@@ -216,13 +216,19 @@ Each resolved run reports one state:
   `HELIART_SOURCE_PATH` environment variables), but no baseline module is
   replaced. Ordinary engine knobs (e.g. `engine.backend`,
   `engine.config.variant`) do not affect qualification.
-- `development-overrides`: one or more baseline-pinned NSX modules are
-  replaced, either through `build.nsx_modules` or through an engine-owned
-  module selector (`engine.config.cmsis_nn_path`, `engine.config.cmsis_nn_ref`,
-  or the `CMSIS_NN_PATH` environment variable, all of which replace
-  `nsx-cmsis-nn`). Overrides are classified by the dependency they replace,
-  not by the config key that carried them, so the `cmsis_nn_ref` form and the
-  `build.nsx_modules` form of the same ref stamp identically.
+- `development-overrides`: an NSX module is replaced, either through any
+  `build.nsx_modules` entry NSX itself resolves (whether or not the baseline
+  pins that module; entries naming an engine-owned module are ignored with a
+  warning and do not count) or through a CMSIS-NN provider selector
+  (`engine.config.cmsis_nn_path`, `engine.config.cmsis_nn_ref`, or the
+  `CMSIS_NN_PATH` environment variable). Overrides are classified by the
+  dependency they replace, not by the config key that carried them: the
+  selector is recorded under the provider module it replaces (`nsx-cmsis-nn`
+  for the helia engines and ExecuTorch's `ns` provider, `arm-cmsis-nn` for
+  ExecuTorch's `arm` provider), so the `cmsis_nn_ref` form and the
+  `build.nsx_modules` form of the same ref stamp identically. Empty selector
+  values are not overrides. The dependency provenance's `overrides` list uses
+  the same module-scoped record for the selector that took effect.
 
 Explicit local paths, branches, and SHAs remain supported. They are never
 silently replaced by the baseline; the state and override names are recorded

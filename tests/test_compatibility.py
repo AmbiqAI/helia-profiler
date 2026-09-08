@@ -200,6 +200,76 @@ def test_cmsis_nn_override_has_same_stamp_as_applied_nsx_module_override(
     assert provenance["module_overrides"] == ["nsx-cmsis-nn"]
 
 
+@pytest.mark.parametrize(
+    ("engine_type", "backend", "module"),
+    [
+        ("helia-rt", None, "nsx-cmsis-nn"),
+        ("helia-aot", None, "nsx-cmsis-nn"),
+        ("executorch", "ns", "nsx-cmsis-nn"),
+        ("executorch", "arm", "arm-cmsis-nn"),
+        # ExecuTorch defaults to the arm provider when no backend is set.
+        ("executorch", None, "arm-cmsis-nn"),
+    ],
+)
+def test_cmsis_nn_selector_names_the_provider_module_it_replaces(
+    tmp_path: Path, engine_type: str, backend: str | None, module: str
+) -> None:
+    model = tmp_path / ("model.pte" if engine_type == "executorch" else "model.tflite")
+    model.write_bytes(b"\x00")
+    config = _config(
+        tmp_path,
+        model={"path": str(model)},
+        engine={"type": engine_type, "backend": backend, "config": {"cmsis_nn_ref": "v9.9.9"}},
+    )
+
+    assert config.compatibility is not None
+    assert config.compatibility.qualification is QualificationState.DEVELOPMENT_OVERRIDES
+    assert config.compatibility.module_overrides == (module,)
+
+
+def test_cmsis_nn_env_fallback_does_not_reach_executorch_arm_provider(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # engines/executorch._provider_module_ref only reads engine.config for the
+    # arm provider, so the environment variable changes nothing there.
+    monkeypatch.setenv("CMSIS_NN_PATH", str(tmp_path / "ns-cmsis-nn"))
+    model = tmp_path / "model.pte"
+    model.write_bytes(b"\x00")
+    config = _config(
+        tmp_path,
+        model={"path": str(model)},
+        engine={"type": "executorch", "backend": "arm"},
+    )
+
+    assert config.compatibility is not None
+    assert config.compatibility.qualification is QualificationState.QUALIFIED
+    assert not config.compatibility.module_overrides
+
+
+@pytest.mark.parametrize(
+    "engine_config",
+    [
+        {"cmsis_nn_path": ""},
+        {"cmsis_nn_ref": ""},
+        {"cmsis_nn_path": None},
+        {"dist_path": ""},
+        {"source_path": ""},
+        {"source": {}},
+    ],
+)
+def test_empty_source_override_values_do_not_change_qualification(
+    tmp_path: Path, engine_config: dict[str, object]
+) -> None:
+    # Every adapter gates on truthiness and falls back to the baseline for an
+    # empty value, so the stamp must not claim an override that never applied.
+    config = _config(tmp_path, engine={"config": engine_config})
+
+    assert config.compatibility is not None
+    assert config.compatibility.qualification is QualificationState.QUALIFIED
+    assert not config.compatibility.module_overrides
+    assert not config.compatibility.engine_overrides
+
+
 def test_engine_backend_selection_does_not_affect_qualification(tmp_path: Path) -> None:
     # Selecting the cmsis_nn TFLM backend still resolves exclusively to
     # baseline-qualified refs (arm-cmsis-nn is a required qualified

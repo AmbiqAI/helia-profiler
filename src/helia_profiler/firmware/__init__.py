@@ -240,9 +240,10 @@ def generate_app(ctx: PipelineContext) -> Path:
 
     # Warn about overrides that didn't match any module in the build. Modules
     # that engine adapters resolve themselves (nsx-helia-rt, nsx-cmsis-nn) are
-    # configured via `engine.config` (dist_path / source_path / source /
-    # cmsis_nn_path — see compatibility's _ENGINE_SOURCE_OVERRIDE_KEYS and
-    # _MODULE_SOURCE_OVERRIDE_KEYS), not
+    # configured via `engine.config` (dist_path / source_path / source for the
+    # engine, cmsis_nn_path / cmsis_nn_ref or the CMSIS_NN_PATH environment
+    # variable for the CMSIS-NN provider — see compatibility's
+    # _ENGINE_SOURCE_OVERRIDE_KEYS / _MODULE_SOURCE_OVERRIDE_KEYS), not
     # `build.nsx_modules` — call that out explicitly. Other extra modules
     # (e.g. TFLM's nsx-tflite-micro / arm-cmsis-nn) have no engine.config
     # equivalent, so they fall back to the generic "unrecognized name" hint.
@@ -252,7 +253,8 @@ def generate_app(ctx: PipelineContext) -> Path:
             log.warning(
                 "build.nsx_modules override '%s' targets an engine-provided module "
                 "and was not applied — configure it via engine.config "
-                "(dist_path / source_path / source / cmsis_nn_path) instead.",
+                "(dist_path / source_path / source / cmsis_nn_path / cmsis_nn_ref, "
+                "or the CMSIS_NN_PATH environment variable) instead.",
                 name,
             )
         else:

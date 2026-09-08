@@ -641,6 +641,8 @@ class ProfileConfig:
                     module_overrides=self.build.nsx_modules,
                     engine_config=self.engine.config,
                     engine_config_path=self.engine.config_path,
+                    engine_type=self.engine.type.value,
+                    engine_backend=self.engine.backend,
                 ),
             )
 

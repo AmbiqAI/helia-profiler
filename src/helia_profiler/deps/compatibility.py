@@ -178,8 +178,8 @@ class CompatibilityResolution:
     # NSX *module* names, not project names — the NSX registry projects a
     # module belongs to (see baseline.project() vs baseline.module()) may
     # aggregate several modules, but an override here always targets one
-    # module by name. Includes modules replaced through engine.config
-    # selectors (cmsis_nn_path / cmsis_nn_ref / CMSIS_NN_PATH -> nsx-cmsis-nn),
+    # module by name. Includes the CMSIS-NN provider module replaced through
+    # engine.config selectors (cmsis_nn_path / cmsis_nn_ref / CMSIS_NN_PATH),
     # classified by what they replace rather than by the key that carried
     # them. Named distinctly from
     # firmware/project.py's unrelated `_resolve_project_overrides()` (which
@@ -233,7 +233,65 @@ def load_compatibility_baseline(path: Path | None = None) -> CompatibilityBaseli
 # Other keys (e.g. "variant", "linker_profile", "aot_args") are ordinary
 # build knobs and do not deviate from the qualified engine baseline.
 _ENGINE_SOURCE_OVERRIDE_KEYS = frozenset({"dist_path", "source_path", "source"})
+# engine.config keys that replace a baseline-pinned NSX *module* (the CMSIS-NN
+# provider) rather than the engine itself — see select_cmsis_nn_override().
 _MODULE_SOURCE_OVERRIDE_KEYS = frozenset({"cmsis_nn_path", "cmsis_nn_ref"})
+
+# The two NSX modules a CMSIS-NN selector can replace.
+CMSIS_NN_PROVIDER_MODULES = frozenset({"arm-cmsis-nn", "nsx-cmsis-nn"})
+
+
+@dataclass(frozen=True)
+class CmsisNnOverride:
+    """One effective CMSIS-NN provider replacement and the selector that carried it."""
+
+    module: str  # NSX module replaced ("arm-cmsis-nn" or "nsx-cmsis-nn")
+    mode: str  # "path" or "ref"
+    selector: (
+        str  # "engine.config.cmsis_nn_path" / "engine.config.cmsis_nn_ref" / "env.CMSIS_NN_PATH"
+    )
+    requested: Any  # the raw configured value; callers validate its type
+
+
+def cmsis_nn_provider_module(engine_type: str, engine_backend: str | None) -> str:
+    """The CMSIS-NN provider module an engine builds, from config alone.
+
+    The helia engines always build AmbiqAI's ``nsx-cmsis-nn``. ExecuTorch
+    declares exactly one provider: ``engine.backend`` ``"ns"`` selects
+    ``nsx-cmsis-nn``, anything else (including an unset backend, ExecuTorch's
+    ``arm`` default) selects ``arm-cmsis-nn``. A PTE sidecar can still flip an
+    unset backend to ``ns`` at prepare-engine time; the dependency
+    provenance, which sees the prepared artifacts, is authoritative there.
+    Engines that never consume the selectors (TFLM) still get a name so a
+    stray selector stamps conservatively rather than being ignored.
+    """
+    if engine_type == "executorch" and engine_backend != "ns":
+        return "arm-cmsis-nn"
+    return "nsx-cmsis-nn"
+
+
+def select_cmsis_nn_override(engine_config: Any, *, provider_module: str) -> CmsisNnOverride | None:
+    """Return the CMSIS-NN selector that actually takes effect, if any.
+
+    Mirrors the adapters' precedence (``engines/cmsis_nn.py``): an explicit
+    ``cmsis_nn_path`` wins, then ``cmsis_nn_ref``, then the ``CMSIS_NN_PATH``
+    environment fallback — which only reaches ``nsx-cmsis-nn`` builds;
+    ExecuTorch's ``arm`` provider never reads it. Empty values are not
+    overrides: every adapter gates on truthiness and falls back to the
+    baseline ref, so they must not change the qualification stamp either.
+    """
+    config = engine_config if isinstance(engine_config, Mapping) else {}
+    path = config.get("cmsis_nn_path")
+    if path:
+        return CmsisNnOverride(provider_module, "path", "engine.config.cmsis_nn_path", path)
+    ref = config.get("cmsis_nn_ref")
+    if ref:
+        return CmsisNnOverride(provider_module, "ref", "engine.config.cmsis_nn_ref", ref)
+    env_path = os.environ.get("CMSIS_NN_PATH")
+    if env_path and provider_module == "nsx-cmsis-nn":
+        return CmsisNnOverride(provider_module, "path", "env.CMSIS_NN_PATH", env_path)
+    return None
+
 
 # NSX module names that engine adapters resolve themselves (via
 # engine.config's dist_path/source_path/source/cmsis_nn_path/cmsis_nn_ref, not build.nsx_modules).
@@ -250,8 +308,16 @@ def resolve_compatibility(
     module_overrides: Mapping[str, Any],
     engine_config: Any,
     engine_config_path: Path | None,
+    engine_type: str,
+    engine_backend: str | None,
 ) -> CompatibilityResolution:
-    """Classify explicit module and engine overrides without mutating config."""
+    """Classify explicit module and engine overrides without mutating config.
+
+    Overrides are bucketed by what they replace, not by the key that carried
+    them: a CMSIS-NN selector replaces a baseline-pinned module, so it lands
+    in ``module_overrides`` under the provider module's name and stamps
+    ``development-overrides`` exactly like the ``build.nsx_modules`` form.
+    """
     modules = {str(name) for name in module_overrides if str(name) not in ENGINE_OWNED_MODULE_NAMES}
     engines: set[str] = set()
     if engine_config_path is not None:
@@ -259,15 +325,19 @@ def resolve_compatibility(
         # engine config file conservatively as a possible source override.
         engines.add("engine.config_path")
     if isinstance(engine_config, Mapping):
-        if _MODULE_SOURCE_OVERRIDE_KEYS.intersection(engine_config):
-            modules.add("nsx-cmsis-nn")
+        # Empty values are not overrides: the adapters gate on truthiness and
+        # fall back to the baseline, so the stamp must too.
         engines.update(
             f"engine.config.{key}"
             for key in sorted(engine_config)
-            if key in _ENGINE_SOURCE_OVERRIDE_KEYS
+            if key in _ENGINE_SOURCE_OVERRIDE_KEYS and engine_config[key]
         )
-    if os.environ.get("CMSIS_NN_PATH"):
-        modules.add("nsx-cmsis-nn")
+    cmsis_nn = select_cmsis_nn_override(
+        engine_config,
+        provider_module=cmsis_nn_provider_module(engine_type, engine_backend),
+    )
+    if cmsis_nn is not None:
+        modules.add(cmsis_nn.module)
     for variable in ("HELIART_DIST_PATH", "HELIART_SOURCE_PATH"):
         if os.environ.get(variable):
             engines.add(f"env.{variable}")

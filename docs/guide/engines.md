@@ -96,10 +96,10 @@ the runtime's idempotent bridge prevents duplicate targets. The `ns` provider
 uses PR #1's private compatibility layer for the fork's `weight_sum_ctx` ABI
 and resolves `nsx-cmsis-nn` at the baseline's qualified ref like the helia
 engines (v7.31.0, verified on Apollo510).
-Set `engine.config.cmsis_nn_path` or `cmsis_nn_ref` to override the selected
-provider while preserving the same ordered module contract. These overrides,
-including `CMSIS_NN_PATH`, replace a baseline module and stamp
-`development-overrides`.
+Set `engine.config.cmsis_nn_path` or `engine.config.cmsis_nn_ref` to override
+the selected provider while preserving the same ordered module contract. These
+overrides, including the `CMSIS_NN_PATH` environment variable, replace a
+baseline module and stamp `development-overrides`.
 
 ### NS Tier-1 kernels (`ns_ops`)
 

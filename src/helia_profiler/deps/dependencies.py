@@ -21,7 +21,6 @@ from neuralspotx.nsx_lock import LOCK_SCHEMA_VERSION, hash_manifest, read_lock
 from . import nsx as nsx_cli
 from .._version import __version__
 from ..errors import BuildError, DependencyError, LockError, VersionError
-from ..engines import EngineType
 from ..results.dependencies import (
     ContentDigest,
     DependencyLockMode,
@@ -34,7 +33,12 @@ from ..results.dependencies import (
     DependencyWorkspace,
 )
 from ..results.serde import sha256_file
-from .compatibility import QualificationState
+from .compatibility import (
+    CMSIS_NN_PROVIDER_MODULES,
+    QualificationState,
+    cmsis_nn_provider_module,
+    select_cmsis_nn_override,
+)
 from .sync import (
     _offline_materialization_error,
     _run_frozen_sync_with_repair,
@@ -139,6 +143,21 @@ def _registry_digest() -> ContentDigest:
     return _digest_bytes(_canonical_bytes(nsx_cli.load_registry()))
 
 
+def _cmsis_nn_provider_module(ctx: PipelineContext) -> str:
+    """The CMSIS-NN provider module this build declares.
+
+    Prepared engine artifacts are authoritative (ExecuTorch picks its provider
+    from ``engine.backend`` *or* the PTE sidecar); before they exist, fall back
+    to the config-only answer the qualification stamp uses.
+    """
+    artifacts = ctx.engine_artifacts
+    if artifacts is not None:
+        for module in artifacts.extra_modules:
+            if module.name in CMSIS_NN_PROVIDER_MODULES:
+                return module.name
+    return cmsis_nn_provider_module(ctx.config.engine.type.value, ctx.config.engine.backend)
+
+
 def _override_inputs(ctx: PipelineContext) -> tuple[dict[str, Any], tuple[DependencyOverride, ...]]:
     inputs: dict[str, Any] = {}
     provenance: list[DependencyOverride] = []
@@ -161,7 +180,7 @@ def _override_inputs(ctx: PipelineContext) -> tuple[dict[str, Any], tuple[Depend
             provenance.append(DependencyOverride("module", name, "version", override.version))
 
     engine_config = ctx.config.engine.config
-    for key in ("dist_path", "source_path", "cmsis_nn_path"):
+    for key in ("dist_path", "source_path"):
         raw = engine_config.get(key)
         if raw is None:
             continue
@@ -172,11 +191,36 @@ def _override_inputs(ctx: PipelineContext) -> tuple[dict[str, Any], tuple[Depend
         requested = normalize_path(raw)
         digest = _digest_path(Path(raw).expanduser())
         provenance.append(DependencyOverride("engine", key, "path", requested, digest))
+    # A CMSIS-NN selector replaces a baseline-pinned *module*, so it is
+    # recorded under the provider module it replaces — the same shape as the
+    # equivalent build.nsx_modules entry — not under the engine.config key
+    # that carried it. Only the selector that takes effect is recorded.
     cmsis_nn_ref = engine_config.get("cmsis_nn_ref")
-    if cmsis_nn_ref is not None:
-        if not isinstance(cmsis_nn_ref, str) or not cmsis_nn_ref.strip():
-            raise DependencyError("engine.config.cmsis_nn_ref must be a non-empty git ref.")
-        provenance.append(DependencyOverride("engine", "cmsis_nn_ref", "ref", cmsis_nn_ref))
+    if cmsis_nn_ref is not None and (not isinstance(cmsis_nn_ref, str) or not cmsis_nn_ref.strip()):
+        raise DependencyError("engine.config.cmsis_nn_ref must be a non-empty git ref.")
+    cmsis_nn = select_cmsis_nn_override(
+        engine_config, provider_module=_cmsis_nn_provider_module(ctx)
+    )
+    if cmsis_nn is not None:
+        if cmsis_nn.mode == "path":
+            if not isinstance(cmsis_nn.requested, (str, Path)):
+                raise DependencyError(
+                    f"{cmsis_nn.selector} must be a filesystem path for dependency provenance."
+                )
+            path = Path(cmsis_nn.requested).expanduser()
+            provenance.append(
+                DependencyOverride(
+                    "module",
+                    cmsis_nn.module,
+                    "path",
+                    normalize_path(cmsis_nn.requested),
+                    _digest_path(path),
+                )
+            )
+        else:
+            provenance.append(
+                DependencyOverride("module", cmsis_nn.module, "ref", str(cmsis_nn.requested))
+            )
     source = engine_config.get("source")
     if source is not None:
         if not isinstance(source, dict):
@@ -197,7 +241,7 @@ def _override_inputs(ctx: PipelineContext) -> tuple[dict[str, Any], tuple[Depend
                 f"{repository}@{reference}",
             )
         )
-    for variable in ("HELIART_DIST_PATH", "HELIART_SOURCE_PATH", "CMSIS_NN_PATH"):
+    for variable in ("HELIART_DIST_PATH", "HELIART_SOURCE_PATH"):
         raw = os.environ.get(variable)
         if raw:
             path = Path(raw).expanduser()
@@ -600,27 +644,23 @@ def _verify_baseline_resolution(ctx: PipelineContext, provenance: DependencyProv
     engine_projects = {engine.name for engine in baseline.engines if engine.ref is not None}
     module_projects = {module.name: module.project for module in provenance.modules}
     skipped: set[str] = set()
+    baseline_module_projects = {module.name: module.project for module in baseline.modules}
     for override in provenance.overrides:
         if override.scope == "project":
             skipped.add(override.name)
         elif override.scope == "module":
+            # The lock names the module the override targeted. The CMSIS-NN
+            # provider is declared by the engine adapter and may be locked
+            # under another name, so map it through the baseline instead.
             project = module_projects.get(override.name)
+            if project is None and override.name in CMSIS_NN_PROVIDER_MODULES:
+                project = baseline_module_projects.get(override.name)
             if project is not None:
                 skipped.add(project)
         elif override.scope == "engine":
             # Engine source overrides redirect engine-owned projects; their
             # divergence is already classified by qualification state.
             skipped |= engine_projects
-            if override.name in {"cmsis_nn_path", "cmsis_nn_ref"}:
-                provider_projects = {"ns-cmsis-nn"}
-                if ctx.config.engine.type == EngineType.EXECUTORCH:
-                    artifacts = ctx.engine_artifacts
-                    provider_projects = {
-                        module.project
-                        for module in (artifacts.extra_modules if artifacts is not None else [])
-                        if module.name in {"arm-cmsis-nn", "nsx-cmsis-nn"}
-                    }
-                skipped.update(project for project in provider_projects if project is not None)
     for module in provenance.modules:
         expected = pinned.get(module.project)
         if (
