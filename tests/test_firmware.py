@@ -1825,7 +1825,7 @@ class TestNsxModuleOverrides:
 
         manifest = yaml.safe_load((app_dir / "nsx.yml").read_text())
         projects = manifest["module_registry"]["projects"]
-        assert projects["nsx-ambiq-sdk"]["revision"] == "a9f4ec25a162f6f3700623feb691423bb5a51132"
+        assert projects["nsx-ambiq-sdk"]["revision"] == "aefce2ca858795e783c76726ebe7d14d9d4bde7c"
         assert projects["neuralspotx"]["revision"] == "2dbe12a2799fd8c3df85f1a103b0adca340c901f"
 
     def test_preview_board_defaults_to_preview_channel(self, tmp_path: Path, fake_dist: Path):
@@ -2053,7 +2053,7 @@ class TestNsxModuleOverrides:
         registry = nsx_yml["module_registry"]
         assert (
             registry["projects"]["nsx-ambiq-sdk"]["revision"]
-            == "a9f4ec25a162f6f3700623feb691423bb5a51132"
+            == "aefce2ca858795e783c76726ebe7d14d9d4bde7c"
         )
         assert (
             registry["projects"]["neuralspotx"]["revision"]
@@ -2256,3 +2256,59 @@ print(json.dumps(list(overrides)))
     # Vacuity guard (#175): an empty resolver result would pass
     # the equality trivially while asserting nothing.
     assert len(json.loads(orders[0])) >= 2
+
+
+class TestResolveProjectOverrides:
+    """Baseline modernization must not clobber starter-profile branch pins."""
+
+    @staticmethod
+    def _specs():
+        from helia_profiler.firmware.project import NsxModuleSpec
+
+        return [NsxModuleSpec("nsx-npu", "nsx-ambiq-sdk")]
+
+    @staticmethod
+    def _baseline():
+        from helia_profiler.deps.compatibility import load_compatibility_baseline
+
+        return load_compatibility_baseline()
+
+    def test_baseline_ref_applied_without_profile_pin(self):
+        from helia_profiler.firmware.project import _resolve_project_overrides
+
+        baseline = self._baseline()
+        overrides = _resolve_project_overrides(self._specs(), {}, baseline, profile={})
+        assert overrides["nsx-ambiq-sdk"] == ("ref", baseline.project("nsx-ambiq-sdk").ref)
+
+    def test_profile_branch_pin_suppresses_baseline_ref(self):
+        from helia_profiler.firmware.project import _resolve_project_overrides
+
+        profile = {
+            "project_overrides": {
+                "nsx-ambiq-sdk": {"revision": "feat/nsx-power-atomiq110"}
+            }
+        }
+        overrides = _resolve_project_overrides(self._specs(), {}, self._baseline(), profile=profile)
+        assert "nsx-ambiq-sdk" not in overrides
+
+    def test_profile_release_tag_pin_still_modernized_to_baseline(self):
+        from helia_profiler.firmware.project import _resolve_project_overrides
+
+        baseline = self._baseline()
+        profile = {"project_overrides": {"nsx-ambiq-sdk": {"revision": "r5.3"}}}
+        overrides = _resolve_project_overrides(self._specs(), {}, baseline, profile=profile)
+        assert overrides["nsx-ambiq-sdk"] == ("ref", baseline.project("nsx-ambiq-sdk").ref)
+
+    def test_user_override_outranks_profile_pin(self):
+        from types import SimpleNamespace
+
+        from helia_profiler.firmware.project import _resolve_project_overrides
+
+        profile = {
+            "project_overrides": {
+                "nsx-ambiq-sdk": {"revision": "feat/nsx-power-atomiq110"}
+            }
+        }
+        user = {"nsx-npu": SimpleNamespace(path=None, ref="my-branch", version=None)}
+        overrides = _resolve_project_overrides(self._specs(), user, self._baseline(), profile=profile)
+        assert overrides["nsx-ambiq-sdk"] == ("ref", "my-branch")

@@ -13,7 +13,7 @@ The current baseline is `hpx-neuralspotx-0.8.1-2026-09`:
 | Identity | Qualified reference |
 | --- | --- |
 | `neuralspotx` package | `0.8.1`, wheel SHA-256 `7aac6f1b…9094`, tag peeled to `2dbe12a2…901f` |
-| `nsx-ambiq-sdk` | `v5.2.24`, peeled commit `a9f4ec25…1132` |
+| `nsx-ambiq-sdk` | `v5.2.25`, peeled commit `aefce2ca…de7c` |
 | `nsx-pmu-armv8m` | `5725c065…c88` |
 | `nsx-tflite-micro` | `7afcf2b4…333` |
 | `arm-cmsis-nn` | `6d21a6f8…f7c` |
@@ -30,9 +30,15 @@ board descriptor fix (AmbiqAI/neuralspotx#250, closing hpx#263): 0.7.17's
 `apollo4l_evb` and `apollo4l_blue_evb` descriptors cleared `NSX_SYSTEM_SOURCE`,
 so the startup library was built without the CMSIS system file and every
 profiler firmware for those boards failed to link with `SystemCoreClock`
-undefined. Only the tool row moves: 0.8.1's packaged registry resolves each
-baseline project at the same tag as 0.7.17's (nsx-ambiq-sdk `v5.2.24`,
-nsx-pmu-armv8m `v0.2.0`, nsx-tflite-micro and arm-cmsis-nn `v0.1.0`,
+undefined. Besides the tool row, this revision moves `nsx-ambiq-sdk` to
+`v5.2.25` for the Ethos-U work: v5.2.25 adds the `nsx-npu` module and the
+`AM_PART_ATOMIQ110` branch in nsx-core's `nsx_mem.h` (v5.2.24's placement
+macros expand to nothing on that part, so SRAM arena placement would be
+silently inert). 0.8.1's packaged registry itself still resolves `nsx-core`
+at `v5.2.24` module-level — only `nsx-npu` is overridden to `v5.2.25`
+upstream — which is why the baseline pins the SDK project and HPX re-points
+every sdk-owned app module to it. The remaining projects stay at 0.7.17's
+tags (nsx-pmu-armv8m `v0.2.0`, nsx-tflite-micro and arm-cmsis-nn `v0.1.0`,
 nsx-sensors `v0.3.0`, and still `ns-cmsis-nn v7.29.2` under the hpx-declared
 `v7.32.0`), each re-peeled to the commit already recorded. Two 0.8.x changes
 are worth knowing: the Python floor rose to 3.11 (HPX already requires it),
@@ -170,10 +176,14 @@ in-flight atomiq110 work (PR #98) will opt into it via
 for the flag mapping. Minimum supported version stays 1.16.0 (HPX relies
 on nothing 1.17-only).
 
-neuralSPOT-X 0.7.17 fixes the J-Link flash-verification false negative that
+neuralSPOT-X 0.8.0 added the `atomiq110_fpga_turbo` starter profile
+(retained in 0.8.1), and `nsx-ambiq-sdk` v5.2.25 adds the `nsx-npu` module
+(Ethos-U core driver and bring-up) that both engines' `ethos_u` backend
+declares — the two reasons this revision moved off v5.2.24. 0.7.17 had fixed the J-Link
+flash-verification false negative that
 aborted idempotent re-flashes of an unchanged image, and enforces
-`ExitOnError 1` in generated flash recipes (AmbiqAI/neuralspotx#220). Its
-packaged registry resolves `ns-cmsis-nn` at `v7.29.2`; that promotion
+`ExitOnError 1` in generated flash recipes (AmbiqAI/neuralspotx#220). The
+packaged registry still resolves `ns-cmsis-nn` at `v7.29.2`; that promotion
 advanced the qualified ref in lockstep, and the 2026-09 revision then moved
 `nsx-cmsis-nn` into the hpx-declared tier at `v7.31.0`.
 

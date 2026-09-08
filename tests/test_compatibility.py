@@ -41,7 +41,7 @@ def test_default_baseline_has_exact_qualified_refs(tmp_path: Path) -> None:
         == "7aac6f1b2e89ebf41dfe087c7588e0db11d65e8a11cac2cda03f6d7c510a9094"
     )
     assert baseline.project("neuralspotx").ref == "2dbe12a2799fd8c3df85f1a103b0adca340c901f"
-    assert baseline.project("nsx-ambiq-sdk").ref == "a9f4ec25a162f6f3700623feb691423bb5a51132"
+    assert baseline.project("nsx-ambiq-sdk").ref == "aefce2ca858795e783c76726ebe7d14d9d4bde7c"
     assert baseline.project("nsx-pmu-armv8m").ref == "5725c065a0c3603132f1064ee2684d1fa8587c88"
     assert baseline.project("nsx-tflite-micro").ref == "7afcf2b4170e039caf4c49f91e2c45d5869be333"
     assert baseline.project("arm-cmsis-nn").ref == "6d21a6f821fb72541173a6c4d05d83329fa74f7c"
@@ -60,7 +60,7 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
 
     assert {project.name: project.ref for project in baseline.projects} == {
         "neuralspotx": "2dbe12a2799fd8c3df85f1a103b0adca340c901f",
-        "nsx-ambiq-sdk": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+        "nsx-ambiq-sdk": "aefce2ca858795e783c76726ebe7d14d9d4bde7c",
         "nsx-pmu-armv8m": "5725c065a0c3603132f1064ee2684d1fa8587c88",
         "nsx-tflite-micro": "7afcf2b4170e039caf4c49f91e2c45d5869be333",
         "arm-cmsis-nn": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",
@@ -79,7 +79,7 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "nsx-sensors": "c219a2bc98c62f96819fae20ab6c8911fcea3e25",
     }
     assert {module.name: module.ref for module in baseline.modules} == {
-        "nsx-ambiq-bsp": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+        "nsx-ambiq-bsp": "aefce2ca858795e783c76726ebe7d14d9d4bde7c",
         "nsx-pmu-armv8m": "5725c065a0c3603132f1064ee2684d1fa8587c88",
         "nsx-tflite-micro": "7afcf2b4170e039caf4c49f91e2c45d5869be333",
         "arm-cmsis-nn": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",

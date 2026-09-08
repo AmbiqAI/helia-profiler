@@ -24,7 +24,13 @@ def test_groups_exist():
 
 
 def test_catalog_matches_upstream_export_size():
-    assert len(list_counters()) == 70
+    # 70 ARM PMU counters from the upstream export + 8 Ethos-U NPU events.
+    counters = list_counters()
+    arm = [c for c in counters if c.name.startswith("ARM_PMU_")]
+    npu = [c for c in counters if c.name.startswith("ETHOSU_PMU_")]
+    assert len(arm) == 70
+    assert len(npu) == 8
+    assert len(counters) == 78
 
 
 def test_catalog_includes_noncontiguous_unaligned_mve_counter():
@@ -109,3 +115,30 @@ def test_supported_groups_for_domains_filters_unknown_domains():
 def test_validate_group_selection_rejects_unsupported_groups():
     with pytest.raises(ValueError, match="not supported"):
         validate_group_selection({"mve": "default"}, supported_groups=("cpu",))
+
+
+def test_ethos_npu_group_registered():
+    counters = resolve_counters({"ethos_npu": "all"})
+    assert len(counters) == 8  # U85 catalogue
+    for c in counters:
+        assert c.group == "ethos_npu"
+        assert c.name.startswith("ETHOSU_PMU_")
+
+
+def test_ethos_npu_default_fits_one_pass():
+    counters = resolve_counters({"ethos_npu": "default"})
+    passes = plan_passes(counters)
+    assert len(passes) == 1
+    assert passes[0].group == "ethos_npu"
+    names = [c.name for c in passes[0].counters]
+    assert "ETHOSU_PMU_CYCLE" in names
+    assert "ETHOSU_PMU_NPU_ACTIVE" in names
+
+
+def test_ethos_npu_gated_by_domain():
+    assert "ethos_npu" in supported_groups_for_domains(("cpu", "ethos_npu"))
+    assert "ethos_npu" not in supported_groups_for_domains(("cpu", "memory", "mve"))
+    with pytest.raises(ValueError, match="not supported"):
+        validate_group_selection(
+            {"ethos_npu": "default"}, supported_groups=("cpu", "memory", "mve")
+        )

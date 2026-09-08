@@ -130,6 +130,7 @@ def build_resolver_plan(
     engine_type: EngineType,
     engine_config: dict[str, object],
     model_analysis: ModelAnalysis | None,
+    ethos_u: bool = False,
 ) -> ResolverPlan:
     """Return the selected resolver strategy for generated firmware.
 
@@ -138,7 +139,12 @@ def build_resolver_plan(
     - ``engine.config.resolver_ops: auto`` -> builtins observed in model analysis
 
     All other engines keep the broad allowlist behavior.
+
+    ``ethos_u`` appends the Ethos-U custom-op kernel registration (heliaRT's
+    ``AddEthosU()``) so Vela-compiled graphs dispatch to the NPU.
     """
+
+    npu_registrations = ("r.AddEthosU();",) if ethos_u else ()
 
     default_mode = "auto" if engine_type is EngineType.HELIA_RT else "all"
     mode = str(engine_config.get("resolver_ops", default_mode)).strip().lower()
@@ -173,7 +179,7 @@ def build_resolver_plan(
                     ", ".join(unsupported),
                 )
             if registrations:
-                return ResolverPlan(mode="auto", registrations=registrations)
+                return ResolverPlan(mode="auto", registrations=registrations + npu_registrations)
             log.warning(
                 "Auto resolver selection produced no supported registrations; "
                 "falling back to broad resolver registration"
@@ -181,5 +187,5 @@ def build_resolver_plan(
 
     return ResolverPlan(
         mode="all",
-        registrations=tuple(code for _, code in _ALL_REGISTRATIONS),
+        registrations=tuple(code for _, code in _ALL_REGISTRATIONS) + npu_registrations,
     )

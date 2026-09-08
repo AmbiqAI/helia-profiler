@@ -264,11 +264,19 @@ class HeliaAotArtifacts(EngineArtifacts):
     #: be extracted from the codegen context.
     aot_op_manifest: list[dict[str, Any]] | None = None
 
+    #: heliaAOT's ``engine.backend`` selector (e.g. ``"ethos_u"``), or
+    #: ``None`` for the default CMSIS-NN-only codegen path.
+    engine_backend: str | None = None
+
     _PINNED_ENGINE_TYPE: ClassVar[EngineType | None] = EngineType.HELIA_AOT
 
     @property
     def resolved_version(self) -> str | None:
         return self.helia_aot_version
+
+    @property
+    def resolved_backend(self) -> str | None:
+        return self.engine_backend
 
 
 @dataclass(frozen=True, kw_only=True)
