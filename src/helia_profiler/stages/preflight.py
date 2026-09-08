@@ -86,12 +86,12 @@ def _check_model(path: Path, engine: EngineType) -> None:
     if not path.exists():
         raise ConfigError(
             f"Model file not found: {path}",
-            hint="Check the path in model.path (CLI --model / YAML).",
+            hint="Check the positional MODEL argument on the CLI or model.path in YAML.",
         )
     if not path.is_file():
         raise ConfigError(
             f"Model path is not a regular file: {path}",
-            hint="model.path must point to a .tflite flatbuffer, not a directory.",
+            hint="model.path must point to a model file (.tflite or .pte), not a directory.",
         )
     size = path.stat().st_size
     if size == 0:

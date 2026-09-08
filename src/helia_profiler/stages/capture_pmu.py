@@ -34,7 +34,10 @@ class CapturePmuStage:
         except Exception as exc:
             raise CaptureError(
                 f"Capture failed: {exc}",
-                hint="Check serial/SWO connection to the target board.",
+                hint=(
+                    "Check the configured transport connection "
+                    "(RTT, USB CDC, UART, or SWO) to the target board."
+                ),
             ) from exc
 
         ctx.publish_profile_result(pmu_result)

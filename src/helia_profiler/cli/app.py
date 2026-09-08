@@ -271,7 +271,7 @@ def profile_command(
         Optional[str],
         typer.Option(
             "--nsx-channel",
-            help="NSX channel for module resolution (default: stable).",
+            help="NSX channel for module resolution (default: the board's registered channel).",
             rich_help_panel=G_BUILD,
         ),
     ] = None,
@@ -386,7 +386,7 @@ def profile_command(
         Optional[int],
         typer.Option(
             "--power-duration",
-            help="Power capture seconds (default: 30)",
+            help="Power capture seconds (default: auto-tuned from profile timing)",
             rich_help_panel=G_POWER,
         ),
     ] = None,

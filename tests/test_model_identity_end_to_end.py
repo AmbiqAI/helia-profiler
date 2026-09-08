@@ -32,7 +32,7 @@ from helia_profiler.wire import HPX_END_SENTINEL, HPX_START_SENTINEL
 SENT_BYTES = 53_744
 
 
-def _context(tmp_path: Path, wire: str | None) -> PipelineContext:
+def _context(tmp_path: Path, wire: str | None, sent_bytes: int = SENT_BYTES) -> PipelineContext:
     config = load_config(
         None,
         {
@@ -46,7 +46,7 @@ def _context(tmp_path: Path, wire: str | None) -> PipelineContext:
         hpx_version="0.1.0",
         run_id="run-1",
         timestamp="2026-09-08T00:00:00+00:00",
-        model=ModelInfo(name="kws.tflite", size_bytes=SENT_BYTES, sha256="a" * 64),
+        model=ModelInfo(name="kws.tflite", size_bytes=sent_bytes, sha256="a" * 64),
     )
     lines = [HPX_START_SENTINEL]
     if wire is not None:
@@ -103,23 +103,31 @@ def test_a_malformed_size_still_publishes_and_renders(wire: str, tmp_path: Path)
     # search would pass while the row itself silently interpreted the markup.
     row = next(line for line in rendered.splitlines() if "unavailable" in line)
     assert wire in row
+    assert "Validity: DEGRADED" in rendered
 
 
-def test_a_matching_size_publishes_the_number_and_stays_clean(tmp_path: Path):
-    summary, rendered = _publish_and_render(_context(tmp_path, str(SENT_BYTES)), tmp_path)
+@pytest.mark.parametrize("size", [0, 1, SENT_BYTES])
+def test_a_matching_size_publishes_the_number_and_stays_clean(tmp_path: Path, size: int):
+    summary, rendered = _publish_and_render(_context(tmp_path, str(size), size), tmp_path)
 
-    assert summary["memory"]["model_size"] == SENT_BYTES
+    assert summary["memory"]["model_size"] == size
     codes = [issue["code"] for issue in summary["issues"]]
     assert IssueCode.FIRMWARE_MODEL_IDENTITY_UNVERIFIABLE not in codes
     assert IssueCode.FIRMWARE_MODEL_MISMATCH not in codes
     assert "unavailable" not in rendered
+    assert f"Model    {size:>8,} bytes" in rendered
+    assert "Validity: VALID" in rendered
 
 
-def test_a_mismatched_size_publishes_the_error_and_the_number(tmp_path: Path):
-    summary, _ = _publish_and_render(_context(tmp_path, "1244"), tmp_path)
+@pytest.mark.parametrize("size", [0, 1244])
+def test_a_mismatched_size_publishes_the_error_and_the_number(tmp_path: Path, size: int):
+    summary, rendered = _publish_and_render(_context(tmp_path, str(size)), tmp_path)
 
-    assert summary["memory"]["model_size"] == 1244
+    assert summary["memory"]["model_size"] == size
     assert IssueCode.FIRMWARE_MODEL_MISMATCH in [issue["code"] for issue in summary["issues"]]
+    assert f"Model    {size:>8,} bytes" in rendered
+    assert IssueCode.FIRMWARE_MODEL_MISMATCH in rendered
+    assert "Validity: INVALID" in rendered
 
 
 def test_an_absent_size_publishes_nothing_about_identity(tmp_path: Path):
@@ -130,3 +138,4 @@ def test_an_absent_size_publishes_nothing_about_identity(tmp_path: Path):
     assert IssueCode.FIRMWARE_MODEL_MISMATCH not in codes
     assert "model_size" not in summary.get("memory", {})
     assert "unavailable" not in rendered
+    assert "Model    " not in rendered

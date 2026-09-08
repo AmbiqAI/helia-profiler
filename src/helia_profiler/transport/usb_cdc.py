@@ -242,7 +242,8 @@ def _find_cdc_port(
         f"No USB CDC device found within {timeout_s}s",
         hint=(
             "Ensure the board is connected via USB and the firmware "
-            "initialises nsx_usb.  Check 'ls /dev/tty.usbmodem*'."
+            "initialises nsx_usb.  Check 'hpx ports list --all', "
+            "'ls /dev/tty.usbmodem*' (macOS), or 'ls /dev/ttyACM*' (Linux)."
         ),
     )
 

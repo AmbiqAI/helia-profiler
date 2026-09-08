@@ -90,7 +90,10 @@ opens that serial port and reads the same HPX protocol stream.
 
 ### How heliaPROFILER uses it
 
-- Auto-detects the target serial port by VID/PID.
+- Matches the firmware's `HPX-<jlink_serial>` USB serial-number marker when
+  available. Otherwise, falls back to `/dev/tty.usbmodem*` (macOS) and
+  `/dev/ttyACM*` (Linux), excluding SEGGER/J-Link ports and devices with a
+  different `HPX-*` marker. Ambiguous candidates require an explicit `--usb-port`.
 - Reads through `pyserial`, line-buffered.
 - The firmware **pauses USB polling** (Timer 3) around each PMU
   measurement window so USB interrupts don't pollute the counters.
@@ -153,13 +156,16 @@ For 95% of runs, the default `rtt` is correct. Switch to `usb_cdc` when:
 ??? failure "RTT capture hangs / no data after flash"
     Most often: the firmware is wedged before reaching the HPX protocol.
     Try `--verbose` to see where it stopped. If JLinkExe reports
-    `Cannot connect to RTT control block`, run `hpx doctor` to check
-    J-Link version (need >= V7.80).
+    `Cannot connect to RTT control block`, run `hpx doctor` to check that
+    J-Link Commander is available. Doctor does not check its version;
+    verify the installed version separately and update the SEGGER J-Link
+    software if needed.
 
 ??? failure "USB CDC: serial port not found"
     Replug the **target USB** cable (not just the J-Link). On Linux you
-    may need udev rules for the device VID/PID. The profiler logs the
-    expected VID/PID on `--verbose`.
+    may need udev rules for the device VID/PID. Use `hpx ports list --all --json`
+    to inspect the port's `hwid` (including VID/PID when available); `--verbose`
+    reports marker matching and port discovery, not an expected VID/PID.
 
 ??? failure "USB CDC numbers look noisier than RTT"
     The firmware pauses Timer 3 (USB poll) around PMU windows, but on
