@@ -36,11 +36,11 @@ def _cfg(backend: str | None = None):
 
 
 class TestBoardMap:
-    def test_atomiq110_maps_to_at110(self):
-        assert _BOARD_TO_AOT_PLATFORM["atomiq110_fpga_turbo"] == "at110"
+    def test_atomiq110_maps_to_atomiq110(self):
+        assert _BOARD_TO_AOT_PLATFORM["atomiq110_fpga_turbo"] == "atomiq110"
 
     def test_resolve_platform_for_atomiq110(self):
-        assert _resolve_aot_platform(_cfg()) == "at110"
+        assert _resolve_aot_platform(_cfg()) == "atomiq110"
 
 
 class TestExtraModules:
