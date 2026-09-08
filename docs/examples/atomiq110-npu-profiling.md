@@ -116,7 +116,5 @@ executes as one atomic NPU command stream. Consequences:
 
 ## See also
 
-- [Atomiq110 FPGA Bring-up](atomiq110-fpga-bringup.md) — CPU-only
-  bring-up flow and probe/port preflight.
 - [Configuration Reference](../reference/configuration.md) — `pmu_counters`
   groups and `engine.backend`.

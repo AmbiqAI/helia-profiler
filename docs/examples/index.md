@@ -77,14 +77,6 @@ Every recipe follows the same shape:
 
     [:octicons-arrow-right-24: Read](toolchain-comparison.md)
 
--   :material-chip:{ .lg .middle } __Atomiq110 FPGA Bring-up (No Power)__
-
-    ---
-
-    Validate build/flash/capture and per-layer PMU output on `atomiq110_fpga_turbo`.
-
-    [:octicons-arrow-right-24: Read](atomiq110-fpga-bringup.md)
-
 -   :material-memory:{ .lg .middle } __Atomiq110 NPU Profiling (Ethos-U85)__
 
     ---
