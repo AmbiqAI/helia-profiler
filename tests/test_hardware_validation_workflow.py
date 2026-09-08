@@ -70,6 +70,7 @@ def _run_bash(script: str, env: dict[str, str], cwd: Path) -> str:
         check=True,
         capture_output=True,
         text=True,
+        timeout=15,
     ).stdout
 
 
@@ -138,6 +139,7 @@ git() {
       echo "${HPX_NSX_EXECUTORCH_REF}"
     fi
   fi
+  return 0
 }
 """
     script = _step(validate_job, "Initialize qualified ExecuTorch dependencies")["run"]
@@ -152,6 +154,42 @@ git() {
     else:
         assert "ns-cmsis-nn" not in revisions
     assert (tmp_path / "results" / "validation" / "executorch-revisions.txt").is_file()
+
+
+@pytest.mark.parametrize("requested_ref", ['candidate"branch', "candidate-branch", "b" * 40])
+def test_ns_override_provenance_preserves_the_requested_ref(
+    validate_job: dict[str, Any], tmp_path: Path, requested_ref: str
+) -> None:
+    if shutil.which("jq") is None:
+        pytest.skip("workflow provenance requires jq")
+    env = {
+        "RUNNER_TEMP": str(tmp_path),
+        "GITHUB_ENV": str(tmp_path / "env"),
+        "GITHUB_OUTPUT": str(tmp_path / "output"),
+        "GITHUB_STEP_SUMMARY": str(tmp_path / "summary"),
+        "HPX_NS_CMSIS_NN_REF": requested_ref,
+        "EXPECTED_COMMIT": "b" * 40,
+    }
+    mock_git = """
+git() {
+  if [[ "$1" == check-ref-format ]]; then
+    command git "$@"
+  elif [[ "$*" == *"rev-parse HEAD" ]]; then
+    echo "$EXPECTED_COMMIT"
+  else
+    return 0
+  fi
+}
+"""
+    script = _step(validate_job, "Resolve ns-cmsis-nn source")["run"]
+    _run_bash(mock_git + script, env, tmp_path)
+    exported = dict(line.split("=", 1) for line in (tmp_path / "env").read_text().splitlines())
+    revision = json.loads(exported["HPX_SOURCE_REVISIONS_JSON"])["ns-cmsis-nn"]
+    assert revision == {
+        "requested_kind": "commit" if requested_ref == env["EXPECTED_COMMIT"] else "branch",
+        "requested_ref": requested_ref,
+        "resolved_commit": env["EXPECTED_COMMIT"],
+    }
 
 
 def _triggers(workflow: dict[Any, Any]) -> dict[str, Any]:

@@ -48,7 +48,7 @@ on:
           - arm
           - ns
       ns_cmsis_nn_ref:
-        description: "Optional ns-cmsis-nn branch name or full 40-character commit SHA (empty uses the HPX qualified baseline)"
+        description: "Optional ns-cmsis-nn branch or full commit SHA; empty skips resolution and lets HPX use its qualified baseline without an override"
         required: false
         default: ""
         type: string
@@ -258,8 +258,12 @@ jobs:
           fi
           echo "NS_CMSIS_NN_RESOLVED_COMMIT=${resolved_commit}" >> "${GITHUB_ENV}"
           echo "resolved_commit=${resolved_commit}" >> "${GITHUB_OUTPUT}"
-          echo "HPX_SOURCE_REVISIONS_JSON={\"ns-cmsis-nn\":{\"requested_kind\":\"${requested_kind}\",\"requested_ref\":\"${requested_ref}\",\"resolved_commit\":\"${resolved_commit}\"}}" \
-            >> "${GITHUB_ENV}"
+          source_revisions="$(jq -cn \
+            --arg kind "${requested_kind}" \
+            --arg ref "${requested_ref}" \
+            --arg commit "${resolved_commit}" \
+            '{"ns-cmsis-nn": {requested_kind: $kind, requested_ref: $ref, resolved_commit: $commit}}')"
+          echo "HPX_SOURCE_REVISIONS_JSON=${source_revisions}" >> "${GITHUB_ENV}"
 
           mkdir -p results/validation
           {
