@@ -97,7 +97,9 @@ uses PR #1's private compatibility layer for the fork's `weight_sum_ctx` ABI
 and resolves `nsx-cmsis-nn` at the baseline's qualified ref like the helia
 engines (v7.31.0, verified on Apollo510).
 Set `engine.config.cmsis_nn_path` or `cmsis_nn_ref` to override the selected
-provider while preserving the same ordered module contract.
+provider while preserving the same ordered module contract. These overrides,
+including `CMSIS_NN_PATH`, replace a baseline module and stamp
+`development-overrides`.
 
 ### NS Tier-1 kernels (`ns_ops`)
 
@@ -251,8 +253,8 @@ registry and local-source modes compile heliaRT with the selected toolchain.
 | `dist_path` | string | *(registry module)* | Explicit local prebuilt distribution |
 | `source.repo` | string | — | GitHub repo for an explicit prebuilt release |
 | `source.ref` | string | — | Explicit release tag |
-| `cmsis_nn_path` | string | *(baseline ref)* | Local ns-cmsis-nn checkout for the source build (mutually exclusive with `cmsis_nn_ref`) |
-| `cmsis_nn_ref` | string | *(baseline ref)* | Exact ns-cmsis-nn git ref for the source build; stamps `qualified-with-engine-override` |
+| `cmsis_nn_path` | string | *(baseline ref)* | Local ns-cmsis-nn checkout for the source build (mutually exclusive with `cmsis_nn_ref`); stamps `development-overrides` |
+| `cmsis_nn_ref` | string | *(baseline ref)* | Exact ns-cmsis-nn git ref for the source build; stamps `development-overrides` |
 | `cmsis_nn_requantize_inline_asm` | bool | `true` | Use inline-asm requantization path |
 
 ### heliaRT runtime notes
@@ -291,7 +293,8 @@ engine:
 1.  Optional override for AmbiqAI's
   [ns-cmsis-nn](https://github.com/AmbiqAI/ns-cmsis-nn) source. By default
   `hpx` resolves `nsx-cmsis-nn` from the NSX registry. Set `cmsis_nn_path`
-  or `CMSIS_NN_PATH` only when you want to vendor a local checkout.
+  or `CMSIS_NN_PATH` only when you want to vendor a local checkout; either
+  stamps `development-overrides` because it replaces a baseline module.
 2.  C symbol prefix for generated code (default `hpx`). Avoids
     namespace collisions when linking multiple AOT models.
 3.  Generated NSX module name (default `hpx_model`).
@@ -384,8 +387,8 @@ The pipeline:
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `cmsis_nn_path` | string | *(baseline ref)* | Local ns-cmsis-nn checkout (mutually exclusive with `cmsis_nn_ref`) |
-| `cmsis_nn_ref` | string | *(baseline ref)* | Exact ns-cmsis-nn git ref; stamps `qualified-with-engine-override` |
+| `cmsis_nn_path` | string | *(baseline ref)* | Local ns-cmsis-nn checkout (mutually exclusive with `cmsis_nn_ref`); stamps `development-overrides` |
+| `cmsis_nn_ref` | string | *(baseline ref)* | Exact ns-cmsis-nn git ref; stamps `development-overrides` |
 | `prefix` | string | `hpx` | C symbol prefix |
 | `module_name` | string | `hpx_model` | Generated NSX module name |
 | `cmsis_nn_requantize_inline_asm` | bool | `true` | Use inline-asm requantization path |

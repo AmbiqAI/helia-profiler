@@ -144,16 +144,60 @@ def test_provenance_fingerprint_is_serializable_and_stable(tmp_path: Path) -> No
     assert json.loads(json.dumps(provenance)) == provenance
 
 
-def test_engine_override_is_qualified_with_override(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [
+        ("source", {"repo": "local/helia-rt", "ref": "feature/test"}),
+        ("source_path", "local/helia-rt"),
+        ("dist_path", "local/helia-rt-dist"),
+    ],
+)
+def test_engine_override_is_qualified_with_override(
+    tmp_path: Path, key: str, value: object
+) -> None:
     config = _config(
         tmp_path,
-        engine={"config": {"source": {"repo": "local/helia-rt", "ref": "feature/test"}}},
+        engine={"config": {key: value}},
     )
 
     assert config.compatibility is not None
     assert config.compatibility.qualification is QualificationState.QUALIFIED_WITH_ENGINE_OVERRIDE
-    assert config.compatibility.engine_overrides == ("engine.config.source",)
+    assert config.compatibility.engine_overrides == (f"engine.config.{key}",)
     assert not config.compatibility.module_overrides
+
+
+@pytest.mark.parametrize("selector", ["cmsis_nn_ref", "cmsis_nn_path", "CMSIS_NN_PATH"])
+@pytest.mark.parametrize("with_engine_override", [False, True])
+def test_cmsis_nn_override_has_same_stamp_as_applied_nsx_module_override(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    selector: str,
+    with_engine_override: bool,
+) -> None:
+    module_config = _config(
+        tmp_path,
+        build={"nsx_modules": {"nsx-tflite-micro": {"ref": "feature/test"}}},
+    )
+    engine_config = {"source_path": "local/helia-rt"} if with_engine_override else {}
+    if selector == "CMSIS_NN_PATH":
+        monkeypatch.setenv(selector, str(tmp_path / "ns-cmsis-nn"))
+    else:
+        engine_config[selector] = (
+            "feature/test" if selector == "cmsis_nn_ref" else str(tmp_path / "ns-cmsis-nn")
+        )
+    config = _config(tmp_path, engine={"config": engine_config})
+
+    assert config.compatibility is not None
+    assert module_config.compatibility is not None
+    assert config.compatibility.qualification is module_config.compatibility.qualification
+    assert config.compatibility.qualification is QualificationState.DEVELOPMENT_OVERRIDES
+    assert config.compatibility.module_overrides == ("nsx-cmsis-nn",)
+    assert config.compatibility.engine_overrides == (
+        ("engine.config.source_path",) if with_engine_override else ()
+    )
+    provenance = config.compatibility.to_dict()
+    assert provenance["qualification"] == "development-overrides"
+    assert provenance["module_overrides"] == ["nsx-cmsis-nn"]
 
 
 def test_engine_backend_selection_does_not_affect_qualification(tmp_path: Path) -> None:
@@ -191,8 +235,10 @@ def test_module_override_is_development_override(tmp_path: Path) -> None:
     assert config.compatibility.module_overrides == ("nsx-core",)
 
 
+@pytest.mark.parametrize("module", ["nsx-helia-rt", "nsx-cmsis-nn", "nsx-executorch"])
 def test_engine_owned_module_override_is_not_a_development_override(
     tmp_path: Path,
+    module: str,
 ) -> None:
     # nsx-helia-rt / nsx-cmsis-nn are resolved by their engine adapters (via
     # engine.config), not build.nsx_modules — firmware/__init__.py silently
@@ -201,7 +247,7 @@ def test_engine_owned_module_override_is_not_a_development_override(
     # was actually applied, so this must not report development-overrides.
     config = _config(
         tmp_path,
-        build={"nsx_modules": {"nsx-helia-rt": {"ref": "feature/test"}}},
+        build={"nsx_modules": {module: {"ref": "feature/test"}}},
     )
 
     assert config.compatibility is not None

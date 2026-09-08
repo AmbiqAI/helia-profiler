@@ -175,7 +175,7 @@ class CompatibilityResolution:
 
     baseline: CompatibilityBaseline
     qualification: QualificationState
-    # NSX *module* names (build.nsx_modules keys), not project names — the
+    # NSX *module* names, including modules selected via engine.config, not project names — the
     # NSX registry projects a module belongs to (see baseline.project() vs
     # baseline.module()) may aggregate several modules, but an override here
     # always targets one module by name. Named distinctly from
@@ -229,9 +229,8 @@ def load_compatibility_baseline(path: Path | None = None) -> CompatibilityBaseli
 # engine.config keys that redirect where an engine's source/binary comes from.
 # Other keys (e.g. "variant", "linker_profile", "aot_args") are ordinary
 # build knobs and do not deviate from the qualified engine baseline.
-_ENGINE_SOURCE_OVERRIDE_KEYS = frozenset(
-    {"dist_path", "source_path", "source", "cmsis_nn_path", "cmsis_nn_ref"}
-)
+_ENGINE_SOURCE_OVERRIDE_KEYS = frozenset({"dist_path", "source_path", "source"})
+_MODULE_SOURCE_OVERRIDE_KEYS = frozenset({"cmsis_nn_path", "cmsis_nn_ref"})
 
 # NSX module names that engine adapters resolve themselves (via
 # engine.config's dist_path/source_path/source/cmsis_nn_path/cmsis_nn_ref, not build.nsx_modules).
@@ -250,21 +249,23 @@ def resolve_compatibility(
     engine_config_path: Path | None,
 ) -> CompatibilityResolution:
     """Classify explicit module and engine overrides without mutating config."""
-    modules = tuple(
-        sorted(str(name) for name in module_overrides if str(name) not in ENGINE_OWNED_MODULE_NAMES)
-    )
+    modules = {str(name) for name in module_overrides if str(name) not in ENGINE_OWNED_MODULE_NAMES}
     engines: set[str] = set()
     if engine_config_path is not None:
         # The file's contents aren't parsed here, so treat any use of an
         # engine config file conservatively as a possible source override.
         engines.add("engine.config_path")
     if isinstance(engine_config, Mapping):
+        if _MODULE_SOURCE_OVERRIDE_KEYS.intersection(engine_config):
+            modules.add("nsx-cmsis-nn")
         engines.update(
             f"engine.config.{key}"
             for key in sorted(engine_config)
             if key in _ENGINE_SOURCE_OVERRIDE_KEYS
         )
-    for variable in ("HELIART_DIST_PATH", "HELIART_SOURCE_PATH", "CMSIS_NN_PATH"):
+    if os.environ.get("CMSIS_NN_PATH"):
+        modules.add("nsx-cmsis-nn")
+    for variable in ("HELIART_DIST_PATH", "HELIART_SOURCE_PATH"):
         if os.environ.get(variable):
             engines.add(f"env.{variable}")
 
@@ -277,7 +278,7 @@ def resolve_compatibility(
     return CompatibilityResolution(
         baseline=baseline,
         qualification=qualification,
-        module_overrides=modules,
+        module_overrides=tuple(sorted(modules)),
         engine_overrides=tuple(sorted(engines)),
     )
 
