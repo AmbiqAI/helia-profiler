@@ -47,9 +47,6 @@
           config.allowUnfreePredicate =
             pkg:
             builtins.elem (lib.getName pkg) [
-              "JLink_Linux_V962_x86_64.tgz"
-              "JLink_Linux_V962_arm64.tgz"
-              "JLink_MacOSX_V962_arm64.pkg"
               "segger-jlink"
             ];
         };
@@ -145,21 +142,6 @@
         system:
         let
           c = components.${system};
-          prepareJlink = c.pkgs.writeShellApplication {
-            name = "hpx-prepare-jlink";
-            runtimeInputs = [
-              c.pkgs.coreutils
-              c.pkgs.curl
-              c.pkgs.nix
-            ];
-            text = ''
-              export HPX_JLINK_DOWNLOAD_URL="${c.jlink.download.downloadUrl}"
-              export HPX_JLINK_EXPECTED_MD5="${c.jlink.download.md5}"
-              export HPX_JLINK_EXPECTED_SIZE="${c.jlink.download.size}"
-              export HPX_JLINK_STORE_NAME="${c.jlink.download.filename}"
-              ${builtins.readFile ./nix/scripts/prepare-jlink.sh}
-            '';
-          };
           installUdevRules = lib.optionalAttrs c.isLinux (
             c.pkgs.writeShellApplication {
               name = "hpx-install-udev-rules";
@@ -187,11 +169,6 @@
             program = "${c.hpx}/bin/hpx";
             meta.description = "Run the packaged heliaPROFILER CLI";
           };
-          prepare-jlink = {
-            type = "app";
-            program = "${prepareJlink}/bin/hpx-prepare-jlink";
-            meta.description = "Download, verify, and import licensed SEGGER J-Link 9.62";
-          };
           verify-isolation = {
             type = "app";
             program = "${verifyIsolation}/bin/hpx-verify-isolation";
@@ -213,8 +190,17 @@
           c = components.${system};
           editablePythonSet = c.pythonSet.overrideScope editableOverlay;
           devEnv = editablePythonSet.mkVirtualEnv "helia-profiler-dev-env" workspace.deps.all;
+          contributorPreCommit = c.pkgs.pre-commit.overridePythonAttrs (_: rec {
+            version = "4.6.0";
+            src = c.pkgs.fetchFromGitHub {
+              owner = "pre-commit";
+              repo = "pre-commit";
+              tag = "v${version}";
+              hash = "sha256-WfajnE1PktzNs0Tand51/qUWEULGZqSNH48Ivu67kA8=";
+            };
+          });
         in
-        {
+        rec {
           default = c.pkgs.mkShell {
             packages = [
               devEnv
@@ -236,6 +222,9 @@
               export REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
             '';
           };
+          contrib = default.overrideAttrs (previous: {
+            nativeBuildInputs = previous.nativeBuildInputs ++ [ contributorPreCommit ];
+          });
         }
       );
 
