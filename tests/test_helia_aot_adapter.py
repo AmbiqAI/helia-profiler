@@ -51,17 +51,13 @@ class TestExtraModules:
         assert [m.name for m in mods] == ["ns-cmsis-nn", "kws_model"]
 
     def test_ethos_u_backend_inserts_npu_before_aot_module(self):
-        mods = _build_extra_modules(
-            _cfg("ethos_u"), self._CMSIS, "kws_model", Path("/tmp/aot")
-        )
+        mods = _build_extra_modules(_cfg("ethos_u"), self._CMSIS, "kws_model", Path("/tmp/aot"))
         names = [m.name for m in mods]
         assert names == ["ns-cmsis-nn", NSX_NPU_MODULE, "kws_model"]
         assert names.index(NSX_NPU_MODULE) < names.index("kws_model")
 
     def test_npu_module_ref_is_registry_backed(self):
-        mods = _build_extra_modules(
-            _cfg("ethos_u"), self._CMSIS, "kws_model", Path("/tmp/aot")
-        )
+        mods = _build_extra_modules(_cfg("ethos_u"), self._CMSIS, "kws_model", Path("/tmp/aot"))
         npu = next(m for m in mods if m.name == NSX_NPU_MODULE)
         assert npu.local is False
         assert npu.project == NSX_NPU_PROJECT

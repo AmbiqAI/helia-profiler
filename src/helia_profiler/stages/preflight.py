@@ -384,9 +384,7 @@ def _check_npu_backend(cfg) -> None:
         raise ConfigError(
             f"Board '{cfg.target.board}' ({soc.name}) has no Ethos-U NPU — "
             "engine.backend=ethos_u is unavailable.",
-            hint=(
-                f"NPU-capable boards: {', '.join(npu_boards) if npu_boards else 'none'}."
-            ),
+            hint=(f"NPU-capable boards: {', '.join(npu_boards) if npu_boards else 'none'}."),
         )
     _check_vela_accelerator_config(cfg, soc)
 
