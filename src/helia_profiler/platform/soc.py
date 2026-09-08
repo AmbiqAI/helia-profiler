@@ -792,10 +792,9 @@ _register_soc(
                 default="lp",
             ),
         ),
-        # No AM_PART_* macro on this part -- the HAL is selected by its
-        # mcu/atomiq110/ directory rather than a device-header ifdef, and
-        # the real build-time selector is PART_atomiq110 (see
-        # NSX_SOC_COMPILE_DEFINITIONS in cmake/socs/facts/atomiq110.cmake).
+        # The SoC facts expose PART_atomiq110 through
+        # NSX_SOC_COMPILE_DEFINITIONS; neuralspotx's board target additionally
+        # defines AM_PART_ATOMIQ110 for HAL-facing compile gates.
         c_define="PART_atomiq110",
         cmsis_header="atomiq110.h",
         # M55 RTT lives in non-cached TCM (.bss); scan window matches the
