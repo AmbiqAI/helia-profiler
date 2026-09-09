@@ -252,7 +252,12 @@ jobs:
           git -C "${checkout_path}" checkout --detach FETCH_HEAD
 
           resolved_commit="$(git -C "${checkout_path}" rev-parse HEAD)"
-          if [[ "${requested_kind}" != "branch" && "${resolved_commit}" != "${requested_ref,,}" ]]; then
+          # tr rather than bash's own lowercase parameter expansion, which
+          # needs bash 4. This block is executed under the host's bash by
+          # tests/test_hardware_validation_workflow.py, and macOS still
+          # ships 3.2 (#293).
+          requested_commit="$(printf '%s' "${requested_ref}" | tr '[:upper:]' '[:lower:]')"
+          if [[ "${requested_kind}" != "branch" && "${resolved_commit}" != "${requested_commit}" ]]; then
             echo "Resolved ns-cmsis-nn commit does not match the requested commit." >&2
             exit 2
           fi
