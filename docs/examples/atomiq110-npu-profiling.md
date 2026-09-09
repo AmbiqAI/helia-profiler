@@ -71,7 +71,7 @@ The `ethos_npu` default preset samples, per profiled layer:
 | `ETHOSU_PMU_MAC_ACTIVE` | Cycles the MAC engine is active |
 | `ETHOSU_PMU_SRAM_RD_DATA_BEAT_RECEIVED` | SRAM read data beats |
 
-Use `ethos_npu: all` for the full 8-event catalogue (runs a second pass),
+Use `ethos_npu: all` for the full 9-event catalogue (runs extra passes),
 or list explicit `ETHOSU_PMU_*` names.
 
 ## heliaAOT variant

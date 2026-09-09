@@ -20,6 +20,7 @@ enum ethosu_pmu_event_type {
     ETHOSU_PMU_SRAM_RD_DATA_BEAT_RECEIVED,
     ETHOSU_PMU_SRAM_WR_DATA_BEAT_WRITTEN,
     ETHOSU_PMU_EXT_RD_DATA_BEAT_RECEIVED,
+    ETHOSU_PMU_EXT_WR_DATA_BEAT_WRITTEN,
 };
 
 static inline void ETHOSU_PMU_Enable(struct ethosu_driver *drv) { (void)drv; }
