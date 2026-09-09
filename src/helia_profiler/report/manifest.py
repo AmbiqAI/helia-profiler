@@ -17,6 +17,7 @@ from ..results import (
     RunStatus,
 )
 from ..firmware import measured_power_fingerprint
+from ..results.dimensions import derive_architecture_flags
 from ..results.serde import nested_get, sha256_file
 from ..evaluation import evaluate_run
 from .contracts import (
@@ -171,6 +172,8 @@ def _provenance(ctx: PipelineContext) -> dict[str, Any]:
         provenance["model"] = asdict(ctx.run_metadata.model)
     if ctx.run_metadata.toolchain is not None:
         provenance["toolchain"] = asdict(ctx.run_metadata.toolchain)
+    if ctx.run_metadata.build_images:
+        provenance["build_images"] = [asdict(image) for image in ctx.run_metadata.build_images]
     if ctx.run_metadata.compatibility is not None:
         provenance["compatibility"] = ctx.run_metadata.compatibility.to_dict()
     if ctx.run_metadata.dependencies is not None:
@@ -217,6 +220,11 @@ def _comparability(ctx: PipelineContext) -> dict[str, Any]:
             ctx.run_metadata.engine.version if ctx.run_metadata.engine is not None else None
         ),
         ComparisonDimension.LINK_FAMILY: (platform.link_family if platform is not None else None),
+        # Same derivation the reader runs on the published record, so the
+        # manifest cannot disagree with the artifact it summarizes.
+        ComparisonDimension.ARCHITECTURE_FLAGS: derive_architecture_flags(
+            {"build_images": [asdict(image) for image in ctx.run_metadata.build_images]}
+        ),
     }
     if ctx.power_result is not None:
         # A run that measured no power has nothing to say about how it

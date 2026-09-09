@@ -74,4 +74,4 @@ wire-format change renames it.
 - **`metric.memory_<dimension>_mismatch`** (`metric_blocking`) — Per-region memory metrics omitted because a memory comparison dimension differs between the runs.
   Dimensions: `link_family`
 - **`dimension.<dimension>_differs`** (`informative`) — A comparison dimension differs between the runs; deltas remain comparable but should be read in that light.
-  Dimensions: `hpx_version`, `engine`, `board`, `soc`, `cpu_clock`, `toolchain`, `compiler_version`, `system_clock_hz`, `run_summary_schema_version`, `run_metadata_schema_version`, `transport`, `arena_location`, `weights_location`, `engine_version`
+  Dimensions: `hpx_version`, `engine`, `board`, `soc`, `cpu_clock`, `toolchain`, `compiler_version`, `system_clock_hz`, `run_summary_schema_version`, `run_metadata_schema_version`, `transport`, `arena_location`, `weights_location`, `engine_version`, `architecture_flags`

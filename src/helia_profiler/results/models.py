@@ -257,6 +257,29 @@ class EngineInfo:
     version: str | None = None
 
 
+@dataclass(frozen=True)
+class BuildImage:
+    """Identity of one binary a run actually built (#291).
+
+    Source provenance names the inputs; this names the output. Without it two
+    images differing only in ``-mcpu`` carry identical metadata, and evidence
+    can only be told apart by the directory it was filed under — the gap
+    behind the #480 misattribution and the #488 qualification limit.
+
+    ``architecture_flags`` maps each ISA-selecting flag to the number of
+    translation units that carried it, over the whole build tree rather than
+    this target alone. Empty when the build left no compile database.
+    """
+
+    role: str = ""
+    target_name: str = ""
+    binary_name: str = ""
+    sha256: str = ""
+    size_bytes: int = 0
+    architecture_flags: dict[str, int] = field(default_factory=dict)
+    translation_units: int = 0
+
+
 @dataclass
 class RunMetadata:
     """Accumulated run metadata — enriched by stages, consumed by reports."""
@@ -268,6 +291,9 @@ class RunMetadata:
     platform: PlatformInfo | None = None
     model: ModelInfo | None = None
     toolchain: ToolchainInfo | None = None
+    #: One entry per built target ("profile", "power"). Appended as each
+    #: build stage completes, so a power run records both images.
+    build_images: tuple[BuildImage, ...] = ()
     engine: EngineInfo | None = None
     firmware: FirmwareMeta | None = None
     memory_plan: "MemoryPlan | None" = None

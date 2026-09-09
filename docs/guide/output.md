@@ -210,6 +210,20 @@ Full provenance for the run:
     "compiler_version": "arm-none-eabi-gcc (Arm GNU Toolchain 14.3.Rel1) 14.3.1",
     "cmake_version": "cmake version 3.31.6"
   },
+  "build_images": [
+    {
+      "role": "profile",
+      "target_name": "hpx_profiler",
+      "binary_name": "hpx_profiler",
+      "sha256": "b8978f0f...",
+      "size_bytes": 5236108,
+      "architecture_flags": {
+        "-mcpu=cortex-m55": 75,
+        "-mfloat-abi=hard": 75
+      },
+      "translation_units": 75
+    }
+  ],
   "firmware": {
     "arena_size": 131072,
     "allocated_arena": 29780,
@@ -217,6 +231,19 @@ Full provenance for the run:
   }
 }
 ```
+
+`build_images` records the binary each run actually built — one entry per
+target, so a power run lists both `profile` and `power`. `sha256` is the
+digest of the image itself; `architecture_flags` counts the instruction-set
+flags the compiler received across the build tree, read from the build's own
+`compile_commands.json`.
+
+The flags matter for A/B work. Two builds differing only in
+`-mcpu=cortex-m55` versus `-mcpu=cortex-m55+nomve` are otherwise identical in
+metadata, which leaves the directory name as the only record of which is
+which. `hpx compare` reports the difference as the informative **Architecture
+flags** dimension: a Helium on/off study is a comparison you meant to run, so
+the difference is surfaced rather than blocked.
 
 ### aot_operator_manifest.json
 

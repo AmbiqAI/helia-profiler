@@ -8,6 +8,7 @@ from ..results import FirmwareArtifact
 from ..errors import BuildError
 from ..pipeline import PipelineContext
 from ..results import ToolchainInfo
+from ..firmware.image import record_build_image
 from ..hostenv.memory_measurement import measure_memory_regions, reconcile_memory
 from ..hostenv.toolchain_probe import (
     binary_sections,
@@ -99,6 +100,13 @@ class BuildFirmwareStage:
                 binary_path=binary_path,
                 binary_sections=ctx.binary_sections,
             )
+        )
+        record_build_image(
+            ctx,
+            role="profile",
+            target_name="hpx_profiler",
+            binary_path=binary_path,
+            build_dir=build_dir,
         )
         ready_message = "Profile firmware ready"
         if ctx.binary_sections is not None:
