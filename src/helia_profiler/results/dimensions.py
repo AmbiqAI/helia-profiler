@@ -73,6 +73,7 @@ class ComparisonDimension(StrEnum):
     ARENA_LOCATION = "arena_location"
     WEIGHTS_LOCATION = "weights_location"
     ENGINE_VERSION = "engine_version"
+    ARCHITECTURE_FLAGS = "architecture_flags"
 
 
 class DimensionEffect(StrEnum):
@@ -164,6 +165,31 @@ class DimensionSpec:
     #: the same conservative non-blocking rule as an absent value itself.
     scoped_to: tuple[ComparisonDimension, ...] = ()
     fallback: ArtifactPath | None = None
+
+
+def derive_architecture_flags(metadata: dict[str, Any]) -> str | None:
+    """Summarize the ISA flags the profiled image was actually built with.
+
+    Public because the manifest writer calls it on the same serialized list
+    it publishes: a value computed two ways is a value that can disagree
+    with itself (#115). Derived rather than a plain path because the record
+    is a list keyed by role, and a comparison wants one string.
+    """
+    images = metadata.get("build_images")
+    if not isinstance(images, list):
+        return None
+    by_role = {
+        image.get("role"): image
+        for image in images
+        if isinstance(image, dict) and isinstance(image.get("architecture_flags"), dict)
+    }
+    # The profile image is what produced the cycle counts being compared;
+    # a power-only run has no other candidate.
+    image = by_role.get("profile") or next(iter(by_role.values()), None)
+    if image is None:
+        return None
+    flags = image["architecture_flags"]
+    return " ".join(sorted(flags)) if flags else None
 
 
 def _derive_power_monitor(power: dict[str, Any]) -> str:
@@ -294,6 +320,18 @@ _DIMENSION_SPECS: tuple[DimensionSpec, ...] = (
         ArtifactSource.RUN_METADATA,
         ("engine", "version"),
         label="Engine version",
+    ),
+    # Appended after ENGINE_VERSION for the same reason it was registered
+    # last (#193). Informative, not blocking: an MVE-vs-+nomve A/B is a
+    # comparison someone deliberately ran, so refusing it would break the
+    # study this dimension exists to make legible. Absent on artifacts
+    # predating #291 -- the comparator's None-skip rule applies.
+    DimensionSpec(
+        ComparisonDimension.ARCHITECTURE_FLAGS,
+        DimensionEffect.INFORMATIVE,
+        ArtifactSource.RUN_METADATA,
+        derive=derive_architecture_flags,
+        label="Architecture flags",
     ),
     DimensionSpec(
         ComparisonDimension.POWER_SCOPE,

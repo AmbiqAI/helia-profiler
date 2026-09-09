@@ -9,6 +9,7 @@ from pathlib import Path
 from ..config import PowerFirmware
 from ..results import FirmwareArtifact
 from ..errors import BuildError, FirmwareError
+from ..firmware.image import record_build_image
 from ..power.diagnostics import count_noun
 from ..pipeline import PipelineContext
 
@@ -101,6 +102,13 @@ class BuildPowerFirmwareStage:
                 build_dir=ctx.build_dir,
                 binary_path=binary_path,
             )
+        )
+        record_build_image(
+            ctx.run_metadata,
+            role="power",
+            target_name="hpx_profiler_power",
+            binary_path=binary_path,
+            build_dir=ctx.build_dir,
         )
         log.info(
             "Power firmware rebuilt: %s (N=%d, source=%s)",

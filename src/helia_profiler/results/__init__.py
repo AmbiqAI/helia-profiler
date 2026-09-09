@@ -64,6 +64,7 @@ from .support_bundle import (
 )
 from .models import (
     BinarySections,
+    BuildImage,
     ConsumerKind,
     EngineInfo,
     FirmwareMeta,
@@ -91,6 +92,7 @@ from .models import (
 
 __all__ = [
     "BinarySections",
+    "BuildImage",
     "COMPARABILITY_FAMILIES",
     "COMPARABILITY_REGISTRY",
     "ComparabilityCode",

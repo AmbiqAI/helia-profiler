@@ -102,6 +102,7 @@ def test_family_membership_and_order_are_the_documented_sets():
         # #193: appended, never inserted -- family order is emitted-issue
         # order and existing positions are frozen shipped behavior.
         "engine_version",
+        "architecture_flags",
     ]
     # #206: the first non-power metric group, its own family and wire prefix.
     assert [d.value for d in MEMORY_DIMENSION_MISMATCH.dimensions] == ["link_family"]
