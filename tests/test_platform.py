@@ -542,6 +542,39 @@ def test_a_custom_soc_inherits_the_npu_of_the_part_it_is_based_on():
     assert soc.npu == "ethos-u85-256"
 
 
+def test_a_custom_soc_inherits_the_placement_bases_of_the_part_it_is_based_on():
+    """``based_on: atomiq110`` must keep Atomiq's emulated memory windows.
+
+    ``_placement_bases`` keys its per-SoC override table by name, which a
+    derivative's own name misses — the fallback was the AP5 family map
+    (SRAM 0x20080000, MRAM 0x0), so placement verification compared the
+    linker output against the wrong ranges.
+    """
+    from helia_profiler.platform.placement import Placement
+
+    soc = _custom_soc("atomiq_lab", {"based_on": "atomiq110"})
+    bases = soc.capabilities.memory.placement_bases
+
+    assert bases[Placement.SRAM] == 0x21000000
+    assert bases[Placement.MRAM] == 0x22000000
+
+
+def test_placement_base_inheritance_chains_through_another_custom_soc():
+    from helia_profiler.platform.placement import Placement
+
+    registry = build_custom_platform_registry(
+        {
+            "custom_socs": {
+                "atomiq_lab": {"based_on": "atomiq110"},
+                "atomiq_lab2": {"based_on": "atomiq_lab"},
+            }
+        }
+    )
+    bases = registry.socs["atomiq_lab2"].capabilities.memory.placement_bases
+
+    assert bases[Placement.MRAM] == 0x22000000
+
+
 def test_a_custom_soc_inherits_the_address_of_the_part_it_is_based_on():
     """``based_on`` is a statement about a specific, characterised part.
 
@@ -993,6 +1026,7 @@ def test_the_custom_soc_keys_are_a_pinned_subset_of_the_soc_definition():
         "ssram_full_power_enum",
         "has_radio_subsystem",
         "npu",  # NPU presence/config is a silicon fact, not user-declarable
+        "memory_bases_like",  # inherited from based_on, never declared
     }
     # Keys that are config surface only and back no SocDef field.
     not_a_soc_field = {
@@ -1040,6 +1074,32 @@ def test_both_custom_blocks_accept_the_same_free_form_description():
     soc = _custom_soc("oem4", _scratch_soc_spec(description="OEM part, rev B"))
 
     assert soc.name == "oem4"  # accepted, and backs no SocDef field
+
+
+def test_a_custom_board_inherits_and_can_state_is_fpga():
+    registry = build_custom_platform_registry(
+        {
+            "custom_boards": {
+                "fpga_lab": {"based_on": "atomiq110_fpga_turbo"},
+                "silicon_lab": {"based_on": "atomiq110_fpga_turbo", "is_fpga": False},
+            }
+        }
+    )
+
+    assert registry.boards["fpga_lab"].is_fpga
+    assert not registry.boards["silicon_lab"].is_fpga
+
+
+def test_a_quoted_string_is_fpga_is_rejected_not_coerced():
+    """``is_fpga: "false"`` must fail validation, not parse as True.
+
+    This flag relaxes the NPU power-ack handshake in generated firmware, so a
+    YAML quoting mistake would silently change hardware-init behavior.
+    """
+    with pytest.raises(ConfigError, match="is_fpga must be a boolean"):
+        build_custom_platform_registry(
+            {"custom_boards": {"lab": {"based_on": "atomiq110_fpga_turbo", "is_fpga": "false"}}}
+        )
 
 
 def test_a_custom_board_inherits_the_ble_reset_pin_of_the_board_it_is_based_on():

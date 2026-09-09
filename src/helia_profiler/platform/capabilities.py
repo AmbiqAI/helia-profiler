@@ -338,8 +338,15 @@ _SOC_MEMORY_BASES: dict[str, dict[Placement, int]] = {
 
 
 def _placement_bases(soc: SocDef) -> Mapping[Placement, int]:
-    """Return the frozen placement-base map for *soc* (empty if unknown)."""
-    bases = _SOC_MEMORY_BASES.get(soc.name) or _FAMILY_MEMORY_BASES.get(soc.family, {})
+    """Return the frozen placement-base map for *soc* (empty if unknown).
+
+    ``memory_bases_like`` (set for ``based_on`` custom derivatives) keys the
+    per-SoC override table in place of the derivative's own name, so an
+    Atomiq-derived part keeps Atomiq's emulated MRAM/SRAM windows instead of
+    falling back to the AP5 family map.
+    """
+    key = soc.memory_bases_like or soc.name
+    bases = _SOC_MEMORY_BASES.get(key) or _FAMILY_MEMORY_BASES.get(soc.family, {})
     return MappingProxyType(dict(bases))
 
 

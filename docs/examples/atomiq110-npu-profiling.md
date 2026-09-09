@@ -6,6 +6,9 @@ PMU (`ethos_npu` group) per layer.
 
 ## Prerequisites
 
+- The `analysis` extra (`pip install 'helia-profiler[analysis]'`) — preflight
+  validates the model's Vela accelerator config against the target NPU, which
+  needs `ai-edge-litert`.
 - An Atomiq110 FPGA image whose NPU bitstream matches the SDK generation
   used by `nsx-npu` (a mismatch fails NPU init at boot — the firmware
   reports `HPX_ERROR=npu_init_failed ... hint=bitstream_sdk_generation_mismatch`).

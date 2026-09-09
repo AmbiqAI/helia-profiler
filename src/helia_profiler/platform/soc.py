@@ -234,6 +234,16 @@ class SocDef:
     #: family tag that, in this model, only records a core tier.
     app_flash_load_addr: int | None = None
 
+    #: Name of the part whose resolved placement-base map this SoC's memory
+    #: map follows.  Set only by ``platform.custom`` for ``based_on``
+    #: derivatives (to the base chain's built-in name) so that
+    #: ``capabilities._placement_bases`` reaches per-SoC base overrides —
+    #: atomiq110's emulated MRAM/SRAM windows — that its name-keyed lookup
+    #: would otherwise miss, exactly as ``based_on`` inherits the app-flash
+    #: address.  Never user-declarable: a custom part states a novel memory
+    #: map through its own family/name, not by claiming another part's.
+    memory_bases_like: str | None = None
+
     #: Whether this definition comes from the built-in registry below.  See
     #: :class:`SocOrigin`; set by ``_register_soc`` and by nothing else.
     origin: SocOrigin = SocOrigin.CUSTOM
