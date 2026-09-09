@@ -354,10 +354,7 @@ def _check_pmu_selection(cfg) -> None:
         resolved = resolve_counters(cfg.profiling.pmu_counters)
     except (TypeError, ValueError) as exc:
         raise ConfigError(str(exc)) from exc
-    if (
-        any(c.group == "ethos_npu" for c in resolved)
-        and cfg.engine.backend != "ethos_u"
-    ):
+    if any(c.group == "ethos_npu" for c in resolved) and cfg.engine.backend != "ethos_u":
         raise ConfigError(
             "The ethos_npu counter group (ETHOSU_PMU_*) requires engine.backend=ethos_u "
             "(the NPU is only exercised when the Ethos-U backend is enabled).",
