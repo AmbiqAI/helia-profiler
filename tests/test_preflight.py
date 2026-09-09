@@ -668,6 +668,22 @@ class TestPreflightEthosNpuCounters:
 
         _check_pmu_selection(ctx.config)  # must not raise
 
+    def test_npu_counter_smuggled_under_another_key_still_rejected(self, tmp_path: Path):
+        """The gate is on resolved counter GROUPS, not the selection keys:
+        an explicit NPU counter listed under 'cpu' still plans an
+        ethos_npu firmware pass."""
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "target": {"board": "atomiq110_fpga_turbo"},
+                "profiling": {"pmu_counters": {"cpu": ["ETHOSU_PMU_CYCLE"]}},
+            },
+        )
+        from helia_profiler.stages.preflight import _check_pmu_selection
+
+        with pytest.raises(ConfigError, match="requires engine.backend=ethos_u"):
+            _check_pmu_selection(ctx.config)
+
     def test_ethos_npu_with_helia_aot_backend_accepted(self, tmp_path: Path):
         ctx = _make_ctx(
             tmp_path,

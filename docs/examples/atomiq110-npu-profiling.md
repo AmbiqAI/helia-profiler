@@ -21,8 +21,10 @@ PMU (`ethos_npu` group) per layer.
 vela --accelerator-config ethos-u85-256 model_INT8.tflite
 ```
 
-`hpx` cross-checks model and config: a Vela model without
-`engine.backend: ethos_u` is rejected, and vice versa.
+`hpx` cross-checks model and config: `engine.backend: ethos_u` without a
+Vela model is always rejected. The reverse check (a Vela model on a CPU
+backend) needs the `analysis` extra listed above; without it the mismatch
+surfaces at runtime as an unresolved `ethos-u` custom op.
 
 ## Setup
 

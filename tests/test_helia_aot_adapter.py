@@ -12,12 +12,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from helia_profiler.config import load_config
+from helia_profiler.engines.ethos_u import NSX_NPU_MODULE, NSX_NPU_PROJECT
 from helia_profiler.engines.helia_aot.adapter import _build_extra_modules
 from helia_profiler.engines.helia_aot.compile import (
     _BOARD_TO_AOT_PLATFORM,
     _resolve_aot_platform,
 )
-from helia_profiler.engines.helia_rt.adapter import NSX_NPU_MODULE, NSX_NPU_PROJECT
 from helia_profiler.results import NsxModuleRef
 
 
