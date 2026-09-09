@@ -171,49 +171,44 @@ def test_an_unreadable_binary_records_nothing_rather_than_a_digestless_image(tmp
 # ---------------------------------------------------------------------------
 
 
-class _Ctx:
-    def __init__(self) -> None:
-        self.run_metadata = RunMetadata()
-
-
-def _record(ctx: _Ctx, root: Path, flags: list[str], *, role: str) -> None:
+def _record(metadata: RunMetadata, root: Path, flags: list[str], *, role: str) -> None:
     build_dir, binary = _build_tree(root, flags)
     record_build_image(
-        ctx, role=role, target_name=f"hpx_{role}", binary_path=binary, build_dir=build_dir
+        metadata, role=role, target_name=f"hpx_{role}", binary_path=binary, build_dir=build_dir
     )
 
 
 def test_a_power_run_records_both_of_its_images(tmp_path):
-    ctx = _Ctx()
-    _record(ctx, tmp_path / "profile", [MVE], role="profile")
-    _record(ctx, tmp_path / "power", [MVE], role="power")
+    meta = RunMetadata()
+    _record(meta, tmp_path / "profile", [MVE], role="profile")
+    _record(meta, tmp_path / "power", [MVE], role="power")
 
-    assert [image.role for image in ctx.run_metadata.build_images] == ["profile", "power"]
+    assert [image.role for image in meta.build_images] == ["profile", "power"]
 
 
 def test_rebuilding_a_target_records_the_image_that_ran_not_the_first_one(tmp_path):
     """The power target is rebuilt for a host-selected N; the last one flashes."""
-    ctx = _Ctx()
-    _record(ctx, tmp_path / "profile", [MVE], role="profile")
-    _record(ctx, tmp_path / "first", [MVE], role="power")
-    first = ctx.run_metadata.build_images[-1].sha256
-    _record(ctx, tmp_path / "second", [NOMVE], role="power")
+    meta = RunMetadata()
+    _record(meta, tmp_path / "profile", [MVE], role="profile")
+    _record(meta, tmp_path / "first", [MVE], role="power")
+    first = meta.build_images[-1].sha256
+    _record(meta, tmp_path / "second", [NOMVE], role="power")
 
-    roles = [image.role for image in ctx.run_metadata.build_images]
+    roles = [image.role for image in meta.build_images]
     assert roles == ["profile", "power"]
-    assert ctx.run_metadata.build_images[-1].sha256 != first
+    assert meta.build_images[-1].sha256 != first
 
 
 def test_an_unreadable_binary_leaves_run_metadata_untouched(tmp_path):
-    ctx = _Ctx()
+    meta = RunMetadata()
     build_dir, binary = _build_tree(tmp_path, [MVE])
     binary.unlink()
 
     record_build_image(
-        ctx, role="profile", target_name="hpx_profiler", binary_path=binary, build_dir=build_dir
+        meta, role="profile", target_name="hpx_profiler", binary_path=binary, build_dir=build_dir
     )
 
-    assert ctx.run_metadata.build_images == ()
+    assert meta.build_images == ()
 
 
 # ---------------------------------------------------------------------------

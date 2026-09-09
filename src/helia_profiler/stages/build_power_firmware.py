@@ -104,7 +104,7 @@ class BuildPowerFirmwareStage:
             )
         )
         record_build_image(
-            ctx,
+            ctx.run_metadata,
             role="power",
             target_name="hpx_profiler_power",
             binary_path=binary_path,

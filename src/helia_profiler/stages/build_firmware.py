@@ -102,7 +102,7 @@ class BuildFirmwareStage:
             )
         )
         record_build_image(
-            ctx,
+            ctx.run_metadata,
             role="profile",
             target_name="hpx_profiler",
             binary_path=binary_path,

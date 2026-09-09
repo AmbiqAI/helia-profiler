@@ -16,13 +16,9 @@ import logging
 import re
 from collections import Counter
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-from ..results import BuildImage
+from ..results import BuildImage, RunMetadata
 from ..results.serde import sha256_file
-
-if TYPE_CHECKING:
-    from ..pipeline import PipelineContext
 
 log = logging.getLogger("hpx")
 
@@ -68,7 +64,7 @@ def build_image(
 
 
 def record_build_image(
-    ctx: PipelineContext,
+    metadata: RunMetadata,
     *,
     role: str,
     target_name: str,
@@ -76,6 +72,10 @@ def record_build_image(
     build_dir: Path,
 ) -> None:
     """Append one built target's identity to run metadata.
+
+    Takes the metadata rather than the pipeline context because that is all
+    it touches — a build stage is not a prerequisite for recording what a
+    build produced.
 
     Replaces any earlier entry for the same role: a power run re-renders and
     rebuilds its target for a host-selected inference count, and the image
@@ -89,10 +89,8 @@ def record_build_image(
     )
     if image is None:
         return
-    kept = tuple(
-        existing for existing in ctx.run_metadata.build_images if existing.role != image.role
-    )
-    ctx.run_metadata.build_images = (*kept, image)
+    kept = tuple(existing for existing in metadata.build_images if existing.role != image.role)
+    metadata.build_images = (*kept, image)
     log.info(
         "Build image (%s): sha256=%s%s",
         role,
