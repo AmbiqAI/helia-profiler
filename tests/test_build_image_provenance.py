@@ -127,10 +127,19 @@ def test_the_arguments_form_of_the_compile_database_is_read_too(tmp_path):
     assert image.architecture_flags == {NOMVE: 1, "-mfloat-abi=hard": 1}
 
 
-def test_the_compile_database_is_found_below_the_build_root(tmp_path):
-    image = _image(tmp_path, [MVE], nest=2)
+@pytest.mark.parametrize("nest", [0, 1, 2])
+def test_the_compile_database_is_found_down_to_the_declared_depth(tmp_path, nest):
+    image = _image(tmp_path, [MVE], nest=nest)
 
     assert image.architecture_flags == {MVE: 3}
+
+
+def test_a_database_deeper_than_the_bound_costs_the_flags_not_the_digest(tmp_path):
+    """Pins where the search stops, so the bound is a decision, not a surprise."""
+    image = _image(tmp_path, [MVE], nest=3)
+
+    assert image.sha256
+    assert image.architecture_flags == {}
 
 
 @pytest.mark.parametrize(

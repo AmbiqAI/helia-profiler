@@ -26,9 +26,10 @@ log = logging.getLogger("hpx")
 #: them is a different measurement, whatever its directory is called.
 _ARCH_FLAG = re.compile(r"(?<![\w=])-m(?:cpu|arch|fpu|float-abi)=[^\s\"']+")
 
-#: Deepest build tree worth searching for the compile database. NSX writes it
-#: at the build root; the bound stops a runaway walk on an odd layout.
-_COMPILE_DB_DEPTH = 3
+#: How many directory levels below the build root to search for the compile
+#: database, 0 meaning the root itself. NSX writes it at the root; the bound
+#: covers a nested generator layout without a runaway walk of the whole tree.
+_COMPILE_DB_MAX_DEPTH = 2
 
 
 def build_image(
@@ -106,9 +107,9 @@ def _architecture_flags(build_dir: Path) -> tuple[dict[str, int], int]:
     uniform build, while two spellings of ``-mcpu`` state a genuinely mixed
     one instead of letting whichever appeared first speak for the image.
 
-    The database covers the whole build tree — every module compiled into it,
-    not only ``target_name`` — which is what makes it answer "was this tree
-    built with Helium", the question the flags are recorded for.
+    The database covers the whole build tree, every module compiled into it
+    rather than one target's own units. That is the right scope here: the
+    question these flags answer is "was this tree built with Helium".
     """
     database = _find_compile_database(build_dir)
     if database is None:
@@ -149,7 +150,7 @@ def _command_text(entry: dict[str, object]) -> str:
 
 def _find_compile_database(build_dir: Path) -> Path | None:
     """Locate the compile database, shallowest match first."""
-    for depth in range(_COMPILE_DB_DEPTH):
+    for depth in range(_COMPILE_DB_MAX_DEPTH + 1):
         pattern = "/".join(["*"] * depth + ["compile_commands.json"])
         matches = sorted(path for path in build_dir.glob(pattern) if path.is_file())
         if matches:
