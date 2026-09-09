@@ -156,7 +156,17 @@ git() {
     assert (tmp_path / "results" / "validation" / "executorch-revisions.txt").is_file()
 
 
-@pytest.mark.parametrize("requested_ref", ['candidate"branch', "candidate-branch", "b" * 40])
+@pytest.mark.parametrize(
+    "requested_ref",
+    [
+        'candidate"branch',
+        "candidate-branch",
+        "b" * 40,
+        # An upper-case SHA still names the commit git reports in lower
+        # case. Pins that the case-folding compare survives (#293).
+        "B" * 40,
+    ],
+)
 def test_ns_override_provenance_preserves_the_requested_ref(
     validate_job: dict[str, Any], tmp_path: Path, requested_ref: str
 ) -> None:
@@ -186,7 +196,9 @@ git() {
     exported = dict(line.split("=", 1) for line in (tmp_path / "env").read_text().splitlines())
     revision = json.loads(exported["HPX_SOURCE_REVISIONS_JSON"])["ns-cmsis-nn"]
     assert revision == {
-        "requested_kind": "commit" if requested_ref == env["EXPECTED_COMMIT"] else "branch",
+        "requested_kind": (
+            "commit" if requested_ref.lower() == env["EXPECTED_COMMIT"] else "branch"
+        ),
         "requested_ref": requested_ref,
         "resolved_commit": env["EXPECTED_COMMIT"],
     }
