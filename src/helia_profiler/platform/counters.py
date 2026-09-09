@@ -83,6 +83,7 @@ _ETHOS_NPU_EVENTS: tuple[tuple[str, str], ...] = (
     ("ETHOSU_PMU_SRAM_RD_DATA_BEAT_RECEIVED", "SRAM interface read data beats"),
     ("ETHOSU_PMU_SRAM_WR_DATA_BEAT_WRITTEN", "SRAM interface write data beats"),
     ("ETHOSU_PMU_EXT_RD_DATA_BEAT_RECEIVED", "External (flash/MRAM) read data beats"),
+    ("ETHOSU_PMU_EXT_WR_DATA_BEAT_WRITTEN", "External (flash/MRAM) write data beats"),
 )
 
 for _name, _desc in _ETHOS_NPU_EVENTS:

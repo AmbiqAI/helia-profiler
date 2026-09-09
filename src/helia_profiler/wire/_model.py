@@ -180,6 +180,11 @@ ALL_ENGINES: frozenset[EngineType] = frozenset(EngineType)
 #: ``main.cc.j2`` renders identically for both — one template, two engine ids.
 TFLM_ENGINES: frozenset[EngineType] = frozenset({EngineType.TFLM, EngineType.HELIA_RT})
 AOT_ENGINES: frozenset[EngineType] = frozenset({EngineType.HELIA_AOT})
+#: Engines that can reach ``backend=ethos_u`` (preflight's _check_npu_backend
+#: rejects everything else) — the published producer set for NPU tokens. The
+#: shared tflm template renders the emitting code, but stock tflm can never
+#: gate it true.
+NPU_ENGINES: frozenset[EngineType] = frozenset({EngineType.HELIA_RT, EngineType.HELIA_AOT})
 ET_ENGINES: frozenset[EngineType] = frozenset({EngineType.EXECUTORCH})
 #: Engines with a dedicated power binary. ExecuTorch has none — preflight
 #: rejects ``engine.type=executorch`` with ``power.enabled``.

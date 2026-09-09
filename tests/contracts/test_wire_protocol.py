@@ -398,13 +398,14 @@ def _matrix() -> list[_Render]:
             overrides={"arena_regions": [_TCM_REGION, _PSRAM_REGION]},
         ),
         # Ethos-U NPU init: gates _npu_init.j2 (HPX_NPU + npu_init_failed)
-        # in both engine mains; heliaRT rides the tflm render (same template,
-        # see _UNFLIPPABLE_PAIRS).
+        # in both engine mains. The render is heliaRT — a published NPU
+        # producer (NPU_ENGINES); stock tflm shares the template but can
+        # never gate it true (_check_npu_backend).
         _Render(
-            "ap510|rtt|tflm|ethos-u",
+            "ap510|rtt|helia-rt|ethos-u",
             "apollo510",
             "rtt",
-            "tflm",
+            "helia-rt",
             overrides={"has_ethos_u": True},
         ),
         _Render(
@@ -745,9 +746,6 @@ _UNFLIPPABLE_PAIRS: dict[tuple[str, str], str] = {
     ("busy_loop_probe", "helia-rt"): (
         "heliaRT renders main.cc.j2 byte-identically to tflm, which carries "
         "the busy-loop renders; a second identical render would prove nothing."
-    ),
-    ("has_ethos_u", "helia-rt"): (
-        "heliaRT renders main.cc.j2 byte-identically to tflm, which carries the ethos-u render."
     ),
     ("apollo3_burst", "executorch"): (
         "ExecuTorch is Cortex-M55 (apollo510) only and burst is an Apollo3 "

@@ -24,13 +24,13 @@ def test_groups_exist():
 
 
 def test_catalog_matches_upstream_export_size():
-    # 70 ARM PMU counters from the upstream export + 8 Ethos-U NPU events.
+    # 70 ARM PMU counters from the upstream export + 9 Ethos-U NPU events.
     counters = list_counters()
     arm = [c for c in counters if c.name.startswith("ARM_PMU_")]
     npu = [c for c in counters if c.name.startswith("ETHOSU_PMU_")]
     assert len(arm) == 70
-    assert len(npu) == 8
-    assert len(counters) == 78
+    assert len(npu) == 9
+    assert len(counters) == 79
 
 
 def test_catalog_includes_noncontiguous_unaligned_mve_counter():
@@ -119,7 +119,7 @@ def test_validate_group_selection_rejects_unsupported_groups():
 
 def test_ethos_npu_group_registered():
     counters = resolve_counters({"ethos_npu": "all"})
-    assert len(counters) == 8  # U85 catalogue
+    assert len(counters) == 9  # U85 catalogue
     for c in counters:
         assert c.group == "ethos_npu"
         assert c.name.startswith("ETHOSU_PMU_")
