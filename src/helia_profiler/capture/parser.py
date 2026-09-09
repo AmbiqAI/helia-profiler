@@ -630,11 +630,11 @@ def _merge_presets(
 def _infer_group(preset_name: str) -> str:
     """Derive the compute-unit group from a preset/pass name.
 
-    New-style pass names use ``<group>_<index>`` (e.g. ``mve_0``).
-    Legacy preset names are mapped directly.
+    New-style pass names use ``<group>_<index>`` (e.g. ``mve_0``,
+    ``ethos_npu_0``). Legacy preset names are mapped directly.
     """
-    # New convention: group_index
-    m = re.match(r"^([a-z]+)_\d+$", preset_name)
+    # New convention: group_index (group names may contain underscores)
+    m = re.match(r"^([a-z_]+)_\d+$", preset_name)
     if m:
         return m.group(1)
     # Legacy preset names map 1:1

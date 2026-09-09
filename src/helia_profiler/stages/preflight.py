@@ -36,6 +36,7 @@ from ..pipeline import PipelineContext
 from ..placement import Placement
 from ..platform import get_soc_for_board
 from ..platform.counters import (
+    resolve_counters,
     supported_groups_for_domains,
     validate_group_selection,
 )
@@ -345,11 +346,20 @@ def _check_pmu_selection(cfg) -> None:
         ) from exc
 
     # ethos_npu counters are sampled via the Ethos-U driver's inference
-    # hooks — without the ethos_u engine backend the NPU never runs and every
-    # row would be zero.
-    if "ethos_npu" in cfg.profiling.pmu_counters and cfg.engine.backend != "ethos_u":
+    # hooks — without the ethos_u engine backend the NPU never runs and the
+    # generated ethos_npu pass would reference NPU code that is not rendered.
+    # Gate on the RESOLVED counters' groups, not the selection keys: an
+    # explicit name list may put an NPU counter under any key.
+    try:
+        resolved = resolve_counters(cfg.profiling.pmu_counters)
+    except (TypeError, ValueError) as exc:
+        raise ConfigError(str(exc)) from exc
+    if (
+        any(c.group == "ethos_npu" for c in resolved)
+        and cfg.engine.backend != "ethos_u"
+    ):
         raise ConfigError(
-            "The 'ethos_npu' counter group requires engine.backend=ethos_u "
+            "The ethos_npu counter group (ETHOSU_PMU_*) requires engine.backend=ethos_u "
             "(the NPU is only exercised when the Ethos-U backend is enabled).",
             hint=(
                 "Set engine.backend=ethos_u with engine.type helia-rt or "
