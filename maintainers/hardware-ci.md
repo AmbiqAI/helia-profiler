@@ -356,7 +356,16 @@ Each board job uploads its own artifact, named
 `hardware-validation-<run_id>-<board>`. A run therefore has one artifact per
 board. Consumers such as the dashboard group a run's artifacts by the GitHub run
 ID recorded in each `validation_manifest.json` under `run.github.run_id`; there
-is no merge step in the workflow.
+is no merge step in the workflow. The upload runs whether or not validation
+passed, and it overwrites an artifact of the same name, so "re-run failed jobs"
+replaces the failed board's artifact with the new attempt's bundle (the
+manifest records `run.github.run_attempt`).
+
+The validate job's shell steps build provenance JSON with `jq`. The bench
+runner services expose only the runner contract's package set on `PATH`, not
+the host's general tools, so `jq` is part of that contract
+(`lab.embedded.packages` in `AmbiqAI/aitg-hardware-runner-nixos`) and the
+job's first step fails with a named error when it is missing.
 
 The runner must already provide:
 
@@ -366,6 +375,7 @@ The runner must already provide:
 - ARM toolchain, CMake, Ninja, and NSX on `PATH`
 - ATfE plus `ATFE_ROOT` when selected toolchains include `atfe`
 - Git LFS support for model fixtures
+- `jq` on `PATH` for the provenance steps
 - optional Joulescope access and wiring when `power` is `on` or `both`
 
 ATfE runs require `ATFE_ROOT` to point at the Arm Toolchain for Embedded install

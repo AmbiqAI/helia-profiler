@@ -178,6 +178,13 @@ jobs:
             echo "::error::runner owns board '${HPX_BOARD}' but this job targets '${HPX_VALIDATION_BOARD}'; check the runner's labels" >&2
             exit 2
           fi
+          # The provenance steps below build JSON with jq. The runner service
+          # exposes only the contract's package set on PATH, so a bench built
+          # without jq must fail here, not minutes later inside a job.
+          if ! command -v jq > /dev/null; then
+            echo "::error::runner has no jq on PATH; it is not configured per the runner contract" >&2
+            exit 2
+          fi
 
           {
             echo "HPX_VALIDATION_JLINK_SERIALS=${HPX_BOARD}=${HPX_JLINK_SERIAL}"
@@ -407,7 +414,14 @@ jobs:
           if [[ -n "${HPX_VALIDATION_POWER_SERIALS}" ]]; then
             args+=(--power-serials "${HPX_VALIDATION_POWER_SERIALS}")
           fi
-          uv run hpx validate "${args[@]}"
+          preview="$(uv run hpx validate "${args[@]}")"
+          printf '%s\n' "${preview}"
+          # A selection that matches nothing used to pass silently: no
+          # bundle, green job, and nothing for the dashboard to show.
+          if [[ "${preview}" == *"0 case(s) would run"* ]]; then
+            echo "::error::the requested suite, boards, and axes select no validation cases on ${HPX_VALIDATION_BOARD}" >&2
+            exit 2
+          fi
 
       - name: Run hardware validation
         run: |
@@ -462,12 +476,15 @@ jobs:
         run: uv run pytest -m compile_hw tests/contracts/test_render_compile_hw.py -rs -W default
 
       # One artifact per board. Consumers group a run's artifacts by the
-      # GitHub run ID recorded in each validation_manifest.json.
+      # GitHub run ID recorded in each validation_manifest.json. The upload
+      # runs on failure too, so "re-run failed jobs" meets an artifact of the
+      # same name from the first attempt: overwrite it rather than fail.
       - name: Upload validation artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: hardware-validation-${{ github.run_id }}-${{ matrix.board }}
+          overwrite: true
           path: |
             results/validation/
             !results/validation/**/work/**
