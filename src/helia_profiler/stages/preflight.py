@@ -1,4 +1,27 @@
-"""Run fail-fast configuration and domain checks without touching hardware."""
+"""Preflight: fail fast on the common, preventable problems.
+
+This stage runs before any platform resolution, code generation or build so
+that users get an immediate, actionable error when something trivial is
+wrong — instead of waiting for a confusing failure several stages in.
+
+Checks performed (in order):
+
+1. **Model file** (``engines/model_validation``) — exists, is a regular file,
+   non-empty, matches the selected engine, and carries a supported quantized
+   Softmax scaling.
+2. **Arena / RTT buffer sizes** — if specified, are positive.
+3. **Model placement** (``engines/preflight``) — optional arena/weights
+   overrides use regions the engine supports.
+4. **PMU selection, profiling mode, USB transport** (``platform/preflight``,
+   ``engines/preflight``) — the board and engine can honour what was asked.
+5. **Output directory** — can be created + written to.
+6. **Host toolchain** — ``nsx``, ``cmake``, ``ninja``, the selected compiler,
+   and ``SEGGER commander`` are available. ATfE is located via ``ATFE_ROOT``.
+
+All failures raise :class:`ConfigError` with a hint explaining how to fix
+it.  The stage never touches hardware — that's reserved for later stages —
+so running preflight on a laptop without a board attached is safe.
+"""
 
 from __future__ import annotations
 
@@ -74,7 +97,8 @@ def _check_output_dir(out_dir: Path) -> None:
             f"Cannot create output directory: {resolved} ({exc})",
             hint="Check output.dir — the parent must be writable.",
         ) from exc
-    # Probe writability even when the directory already exists.
+    # Write probe — catches mounted-read-only or permissions issues that
+    # mkdir() alone won't flag.
     probe = resolved / ".hpx_write_probe"
     try:
         probe.write_bytes(b"")

@@ -27,6 +27,10 @@ class PlanMemoryStage:
 
     def run(self, ctx: PipelineContext) -> None:
         cfg = ctx.config
+        # The engine adapter owns engine-specific placement policy.  Stage 2
+        # populates ctx.engine_adapter; for the rare early-call path where
+        # soc/adapter aren't yet available we fall back to a fresh adapter
+        # via the registry.
         arena_region, weights_region = resolve_placement(
             model=cfg.model,
             board=cfg.target.board,
@@ -37,6 +41,9 @@ class PlanMemoryStage:
         ctx.weights_region = weights_region
         log.info("Placement: arena=%s, weights=%s", arena_region, weights_region)
 
+        # Build / select the memory plan, then append the hpx-owned
+        # consumers every firmware reserves regardless of engine (#133
+        # Phase 3) so the overflow check finally sees them.
         plan = select_memory_plan(
             engine_type=cfg.engine.type,
             model=cfg.model,

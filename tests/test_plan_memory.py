@@ -736,10 +736,14 @@ class TestMemoryPlanningDomain:
         plan = apply_capacities(augmented, soc.memory)
         validate_memory_plan(plan)
 
-        assert initial.region("SRAM").used == 65536
-        assert initial.region("SRAM").capacity == 0
-        assert plan.region("SRAM").capacity == soc.memory.sram_kb * 1024
-        assert plan.region("MRAM").used == 2048
+        initial_sram = initial.region("SRAM")
+        planned_sram = plan.region("SRAM")
+        planned_mram = plan.region("MRAM")
+        assert initial_sram is not None and planned_sram is not None and planned_mram is not None
+        assert initial_sram.used == 65536
+        assert initial_sram.capacity == 0
+        assert planned_sram.capacity == soc.memory.sram_kb * 1024
+        assert planned_mram.used == 2048
         assert plan.model_weight_bytes == 2048
         assert model.arena_location is Placement.SRAM
         assert (

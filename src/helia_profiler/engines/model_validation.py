@@ -68,7 +68,22 @@ def check_model(path: Path, engine: EngineType) -> None:
 
 
 def check_softmax_scaling(path: Path, engine: EngineType) -> None:
-    """Reject unsupported quantized Softmax scales after checking the model file."""
+    """Reject quantized Softmax scales the selected engine cannot handle (#57).
+
+    TFLM aborts inside ``AllocateTensors()`` when ``beta * input_scale * 2**26
+    <= 1`` -- from the host that is a HardFault / RTT timeout with no
+    indication the model was the problem, after the board was powered, the
+    firmware built, and the image flashed. heliaAOT has no target-side abort,
+    but its compiler raises ``ValueError: negative shift count`` for
+    multipliers below 0.5 -- a stage-2 crash whose message names nothing. The
+    two numbers sit in the flatbuffer, so either run dies HERE instead, with
+    the quantization named. See ``modelcost/softmax_preflight`` for the
+    per-engine boundaries and how each was established.
+
+    Ordered after :func:`check_model`, which has already verified the file
+    reads and carries the TFLite magic -- so a parse failure past that point
+    is a malformed flatbuffer, reported as such rather than as a stack trace.
+    """
     if engine is EngineType.EXECUTORCH:
         return  # .pte -- never parses a TFLite flatbuffer
     try:

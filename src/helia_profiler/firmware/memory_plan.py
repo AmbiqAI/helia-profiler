@@ -421,7 +421,7 @@ def add_hpx_owned_consumers(
 
     transport = target.transport
     if transport == Transport.RTT:
-        from ..firmware import rtt_buffer_size_up
+        from . import rtt_buffer_size_up
 
         up = rtt_buffer_size_up(
             target.toolchain,

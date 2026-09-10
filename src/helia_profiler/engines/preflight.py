@@ -13,6 +13,10 @@ def check_runtime_split_locations(cfg: ProfileConfig) -> None:
     """Validate requested regions, including engine-specific PSRAM constraints."""
     runtime_arena = cfg.model.arena_location
     runtime_weights = cfg.model.weights_location
+
+    # The engine, not the placement, decides how PSRAM gets populated
+    # (#219) — so PSRAM validity is an adapter capability, not an
+    # EngineType branch.
     adapter = get_adapter(cfg.engine.type)
     if runtime_arena == Placement.PSRAM or runtime_weights == Placement.PSRAM:
         if adapter.psram_weights_source is PsramWeightsSource.UNSUPPORTED:
@@ -32,7 +36,11 @@ def check_runtime_split_locations(cfg: ProfileConfig) -> None:
                     "Use --transport rtt, or keep weights in MRAM/SRAM."
                 ),
             )
-    # Engine-specific rules can request PSRAM even with both coarse fields unset.
+    # Engine-specific PSRAM constraints — called unconditionally, not just
+    # when the coarse split fields say PSRAM: an engine can be steered into
+    # PSRAM by its own config (heliaAOT per-tensor rules in
+    # aot_args.memory.tensors) with both coarse fields unset, and that path
+    # must hit the same fail-fast wall.
     adapter.check_psram_placement(cfg)
     _check_explicit_location(
         runtime_arena,
@@ -66,6 +74,17 @@ def check_profiling_support(
             hint="Disable power capture; clean end-to-end cycle measurements are supported.",
         )
     if engine is EngineType.EXECUTORCH and clean_window_probe is CleanWindowProbe.BUSY_LOOP:
+        # The busy_loop probe is a power-window diagnostic: it replaces the
+        # model with a calibrated CPU spin so an external instrument has a
+        # known-shape window to gate on, and reports HPX_CLEAN_INFER_COUNT=1
+        # for the single unit of work it performs.  ExecuTorch has no power
+        # support at all (rejected just above), so the probe has nothing to
+        # gate -- and since #154 phase 4 the render would silently succeed:
+        # main_executorch.cc.j2's engine_clean_window override delegates the
+        # busy_loop branch straight back to the base, so the firmware would
+        # come back with a nop-loop window reporting COUNT=1 where this
+        # engine's HPX_CLEAN_INFER_* are defined as real execute-only
+        # inference timing.
         raise ConfigError(
             "The busy_loop clean-window probe requires an engine with "
             "power-window support; engine.type=executorch has none.",
