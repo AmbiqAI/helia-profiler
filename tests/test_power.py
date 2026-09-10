@@ -1141,17 +1141,26 @@ class TestGatedCaptureContracts:
         monkeypatch.setattr(module, "_close_device", lambda *_args: None)
         reads = 0
         ms = _SECOND // 1000
+        # Read brackets come from the host clock. Drive it from the fake
+        # read so the timeline is deterministic: each read takes 10 ms and
+        # its stats packet lands a hair before the sample tick, as on a real
+        # host. A real clock with 15.6 ms resolution (Windows, Python 3.11)
+        # measured two 10 ms brackets as 0.032 s and failed the floor below.
+        host_ticks = 0
+        monkeypatch.setattr(module, "_host_monotonic_time64", lambda _time64: host_ticks)
 
         def read_snapshot(_driver, _path):
-            nonlocal reads
+            nonlocal reads, host_ticks
             time.sleep(0.01)
             reads += 1
+            host_ticks += 10 * ms
             fake._stats_cb(
                 "u/js220/test/s/stats/value",
                 TestGatedStatsProcessing._packet(
                     reads * ms, (reads + 1) * ms, 0.0001, 0.00018, 0.12
                 ),
             )
+            host_ticks += ms // 100
             return int(reads in (2, 3))
 
         monkeypatch.setattr(module, "_read_gpi_snapshot", read_snapshot)
