@@ -38,6 +38,7 @@ from .issues import (
     COMPARABILITY_REGISTRY,
     DIMENSION_DIFFERS,
     MEMORY_DIMENSION_MISMATCH,
+    METRIC_BLOCKING_CODE_BY_GROUP,
     ISSUE_REGISTRY,
     POWER_DIMENSION_MISMATCH,
     ComparabilityCode,
@@ -45,6 +46,7 @@ from .issues import (
     ComparisonDimension,
     IssueCode,
     Severity,
+    error_metric_group,
 )
 from .manifest import (
     RESULT_MANIFEST_SCHEMA,
@@ -112,6 +114,7 @@ __all__ = [
     "DeploymentRecord",
     "DIMENSION_DIFFERS",
     "MEMORY_DIMENSION_MISMATCH",
+    "METRIC_BLOCKING_CODE_BY_GROUP",
     "DIMENSION_REGISTRY",
     "DimensionEffect",
     "dimensions_with_effect",
@@ -153,6 +156,7 @@ __all__ = [
     "RunMetadata",
     "RunStatus",
     "Severity",
+    "error_metric_group",
     "SUPPORT_BUNDLE_SCHEMA",
     "SUPPORT_BUNDLE_SCHEMA_VERSION",
     "SupportBundleManifest",
