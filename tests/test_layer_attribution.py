@@ -44,7 +44,11 @@ class TestSourceIndexFromOp:
         assert source_index_from_op("CONV_2D") is None
 
     def test_non_integer_suffix_is_none(self):
-        # ExecuTorch labels name chain/instruction, not a tflite operator.
+        # ExecuTorch labels name chain/instruction, not a tflite operator —
+        # with the operator name (#301) or the older kind-only prefix. The
+        # `::` namespace separator must not be mistaken for a suffix either.
+        assert source_index_from_op("aten::add.out:c3i12") is None
+        assert source_index_from_op("cortex_m::quantized_conv2d.out:c0i0") is None
         assert source_index_from_op("OPERATOR_CALL:c3i12") is None
         assert source_index_from_op("OP:-1") is None
         assert source_index_from_op("OP:") is None
@@ -127,9 +131,10 @@ class TestLayerAttributor:
         att = LayerAttributor(_skewed_analysis(), None)
         # In-range id on purpose: an identity fallback for ":"-labelled ops
         # would positionally resolve id 0 to 100,000 macs (#222).
-        result = att.attribute(0, "OPERATOR_CALL:c3i12")
-        assert result.source_index is None
-        assert result.macs is None
+        for op in ("aten::add.out:c3i12", "OPERATOR_CALL:c3i12"):
+            result = att.attribute(0, op)
+            assert result.source_index is None, op
+            assert result.macs is None, op
         assert att.attribute("odd-id", "CONV_2D").macs is None
 
     def test_a_carried_source_index_outranks_the_label_but_not_the_manifest(self):

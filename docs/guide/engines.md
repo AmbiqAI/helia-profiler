@@ -27,8 +27,10 @@ The ExecuTorch engine consumes an already exported `.pte` program and builds
 the local `nsx-executorch` Cortex-M runtime into the generated NSX firmware.
 It uses ExecuTorch's `EventTracer` instruction scopes to reset and sample the
 Armv8-M PMU around each kernel or delegate call. This keeps the runtime and
-CMSIS-NN kernels unmodified while producing stable instruction identities such
-as `OPERATOR_CALL:c0i7` in per-layer results.
+CMSIS-NN kernels unmodified. Per-layer rows are labelled with the serialized
+operator that ran and a stable chain/instruction identity, such as
+`cortex_m::quantized_conv2d.out:c0i7` or `aten::add.out:c0i12`; a delegate
+call carries its backend id instead of an operator name.
 
 ```yaml title="hpx.yml"
 model:
