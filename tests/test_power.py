@@ -1164,7 +1164,9 @@ class TestGatedCaptureContracts:
         )
         assert result.gated_windows
         assert result.metadata.gating_method == "gpi_snapshot_poll+host_stats_integral"
-        assert result.metadata.gating_diagnostics["poll_edge_uncertainty_s"] >= 0.04
+        diagnostics = result.metadata.gating_diagnostics
+        assert diagnostics is not None
+        assert diagnostics["poll_edge_uncertainty_s"] >= 0.04
 
     @pytest.mark.parametrize("window_count", [-1, 0, 2])
     def test_multiple_windows_rejected_before_open(self, monkeypatch, window_count):
