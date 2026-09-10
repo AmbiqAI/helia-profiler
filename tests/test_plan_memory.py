@@ -712,7 +712,9 @@ class TestMemoryPlanningDomain:
         path = tmp_path / "model.tflite"
         path.write_bytes(b"\x00" * 2048)
         model = ModelConfig(
-            path=path, arena_size=65536, arena_location=Placement.SRAM,
+            path=path,
+            arena_size=65536,
+            arena_location=Placement.SRAM,
             weights_location=Placement.MRAM,
         )
         target = TargetConfig(board="apollo510_evb")
@@ -722,8 +724,11 @@ class TestMemoryPlanningDomain:
         )
         assert (arena, weights) == (Placement.SRAM, Placement.MRAM)
         initial = select_memory_plan(
-            engine_type=EngineType.TFLM, model=model, artifacts=None,
-            arena_region=arena, weights_region=weights,
+            engine_type=EngineType.TFLM,
+            model=model,
+            artifacts=None,
+            arena_region=arena,
+            weights_region=weights,
         )
         augmented = add_hpx_owned_consumers(
             initial, soc=soc, engine_type=EngineType.TFLM, target=target
@@ -737,9 +742,10 @@ class TestMemoryPlanningDomain:
         assert plan.region("MRAM").used == 2048
         assert plan.model_weight_bytes == 2048
         assert model.arena_location is Placement.SRAM
-        assert add_hpx_owned_consumers(
-            augmented, soc=soc, engine_type=EngineType.TFLM, target=target
-        ) == augmented
+        assert (
+            add_hpx_owned_consumers(augmented, soc=soc, engine_type=EngineType.TFLM, target=target)
+            == augmented
+        )
 
     def test_missing_soc_leaves_plan_unchanged(self):
         from helia_profiler.config import TargetConfig
@@ -750,6 +756,9 @@ class TestMemoryPlanningDomain:
 
         plan = MemoryPlan(engine=EngineType.TFLM)
         assert apply_capacities(plan, None) is plan
-        assert add_hpx_owned_consumers(
-            plan, soc=None, engine_type=EngineType.TFLM, target=TargetConfig()
-        ) is plan
+        assert (
+            add_hpx_owned_consumers(
+                plan, soc=None, engine_type=EngineType.TFLM, target=TargetConfig()
+            )
+            is plan
+        )
