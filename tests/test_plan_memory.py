@@ -500,7 +500,7 @@ class TestHpxOwnedConsumers:
 
     def test_record_size_table_is_the_frozen_contract(self):
         from helia_profiler.engines import EngineType
-        from helia_profiler.stages.plan_memory import PMU_RECORD_SIZE_BYTES
+        from helia_profiler.firmware.memory_plan import PMU_RECORD_SIZE_BYTES
 
         assert PMU_RECORD_SIZE_BYTES == {
             EngineType.TFLM: 24,
@@ -670,7 +670,7 @@ class TestHpxOwnedConsumers:
             MemoryPlan,
             MemoryRegionUsage,
         )
-        from helia_profiler.stages.plan_memory import _add_hpx_owned_consumers
+        from helia_profiler.firmware.memory_plan import add_hpx_owned_consumers
 
         engine_plan = MemoryPlan(
             engine=EngineType.HELIA_AOT,
@@ -688,6 +688,81 @@ class TestHpxOwnedConsumers:
             ),
         )
         ctx = _make_ctx(tmp_path, {"engine": {"type": "helia-aot"}})
-        merged = _add_hpx_owned_consumers(engine_plan, ctx)
+        merged = add_hpx_owned_consumers(
+            engine_plan, soc=ctx.soc, engine_type=ctx.config.engine.type, target=ctx.config.target
+        )
         records = [c for r in merged.regions for c in r.consumers if c.name == "pmu_layer_records"]
         assert [c.size for c in records] == [1234]  # engine's entry kept, once
+
+
+class TestMemoryPlanningDomain:
+    def test_plans_firmware_without_pipeline_context(self, tmp_path):
+        from helia_profiler.config import ModelConfig, TargetConfig
+        from helia_profiler.engines import get_adapter
+        from helia_profiler.firmware.memory_plan import (
+            add_hpx_owned_consumers,
+            apply_capacities,
+            resolve_placement,
+            select_memory_plan,
+            validate_memory_plan,
+        )
+        from helia_profiler.placement import Placement
+        from helia_profiler.platform import get_soc_for_board
+
+        path = tmp_path / "model.tflite"
+        path.write_bytes(b"\x00" * 2048)
+        model = ModelConfig(
+            path=path,
+            arena_size=65536,
+            arena_location=Placement.SRAM,
+            weights_location=Placement.MRAM,
+        )
+        target = TargetConfig(board="apollo510_evb")
+        soc = get_soc_for_board(target.board)
+        arena, weights = resolve_placement(
+            model=model, board=target.board, soc=soc, adapter=get_adapter(EngineType.TFLM)
+        )
+        assert (arena, weights) == (Placement.SRAM, Placement.MRAM)
+        initial = select_memory_plan(
+            engine_type=EngineType.TFLM,
+            model=model,
+            artifacts=None,
+            arena_region=arena,
+            weights_region=weights,
+        )
+        augmented = add_hpx_owned_consumers(
+            initial, soc=soc, engine_type=EngineType.TFLM, target=target
+        )
+        plan = apply_capacities(augmented, soc.memory)
+        validate_memory_plan(plan)
+
+        initial_sram = initial.region("SRAM")
+        planned_sram = plan.region("SRAM")
+        planned_mram = plan.region("MRAM")
+        assert initial_sram is not None and planned_sram is not None and planned_mram is not None
+        assert initial_sram.used == 65536
+        assert initial_sram.capacity == 0
+        assert planned_sram.capacity == soc.memory.sram_kb * 1024
+        assert planned_mram.used == 2048
+        assert plan.model_weight_bytes == 2048
+        assert model.arena_location is Placement.SRAM
+        assert (
+            add_hpx_owned_consumers(augmented, soc=soc, engine_type=EngineType.TFLM, target=target)
+            == augmented
+        )
+
+    def test_missing_soc_leaves_plan_unchanged(self):
+        from helia_profiler.config import TargetConfig
+        from helia_profiler.firmware.memory_plan import (
+            add_hpx_owned_consumers,
+            apply_capacities,
+        )
+
+        plan = MemoryPlan(engine=EngineType.TFLM)
+        assert apply_capacities(plan, None) is plan
+        assert (
+            add_hpx_owned_consumers(
+                plan, soc=None, engine_type=EngineType.TFLM, target=TargetConfig()
+            )
+            is plan
+        )
