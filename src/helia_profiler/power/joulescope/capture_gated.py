@@ -34,10 +34,12 @@ from .device import (
 )
 from .diagnostics import _gated_stats_diagnostics, _poll_edge_uncertainty_s
 from .stats import (
+    _counter_rate_ratio,
     _fullrate_energy_over_windows,
     _map_poll_samples_to_packet_time,
     _process_gated_stats,
     _segment_streamed_gpi,
+    streamed_gpi_timebase,
     _summary_to_dict,
     _whole_summary_from_stats,
 )
@@ -590,6 +592,28 @@ def capture_gated(
                 poll_reads, minimum_window_s=minimum_gate_s
             )
 
+        # How the streamed-GPI time base was derived (#249). Both gate edges
+        # are placed with a per-sample spacing inferred from frame timestamps,
+        # so when a window disagrees with the firmware clock this says whether
+        # that inference is the reason. Diagnostic only.
+        #
+        # Computed once and attached to every diagnostics dict that can reach
+        # the artifact: the degraded path publishes the dict built here, while
+        # the success path builds a second one further down. Attaching it to
+        # only the first silently dropped it from exactly the runs worth
+        # diagnosing.
+        stream_timebase = (
+            streamed_gpi_timebase(gpi_stream_frames)
+            if gpi_stream_enabled and gpi_stream_frames
+            else None
+        )
+        if stream_timebase is not None:
+            gating_diagnostics["gpi_stream_timebase"] = stream_timebase
+        # The filter that scales utc, read straight from the packets (#249).
+        counter_rate = _counter_rate_ratio(packets)
+        if counter_rate is not None:
+            gating_diagnostics["instrument_time_map"] = counter_rate
+
         windows, gated_summary = _process_gated_stats(
             packets=packets,
             poll_samples=aligned_poll_samples,
@@ -770,6 +794,9 @@ def capture_gated(
         if packets:
             whole_summary = _whole_summary_from_stats(packets)
             metadata.whole_capture_summary = _summary_to_dict(whole_summary)
+            # One dict, attached once above: main consolidated the second
+            # _gated_stats_diagnostics call that used to build a fresh one here
+            # and silently drop anything added to the first.
             diagnostics = gating_diagnostics
             metadata.gating_diagnostics = diagnostics
             sane_window = gated_summary.avg_current_a > whole_summary.avg_current_a

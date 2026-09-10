@@ -85,9 +85,107 @@ def _sv(field: Any, default: float = 0.0) -> float:
     return default
 
 
+def _packet_duration_ticks(t: dict[str, Any], u0: float, u1: float, second: float) -> float:
+    """How long one stats packet covered, in time64 ticks (#249).
+
+    ``utc`` is not a device timestamp. jsdrv maps the instrument's sample
+    counter to UTC through a filter it fits while streaming, and publishes that
+    fit in every packet as ``time.time_map.counter_rate``. Measured on a JS320
+    that rate read 15,849,906 Hz against a nameplate ``sample_freq`` of
+    16,000,000 -- a 9470 ppm deficit -- and ``u1 - u0`` overstated the packet by
+    9469 ppm to match. Early in a session the same fit was 2.9 % out.
+
+    The window's duration is the sum of these, so that error lands directly on
+    the reported gate width and on everything divided by it: average current,
+    average power and TOPS. Not TOPS-per-watt -- it is ops over energy once the
+    duration cancels -- and not ``energy_j``, which the device integrated.
+
+    Measured range on one bench session: 130 ppm once the fit had settled,
+    1.5 % on the first captures after the stream started, and 2.9 % at the
+    coldest reading. The single-packet figure above is one sample of that, not
+    a typical value.
+
+    ``utc`` stays the axis packets are *selected* on -- a shared scale error
+    cancels out of a selection -- and is the fallback when a packet carries no
+    counter span.
+    ``second`` is ``time64.SECOND``, passed in rather than imported here: this
+    runs once per stat packet, and a per-element import cost ~15 % of
+    ``_stats_arrays`` on a minute-long capture.
+    """
+    # `delta` first: the driver divides by exactly this to build the charge and
+    # energy integrals in the same packet, so taking it makes
+    # ``energy_j / duration_s`` consistent by construction rather than by
+    # reimplementing the same arithmetic and hoping it matches.
+    delta = (t.get("delta", {}) or {}).get("value")
+    try:
+        if delta is not None and float(delta) > 0:
+            return float(delta) * second
+    except (TypeError, ValueError):
+        pass
+    samples = (t.get("samples", {}) or {}).get("value")
+    freq = (t.get("sample_freq", {}) or {}).get("value")
+    try:
+        if samples is not None and len(samples) >= 2 and freq:
+            span = float(samples[1]) - float(samples[0])
+            # Strictly positive: a decreasing pair is a corrupt packet, and a
+            # negative duration would make _process_gated_stats drop the whole
+            # window silently rather than fall back to utc.
+            if span > 0:
+                return span * second / float(freq)
+    except (TypeError, ValueError, IndexError):
+        pass
+    return u1 - u0
+
+
+def _counter_rate_ratio(packets: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """How far jsdrv's fitted counter rate sits from the nameplate rate.
+
+    Published as a diagnostic because it is the direct read on the error above:
+    it is what ``utc`` is scaled by, and one run of it identifies a bad time
+    base that previously took a nineteen-capture series to attribute.
+
+    Reported as a range, not a median. The quantity *moves* -- that is the whole
+    point of it -- and a median over a capture that converged halfway through
+    returns the settled value, hiding the very sweep worth seeing. A capture
+    2.9 % out for its first half reduces to a median of exactly 1.000000. The
+    first/last pair says which direction it moved and whether it had settled by
+    the end.
+    """
+    import numpy as np
+
+    ratios, rates, freqs = [], [], []
+    for packet in packets:
+        t = packet.get("time", {}) if isinstance(packet, dict) else {}
+        rate = (t.get("time_map", {}) or {}).get("counter_rate")
+        freq = (t.get("sample_freq", {}) or {}).get("value")
+        if rate and freq:
+            rates.append(float(rate))
+            freqs.append(float(freq))
+            ratios.append(float(freq) / float(rate))
+    if not ratios:
+        return None
+    return {
+        "counter_rate_hz": float(np.median(rates)),
+        "sample_freq_hz": float(np.median(freqs)),
+        # >1 means utc runs fast, inflating any duration measured on it.
+        "utc_over_counter_rate": float(np.median(ratios)),
+        "utc_over_counter_rate_min": float(np.min(ratios)),
+        "utc_over_counter_rate_max": float(np.max(ratios)),
+        "utc_over_counter_rate_first": ratios[0],
+        "utc_over_counter_rate_last": ratios[-1],
+        # Non-zero means the fit was still moving during the capture.
+        "counter_rate_swept_by": float(np.max(ratios) - np.min(ratios)),
+        "packets_with_time_map": len(ratios),
+        "packets_total": len(packets),
+    }
+
+
 def _stats_arrays(packets: list[dict[str, Any]]) -> dict[str, Any]:
     """Vectorise the per-packet fields we use from ``s/stats/value`` packets."""
     import numpy as np
+    from pyjoulescope_driver import time64
+
+    second = float(time64.SECOND)
 
     mid, host_time, dur, cur_avg, cur_max, cur_min, cur_int, pwr_avg, pwr_int = (
         [] for _ in range(9)
@@ -104,7 +202,7 @@ def _stats_arrays(packets: list[dict[str, Any]]) -> dict[str, Any]:
         pwr = sig.get("power", {})
         mid.append(0.5 * (u0 + u1))
         host_time.append(float(host_tick) if host_tick is not None else np.nan)
-        dur.append((u1 - u0))
+        dur.append(_packet_duration_ticks(t, u0, u1, second))
         cur_avg.append(_sv(cur.get("avg")))
         cur_max.append(_sv(cur.get("max")))
         cur_min.append(_sv(cur.get("min")))
@@ -323,6 +421,76 @@ def _segment_streamed_gpi(
     return windows
 
 
+def streamed_gpi_timebase(frames: list[dict[str, Any]]) -> dict[str, Any]:
+    """Report how the streamed-GPI time base was reconstructed (#249).
+
+    :func:`_segment_streamed_gpi` cannot trust the JS320's reported sample rate
+    -- the instrument advertises the raw rate with ``decimate_factor`` 1 while
+    delivering 8:1-decimated samples -- so it derives the per-sample spacing
+    from consecutive frame ``utc`` values instead. Every intra-frame edge is
+    then placed at ``frame_t0 + index * tick_per_sample``, which makes that one
+    derived number decide both gate edges.
+
+    This records what the derivation actually saw, so a window that disagrees
+    with the firmware clock can be attributed to the time base rather than
+    guessed at. Diagnostic only: nothing here feeds the gate or the energy.
+    """
+    import numpy as np
+    from pyjoulescope_driver import time64
+
+    usable = [
+        frame for frame in frames if np.asarray(frame["data"]).size and float(frame["rate"]) > 0
+    ]
+    if not usable:
+        return {"frame_count": 0}
+
+    spacings = [
+        (float(nxt["utc"]) - float(cur["utc"])) / int(np.asarray(cur["data"]).size)
+        for cur, nxt in zip(usable, usable[1:])
+        if float(nxt["utc"]) > float(cur["utc"])
+    ]
+    sizes = [int(np.asarray(frame["data"]).size) for frame in usable]
+    reported_rate = float(usable[0]["rate"])
+    out: dict[str, Any] = {
+        "frame_count": len(usable),
+        "dropped_or_empty_frames": len(frames) - len(usable),
+        "reported_rate_hz": reported_rate,
+        "sample_count_total": int(sum(sizes)),
+        "frame_sample_count_min": min(sizes),
+        "frame_sample_count_max": max(sizes),
+        "spacing_sample_count": len(spacings),
+    }
+    if not spacings:
+        out["tick_per_sample"] = time64.SECOND / reported_rate
+        out["tick_per_sample_source"] = "reported_rate"
+        return out
+
+    median = float(np.median(spacings))
+    out.update(
+        {
+            "tick_per_sample": median,
+            "tick_per_sample_source": "median_frame_spacing",
+            "implied_rate_hz": time64.SECOND / median if median else None,
+            # Ratio of the rate the instrument claims to the rate its own frame
+            # timestamps imply. The 8:1 decimation shows up here as ~8.
+            "reported_over_implied_rate": (reported_rate * median / time64.SECOND)
+            if median
+            else None,
+            # Spread across the capture. A stable time base gives a tight
+            # band; a wide one means the median -- and therefore both gate
+            # edges -- is an estimate over noisy input.
+            "spacing_min_tick": float(np.min(spacings)),
+            "spacing_max_tick": float(np.max(spacings)),
+            "spacing_p05_tick": float(np.percentile(spacings, 5)),
+            "spacing_p95_tick": float(np.percentile(spacings, 95)),
+            "spacing_relative_spread": (float(np.max(spacings)) - float(np.min(spacings))) / median
+            if median
+            else None,
+        }
+    )
+    return out
+
+
 def _fullrate_energy_over_windows(
     *,
     cur_chunks: list[Any],
@@ -358,7 +526,16 @@ def _fullrate_energy_over_windows(
     sr = float(anchors[-1][2])
     if sr <= 0:
         return None
-    slope = time64.SECOND / sr
+    # Ticks per sample ON THE EDGES' OWN AXIS (#249). The window edges come from
+    # GPI polls mapped to the driver's fitted utc, so placing samples at the
+    # nameplate rate instead selects a span wrong by the fit's error -- 2.9 %
+    # at its worst, which is 286 extra samples on a 10 ms window. Consecutive
+    # anchors carry both a sample index and a utc, so they give the conversion
+    # directly; the nameplate rate is the fallback when there is only one.
+    if len(idx) >= 2 and idx[-1] > idx[0] and utc[-1] > utc[0]:
+        slope = (utc[-1] - utc[0]) / (idx[-1] - idx[0])
+    else:
+        slope = time64.SECOND / sr
     i0, u0 = idx[0], utc[0]
     sample_utc = u0 + (np.arange(n, dtype=np.float64) - i0) * slope
 
@@ -381,7 +558,13 @@ def _fullrate_energy_over_windows(
             continue
         charge_c = float(np.sum(seg_i) * dt)
         energy_j = float(np.sum(seg_i * seg_v) * dt)
-        dur_s = (fall - rise) / time64.SECOND
+        # Count the samples, do not measure the edges (#249). The samples are
+        # spaced at the nameplate rate ``dt``, while ``rise``/``fall`` are on
+        # the driver's fitted utc axis -- so ``(fall - rise)`` carries that
+        # fit's error while the charge and energy above do not. This is the
+        # measurement someone reaches for to corroborate the gated path, and
+        # it would have disagreed with it by up to 1.5 %.
+        dur_s = float(seg_i.size) * dt
         tot_charge += charge_c
         tot_energy += energy_j
         tot_dur += dur_s

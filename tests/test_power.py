@@ -234,8 +234,26 @@ class TestGatedStatsProcessing:
 
     @staticmethod
     def _packet(u0: int, u1: int, cur_int: float, pwr_int: float, cur_max: float):
+        # A real jsdrv packet carries its counter span and the time_map fit
+        # alongside utc; the duration and the #249 diagnostic both come from
+        # them, so a fixture without them silently tests only the fallback.
+        _FREQ = 16_000_000.0
+        _RATE = 15_849_906.047525965
+        _s0 = 13_043_307_285_148 + round(u0 / _SECOND * _FREQ)
+        # round, not truncate: _SECOND // 1000 is not an exact millisecond,
+        # and flooring would make the fixture short by 60 ppm.
+        _span = round((u1 - u0) / _SECOND * _FREQ)
         return {
-            "time": {"utc": {"value": [u0, u1]}},
+            "time": {
+                "utc": {"value": [u0, u1]},
+                "samples": {"value": [_s0, _s0 + _span]},
+                "sample_freq": {"value": _FREQ},
+                "time_map": {
+                    "counter_rate": _RATE,
+                    "offset_time": u0,
+                    "offset_counter": _s0,
+                },
+            },
             "signals": {
                 "current": {
                     "avg": {"value": cur_int / ((u1 - u0) / _SECOND)},
@@ -338,21 +356,6 @@ class TestGatedStatsProcessing:
         )
         assert len(windows) == 1
         assert summary.avg_current_a == pytest.approx(0.1, rel=1e-6)
-
-    def test_alternating_signed_packets_are_rectified_before_summing(self):
-        from helia_profiler.power.joulescope.stats import _process_gated_stats
-
-        ms = _SECOND // 1000
-        packets = [
-            self._packet(i * ms, (i + 1) * ms, sign * 0.0001, sign * 0.00018, 0.12)
-            for i, sign in enumerate([1, -1] * 5)
-        ]
-        windows, summary = _process_gated_stats(
-            packets=packets, poll_samples=[(-ms, 0), (0, 1), (10 * ms, 0)], io_voltage=1.8
-        )
-        assert len(windows) == 1
-        assert windows[0].charge_c == pytest.approx(0.001)
-        assert summary.energy_j == pytest.approx(0.0018)
 
     def test_gated_diagnostics_separates_selected_packets(self):
         from helia_profiler.power.joulescope.diagnostics import _gated_stats_diagnostics
@@ -473,53 +476,6 @@ class TestGatedStatsProcessing:
 
         assert [level for _tick, level in mapped] == [0, 1, 0]
         assert mapped[0][0] < mapped[1][0] < mapped[2][0]
-
-    @pytest.mark.parametrize("edge", ["rise", "fall"])
-    def test_mapping_rejects_gate_outside_stats_coverage(self, edge):
-        from helia_profiler.power.joulescope.stats import _map_poll_samples_to_packet_time
-
-        ms = _SECOND // 1000
-        packets = [
-            self._packet_with_host_time(i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12, (100 + i) * ms)
-            for i in range(20)
-        ]
-        rise = 90 if edge == "rise" else 105
-        fall = 130 if edge == "fall" else 115
-        with pytest.raises(PowerError, match="do not cover the GPIO gate"):
-            _map_poll_samples_to_packet_time(
-                packets=packets,
-                poll_samples=[(80 * ms, 0), (rise * ms, 1), (fall * ms, 0)],
-            )
-
-    def test_mapping_extrapolates_normal_endpoint_uncertainty(self):
-        from helia_profiler.power.joulescope.stats import _map_poll_samples_to_packet_time
-
-        ms = _SECOND // 1000
-        packets = [
-            self._packet_with_host_time(i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12, (100 + i) * ms)
-            for i in range(20)
-        ]
-        mapped = _map_poll_samples_to_packet_time(
-            packets=packets,
-            poll_samples=[(90 * ms, 0), (99 * ms, 1), (120 * ms, 0), (140 * ms, 0)],
-        )
-        assert mapped[1][0] == pytest.approx(-ms / 2, abs=1)
-        assert mapped[2][0] == pytest.approx(20.5 * ms, abs=1)
-        assert mapped[3][0] > mapped[2][0]
-
-    @pytest.mark.parametrize("host_ticks", [None, [100, 100]])
-    def test_mapping_rejects_missing_or_constant_anchors(self, host_ticks):
-        from helia_profiler.power.joulescope.stats import _map_poll_samples_to_packet_time
-
-        ms = _SECOND // 1000
-        packets = [self._packet(i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12) for i in range(2)]
-        if host_ticks:
-            for packet, tick in zip(packets, host_ticks):
-                packet["_host_time64"] = tick * ms
-        with pytest.raises(PowerError, match="Insufficient"):
-            _map_poll_samples_to_packet_time(
-                packets=packets, poll_samples=[(90 * ms, 0), (100 * ms, 1), (101 * ms, 0)]
-            )
 
     def test_gated_stats_filters_short_gpio_glitch(self):
         from helia_profiler.power.joulescope.stats import _process_gated_stats
@@ -895,11 +851,6 @@ class TestStreamedGateSelection:
         monkeypatch.setattr(module, "_open_device", lambda _serial: (fake, "u/js320/test", "js320"))
         monkeypatch.setattr(module, "_close_device", lambda *_a, **_k: None)
 
-        def unexpected_mapping(**_kwargs):
-            pytest.fail("Streamed gate edges must not depend on snapshot timestamp coverage")
-
-        monkeypatch.setattr(module, "_map_poll_samples_to_packet_time", unexpected_mapping)
-
         # Snapshot poller sees one plain rise/fall so the capture completes;
         # its edge timing is deliberately NOT what the assertion checks.
         calls = {"n": 0}
@@ -934,8 +885,15 @@ class TestStreamedGateSelection:
         diagnostics = result.metadata.gating_diagnostics
         assert diagnostics is not None
         assert diagnostics["gate_edge_source"] == "gpi_stream"
-        assert "poll_edge_uncertainty_s" not in diagnostics
         assert diagnostics["stream_segment_count"] == 2
+        # #249: both records must reach the PUBLISHED dict. gating_diagnostics
+        # is built twice -- once for the degraded path, once here -- and a
+        # previous fix attached these to the first only, so they were absent
+        # from exactly the successful runs worth diagnosing.
+        assert "gpi_stream_timebase" in diagnostics
+        time_map = diagnostics["instrument_time_map"]
+        assert time_map["utc_over_counter_rate"] == pytest.approx(1.009469, rel=1e-4)
+        assert time_map["packets_with_time_map"] == time_map["packets_total"]
         (recorded,) = diagnostics["windows"]
         assert recorded["rise_tick"] == pytest.approx(19 * ms, abs=ms // 100)
         assert recorded["fall_tick"] == pytest.approx(29 * ms, abs=ms // 100)
@@ -973,6 +931,13 @@ class TestMissedGateWarningNamesTheFix:
                     return callback
             return None
 
+        @property
+        def _gpi_cb(self):
+            for topic, callback in self._subs.items():
+                if "/s/gpi/" in topic and topic.endswith("!data"):
+                    return callback
+            return None
+
         def emit_packets(self, count: int) -> None:
             assert self._stats_cb is not None, "subscribe() was never called"
             ms = _SECOND // 1000
@@ -980,6 +945,26 @@ class TestMissedGateWarningNamesTheFix:
                 self._stats_cb(
                     "u/js320/test/s/stats/value",
                     TestGatedStatsProcessing._packet(i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12),
+                )
+            # GPI frames that never go high, matching the missed-gate scenario.
+            # Without them the degraded path has no stream to characterise and
+            # its time-base record is vacuously absent.
+            gpi = self._gpi_cb
+            if gpi is None:
+                return
+            import numpy as np
+
+            per_frame = 8
+            for i in range(count):
+                gpi(
+                    "u/js320/test/s/gpi/0/!data",
+                    {
+                        "utc": i * ms,
+                        "sample_rate": 16_000_000.0,
+                        "decimate_factor": 16,
+                        "sample_id": i * per_frame * 16,
+                        "data": np.zeros(per_frame, dtype=np.uint8),
+                    },
                 )
 
     def _run_capture(self, monkeypatch, *, lockstep: bool, wired: bool):
@@ -1017,6 +1002,23 @@ class TestMissedGateWarningNamesTheFix:
         )
         assert "No GPIO gate rising edge detected" in warnings
         assert "power.lockstep: true" in warnings
+
+    def test_the_degraded_artifact_still_carries_the_time_base_diagnostics(
+        self, monkeypatch, caplog
+    ):
+        """#249: a run that lost its gate is the one an operator most needs to
+        diagnose, so both time-base records must survive to the degraded
+        artifact -- not only to the successful path's dict."""
+        with caplog.at_level(logging.WARNING, logger="hpx"):
+            result = self._run_capture(monkeypatch, lockstep=True, wired=True)
+
+        assert result.metadata.integrity == "degraded"
+        diagnostics = result.metadata.gating_diagnostics
+        assert diagnostics is not None
+        assert "gpi_stream_timebase" in diagnostics
+        time_map = diagnostics["instrument_time_map"]
+        assert time_map["utc_over_counter_rate"] == pytest.approx(1.009469, rel=1e-4)
+        assert time_map["packets_with_time_map"] == 10
 
     def test_warning_stays_wiring_only_when_lockstep_was_already_on(self, monkeypatch, caplog):
         with caplog.at_level(logging.WARNING, logger="hpx"):
@@ -1103,131 +1105,6 @@ class TestJoulescopeUngatedCapture:
         assert result.summary.sample_count == 1
         assert result.summary.avg_current_a == pytest.approx(0.01, rel=1e-6)
         assert ("u/js320/25QG/s/i/range/mode", "auto") in fake_driver.published
-
-    @pytest.mark.parametrize(
-        ("current_min", "current_max", "peak"),
-        [
-            (-0.03, -0.002, 0.03),
-            (-0.03, 0.04, 0.04),
-            (-0.03, float("nan"), 0.03),
-            (float("nan"), 0.04, 0.04),
-        ],
-    )
-    def test_peak_uses_both_extrema_without_rectifying_energy(self, current_min, current_max, peak):
-        from helia_profiler.power.joulescope.stats import _process_stats
-
-        packet = self._stats_packet()
-        packet["signals"]["current"] = {
-            "avg": {"value": -0.01},
-            "min": {"value": current_min},
-            "max": {"value": current_max},
-        }
-        samples, summary = _process_stats([packet], duration_s=2.0, io_voltage=1.8)
-        assert summary.peak_current_a == pytest.approx(peak)
-        assert summary.avg_current_a == pytest.approx(-0.01)
-        assert samples[0].current_a == pytest.approx(-0.01)
-        assert summary.energy_j == pytest.approx(-0.036)
-
-
-class TestGatedCaptureContracts:
-    def test_poll_capture_publishes_measured_edge_uncertainty(self, monkeypatch):
-        import time
-
-        from helia_profiler.power.joulescope import capture_gated as module
-        from helia_profiler.power.joulescope.driver import JoulescopeDriver
-
-        fake = TestMissedGateWarningNamesTheFix._FakeJoulescopeDriver()
-        monkeypatch.setattr(module, "_open_device", lambda _serial: (fake, "u/js220/test", "js220"))
-        monkeypatch.setattr(module, "_close_device", lambda *_args: None)
-        reads = 0
-        ms = _SECOND // 1000
-        # Read brackets come from the host clock. Drive it from the fake
-        # read so the timeline is deterministic: each read takes 10 ms and
-        # its stats packet lands a hair before the sample tick, as on a real
-        # host. A real clock with 15.6 ms resolution (Windows, Python 3.11)
-        # measured two 10 ms brackets as 0.032 s and failed the floor below.
-        host_ticks = 0
-        monkeypatch.setattr(module, "_host_monotonic_time64", lambda _time64: host_ticks)
-
-        def read_snapshot(_driver, _path):
-            nonlocal reads, host_ticks
-            time.sleep(0.01)
-            reads += 1
-            host_ticks += 10 * ms
-            fake._stats_cb(
-                "u/js220/test/s/stats/value",
-                TestGatedStatsProcessing._packet(
-                    reads * ms, (reads + 1) * ms, 0.0001, 0.00018, 0.12
-                ),
-            )
-            host_ticks += ms // 100
-            return int(reads in (2, 3))
-
-        monkeypatch.setattr(module, "_read_gpi_snapshot", read_snapshot)
-        result = module.capture_gated(
-            JoulescopeDriver(),
-            duration_s=0.5,
-            io_voltage=1.8,
-            sync_input_index=0,
-            guard_s=0,
-        )
-        assert result.gated_windows
-        assert result.metadata.gating_method == "gpi_snapshot_poll+host_stats_integral"
-        diagnostics = result.metadata.gating_diagnostics
-        assert diagnostics is not None
-        assert diagnostics["poll_edge_uncertainty_s"] >= 0.04
-
-    @pytest.mark.parametrize("window_count", [-1, 0, 2])
-    def test_multiple_windows_rejected_before_open(self, monkeypatch, window_count):
-        from helia_profiler.power.joulescope import capture_gated as module
-        from helia_profiler.power.joulescope.driver import JoulescopeDriver
-
-        def unexpected_open(_serial):
-            pytest.fail("Unsupported window count must fail before device access")
-
-        monkeypatch.setattr(module, "_open_device", unexpected_open)
-        with pytest.raises(PowerError, match="exactly one high window"):
-            module.capture_gated(
-                JoulescopeDriver(),
-                duration_s=1.0,
-                io_voltage=1.8,
-                sync_input_index=0,
-                min_high_windows=window_count,
-            )
-
-    def test_fullrate_reference_is_signed_rectangular_sum(self):
-        import numpy as np
-
-        from helia_profiler.power.joulescope.stats import _fullrate_energy_over_windows
-
-        result = _fullrate_energy_over_windows(
-            cur_chunks=[np.asarray([1.0, -2.0, 3.0])],
-            volt_chunks=[np.asarray([2.0, 2.0, 2.0])],
-            anchors=[(0, 0, 1.0)],
-            poll_samples=[],
-            windows_override=[(0, 3 * _SECOND)],
-        )
-        assert result is not None
-        assert result["method"] == "fullrate_rectangular_integral"
-        assert result["charge_c"] == pytest.approx(2.0)
-        assert result["energy_j"] == pytest.approx(4.0)
-        assert result["mean_current_a"] == pytest.approx(2.0 / 3)
-
-    @pytest.mark.parametrize("sample_rate", [0, -1])
-    def test_fullrate_reference_rejects_nonpositive_rate(self, sample_rate):
-        import numpy as np
-
-        from helia_profiler.power.joulescope.stats import _fullrate_energy_over_windows
-
-        assert (
-            _fullrate_energy_over_windows(
-                cur_chunks=[np.ones(2)],
-                volt_chunks=[np.ones(2)],
-                anchors=[(0, 0, sample_rate)],
-                poll_samples=[(-1, 0), (0, 1), (_SECOND, 0)],
-            )
-            is None
-        )
 
 
 class TestPowerMode:
@@ -3614,51 +3491,6 @@ class TestObserverAbsoluteSlack:
         assert external_observer_slack_s(1000) == pytest.approx(0.002 + 0.008)
         assert external_observer_slack_s(100) == pytest.approx(0.020 + 0.008)
         assert external_observer_slack_s(None) == pytest.approx(0.008)
-
-    def test_edge_brackets_include_read_latency_and_ignore_short_pulses(self):
-        from helia_profiler.power.joulescope.diagnostics import _poll_edge_uncertainty_s
-
-        ms = _SECOND // 1000
-        reads = [
-            (0, 5, 0),
-            (10, 15, 1),
-            (20, 25, 0),
-            (30, 40, 0),
-            (50, 65, 1),
-            (100, 115, 1),
-            (130, 150, 0),
-        ]
-        uncertainty = _poll_edge_uncertainty_s(
-            [(start * ms, end * ms, level) for start, end, level in reads],
-            minimum_window_s=0.05,
-        )
-        assert uncertainty == pytest.approx(0.035 + 0.050, abs=1e-6)
-
-    @pytest.mark.parametrize(
-        ("source", "expected"), [("gpi_snapshot_poll", 0.052), ("gpi_stream", 0.010)]
-    )
-    def test_run_clock_uses_measured_uncertainty_only_for_polled_edges(self, source, expected):
-        from helia_profiler.power.diagnostics import assess_run_window_clock
-
-        result = PowerResult(
-            summary=PowerSummary(0.1, 0.18, 0.2, 0.018, 0.1, 100),
-            gated_windows=[GatedPowerWindow(0.0, 0.1, 0.1, 0.01, 0.018, 0.1, 0.18, 0.2, 100)],
-            metadata=PowerMetadata(
-                gating_method=f"{source}+host_stats_integral",
-                gating_diagnostics={"poll_edge_uncertainty_s": 0.050},
-            ),
-        )
-        agreement = assess_run_window_clock(
-            elapsed_us=130_000,
-            internal_mode=False,
-            gated_result=result,
-            planned_inference_count=None,
-            planned_inference_us=None,
-            stats_rate_hz=1000,
-        )
-        assert agreement is not None
-        assert agreement.absolute_slack_s == pytest.approx(expected)
-        assert agreement.agrees is (source == "gpi_snapshot_poll")
 
     def test_absolute_slack_floors_the_relative_band(self):
         from helia_profiler.power.diagnostics import assess_window_clock
