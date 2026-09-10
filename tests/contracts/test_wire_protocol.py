@@ -1267,7 +1267,7 @@ def test_csv_row_format_is_pinned_per_engine():
     # Operator name (+ ".overload" when present), then the chain/instruction
     # identity; the instruction kind is only the unnamed fallback (#301).
     assert 'hpx_printf("%d,%s%s%s:c%ldi%lu", i, label,' in et
-    assert 'const char *label = named ? event.name' in et
+    assert "const char *label = named ? event.name" in et
     assert '? "OPERATOR_CALL" : "DELEGATE_CALL");' in et
 
     # The three loop-based emitters close the row with the overflow flag; the
