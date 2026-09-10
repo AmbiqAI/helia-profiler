@@ -2,9 +2,8 @@
 
 ``_serialise_memory_plan`` is shared by ``summary.py`` (embeds a condensed
 ``memory_plan`` block in ``summary.json``) and ``_write_memory_breakdown``
-below (the full ``detailed/memory.json`` report). Both also rely on
-``_CACHE_COUNTERS`` to aggregate cache/memory PMU counters, so this module
-owns that shared list rather than duplicating it.
+below (the full ``detailed/memory.json`` report). Both use ``_cache_totals``
+for cache/memory counters and matching-pair hit rates.
 """
 
 from __future__ import annotations

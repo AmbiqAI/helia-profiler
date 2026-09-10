@@ -32,7 +32,7 @@ from .device import (
     _open_device,
     _read_gpi_snapshot,
 )
-from .diagnostics import _gated_stats_diagnostics
+from .diagnostics import _gated_stats_diagnostics, _poll_edge_uncertainty_s
 from .stats import (
     _fullrate_energy_over_windows,
     _map_poll_samples_to_packet_time,
@@ -124,8 +124,6 @@ def capture_gated(
     # the driver has no config access, so the caller passes the probe-aware
     # word (power.diagnostics.count_noun, #172).
     work_noun: str = "inferences",
-    # Shared with diagnostics.external_observer_slack_s: the observer check's
-    # absolute slack assumes edges are resolved no finer than this cadence.
     poll_interval_s: float = GATE_EDGE_POLL_INTERVAL_S,
     min_high_windows: int = 1,
     guard_s: float = 0.15,
@@ -143,15 +141,19 @@ def capture_gated(
     the device's host-side statistics stream at ``stats_rate_hz`` (via
     ``s/stats/scnt``).  Each stat packet carries the instrument's *full-rate*
     charge and energy integrals over a ~1 ms sub-window, so summing the
-    packets that fall inside the GPIO-high window yields exact window energy
-    with only a few KB of data.  The per-packet avg/min/max/std also give a
+    packets selected by midpoint yields window energy with packet-scale
+    endpoint uncertainty. The per-packet avg/min/max/std also give a
     spike-robust current/power distribution for reporting.
 
-    The gated clean pass runs first in the firmware, so once the poller sees
-    ``min_high_windows`` complete GPIO-high windows plus a ``guard_s`` settle
-    we early-stop; ``duration_s`` is only a safety upper bound.
+    Only one clean window is supported. After its falling edge and a
+    ``guard_s`` settle, capture stops; ``duration_s`` is a safety upper bound.
     """
     del kwargs
+
+    if min_high_windows != 1:
+        raise PowerError(
+            "Joulescope gated capture supports exactly one high window (min_high_windows=1)."
+        )
 
     try:
         from pyjoulescope_driver import time64
@@ -173,6 +175,7 @@ def capture_gated(
     packets: list[dict[str, Any]] = []
     stop = threading.Event()
     poll_samples: list[tuple[int, int]] = []
+    poll_reads: list[tuple[int, int, int]] = []
     bit = 1 << sync_input_index
     windows_done = 0
     first_high_at: float | None = None
@@ -286,7 +289,9 @@ def capture_gated(
         complete_at: float | None = None
         while not stop.is_set():
             try:
+                read_start = _host_monotonic_time64(time64)
                 gpi_value = _read_gpi_snapshot(driver, device_path)
+                sample_tick = _host_monotonic_time64(time64)
                 with gpi_condition:
                     latest_gpi_value = gpi_value
                     gpi_sample_sequence += 1
@@ -298,21 +303,25 @@ def capture_gated(
                     # latest bitfield for READY qualification, but establish a
                     # fresh low/high gate history only after GO is sent.
                     poll_samples.clear()
+                    poll_reads[:] = [(read_start, sample_tick, level)]
                     high_seen = False
                     first_high_at = None
                     first_low_after_high_at = None
                     prev_level = level
                     time.sleep(poll_interval_s)
                     continue
-                sample_tick = _host_monotonic_time64(time64)
                 # GO may be asserted between poll iterations.  In that case
                 # the first retained post-GO sample is already high, while
                 # ``prev_level`` correctly carries the known pre-GO low
                 # state.  Preserve that state in the segmenter input so the
                 # real falling edge can close a complete window.
                 if not poll_samples and not prev_level and level:
-                    poll_samples.append((sample_tick - 1, 0))
+                    prior_tick = poll_reads[-1][1] if poll_reads else read_start
+                    poll_samples.append((prior_tick, 0))
+                    if not poll_reads:
+                        poll_reads.append((read_start, read_start, 0))
                 poll_samples.append((sample_tick, level))
+                poll_reads.append((read_start, sample_tick, level))
                 if level and not prev_level:
                     high_seen = True
                     saw_any_gate_rise = True
@@ -464,11 +473,6 @@ def capture_gated(
 
         aligned_poll_samples = poll_samples
         use_device_time_axis = family in ("js220", "js320")
-        if use_device_time_axis:
-            aligned_poll_samples = _map_poll_samples_to_packet_time(
-                packets=packets,
-                poll_samples=poll_samples,
-            )
 
         # Prefer instrument-clock gate edges from the GPI stream whenever it
         # produced at least one window that clears the minimum gate.  The
@@ -511,6 +515,13 @@ def capture_gated(
                     len(raw_streamed),
                     minimum_gate_s,
                 )
+
+        if use_device_time_axis and streamed_gate_windows is None:
+            aligned_poll_samples = _map_poll_samples_to_packet_time(
+                packets=packets,
+                poll_samples=poll_samples,
+                minimum_window_s=minimum_gate_s,
+            )
 
         dump_dir = os.environ.get("HPX_GATE_DEBUG_DUMP")
         if dump_dir:
@@ -574,6 +585,10 @@ def capture_gated(
             gate_edge_source=gate_edge_source,
             stream_segment_count=len(raw_streamed) if gpi_stream_enabled else None,
         )
+        if gate_edge_source == "gpi_snapshot_poll":
+            gating_diagnostics["poll_edge_uncertainty_s"] = _poll_edge_uncertainty_s(
+                poll_reads, minimum_window_s=minimum_gate_s
+            )
 
         windows, gated_summary = _process_gated_stats(
             packets=packets,
@@ -725,6 +740,7 @@ def capture_gated(
                 volt_chunks=fr_volt,
                 anchors=fr_anchors,
                 poll_samples=aligned_poll_samples,
+                windows_override=streamed_gate_windows,
             )
             if fr:
                 metadata.fullrate_xcheck = fr
@@ -754,14 +770,7 @@ def capture_gated(
         if packets:
             whole_summary = _whole_summary_from_stats(packets)
             metadata.whole_capture_summary = _summary_to_dict(whole_summary)
-            diagnostics = _gated_stats_diagnostics(
-                packets=packets,
-                poll_samples=aligned_poll_samples,
-                prefer_device_time=use_device_time_axis,
-                windows_override=streamed_gate_windows,
-                gate_edge_source=gate_edge_source,
-                stream_segment_count=len(raw_streamed) if gpi_stream_enabled else None,
-            )
+            diagnostics = gating_diagnostics
             metadata.gating_diagnostics = diagnostics
             sane_window = gated_summary.avg_current_a > whole_summary.avg_current_a
             metadata.gated_vs_whole_current_ok = sane_window

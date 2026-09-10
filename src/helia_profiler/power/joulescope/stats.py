@@ -38,7 +38,7 @@ def _process_stats(
         currents.append(_extract_scalar(cur.get("avg", 0.0)))
         voltages.append(_extract_scalar(vol.get("avg", io_voltage), default=io_voltage))
         peaks.append(
-            max(
+            np.fmax(
                 abs(_extract_scalar(cur.get("max", 0.0))),
                 abs(_extract_scalar(cur.get("min", 0.0))),
             )
@@ -362,7 +362,9 @@ def _fullrate_energy_over_windows(
     i0, u0 = idx[0], utc[0]
     sample_utc = u0 + (np.arange(n, dtype=np.float64) - i0) * slope
 
-    windows = windows_override if windows_override is not None else _segment_gpi_windows(poll_samples)
+    windows = (
+        windows_override if windows_override is not None else _segment_gpi_windows(poll_samples)
+    )
     if not windows:
         return None
 
@@ -423,8 +425,8 @@ def _process_gated_stats(
     """Integrate the gated window(s) from on-device stat-packet integrals.
 
     Each packet carries the instrument's full-rate charge/energy integral over a
-    ~1 ms sub-window, so summing the packets whose midpoint falls inside a
-    GPIO-high window gives exact window charge/energy.  The per-packet
+    ~1 ms sub-window. Select packets by midpoint, retaining packet-scale
+    endpoint uncertainty in the window charge/energy. The per-packet
     avg/max samples within the window yield the spike-robust distribution
     (median / p95 / p99 / glitch-robust peak) so a lone transient sample cannot
     define the headline current.

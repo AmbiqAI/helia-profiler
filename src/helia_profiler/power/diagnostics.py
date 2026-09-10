@@ -244,9 +244,7 @@ def assess_gate_duration(
 #: :func:`external_observer_slack_s` adds an absolute floor.
 EXTERNAL_WINDOW_CLOCK_TOLERANCE = 0.01
 
-#: GPI poll cadence of the gated capture loop (capture_gated.py uses this as
-#: its ``poll_interval_s`` default). Each gate edge is resolved no finer than
-#: one poll, so the observer comparison must absorb up to two of these.
+#: Sleep between GPI snapshot reads, not the read-to-read observation cadence.
 GATE_EDGE_POLL_INTERVAL_S = 0.004
 
 #: Largest ``|1 - ratio|`` of gate vs est*count that HFRC thermal drift
@@ -268,16 +266,22 @@ DRIFT_PLAUSIBLE_RATIO_DEVIATION = 0.15
 DRIFT_NOTE_MIN_RATIO_DEVIATION = 0.05
 
 
-def external_observer_slack_s(stats_rate_hz: int | None) -> float:
+def external_observer_slack_s(
+    stats_rate_hz: int | None,
+    *,
+    gate_edge_source: str | None = None,
+    poll_edge_uncertainty_s: float | None = None,
+) -> float:
     """Absolute mechanical error bound on the gate-vs-firmware comparison.
 
-    The gate side is a stats-packet integral (up to one packet of edge
-    quantization per side) bounded by GPI polls (up to one poll interval per
-    edge). Mirrors ``packet_slack_s`` in :func:`assess_gate_duration`, which
-    has always modelled the packet term for the est*count band.
+    Snapshot edges use measured read brackets, including USB/read latency.
+    Streamed edges and legacy captures retain the existing fixed allowance.
     """
     packet_s = 2.0 / max(1, stats_rate_hz) if stats_rate_hz else 0.0
-    return packet_s + 2.0 * GATE_EDGE_POLL_INTERVAL_S
+    edge_s = 2.0 * GATE_EDGE_POLL_INTERVAL_S
+    if gate_edge_source == "gpi_snapshot_poll" and poll_edge_uncertainty_s is not None:
+        edge_s = max(edge_s, poll_edge_uncertainty_s)
+    return packet_s + edge_s
 
 
 #: Internally-referenced tolerance, TWO-SIDED. Internal mode has no host-timed
@@ -606,7 +610,15 @@ def assess_run_window_clock(
             return None
         reference_s, reference_source = reference
         tolerance = EXTERNAL_WINDOW_CLOCK_TOLERANCE
-        absolute_slack_s = external_observer_slack_s(stats_rate_hz)
+        diagnostics = gated_result.metadata.gating_diagnostics or {}
+        edge_source = diagnostics.get("gate_edge_source")
+        if edge_source is None and gated_result.metadata.gating_method:
+            edge_source = gated_result.metadata.gating_method.split("+", 1)[0]
+        absolute_slack_s = external_observer_slack_s(
+            stats_rate_hz,
+            gate_edge_source=edge_source,
+            poll_edge_uncertainty_s=diagnostics.get("poll_edge_uncertainty_s"),
+        )
     else:
         if not planned_inference_count or not planned_inference_us:
             return None

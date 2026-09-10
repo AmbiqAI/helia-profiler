@@ -132,14 +132,10 @@ per-preset results into unified layer rows (`PmuResult.layers`) and into
 per-compute-unit groups (`PmuResult.groups`, keyed by the `<group>_<index>`
 pass-name convention, e.g. `mve_0`/`mve_1` → `mve`).
 
-The merge assumes:
-- **Layer ordering is stable** — run-to-run execution is deterministic, so
-  layers are matched by index across presets
-- **Layer count is identical** across presets
-
-If layer counts are inconsistent across iterations within a preset (a
-transport or firmware issue), the parser logs a warning with the observed
-counts and continues with the data it has.
+Layers are matched by explicit layer ID, with the same operator label required
+across iterations and presets; row order may differ. Missing, duplicate, or
+conflicting identities raise `CaptureError`, including when the first iteration
+is truncated. The parser does not publish partial or position-shifted aggregates.
 
 ## Timeouts and error handling
 
