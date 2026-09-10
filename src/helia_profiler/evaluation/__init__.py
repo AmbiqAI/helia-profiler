@@ -34,6 +34,14 @@ from .comparison_profile import (
 )
 from .validity import RunEvaluation, evaluate_run
 from .engine_analysis import analyze_for_engine
+from ..modelcost import (
+    ETHOS_U_OP_NAME,
+    LayerOps,
+    ModelAnalysis,
+    analyze_model,
+    is_available,
+    vela_accelerator_config,
+)
 
 __all__ = [
     "ComparabilityAssessment",
@@ -44,6 +52,7 @@ __all__ = [
     "CounterDiff",
     "ComparisonProfile",
     "ComparisonVerdict",
+    "ETHOS_U_OP_NAME",
     "MetricDirection",
     "MetricDiff",
     "MetricPolicy",
@@ -55,8 +64,11 @@ __all__ = [
     "VerdictStatus",
     "assess_comparability",
     "analyze_for_engine",
+    "analyze_model",
     "compare_runs",
     "evaluate_comparison_profile",
     "evaluate_run",
+    "is_available",
+    "vela_accelerator_config",
     "write_compare_artifacts",
 ]

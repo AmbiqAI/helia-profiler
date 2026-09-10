@@ -397,6 +397,24 @@ def _matrix() -> list[_Render]:
             "helia-aot",
             overrides={"arena_regions": [_TCM_REGION, _PSRAM_REGION]},
         ),
+        # Ethos-U NPU init: gates _npu_init.j2 (HPX_NPU + npu_init_failed)
+        # in both engine mains. The render is heliaRT — a published NPU
+        # producer (NPU_ENGINES); stock tflm shares the template but can
+        # never gate it true (_check_npu_backend).
+        _Render(
+            "ap510|rtt|helia-rt|ethos-u",
+            "apollo510",
+            "rtt",
+            "helia-rt",
+            overrides={"has_ethos_u": True},
+        ),
+        _Render(
+            "ap510|rtt|helia-aot|ethos-u",
+            "apollo510",
+            "rtt",
+            "helia-aot",
+            overrides={"has_ethos_u": True},
+        ),
         # Apollo3 burst, both engines that can reach an Apollo3 build (the
         # gate is per-engine, and heliaAOT renders its own template).
         _Render(
@@ -657,6 +675,7 @@ _PREDICATES = {
         "not allocate_arenas and arena_regions with blob_filename and placement == psram"
     ): _aot_psram_blobs,
     "busy_loop_probe": lambda v: bool(v["busy_loop_probe"]),
+    "has_ethos_u": lambda v: bool(v.get("has_ethos_u", False)),
     "clean_window_trace and transport not in (swo, uart)": (
         lambda v: bool(v.get("clean_window_trace")) and v["transport"] not in ("swo", "uart")
     ),
@@ -986,6 +1005,7 @@ def test_error_code_catalogue():
         "bind_arena_failed",
         "const_blob_psram_write_failed",
         "model_init_failed",
+        "npu_init_failed",
         "executorch",
         "operator_count_exceeds_capacity",
         "pmu_init_or_selftest_failed",

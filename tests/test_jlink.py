@@ -569,6 +569,7 @@ def test_every_registered_soc_has_its_nsx_app_flash_load_address() -> None:
         "apollo5b": 0x00410000,
         "apollo330P": 0x00410000,
         "apollo510L": 0x00410000,
+        "atomiq110": 0x22000000,
     }
     actual = {soc.name: soc.capabilities.memory.app_flash_load_addr for soc in list_socs()}
 

@@ -8,12 +8,12 @@ Stage 5 combines its identity and canonical hash with the NSX registry hash,
 target, engine, overrides, and relevant build inputs to select an isolated
 dependency workspace.
 
-The current baseline is `hpx-neuralspotx-0.7.17-2026-09`:
+The current baseline is `hpx-neuralspotx-0.8.0-2026-09`:
 
 | Identity | Qualified reference |
 | --- | --- |
-| `neuralspotx` package | `0.7.17`, wheel SHA-256 `1289cd67…fbdb`, tag peeled to `8b5a7fa9…b44f` |
-| `nsx-ambiq-sdk` | `v5.2.24`, peeled commit `a9f4ec25…1132` |
+| `neuralspotx` package | `0.8.0`, wheel SHA-256 `64bc134e…7614`, tag peeled to `38aff779…9490` |
+| `nsx-ambiq-sdk` | `v5.2.25`, peeled commit `aefce2ca…de7c` |
 | `nsx-pmu-armv8m` | `5725c065…c88` |
 | `nsx-tflite-micro` | `7afcf2b4…333` |
 | `arm-cmsis-nn` | `6d21a6f8…f7c` |
@@ -55,7 +55,7 @@ previously qualified `v7.29.2` is the core heliaRT 1.18.0 (withdrawn) shipped
 outright: every generated module carries an unconditional
 `#error "CMSIS-NN version too old; need at least v7.31.0"` whose rationale
 names v7.29.x/v7.30.0 as defective for int8 as well (helia-aot#356). So this
-revision qualifies `ns-cmsis-nn v7.31.0` and — because neuralSPOT-X 0.7.17's
+revision qualifies `ns-cmsis-nn v7.31.0` and — because neuralSPOT-X 0.8.0's
 registry still resolves v7.29.2 — hpx **declares** `nsx-cmsis-nn` at that ref
 on both engines' source routes instead of inheriting the registry's choice.
 The module thereby moves from the registry-governed tier to the hpx-declared
@@ -151,10 +151,14 @@ in-flight atomiq110 work (PR #98) will opt into it via
 for the flag mapping. Minimum supported version stays 1.16.0 (HPX relies
 on nothing 1.17-only).
 
-neuralSPOT-X 0.7.17 fixes the J-Link flash-verification false negative that
+neuralSPOT-X 0.8.0 adds the `atomiq110_fpga_turbo` starter profile, and
+`nsx-ambiq-sdk` v5.2.25 adds the `nsx-npu` module (Ethos-U core driver and
+bring-up) that both engines' `ethos_u` backend declares — the two reasons
+this revision moved off 0.7.17 / v5.2.24. 0.7.17 had fixed the J-Link
+flash-verification false negative that
 aborted idempotent re-flashes of an unchanged image, and enforces
-`ExitOnError 1` in generated flash recipes (AmbiqAI/neuralspotx#220). Its
-packaged registry resolves `ns-cmsis-nn` at `v7.29.2`; that promotion
+`ExitOnError 1` in generated flash recipes (AmbiqAI/neuralspotx#220). The
+packaged registry still resolves `ns-cmsis-nn` at `v7.29.2`; that promotion
 advanced the qualified ref in lockstep, and the 2026-09 revision then moved
 `nsx-cmsis-nn` into the hpx-declared tier at `v7.31.0`.
 
@@ -164,8 +168,7 @@ nsx-sensors and, since the 2026-09 revision, `nsx-cmsis-nn`) carry
 manifest pins at the baseline refs, and those pins defeat the packaged
 registry (concretely: a module whose `NsxModuleRef.ref` is set is rendered
 into the app's module-registry override, which NSX locking honours over its
-packaged default) — `nsx-sensors` stays at its audited `v0.3.0` pin even though
-0.7.17's registry default is older, and `nsx-cmsis-nn` builds at `v7.31.0`
+packaged default) — `nsx-sensors` stays at its audited `v0.3.0` pin, and `nsx-cmsis-nn` builds at `v7.31.0`
 where the registry would resolve `v7.29.2`. The stock-TFLM engine's
 declared modules (`nsx-tflite-micro`, `arm-cmsis-nn`) sit in the
 registry-governed tier: hpx renders informational manifest revisions

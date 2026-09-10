@@ -1220,6 +1220,7 @@ class TestGenerateApp:
         # M55 / Apollo5 family is gated to non-cached TCM (.bss default).
         assert "defined(AM_PART_APOLLO510)" in conf
         assert "defined(AM_PART_APOLLO330P)" in conf
+        assert "defined(AM_PART_ATOMIQ110)" in conf
         # Cacheless parts still relocate the buffers into shared SRAM.
         assert "#elif NSX_MEM__HAS_SRAM_BSS" in conf
         assert "#define SEGGER_RTT_SECTION NSX_MEM__SEC_SRAM_BSS" in conf
@@ -1825,8 +1826,8 @@ class TestNsxModuleOverrides:
 
         manifest = yaml.safe_load((app_dir / "nsx.yml").read_text())
         projects = manifest["module_registry"]["projects"]
-        assert projects["nsx-ambiq-sdk"]["revision"] == "a9f4ec25a162f6f3700623feb691423bb5a51132"
-        assert projects["neuralspotx"]["revision"] == "8b5a7fa99f044cfd4ba3c0668fb2419eceabb44f"
+        assert projects["nsx-ambiq-sdk"]["revision"] == "aefce2ca858795e783c76726ebe7d14d9d4bde7c"
+        assert projects["neuralspotx"]["revision"] == "38aff77907c3821e6165f3e0344362e0b59b9490"
 
     def test_preview_board_defaults_to_preview_channel(self, tmp_path: Path, fake_dist: Path):
         model = tmp_path / "model.tflite"
@@ -1983,7 +1984,7 @@ class TestNsxModuleOverrides:
         manifest = yaml.safe_load(nsx_yml)
         assert (
             manifest["module_registry"]["projects"]["neuralspotx"]["revision"]
-            == "8b5a7fa99f044cfd4ba3c0668fb2419eceabb44f"
+            == "38aff77907c3821e6165f3e0344362e0b59b9490"
         )
 
     def test_ref_override_in_nsx_yml(self, tmp_path: Path, fake_dist: Path):
@@ -2011,7 +2012,7 @@ class TestNsxModuleOverrides:
         assert len(direct_overrides) == sdk_module_count
         assert (
             manifest["module_registry"]["projects"]["neuralspotx"]["revision"]
-            == "8b5a7fa99f044cfd4ba3c0668fb2419eceabb44f"
+            == "38aff77907c3821e6165f3e0344362e0b59b9490"
         )
 
     def test_ref_override_aligns_module_registry_revisions(self, tmp_path: Path, fake_dist: Path):
@@ -2053,11 +2054,11 @@ class TestNsxModuleOverrides:
         registry = nsx_yml["module_registry"]
         assert (
             registry["projects"]["nsx-ambiq-sdk"]["revision"]
-            == "a9f4ec25a162f6f3700623feb691423bb5a51132"
+            == "aefce2ca858795e783c76726ebe7d14d9d4bde7c"
         )
         assert (
             registry["projects"]["neuralspotx"]["revision"]
-            == "8b5a7fa99f044cfd4ba3c0668fb2419eceabb44f"
+            == "38aff77907c3821e6165f3e0344362e0b59b9490"
         )
         # Standalone baseline-pinned projects need a module-level revision
         # too. NSX honours a module's own revision over its project's, so a
@@ -2256,3 +2257,36 @@ print(json.dumps(list(overrides)))
     # Vacuity guard (#175): an empty resolver result would pass
     # the equality trivially while asserting nothing.
     assert len(json.loads(orders[0])) >= 2
+
+
+class TestResolveProjectOverrides:
+    """The baseline default ref applies uniformly; only explicit user
+    overrides outrank it (the starter-profile branch exception is gone)."""
+
+    @staticmethod
+    def _specs():
+        from helia_profiler.firmware.project import NsxModuleSpec
+
+        return [NsxModuleSpec("nsx-npu", "nsx-ambiq-sdk")]
+
+    @staticmethod
+    def _baseline():
+        from helia_profiler.deps.compatibility import load_compatibility_baseline
+
+        return load_compatibility_baseline()
+
+    def test_baseline_ref_applied(self):
+        from helia_profiler.firmware.project import _resolve_project_overrides
+
+        baseline = self._baseline()
+        overrides = _resolve_project_overrides(self._specs(), {}, baseline)
+        assert overrides["nsx-ambiq-sdk"] == ("ref", baseline.project("nsx-ambiq-sdk").ref)
+
+    def test_user_override_outranks_baseline(self):
+        from types import SimpleNamespace
+
+        from helia_profiler.firmware.project import _resolve_project_overrides
+
+        user = {"nsx-npu": SimpleNamespace(path=None, ref="my-branch", version=None)}
+        overrides = _resolve_project_overrides(self._specs(), user, self._baseline())
+        assert overrides["nsx-ambiq-sdk"] == ("ref", "my-branch")

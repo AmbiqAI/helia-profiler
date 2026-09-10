@@ -8,7 +8,7 @@ import pytest
 
 from helia_profiler.config import load_config
 from helia_profiler.engines import EngineType
-from helia_profiler.engines.base import ExecutorchArtifacts, HeliaAotArtifacts
+from helia_profiler.engines.base import ExecutorchArtifacts, HeliaAotArtifacts, HeliaRtArtifacts
 from helia_profiler.errors import PlatformError
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.placement import MemoryRegion
@@ -525,6 +525,43 @@ class TestHpxOwnedConsumers:
             assert sram is not None
             records = [c for c in sram.consumers if c.name == "pmu_layer_records"]
             assert [c.size for c in records] == [expected], engine
+
+    def test_npu_table_bytes_per_layer_is_the_frozen_contract(self):
+        from helia_profiler.stages.plan_memory import NPU_PMU_TABLE_BYTES_PER_LAYER
+
+        # _npu_pmu.j2:39-43: g_npu_acc uint32[4] + g_npu_hit + g_npu_ovf.
+        assert NPU_PMU_TABLE_BYTES_PER_LAYER == 18
+
+    def test_ethos_u_backend_books_the_npu_pmu_tables(self, tmp_path):
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "engine": {"type": "helia-rt", "backend": "ethos_u"},
+                "target": {"board": "atomiq110_fpga_turbo"},
+            },
+        )
+        ctx.engine_artifacts = HeliaRtArtifacts(
+            engine_type=EngineType.HELIA_RT,
+            engine_header="nsx_helia_rt.h",
+            engine_backend="ethos_u",
+            heliart_version="0.0.0",
+            heliart_variant="release",
+            heliart_toolchain_tag="gcc",
+        )
+        PlanMemoryStage().run(ctx)
+        assert ctx.memory_plan is not None
+        sram = ctx.memory_plan.region("SRAM")
+        assert sram is not None
+        tables = [c for c in sram.consumers if c.name == "npu_pmu_tables"]
+        # atomiq110: pmu_max_ops = 4096 -> 4096 * 18 = 73,728 bytes.
+        assert [c.size for c in tables] == [4096 * 18]
+
+    def test_no_npu_tables_without_the_ethos_u_backend(self, tmp_path):
+        ctx = _make_ctx(tmp_path)
+        PlanMemoryStage().run(ctx)
+        assert ctx.memory_plan is not None
+        names = {c.name for r in ctx.memory_plan.regions for c in r.consumers}
+        assert "npu_pmu_tables" not in names
 
     def test_dwt_tier_records_book_the_smaller_object_header(self, tmp_path):
         """#180: the DWT-tier profiler object has NO config

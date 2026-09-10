@@ -490,3 +490,239 @@ class TestPreflightOutputDir:
                     PreflightStage().run(ctx)
         finally:
             out.chmod(0o700)  # allow cleanup
+
+
+class TestPreflightNpuBackend:
+    """engine.backend=ethos_u is gated to NPU-equipped boards."""
+
+    def test_ethos_u_rejected_on_non_npu_board(self, tmp_path: Path):
+        ctx = _make_ctx(
+            tmp_path,
+            {"engine": {"type": "helia-rt", "backend": "ethos_u"}},
+        )  # default board: apollo510_evb (no NPU)
+        from helia_profiler.stages.preflight import _check_npu_backend
+
+        with pytest.raises(ConfigError, match="no Ethos-U NPU"):
+            _check_npu_backend(ctx.config)
+
+    def test_error_lists_npu_capable_boards(self, tmp_path: Path):
+        ctx = _make_ctx(
+            tmp_path,
+            {"engine": {"type": "helia-rt", "backend": "ethos_u"}},
+        )
+        from helia_profiler.stages.preflight import _check_npu_backend
+
+        with pytest.raises(ConfigError) as excinfo:
+            _check_npu_backend(ctx.config)
+        assert "atomiq110_fpga_turbo" in str(excinfo.value)
+
+    def test_ethos_u_accepted_on_atomiq110(self, tmp_path: Path):
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "engine": {"type": "helia-rt", "backend": "ethos_u"},
+                "target": {"board": "atomiq110_fpga_turbo"},
+            },
+        )
+        from helia_profiler.stages.preflight import _check_npu_backend
+
+        with patch("helia_profiler.evaluation.is_available", return_value=True):
+            _check_npu_backend(ctx.config)  # must not raise
+
+    def test_default_backend_not_gated(self, tmp_path: Path):
+        ctx = _make_ctx(tmp_path, {"engine": {"type": "helia-rt"}})
+        from helia_profiler.stages.preflight import _check_npu_backend
+
+        _check_npu_backend(ctx.config)  # must not raise
+
+
+class TestVelaAcceleratorConfigMatch:
+    """A Vela model must be compiled for the target's own NPU (#184).
+
+    A mismatched command stream is rejected by the Ethos-U driver at the first
+    inference, so without this check the run builds, flashes and then hangs.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _parser_available(self):
+        """The check itself is under test, not the analysis extra: CI's
+        unit-test env installs no ai-edge-litert, so availability is pinned."""
+        with patch("helia_profiler.evaluation.is_available", return_value=True):
+            yield
+
+    def _npu_ctx(self, tmp_path: Path):
+        return _make_ctx(
+            tmp_path,
+            {
+                "engine": {"type": "helia-rt", "backend": "ethos_u"},
+                "target": {"board": "atomiq110_fpga_turbo"},
+            },
+        )
+
+    def test_matching_config_accepted(self, tmp_path: Path):
+        ctx = self._npu_ctx(tmp_path)
+        from helia_profiler.stages.preflight import _check_npu_backend
+
+        with patch(
+            "helia_profiler.evaluation.vela_accelerator_config",
+            return_value="ethos-u85-256",
+        ):
+            _check_npu_backend(ctx.config)  # must not raise
+
+    def test_mismatched_config_rejected(self, tmp_path: Path):
+        ctx = self._npu_ctx(tmp_path)
+        from helia_profiler.stages.preflight import _check_npu_backend
+
+        with patch(
+            "helia_profiler.evaluation.vela_accelerator_config",
+            return_value="ethos-u55-128",
+        ):
+            with pytest.raises(ConfigError) as excinfo:
+                _check_npu_backend(ctx.config)
+        message = str(excinfo.value)
+        # The error must name BOTH configs so the fix is obvious.
+        assert "ethos-u55-128" in message
+        assert "ethos-u85-256" in message
+
+    def test_mac_count_mismatch_rejected(self, tmp_path: Path):
+        """Same NPU generation, different MACs/cycle is still incompatible."""
+        ctx = self._npu_ctx(tmp_path)
+        from helia_profiler.stages.preflight import _check_npu_backend
+
+        with patch(
+            "helia_profiler.evaluation.vela_accelerator_config",
+            return_value="ethos-u85-128",
+        ):
+            with pytest.raises(ConfigError, match="ethos-u85-128"):
+                _check_npu_backend(ctx.config)
+
+    def test_undeterminable_config_skipped(self, tmp_path: Path):
+        """Unknown must never be reported as a mismatch."""
+        ctx = self._npu_ctx(tmp_path)
+        from helia_profiler.stages.preflight import _check_npu_backend
+
+        with patch(
+            "helia_profiler.evaluation.vela_accelerator_config",
+            return_value=None,
+        ):
+            _check_npu_backend(ctx.config)  # must not raise
+
+    def test_case_insensitive_match(self, tmp_path: Path):
+        ctx = self._npu_ctx(tmp_path)
+        from helia_profiler.stages.preflight import _check_npu_backend
+
+        with patch(
+            "helia_profiler.evaluation.vela_accelerator_config",
+            return_value="ETHOS-U85-256",
+        ):
+            _check_npu_backend(ctx.config)  # must not raise
+
+    def test_missing_parser_is_a_dependency_error_not_a_silent_skip(self, tmp_path: Path):
+        """Without ai-edge-litert the check cannot run at all — that must
+        surface as an actionable install hint, not pass unvalidated."""
+        ctx = self._npu_ctx(tmp_path)
+        from helia_profiler.stages.preflight import _check_npu_backend
+
+        with patch("helia_profiler.evaluation.is_available", return_value=False):
+            with pytest.raises(ConfigError) as excinfo:
+                _check_npu_backend(ctx.config)
+        assert "ai-edge-litert" in str(excinfo.value)
+        assert "helia-profiler[analysis]" in (excinfo.value.hint or "")
+
+
+class TestPreflightEthosNpuCounters:
+    """The ethos_npu counter group requires engine.backend=ethos_u."""
+
+    def test_ethos_npu_without_backend_rejected(self, tmp_path: Path):
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "target": {"board": "atomiq110_fpga_turbo"},
+                "profiling": {"pmu_counters": {"ethos_npu": "default"}},
+            },
+        )
+        from helia_profiler.stages.preflight import _check_pmu_selection
+
+        with pytest.raises(ConfigError, match="requires engine.backend=ethos_u"):
+            _check_pmu_selection(ctx.config)
+
+    def test_ethos_npu_with_backend_accepted(self, tmp_path: Path):
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "target": {"board": "atomiq110_fpga_turbo"},
+                "engine": {"type": "helia-rt", "backend": "ethos_u"},
+                "profiling": {"pmu_counters": {"ethos_npu": "default"}},
+            },
+        )
+        from helia_profiler.stages.preflight import _check_pmu_selection
+
+        _check_pmu_selection(ctx.config)  # must not raise
+
+    def test_cpu_counters_not_gated_on_backend(self, tmp_path: Path):
+        ctx = _make_ctx(
+            tmp_path,
+            {"profiling": {"pmu_counters": {"cpu": "default"}}},
+        )
+        from helia_profiler.stages.preflight import _check_pmu_selection
+
+        _check_pmu_selection(ctx.config)  # must not raise
+
+    def test_npu_counter_smuggled_under_another_key_still_rejected(self, tmp_path: Path):
+        """The gate is on resolved counter GROUPS, not the selection keys:
+        an explicit NPU counter listed under 'cpu' still plans an
+        ethos_npu firmware pass."""
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "target": {"board": "atomiq110_fpga_turbo"},
+                "profiling": {"pmu_counters": {"cpu": ["ETHOSU_PMU_CYCLE"]}},
+            },
+        )
+        from helia_profiler.stages.preflight import _check_pmu_selection
+
+        with pytest.raises(ConfigError, match="requires engine.backend=ethos_u"):
+            _check_pmu_selection(ctx.config)
+
+    def test_ethos_npu_with_helia_aot_backend_accepted(self, tmp_path: Path):
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "target": {"board": "atomiq110_fpga_turbo"},
+                "engine": {"type": "helia-aot", "backend": "ethos_u"},
+                "profiling": {"pmu_counters": {"ethos_npu": "default"}},
+            },
+        )
+        from helia_profiler.stages.preflight import _check_pmu_selection
+
+        _check_pmu_selection(ctx.config)  # must not raise
+
+
+class TestPreflightNpuBackendEngineGate:
+    """engine.backend=ethos_u is limited to engines with NPU dispatch."""
+
+    def test_tflm_with_ethos_u_backend_rejected(self, tmp_path: Path):
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "target": {"board": "atomiq110_fpga_turbo"},
+                "engine": {"type": "tflm", "backend": "ethos_u"},
+            },
+        )
+        from helia_profiler.stages.preflight import _check_npu_backend
+
+        with pytest.raises(ConfigError, match="only helia-rt and helia-aot"):
+            _check_npu_backend(ctx.config)
+
+    def test_helia_aot_with_ethos_u_backend_accepted(self, tmp_path: Path):
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "target": {"board": "atomiq110_fpga_turbo"},
+                "engine": {"type": "helia-aot", "backend": "ethos_u"},
+            },
+        )
+        from helia_profiler.stages.preflight import _check_npu_backend
+
+        with patch("helia_profiler.evaluation.is_available", return_value=True):
+            _check_npu_backend(ctx.config)  # must not raise

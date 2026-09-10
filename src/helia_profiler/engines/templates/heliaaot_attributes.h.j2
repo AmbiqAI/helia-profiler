@@ -28,9 +28,11 @@
 /*
  * Apollo510 / Apollo510B  (Cortex-M55, ITCM + TCM + 3 MB Shared SRAM)
  * Apollo5A / Apollo5B     (Cortex-M55, ITCM + TCM + 3 MB Shared SRAM)
+ * Atomiq110               (Cortex-M55 + Ethos-U85, same section layout)
  */
 #if defined(AM_PART_APOLLO510) || defined(AM_PART_APOLLO510B) \
- || defined(AM_PART_APOLLO5A)  || defined(AM_PART_APOLLO5B)
+ || defined(AM_PART_APOLLO5A)  || defined(AM_PART_APOLLO5B) \
+ || defined(AM_PART_ATOMIQ110)
 
   /* DTCM — default .data/.bss is already in TCM, no attribute needed */
   #define {{ prefix|upper }}_PUT_IN_DTCM

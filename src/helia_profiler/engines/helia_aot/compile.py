@@ -75,6 +75,7 @@ _BOARD_TO_AOT_PLATFORM: dict[str, str] = {
     "apollo4l_blue_evb": "apollo4l_blue_evb",
     "apollo510_evb": "apollo510_evb",
     "apollo510b_evb": "apollo510_evb",  # same SoC family / memory layout
+    "atomiq110_fpga_turbo": "atomiq110",  # Atomiq110 FPGA (M55 + Ethos-U85-256)
     "apollo5b_evb": "apollo510_evb",
     "apollo330mP_evb": "apollo510_evb",  # Cortex-M55, AP5 family
     "apollo510dL_evb": "apollo510_evb",  # Cortex-M55, AP5 family (as apollo330mP_evb)
@@ -183,6 +184,16 @@ def _resolve_aot_placement_intent(
         arena = Placement(config.model.arena_location)
     if config.model.weights_location:
         weights = Placement(config.model.weights_location)
+
+    # Ethos-U backend: NPU-visible buffers (scratch/IO and the command
+    # stream/weights) default to SRAM/MRAM. The automatic choice never picks
+    # TCM for them; an explicit TCM request is honored (the NPU reaches TCM
+    # through the M55's AHB slave port while the core is awake).
+    if config.engine.backend == "ethos_u":
+        if not config.model.arena_location and arena == Placement.TCM:
+            arena = Placement.SRAM
+        if not config.model.weights_location and weights == Placement.TCM:
+            weights = Placement.MRAM
     return arena, weights
 
 

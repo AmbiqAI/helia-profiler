@@ -55,6 +55,16 @@ class HpxPmuProfiler : public tflite::MicroProfilerInterface {
     void PrintCsv() const;
     int num_events() const { return num_events_; }
     int num_counters() const { return num_counters_; }
+    /// Tag (op name) recorded for layer *i*, or nullptr when out of range.
+    const char* layer_tag(int i) const {
+        return (i >= 0 && i < num_events_) ? layers_[i].tag : nullptr;
+    }
+    /// Ordinal of the last op whose BeginEvent has run this iteration
+    /// (-1 before the first op; stays at the last ordinal after EndEvent).
+    /// Used by external samplers (e.g. the Ethos-U PMU hooks) to attribute
+    /// their measurements to the dispatching TFLM layer — they only sample
+    /// inside an op's execution window, where this names that op.
+    int current_layer() const { return num_events_ - 1; }
     void SetCounterNames(const char* const names[], int num_names);
 
     /// Configure heartbeat emission cadence.

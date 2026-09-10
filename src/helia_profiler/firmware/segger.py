@@ -162,7 +162,8 @@ def _copy_segger_rtt(dest_dir: Path, configured_path: Path | None = None) -> Non
         '#include "nsx_mem.h"\n'
         "#if defined(AM_PART_APOLLO510) || defined(AM_PART_APOLLO510B) || \\\n"
         "    defined(AM_PART_APOLLO5A)  || defined(AM_PART_APOLLO5B)  || \\\n"
-        "    defined(AM_PART_APOLLO510L) || defined(AM_PART_APOLLO330P)\n"
+        "    defined(AM_PART_APOLLO510L) || defined(AM_PART_APOLLO330P) || \\\n"
+        "    defined(AM_PART_ATOMIQ110)\n"
         "  /* Non-cached TCM: leave SEGGER_RTT_SECTION undefined (default .bss). */\n"
         "#elif NSX_MEM__HAS_SRAM_BSS\n"
         "  #ifndef SEGGER_RTT_SECTION\n"

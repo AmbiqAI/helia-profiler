@@ -427,6 +427,7 @@ def render_project_files(ctx: ProjectRenderContext) -> None:
         _jinja_env.get_template("CMakeLists.txt.j2").render(
             board=ctx.board.name,
             engine_type=ctx.artifacts.engine_type,
+            has_ethos_u=ctx.artifacts.resolved_backend == "ethos_u",
             cmake_vars=ctx.artifacts.cmake_vars,
             compiler_launcher=ctx.compiler_launcher,
             # Only heliaAOT links a generated engine target; every other

@@ -1,20 +1,20 @@
 {
   "schema": "hpx.compatibility-baseline",
   "schema_version": 1,
-  "baseline_id": "hpx-neuralspotx-0.7.17-2026-09",
+  "baseline_id": "hpx-neuralspotx-0.8.0-2026-09",
   "neuralspotx": {
     "package": "neuralspotx",
-    "version": "0.7.17",
-    "sha256": "1289cd67eb27475159a4f9083338ee81648fcc115783db4f467ec96c9ca0fbdb"
+    "version": "0.8.0",
+    "sha256": "64bc134e5e6866c51fc67c51501f0f7d5b318a9154d96534af555486d8857614"
   },
   "projects": {
     "neuralspotx": {
       "url": "https://github.com/AmbiqAI/neuralspotx.git",
-      "ref": "8b5a7fa99f044cfd4ba3c0668fb2419eceabb44f"
+      "ref": "38aff77907c3821e6165f3e0344362e0b59b9490"
     },
     "nsx-ambiq-sdk": {
       "url": "https://github.com/AmbiqAI/nsx-ambiq-sdk.git",
-      "ref": "a9f4ec25a162f6f3700623feb691423bb5a51132"
+      "ref": "aefce2ca858795e783c76726ebe7d14d9d4bde7c"
     },
     "nsx-pmu-armv8m": {
       "url": "https://github.com/AmbiqAI/nsx-pmu-armv8m.git",
@@ -48,7 +48,7 @@
   "modules": {
     "nsx-ambiq-bsp": {
       "project": "nsx-ambiq-sdk",
-      "ref": "a9f4ec25a162f6f3700623feb691423bb5a51132"
+      "ref": "aefce2ca858795e783c76726ebe7d14d9d4bde7c"
     },
     "nsx-pmu-armv8m": {
       "project": "nsx-pmu-armv8m",

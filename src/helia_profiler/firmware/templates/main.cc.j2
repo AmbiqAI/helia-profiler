@@ -38,6 +38,11 @@
 #include "tensorflow/compiler/mlir/lite/schema/schema_utils.h"
 
 #include "hpx_pmu_profiler.h"
+{% if has_ethos_u | default(false) %}
+// Ethos-U NPU bring-up (nsx-npu module): powers/initializes the microNPU
+// before the interpreter dispatches Vela's ethos-u custom op to it.
+#include "nsx_npu.h"
+{% endif %}
 {%- endblock %}
 
 {% block engine_model_storage %}
@@ -123,6 +128,18 @@ static uint8_t *g_arena = g_arena_storage;
 static HpxPmuProfiler g_profiler;
 {% else %}
 NSX_MEM_SRAM static HpxPmuProfiler g_profiler;
+{% endif %}
+
+{% if has_ethos_u | default(false) %}
+// Engine seams for the engine-agnostic _npu_pmu.j2 (see its header).
+#define HPX_NPU_MAX_LAYERS HpxPmuProfiler::kMaxLayers
+static inline int hpx_npu_current_layer(void) { return g_profiler.current_layer(); }
+static inline int hpx_npu_num_layers(void) { return g_profiler.num_events(); }
+static inline void hpx_npu_print_row_head(int i) {
+    const char *tag = g_profiler.layer_tag(i);
+    hpx_printf("%d,%s", i, tag ? tag : "?");
+}
+{% include "_npu_pmu.j2" %}
 {% endif %}
 
 // Register builtin ops using the selected resolver strategy.
@@ -245,6 +262,9 @@ static tflite::MicroMutableOpResolver<kMaxOps> &get_resolver() {
 {%- endblock %}
 
 {% block engine_model_setup %}
+{% if has_ethos_u | default(false) %}
+{% include "_npu_init.j2" %}
+{% endif %}
     tflite::InitializeTarget();
 
     const tflite::Model *model = tflite::GetModel(model_data);
@@ -257,7 +277,11 @@ static tflite::MicroMutableOpResolver<kMaxOps> &get_resolver() {
     }
 
 {% if not power_only | default(false) %}    // Use the first pass to allocate (all passes use the same model/arena)
-{% if pmu_passes[0].custom %}
+{% if pmu_passes[0].group == "ethos_npu" %}
+    // First pass samples the Ethos-U's own PMU; the ARM-side profiler only
+    // records layer ordinals/tags (0 ARM counters).
+    g_profiler.InitCustom(nullptr, 0);
+{% elif pmu_passes[0].custom %}
 {% if has_armv8m_pmu %}
     {
         static const uint32_t _init_ids[] = { {{ pmu_passes[0].event_ids | join(', ') }} };
@@ -406,7 +430,23 @@ static tflite::MicroMutableOpResolver<kMaxOps> &get_resolver() {
         g_profiler.SetEnabled(true);{% endblock %}
 
 {% block engine_pass_init %}
-{% if pass.custom %}
+{% if has_ethos_u | default(false) %}
+    // Only the ethos_npu pass leaves NPU PMU tracking enabled; every other
+    // pass must not accumulate stale counters from a prior ethos_npu pass.
+    hpx_npu_set_enabled({{ "true" if pass.group == "ethos_npu" else "false" }});
+{% endif %}
+{% if pass.group == "ethos_npu" %}
+    {
+        // Ethos-U PMU pass: counters live in the NPU and are sampled by the
+        // driver inference hooks (_npu_pmu.j2). g_profiler still tracks layer
+        // ordinals/tags so rows align with ARM-PMU presets, but programs no
+        // ARM counters. Names ARE the driver's symbolic event enum.
+        static const enum ethosu_pmu_event_type _pass{{ loop.index0 }}_npu_events[] = { {{ pass.counter_names | join(', ') }} };
+        static const char* _pass{{ loop.index0 }}_names[] = { {% for name in pass.counter_names %}"{{ name }}"{% if not loop.last %}, {% endif %}{% endfor %} };
+        g_profiler.InitCustom(nullptr, 0);
+        hpx_npu_configure(_pass{{ loop.index0 }}_npu_events, _pass{{ loop.index0 }}_names, {{ pass.num_counters }});
+    }
+{% elif pass.custom %}
 {% if has_armv8m_pmu %}
     {
         static const uint32_t _pass{{ loop.index0 }}_ids[] = { {{ pass.event_ids | join(', ') }} };
@@ -434,7 +474,22 @@ static tflite::MicroMutableOpResolver<kMaxOps> &get_resolver() {
 
 {% block engine_iteration_setup %}
         g_profiler.ClearEvents();
+{% if pass.group == "ethos_npu" %}
+        hpx_npu_clear();
+{% endif %}
         g_profiler.SetIterationContext({{ loop.index0 }}, iter);
 {%- endblock %}
 
-{% block engine_print_csv %}        g_profiler.PrintCsv();{% endblock %}
+{% block engine_print_csv %}{% if pass.group == "ethos_npu" %}
+        hpx_npu_print_csv();
+{% else %}
+        g_profiler.PrintCsv();
+{% endif %}{%- endblock %}
+
+{% block engine_profiled_summary %}
+{% if has_ethos_u | default(false) %}
+    // Passes are done; leave NPU PMU tracking disabled rather than armed on
+    // whatever group happened to run last.
+    hpx_npu_set_enabled(false);
+{% endif %}
+{{ super() }}{% endblock %}

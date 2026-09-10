@@ -51,6 +51,9 @@ def test_infer_group_new_style():
     assert _infer_group("mve_1") == "mve"
     assert _infer_group("cpu_0") == "cpu"
     assert _infer_group("memory_2") == "memory"
+    # Group names may contain underscores (ethos_npu_0 .. ethos_npu_2).
+    assert _infer_group("ethos_npu_0") == "ethos_npu"
+    assert _infer_group("ethos_npu_2") == "ethos_npu"
 
 
 def test_infer_group_legacy():
@@ -297,6 +300,30 @@ def test_multi_pass_same_group_merged():
     assert mve_layers[0].counters["ARM_PMU_MVE_STALL"] == 50
     assert mve_layers[1].counters["ARM_PMU_MVE_INST_RETIRED"] == 100
     assert mve_layers[1].counters["ARM_PMU_MVE_STALL"] == 10
+
+
+def test_multi_pass_ethos_npu_merged_into_one_group():
+    """ethos_npu_0/ethos_npu_1 merge into a single 'ethos_npu' group —
+    the underscore in the group name must not defeat pass-name splitting."""
+    header_a = ["Layer", "Op", "ETHOSU_PMU_CYCLE"]
+    rows_a = [["0", "ethos-u", "9000"]]
+
+    header_b = ["Layer", "Op", "ETHOSU_PMU_EXT_WR_DATA_BEAT_WRITTEN"]
+    rows_b = [["0", "ethos-u", "400"]]
+
+    lines = _wrap_session(
+        {"presets": "ethos_npu_0,ethos_npu_1"},
+        [
+            _make_preset_block("ethos_npu_0", header_a, rows_a),
+            _make_preset_block("ethos_npu_1", header_b, rows_b),
+        ],
+    )
+    result = parse_firmware_output(lines)
+
+    assert set(result.groups) == {"ethos_npu"}
+    layers = result.groups["ethos_npu"]
+    assert layers[0].counters["ETHOSU_PMU_CYCLE"] == 9000
+    assert layers[0].counters["ETHOSU_PMU_EXT_WR_DATA_BEAT_WRITTEN"] == 400
 
 
 def test_multi_group_separate():

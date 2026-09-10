@@ -51,6 +51,23 @@ def _sample_pmu_passes() -> list[dict[str, object]]:
     ]
 
 
+def _npu_pmu_pass() -> dict[str, object]:
+    return {
+        "name": "EthosNpu",
+        "custom": True,
+        "event_ids": ["0x0000", "0x0000", "0x0000", "0x0000"],
+        "counter_names": [
+            "ETHOSU_PMU_CYCLE",
+            "ETHOSU_PMU_NPU_ACTIVE",
+            "ETHOSU_PMU_MAC_ACTIVE",
+            "ETHOSU_PMU_SRAM_RD_DATA_BEAT_RECEIVED",
+        ],
+        "num_counters": 4,
+        "c_enum": None,
+        "group": "ethos_npu",
+    }
+
+
 def _render_tflm(
     transport: str = "rtt",
     template_name: str = "main.cc.j2",
@@ -73,10 +90,13 @@ def _render_tflm(
     # so the matching power-binary default keeps them on the DWT paths unless a
     # case opts into STIMER explicitly.
     power_window_timer: str = "dwt",
+    has_ethos_u: bool = False,
+    pmu_passes: list[dict[str, object]] | None = None,
     psram_clock_hz: int = 48_000_000,
     **extra_vars: object,
 ) -> str:
     registrations = resolver_registrations or ["r.AddConv2D();", "r.AddSoftmax();"]
+    passes = pmu_passes if pmu_passes is not None else _sample_pmu_passes()
     return _env.get_template(template_name).render(
         **resolve_window_timer(
             clean_window_probe=clean_window_probe,
@@ -102,8 +122,8 @@ def _render_tflm(
         window_min=10,
         window_max=200,
         clean_window_probe=clean_window_probe,
-        pmu_passes=_sample_pmu_passes(),
-        pmu_pass_names=["Cache"],
+        pmu_passes=passes,
+        pmu_pass_names=[p["name"] for p in passes],
         power_sync_enabled=False,
         sync_gpio_pin=91,
         transport=transport,
@@ -121,6 +141,7 @@ def _render_tflm(
         heartbeat_enabled=True,
         heartbeat_every_n_ops=4,
         heartbeat_every_ms=0,
+        has_ethos_u=has_ethos_u,
         psram_clock_hz=psram_clock_hz,
         # HPX_ENGINE= is emitted by the shared skeleton for every engine
         # (_main_base.cc.j2); production derives this from EngineType.
@@ -146,6 +167,8 @@ def _render_aot(
     power_only: bool = False,
     # See _render_tflm.
     power_window_timer: str = "dwt",
+    has_ethos_u: bool = False,
+    pmu_passes: list[dict[str, object]] | None = None,
     psram_clock_hz: int = 48_000_000,
     **extra_vars: object,
 ) -> str:
@@ -159,6 +182,7 @@ def _render_aot(
         aot_prefix="fake",
         cmsis_device_header=cmsis_device_header,
         aot_op_manifest=[{"id": 0, "op_type": "CONV_2D"}],
+        has_ethos_u=has_ethos_u,
         iterations=3,
         warmup=1,
         clean_warmup=1,
@@ -170,8 +194,10 @@ def _render_aot(
         window_min=10,
         window_max=200,
         clean_window_probe=clean_window_probe,
-        pmu_passes=_sample_pmu_passes(),
-        pmu_pass_names=["Cache"],
+        pmu_passes=pmu_passes if pmu_passes is not None else _sample_pmu_passes(),
+        pmu_pass_names=[
+            str(p["name"]) for p in (pmu_passes if pmu_passes is not None else _sample_pmu_passes())
+        ],
         power_sync_enabled=False,
         sync_gpio_pin=91,
         transport=transport,
@@ -951,9 +977,176 @@ class TestMainAotCcRender:
         assert "kMaxLayers = 4096;" in large
 
 
-# ---------------------------------------------------------------------------
-# On-target INA228 power monitor (power.driver: ina228)
-# ---------------------------------------------------------------------------
+class TestEthosURender:
+    """has_ethos_u gates the NPU include + init block in main.cc.j2."""
+
+    def test_npu_blocks_present_when_enabled(self):
+        out = _render_tflm(has_ethos_u=True)
+        assert '#include "nsx_npu.h"' in out
+        assert "nsx_npu_init(&npu_cfg)" in out
+        assert "HPX_NPU=ethos-u85 init=ok" in out
+        assert "HPX_ERROR=npu_init_failed" in out
+        # Init must run before the interpreter touches the model.
+        assert out.index("nsx_npu_init") < out.index("tflite::InitializeTarget")
+
+    def test_npu_blocks_absent_by_default(self):
+        out = _render_tflm()
+        assert "nsx_npu" not in out
+        assert "HPX_NPU" not in out
+
+    def test_power_only_uses_terminal_fail(self):
+        out = _render_tflm(has_ethos_u=True, power_only=True)
+        assert 'hpx_power_terminal_fail("npu", 2U);' in out
+
+    def test_tolerate_power_ack_defaults_off(self):
+        out = _render_tflm(has_ethos_u=True)
+        assert ".tolerate_power_ack = false," in out
+
+    def test_tolerate_power_ack_set_for_fpga_boards(self):
+        for power_only in (False, True):
+            out = _render_tflm(has_ethos_u=True, power_only=power_only, npu_tolerate_power_ack=True)
+            assert ".tolerate_power_ack = true," in out
+
+    def test_npu_pmu_partial_included(self):
+        out = _render_tflm(has_ethos_u=True)
+        assert '#include "pmu_ethosu.h"' in out
+        assert '#include "nsx_ethos_u.h"' in out
+        assert "hpx_npu_probe(" in out
+        assert "hpx_npu_print_csv" in out
+
+    def test_npu_pmu_uses_driver_probe_not_strong_hooks(self):
+        """The driver owns ethosu_inference_begin/end; redefining them collides
+        at link (WORKAROUND helia-profiler#183: nsx-ethos-u-driver ships strong
+        overrides via INTERFACE_SOURCES). We must register a probe instead."""
+        out = _render_tflm(has_ethos_u=True)
+        # No *definition* of the driver-owned symbols (prose mentioning them in
+        # the explanatory comment is fine).
+        assert "void ethosu_inference_begin(" not in out
+        assert "void ethosu_inference_end(" not in out
+        # The dead auto-config hook the driver does not have.
+        assert "ethosu_pmu_auto_config_enabled" not in out
+        # Probe dispatches on the driver's phase constants.
+        assert "NSX_ETHOS_U_PROBE_BEGIN" in out
+        assert "NSX_ETHOS_U_PROBE_END" in out
+        # Registered on the init path, before the first inference.
+        assert "nsx_ethos_u_set_probe(hpx_npu_probe);" in out
+        assert out.index("nsx_ethos_u_set_probe(hpx_npu_probe);") < out.index(
+            "interpreter.Invoke();"
+        )
+
+    def test_npu_pmu_partial_absent_without_ethos_u(self):
+        out = _render_tflm()
+        assert "pmu_ethosu.h" not in out
+        assert "nsx_ethos_u_set_probe" not in out
+        assert "hpx_npu_probe" not in out
+
+    def test_npu_pmu_tracks_overflow_per_layer(self):
+        """Hardware counter saturation and uint32 accumulation wrap must both
+        reach the CSV overflow column — never a hardcoded 0."""
+        out = _render_tflm(has_ethos_u=True, pmu_passes=[_npu_pmu_pass()])
+        # Stale flags cleared before each dispatch window (W1C register).
+        assert "ETHOSU_PMU_Set_CNTR_OVS(drv, mask);" in out
+        # Hardware overflow read back and latched per layer.
+        assert "ETHOSU_PMU_Get_CNTR_OVS(drv)" in out
+        # Accumulation wrap across dispatches latched per layer.
+        assert "g_npu_acc[layer][i] < before" in out
+        # Emitted per row, and reset with the rest of the iteration state.
+        assert 'hpx_printf(",%u\\n", (unsigned)g_npu_ovf[i]);' in out
+        assert 'hpx_printf(",0\\n");' not in out
+        assert "memset((void *)g_npu_ovf, 0, sizeof(g_npu_ovf));" in out
+
+    def test_ethos_npu_pass_uses_npu_csv(self):
+        out = _render_tflm(has_ethos_u=True, pmu_passes=[_npu_pmu_pass()])
+        # Pass programs NPU events symbolically and prints via the NPU path.
+        assert "ETHOSU_PMU_CYCLE, ETHOSU_PMU_NPU_ACTIVE" in out
+        assert "hpx_npu_configure(" in out
+        assert "hpx_npu_set_enabled(true);" in out
+        assert "hpx_npu_set_enabled(false);" in out
+        assert "hpx_npu_clear();" in out
+        assert "hpx_npu_print_csv();" in out
+        # ARM-side profiler records only layer ordinals for this pass.
+        assert "g_profiler.InitCustom(nullptr, 0);" in out
+        assert "g_profiler.PrintCsv();" not in out
+
+    def test_mixed_passes_branch_per_group(self):
+        out = _render_tflm(
+            has_ethos_u=True,
+            pmu_passes=[_sample_pmu_passes()[0], _npu_pmu_pass()],
+        )
+        # Both print paths coexist: ARM pass keeps PrintCsv, NPU pass its own.
+        assert "g_profiler.PrintCsv();" in out
+        assert "hpx_npu_print_csv();" in out
+
+
+class TestEthosUAotRender:
+    """has_ethos_u gates the NPU include + init + PMU blocks in main_aot.cc.j2."""
+
+    def test_npu_blocks_present_when_enabled(self):
+        out = _render_aot(has_ethos_u=True)
+        assert '#include "nsx_npu.h"' in out
+        assert "nsx_npu_init(&npu_cfg)" in out
+        assert "HPX_NPU=ethos-u85 init=ok" in out
+        assert "HPX_ERROR=npu_init_failed" in out
+        # Init must run before the AOT runtime touches the model.
+        assert out.index("nsx_npu_init") < out.index("fake_model_init")
+
+    def test_npu_blocks_absent_by_default(self):
+        out = _render_aot()
+        assert "nsx_npu" not in out
+        assert "HPX_NPU" not in out
+        assert "pmu_ethosu.h" not in out
+        assert "nsx_ethos_u_set_probe" not in out
+        assert "hpx_npu_probe" not in out
+
+    def test_power_only_uses_terminal_fail(self):
+        out = _render_aot(has_ethos_u=True, power_only=True)
+        assert 'hpx_power_terminal_fail("npu", 2U);' in out
+
+    def test_tolerate_power_ack_defaults_off(self):
+        out = _render_aot(has_ethos_u=True)
+        assert ".tolerate_power_ack = false," in out
+
+    def test_tolerate_power_ack_set_for_fpga_boards(self):
+        for power_only in (False, True):
+            out = _render_aot(has_ethos_u=True, power_only=power_only, npu_tolerate_power_ack=True)
+            assert ".tolerate_power_ack = true," in out
+
+    def test_npu_pmu_partial_included_with_aot_seams(self):
+        out = _render_aot(has_ethos_u=True)
+        assert '#include "pmu_ethosu.h"' in out
+        assert '#include "nsx_ethos_u.h"' in out
+        # Driver owns the strong hooks; we register a probe (see #183).
+        assert "void ethosu_inference_begin(" not in out
+        assert "void ethosu_inference_end(" not in out
+        assert "ethosu_pmu_auto_config_enabled" not in out
+        assert "hpx_npu_probe(" in out
+        assert "nsx_ethos_u_set_probe(hpx_npu_probe);" in out
+        # AOT engine seams — layer ordinal from the operator callback.
+        assert "#define HPX_NPU_MAX_LAYERS kMaxLayers" in out
+        assert "return g_num_layers;" in out
+        # Row head reuses the AOT "TYPE:id" tag for host-side merging.
+        assert 'hpx_printf("%d,%s:%ld", i, aot_op_name(i), (long)aot_op_id(i));' in out
+
+    def test_ethos_npu_pass_uses_npu_csv(self):
+        out = _render_aot(has_ethos_u=True, pmu_passes=[_npu_pmu_pass()])
+        assert "ETHOSU_PMU_CYCLE, ETHOSU_PMU_NPU_ACTIVE" in out
+        assert "hpx_npu_configure(" in out
+        assert "hpx_npu_set_enabled(true);" in out
+        assert "hpx_npu_set_enabled(false);" in out
+        assert "hpx_npu_clear();" in out
+        assert "hpx_npu_print_csv();" in out
+        # ARM-side profiler records only layer ordinals for this pass.
+        assert "profiler_init_custom(nullptr, 0);" in out
+        assert "profiler_print_csv();" not in out
+
+    def test_mixed_passes_branch_per_group(self):
+        out = _render_aot(
+            has_ethos_u=True,
+            pmu_passes=[_sample_pmu_passes()[0], _npu_pmu_pass()],
+        )
+        assert "profiler_print_csv();" in out
+        assert "hpx_npu_print_csv();" in out
+
 
 _INA228_VARS: dict[str, object] = {
     "power_monitor": "ina228",
