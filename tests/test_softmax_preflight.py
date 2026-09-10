@@ -28,7 +28,7 @@ from helia_profiler.modelcost.softmax_preflight import (
     scan_softmax_scaling,
     softmax_input_multiplier,
 )
-from helia_profiler.stages.preflight import _check_softmax_scaling
+from helia_profiler.engines.model_validation import check_softmax_scaling as _check_softmax_scaling
 
 FIXTURES = Path(__file__).parent / "fixtures"
 BAD_MODEL = FIXTURES / "softmax_scale_unsupported.tflite"
@@ -291,7 +291,7 @@ class TestPreflightGate:
             multiplier=0.0,
         )
         monkeypatch.setattr(
-            "helia_profiler.stages.preflight.scan_softmax_scaling",
+            "helia_profiler.engines.model_validation.scan_softmax_scaling",
             lambda _path: [no_beta],
         )
 

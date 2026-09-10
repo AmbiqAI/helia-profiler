@@ -744,10 +744,19 @@ def test_derived_analysis_fields_are_not_counter_diffs(tmp_path: Path):
             w.writeheader()
             w.writerows(rows)
 
-    row = compare_runs(baseline, candidate).layer_rows[0]
+    result = compare_runs(baseline, candidate)
+    row = result.layer_rows[0]
 
     assert "ARM_PMU_CPU_CYCLES" in row.counters
     assert not {"macs", "ops", "cycles_per_mac"} & set(row.counters)
+
+    paths = write_compare_artifacts(result, tmp_path / "diff")
+    with next(path for path in paths if path.name == "layer_diff.csv").open(newline="") as f:
+        csv_row = next(csv.DictReader(f))
+    assert float(csv_row["baseline_cycles"]) == 800
+    assert float(csv_row["candidate_cycles"]) == 700
+    assert float(csv_row["delta_cycles"]) == -100
+    assert not any(field.endswith(("macs", "ops", "cycles_per_mac")) for field in csv_row)
 
 
 def test_layer_diff_row_is_frozen_and_flattens_for_csv(tmp_path: Path):

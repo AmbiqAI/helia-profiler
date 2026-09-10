@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..results import BinarySections
+from ._proc import run_text
 from .toolchains import get_toolchain_spec, resolve_toolchain_executable
 
 # The #133 inventory API lives in elf_inventory (extracted at the module
@@ -64,9 +65,7 @@ def _compiler_command(toolchain: str) -> str:
 def _run_version(cmd: str, *, timeout_s: int) -> str:
     """Return the first line of ``<cmd> --version`` stdout, or ``""``."""
     try:
-        result = subprocess.run(
-            [cmd, "--version"], capture_output=True, text=True, timeout=timeout_s
-        )
+        result = run_text([cmd, "--version"], timeout_s=timeout_s)
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
         log.debug("%s --version probe failed: %s", cmd, exc)
         return ""
@@ -107,11 +106,9 @@ def _sections_via_size(
          123420   27032   92412  242864   3b4b0 hpx_profiler
     """
     try:
-        result = subprocess.run(
+        result = run_text(
             [size_cmd, str(binary_path)],
-            capture_output=True,
-            text=True,
-            timeout=timeout_s,
+            timeout_s=timeout_s,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
         log.debug("%s probe failed: %s", size_cmd, exc)
@@ -244,11 +241,9 @@ def _reserved_via_readelf(
     an adjustment.
     """
     try:
-        result = subprocess.run(
+        result = run_text(
             [readelf_cmd, "-S", "-W", str(binary_path)],
-            capture_output=True,
-            text=True,
-            timeout=timeout_s,
+            timeout_s=timeout_s,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
         log.debug("%s section probe failed: %s", readelf_cmd, exc)
@@ -309,11 +304,9 @@ def _reserved_via_fromelf(
     adjustment -- the same degradation contract as the readelf probe.
     """
     try:
-        result = subprocess.run(
+        result = run_text(
             ["fromelf", "--text", "-v", str(binary_path)],
-            capture_output=True,
-            text=True,
-            timeout=timeout_s,
+            timeout_s=timeout_s,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
         log.debug("fromelf section probe failed: %s", exc)
@@ -429,11 +422,9 @@ def _sections_via_fromelf(
     reported unadjusted (#132's documented degradation) rather than failing.
     """
     try:
-        result = subprocess.run(
+        result = run_text(
             ["fromelf", "--text", "-z", str(binary_path)],
-            capture_output=True,
-            text=True,
-            timeout=timeout_s,
+            timeout_s=timeout_s,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
         log.debug("fromelf probe failed: %s", exc)
@@ -537,11 +528,9 @@ def symbol_address(
     """
     nm = _nm_command(toolchain)
     try:
-        result = subprocess.run(
+        result = run_text(
             [nm, str(binary_path)],
-            capture_output=True,
-            text=True,
-            timeout=timeout_s,
+            timeout_s=timeout_s,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
         log.debug("%s probe failed: %s", nm, exc)
