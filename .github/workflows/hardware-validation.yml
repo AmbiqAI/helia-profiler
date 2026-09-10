@@ -412,7 +412,14 @@ jobs:
           if [[ -n "${HPX_VALIDATION_POWER_SERIALS}" ]]; then
             args+=(--power-serials "${HPX_VALIDATION_POWER_SERIALS}")
           fi
-          uv run hpx validate "${args[@]}"
+          preview="$(uv run hpx validate "${args[@]}")"
+          printf '%s\n' "${preview}"
+          # A selection that matches nothing used to pass silently: no
+          # bundle, green job, and nothing for the dashboard to show.
+          if [[ "${preview}" == *"0 case(s) would run"* ]]; then
+            echo "::error::the requested suite, boards, and axes select no validation cases on ${HPX_VALIDATION_BOARD}" >&2
+            exit 2
+          fi
 
       - name: Run hardware validation
         run: |

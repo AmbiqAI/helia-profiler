@@ -263,6 +263,30 @@ def test_artifact_is_uploaded_per_board(validate_job: dict[str, Any]) -> None:
     assert upload["with"]["overwrite"] is True
 
 
+def test_preview_fails_when_no_case_is_selected(
+    workflow: dict[Any, Any], validate_job: dict[str, Any], tmp_path: Path
+) -> None:
+    """An empty selection must not pass as a green job with no bundle."""
+    env = {key: "" for key in workflow["env"] if key.startswith("HPX_VALIDATION_")}
+    env.update(
+        HPX_VALIDATION_BOARD="apollo3p_evb",
+        HPX_VALIDATION_JLINK_SERIALS="",
+        HPX_VALIDATION_POWER="off",
+        HPX_VALIDATION_POWER_BOARDS="",
+        HPX_VALIDATION_POWER_SERIALS="",
+        HPX_VALIDATION_EXECUTORCH_BACKENDS="both",
+        HPX_NS_CMSIS_NN_REF="",
+    )
+    script = _step(validate_job, "Preview validation cases")["run"]
+    empty = 'uv() { printf "Registered models: kws\n\n0 case(s) would run:\n"; }\n' + script
+    with pytest.raises(subprocess.CalledProcessError) as failure:
+        _run_bash(empty, env, tmp_path)
+    assert failure.value.returncode == 2
+    assert "select no validation cases on apollo3p_evb" in failure.value.stderr
+    listed = 'uv() { printf "1 case(s) would run:\n  apollo3p_evb-kws-rt-ns\n"; }\n' + script
+    assert "1 case(s) would run:" in _run_bash(listed, env, tmp_path)
+
+
 def test_validate_job_scripts_do_not_need_jq(validate_job: dict[str, Any]) -> None:
     """The bench runners expose only the embedded toolchain on PATH (jq is not on it)."""
     for step in validate_job["steps"]:
