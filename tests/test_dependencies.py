@@ -29,7 +29,7 @@ from helia_profiler.engines.base import ExecutorchArtifacts, TflmArtifacts
 from helia_profiler.errors import DependencyError, LockError, VersionError
 from helia_profiler.errors import BuildError
 from helia_profiler.pipeline import PipelineContext
-from helia_profiler.results import DependencyLockMode, NsxModuleRef
+from helia_profiler.results import DependencyLockMode, DependencyOverride, NsxModuleRef
 from helia_profiler.deps.compatibility import QualificationState
 from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 
@@ -698,10 +698,13 @@ def test_engine_cmsis_nn_override_exempts_provider_project_from_baseline_check(
     provenance = prepare_locked_dependencies(ctx)
 
     assert provenance.modules[0].peeled_commit == "d" * 40
-    assert any(
-        override.scope == "engine" and override.name == "cmsis_nn_ref"
-        for override in provenance.overrides
+    # The selector is recorded under the module it replaced, in the same shape
+    # as the equivalent build.nsx_modules override, not under the config key.
+    module = "arm-cmsis-nn" if project == "arm-cmsis-nn" else "nsx-cmsis-nn"
+    assert (
+        DependencyOverride("module", module, "ref", "feature/provider-test") in provenance.overrides
     )
+    assert not any(override.scope == "engine" for override in provenance.overrides)
 
 
 def test_unpinned_projects_are_not_baseline_checked(
