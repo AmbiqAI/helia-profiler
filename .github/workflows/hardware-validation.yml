@@ -178,6 +178,13 @@ jobs:
             echo "::error::runner owns board '${HPX_BOARD}' but this job targets '${HPX_VALIDATION_BOARD}'; check the runner's labels" >&2
             exit 2
           fi
+          # The provenance steps below build JSON with jq. The runner service
+          # exposes only the contract's package set on PATH, so a bench built
+          # without jq must fail here, not minutes later inside a job.
+          if ! command -v jq > /dev/null; then
+            echo "::error::runner has no jq on PATH; it is not configured per the runner contract" >&2
+            exit 2
+          fi
 
           {
             echo "HPX_VALIDATION_JLINK_SERIALS=${HPX_BOARD}=${HPX_JLINK_SERIAL}"
@@ -263,15 +270,11 @@ jobs:
           fi
           echo "NS_CMSIS_NN_RESOLVED_COMMIT=${resolved_commit}" >> "${GITHUB_ENV}"
           echo "resolved_commit=${resolved_commit}" >> "${GITHUB_OUTPUT}"
-          # Plain bash, no jq: the bench runners only carry the embedded
-          # toolchain on their PATH. A branch name has already passed
-          # git check-ref-format, which leaves only the double quote (and
-          # backslash, defensively) to escape for JSON.
-          json_string() {
-            local value="${1//\\/\\\\}"
-            printf '"%s"' "${value//\"/\\\"}"
-          }
-          source_revisions="{\"ns-cmsis-nn\": {\"requested_kind\": $(json_string "${requested_kind}"), \"requested_ref\": $(json_string "${requested_ref}"), \"resolved_commit\": $(json_string "${resolved_commit}")}}"
+          source_revisions="$(jq -cn \
+            --arg kind "${requested_kind}" \
+            --arg ref "${requested_ref}" \
+            --arg commit "${resolved_commit}" \
+            '{"ns-cmsis-nn": {requested_kind: $kind, requested_ref: $ref, resolved_commit: $commit}}')"
           echo "HPX_SOURCE_REVISIONS_JSON=${source_revisions}" >> "${GITHUB_ENV}"
 
           mkdir -p results/validation
@@ -329,17 +332,16 @@ jobs:
           fi
 
           echo "NSX_EXECUTORCH_ROOT=${checkout_path}" >> "${GITHUB_ENV}"
-          # Plain bash, no jq (see the ns-cmsis-nn step). The commits are
-          # hex from git rev-parse, so they need no escaping. An existing
-          # HPX_SOURCE_REVISIONS_JSON is the one-object document the
-          # ns-cmsis-nn step wrote; splice its members in front of ours.
-          pinned() {
-            printf '"%s": {"requested_kind": "commit", "requested_ref": "%s", "resolved_commit": "%s"}' "$1" "$2" "$2"
-          }
-          existing="${HPX_SOURCE_REVISIONS_JSON:-}"
-          existing="${existing#\{}"
-          existing="${existing%\}}"
-          source_revisions="{${existing:+${existing}, }$(pinned nsx-executorch "${resolved_commit}"), $(pinned executorch "${executorch_commit}"), $(pinned arm-cmsis-nn 6d21a6f821fb72541173a6c4d05d83329fa74f7c)}"
+          source_revisions="$(jq -cn \
+            --argjson existing "${HPX_SOURCE_REVISIONS_JSON:-null}" \
+            --arg nsx "${resolved_commit}" \
+            --arg et "${executorch_commit}" \
+            --arg arm "6d21a6f821fb72541173a6c4d05d83329fa74f7c" \
+            '$existing + {
+              "nsx-executorch": {requested_kind: "commit", requested_ref: $nsx, resolved_commit: $nsx},
+              "executorch": {requested_kind: "commit", requested_ref: $et, resolved_commit: $et},
+              "arm-cmsis-nn": {requested_kind: "commit", requested_ref: $arm, resolved_commit: $arm}
+            }')"
           echo "HPX_SOURCE_REVISIONS_JSON=${source_revisions}" >> "${GITHUB_ENV}"
           mkdir -p results/validation
           {

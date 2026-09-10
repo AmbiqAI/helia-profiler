@@ -361,10 +361,11 @@ passed, and it overwrites an artifact of the same name, so "re-run failed jobs"
 replaces the failed board's artifact with the new attempt's bundle (the
 manifest records `run.github.run_attempt`).
 
-The validate job's own shell steps use only bash, git, and `uv`. In particular
-they do not call `jq`: the bench runner services expose the embedded
-toolchain on `PATH`, not the host's general tools, and the plan job (which does
-use `jq`) runs on a GitHub-hosted runner.
+The validate job's shell steps build provenance JSON with `jq`. The bench
+runner services expose only the runner contract's package set on `PATH`, not
+the host's general tools, so `jq` is part of that contract
+(`lab.embedded.packages` in `AmbiqAI/aitg-hardware-runner-nixos`) and the
+job's first step fails with a named error when it is missing.
 
 The runner must already provide:
 
@@ -374,6 +375,7 @@ The runner must already provide:
 - ARM toolchain, CMake, Ninja, and NSX on `PATH`
 - ATfE plus `ATFE_ROOT` when selected toolchains include `atfe`
 - Git LFS support for model fixtures
+- `jq` on `PATH` for the provenance steps
 - optional Joulescope access and wiring when `power` is `on` or `both`
 
 ATfE runs require `ATFE_ROOT` to point at the Arm Toolchain for Embedded install
