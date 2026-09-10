@@ -210,7 +210,10 @@ per-layer counters are combined across those iterations:
 
 All three methods first reject **structurally-invalid samples** — a
 uint32-wrap (finish < start) or a frozen-zero row — before aggregating, and
-log how many were rejected.
+log how many were rejected. A counter with no surviving samples is omitted
+from the aggregate, not replaced with rejected values; raw iterations remain
+available for diagnostics. Consistently all-zero layers are retained because
+they cannot be distinguished from genuine zero measurements by the parser.
 
 ```yaml
 profiling:
@@ -245,11 +248,17 @@ between the two is normal and shown in the terminal output.
 
 | Metric | Formula | Included in |
 |---|---|---|
-| L1D hit rate | `1 - (L1D_CACHE_MISS_RD / L1D_CACHE_RD) × 100%` | `summary.json`, `detailed/memory.json` |
+| L1D hit rate | `(1 - L1D_CACHE_MISS_RD / L1D_CACHE_RD) × 100%` | `summary.json`, `detailed/memory.json` |
 | MVE instruction share | `MVE_INST_RETIRED / INST_RETIRED × 100%` | Terminal summary |
 | MVE MAC density | `MVE_INT_MAC_RETIRED / MVE_INST_RETIRED` | Terminal summary |
 | MVE load/store density | `MVE_LDST_RETIRED / MVE_INST_RETIRED` | Terminal summary |
 | MVE stall share | `MVE_STALL / CPU_CYCLES × 100%` | Terminal summary |
+
+L1D hit rate prefers the read-access/read-miss pair above, falling back to
+`L1D_CACHE`/`L1D_CACHE_REFILL` only as a complete pair. Both counters must cover
+every layer. If no consistent pair has finite totals, positive accesses, and
+misses between zero and accesses, the derived rate is omitted; measured
+counter totals are still reported.
 
 ## Apollo3 and Apollo4: the debugger must stay attached
 

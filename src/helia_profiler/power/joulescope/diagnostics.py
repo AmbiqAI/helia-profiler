@@ -15,6 +15,27 @@ from typing import Any
 from .stats import _gated_mask_axis, _segment_gpi_windows, _stats_arrays
 
 
+def _poll_edge_uncertainty_s(
+    reads: list[tuple[int, int, int]], *, minimum_window_s: float = 0.0
+) -> float:
+    """Sum the measured read brackets at both edges of qualifying windows."""
+    from pyjoulescope_driver import time64
+
+    rise: int | None = None
+    rise_bound = 0
+    total = 0
+    for previous, current in zip(reads, reads[1:]):
+        _, end, level = current
+        if level and not previous[2]:
+            rise = end
+            rise_bound = end - previous[0]
+        elif not level and previous[2] and rise is not None:
+            if (end - rise) / time64.SECOND >= minimum_window_s:
+                total += rise_bound + end - previous[0]
+            rise = None
+    return total / time64.SECOND
+
+
 def _gated_stats_diagnostics(
     *,
     packets: list[dict[str, Any]],

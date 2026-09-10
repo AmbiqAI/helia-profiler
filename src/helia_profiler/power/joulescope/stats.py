@@ -37,7 +37,12 @@ def _process_stats(
         vol = sig.get("voltage", {})
         currents.append(_extract_scalar(cur.get("avg", 0.0)))
         voltages.append(_extract_scalar(vol.get("avg", io_voltage), default=io_voltage))
-        peaks.append(_extract_scalar(cur.get("max", 0.0)))
+        peaks.append(
+            np.fmax(
+                abs(_extract_scalar(cur.get("max", 0.0))),
+                abs(_extract_scalar(cur.get("min", 0.0))),
+            )
+        )
 
     if not currents:
         currents = [0.0]
@@ -106,23 +111,8 @@ def _stats_arrays(packets: list[dict[str, Any]]) -> dict[str, Any]:
         cur_int.append(_sv(cur.get("integral")))
         pwr_avg.append(_sv(pwr.get("avg")))
         pwr_int.append(_sv(pwr.get("integral")))
-    # Report current/power as magnitude.  The Joulescope's sign reflects which
-    # terminal sources vs sinks; on a SoC-only rail wired with reversed IN/OUT
-    # the draw reads negative even though the magnitude is correct.  We measure
-    # consumption, so normalize to |I|/|P|; timestamps are left untouched.
-    #
-    # Polarity-robust peak: the JS110 reports per-window avg/min/max as *signed*
-    # values.  With reversed IN/OUT the SoC draw is negative, so the true current
-    # PEAK is the most-negative sample (the ``min`` field) and ``max`` holds the
-    # trough (closest to zero).  Taking ``|max|`` alone therefore reports the
-    # trough as the peak — the tell is a "peak" that comes out *below* the p99 of
-    # the per-window averages, which is physically impossible (max >= mean
-    # always).  We saw exactly that on AP510 (a measured peak below the p99 of
-    # the per-window averages).
-    # ``max(|max|, |min|)`` recovers the real peak regardless of wiring polarity;
-    # it also leaves the correctly-wired (positive) case unchanged.  The window
-    # average is unaffected — it comes from the abs'd charge integral, which is
-    # direction-independent — so this only fixes the peak/percentile stats.
+    # Rectify each packet's net integral, not each full-rate sample.
+    # Peak magnitude uses both signed extrema regardless of wiring polarity.
     abs_max = np.abs(np.asarray(cur_max, dtype=np.float64))
     abs_min = np.abs(np.asarray(cur_min, dtype=np.float64))
     return {
@@ -134,13 +124,7 @@ def _stats_arrays(packets: list[dict[str, Any]]) -> dict[str, Any]:
         "cur_min": abs_min,
         "cur_peak": np.maximum(abs_max, abs_min),
         "cur_int": np.abs(np.asarray(cur_int, dtype=np.float64)),
-        # Signed charge integral, kept alongside the magnitude-normalized
-        # arrays: a *net negative* gated charge is physically impossible for
-        # a load and means the measurement itself is corrupt (reversed IN/OUT
-        # wiring, or current backfed into the target around the shunt — e.g.
-        # a host-driven GO GPIO held high during the window, observed at
-        # several mA on an AP510 EVB).  ``_process_gated_stats`` raises on it
-        # instead of letting abs() launder it into a plausible number.
+        # Preserve signed charge for the gated backfeed/polarity check.
         "cur_int_signed": np.asarray(cur_int, dtype=np.float64),
         "pwr_avg": np.abs(np.asarray(pwr_avg, dtype=np.float64)),
         "pwr_int": np.abs(np.asarray(pwr_int, dtype=np.float64)),
@@ -164,37 +148,60 @@ def _map_poll_samples_to_packet_time(
     *,
     packets: list[dict[str, Any]],
     poll_samples: list[tuple[int, int]],
+    minimum_window_s: float = 0.0,
 ) -> list[tuple[int, int]]:
     """Map host-timestamped GPI polls onto the instrument stats timeline.
 
     JS220/JS320 ``s/stats`` callbacks can arrive in USB bursts. Selecting
     packets by callback arrival time therefore truncates a correctly observed
     GPIO window. Each packet includes both its instrument midpoint and the
-    host timestamp captured at callback arrival, which provides the conversion
-    needed to express GPI poll instants on the instrument timeline.
+    host timestamp captured at callback arrival. Gate edges must be covered
+    by those anchors, allowing at most one packet of endpoint uncertainty.
     """
     import numpy as np
+    from pyjoulescope_driver import time64
 
     if len(poll_samples) < 1:
+        return poll_samples
+
+    windows = [
+        (rise, fall)
+        for rise, fall in _segment_gpi_windows(poll_samples)
+        if (fall - rise) / time64.SECOND >= minimum_window_s
+    ]
+    if not windows:
         return poll_samples
 
     a = _stats_arrays(packets)
     host_time = a["host_time"]
     device_time = a["mid"]
     if host_time.size < 2 or np.isnan(host_time).any():
-        return poll_samples
+        raise PowerError("Insufficient stats timestamps to align the GPIO gate.")
 
-    order = np.argsort(host_time)
+    order = np.argsort(host_time, kind="stable")
+    duration = a["dur_ticks"][order]
     host_time = host_time[order]
     device_time = device_time[order]
     unique = np.concatenate(([True], np.diff(host_time) > 0))
     host_time = host_time[unique]
     device_time = device_time[unique]
     if host_time.size < 2:
-        return poll_samples
+        raise PowerError("Insufficient distinct stats timestamps to align the GPIO gate.")
+
+    for rise, fall in windows:
+        if rise < host_time[0] - duration[0] or fall > host_time[-1] + duration[-1]:
+            raise PowerError(
+                "Stats timestamps do not cover the GPIO gate; refusing to truncate the window.",
+                hint="Check the Joulescope USB connection and retry the capture.",
+            )
 
     polls = np.asarray([tick for tick, _level in poll_samples], dtype=np.float64)
     mapped = np.interp(polls, host_time, device_time)
+    # Extrapolate endpoint uncertainty at clock rate, never clamp a gate edge.
+    before = polls < host_time[0]
+    after = polls > host_time[-1]
+    mapped[before] = device_time[0] + polls[before] - host_time[0]
+    mapped[after] = device_time[-1] + polls[after] - host_time[-1]
     return [(int(tick), level) for tick, (_host_tick, level) in zip(mapped, poll_samples)]
 
 
@@ -322,14 +329,12 @@ def _fullrate_energy_over_windows(
     volt_chunks: list[Any],
     anchors: list[tuple[int, int, float]],
     poll_samples: list[tuple[int, int]],
+    windows_override: list[tuple[float, float]] | None = None,
 ) -> dict[str, Any] | None:
     """Integrate raw full-rate current/voltage over the GPI-high windows.
 
-    This is the *reference* energy method used by AutoDeploy: rather than
-    summing the device's 1 kHz statistics ``integral`` fields, it integrates
-    the full-rate (``s/i/!data`` + ``s/v/!data``) sample stream directly.  Any
-    high-frequency current content (e.g. SIMO buck switching spikes) that the
-    decimated statistics stream smooths away is captured here.
+    Uses a signed rectangular sum, ``sum(I * V) / sample_rate``, rather than
+    the packet-rectified integrals used for the primary gated measurement.
 
     Returns per-window and aggregate energy/charge, or ``None`` if there is
     insufficient data to build a timeline.
@@ -357,7 +362,9 @@ def _fullrate_energy_over_windows(
     i0, u0 = idx[0], utc[0]
     sample_utc = u0 + (np.arange(n, dtype=np.float64) - i0) * slope
 
-    windows = _segment_gpi_windows(poll_samples)
+    windows = (
+        windows_override if windows_override is not None else _segment_gpi_windows(poll_samples)
+    )
     if not windows:
         return None
 
@@ -392,7 +399,7 @@ def _fullrate_energy_over_windows(
         return None
 
     return {
-        "method": "fullrate_trapezoid_integral",
+        "method": "fullrate_rectangular_integral",
         "sample_rate_hz": sr,
         "sample_count": int(n),
         "window_count": len(win_out),
@@ -418,8 +425,8 @@ def _process_gated_stats(
     """Integrate the gated window(s) from on-device stat-packet integrals.
 
     Each packet carries the instrument's full-rate charge/energy integral over a
-    ~1 ms sub-window, so summing the packets whose midpoint falls inside a
-    GPIO-high window gives exact window charge/energy.  The per-packet
+    ~1 ms sub-window. Select packets by midpoint, retaining packet-scale
+    endpoint uncertainty in the window charge/energy. The per-packet
     avg/max samples within the window yield the spike-robust distribution
     (median / p95 / p99 / glitch-robust peak) so a lone transient sample cannot
     define the headline current.

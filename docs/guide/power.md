@@ -131,6 +131,32 @@ healthy run looks like.
 for this path, plus health signals described in
 [Verifying a capture](#verifying-a-capture).
 
+### Integration and timing semantics
+
+Gated statistics sum the **magnitude of each packet's signed net charge and
+energy integral**. This is neither the signed net total across the whole
+window nor sample-by-sample rectification: opposite signs can cancel within
+a packet, but not between packets. Bidirectional/noise-dominated readings
+can therefore depend on the statistics rate. The net-negative gated-charge
+check still rejects substantial reverse flow; magnitude reporting does not
+make backfeed or reversed wiring valid. Peak current uses the larger
+magnitude of the packet's minimum and maximum.
+
+Ungated capture retains signed averages and energy, with magnitude peak
+current. The optional `HPX_POWER_FULLRATE_XCHECK=1` cross-check uses a signed
+rectangular sum (`sum(I * V) / sample_rate`), recorded as
+`fullrate_rectangular_integral`, not trapezoidal integration.
+
+Packets are selected by their midpoints, so gate endpoints carry packet
+quantization uncertainty. JS220/JS320 streamed edges stay on the instrument
+clock. Snapshot-poll fallback records the measured brackets around both
+edges, including read latency and scheduling gaps, in
+`gating_diagnostics.poll_edge_uncertainty_s`; the firmware-clock comparison
+uses this allowance only for polled edges. Legacy captures without measured
+brackets retain their existing allowance. A gate outside the host/device
+timestamp anchors by more than one endpoint packet is rejected rather than
+silently shortened. Gated capture supports one clean window per invocation.
+
 ## Wiring reference
 
 The **minimum** wiring is one wire: the board's sync/gate GPIO into the
