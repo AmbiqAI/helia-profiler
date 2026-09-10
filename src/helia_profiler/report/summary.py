@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from .memory import (
-    _CACHE_COUNTERS,
+    _cache_totals,
     _serialise_memory_plan,
     _serialise_memory_reconciliation,
     _serialise_memory_regions,
@@ -122,19 +122,8 @@ def _write_summary(
             summary["binary"]["reserved"] = bs.reserved
 
     # Cache / memory counter totals (summed across all layers)
-    cache: dict[str, float] = {}
-    for layer in layers:
-        for cname in _CACHE_COUNTERS:
-            if cname in layer.counters:
-                cache[cname] = cache.get(cname, 0) + layer.counters[cname]
+    cache = _cache_totals(layers)
     if cache:
-        # Compute derived metrics
-        l1d_accesses = cache.get("ARM_PMU_L1D_CACHE_RD", cache.get("ARM_PMU_L1D_CACHE", 0))
-        l1d_misses = cache.get(
-            "ARM_PMU_L1D_CACHE_MISS_RD", cache.get("ARM_PMU_L1D_CACHE_REFILL", 0)
-        )
-        if l1d_accesses > 0:
-            cache["l1d_hit_rate_pct"] = round((1 - l1d_misses / l1d_accesses) * 100, 2)
         summary["cache"] = cache
 
     # Model analysis — MACs, OPS, TOPS
