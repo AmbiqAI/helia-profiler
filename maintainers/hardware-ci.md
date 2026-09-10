@@ -356,7 +356,15 @@ Each board job uploads its own artifact, named
 `hardware-validation-<run_id>-<board>`. A run therefore has one artifact per
 board. Consumers such as the dashboard group a run's artifacts by the GitHub run
 ID recorded in each `validation_manifest.json` under `run.github.run_id`; there
-is no merge step in the workflow.
+is no merge step in the workflow. The upload runs whether or not validation
+passed, and it overwrites an artifact of the same name, so "re-run failed jobs"
+replaces the failed board's artifact with the new attempt's bundle (the
+manifest records `run.github.run_attempt`).
+
+The validate job's own shell steps use only bash, git, and `uv`. In particular
+they do not call `jq`: the bench runner services expose the embedded
+toolchain on `PATH`, not the host's general tools, and the plan job (which does
+use `jq`) runs on a GitHub-hosted runner.
 
 The runner must already provide:
 

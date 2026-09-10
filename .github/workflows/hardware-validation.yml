@@ -263,11 +263,15 @@ jobs:
           fi
           echo "NS_CMSIS_NN_RESOLVED_COMMIT=${resolved_commit}" >> "${GITHUB_ENV}"
           echo "resolved_commit=${resolved_commit}" >> "${GITHUB_OUTPUT}"
-          source_revisions="$(jq -cn \
-            --arg kind "${requested_kind}" \
-            --arg ref "${requested_ref}" \
-            --arg commit "${resolved_commit}" \
-            '{"ns-cmsis-nn": {requested_kind: $kind, requested_ref: $ref, resolved_commit: $commit}}')"
+          # Plain bash, no jq: the bench runners only carry the embedded
+          # toolchain on their PATH. A branch name has already passed
+          # git check-ref-format, which leaves only the double quote (and
+          # backslash, defensively) to escape for JSON.
+          json_string() {
+            local value="${1//\\/\\\\}"
+            printf '"%s"' "${value//\"/\\\"}"
+          }
+          source_revisions="{\"ns-cmsis-nn\": {\"requested_kind\": $(json_string "${requested_kind}"), \"requested_ref\": $(json_string "${requested_ref}"), \"resolved_commit\": $(json_string "${resolved_commit}")}}"
           echo "HPX_SOURCE_REVISIONS_JSON=${source_revisions}" >> "${GITHUB_ENV}"
 
           mkdir -p results/validation
@@ -325,16 +329,17 @@ jobs:
           fi
 
           echo "NSX_EXECUTORCH_ROOT=${checkout_path}" >> "${GITHUB_ENV}"
-          source_revisions="$(jq -cn \
-            --argjson existing "${HPX_SOURCE_REVISIONS_JSON:-null}" \
-            --arg nsx "${resolved_commit}" \
-            --arg et "${executorch_commit}" \
-            --arg arm "6d21a6f821fb72541173a6c4d05d83329fa74f7c" \
-            '$existing + {
-              "nsx-executorch": {requested_kind: "commit", requested_ref: $nsx, resolved_commit: $nsx},
-              "executorch": {requested_kind: "commit", requested_ref: $et, resolved_commit: $et},
-              "arm-cmsis-nn": {requested_kind: "commit", requested_ref: $arm, resolved_commit: $arm}
-            }')"
+          # Plain bash, no jq (see the ns-cmsis-nn step). The commits are
+          # hex from git rev-parse, so they need no escaping. An existing
+          # HPX_SOURCE_REVISIONS_JSON is the one-object document the
+          # ns-cmsis-nn step wrote; splice its members in front of ours.
+          pinned() {
+            printf '"%s": {"requested_kind": "commit", "requested_ref": "%s", "resolved_commit": "%s"}' "$1" "$2" "$2"
+          }
+          existing="${HPX_SOURCE_REVISIONS_JSON:-}"
+          existing="${existing#\{}"
+          existing="${existing%\}}"
+          source_revisions="{${existing:+${existing}, }$(pinned nsx-executorch "${resolved_commit}"), $(pinned executorch "${executorch_commit}"), $(pinned arm-cmsis-nn 6d21a6f821fb72541173a6c4d05d83329fa74f7c)}"
           echo "HPX_SOURCE_REVISIONS_JSON=${source_revisions}" >> "${GITHUB_ENV}"
           mkdir -p results/validation
           {
@@ -462,12 +467,15 @@ jobs:
         run: uv run pytest -m compile_hw tests/contracts/test_render_compile_hw.py -rs -W default
 
       # One artifact per board. Consumers group a run's artifacts by the
-      # GitHub run ID recorded in each validation_manifest.json.
+      # GitHub run ID recorded in each validation_manifest.json. The upload
+      # runs on failure too, so "re-run failed jobs" meets an artifact of the
+      # same name from the first attempt: overwrite it rather than fail.
       - name: Upload validation artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: hardware-validation-${{ github.run_id }}-${{ matrix.board }}
+          overwrite: true
           path: |
             results/validation/
             !results/validation/**/work/**

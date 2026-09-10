@@ -115,8 +115,6 @@ def test_executorch_provenance_with_optional_ns_override(
     tmp_path: Path,
     has_override: bool,
 ) -> None:
-    if shutil.which("jq") is None:
-        pytest.skip("workflow provenance requires jq")
     env = {
         "GITHUB_WORKSPACE": str(tmp_path),
         "GITHUB_ENV": str(tmp_path / "env"),
@@ -170,8 +168,6 @@ git() {
 def test_ns_override_provenance_preserves_the_requested_ref(
     validate_job: dict[str, Any], tmp_path: Path, requested_ref: str
 ) -> None:
-    if shutil.which("jq") is None:
-        pytest.skip("workflow provenance requires jq")
     env = {
         "RUNNER_TEMP": str(tmp_path),
         "GITHUB_ENV": str(tmp_path / "env"),
@@ -262,6 +258,18 @@ def test_artifact_is_uploaded_per_board(validate_job: dict[str, Any]) -> None:
     assert upload["with"]["name"] == (
         "hardware-validation-${{ github.run_id }}-${{ matrix.board }}"
     )
+    # The upload runs on failure too, so re-running a failed board job meets
+    # its own first-attempt artifact; without overwrite the re-run fails.
+    assert upload["with"]["overwrite"] is True
+
+
+def test_validate_job_scripts_do_not_need_jq(validate_job: dict[str, Any]) -> None:
+    """The bench runners expose only the embedded toolchain on PATH (jq is not on it)."""
+    for step in validate_job["steps"]:
+        commands = [
+            line for line in step.get("run", "").splitlines() if not line.lstrip().startswith("#")
+        ]
+        assert "jq" not in " ".join(commands).split(), f"step {step.get('name')!r} calls jq"
 
 
 def test_plan_job_builds_matrix_from_boards_input(workflow: dict[Any, Any]) -> None:
