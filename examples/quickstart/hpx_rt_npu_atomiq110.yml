@@ -1,4 +1,6 @@
 # heliaPROFILER quickstart — Ethos-U85 NPU profiling on Atomiq110 FPGA (helia-rt)
+# EXPERIMENTAL: best-effort support; may change or be removed in a minor release.
+# FPGA timing, cycle, latency, power, and energy results do not represent silicon.
 # Profiles the checked-in Vela-compiled KWS model (micronet-m, ethos-u85-256)
 # on the NPU and samples the Ethos-U's own PMU (NPU cycles / MAC activity /
 # SRAM traffic) alongside the ARM PMU. Run from the repo root, or point

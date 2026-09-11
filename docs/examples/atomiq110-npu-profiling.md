@@ -1,8 +1,18 @@
-# Atomiq110 NPU Profiling (Ethos-U85)
+# Atomiq110 NPU Profiling (Ethos-U85, Experimental)
 
 **Goal:** profile a Vela-compiled model on the Ethos-U85 NPU on
 `atomiq110_fpga_turbo`, capturing both ARM PMU counters and the NPU's own
 PMU (`ethos_npu` group) per layer.
+
+!!! warning "Experimental FPGA target"
+    HPX support for Atomiq110 and `atomiq110_fpga_turbo` is best-effort,
+    is not release-blocking, and may change or be removed in any minor
+    release. It is outside the compatibility guarantees for
+    production-silicon targets.
+
+    Clock rates, cycle counts, latency, power, and energy measurements from
+    this FPGA describe its current image only. Do not use them as
+    representative measurements for production Atomiq110 silicon.
 
 ## Prerequisites
 

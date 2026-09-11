@@ -77,11 +77,12 @@ Every recipe follows the same shape:
 
     [:octicons-arrow-right-24: Read](toolchain-comparison.md)
 
--   :material-memory:{ .lg .middle } __Atomiq110 NPU Profiling (Ethos-U85)__
+-   :material-memory:{ .lg .middle } __Atomiq110 NPU Profiling (Experimental)__
 
     ---
 
-    Profile a Vela-compiled model on the Ethos-U85 NPU with the `ethos_npu` counter group.
+    Profile a Vela-compiled model on the experimental Atomiq110 FPGA target.
+    FPGA performance and power results are not representative of silicon.
 
     [:octicons-arrow-right-24: Read](atomiq110-npu-profiling.md)
 

@@ -1,4 +1,6 @@
 # heliaPROFILER quickstart — Ethos-U85 NPU profiling on Atomiq110 FPGA (heliaAOT)
+# EXPERIMENTAL: best-effort support; may change or be removed in a minor release.
+# FPGA timing, cycle, latency, power, and energy results do not represent silicon.
 # Same checked-in Vela-compiled KWS model as hpx_rt_npu_atomiq110.yml but
 # compiled ahead-of-time with heliaAOT instead of interpreted by helia-rt:
 # the Vela ethos-u op becomes a generated NPU kernel dispatching the embedded
