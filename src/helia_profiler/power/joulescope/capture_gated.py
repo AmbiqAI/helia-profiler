@@ -595,13 +595,8 @@ def capture_gated(
         # How the streamed-GPI time base was derived (#249). Both gate edges
         # are placed with a per-sample spacing inferred from frame timestamps,
         # so when a window disagrees with the firmware clock this says whether
-        # that inference is the reason. Diagnostic only.
-        #
-        # Computed once and attached to every diagnostics dict that can reach
-        # the artifact: the degraded path publishes the dict built here, while
-        # the success path builds a second one further down. Attaching it to
-        # only the first silently dropped it from exactly the runs worth
-        # diagnosing.
+        # that inference is the reason. Diagnostic only. Attached to the one
+        # dict both the degraded and the successful path publish.
         stream_timebase = (
             _streamed_gpi_timebase(gpi_stream_frames)
             if gpi_stream_enabled and gpi_stream_frames

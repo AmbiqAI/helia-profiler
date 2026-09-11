@@ -453,3 +453,25 @@ def test_the_fullrate_cross_check_falls_back_to_nameplate_with_one_anchor():
 
     assert out is not None
     assert out["windows"][0]["duration_s"] == pytest.approx(0.010, rel=2e-3)
+
+
+def test_a_packet_that_fell_back_to_utc_is_counted():
+    """The fallback should never fire — every stats packet carries `delta`,
+    `samples` and `sample_freq` from one dict literal — which is why a silent
+    one would be bad: that window mixed two axes."""
+    packets = [_packet(index=i) for i in range(4)]
+    for p in packets[:2]:
+        del p["time"]["delta"]
+        del p["time"]["samples"]
+
+    d = _counter_rate_ratio(packets)
+
+    assert d is not None
+    assert d["packets_without_counter_span"] == 2
+
+
+def test_a_healthy_capture_reports_no_fallbacks():
+    d = _counter_rate_ratio([_packet(index=i) for i in range(4)])
+
+    assert d is not None
+    assert d["packets_without_counter_span"] == 0

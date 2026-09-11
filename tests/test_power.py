@@ -969,10 +969,8 @@ class TestStreamedGateSelection:
         assert diagnostics["gate_edge_source"] == "gpi_stream"
         assert "poll_edge_uncertainty_s" not in diagnostics
         assert diagnostics["stream_segment_count"] == 2
-        # #249: both time-base records must reach the PUBLISHED dict. An earlier
-        # fix attached them to a dict that a second _gated_stats_diagnostics
-        # call then replaced, so they were absent from exactly the successful
-        # runs worth diagnosing.
+        # #249: both time-base records must reach the PUBLISHED dict, which is
+        # the object metadata carries -- not whatever was built along the way.
         assert "gpi_stream_timebase" in diagnostics
         time_map = diagnostics["instrument_time_map"]
         assert time_map["utc_over_counter_rate"] == pytest.approx(1.009469, rel=1e-4)
