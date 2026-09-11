@@ -110,7 +110,7 @@ env:
   # build.compiler_launcher auto-detect picks ccache up from PATH.
   CCACHE_MAXSIZE: 10G
   SEGGER_RTT_PATH: ${{ github.workspace }}/segger-rtt
-  HPX_NSX_EXECUTORCH_REF: 27eee513636821398f0bb5e92055526cac29b1ed
+  HPX_NSX_EXECUTORCH_REF: 5514ac1ea8439b3fe615d180bf68c75a9dabb48e
   # Scheduled runs have no workflow_dispatch inputs. Keep those runs aligned
   # with the manual defaults, except that nightly validation covers the full suite.
   HPX_VALIDATION_SUITE: ${{ inputs.suite || 'complete' }}

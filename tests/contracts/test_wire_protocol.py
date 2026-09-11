@@ -1264,8 +1264,11 @@ def test_csv_row_format_is_pinned_per_engine():
     assert 'hpx_printf("%d,%s:%ld", i, aot_op_name(i), (long)aot_op_id(i));' in aot
 
     et = _render("apollo510", "rtt", "executorch")
-    assert 'hpx_printf("%d,%s:c%ldi%lu", i,' in et
-    assert '? "OPERATOR_CALL" : "DELEGATE_CALL",' in et
+    # Operator name (+ ".overload" when present), then the chain/instruction
+    # identity; the instruction kind is only the unnamed fallback (#301).
+    assert 'hpx_printf("%d,%s%s%s:c%ldi%lu", i, label,' in et
+    assert "const char *label = named ? event.name" in et
+    assert '? "OPERATOR_CALL" : "DELEGATE_CALL");' in et
 
     # The three loop-based emitters close the row with the overflow flag; the
     # Cortex-M4 profiler folds it into the single call pinned above.

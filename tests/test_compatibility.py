@@ -47,8 +47,8 @@ def test_default_baseline_has_exact_qualified_refs(tmp_path: Path) -> None:
     assert baseline.project("arm-cmsis-nn").ref == "6d21a6f821fb72541173a6c4d05d83329fa74f7c"
     assert baseline.module("arm-cmsis-nn").ref == "6d21a6f821fb72541173a6c4d05d83329fa74f7c"
     assert baseline.project("ns-cmsis-nn").ref == "aaeb145a67c3decd9869f96474e36e7dbdc2030c"
-    assert baseline.project("nsx-executorch").ref == "27eee513636821398f0bb5e92055526cac29b1ed"
-    assert baseline.engine("executorch").ref == "27eee513636821398f0bb5e92055526cac29b1ed"
+    assert baseline.project("nsx-executorch").ref == "5514ac1ea8439b3fe615d180bf68c75a9dabb48e"
+    assert baseline.engine("executorch").ref == "5514ac1ea8439b3fe615d180bf68c75a9dabb48e"
     assert baseline.engine("helia-rt").ref == "edb3a25fc96c8e9b634dabdb9cd31cb22aa43440"
     assert baseline.engine("helia-aot").min_version == "0.20.0"
     assert baseline.engine("helia-aot").max_version_exclusive == "0.21.0"
@@ -65,7 +65,7 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "nsx-tflite-micro": "7afcf2b4170e039caf4c49f91e2c45d5869be333",
         "arm-cmsis-nn": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",
         "ns-cmsis-nn": "aaeb145a67c3decd9869f96474e36e7dbdc2030c",
-        "nsx-executorch": "27eee513636821398f0bb5e92055526cac29b1ed",
+        "nsx-executorch": "5514ac1ea8439b3fe615d180bf68c75a9dabb48e",
         "helia-rt": "edb3a25fc96c8e9b634dabdb9cd31cb22aa43440",
         # nsx-sensors v0.3.0 — full datasheet audit of the INA228 driver.
         # Cumulative fixes that matter here: SHUNT_CAL scaling (v0.2.0),
@@ -84,7 +84,7 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "nsx-tflite-micro": "7afcf2b4170e039caf4c49f91e2c45d5869be333",
         "arm-cmsis-nn": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",
         "nsx-cmsis-nn": "aaeb145a67c3decd9869f96474e36e7dbdc2030c",
-        "nsx-executorch": "27eee513636821398f0bb5e92055526cac29b1ed",
+        "nsx-executorch": "5514ac1ea8439b3fe615d180bf68c75a9dabb48e",
         "nsx-helia-rt": "edb3a25fc96c8e9b634dabdb9cd31cb22aa43440",
         "nsx-sensors": "c219a2bc98c62f96819fae20ab6c8911fcea3e25",
     }

@@ -27,8 +27,10 @@ The ExecuTorch engine consumes an already exported `.pte` program and builds
 the local `nsx-executorch` Cortex-M runtime into the generated NSX firmware.
 It uses ExecuTorch's `EventTracer` instruction scopes to reset and sample the
 Armv8-M PMU around each kernel or delegate call. This keeps the runtime and
-CMSIS-NN kernels unmodified while producing stable instruction identities such
-as `OPERATOR_CALL:c0i7` in per-layer results.
+CMSIS-NN kernels unmodified. Per-layer rows are labelled with the serialized
+operator that ran and a stable chain/instruction identity, such as
+`cortex_m::quantized_conv2d.out:c0i7` or `aten::add.out:c0i12`; a delegate
+call carries its backend id instead of an operator name.
 
 ```yaml title="hpx.yml"
 model:
@@ -70,9 +72,12 @@ too small for the combined method/temporary/planned arenas) and accepts a
 caller-supplied PTE. By default HPX materializes the `nsx-executorch` checkout
 itself: it clones the repository URL pinned by the compatibility baseline into
 `~/.cache/helia-profiler/nsx-executorch/`, checks out the exact pinned commit
-(currently `62b22f96dc49e2c28eb20aee0f15ebb7ad1c1d59` — the PR #4 merge adding
-the helia-torch CLI, on top of PR #2's out-of-tree `cortex_m_ns::` Tier 1
-operators; HPX pins a commit, not a branch or release tag), and initializes
+(currently `5514ac1ea8439b3fe615d180bf68c75a9dabb48e` — the commit that names
+operators and delegates in the profiling `OperatorEvent`, on top of the
+helia-torch CLI and the out-of-tree `cortex_m_ns::` Tier 1 operators; the
+authoritative value is `engines.executorch.ref` in
+`src/helia_profiler/data/compatibility-baseline-v1.json`, and HPX pins a
+commit, not a branch or release tag), and initializes
 `external/executorch` plus the
 minimal Cortex-M submodule set from that repository's README. When the
 baseline pin moves, the cache is re-synced to the new commit automatically.

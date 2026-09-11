@@ -18,12 +18,12 @@ The current baseline is `hpx-neuralspotx-0.8.1-2026-09`:
 | `nsx-tflite-micro` | `7afcf2b4…333` |
 | `arm-cmsis-nn` | `6d21a6f8…f7c` |
 | `ns-cmsis-nn` | `aaeb145a…30c` (`v7.32.0`, hpx-declared — see below) |
-| `nsx-executorch` | `27eee513…b1ed` |
+| `nsx-executorch` | `5514ac1e…b48e` |
 | `nsx-sensors` | `c219a2bc…3e25` (`v0.3.0`, peeled) |
 | heliaRT | `1.20.0`, commit `edb3a25f…440` (min supported `1.16.0` — from `HELIART_MIN_VERSION` in code, not a baseline-JSON field) |
 | heliaAOT | `min_version=0.20.0`, `max_version_exclusive=0.21.0` |
 | tflm | governed entirely by the `nsx-tflite-micro` / `arm-cmsis-nn` module refs above |
-| executorch | `0.1.0`, module ref `27eee513…b1ed` (a checkout's `version.txt` is verified against the baseline) |
+| executorch | `0.1.0`, module ref `5514ac1e…b48e` (a checkout's `version.txt` is verified against the baseline) |
 
 This revision moves neuralSPOT-X `0.7.17 → 0.8.1` for the Apollo4 Blue Lite
 board descriptor fix (AmbiqAI/neuralspotx#250, closing hpx#263): 0.7.17's

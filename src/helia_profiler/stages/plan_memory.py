@@ -365,13 +365,14 @@ class PlanMemoryStage:
 #:     (hpx_pmu_profiler.h.j2:78-82)
 #:   heliaAOT:     {uint32 counters[4]; bool} padded          -> 20
 #:     (main_aot.cc.j2:61-64)
-#:   ExecuTorch:   {12-byte OperatorEvent; uint32[4]; bool}   -> 32
-#:     (main_executorch.cc.j2:73-77; nsx_executorch.h OperatorEvent)
+#:   ExecuTorch:   {20-byte OperatorEvent; uint32[4]; bool}   -> 40
+#:     (main_executorch.cc.j2:73-77; nsx_executorch.h OperatorEvent =
+#:     kind + chain_index + instruction_index + two const char* (#301))
 PMU_RECORD_SIZE_BYTES: dict[EngineType, int] = {
     EngineType.TFLM: 24,
     EngineType.HELIA_RT: 24,
     EngineType.HELIA_AOT: 20,
-    EngineType.EXECUTORCH: 32,
+    EngineType.EXECUTORCH: 40,
 }
 
 #: TFLM/heliaRT reserve the records INSIDE the HpxPmuProfiler object

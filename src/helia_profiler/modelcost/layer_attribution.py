@@ -47,8 +47,9 @@ def source_index_from_op(op: str) -> int | None:
 
     helia-aot firmware labels layers ``"<TYPE>:<original tflite index>"``
     (``"FULLY_CONNECTED:43"``). Only a strict integer suffix counts —
-    ExecuTorch's ``"OPERATOR_CALL:c3i12"`` names no tflite operator and
-    must stay ``None`` (#218: never guess a source index).
+    ExecuTorch's chain/instruction suffix (``"aten::add.out:c3i12"``, or
+    ``"OPERATOR_CALL:c3i12"`` in older artifacts) names no tflite operator
+    and must stay ``None`` (#218: never guess a source index).
     """
     _, sep, suffix = str(op).rpartition(":")
     if not sep or not suffix.isdigit():
@@ -142,7 +143,7 @@ class LayerAttributor:
             source = position
             explicit = False
         else:
-            # A non-integer suffix (e.g. ExecuTorch "OPERATOR_CALL:c3i12")
+            # A non-integer suffix (e.g. ExecuTorch "aten::add.out:c3i12")
             # names no tflite operator.
             source = None
         found = self._by_source.get(source) if source is not None else None
