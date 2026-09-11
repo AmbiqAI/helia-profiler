@@ -296,6 +296,9 @@ def test_preview_fails_when_no_case_is_selected(
 def test_plan_job_builds_matrix_from_boards_input(workflow: dict[Any, Any]) -> None:
     plan = workflow["jobs"]["plan"]
     assert plan["outputs"]["boards"] == "${{ steps.matrix.outputs.boards }}"
+    default_boards = "apollo510_evb,apollo330mP_evb,apollo3p_evb,apollo4l_blue_evb"
+    # Manual dispatch and the scheduled fallback must name the same boards.
+    assert _triggers(workflow)["workflow_dispatch"]["inputs"]["boards"]["default"] == default_boards
     assert workflow["env"]["HPX_VALIDATION_BOARDS"] == (
-        "${{ inputs.boards || 'apollo510_evb,apollo330mP_evb,apollo3p_evb' }}"
+        f"${{{{ inputs.boards || '{default_boards}' }}}}"
     )
