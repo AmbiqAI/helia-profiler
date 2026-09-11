@@ -162,6 +162,11 @@ packaged registry still resolves `ns-cmsis-nn` at `v7.29.2`; that promotion
 advanced the qualified ref in lockstep, and the 2026-09 revision then moved
 `nsx-cmsis-nn` into the hpx-declared tier at `v7.31.0`.
 
+The qualification states in this document cover dependency and source
+resolution only. They do not qualify Atomiq110 hardware, make measurements
+from its experimental FPGA target representative of production silicon, or
+promote that target's support status.
+
 Baseline refs relate to the packaged registry in two tiers. Modules HPX
 itself declares in generated apps (the SDK monorepo, PMU, heliaRT,
 nsx-sensors and, since the 2026-09 revision, `nsx-cmsis-nn`) carry

@@ -28,6 +28,18 @@ Board                    SoC          Core         Backends             Domains 
  atomiq110_fpga_turbo     atomiq110    cortex-m55   dwt, armv8m-pmu      cpu, mve, ethos_npu       preview
 ```
 
+!!! warning "Experimental Atomiq110 support"
+    HPX support for the Atomiq110 SoC and `atomiq110_fpga_turbo` board is
+    experimental. It is best-effort, is not a release blocker, and may change
+    or be removed in any minor release. It is outside the compatibility
+    guarantees for production-silicon targets.
+
+    This FPGA target's clock rates, cycle counts, latency, power, and energy
+    measurements describe the FPGA image only and are not representative of
+    production silicon. The literal `preview` value above is preserved because
+    it is the board's registered channel; this documentation-only status does
+    not change CLI behavior or NSX module resolution.
+
 Cortex-M55 boards (AP5/AP330 family) expose the full Armv8-M PMU plus MVE
 counters; Cortex-M4 boards (AP3/AP4 family) expose CPU counters via DWT
 only. `atomiq110_fpga_turbo` additionally has an Ethos-U85 NPU, exposing
