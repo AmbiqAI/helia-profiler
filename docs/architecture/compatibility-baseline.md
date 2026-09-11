@@ -8,11 +8,11 @@ Stage 5 combines its identity and canonical hash with the NSX registry hash,
 target, engine, overrides, and relevant build inputs to select an isolated
 dependency workspace.
 
-The current baseline is `hpx-neuralspotx-0.7.17-2026-09`:
+The current baseline is `hpx-neuralspotx-0.8.1-2026-09`:
 
 | Identity | Qualified reference |
 | --- | --- |
-| `neuralspotx` package | `0.7.17`, wheel SHA-256 `1289cd67…fbdb`, tag peeled to `8b5a7fa9…b44f` |
+| `neuralspotx` package | `0.8.1`, wheel SHA-256 `7aac6f1b…9094`, tag peeled to `2dbe12a2…901f` |
 | `nsx-ambiq-sdk` | `v5.2.24`, peeled commit `a9f4ec25…1132` |
 | `nsx-pmu-armv8m` | `5725c065…c88` |
 | `nsx-tflite-micro` | `7afcf2b4…333` |
@@ -24,6 +24,24 @@ The current baseline is `hpx-neuralspotx-0.7.17-2026-09`:
 | heliaAOT | `min_version=0.20.0`, `max_version_exclusive=0.21.0` |
 | tflm | governed entirely by the `nsx-tflite-micro` / `arm-cmsis-nn` module refs above |
 | executorch | `0.1.0`, module ref `5514ac1e…b48e` (a checkout's `version.txt` is verified against the baseline) |
+
+This revision moves neuralSPOT-X `0.7.17 → 0.8.1` for the Apollo4 Blue Lite
+board descriptor fix (AmbiqAI/neuralspotx#250, closing hpx#263): 0.7.17's
+`apollo4l_evb` and `apollo4l_blue_evb` descriptors cleared `NSX_SYSTEM_SOURCE`,
+so the startup library was built without the CMSIS system file and every
+profiler firmware for those boards failed to link with `SystemCoreClock`
+undefined. Only the tool row moves: 0.8.1's packaged registry resolves each
+baseline project at the same tag as 0.7.17's (nsx-ambiq-sdk `v5.2.24`,
+nsx-pmu-armv8m `v0.2.0`, nsx-tflite-micro and arm-cmsis-nn `v0.1.0`,
+nsx-sensors `v0.3.0`, and still `ns-cmsis-nn v7.29.2` under the hpx-declared
+`v7.32.0`), each re-peeled to the commit already recorded. Two 0.8.x changes
+are worth knowing: the Python floor rose to 3.11 (HPX already requires it),
+and the packaged board and tooling modules changed content hash
+(neuralspotx#247), so an `nsx.lock` produced under 0.7.17 cannot be
+`nsx sync --frozen`'d against 0.8.1 — the dependency workspace is keyed on the
+baseline fingerprint and registry hash, so a promoted run resolves a fresh
+lock rather than reusing a stale one. With this baseline `apollo4l_blue_evb`
+joins the nightly hardware-validation default board list.
 
 heliaRT 1.20.0, heliaAOT 0.20.0 and `ns-cmsis-nn v7.32.0` (issue #279) move
 together because they must: v7.32.0 consolidated the float switches onto
@@ -55,9 +73,10 @@ previously qualified `v7.29.2` is the core heliaRT 1.18.0 (withdrawn) shipped
 outright: every generated module carries an unconditional
 `#error "CMSIS-NN version too old; need at least v7.31.0"` whose rationale
 names v7.29.x/v7.30.0 as defective for int8 as well (helia-aot#356). So this
-revision qualifies `ns-cmsis-nn v7.31.0` and — because neuralSPOT-X 0.7.17's
-registry still resolves v7.29.2 — hpx **declares** `nsx-cmsis-nn` at that ref
-on both engines' source routes instead of inheriting the registry's choice.
+revision qualifies `ns-cmsis-nn v7.31.0` and — because neuralSPOT-X's
+packaged registry (0.7.17, and still 0.8.1) resolves v7.29.2 — hpx
+**declares** `nsx-cmsis-nn` at that ref on both engines' source routes
+instead of inheriting the registry's choice.
 The module thereby moves from the registry-governed tier to the hpx-declared
 tier (next section); neuralSPOT-X itself is unchanged. heliaRT 1.19.0 accepts
 any `>= v7.28.0`, so both engines now build against one core with no override,
@@ -164,8 +183,9 @@ nsx-sensors and, since the 2026-09 revision, `nsx-cmsis-nn`) carry
 manifest pins at the baseline refs, and those pins defeat the packaged
 registry (concretely: a module whose `NsxModuleRef.ref` is set is rendered
 into the app's module-registry override, which NSX locking honours over its
-packaged default) — `nsx-sensors` stays at its audited `v0.3.0` pin even though
-0.7.17's registry default is older, and `nsx-cmsis-nn` builds at `v7.31.0`
+packaged default) — `nsx-sensors` stays at its audited `v0.3.0` pin
+(0.7.17's registry default was older; 0.8.1's matches it), and
+`nsx-cmsis-nn` builds at `v7.31.0`
 where the registry would resolve `v7.29.2`. The stock-TFLM engine's
 declared modules (`nsx-tflite-micro`, `arm-cmsis-nn`) sit in the
 registry-governed tier: hpx renders informational manifest revisions
