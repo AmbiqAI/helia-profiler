@@ -85,6 +85,46 @@ def _sv(field: Any, default: float = 0.0) -> float:
     return default
 
 
+def _counter_duration_ticks(t: dict[str, Any], second: float) -> float | None:
+    """A packet's duration from its own counter metadata, or ``None``.
+
+    ``None`` means the packet does not state a usable duration and the caller
+    must fall back to ``utc``. Every rejection is a positivity check, not a
+    truthiness one: a negative ``sample_freq`` or a decreasing sample pair would
+    otherwise yield a negative duration, and ``_process_gated_stats`` drops a
+    window whose duration is <= 0 — losing the gate entirely instead of falling
+    back, which is worse than the error being corrected.
+
+    One function so the fallback and the count of fallbacks cannot disagree
+    about what "usable" means. They did: the counter used container truthiness
+    where this uses validity, so a zero-span packet fell back silently while the
+    diagnostic reported none had.
+    """
+    delta = (t.get("delta", {}) or {}).get("value")
+    try:
+        # `delta` first: the driver divides by exactly this to build the charge
+        # and energy integrals in the same packet, so taking it makes
+        # ``energy_j / duration_s`` consistent by construction rather than by
+        # reimplementing the same arithmetic and hoping it matches.
+        if delta is not None and float(delta) > 0:
+            return float(delta) * second
+    except (TypeError, ValueError):
+        pass
+    samples = (t.get("samples") or {}).get("value")
+    freq = (t.get("sample_freq") or {}).get("value")
+    if samples is None or freq is None:
+        return None
+    try:
+        rate = float(freq)
+        if rate > 0 and len(samples) >= 2:
+            span = float(samples[1]) - float(samples[0])
+            if span > 0:
+                return span * second / rate
+    except (TypeError, ValueError, IndexError):
+        pass
+    return None
+
+
 def _packet_duration_ticks(t: dict[str, Any], u0: float, u1: float, second: float) -> float:
     """How long one stats packet covered, in time64 ticks (#249).
 
@@ -112,32 +152,11 @@ def _packet_duration_ticks(t: dict[str, Any], u0: float, u1: float, second: floa
     runs once per stat packet, and a per-element import cost ~15 % of
     ``_stats_arrays`` on a minute-long capture.
     """
-    # `delta` first: the driver divides by exactly this to build the charge and
-    # energy integrals in the same packet, so taking it makes
-    # ``energy_j / duration_s`` consistent by construction rather than by
-    # reimplementing the same arithmetic and hoping it matches.
-    delta = (t.get("delta", {}) or {}).get("value")
-    try:
-        if delta is not None and float(delta) > 0:
-            return float(delta) * second
-    except (TypeError, ValueError):
-        pass
-    samples = (t.get("samples", {}) or {}).get("value")
-    freq = (t.get("sample_freq", {}) or {}).get("value")
-    try:
-        if samples is not None and len(samples) >= 2 and freq:
-            span = float(samples[1]) - float(samples[0])
-            # Strictly positive: a decreasing pair is a corrupt packet, and a
-            # negative duration would make _process_gated_stats drop the whole
-            # window silently rather than fall back to utc.
-            if span > 0:
-                return span * second / float(freq)
-    except (TypeError, ValueError, IndexError):
-        pass
-    return u1 - u0
+    ticks = _counter_duration_ticks(t, second)
+    return u1 - u0 if ticks is None else ticks
 
 
-def _packets_without_counter_span(packets: list[dict[str, Any]]) -> int:
+def _packets_without_counter_span(packets: list[dict[str, Any]], second: float) -> int:
     """Packets whose duration had to come from ``utc`` after all.
 
     Should always be zero: every ``s/stats/value`` packet carries ``delta``,
@@ -145,21 +164,13 @@ def _packets_without_counter_span(packets: list[dict[str, Any]]) -> int:
     instrument families. It is counted because if it ever is not zero, that
     window mixed two axes — the exact defect this module was changed to
     remove — and would otherwise do so without saying a word.
-
-    Deliberately a separate predicate from ``_counter_rate_ratio``'s: that one
-    keys on ``time_map``, this one on what the duration actually used.
     """
     missing = 0
     for packet in packets:
         t = packet.get("time", {}) if isinstance(packet, dict) else {}
         if not (t.get("utc", {}) or {}).get("value"):
             continue
-        delta = (t.get("delta", {}) or {}).get("value")
-        samples = (t.get("samples", {}) or {}).get("value")
-        freq = (t.get("sample_freq", {}) or {}).get("value")
-        has_delta = isinstance(delta, (int, float)) and not isinstance(delta, bool) and delta > 0
-        has_span = bool(samples) and len(samples) >= 2 and bool(freq)
-        if not has_delta and not has_span:
+        if _counter_duration_ticks(t, second) is None:
             missing += 1
     return missing
 
@@ -179,7 +190,9 @@ def _counter_rate_ratio(packets: list[dict[str, Any]]) -> dict[str, Any] | None:
     the end.
     """
     import numpy as np
+    from pyjoulescope_driver import time64
 
+    second = float(time64.SECOND)
     ratios, rates, freqs = [], [], []
     for packet in packets:
         t = packet.get("time", {}) if isinstance(packet, dict) else {}
@@ -205,7 +218,7 @@ def _counter_rate_ratio(packets: list[dict[str, Any]]) -> dict[str, Any] | None:
         "packets_with_time_map": len(ratios),
         "packets_total": len(packets),
         # Non-zero means some window mixed the counter and utc axes.
-        "packets_without_counter_span": _packets_without_counter_span(packets),
+        "packets_without_counter_span": _packets_without_counter_span(packets, second),
     }
 
 
@@ -574,12 +587,23 @@ def _fullrate_energy_over_windows(
     # at its worst, which is 286 extra samples on a 10 ms window. Consecutive
     # anchors carry both a sample index and a utc, so they give the conversion
     # directly; the nameplate rate is the fallback when there is only one.
-    if len(idx) >= 2 and idx[-1] > idx[0] and utc[-1] > utc[0]:
-        slope = (utc[-1] - utc[0]) / (idx[-1] - idx[0])
+    positions = np.arange(n, dtype=np.float64)
+    if idx.size >= 2 and np.all(np.diff(idx) > 0) and np.all(np.diff(utc) > 0):
+        # Piecewise between adjacent anchors, not a single endpoint slope: the
+        # fit can move during a capture, and a capture-wide slope would then
+        # misplace every sample in between -- the same error in a different
+        # place. np.interp extrapolates flat past the ends, so carry the local
+        # edge slopes out to the tails by hand.
+        sample_utc = np.interp(positions, idx, utc)
+        head, tail = positions < idx[0], positions > idx[-1]
+        if head.any():
+            first = (utc[1] - utc[0]) / (idx[1] - idx[0])
+            sample_utc[head] = utc[0] + (positions[head] - idx[0]) * first
+        if tail.any():
+            last = (utc[-1] - utc[-2]) / (idx[-1] - idx[-2])
+            sample_utc[tail] = utc[-1] + (positions[tail] - idx[-1]) * last
     else:
-        slope = time64.SECOND / sr
-    i0, u0 = idx[0], utc[0]
-    sample_utc = u0 + (np.arange(n, dtype=np.float64) - i0) * slope
+        sample_utc = utc[0] + (positions - idx[0]) * (time64.SECOND / sr)
 
     windows = (
         windows_override if windows_override is not None else _segment_gpi_windows(poll_samples)

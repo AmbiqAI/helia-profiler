@@ -17,6 +17,7 @@ import pytest
 
 from helia_profiler.power.joulescope.stats import (
     _counter_rate_ratio,
+    _packets_without_counter_span,
     _packet_duration_ticks,
     _process_gated_stats,
     _stats_arrays,
@@ -475,3 +476,86 @@ def test_a_healthy_capture_reports_no_fallbacks():
 
     assert d is not None
     assert d["packets_without_counter_span"] == 0
+
+
+def test_the_fullrate_axis_follows_a_fit_that_moves_mid_capture():
+    """A single endpoint slope averages a moving fit and misplaces every sample
+    between the ends. Anchors are interpolated piecewise instead."""
+    import numpy as np
+
+    from helia_profiler.power.joulescope.stats import _fullrate_energy_over_windows
+
+    sr, n = 1_000_000.0, 20_000
+    # The fit runs 2.86 % fast for the first half, then settles.
+    anchors, utc = [], 0.0
+    for k in range(0, n, 1000):
+        anchors.append((k, int(utc), sr))
+        utc += 1000 / sr * time64.SECOND * (1.0286 if k < n // 2 else 1.0)
+    rise = anchors[5][1]
+    fall = anchors[15][1]
+
+    out = _fullrate_energy_over_windows(
+        cur_chunks=[np.full(n, 0.004, dtype=np.float32)],
+        volt_chunks=[np.full(n, 1.8, dtype=np.float32)],
+        anchors=anchors,
+        poll_samples=[(0, 0), (rise, 1), (fall, 0)],
+    )
+
+    assert out is not None
+    # Edges sit exactly on anchors 5 and 15, so a piecewise axis selects
+    # exactly 10,000 samples: 10 ms at 1 MSPS. Asserted exactly, because an
+    # endpoint slope lands at 9.992 ms here and a loose band would let it pass.
+    assert out["windows"][0]["duration_s"] == pytest.approx(0.010, rel=1e-12)
+
+
+# ---------------------------------------------------------------------------
+# The fallback and its counter must agree about what "usable" means
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "block, why",
+    [
+        ({"samples": {"value": [0, 32000]}, "sample_freq": {"value": -16e6}}, "negative freq"),
+        ({"samples": {"value": [0, 32000]}, "sample_freq": {"value": 0}}, "zero freq"),
+        ({"samples": {"value": [5, 5]}, "sample_freq": {"value": NAMEPLATE}}, "zero span"),
+        ({"samples": {"value": [900, 100]}, "sample_freq": {"value": NAMEPLATE}}, "decreasing"),
+        ({"delta": {"value": -0.002}}, "negative delta"),
+        ({"delta": {"value": 0}}, "zero delta"),
+        ({}, "nothing stated"),
+    ],
+)
+def test_an_unusable_packet_falls_back_and_is_counted_as_such(block, why):
+    """The count and the fallback share one predicate. They did not: the count
+    used container truthiness where the fallback used validity, so a zero-span
+    packet took the utc path while the diagnostic reported that none had."""
+    t = dict(block)
+    t["utc"] = {"value": [0, 250]}
+
+    duration = _packet_duration_ticks(t, 0.0, 250.0, time64.SECOND)
+
+    assert duration == 250.0, f"{why}: should have fallen back to utc"
+    assert _packets_without_counter_span([{"time": t}], time64.SECOND) == 1, (
+        f"{why}: fell back but was not counted"
+    )
+
+
+def test_a_negative_sample_freq_never_produces_a_negative_duration():
+    """A negative duration is worse than a wrong one: _process_gated_stats drops
+    a window with duration <= 0, so the gate would vanish rather than fall back."""
+    t = {
+        "samples": {"value": [0, 32000]},
+        "sample_freq": {"value": -NAMEPLATE},
+        "utc": {"value": [0, 250]},
+    }
+
+    assert _packet_duration_ticks(t, 0.0, 250.0, time64.SECOND) == 250.0
+
+
+def test_a_numeric_string_delta_is_used_and_not_counted_as_a_fallback():
+    t = {"delta": {"value": "0.002"}, "utc": {"value": [0, 250]}}
+
+    ticks = _packet_duration_ticks(t, 0.0, 250.0, time64.SECOND)
+
+    assert ticks / time64.SECOND == pytest.approx(0.002, rel=1e-12)
+    assert _packets_without_counter_span([{"time": t}], time64.SECOND) == 0
