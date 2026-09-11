@@ -137,6 +137,33 @@ def _packet_duration_ticks(t: dict[str, Any], u0: float, u1: float, second: floa
     return u1 - u0
 
 
+def _packets_without_counter_span(packets: list[dict[str, Any]]) -> int:
+    """Packets whose duration had to come from ``utc`` after all.
+
+    Should always be zero: every ``s/stats/value`` packet carries ``delta``,
+    ``samples`` and ``sample_freq`` from one dict literal, on all three
+    instrument families. It is counted because if it ever is not zero, that
+    window mixed two axes — the exact defect this module was changed to
+    remove — and would otherwise do so without saying a word.
+
+    Deliberately a separate predicate from ``_counter_rate_ratio``'s: that one
+    keys on ``time_map``, this one on what the duration actually used.
+    """
+    missing = 0
+    for packet in packets:
+        t = packet.get("time", {}) if isinstance(packet, dict) else {}
+        if not (t.get("utc", {}) or {}).get("value"):
+            continue
+        delta = (t.get("delta", {}) or {}).get("value")
+        samples = (t.get("samples", {}) or {}).get("value")
+        freq = (t.get("sample_freq", {}) or {}).get("value")
+        has_delta = isinstance(delta, (int, float)) and not isinstance(delta, bool) and delta > 0
+        has_span = bool(samples) and len(samples) >= 2 and bool(freq)
+        if not has_delta and not has_span:
+            missing += 1
+    return missing
+
+
 def _counter_rate_ratio(packets: list[dict[str, Any]]) -> dict[str, Any] | None:
     """How far jsdrv's fitted counter rate sits from the nameplate rate.
 
@@ -177,6 +204,8 @@ def _counter_rate_ratio(packets: list[dict[str, Any]]) -> dict[str, Any] | None:
         "counter_rate_swept_by": float(np.max(ratios) - np.min(ratios)),
         "packets_with_time_map": len(ratios),
         "packets_total": len(packets),
+        # Non-zero means some window mixed the counter and utc axes.
+        "packets_without_counter_span": _packets_without_counter_span(packets),
     }
 
 
@@ -348,6 +377,27 @@ def _segment_gpi_windows(poll_samples: list[tuple[int, int]]) -> list[tuple[floa
     return windows
 
 
+def _frame_spacings(usable: list[dict[str, Any]]) -> list[float]:
+    """Ticks per delivered sample, from each consecutive pair of GPI frames.
+
+    Divides by ``cur``'s sample count, not ``nxt``'s: frame ``cur`` starts at
+    its own ``utc`` and holds ``N_cur`` samples, so the next frame's first
+    sample sits at ``utc_cur + N_cur * spacing``. Using ``nxt``'s count is
+    wrong whenever the two differ -- which ``_streamed_gpi_timebase`` expects
+    often enough to publish ``frame_sample_count_min``/``_max``.
+
+    One helper for both callers so the diagnostic cannot drift from the
+    expression that actually places the gate edges.
+    """
+    import numpy as np
+
+    return [
+        (float(nxt["utc"]) - float(cur["utc"])) / int(np.asarray(cur["data"]).size)
+        for cur, nxt in zip(usable, usable[1:])
+        if float(nxt["utc"]) > float(cur["utc"])
+    ]
+
+
 def _segment_streamed_gpi(
     frames: list[dict[str, Any]],
 ) -> list[tuple[float, float]]:
@@ -384,11 +434,7 @@ def _segment_streamed_gpi(
     # per-frame ``utc`` values are device-exact, so consecutive frames give
     # the true spacing directly and a median over the capture rejects any
     # frame-drop outliers.
-    spacings = [
-        (float(nxt["utc"]) - float(cur["utc"])) / int(np.asarray(cur["data"]).size)
-        for cur, nxt in zip(usable, usable[1:])
-        if float(nxt["utc"]) > float(cur["utc"])
-    ]
+    spacings = _frame_spacings(usable)
     if spacings:
         tick_per_sample = float(np.median(spacings))
     else:
@@ -421,7 +467,7 @@ def _segment_streamed_gpi(
     return windows
 
 
-def streamed_gpi_timebase(frames: list[dict[str, Any]]) -> dict[str, Any]:
+def _streamed_gpi_timebase(frames: list[dict[str, Any]]) -> dict[str, Any]:
     """Report how the streamed-GPI time base was reconstructed (#249).
 
     :func:`_segment_streamed_gpi` cannot trust the JS320's reported sample rate
@@ -444,11 +490,7 @@ def streamed_gpi_timebase(frames: list[dict[str, Any]]) -> dict[str, Any]:
     if not usable:
         return {"frame_count": 0}
 
-    spacings = [
-        (float(nxt["utc"]) - float(cur["utc"])) / int(np.asarray(cur["data"]).size)
-        for cur, nxt in zip(usable, usable[1:])
-        if float(nxt["utc"]) > float(cur["utc"])
-    ]
+    spacings = _frame_spacings(usable)
     sizes = [int(np.asarray(frame["data"]).size) for frame in usable]
     reported_rate = float(usable[0]["rate"])
     out: dict[str, Any] = {
@@ -642,6 +684,12 @@ def _process_gated_stats(
     peak_current = 0.0
 
     for rise, fall in windows:
+        # Admission below is on the utc span; the duration reported for the
+        # window is the counter-based sum (#249). Different axes, deliberately:
+        # the floor is a coarse "is this long enough to trust" gate at 1 s
+        # against a multi-second window, so the fit's error cannot move a
+        # window across it. Worth knowing they differ if that margin ever
+        # narrows.
         mask = (mask_axis >= rise) & (mask_axis <= fall)
         if not bool(mask.any()):
             continue

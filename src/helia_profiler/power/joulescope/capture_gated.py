@@ -39,7 +39,7 @@ from .stats import (
     _map_poll_samples_to_packet_time,
     _process_gated_stats,
     _segment_streamed_gpi,
-    streamed_gpi_timebase,
+    _streamed_gpi_timebase,
     _summary_to_dict,
     _whole_summary_from_stats,
 )
@@ -603,7 +603,7 @@ def capture_gated(
         # only the first silently dropped it from exactly the runs worth
         # diagnosing.
         stream_timebase = (
-            streamed_gpi_timebase(gpi_stream_frames)
+            _streamed_gpi_timebase(gpi_stream_frames)
             if gpi_stream_enabled and gpi_stream_frames
             else None
         )
@@ -794,9 +794,6 @@ def capture_gated(
         if packets:
             whole_summary = _whole_summary_from_stats(packets)
             metadata.whole_capture_summary = _summary_to_dict(whole_summary)
-            # One dict, attached once above: main consolidated the second
-            # _gated_stats_diagnostics call that used to build a fresh one here
-            # and silently drop anything added to the first.
             diagnostics = gating_diagnostics
             metadata.gating_diagnostics = diagnostics
             sane_window = gated_summary.avg_current_a > whole_summary.avg_current_a

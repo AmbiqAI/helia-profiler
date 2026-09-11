@@ -52,6 +52,12 @@ class GatedPowerWindow:
     ``median``/``p95``/``p99`` expose the spread and a glitch-robust peak).
     """
 
+    #: Gate edges, on the driver's fitted ``utc`` axis -- the same axis the
+    #: stat packets are selected on, so a scale error in that fit cancels out
+    #: of the selection. ``duration_s`` is NOT their difference: it is the sum
+    #: of the selected packets' own durations, taken from the instrument's
+    #: sample counter (#249), so the two are not expected to agree to better
+    #: than a packet at each end plus the fit's error.
     start_s: float
     end_s: float
     duration_s: float
