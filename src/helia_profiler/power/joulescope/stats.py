@@ -96,9 +96,7 @@ def _counter_duration_ticks(t: dict[str, Any], second: float) -> float | None:
     back, which is worse than the error being corrected.
 
     One function so the fallback and the count of fallbacks cannot disagree
-    about what "usable" means. They did: the counter used container truthiness
-    where this uses validity, so a zero-span packet fell back silently while the
-    diagnostic reported none had.
+    about what "usable" means.
     """
     delta = (t.get("delta", {}) or {}).get("value")
     try:
@@ -126,31 +124,21 @@ def _counter_duration_ticks(t: dict[str, Any], second: float) -> float | None:
 
 
 def _packet_duration_ticks(t: dict[str, Any], u0: float, u1: float, second: float) -> float:
-    """How long one stats packet covered, in time64 ticks (#249).
+    """How long one stats packet covered, in time64 ticks.
 
-    ``utc`` is not a device timestamp. jsdrv maps the instrument's sample
-    counter to UTC through a filter it fits while streaming, and publishes that
-    fit in every packet as ``time.time_map.counter_rate``. Measured on a JS320
-    that rate read 15,849,906 Hz against a nameplate ``sample_freq`` of
-    16,000,000 -- a 9470 ppm deficit -- and ``u1 - u0`` overstated the packet by
-    9469 ppm to match. Early in a session the same fit was 2.9 % out.
-
-    The window's duration is the sum of these, so that error lands directly on
-    the reported gate width and on everything divided by it: average current,
-    average power and TOPS. Not TOPS-per-watt -- it is ops over energy once the
-    duration cancels -- and not ``energy_j``, which the device integrated.
-
-    Measured range on one bench session: 130 ppm once the fit had settled,
-    1.5 % on the first captures after the stream started, and 2.9 % at the
-    coldest reading. The single-packet figure above is one sample of that, not
-    a typical value.
+    Measured on the packet's own sample counter, not on ``u1 - u0``: ``utc`` is
+    the driver's fitted counter-to-UTC map applied to those same counter values,
+    so a span taken from it carries whatever error the fit currently has. The
+    window's duration is the sum of these, and average current, average power
+    and TOPS all divide by it. ``energy_j`` and TOPS-per-watt do not, so neither
+    moves. See helia-profiler#249 for the measurements behind this.
 
     ``utc`` stays the axis packets are *selected* on -- a shared scale error
     cancels out of a selection -- and is the fallback when a packet carries no
     counter span.
-    ``second`` is ``time64.SECOND``, passed in rather than imported here: this
-    runs once per stat packet, and a per-element import cost ~15 % of
-    ``_stats_arrays`` on a minute-long capture.
+
+    ``second`` is ``time64.SECOND``, passed in rather than imported: this runs
+    once per stat packet.
     """
     ticks = _counter_duration_ticks(t, second)
     return u1 - u0 if ticks is None else ticks
@@ -176,18 +164,15 @@ def _packets_without_counter_span(packets: list[dict[str, Any]], second: float) 
 
 
 def _counter_rate_ratio(packets: list[dict[str, Any]]) -> dict[str, Any] | None:
-    """How far jsdrv's fitted counter rate sits from the nameplate rate.
+    """How far the driver's fitted counter rate sits from the nameplate rate.
 
-    Published as a diagnostic because it is the direct read on the error above:
-    it is what ``utc`` is scaled by, and one run of it identifies a bad time
-    base that previously took a nineteen-capture series to attribute.
+    This is what ``utc`` is scaled by, so it is the direct read on the error
+    ``_packet_duration_ticks`` avoids.
 
-    Reported as a range, not a median. The quantity *moves* -- that is the whole
-    point of it -- and a median over a capture that converged halfway through
-    returns the settled value, hiding the very sweep worth seeing. A capture
-    2.9 % out for its first half reduces to a median of exactly 1.000000. The
-    first/last pair says which direction it moved and whether it had settled by
-    the end.
+    Reported as a range, not a median: the quantity moves while a stream
+    converges, and a median over a capture that settled partway through returns
+    the settled value and hides the sweep. The first/last pair says which way it
+    moved and whether it had settled. See helia-profiler#249.
     """
     import numpy as np
     from pyjoulescope_driver import time64
@@ -583,8 +568,7 @@ def _fullrate_energy_over_windows(
         return None
     # Ticks per sample ON THE EDGES' OWN AXIS (#249). The window edges come from
     # GPI polls mapped to the driver's fitted utc, so placing samples at the
-    # nameplate rate instead selects a span wrong by the fit's error -- 2.9 %
-    # at its worst, which is 286 extra samples on a 10 ms window. Consecutive
+    # nameplate rate instead selects a span wrong by the fit's error. Consecutive
     # anchors carry both a sample index and a utc, so they give the conversion
     # directly; the nameplate rate is the fallback when there is only one.
     positions = np.arange(n, dtype=np.float64)

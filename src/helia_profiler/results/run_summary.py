@@ -45,7 +45,11 @@ RUN_SUMMARY_SCHEMA = "hpx.run-summary"
 #: v4: #142/#181 gate verdict re-sourced -- energy_per_inference_j can
 #: coexist with gate_duration_integrity.valid=false, suspect re-keyed to
 #: the observer arbitration, gated_window_reference_drift added.
-RUN_SUMMARY_SCHEMA_VERSION = 4
+#: v5: #249 gated durations measured on the instrument's sample counter
+#: rather than the driver's fitted utc, so duration_s, avg_current_a,
+#: avg_power_w and the TOPS figures shift; energy_j and TOPS-per-watt do
+#: not. A v4 and a v5 summary are not comparable on those fields.
+RUN_SUMMARY_SCHEMA_VERSION = 5
 
 __all__ = [
     "RUN_SUMMARY_SCHEMA",
