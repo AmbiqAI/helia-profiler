@@ -229,13 +229,46 @@ class TestPowerDiagnostics:
         assert "power.lockstep" not in failure.hint
 
 
+_FREQ = 16_000_000.0
+#: The fit jsdrv had settled on when #249 was diagnosed on the bench.
+_COUNTER_RATE = 15_849_906.047525965
+
+
+def _S0(u0: int) -> int:
+    """Counter value for a utc tick, on the instrument's own sample clock."""
+    return 13_043_307_285_148 + round(u0 / _SECOND * _FREQ)
+
+
+def _SPAN(u0: int, u1: int) -> int:
+    """Counter span for a utc interval.
+
+    Rounds: ``_SECOND // 1000`` is not an exact millisecond, and flooring would
+    leave the fixture 60 ppm short of the duration it means to describe.
+    """
+    return round((u1 - u0) / _SECOND * _FREQ)
+
+
 class TestGatedStatsProcessing:
     """Host-side integration of on-device stat packets into gated windows."""
 
     @staticmethod
     def _packet(u0: int, u1: int, cur_int: float, pwr_int: float, cur_max: float):
         return {
-            "time": {"utc": {"value": [u0, u1]}},
+            "time": {
+                "utc": {"value": [u0, u1]},
+                # A real jsdrv packet carries its counter span, the divisor it
+                # used for the integrals, and the time_map fit. The duration and
+                # the #249 diagnostic both come from them, so a fixture with
+                # only utc silently exercises the fallback alone.
+                "samples": {"value": [_S0(u0), _S0(u0) + _SPAN(u0, u1)]},
+                "sample_freq": {"value": _FREQ},
+                "delta": {"value": (u1 - u0) / _SECOND},
+                "time_map": {
+                    "counter_rate": _COUNTER_RATE,
+                    "offset_time": u0,
+                    "offset_counter": _S0(u0),
+                },
+            },
             "signals": {
                 "current": {
                     "avg": {"value": cur_int / ((u1 - u0) / _SECOND)},
@@ -936,6 +969,12 @@ class TestStreamedGateSelection:
         assert diagnostics["gate_edge_source"] == "gpi_stream"
         assert "poll_edge_uncertainty_s" not in diagnostics
         assert diagnostics["stream_segment_count"] == 2
+        # #249: both time-base records must reach the PUBLISHED dict, which is
+        # the object metadata carries -- not whatever was built along the way.
+        assert "gpi_stream_timebase" in diagnostics
+        time_map = diagnostics["instrument_time_map"]
+        assert time_map["utc_over_counter_rate"] == pytest.approx(1.009469, rel=1e-4)
+        assert time_map["packets_with_time_map"] == time_map["packets_total"]
         (recorded,) = diagnostics["windows"]
         assert recorded["rise_tick"] == pytest.approx(19 * ms, abs=ms // 100)
         assert recorded["fall_tick"] == pytest.approx(29 * ms, abs=ms // 100)
@@ -973,6 +1012,13 @@ class TestMissedGateWarningNamesTheFix:
                     return callback
             return None
 
+        @property
+        def _gpi_cb(self):
+            for topic, callback in self._subs.items():
+                if "/s/gpi/" in topic and topic.endswith("!data"):
+                    return callback
+            return None
+
         def emit_packets(self, count: int) -> None:
             assert self._stats_cb is not None, "subscribe() was never called"
             ms = _SECOND // 1000
@@ -980,6 +1026,26 @@ class TestMissedGateWarningNamesTheFix:
                 self._stats_cb(
                     "u/js320/test/s/stats/value",
                     TestGatedStatsProcessing._packet(i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12),
+                )
+            # GPI frames that never go high, matching this scenario's missed
+            # gate. Without them the degraded path has no stream to characterise
+            # and its time-base record is vacuously absent.
+            gpi = self._gpi_cb
+            if gpi is None:
+                return
+            import numpy as np
+
+            per_frame = 8
+            for i in range(count):
+                gpi(
+                    "u/js320/test/s/gpi/0/!data",
+                    {
+                        "utc": i * ms,
+                        "sample_rate": 16_000_000.0,
+                        "decimate_factor": 16,
+                        "sample_id": i * per_frame * 16,
+                        "data": np.zeros(per_frame, dtype=np.uint8),
+                    },
                 )
 
     def _run_capture(self, monkeypatch, *, lockstep: bool, wired: bool):
@@ -1017,6 +1083,23 @@ class TestMissedGateWarningNamesTheFix:
         )
         assert "No GPIO gate rising edge detected" in warnings
         assert "power.lockstep: true" in warnings
+
+    def test_the_degraded_artifact_still_carries_the_time_base_diagnostics(
+        self, monkeypatch, caplog
+    ):
+        """#249: a run that lost its gate is the one an operator most needs to
+        diagnose, so both time-base records must survive onto the degraded
+        artifact, not only onto the successful path's."""
+        with caplog.at_level(logging.WARNING, logger="hpx"):
+            result = self._run_capture(monkeypatch, lockstep=True, wired=True)
+
+        assert result.metadata.integrity == "degraded"
+        diagnostics = result.metadata.gating_diagnostics
+        assert diagnostics is not None
+        assert "gpi_stream_timebase" in diagnostics
+        time_map = diagnostics["instrument_time_map"]
+        assert time_map["utc_over_counter_rate"] == pytest.approx(1.009469, rel=1e-4)
+        assert time_map["packets_with_time_map"] == 10
 
     def test_warning_stays_wiring_only_when_lockstep_was_already_on(self, monkeypatch, caplog):
         with caplog.at_level(logging.WARNING, logger="hpx"):

@@ -6,6 +6,42 @@ This project follows [Semantic Versioning](https://semver.org/) and uses
 [Release Please](https://github.com/googleapis/release-please) to prepare
 release pull requests from Conventional Commits.
 
+## Unreleased
+
+### Reporting changes for existing users
+
+* **Gated power durations no longer inherit the Joulescope driver's clock fit
+  ([#249](https://github.com/AmbiqAI/helia-profiler/issues/249)).** A gated
+  window's duration was summed from each stat packet's `utc` span. `utc` is not
+  a device timestamp: jsdrv fits a sample-counter-to-UTC map while streaming and
+  the packet's span is that fit applied to its counter values. The fit converges
+  over the first minutes of a stream, so the reported window inherited its
+  error — measured on a JS320 at 130 ppm once settled, 1.5 % on the first
+  captures after the stream started, and 2.9 % at the coldest reading, which is
+  143 ms on a 5 s window.
+
+  Durations now come from the divisor the driver itself used to build the
+  packet's charge and energy integrals, so `energy_j / duration_s` is consistent
+  by construction.
+
+  **What moves:** `power.duration_s`, `avg_current_a`, `avg_power_w`, and the
+  TOPS figures derived from them, by up to 1.5 % across a session and most at
+  the start of one. **What does not:** `energy_j`, which the instrument
+  integrates on-device, and TOPS-per-watt, where the duration cancels.
+
+  **Results captured before and after this change are not directly comparable**
+  on those fields, and `summary.json` now carries `schema_version` 5 to say so;
+  a comparison between a schema 4 and a schema 5 run reports the difference. A
+  run whose gate previously disagreed with the firmware's own window clock may
+  now agree: across a 19-capture bench series the observer error fell from up to
+  1.47 % to at most 0.026 %, and two runs changed verdict from `INVALID` to
+  valid. None changed the other way.
+
+  Each capture now publishes `power.gating_diagnostics.instrument_time_map`,
+  reporting the fit against the instrument's nameplate rate as a range, so a
+  capture taken while it was still settling says so.
+
+
 ## [0.1.6](https://github.com/AmbiqAI/helia-profiler/compare/v0.1.5...v0.1.6) (2026-08-19)
 
 

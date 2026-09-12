@@ -94,7 +94,7 @@ consumers can evolve parsers without coupling every file to the bundle schema:
 
 | Artifact | Schema | Packaged JSON Schema |
 | --- | --- | --- |
-| `summary.json` | `hpx.run-summary` v4 | `run_summary.schema.v1.json` (root fields; the authoritative shape is the typed model `helia_profiler.results.run_summary.RunSummary`) |
+| `summary.json` | `hpx.run-summary` v5 | `run_summary.schema.v1.json` (root fields; the authoritative shape is the typed model `helia_profiler.results.run_summary.RunSummary`) |
 | `run_metadata.json` | `hpx.run-metadata` v1 | `run_metadata.schema.v1.json` |
 | `profile_results.json` | `hpx.profile-results` v1 | `profile_results.schema.v1.json` |
 
@@ -109,7 +109,7 @@ The top-level summary — start here for a quick overview.
 ```json
 {
   "schema": "hpx.run-summary",
-  "schema_version": 4,
+  "schema_version": 5,
   "engine": "helia-rt",
   "layers": 13,
   "total_cycles": 2016376,

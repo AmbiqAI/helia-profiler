@@ -34,10 +34,12 @@ from .device import (
 )
 from .diagnostics import _gated_stats_diagnostics, _poll_edge_uncertainty_s
 from .stats import (
+    _counter_rate_ratio,
     _fullrate_energy_over_windows,
     _map_poll_samples_to_packet_time,
     _process_gated_stats,
     _segment_streamed_gpi,
+    _streamed_gpi_timebase,
     _summary_to_dict,
     _whole_summary_from_stats,
 )
@@ -589,6 +591,23 @@ def capture_gated(
             gating_diagnostics["poll_edge_uncertainty_s"] = _poll_edge_uncertainty_s(
                 poll_reads, minimum_window_s=minimum_gate_s
             )
+
+        # How the streamed-GPI time base was derived (#249). Both gate edges
+        # are placed with a per-sample spacing inferred from frame timestamps,
+        # so when a window disagrees with the firmware clock this says whether
+        # that inference is the reason. Diagnostic only. Attached to the one
+        # dict both the degraded and the successful path publish.
+        stream_timebase = (
+            _streamed_gpi_timebase(gpi_stream_frames)
+            if gpi_stream_enabled and gpi_stream_frames
+            else None
+        )
+        if stream_timebase is not None:
+            gating_diagnostics["gpi_stream_timebase"] = stream_timebase
+        # The filter that scales utc, read straight from the packets (#249).
+        counter_rate = _counter_rate_ratio(packets)
+        if counter_rate is not None:
+            gating_diagnostics["instrument_time_map"] = counter_rate
 
         windows, gated_summary = _process_gated_stats(
             packets=packets,
