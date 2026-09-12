@@ -2,13 +2,12 @@
 
 A gated window's duration is the sum of its stat packets' durations. Those were
 measured as `u1 - u0` on the `utc` field, which is not a device timestamp:
-jsdrv fits a sample-counter-to-UTC map while streaming and publishes it in every
-packet as `time.time_map.counter_rate`. Measured on a JS320 that rate read
-15,849,906 Hz against a nameplate 16,000,000 -- 9470 ppm low -- and every
-packet's `u1 - u0` was 9469 ppm long to match. Early in a session the same fit
-was 2.9 % out, which is 143 ms on a 5 s window.
+jsdrv fits a sample-counter-to-UTC map while streaming, so a span read off `utc`
+carries whatever error that fit currently has. The same packet carries the
+counter span the fit was built from, which is exact.
 
-The same packet carries the counter span, which is exact.
+These tests pin that contract. The bench measurements behind it are in #249 and
+in the CHANGELOG entry.
 """
 
 from __future__ import annotations
@@ -27,9 +26,11 @@ pytest.importorskip("numpy")
 time64 = pytest.importorskip("pyjoulescope_driver.time64")
 
 NAMEPLATE = 16_000_000.0
-#: The rate jsdrv had fitted on the bench when this was diagnosed.
+#: A fitted counter rate as jsdrv actually publishes one: close to nameplate,
+#: not equal to it, and not round. Sourced from #249 so the fixtures exercise a
+#: realistic error rather than one chosen to make the arithmetic convenient.
 MEASURED_COUNTER_RATE = 15_849_906.047525965
-#: Its error early in a session, when #249's 143 ms window came from.
+#: The same, at the largest error #249 recorded.
 COLD_COUNTER_RATE = NAMEPLATE / 1.0286
 
 
