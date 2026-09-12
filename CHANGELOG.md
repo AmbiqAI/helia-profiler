@@ -30,10 +30,12 @@ release pull requests from Conventional Commits.
   integrates on-device, and TOPS-per-watt, where the duration cancels.
 
   **Results captured before and after this change are not directly comparable**
-  on those fields. A run whose gate previously disagreed with the firmware's own
-  window clock may now agree: across a 19-capture bench series the observer
-  error fell from up to 1.47 % to at most 0.026 %, and two runs changed verdict
-  from `INVALID` to valid. None changed the other way.
+  on those fields, and `summary.json` now carries `schema_version` 5 to say so;
+  a comparison between a schema 4 and a schema 5 run reports the difference. A
+  run whose gate previously disagreed with the firmware's own window clock may
+  now agree: across a 19-capture bench series the observer error fell from up to
+  1.47 % to at most 0.026 %, and two runs changed verdict from `INVALID` to
+  valid. None changed the other way.
 
   Each capture now publishes `power.gating_diagnostics.instrument_time_map`,
   reporting the fit against the instrument's nameplate rate as a range, so a
