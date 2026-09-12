@@ -942,7 +942,11 @@ passes, so it is cross-checked directly. Four issue codes come out of that:
   independent clocks timing the same physical window in the same boot, so
   drift cannot explain a miss — the gate did not bracket what the firmware
   timed. An **error**: it is the authoritative window-integrity verdict, and
-  per-inference metrics are suppressed when it fires.
+  per-inference metrics are suppressed when it fires. The run is INVALID, but
+  the error is confined to the `power` metric family: `hpx compare` still
+  computes cycle, latency, memory and per-layer deltas against such a run and
+  omits only the power rows, because the gate the firmware disagreed with
+  bounds none of those figures.
 - **`power.window_clock_mismatch`** — internal mode: the firmware's window
   disagrees with `inference_count × reference_inference_us` (25% tolerance —
   loose because that reference comes from a different binary, in a different

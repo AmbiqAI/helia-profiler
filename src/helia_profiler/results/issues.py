@@ -103,6 +103,15 @@ class IssueSpec:
     levels: whether the broken number is the measurement of record decides
     fatal-vs-warn, and that decision stays at the emit site — the registry
     records the envelope so an emit outside it cannot ship.
+
+    ``metric_group`` names the metric family an ERROR is confined to, for the
+    errors that break one family rather than the run. It is part of the code's
+    meaning — the same discipline as :attr:`ComparabilitySpec.metric_group`,
+    and for the same reason: a consumer cannot key on the code string
+    (``test_no_bare_registered_code_literal_survives_in_src`` forbids it), so
+    the scope has to travel with the registry entry. ``None`` means the error
+    is run-wide, which is the safe default and what every unrecognized code
+    gets on the read side.
     """
 
     code: IssueCode
@@ -110,6 +119,7 @@ class IssueSpec:
     severity: Severity | None = None
     internal_severity: Severity | None = None
     external_severity: Severity | None = None
+    metric_group: str | None = None
 
     def __post_init__(self) -> None:
         fixed = self.severity is not None
@@ -225,6 +235,12 @@ _ISSUE_SPECS: tuple[IssueSpec, ...] = (
         "The instrument-timed gate and the firmware's own window clock "
         "disagree about the same physical window.",
         severity=Severity.ERROR,
+        # Confined to power: the disagreement is between the host's gate and
+        # the firmware's STIMER window, and every figure derived from the gate
+        # inherits it. Nothing about it touches the cycle counts and latency,
+        # which the profile binary measured in an earlier stage on its own
+        # clock. Same group literal the POWER_INTEGRITY dimension uses.
+        metric_group=DIMENSION_REGISTRY[ComparisonDimension.POWER_INTEGRITY].metric_group,
     ),
     IssueSpec(
         IssueCode.POWER_TERMINAL_MISSING,
@@ -283,6 +299,22 @@ _ISSUE_SPECS: tuple[IssueSpec, ...] = (
 ISSUE_REGISTRY: Mapping[IssueCode, IssueSpec] = MappingProxyType(
     {spec.code: spec for spec in _ISSUE_SPECS}
 )
+
+
+def error_metric_group(code: str) -> str | None:
+    """The metric family one issue code is confined to, else ``None``.
+
+    Takes the wire string rather than the enum member because that is what a
+    read-back bundle carries: ``ResultIssue.code`` is deliberately ``str`` for
+    cross-version tolerance. A code this build does not recognize has no group
+    and so confines nothing — a bundle written by a newer hpx blocks
+    everything rather than being quietly downgraded to a partial comparison.
+    """
+    try:
+        known = IssueCode(code)
+    except ValueError:
+        return None
+    return ISSUE_REGISTRY[known].metric_group
 
 
 class ComparabilitySeverity(StrEnum):
@@ -374,6 +406,18 @@ _COMPARABILITY_SPECS: tuple[ComparabilitySpec, ...] = (
 
 COMPARABILITY_REGISTRY: Mapping[ComparabilityCode, ComparabilitySpec] = MappingProxyType(
     {spec.code: spec for spec in _COMPARABILITY_SPECS}
+)
+
+#: The METRIC_BLOCKING code that confines each metric family, derived rather
+#: than listed so a new family cannot be tagged on an issue without a code to
+#: express it. A group absent here has no way to be confined, and the caller
+#: must fall back to blocking the whole comparison.
+METRIC_BLOCKING_CODE_BY_GROUP: Mapping[str, ComparabilityCode] = MappingProxyType(
+    {
+        spec.metric_group: spec.code
+        for spec in _COMPARABILITY_SPECS
+        if spec.severity is ComparabilitySeverity.METRIC_BLOCKING and spec.metric_group is not None
+    }
 )
 
 
