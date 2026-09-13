@@ -19,7 +19,7 @@ from .comparison_profile import (
 from ..errors import ReportError
 from ..results import ComparisonDimension, ResultManifest, load_result_manifest
 from ..modelcost import source_index_from_op
-from ..results.dimensions import DIMENSION_REGISTRY, ArtifactSource
+from ..results.dimensions import DIMENSION_REGISTRY
 from ..results.serde import nested_get, to_float
 
 
@@ -154,8 +154,8 @@ def _dimension_row(dimension: ComparisonDimension) -> _ConfigField:
     come from the dimension registry, so the table cannot drift from it.
     Row ORDER stays hand-controlled below — it is rendered artifact content."""
     spec = DIMENSION_REGISTRY[dimension]
-    if spec.source is not ArtifactSource.RUN_METADATA or spec.label is None:
-        raise ValueError(f"{dimension} is not a run-metadata dimension with a display label.")
+    if spec.label is None:
+        raise ValueError(f"{dimension} is not a comparison dimension with a display label.")
     return _ConfigField(dimension.value, spec.label, spec.path, dimension=dimension)
 
 
@@ -184,6 +184,7 @@ _CONFIG_FIELDS: tuple[_ConfigField, ...] = (
     _dimension_row(ComparisonDimension.COMPILER_VERSION),
     _dimension_row(ComparisonDimension.SYSTEM_CLOCK_HZ),
     _dimension_row(ComparisonDimension.RUN_METADATA_SCHEMA_VERSION),
+    _dimension_row(ComparisonDimension.RUN_SUMMARY_SCHEMA_VERSION),
 )
 
 

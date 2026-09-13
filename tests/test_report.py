@@ -15,6 +15,7 @@ from helia_profiler.results import (
     PowerRunPlan,
     PowerTerminalRecord,
 )
+from helia_profiler.results.run_summary import RUN_SUMMARY_SCHEMA_VERSION
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.errors import ReportError
 from helia_profiler.power.base import GatedPowerWindow, PowerResult, PowerSummary
@@ -312,9 +313,7 @@ def test_write_summary_includes_device_profiled_infer_latency(tmp_path: Path):
         "device_profiled_infer_avg_us": 8000,
     }
     assert summary["schema"] == "hpx.run-summary"
-    assert (
-        summary["schema_version"] == 4
-    )  # v2: #24 binary.bss; v3: #133 memory_regions; v4: #142/#181 gate verdict
+    assert summary["schema_version"] == RUN_SUMMARY_SCHEMA_VERSION
     assert summary["validity"] == "valid"
     assert summary["issues"] == []
 
@@ -517,7 +516,7 @@ def test_write_report_publishes_verifiable_manifest_last(tmp_path: Path):
     assert artifacts["summary.json"].role == "core"
     assert artifacts["summary.json"].name == "hpx.summary"
     assert artifacts["summary.json"].schema == "hpx.run-summary"
-    assert artifacts["summary.json"].schema_version == 4
+    assert artifacts["summary.json"].schema_version == RUN_SUMMARY_SCHEMA_VERSION
     assert artifacts["summary.json"].optional is False
     assert artifacts["profile_results.csv"].name == "hpx.profile-layers"
     assert artifacts["profile_results.csv"].schema is None

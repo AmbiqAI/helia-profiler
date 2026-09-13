@@ -229,13 +229,46 @@ class TestPowerDiagnostics:
         assert "power.lockstep" not in failure.hint
 
 
+_FREQ = 16_000_000.0
+#: A non-unity fitted rate makes the diagnostic distinct from nameplate.
+_COUNTER_RATE = 15_849_906.047525965
+
+
+def _S0(u0: int) -> int:
+    """Counter value for a utc tick, on the instrument's own sample clock."""
+    return 13_043_307_285_148 + round(u0 / _SECOND * _FREQ)
+
+
+def _SPAN(u0: int, u1: int) -> int:
+    """Counter span for a utc interval.
+
+    Rounds: ``_SECOND // 1000`` is not an exact millisecond, and flooring would
+    leave the fixture 60 ppm short of the duration it means to describe.
+    """
+    return round((u1 - u0) / _SECOND * _FREQ)
+
+
 class TestGatedStatsProcessing:
     """Host-side integration of on-device stat packets into gated windows."""
 
     @staticmethod
     def _packet(u0: int, u1: int, cur_int: float, pwr_int: float, cur_max: float):
         return {
-            "time": {"utc": {"value": [u0, u1]}},
+            "time": {
+                "utc": {"value": [u0, u1]},
+                # A real jsdrv packet carries its counter span, the divisor it
+                # used for the integrals, and the time_map fit. The duration and
+                # the #249 diagnostic both come from them, so a fixture with
+                # only utc silently exercises the fallback alone.
+                "samples": {"value": [_S0(u0), _S0(u0) + _SPAN(u0, u1)]},
+                "sample_freq": {"value": _FREQ},
+                "delta": {"value": (u1 - u0) / _SECOND},
+                "time_map": {
+                    "counter_rate": _COUNTER_RATE,
+                    "offset_time": u0,
+                    "offset_counter": _S0(u0),
+                },
+            },
             "signals": {
                 "current": {
                     "avg": {"value": cur_int / ((u1 - u0) / _SECOND)},
@@ -842,17 +875,33 @@ class TestStreamedGateSelection:
     """
 
     class _FakeStreamingDriver:
-        def __init__(self) -> None:
+        def __init__(self, *, fullrate_case="continuous") -> None:
+            self.fullrate_case = fullrate_case
+            self.controls = []
+            self.unsubscribed = []
             self._subs: dict[str, object] = {}
 
         def publish(self, _topic, _value, **_kwargs) -> None:
-            pass
+            self.controls.append((_topic, _value))
+            if (
+                self.fullrate_case == "setup_control_failure"
+                and _topic.endswith("/s/v/ctrl")
+                and _value == 1
+            ):
+                raise RuntimeError("voltage stream unavailable")
 
         def subscribe(self, topic, _flags, callback) -> None:
+            if self.fullrate_case == "setup_subscribe_failure" and topic.endswith("/s/v/!data"):
+                raise RuntimeError("voltage subscription unavailable")
             self._subs[topic] = callback
+            if self.fullrate_case == "setup_subscribe_partial_failure" and topic.endswith(
+                "/s/v/!data"
+            ):
+                raise RuntimeError("voltage subscribe failed after registration")
 
         def unsubscribe(self, _topic, _callback) -> None:
-            pass
+            self.unsubscribed.append(_topic)
+            self._subs.pop(_topic, None)
 
         def _cb(self, fragment: str):
             for topic, callback in self._subs.items():
@@ -873,6 +922,14 @@ class TestStreamedGateSelection:
                     "u/js320/test/s/stats/value",
                     TestGatedStatsProcessing._packet(i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12),
                 )
+            gpi_cb(
+                "u/js320/test/s/gpi/0/!data",
+                {
+                    "data": [],
+                    "sample_rate": 1000,
+                    "utc": 0,
+                },
+            )
             # GPI stream at 1 kHz: a 12 ms coupling stretch (qualifying!),
             # a 5 ms low gap, then the 10 ms real window, then low.
             levels = [0] * 2 + [1] * 12 + [0] * 5 + [1] * 10 + [0] * 5
@@ -887,11 +944,57 @@ class TestStreamedGateSelection:
                 },
             )
 
-    def test_last_qualifying_stream_window_wins(self, monkeypatch):
+            for channel, level in (("i", 0.0001), ("v", 1.8)):
+                callback = self._cb(f"/s/{channel}/!data")
+                if callback is None:
+                    continue
+                for start in (0, 20):
+                    sample_id = start
+                    if self.fullrate_case == f"gap_{channel}" and start == 20:
+                        sample_id += 1
+                    if self.fullrate_case == "unaligned" and channel == "v":
+                        sample_id += 1
+                    frame = {
+                        "data": np.full(20, level, dtype=np.float32),
+                        "sample_rate": 2000
+                        if self.fullrate_case == "rate_change" and start
+                        else 1000,
+                        "sample_id": sample_id,
+                        "utc": start * ms,
+                    }
+                    if self.fullrate_case == "missing_id":
+                        del frame["sample_id"]
+                    if self.fullrate_case == "missing_utc" and channel == "i" and start == 0:
+                        del frame["utc"]
+                    if self.fullrate_case == "duplicate_utc" and channel == "i":
+                        frame["utc"] = 0
+                    if self.fullrate_case == "outside_gate":
+                        frame["utc"] += 100 * ms
+                    callback(f"u/js320/test/s/{channel}/!data", frame)
+
+    @pytest.mark.parametrize(
+        "fullrate_case",
+        [
+            "continuous",
+            "gap_i",
+            "gap_v",
+            "unaligned",
+            "missing_id",
+            "rate_change",
+            "missing_utc",
+            "duplicate_utc",
+            "outside_gate",
+            "setup_subscribe_failure",
+            "setup_control_failure",
+            "setup_subscribe_partial_failure",
+        ],
+    )
+    def test_last_qualifying_stream_window_wins(self, monkeypatch, fullrate_case):
         from helia_profiler.power.joulescope import capture_gated as module
         from helia_profiler.power.joulescope.driver import JoulescopeDriver
 
-        fake = self._FakeStreamingDriver()
+        fake = self._FakeStreamingDriver(fullrate_case=fullrate_case)
+        monkeypatch.setenv("HPX_POWER_FULLRATE_XCHECK", "1")
         monkeypatch.setattr(module, "_open_device", lambda _serial: (fake, "u/js320/test", "js320"))
         monkeypatch.setattr(module, "_close_device", lambda *_a, **_k: None)
 
@@ -936,6 +1039,35 @@ class TestStreamedGateSelection:
         assert diagnostics["gate_edge_source"] == "gpi_stream"
         assert "poll_edge_uncertainty_s" not in diagnostics
         assert diagnostics["stream_segment_count"] == 2
+        # #249: both time-base records must reach the PUBLISHED dict, which is
+        # the object metadata carries -- not whatever was built along the way.
+        assert "gpi_stream_timebase" in diagnostics
+        assert diagnostics["gpi_stream_timebase"]["dropped_or_empty_frames"] == 1
+        assert diagnostics["gpi_stream_timebase"]["frame_count"] == 1
+        time_map = diagnostics["instrument_time_map"]
+        assert "utc_over_counter_rate" not in time_map
+        assert time_map["utc_over_counter_rate_min"] == pytest.approx(1.009469, rel=1e-4)
+        assert time_map["utc_over_counter_rate_max"] == pytest.approx(1.009469, rel=1e-4)
+        assert time_map["packets_with_time_map"] == time_map["packets_total"]
+        if fullrate_case == "continuous":
+            assert result.metadata.fullrate_xcheck is not None
+            assert result.metadata.fullrate_xcheck["duration_s"] == 0.010
+            assert "fullrate_xcheck_unavailable_reason" not in diagnostics
+        else:
+            assert result.metadata.fullrate_xcheck is None
+            expected_reason = "noncontiguous_or_unaligned_source_samples"
+            if fullrate_case in ("missing_utc", "duplicate_utc"):
+                expected_reason = "incomplete_or_nonmonotonic_utc_anchors"
+            elif fullrate_case == "outside_gate":
+                expected_reason = "no_integrable_gate_samples"
+            elif fullrate_case.startswith("setup_"):
+                expected_reason = "stream_setup_failed"
+                assert "u/js320/test/s/i/!data" in fake.unsubscribed
+                assert ("u/js320/test/s/i/ctrl", 0) in fake.controls
+                assert ("u/js320/test/s/v/ctrl", 0) in fake.controls
+                assert fake._cb("/s/i/!data") is None
+                assert fake._cb("/s/v/!data") is None
+            assert diagnostics["fullrate_xcheck_unavailable_reason"] == expected_reason
         (recorded,) = diagnostics["windows"]
         assert recorded["rise_tick"] == pytest.approx(19 * ms, abs=ms // 100)
         assert recorded["fall_tick"] == pytest.approx(29 * ms, abs=ms // 100)
@@ -954,7 +1086,8 @@ class TestMissedGateWarningNamesTheFix:
     class _FakeJoulescopeDriver:
         """Minimal pyjoulescope_driver.Driver stand-in for the gated path."""
 
-        def __init__(self) -> None:
+        def __init__(self, *, empty_frames=False) -> None:
+            self.empty_frames = empty_frames
             self._subs: dict[str, object] = {}
 
         def publish(self, _topic, _value, **_kwargs) -> None:
@@ -973,6 +1106,13 @@ class TestMissedGateWarningNamesTheFix:
                     return callback
             return None
 
+        @property
+        def _gpi_cb(self):
+            for topic, callback in self._subs.items():
+                if "/s/gpi/" in topic and topic.endswith("!data"):
+                    return callback
+            return None
+
         def emit_packets(self, count: int) -> None:
             assert self._stats_cb is not None, "subscribe() was never called"
             ms = _SECOND // 1000
@@ -981,12 +1121,34 @@ class TestMissedGateWarningNamesTheFix:
                     "u/js320/test/s/stats/value",
                     TestGatedStatsProcessing._packet(i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12),
                 )
+            # GPI frames that never go high, matching this scenario's missed
+            # gate. Without them the degraded path has no stream to characterise
+            # and its time-base record is vacuously absent.
+            gpi = self._gpi_cb
+            if gpi is None:
+                return
+            import numpy as np
 
-    def _run_capture(self, monkeypatch, *, lockstep: bool, wired: bool):
+            per_frame = 0 if self.empty_frames else 8
+            if self.empty_frames == "silent":
+                return
+            for i in range(count):
+                gpi(
+                    "u/js320/test/s/gpi/0/!data",
+                    {
+                        "utc": i * ms,
+                        "sample_rate": 16_000_000.0,
+                        "decimate_factor": 16,
+                        "sample_id": i * per_frame * 16,
+                        "data": np.zeros(per_frame, dtype=np.uint8),
+                    },
+                )
+
+    def _run_capture(self, monkeypatch, *, lockstep: bool, wired: bool, empty_frames=False):
         from helia_profiler.power.joulescope import capture_gated as module
         from helia_profiler.power.joulescope.driver import JoulescopeDriver
 
-        fake = self._FakeJoulescopeDriver()
+        fake = self._FakeJoulescopeDriver(empty_frames=empty_frames)
         monkeypatch.setattr(module, "_open_device", lambda _serial: (fake, "u/js320/test", "js320"))
         # GPI never goes high: the gate was missed entirely.
         monkeypatch.setattr(module, "_read_gpi_snapshot", lambda _d, _p: 0)
@@ -1017,6 +1179,52 @@ class TestMissedGateWarningNamesTheFix:
         )
         assert "No GPIO gate rising edge detected" in warnings
         assert "power.lockstep: true" in warnings
+
+    @pytest.mark.parametrize("empty_frames", [False, True, "silent"])
+    def test_the_degraded_artifact_still_carries_the_time_base_diagnostics(
+        self, monkeypatch, caplog, empty_frames
+    ):
+        """#249: a run that lost its gate is the one an operator most needs to
+        diagnose, so both time-base records must survive onto the degraded
+        artifact, not only onto the successful path's."""
+        with caplog.at_level(logging.WARNING, logger="hpx"):
+            result = self._run_capture(
+                monkeypatch, lockstep=True, wired=True, empty_frames=empty_frames
+            )
+
+        assert result.metadata.integrity == "degraded"
+        diagnostics = result.metadata.gating_diagnostics
+        assert diagnostics is not None
+        assert "gpi_stream_timebase" in diagnostics
+        stream = diagnostics["gpi_stream_timebase"]
+        assert stream["frame_count"] == (0 if empty_frames else 10)
+        if empty_frames == "silent":
+            assert stream == {"frame_count": 0}
+        else:
+            assert stream["dropped_or_empty_frames"] == (10 if empty_frames else 0)
+        time_map = diagnostics["instrument_time_map"]
+        assert "utc_over_counter_rate" not in time_map
+        assert time_map["utc_over_counter_rate_min"] == pytest.approx(1.009469, rel=1e-4)
+        assert time_map["utc_over_counter_rate_max"] == pytest.approx(1.009469, rel=1e-4)
+        assert time_map["packets_with_time_map"] == 10
+
+    @pytest.mark.parametrize("setup_failure", [False, True])
+    def test_degraded_capture_reports_fullrate_unavailability(self, monkeypatch, setup_failure):
+        monkeypatch.setenv("HPX_POWER_FULLRATE_XCHECK", "1")
+        original = self._FakeJoulescopeDriver.subscribe
+
+        def subscribe(driver, topic, flags, callback):
+            if setup_failure and topic.endswith("/s/v/!data"):
+                raise RuntimeError("voltage subscription unavailable")
+            original(driver, topic, flags, callback)
+
+        monkeypatch.setattr(self._FakeJoulescopeDriver, "subscribe", subscribe)
+        result = self._run_capture(monkeypatch, lockstep=True, wired=True)
+        assert result.metadata.integrity == "degraded"
+        assert result.metadata.fullrate_xcheck is None
+        assert result.metadata.gating_diagnostics["fullrate_xcheck_unavailable_reason"] == (
+            "stream_setup_failed" if setup_failure else "no_integrable_gate_samples"
+        )
 
     def test_warning_stays_wiring_only_when_lockstep_was_already_on(self, monkeypatch, caplog):
         with caplog.at_level(logging.WARNING, logger="hpx"):

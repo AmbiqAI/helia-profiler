@@ -94,7 +94,7 @@ consumers can evolve parsers without coupling every file to the bundle schema:
 
 | Artifact | Schema | Packaged JSON Schema |
 | --- | --- | --- |
-| `summary.json` | `hpx.run-summary` v4 | `run_summary.schema.v1.json` (root fields; the authoritative shape is the typed model `helia_profiler.results.run_summary.RunSummary`) |
+| `summary.json` | `hpx.run-summary` v5 | `run_summary.schema.v1.json` (root fields; the authoritative shape is the typed model `helia_profiler.results.run_summary.RunSummary`) |
 | `run_metadata.json` | `hpx.run-metadata` v1 | `run_metadata.schema.v1.json` |
 | `profile_results.json` | `hpx.profile-results` v1 | `profile_results.schema.v1.json` |
 
@@ -109,7 +109,7 @@ The top-level summary — start here for a quick overview.
 ```json
 {
   "schema": "hpx.run-summary",
-  "schema_version": 4,
+  "schema_version": 5,
   "engine": "helia-rt",
   "layers": 13,
   "total_cycles": 2016376,
@@ -467,6 +467,15 @@ inputs are (no symbol table, partial listing, no measured view).
     `helia_profiler.results.run_summary.load_run_summary`, whose
     `gate_duration_unarbitrated_failure` property applies the arbitration
     for you.
+
+!!! note "Schema v5"
+    Gated power duration now prefers the driver's packet duration, then its
+    sample span, with fitted UTC used only as fallback (#249). This changes
+    `duration_s`, `avg_current_a`, `avg_power_w`, and derived TOPS; packet
+    energy and TOPS-per-watt are unchanged by the duration correction.
+    Comparing v4 and v5 reports an `INFORMATIVE` schema difference and still
+    computes metrics. Re-record baselines for the affected power fields;
+    those measurements do not have identical semantics across this boundary.
 
 ## Terminal summary
 
