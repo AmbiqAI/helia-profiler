@@ -619,3 +619,22 @@ def test_fullrate_streams_accept_different_chunk_boundaries_for_the_same_interva
         [span(0, 100), span(101, 199)], [span(0, 100), span(101, 199)]
     )
     assert not _fullrate_streams_contiguous([span(0, 100), span(99, 201)], [span(0, 300)])
+
+
+@pytest.mark.parametrize("utc_scale", [0.5, 1.0, 2.0])
+@pytest.mark.parametrize("margin_ms", [1.5, 2.5])
+def test_host_poll_coverage_uses_packet_duration_on_the_host_axis(utc_scale, margin_ms):
+    from helia_profiler.errors import PowerError
+    from helia_profiler.power.joulescope.stats import _map_poll_samples_to_packet_time
+
+    packets = [_packet(index=i, counter_rate=NAMEPLATE / utc_scale) for i in range(3)]
+    for i, packet in enumerate(packets):
+        packet["_host_time64"] = int((10 + i * 0.002) * time64.SECOND)
+    first, last = packets[0]["_host_time64"], packets[-1]["_host_time64"]
+    margin = int(margin_ms / 1000 * time64.SECOND)
+    polls = [(first - 4 * time64.SECOND // 1000, 0), (first - margin, 1), (last + margin, 0)]
+    if margin_ms < 2:
+        assert len(_map_poll_samples_to_packet_time(packets=packets, poll_samples=polls)) == 3
+    else:
+        with pytest.raises(PowerError, match="do not cover"):
+            _map_poll_samples_to_packet_time(packets=packets, poll_samples=polls)

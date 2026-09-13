@@ -468,6 +468,15 @@ inputs are (no symbol table, partial listing, no measured view).
     `gate_duration_unarbitrated_failure` property applies the arbitration
     for you.
 
+!!! note "Schema v5"
+    Gated power duration now prefers the driver's packet duration, then its
+    sample span, with fitted UTC used only as fallback (#249). This changes
+    `duration_s`, `avg_current_a`, `avg_power_w`, and derived TOPS; packet
+    energy and TOPS-per-watt are unchanged by the duration correction.
+    Comparing v4 and v5 reports an `INFORMATIVE` schema difference and still
+    computes metrics. Re-record baselines for the affected power fields;
+    those measurements do not have identical semantics across this boundary.
+
 ## Terminal summary
 
 Every run prints a summary to the terminal:

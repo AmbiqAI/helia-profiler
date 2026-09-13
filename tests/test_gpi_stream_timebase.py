@@ -137,3 +137,21 @@ def test_a_wholly_unusable_stream_reports_its_discarded_input(rate, data):
         "frame_count": 0,
         "dropped_or_empty_frames": 1,
     }
+
+
+@pytest.mark.parametrize("bad_rate", [0.0, -1.0, float("inf"), float("nan")])
+def test_excluded_frame_does_not_bridge_spacing_or_gate_edges(bad_rate):
+    from helia_profiler.power.joulescope.stats import _segment_streamed_gpi
+
+    tick = time64.SECOND / 1000
+    frames = [
+        {"utc": 0, "rate": 1000.0, "data": [0, 1, 1, 1, 1, 1, 1, 1]},
+        {"utc": 8 * tick, "rate": bad_rate, "data": [1] * 8},
+        {"utc": 16 * tick, "rate": 1000.0, "data": [1, 0, 1, 1, 0, 0, 0, 0]},
+    ]
+    d = _streamed_gpi_timebase(frames)
+    assert d["spacing_sample_count"] == 0
+    assert d["tick_per_sample"] == tick
+    assert d["tick_per_sample_source"] == "reported_rate"
+    assert d["dropped_or_empty_frames"] == 1
+    assert _segment_streamed_gpi(frames) == [(18 * tick, 20 * tick)]

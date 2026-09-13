@@ -25,8 +25,8 @@ release pull requests from Conventional Commits.
   by construction.
 
   **What moves:** `power.duration_s`, `avg_current_a`, `avg_power_w`, and the
-  TOPS figures derived from them, by up to 1.5 % across a session and most at
-  the start of one. **What does not:** `energy_j`, which the instrument
+  TOPS figures derived from them, by amounts that depend on the fitted UTC
+  scale during the capture. **What does not:** `energy_j`, which the instrument
   integrates on-device, and TOPS-per-watt, where the duration cancels.
 
   **Results captured before and after this change are not directly comparable**

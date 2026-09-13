@@ -230,7 +230,7 @@ class TestPowerDiagnostics:
 
 
 _FREQ = 16_000_000.0
-#: The fit jsdrv had settled on when #249 was diagnosed on the bench.
+#: A non-unity fitted rate makes the diagnostic distinct from nameplate.
 _COUNTER_RATE = 15_849_906.047525965
 
 

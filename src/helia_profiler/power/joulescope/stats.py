@@ -276,6 +276,7 @@ def _map_poll_samples_to_packet_time(
         raise PowerError("Insufficient stats timestamps to align the GPIO gate.")
 
     order = np.argsort(host_time, kind="stable")
+    # Coverage is checked on host timestamps, so use packet duration, not fitted UTC span.
     duration = a["dur_ticks"][order]
     host_time = host_time[order]
     device_time = device_time[order]
@@ -347,24 +348,20 @@ def _segment_gpi_windows(poll_samples: list[tuple[int, int]]) -> list[tuple[floa
     return windows
 
 
-def _frame_spacings(usable: list[dict[str, Any]]) -> list[float]:
-    """Ticks per delivered sample, from each consecutive pair of GPI frames.
-
-    Divides by ``cur``'s sample count, not ``nxt``'s: frame ``cur`` starts at
-    its own ``utc`` and holds ``N_cur`` samples, so the next frame's first
-    sample sits at ``utc_cur + N_cur * spacing``. Using ``nxt``'s count is
-    wrong whenever the two differ -- which ``_streamed_gpi_timebase`` expects
-    often enough to publish ``frame_sample_count_min``/``_max``.
-
-    One helper for both callers so the diagnostic cannot drift from the
-    expression that actually places the gate edges.
-    """
+def _frame_spacings(frames: list[dict[str, Any]]) -> list[float]:
+    """Measure adjacent valid-frame spacing without bridging excluded input."""
     import numpy as np
 
     return [
         (float(nxt["utc"]) - float(cur["utc"])) / int(np.asarray(cur["data"]).size)
-        for cur, nxt in zip(usable, usable[1:])
-        if float(nxt["utc"]) > float(cur["utc"])
+        for cur, nxt in zip(frames, frames[1:])
+        if np.asarray(cur["data"]).size
+        and np.asarray(nxt["data"]).size
+        and math.isfinite(float(cur["rate"]))
+        and math.isfinite(float(nxt["rate"]))
+        and float(cur["rate"]) > 0
+        and float(nxt["rate"]) > 0
+        and float(nxt["utc"]) > float(cur["utc"])
     ]
 
 
@@ -388,23 +385,17 @@ def _segment_streamed_gpi(
     from pyjoulescope_driver import time64
 
     usable = [
-        frame for frame in frames if np.asarray(frame["data"]).size and float(frame["rate"]) > 0
+        frame
+        for frame in frames
+        if np.asarray(frame["data"]).size
+        and math.isfinite(float(frame["rate"]))
+        and float(frame["rate"]) > 0
     ]
     if not usable:
         return []
 
-    # Per-sample spacing measured from the frames themselves, NOT from the
-    # reported rate: JS320 GPI ``!data`` frames report ``sample_rate`` at the
-    # raw instrument rate with ``decimate_factor`` 1 while actually carrying
-    # 8:1-decimated samples (observed live: ``sample_id`` counts raw samples
-    # and both sid and utc advance exactly 8 per delivered sample).  Trusting
-    # the reported rate compressed every frame's intra-frame time 8x and put
-    # streamed edges tens of ms off — flagged by the firmware window clock,
-    # whose STIMER bracket a correctly measured gate can never exceed.  The
-    # per-frame ``utc`` values are device-exact, so consecutive frames give
-    # the true spacing directly and a median over the capture rejects any
-    # frame-drop outliers.
-    spacings = _frame_spacings(usable)
+    # Use adjacent frame timestamps for the fitted-UTC spacing (helia-profiler#249).
+    spacings = _frame_spacings(frames)
     if spacings:
         tick_per_sample = float(np.median(spacings))
     else:
@@ -412,8 +403,12 @@ def _segment_streamed_gpi(
 
     edges: list[tuple[float, int]] = []  # (tick, new_level)
     prev_level: int | None = None
-    for frame in usable:
+    for frame in frames:
         data = np.asarray(frame["data"])
+        if not data.size or not math.isfinite(float(frame["rate"])) or float(frame["rate"]) <= 0:
+            edges.append((float(frame["utc"]), -1))
+            prev_level = None
+            continue
         frame_t0 = float(frame["utc"])
         levels = (data > 0).astype(np.int8)
         if prev_level is None:
@@ -429,7 +424,9 @@ def _segment_streamed_gpi(
     windows: list[tuple[float, float]] = []
     rise: float | None = None
     for tick, level in edges:
-        if level and rise is None:
+        if level < 0:
+            rise = None
+        elif level and rise is None:
             rise = tick
         elif not level and rise is not None:
             windows.append((rise, tick))
@@ -443,7 +440,11 @@ def _streamed_gpi_timebase(frames: list[dict[str, Any]]) -> dict[str, Any]:
     from pyjoulescope_driver import time64
 
     usable = [
-        frame for frame in frames if np.asarray(frame["data"]).size and float(frame["rate"]) > 0
+        frame
+        for frame in frames
+        if np.asarray(frame["data"]).size
+        and math.isfinite(float(frame["rate"]))
+        and float(frame["rate"]) > 0
     ]
     if not usable:
         return (
@@ -452,7 +453,7 @@ def _streamed_gpi_timebase(frames: list[dict[str, Any]]) -> dict[str, Any]:
             else {"frame_count": 0}
         )
 
-    spacings = _frame_spacings(usable)
+    spacings = _frame_spacings(frames)
     sizes = [int(np.asarray(frame["data"]).size) for frame in usable]
     reported_rate = float(usable[0]["rate"])
     out: dict[str, Any] = {
@@ -685,12 +686,7 @@ def _process_gated_stats(
     peak_current = 0.0
 
     for rise, fall in windows:
-        # Admission below is on the utc span; the duration reported for the
-        # window is the counter-based sum (#249). Different axes, deliberately:
-        # the floor is a coarse "is this long enough to trust" gate at 1 s
-        # against a multi-second window, so the fit's error cannot move a
-        # window across it. Worth knowing they differ if that margin ever
-        # narrows.
+        # Admission uses the selected axis and configured floor; duration sums packet metadata.
         mask = (mask_axis >= rise) & (mask_axis <= fall)
         if not bool(mask.any()):
             continue
