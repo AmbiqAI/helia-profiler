@@ -8,6 +8,7 @@ JS220 ``s/stats/value`` shape, both of which expose
 from __future__ import annotations
 
 import logging
+import math
 import os
 from typing import Any
 
@@ -164,15 +165,9 @@ def _packets_without_counter_span(packets: list[dict[str, Any]], second: float) 
 
 
 def _counter_rate_ratio(packets: list[dict[str, Any]]) -> dict[str, Any] | None:
-    """How far the driver's fitted counter rate sits from the nameplate rate.
+    """Report the fitted-rate ratio's range and endpoints across usable packets.
 
-    This is what ``utc`` is scaled by, so it is the direct read on the error
-    ``_packet_duration_ticks`` avoids.
-
-    Reported as a range, not a median: the quantity moves while a stream
-    converges, and a median over a capture that settled partway through returns
-    the settled value and hides the sweep. The first/last pair says which way it
-    moved and whether it had settled. See helia-profiler#249.
+    Rate medians are labeled explicitly; see helia-profiler#249.
     """
     import numpy as np
     from pyjoulescope_driver import time64
@@ -183,17 +178,26 @@ def _counter_rate_ratio(packets: list[dict[str, Any]]) -> dict[str, Any] | None:
         t = packet.get("time", {}) if isinstance(packet, dict) else {}
         rate = (t.get("time_map", {}) or {}).get("counter_rate")
         freq = (t.get("sample_freq", {}) or {}).get("value")
-        if rate and freq:
-            rates.append(float(rate))
-            freqs.append(float(freq))
-            ratios.append(float(freq) / float(rate))
+        if rate is None or freq is None:
+            continue
+        try:
+            rate, freq = float(rate), float(freq)
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if not (math.isfinite(rate) and math.isfinite(freq) and rate > 0 and freq > 0):
+            continue
+        ratio = freq / rate
+        if not math.isfinite(ratio) or ratio <= 0:
+            continue
+        rates.append(rate)
+        freqs.append(freq)
+        ratios.append(ratio)
     if not ratios:
         return None
     return {
-        "counter_rate_hz": float(np.median(rates)),
-        "sample_freq_hz": float(np.median(freqs)),
+        "counter_rate_median_hz": float(np.median(rates)),
+        "sample_freq_median_hz": float(np.median(freqs)),
         # >1 means utc runs fast, inflating any duration measured on it.
-        "utc_over_counter_rate": float(np.median(ratios)),
         "utc_over_counter_rate_min": float(np.min(ratios)),
         "utc_over_counter_rate_max": float(np.max(ratios)),
         "utc_over_counter_rate_first": ratios[0],
@@ -466,19 +470,7 @@ def _segment_streamed_gpi(
 
 
 def _streamed_gpi_timebase(frames: list[dict[str, Any]]) -> dict[str, Any]:
-    """Report how the streamed-GPI time base was reconstructed (#249).
-
-    :func:`_segment_streamed_gpi` cannot trust the JS320's reported sample rate
-    -- the instrument advertises the raw rate with ``decimate_factor`` 1 while
-    delivering 8:1-decimated samples -- so it derives the per-sample spacing
-    from consecutive frame ``utc`` values instead. Every intra-frame edge is
-    then placed at ``frame_t0 + index * tick_per_sample``, which makes that one
-    derived number decide both gate edges.
-
-    This records what the derivation actually saw, so a window that disagrees
-    with the firmware clock can be attributed to the time base rather than
-    guessed at. Diagnostic only: nothing here feeds the gate or the energy.
-    """
+    """Report the frame spacing used for streamed-GPI edges and excluded input."""
     import numpy as np
     from pyjoulescope_driver import time64
 
@@ -486,7 +478,11 @@ def _streamed_gpi_timebase(frames: list[dict[str, Any]]) -> dict[str, Any]:
         frame for frame in frames if np.asarray(frame["data"]).size and float(frame["rate"]) > 0
     ]
     if not usable:
-        return {"frame_count": 0}
+        return (
+            {"frame_count": 0, "dropped_or_empty_frames": len(frames)}
+            if frames
+            else {"frame_count": 0}
+        )
 
     spacings = _frame_spacings(usable)
     sizes = [int(np.asarray(frame["data"]).size) for frame in usable]
@@ -608,12 +604,7 @@ def _fullrate_energy_over_windows(
             continue
         charge_c = float(np.sum(seg_i) * dt)
         energy_j = float(np.sum(seg_i * seg_v) * dt)
-        # Count the samples, do not measure the edges (#249). The samples are
-        # spaced at the nameplate rate ``dt``, while ``rise``/``fall`` are on
-        # the driver's fitted utc axis -- so ``(fall - rise)`` carries that
-        # fit's error while the charge and energy above do not. This is the
-        # measurement someone reaches for to corroborate the gated path, and
-        # it would have disagreed with it by up to 1.5 %.
+        # Duration uses the integrated sample count and rate (helia-profiler#249).
         dur_s = float(seg_i.size) * dt
         tot_charge += charge_c
         tot_energy += energy_j

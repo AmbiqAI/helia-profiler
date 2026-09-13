@@ -1,14 +1,4 @@
-"""The gate's width must not ride on a filter the driver is still fitting (#249).
-
-A gated window's duration is the sum of its stat packets' durations. Those were
-measured as `u1 - u0` on the `utc` field, which is not a device timestamp:
-jsdrv fits a sample-counter-to-UTC map while streaming, so a span read off `utc`
-carries whatever error that fit currently has. The same packet carries the
-counter span the fit was built from, which is exact.
-
-These tests pin that contract. The bench measurements behind it are in #249 and
-in the CHANGELOG entry.
-"""
+"""Packet duration uses driver metadata; diagnostics expose the full fitted-rate range."""
 
 from __future__ import annotations
 
@@ -230,13 +220,15 @@ def test_a_scale_error_cancels_out_of_the_selection_at_a_real_boundary():
 # ---------------------------------------------------------------------------
 
 
-def test_the_filters_error_is_published_as_a_ratio():
+def test_the_filters_error_is_published_as_a_range():
     d = _counter_rate_ratio([_packet(index=i) for i in range(5)])
 
     assert d is not None
-    assert d["counter_rate_hz"] == pytest.approx(MEASURED_COUNTER_RATE)
-    assert d["sample_freq_hz"] == pytest.approx(NAMEPLATE)
-    assert d["utc_over_counter_rate"] == pytest.approx(1.009469, rel=1e-5)
+    assert d["counter_rate_median_hz"] == pytest.approx(MEASURED_COUNTER_RATE)
+    assert d["sample_freq_median_hz"] == pytest.approx(NAMEPLATE)
+    assert "utc_over_counter_rate" not in d
+    assert d["utc_over_counter_rate_min"] == NAMEPLATE / MEASURED_COUNTER_RATE
+    assert d["utc_over_counter_rate_max"] == NAMEPLATE / MEASURED_COUNTER_RATE
     assert d["packets_with_time_map"] == 5
 
 
@@ -244,7 +236,9 @@ def test_a_converged_filter_reports_unity():
     d = _counter_rate_ratio([_packet(index=i, counter_rate=NAMEPLATE) for i in range(3)])
 
     assert d is not None
-    assert d["utc_over_counter_rate"] == pytest.approx(1.0, rel=1e-12)
+    assert "utc_over_counter_rate" not in d
+    assert d["utc_over_counter_rate_min"] == 1.0
+    assert d["utc_over_counter_rate_max"] == 1.0
 
 
 def test_packets_without_a_time_map_report_nothing_rather_than_a_default():
@@ -277,15 +271,19 @@ def test_the_duration_is_right_even_while_the_fit_is_still_moving():
 
 
 def test_a_capture_that_converged_halfway_does_not_report_itself_settled():
-    """A median over this returns exactly 1.000000 and hides the sweep -- the
-    defect this diagnostic had when first written."""
+    """A settled majority must not hide the earlier fitted-rate error."""
     packets = [_packet(index=i, counter_rate=COLD_COUNTER_RATE) for i in range(50)]
     packets += [_packet(index=50 + i, counter_rate=NAMEPLATE) for i in range(51)]
 
     d = _counter_rate_ratio(packets)
 
     assert d is not None
-    assert d["counter_rate_swept_by"] == pytest.approx(0.0286, rel=1e-3)
+    assert "utc_over_counter_rate" not in d
+    assert "counter_rate_hz" not in d
+    assert "sample_freq_hz" not in d
+    assert d["utc_over_counter_rate_min"] == 1.0
+    assert d["utc_over_counter_rate_max"] == NAMEPLATE / COLD_COUNTER_RATE
+    assert d["counter_rate_swept_by"] == NAMEPLATE / COLD_COUNTER_RATE - 1.0
     assert d["utc_over_counter_rate_first"] == pytest.approx(1.0286, rel=1e-6)
     assert d["utc_over_counter_rate_last"] == pytest.approx(1.0, rel=1e-9)
     assert d["utc_over_counter_rate_max"] > d["utc_over_counter_rate_min"]
@@ -298,16 +296,18 @@ def test_a_steady_fit_reports_no_sweep():
     assert d["counter_rate_swept_by"] == pytest.approx(0.0, abs=1e-12)
 
 
-def test_the_reported_ratio_is_not_dragged_by_one_outlying_packet():
-    """Median, not mean: a single bad fit in a settled capture is noise."""
+def test_a_single_rate_excursion_remains_visible():
+    """Even one fitted-rate excursion must remain visible in the range."""
     packets = [_packet(index=i, counter_rate=NAMEPLATE) for i in range(40)]
     packets[7] = _packet(index=7, counter_rate=NAMEPLATE / 2.0)
 
     d = _counter_rate_ratio(packets)
 
     assert d is not None
-    assert d["utc_over_counter_rate"] == pytest.approx(1.0, rel=1e-9)
-    assert d["utc_over_counter_rate_max"] == pytest.approx(2.0, rel=1e-9)
+    assert "utc_over_counter_rate" not in d
+    assert d["utc_over_counter_rate_min"] == 1.0
+    assert d["utc_over_counter_rate_max"] == 2.0
+    assert d["counter_rate_swept_by"] == 1.0
 
 
 def test_partial_time_map_coverage_is_reported_as_a_fraction_not_a_count():
@@ -560,3 +560,22 @@ def test_a_numeric_string_delta_is_used_and_not_counted_as_a_fallback():
 
     assert ticks / time64.SECOND == pytest.approx(0.002, rel=1e-12)
     assert _packets_without_counter_span([{"time": t}], time64.SECOND) == 0
+
+
+@pytest.mark.parametrize("field", ["counter_rate", "sample_freq"])
+@pytest.mark.parametrize("value", [None, "?", 0, -1, float("nan"), float("inf")])
+def test_unusable_optional_rate_metadata_is_excluded(field, value):
+    packets = [_packet(index=i, counter_rate=NAMEPLATE) for i in range(2)]
+    if field == "counter_rate":
+        packets[0]["time"]["time_map"]["counter_rate"] = value
+    else:
+        packets[0]["time"]["sample_freq"]["value"] = value
+
+    d = _counter_rate_ratio(packets)
+
+    assert d is not None
+    assert d["packets_with_time_map"] == 1
+    assert d["packets_total"] == 2
+    assert d["utc_over_counter_rate_min"] == 1.0
+    assert d["utc_over_counter_rate_max"] == 1.0
+    assert _counter_rate_ratio(packets[:1]) is None

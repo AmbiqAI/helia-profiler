@@ -906,6 +906,14 @@ class TestStreamedGateSelection:
                     "u/js320/test/s/stats/value",
                     TestGatedStatsProcessing._packet(i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12),
                 )
+            gpi_cb(
+                "u/js320/test/s/gpi/0/!data",
+                {
+                    "data": [],
+                    "sample_rate": 1000,
+                    "utc": 0,
+                },
+            )
             # GPI stream at 1 kHz: a 12 ms coupling stretch (qualifying!),
             # a 5 ms low gap, then the 10 ms real window, then low.
             levels = [0] * 2 + [1] * 12 + [0] * 5 + [1] * 10 + [0] * 5
@@ -972,8 +980,12 @@ class TestStreamedGateSelection:
         # #249: both time-base records must reach the PUBLISHED dict, which is
         # the object metadata carries -- not whatever was built along the way.
         assert "gpi_stream_timebase" in diagnostics
+        assert diagnostics["gpi_stream_timebase"]["dropped_or_empty_frames"] == 1
+        assert diagnostics["gpi_stream_timebase"]["frame_count"] == 1
         time_map = diagnostics["instrument_time_map"]
-        assert time_map["utc_over_counter_rate"] == pytest.approx(1.009469, rel=1e-4)
+        assert "utc_over_counter_rate" not in time_map
+        assert time_map["utc_over_counter_rate_min"] == pytest.approx(1.009469, rel=1e-4)
+        assert time_map["utc_over_counter_rate_max"] == pytest.approx(1.009469, rel=1e-4)
         assert time_map["packets_with_time_map"] == time_map["packets_total"]
         (recorded,) = diagnostics["windows"]
         assert recorded["rise_tick"] == pytest.approx(19 * ms, abs=ms // 100)
@@ -993,7 +1005,8 @@ class TestMissedGateWarningNamesTheFix:
     class _FakeJoulescopeDriver:
         """Minimal pyjoulescope_driver.Driver stand-in for the gated path."""
 
-        def __init__(self) -> None:
+        def __init__(self, *, empty_frames=False) -> None:
+            self.empty_frames = empty_frames
             self._subs: dict[str, object] = {}
 
         def publish(self, _topic, _value, **_kwargs) -> None:
@@ -1035,7 +1048,7 @@ class TestMissedGateWarningNamesTheFix:
                 return
             import numpy as np
 
-            per_frame = 8
+            per_frame = 0 if self.empty_frames else 8
             for i in range(count):
                 gpi(
                     "u/js320/test/s/gpi/0/!data",
@@ -1048,11 +1061,11 @@ class TestMissedGateWarningNamesTheFix:
                     },
                 )
 
-    def _run_capture(self, monkeypatch, *, lockstep: bool, wired: bool):
+    def _run_capture(self, monkeypatch, *, lockstep: bool, wired: bool, empty_frames=False):
         from helia_profiler.power.joulescope import capture_gated as module
         from helia_profiler.power.joulescope.driver import JoulescopeDriver
 
-        fake = self._FakeJoulescopeDriver()
+        fake = self._FakeJoulescopeDriver(empty_frames=empty_frames)
         monkeypatch.setattr(module, "_open_device", lambda _serial: (fake, "u/js320/test", "js320"))
         # GPI never goes high: the gate was missed entirely.
         monkeypatch.setattr(module, "_read_gpi_snapshot", lambda _d, _p: 0)
@@ -1084,21 +1097,29 @@ class TestMissedGateWarningNamesTheFix:
         assert "No GPIO gate rising edge detected" in warnings
         assert "power.lockstep: true" in warnings
 
+    @pytest.mark.parametrize("empty_frames", [False, True])
     def test_the_degraded_artifact_still_carries_the_time_base_diagnostics(
-        self, monkeypatch, caplog
+        self, monkeypatch, caplog, empty_frames
     ):
         """#249: a run that lost its gate is the one an operator most needs to
         diagnose, so both time-base records must survive onto the degraded
         artifact, not only onto the successful path's."""
         with caplog.at_level(logging.WARNING, logger="hpx"):
-            result = self._run_capture(monkeypatch, lockstep=True, wired=True)
+            result = self._run_capture(
+                monkeypatch, lockstep=True, wired=True, empty_frames=empty_frames
+            )
 
         assert result.metadata.integrity == "degraded"
         diagnostics = result.metadata.gating_diagnostics
         assert diagnostics is not None
         assert "gpi_stream_timebase" in diagnostics
+        stream = diagnostics["gpi_stream_timebase"]
+        assert stream["frame_count"] == (0 if empty_frames else 10)
+        assert stream["dropped_or_empty_frames"] == (10 if empty_frames else 0)
         time_map = diagnostics["instrument_time_map"]
-        assert time_map["utc_over_counter_rate"] == pytest.approx(1.009469, rel=1e-4)
+        assert "utc_over_counter_rate" not in time_map
+        assert time_map["utc_over_counter_rate_min"] == pytest.approx(1.009469, rel=1e-4)
+        assert time_map["utc_over_counter_rate_max"] == pytest.approx(1.009469, rel=1e-4)
         assert time_map["packets_with_time_map"] == 10
 
     def test_warning_stays_wiring_only_when_lockstep_was_already_on(self, monkeypatch, caplog):

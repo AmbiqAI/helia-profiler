@@ -238,8 +238,6 @@ def capture_gated(
             import numpy as np
 
             data = np.asarray(value["data"])
-            if data.size == 0:
-                return
             decimate = max(1, int(value.get("decimate_factor", 1) or 1))
             rate = float(value["sample_rate"]) / decimate
             sample_id = value.get("sample_id")

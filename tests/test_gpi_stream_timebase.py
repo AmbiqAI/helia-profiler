@@ -129,3 +129,11 @@ def test_the_segmenter_places_edges_correctly_across_uneven_frames():
     assert len(windows) == 1
     rise, fall = windows[0]
     assert (fall - rise) == pytest.approx(10 * tick, rel=1e-9)
+
+
+@pytest.mark.parametrize("rate, data", [(1.0, []), (0.0, [0]), (-1.0, [0])])
+def test_a_wholly_unusable_stream_reports_its_discarded_input(rate, data):
+    assert _streamed_gpi_timebase([{"utc": 0.0, "rate": rate, "data": data}]) == {
+        "frame_count": 0,
+        "dropped_or_empty_frames": 1,
+    }
