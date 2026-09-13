@@ -37,8 +37,8 @@ release pull requests from Conventional Commits.
   1.47 % to at most 0.026 %, and two runs changed verdict from `INVALID` to
   valid. None changed the other way.
 
-  Each capture now publishes `power.gating_diagnostics.instrument_time_map`,
-  reporting the fit against the instrument's nameplate rate as a range, so a
+  Gated captures with usable rate metadata now publish
+  `power.gating_diagnostics.instrument_time_map`, reporting the fit against the instrument's nameplate rate as a range, so a
   capture taken while it was still settling says so.
 
 

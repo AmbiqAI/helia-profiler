@@ -12,8 +12,8 @@ truth; ``memory_plan`` is a pure decision record. v4 (#142/#181):
 ``energy_per_inference_j`` can coexist with
 ``gate_duration_integrity.valid: false``; ``gated_window_duration_suspect``
 keys on the observer arbitration; ``gated_window_reference_drift`` added.
-v5 (#249): a gated window's duration comes from each stat packet's own
-sample counter instead of the driver's fitted ``utc``, so ``duration_s``,
+v5 (#249): gated duration prefers driver ``time.delta``, then sample span,
+then fitted ``utc`` as fallback, so ``duration_s``,
 ``avg_current_a``, ``avg_power_w`` and the TOPS figures move by up to the
 fit's error; ``energy_j`` and TOPS-per-watt do not.
 Each was a semantic change a cross-boundary consumer must SEE —

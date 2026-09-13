@@ -1,13 +1,4 @@
-"""Guards docs/guide/output.md against advertising a stale schema version.
-
-The guide tells a consumer which version to expect, in two places: the artifact
-table and the worked ``summary.json`` example. Both are hand-written, so a
-version bump leaves them behind silently -- #249 bumped the run summary to 5 and
-the guide still promised 4 until a reviewer read both files side by side.
-
-Only the current claims are pinned. The "what changed in v2" style history later
-in the guide names old versions on purpose.
-"""
+"""The guide's current schema table and examples match the exported versions."""
 
 from __future__ import annotations
 

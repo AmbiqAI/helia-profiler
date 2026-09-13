@@ -87,18 +87,7 @@ def _sv(field: Any, default: float = 0.0) -> float:
 
 
 def _counter_duration_ticks(t: dict[str, Any], second: float) -> float | None:
-    """A packet's duration from its own counter metadata, or ``None``.
-
-    ``None`` means the packet does not state a usable duration and the caller
-    must fall back to ``utc``. Every rejection is a positivity check, not a
-    truthiness one: a negative ``sample_freq`` or a decreasing sample pair would
-    otherwise yield a negative duration, and ``_process_gated_stats`` drops a
-    window whose duration is <= 0 — losing the gate entirely instead of falling
-    back, which is worse than the error being corrected.
-
-    One function so the fallback and the count of fallbacks cannot disagree
-    about what "usable" means.
-    """
+    """Return positive driver delta or sample-span duration, or None for UTC fallback."""
     delta = (t.get("delta", {}) or {}).get("value")
     try:
         # `delta` first: the driver divides by exactly this to build the charge
@@ -125,35 +114,13 @@ def _counter_duration_ticks(t: dict[str, Any], second: float) -> float | None:
 
 
 def _packet_duration_ticks(t: dict[str, Any], u0: float, u1: float, second: float) -> float:
-    """How long one stats packet covered, in time64 ticks.
-
-    Measured on the packet's own sample counter, not on ``u1 - u0``: ``utc`` is
-    the driver's fitted counter-to-UTC map applied to those same counter values,
-    so a span taken from it carries whatever error the fit currently has. The
-    window's duration is the sum of these, and average current, average power
-    and TOPS all divide by it. ``energy_j`` and TOPS-per-watt do not, so neither
-    moves. See helia-profiler#249 for the measurements behind this.
-
-    ``utc`` stays the axis packets are *selected* on -- a shared scale error
-    cancels out of a selection -- and is the fallback when a packet carries no
-    counter span.
-
-    ``second`` is ``time64.SECOND``, passed in rather than imported: this runs
-    once per stat packet.
-    """
+    """Return packet duration in ticks: driver delta, sample span, then UTC (#249)."""
     ticks = _counter_duration_ticks(t, second)
     return u1 - u0 if ticks is None else ticks
 
 
 def _packets_without_counter_span(packets: list[dict[str, Any]], second: float) -> int:
-    """Packets whose duration had to come from ``utc`` after all.
-
-    Should always be zero: every ``s/stats/value`` packet carries ``delta``,
-    ``samples`` and ``sample_freq`` from one dict literal, on all three
-    instrument families. It is counted because if it ever is not zero, that
-    window mixed two axes — the exact defect this module was changed to
-    remove — and would otherwise do so without saying a word.
-    """
+    """Count timestamped packets whose duration requires the UTC fallback."""
     missing = 0
     for packet in packets:
         t = packet.get("time", {}) if isinstance(packet, dict) else {}
