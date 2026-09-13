@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import re
+from importlib.resources import files
 from pathlib import Path
 
 from helia_profiler.report.contracts import (
@@ -46,3 +48,13 @@ def test_the_worked_summary_example_carries_the_live_version():
     )
     assert block is not None, f"{DOCS_PATH.name} has no worked {RUN_SUMMARY_SCHEMA} example"
     assert int(block.group(1)) == RUN_SUMMARY_SCHEMA_VERSION
+
+
+def test_packaged_summary_schema_matches_the_emitted_version():
+    schema = json.loads(
+        files("helia_profiler")
+        .joinpath("data/run_summary.schema.v1.json")
+        .read_text(encoding="utf-8")
+    )
+    assert schema["properties"]["schema"] == {"const": RUN_SUMMARY_SCHEMA}
+    assert schema["properties"]["schema_version"] == {"const": RUN_SUMMARY_SCHEMA_VERSION}

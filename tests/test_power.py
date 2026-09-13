@@ -877,16 +877,31 @@ class TestStreamedGateSelection:
     class _FakeStreamingDriver:
         def __init__(self, *, fullrate_case="continuous") -> None:
             self.fullrate_case = fullrate_case
+            self.controls = []
+            self.unsubscribed = []
             self._subs: dict[str, object] = {}
 
         def publish(self, _topic, _value, **_kwargs) -> None:
-            pass
+            self.controls.append((_topic, _value))
+            if (
+                self.fullrate_case == "setup_control_failure"
+                and _topic.endswith("/s/v/ctrl")
+                and _value == 1
+            ):
+                raise RuntimeError("voltage stream unavailable")
 
         def subscribe(self, topic, _flags, callback) -> None:
+            if self.fullrate_case == "setup_subscribe_failure" and topic.endswith("/s/v/!data"):
+                raise RuntimeError("voltage subscription unavailable")
             self._subs[topic] = callback
+            if self.fullrate_case == "setup_subscribe_partial_failure" and topic.endswith(
+                "/s/v/!data"
+            ):
+                raise RuntimeError("voltage subscribe failed after registration")
 
         def unsubscribe(self, _topic, _callback) -> None:
-            pass
+            self.unsubscribed.append(_topic)
+            self._subs.pop(_topic, None)
 
         def _cb(self, fragment: str):
             for topic, callback in self._subs.items():
@@ -969,6 +984,9 @@ class TestStreamedGateSelection:
             "missing_utc",
             "duplicate_utc",
             "outside_gate",
+            "setup_subscribe_failure",
+            "setup_control_failure",
+            "setup_subscribe_partial_failure",
         ],
     )
     def test_last_qualifying_stream_window_wins(self, monkeypatch, fullrate_case):
@@ -1042,6 +1060,13 @@ class TestStreamedGateSelection:
                 expected_reason = "incomplete_or_nonmonotonic_utc_anchors"
             elif fullrate_case == "outside_gate":
                 expected_reason = "no_integrable_gate_samples"
+            elif fullrate_case.startswith("setup_"):
+                expected_reason = "stream_setup_failed"
+                assert "u/js320/test/s/i/!data" in fake.unsubscribed
+                assert ("u/js320/test/s/i/ctrl", 0) in fake.controls
+                assert ("u/js320/test/s/v/ctrl", 0) in fake.controls
+                assert fake._cb("/s/i/!data") is None
+                assert fake._cb("/s/v/!data") is None
             assert diagnostics["fullrate_xcheck_unavailable_reason"] == expected_reason
         (recorded,) = diagnostics["windows"]
         assert recorded["rise_tick"] == pytest.approx(19 * ms, abs=ms // 100)
@@ -1182,6 +1207,24 @@ class TestMissedGateWarningNamesTheFix:
         assert time_map["utc_over_counter_rate_min"] == pytest.approx(1.009469, rel=1e-4)
         assert time_map["utc_over_counter_rate_max"] == pytest.approx(1.009469, rel=1e-4)
         assert time_map["packets_with_time_map"] == 10
+
+    def test_degraded_capture_reports_fullrate_setup_failure(self, monkeypatch):
+        monkeypatch.setenv("HPX_POWER_FULLRATE_XCHECK", "1")
+        original = self._FakeJoulescopeDriver.subscribe
+
+        def subscribe(driver, topic, flags, callback):
+            if topic.endswith("/s/v/!data"):
+                raise RuntimeError("voltage subscription unavailable")
+            original(driver, topic, flags, callback)
+
+        monkeypatch.setattr(self._FakeJoulescopeDriver, "subscribe", subscribe)
+        result = self._run_capture(monkeypatch, lockstep=True, wired=True)
+        assert result.metadata.integrity == "degraded"
+        assert result.metadata.fullrate_xcheck is None
+        assert (
+            result.metadata.gating_diagnostics["fullrate_xcheck_unavailable_reason"]
+            == "stream_setup_failed"
+        )
 
     def test_warning_stays_wiring_only_when_lockstep_was_already_on(self, monkeypatch, caplog):
         with caplog.at_level(logging.WARNING, logger="hpx"):

@@ -258,7 +258,9 @@ def capture_gated(
     # Set HPX_POWER_FULLRATE_XCHECK=1 to also stream raw s/i + s/v at the
     # instrument's native rate and integrate energy over the GPI windows,
     # logged alongside the 1 kHz stats-sum for direct comparison.
-    fr_xcheck = os.environ.get("HPX_POWER_FULLRATE_XCHECK") == "1"
+    fr_requested = os.environ.get("HPX_POWER_FULLRATE_XCHECK") == "1"
+    fr_xcheck = fr_requested
+    fr_subscriptions: list[tuple[str, Any]] = []
     fr_cur: list[Any] = []
     fr_volt: list[Any] = []
     fr_anchors: list[tuple[int, int, float]] = []
@@ -284,6 +286,20 @@ def capture_gated(
         data = np.asarray(value["data"], dtype=np.float32)
         fr_volt.append(data.copy())
         fr_volt_spans.append(_fullrate_sample_span(value, len(data)))
+
+    def _stop_fullrate_streams() -> None:
+        """Stop each requested channel and release every attempted subscription."""
+        for channel in ("i", "v"):
+            try:
+                driver.publish(f"{device_path}/s/{channel}/ctrl", 0, timeout=0)
+            except Exception:
+                log.debug("Failed to stop full-rate %s stream", channel, exc_info=True)
+        for topic, callback in list(fr_subscriptions):
+            try:
+                driver.unsubscribe(topic, callback)
+                fr_subscriptions.remove((topic, callback))
+            except Exception:
+                log.debug("Failed to unsubscribe full-rate stream", exc_info=True)
 
     def _poller() -> None:
         nonlocal first_high_at, first_low_after_high_at, short_pulse_first_s
@@ -422,14 +438,17 @@ def capture_gated(
                 )
         if fr_xcheck:
             try:
-                driver.subscribe(f"{device_path}/s/i/!data", ["pub"], _on_fr_current)
-                driver.subscribe(f"{device_path}/s/v/!data", ["pub"], _on_fr_voltage)
+                for channel, callback in (("i", _on_fr_current), ("v", _on_fr_voltage)):
+                    topic = f"{device_path}/s/{channel}/!data"
+                    fr_subscriptions.append((topic, callback))
+                    driver.subscribe(topic, ["pub"], callback)
                 driver.publish(f"{device_path}/s/i/ctrl", 1, timeout=0)
                 driver.publish(f"{device_path}/s/v/ctrl", 1, timeout=0)
                 log.info("Joulescope full-rate energy cross-check enabled (s/i + s/v streaming)")
             except Exception:
                 log.warning("Failed to enable full-rate cross-check streaming", exc_info=True)
                 fr_xcheck = False
+                _stop_fullrate_streams()
         try:
             thread = threading.Thread(target=_poller, daemon=True)
             thread.start()
@@ -469,14 +488,8 @@ def capture_gated(
                     driver.unsubscribe(gpi_data_topic, _on_gpi_data)
                 except Exception:
                     pass
-            if fr_xcheck:
-                try:
-                    driver.publish(f"{device_path}/s/i/ctrl", 0, timeout=0)
-                    driver.publish(f"{device_path}/s/v/ctrl", 0, timeout=0)
-                    driver.unsubscribe(f"{device_path}/s/i/!data", _on_fr_current)
-                    driver.unsubscribe(f"{device_path}/s/v/!data", _on_fr_voltage)
-                except Exception:
-                    pass
+            if fr_requested:
+                _stop_fullrate_streams()
 
         aligned_poll_samples = poll_samples
         use_device_time_axis = family in ("js220", "js320")
@@ -592,6 +605,8 @@ def capture_gated(
             gate_edge_source=gate_edge_source,
             stream_segment_count=len(raw_streamed) if gpi_stream_enabled else None,
         )
+        if fr_requested and not fr_xcheck:
+            gating_diagnostics["fullrate_xcheck_unavailable_reason"] = "stream_setup_failed"
         if gate_edge_source == "gpi_snapshot_poll":
             gating_diagnostics["poll_edge_uncertainty_s"] = _poll_edge_uncertainty_s(
                 poll_reads, minimum_window_s=minimum_gate_s
