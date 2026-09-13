@@ -1047,3 +1047,34 @@ def test_compare_console_survives_a_non_finite_metric(tmp_path: Path):
 
     result = compare_runs(baseline, candidate)
     print_compare(HpxConsole(verbosity=0), result)  # must not raise ValueError
+
+
+@pytest.mark.parametrize("baseline_version,candidate_version", [(4, 5), (5, 5)])
+def test_summary_schema_dimension_is_visible_and_usable_in_profiles(
+    tmp_path, baseline_version, candidate_version
+):
+    paths = [tmp_path / "base", tmp_path / "candidate"]
+    for path, version in zip(paths, (baseline_version, candidate_version)):
+        _write_run(path, toolchain="gcc", total_cycles=100, avg_us=100, layer_cycles=[100])
+        summary_path = path / "summary.json"
+        summary = json.loads(summary_path.read_text())
+        summary["schema_version"] = version
+        summary_path.write_text(json.dumps(summary))
+    profile = ComparisonProfile(
+        schema="hpx.comparison-profile",
+        schema_version=1,
+        metrics={"total_cycles": MetricPolicy(direction=MetricDirection.EQUAL, unit="cycles")},
+        required_dimensions=("run_summary_schema_version",),
+    )
+    result = compare_runs(*paths, profile=profile)
+    row = next(row for row in result.config_rows if row.key == "run_summary_schema_version")
+    assert (row.baseline, row.candidate) == (baseline_version, candidate_version)
+    assert row.status == ("same" if baseline_version == candidate_version else "diff")
+    assert result.comparability.run_metrics_comparable
+    assert result.verdict is not None
+    assert result.verdict.status.value == (
+        "pass" if baseline_version == candidate_version else "fail"
+    )
+    assert result.verdict.dimension_mismatches == (
+        () if baseline_version == candidate_version else ("run_summary_schema_version",)
+    )

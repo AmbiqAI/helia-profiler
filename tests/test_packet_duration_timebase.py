@@ -86,7 +86,7 @@ def test_a_packets_duration_comes_from_its_counter_span():
 
 
 def test_the_utc_span_of_that_same_packet_is_long_by_the_filters_error():
-    """Pins the defect, so a regression restores a number that is provably wrong."""
+    """A non-unity fitted rate changes UTC span but not packet duration."""
     p = _packet(index=0)
     u0, u1 = (float(v) for v in p["time"]["utc"]["value"])
 

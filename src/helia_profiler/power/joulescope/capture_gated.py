@@ -760,6 +760,13 @@ def capture_gated(
                 gating_diagnostics["fullrate_xcheck_unavailable_reason"] = (
                     "noncontiguous_or_unaligned_source_samples"
                 )
+            anchors_complete = len(fr_anchors) == len(fr_cur) and all(
+                nxt[1] > cur[1] for cur, nxt in zip(fr_anchors, fr_anchors[1:])
+            )
+            if contiguous and not anchors_complete:
+                gating_diagnostics["fullrate_xcheck_unavailable_reason"] = (
+                    "incomplete_or_nonmonotonic_utc_anchors"
+                )
             fr = (
                 _fullrate_energy_over_windows(
                     cur_chunks=fr_cur,
@@ -768,7 +775,7 @@ def capture_gated(
                     poll_samples=aligned_poll_samples,
                     windows_override=streamed_gate_windows,
                 )
-                if contiguous
+                if contiguous and anchors_complete
                 else None
             )
             if fr:
@@ -790,6 +797,9 @@ def capture_gated(
                     (fr_energy_per / stats_energy_per) if stats_energy_per else float("nan"),
                 )
             else:
+                gating_diagnostics.setdefault(
+                    "fullrate_xcheck_unavailable_reason", "no_integrable_gate_samples"
+                )
                 log.warning(
                     "Full-rate cross-check requested but produced no result "
                     "(chunks=%d, anchors=%d)",

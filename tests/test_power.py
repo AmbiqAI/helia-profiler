@@ -949,10 +949,27 @@ class TestStreamedGateSelection:
                     }
                     if self.fullrate_case == "missing_id":
                         del frame["sample_id"]
+                    if self.fullrate_case == "missing_utc" and channel == "i" and start == 0:
+                        del frame["utc"]
+                    if self.fullrate_case == "duplicate_utc" and channel == "i":
+                        frame["utc"] = 0
+                    if self.fullrate_case == "outside_gate":
+                        frame["utc"] += 100 * ms
                     callback(f"u/js320/test/s/{channel}/!data", frame)
 
     @pytest.mark.parametrize(
-        "fullrate_case", ["continuous", "gap_i", "gap_v", "unaligned", "missing_id", "rate_change"]
+        "fullrate_case",
+        [
+            "continuous",
+            "gap_i",
+            "gap_v",
+            "unaligned",
+            "missing_id",
+            "rate_change",
+            "missing_utc",
+            "duplicate_utc",
+            "outside_gate",
+        ],
     )
     def test_last_qualifying_stream_window_wins(self, monkeypatch, fullrate_case):
         from helia_profiler.power.joulescope import capture_gated as module
@@ -1020,9 +1037,12 @@ class TestStreamedGateSelection:
             assert "fullrate_xcheck_unavailable_reason" not in diagnostics
         else:
             assert result.metadata.fullrate_xcheck is None
-            assert diagnostics["fullrate_xcheck_unavailable_reason"] == (
-                "noncontiguous_or_unaligned_source_samples"
-            )
+            expected_reason = "noncontiguous_or_unaligned_source_samples"
+            if fullrate_case in ("missing_utc", "duplicate_utc"):
+                expected_reason = "incomplete_or_nonmonotonic_utc_anchors"
+            elif fullrate_case == "outside_gate":
+                expected_reason = "no_integrable_gate_samples"
+            assert diagnostics["fullrate_xcheck_unavailable_reason"] == expected_reason
         (recorded,) = diagnostics["windows"]
         assert recorded["rise_tick"] == pytest.approx(19 * ms, abs=ms // 100)
         assert recorded["fall_tick"] == pytest.approx(29 * ms, abs=ms // 100)
