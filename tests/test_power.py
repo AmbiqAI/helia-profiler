@@ -1208,12 +1208,13 @@ class TestMissedGateWarningNamesTheFix:
         assert time_map["utc_over_counter_rate_max"] == pytest.approx(1.009469, rel=1e-4)
         assert time_map["packets_with_time_map"] == 10
 
-    def test_degraded_capture_reports_fullrate_setup_failure(self, monkeypatch):
+    @pytest.mark.parametrize("setup_failure", [False, True])
+    def test_degraded_capture_reports_fullrate_unavailability(self, monkeypatch, setup_failure):
         monkeypatch.setenv("HPX_POWER_FULLRATE_XCHECK", "1")
         original = self._FakeJoulescopeDriver.subscribe
 
         def subscribe(driver, topic, flags, callback):
-            if topic.endswith("/s/v/!data"):
+            if setup_failure and topic.endswith("/s/v/!data"):
                 raise RuntimeError("voltage subscription unavailable")
             original(driver, topic, flags, callback)
 
@@ -1221,9 +1222,8 @@ class TestMissedGateWarningNamesTheFix:
         result = self._run_capture(monkeypatch, lockstep=True, wired=True)
         assert result.metadata.integrity == "degraded"
         assert result.metadata.fullrate_xcheck is None
-        assert (
-            result.metadata.gating_diagnostics["fullrate_xcheck_unavailable_reason"]
-            == "stream_setup_failed"
+        assert result.metadata.gating_diagnostics["fullrate_xcheck_unavailable_reason"] == (
+            "stream_setup_failed" if setup_failure else "no_integrable_gate_samples"
         )
 
     def test_warning_stays_wiring_only_when_lockstep_was_already_on(self, monkeypatch, caplog):

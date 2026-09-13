@@ -634,6 +634,10 @@ def capture_gated(
             windows_override=streamed_gate_windows,
         )
         if not windows:
+            if fr_requested:
+                gating_diagnostics.setdefault(
+                    "fullrate_xcheck_unavailable_reason", "no_integrable_gate_samples"
+                )
             failure = classify_gate_failure(
                 saw_gate_rise=saw_any_gate_rise,
                 saw_gate_fall=saw_any_gate_fall,
