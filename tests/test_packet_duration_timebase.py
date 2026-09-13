@@ -16,11 +16,9 @@ pytest.importorskip("numpy")
 time64 = pytest.importorskip("pyjoulescope_driver.time64")
 
 NAMEPLATE = 16_000_000.0
-#: A fitted counter rate as jsdrv actually publishes one: close to nameplate,
-#: not equal to it, and not round. Sourced from #249 so the fixtures exercise a
-#: realistic error rather than one chosen to make the arithmetic convenient.
+#: A non-round fitted rate close to, but distinct from, nameplate.
 MEASURED_COUNTER_RATE = 15_849_906.047525965
-#: The same, at the largest error #249 recorded.
+#: A larger non-unity ratio exercises visibly inflated UTC durations.
 COLD_COUNTER_RATE = NAMEPLATE / 1.0286
 
 
@@ -283,7 +281,7 @@ def test_a_capture_that_converged_halfway_does_not_report_itself_settled():
     assert "sample_freq_hz" not in d
     assert d["utc_over_counter_rate_min"] == 1.0
     assert d["utc_over_counter_rate_max"] == NAMEPLATE / COLD_COUNTER_RATE
-    assert d["counter_rate_swept_by"] == NAMEPLATE / COLD_COUNTER_RATE - 1.0
+    assert d["utc_over_counter_rate_sweep"] == NAMEPLATE / COLD_COUNTER_RATE - 1.0
     assert d["utc_over_counter_rate_first"] == pytest.approx(1.0286, rel=1e-6)
     assert d["utc_over_counter_rate_last"] == pytest.approx(1.0, rel=1e-9)
     assert d["utc_over_counter_rate_max"] > d["utc_over_counter_rate_min"]
@@ -293,7 +291,7 @@ def test_a_steady_fit_reports_no_sweep():
     d = _counter_rate_ratio([_packet(index=i, counter_rate=NAMEPLATE) for i in range(20)])
 
     assert d is not None
-    assert d["counter_rate_swept_by"] == pytest.approx(0.0, abs=1e-12)
+    assert d["utc_over_counter_rate_sweep"] == pytest.approx(0.0, abs=1e-12)
 
 
 def test_a_single_rate_excursion_remains_visible():
@@ -307,7 +305,7 @@ def test_a_single_rate_excursion_remains_visible():
     assert "utc_over_counter_rate" not in d
     assert d["utc_over_counter_rate_min"] == 1.0
     assert d["utc_over_counter_rate_max"] == 2.0
-    assert d["counter_rate_swept_by"] == 1.0
+    assert d["utc_over_counter_rate_sweep"] == 1.0
 
 
 def test_partial_time_map_coverage_is_reported_as_a_fraction_not_a_count():
@@ -579,3 +577,45 @@ def test_unusable_optional_rate_metadata_is_excluded(field, value):
     assert d["utc_over_counter_rate_min"] == 1.0
     assert d["utc_over_counter_rate_max"] == 1.0
     assert _counter_rate_ratio(packets[:1]) is None
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), -float("inf"), 1e308])
+def test_nonfinite_or_overflowing_delta_uses_sample_span(value):
+    t = {"delta": {"value": value}, "samples": {"value": [0, 2]}, "sample_freq": {"value": 1000}}
+    assert _packet_duration_ticks(t, 10, 30, time64.SECOND) == 0.002 * time64.SECOND
+    assert (
+        _packets_without_counter_span([{"time": {**t, "utc": {"value": [10, 30]}}}], time64.SECOND)
+        == 0
+    )
+
+
+@pytest.mark.parametrize("field", ["sample_freq", "samples"])
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), -float("inf")])
+def test_nonfinite_counter_span_uses_utc_and_counts_fallback(field, value):
+    t = {
+        "utc": {"value": [10, 30]},
+        "samples": {"value": [0, value] if field == "samples" else [0, 2]},
+        "sample_freq": {"value": value if field == "sample_freq" else 1000},
+    }
+    assert _packet_duration_ticks(t, 10, 30, time64.SECOND) == 20
+    assert _packets_without_counter_span([{"time": t}], time64.SECOND) == 1
+
+
+def test_fullrate_streams_accept_different_chunk_boundaries_for_the_same_interval():
+    from helia_profiler.power.joulescope.stats import (
+        _fullrate_sample_span,
+        _fullrate_streams_contiguous,
+    )
+
+    def span(start, count):
+        return _fullrate_sample_span(
+            {"sample_id": start * 2, "decimate_factor": 2, "sample_rate": 2000}, count
+        )
+
+    assert _fullrate_streams_contiguous(
+        [span(0, 100), span(100, 200)], [span(0, 150), span(150, 150)]
+    )
+    assert not _fullrate_streams_contiguous(
+        [span(0, 100), span(101, 199)], [span(0, 100), span(101, 199)]
+    )
+    assert not _fullrate_streams_contiguous([span(0, 100), span(99, 201)], [span(0, 300)])

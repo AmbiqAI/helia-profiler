@@ -313,9 +313,7 @@ def test_write_summary_includes_device_profiled_infer_latency(tmp_path: Path):
         "device_profiled_infer_avg_us": 8000,
     }
     assert summary["schema"] == "hpx.run-summary"
-    assert (
-        summary["schema_version"] == RUN_SUMMARY_SCHEMA_VERSION
-    )  # v2: #24 binary.bss; v3: #133 memory_regions; v4: #142/#181 gate verdict
+    assert summary["schema_version"] == RUN_SUMMARY_SCHEMA_VERSION
     assert summary["validity"] == "valid"
     assert summary["issues"] == []
 

@@ -36,6 +36,8 @@ from .diagnostics import _gated_stats_diagnostics, _poll_edge_uncertainty_s
 from .stats import (
     _counter_rate_ratio,
     _fullrate_energy_over_windows,
+    _fullrate_sample_span,
+    _fullrate_streams_contiguous,
     _map_poll_samples_to_packet_time,
     _process_gated_stats,
     _segment_streamed_gpi,
@@ -261,6 +263,8 @@ def capture_gated(
     fr_volt: list[Any] = []
     fr_anchors: list[tuple[int, int, float]] = []
     fr_n = [0]
+    fr_cur_spans: list[tuple[int, int, float] | None] = []
+    fr_volt_spans: list[tuple[int, int, float] | None] = []
 
     def _on_fr_current(_topic: str, value: Any) -> None:
         import numpy as np
@@ -271,12 +275,15 @@ def capture_gated(
         if utc is not None:
             fr_anchors.append((fr_n[0], int(utc), float(sr)))
         fr_cur.append(data.copy())
+        fr_cur_spans.append(_fullrate_sample_span(value, len(data)))
         fr_n[0] += len(data)
 
     def _on_fr_voltage(_topic: str, value: Any) -> None:
         import numpy as np
 
-        fr_volt.append(np.asarray(value["data"], dtype=np.float32).copy())
+        data = np.asarray(value["data"], dtype=np.float32)
+        fr_volt.append(data.copy())
+        fr_volt_spans.append(_fullrate_sample_span(value, len(data)))
 
     def _poller() -> None:
         nonlocal first_high_at, first_low_after_high_at, short_pulse_first_s
@@ -595,11 +602,7 @@ def capture_gated(
         # so when a window disagrees with the firmware clock this says whether
         # that inference is the reason. Diagnostic only. Attached to the one
         # dict both the degraded and the successful path publish.
-        stream_timebase = (
-            _streamed_gpi_timebase(gpi_stream_frames)
-            if gpi_stream_enabled and gpi_stream_frames
-            else None
-        )
+        stream_timebase = _streamed_gpi_timebase(gpi_stream_frames) if gpi_stream_enabled else None
         if stream_timebase is not None:
             gating_diagnostics["gpi_stream_timebase"] = stream_timebase
         # The filter that scales utc, read straight from the packets (#249).
@@ -752,12 +755,21 @@ def capture_gated(
                 gate_integrity, relative_tolerance=gate_relative_tolerance
             )
         if fr_xcheck:
-            fr = _fullrate_energy_over_windows(
-                cur_chunks=fr_cur,
-                volt_chunks=fr_volt,
-                anchors=fr_anchors,
-                poll_samples=aligned_poll_samples,
-                windows_override=streamed_gate_windows,
+            contiguous = _fullrate_streams_contiguous(fr_cur_spans, fr_volt_spans)
+            if not contiguous:
+                gating_diagnostics["fullrate_xcheck_unavailable_reason"] = (
+                    "noncontiguous_or_unaligned_source_samples"
+                )
+            fr = (
+                _fullrate_energy_over_windows(
+                    cur_chunks=fr_cur,
+                    volt_chunks=fr_volt,
+                    anchors=fr_anchors,
+                    poll_samples=aligned_poll_samples,
+                    windows_override=streamed_gate_windows,
+                )
+                if contiguous
+                else None
             )
             if fr:
                 metadata.fullrate_xcheck = fr

@@ -90,13 +90,12 @@ def _counter_duration_ticks(t: dict[str, Any], second: float) -> float | None:
     """Return positive driver delta or sample-span duration, or None for UTC fallback."""
     delta = (t.get("delta", {}) or {}).get("value")
     try:
-        # `delta` first: the driver divides by exactly this to build the charge
-        # and energy integrals in the same packet, so taking it makes
-        # ``energy_j / duration_s`` consistent by construction rather than by
-        # reimplementing the same arithmetic and hoping it matches.
-        if delta is not None and float(delta) > 0:
-            return float(delta) * second
-    except (TypeError, ValueError):
+        if delta is not None:
+            duration = float(delta)
+            ticks = duration * second
+            if math.isfinite(duration) and duration > 0 and math.isfinite(ticks) and ticks > 0:
+                return ticks
+    except (TypeError, ValueError, OverflowError):
         pass
     samples = (t.get("samples") or {}).get("value")
     freq = (t.get("sample_freq") or {}).get("value")
@@ -104,11 +103,13 @@ def _counter_duration_ticks(t: dict[str, Any], second: float) -> float | None:
         return None
     try:
         rate = float(freq)
-        if rate > 0 and len(samples) >= 2:
+        if math.isfinite(rate) and rate > 0 and len(samples) >= 2:
             span = float(samples[1]) - float(samples[0])
-            if span > 0:
-                return span * second / rate
-    except (TypeError, ValueError, IndexError):
+            if math.isfinite(span) and span > 0:
+                ticks = (span / rate) * second
+                if math.isfinite(ticks) and ticks > 0:
+                    return ticks
+    except (TypeError, ValueError, IndexError, OverflowError):
         pass
     return None
 
@@ -170,7 +171,7 @@ def _counter_rate_ratio(packets: list[dict[str, Any]]) -> dict[str, Any] | None:
         "utc_over_counter_rate_first": ratios[0],
         "utc_over_counter_rate_last": ratios[-1],
         # Non-zero means the fit was still moving during the capture.
-        "counter_rate_swept_by": float(np.max(ratios) - np.min(ratios)),
+        "utc_over_counter_rate_sweep": float(np.max(ratios) - np.min(ratios)),
         "packets_with_time_map": len(ratios),
         "packets_total": len(packets),
         # Non-zero means some window mixed the counter and utc axes.
@@ -492,6 +493,40 @@ def _streamed_gpi_timebase(frames: list[dict[str, Any]]) -> dict[str, Any]:
         }
     )
     return out
+
+
+def _fullrate_sample_span(frame: dict[str, Any], count: int) -> tuple[int, int, float] | None:
+    """Return a frame's delivered-sample interval and rate, or None if unknown."""
+    try:
+        step = int(frame.get("decimate_factor", 1))
+        sample_id = int(frame["sample_id"])
+        rate = float(frame["sample_rate"]) / step
+        if step <= 0 or sample_id < 0 or sample_id % step or count <= 0:
+            return None
+        if not math.isfinite(rate) or rate <= 0:
+            return None
+        start = sample_id // step
+        return start, start + count, rate
+    except (KeyError, TypeError, ValueError, OverflowError, ZeroDivisionError):
+        return None
+
+
+def _fullrate_streams_contiguous(
+    current: list[tuple[int, int, float] | None],
+    voltage: list[tuple[int, int, float] | None],
+) -> bool:
+    """Require complete, aligned current/voltage source intervals at one rate."""
+    bounds = []
+    for spans in (current, voltage):
+        if not spans or spans[0] is None:
+            return False
+        start, end, rate = spans[0]
+        for span in spans[1:]:
+            if span is None or span[0] != end or span[2] != rate:
+                return False
+            end = span[1]
+        bounds.append((start, end, rate))
+    return bounds[0] == bounds[1]
 
 
 def _fullrate_energy_over_windows(
