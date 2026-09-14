@@ -73,7 +73,7 @@ _METRIC_FIELDS: tuple[_MetricField, ...] = (
     _MetricField("power.avg_power_w", ("power", "avg_power_w"), "W", group="power"),
     _MetricField("power.peak_current_a", ("power", "peak_current_a"), "A", group="power"),
     _MetricField("power.energy_j", ("power", "energy_j"), "J", group="power"),
-    _MetricField("power.duration_s", ("power", "duration_s"), "s", group="power"),
+    _MetricField("power.duration_s", ("power", "capture_duration_s"), "s", group="power"),
     _MetricField(
         "power.energy_per_inference_j", ("power", "energy_per_inference_j"), "J", group="power"
     ),
