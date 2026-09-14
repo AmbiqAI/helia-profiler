@@ -964,6 +964,7 @@ class TestMainAotCcRender:
             cmsis_device_header="apollo330P.h",
             profiling_backends=["dwt", "armv8m-pmu"],
             has_armv8m_pmu=True,
+            has_ethos_u=False,
             pmu_max_ops=512,
         )
         assert "kMaxLayers = 512;" in small
@@ -972,9 +973,29 @@ class TestMainAotCcRender:
             cmsis_device_header="apollo510.h",
             profiling_backends=["dwt", "armv8m-pmu"],
             has_armv8m_pmu=True,
+            has_ethos_u=False,
             pmu_max_ops=4096,
         )
         assert "kMaxLayers = 4096;" in large
+
+    def test_hpx_pmu_profiler_npu_accessors_gated_on_has_ethos_u(self):
+        """layer_tag()/current_layer() exist for the Ethos-U PMU hooks only.
+        Rendering them into non-NPU firmware would change the header hashed
+        by measured_power_fingerprint, invalidating every existing board's
+        power artifacts against post-merge runs (#284 review)."""
+        template = _env.get_template("hpx_pmu_profiler.h.j2")
+        kwargs = dict(
+            cmsis_device_header="apollo510.h",
+            profiling_backends=["dwt", "armv8m-pmu"],
+            has_armv8m_pmu=True,
+            pmu_max_ops=512,
+        )
+        without = template.render(has_ethos_u=False, **kwargs)
+        assert "layer_tag" not in without
+        assert "current_layer" not in without
+        with_npu = template.render(has_ethos_u=True, **kwargs)
+        assert "layer_tag" in with_npu
+        assert "current_layer" in with_npu
 
 
 class TestEthosURender:

@@ -149,6 +149,7 @@ def _render_pmu_profiler_header(vars: dict) -> str:
         cmsis_device_header=vars["cmsis_device_header"],
         profiling_backends=list(vars["profiling_backends"]),
         has_armv8m_pmu=vars["has_armv8m_pmu"],
+        has_ethos_u=vars.get("has_ethos_u", False),
         pmu_max_ops=vars["pmu_max_ops"],
     )
 
@@ -294,7 +295,7 @@ def _build_cases() -> list[_CompileCase]:
             _CompileCase(
                 case_id=f"atomiq110|rtt|{engine}|ethos-u",
                 text=_render("atomiq110", "rtt", engine, overrides=dict(npu_overrides)),
-                vars=_common_kwargs("atomiq110", "rtt"),
+                vars={**_common_kwargs("atomiq110", "rtt"), "has_ethos_u": True},
             )
         )
 
