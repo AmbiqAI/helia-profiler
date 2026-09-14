@@ -193,7 +193,7 @@ def test_atomiq110_hardware_facts_not_copied_from_apollo510():
     soc = get_soc_for_board("atomiq110_fpga_turbo")
     # FPGA "turbo" bitstream: single fixed 25 MHz clock, no faster "hp" tier.
     assert soc.cpu_clock.speed_names == ("lp",)
-    assert soc.cpu_clock.default_speed.mhz == 25
+    assert soc.cpu_clock.speed("lp").mhz == 25
     # Real FPGA memory map: 496 KB DTCM/TCM, 256 KB ITCM, 3072 KB SSRAM,
     # 4096 KB MRAM, and no PSRAM/MSPI populated on this board.
     assert soc.memory.dtcm_kb == 496
@@ -1434,7 +1434,6 @@ def test_atomiq110_declares_ethos_u85_npu():
     soc = get_soc_for_board("atomiq110_fpga_turbo")
     assert soc.npu == "ethos-u85-256"
     assert "ethos_npu" in soc.profiling_domains
-    assert "npu" in soc.feature_flags
 
 
 def test_non_npu_socs_have_no_npu_domain():

@@ -150,15 +150,6 @@ class ClockDomain:
     def speed_names(self) -> tuple[str, ...]:
         return tuple(s.name for s in self.speeds)
 
-    @property
-    def default_speed(self) -> ClockSpeed:
-        speed = self.speed(self.default)
-        if speed is None:
-            raise ValueError(
-                f"Clock domain '{self.name}' default '{self.default}' is not a declared speed."
-            )
-        return speed
-
 
 @dataclass(frozen=True)
 class SocDef:
@@ -355,16 +346,6 @@ class SocDef:
         if self.npu is not None:
             domains.append("ethos_npu")
         return tuple(domains)
-
-    @property
-    def feature_flags(self) -> tuple[str, ...]:
-        """Short capability tags suitable for logs, metadata, and CLI output."""
-        flags: list[str] = list(self.profiling_backends)
-        if self.has_mve:
-            flags.append("mve")
-        if self.npu is not None:
-            flags.append("npu")
-        return tuple(flags)
 
 
 # ---------------------------------------------------------------------------
