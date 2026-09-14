@@ -376,7 +376,7 @@ PMU_RECORD_SIZE_BYTES: dict[EngineType, int] = {
 }
 
 #: Per-layer bytes of the Ethos-U accumulation tables the shared
-#: ``_npu_pmu.j2`` declares under ``NSX_MEM_SRAM``, HPX_NPU_MAX_LAYERS
+#: ``_npu_pmu.j2`` declares under ``NSX_MEM_SRAM_BSS``, HPX_NPU_MAX_LAYERS
 #: (= soc.pmu_max_ops) times over: g_npu_acc uint32[kNpuMaxEvents=4]
 #: (16) + g_npu_hit uint8 (1) + g_npu_ovf uint8 (1) — _npu_pmu.j2:39-43.
 NPU_PMU_TABLE_BYTES_PER_LAYER = 4 * 4 + 1 + 1
@@ -513,13 +513,15 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
             )
         )
 
-    # Ethos-U builds render _npu_pmu.j2's per-layer tables under
-    # NSX_MEM_SRAM (same has_ethos_u predicate as firmware/context.py).
+    # Ethos-U profile builds render _npu_pmu.j2's per-layer tables under
+    # NSX_MEM_SRAM_BSS (same has_ethos_u predicate as firmware/context.py;
+    # the power binary excludes them). NB the plan describes the PROFILE
+    # binary — same scope as pmu_layer_records above.
     artifacts = ctx.engine_artifacts
     if artifacts is not None and artifacts.resolved_backend == "ethos_u":
         additions.append(
             (
-                _nsx_mem_sram_region(soc),
+                _nsx_mem_sram_bss_region(soc),
                 MemoryConsumer(
                     name="npu_pmu_tables",
                     size=int(soc.pmu_max_ops) * NPU_PMU_TABLE_BYTES_PER_LAYER,

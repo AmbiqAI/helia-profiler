@@ -74,6 +74,7 @@ class PreflightStage:
         _check_pmu_selection(cfg)
         _check_npu_backend(cfg)
         _check_transport_support(cfg)
+        _check_power_board_support(cfg)
         _check_output_dir(cfg.output.dir)
         _check_host_tools(cfg)
         log.info("Preflight checks passed.")
@@ -440,6 +441,20 @@ def _check_vela_accelerator_config(cfg, soc) -> None:
             "profile the resulting *_vela.tflite."
         ),
     )
+
+
+def _check_power_board_support(cfg) -> None:
+    if not cfg.power.enabled:
+        return
+    from ..platform import get_board
+
+    board = get_board(cfg.target.board, registry=cfg.platform_registry)
+    if board.is_fpga:
+        raise ConfigError(
+            f"Board '{cfg.target.board}' is an FPGA platform — power measurements "
+            "do not represent silicon and the board has no power-capture wiring.",
+            hint="Disable power capture (power.enabled: false) or profile on a silicon board.",
+        )
 
 
 def _check_transport_support(cfg) -> None:

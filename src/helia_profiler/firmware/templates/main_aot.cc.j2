@@ -286,7 +286,7 @@ static void model_operator_cb(
 
 // AOT model context with profiling callback
 // ---------------------------------------------------------------------------
-{% if has_ethos_u | default(false) %}
+{% if has_ethos_u | default(false) and not power_only | default(false) %}
 // Engine seams for the engine-agnostic _npu_pmu.j2 (see its header). The
 // driver hooks fire inside an operator's run window, i.e. after the
 // callback's run_started (g_num_layers not yet incremented) and before

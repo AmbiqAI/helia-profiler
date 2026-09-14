@@ -34,13 +34,13 @@ static volatile bool g_npu_enabled = false;
 
 // Per-layer accumulation for the current profiled iteration. Indexed by the
 // engine's layer ordinal; multiple dispatches from one layer accumulate.
-// SRAM-resident: HPX_NPU_MAX_LAYERS * kNpuMaxEvents * 4 B is far too large
-// for TCM.
-NSX_MEM_SRAM static uint32_t g_npu_acc[HPX_NPU_MAX_LAYERS][kNpuMaxEvents];
-NSX_MEM_SRAM static uint8_t g_npu_hit[HPX_NPU_MAX_LAYERS];
+// SRAM-resident (zero-init .sram_bss — nothing to copy from MRAM at boot):
+// HPX_NPU_MAX_LAYERS * kNpuMaxEvents * 4 B is far too large for TCM.
+NSX_MEM_SRAM_BSS static uint32_t g_npu_acc[HPX_NPU_MAX_LAYERS][kNpuMaxEvents];
+NSX_MEM_SRAM_BSS static uint8_t g_npu_hit[HPX_NPU_MAX_LAYERS];
 // Sticky per-layer overflow: hardware counter saturation (PMOVSSET) or wrap
 // of the uint32 accumulation across dispatches within one iteration.
-NSX_MEM_SRAM static uint8_t g_npu_ovf[HPX_NPU_MAX_LAYERS];
+NSX_MEM_SRAM_BSS static uint8_t g_npu_ovf[HPX_NPU_MAX_LAYERS];
 
 extern "C" void hpx_npu_probe(const char *phase, struct ethosu_driver *drv,
                               void *user_arg);

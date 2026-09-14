@@ -79,6 +79,28 @@ class TestPreflightHappyPath:
             with pytest.raises(ConfigError, match="ExecuTorch profiling"):
                 PreflightStage().run(ctx)
 
+    def test_fpga_board_rejects_power_capture(self, tmp_path: Path):
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "target": {"board": "atomiq110_fpga_turbo"},
+                "power": {"enabled": True},
+            },
+        )
+        with patch("shutil.which", side_effect=_all_tools_present):
+            with pytest.raises(ConfigError, match="FPGA"):
+                PreflightStage().run(ctx)
+
+    def test_fpga_board_passes_without_power(self, tmp_path: Path):
+        ctx = _make_ctx(tmp_path, {"target": {"board": "atomiq110_fpga_turbo"}})
+        with patch("shutil.which", side_effect=_all_tools_present):
+            PreflightStage().run(ctx)
+
+    def test_silicon_board_accepts_power_capture(self, tmp_path: Path):
+        ctx = _make_ctx(tmp_path, {"power": {"enabled": True}})
+        with patch("shutil.which", side_effect=_all_tools_present):
+            PreflightStage().run(ctx)
+
     @pytest.mark.parametrize("field", ["arena_location", "weights_location"])
     def test_executorch_rejects_psram_placement(self, tmp_path: Path, field: str):
         model = tmp_path / "model.pte"

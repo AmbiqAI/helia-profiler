@@ -130,8 +130,9 @@ static HpxPmuProfiler g_profiler;
 NSX_MEM_SRAM static HpxPmuProfiler g_profiler;
 {% endif %}
 
-{% if has_ethos_u | default(false) %}
+{% if has_ethos_u | default(false) and not power_only | default(false) %}
 // Engine seams for the engine-agnostic _npu_pmu.j2 (see its header).
+// Profile binary only: the power binary runs the NPU but samples nothing.
 #define HPX_NPU_MAX_LAYERS HpxPmuProfiler::kMaxLayers
 static inline int hpx_npu_current_layer(void) { return g_profiler.current_layer(); }
 static inline int hpx_npu_num_layers(void) { return g_profiler.num_events(); }
