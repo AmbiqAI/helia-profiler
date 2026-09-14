@@ -65,6 +65,20 @@ class AnalyzeModelStage:
     def run(self, ctx: PipelineContext) -> None:
         result = analyze_model(ctx.config.model.path)
         if result is None:
+            # The ethos_u fail-fast gate must not be skippable by a model the
+            # analyzer cannot read: an unanalyzable flatbuffer has no
+            # Vela-compiled ethos-u op, so nothing would run on the NPU.
+            if ctx.config.engine.backend == "ethos_u":
+                raise ConfigError(
+                    "engine.backend=ethos_u selected, but the model could "
+                    "not be analyzed (no readable subgraphs) — a Vela-"
+                    "compiled model it is not.",
+                    hint=(
+                        "Compile it first: pip install ethos-u-vela && "
+                        "vela model.tflite --accelerator-config ethos-u85-256 "
+                        "--output-dir vela_out, then profile the *_vela.tflite."
+                    ),
+                )
             log.warning("Model analysis returned no results")
             return
 
