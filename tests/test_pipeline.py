@@ -718,7 +718,9 @@ def test_render_context_tolerates_npu_power_ack_only_on_fpga_boards(tmp_path: Pa
             heliart_toolchain_tag="gcc",
         )
         cpu = ctx.soc.cpu_clock
-        ctx.run_metadata.platform = PlatformInfo(cpu_clock_mhz=cpu.speed(cpu.default).mhz)
+        default_speed = cpu.speed(cpu.default)
+        assert default_speed is not None
+        ctx.run_metadata.platform = PlatformInfo(cpu_clock_mhz=default_speed.mhz)
         return FirmwareRenderContext.from_pipeline_context(ctx)
 
     fpga = _render_ctx("atomiq110_fpga_turbo", "atomiq110")
