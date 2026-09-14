@@ -14,6 +14,7 @@ The current baseline is `hpx-neuralspotx-0.8.1-2026-09`:
 | --- | --- |
 | `neuralspotx` package | `0.8.1`, wheel SHA-256 `7aac6f1b…9094`, tag peeled to `2dbe12a2…901f` |
 | `nsx-ambiq-sdk` | `v5.2.25`, peeled commit `aefce2ca…de7c` |
+| `nsx-ethos-u-driver` | `f0f99bb1…5a8` (peeled from `nsx-ethos-u-driver-v0.1.2`; pulled transitively by `nsx-npu`) |
 | `nsx-pmu-armv8m` | `5725c065…c88` |
 | `nsx-tflite-micro` | `7afcf2b4…333` |
 | `arm-cmsis-nn` | `6d21a6f8…f7c` |

@@ -16,6 +16,10 @@
       "url": "https://github.com/AmbiqAI/nsx-ambiq-sdk.git",
       "ref": "aefce2ca858795e783c76726ebe7d14d9d4bde7c"
     },
+    "nsx-ethos-u-driver": {
+      "url": "https://github.com/AmbiqAI/nsx-ethos-u-driver.git",
+      "ref": "f0f99bb124b22486ef55694c76567008680cb5a8"
+    },
     "nsx-pmu-armv8m": {
       "url": "https://github.com/AmbiqAI/nsx-pmu-armv8m.git",
       "ref": "5725c065a0c3603132f1064ee2684d1fa8587c88"
@@ -47,6 +51,10 @@
   },
   "modules": {
     "nsx-ambiq-bsp": {
+      "project": "nsx-ambiq-sdk",
+      "ref": "aefce2ca858795e783c76726ebe7d14d9d4bde7c"
+    },
+    "nsx-npu": {
       "project": "nsx-ambiq-sdk",
       "ref": "aefce2ca858795e783c76726ebe7d14d9d4bde7c"
     },

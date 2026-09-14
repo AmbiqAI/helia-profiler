@@ -61,6 +61,11 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
     assert {project.name: project.ref for project in baseline.projects} == {
         "neuralspotx": "2dbe12a2799fd8c3df85f1a103b0adca340c901f",
         "nsx-ambiq-sdk": "aefce2ca858795e783c76726ebe7d14d9d4bde7c",
+        # Vendored Arm Ethos-U core driver pulled transitively by nsx-npu.
+        # The packaged registry pins it at the mutable tag
+        # nsx-ethos-u-driver-v0.1.2; the baseline records the peeled commit
+        # so _verify_baseline_resolution covers the NPU sampling path.
+        "nsx-ethos-u-driver": "f0f99bb124b22486ef55694c76567008680cb5a8",
         "nsx-pmu-armv8m": "5725c065a0c3603132f1064ee2684d1fa8587c88",
         "nsx-tflite-micro": "7afcf2b4170e039caf4c49f91e2c45d5869be333",
         "arm-cmsis-nn": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",
@@ -80,6 +85,7 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
     }
     assert {module.name: module.ref for module in baseline.modules} == {
         "nsx-ambiq-bsp": "aefce2ca858795e783c76726ebe7d14d9d4bde7c",
+        "nsx-npu": "aefce2ca858795e783c76726ebe7d14d9d4bde7c",
         "nsx-pmu-armv8m": "5725c065a0c3603132f1064ee2684d1fa8587c88",
         "nsx-tflite-micro": "7afcf2b4170e039caf4c49f91e2c45d5869be333",
         "arm-cmsis-nn": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",
