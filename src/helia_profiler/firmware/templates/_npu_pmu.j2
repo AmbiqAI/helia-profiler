@@ -128,6 +128,9 @@ extern "C" void hpx_npu_probe(const char *phase, struct ethosu_driver *drv,
 // CSV emission mirroring the engine's per-layer CSV: one row per layer so
 // the host merges this preset with ARM-PMU presets by layer index. Rows
 // for CPU-resident layers are all zeros (the NPU never ran for them).
+// NPU_DISPATCHED carries g_npu_hit so the host can tell "the NPU ran and
+// counted zero" apart from "the NPU never dispatched for this layer" —
+// without it a no-op probe reads as a real all-zero measurement.
 static void hpx_npu_print_csv(void) {
     const int num_layers = hpx_npu_num_layers();
     if (num_layers == 0 || g_npu_num_events == 0) {
@@ -137,12 +140,12 @@ static void hpx_npu_print_csv(void) {
     for (int e = 0; e < g_npu_num_events; e++) {
         hpx_printf(",\"%s\"", g_npu_event_names[e] ? g_npu_event_names[e] : "?");
     }
-    hpx_printf(",\"overflow\"\n");
+    hpx_printf(",\"NPU_DISPATCHED\",\"overflow\"\n");
     for (int i = 0; i < num_layers; i++) {
         hpx_npu_print_row_head(i);
         for (int e = 0; e < g_npu_num_events; e++) {
             hpx_printf(",%lu", (unsigned long)g_npu_acc[i][e]);
         }
-        hpx_printf(",%u\n", (unsigned)g_npu_ovf[i]);
+        hpx_printf(",%u,%u\n", (unsigned)g_npu_hit[i], (unsigned)g_npu_ovf[i]);
     }
 }

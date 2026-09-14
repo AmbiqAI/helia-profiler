@@ -1069,25 +1069,42 @@ class TestEthosURender:
         assert "ETHOSU_PMU_Set_CNTR_OVS(drv, mask);" in out
         # Hardware overflow read back and latched per layer.
         assert "ETHOSU_PMU_Get_CNTR_OVS(drv)" in out
+        # Multiple dispatches from one layer ACCUMULATE — the overflow check
+        # alone survives a mutant that drops the addition (#284 review).
+        assert "const uint32_t before = g_npu_acc[layer][i];" in out
+        assert "g_npu_acc[layer][i] = before + ETHOSU_PMU_Get_EVCNTR(drv, (uint32_t)i);" in out
         # Accumulation wrap across dispatches latched per layer.
         assert "g_npu_acc[layer][i] < before" in out
         # Emitted per row, and reset with the rest of the iteration state.
-        assert 'hpx_printf(",%u\\n", (unsigned)g_npu_ovf[i]);' in out
+        assert 'hpx_printf(",%u,%u\\n", (unsigned)g_npu_hit[i], (unsigned)g_npu_ovf[i]);' in out
         assert 'hpx_printf(",0\\n");' not in out
         assert "memset((void *)g_npu_ovf, 0, sizeof(g_npu_ovf));" in out
 
-    def test_ethos_npu_pass_uses_npu_csv(self):
+    def test_npu_pmu_reports_dispatch_per_layer(self):
+        """Layers the NPU never dispatched must be distinguishable from
+        layers that ran and counted zero — via the NPU_DISPATCHED column."""
         out = _render_tflm(has_ethos_u=True, pmu_passes=[_npu_pmu_pass()])
+        assert '",\\"NPU_DISPATCHED\\",\\"overflow\\"\\n"' in out
+        assert "g_npu_hit[layer] = 1U;" in out
+        assert "memset((void *)g_npu_hit, 0, sizeof(g_npu_hit));" in out
+
+    def test_ethos_npu_pass_uses_npu_csv(self):
+        # Render a CPU pass alongside the NPU pass so the per-pass toggle at
+        # pass setup is observable: NPU tracking must be enabled ONLY for the
+        # ethos_npu pass. A bare `"...(false);" in out` was satisfied by the
+        # unrelated end-of-passes disable in engine_profiled_summary (#284
+        # review: a mutant flipping the toggle survived).
+        out = _render_tflm(has_ethos_u=True, pmu_passes=_sample_pmu_passes() + [_npu_pmu_pass()])
         # Pass programs NPU events symbolically and prints via the NPU path.
         assert "ETHOSU_PMU_CYCLE, ETHOSU_PMU_NPU_ACTIVE" in out
         assert "hpx_npu_configure(" in out
-        assert "hpx_npu_set_enabled(true);" in out
-        assert "hpx_npu_set_enabled(false);" in out
+        assert out.count("hpx_npu_set_enabled(true);") == 1  # the NPU pass
+        # The CPU pass's setup disable + the end-of-passes disable.
+        assert out.count("hpx_npu_set_enabled(false);") == 2
         assert "hpx_npu_clear();" in out
         assert "hpx_npu_print_csv();" in out
         # ARM-side profiler records only layer ordinals for this pass.
         assert "g_profiler.InitCustom(nullptr, 0);" in out
-        assert "g_profiler.PrintCsv();" not in out
 
     def test_mixed_passes_branch_per_group(self):
         out = _render_tflm(
@@ -1149,16 +1166,18 @@ class TestEthosUAotRender:
         assert 'hpx_printf("%d,%s:%ld", i, aot_op_name(i), (long)aot_op_id(i));' in out
 
     def test_ethos_npu_pass_uses_npu_csv(self):
-        out = _render_aot(has_ethos_u=True, pmu_passes=[_npu_pmu_pass()])
+        # Mixed passes so the per-pass toggle is observable (see the TFLM
+        # twin above for why bare containment was a false positive).
+        out = _render_aot(has_ethos_u=True, pmu_passes=_sample_pmu_passes() + [_npu_pmu_pass()])
         assert "ETHOSU_PMU_CYCLE, ETHOSU_PMU_NPU_ACTIVE" in out
         assert "hpx_npu_configure(" in out
-        assert "hpx_npu_set_enabled(true);" in out
-        assert "hpx_npu_set_enabled(false);" in out
+        assert out.count("hpx_npu_set_enabled(true);") == 1  # the NPU pass
+        # The CPU pass's setup disable + the end-of-passes disable.
+        assert out.count("hpx_npu_set_enabled(false);") == 2
         assert "hpx_npu_clear();" in out
         assert "hpx_npu_print_csv();" in out
         # ARM-side profiler records only layer ordinals for this pass.
         assert "profiler_init_custom(nullptr, 0);" in out
-        assert "profiler_print_csv();" not in out
 
     def test_mixed_passes_branch_per_group(self):
         out = _render_aot(
