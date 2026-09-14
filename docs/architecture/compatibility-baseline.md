@@ -171,11 +171,12 @@ dimension (#193): the measured `run_metadata.engine.version` renders as an
 `dimension.engine_version_differs` warning when the two sides differ
 (absent for artifacts predating the dimension, and for tflm/executorch
 runs, which record no resolved version).
-The Ethos-U kernel support is outside what HPX consumes **today**; the
-in-flight atomiq110 work (PR #98) will opt into it via
-`NSX_HELIA_RT_ENABLE_ETHOSU` and requires a helia-rt newer than 1.17.0
-for the flag mapping. Minimum supported version stays 1.16.0 (HPX relies
-on nothing 1.17-only).
+HPX consumes the Ethos-U kernel support since the atomiq110 work (PR
+#284): the `ethos_u` engine backend opts in via
+`NSX_HELIA_RT_ENABLE_ETHOSU` on a heliaRT source build, which requires a
+helia-rt newer than 1.17.0 for the flag mapping. Minimum supported
+version stays 1.16.0 for the CPU backends (which rely on nothing
+1.17-only).
 
 neuralSPOT-X 0.8.0 added the `atomiq110_fpga_turbo` starter profile
 (retained in 0.8.1), and `nsx-ambiq-sdk` v5.2.25 adds the `nsx-npu` module

@@ -6,8 +6,13 @@
 # the Vela ethos-u op becomes a generated NPU kernel dispatching the embedded
 # command stream to the driver. Run from the repo root.
 #
-# The model MUST be Vela-compiled (contains ethos-u custom ops); hpx rejects
-# plain tflite models when engine.backend=ethos_u and vice versa. With the
+# The model MUST be Vela-compiled (contains ethos-u custom ops), and this
+# backend requires the `analysis` extra (ai-edge-litert; included in the
+# `aot` extra this engine already needs):
+#   uv sync --extra aot   (or: pip install 'helia-profiler[aot]')
+# With it installed, hpx rejects a plain tflite model when
+# engine.backend=ethos_u, and a Vela model on a non-NPU backend (that
+# reverse check is skipped without ai-edge-litert). With the
 # NPU backend, automatic placement keeps arena/weights in SRAM/MRAM; an
 # explicit tcm placement is honored.
 model:
