@@ -219,6 +219,9 @@ def _comparability(ctx: PipelineContext) -> dict[str, Any]:
         ComparisonDimension.ENGINE_VERSION: (
             ctx.run_metadata.engine.version if ctx.run_metadata.engine is not None else None
         ),
+        ComparisonDimension.ENGINE_BACKEND: (
+            ctx.run_metadata.engine.backend if ctx.run_metadata.engine is not None else None
+        ),
         ComparisonDimension.LINK_FAMILY: (platform.link_family if platform is not None else None),
         # Same derivation the reader runs on the published record, so the
         # manifest cannot disagree with the artifact it summarizes.
