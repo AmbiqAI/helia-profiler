@@ -129,12 +129,16 @@ def _write_summary(
     # Model analysis — MACs, OPS, TOPS
     if ctx.model_analysis is not None:
         ma = ctx.model_analysis
+        # Vela ethos-u custom ops are opaque to the analyzer: their MACs,
+        # ops, and folded weights are unknown, so publish null rather than
+        # a zero a reader would take as "does no work".
+        opaque = ma.has_ethos_u_op
         analysis_dict: dict[str, Any] = {
-            "total_macs": ma.total_macs,
-            "total_ops": ma.total_ops,
-            "num_parameters": ma.num_parameters,
+            "total_macs": None if opaque else ma.total_macs,
+            "total_ops": None if opaque else ma.total_ops,
+            "num_parameters": None if opaque else ma.num_parameters,
         }
-        if total_cycles > 0 and ma.total_ops > 0:
+        if not opaque and total_cycles > 0 and ma.total_ops > 0:
             analysis_dict["cycles_per_mac"] = (
                 round(total_cycles / ma.total_macs, 2) if ma.total_macs else None
             )
@@ -442,6 +446,10 @@ def _write_summary(
         if (
             probe_ran_inferences
             and infer_count is not None
+            # Opaque ethos-u ops make total_ops an unknown, not a zero —
+            # a TOPS figure derived from it would be fabricated.
+            and not ma.has_ethos_u_op
+            and ma.total_ops > 0
             and ps.avg_power_w
             and ps.avg_power_w > 0
             and ps.duration_s
