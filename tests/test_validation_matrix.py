@@ -64,8 +64,7 @@ class TestRegistry:
 
     def test_every_board_has_an_nsx_toolchain_contract(self):
         # Every validation board must resolve to a packaged NSX board module
-        # with a concrete toolchain declaration; otherwise the matrix has no
-        # contract to stay inside and nsx lock rejections would return.
+        # with a concrete toolchain declaration for the matrix to stay inside.
         for board_id in BOARDS:
             declared = nsx_declared_toolchains(board_id)
             assert declared is not None, board_id
@@ -74,8 +73,8 @@ class TestRegistry:
             assert Toolchain.ARM_NONE_EABI_GCC in toolchains, board_id
 
     def test_default_axis_stays_inside_the_nsx_toolchain_contract(self):
-        # helia-profiler#310: a default-axis case whose toolchain the NSX
-        # board module omits fails in nsx lock before any firmware is built.
+        # Every default-axis case must use a toolchain its NSX board module
+        # declares.
         for case in build_matrix():
             declared = nsx_declared_toolchains(case.board.id)
             assert declared is not None, case.board.id
@@ -305,9 +304,8 @@ class TestBuildMatrix:
         )
 
     def test_default_axis_drops_toolchains_the_nsx_board_module_omits(self):
-        # neuralspotx 0.8.1 declares only arm-none-eabi-gcc for
-        # apollo4l_blue_evb (helia-profiler#310): the board-default axis
-        # must not schedule atfe or armclang cases that nsx lock rejects.
+        # The packaged apollo4l_blue_evb module declares only
+        # arm-none-eabi-gcc, so the board-default axis is that one toolchain.
         cases = build_matrix(
             models=["kws"],
             engines=["helia-rt"],

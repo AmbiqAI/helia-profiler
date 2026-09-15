@@ -181,8 +181,8 @@ class TestBoardModuleCompatibility:
     """``board_module_compatibility`` reads the packaged NSX board module."""
 
     def test_reads_the_qualified_boards_toolchain_declaration(self) -> None:
-        # neuralspotx 0.8.1 declares only gcc for apollo4l_blue_evb
-        # (helia-profiler#310) and all three toolchains for apollo3p_evb.
+        # The canonical declarations the matrix keys on: gcc only for
+        # apollo4l_blue_evb, all three toolchains for apollo3p_evb.
         assert nsx.board_module_compatibility("apollo4l_blue_evb") == (
             "nsx-board-apollo4l-blue-evb",
             ("arm-none-eabi-gcc",),

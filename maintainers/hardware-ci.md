@@ -253,9 +253,11 @@ only that axis.
   `ns-cmsis-nn-revision.txt` with the validation artifacts, and the resolved
   commit is passed as `--ns-cmsis-nn-ref`.
 - `toolchains`: optional comma-separated toolchains such as
-  `arm-none-eabi-gcc,armclang,atfe`. Empty stays inside what the qualified
-  neuralspotx board module declares for each board (`nsx lock` refuses the
-  rest); an explicit toolchain outside that declaration runs as a named skip
+  `arm-none-eabi-gcc,armclang,atfe`. Empty takes the suite's preset
+  (`arm-none-eabi-gcc` for `smoke`, `arm-none-eabi-gcc,atfe` for the
+  others), which counts as an explicit request: a preset toolchain the
+  board's neuralspotx module does not declare is enumerated and recorded as
+  a skip naming the module, not as a failure
 - `atfe_root`: optional ATfE install directory; when empty, the workflow uses
   a GitHub variable named `ATFE_ROOT` if present and otherwise leaves the
   runner's existing environment untouched

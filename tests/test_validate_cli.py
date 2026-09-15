@@ -39,9 +39,9 @@ class TestValidateList:
         assert "ad" in proc.stdout
 
     def test_list_names_the_skip_for_an_undeclared_toolchain(self):
-        # neuralspotx 0.8.1 declares only gcc for apollo4l_blue_evb
-        # (helia-profiler#310): the explicit atfe request is listed with the
-        # reason the harness will record, and the gcc case carries no note.
+        # An explicitly requested toolchain the board module omits is listed
+        # with the reason the harness will record; the declared one carries
+        # no note.
         proc = _run_hpx(
             "validate",
             "--list",

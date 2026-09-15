@@ -179,16 +179,10 @@ def _nsx_toolchain_name(toolchain: Toolchain) -> str:
 
 @functools.lru_cache(maxsize=None)
 def nsx_declared_toolchains(board_id: str) -> tuple[str, frozenset[Toolchain]] | None:
-    """Toolchains the qualified NSX board module accepts for *board_id*.
+    """Toolchains the packaged NSX board module declares for *board_id*.
 
-    ``BoardSpec.toolchains`` is what hpx can drive; the NSX board module's
-    ``compatibility.toolchains`` is what ``nsx lock`` will accept. A case
-    outside that declaration fails in ``build_firmware`` before anything is
-    compiled or flashed, so the matrix keeps its default axis inside it and
-    names the gap when a toolchain is requested explicitly. Returns
-    ``(module_name, toolchains)``, or *None* when the installed neuralspotx
-    declares no contract for the board (unknown board, wildcard, or no
-    packaged metadata) — then the selection is left untouched.
+    Returns ``(module_name, toolchains)``, or *None* when the module declares
+    no contract (unknown board, wildcard, or no packaged metadata).
     """
     declared = nsx_cli.board_module_compatibility(board_id)
     if declared is None:
@@ -648,11 +642,10 @@ def build_matrix(
         else:
             power_flags = [True]
         board_toolchains = _intersect_or_board_default(toolchain_filter, board.toolchains)
-        # On the board-default toolchain axis, stay inside what the qualified
-        # NSX board module declares: a toolchain it omits is refused by
-        # ``nsx lock`` before any firmware is built (helia-profiler#310).
-        # Explicit requests keep their cases so case_validity() records the
-        # named skip instead of silently enumerating nothing.
+        # The board-default toolchain axis stays inside the NSX board
+        # module's declaration. Explicit requests keep their cases so
+        # case_validity() records the named skip instead of silently
+        # enumerating nothing.
         declared = nsx_declared_toolchains(board_id)
         if toolchain_filter is None and declared is not None:
             board_toolchains = tuple(t for t in board_toolchains if t in declared[1])

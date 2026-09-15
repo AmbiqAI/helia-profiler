@@ -337,18 +337,12 @@ def registry_project(name: str) -> dict[str, Any] | None:
 
 
 def board_module_compatibility(board: str) -> tuple[str, tuple[str, ...]] | None:
-    """Return ``(module_name, toolchains)`` the packaged NSX board module declares.
+    """Return ``(module_name, toolchains)`` from the packaged NSX board module.
 
-    ``nsx lock`` refuses any target whose toolchain is missing from the board
-    module's ``compatibility.toolchains`` (``NSX_SKIP_COMPAT_CHECK`` aside), so
-    this is the toolchain contract hpx must stay inside for *board*. The
-    module is the one the board's starter profile names, read from the
-    neuralspotx install the compatibility baseline qualified — no network,
-    no git. A ``"*"`` entry means the module accepts every toolchain.
-
+    The module is the one *board*'s starter profile names; ``toolchains`` is
+    its ``compatibility.toolchains`` list, where ``"*"`` means any toolchain.
     Returns *None* when the board has no starter profile, the profile names
-    no board module, or the module's metadata is not packaged: callers then
-    have no contract to enforce and must leave their selection untouched.
+    no board module, or the module's metadata is not packaged.
     """
     from neuralspotx.metadata import load_yaml, registry_entry_for_module
     from neuralspotx.module_registry import packaged_module_metadata_path
