@@ -19,7 +19,7 @@ from helia_profiler.validation import (
     load_model_file,
     models_from_paths,
 )
-from helia_profiler.validation.matrix import MemoryProfile
+from helia_profiler.validation.matrix import MemoryProfile, nsx_declared_toolchains
 
 
 class TestRegistry:
@@ -61,6 +61,25 @@ class TestRegistry:
         assert "apollo4l_blue_evb" in BOARDS
         assert BOARDS["apollo4l_blue_evb"].jlink_device == "AMAP42KL-KBR"
         assert BOARDS["apollo4l_blue_evb"].has_psram is True
+
+    def test_every_board_has_an_nsx_toolchain_contract(self):
+        # Every validation board must resolve to a packaged NSX board module
+        # with a concrete toolchain declaration for the matrix to stay inside.
+        for board_id in BOARDS:
+            declared = nsx_declared_toolchains(board_id)
+            assert declared is not None, board_id
+            module_name, toolchains = declared
+            assert module_name.startswith("nsx-board-"), board_id
+            assert Toolchain.ARM_NONE_EABI_GCC in toolchains, board_id
+
+    def test_default_axis_stays_inside_the_nsx_toolchain_contract(self):
+        # Every default-axis case must use a toolchain its NSX board module
+        # declares.
+        for case in build_matrix():
+            declared = nsx_declared_toolchains(case.board.id)
+            assert declared is not None, case.board.id
+            module_name, toolchains = declared
+            assert case.toolchain in toolchains, (case.case_id, module_name)
 
     def test_engines_include_tflm_cmsis_nn_baseline(self):
         assert set(ENGINES) == {
@@ -154,45 +173,47 @@ class TestBuildMatrix:
     def test_full_matrix_default(self):
         cases = build_matrix()
         # Power is intentionally off by default for PR reliability validation:
-        # Existing engines contribute 3996 cases across the six boards (the
-        # Apollo510 Lite hides its PSRAM, see board.py).
+        # Existing engines contribute 3516 cases across the six boards (the
+        # Apollo510 Lite hides its PSRAM, see board.py; the qualified
+        # neuralspotx declares only gcc for apollo4l_blue_evb, so its default
+        # axis has one toolchain instead of three).
         # ExecuTorch adds 256 cases on each of the three Cortex-M55 boards: 4 models × 2
         # providers × {gcc, atfe} × 4 × 4 (armclang is excluded until validated
         # separately). PSRAM is omitted because the ExecuTorch adapter does not
         # support it.
-        assert len(cases) == 4764
+        assert len(cases) == 4284
 
     def test_power_on_keeps_executorch_unpowered(self):
         # ExecuTorch remains unpowered until its dedicated firmware implements
-        # the GPIO READY/GO/gate protocol, so power="on" flips only the 3996
+        # the GPIO READY/GO/gate protocol, so power="on" flips only the 3516
         # non-ExecuTorch cases and leaves the case count unchanged.
         cases = build_matrix(power="on")
-        assert len(cases) == 4764
-        assert sum(1 for case in cases if case.power) == 3996
+        assert len(cases) == 4284
+        assert sum(1 for case in cases if case.power) == 3516
 
     def test_power_both_adds_powered_variants(self):
         # "both" adds a powered variant for each powerable case:
-        # 4764 unpowered + 3996 powered.
+        # 4284 unpowered + 3516 powered.
         cases = build_matrix(power="both")
-        assert len(cases) == 8760
-        assert sum(1 for case in cases if case.power) == 3996
+        assert len(cases) == 7800
+        assert sum(1 for case in cases if case.power) == 3516
 
     def test_repeat_multiplies_matrix(self):
-        assert len(build_matrix(power="off", repeat=3)) == 14292
+        assert len(build_matrix(power="off", repeat=3)) == 12852
 
     def test_model_filter(self):
         cases = build_matrix(models=["kws"], power="off")
-        assert len(cases) == 1191
+        assert len(cases) == 1071
         assert {c.model.id for c in cases} == {"kws"}
 
     def test_engine_filter(self):
         cases = build_matrix(engines=["helia-aot"], power="off")
-        assert len(cases) == 1332
+        assert len(cases) == 1172
         assert all(c.engine is EngineType.HELIA_AOT for c in cases)
 
     def test_tflm_engine_filter(self):
         cases = build_matrix(engines=["tflm"], power="off")
-        assert len(cases) == 1332
+        assert len(cases) == 1172
         assert all(c.engine is EngineType.TFLM for c in cases)
 
     def test_executorch_expands_both_providers_for_all_models(self):
@@ -281,6 +302,59 @@ class TestBuildMatrix:
             boards=["apollo330mP_evb"],
             memories=["psram"],
         )
+
+    def test_default_axis_drops_toolchains_the_nsx_board_module_omits(self):
+        # The packaged apollo4l_blue_evb module declares only
+        # arm-none-eabi-gcc, so the board-default axis is that one toolchain.
+        cases = build_matrix(
+            models=["kws"],
+            engines=["helia-rt"],
+            boards=["apollo4l_blue_evb"],
+            transports=["rtt"],
+            memories=["auto"],
+        )
+        assert [case.toolchain for case in cases] == [Toolchain.ARM_NONE_EABI_GCC]
+        assert all(case_validity(case) is None for case in cases)
+
+    def test_explicit_undeclared_toolchain_enumerates_with_a_named_skip(self):
+        # An explicit request keeps the cases so the harness records the
+        # reason instead of silently selecting nothing.
+        cases = build_matrix(
+            models=["kws"],
+            engines=["helia-rt"],
+            boards=["apollo4l_blue_evb"],
+            toolchains=["atfe"],
+            transports=["rtt"],
+            memories=["auto"],
+        )
+        assert [case.toolchain for case in cases] == [Toolchain.ATFE]
+        assert case_validity(cases[0]) == (
+            "NSX board module nsx-board-apollo4l-blue-evb does not declare the atfe toolchain"
+        )
+
+    def test_no_nsx_contract_leaves_the_default_axis_alone(self, monkeypatch):
+        # Wildcard and unknown declarations mean "no contract": the board's own
+        # toolchain list stands, exactly as before the contract existed.
+        for declared in (None, ("nsx-board-fake", ("*",))):
+            monkeypatch.setattr(
+                "helia_profiler.validation.matrix.nsx_cli.board_module_compatibility",
+                lambda _board, declared=declared: declared,
+            )
+            nsx_declared_toolchains.cache_clear()
+            try:
+                cases = build_matrix(
+                    models=["kws"],
+                    engines=["helia-rt"],
+                    boards=["apollo4l_blue_evb"],
+                    transports=["rtt"],
+                    memories=["auto"],
+                )
+                assert {case.toolchain for case in cases} == set(
+                    BOARDS["apollo4l_blue_evb"].toolchains
+                )
+                assert all(case_validity(case) is None for case in cases)
+            finally:
+                nsx_declared_toolchains.cache_clear()
 
     def test_executorch_enumerates_gcc_and_atfe(self):
         cases = build_matrix(

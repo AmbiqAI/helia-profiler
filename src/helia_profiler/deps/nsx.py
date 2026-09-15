@@ -334,3 +334,40 @@ def registry_project(name: str) -> dict[str, Any] | None:
     if not isinstance(entry, dict):
         return None
     return dict(entry)
+
+
+def board_module_compatibility(board: str) -> tuple[str, tuple[str, ...]] | None:
+    """Return ``(module_name, toolchains)`` from the packaged NSX board module.
+
+    The module is the one *board*'s starter profile names; ``toolchains`` is
+    its ``compatibility.toolchains`` list, where ``"*"`` means any toolchain.
+    Returns *None* when the board has no starter profile, the profile names
+    no board module, or the module's metadata is not packaged.
+    """
+    from neuralspotx.metadata import load_yaml, registry_entry_for_module
+    from neuralspotx.module_registry import packaged_module_metadata_path
+
+    profile = starter_profile(board)
+    if profile is None:
+        return None
+    modules = profile.get("modules") or []
+    module_name = next(
+        (name for name in modules if isinstance(name, str) and name.startswith("nsx-board-")),
+        None,
+    )
+    if module_name is None:
+        return None
+    registry = load_registry()
+    try:
+        entry = registry_entry_for_module(registry, module_name)
+        metadata_path = packaged_module_metadata_path(module_name, entry, registry)
+        metadata = load_yaml(metadata_path)
+    except (KeyError, ValueError, OSError, NSXError):
+        return None
+    compatibility = metadata.get("compatibility")
+    if not isinstance(compatibility, dict):
+        return None
+    toolchains = compatibility.get("toolchains")
+    if not isinstance(toolchains, list) or not all(isinstance(t, str) for t in toolchains):
+        return None
+    return module_name, tuple(toolchains)

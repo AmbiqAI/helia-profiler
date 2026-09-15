@@ -175,3 +175,37 @@ class TestNsxSync:
         with patch("helia_profiler.deps.nsx.nsx_api.sync_app") as m:
             nsx.sync(tmp_path, frozen=True)
         assert m.call_args.kwargs["frozen"] is True
+
+
+class TestBoardModuleCompatibility:
+    """``board_module_compatibility`` reads the packaged NSX board module."""
+
+    def test_reads_the_qualified_boards_toolchain_declaration(self) -> None:
+        # The canonical declarations the matrix keys on: gcc only for
+        # apollo4l_blue_evb, all three toolchains for apollo3p_evb.
+        assert nsx.board_module_compatibility("apollo4l_blue_evb") == (
+            "nsx-board-apollo4l-blue-evb",
+            ("arm-none-eabi-gcc",),
+        )
+        declared = nsx.board_module_compatibility("apollo3p_evb")
+        assert declared is not None
+        assert declared[0] == "nsx-board-apollo3p-evb"
+        assert set(declared[1]) == {"arm-none-eabi-gcc", "armclang", "atfe"}
+
+    def test_follows_the_starter_profiles_module_name(self) -> None:
+        # The registry spells this module in lower case; deriving the name
+        # from the board ID would miss it.
+        declared = nsx.board_module_compatibility("apollo330mP_evb")
+        assert declared is not None
+        assert declared[0] == "nsx-board-apollo330mp-evb"
+        assert "atfe" in declared[1]
+
+    def test_unknown_board_has_no_contract(self) -> None:
+        assert nsx.board_module_compatibility("no_such_board") is None
+
+    def test_profile_without_a_board_module_has_no_contract(self) -> None:
+        with patch(
+            "helia_profiler.deps.nsx.starter_profile",
+            return_value={"modules": ["nsx-core", "nsx-tooling"]},
+        ):
+            assert nsx.board_module_compatibility("apollo510_evb") is None

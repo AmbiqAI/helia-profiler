@@ -38,6 +38,30 @@ class TestValidateList:
         assert "ic" in proc.stdout
         assert "ad" in proc.stdout
 
+    def test_list_names_the_skip_for_an_undeclared_toolchain(self):
+        # An explicitly requested toolchain the board module omits is listed
+        # with the reason the harness will record; the declared one carries
+        # no note.
+        proc = _run_hpx(
+            "validate",
+            "--list",
+            "--suite",
+            "smoke",
+            "--boards",
+            "apollo4l_blue_evb",
+            "--toolchains",
+            "gcc,atfe",
+            "--power",
+            "off",
+        )
+        assert proc.returncode == 0, proc.stderr
+        assert "2 case(s) would run" in proc.stdout
+        lines = {line.split()[0]: line for line in proc.stdout.splitlines() if "apollo4l" in line}
+        assert "skip:" not in lines["apollo4l_blue_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto"]
+        assert lines["apollo4l_blue_evb-kws-rt-ns-atfe-rtt-auto"].endswith(
+            "skip: NSX board module nsx-board-apollo4l-blue-evb does not declare the atfe toolchain"
+        )
+
     def test_list_engine_alias_aot(self):
         proc = _run_hpx("validate", "--list", "--engines", "aot", "--power", "off")
         assert proc.returncode == 0, proc.stderr

@@ -10,6 +10,20 @@ release pull requests from Conventional Commits.
 
 ### Reporting changes for existing users
 
+* **`hpx validate` keeps its default toolchain axis inside the qualified NSX
+  board module's declaration
+  ([#310](https://github.com/AmbiqAI/helia-profiler/issues/310)).** The
+  matrix used to schedule every toolchain hpx can drive for every board, and
+  `nsx lock` refused the ones the board module does not declare before any
+  firmware was built. With neuralspotx 0.8.1 that is `atfe` and `armclang`
+  on `apollo4l_blue_evb`. Without `--toolchains` or a suite, those cases no
+  longer appear for the board. A toolchain requested explicitly, which the
+  suite presets do (`complete` and the model suites select `gcc,atfe`), is
+  still enumerated and records a skip naming the module instead of a
+  failure, so the complete suite still lists 24 apollo4l cases: 12 run and 12
+  skip. `hpx validate --list` now prints that reason next to each case the
+  harness will skip.
+
 * **Gated power durations no longer inherit the Joulescope driver's clock fit
   ([#249](https://github.com/AmbiqAI/helia-profiler/issues/249)).** A gated
   window's duration was summed from each stat packet's `utc` span. `utc` is not
