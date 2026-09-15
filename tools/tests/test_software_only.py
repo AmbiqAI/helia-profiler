@@ -89,6 +89,19 @@ def test_children_and_grandchildren_inherit_guard(sandbox):
     assert not sandbox[1].exists()
 
 
+def test_child_uses_the_same_checkout(sandbox):
+    child = "import helia_profiler; print(helia_profiler.__file__)"
+    result = run_probe(
+        sandbox,
+        "import subprocess, sys\n"
+        f"p = subprocess.run([sys.executable, '-c', {child!r}], capture_output=True, text=True)\n"
+        "assert p.returncode == 0, p.stderr\nprint(p.stdout)\n",
+    )
+    assert result.returncode == 0, result.stderr
+    assert str(ROOT / "src" / "helia_profiler" / "__init__.py") in result.stdout
+    assert not sandbox[1].exists()
+
+
 @pytest.mark.parametrize("options", ["['-S']", "['-I']", "['-E']", "['-sS']"])
 def test_child_startup_bypasses_rejected(sandbox, options):
     result = run_probe(

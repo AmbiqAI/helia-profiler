@@ -82,7 +82,8 @@ def install() -> None:
     sys.meta_path.insert(0, DeviceImports())
     _serial_stub()
     previous = os.environ.get("PYTHONPATH", "")
-    os.environ["PYTHONPATH"] = os.pathsep.join(filter(None, (BOOTSTRAP, previous)))
+    source = str(Path(__file__).resolve().parents[2] / "src")
+    os.environ["PYTHONPATH"] = os.pathsep.join(filter(None, (BOOTSTRAP, source, previous)))
     os.environ["PYTHONSAFEPATH"] = "1"
     sys.addaudithook(_audit)
     sys.modules["_hpx_software_guard"] = sys.modules[__name__]
