@@ -388,8 +388,8 @@ def _run_case_inprocess(
     :class:`subprocess.CompletedProcess` so the caller can treat both
     branches uniformly.
     """
-    # Local import so a missing optional dep at import time of this
-    # module doesn't break subprocess-only users.
+    # Deliberate validation → CLI exception for opt-in HIL coverage/debugging
+    # (https://github.com/AmbiqAI/helia-profiler/issues/229); keep the import local.
     from helia_profiler.cli import main as cli_main
 
     argv = list(cmd[1:])  # drop "hpx"

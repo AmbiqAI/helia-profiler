@@ -58,7 +58,7 @@ _ENGINES = ["tflm", "helia-rt", "helia-aot", "executorch"]
 _ENGINE_SOCS: dict[str, list[str]] = {"executorch": ["apollo510"]}
 
 #: Engines that appear in the power_only and busy-loop matrices.  ExecuTorch is
-#: excluded from both: ``stages.preflight._check_transport_support`` rejects
+#: excluded from both: ``engines.preflight.check_profiling_support`` rejects
 #: engine.type=executorch with power.enabled (pinned by
 #: ``test_executorch_power_tripwire.py``), and the busy_loop clean-window probe
 #: exists only to gate an external power capture, so neither combination is

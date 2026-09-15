@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import zipfile
+from importlib.util import resolve_name
 from pathlib import Path
 
 
@@ -300,3 +301,102 @@ def test_modelcost_closure_is_sibling_only() -> None:
     outside. This is the wall a future shared package ships behind."""
     offenders = _closure_offenders("modelcost", {"modelcost"})
     assert not offenders, f"modelcost/ gained hpx imports: {offenders}"
+
+
+#: Domain helpers extracted from the stages in #238: they take configuration
+#: or explicit values and never see the pipeline (docs/architecture/pipeline.md
+#: "Preflight" and "Plan Memory").  Pinned per file because firmware/ as a
+#: whole still names PipelineContext under TYPE_CHECKING.
+_STAGE_FREE_DOMAIN_MODULES: tuple[tuple[str, str], ...] = (
+    ("engines", "preflight.py"),
+    ("engines", "model_validation.py"),
+    ("platform", "preflight.py"),
+    ("firmware", "memory_plan.py"),
+)
+
+
+def test_extracted_domain_helpers_never_import_the_pipeline() -> None:
+    """#238: the preflight and memory-planning helpers moved out of stages/
+    so they can be exercised without a ``PipelineContext``. Reaching back
+    into ``pipeline`` or ``stages`` (lazily or under TYPE_CHECKING) would
+    silently undo that extraction."""
+    offenders = {
+        f"{package}/{name}": hits
+        for package, name in _STAGE_FREE_DOMAIN_MODULES
+        if (
+            hits := [
+                target
+                for target in _hpx_import_targets(_SRC / package / name, module_level_only=False)
+                if _hpx_target_head(target, package) in {"pipeline", "stages"}
+            ]
+        )
+    }
+    assert not offenders, f"domain helpers reach back into the pipeline: {offenders}"
+
+
+def test_result_serde_source_dependencies_stay_small() -> None:
+    """Pin source imports, not the closure reached through eager parent initializers."""
+    path = _SRC / "results" / "serde.py"
+    assert _hpx_import_targets(path, module_level_only=False) == ["..errors.ReportError"]
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        if isinstance(node, ast.Import):
+            modules = [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom) and not node.level:
+            modules = [node.module or ""]
+        else:
+            continue
+        assert all(module.split(".")[0] in sys.stdlib_module_names for module in modules), (
+            f"results.serde gained a non-stdlib dependency: {modules}"
+        )
+
+
+def test_results_only_import_power_data_contracts() -> None:
+    """Result composition may name power data, never driver or registry operations."""
+    allowed = {
+        "helia_profiler.power.base.PowerResult",
+        "helia_profiler.power.metadata.ObservationMode",
+        "helia_profiler.power.metadata.PowerIntegrity",
+    }
+    offenders = []
+    for path in sorted((_SRC / "results").rglob("*.py")):
+        package = ".".join(("helia_profiler", *path.parent.relative_to(_SRC).parts))
+        for target in _hpx_import_targets(path, module_level_only=False):
+            absolute = resolve_name(target, package)
+            if (
+                absolute == "helia_profiler.power" or absolute.startswith("helia_profiler.power.")
+            ) and absolute not in allowed:
+                offenders.append(f"{path.relative_to(_SRC)}: {target}")
+    assert not offenders, f"results/ gained power implementation dependencies: {offenders}"
+
+
+def test_power_data_contracts_do_not_import_results() -> None:
+    """Power data owns its vocabulary independently of result composition."""
+    for name in ("base.py", "metadata.py"):
+        hits = [
+            target
+            for target in _hpx_import_targets(_SRC / "power" / name, module_level_only=False)
+            if _hpx_target_head(target, "power") == "results"
+        ]
+        assert not hits, f"power/{name} imports result composition: {hits}"
+
+
+def test_results_use_public_domain_owned_power_types() -> None:
+    """Public aliases and composed fields use one power-domain type identity."""
+    from typing import get_type_hints
+
+    import helia_profiler as hpx
+    from helia_profiler import power
+    from helia_profiler.power.base import PowerResult
+    from helia_profiler.power.metadata import ObservationMode, PowerIntegrity, PowerMetadata
+    from helia_profiler.results import PowerObservation
+    from helia_profiler.results import models
+
+    assert hpx.PowerResult is power.PowerResult is models.PowerResult is PowerResult
+    assert hpx.ObservationMode is power.ObservationMode is ObservationMode
+    assert hpx.PowerIntegrity is power.PowerIntegrity is PowerIntegrity
+    assert hpx.PowerMetadata is power.PowerMetadata is PowerMetadata
+    hints = get_type_hints(PowerObservation)
+    assert hints["result"] is PowerResult
+    assert hints["mode"] is ObservationMode
+    assert hints["integrity"] is PowerIntegrity
+    assert get_type_hints(PowerResult)["metadata"] is PowerMetadata

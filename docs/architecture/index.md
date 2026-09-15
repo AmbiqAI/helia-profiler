@@ -47,9 +47,10 @@ Compare engines by running `hpx profile` twice with different configs.
 
 ### 3. Typed stage boundaries
 
-Structured stage outputs use typed dataclasses from the `results/` package.
-The one exception is `LayerResult.counters: dict[str, float]` — PMU counter
-names are dynamic and can't be enumerated as fields.
+Structured stage outputs use typed dataclasses composed in the `results/`
+package. Domain-owned power records remain in `power/` (see the boundary
+decisions below). `LayerResult.counters: dict[str, float]` uses dynamic PMU
+counter names that can't be enumerated as fields.
 
 ### 4. Subprocess isolation
 
@@ -210,6 +211,47 @@ PipelineContext (mutable state bag)
 
 Each stage reads what it needs from the context, does its work, and writes
 its output back to the context. Stages never reach into other stages' internals.
+
+## Result and power boundaries
+
+Decisions for [#238](https://github.com/AmbiqAI/helia-profiler/issues/238):
+
+### Keep result serialization in `results.serde`
+
+Retain the result-specific parsing contract (known fields, unknown keys in
+`extra`, malformed documents raising `ReportError`) and shared digest/read/coercion
+helpers here; there is no concrete independent consumer justifying a shared wheel.
+Producers/readers may import `results.serde`; its own permitted source dependencies
+are only the standard library and `errors.ReportError`, never result models,
+config, orchestration, drivers, or reporting implementations.
+
+This is a **source boundary, not a runtime leaf**: Python initializes parents
+before submodules. Importing `helia_profiler.results.serde` executes the eager
+root and `results` initializers, reaching the result-model closure and broader
+public API. We retain that behavior, not introduce a package-wide lazy-init sweep.
+
+### Keep power measurement types in `power/`
+
+`power.base` owns `PowerResult`, sample/summary/window records, and `PowerDriver`;
+`power.metadata` owns `PowerMetadata`, `ObservationMode`, and `PowerIntegrity`.
+Results compose these domain types; drivers and capture orchestration consume
+them. `PowerResult` is frozen; its metadata is deliberately enriched during capture.
+Existing root and `power` re-exports retain the same type identities.
+
+Permitted direct `results/` → `power/` imports are `power.base.PowerResult` and
+`power.metadata.{ObservationMode, PowerIntegrity}`, never drivers, the driver
+protocol, or registry operations. Conversely, `power.base` and `power.metadata`
+must not import `results/`. Metadata retains its domain diagnostics and type-only
+target-lifecycle reference; that graph is not claimed as an extractable data leaf.
+
+**Extraction trigger:** an identified independent consumer needing these contracts
+without HPX runtime dependencies. Define error/schema compatibility, an explicit
+metadata/diagnostics boundary, and fresh-interpreter installed-package import tests.
+A smaller `power` data/protocol split is warranted if a consumer needs records
+independently of the driver contract; preserve public import aliases. Neither
+that split nor moving metadata into `results/` alone removes parent initialization
+or the diagnostics graph. Current tests pin source directions and type identity,
+not an isolated runtime closure.
 
 ## Next
 

@@ -104,7 +104,7 @@ TFLM_ABSENT_BETA = 0.0
 def _read_aot_absent_beta() -> float:
     """Live-read helia-aot's beta default, degrading to 1.0 on ANY failure.
 
-    This runs at import time of a module that stages/preflight.py pulls in
+    This runs at import time of a module that engines/model_validation.py pulls in
     for every engine, so a helia-aot bump that makes the field required or
     renames it must not turn into "hpx won't start" — it degrades here and
     fails LOUDLY in analysis-tests instead, where the aot-guarded pinning

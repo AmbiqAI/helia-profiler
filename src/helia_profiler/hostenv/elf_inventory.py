@@ -15,6 +15,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from ._proc import run_text
 from .toolchains import get_toolchain_spec, resolve_toolchain_executable
 
 log = logging.getLogger("hpx")
@@ -188,17 +189,9 @@ def _inventory_via_readelf(
 ) -> tuple[tuple[ElfSection, ...], int] | None:
     """(sections, unparsed_row_count), or None when the tool failed."""
     try:
-        result = subprocess.run(
+        result = run_text(
             [readelf_cmd, "-S", "-W", str(binary_path)],
-            capture_output=True,
-            text=True,
-            # Section names are arbitrary bytes; the platform default codec
-            # (cp1252 on Windows) can RAISE mid-decode, escaping the
-            # degrade-to-None contract. Decode deterministically, replace
-            # the undecodable (#176 fresh-review).
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout_s,
+            timeout_s=timeout_s,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
         log.debug("readelf inventory probe failed: %s", exc)
@@ -247,13 +240,9 @@ def _segments_via_readelf(
     inventory (load-image accounting) but their absence must not discard
     it."""
     try:
-        result = subprocess.run(
+        result = run_text(
             [readelf_cmd, "-l", "-W", str(binary_path)],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout_s,
+            timeout_s=timeout_s,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
         log.debug("readelf segment probe failed: %s", exc)
@@ -390,13 +379,9 @@ def section_inventory(
     spec = get_toolchain_spec(toolchain)
     if spec.section_probe == "fromelf":
         try:
-            result = subprocess.run(
+            result = run_text(
                 ["fromelf", "--text", "-v", str(binary_path)],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=timeout_s,
+                timeout_s=timeout_s,
             )
         except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
             log.debug("fromelf inventory probe failed: %s", exc)
@@ -483,13 +468,9 @@ def symbol_inventory(
     """
     nm = _nm_command(toolchain)
     try:
-        result = subprocess.run(
+        result = run_text(
             [nm, "-S", "--size-sort", str(binary_path)],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout_s,
+            timeout_s=timeout_s,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
         log.debug("nm symbol inventory probe failed: %s", exc)
