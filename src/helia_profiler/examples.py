@@ -25,6 +25,14 @@ def tiny_cnn() -> Path:
     return _materialize_model("tiny-cnn")
 
 
+def ambiq_vela_ini() -> Path:
+    """Materialize the packaged Ambiq Vela system configuration (.ini)."""
+    data = resources.files("helia_profiler").joinpath("data", "vela", "ambiq_vela.ini").read_bytes()
+    digest = hashlib.sha256(data).hexdigest()
+    destination = _cache_root().parent / "vela" / digest[:12] / "ambiq_vela.ini"
+    return _write_if_missing(destination, data, digest)
+
+
 def _materialize_model(name: str) -> Path:
     filename, manifest_name = _MODELS[name]
     package_root = resources.files("helia_profiler").joinpath("data", "models")
@@ -39,10 +47,11 @@ def _materialize_model(name: str) -> Path:
         )
 
     destination = _cache_root() / name / expected_digest[:12] / filename
-    if (
-        destination.is_file()
-        and hashlib.sha256(destination.read_bytes()).hexdigest() == expected_digest
-    ):
+    return _write_if_missing(destination, data, expected_digest)
+
+
+def _write_if_missing(destination: Path, data: bytes, digest: str) -> Path:
+    if destination.is_file() and hashlib.sha256(destination.read_bytes()).hexdigest() == digest:
         return destination
 
     destination.parent.mkdir(parents=True, exist_ok=True)
