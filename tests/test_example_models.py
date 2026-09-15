@@ -74,3 +74,40 @@ def test_example_model_has_fixed_batch_size_one() -> None:
     for detail in (*interpreter.get_input_details(), *interpreter.get_output_details()):
         assert detail["shape"][0] == 1
         assert detail["shape_signature"][0] == 1
+
+
+def test_ambiq_vela_ini_materializes_and_parses(tmp_path: Path, monkeypatch) -> None:
+    import configparser
+
+    monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path))
+
+    path = hpx.examples.ambiq_vela_ini()
+
+    assert path.is_file()
+    assert hpx.examples.ambiq_vela_ini() == path
+    parser = configparser.ConfigParser()
+    assert parser.read(path)
+    for section in (
+        "System_Config.Ambiq_ULP_SRAM",
+        "System_Config.Ambiq_LP_SRAM",
+        "System_Config.Ambiq_HP_SRAM",
+        "Memory_Mode.Sram_Only",
+        "Memory_Mode.Shared_Sram",
+    ):
+        assert section in parser.sections()
+    # Every NPU clock tier runs against the fixed 250 MHz memory fabric.
+    for section in parser.sections():
+        if not section.startswith("System_Config."):
+            continue
+        cfg = parser[section]
+        fabric = float(cfg["core_clock"]) * float(cfg["Sram_clock_scale"])
+        assert fabric == 250e6
+
+
+def test_ambiq_vela_ini_quickstart_copy_matches_packaged() -> None:
+    packaged = Path(examples.__file__).parent / "data" / "vela" / "ambiq_vela.ini"
+    quickstart = (
+        Path(__file__).resolve().parent.parent / "examples" / "quickstart" / "ambiq_vela.ini"
+    )
+
+    assert quickstart.read_bytes() == packaged.read_bytes()
