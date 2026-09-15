@@ -72,6 +72,8 @@ def _audit(event: str, args: tuple) -> None:
     if event == "subprocess.Popen":
         if not _validated_launch.get():
             _check_child(*args)
+    elif event == "os.posix_spawn" and _validated_launch.get():
+        return
     elif event in {"os.system", "os.exec", "os.posix_spawn", "os.spawn", "os.startfile"}:
         raise SoftwareOnlyViolation(f"software-only: process escape blocked: {event}")
 

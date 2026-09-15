@@ -69,7 +69,8 @@ replay()
     assert sandbox[1].exists()
 
 
-def test_children_and_grandchildren_inherit_guard(sandbox):
+@pytest.mark.parametrize("close_fds", [True, False])
+def test_children_and_grandchildren_inherit_guard(sandbox, close_fds):
     inner = "import serial; serial.Serial()"
     child = (
         "import subprocess, sys; "
@@ -80,7 +81,8 @@ def test_children_and_grandchildren_inherit_guard(sandbox):
         sandbox,
         (
             "import subprocess, sys\n"
-            f"p = subprocess.run([sys.executable, '-c', {child!r}], capture_output=True, text=True)\n"
+            f"p = subprocess.run([sys.executable, '-c', {child!r}], "
+            f"close_fds={close_fds!r}, capture_output=True, text=True)\n"
             "assert p.returncode == 0, p.stderr\nprint(p.stdout)\n"
         ),
     )
@@ -134,6 +136,7 @@ def test_child_stripped_environment_rejected(sandbox):
         "subprocess.run(['a-command-that-must-never-start'])",
         "subprocess.run('a-command-that-must-never-start', shell=True)",
         "os.system('a-command-that-must-never-start')",
+        "sys.audit('os.posix_spawn', sys.executable, [sys.executable], {})",
         "os.execv(sys.executable, [sys.executable, '-c', 'import pylink'])",
     ],
 )
