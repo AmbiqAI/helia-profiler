@@ -13,7 +13,8 @@ from pathlib import Path
 
 DEVICE_MODULES = frozenset({"serial", "pylink", "pyjoulescope_driver", "joulescope", "usb"})
 BOOTSTRAP = str(Path(__file__).resolve().parent)
-_validated_launch = contextvars.ContextVar("hpx_validated_launch", default=False)
+SOURCE = str(Path(__file__).resolve().parents[2] / "src")
+_validated_launch = contextvars.ContextVar("hpx_validated_launch", default=None)
 _popen_signature = inspect.signature(subprocess.Popen)
 
 
@@ -62,7 +63,7 @@ def _check_child(executable, arguments, cwd, environment) -> None:
             break
         if arg not in {"-u", "-B"}:
             raise SoftwareOnlyViolation("software-only: unsupported Python startup option")
-    if env.get("PYTHONPATH", "").split(os.pathsep)[0] != BOOTSTRAP:
+    if env.get("PYTHONPATH", "").split(os.pathsep)[:2] != [BOOTSTRAP, SOURCE]:
         raise SoftwareOnlyViolation("software-only: child must inherit guarded PYTHONPATH")
     if env.get("PYTHONSAFEPATH") != "1":
         raise SoftwareOnlyViolation("software-only: child must inherit PYTHONSAFEPATH=1")
@@ -70,9 +71,9 @@ def _check_child(executable, arguments, cwd, environment) -> None:
 
 def _audit(event: str, args: tuple) -> None:
     if event == "subprocess.Popen":
-        if not _validated_launch.get():
+        if _validated_launch.get() != os.getpid():
             _check_child(*args)
-    elif event == "os.posix_spawn" and _validated_launch.get():
+    elif event == "os.posix_spawn" and _validated_launch.get() == os.getpid():
         return
     elif event in {"os.system", "os.exec", "os.posix_spawn", "os.spawn", "os.startfile"}:
         raise SoftwareOnlyViolation(f"software-only: process escape blocked: {event}")
@@ -86,8 +87,10 @@ class GuardedPopen(subprocess.Popen):
         argv = bound["args"]
         if bound.get("shell") or not isinstance(argv, (list, tuple)) or not argv:
             raise SoftwareOnlyViolation("software-only: shell/string command blocked")
+        if bound.get("preexec_fn") is not None:
+            raise SoftwareOnlyViolation("software-only: preexec_fn callback blocked")
         _check_child(bound.get("executable") or argv[0], argv, bound.get("cwd"), bound.get("env"))
-        token = _validated_launch.set(True)
+        token = _validated_launch.set(os.getpid())
         try:
             super().__init__(*args, **kwargs)
         finally:
@@ -98,16 +101,17 @@ def install() -> None:
     """Install before importing any project or device module; children inherit it."""
     if "_hpx_software_guard" in sys.modules:
         return
-    loaded = DEVICE_MODULES.intersection(name.split(".")[0] for name in sys.modules)
-    if loaded or "helia_profiler" in sys.modules:
+    loaded = (DEVICE_MODULES | {"helia_profiler"}).intersection(
+        name.split(".")[0] for name in sys.modules
+    )
+    if loaded:
         raise SoftwareOnlyViolation(
-            f"software-only: device modules already loaded: {sorted(loaded)}"
+            f"software-only: device or HPX modules already loaded: {sorted(loaded)}"
         )
     sys.meta_path.insert(0, DeviceImports())
     _serial_stub()
     previous = os.environ.get("PYTHONPATH", "")
-    source = str(Path(__file__).resolve().parents[2] / "src")
-    os.environ["PYTHONPATH"] = os.pathsep.join(filter(None, (BOOTSTRAP, source, previous)))
+    os.environ["PYTHONPATH"] = os.pathsep.join(filter(None, (BOOTSTRAP, SOURCE, previous)))
     os.environ["PYTHONSAFEPATH"] = "1"
     sys.addaudithook(_audit)
     subprocess.Popen = GuardedPopen

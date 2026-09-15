@@ -112,11 +112,12 @@ Callbacks copied after startup retain those inert operations even if a later
 monkeypatch changes the original module. Installation rejects already imported
 HPX/device modules. Selecting a pytest marker alone does not provide this guard.
 
-Python children must use `sys.executable` and inherit `PYTHONPATH` and
-`PYTHONSAFEPATH`; a `sitecustomize` hook guards children and grandchildren before
+Python children must use `sys.executable` and retain the launcher's bootstrap and
+checkout `src` prefix in `PYTHONPATH`, plus `PYTHONSAFEPATH=1`;
+a `sitecustomize` hook guards children and grandchildren before
 their scripts run. Stripped environments, startup flags that suppress the hook,
-shells and external commands are rejected. Mock external tool calls in these
-tests. Tests importing vendor helpers such as `pyjoulescope_driver.time64` also
+shells, `preexec_fn` callbacks and external commands are rejected. Mock external
+tool calls in these tests. Tests importing vendor helpers such as `pyjoulescope_driver.time64` also
 fail explicitly; this launcher is not a drop-in replacement for the whole suite.
 
 This is an accidental-access guard for trusted Python tests, not an OS sandbox:

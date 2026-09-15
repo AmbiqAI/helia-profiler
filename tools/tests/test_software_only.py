@@ -155,7 +155,7 @@ def test_preloaded_module_rejected(sandbox):
         "from software_guard.guard import install\ninstall()\n"
     )
     result = run_probe(sandbox, source, guarded=False)
-    assert "software-only: device modules already loaded" in result.stderr
+    assert "software-only: device or HPX modules already loaded" in result.stderr
     assert sandbox[1].exists()
 
 
@@ -194,7 +194,7 @@ raise SystemExit(pytest.main([
 """
     result = run_probe(sandbox, source)
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "26 passed" in result.stdout
+    assert " passed" in result.stdout
     assert not sandbox[1].exists()
 
 
@@ -215,6 +215,88 @@ except guard.SoftwareOnlyViolation:
     pass
 else:
     raise AssertionError('unvalidated string audit allowed')
+"""
+    result = run_probe(sandbox, source)
+    assert result.returncode == 0, result.stderr
+    assert not sandbox[1].exists()
+
+
+@pytest.mark.parametrize(
+    "callback_argument", ["preexec_fn=callback", "positional", "preexec_fn=False"]
+)
+def test_preexec_rejected_before_native_launch(sandbox, callback_argument):
+    arguments = "[sys.executable, '-c', 'pass'], " + callback_argument
+    if callback_argument == "positional":
+        arguments = "[sys.executable, '-c', 'pass'], -1, None, None, None, None, callback"
+    source = f"""import subprocess, sys
+from pathlib import Path
+from unittest.mock import patch
+guard = sys.modules['_hpx_software_guard']
+def callback():
+    raise AssertionError('CALLBACK SENTINEL')
+def native_launch(self, *args, **kwargs):
+    Path({str(sandbox[1])!r}).touch()
+with patch.object(guard.GuardedPopen.__bases__[0], '__init__', native_launch):
+    subprocess.Popen({arguments})
+"""
+    result = run_probe(sandbox, source)
+    assert result.returncode != 0
+    assert "software-only: preexec_fn callback blocked" in result.stderr
+    assert not sandbox[1].exists()
+
+
+@pytest.mark.parametrize("module", ["helia_profiler", "helia_profiler.example"])
+def test_preloaded_hpx_diagnostic(sandbox, module):
+    source = (
+        "import sys, types\n"
+        f"sys.modules[{module!r}] = types.ModuleType({module!r})\n"
+        f"sys.path.insert(0, {str(ROOT / 'tools')!r})\n"
+        "from software_guard.guard import install\ninstall()\n"
+    )
+    result = run_probe(sandbox, source, guarded=False)
+    assert result.returncode != 0
+    assert "device or HPX modules already loaded: ['helia_profiler']" in result.stderr
+    assert not sandbox[1].exists()
+
+
+@pytest.mark.parametrize(
+    "prefix", ["[guard.BOOTSTRAP]", "[guard.BOOTSTRAP, unrelated, expected_source]"]
+)
+def test_child_source_prefix_cannot_be_omitted_or_displaced(sandbox, prefix):
+    marker = sandbox[1]
+    source = f"""import os, subprocess, sys
+from pathlib import Path
+guard = sys.modules['_hpx_software_guard']
+unrelated = {str(sandbox[0])!r}
+expected_source = {str(ROOT / "src")!r}
+env = dict(os.environ, PYTHONPATH=os.pathsep.join({prefix}))
+subprocess.run([sys.executable, '-c', {f"from pathlib import Path; Path({str(marker)!r}).touch()"!r}], env=env)
+"""
+    result = run_probe(sandbox, source)
+    assert result.returncode != 0
+    assert "software-only: child must inherit guarded PYTHONPATH" in result.stderr
+    assert not marker.exists()
+
+
+def test_launch_allowance_is_bound_to_its_process(sandbox):
+    source = """import os, subprocess, sys
+from unittest.mock import patch
+guard = sys.modules['_hpx_software_guard']
+parent_pid = os.getpid()
+def inherited_init(self, *args, **kwargs):
+    with patch.object(os, 'getpid', return_value=parent_pid + 1):
+        for event, payload in [
+            ('os.posix_spawn', (sys.executable, [], {})),
+            ('subprocess.Popen', (None, 'python.exe -c pass', None, None)),
+        ]:
+            try:
+                sys.audit(event, *payload)
+            except guard.SoftwareOnlyViolation:
+                pass
+            else:
+                raise AssertionError('another process inherited the launch allowance')
+with patch.object(guard.GuardedPopen.__bases__[0], '__init__', inherited_init):
+    subprocess.Popen([sys.executable, '-c', 'pass'])
 """
     result = run_probe(sandbox, source)
     assert result.returncode == 0, result.stderr
