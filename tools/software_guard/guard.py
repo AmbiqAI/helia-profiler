@@ -3,13 +3,18 @@
 from __future__ import annotations
 
 import importlib.abc
+import contextvars
+import inspect
 import os
+import subprocess
 import sys
 import types
 from pathlib import Path
 
 DEVICE_MODULES = frozenset({"serial", "pylink", "pyjoulescope_driver", "joulescope", "usb"})
 BOOTSTRAP = str(Path(__file__).resolve().parent)
+_validated_launch = contextvars.ContextVar("hpx_validated_launch", default=False)
+_popen_signature = inspect.signature(subprocess.Popen)
 
 
 class SoftwareOnlyViolation(RuntimeError):
@@ -65,9 +70,26 @@ def _check_child(executable, arguments, cwd, environment) -> None:
 
 def _audit(event: str, args: tuple) -> None:
     if event == "subprocess.Popen":
-        _check_child(*args)
+        if not _validated_launch.get():
+            _check_child(*args)
     elif event in {"os.system", "os.exec", "os.posix_spawn", "os.spawn", "os.startfile"}:
         raise SoftwareOnlyViolation(f"software-only: process escape blocked: {event}")
+
+
+class GuardedPopen(subprocess.Popen):
+    """Validate argv before Windows converts it to a command-line string."""
+
+    def __init__(self, *args, **kwargs):
+        bound = _popen_signature.bind(*args, **kwargs).arguments
+        argv = bound["args"]
+        if bound.get("shell") or not isinstance(argv, (list, tuple)) or not argv:
+            raise SoftwareOnlyViolation("software-only: shell/string command blocked")
+        _check_child(bound.get("executable") or argv[0], argv, bound.get("cwd"), bound.get("env"))
+        token = _validated_launch.set(True)
+        try:
+            super().__init__(*args, **kwargs)
+        finally:
+            _validated_launch.reset(token)
 
 
 def install() -> None:
@@ -86,4 +108,5 @@ def install() -> None:
     os.environ["PYTHONPATH"] = os.pathsep.join(filter(None, (BOOTSTRAP, source, previous)))
     os.environ["PYTHONSAFEPATH"] = "1"
     sys.addaudithook(_audit)
+    subprocess.Popen = GuardedPopen
     sys.modules["_hpx_software_guard"] = sys.modules[__name__]

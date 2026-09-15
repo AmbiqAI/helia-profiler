@@ -193,3 +193,26 @@ raise SystemExit(pytest.main([
     assert result.returncode == 0, result.stdout + result.stderr
     assert "26 passed" in result.stdout
     assert not sandbox[1].exists()
+
+
+def test_windows_audit_conversion_is_allowed_only_inside_validated_launch(sandbox):
+    source = """import subprocess, sys
+from unittest.mock import patch
+guard = sys.modules['_hpx_software_guard']
+called = []
+def windows_init(self, *args, **kwargs):
+    sys.audit('subprocess.Popen', None, 'python.exe -c pass', None, None)
+    called.append(True)
+with patch.object(guard.GuardedPopen.__bases__[0], '__init__', windows_init):
+    subprocess.Popen([sys.executable, '-c', 'pass'])
+assert called == [True]
+try:
+    sys.audit('subprocess.Popen', None, 'python.exe -c pass', None, None)
+except guard.SoftwareOnlyViolation:
+    pass
+else:
+    raise AssertionError('unvalidated string audit allowed')
+"""
+    result = run_probe(sandbox, source)
+    assert result.returncode == 0, result.stderr
+    assert not sandbox[1].exists()
