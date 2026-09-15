@@ -98,7 +98,7 @@ jobs:
         run: uv sync --locked --group test
 
       - name: Run pytest
-        run: uv run --group test pytest tests/ -q
+        run: uv run --group test pytest tests/ tools/tests/ -q
 
   # ---------------------------------------------------------------
   # Analysis extra — the tests that need ai-edge-litert.

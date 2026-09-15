@@ -98,6 +98,44 @@ uv run --group docs zensical build
 runs with no board attached. Hardware cases run through `hpx validate` (or
 `pytest -m hardware`).
 
+For software-only capture tests or standalone review probes, install the device
+guard **before** importing HPX:
+
+```bash
+uv run python tools/software_only.py pytest tests/test_power_drivers.py -q
+uv run python tools/software_only.py python /path/to/probe.py
+```
+
+Standalone probes can import sibling helpers; the checkout `src` directory
+retains precedence over the probe directory.
+
+The launcher blocks Joulescope, J-Link and USB driver imports and provides inert
+serial constructors and port discovery that raise until replaced with fakes.
+Callbacks copied after startup retain those inert operations even if a later
+monkeypatch changes the original module. Installation rejects already imported
+HPX/device modules. Selecting a pytest marker alone does not provide this guard.
+
+Python children must use `sys.executable` and retain the launcher's bootstrap and
+checkout `src` prefix in `PYTHONPATH`, plus `PYTHONSAFEPATH=1`;
+a `sitecustomize` hook guards children and grandchildren before
+their scripts run. Stripped environments, startup flags that suppress the hook,
+shells, `preexec_fn` callbacks and external commands are rejected. Mock external
+tool calls in these tests. Tests importing vendor helpers such as `pyjoulescope_driver.time64` also
+fail explicitly; this launcher is not a drop-in replacement for the whole suite.
+
+This is an accidental-access guard for trusted Python tests, not an OS sandbox:
+trusted interpreter startup/site files are assumed, and direct native device I/O
+or deliberate removal of the guard is outside its boundary. Run hardware tests
+separately through the existing explicit hardware workflow with board ownership.
+The guard does not alter production capture behavior or claim hardware validation.
+
+The launcher's own tests run fresh interpreters against inert vendor sentinels,
+including unguarded negative controls; run them outside the launcher:
+
+```bash
+uv run pytest --confcutdir=tools/tests tools/tests/test_software_only.py -q
+```
+
 ### Pre-commit hooks
 
 One-time setup after cloning:
