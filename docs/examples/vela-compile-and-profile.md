@@ -42,9 +42,16 @@ Two inputs decide what Vela produces:
 - An Atomiq110 FPGA board (see the
   [Atomiq110 recipe](atomiq110-npu-profiling.md) for bitstream
   prerequisites) with a J-Link probe attached.
-- The `analysis` extra for HPX preflight validation:
-  `pip install 'helia-profiler[analysis]'` (already present when running
-  via `uv --directory <repo> run`).
+- The `analysis` extra — HPX preflight validates the model's Vela
+  accelerator config against the target NPU, which needs `ai-edge-litert`.
+  Install it explicitly:
+
+```bash
+# repo checkout (uv):
+uv --directory /path/to/helia-profiler sync --extra analysis
+# installed package (pip):
+pip install 'helia-profiler[analysis]'
+```
 
 Vela itself is **not** an HPX dependency — it is a model-preparation tool
 you run once per model. No permanent install is needed:
@@ -113,7 +120,7 @@ The checked-in profile config already points at a Vela-compiled KWS model;
 point it at your fresh output:
 
 ```bash
-uv --directory /path/to/helia-profiler run hpx profile \
+uv --directory /path/to/helia-profiler run --extra analysis hpx profile \
   ./vela_out/kws_model_vela.tflite \
   --config examples/quickstart/hpx_rt_npu_atomiq110.yml
 ```
