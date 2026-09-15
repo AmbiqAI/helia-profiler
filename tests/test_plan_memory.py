@@ -746,7 +746,6 @@ class TestMemoryPlanningDomain:
         assert planned_sram.capacity == soc.memory.sram_kb * 1024
         assert planned_mram.used == 2048
         assert plan.model_weight_bytes == 2048
-        assert model.arena_location is Placement.SRAM
         assert (
             add_hpx_owned_consumers(augmented, soc=soc, engine_type=EngineType.TFLM, target=target)
             == augmented

@@ -49,7 +49,8 @@ def check_model(path: Path, engine: EngineType) -> None:
     # bytes.  Anything else is either truncated, a different format, or a
     # Python pickle masquerading as a model.
     try:
-        head = path.read_bytes()[:16]
+        with path.open("rb") as handle:
+            head = handle.read(16)
     except OSError as exc:
         raise ConfigError(
             f"Cannot read model file: {path} ({exc})",

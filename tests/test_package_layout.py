@@ -303,6 +303,37 @@ def test_modelcost_closure_is_sibling_only() -> None:
     assert not offenders, f"modelcost/ gained hpx imports: {offenders}"
 
 
+#: Domain helpers extracted from the stages in #238: they take configuration
+#: or explicit values and never see the pipeline (docs/architecture/pipeline.md
+#: "Preflight" and "Plan Memory").  Pinned per file because firmware/ as a
+#: whole still names PipelineContext under TYPE_CHECKING.
+_STAGE_FREE_DOMAIN_MODULES: tuple[tuple[str, str], ...] = (
+    ("engines", "preflight.py"),
+    ("engines", "model_validation.py"),
+    ("platform", "preflight.py"),
+    ("firmware", "memory_plan.py"),
+)
+
+
+def test_extracted_domain_helpers_never_import_the_pipeline() -> None:
+    """#238: the preflight and memory-planning helpers moved out of stages/
+    so they can be exercised without a ``PipelineContext``. Reaching back
+    into ``pipeline`` or ``stages`` (lazily or under TYPE_CHECKING) would
+    silently undo that extraction."""
+    offenders = {
+        f"{package}/{name}": hits
+        for package, name in _STAGE_FREE_DOMAIN_MODULES
+        if (
+            hits := [
+                target
+                for target in _hpx_import_targets(_SRC / package / name, module_level_only=False)
+                if _hpx_target_head(target, package) in {"pipeline", "stages"}
+            ]
+        )
+    }
+    assert not offenders, f"domain helpers reach back into the pipeline: {offenders}"
+
+
 def test_result_serde_source_dependencies_stay_small() -> None:
     """Pin source imports, not the closure reached through eager parent initializers."""
     path = _SRC / "results" / "serde.py"

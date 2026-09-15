@@ -68,12 +68,12 @@ def check_profiling_support(
     engine: EngineType, *, power_enabled: bool, clean_window_probe: CleanWindowProbe
 ) -> None:
     """Reject profiling modes the selected engine cannot implement."""
-    if engine is EngineType.EXECUTORCH and power_enabled:
+    if engine == EngineType.EXECUTORCH and power_enabled:
         raise ConfigError(
             "ExecuTorch profiling does not yet support the dedicated power binary.",
             hint="Disable power capture; clean end-to-end cycle measurements are supported.",
         )
-    if engine is EngineType.EXECUTORCH and clean_window_probe is CleanWindowProbe.BUSY_LOOP:
+    if engine == EngineType.EXECUTORCH and clean_window_probe == CleanWindowProbe.BUSY_LOOP:
         # The busy_loop probe is a power-window diagnostic: it replaces the
         # model with a calibrated CPU spin so an external instrument has a
         # known-shape window to gate on, and reports HPX_CLEAN_INFER_COUNT=1

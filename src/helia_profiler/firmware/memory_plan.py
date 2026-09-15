@@ -11,6 +11,7 @@ from ..engines.base import EngineAdapter, EngineArtifacts, ExecutorchArtifacts
 from ..placement import MemoryRegion, Placement, resolve_fastest_fit_placement
 from ..platform import MemoryLayout, PmuTier, SocDef, SocFamily
 from ..results import ConsumerKind, MemoryConsumer, MemoryPlan, MemoryRegionUsage
+from .build import rtt_buffer_size_up
 
 log = logging.getLogger("hpx")
 
@@ -71,14 +72,8 @@ def _synthesise_plan(
     except OSError:
         model_bytes = 0
 
-    weight_phys = _LOGICAL_TO_PHYSICAL.get(
-        Placement(weights_region) if weights_region else Placement.MRAM,
-        MemoryRegion.MRAM,
-    )
-    arena_phys = _LOGICAL_TO_PHYSICAL.get(
-        Placement(arena_region) if arena_region else Placement.TCM,
-        MemoryRegion.DTCM,
-    )
+    weight_phys = _LOGICAL_TO_PHYSICAL[weights_region]
+    arena_phys = _LOGICAL_TO_PHYSICAL[arena_region]
 
     region_map: dict[MemoryRegion, list[MemoryConsumer]] = {}
 
@@ -422,8 +417,6 @@ def add_hpx_owned_consumers(
 
     transport = target.transport
     if transport == Transport.RTT:
-        from . import rtt_buffer_size_up
-
         up = rtt_buffer_size_up(
             target.toolchain,
             transport,
