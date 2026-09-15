@@ -104,11 +104,12 @@ def test_child_uses_the_same_checkout(sandbox):
 
 @pytest.mark.parametrize("options", ["['-S']", "['-I']", "['-E']", "['-sS']"])
 def test_child_startup_bypasses_rejected(sandbox, options):
+    child = f"from pathlib import Path; Path({str(sandbox[1])!r}).touch()"
     result = run_probe(
         sandbox,
         (
             "import subprocess, sys\n"
-            f"subprocess.run([sys.executable] + {options} + ['-c', 'import pylink'])\n"
+            f"subprocess.run([sys.executable] + {options} + ['-c', {child!r}])\n"
         ),
     )
     assert result.returncode != 0
@@ -117,12 +118,10 @@ def test_child_startup_bypasses_rejected(sandbox, options):
 
 
 def test_child_stripped_environment_rejected(sandbox):
+    child = f"from pathlib import Path; Path({str(sandbox[1])!r}).touch()"
     result = run_probe(
         sandbox,
-        (
-            "import subprocess, sys\n"
-            "subprocess.run([sys.executable, '-c', 'import pylink'], env={})\n"
-        ),
+        (f"import subprocess, sys\nsubprocess.run([sys.executable, '-c', {child!r}], env={{}})\n"),
     )
     assert result.returncode != 0
     assert "software-only: child must inherit" in result.stderr
