@@ -37,6 +37,46 @@ def run_probe(sandbox, source, *, guarded=True):
     )
 
 
+@pytest.mark.parametrize("relative", [False, True])
+def test_standalone_sibling_imports_preserve_checkout_and_guard(sandbox, relative):
+    directory, marker = sandbox
+    probes = directory / "standalone probes"
+    probes.mkdir()
+    (probes / "helper.py").write_text("VALUE = 42\n")
+    package = probes / "helpers"
+    package.mkdir()
+    (package / "__init__.py").write_text("VALUE = 43\n")
+    competing = probes / "helia_profiler"
+    competing.mkdir()
+    (competing / "__init__.py").write_text("raise AssertionError('wrong checkout')\n")
+    probe = probes / "probe.py"
+    probe.write_text(
+        "import helper, helpers, importlib.util\n"
+        "from pathlib import Path\n"
+        "assert helper.VALUE == 42\n"
+        "assert helpers.VALUE == 43\n"
+        f"assert Path(importlib.util.find_spec('helia_profiler').origin) == "
+        f"Path({str(ROOT / 'src' / 'helia_profiler' / '__init__.py')!r})\n"
+        "try:\n    import pylink\n"
+        "except RuntimeError as error:\n"
+        "    assert 'software-only: device import blocked' in str(error)\n"
+        "else:\n    raise AssertionError('vendor guard missing')\n"
+        "print('sibling helper and checkout verified')\n"
+    )
+    argument = probe.relative_to(directory) if relative else probe
+    result = subprocess.run(
+        [sys.executable, str(LAUNCHER), "python", str(argument)],
+        cwd=directory,
+        env=dict(os.environ, PYTHONPATH=str(directory), PYTHONSAFEPATH="1"),
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "sibling helper and checkout verified" in result.stdout
+    assert not marker.exists()
+
+
 @pytest.mark.parametrize("module", ["pylink", "pyjoulescope_driver", "joulescope", "usb"])
 def test_guard_precedes_vendor_import_and_negative_control(sandbox, module):
     source = f"import {module}\n"

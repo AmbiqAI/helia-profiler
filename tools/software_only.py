@@ -21,6 +21,7 @@ def main() -> None:
 
         raise SystemExit(pytest.main(arguments))
     sys.argv = arguments
+    sys.path.insert(1, str(Path(arguments[0]).resolve().parent))
     runpy.run_path(arguments[0], run_name="__main__")
 
 

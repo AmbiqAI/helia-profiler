@@ -106,6 +106,9 @@ uv run python tools/software_only.py pytest tests/test_power_drivers.py -q
 uv run python tools/software_only.py python /path/to/probe.py
 ```
 
+Standalone probes can import sibling helpers; the checkout `src` directory
+retains precedence over the probe directory.
+
 The launcher blocks Joulescope, J-Link and USB driver imports and provides inert
 serial constructors and port discovery that raise until replaced with fakes.
 Callbacks copied after startup retain those inert operations even if a later
