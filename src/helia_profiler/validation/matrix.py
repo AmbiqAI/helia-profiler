@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+import functools
 from pathlib import Path
 import re
 from typing import Any
@@ -19,7 +20,9 @@ from typing import Any
 import yaml
 
 from ..config import Toolchain, Transport
+from ..deps import nsx as nsx_cli
 from ..engines import EngineType
+from ..hostenv.toolchains import get_toolchain_spec
 from ..platform import SocFamily, get_soc_for_board
 
 # ---------------------------------------------------------------------------
@@ -169,9 +172,42 @@ class CaseSpec:
         return CmsisNNProvider.NS
 
 
+def _nsx_toolchain_name(toolchain: Toolchain) -> str:
+    """The name NSX uses for *toolchain* in ``nsx.yml`` and module metadata."""
+    return get_toolchain_spec(toolchain).nsx_name or Toolchain.ARM_NONE_EABI_GCC.value
+
+
+@functools.lru_cache(maxsize=None)
+def nsx_declared_toolchains(board_id: str) -> tuple[str, frozenset[Toolchain]] | None:
+    """Toolchains the qualified NSX board module accepts for *board_id*.
+
+    ``BoardSpec.toolchains`` is what hpx can drive; the NSX board module's
+    ``compatibility.toolchains`` is what ``nsx lock`` will accept. A case
+    outside that declaration fails in ``build_firmware`` before anything is
+    compiled or flashed, so the matrix keeps its default axis inside it and
+    names the gap when a toolchain is requested explicitly. Returns
+    ``(module_name, toolchains)``, or *None* when the installed neuralspotx
+    declares no contract for the board (unknown board, wildcard, or no
+    packaged metadata) — then the selection is left untouched.
+    """
+    declared = nsx_cli.board_module_compatibility(board_id)
+    if declared is None:
+        return None
+    module_name, names = declared
+    if "*" in names:
+        return None
+    return module_name, frozenset(t for t in Toolchain if _nsx_toolchain_name(t) in names)
+
+
 def case_validity(case: CaseSpec) -> str | None:
     """Return a skip reason if the case is a known-unsupported combination."""
     soc = get_soc_for_board(case.board.id)
+    declared = nsx_declared_toolchains(case.board.id)
+    if declared is not None and case.toolchain not in declared[1]:
+        return (
+            f"NSX board module {declared[0]} does not declare the "
+            f"{_nsx_toolchain_name(case.toolchain)} toolchain"
+        )
     if case.engine is EngineType.EXECUTORCH:
         if case.model.executorch is None:
             return "no ExecuTorch PTE contract is registered for this model"
@@ -612,6 +648,14 @@ def build_matrix(
         else:
             power_flags = [True]
         board_toolchains = _intersect_or_board_default(toolchain_filter, board.toolchains)
+        # On the board-default toolchain axis, stay inside what the qualified
+        # NSX board module declares: a toolchain it omits is refused by
+        # ``nsx lock`` before any firmware is built (helia-profiler#310).
+        # Explicit requests keep their cases so case_validity() records the
+        # named skip instead of silently enumerating nothing.
+        declared = nsx_declared_toolchains(board_id)
+        if toolchain_filter is None and declared is not None:
+            board_toolchains = tuple(t for t in board_toolchains if t in declared[1])
         board_transports = _intersect_or_board_default(transport_filter, board.transports)
         board_memories = _intersect_or_board_default(memory_filter, board.memories)
         soc = get_soc_for_board(board_id)

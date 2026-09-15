@@ -110,7 +110,11 @@ picture before re-running.
 
 Each axis is an independent comma-separated flag; unset axes fall back to
 board defaults (or, for `--suite`, the suite's preset defaults). Explicit
-flags always win over the suite preset:
+flags always win over the suite preset. The default toolchain axis is
+additionally limited to what the installed neuralspotx board module declares
+for the board (`nsx lock` refuses anything else); an explicitly requested
+toolchain outside that declaration is enumerated and skipped with the reason
+in the report, so `--list` shows the gap:
 
 ```bash
 hpx validate --models kws,ic --engines helia-rt --boards apollo510_evb \

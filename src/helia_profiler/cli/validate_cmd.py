@@ -44,7 +44,7 @@ def _cmd_validate(
     verbose: int = 0,
 ) -> None:
     """Drive the hardware validation suite via pytest."""
-    from ..validation import BOARDS
+    from ..validation import BOARDS, case_validity
     from ..validation.plan import resolve_plan
 
     try:
@@ -88,10 +88,15 @@ def _cmd_validate(
             power_flag = "power" if c.power else "     "
             engine = c.engine.value
             engine = f"{engine}/{c.cmsis_nn_provider.value}"
+            # A case the harness will skip is still listed — that is where
+            # an explicitly requested but unsupported axis value becomes
+            # visible — with the reason it will record.
+            reason = case_validity(c)
+            skip_note = f"  skip: {reason}" if reason else ""
             print(
                 f"  {c.case_id:<82}  {engine:<14}  "
                 f"{c.toolchain.value:<18}  {c.transport.value:<7}  {c.memory.value:<5}  "
-                f"{power_flag}"
+                f"{power_flag}{skip_note}"
             )
         return
 

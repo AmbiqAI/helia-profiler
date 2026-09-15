@@ -44,7 +44,7 @@ runner should also read
 | `--executorch-backends` | ExecuTorch CMSIS-NN providers: `arm`, `ns`, or `both` (default). TFLM always uses ARM CMSIS-NN; heliaRT and heliaAOT always use ns-cmsis-nn. |
 | `--ns-cmsis-nn-ref` | Exact ns-cmsis-nn commit/ref used by heliaRT, heliaAOT, and ExecuTorch/ns. |
 | `--boards` | Comma-separated board IDs (default: `apollo510_evb`). |
-| `--toolchains` | Comma-separated toolchains: `gcc`, `armclang`/`acfe`, `atfe` (default: board defaults). |
+| `--toolchains` | Comma-separated toolchains: `gcc`, `armclang`/`acfe`, `atfe` (default: board defaults, limited to what the qualified neuralspotx board module declares — a toolchain it omits is refused by `nsx lock`; requesting one explicitly enumerates the cases with a skip reason). |
 | `--interfaces`, `--transports` | Comma-separated transports: `rtt`, `uart`, `swo`, `usb_cdc` (default: board defaults). |
 | `--memories` | Comma-separated placement presets: `auto`, `tcm`, `sram`, `mram`, `psram` (default: board defaults). |
 | `--power` | Power matrix: `off` (default), `on` (only Joulescope runs), or `both`. |
