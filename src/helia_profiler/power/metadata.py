@@ -139,11 +139,11 @@ class PowerMetadata:
     window_clock_ceiling: WindowClockCeiling | None = None
     target_lifecycle: "TargetLifecyclePlan | None" = None
 
-    # -- Artifact-only diagnostics: written by capture, read by nothing in
-    # -- src/ except the report passthrough. Kept for wire stability.
+    # -- Artifact-only diagnostics, retained for wire stability.
     short_gate_pulse_diagnostics: dict[str, Any] | None = None
     whole_capture_summary: dict[str, Any] | None = None
     fullrate_xcheck: dict[str, Any] | None = None
+    #: Gate alignment and measured polling uncertainty used by clock agreement.
     gating_diagnostics: dict[str, Any] | None = None
     gated_vs_whole_current_ok: bool | None = None
 

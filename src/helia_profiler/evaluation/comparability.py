@@ -9,12 +9,15 @@ from ..results import (
     COMPARABILITY_REGISTRY,
     DIMENSION_DIFFERS,
     MEMORY_DIMENSION_MISMATCH,
+    METRIC_BLOCKING_CODE_BY_GROUP,
     POWER_DIMENSION_MISMATCH,
     ComparabilityCode,
     ComparabilitySeverity,
     ComparisonDimension,
     ResultValidity,
     RunStatus,
+    Severity,
+    error_metric_group,
 )
 from ..results.serde import nested_get
 from ..results.dimensions import DIMENSION_REGISTRY, ArtifactSource
@@ -24,6 +27,7 @@ from ..results.dimensions import DIMENSION_REGISTRY, ArtifactSource
 from ..results.issues import ComparabilityCodeFamily
 
 if TYPE_CHECKING:
+    from ..results import ResultManifest
     from .compare import RunArtifacts
 
 
@@ -87,6 +91,55 @@ def _issue(code: ComparabilityCode, message: str, **context: Any) -> Comparabili
     )
 
 
+def _invalid_result_issues(role: str, manifest: "ResultManifest") -> list[ComparabilityIssue]:
+    """Confine an invalid result to the metric families its errors broke.
+
+    An INVALID verdict used to block the whole comparison, which threw away
+    cycles, latency, memory and per-layer deltas that no failing check had
+    anything to say about — a power run whose gate disagreed with the firmware
+    clock produced no comparison at all, rather than one without power rows.
+
+    An error confined to a metric family says so in the registry
+    (``IssueSpec.metric_group``). When every error on the run is confined, and
+    every family named has a METRIC_BLOCKING code to express it, those codes
+    replace the blanket block. Anything else — an unconfined error, an
+    unrecognized code from a newer hpx, or a family with no code — falls back
+    to blocking everything, so the partial comparison is only ever reached
+    when it is provably safe.
+
+    The verdict itself is untouched: the run is still INVALID, ``--fail-on-
+    invalid`` still exits non-zero, and the console still shows the error.
+    """
+    errors = [issue for issue in manifest.issues if issue.severity == Severity.ERROR]
+    groups: list[str] = []
+    for issue in errors:
+        group = error_metric_group(issue.code)
+        if group is None or group not in METRIC_BLOCKING_CODE_BY_GROUP:
+            groups = []
+            break
+        if group not in groups:
+            groups.append(group)
+    if not groups:
+        return [
+            _issue(
+                ComparabilityCode.RESULT_INVALID,
+                f"The {role} result is invalid and cannot be compared.",
+                role=role,
+                run_id=manifest.run_id,
+            )
+        ]
+    return [
+        _issue(
+            METRIC_BLOCKING_CODE_BY_GROUP[group],
+            f"The {role} result is invalid for {group} metrics only; "
+            f"other metrics remain comparable.",
+            role=role,
+            run_id=manifest.run_id,
+        )
+        for group in groups
+    ]
+
+
 def _family_issue(
     family: ComparabilityCodeFamily,
     dimension: ComparisonDimension,
@@ -124,14 +177,7 @@ def assess_comparability(
                 )
             )
         if manifest is not None and manifest.validity is ResultValidity.INVALID:
-            issues.append(
-                _issue(
-                    ComparabilityCode.RESULT_INVALID,
-                    f"The {role} result is invalid and cannot be compared.",
-                    role=role,
-                    run_id=manifest.run_id,
-                )
-            )
+            issues.extend(_invalid_result_issues(role, manifest))
         elif manifest is None and run.summary.get("overflow_detected"):
             issues.append(
                 _issue(

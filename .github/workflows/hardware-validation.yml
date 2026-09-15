@@ -26,7 +26,7 @@ on:
       boards:
         description: "Comma-separated board IDs; each becomes one job on that board's runner"
         required: true
-        default: apollo510_evb,apollo330mP_evb,apollo3p_evb
+        default: apollo510_evb,apollo330mP_evb,apollo3p_evb,apollo4l_blue_evb
         type: string
       models:
         description: "Optional comma-separated model IDs; empty uses suite defaults"
@@ -110,13 +110,11 @@ env:
   # build.compiler_launcher auto-detect picks ccache up from PATH.
   CCACHE_MAXSIZE: 10G
   SEGGER_RTT_PATH: ${{ github.workspace }}/segger-rtt
-  HPX_NSX_EXECUTORCH_REF: 27eee513636821398f0bb5e92055526cac29b1ed
+  HPX_NSX_EXECUTORCH_REF: 5514ac1ea8439b3fe615d180bf68c75a9dabb48e
   # Scheduled runs have no workflow_dispatch inputs. Keep those runs aligned
   # with the manual defaults, except that nightly validation covers the full suite.
   HPX_VALIDATION_SUITE: ${{ inputs.suite || 'complete' }}
-  # apollo4l_blue_evb is registered but not nightly yet: its profiler firmware
-  # does not link (undefined SystemCoreClock); see the issue in maintainers/hardware-ci.md.
-  HPX_VALIDATION_BOARDS: ${{ inputs.boards || 'apollo510_evb,apollo330mP_evb,apollo3p_evb' }}
+  HPX_VALIDATION_BOARDS: ${{ inputs.boards || 'apollo510_evb,apollo330mP_evb,apollo3p_evb,apollo4l_blue_evb' }}
   HPX_VALIDATION_MODELS: ${{ inputs.models || '' }}
   HPX_VALIDATION_ENGINES: ${{ inputs.engines || '' }}
   HPX_VALIDATION_EXECUTORCH_BACKENDS: ${{ inputs.executorch_backends || 'ns' }}
@@ -176,6 +174,13 @@ jobs:
           fi
           if [[ "${HPX_BOARD}" != "${HPX_VALIDATION_BOARD}" ]]; then
             echo "::error::runner owns board '${HPX_BOARD}' but this job targets '${HPX_VALIDATION_BOARD}'; check the runner's labels" >&2
+            exit 2
+          fi
+          # The provenance steps below build JSON with jq. The runner service
+          # exposes only the contract's package set on PATH, so a bench built
+          # without jq must fail here, not minutes later inside a job.
+          if ! command -v jq > /dev/null; then
+            echo "::error::runner has no jq on PATH; it is not configured per the runner contract" >&2
             exit 2
           fi
 
@@ -407,7 +412,14 @@ jobs:
           if [[ -n "${HPX_VALIDATION_POWER_SERIALS}" ]]; then
             args+=(--power-serials "${HPX_VALIDATION_POWER_SERIALS}")
           fi
-          uv run hpx validate "${args[@]}"
+          preview="$(uv run hpx validate "${args[@]}")"
+          printf '%s\n' "${preview}"
+          # A selection that matches nothing used to pass silently: no
+          # bundle, green job, and nothing for the dashboard to show.
+          if [[ "${preview}" == *"0 case(s) would run"* ]]; then
+            echo "::error::the requested suite, boards, and axes select no validation cases on ${HPX_VALIDATION_BOARD}" >&2
+            exit 2
+          fi
 
       - name: Run hardware validation
         run: |
@@ -462,12 +474,15 @@ jobs:
         run: uv run pytest -m compile_hw tests/contracts/test_render_compile_hw.py -rs -W default
 
       # One artifact per board. Consumers group a run's artifacts by the
-      # GitHub run ID recorded in each validation_manifest.json.
+      # GitHub run ID recorded in each validation_manifest.json. The upload
+      # runs on failure too, so "re-run failed jobs" meets an artifact of the
+      # same name from the first attempt: overwrite it rather than fail.
       - name: Upload validation artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: hardware-validation-${{ github.run_id }}-${{ matrix.board }}
+          overwrite: true
           path: |
             results/validation/
             !results/validation/**/work/**

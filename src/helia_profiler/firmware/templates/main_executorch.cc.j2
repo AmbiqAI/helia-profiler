@@ -248,11 +248,25 @@ static void print_layers(void) {
     hpx_printf(",\"overflow\"\n");
     for (int i = 0; i < g_num_layers; ++i) {
         const LayerRecord &record = g_layers[i];
-        hpx_printf("%d,%s:c%ldi%lu", i,
-                   record.event.kind == nsx::executorch::OperatorKind::kKernel
-                       ? "OPERATOR_CALL" : "DELEGATE_CALL",
-                   (long)record.event.chain_index,
-                   (unsigned long)record.event.instruction_index);
+        const nsx::executorch::OperatorEvent &event = record.event;
+        // Op label: what the instruction ran -- the serialized operator with
+        // its overload (`aten::add.out`, `cortex_m::quantized_conv2d.out`)
+        // or the delegate's backend id -- with the instruction kind as the
+        // fallback when the plan names nothing (#301).  The chain/instruction
+        // suffix keeps the identity unique when an operator repeats; it is
+        // never a tflite index, so host-side attribution leaves it alone.
+        const bool named = event.name != nullptr;
+        const char *label = named ? event.name
+            : (event.kind == nsx::executorch::OperatorKind::kKernel
+                   ? "OPERATOR_CALL" : "DELEGATE_CALL");
+        const char *overload =
+            (named && event.overload != nullptr && event.overload[0] != '\0')
+                ? event.overload : nullptr;
+        hpx_printf("%d,%s%s%s:c%ldi%lu", i, label,
+                   overload != nullptr ? "." : "",
+                   overload != nullptr ? overload : "",
+                   (long)event.chain_index,
+                   (unsigned long)event.instruction_index);
         for (int c = 0; c < g_num_counters; ++c) {
             hpx_printf(",%lu", (unsigned long)record.counters[c]);
         }

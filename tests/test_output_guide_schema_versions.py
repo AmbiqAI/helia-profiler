@@ -1,0 +1,60 @@
+"""The guide's current schema table and examples match the exported versions."""
+
+from __future__ import annotations
+
+import json
+import re
+from importlib.resources import files
+from pathlib import Path
+
+from helia_profiler.report.contracts import (
+    PROFILE_RESULTS_SCHEMA,
+    PROFILE_RESULTS_SCHEMA_VERSION,
+    RUN_METADATA_SCHEMA,
+    RUN_METADATA_SCHEMA_VERSION,
+    RUN_SUMMARY_SCHEMA,
+    RUN_SUMMARY_SCHEMA_VERSION,
+)
+
+DOCS_PATH = Path(__file__).resolve().parents[1] / "docs" / "guide" / "output.md"
+
+#: Every schema the guide's artifact table advertises, with its live version.
+ADVERTISED = (
+    (RUN_SUMMARY_SCHEMA, RUN_SUMMARY_SCHEMA_VERSION),
+    (RUN_METADATA_SCHEMA, RUN_METADATA_SCHEMA_VERSION),
+    (PROFILE_RESULTS_SCHEMA, PROFILE_RESULTS_SCHEMA_VERSION),
+)
+
+
+def test_the_artifact_table_advertises_the_live_schema_versions():
+    text = DOCS_PATH.read_text(encoding="utf-8")
+    for schema, version in ADVERTISED:
+        # The table cell reads: `hpx.run-summary` v5
+        found = re.findall(rf"`{re.escape(schema)}` v(\d+)", text)
+        assert found, f"{DOCS_PATH.name} never advertises {schema}"
+        assert found == [str(version)] * len(found), (
+            f"{DOCS_PATH.name} advertises {schema} v{found} but the contract is v{version}"
+        )
+
+
+def test_the_worked_summary_example_carries_the_live_version():
+    text = DOCS_PATH.read_text(encoding="utf-8")
+    # The example pairs the schema name with its version two lines apart; pin
+    # the pair rather than a bare `"schema_version": N`, which also appears in
+    # the run-metadata and profile-results examples.
+    block = re.search(
+        rf'"schema": "{re.escape(RUN_SUMMARY_SCHEMA)}",\s*\n\s*"schema_version": (\d+),',
+        text,
+    )
+    assert block is not None, f"{DOCS_PATH.name} has no worked {RUN_SUMMARY_SCHEMA} example"
+    assert int(block.group(1)) == RUN_SUMMARY_SCHEMA_VERSION
+
+
+def test_packaged_summary_schema_matches_the_emitted_version():
+    schema = json.loads(
+        files("helia_profiler")
+        .joinpath("data/run_summary.schema.v1.json")
+        .read_text(encoding="utf-8")
+    )
+    assert schema["properties"]["schema"] == {"const": RUN_SUMMARY_SCHEMA}
+    assert schema["properties"]["schema_version"] == {"const": RUN_SUMMARY_SCHEMA_VERSION}

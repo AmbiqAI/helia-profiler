@@ -49,6 +49,12 @@ hpx compare results/rt results/aot \
   --output-dir results/rt-vs-aot
 ```
 
+The `power.duration_s` comparison row reads `power.capture_duration_s` from
+`summary.json`. It is the duration of the power measurement identified by
+`power.measurement_scope`: the gated measurement for GPIO-gated runs, or the
+capture measurement for free-form runs. It does not use the host timing field
+`latency.capture_duration_s` or the separate whole-capture diagnostics.
+
 HPX verifies declared result-manifest paths, sizes, and SHA-256 digests before
 reading a bundle. It then applies typed comparability rules:
 

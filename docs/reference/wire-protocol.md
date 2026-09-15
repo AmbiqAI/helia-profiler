@@ -212,7 +212,7 @@ The per-layer rows between two iteration sentinels carry no `HPX_` token of thei
 - **tflm** — rows are `<index>,<tag>,<counters...>,<overflow>`; the tag is TFLM's per-op tag string (or `?`).
 - **helia-rt** — Identical to tflm — same template, same profiler class.
 - **helia-aot** — rows are `<index>,<OP_TYPE>:<op_id>,<counters...>,<overflow>`; the operator id disambiguates repeated op types.
-- **executorch** — rows are `<index>,OPERATOR_CALL|DELEGATE_CALL:c<chain>i<instr>,<counters...>,<overflow>`.
+- **executorch** — rows are `<index>,<operator>:c<chain>i<instr>,<counters...>,<overflow>`; the operator is the serialized ExecuTorch operator name with its overload (`aten::add.out`, `cortex_m::quantized_conv2d.out`) for kernel calls or the backend id for delegate calls, falling back to `OPERATOR_CALL`/`DELEGATE_CALL` when the plan names nothing; the chain/instruction suffix disambiguates repeated operators.
 
 ## Heartbeat phases
 

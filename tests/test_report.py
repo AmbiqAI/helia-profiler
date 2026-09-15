@@ -15,6 +15,7 @@ from helia_profiler.results import (
     PowerRunPlan,
     PowerTerminalRecord,
 )
+from helia_profiler.results.run_summary import RUN_SUMMARY_SCHEMA_VERSION
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.errors import ReportError
 from helia_profiler.power.base import GatedPowerWindow, PowerResult, PowerSummary
@@ -127,6 +128,82 @@ def test_metadata_to_dict_includes_runtime_versions():
     assert data["engine"] == {"type": "helia-aot", "version": "0.18.4"}
 
 
+@pytest.mark.parametrize(
+    ("counters", "expected_rate"),
+    [
+        ({"ARM_PMU_L1D_CACHE_RD": 100, "ARM_PMU_L1D_CACHE_MISS_RD": 20}, 80),
+        ({"ARM_PMU_L1D_CACHE": 100, "ARM_PMU_L1D_CACHE_REFILL": 30}, 70),
+        ({"ARM_PMU_L1D_CACHE_RD": 100, "ARM_PMU_L1D_CACHE_REFILL": 150}, None),
+        ({"ARM_PMU_L1D_CACHE": 100, "ARM_PMU_L1D_CACHE_MISS_RD": 20}, None),
+        ({"ARM_PMU_L1D_CACHE_RD": 100}, None),
+        ({"ARM_PMU_L1D_CACHE_MISS_RD": 20}, None),
+        (
+            {
+                "ARM_PMU_L1D_CACHE_RD": 10,
+                "ARM_PMU_L1D_CACHE": 100,
+                "ARM_PMU_L1D_CACHE_REFILL": 30,
+            },
+            70,
+        ),
+        (
+            {
+                "ARM_PMU_L1D_CACHE_RD": 100,
+                "ARM_PMU_L1D_CACHE_MISS_RD": 20,
+                "ARM_PMU_L1D_CACHE": 200,
+                "ARM_PMU_L1D_CACHE_REFILL": 60,
+            },
+            80,
+        ),
+        ({"ARM_PMU_L1D_CACHE_RD": 0, "ARM_PMU_L1D_CACHE_MISS_RD": 0}, None),
+        ({"ARM_PMU_L1D_CACHE_RD": -1, "ARM_PMU_L1D_CACHE_MISS_RD": 0}, None),
+        ({"ARM_PMU_L1D_CACHE_RD": 100, "ARM_PMU_L1D_CACHE_MISS_RD": -1}, None),
+        ({"ARM_PMU_L1D_CACHE_RD": 100, "ARM_PMU_L1D_CACHE_MISS_RD": 101}, None),
+        ({"ARM_PMU_L1D_CACHE_RD": float("inf"), "ARM_PMU_L1D_CACHE_MISS_RD": 0}, None),
+        ({"ARM_PMU_L1D_CACHE_RD": 100, "ARM_PMU_L1D_CACHE_MISS_RD": float("nan")}, None),
+    ],
+)
+def test_reports_use_matching_cache_counter_pairs(tmp_path, counters, expected_rate):
+    from helia_profiler.report.memory import _write_memory_breakdown
+
+    ctx = PipelineContext(
+        config=load_config(None, {"model": {"path": "test.tflite"}}),
+        work_dir=tmp_path,
+    )
+    set_profile_result(
+        ctx,
+        PmuResult(
+            meta=FirmwareMeta(),
+            layers=[LayerResult(id=0, op="CONV", counters=counters)],
+        ),
+    )
+    summary = json.loads(_write_summary(ctx, tmp_path).read_text())
+    memory = json.loads(_write_memory_breakdown(ctx, tmp_path).read_text())
+    for totals in (summary["cache"], memory["cache_totals"]):
+        assert set(totals) - {"l1d_hit_rate_pct"} == set(counters)
+        if expected_rate is None:
+            assert "l1d_hit_rate_pct" not in totals
+        else:
+            assert totals["l1d_hit_rate_pct"] == expected_rate
+
+
+def test_cache_rate_requires_the_same_layer_population():
+    from helia_profiler.report.memory import _cache_totals
+
+    layers = [
+        LayerResult(
+            id=0,
+            op="CONV",
+            counters={"ARM_PMU_L1D_CACHE_RD": 100, "ARM_PMU_L1D_CACHE_MISS_RD": 20},
+        ),
+        LayerResult(id=1, op="ADD", counters={"ARM_PMU_L1D_CACHE_RD": 100}),
+    ]
+    assert _cache_totals(layers) == {
+        "ARM_PMU_L1D_CACHE_RD": 200,
+        "ARM_PMU_L1D_CACHE_MISS_RD": 20,
+    }
+    assert _cache_totals([]) == {}
+
+
 def test_write_summary_surfaces_the_clean_window_self_check(tmp_path: Path):
     """The window-clock self-check must reach summary.json (#121).
 
@@ -236,9 +313,7 @@ def test_write_summary_includes_device_profiled_infer_latency(tmp_path: Path):
         "device_profiled_infer_avg_us": 8000,
     }
     assert summary["schema"] == "hpx.run-summary"
-    assert (
-        summary["schema_version"] == 4
-    )  # v2: #24 binary.bss; v3: #133 memory_regions; v4: #142/#181 gate verdict
+    assert summary["schema_version"] == RUN_SUMMARY_SCHEMA_VERSION
     assert summary["validity"] == "valid"
     assert summary["issues"] == []
 
@@ -441,7 +516,7 @@ def test_write_report_publishes_verifiable_manifest_last(tmp_path: Path):
     assert artifacts["summary.json"].role == "core"
     assert artifacts["summary.json"].name == "hpx.summary"
     assert artifacts["summary.json"].schema == "hpx.run-summary"
-    assert artifacts["summary.json"].schema_version == 4
+    assert artifacts["summary.json"].schema_version == RUN_SUMMARY_SCHEMA_VERSION
     assert artifacts["summary.json"].optional is False
     assert artifacts["profile_results.csv"].name == "hpx.profile-layers"
     assert artifacts["profile_results.csv"].schema is None

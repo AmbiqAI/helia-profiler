@@ -193,7 +193,7 @@ class TestPlanMemorySynthesise:
             "temporary_arena": 32768,
             "input_buffer": 110592,
             "output_buffer": 8,
-            "pmu_layer_records": 4096 * 32,
+            "pmu_layer_records": 4096 * 40,
         }
 
     def test_synth_plan_default_auto_places_both_in_tcm(self, tmp_path: Path):
@@ -506,7 +506,8 @@ class TestHpxOwnedConsumers:
             EngineType.TFLM: 24,
             EngineType.HELIA_RT: 24,
             EngineType.HELIA_AOT: 20,
-            EngineType.EXECUTORCH: 32,
+            # #301: OperatorEvent grew by two const char* (name, overload).
+            EngineType.EXECUTORCH: 40,
         }
 
     def test_records_planned_for_every_engine_with_true_sizes(self, tmp_path):

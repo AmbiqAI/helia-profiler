@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from .memory import (
-    _CACHE_COUNTERS,
+    _cache_totals,
     _serialise_memory_plan,
     _serialise_memory_reconciliation,
     _serialise_memory_regions,
@@ -122,19 +122,8 @@ def _write_summary(
             summary["binary"]["reserved"] = bs.reserved
 
     # Cache / memory counter totals (summed across all layers)
-    cache: dict[str, float] = {}
-    for layer in layers:
-        for cname in _CACHE_COUNTERS:
-            if cname in layer.counters:
-                cache[cname] = cache.get(cname, 0) + layer.counters[cname]
+    cache = _cache_totals(layers)
     if cache:
-        # Compute derived metrics
-        l1d_accesses = cache.get("ARM_PMU_L1D_CACHE_RD", cache.get("ARM_PMU_L1D_CACHE", 0))
-        l1d_misses = cache.get(
-            "ARM_PMU_L1D_CACHE_MISS_RD", cache.get("ARM_PMU_L1D_CACHE_REFILL", 0)
-        )
-        if l1d_accesses > 0:
-            cache["l1d_hit_rate_pct"] = round((1 - l1d_misses / l1d_accesses) * 100, 2)
         summary["cache"] = cache
 
     # Model analysis — MACs, OPS, TOPS
@@ -220,10 +209,19 @@ def _write_summary(
         # derivation families below would fabricate. Same predicate
         # collect_power_terminal and evaluation.validity ask (#125).
         probe_ran_inferences = probe_runs_inferences(ctx.config.profiling.clean_window_probe)
+        arbitration = evaluation.gate_arbitration
         if not probe_ran_inferences:
             summary["power"]["per_inference_metrics_omitted"] = (
                 f"clean_window_probe={ctx.config.profiling.clean_window_probe} runs no inferences"
             )
+        elif arbitration is not None and arbitration.suppress_per_inference:
+            # Name the gate verdict in the artifact, not only in the log.
+            # This field used to be written for the busy_loop probe alone, so
+            # a summary.json reader could see the per-inference figures
+            # missing with nothing to say which of the four verdicts withheld
+            # them. Written here rather than beside the suppression itself so
+            # the key lands in its model-declared position.
+            summary["power"]["per_inference_metrics_omitted"] = str(arbitration.suppression_reason)
         if measurement_scope == "gpio_gated_clean_window":
             if ctx.power_result.gated_windows:
                 gw = ctx.power_result.gated_windows[0]

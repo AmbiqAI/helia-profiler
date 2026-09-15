@@ -510,12 +510,10 @@ def _average_iterations(
         counters: dict[str, float] = {}
         for col in numeric_cols:
             clean: list[float] = []
-            raw: list[float] = []
             for it_idx, row in rows:
                 v = row.get(col)
                 if not isinstance(v, (int, float)):
                     continue
-                raw.append(float(v))
                 # uint32-wrap is an independent per-counter underflow, judged
                 # on the individual value rather than the whole row.
                 if v >= _UINT32_WRAP_THRESHOLD:
@@ -524,10 +522,6 @@ def _average_iterations(
                 if it_idx in frozen_iters:
                     continue
                 clean.append(float(v))
-            if not clean:
-                # Everything looked invalid — fall back to the raw samples
-                # rather than emitting an empty counter.
-                clean = raw
             if clean:
                 counters[col] = _aggregate(clean, aggregation)
 
@@ -550,7 +544,8 @@ def _average_iterations(
         log.warning(
             "Rejected %d uint32-wrap value(s) and %d frozen-zero sample row(s) "
             "before %s aggregation (likely debug-probe settling on the first "
-            "iterations; counters reflect the surviving samples).",
+            "iterations; counters reflect the surviving samples, and counters "
+            "without surviving samples are omitted).",
             total_wrap,
             total_frozen,
             aggregation,

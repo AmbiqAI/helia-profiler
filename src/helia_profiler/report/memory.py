@@ -2,21 +2,21 @@
 
 ``_serialise_memory_plan`` is shared by ``summary.py`` (embeds a condensed
 ``memory_plan`` block in ``summary.json``) and ``_write_memory_breakdown``
-below (the full ``detailed/memory.json`` report). Both also rely on
-``_CACHE_COUNTERS`` to aggregate cache/memory PMU counters, so this module
-owns that shared list rather than duplicating it.
+below (the full ``detailed/memory.json`` report). Both use ``_cache_totals``
+for cache/memory counters and matching-pair hit rates.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import math
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
-    from ..results import MeasuredMemoryRegions, MemoryPlan, MemoryReconciliation
+    from ..results import LayerResult, MeasuredMemoryRegions, MemoryPlan, MemoryReconciliation
     from ..hostenv.toolchain_probe import SymbolEntry
 
 log = logging.getLogger("hpx")
@@ -37,6 +37,33 @@ _CACHE_COUNTERS = (
     "ARM_PMU_BUS_ACCESS",
     "ARM_PMU_BUS_CYCLES",
 )
+
+
+def _cache_totals(layers: list[LayerResult]) -> dict[str, float]:
+    """Sum cache counters, deriving hit rate only from a complete matching pair."""
+    totals: dict[str, float] = {}
+    for layer in layers:
+        for name in _CACHE_COUNTERS:
+            if name in layer.counters:
+                totals[name] = totals.get(name, 0) + layer.counters[name]
+    for accesses, misses in (
+        ("ARM_PMU_L1D_CACHE_RD", "ARM_PMU_L1D_CACHE_MISS_RD"),
+        ("ARM_PMU_L1D_CACHE", "ARM_PMU_L1D_CACHE_REFILL"),
+    ):
+        if not layers or not all(
+            accesses in layer.counters and misses in layer.counters for layer in layers
+        ):
+            continue
+        access_count, miss_count = totals[accesses], totals[misses]
+        if (
+            math.isfinite(access_count)
+            and math.isfinite(miss_count)
+            and access_count > 0
+            and 0 <= miss_count <= access_count
+        ):
+            totals["l1d_hit_rate_pct"] = round((1 - miss_count / access_count) * 100, 2)
+            break
+    return totals
 
 
 def _serialise_memory_plan(plan: MemoryPlan) -> dict[str, Any]:
@@ -259,18 +286,8 @@ def _write_memory_breakdown(ctx: PipelineContext, detail_dir: Path) -> Path:
         data["per_layer_memory"] = per_layer
 
     # Aggregate cache totals
-    totals: dict[str, float] = {}
-    for layer in layers:
-        for cname in _CACHE_COUNTERS:
-            if cname in layer.counters:
-                totals[cname] = totals.get(cname, 0) + layer.counters[cname]
+    totals = _cache_totals(layers)
     if totals:
-        l1d_accesses = totals.get("ARM_PMU_L1D_CACHE_RD", totals.get("ARM_PMU_L1D_CACHE", 0))
-        l1d_misses = totals.get(
-            "ARM_PMU_L1D_CACHE_MISS_RD", totals.get("ARM_PMU_L1D_CACHE_REFILL", 0)
-        )
-        if l1d_accesses > 0:
-            totals["l1d_hit_rate_pct"] = round((1 - l1d_misses / l1d_accesses) * 100, 2)
         data["cache_totals"] = totals
 
     out_path = detail_dir / "memory.json"

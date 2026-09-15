@@ -400,6 +400,16 @@ def test_all_zero_counter_is_preserved():
     assert result.layers[0].cycles == 0
 
 
+def test_counter_without_surviving_samples_is_omitted(caplog):
+    for aggregation in Aggregation:
+        for values in (["4294967295", "4294967294"], ["0", "4294967295"]):
+            result = parse_firmware_output(_single_layer_iters(values), aggregation=aggregation)
+            assert result.layers[0].cycles is None
+            assert "ARM_PMU_CPU_CYCLES" not in result.layers[0].counters
+            assert result.presets["basic_cpu"].layers[0].cycles is None
+    assert "without surviving samples are omitted" in caplog.text
+
+
 def _multi_counter_iters(rows: list[tuple[str, str]]) -> list[str]:
     """One-layer stream with two counters (CPU_CYCLES, STALL) per iteration."""
     lines = ["--- HPX_START ---", "HPX_PRESETS=basic_cpu", "--- HPX_PRESET basic_cpu ---"]
@@ -436,6 +446,15 @@ def test_fully_frozen_row_is_dropped_across_all_counters():
     # iter0 (all-zero row) dropped: median(600000, 602000) and median(10, 12).
     assert layer.cycles == 601000
     assert layer.counters["ARM_PMU_STALL"] == 11
+
+
+def test_invalid_counter_does_not_discard_healthy_counter():
+    result = parse_firmware_output(
+        _multi_counter_iters([("0", "0"), ("600000", "4294967295"), ("602000", "4294967294")])
+    )
+    assert result.layers[0].cycles == 601000
+    assert "ARM_PMU_STALL" not in result.layers[0].counters
+    assert result.presets["basic_cpu"].iterations[1][0].counters["ARM_PMU_STALL"] == 4294967295
 
 
 # ---------------------------------------------------------------------------

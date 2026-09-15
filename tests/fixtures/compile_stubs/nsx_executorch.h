@@ -14,9 +14,12 @@ enum class OperatorKind {
 
 struct OperatorEvent {
     OperatorKind kind;
-    const char *name;
     int32_t chain_index;
     uint32_t instruction_index;
+    // Operator name + overload (kernel) or backend id (delegate); nullptr when
+    // the plan names nothing.  Mirrors nsx-executorch includes-api.
+    const char *name;
+    const char *overload;
 };
 
 struct ProfilingCallbacks {
