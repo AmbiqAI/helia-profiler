@@ -1,0 +1,45 @@
+# heliaPROFILER quickstart — Ethos-U85 NPU profiling on Atomiq110 FPGA (helia-rt)
+# EXPERIMENTAL: best-effort support; may change or be removed in a minor release.
+# FPGA timing, cycle, latency, power, and energy results do not represent silicon.
+# Profiles the checked-in Vela-compiled KWS model (micronet-m, ethos-u85-256)
+# on the NPU and samples the Ethos-U's own PMU (NPU cycles / MAC activity /
+# SRAM traffic) alongside the ARM PMU. Run from the repo root, or point
+# model.path at your own Vela-compiled model.
+#
+# The model MUST be Vela-compiled (contains ethos-u custom ops), and this
+# backend requires the `analysis` extra (ai-edge-litert):
+#   uv sync --extra analysis   (or: pip install 'helia-profiler[analysis]')
+# With it installed, hpx rejects a plain tflite model when
+# engine.backend=ethos_u, and a Vela model on a non-NPU backend (that
+# reverse check is skipped without the extra).
+model:
+  path: examples/quickstart/kws_model_vela.tflite
+  arena_size: 524288
+  arena_location: sram
+  weights_location: mram
+
+engine:
+  type: helia-rt
+  backend: ethos_u
+  config:
+    variant: release-with-logs
+
+target:
+  board: atomiq110_fpga_turbo
+  toolchain: arm-none-eabi-gcc
+  transport: rtt
+
+profiling:
+  pmu_counters:
+    cpu: default
+    ethos_npu: default
+  per_layer: true
+  iterations: 5
+  warmup: 2
+
+power:
+  enabled: false
+
+output:
+  format: csv
+  dir: ./results/atomiq110_npu

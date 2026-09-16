@@ -50,4 +50,5 @@ class PrepareEngineStage:
         ctx.run_metadata.engine = EngineInfo(
             type=engine_type.value,
             version=artifacts.resolved_version,
+            backend=artifacts.resolved_backend,
         )

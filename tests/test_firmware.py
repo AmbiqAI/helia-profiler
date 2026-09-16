@@ -151,6 +151,40 @@ def _fake_starter_profiles() -> dict[str, dict]:
                 "nsx-psram": {"project": unified_project},
             },
         },
+        "atomiq110_fpga_turbo": {
+            "modules": [
+                "nsx-ambiqsuite",
+                "nsx-ambiq-hal",
+                "nsx-ambiq-bsp",
+                "nsx-soc-hal",
+                "nsx-cmsis-startup",
+                "nsx-board-atomiq110-fpga-turbo",
+                "nsx-cmsis-core",
+                "nsx-core",
+                "nsx-pmu-armv8m",
+                "nsx-tooling",
+            ],
+            "project_overrides": {
+                unified_project: {
+                    "revision": "main",
+                    "metadata": "modules/nsx-ambiqsuite/nsx-module.yaml",
+                }
+            },
+            "module_overrides": {
+                "nsx-ambiqsuite": {"project": unified_project},
+                "nsx-ambiq-hal": {"project": unified_project},
+                "nsx-ambiq-bsp": {"project": unified_project},
+                "nsx-soc-hal": {"project": unified_project},
+                "nsx-cmsis-core": {"project": unified_project},
+                "nsx-cmsis-startup": {"project": unified_project},
+                "nsx-core": {"project": unified_project},
+                "nsx-npu": {"project": unified_project},
+                "nsx-gpio": {"project": unified_project},
+                "nsx-interrupt": {"project": unified_project},
+                "nsx-timer": {"project": unified_project},
+                "nsx-uart": {"project": unified_project},
+            },
+        },
     }
 
 
@@ -162,6 +196,7 @@ def fake_nsx_registry(monkeypatch: pytest.MonkeyPatch) -> None:
         "nsx-board-apollo510-evb": "neuralspotx",
         "nsx-board-apollo4p-evb": "neuralspotx",
         "nsx-board-apollo3p-evb": "neuralspotx",
+        "nsx-board-atomiq110-fpga-turbo": "neuralspotx",
         "nsx-pmu-armv8m": "nsx-pmu-armv8m",
     }
     projects = {
@@ -1220,6 +1255,7 @@ class TestGenerateApp:
         # M55 / Apollo5 family is gated to non-cached TCM (.bss default).
         assert "defined(AM_PART_APOLLO510)" in conf
         assert "defined(AM_PART_APOLLO330P)" in conf
+        assert "defined(AM_PART_ATOMIQ110)" in conf
         # Cacheless parts still relocate the buffers into shared SRAM.
         assert "#elif NSX_MEM__HAS_SRAM_BSS" in conf
         assert "#define SEGGER_RTT_SECTION NSX_MEM__SEC_SRAM_BSS" in conf
@@ -1825,8 +1861,41 @@ class TestNsxModuleOverrides:
 
         manifest = yaml.safe_load((app_dir / "nsx.yml").read_text())
         projects = manifest["module_registry"]["projects"]
-        assert projects["nsx-ambiq-sdk"]["revision"] == "a9f4ec25a162f6f3700623feb691423bb5a51132"
+        assert projects["nsx-ambiq-sdk"]["revision"] == "aefce2ca858795e783c76726ebe7d14d9d4bde7c"
         assert projects["neuralspotx"]["revision"] == "2dbe12a2799fd8c3df85f1a103b0adca340c901f"
+
+    def test_atomiq110_pins_nsx_core_and_npu_module_entries(self, tmp_path: Path, fake_dist: Path):
+        """The sdk baseline pin must reach the module_registry *module* entries.
+
+        NSX resolves a module-level registry revision ahead of the project
+        override, and the packaged registry holds nsx-core at a revision
+        whose nsx_mem.h has no AM_PART_ATOMIQ110 branch — an unpinned
+        nsx-core would silently no-op SRAM placement on this board.
+        """
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt", "config": {"dist_path": str(fake_dist)}},
+                "target": {"board": "atomiq110_fpga_turbo"},
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        work_dir = tmp_path / "work"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        ctx = PipelineContext(config=config, work_dir=work_dir)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        manifest = yaml.safe_load((app_dir / "nsx.yml").read_text())
+        registry = manifest["module_registry"]
+        sdk_ref = "aefce2ca858795e783c76726ebe7d14d9d4bde7c"
+        assert registry["projects"]["nsx-ambiq-sdk"]["revision"] == sdk_ref
+        assert registry["modules"]["nsx-core"]["revision"] == sdk_ref
+        assert registry["modules"]["nsx-npu"]["revision"] == sdk_ref
 
     def test_preview_board_defaults_to_preview_channel(self, tmp_path: Path, fake_dist: Path):
         model = tmp_path / "model.tflite"
@@ -2053,7 +2122,7 @@ class TestNsxModuleOverrides:
         registry = nsx_yml["module_registry"]
         assert (
             registry["projects"]["nsx-ambiq-sdk"]["revision"]
-            == "a9f4ec25a162f6f3700623feb691423bb5a51132"
+            == "aefce2ca858795e783c76726ebe7d14d9d4bde7c"
         )
         assert (
             registry["projects"]["neuralspotx"]["revision"]
@@ -2256,3 +2325,36 @@ print(json.dumps(list(overrides)))
     # Vacuity guard (#175): an empty resolver result would pass
     # the equality trivially while asserting nothing.
     assert len(json.loads(orders[0])) >= 2
+
+
+class TestResolveProjectOverrides:
+    """The baseline default ref applies uniformly; only explicit user
+    overrides outrank it (the starter-profile branch exception is gone)."""
+
+    @staticmethod
+    def _specs():
+        from helia_profiler.firmware.project import NsxModuleSpec
+
+        return [NsxModuleSpec("nsx-npu", "nsx-ambiq-sdk")]
+
+    @staticmethod
+    def _baseline():
+        from helia_profiler.deps.compatibility import load_compatibility_baseline
+
+        return load_compatibility_baseline()
+
+    def test_baseline_ref_applied(self):
+        from helia_profiler.firmware.project import _resolve_project_overrides
+
+        baseline = self._baseline()
+        overrides = _resolve_project_overrides(self._specs(), {}, baseline)
+        assert overrides["nsx-ambiq-sdk"] == ("ref", baseline.project("nsx-ambiq-sdk").ref)
+
+    def test_user_override_outranks_baseline(self):
+        from types import SimpleNamespace
+
+        from helia_profiler.firmware.project import _resolve_project_overrides
+
+        user = {"nsx-npu": SimpleNamespace(path=None, ref="my-branch", version=None)}
+        overrides = _resolve_project_overrides(self._specs(), user, self._baseline())
+        assert overrides["nsx-ambiq-sdk"] == ("ref", "my-branch")

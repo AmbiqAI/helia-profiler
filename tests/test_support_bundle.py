@@ -532,7 +532,7 @@ def test_collect_support_bundle_always_includes_checks_and_compatibility() -> No
     )
     assert (
         compatibility_payload["projects"]["nsx-ambiq-sdk"]["ref"]
-        == "a9f4ec25a162f6f3700623feb691423bb5a51132"
+        == "aefce2ca858795e783c76726ebe7d14d9d4bde7c"
     )
 
 

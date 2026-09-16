@@ -65,6 +65,16 @@ _ENGINE_SOCS: dict[str, list[str]] = {"executorch": ["apollo510"]}
 #: reachable from a supported configuration.
 _MATRIX_ENGINES = [e for e in _ENGINES if e != "executorch"]
 
+# Atomiq110 Ethos-U NPU matrix. The ethos_u-backend renders take template
+# branches no Apollo render reaches (_npu_init.j2 / _npu_pmu.j2 and the
+# ethos_npu PMU pass), so they get their own snapshot entries instead of
+# widening _SOCS: tflm cannot select the backend, executorch is
+# Apollo510-only, and usb_cdc is unavailable on atomiq110 (no nsx-ambiq-usb
+# support).
+_NPU_SOC = "atomiq110"
+_NPU_TRANSPORTS = ["rtt", "swo", "uart"]
+_NPU_ENGINES = ["helia-rt", "helia-aot"]
+
 
 def _socs_for(engine: str) -> list[str]:
     return _ENGINE_SOCS.get(engine, _SOCS)
@@ -147,6 +157,12 @@ _MARKERS: dict[str, str | tuple[str, ...]] = {
     # announce" from both profile shapes — reverting the busy arm to 0 flips
     # this marker rather than hiding in a sha256 change.
     "est_ms_hardcoded_zero": "est_ms=0\\n",
+    # Ethos-U NPU blocks — true only for the atomiq110 ethos_u-backend
+    # matrix. Keyed on the init CALL and the NPU pass's CSV print, so losing
+    # either the bring-up or the NPU PMU path flips a marker instead of
+    # hiding in sha256 drift.
+    "npu_init": "nsx_npu_init(",
+    "npu_pmu_pass": "hpx_npu_print_csv();",
 }
 
 
@@ -509,6 +525,46 @@ def _profile_busy_loop_combos() -> list[tuple[str, str, str]]:
     return [(soc, _BUSY_LOOP_TRANSPORT, engine) for soc in _SOCS for engine in _MATRIX_ENGINES]
 
 
+def _npu_pmu_pass() -> dict[str, object]:
+    """An ethos_npu pass, in the shape production emits (symbolic events)."""
+    return {
+        "name": "EthosNpu",
+        "custom": True,
+        "event_ids": ["0x0000", "0x0000", "0x0000", "0x0000"],
+        "counter_names": [
+            "ETHOSU_PMU_CYCLE",
+            "ETHOSU_PMU_NPU_ACTIVE",
+            "ETHOSU_PMU_MAC_ACTIVE",
+            "ETHOSU_PMU_SRAM_RD_DATA_BEAT_RECEIVED",
+        ],
+        "num_counters": 4,
+        "c_enum": None,
+        "group": "ethos_npu",
+    }
+
+
+def _npu_overrides() -> dict[str, object]:
+    """Render inputs for the atomiq110 ethos_u-backend matrix.
+
+    ``npu_tolerate_power_ack=True`` mirrors production: the only atomiq110
+    board is an FPGA (``board.is_fpga`` is the derivation, pinned by
+    tests/test_pipeline.py). A mixed CPU+NPU pass list exercises the per-pass
+    NPU enable/disable toggle, not just the NPU-only shape.
+    """
+    return {
+        "has_ethos_u": True,
+        "npu_tolerate_power_ack": True,
+        "pmu_passes": _sample_pmu_passes() + [_npu_pmu_pass()],
+        "pmu_pass_names": ["Cache", "EthosNpu"],
+    }
+
+
+def _npu_combos() -> list[tuple[str, str, str]]:
+    return [
+        (_NPU_SOC, transport, engine) for transport in _NPU_TRANSPORTS for engine in _NPU_ENGINES
+    ]
+
+
 def _key(
     soc: str,
     transport: str,
@@ -571,6 +627,14 @@ def _build_all() -> dict:
                 )
             )
             for soc, transport, engine in _profile_busy_loop_combos()
+        }
+    )
+    result.update(
+        {
+            _key(soc, transport, engine): _digest(
+                _render(soc, transport, engine, overrides=_npu_overrides())
+            )
+            for soc, transport, engine in _npu_combos()
         }
     )
     return result
@@ -713,6 +777,39 @@ def test_profile_busy_loop_render_matches_snapshot(soc, transport, engine):
     current = _digest(_render(soc, transport, engine, clean_window_probe=_POWER_BUSY_LOOP_PROBE))
     expected = _SNAPSHOTS[key]
 
+    assert current["markers"] == expected["markers"], (
+        f"[{key}] active feature blocks changed:\n"
+        f"  expected: {expected['markers']}\n"
+        f"  actual:   {current['markers']}\n{_REGEN_HINT}"
+    )
+    assert current["sha256"] == expected["sha256"], f"[{key}] render hash changed. {_REGEN_HINT}"
+
+
+@pytest.mark.parametrize(
+    "soc,transport,engine",
+    _npu_combos(),
+    ids=[_key(*c) for c in _npu_combos()],
+)
+def test_npu_render_matches_snapshot(soc, transport, engine):
+    """Atomiq110 ethos_u-backend renders (has_ethos_u=True).
+
+    These take template branches no Apollo render reaches — the NPU bring-up
+    (_npu_init.j2), the NPU PMU capture (_npu_pmu.j2) and its per-pass
+    enable/disable toggle — so without these entries the whole NPU surface of
+    main.cc.j2/main_aot.cc.j2 sat outside the reviewed snapshot layer.
+    """
+    assert _SNAPSHOTS, (
+        "no firmware render snapshot committed — generate it with HPX_UPDATE_SNAPSHOTS=1"
+    )
+    key = _key(soc, transport, engine)
+    assert key in _SNAPSHOTS, f"{key} missing from snapshot. {_REGEN_HINT}"
+
+    current = _digest(_render(soc, transport, engine, overrides=_npu_overrides()))
+    expected = _SNAPSHOTS[key]
+
+    assert current["markers"]["npu_init"] and current["markers"]["npu_pmu_pass"], (
+        f"[{key}] NPU feature blocks missing from an ethos_u-backend render"
+    )
     assert current["markers"] == expected["markers"], (
         f"[{key}] active feature blocks changed:\n"
         f"  expected: {expected['markers']}\n"
@@ -1487,6 +1584,7 @@ def test_snapshot_covers_exactly_the_current_matrix():
             for c in _power_busy_loop_combos()
         }
         | {_key(*c, clean_window_probe=_POWER_BUSY_LOOP_PROBE) for c in _profile_busy_loop_combos()}
+        | {_key(*c) for c in _npu_combos()}
     )
     assert set(_SNAPSHOTS) == expected_keys, _REGEN_HINT
 

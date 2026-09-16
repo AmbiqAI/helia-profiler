@@ -372,12 +372,17 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
     # Model analysis summary
     if ctx.model_analysis is not None:
         ma = ctx.model_analysis
-        overview.add_row("Total MACs", f"{ma.total_macs:,}")
-        overview.add_row("Total OPS", f"{ma.total_ops:,}")
-        if ma.total_macs > 0 and total_cycles > 0:
-            cpm = total_cycles / ma.total_macs
-            overview.add_row("Cycles/MAC", f"{cpm:.2f}")
-        overview.add_row("Parameters", f"{ma.num_parameters:,}")
+        if ma.has_ethos_u_op:
+            # Ethos-u custom ops are opaque to the analyzer — no fake zeros.
+            overview.add_row("Total MACs", "[dim]n/a (ethos-u op is opaque)[/dim]")
+            overview.add_row("Total OPS", "[dim]n/a (ethos-u op is opaque)[/dim]")
+        else:
+            overview.add_row("Total MACs", f"{ma.total_macs:,}")
+            overview.add_row("Total OPS", f"{ma.total_ops:,}")
+            if ma.total_macs > 0 and total_cycles > 0:
+                cpm = total_cycles / ma.total_macs
+                overview.add_row("Cycles/MAC", f"{cpm:.2f}")
+            overview.add_row("Parameters", f"{ma.num_parameters:,}")
 
     if pmu.overflow_detected:
         overview.add_row(

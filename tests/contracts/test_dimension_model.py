@@ -41,11 +41,12 @@ def test_manifest_writer_records_the_resolved_engine_version(tmp_path: Path):
     from helia_profiler.results import EngineInfo
 
     ctx = make_pmu_ctx(tmp_path, board="apollo510_evb", power_enabled=False)
-    ctx.run_metadata.engine = EngineInfo(type="helia-rt", version="1.17.0")
+    ctx.run_metadata.engine = EngineInfo(type="helia-rt", version="1.17.0", backend="ethos_u")
 
     recorded = _comparability(ctx)
 
     assert recorded[ComparisonDimension.ENGINE_VERSION] == "1.17.0"
+    assert recorded[ComparisonDimension.ENGINE_BACKEND] == "ethos_u"
 
 
 def test_manifest_writer_records_every_authoritative_dimension(tmp_path: Path):

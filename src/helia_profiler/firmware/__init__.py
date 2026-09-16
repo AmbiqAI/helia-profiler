@@ -458,6 +458,7 @@ def generate_app(ctx: PipelineContext) -> Path:
                 cmsis_device_header=render_context.pmu.cmsis_device_header,
                 profiling_backends=profiling_backends,
                 has_armv8m_pmu=has_armv8m_pmu,
+                has_ethos_u=render_context.engine.has_ethos_u,
                 pmu_max_ops=soc.pmu_max_ops,
             ),
         )

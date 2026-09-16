@@ -255,6 +255,9 @@ class EngineInfo:
 
     type: str = ""
     version: str | None = None
+    #: Compute backend the engine resolved (e.g. "cmsis_nn", "ethos_u");
+    #: ``None`` when the engine has no backend notion.
+    backend: str | None = None
 
 
 @dataclass(frozen=True)

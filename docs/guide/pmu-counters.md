@@ -62,6 +62,7 @@ available depends on the target's **PMU tier**:
 | Tier | SoC family | Groups |
 |---|---|---|
 | Armv8-M PMU | Apollo5 family (Cortex-M55, including Apollo330P) | `cpu`, `mve`, `memory` |
+| Armv8-M PMU + Ethos-U | Atomiq110 (Cortex-M55 + Ethos-U85) | `cpu`, `mve`, `memory`, `ethos_npu` |
 | DWT-only | Apollo3/Apollo3P, Apollo4/Apollo4P/Apollo4L (Cortex-M4) | Cycle counter only — no group selection |
 
 On DWT-only targets, heliaPROFILER warns and captures cycle counts only;
@@ -167,6 +168,30 @@ Cortex-M55 (the Armv8-M PMU tier).
 
 `default`: `ARM_PMU_MVE_INST_RETIRED`, `ARM_PMU_MVE_INT_MAC_RETIRED`,
 `ARM_PMU_MVE_LDST_RETIRED`, `ARM_PMU_MVE_STALL`.
+
+### Ethos-U NPU counters
+
+Ethos-U NPU activity, sampled from the NPU's own PMU via the core-driver
+API (not the ARM PMU). Only available on SoCs with an Ethos-U NPU
+(Atomiq110), and only meaningful for Vela-compiled models running on the
+`ethos_u` engine backend. Counted per ethos-u command stream via the
+driver's inference begin/end hooks; layers the NPU never dispatched are
+reported via the `NPU_DISPATCHED` column rather than as zeros.
+
+| Counter | Description |
+|---|---|
+| `ETHOSU_PMU_CYCLE` | Total NPU cycles while the command stream runs |
+| `ETHOSU_PMU_NPU_ACTIVE` | Cycles the NPU is active (not idle/stalled) |
+| `ETHOSU_PMU_NPU_IDLE` | Cycles the NPU is idle |
+| `ETHOSU_PMU_MAC_ACTIVE` | Cycles the MAC engine is active |
+| `ETHOSU_PMU_WD_ACTIVE` | Cycles the weight decoder is active |
+| `ETHOSU_PMU_SRAM_RD_DATA_BEAT_RECEIVED` | SRAM interface read data beats |
+| `ETHOSU_PMU_SRAM_WR_DATA_BEAT_WRITTEN` | SRAM interface write data beats |
+| `ETHOSU_PMU_EXT_RD_DATA_BEAT_RECEIVED` | External (flash/MRAM) read data beats |
+| `ETHOSU_PMU_EXT_WR_DATA_BEAT_WRITTEN` | External (flash/MRAM) write data beats |
+
+`default`: `ETHOSU_PMU_CYCLE`, `ETHOSU_PMU_NPU_ACTIVE`,
+`ETHOSU_PMU_MAC_ACTIVE`, `ETHOSU_PMU_SRAM_RD_DATA_BEAT_RECEIVED`.
 
 ## Multi-pass profiling
 
@@ -334,5 +359,6 @@ per-SoC limit rather than a config knob.
 
 ??? failure "PMU counter group not supported for this target"
     The requested group (for example `mve`) isn't available on the
-    target's PMU tier or SoC. Only `cpu`, `mve`, and `memory` exist, and
-    `mve` requires the Armv8-M PMU tier (Cortex-M55 / Apollo5 family).
+    target's PMU tier or SoC. The groups are `cpu`, `mve`, `memory`, and
+    `ethos_npu`; `mve` requires the Armv8-M PMU tier (Cortex-M55), and
+    `ethos_npu` an SoC with an Ethos-U NPU (Atomiq110).

@@ -29,6 +29,7 @@ CHARACTERIZED_SOCS = (
     "apollo5b",
     "apollo330P",
     "apollo510L",
+    "atomiq110",
 )
 
 
@@ -109,7 +110,8 @@ def test_apollo510_windows_are_the_linker_script_values():
 # soc_placement_ranges) and the verified windows, pinned EXACTLY per SoC
 # (#176, lengths added in the fresh-eyes round): real MRAM start
 # plus (legacy length, verified length) for MRAM / TCM / SRAM. Every legacy
-# MRAM base is 0x0 (asserted in the test body); a Phase-2 edit that turns
+# MRAM base is 0x0 except atomiq110's (asserted in the test body); a Phase-2
+# edit that turns
 # any known divergence into agreement — or vice versa — must consciously
 # edit this table.
 _EXPECTED_LEGACY_VS_VERIFIED = {
@@ -121,6 +123,10 @@ _EXPECTED_LEGACY_VS_VERIFIED = {
     "apollo510b": (0x00410000, (4_194_304, 4_128_768), (524_288, 524_288), (3_145_728, 3_145_728)),
     "apollo5b": (0x00410000, (4_194_304, 4_128_768), (524_288, 524_288), (3_145_728, 3_145_728)),
     "apollo330P": (0x00410000, (2_031_616, 2_031_616), (245_760, 262_144), (1_835_008, 1_835_008)),
+    # atomiq110's legacy table already carries the real (FPGA-emulated)
+    # bases, so its only divergence is the TCM length: legacy = the 496 KB
+    # gcc script region, verified window = the 512 KB hardware aperture.
+    "atomiq110": (0x22000000, (4_194_304, 4_194_304), (507_904, 524_288), (3_145_728, 3_145_728)),
 }
 _EXPECTED_LEGACY_VS_VERIFIED["apollo510L"] = _EXPECTED_LEGACY_VS_VERIFIED["apollo330P"]
 
@@ -142,7 +148,10 @@ def test_known_divergences_from_the_legacy_placement_table_are_pinned():
         mram_start, mram_lens, tcm_lens, sram_lens = _EXPECTED_LEGACY_VS_VERIFIED[name]
         legacy_mram = legacy[Placement.MRAM]
         real_mram = verified[MemoryRegion.MRAM].window
-        assert legacy_mram.start == 0x0, name
+        # atomiq110 is the one part whose legacy table already carries the
+        # real MRAM base (the FPGA map was added after #133); every older
+        # entry has the legacy 0x0.
+        assert legacy_mram.start == (mram_start if name == "atomiq110" else 0x0), name
         assert real_mram.start == mram_start, name
         assert (legacy_mram.length, real_mram.length) == mram_lens, name
         legacy_tcm = legacy[Placement.TCM]
@@ -194,6 +203,33 @@ def test_apollo3p_dtcm_is_the_64k_hardware_aperture_and_stackmem_is_sram():
     sram = by_region[MemoryRegion.SRAM]
     assert sram.app_window[LinkFamily.GNU] == MemoryRange(0x10011000, 716_800)
     assert not sram.app_window[LinkFamily.GNU].contains(0x10010000)
+
+
+def test_atomiq110_windows_are_the_nbl_linker_script_values():
+    """atomiq110's DEFAULT profile is the nbl (no-bootloader) variant, so
+    MRAM is the FULL 4 MB FPGA-emulated flash aperture at 0x22000000 — no
+    SBL carve-out. DTCM is the 512 KB hardware aperture (DTCM_MAX_SIZE)
+    with the same per-link-family extents as apollo510 (gcc: the full
+    496 KB MCU_TCM script region; armlink: 492 KB MCU_TCM). SRAM is the
+    3 MB SSRAM aperture at 0x21000000, where the profiler arena and NPU
+    PMU tables land (.sram_bss)."""
+    windows = linked_memory_map(get_soc("atomiq110"))
+    by_region = {w.region: w for w in windows}
+    mram = by_region[MemoryRegion.MRAM]
+    assert mram.window == MemoryRange(0x22000000, 4_194_304)
+    assert mram.window_provenance == "linker-app-origin"
+    assert by_region[MemoryRegion.ITCM].window == MemoryRange(0x00000000, 262_144)
+    dtcm = by_region[MemoryRegion.DTCM]
+    assert dtcm.window == MemoryRange(0x20000000, 524_288)
+    assert dtcm.app_window[LinkFamily.GNU] == MemoryRange(0x20000000, 507_904)
+    assert dtcm.app_window[LinkFamily.ARMLINK] == MemoryRange(0x20000000, 503_808)
+    sram = by_region[MemoryRegion.SRAM]
+    assert sram.window == MemoryRange(0x21000000, 3_145_728)
+    # The values a real atomiq110_fpga_turbo gcc link produced: arena and
+    # NPU PMU tables in .sram_bss classify as SRAM, not DTCM.
+    assert classify_address(0x21012000, windows) is MemoryRegion.SRAM
+    assert classify_address(0x22000000, windows) is MemoryRegion.MRAM
+    assert MemoryRegion.PSRAM not in by_region
 
 
 def test_non_builtin_socs_degrade_to_empty_even_on_name_collision():
@@ -372,6 +408,25 @@ _EXPECTED_APP_WINDOWS["apollo510b"] = _EXPECTED_APP_WINDOWS["apollo510"]
 _EXPECTED_APP_WINDOWS["apollo5b"] = _EXPECTED_APP_WINDOWS["apollo510"]
 # apollo510L links against apollo330P's byte-identical scripts.
 _EXPECTED_APP_WINDOWS["apollo510L"] = _EXPECTED_APP_WINDOWS["apollo330P"]
+_EXPECTED_APP_WINDOWS["atomiq110"] = {
+    MemoryRegion.ITCM: {
+        LinkFamily.GNU: (0x00000000, 262_144),
+        LinkFamily.ARMLINK: (0x00000000, 262_144),
+    },
+    # nbl default: the app links at the full 4 MB FPGA MRAM aperture.
+    MemoryRegion.MRAM: {
+        LinkFamily.GNU: (0x22000000, 4_194_304),
+        LinkFamily.ARMLINK: (0x22000000, 4_194_304),
+    },
+    MemoryRegion.DTCM: {
+        LinkFamily.GNU: (0x20000000, 507_904),
+        LinkFamily.ARMLINK: (0x20000000, 503_808),
+    },
+    MemoryRegion.SRAM: {
+        LinkFamily.GNU: (0x21000000, 3_145_728),
+        LinkFamily.ARMLINK: (0x21000000, 3_145_728),
+    },
+}
 
 
 def test_every_app_window_extent_is_pinned_exactly():
@@ -424,7 +479,8 @@ def test_characterized_socs_cover_the_entire_registry():
     fails loudly here instead of silently returning () forever."""
     from helia_profiler.platform import list_socs
 
-    assert set(CHARACTERIZED_SOCS) == {soc.name for soc in list_socs()}
+    registered = {soc.name for soc in list_socs()}
+    assert set(CHARACTERIZED_SOCS) == registered
 
 
 def test_link_family_map_stays_in_lockstep_with_the_toolchain_enum():

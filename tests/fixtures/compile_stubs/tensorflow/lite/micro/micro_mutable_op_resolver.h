@@ -126,6 +126,11 @@ class MicroMutableOpResolver : public MicroOpResolver {
         (void)registration;
         return kTfLiteOk;
     }
+    // heliaRT extension: registers the Vela ethos-u custom op (no-arg,
+    // unlike the builtin Add* helpers) -- micro_mutable_op_resolver.h:282.
+    TfLiteStatus AddEthosU() {
+        return kTfLiteOk;
+    }
     TfLiteStatus AddExp(const TFLMRegistration *registration = nullptr) {
         (void)registration;
         return kTfLiteOk;

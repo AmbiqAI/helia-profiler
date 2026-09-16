@@ -112,6 +112,8 @@ from .test_firmware_render_snapshots import (  # noqa: E402
     _all_combos,
     _common_kwargs,
     _key,
+    _npu_combos,
+    _npu_overrides,
     _power_busy_loop_combos,
     _power_combos,
     _profile_busy_loop_combos,
@@ -149,6 +151,7 @@ def _render_pmu_profiler_header(vars: dict) -> str:
         cmsis_device_header=vars["cmsis_device_header"],
         profiling_backends=list(vars["profiling_backends"]),
         has_armv8m_pmu=vars["has_armv8m_pmu"],
+        has_ethos_u=vars.get("has_ethos_u", False),
         pmu_max_ops=vars["pmu_max_ops"],
     )
 
@@ -165,14 +168,18 @@ def _snapshot_cases() -> list[tuple[str, tuple]]:
     """(case id, _render args) per snapshot-matrix scenario.
 
     Mirrors ``_build_all()`` in the snapshot module: the transport matrix,
-    the power_only matrix, and both busy_loop matrices.
+    the power_only matrix, both busy_loop matrices, and the atomiq110 NPU
+    matrix (whose overrides ride as the sixth arg-tuple element).
     """
     cases: list[tuple[str, tuple]] = []
     for soc, transport, engine in _all_combos():
-        cases.append((_key(soc, transport, engine), (soc, transport, engine, False, "infer")))
+        cases.append((_key(soc, transport, engine), (soc, transport, engine, False, "infer", None)))
     for soc, transport, engine in _power_combos():
         cases.append(
-            (_key(soc, transport, engine, power_only=True), (soc, transport, engine, True, "infer"))
+            (
+                _key(soc, transport, engine, power_only=True),
+                (soc, transport, engine, True, "infer", None),
+            )
         )
     for soc, transport, engine in _power_busy_loop_combos():
         cases.append(
@@ -184,14 +191,21 @@ def _snapshot_cases() -> list[tuple[str, tuple]]:
                     power_only=True,
                     clean_window_probe=_POWER_BUSY_LOOP_PROBE,
                 ),
-                (soc, transport, engine, True, _POWER_BUSY_LOOP_PROBE),
+                (soc, transport, engine, True, _POWER_BUSY_LOOP_PROBE, None),
             )
         )
     for soc, transport, engine in _profile_busy_loop_combos():
         cases.append(
             (
                 _key(soc, transport, engine, clean_window_probe=_POWER_BUSY_LOOP_PROBE),
-                (soc, transport, engine, False, _POWER_BUSY_LOOP_PROBE),
+                (soc, transport, engine, False, _POWER_BUSY_LOOP_PROBE, None),
+            )
+        )
+    for soc, transport, engine in _npu_combos():
+        cases.append(
+            (
+                _key(soc, transport, engine),
+                (soc, transport, engine, False, "infer", _npu_overrides()),
             )
         )
     return cases
@@ -218,14 +232,22 @@ _FULL_RESOLVER_ID = "apollo510|rtt|tflm|full-resolver"
 def _build_cases() -> list[_CompileCase]:
     cases: list[_CompileCase] = []
 
-    for case_id, (soc, transport, engine, power_only, probe) in _snapshot_cases():
+    for case_id, (soc, transport, engine, power_only, probe, overrides) in _snapshot_cases():
+        case_vars = _common_kwargs(soc, transport)
+        if overrides and overrides.get("has_ethos_u"):
+            case_vars["has_ethos_u"] = True
         cases.append(
             _CompileCase(
                 case_id=case_id,
                 text=_render(
-                    soc, transport, engine, power_only=power_only, clean_window_probe=probe
+                    soc,
+                    transport,
+                    engine,
+                    power_only=power_only,
+                    clean_window_probe=probe,
+                    overrides=overrides,
                 ),
-                vars=_common_kwargs(soc, transport),
+                vars=case_vars,
             )
         )
 
@@ -265,6 +287,42 @@ def _build_cases() -> list[_CompileCase]:
             vars=_common_kwargs("apollo510", "rtt"),
         )
     )
+
+    # Ethos-U NPU path (atomiq110): has_ethos_u gates _npu_init.j2 and
+    # _npu_pmu.j2 in both engine mains; an ethos_npu pass exercises the
+    # NPU-PMU program/accumulate/overflow/CSV blocks.
+    npu_pass = {
+        "name": "EthosNpu",
+        "custom": True,
+        "event_ids": ["0x0000", "0x0000", "0x0000", "0x0000"],
+        "counter_names": [
+            "ETHOSU_PMU_CYCLE",
+            "ETHOSU_PMU_NPU_ACTIVE",
+            "ETHOSU_PMU_MAC_ACTIVE",
+            "ETHOSU_PMU_SRAM_RD_DATA_BEAT_RECEIVED",
+        ],
+        "num_counters": 4,
+        "c_enum": None,
+        "group": "ethos_npu",
+    }
+    npu_overrides = {
+        "has_ethos_u": True,
+        "npu_tolerate_power_ack": True,
+        # The production plan appends AddEthosU last (op_resolver.py) — the
+        # one new vendor symbol on the dispatch path must compile too (#187).
+        "resolver_registrations": ["r.AddConv2D();", "r.AddEthosU();"],
+        "resolver_max_ops": 2,
+        "pmu_passes": [npu_pass],
+        "pmu_pass_names": ["EthosNpu"],
+    }
+    for engine in ("helia-rt", "helia-aot"):
+        cases.append(
+            _CompileCase(
+                case_id=f"atomiq110|rtt|{engine}|ethos-u",
+                text=_render("atomiq110", "rtt", engine, overrides=dict(npu_overrides)),
+                vars={**_common_kwargs("atomiq110", "rtt"), "has_ethos_u": True},
+            )
+        )
 
     # hpx_pmu_profiler.cc: the second TU of every TFLM/heliaRT app
     # (CMakeLists.txt.j2 compiles it into both binaries), rendered per SoC
