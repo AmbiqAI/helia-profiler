@@ -8,7 +8,7 @@ runtime's own ``execution_cycles`` and declares neither the STIMER bracket
 nor ``clean_cycles``, so a ``power_only`` render would reach
 ``_power_terminal_success.j2`` with no duration source.  That is why the
 matrix pairs executorch with neither ``_power_combos`` nor the busy-loop
-probe, and why ``stages.preflight._check_transport_support`` rejects
+probe, and why ``engines.preflight.check_profiling_support`` rejects
 executorch + power.
 
 This test does not implement the fix; it fails the moment that gate is
@@ -21,16 +21,16 @@ import pytest
 
 from helia_profiler.config import load_config
 from helia_profiler.errors import ConfigError
-from helia_profiler.stages.preflight import _check_transport_support
+from helia_profiler.engines.preflight import check_profiling_support
 
 from .test_firmware_render_snapshots import _ENGINES, _MATRIX_ENGINES
 
 _BUG_CLASS_MESSAGE = (
-    "stages.preflight._check_transport_support now accepts "
+    "engines.preflight.check_profiling_support now accepts "
     "engine.type=executorch with power.enabled=True, but "
     "'executorch' is absent from the render-contract engine matrix "
     "(_ENGINES in tests/contracts/test_firmware_render_snapshots.py). Lifting "
-    "the preflight rejection in stages/preflight.py resurrects the #106/#107 "
+    "the preflight rejection in engines/preflight.py resurrects the #106/#107 "
     "frozen/garbage-window bug class for main_executorch.cc.j2: it has no "
     "power_only window bracketing, no terminal record, and no "
     "SocCapabilities.power_window_timer consumption -- its engine_clean_window "
@@ -51,7 +51,7 @@ _BUG_CLASS_MESSAGE = (
     "guards become load-bearing for it). "
     "(If you MOVED the rejection to another function rather than removing it, "
     "production is fine and this test just needs to call the new one -- it "
-    "names _check_transport_support deliberately so this stays a loud, "
+    "names check_profiling_support deliberately so this stays a loud, "
     "fail-closed prompt to re-point it rather than a silent loss of the guard.)"
 )
 
@@ -95,7 +95,7 @@ def test_preflight_accepting_executorch_power_requires_engine_matrix_coverage(
     """Fails the moment preflight stops rejecting executorch+power while the
     render-contract matrix has not been extended to cover it.
 
-    Today ``_check_transport_support`` raises ``ConfigError`` for this
+    Today ``check_profiling_support`` raises ``ConfigError`` for this
     combination, so this test currently just confirms that (and stays green).
     The moment that rejection is removed -- or narrowed to only one power mode
     -- without the matching render/test work, this flips to a hard failure
@@ -104,7 +104,11 @@ def test_preflight_accepting_executorch_power_requires_engine_matrix_coverage(
     cfg = _executorch_power_cfg(tmp_path, mode, board)
 
     try:
-        _check_transport_support(cfg)
+        check_profiling_support(
+            cfg.engine.type,
+            power_enabled=cfg.power.enabled,
+            clean_window_probe=cfg.profiling.clean_window_probe,
+        )
     except ConfigError:
         preflight_accepts_executorch_power = False
     else:
@@ -125,10 +129,14 @@ def test_preflight_accepting_executorch_power_requires_engine_matrix_coverage(
         assert "executorch" in _MATRIX_ENGINES, _BUG_CLASS_MESSAGE
     else:
         # Still gated -- nothing to pin yet, but assert the gate directly so
-        # this test doesn't pass vacuously if _check_transport_support starts
+        # this test doesn't pass vacuously if check_profiling_support starts
         # raising for an unrelated reason (e.g. a bad tmp_path model).
         with pytest.raises(ConfigError, match="ExecuTorch profiling"):
-            _check_transport_support(cfg)
+            check_profiling_support(
+                cfg.engine.type,
+                power_enabled=cfg.power.enabled,
+                clean_window_probe=cfg.profiling.clean_window_probe,
+            )
 
 
 @pytest.mark.parametrize("board", ["apollo3p_evb", "apollo4p_evb", "apollo510_evb"])
@@ -165,7 +173,11 @@ def test_preflight_rejects_executorch_with_the_busy_loop_clean_window_probe(tmp_
     )
 
     with pytest.raises(ConfigError, match="busy_loop"):
-        _check_transport_support(cfg)
+        check_profiling_support(
+            cfg.engine.type,
+            power_enabled=cfg.power.enabled,
+            clean_window_probe=cfg.profiling.clean_window_probe,
+        )
 
     # And the default probe is untouched -- the rejection must be about the
     # probe, not about ExecuTorch reaching this function at all.
@@ -177,4 +189,8 @@ def test_preflight_rejects_executorch_with_the_busy_loop_clean_window_probe(tmp_
             "target": {"board": board},
         },
     )
-    _check_transport_support(ok_cfg)
+    check_profiling_support(
+        ok_cfg.engine.type,
+        power_enabled=ok_cfg.power.enabled,
+        clean_window_probe=ok_cfg.profiling.clean_window_probe,
+    )

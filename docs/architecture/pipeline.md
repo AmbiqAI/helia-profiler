@@ -105,6 +105,21 @@ early return when a field is unset) stay on the raw field.
 
 ## Stage-by-stage detail
 
+### Preflight
+
+**File:** `stages/preflight.py`
+**Reads:** `ctx.config`
+
+Runs host-only checks in fail-fast order. Engine-aware model and Softmax
+validation lives in `engines/model_validation.py`; engine placement and
+profiling capabilities in `engines/preflight.py`; board PMU and USB checks
+in `platform/preflight.py`. The pure scanner stays in `modelcost/`, without
+HPX engine or error dependencies.
+
+The stage retains basic configuration/output-directory checks and host
+dependency error translation. Domain helpers receive configuration or explicit
+values, never `PipelineContext`, and do not publish pipeline state.
+
 ### Resolve Platform
 
 **File:** `stages/resolve_platform.py`
@@ -132,6 +147,21 @@ and creates the model module while resolving CMSIS-NN. For **TFLM**, it resolves
 the stock interpreter module and selected backend. For **ExecuTorch**, it
 validates the pinned `nsx-executorch` checkout and wraps it as a local module
 behind the selected CMSIS-NN provider.
+
+### Plan Memory
+
+**File:** `stages/plan_memory.py`
+**Reads:** `ctx.config`, `ctx.soc`, `ctx.engine_adapter`, `ctx.engine_artifacts`
+**Sets:** `ctx.arena_region`, `ctx.weights_region`, `ctx.memory_plan`, `ctx.run_metadata.memory_plan`
+
+Delegates to `firmware/memory_plan.py` for placement, engine-plan selection or
+buffer synthesis, firmware-owned consumers, capacity accounting, and overflow
+validation. These functions take typed configuration, platform, and engine
+inputs and return placement values or frozen `MemoryPlan` records; they never
+access `PipelineContext`.
+
+The stage owns logging and context publication: placement is published first,
+and the completed memory plan only after validation succeeds.
 
 ### Generate Firmware
 

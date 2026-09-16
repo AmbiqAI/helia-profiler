@@ -49,6 +49,14 @@ prove the same value — absence on one side fails conservatively.
 run, layer, power, and memory comparability decisions, so automation does not
 need to parse warning text.
 
+With `--output-dir`, `layer_diff.csv` carries aligned layer IDs and operations,
+baseline/candidate cycle counts, absolute and percentage cycle deltas, and
+measured PMU-counter deltas (plus memory-placement differences when available).
+It does not carry per-layer `macs`, `ops`, or `cycles_per_mac` columns: these are
+derived model-analysis enrichments, not measured counters. Read them from each
+run's `profile_results.csv` when analysis is available. Incompatible layer
+topologies suppress per-layer comparisons rather than inventing an alignment.
+
 ## Options
 
 | Flag | Description |

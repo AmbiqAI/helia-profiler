@@ -19,6 +19,7 @@ import re
 import subprocess
 from pathlib import Path
 
+from ..hostenv._proc import run_text
 from ..hostenv.toolchains import get_toolchain_spec, resolve_toolchain_executable
 
 log = logging.getLogger("hpx")
@@ -85,12 +86,7 @@ def _address_from_nm(
     )
     for elf in elf_candidates:
         try:
-            result = subprocess.run(
-                [nm, str(elf)],
-                capture_output=True,
-                text=True,
-                timeout=timeout_s,
-            )
+            result = run_text([nm, str(elf)], timeout_s=timeout_s)
         except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
             log.debug("%s probe failed: %s", nm, exc)
             return None

@@ -44,6 +44,49 @@ def _all_tools_present(_name: str) -> str:
 
 
 class TestPreflightHappyPath:
+    def test_domain_checks_keep_fail_fast_order(self, tmp_path, monkeypatch):
+        from unittest.mock import Mock, call
+
+        from helia_profiler.stages import preflight
+
+        ctx = _make_ctx(tmp_path, {"target": {"transport": "usb_cdc"}})
+        cfg = ctx.config
+        checks = Mock()
+        for name in (
+            "check_model",
+            "check_softmax_scaling",
+            "_check_arena_size",
+            "_check_rtt_buffer_size",
+            "check_runtime_split_locations",
+            "check_pmu_selection",
+            "check_profiling_support",
+            "check_usb_support",
+            "_check_output_dir",
+            "_check_host_tools",
+        ):
+            monkeypatch.setattr(preflight, name, getattr(checks, name))
+
+        PreflightStage().run(ctx)
+
+        assert checks.mock_calls == [
+            call.check_model(cfg.model.path, cfg.engine.type),
+            call.check_softmax_scaling(cfg.model.path, cfg.engine.type),
+            call._check_arena_size(cfg.model.arena_size),
+            call._check_rtt_buffer_size(cfg.target.rtt_buffer_size_up),
+            call.check_runtime_split_locations(cfg),
+            call.check_pmu_selection(
+                cfg.target.board, cfg.profiling.pmu_counters, registry=cfg.platform_registry
+            ),
+            call.check_profiling_support(
+                cfg.engine.type,
+                power_enabled=cfg.power.enabled,
+                clean_window_probe=cfg.profiling.clean_window_probe,
+            ),
+            call.check_usb_support(cfg.target.board, registry=cfg.platform_registry),
+            call._check_output_dir(cfg.output.dir),
+            call._check_host_tools(cfg),
+        ]
+
     def test_passes_with_valid_inputs(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path)
         with patch("shutil.which", side_effect=_all_tools_present):

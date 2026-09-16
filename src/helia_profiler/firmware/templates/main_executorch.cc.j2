@@ -24,8 +24,8 @@
    both would put this engine's load+execute cost on the wire under keys every
    other engine uses for execute-only inference timing.
 
-   ExecuTorch has no dedicated power binary: stages.preflight
-   _check_transport_support rejects engine.type=executorch with power.enabled
+   ExecuTorch has no dedicated power binary: engines.preflight
+   check_profiling_support rejects engine.type=executorch with power.enabled
    (pinned by tests/contracts/test_executorch_power_tripwire.py), so no
    `power_only` render of this template is reachable from a supported
    configuration and none of the blocks here carry a power_only branch. #}
