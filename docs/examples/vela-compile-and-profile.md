@@ -31,8 +31,11 @@ Two inputs decide what Vela produces:
   `ethos-u85-256`.
 - `--config` + `--system-config` + `--memory-mode` — an `.ini` file
   describing the *system around the NPU* (clocks, memory ports,
-  latencies). This shapes Vela's scheduling decisions and static
-  performance estimates. It does not affect correctness.
+  latencies). The system config only shapes Vela's scheduling decisions
+  and static performance estimates. The memory mode is different: it
+  decides which memory region holds the weights and the arena, so it must
+  agree with where the runtime actually places those buffers and with the
+  driver's region configuration.
 
 ## Prerequisites
 
@@ -133,10 +136,17 @@ per-layer CSVs with two counter families:
 
 ## What you get
 
+The firmware streams one CSV row per layer over RTT, in the
+[wire-protocol](../reference/wire-protocol.md) shape:
+
 ```csv
 "Layer","Op","ETHOSU_PMU_CYCLE","ETHOSU_PMU_NPU_ACTIVE","ETHOSU_PMU_MAC_ACTIVE","ETHOSU_PMU_SRAM_RD_DATA_BEAT_RECEIVED","NPU_DISPATCHED","overflow"
 0,ethos-u,224128,191320,169227,61,1,0
 ```
+
+HPX publishes the same counters in the run's `profile_results.csv` under
+`id,op,<counters>,cycles,cycles_pct,overflow`, with `overflow` written as
+`False`/`True` — see the [Output guide](../guide/output.md).
 
 Quick reads: `NPU_ACTIVE / CYCLE` is NPU utilization for the dispatch;
 `MAC_ACTIVE / NPU_ACTIVE` separates compute-bound from memory-bound.

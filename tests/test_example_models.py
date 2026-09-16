@@ -95,13 +95,15 @@ def test_ambiq_vela_ini_materializes_and_parses(tmp_path: Path, monkeypatch) -> 
         "Memory_Mode.Shared_Sram",
     ):
         assert section in parser.sections()
-    # Every NPU clock tier runs against the fixed 250 MHz memory fabric.
+    # Every NPU clock tier runs against the fixed 250 MHz memory fabric on
+    # both ports: Sram (arena) and Dram/Axi1 (Shared_Sram constants).
     for section in parser.sections():
         if not section.startswith("System_Config."):
             continue
         cfg = parser[section]
-        fabric = float(cfg["core_clock"]) * float(cfg["Sram_clock_scale"])
-        assert fabric == 250e6
+        for scale in ("Sram_clock_scale", "Dram_clock_scale"):
+            fabric = float(cfg["core_clock"]) * float(cfg[scale])
+            assert fabric == 250e6, (section, scale)
 
 
 def test_ambiq_vela_ini_quickstart_copy_matches_packaged() -> None:
