@@ -109,6 +109,65 @@ replay()
     assert sandbox[1].exists()
 
 
+def run_port_probe(directory, operation, *, guarded):
+    """Exercise inert discovery APIs or the real ports function without HPX package startup."""
+    directory.mkdir()
+    imported = directory / "serial-imported"
+    called = directory / "enumeration-called"
+    package = directory / "serial" / "tools"
+    package.mkdir(parents=True)
+    (package.parent / "__init__.py").write_text(
+        f"from pathlib import Path\nPath({str(imported)!r}).touch()\n"
+    )
+    (package / "__init__.py").write_text("")
+    (package / "list_ports.py").write_text(
+        "from pathlib import Path\n"
+        f"def comports():\n    Path({str(called)!r}).touch()\n    return []\n"
+        f"def grep(pattern):\n    Path({str(called)!r}).touch()\n    yield from ()\n"
+    )
+    if operation == "hpx":
+        source = (
+            "import importlib.util, sys\n"
+            "spec = importlib.util.spec_from_file_location('guard_test_ports', "
+            f"{str(ROOT / 'src' / 'helia_profiler' / 'transport' / 'ports.py')!r})\n"
+            "ports = importlib.util.module_from_spec(spec)\n"
+            "sys.modules[spec.name] = ports\nspec.loader.exec_module(ports)\n"
+            "assert ports.list_serial_ports(include_all=True) == ()\n"
+        )
+    else:
+        source = "from serial.tools import list_ports\n"
+        source += (
+            "assert list_ports.comports() == []\n"
+            if operation == "comports"
+            else "assert list(list_ports.grep('.*')) == []\n"
+        )
+    probe = directory / "probe.py"
+    probe.write_text(source)
+    command = [sys.executable, str(LAUNCHER), "python"] if guarded else [sys.executable]
+    result = subprocess.run(
+        command + [str(probe)],
+        env=dict(os.environ, PYTHONPATH=str(directory), PYTHONSAFEPATH="1"),
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    return result, imported, called
+
+
+@pytest.mark.parametrize("operation", ["comports", "grep", "hpx"])
+def test_port_enumeration_requires_fake_before_discovery(tmp_path, operation):
+    control, imported, called = run_port_probe(tmp_path / "control", operation, guarded=False)
+    assert control.returncode == 0, control.stderr
+    assert imported.exists()
+    assert called.exists()
+
+    result, imported, called = run_port_probe(tmp_path / "guarded", operation, guarded=True)
+    assert result.returncode != 0
+    assert "SoftwareOnlyViolation: software-only: device operation requires a fake" in result.stderr
+    assert not imported.exists()
+    assert not called.exists()
+
+
 @pytest.mark.parametrize("close_fds", [True, False])
 def test_children_and_grandchildren_inherit_guard(sandbox, close_fds):
     inner = "import serial; serial.Serial()"
