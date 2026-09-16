@@ -2,8 +2,7 @@
 
 **Goal:** take a plain INT8 LiteRT (TFLite) model, compile it for the
 Ethos-U85 NPU with Arm's Vela compiler using Ambiq's system configuration,
-and profile the result on the Atomiq110 FPGA — no prior Ethos-U experience
-assumed.
+and profile the result on the Atomiq110 FPGA.
 
 !!! warning "Experimental FPGA target"
     HPX support for Atomiq110 and `atomiq110_fpga_turbo` is best-effort and
