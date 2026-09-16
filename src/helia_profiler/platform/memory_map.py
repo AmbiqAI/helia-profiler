@@ -3,13 +3,14 @@
 The characterized truth of where the LINKER puts things, per SoC and — where
 the two link families disagree — per link family. Every constant below was
 read from the NSX linker scripts and scatter files that hpx's builds actually
-link against (the DEFAULT/``sbl`` profile; ``nsx_select_linker_script`` in
-nsx's ``nsx_toolchain_flags.cmake`` picks it unless an engine opts into the
+link against (the DEFAULT profile — the ``sbl`` scripts on Apollo parts, the
+``nbl`` scripts on atomiq110; ``nsx_select_linker_script`` in nsx's
+``nsx_toolchain_flags.cmake`` picks it unless an engine opts into the
 ``itcm`` profile), byte-verified identical across every cached nsx-ambiq-sdk
 revision, the dev checkout, and a materialized hpx workspace, and — for
-apollo510 (gcc) and apollo330P (gcc + ATfE) — confirmed against real
-``hpx_profiler.map`` files. Citations are ``<soc>/<toolchain>/<script>:<line>``
-inside ``nsx-core/src``.
+apollo510 (gcc), apollo330P (gcc + ATfE), and atomiq110 (gcc) — confirmed
+against real ``hpx_profiler.map`` files. Citations are
+``<soc>/<toolchain>/<script>:<line>`` inside ``nsx-core/src``.
 
 Why this table exists SEPARATELY from ``capabilities._FAMILY_MEMORY_BASES``:
 that older table records the datasheet-flavored values ``soc_placement_ranges``
@@ -341,6 +342,42 @@ _APOLLO330P = (
     _window(MemoryRegion.SRAM, 0x20080000, 1_835_008, gnu=1_835_008, armlink=1_835_008),
 )
 
+# atomiq110 — atomiq110/gcc/linker_script_nbl.ld:16-21, atomiq110/armclang/
+# linker_script_nbl.sct:10-43. This SoC's DEFAULT profile is the "nbl"
+# (no-bootloader) variant — cmake/socs/atomiq110.cmake selects it for both
+# link families — so MRAM is the FULL 4 MB FPGA-emulated flash aperture at
+# 0x22000000 (RRAM_BASEADDR / RRAM_MAX_SIZE in the SDK's
+# am_reg_base_addresses.h): the app links at the hardware base, no SBL
+# carve-out. DTCM window = the 512 KB hardware aperture (DTCM_MAX_SIZE);
+# gcc's MCU_TCM stops at 496 KB (floating .stack inside, fill-to-end
+# .heap), armlink tiles 492 KB MCU_TCM + fixed 4 KB heap + 16 KB stack to
+# the aperture — the same shape as apollo510. SRAM window = the SSRAM
+# aperture (3 MB @ 0x21000000; the upper 1 MB of the 4 MB decode aperture
+# is unpopulated, per the scripts). The regs header declares no ITCM
+# aperture; both scripts' MCU_ITCM is the 256 KB M55 ITCM at 0x0, matching
+# soc.memory.itcm_kb. Confirmed against a real atomiq110_fpga_turbo gcc
+# hpx_profiler.map (MCU_ITCM 0x40000, MCU_MRAM 0x22000000/0x400000,
+# MCU_TCM 0x7C000, SHARED_SRAM 0x21000000/0x300000).
+_ATOMIQ110 = (
+    _window(MemoryRegion.ITCM, 0x00000000, 262_144, gnu=262_144, armlink=262_144),
+    _window(
+        MemoryRegion.MRAM,
+        0x22000000,
+        4_194_304,
+        gnu=4_194_304,
+        armlink=4_194_304,
+        window_provenance="linker-app-origin",
+    ),
+    _window(
+        MemoryRegion.DTCM,
+        0x20000000,
+        524_288,
+        gnu=507_904,
+        armlink=503_808,
+    ),
+    _window(MemoryRegion.SRAM, 0x21000000, 3_145_728, gnu=3_145_728, armlink=3_145_728),
+)
+
 _MAPS: Mapping[str, tuple[LinkedRegionWindow, ...]] = MappingProxyType(
     {
         "apollo3p": _APOLLO3P,
@@ -353,6 +390,7 @@ _MAPS: Mapping[str, tuple[LinkedRegionWindow, ...]] = MappingProxyType(
         # apollo510L's linker scripts are byte-identical to apollo330P's (see
         # the _APOLLO330P note above).
         "apollo510L": _APOLLO330P,
+        "atomiq110": _ATOMIQ110,
     }
 )
 
@@ -373,7 +411,8 @@ def linked_memory_map(
     guessed, per #131's discipline.
 
     ``linker_profile`` is the third axis of the real layout: these tables
-    characterize NSX's DEFAULT (sbl-based) profile ONLY. ``itcm`` is a
+    characterize NSX's DEFAULT profile ONLY (sbl-based on Apollo parts,
+    nbl-based on atomiq110). ``itcm`` is a
     documented engine knob (``docs/guide/engines.md``) forwarded straight
     to CMake, and its scripts declare DIFFERENT regions — on apollo330P,
     AP510-sized ones (the upstream NSX bug in PR #176's report) — so any

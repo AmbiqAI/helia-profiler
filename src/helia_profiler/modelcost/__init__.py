@@ -21,16 +21,19 @@ from .layer_attribution import (
     source_index_from_op,
 )
 from .model_analysis import (
+    ETHOS_U_OP_NAME,
     LayerOps,
     ModelAnalysis,
     analyze_air_model,
     analyze_model,
     is_aot_available,
     is_available,
+    vela_accelerator_config,
 )
 from .softmax_preflight import aot_softmax_verdict, scan_softmax_scaling
 
 __all__ = [
+    "ETHOS_U_OP_NAME",
     "LayerAttribution",
     "LayerAttributor",
     "LayerOps",
@@ -43,4 +46,5 @@ __all__ = [
     "manifest_source_map",
     "scan_softmax_scaling",
     "source_index_from_op",
+    "vela_accelerator_config",
 ]

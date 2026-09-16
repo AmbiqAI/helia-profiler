@@ -77,4 +77,13 @@ Every recipe follows the same shape:
 
     [:octicons-arrow-right-24: Read](toolchain-comparison.md)
 
+-   :material-memory:{ .lg .middle } __Atomiq110 NPU Profiling (Experimental)__
+
+    ---
+
+    Profile a Vela-compiled model on the experimental Atomiq110 FPGA target.
+    FPGA performance and power results are not representative of silicon.
+
+    [:octicons-arrow-right-24: Read](atomiq110-npu-profiling.md)
+
 </div>

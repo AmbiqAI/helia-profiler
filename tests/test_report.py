@@ -49,7 +49,7 @@ from helia_profiler.report import (
     write_report,
 )
 from helia_profiler.results import load_result_manifest
-from helia_profiler.modelcost import ModelAnalysis
+from helia_profiler.modelcost import ETHOS_U_OP_NAME, LayerOps, ModelAnalysis
 from helia_profiler.results.issues import IssueCode
 from helia_profiler.results import (
     EngineInfo,
@@ -1479,6 +1479,32 @@ def test_tops_suppressed_for_busy_loop(tmp_path: Path):
         probe="busy_loop",
     )
     ma = _tops(ctx, tmp_path)
+    assert "tops" not in ma and "tops_per_watt" not in ma
+
+
+def test_opaque_ethos_u_analysis_publishes_null_not_zero(tmp_path: Path):
+    """A Vela ethos-u custom op is opaque to the analyzer: its MACs, ops and
+    folded weights are unknown, not zero. The summary must publish null
+    totals and suppress TOPS — a 0.000000 TOPS headline for an NPU would be
+    a fabricated measurement (#284 review)."""
+    ctx = _tops_ctx(
+        tmp_path,
+        scope=MeasurementScope.ON_DEVICE_GATED_INFERENCE,
+        on_device_count=500,
+        duration_s=5.0,
+    )
+    ctx.model_analysis = ModelAnalysis(
+        layers=[LayerOps(id=0, op=ETHOS_U_OP_NAME)],
+        total_macs=0,
+        total_ops=0,
+        num_parameters=0,
+    )
+    summary = json.loads(_write_summary(ctx, tmp_path).read_text())
+    ma = summary["model_analysis"]
+    assert ma["total_macs"] is None
+    assert ma["total_ops"] is None
+    assert ma["num_parameters"] is None
+    assert "cycles_per_mac" not in ma and "cycles_per_op" not in ma
     assert "tops" not in ma and "tops_per_watt" not in ma
 
 

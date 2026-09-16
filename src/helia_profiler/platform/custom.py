@@ -112,6 +112,7 @@ class CustomBoardField(Enum):
     DEFAULT_GO_GPIO_PIN = "default_go_gpio_pin"
     BLE_RESET_GPIO_PIN = "ble_reset_gpio_pin"
     STARTER_PROFILE_BOARD = "starter_profile_board"
+    IS_FPGA = "is_fpga"
     DESCRIPTION = "description"
 
 
@@ -180,6 +181,12 @@ def _build_custom_socs(raw: Any, base: PlatformRegistry) -> dict[str, SocDef]:
             ),
             c_define=str(c_define),
             cmsis_header=str(cmsis_header),
+            # Inherited, never user-declared: NPU presence is a silicon fact
+            # of the based_on part (see the pinned-subset platform test).
+            npu=base_soc.npu if base_soc else None,
+            # Likewise: the based_on part's resolved placement-base map keeps
+            # working for the derivative (see SocDef.memory_bases_like).
+            memory_bases_like=((base_soc.memory_bases_like or base_soc.name) if base_soc else None),
             rtt_scan_ranges=_build_rtt_scan_ranges(
                 spec.get("rtt_scan_ranges", base_soc.rtt_scan_ranges if base_soc else None),
                 field_name=f"target.custom_socs.{name}.rtt_scan_ranges",
@@ -242,6 +249,23 @@ def _app_flash_load_addr(
     if raw is None:
         return None
     return _address(raw, field_name=field_name)
+
+
+def _strict_bool(raw: Any, *, field_name: str) -> bool:
+    """Parse a boolean, rejecting the string/number shapes ``bool()`` mangles.
+
+    YAML resolves an unquoted ``false`` to a real bool; a quoted ``"false"``
+    is a non-empty string and would coerce to ``True``.  This flag reaches
+    generated firmware (``is_fpga`` relaxes the NPU power-ack handshake), so
+    a malformed value must fail validation instead of silently flipping
+    hardware-init behavior.
+    """
+    if isinstance(raw, bool):
+        return raw
+    raise ConfigError(
+        f"{field_name} must be a boolean, got {raw!r}.",
+        hint="Write an unquoted YAML boolean, e.g. is_fpga: true",
+    )
 
 
 def _address(raw: Any, *, field_name: str) -> int:
@@ -493,6 +517,10 @@ def _build_custom_boards(raw: Any, registry: PlatformRegistry) -> dict[str, Boar
             ),
             starter_profile_board=(
                 str(starter_profile_board) if starter_profile_board is not None else None
+            ),
+            is_fpga=_strict_bool(
+                spec.get("is_fpga", base_board.is_fpga if base_board else False),
+                field_name=f"target.custom_boards.{name}.is_fpga",
             ),
             description=str(spec.get("description", base_board.description if base_board else "")),
         )

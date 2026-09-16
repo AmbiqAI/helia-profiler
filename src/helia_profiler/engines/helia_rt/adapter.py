@@ -18,6 +18,7 @@ from ...results import NsxModuleRef
 from .. import EngineType, TFLM_ENGINE_HEADER
 from ..base import HeliaRtArtifacts, PsramWeightsSource, SingleArenaPlacementMixin
 from ..cmsis_nn import cmsis_nn_cmake_vars, cmsis_nn_module_ref
+from ..ethos_u import NSX_NPU_MODULE, NSX_NPU_PROJECT
 from .artifacts import (
     HELIART_MODULE,
     HELIART_PROJECT,
@@ -33,6 +34,26 @@ from .artifacts import (
 from .nsx_module import _install_nsx_module, _install_nsx_module_source
 
 log = logging.getLogger("hpx")
+
+# Ethos-U NPU support: the nsx-npu registry module (identity shared with
+# heliaAOT via ..ethos_u) vendors the Ethos-U core driver and the
+# nsx_npu_init() bring-up helper; the CMake flag compiles heliaRT's ethos-u
+# custom-op kernel against that real driver instead of its host stub.
+# Mirrors the hardware-validated NSX npu-tflm app wiring.
+_ETHOSU_CMAKE_FLAG = "NSX_HELIA_RT_ENABLE_ETHOSU"
+
+
+def _add_ethos_u_artifacts(extra_modules: list[NsxModuleRef], cmake_vars: dict[str, str]) -> None:
+    """Append the NPU module + kernel flag for the ``ethos_u`` backend."""
+    extra_modules.append(
+        NsxModuleRef(
+            name=NSX_NPU_MODULE,
+            path=Path(),
+            local=False,
+            project=NSX_NPU_PROJECT,
+        )
+    )
+    cmake_vars[_ETHOSU_CMAKE_FLAG] = "ON"
 
 
 class HeliaRTAdapter(SingleArenaPlacementMixin):
@@ -65,6 +86,10 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
         backend = config.engine.backend or "helia"
         variant = config.engine.config.get("variant", "release-with-logs")
         core_override = config.engine.config.get("core_override")
+
+        # heliaRT treats unknown backend strings as a passthrough for its own
+        # runtime selection — only "ethos_u" changes hpx behavior here.
+        ethos_u = backend == "ethos_u"
 
         # Validate variant
         valid_variants = ("debug", "release-with-logs", "release")
@@ -119,6 +144,8 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
             )
             extra_modules.append(cmsis_nn_module_ref(config, work_dir))
             cmake_vars.update(cmsis_nn_cmake_vars(config))
+            if ethos_u:
+                _add_ethos_u_artifacts(extra_modules, cmake_vars)
             return HeliaRtArtifacts(
                 engine_type=EngineType.HELIA_RT,
                 extra_modules=extra_modules,
@@ -170,6 +197,17 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
         else:
             # --- Prebuilt distribution (explicit dist_path or custom
             #     GitHub release) ---
+            if ethos_u:
+                raise EngineError(
+                    "backend 'ethos_u' requires a heliaRT source build — "
+                    "prebuilt heliaRT distributions do not ship the Ethos-U "
+                    "custom-op kernel.",
+                    hint=(
+                        "Remove engine.config.dist_path/source (registry "
+                        "default builds from source), or set "
+                        "engine.config.source_path to a heliaRT checkout."
+                    ),
+                )
             dist_path, resolved_version = _resolve_distribution(config)
             _check_version_compatibility(dist_path, resolved_version)
             version = resolved_version or HELIART_VERSION
@@ -209,6 +247,8 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
                 project=HELIART_PROJECT,
             ),
         )
+        if ethos_u:
+            _add_ethos_u_artifacts(extra_modules, cmake_vars)
 
         return HeliaRtArtifacts(
             engine_type=EngineType.HELIA_RT,

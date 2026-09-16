@@ -692,3 +692,39 @@ def test_render_context_requires_resolved_platform_metadata(tmp_path: Path):
     ctx.engine_artifacts = TflmArtifacts(engine_header=TFLM_ENGINE_HEADER)
     with pytest.raises(PipelineError, match="run_metadata.platform.*ResolvePlatformStage"):
         FirmwareRenderContext.from_pipeline_context(ctx)
+
+
+def test_render_context_tolerates_npu_power_ack_only_on_fpga_boards(tmp_path: Path):
+    """npu_tolerate_power_ack is derived from board.is_fpga in
+    FirmwareRenderContext.from_pipeline_context — the FPGA NPU power domain
+    may not report an ACK. The template-render tests pass the variable
+    directly, so only this pins the derivation (#284 review: a mutant
+    forcing it False survived the suite)."""
+    from helia_profiler.engines.base import EngineType, HeliaRtArtifacts
+    from helia_profiler.firmware.context import FirmwareRenderContext
+    from helia_profiler.platform import get_board, get_soc
+    from helia_profiler.results.models import PlatformInfo
+
+    def _render_ctx(board_name: str, soc_name: str) -> FirmwareRenderContext:
+        ctx = PipelineContext(config=_make_config(tmp_path), work_dir=tmp_path)
+        ctx.soc = get_soc(soc_name)
+        ctx.board = get_board(board_name)
+        ctx.engine_artifacts = HeliaRtArtifacts(
+            engine_type=EngineType.HELIA_RT,
+            engine_header="nsx_helia_rt.h",
+            engine_backend="ethos_u",
+            heliart_version="0.0.0",
+            heliart_variant="release",
+            heliart_toolchain_tag="gcc",
+        )
+        cpu = ctx.soc.cpu_clock
+        default_speed = cpu.speed(cpu.default)
+        assert default_speed is not None
+        ctx.run_metadata.platform = PlatformInfo(cpu_clock_mhz=default_speed.mhz)
+        return FirmwareRenderContext.from_pipeline_context(ctx)
+
+    fpga = _render_ctx("atomiq110_fpga_turbo", "atomiq110")
+    assert fpga.engine.has_ethos_u
+    assert fpga.engine.npu_tolerate_power_ack is True
+    silicon = _render_ctx("apollo510_evb", "apollo510")
+    assert silicon.engine.npu_tolerate_power_ack is False

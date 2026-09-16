@@ -74,6 +74,7 @@ class ComparisonDimension(StrEnum):
     WEIGHTS_LOCATION = "weights_location"
     ENGINE_VERSION = "engine_version"
     ARCHITECTURE_FLAGS = "architecture_flags"
+    ENGINE_BACKEND = "engine_backend"
 
 
 class DimensionEffect(StrEnum):
@@ -422,6 +423,18 @@ _DIMENSION_SPECS: tuple[DimensionSpec, ...] = (
             "outside it, so used/free are not the same quantity. Binary "
             "section sizes remain comparable."
         ),
+    ),
+    # Appended last, the #193/#291 append-only convention. Informative, not
+    # blocking: a cpu-vs-ethos_u A/B on one model is a comparison someone
+    # deliberately ran — but without this dimension the two runs compared as
+    # IDENTICAL. None on artifacts predating the record and on engines that
+    # resolve no backend — the comparator's None-skip rule applies.
+    DimensionSpec(
+        ComparisonDimension.ENGINE_BACKEND,
+        DimensionEffect.INFORMATIVE,
+        ArtifactSource.RUN_METADATA,
+        ("engine", "backend"),
+        label="Engine backend",
     ),
 )
 

@@ -180,6 +180,11 @@ ALL_ENGINES: frozenset[EngineType] = frozenset(EngineType)
 #: ``main.cc.j2`` renders identically for both — one template, two engine ids.
 TFLM_ENGINES: frozenset[EngineType] = frozenset({EngineType.TFLM, EngineType.HELIA_RT})
 AOT_ENGINES: frozenset[EngineType] = frozenset({EngineType.HELIA_AOT})
+#: Engines that can reach ``backend=ethos_u`` (preflight's _check_npu_backend
+#: rejects everything else) — the published producer set for NPU tokens. The
+#: shared tflm template renders the emitting code, but stock tflm can never
+#: gate it true.
+NPU_ENGINES: frozenset[EngineType] = frozenset({EngineType.HELIA_RT, EngineType.HELIA_AOT})
 ET_ENGINES: frozenset[EngineType] = frozenset({EngineType.EXECUTORCH})
 #: Engines with a dedicated power binary. ExecuTorch has none — preflight
 #: rejects ``engine.type=executorch`` with ``power.enabled``.
@@ -229,6 +234,7 @@ class FirmwareErrorCode(StrEnum):
     BIND_ARENA_FAILED = "bind_arena_failed"
     CONST_BLOB_PSRAM_WRITE_FAILED = "const_blob_psram_write_failed"
     MODEL_INIT_FAILED = "model_init_failed"
+    NPU_INIT_FAILED = "npu_init_failed"
     EXECUTORCH = "executorch"
     OPERATOR_COUNT_EXCEEDS_CAPACITY = "operator_count_exceeds_capacity"
     PMU_INIT_OR_SELFTEST_FAILED = "pmu_init_or_selftest_failed"
@@ -263,6 +269,9 @@ class WireKey(StrEnum):
     SYSTEM_CLOCK_HZ = "system_clock_hz"
     BURST_AVAIL = "burst_avail"
     BURST_ENGAGED = "burst_engaged"
+
+    # --- NPU bring-up -------------------------------------------------------
+    NPU = "npu"
 
     # --- heartbeat configuration -----------------------------------------
     HEARTBEAT_ENABLED = "heartbeat_enabled"
@@ -482,6 +491,7 @@ GATE_AOT_CONST_BLOBS_IN_PSRAM = (
     "not allocate_arenas and arena_regions with blob_filename and placement == psram"
 )
 GATE_BUSY_LOOP_PROBE = "busy_loop_probe"
+GATE_HAS_ETHOS_U = "has_ethos_u"
 GATE_STIMER_WINDOW = "use_stimer_window and not power_only"
 GATE_CLEAN_WINDOW_TRACE = "clean_window_trace and transport not in (swo, uart)"
 GATE_NOT_STIMER_WINDOW = "not use_stimer_window"

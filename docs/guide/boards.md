@@ -16,6 +16,7 @@ Run `hpx boards` to see the live list. As of this release:
 | `apollo5b_evb` | apollo5b | Cortex-M55 | Full Armv8-M | Yes | Yes | Preview |
 | `apollo330mP_evb` | apollo330P | Cortex-M55 | Full Armv8-M | Yes | Yes | Preview |
 | `apollo510dL_evb` | apollo510L | Cortex-M55 | Full Armv8-M | Yes | No[^510l-psram] | Preview |
+| `atomiq110_fpga_turbo` **(experimental)** | atomiq110 | Cortex-M55 | Full Armv8-M | Yes | No | Preview |
 | `apollo4p_evb` | apollo4p | Cortex-M4 | DWT only | No | Yes | Preview |
 | `apollo4l_evb` | apollo4l | Cortex-M4 | DWT only | No | Yes | Preview |
 | `apollo4l_blue_evb` | apollo4l | Cortex-M4 | DWT only | No | Yes | Preview |
@@ -33,7 +34,7 @@ Run `hpx boards` to see the live list. As of this release:
 
 ## SoC families
 
-### AP5 — Cortex-M55 (Apollo510, Apollo510b, Apollo5b, Apollo330P, Apollo510 Lite)
+### AP5 — Cortex-M55 (Apollo510, Apollo510b, Apollo5b, Apollo330P, Apollo510 Lite, Atomiq110)
 
 - Full **Armv8-M PMU** with 8 configurable event counters plus a
   dedicated cycle counter.
@@ -44,6 +45,24 @@ Run `hpx boards` to see the live list. As of this release:
 !!! note "Apollo330P is in the AP5 family"
     Despite the "3" in the name, Apollo330P uses a Cortex-M55 core. It
     belongs to the AP5 family and gets full PMU + MVE.
+
+!!! warning "Experimental Atomiq110 support"
+    HPX support for the Atomiq110 SoC and `atomiq110_fpga_turbo` board is
+    experimental. It is best-effort, is not a release blocker, and may change
+    or be removed in any minor release. It is outside the compatibility
+    guarantees for production-silicon targets.
+
+    The only upstream Atomiq110 realization is currently a Cortex-M55 +
+    Ethos-U85 NPU FPGA carrier running at a single fixed 25 MHz clock (no
+    PSRAM and no onboard BLE radio). Its clock rates, cycle counts, latency,
+    power, and energy measurements describe the FPGA image only and are not
+    representative of production silicon. The registered channel remains
+    `preview`; this documentation-only status does not change target selection
+    or NSX module resolution.
+
+    The FPGA exposes full PMU + MVE profiling and the Ethos-U NPU through the
+    `ethos_u` engine backend with the `ethos_npu` counter group (see the
+    [NPU profiling example](../examples/atomiq110-npu-profiling.md)).
 
 ### AP4 — Cortex-M4 (Apollo4p)
 
@@ -95,6 +114,7 @@ For reference:
 | `apollo5b_evb` | `AP510NFA-CBR` |
 | `apollo330mP_evb` | `Apollo330P_510L` |
 | `apollo510dL_evb` | `AP510L` |
+| `atomiq110_fpga_turbo` | `Atomiq110` |
 | `apollo4p_evb` | `AMAP42KP-KBR` |
 | `apollo4l_evb` | `AMAP42KL-KBR` |
 | `apollo4l_blue_evb` | `AMAP42KL-KBR` |
