@@ -3,7 +3,13 @@
 from __future__ import annotations
 
 import json
+from io import StringIO
 from pathlib import Path
+
+import pytest
+from rich.console import Console
+
+from helia_profiler.console import HpxConsole
 
 from helia_profiler.validation.report import (
     build_manifest,
@@ -345,3 +351,38 @@ def test_powered_case_publishes_dashboard_metrics_and_detailed_artifact(tmp_path
     assert report_case["power"] is True
     assert report_case["power_metrics"] == power
     assert report_case["avg_power_mw"] == 7.06
+
+
+@pytest.mark.parametrize("field", ["clean_workload", "power_workload"])
+@pytest.mark.parametrize(
+    "value",
+    [
+        None,
+        123,
+        True,
+        ["bad"],
+        {"bad": True},
+        "",
+        "future[workload]",
+        "aot_raw_zero_refill_included_v1",
+    ],
+)
+def test_foreign_validation_workloads_are_normalized_for_display(tmp_path: Path, field, value):
+    raw = _case(tmp_path).to_dict()
+    raw[field] = value
+    path = tmp_path / "validation_report.json"
+    path.write_text(json.dumps({"cases": [raw]}), encoding="utf-8")
+
+    loaded = load_validation_report(path)
+    console = HpxConsole()
+    output = StringIO()
+    console._console = Console(file=output, width=240)
+    console.print_validation(loaded)
+    expected = value if isinstance(value, str) else None
+    assert getattr(loaded.cases[0], field) == expected
+    if expected:
+        assert (
+            "refill included" if expected == "aot_raw_zero_refill_included_v1" else expected
+        ) in output.getvalue()
+    elif expected is None:
+        assert field not in loaded.cases[0].to_dict()

@@ -76,6 +76,9 @@ def load_validation_report(path: Path) -> ValidationReport:
         if not isinstance(raw, dict) or not required.issubset(raw):
             raise ReportError(f"Invalid validation case at index {index}: {report_path}")
         values = {key: value for key, value in raw.items() if key in case_fields}
+        for key in ("clean_workload", "power_workload"):
+            if not isinstance(values.get(key), str):
+                values[key] = None
         if isinstance(values.get("health_issues"), list):
             values["health_issues"] = tuple(values["health_issues"])
         cases.append(CaseResult(**values))
