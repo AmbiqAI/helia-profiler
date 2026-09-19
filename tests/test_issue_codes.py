@@ -83,6 +83,7 @@ def test_family_membership_and_order_are_the_documented_sets():
         "power_monitor",
         "power_lockstep",
         "power_clean_window_probe",
+        "power_clean_workload",
         "power_firmware_fingerprint",
     ]
     assert [d.value for d in DIMENSION_DIFFERS.dimensions] == [

@@ -70,7 +70,7 @@ doubles the `power` prefix because the dimension names themselves start with
 wire-format change renames it.
 
 - **`metric.power_<dimension>_mismatch`** (`metric_blocking`) — Power metrics omitted because a power comparison dimension differs between the runs.
-  Dimensions: `power_scope`, `power_mode`, `power_firmware`, `power_monitor`, `power_lockstep`, `power_clean_window_probe`, `power_firmware_fingerprint`
+  Dimensions: `power_scope`, `power_mode`, `power_firmware`, `power_monitor`, `power_lockstep`, `power_clean_window_probe`, `power_clean_workload`, `power_firmware_fingerprint`
 - **`metric.memory_<dimension>_mismatch`** (`metric_blocking`) — Per-region memory metrics omitted because a memory comparison dimension differs between the runs.
   Dimensions: `link_family`
 - **`dimension.<dimension>_differs`** (`informative`) — A comparison dimension differs between the runs; deltas remain comparable but should be read in that light.
