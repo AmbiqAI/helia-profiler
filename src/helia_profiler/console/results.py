@@ -13,6 +13,7 @@ from rich.table import Table
 from rich.text import Text
 
 from .tables import _fmt_bytes, _progress_bar
+from ..firmware.workload import measured_clean_workload
 from ..power.metadata import PowerIntegrity
 from ..results.serde import to_float
 
@@ -357,7 +358,7 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
     overview.add_row("Total cycles", f"[bold cyan]{total_cycles:,.0f}[/bold cyan]")
 
     # Clean end-to-end cycles (no per-layer instrumentation), with the
-    # delta vs the per-layer sum so the instrumentation overhead is visible.
+    # delta vs the per-layer sum; clean input preparation can also contribute.
     clean_cycles = meta.clean_infer_avg_cycles
     if clean_cycles:
         delta_txt = ""
@@ -365,7 +366,9 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
             delta_pct = (clean_cycles - total_cycles) / total_cycles * 100.0
             delta_txt = f"  [dim]({delta_pct:+.1f}% vs per-layer sum)[/dim]"
         overview.add_row(
-            "Clean E2E cycles",
+            "Clean E2E cycles (includes input refill)"
+            if measured_clean_workload(ctx) is not None
+            else "Clean E2E cycles",
             f"[bold green]{clean_cycles:,.0f}[/bold green]{delta_txt}",
         )
 
@@ -609,6 +612,8 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
         power_table.add_column("Metric", min_width=16)
         power_table.add_column("Value", justify="right", min_width=14)
 
+        if measured_clean_workload(ctx, power=True) is not None:
+            power_table.add_row("Workload", "Raw-zero inputs; refill included")
         power_table.add_row("Avg current", f"{ps.avg_current_a * 1000:.3f} mA")
         power_table.add_row("Avg power", f"{ps.avg_power_w * 1000:.3f} mW")
         power_table.add_row("Peak current", f"{ps.peak_current_a * 1000:.3f} mA")

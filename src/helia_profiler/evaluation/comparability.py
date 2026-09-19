@@ -236,10 +236,9 @@ def assess_comparability(
             continue
         baseline_value = baseline_dimensions.get(dimension)
         candidate_value = candidate_dimensions.get(dimension)
-        if (
-            baseline_value is not None
-            and candidate_value is not None
-            and baseline_value != candidate_value
+        if baseline_value != candidate_value and (
+            dimension == ComparisonDimension.POWER_CLEAN_WORKLOAD
+            or (baseline_value is not None and candidate_value is not None)
         ):
             message = (
                 DIMENSION_REGISTRY[dimension].mismatch_hint

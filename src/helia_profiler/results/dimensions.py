@@ -50,6 +50,7 @@ class ComparisonDimension(StrEnum):
     POWER_MONITOR = "power_monitor"
     POWER_LOCKSTEP = "power_lockstep"
     POWER_CLEAN_WINDOW_PROBE = "power_clean_window_probe"
+    POWER_CLEAN_WORKLOAD = "power_clean_workload"
     POWER_FIRMWARE_FINGERPRINT = "power_firmware_fingerprint"
 
     # Metric gate — a non-valid value on either side blocks power metrics.
@@ -374,6 +375,15 @@ _DIMENSION_SPECS: tuple[DimensionSpec, ...] = (
         DimensionEffect.POWER_METRIC_BLOCKING,
         ArtifactSource.MANIFEST_ONLY,
         metric_group="power",
+    ),
+    DimensionSpec(
+        ComparisonDimension.POWER_CLEAN_WORKLOAD,
+        DimensionEffect.POWER_METRIC_BLOCKING,
+        ArtifactSource.SUMMARY_POWER,
+        ("clean_workload",),
+        metric_group="power",
+        manifest_authoritative=False,
+        mismatch_hint="Power metrics omitted because clean workload differs or is unknown; input restoration may be included.",
     ),
     DimensionSpec(
         ComparisonDimension.POWER_FIRMWARE_FINGERPRINT,

@@ -432,8 +432,9 @@ int main(void) {
         uint32_t clean_warm_min_cyc = 0U;
 {%- endif %}
         for (int w = 0; w < 3; w++) {
-{# Indentation lives INSIDE the reset-inputs blocks (unlike engine_invoke) because an engine whose override is multi-line must indent every line. #}{% block engine_reset_inputs_warm %}{% endblock %}
+{# Indentation lives INSIDE the reset-inputs blocks (unlike engine_invoke) because an engine whose override is multi-line must indent every line. #}{% if not restore_clean_inputs | default(false) %}{% block engine_reset_inputs_warm %}{% endblock %}{% endif %}
             uint32_t wt0 = DWT->CYCCNT;
+{% if restore_clean_inputs | default(false) %}{{ self.engine_reset_inputs_warm() }}{% endif %}
             {# One statement reused at seven call sites across two indent levels, so the base writes the indent and the block holds the bare call; the other six sites call it back through self.engine_invoke(). #}{% block engine_invoke %}{% endblock %}
             uint32_t wc = (uint32_t)(DWT->CYCCNT - wt0);
             if (wc > clean_warm_cyc) clean_warm_cyc = wc;
@@ -465,8 +466,9 @@ int main(void) {
         uint32_t clean_warm_cyc = 0U;
         uint32_t clean_warm_min_cyc = 0U;
         for (int w = 0; w < {{ [clean_warmup | default(1), 3] | max }}; w++) {
-{{ self.engine_reset_inputs_warm() }}
+{% if not restore_clean_inputs | default(false) %}{{ self.engine_reset_inputs_warm() }}{% endif %}
             uint32_t wt0 = DWT->CYCCNT;
+{% if restore_clean_inputs | default(false) %}{{ self.engine_reset_inputs_warm() }}{% endif %}
             {{ self.engine_invoke() }}
             uint32_t wc = (uint32_t)(DWT->CYCCNT - wt0);
             if (wc > clean_warm_cyc) clean_warm_cyc = wc;
@@ -494,8 +496,9 @@ int main(void) {
         dwt_init();
         uint32_t clean_warm_cyc = 0U;
         for (int w = 0; w < {{ [clean_warmup | default(1), 3] | max }}; w++) {
-{{ self.engine_reset_inputs_warm() }}
+{% if not restore_clean_inputs | default(false) %}{{ self.engine_reset_inputs_warm() }}{% endif %}
             uint32_t wt0 = DWT->CYCCNT;
+{% if restore_clean_inputs | default(false) %}{{ self.engine_reset_inputs_warm() }}{% endif %}
             {{ self.engine_invoke() }}
             uint32_t wc = (uint32_t)(DWT->CYCCNT - wt0);
             if (wc > clean_warm_cyc) clean_warm_cyc = wc;
@@ -591,13 +594,7 @@ int main(void) {
         // gate line during the comparatively long engine setup path.
         hpx_sync_ready();
         hpx_sync_wait_go();
-        // Set the inputs once before the gated window, not on every
-        // iteration — AutoDeploy's power loop re-invokes on the same fixed
-        // input every run rather than re-zeroing it each time, and
-        // re-memset()ing per iteration adds real, avoidable overhead inside
-        // the timed/measured window (a measurable share of per-inference
-        // energy for a small KWS model; found 2026-07-02 while diagnosing
-        // the HPX-vs-AutoDeploy power gap).
+        // Initialize the input before opening the measured window.
 {% block engine_reset_inputs %}{% endblock %}
 {% if busy_loop_probe %}
 {% include "_busy_loop_calibration.j2" %}
@@ -755,6 +752,7 @@ int main(void) {
         // timed loop and no resolution concern at this scale (XTAL 32.768 kHz
         // ticks are ~30.5us, negligible against a multi-ms clean window).
         for (int iter = 0; iter < clean_iters_n; iter++) {
+{% if restore_clean_inputs | default(false) %}{{ self.engine_reset_inputs_warm() }}{% endif %}
             {{ self.engine_invoke() }}
             clean_count++;
 {% if clean_window_trace | default(false) and transport not in ["swo", "uart"] %}
@@ -807,6 +805,7 @@ int main(void) {
         const uint32_t clean_low_cyc = clean_warm_min_cyc >> 3;
         for (int iter = 0; iter < clean_iters_n; iter++) {
             uint32_t t0 = DWT->CYCCNT;
+{% if restore_clean_inputs | default(false) %}{{ self.engine_reset_inputs_warm() }}{% endif %}
             {{ self.engine_invoke() }}
             const uint32_t clean_iter_cyc = (uint32_t)(DWT->CYCCNT - t0);
             if (clean_iter_cyc == 0U) {

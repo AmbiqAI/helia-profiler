@@ -170,6 +170,7 @@ class LatencySection:
     device_profiled_infer_count: float | int | None = None
     device_profiled_infer_total_us: float | int | None = None
     device_profiled_infer_avg_us: float | int | None = None
+    clean_workload: str | None = None
     device_clean_infer_count: float | int | None = None
     device_clean_infer_total_cycles: float | int | None = None
     device_clean_infer_avg_cycles: float | int | None = None
@@ -201,6 +202,7 @@ class LatencySection:
         _put(out, "device_clean_dwt_rate_cyc", self.device_clean_dwt_rate_cyc)
         _put(out, "device_clean_dwt_rate_us", self.device_clean_dwt_rate_us)
         _put(out, "device_clean_attach_wait_us", self.device_clean_attach_wait_us)
+        _put(out, "clean_workload", self.clean_workload)
         return out
 
     @classmethod
@@ -213,6 +215,7 @@ class LatencySection:
             "device_profiled_infer_count",
             "device_profiled_infer_total_us",
             "device_profiled_infer_avg_us",
+            "clean_workload",
             "device_clean_infer_count",
             "device_clean_infer_total_cycles",
             "device_clean_infer_avg_cycles",
@@ -232,6 +235,9 @@ class LatencySection:
             device_profiled_infer_count=data.get("device_profiled_infer_count"),
             device_profiled_infer_total_us=data.get("device_profiled_infer_total_us"),
             device_profiled_infer_avg_us=data.get("device_profiled_infer_avg_us"),
+            clean_workload=(
+                data["clean_workload"] if isinstance(data.get("clean_workload"), str) else None
+            ),
             device_clean_infer_count=data.get("device_clean_infer_count"),
             device_clean_infer_total_cycles=data.get("device_clean_infer_total_cycles"),
             device_clean_infer_avg_cycles=data.get("device_clean_infer_avg_cycles"),
@@ -274,6 +280,7 @@ class PowerSection:
     energy_j: float | None = None
     capture_duration_s: float | None = None
     measurement_scope: str | None = None
+    clean_workload: str | None = None
     firmware_code_fingerprint: str | None = None
     observation_mode: str | None = None
     integrity: str | None = None
@@ -329,6 +336,7 @@ class PowerSection:
         "energy_j",
         "capture_duration_s",
         "measurement_scope",
+        "clean_workload",
         "firmware_code_fingerprint",
         "observation_mode",
         "integrity",
