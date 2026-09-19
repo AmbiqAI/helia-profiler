@@ -93,7 +93,7 @@ int main(int argc,char**) {
             )
         )
         path = tmp_path / f"loop-{omit_reset}.cc"
-        path.write_text(code)
+        path.write_text(code, encoding="utf-8")
         executable = path.with_suffix(".exe")
         subprocess.run(
             [compiler, "-std=c++17", str(path), "-o", str(executable)],
@@ -135,8 +135,8 @@ def test_workload_written_from_selected_render(
     ctx.firmware_dir = tmp_path / "firmware"
     src = ctx.firmware_dir / "src"
     src.mkdir(parents=True)
-    (src / "main.cc").write_text(_render_aot())
-    (src / "main_power.cc").write_text(_render_aot(power_only=True))
+    (src / "main.cc").write_text(_render_aot(), encoding="utf-8")
+    (src / "main_power.cc").write_text(_render_aot(power_only=True), encoding="utf-8")
     data = json.loads(_write_summary(ctx, tmp_path).read_text())
     identity = "aot_raw_zero_refill_included_v1"
     assert data["latency"]["clean_workload"] == identity
@@ -144,7 +144,8 @@ def test_workload_written_from_selected_render(
     assert RunSummary.from_dict(data).to_dict()["power"]["clean_workload"] == identity
     assert RunSummary.from_dict(data).to_dict()["latency"]["clean_workload"] == identity
     (src / ("main_power.cc" if firmware_mode == "dedicated" else "main.cc")).write_text(
-        _render_aot(clean_window_probe="busy_loop", power_only=firmware_mode == "dedicated")
+        _render_aot(clean_window_probe="busy_loop", power_only=firmware_mode == "dedicated"),
+        encoding="utf-8",
     )
     assert measured_clean_workload(ctx, power=True) is None
     (src / "main.cc").unlink()
