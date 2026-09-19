@@ -48,6 +48,11 @@ host writes back, generated from the registry in `helia_profiler.wire`.
 matrix of SoCs, transports, engines and binaries and asserts that what they
 emit is exactly what this page says.
 
+AOT clean inference timing includes raw-zero input restoration before each call;
+profiled per-layer timing excludes that preparation. The existing clean wire
+fields retain their units and count meaning. Exported summaries identify this
+workload with `clean_workload`; see [power measurement semantics](../guide/power.md#aot-input-preparation).
+
 ## How to read the tables
 
 * **Scope** — which engines emit the token. `all` means every engine.

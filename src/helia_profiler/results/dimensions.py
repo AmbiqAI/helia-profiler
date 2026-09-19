@@ -30,6 +30,8 @@ from enum import StrEnum
 from types import MappingProxyType
 from typing import Any, Mapping
 
+from .run_summary import PowerSection
+
 
 class ComparisonDimension(StrEnum):
     """Comparison dimensions (the vocabulary behind comparability codes).
@@ -50,6 +52,7 @@ class ComparisonDimension(StrEnum):
     POWER_MONITOR = "power_monitor"
     POWER_LOCKSTEP = "power_lockstep"
     POWER_CLEAN_WINDOW_PROBE = "power_clean_window_probe"
+    POWER_CLEAN_WORKLOAD = "power_clean_workload"
     POWER_FIRMWARE_FINGERPRINT = "power_firmware_fingerprint"
 
     # Metric gate — a non-valid value on either side blocks power metrics.
@@ -123,14 +126,10 @@ class ArtifactPath:
 class DimensionSpec:
     """Declaration of one comparison dimension.
 
-    ``manifest_authoritative`` is ``False`` only for ``power_lockstep``: the
-    runtime value in ``summary.power.sync.lockstep`` records the state the
-    rail was actually in, and config intent (which is what the manifest
-    derives from) answers the wrong question — a driver with no GO output
-    degrades to the null controller even when config resolved lock-step on.
-    The manifest writer excludes it and the reader merge must never override
-    it; both rules are contract-tested from this flag (the #115
-    phantom-comparability lesson, as data instead of comments).
+    ``manifest_authoritative=False`` preserves observed summary values over
+    manifest config intent, including power lockstep and clean workload.
+    The manifest writer excludes these dimensions and the reader never
+    overrides them; contract tests enforce both rules.
 
     ``derive`` computes the value from the source dict when a plain path
     cannot express it (``power_monitor``'s manifest-less fallback).
@@ -374,6 +373,16 @@ _DIMENSION_SPECS: tuple[DimensionSpec, ...] = (
         DimensionEffect.POWER_METRIC_BLOCKING,
         ArtifactSource.MANIFEST_ONLY,
         metric_group="power",
+    ),
+    DimensionSpec(
+        ComparisonDimension.POWER_CLEAN_WORKLOAD,
+        DimensionEffect.POWER_METRIC_BLOCKING,
+        ArtifactSource.SUMMARY_POWER,
+        ("clean_workload",),
+        derive=lambda power: PowerSection.from_dict(power).clean_workload,
+        metric_group="power",
+        manifest_authoritative=False,
+        mismatch_hint="Power metrics omitted because clean workload differs or is unknown; input restoration may be included.",
     ),
     DimensionSpec(
         ComparisonDimension.POWER_FIRMWARE_FINGERPRINT,

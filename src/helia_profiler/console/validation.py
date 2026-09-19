@@ -14,6 +14,8 @@ from rich.text import Text
 
 from .tables import _fmt_bytes
 
+from ..firmware.workload import AOT_CLEAN_WORKLOAD
+
 if TYPE_CHECKING:
     from ..validation.report import ValidationReport
     from ..validation.runner import CaseResult
@@ -272,7 +274,20 @@ def print_validation(
                     if case.energy_uj is not None
                     else "—"
                 )
-            row.append(_format_tags(tags.get(case.case_id, ())))
+            decision = _format_tags(tags.get(case.case_id, ()))
+            if case.clean_workload is not None:
+                decision += (
+                    "\nclean: refill included"
+                    if case.clean_workload == AOT_CLEAN_WORKLOAD
+                    else f"\nclean: {escape(case.clean_workload)}"
+                )
+            if case.power_workload is not None:
+                decision += (
+                    "\npower: refill included"
+                    if case.power_workload == AOT_CLEAN_WORKLOAD
+                    else f"\npower: {escape(case.power_workload)}"
+                )
+            row.append(decision)
             table.add_row(*row)
         console._console.print(table)
         console._console.print()

@@ -290,7 +290,10 @@ silently (the ExecuTorch one did, and had to be converted back in #154).
    `engine_clean_window` is the seam to think hardest about, and only applies if
    your engine's invoke is **not** a pure inference call. The default brackets
    `self.engine_invoke()` with the window clock, which is correct whenever the
-   invoke IS the inference (heliaRT, TFLM, heliaAOT). ExecuTorch overrides it
+   invoke IS the inference (heliaRT, TFLM). AOT enables `restore_clean_inputs`
+   to include raw-zero input restoration before each clean invocation and in
+   the warm timing calibration. Its clean results explicitly include that
+   setup; per-layer profiling does not. ExecuTorch overrides it
    because `run_once_profiled()` reloads the model per call and reports its own
    execute-only cycle count, so inheriting the default would silently redefine
    `HPX_CLEAN_INFER_*` as load+execute. If you override it, you own everything

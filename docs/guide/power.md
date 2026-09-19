@@ -131,6 +131,27 @@ healthy run looks like.
 for this path, plus health signals described in
 [Verifying a capture](#verifying-a-capture).
 
+### AOT input preparation
+
+AOT clean inference windows restore every input to raw zero bytes before each
+invocation. Input storage can be reused as scratch during inference. The clean
+DWT/STIMER timing and GPIO/INA228 energy include this restoration; the warm
+calibration includes it too. No extra model-sized input buffer is allocated.
+Per-layer profiling continues to exclude input preparation. Raw zero bytes are
+not generally quantized real zero, and refilling inputs does not reset persistent
+model state.
+
+New AOT inference results identify this workload as
+`aot_raw_zero_refill_included_v1` in `latency.clean_workload` and
+`power.clean_workload`. These declarations come from the selected rendered
+firmware source, like the firmware fingerprint; they are not binary attestation.
+Absent declarations remain unknown, including older captures and busy-loop runs.
+Power comparison omits deltas between this workload and an unknown or different
+workload. Existing profiled-latency and per-layer comparisons are unchanged.
+When comparing clean timing manually, account for the included input preparation.
+Older captures still describe the workload actually measured; changing input
+values alone does not invalidate electrical measurements.
+
 ### Integration and timing semantics
 
 Gated statistics sum the **magnitude of each packet's signed net charge and

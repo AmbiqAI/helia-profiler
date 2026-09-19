@@ -20,6 +20,7 @@ from ..errors import ReportError
 from ..results.run_summary import RunSummary
 from ..evaluation import evaluate_run
 from ..firmware import measured_power_fingerprint
+from ..firmware.workload import measured_clean_workload
 from ..power.diagnostics import probe_runs_inferences, window_inference_count
 
 if TYPE_CHECKING:
@@ -158,6 +159,9 @@ def _write_summary(
         # None (unreadable source, no plan) is simply not written — absent
         # is the legacy value the comparability reader skips.
         fingerprint = measured_power_fingerprint(ctx)
+        workload = measured_clean_workload(ctx, power=True)
+        if workload is not None:
+            summary["power"]["clean_workload"] = workload
         if fingerprint is not None:
             summary["power"]["firmware_code_fingerprint"] = fingerprint
         if power_meta.get("observation_mode") is not None:
@@ -430,6 +434,11 @@ def _write_summary(
             }.items()
             if value is not None
         }
+
+    workload = measured_clean_workload(ctx)
+    if workload is not None and "latency" in summary:
+        latency_section: dict[str, Any] = summary["latency"]
+        latency_section["clean_workload"] = workload
 
     # Compute TOPS/W if both model analysis and power data are available.
     # Scope-based suppression (free-form, whole-capture) is folded into

@@ -12,6 +12,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from ..firmware.workload import AOT_CLEAN_WORKLOAD
 from .._version import __version__
 from ..errors import ReportError
 from ..results.serde import nested_get
@@ -75,6 +76,9 @@ def load_validation_report(path: Path) -> ValidationReport:
         if not isinstance(raw, dict) or not required.issubset(raw):
             raise ReportError(f"Invalid validation case at index {index}: {report_path}")
         values = {key: value for key, value in raw.items() if key in case_fields}
+        for key in ("clean_workload", "power_workload"):
+            if not isinstance(values.get(key), str):
+                values[key] = None
         if isinstance(values.get("health_issues"), list):
             values["health_issues"] = tuple(values["health_issues"])
         cases.append(CaseResult(**values))
@@ -185,6 +189,18 @@ def render_markdown(results: list[CaseResult]) -> str:
     ]
     for r in results:
         note = r.error or ""
+        if r.clean_workload is not None:
+            note += (
+                "; clean timing includes input refill"
+                if r.clean_workload == AOT_CLEAN_WORKLOAD
+                else f"; clean timing workload: {r.clean_workload}"
+            )
+        if r.power_workload is not None:
+            note += (
+                "; power includes input refill"
+                if r.power_workload == AOT_CLEAN_WORKLOAD
+                else f"; power workload: {r.power_workload}"
+            )
         lines.append(
             "| {cid} | {st} | {dur:.1f} | {toolchain} | {transport} | {memory} | {layers} | {cyc} | {energy} | {avg} | {peak} | {note} |".format(
                 cid=r.case_id,
@@ -278,6 +294,8 @@ def _case_manifest(result: CaseResult, output_dir: Path) -> dict[str, Any]:
             "layers": result.layers,
             "total_cycles": result.total_cycles,
             "latency_avg_us": result.latency_avg_us,
+            "clean_workload": result.clean_workload,
+            "power_workload": result.power_workload,
             "binary_text_bytes": result.binary_text_bytes,
             "binary_data_bytes": result.binary_data_bytes,
             "binary_bss_bytes": result.binary_bss_bytes,
