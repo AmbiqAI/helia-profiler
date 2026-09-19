@@ -75,6 +75,8 @@ class CaseResult:
     layers: int | None = None
     total_cycles: int | None = None
     latency_avg_us: float | None = None
+    clean_workload: str | None = None
+    power_workload: str | None = None
     binary_text_bytes: int | None = None
     binary_data_bytes: int | None = None
     binary_bss_bytes: int | None = None
@@ -604,6 +606,11 @@ def run_case(
                 result.total_cycles = summary.total_cycles_int
             if latency is not None:
                 result.latency_avg_us = latency.best_latency_avg_us
+                if (
+                    latency.device_clean_infer_avg_cycles is not None
+                    or latency.device_clean_infer_avg_us is not None
+                ):
+                    result.clean_workload = latency.clean_workload
             binary = summary.binary
             if binary is not None:
                 result.binary_text_bytes = binary.text
@@ -617,6 +624,7 @@ def run_case(
                 result.model_size_bytes = memory.model_size
             power = summary.power
             if power is not None:
+                result.power_workload = power.clean_workload
                 result.energy_uj = power.energy_uj
                 result.avg_current_ma = power.avg_current_ma
                 result.avg_power_mw = power.avg_power_mw

@@ -186,3 +186,63 @@ def test_power_workload_comparison_preserves_profile_metrics(
     assert result.comparability.layers_comparable
     assert any(not metric.name.startswith("power.") for metric in result.metrics)
     assert any(metric.name.startswith("power.") for metric in result.metrics) is comparable
+
+
+@pytest.mark.parametrize("identity", [None, "aot_raw_zero_refill_included_v1"])
+def test_validation_preserves_measured_workload(tmp_path: Path, monkeypatch, identity: str | None):
+    from helia_profiler.validation import report, runner
+    from helia_profiler.validation.matrix import BOARDS, MODELS, CaseSpec
+
+    case = CaseSpec(
+        model=MODELS["kws"], engine=EngineType.HELIA_AOT, power=False, board=BOARDS["apollo510_evb"]
+    )
+    case_dir = tmp_path / case.case_id
+    case_dir.mkdir()
+    (case_dir / "aot_operator_manifest.json").write_text(json.dumps([{"op": "REVERSE_V2"}]))
+    latency = {"device_clean_infer_avg_cycles": 123, "device_clean_infer_avg_us": 4}
+    power = {"energy_j": 0.001}
+    if identity is not None:
+        latency["clean_workload"] = identity
+        power["clean_workload"] = identity
+    (case_dir / "summary.json").write_text(
+        json.dumps({"layers": 1, "total_cycles": 100, "latency": latency, "power": power})
+    )
+    monkeypatch.setattr(
+        runner,
+        "_run_profile_command",
+        lambda *args, **kwargs: subprocess.CompletedProcess(["inert"], 0, stdout="", stderr=""),
+    )
+    result = runner.run_case(
+        case=case, repo_root=tmp_path, output_root=tmp_path, timeout_s=1, in_process=False
+    )
+    assert result.total_cycles == 123
+    assert result.latency_avg_us == 4
+    assert result.clean_workload == identity
+    assert result.power_workload == identity
+    plain = result.to_dict()
+    manifest = report.build_manifest([result], tmp_path, repo_root=tmp_path)
+    markdown = report.render_markdown([result])
+    if identity is None:
+        assert "clean_workload" not in plain
+        assert "power_workload" not in plain
+        assert "refill" not in markdown
+    else:
+        assert plain["clean_workload"] == identity
+        assert manifest["cases"][0]["metrics"]["clean_workload"] == identity
+        assert manifest["cases"][0]["metrics"]["power_workload"] == identity
+        assert "clean timing includes input refill" in markdown
+        assert "power includes input refill" in markdown
+
+    report_path = tmp_path / "validation.json"
+    report_path.write_text(json.dumps({"cases": [plain]}))
+    loaded = report.load_validation_report(report_path)
+    assert loaded.cases[0].clean_workload == identity
+    assert loaded.cases[0].power_workload == identity
+    from rich.console import Console
+    from helia_profiler.console import HpxConsole
+
+    console = HpxConsole()
+    console._console = Console(record=True, width=240)
+    console.print_validation(loaded)
+    text = console._console.export_text()
+    assert ("refill included" in text) is (identity is not None)
