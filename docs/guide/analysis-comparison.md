@@ -50,10 +50,18 @@ hpx compare results/rt results/aot \
 ```
 
 The `power.duration_s` comparison row reads `power.capture_duration_s` from
-`summary.json`. It is the duration of the power measurement identified by
-`power.measurement_scope`: the gated measurement for GPIO-gated runs, or the
-capture measurement for free-form runs. It does not use the host timing field
-`latency.capture_duration_s` or the separate whole-capture diagnostics.
+`summary.json`: the duration of the selected power measurement. Read it with
+`power.measurement_scope`; the built-in scopes are:
+
+- `gpio_gated_clean_window`: the host instrument's GPIO-high clean window.
+- `on_device_gated_inference`: the on-device monitor's firmware-gated inference window.
+- `free_form_capture`: the whole free-running capture when gating failed.
+- `whole_capture_window`: the legacy whole-capture scope used when producing a
+  summary from power metadata without a scope.
+
+The row does not use host timing (`latency.capture_duration_s`) or replace the
+selected duration with separate whole-capture diagnostics. Scope and integrity
+comparability rules still determine whether power rows are emitted.
 
 HPX verifies declared result-manifest paths, sizes, and SHA-256 digests before
 reading a bundle. It then applies typed comparability rules:
