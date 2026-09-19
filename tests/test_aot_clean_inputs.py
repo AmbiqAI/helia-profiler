@@ -16,7 +16,7 @@ from helia_profiler.evaluation import compare_runs
 from helia_profiler.firmware.workload import measured_clean_workload
 from helia_profiler.report.summary import _write_summary
 from helia_profiler.results import PowerRun, PowerRunPlan
-from helia_profiler.results.run_summary import RunSummary
+from helia_profiler.results.run_summary import RunSummary, load_run_summary
 from tests.test_compare import _write_run
 from tests.test_report import _gated_power_ctx
 from tests.test_template_render import _render_aot
@@ -156,6 +156,9 @@ def test_workload_written_from_selected_render(
     "left,right,comparable",
     [
         (None, None, True),
+        (123, None, True),
+        (["bad"], None, True),
+        ({"bad": True}, "aot_raw_zero_refill_included_v1", False),
         ("aot_raw_zero_refill_included_v1", None, False),
         (None, "aot_raw_zero_refill_included_v1", False),
         ("aot_raw_zero_refill_included_v1", "other", False),
@@ -163,7 +166,7 @@ def test_workload_written_from_selected_render(
     ],
 )
 def test_power_workload_comparison_preserves_profile_metrics(
-    tmp_path: Path, left: str | None, right: str | None, comparable: bool
+    tmp_path: Path, left, right, comparable: bool
 ):
     for name, identity in [("old", left), ("new", right)]:
         power = {
@@ -181,7 +184,14 @@ def test_power_workload_comparison_preserves_profile_metrics(
             layer_cycles=[1000],
             power=power,
         )
+        summary_path = tmp_path / name / "summary.json"
+        data = json.loads(summary_path.read_text(encoding="utf-8"))
+        data["schema_version"] = 5 if name == "old" else 6
+        summary_path.write_text(json.dumps(data), encoding="utf-8")
+        assert load_run_summary(summary_path).schema_version == data["schema_version"]
     result = compare_runs(tmp_path / "old", tmp_path / "new")
+    schema_row = next(row for row in result.config_rows if row.key == "run_summary_schema_version")
+    assert (schema_row.baseline, schema_row.candidate, schema_row.status) == (5, 6, "diff")
     assert result.comparability.power_metrics_comparable is comparable
     assert result.comparability.run_metrics_comparable
     assert result.comparability.layers_comparable
@@ -189,8 +199,10 @@ def test_power_workload_comparison_preserves_profile_metrics(
     assert any(metric.name.startswith("power.") for metric in result.metrics) is comparable
 
 
-@pytest.mark.parametrize("identity", [None, "aot_raw_zero_refill_included_v1"])
-def test_validation_preserves_measured_workload(tmp_path: Path, monkeypatch, identity: str | None):
+@pytest.mark.parametrize(
+    "identity", [None, "aot_raw_zero_refill_included_v1", 123, ["bad"], {"bad": True}]
+)
+def test_validation_preserves_measured_workload(tmp_path: Path, monkeypatch, identity):
     from helia_profiler.validation import report, runner
     from helia_profiler.validation.matrix import BOARDS, MODELS, CaseSpec
 
@@ -208,6 +220,11 @@ def test_validation_preserves_measured_workload(tmp_path: Path, monkeypatch, ide
     (case_dir / "summary.json").write_text(
         json.dumps({"layers": 1, "total_cycles": 100, "latency": latency, "power": power})
     )
+    expected = identity if isinstance(identity, str) else None
+    summary = load_run_summary(case_dir / "summary.json")
+    assert summary.latency is not None and summary.power is not None
+    assert summary.latency.clean_workload == expected
+    assert summary.power.clean_workload == expected
     monkeypatch.setattr(
         runner,
         "_run_profile_command",
@@ -218,27 +235,27 @@ def test_validation_preserves_measured_workload(tmp_path: Path, monkeypatch, ide
     )
     assert result.total_cycles == 123
     assert result.latency_avg_us == 4
-    assert result.clean_workload == identity
-    assert result.power_workload == identity
+    assert result.clean_workload == expected
+    assert result.power_workload == expected
     plain = result.to_dict()
     manifest = report.build_manifest([result], tmp_path, repo_root=tmp_path)
     markdown = report.render_markdown([result])
-    if identity is None:
+    if expected is None:
         assert "clean_workload" not in plain
         assert "power_workload" not in plain
         assert "refill" not in markdown
     else:
-        assert plain["clean_workload"] == identity
-        assert manifest["cases"][0]["metrics"]["clean_workload"] == identity
-        assert manifest["cases"][0]["metrics"]["power_workload"] == identity
+        assert plain["clean_workload"] == expected
+        assert manifest["cases"][0]["metrics"]["clean_workload"] == expected
+        assert manifest["cases"][0]["metrics"]["power_workload"] == expected
         assert "clean timing includes input refill" in markdown
         assert "power includes input refill" in markdown
 
     report_path = tmp_path / "validation.json"
     report_path.write_text(json.dumps({"cases": [plain]}))
     loaded = report.load_validation_report(report_path)
-    assert loaded.cases[0].clean_workload == identity
-    assert loaded.cases[0].power_workload == identity
+    assert loaded.cases[0].clean_workload == expected
+    assert loaded.cases[0].power_workload == expected
     from rich.console import Console
     from helia_profiler.console import HpxConsole
 
@@ -246,4 +263,4 @@ def test_validation_preserves_measured_workload(tmp_path: Path, monkeypatch, ide
     console._console = Console(record=True, width=240)
     console.print_validation(loaded)
     text = console._console.export_text()
-    assert ("refill included" in text) is (identity is not None)
+    assert ("refill included" in text) is (expected is not None)

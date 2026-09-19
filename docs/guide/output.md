@@ -94,7 +94,7 @@ consumers can evolve parsers without coupling every file to the bundle schema:
 
 | Artifact | Schema | Packaged JSON Schema |
 | --- | --- | --- |
-| `summary.json` | `hpx.run-summary` v5 | `run_summary.schema.v1.json` (root fields; the authoritative shape is the typed model `helia_profiler.results.run_summary.RunSummary`) |
+| `summary.json` | `hpx.run-summary` v6 | `run_summary.schema.v1.json` (root fields; the authoritative shape is the typed model `helia_profiler.results.run_summary.RunSummary`) |
 | `run_metadata.json` | `hpx.run-metadata` v1 | `run_metadata.schema.v1.json` |
 | `profile_results.json` | `hpx.profile-results` v1 | `profile_results.schema.v1.json` |
 
@@ -109,7 +109,7 @@ The top-level summary — start here for a quick overview.
 ```json
 {
   "schema": "hpx.run-summary",
-  "schema_version": 5,
+  "schema_version": 6,
   "engine": "helia-rt",
   "layers": 13,
   "total_cycles": 2016376,
@@ -476,6 +476,14 @@ inputs are (no symbol table, partial listing, no measured view).
     Comparing v4 and v5 reports an `INFORMATIVE` schema difference and still
     computes metrics. Re-record baselines for the affected power fields;
     those measurements do not have identical semantics across this boundary.
+
+!!! note "Schema v6"
+    AOT clean timing and power now include restoring raw-zero inputs before
+    each invocation (#317). The optional `latency.clean_workload` and
+    `power.clean_workload` fields identify this measured workload. Older
+    summaries remain readable. A schema difference is informative; the
+    workload identity separately blocks power deltas against missing or
+    different workloads. Profiled and per-layer comparisons remain available.
 
 ## Terminal summary
 

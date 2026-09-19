@@ -49,7 +49,8 @@ RUN_SUMMARY_SCHEMA = "hpx.run-summary"
 #: duration_s, avg_current_a,
 #: avg_power_w and the TOPS figures shift; energy_j and TOPS-per-watt do
 #: not. A v4 and a v5 summary are not comparable on those fields.
-RUN_SUMMARY_SCHEMA_VERSION = 5
+#: v6: #317 AOT clean timing and power include per-call input restoration.
+RUN_SUMMARY_SCHEMA_VERSION = 6
 
 __all__ = [
     "RUN_SUMMARY_SCHEMA",
@@ -392,6 +393,9 @@ class PowerSection:
     def from_dict(cls, data: Mapping[str, Any]) -> PowerSection:
         known = set(cls._KNOWN)
         kwargs: dict[str, Any] = {key: data.get(key) for key in cls._KNOWN}
+        kwargs["clean_workload"] = (
+            data["clean_workload"] if isinstance(data.get("clean_workload"), str) else None
+        )
         return cls(
             **kwargs,
             extras={k: v for k, v in data.items() if k not in known},

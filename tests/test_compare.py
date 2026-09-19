@@ -1049,7 +1049,7 @@ def test_compare_console_survives_a_non_finite_metric(tmp_path: Path):
     print_compare(HpxConsole(verbosity=0), result)  # must not raise ValueError
 
 
-@pytest.mark.parametrize("baseline_version,candidate_version", [(4, 5), (5, 5)])
+@pytest.mark.parametrize("baseline_version,candidate_version", [(4, 5), (5, 5), (5, 6), (6, 6)])
 def test_summary_schema_dimension_is_visible_and_usable_in_profiles(
     tmp_path, baseline_version, candidate_version
 ):
