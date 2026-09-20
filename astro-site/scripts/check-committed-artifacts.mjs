@@ -25,6 +25,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { PAGES_DIR, SOURCE_PATH } from './build-reference.mjs';
+import { PAGE_DIRS } from './build-cli-reference.mjs';
 import { SOURCE_REF_TOKEN } from '../src/integrations/source-ref.mjs';
 
 const site = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -35,6 +36,7 @@ const SCANNED = [
   'astro-site/public',
   'astro-site/src/generated',
   `astro-site/${PAGES_DIR}`,
+  ...PAGE_DIRS.map((directory) => `astro-site/${directory}`),
 ];
 
 /* The roots a build machine actually has. A bare leading slash is not enough,
