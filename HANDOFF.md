@@ -14,80 +14,54 @@ Done:
   #329). The migration reaches `main` as one stacked PR, #332.
 - Phase 2, #330, branch `330-python-api-reference` off `docs-migration`:
   the Python API reference. Landed on `docs-migration` at `8420154`.
-- Phase 3f, #335, branch `335-home-design` off `docs-migration` (`8420154`):
-  the Home design pass. Pushed, no PR; the owner reviews the copy first.
+- helia-ui alpha.16 pinned on `docs-migration` at `5594891` (#336).
+- Phase 3f, #335, branch `335-home-design`, rebased onto `docs-migration`
+  (`5594891`). Reviewed once, fixes applied. Pushed, no PR; the owner reviews
+  the copy first.
 
-Branch `335-home-design` (#335), head `d31fe50`:
+Branch `335-home-design` (#335), head `430d587`:
 - Home is rebuilt from helia-ui parts: `Hero` (contrast) with `StatCard`s in
   `aside` and an `AsciiTerminal` in `media`, then five `Band`s alternating
   muted / plain / tinted / plain / muted. Pipeline band is eight `Card`s with
   `CardHeader step="S01".."S08"`, the grouping `docs/architecture/index.md:83`
   and `docs/architecture/pipeline.md:106` already use. The branch-point
   "where to start" cards, version chip and status wording are unchanged.
-- One local component, `src/components/ProductLogo.astro`: theme-selected
-  wordmark in CSS keyed on `data-theme`. Upstream candidate; helia-ui
-  alpha.15 has no theme-selected image part. The MkDocs `#only-light` /
-  `#only-dark` fragments do not work in Astro, which is why it exists.
-- `src/content.config.ts` now extends `docsSchema` with
-  `heliaFrontmatterSchema`, which is what lets Home set
-  `helia: { pageTitle: false }` so the hero owns the only `h1`.
-- Bytes for Home, branch point `8420154` then head: HTML 33,936 -> 56,965 B
-  (budget 250 KB). External JS 5,489 B unchanged. Inline script
-  6,303 -> 11,172 B; the whole +4,869 B is one block, the
-  `helia-ascii-terminal` custom element, which `AsciiTerminal copy` opts into.
+- Home calls the eight labels steps, not stages. A stage here is one of the 18
+  `*Stage()` objects at `src/helia_profiler/profiler.py:47-64`.
+- Board and engine identity is generated, not typed. `scripts/build-catalog.mjs`
+  runs `scripts/dump-catalog.py` over `src/helia_profiler` and writes
+  `src/data/catalog.json` (committed, `generatedFrom.sourceTree`);
+  `src/lib/home-catalog.mjs` turns it into the lines Home renders, and
+  `check-output.mjs` asserts the built page names every id and shows both
+  counts. Negative-tested: adding a phantom board to the catalog fails the
+  check on both assertions.
+- The extractor parses with `ast`, never imports. `.github/workflows/docs.yml`
+  installs griffe and nothing else on purpose, so a site build must not need
+  the profiler's runtime environment. Do not "simplify" it to an import.
+- Two local parts, both upstream candidates:
+  `src/components/ProductLogo.astro` (theme-selected wordmark keyed on
+  `data-theme`; alpha.16 still has no theme-selected image part, and the MkDocs
+  `#only-light` / `#only-dark` fragments do nothing in Astro) and
+  `src/lib/home-catalog.mjs`.
+- The wordmark is served through `astro:assets` from `src/assets/`, not out of
+  `public/`: 102,126 B of PNG became 13,654 B of webp for a 240 px slot.
+- `src/content.config.ts` extends `docsSchema` with `heliaFrontmatterSchema`,
+  which is what lets Home set `helia: { pageTitle: false }` so the hero owns
+  the only `h1`.
+- Bytes for Home, branch point `5594891` then head, both at alpha.16:
+  see the measurement recorded on the PR. At the head: HTML 59,102 B against a
+  250 KB budget, external JS 5,489 B, inline script 13,046 B of which 6,743 B
+  is the one `helia-ascii-terminal` block that `AsciiTerminal copy` opts into.
+  That block was 4,869 B at alpha.15; alpha.16 grew it with the #150 fix.
 - Working notes not committed: `SOURCES.md` (every Home sentence mapped to its
-  docs page and line) and `SCREENSHOTS/` (1280 and 375 CSS px, light and dark,
-  from `astro preview` of the built artifact via Playwright).
-- Checks green on this head: `build`, `check`, `check:links`, `check:output`,
-  `check:search`, `check:redirects`, `check:reference`, `check:guard`.
-- Open on this branch: rebase onto the helia-ui alpha.16 pin when it lands on
-  `docs-migration`, then recheck Home's `/index.md` rendition (helia-ui#146
-  should make it keep the hero text, the terminal command and the card
-  titles; at alpha.15 it drops all of them).
-
-This branch (#330):
-- helia-ui pinned to `v0.1.0-alpha.15` (`51aaae91cf7942eb0778be48e4b4c9a1b16772c3`),
-  lockfile regenerated on linux/amd64 node:24. alpha.15 moves the Callout
-  recipe into the global `recipes.css` and drops `role` for `aria-label`;
-  this site overrides neither, so nothing here changed.
-- Now `v0.1.0-alpha.16` (`6430e46effafaf32b5ea694dfa08061e286a6d74`) on branch
-  `chore-helia-ui-alpha16`; helia-ui#146 makes the MDX renditions keep
-  `LinkCard`/`Card` content, so `dist/index.md` and `llms-full.txt` gain the
-  four home-page card links instead of orphan description paragraphs.
-- The last 11 NumPy docstring sections (7 files) are Google style, held there
-  by `tests/test_docstring_style.py`.
-- `astro-site/scripts/{dump-python,scope-dump,build-reference}.mjs` produce
-  14 curated pages, `reference.json`, per-module JSON and Markdown, and both
-  llms files, from a griffe 1.7.3 dump scoped by `__api_stability__`.
-- Checks: `check:reference` (committed artifacts carry no absolute path, and
-  the committed pages match a fresh regeneration into a scratch directory),
-  `check:output` now also runs `check-reference-output.mjs`.
-
-Verified on this branch (all local, all green):
-- `npm ci` from the Linux lockfile.
-- `npm run build`, `check`, `check:links`, `check:output`, `check:search`,
-  `check:redirects`, `check:reference`, `check:guard`.
-- 61 legacy routes covered: 57 redirected (49 still deferred to a section
-  landing page, down 8), 4 already served by a page of the same path.
-- 85 published names render as 84 symbols and one module page across 14 pages,
-  each symbol once and badged; the 13 implementation names appear as no symbol,
-  member, sidebar entry or llms-full.txt section.
-- Largest reference page: `/reference/api/helia_profiler/evaluation/` at
-  211,801 B HTML and 14,582 B gzip, against a 250 KB / 40 KB budget.
-- `uv run --no-project --with griffe==1.7.3 griffe dump helia_profiler
-  --search src --docstyle google -f` produces the same dump as the project env,
-  which is what makes the CI job need griffe and nothing else. (Without
-  `--docstyle google -f` the dump is a different size and a different shape;
-  the flags are not cosmetic.)
-- A docs-only commit leaves every generated file untouched: the artifacts
-  committed at `dea74c5` were generated at `d83d145` and `check:reference`
-  still reports them current.
-
-Not verifiable before merge, named as such in #325:
-- the first post-merge push run (artifact, deploy job skipped),
-- a `workflow_dispatch` run with `source_ref` set to a tag,
-- `deploy-pages.yml` still producing the live site.
-Record the run links on #325 when they exist.
+  docs page and line, plus the rendition loss table) and `SCREENSHOTS/` (1280
+  and 375 CSS px, light and dark, from `astro preview` of the built artifact
+  via Playwright).
+- Open, for the owner: sign-off on the copy, and one upstream helia-ui issue
+  for what Home loses in its Markdown rendition. The precise list is the last
+  table in `SOURCES.md`; the headline is that `CardList items`, `StatCard
+  label`, `SectionHeader` titles and `Callout title` never reach `index.md`,
+  so no board or engine id reaches an agent through the hardware band.
 
 ## Decisions that shaped this branch
 
