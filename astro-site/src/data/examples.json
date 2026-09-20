@@ -1,0 +1,92 @@
+[
+  {
+    "slug": "helia-rt-baseline",
+    "title": "heliaRT baseline",
+    "engine": "helia-rt",
+    "toolchain": "GCC",
+    "board": "Apollo510 EVB",
+    "measurement": "latency",
+    "config": "examples/quickstart/hpx_rt.yml",
+    "status": "not yet validated"
+  },
+  {
+    "slug": "helia-aot",
+    "title": "heliaAOT ahead-of-time flow",
+    "engine": "helia-aot",
+    "toolchain": "GCC",
+    "board": "Apollo510 EVB",
+    "measurement": "latency",
+    "config": "examples/quickstart/hpx_aot.yml",
+    "status": "not yet validated"
+  },
+  {
+    "slug": "helia-aot-armclang",
+    "title": "heliaAOT with Arm Compiler",
+    "engine": "helia-aot",
+    "toolchain": "armclang",
+    "board": "Apollo510 EVB",
+    "measurement": "latency",
+    "config": "examples/quickstart/hpx_aot_armclang.yml",
+    "status": "not yet validated"
+  },
+  {
+    "slug": "helia-rt-armclang",
+    "title": "heliaRT with Arm Compiler",
+    "engine": "helia-rt",
+    "toolchain": "armclang",
+    "board": "Apollo510 EVB",
+    "measurement": "latency",
+    "config": "examples/quickstart/hpx_rt_armclang.yml",
+    "status": "not yet validated"
+  },
+  {
+    "slug": "tflm-baseline",
+    "title": "TFLM baseline",
+    "engine": "tflm",
+    "toolchain": "GCC",
+    "board": "Apollo510 EVB",
+    "measurement": "latency",
+    "config": "examples/quickstart/hpx_tflm_baseline.yml",
+    "status": "not yet validated"
+  },
+  {
+    "slug": "aot-power",
+    "title": "Power capture with heliaAOT",
+    "engine": "helia-aot",
+    "toolchain": "GCC",
+    "board": "Apollo510 EVB",
+    "measurement": "power",
+    "config": "examples/quickstart/hpx_aot_power.yml",
+    "status": "not yet validated"
+  },
+  {
+    "slug": "aot-npu-atomiq110",
+    "title": "heliaAOT on the Atomiq110 NPU",
+    "engine": "helia-aot",
+    "toolchain": "GCC",
+    "board": "Atomiq110",
+    "measurement": "latency",
+    "config": "examples/quickstart/hpx_aot_npu_atomiq110.yml",
+    "status": "not yet validated"
+  },
+  {
+    "slug": "rt-npu-atomiq110",
+    "title": "heliaRT on the Atomiq110 NPU",
+    "engine": "helia-rt",
+    "toolchain": "GCC",
+    "board": "Atomiq110",
+    "measurement": "latency",
+    "config": "examples/quickstart/hpx_rt_npu_atomiq110.yml",
+    "status": "not yet validated"
+  },
+  {
+    "slug": "full-sweep",
+    "title": "Full engine sweep",
+    "engine": "all",
+    "toolchain": "GCC",
+    "board": "Apollo510 EVB",
+    "measurement": "latency and power",
+    "config": "examples/quickstart/hpx_full_sweep.yml",
+    "status": "not yet validated"
+  }
+]

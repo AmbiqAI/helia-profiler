@@ -1,0 +1,34 @@
+---
+title: Examples
+description: End-to-end profiling examples, with the engine, toolchain, board and measurement for each.
+---
+
+import examples from '../../../data/examples.json';
+
+Every example below ships with a config file in the repository. The status
+column says whether the run has been reproduced on hardware in this project.
+
+<table>
+  <thead>
+    <tr>
+      <th>Example</th>
+      <th>Engine</th>
+      <th>Toolchain</th>
+      <th>Board</th>
+      <th>Measurement</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {examples.map((example) => (
+      <tr key={example.slug}>
+        <td>{example.title}</td>
+        <td>{example.engine}</td>
+        <td>{example.toolchain}</td>
+        <td>{example.board}</td>
+        <td>{example.measurement}</td>
+        <td>{example.status}</td>
+      </tr>
+    ))}
+  </tbody>
+</table>

@@ -1,0 +1,12 @@
+---
+title: Examples
+description: End-to-end profiling examples, with the engine, toolchain, board and measurement for each.
+---
+
+import examples from '../../../data/examples.json';
+import ExamplesTable from '../../../components/ExamplesTable.tsx';
+
+Every example below ships with a config file in the repository. The status
+column says whether the run has been reproduced on hardware in this project.
+
+<ExamplesTable examples={examples} client:load />
