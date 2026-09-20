@@ -254,13 +254,13 @@ The 97 include implementation-tier symbols (`get_soc`, `SocDef`,
 | --- | --- | --- | --- |
 | Signature shown, separated, annotated | Yes | Yes | **Present** |
 | Constructor signature on a pydantic dataclass | No (`PowerConfig` heading, no parameters) | No (`PowerConfig()`) | **Present in neither**, parity |
-| Pydantic **fields** on the class page | **No** — `PowerConfig` renders its three `@property` members only | **Yes** — all 21 fields | **Different, pyref better** |
+| Pydantic **fields** on the class page | **No**, `PowerConfig` renders its three `@property` members only | **Yes**, all 21 fields | **Different, pyref better** |
 | Field type annotation | Properties only | Every field | **Different, pyref better** |
 | Field **default value** | Not shown | Shown (`enabled: bool = False`, `driver: str = DEFAULT_POWER_DRIVER`) | **Different, pyref better** |
 | Parameters / Attributes table | Yes where the docstring has a NumPy section (`HeartbeatConfig`: Name/Type/Description) | **No** (section 9) | **Different, mkdocstrings better** |
-| Enum members | **No** — `Toolchain`'s member list renders empty | **Yes**, with values (`GCC = 'gcc'`) | **Different, pyref better** |
-| `Bases:` line | **Yes** (`Bases: StrEnum`; `ConfigError` cross-linked to `HpxError`) | **No** — `RefSymbol` has no `bases` field | **Absent in pyref**, regression |
-| Cross-references inside signatures | **Yes** (`<a class="autorefs">` on return types) | **No** — plain code text | **Absent in pyref**, regression |
+| Enum members | **No**, `Toolchain`'s member list renders empty | **Yes**, with values (`GCC = 'gcc'`) | **Different, pyref better** |
+| `Bases:` line | **Yes** (`Bases: StrEnum`; `ConfigError` cross-linked to `HpxError`) | **No**, `RefSymbol` has no `bases` field | **Absent in pyref**, regression |
+| Cross-references inside signatures | **Yes** (`<a class="autorefs">` on return types) | **No**, plain code text | **Absent in pyref**, regression |
 | Cross-references in prose | Yes (`:class:` resolved by the handler) | Model-level `[name][path]` links resolve after the scoping pass; Sphinx roles render literally | **Different** |
 | `merge_init_into_class` | On, nothing to merge (no source `__init__`) | On by default, nothing to merge | **Present in neither**, parity |
 | pydantic validators | Not rendered | Not rendered | **Absent in both**, parity |
@@ -284,8 +284,8 @@ Samples: `PowerConfig` (frozen pydantic dataclass, 21 fields),
 Three published surfaces were checked. Note there are **two** `llms-full.txt`
 and they do not carry the same content:
 
-- `/reference/api/llms-full.txt` — written by pyref from the model.
-- `/llms-full.txt` — written by helia-ui's discoverability integration by
+- `/reference/api/llms-full.txt`, written by pyref from the model.
+- `/llms-full.txt`, written by helia-ui's discoverability integration by
   concatenating the pages' `.md` renditions.
 
 | Sample | Rendered page | `/reference/api/llms-full.txt` | `<route>/index.md` | `/llms-full.txt` |
@@ -413,7 +413,7 @@ authored, 22 generated.
 ## 11. React + Tailwind with one island, against the baseline
 
 Variant: `@astrojs/react`, `react`, `react-dom`, `tailwindcss`,
-`@tailwindcss/vite`, `@astrojs/starlight-tailwind`, plus one island —
+`@tailwindcss/vite`, `@astrojs/starlight-tailwind`, plus one island , 
 `src/components/ExamplesTable.tsx`, a filterable table of the nine example
 configs, `client:load` on the Examples index. Identical content in both
 variants; the baseline renders the same nine rows as a static table.
@@ -498,11 +498,11 @@ One line each; the symptom observed here, not a proposed fix.
 11. **pyref: one page per module has no ceiling.** A 19-symbol module builds a
     448 KB HTML page, 1.8x heliaRT's own per-page budget.
 12. **helia-ui #74, "Reference generators: grouping config and a rendered group
-    index"** — open, and directly on the path here: the current site curates 97
+    index"**, open, and directly on the path here: the current site curates 97
     symbols into 8 grouped pages, and module-per-page is a regression against
     that.
 13. **helia-ui #76, "CodeBlock: extend CodeLanguage with cmake, yaml, xml,
-    kconfig, ini"** — open. `CodeLanguage` in `astro/CodeBlock.astro` is
+    kconfig, ini"**, open. `CodeLanguage` in `astro/CodeBlock.astro` is
     `bash | c | cpp | diff | json | plaintext | python | sh | tsx | typescript`;
     every heliaPROFILER config example is YAML.
 14. **No 404 part.** Nothing under `astro/` or `starlight/` renders a
