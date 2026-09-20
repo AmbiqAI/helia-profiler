@@ -91,6 +91,12 @@ jobs:
         working-directory: astro-site
         run: npm ci
 
+      # rehype-mermaid renders the diagrams at build time in the headless
+      # shell, so the browser has to be on the runner before the build.
+      - name: Install the headless browser mermaid renders in
+        working-directory: astro-site
+        run: npx playwright install --with-deps chromium chromium-headless-shell
+
       # prebuild regenerates it too; doing it here puts the griffe version and
       # the symbol counts in the log before anything can fail downstream.
       - name: Regenerate the Python reference
@@ -112,6 +118,7 @@ jobs:
           npm run check:search
           npm run check:redirects
           npm run check:reference
+          npm run check:port
           npm run check:guard
 
       - name: Show build provenance
