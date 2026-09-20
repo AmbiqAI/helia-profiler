@@ -23,7 +23,9 @@ class Page(HTMLParser):
                 self.duplicates.add(anchor)
             self.ids.add(anchor)
         for attribute in ("href", "src"):
-            if attrs.get(attribute) and (attribute != "href" or tag == "a" or attrs.get("rel") == "stylesheet"):
+            if attrs.get(attribute) and (
+                attribute != "href" or tag == "a" or attrs.get("rel") == "stylesheet"
+            ):
                 self.links.append(attrs[attribute])
 
 
@@ -41,7 +43,7 @@ for path, page in pages.items():
             continue
         if not url.path.startswith(BASE):
             continue
-        target = ROOT / unquote(url.path[len(BASE):])
+        target = ROOT / unquote(url.path[len(BASE) :])
         if url.path.endswith("/"):
             target /= "index.html"
         if not target.is_file():
