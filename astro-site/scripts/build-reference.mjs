@@ -19,10 +19,13 @@ const run = (cmd, args) =>
 
 run('node', ['scripts/scope-dump.mjs']);
 
-const commit = execFileSync('git', ['rev-parse', 'HEAD'], {
-  cwd: root,
-  encoding: 'utf8',
-}).trim();
+/* The commit of the documented source, not HEAD: the model records it, so
+ * HEAD would make every commit look like reference drift under --check. */
+const commit = execFileSync(
+  'git',
+  ['log', '-1', '--format=%H', '--', 'src/helia_profiler'],
+  { cwd: resolve(root, '..'), encoding: 'utf8' },
+).trim();
 
 run('npx', [
   'helia-ui-pyref',
