@@ -12,7 +12,8 @@ Done:
   (branch `324-spike-cli-config`, PR #327). Both stay draft and close unmerged.
 - Phase 1, this branch `325-docs-skeleton` off `origin/main` fd2d510: the Astro
   skeleton, five sections, the docs workflow, redirects, 404, provenance and the
-  site checks. Not yet reviewed, no PR opened.
+  site checks. Reviewed once (merge-ready after fixes); the seven review items
+  are applied. No PR opened yet.
 
 Verified on this branch (all local, all green):
 - `npm ci` from the Linux lockfile; helia-ui `v0.1.0-alpha.14` resolves to
@@ -37,6 +38,16 @@ Record the run links on #325 when they exist.
   write` nor the `github-pages` environment. All four come back in #322.
 - Ordering is decided from the live `build-info.json`, not from the trigger.
   A refusal is a skip, so an out-of-order build does not page anyone.
+- The guard separates "nothing is live" from "cannot tell". 404, 410 and a 200
+  that is not build-info mean nothing comparable is live, so it proceeds; a 5xx
+  or a connection failure is retried three times with backoff and then refuses,
+  because the live site may be newer than the build asking to replace it.
+- `publish.yml`'s docs job waits on `publish-pypi`, so the site never announces
+  a version whose PyPI publish failed.
+- The 404 lives at `src/pages/404.astro`, not in the docs collection. The
+  discoverability integration walks that collection, and a 404 inside it earns
+  an llms.txt line and a `/404/index.md` rendition for a route the site does
+  not serve. Its canonical is set to its own URL for the same reason.
 - `redirects.json` answers a legacy route in one of three ways: `served` (a
   page already lives at that path, so a redirect there would collide with it),
   `redirects` (forwards elsewhere), `deferred` (a subset of the redirect keys
@@ -65,9 +76,16 @@ Record the run links on #325 when they exist.
   / 14 leaves, ProfileConfig + 14 nested models / 106 fields.
 - `src/data/legacy-routes.json` is regenerated only when `mkdocs.yml` changes:
   `uv sync --locked --group docs && uv run --group docs zensical build` then
-  `npm --prefix astro-site run legacy-routes:extract`. It outlives cutover.
-- `build-info.json` is generated in `prebuild`. A clean checkout that runs
-  `astro check` before a build fails on the missing import.
+  `npm --prefix astro-site run legacy-routes:extract`. It outlives cutover. The
+  fixture records the SHA-256 of `mkdocs.yml`, and the extractor refuses a
+  `site/` older than `mkdocs.yml`. Nothing compares the digest yet; a check
+  that does would fail any PR that edits the nav without regenerating.
+- `check:redirects` takes `DOCS_REQUIRE_NO_DEFERRED=1` to turn a non-empty
+  deferred list into a failure. #322 turns it on for good.
+- `build-info.json` is generated in `prebuild` and in `precheck`, so `npm run
+  check` works on a clean checkout. Both write `src/data/` and `public/`, so
+  running `check` after `build` leaves a newer `buildTime` in `src/data/` than
+  in `dist/`; nothing compares the two.
 - `deploy-pages.yml` concurrency group `pages` vs `docs.yml`'s `github-pages`:
   reconcile at cutover (#322).
 - `publish.yml` has workflow-level `contents: read`; the new `docs` job declares
