@@ -29,6 +29,10 @@ async function walk(dir) {
   return out;
 }
 
+/* Outside the timer: the reference pages are an input to the build being
+ * measured, not part of it. */
+execFileSync('node', ['scripts/build-reference.mjs'], { cwd: root, stdio: 'inherit' });
+
 await rm(join(root, 'dist'), { recursive: true, force: true });
 await rm(join(root, '.astro'), { recursive: true, force: true });
 
