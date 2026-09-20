@@ -12,10 +12,40 @@ Done:
   (branch `324-spike-cli-config`, PR #327). Both stay draft and close unmerged.
 - Phase 1, #325, landed on `docs-migration` as d4eec96 (reverted from `main` by
   #329). The migration reaches `main` as one stacked PR, #332.
-- Phase 2, #330, this branch `330-python-api-reference` off `docs-migration`:
-  the Python API reference. No PR opened yet; owner reviews first.
+- Phase 2, #330, the Python API reference, merged into `docs-migration` as
+  8420154 (PR #333).
+- Phase 2, #331, this branch `331-cli-config-reference` off `docs-migration`:
+  the CLI, configuration and issue-code reference. No PR opened yet; owner
+  reviews first.
 
-This branch (#330):
+This branch (#331):
+- Extractors in `tools/docs/` (`_common`, `extract_cli`, `extract_schema`,
+  `extract_issues`, `source_audit`, `check_reference`), lifted from the #324
+  spike. They write `cli.json`, `schema.json` and `issues.json` to
+  `astro-site/src/data/`; `scripts/build-cli-reference.mjs` copies them to
+  `public/reference/{cli,configuration,issue-codes}/`, writes the Markdown
+  rendition of each page beside them, and generates fifteen thin pages plus
+  `src/generated/cli-sidebar.json`.
+- Counts, all asserted: 14 leaf commands, 5 groups, 12 top-level entries, 102
+  options, 4 arguments, 42 panelled options across 7 panels, 6 epilogs, 0
+  environment variables; 15 config classes / 106 fields / 106 schema
+  properties; 27 issue codes, 8 comparability codes, 3 families (25 expanded
+  wire codes). The issue's "28 issue codes" was one high; the registry has 27,
+  matching the 35 rows on the MkDocs page.
+- Pages: 13 command pages (the twelve entries plus an `hpx` overview, which is
+  where `--version` lives), the configuration page and the issue-code page.
+  Largest is the configuration page at 141,451 B HTML / 18,183 B gzip against
+  250 KB / 40 KB.
+- Redirects: the 12 `/reference/<command>/` routes now point at
+  `/reference/cli/<command>/`; `/reference/configuration/` and
+  `/reference/issue-codes/` moved to `served`, because a redirect key that
+  equals a built route is a route collision. Deferred 49 -> 35, served 4 -> 6,
+  redirects 57 -> 55.
+- `docs.yml` gains `astral-sh/setup-uv` and a `check_reference.py --check`
+  step, with the reason it is there and not in `ci.yml` in a workflow comment.
+- `tools/verify_distribution.py` asserts no `tools/` entry reaches the wheel.
+
+Earlier on this stack (#330):
 - helia-ui pinned to `v0.1.0-alpha.15` (`51aaae91cf7942eb0778be48e4b4c9a1b16772c3`),
   lockfile regenerated on linux/amd64 node:24. alpha.15 moves the Callout
   recipe into the global `recipes.css` and drops `role` for `aria-label`;
@@ -86,17 +116,47 @@ Record the run links on #325 when they exist.
 - Pagefind is asserted against the generated index, not through a query: the
   query API is a browser module. `check:search` asserts the term is in the
   vocabulary and in the Home fragment.
+- Typer wraps every command callback before handing it to click, and
+  `inspect.getsourcefile` does not follow `__wrapped__` even though
+  `getsourcelines` does. Without `inspect.unwrap` every command's recorded
+  source is `typer/main.py` inside whatever virtualenv produced the artifact,
+  which is an absolute path in a committed file. `extract_cli` unwraps and
+  refuses any path outside the package.
+- `RefParams` writes the description cell as `<td>{row.description}</td>`,
+  which Astro escapes, so Markdown there reaches the reader as its own source
+  text. That settles the spike's `TODO(#324)`: the option help column is plain
+  text with backticks dropped, and the verbatim help with its code spans lives
+  in the Markdown rendition. Widening the cell is a helia-ui ask, not a local
+  workaround.
+- `check-committed-artifacts.mjs` allows a 40-hex hash the package itself
+  declares, not only the source tree: the compatibility baseline pins
+  neuralspotx by commit and by sha256 and those defaults are part of the
+  configuration reference. Membership is a lookup in the source at HEAD, so a
+  build machine's own commit sha still fails.
+- Command epilogs are verbatim, not `cleandoc`-ed, so the example blocks keep
+  the authored blank lines that rich collapses in a terminal. The code block on
+  the page therefore looks double-spaced; that is the source, not the renderer.
+- The CLI extractors import the package, so `docs.yml` needs `setup-uv` as well
+  as the griffe pin. They run under `uv run --isolated --no-dev` so the typer,
+  click and pydantic versions recorded in the artifacts are the package's pins
+  rather than the job's environment.
 
 ## Next
 
 1. Owner reviews this branch, then a PR into `docs-migration` (label
    `agent-generated`). The docs workflow only runs on a pull request, so the
-   "no board, no secrets" run link on #330 cannot exist until the PR is open.
-2. #331: CLI, configuration and issue-code reference. It collides with this
-   branch in `package.json`, `astro.config.mjs` (one Reference sidebar array),
-   `src/data/redirects.json` and `docs.yml`, so it rebases on this rather than
-   running beside it.
-3. Draft the remaining child issues (plan s5 items 4-17) as their phase arrives.
+   "no board, no secrets" run link on #331 cannot exist until the PR is open.
+2. A helia-ui `v0.1.0-alpha.16` pin bump lands on `docs-migration` as a
+   separate commit (owner). Do not bump it here; rebase on `origin/docs-migration`
+   when told it has landed and re-run the check chain. alpha.16 keeps
+   Card/LinkCard/AsciiTerminal content in the MDX renditions but still strips
+   `Ref*` props, so the per-page Markdown this branch writes is still the
+   completeness target.
+3. The content port (#07, parallel) also edits `src/data/redirects.json` and
+   the Reference sidebar array in `astro.config.mjs`; whoever lands second
+   rebases. It skips every reference page, so the 14 routes here are this
+   branch's alone.
+4. Draft the remaining child issues (plan s5 items 4-17) as their phase arrives.
 
 ## Gotchas
 
