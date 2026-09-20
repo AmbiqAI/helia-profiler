@@ -1,25 +1,33 @@
 ---
 title: heliaPROFILER
 description: Profile LiteRT and ExecuTorch models on Ambiq Apollo hardware.
+#
+# These notes live in the frontmatter rather than in an MDX `{/* */}` comment
+# because the Markdown rendition of this page reproduces an MDX comment
+# verbatim and strips the frontmatter, and the rendition is what an agent reads.
+#
+# Every sentence on this page traces to a docs page or a source file; the map
+# is SOURCES.md on the pull request for AmbiqAI/helia-profiler#335.
+#
+# The terminal carries commands and no output on purpose. No page under docs/
+# and no file under examples/ records a profiling run with provenance:
+# docs/examples/basic-profiling.md prints an output block with no validated-on
+# record and docs/getting-started/first-profile.md prints an illustrative
+# summary.json. Home therefore sends the reader to Examples for numbers.
+# Output lands here only when a run with a provenance record exists to quote.
+#
+# AsciiTerminal `copy` is the one opt-in to a script on this page. It is
+# deliberate: the command is there to be pasted.
+#
+# The hero carries the page's h1, so the shell must not draw a second one from
+# `title`. The anchor stays behind for the skip link; `title` still feeds the
+# tab, the OG card and llms.txt.
+helia:
+  pageTitle: false
 tableOfContents: false
 prev: false
 next: false
 ---
-
-{/*
-  Every sentence on this page traces to a docs page or a source file; the map
-  is SOURCES.md on the pull request for AmbiqAI/helia-profiler#335.
-
-  The terminal carries commands and no output on purpose. No page under docs/
-  and no file under examples/ records a profiling run with provenance:
-  docs/examples/basic-profiling.md prints an output block with no validated-on
-  record and docs/getting-started/first-profile.md prints an illustrative
-  summary.json. Home therefore sends the reader to Examples for numbers.
-  Output lands here only when a run with a provenance record exists to quote.
-
-  AsciiTerminal `copy` is the one opt-in to a script on this page. It is
-  deliberate: the command is there to be pasted.
-*/}
 
 import Hero from '@ambiqai/helia-ui/astro/Hero';
 import Band from '@ambiqai/helia-ui/astro/Band';
@@ -62,7 +70,9 @@ import ProductLogo from '../../components/ProductLogo.astro';
     copy
     lines={[
       { kind: 'command', prompt: '$', text: 'hpx boards' },
-      { kind: 'command', prompt: '$', text: 'hpx profile examples/quickstart/kws_model.tflite --board apollo510_evb' },
+      { kind: 'command', prompt: '$', text: 'hpx profile \\' },
+      { kind: 'command', prompt: '>', text: '  examples/quickstart/kws_model.tflite \\' },
+      { kind: 'command', prompt: '>', text: '  --board apollo510_evb' },
     ]}
   />
 </Hero>
