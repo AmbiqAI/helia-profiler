@@ -15,6 +15,7 @@
     "prebuild": "npm run prepare:docs",
     "build": "astro build",
     "preview": "astro preview",
+    "precheck": "npm run prepare:docs",
     "check": "astro check",
     "check:links": "python3 scripts/check-site-links.py",
     "check:output": "node scripts/check-output.mjs && helia-ui-check-discoverability --root .",

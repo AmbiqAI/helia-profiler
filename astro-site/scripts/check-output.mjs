@@ -12,6 +12,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const site = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -53,9 +54,16 @@ const routeOf = (file) =>
 
 /* Provenance. */
 const buildInfo = JSON.parse(read(dist, 'build-info.json'));
+/* The artifact has to come from the checkout being validated. A stale dist/,
+ * left by an earlier build or restored from a cache, would otherwise pass
+ * every other assertion here while carrying another commit's provenance. */
+const head = execFileSync('git', ['rev-parse', 'HEAD'], {
+  cwd: path.resolve(site, '..'),
+  encoding: 'utf8',
+}).trim();
 check(
-  read(dist, 'build-info.json') === read(site, 'src/data/build-info.json'),
-  'dist/build-info.json and src/data/build-info.json differ.',
+  buildInfo.commit === head,
+  `Artifact was built from ${buildInfo.commit}, the checkout is at ${head}.`,
 );
 check(buildInfo.product === 'heliaPROFILER', 'build-info.json names the wrong product.');
 check(
@@ -160,8 +168,7 @@ for (const file of contentPages) {
   );
 }
 
-/* The sitemap covers every content route except the 404, which is a page
- * without a destination. */
+/* The sitemap covers every content route. */
 const sitemapIndex = read(dist, 'sitemap-index.xml');
 const shards = [...sitemapIndex.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) =>
   match[1].slice(`${origin}${base}`.length),
@@ -170,9 +177,7 @@ const locations = shards.flatMap((shard) =>
   [...read(dist, shard).matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]),
 );
 const expected = contentPages
-  .map(routeOf)
-  .filter((route) => route !== `${base}404/`)
-  .map((route) => `${origin}${route}`)
+  .map((file) => `${origin}${routeOf(file)}`)
   .sort();
 check(
   JSON.stringify([...locations].sort()) === JSON.stringify(expected),
@@ -192,6 +197,15 @@ for (const [label, segment] of SECTIONS) {
 const notFound = read(dist, '404.html');
 check(/name=["']robots["'][^>]*noindex/i.test(notFound), '404 page is missing robots noindex.');
 check(!REDIRECT.test(notFound), '404 page carries a meta refresh.');
+/* It is served from its own URL and it is not a content route, so a canonical
+ * anywhere else names a page the artifact does not contain. */
+const notFoundCanonicals = [
+  ...notFound.matchAll(/<link[^>]*\brel=["']canonical["'][^>]*\bhref=["']([^"']+)["']/gi),
+].map((match) => match[1]);
+check(
+  JSON.stringify(notFoundCanonicals) === JSON.stringify([`${origin}${base}404.html`]),
+  `404 page canonical is ${JSON.stringify(notFoundCanonicals)}.`,
+);
 for (const target of [base, `${base}reference/`]) {
   check(notFound.includes(`href="${target}"`), `404 page does not link to ${target}.`);
   check(
