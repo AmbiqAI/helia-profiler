@@ -22,23 +22,26 @@ import RefSymbol from '@ambiqai/helia-ui/astro/RefSymbol';
 import cli from '../data/cli.json';
 import {
   commandLabel,
+  commandSlug,
   commandsOn,
+  isRoot,
   panelsOf,
   paramRow,
   sourceOf,
 } from '../lib/reference-cli.mjs';
 
 interface Props {
-  /** The top-level entry's name, as it appears under `cli.json`'s root. */
-  command: string;
+  /** The top-level entry's name. Omitted on the overview, which is `hpx`. */
+  command?: string;
 }
 
 const { command } = Astro.props;
-const node = cli.root.commands.find((entry) => entry.name === command);
+const node = command ? cli.root.commands.find((entry) => entry.name === command) : cli.root;
 if (!node) {
   throw new Error(`cli.json has no top-level entry named "${command}".`);
 }
 
+const base = '/helia-profiler/';
 const subcommands = node.commands ?? [];
 ---
 
@@ -47,12 +50,13 @@ const subcommands = node.commands ?? [];
 {
   subcommands.length > 0 && (
     <RefMembers
-      label="Subcommands"
+      label={isRoot(node) ? 'Commands' : 'Subcommands'}
       items={subcommands.map((child) => ({
         id: commandLabel(child.path),
         name: commandLabel(child.path),
         kind: 'command',
         summary: child.short_help ?? '',
+        href: isRoot(node) ? `${base}${commandSlug(child.name)}/` : undefined,
       }))}
     />
   )

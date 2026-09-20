@@ -3,6 +3,10 @@
     "label": "Command line",
     "items": [
       {
+        "label": "Overview",
+        "slug": "reference/cli"
+      },
+      {
         "label": "hpx analyze",
         "slug": "reference/cli/analyze"
       },
