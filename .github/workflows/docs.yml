@@ -138,7 +138,6 @@ jobs:
         with:
           ref: ${{ needs.build.outputs.source_commit }}
           sparse-checkout: astro-site/scripts
-          sparse-checkout-cone-mode: false
 
       - name: Download the tested site
         uses: actions/download-artifact@v4
