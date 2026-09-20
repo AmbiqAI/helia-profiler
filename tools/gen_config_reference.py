@@ -76,16 +76,23 @@ def _section_title(path: tuple[str, ...]) -> str:
 def _docstring(cls: type) -> str:
     """Class docstring as Markdown prose.
 
-    Numpydoc-style ``Attributes`` blocks are stripped: their setext-style
-    underline renders as a broken heading in Markdown, and the per-field
+    ``Attributes`` blocks are stripped in either docstring style: the
+    numpydoc setext underline renders as a broken heading in Markdown, the
+    Google-style block renders as an indented code span, and the per-field
     details are already covered by the generated table.
     """
     doc = inspect.getdoc(cls)
     if not doc:
         return ""
     lines = doc.strip().splitlines()
-    for i in range(len(lines) - 1):
-        if lines[i].strip() in ("Attributes", "Attributes:") and set(lines[i + 1].strip()) == {"-"}:
+    for i, line in enumerate(lines):
+        google = line.strip() == "Attributes:"
+        numpy = (
+            line.strip() == "Attributes"
+            and i + 1 < len(lines)
+            and set(lines[i + 1].strip()) == {"-"}
+        )
+        if google or numpy:
             lines = lines[:i]
             break
     return "\n".join(lines).rstrip()
