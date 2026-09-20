@@ -12,9 +12,16 @@
  * every build's source links to that branch, and a commit sha would rewrite
  * every generated file on every change under src/ and would not survive the
  * squash merges this repository uses. The ref is substituted at build time,
- * so what is committed is the placeholder. The one 40-hex hash allowed is the
- * git tree of the documented source, which is the provenance the reference
- * records.
+ * so what is committed is the placeholder.
+ *
+ * Two kinds of 40-hex hash are allowed and no third. The git tree of the
+ * documented source is the provenance the reference records. A hash the
+ * package itself declares is content, not provenance: the compatibility
+ * baseline pins neuralspotx by commit and by sha256, and a configuration
+ * reference that dropped the pinned default would be documenting a different
+ * package. Membership is decided by looking the hash up in the source at HEAD
+ * rather than by a file allowlist, so a build machine's own commit sha still
+ * fails wherever it appears.
  *
  * Committed content is read from git rather than from the working tree: the
  * prebuild chain rewrites these files, so by the time a check runs the tree
@@ -58,6 +65,21 @@ const sourceTree = git(['rev-parse', `HEAD:${SOURCE_PATH}`]).trim();
 const HASH = /\b[0-9a-f]{40}\b/g;
 const REF = /\/blob\/([^/"'\s)]+)\//g;
 
+/** Whether the documented source declares this hash as one of its own values. */
+const declared = new Map();
+const declaredInSource = (hash) => {
+  if (!declared.has(hash)) {
+    let found = false;
+    try {
+      found = git(['grep', '-l', '--fixed-strings', hash, 'HEAD', '--', SOURCE_PATH]).length > 0;
+    } catch {
+      /* git grep exits 1 when nothing matches, which is the answer, not a fault. */
+    }
+    declared.set(hash, found);
+  }
+  return declared.get(hash);
+};
+
 const failures = [];
 for (const file of tracked) {
   /* A binary asset has no paths to leak and no encoding to assume. */
@@ -68,7 +90,9 @@ for (const file of tracked) {
     if (ABSOLUTE.test(line)) failures.push(`${at}: ${line.trim().slice(0, 160)}`);
     if (line.includes(repo)) failures.push(`${at}: carries the checkout path.`);
     for (const [hash] of line.matchAll(HASH)) {
-      if (hash !== sourceTree) failures.push(`${at}: carries the hash ${hash}.`);
+      if (hash !== sourceTree && !declaredInSource(hash)) {
+        failures.push(`${at}: carries the hash ${hash}.`);
+      }
     }
     for (const [, ref] of line.matchAll(REF)) {
       if (ref !== SOURCE_REF_TOKEN) failures.push(`${at}: a source link names the ref ${ref}.`);

@@ -13,7 +13,12 @@ import RefSection from '@ambiqai/helia-ui/astro/RefSection';
 import RefSymbol from '@ambiqai/helia-ui/astro/RefSymbol';
 
 import schema from '../data/schema.json';
-import { configurationEntries, fieldRows } from '../lib/reference-cli.mjs';
+import {
+  classDescription,
+  configurationEntries,
+  fieldCount,
+  fieldRows,
+} from '../lib/reference-cli.mjs';
 
 const entries = configurationEntries(schema);
 const enums = Object.entries(schema['x-hpx'].enums);
@@ -31,7 +36,7 @@ const enums = Object.entries(schema['x-hpx'].enums);
     id: entry.cls,
     name: entry.name,
     kind: 'class',
-    summary: `${schema['x-hpx'].fieldIndex[entry.cls].length} keys`,
+    summary: `${fieldCount(schema, entry.cls)} keys`,
   }))}
 />
 
@@ -44,7 +49,7 @@ const enums = Object.entries(schema['x-hpx'].enums);
       language="python"
       signature={entry.signature}
       signatureLanguage="python"
-      summary={schema.$defs[entry.cls]?.description ?? undefined}
+      summary={classDescription(schema, entry.cls)}
       level={2}
     >
       {!entry.reachable && (

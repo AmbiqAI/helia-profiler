@@ -77,12 +77,23 @@ function sectionOf(text, title, level = 2) {
 const hasRow = (text, name) =>
   new RegExp(`^\\|\\s*\`${escape(name)}[,\`]`, 'm').test(text);
 
+/* Astro scopes component styles by adding a class to every element it renders,
+ * so the name cell is `<code class="astro-...">`, not `<code>`. */
+const hasCode = (body, text) =>
+  new RegExp(`<code[^>]*>${escape(text)}</code>`).test(body);
+
 /* --- pages ------------------------------------------------------------ */
 
 const pages = [
-  ...cli.root.commands.map((node) => ({
-    route: `${BASE}reference/cli/${node.name}/`,
-    file: path.join(dist, 'reference/cli', node.name, 'index.html'),
+  ...[cli.root, ...cli.root.commands].map((node) => ({
+    route:
+      node.path.length === 0
+        ? `${BASE}reference/cli/`
+        : `${BASE}reference/cli/${node.name}/`,
+    file:
+      node.path.length === 0
+        ? path.join(dist, 'reference/cli/index.html')
+        : path.join(dist, 'reference/cli', node.name, 'index.html'),
     markdown: path.join(served('cli'), `${node.name}.md`),
     artifacts: [
       [`${BASE}reference/cli/cli.json`, path.join(served('cli'), 'cli.json')],
@@ -172,7 +183,7 @@ for (const page of pages.filter((entry) => entry.node)) {
         `${label}: ${param.declaration} is not a row in its section of ${page.markdown}.`,
       );
       check(
-        body.includes(`<code>${paramName(param)}</code>`),
+        hasCode(body, paramName(param)),
         `${label}: ${param.declaration} is not a parameter row on ${page.route}.`,
       );
       paramAssertions += 1;
@@ -185,15 +196,17 @@ for (const page of pages.filter((entry) => entry.node)) {
     }
   }
 }
+/* Every command in the tree and every parameter on it, with no page-level
+ * carve-out: an option that reaches no page is the failure this counts. */
 check(
-  commandAssertions === cli.counts.leaf_commands + cli.counts.groups - 1,
+  commandAssertions === cli.counts.leaf_commands + cli.counts.groups,
   `Asserted ${commandAssertions} command paths, cli.json declares ` +
-    `${cli.counts.leaf_commands + cli.counts.groups - 1} below the root.`,
+    `${cli.counts.leaf_commands + cli.counts.groups}.`,
 );
 check(
-  paramAssertions === cli.counts.options + cli.counts.arguments - cli.root.options.length,
+  paramAssertions === cli.counts.options + cli.counts.arguments,
   `Asserted ${paramAssertions} parameters, cli.json declares ` +
-    `${cli.counts.options + cli.counts.arguments} including the root's own.`,
+    `${cli.counts.options + cli.counts.arguments}.`,
 );
 
 /* --- completeness: configuration and issue codes ---------------------- */
@@ -207,7 +220,7 @@ for (const entry of configurationEntries(schema)) {
   for (const row of fieldRows(schema, entry.cls)) {
     check(hasRow(section, row.name), `${entry.cls}.${row.name}: not a row in configuration.md.`);
     check(
-      configHtml.includes(`<code>${row.name}</code>`),
+      hasCode(configHtml, row.name),
       `${entry.cls}.${row.name}: not a key row on the configuration page.`,
     );
     fieldAssertions += 1;
@@ -228,7 +241,7 @@ const allCodes = [
 ];
 for (const code of allCodes) {
   check(hasRow(issuesMarkdown, code), `${code}: not a row in issue-codes.md.`);
-  check(issuesHtml.includes(`<code>${code}</code>`), `${code}: not a row on the issue-code page.`);
+  check(hasCode(issuesHtml, code), `${code}: not a row on the issue-code page.`);
 }
 check(
   allCodes.length ===
