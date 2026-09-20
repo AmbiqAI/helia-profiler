@@ -380,18 +380,13 @@ def run_jlink_script(
     Args:
         script: Newline-terminated commander script.  Must include ``exit`` so
             ``JLinkExe`` returns control to us.
-        device: Probe / target configuration.  When *jlink_serial* is given
-            the ``-SelectEmuBySN`` flag is added so the correct probe is
-            selected when multiple J-Links are connected.
-        jlink_serial: Probe / target configuration.  When *jlink_serial* is
-            given the ``-SelectEmuBySN`` flag is added so the correct probe is
-            selected when multiple J-Links are connected.
-        speed_khz: Probe / target configuration.  When *jlink_serial* is given
-            the ``-SelectEmuBySN`` flag is added so the correct probe is
-            selected when multiple J-Links are connected.
-        interface: Probe / target configuration.  When *jlink_serial* is given
-            the ``-SelectEmuBySN`` flag is added so the correct probe is
-            selected when multiple J-Links are connected.
+        device: Target device name, part of the probe / target configuration.
+        jlink_serial: Probe serial number.  When given, the
+            ``-SelectEmuBySN`` flag is added so the correct probe is selected
+            when multiple J-Links are connected.
+        speed_khz: Debug clock speed, part of the probe / target
+            configuration.
+        interface: Debug interface, part of the probe / target configuration.
         timeout_s: Wall-clock timeout passed to :func:`subprocess.run`.
         op_label: Short label used in the timeout / error messages
             (e.g. ``"reset"`` -> ``"JLinkExe reset"``).
