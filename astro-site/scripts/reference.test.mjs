@@ -32,7 +32,7 @@ test('the source commit lookup fails by name outside a git checkout', () => {
 });
 
 test('the source commit lookup refuses an empty commit', () => {
-  const run = (cwd, args) => (args[0] === 'rev-parse' ? 'true' : '');
+  const run = (_cwd, args) => (args[0] === 'rev-parse' ? 'true' : '');
   assert.throws(
     () => sourceCommit('/anywhere', { run }),
     (error) => {

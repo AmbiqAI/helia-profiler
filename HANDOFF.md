@@ -10,18 +10,39 @@ Phase 0 outcome and decisions are the comment after it.
 Done:
 - Phase 0 spikes #323 (branch `323-spike-scaffold-pyref`, PR #326) and #324
   (branch `324-spike-cli-config`, PR #327). Both stay draft and close unmerged.
-- Phase 1, this branch `325-docs-skeleton` off `origin/main` fd2d510: the Astro
-  skeleton, five sections, the docs workflow, redirects, 404, provenance and the
-  site checks. Reviewed once (merge-ready after fixes); the seven review items
-  are applied. No PR opened yet.
+- Phase 1, #325, landed on `docs-migration` as d4eec96 (reverted from `main` by
+  #329). The migration reaches `main` as one stacked PR, #332.
+- Phase 2, #330, this branch `330-python-api-reference` off `docs-migration`:
+  the Python API reference. No PR opened yet; owner reviews first.
+
+This branch (#330):
+- helia-ui pinned to `v0.1.0-alpha.15` (`51aaae91cf7942eb0778be48e4b4c9a1b16772c3`),
+  lockfile regenerated on linux/amd64 node:24. alpha.15 moves the Callout
+  recipe into the global `recipes.css` and drops `role` for `aria-label`;
+  this site overrides neither, so nothing here changed.
+- The last 11 NumPy docstring sections (7 files) are Google style, held there
+  by `tests/test_docstring_style.py`.
+- `astro-site/scripts/{dump-python,scope-dump,build-reference}.mjs` produce
+  14 curated pages, `reference.json`, per-module JSON and Markdown, and both
+  llms files, from a griffe 1.7.3 dump scoped by `__api_stability__`.
+- Checks: `check:reference` (committed artifacts carry no absolute path, and
+  the committed pages match a fresh regeneration into a scratch directory),
+  `check:output` now also runs `check-reference-output.mjs`.
 
 Verified on this branch (all local, all green):
-- `npm ci` from the Linux lockfile; helia-ui `v0.1.0-alpha.14` resolves to
-  `95eb9f1d2dc461533ed2c9477d6d52d0ab4969e5`.
+- `npm ci` from the Linux lockfile.
 - `npm run build`, `check`, `check:links`, `check:output`, `check:search`,
-  `check:redirects`, `check:guard`.
-- 61 legacy routes covered: 57 redirected (all deferred to a section landing
-  page), 4 already served by a page of the same path.
+  `check:redirects`, `check:reference`, `check:guard`.
+- 61 legacy routes covered: 57 redirected (49 still deferred to a section
+  landing page, down 8), 4 already served by a page of the same path.
+- 85 published names render as 84 symbols and one module page across 14 pages,
+  each symbol once and badged; the 13 implementation names appear as no symbol,
+  member, sidebar entry or llms-full.txt section.
+- Largest reference page: `/reference/api/helia_profiler/evaluation/` at
+  214,588 B HTML and 14,542 B gzip, against a 250 KB / 40 KB budget.
+- `uv run --no-project --with griffe==1.7.3 griffe dump helia_profiler
+  --search src` produces the same 9,560,212 B dump as the project env, which is
+  what makes the CI job need griffe and nothing else.
 
 Not verifiable before merge, named as such in #325:
 - the first post-merge push run (artifact, deploy job skipped),
@@ -63,12 +84,14 @@ Record the run links on #325 when they exist.
 
 ## Next
 
-1. Owner reviews this branch, then a PR (label `agent-generated`).
-2. After merge: record the three post-merge run links on #325.
-3. Phase 2 reference generation (#320 plan s4): API manifest + pyref, CLI and
-   config extractors in `tools/docs/`, issue codes port. `docs.yml` will need
-   Python and `griffe==1.7.3` in the build job.
-4. Draft the remaining child issues (plan s5 items 4-17) as their phase arrives.
+1. Owner reviews this branch, then a PR into `docs-migration` (label
+   `agent-generated`). The docs workflow only runs on a pull request, so the
+   "no board, no secrets" run link on #330 cannot exist until the PR is open.
+2. #331: CLI, configuration and issue-code reference. It collides with this
+   branch in `package.json`, `astro.config.mjs` (one Reference sidebar array),
+   `src/data/redirects.json` and `docs.yml`, so it rebases on this rather than
+   running beside it.
+3. Draft the remaining child issues (plan s5 items 4-17) as their phase arrives.
 
 ## Gotchas
 
@@ -90,7 +113,24 @@ Record the run links on #325 when they exist.
   reconcile at cutover (#322).
 - `publish.yml` has workflow-level `contents: read`; the new `docs` job declares
   its own higher ceiling, which is what a called workflow inherits.
-- Do not commit `griffe.json` in Phase 2; it embeds absolute source paths.
+- `astro-site/.generated/` is not committed: the griffe dump embeds the
+  absolute source paths of the machine that produced it. Everything downstream
+  of it is committed and checked by `check:reference`.
+- The reference pages are named after the module they document, and a symbol's
+  id is its canonical import path (`helia_profiler.ProfileConfig`) whatever
+  page it is grouped onto. `src/data/api-groups.json` is the grouping; editing
+  it and running `npm run prepare:docs` is how pages are split or merged.
+- pyref writes no per-module Markdown, so `build-reference.mjs` cuts
+  `llms-full.txt` into one `.md` per page beside each module's `.json`
+  (`dist/reference/api/helia_profiler/config.md`). It cannot go at
+  `<route>/index.md`: Starlight writes its own rendition there, and that one
+  drops the `Ref*` props (helia-ui#122).
+- `helia_profiler.examples` is a submodule that `__all__` publishes, so it is a
+  page with no symbols rather than an 85th symbol. 85 names = 84 symbols + 1
+  module page.
+- Every generated file carries the commit of `src/helia_profiler`, so the stale
+  check normalises 40-hex shas out of its byte comparison and asserts
+  provenance separately.
 - helia-ui does not run griffe, it reads the griffe 1.7.3 dump schema. Pin it.
 - typer vendors click: `isinstance(cmd, click.Group)` on top-level `click` is
   always False.
