@@ -24,6 +24,11 @@ export default defineConfig({
       description:
         'Profile LiteRT and ExecuTorch models on Ambiq Apollo hardware.',
       favicon: '/heliaprofiler-icon.png',
+      /* This site ships its own 404 at src/pages/404.astro, outside the docs
+       * collection so the discoverability integration does not index a route
+       * nobody serves. Starlight injects a static /404 of its own, and two
+       * routes at one path is a hard error in a coming Astro. */
+      disable404Route: true,
       plugins: [
         heliaStarlight({
           accent: 'helia-profiler',
