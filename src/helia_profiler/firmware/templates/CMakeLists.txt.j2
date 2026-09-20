@@ -16,6 +16,9 @@ set(NSX_AMBIQ_BSP_LIB_SUBDIR "{{ board }}" CACHE STRING "AmbiqSuite BSP lib subd
 set({{ var_name }} "{{ var_value }}" CACHE STRING "Profiler engine option" FORCE)
 {% endfor %}
 
+# Export configured compile commands for module and application provenance.
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 {% if compiler_launcher %}
 # Compiler launcher (e.g. sccache/ccache) — caches object output across builds.
 # ASM is included intentionally: the NSX toolchains compile their assembly via

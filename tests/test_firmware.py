@@ -744,6 +744,20 @@ class TestGenerateApp:
         cmake = (app_dir / "CMakeLists.txt").read_text()
         assert "nsx::helia_rt" in cmake
 
+    @pytest.mark.parametrize("engine", ["helia-rt", "tflm"])
+    def test_compile_inventory_enabled_before_module_targets(
+        self, tmp_path: Path, fake_dist: Path, engine: str
+    ):
+        ctx = _make_ctx(tmp_path, fake_dist, engine=engine)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        lines = (app_dir / "CMakeLists.txt").read_text(encoding="utf-8").splitlines()
+        export = lines.index("set(CMAKE_EXPORT_COMPILE_COMMANDS ON)")
+        first_include = next(i for i, line in enumerate(lines) if line.startswith("include("))
+        assert export < first_include
+
     def test_cmakelists_links_tflite_micro(self, tmp_path: Path, fake_dist: Path):
         ctx = _make_ctx(tmp_path, fake_dist, engine="tflm")
         ResolvePlatformStage().run(ctx)

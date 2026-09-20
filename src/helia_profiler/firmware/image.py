@@ -39,7 +39,7 @@ def build_image(
     binary_path: Path,
     build_dir: Path,
 ) -> BuildImage | None:
-    """Record which image was built and what the compiler was given.
+    """Record the built image's identity and configured architecture options.
 
     Best-effort, like ``binary_sections``: a missing compile database costs
     the flag set, not the run. Returns ``None`` only when the binary itself
@@ -101,15 +101,9 @@ def record_build_image(
 
 
 def _architecture_flags(build_dir: Path) -> tuple[dict[str, int], int]:
-    """Count the architecture flags the compiler actually received.
+    """Count ISA options per configured translation unit across the build tree.
 
-    Counts rather than a bare set: one flag over every translation unit is a
-    uniform build, while two spellings of ``-mcpu`` state a genuinely mixed
-    one instead of letting whichever appeared first speak for the image.
-
-    The database covers the whole build tree, every module compiled into it
-    rather than one target's own units. That is the right scope here: the
-    question these flags answer is "was this tree built with Helium".
+    Entries may belong to unbuilt targets; prebuilt-library flags are unavailable.
     """
     database = _find_compile_database(build_dir)
     if database is None:
