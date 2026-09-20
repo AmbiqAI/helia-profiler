@@ -24,13 +24,18 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { SOURCE_PATH } from './build-reference.mjs';
+import { PAGES_DIR, SOURCE_PATH } from './build-reference.mjs';
 import { SOURCE_REF_TOKEN } from '../src/integrations/source-ref.mjs';
 
 const site = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repo = path.resolve(site, '..');
 
-const SCANNED = ['astro-site/src/data', 'astro-site/public', 'astro-site/src/generated'];
+const SCANNED = [
+  'astro-site/src/data',
+  'astro-site/public',
+  'astro-site/src/generated',
+  `astro-site/${PAGES_DIR}`,
+];
 
 /* The roots a build machine actually has. A bare leading slash is not enough,
  * because every route on this site starts with one, and a Windows drive letter

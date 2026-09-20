@@ -17,7 +17,7 @@ import { execFileSync } from 'node:child_process';
 import { gzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 
-import { SOURCE_REF_TOKEN } from '../src/integrations/source-ref.mjs';
+import { SOURCE_REF_TOKEN, sourceRef } from '../src/integrations/source-ref.mjs';
 
 const site = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repo = path.resolve(site, '..');
@@ -167,9 +167,13 @@ for (const name of implementation) {
  *
  * Members are asserted as their own heading, not as a substring: "enabled"
  * occurs in four unrelated places in llms-full.txt, so a substring test
- * passes on a page that documents none of them. Parameters are asserted
- * inside the symbol's own section, since the model only carries a parameter
- * when the docstring documents it and the signature carries the rest. */
+ * passes on a page that documents none of them.
+ *
+ * The parameter count this prints is 0 today and that is a real gap, not a
+ * passing check. pyref reads parameters from the docstring's Args section and
+ * no published symbol has one, so the model carries none and a reader gets
+ * them only from the verbatim signature, which is asserted. If the count is
+ * still 0 after a docstring gains an Args section, this loop is wrong. */
 const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const heading = (text, id, level) =>
   new RegExp(`^#{${level},6} ${escape(id)}$`, 'm').test(text);
@@ -186,6 +190,7 @@ const perModule = new Map(
 );
 
 let memberAssertions = 0;
+let paramAssertions = 0;
 for (const symbol of symbols) {
   const markdown = perModule.get(symbol.page.module.path) ?? '';
   const members = [];
@@ -210,6 +215,7 @@ for (const symbol of symbols) {
         section.includes(param.name),
         `${symbol.id}: parameter "${param.name}" missing from its section in ${label}.`,
       );
+      paramAssertions += 1;
     }
   }
 }
@@ -234,7 +240,7 @@ check(
 
 /* The ref is resolved at build time, so no generated file may still carry the
  * placeholder and every source link has to name the ref this build is of. */
-const expectedRef = buildInfo.releaseTag || 'main';
+const expectedRef = sourceRef(buildInfo);
 const stillTokenised = walkFiles(dist).filter((file) =>
   read(file).includes(SOURCE_REF_TOKEN),
 );
@@ -332,7 +338,8 @@ for (const symbol of symbols) badged[tierOf(symbol.name)] = (badged[tierOf(symbo
 console.log(
   `Python reference verified: ${inScope.length} published names as ${symbols.length} symbols ` +
     `(${JSON.stringify(badged)}) and ${modulePages.length} module page across ${pages.length} pages; ` +
-    `${implementation.length} implementation names absent; ${memberAssertions} member headings; ` +
+    `${implementation.length} implementation names absent; ${memberAssertions} member headings, ` +
+    `${paramAssertions} parameter assertions; ` +
     `largest page ${largest.route} ${largest.html} B HTML, ${largest.gzip} B gzip; ` +
     `source tree ${sourceTree.slice(0, 7)} at ref ${expectedRef}.`,
 );

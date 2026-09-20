@@ -5,8 +5,8 @@
  * go. A committed branch name would link to that branch whatever this build is
  * of, and a committed commit sha would rewrite every generated file on every
  * change under src/. The ref is a property of the build, not of the source, so
- * it is substituted here from build-info.json: the release tag when the site is
- * built from a tag, otherwise main.
+ * it is substituted here from build-info.json, which carries the ref the
+ * workflow checked out: a release tag, a branch, or main.
  *
  * This runs over the artifact rather than through a Markdown plugin because
  * Astro 7 defaults to the Sätteri processor, where remark plugins need
@@ -23,8 +23,15 @@ export const SOURCE_REF_TOKEN = '__DOCS_SOURCE_REF__';
 
 const REWRITTEN = new Set(['.html', '.json', '.md', '.txt', '.xml']);
 
-/** The ref this build documents. */
-export const sourceRef = (buildInfo) => buildInfo?.releaseTag || 'main';
+/**
+ * The ref this build documents.
+ *
+ * build-info.mjs has already resolved it: the workflow's source_ref, else the
+ * release tag, else the branch that was checked out. Recomputing a guess here
+ * would send a workflow_dispatch build of docs-migration to main.
+ */
+export const sourceRef = (buildInfo) =>
+  buildInfo?.sourceRef || buildInfo?.releaseTag || 'main';
 
 export function readBuildInfo(siteDir) {
   const file = path.join(siteDir, 'src/data/build-info.json');

@@ -138,9 +138,16 @@ Record the run links on #325 when they exist.
   commit sha rewrites 44 of 47 generated files on any change under src/ and
   does not survive the squash merges this repository uses. `check:reference`
   refuses a committed artifact that carries any other 40-hex hash or any ref.
+- pyref gap: the model carries no parameters for any of the 85 names, because
+  it reads them from the docstring's `Args:` section and no published symbol
+  has one. `check:output` prints "0 parameter assertions" so the gap stays
+  visible. Readers get parameter names, types and defaults from the verbatim
+  signature, which is asserted in llms-full.txt and in the per-module `.md`.
+  Adding `Args:` to a published docstring is what would fill the tables.
 - Source links are committed with the `__DOCS_SOURCE_REF__` placeholder and
-  resolved at build time by `src/integrations/source-ref.mjs`, to the release
-  tag when built from a tag and otherwise `main`. That integration must stay
+  resolved at build time by `src/integrations/source-ref.mjs` to
+  `build-info.json`'s `sourceRef`: the workflow's `source_ref`, else the
+  release tag, else the branch that was checked out. That integration must stay
   last in `astro.config.mjs`: Starlight and helia-ui write their Markdown
   renditions and llms exports in `astro:build:done` too, and hooks run in
   declaration order. The dev server never reaches that hook, so the same
