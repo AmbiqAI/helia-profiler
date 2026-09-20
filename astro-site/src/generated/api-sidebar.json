@@ -1,1 +1,117 @@
-[]
+{
+  "label": "helia_profiler",
+  "items": [
+    {
+      "label": "Overview",
+      "slug": "reference/api/helia_profiler"
+    },
+    {
+      "label": "api",
+      "slug": "reference/api/helia_profiler/api"
+    },
+    {
+      "label": "config",
+      "slug": "reference/api/helia_profiler/config"
+    },
+    {
+      "label": "deps",
+      "collapsed": true,
+      "items": [
+        {
+          "label": "Overview",
+          "slug": "reference/api/helia_profiler/deps"
+        },
+        {
+          "label": "compatibility",
+          "slug": "reference/api/helia_profiler/deps/compatibility"
+        },
+        {
+          "label": "dependencies",
+          "slug": "reference/api/helia_profiler/deps/dependencies"
+        }
+      ]
+    },
+    {
+      "label": "diagnostics",
+      "collapsed": true,
+      "items": [
+        {
+          "label": "Overview",
+          "slug": "reference/api/helia_profiler/diagnostics"
+        },
+        {
+          "label": "support_bundle",
+          "slug": "reference/api/helia_profiler/diagnostics/support_bundle"
+        }
+      ]
+    },
+    {
+      "label": "engines",
+      "slug": "reference/api/helia_profiler/engines"
+    },
+    {
+      "label": "errors",
+      "slug": "reference/api/helia_profiler/errors"
+    },
+    {
+      "label": "evaluation",
+      "slug": "reference/api/helia_profiler/evaluation"
+    },
+    {
+      "label": "examples",
+      "slug": "reference/api/helia_profiler/examples"
+    },
+    {
+      "label": "modelcost",
+      "slug": "reference/api/helia_profiler/modelcost"
+    },
+    {
+      "label": "pipeline",
+      "slug": "reference/api/helia_profiler/pipeline"
+    },
+    {
+      "label": "placement",
+      "slug": "reference/api/helia_profiler/placement"
+    },
+    {
+      "label": "power",
+      "collapsed": true,
+      "items": [
+        {
+          "label": "Overview",
+          "slug": "reference/api/helia_profiler/power"
+        },
+        {
+          "label": "base",
+          "slug": "reference/api/helia_profiler/power/base"
+        },
+        {
+          "label": "metadata",
+          "slug": "reference/api/helia_profiler/power/metadata"
+        }
+      ]
+    },
+    {
+      "label": "results",
+      "slug": "reference/api/helia_profiler/results"
+    },
+    {
+      "label": "session",
+      "slug": "reference/api/helia_profiler/session"
+    },
+    {
+      "label": "target",
+      "collapsed": true,
+      "items": [
+        {
+          "label": "Overview",
+          "slug": "reference/api/helia_profiler/target"
+        },
+        {
+          "label": "lifecycle",
+          "slug": "reference/api/helia_profiler/target/lifecycle"
+        }
+      ]
+    }
+  ]
+}

@@ -10,11 +10,15 @@ const base = '/helia-profiler';
 const basePath = `${base}/`;
 
 /* The React and Tailwind packages are only installed in the react variant, so
- * they are resolved at config time rather than imported at the top. See
+ * they are resolved at config time rather than imported at the top. The
+ * specifier is a variable on purpose: a literal one makes `astro check` demand
+ * the types in the baseline, where the packages are not installed. See
  * scripts/spike-variant.mjs. */
-const react = variant.react ? (await import('@astrojs/react')).default : null;
+/** @param {string} specifier */
+const load = (specifier) => import(/* @vite-ignore */ specifier);
+const react = variant.react ? (await load('@astrojs/react')).default : null;
 const tailwind = variant.react
-  ? (await import('@tailwindcss/vite')).default
+  ? (await load('@tailwindcss/vite')).default
   : null;
 
 export default defineConfig({
@@ -59,7 +63,13 @@ export default defineConfig({
               href: `${basePath}reference/`,
               sidebar: [
                 { label: 'Overview', slug: 'reference' },
-                { label: 'Python API', collapsed: false, items: apiSidebar },
+                /* pyref's --sidebar writes one group object; Starlight's
+                 * `items` wants an array. */
+                {
+                  label: 'Python API',
+                  collapsed: false,
+                  items: Array.isArray(apiSidebar) ? apiSidebar : [apiSidebar],
+                },
               ],
             },
           ],

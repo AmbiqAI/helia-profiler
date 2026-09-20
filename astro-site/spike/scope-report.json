@@ -1,0 +1,622 @@
+{
+  "rendered": [
+    {
+      "name": "__version__",
+      "home": "helia_profiler",
+      "kind": "attribute",
+      "definedAt": "helia_profiler._version.__version__",
+      "rehomed": true
+    },
+    {
+      "name": "profile",
+      "home": "helia_profiler.api",
+      "kind": "function",
+      "definedAt": "helia_profiler.api.profile",
+      "rehomed": false
+    },
+    {
+      "name": "Session",
+      "home": "helia_profiler.session",
+      "kind": "class",
+      "definedAt": "helia_profiler.session.Session",
+      "rehomed": false
+    },
+    {
+      "name": "ProgressUpdate",
+      "home": "helia_profiler.pipeline",
+      "kind": "class",
+      "definedAt": "helia_profiler.pipeline.ProgressUpdate",
+      "rehomed": false
+    },
+    {
+      "name": "examples",
+      "home": "helia_profiler.examples",
+      "kind": "module"
+    },
+    {
+      "name": "ProfileConfig",
+      "home": "helia_profiler.config",
+      "kind": "class",
+      "definedAt": "helia_profiler.config.ProfileConfig",
+      "rehomed": false
+    },
+    {
+      "name": "CompatibilityBaseline",
+      "home": "helia_profiler.deps.compatibility",
+      "kind": "class",
+      "definedAt": "helia_profiler.deps.compatibility.CompatibilityBaseline",
+      "rehomed": false
+    },
+    {
+      "name": "CompatibilityResolution",
+      "home": "helia_profiler.deps.compatibility",
+      "kind": "class",
+      "definedAt": "helia_profiler.deps.compatibility.CompatibilityResolution",
+      "rehomed": false
+    },
+    {
+      "name": "QualificationState",
+      "home": "helia_profiler.deps.compatibility",
+      "kind": "class",
+      "definedAt": "helia_profiler.deps.compatibility.QualificationState",
+      "rehomed": false
+    },
+    {
+      "name": "load_compatibility_baseline",
+      "home": "helia_profiler.deps.compatibility",
+      "kind": "function",
+      "definedAt": "helia_profiler.deps.compatibility.load_compatibility_baseline",
+      "rehomed": false
+    },
+    {
+      "name": "ModelConfig",
+      "home": "helia_profiler.config",
+      "kind": "class",
+      "definedAt": "helia_profiler.config.ModelConfig",
+      "rehomed": false
+    },
+    {
+      "name": "EngineConfig",
+      "home": "helia_profiler.config",
+      "kind": "class",
+      "definedAt": "helia_profiler.config.EngineConfig",
+      "rehomed": false
+    },
+    {
+      "name": "EngineType",
+      "home": "helia_profiler.engines",
+      "kind": "class",
+      "definedAt": "helia_profiler.engines.EngineType",
+      "rehomed": false
+    },
+    {
+      "name": "TargetConfig",
+      "home": "helia_profiler.config",
+      "kind": "class",
+      "definedAt": "helia_profiler.config.TargetConfig",
+      "rehomed": false
+    },
+    {
+      "name": "ProfilingConfig",
+      "home": "helia_profiler.config",
+      "kind": "class",
+      "definedAt": "helia_profiler.config.ProfilingConfig",
+      "rehomed": false
+    },
+    {
+      "name": "PowerConfig",
+      "home": "helia_profiler.config",
+      "kind": "class",
+      "definedAt": "helia_profiler.config.power.PowerConfig",
+      "rehomed": true
+    },
+    {
+      "name": "OutputConfig",
+      "home": "helia_profiler.config",
+      "kind": "class",
+      "definedAt": "helia_profiler.config.OutputConfig",
+      "rehomed": false
+    },
+    {
+      "name": "Toolchain",
+      "home": "helia_profiler.config",
+      "kind": "class",
+      "definedAt": "helia_profiler.vocab.Toolchain",
+      "rehomed": true
+    },
+    {
+      "name": "Transport",
+      "home": "helia_profiler.config",
+      "kind": "class",
+      "definedAt": "helia_profiler.vocab.Transport",
+      "rehomed": true
+    },
+    {
+      "name": "ClockSelection",
+      "home": "helia_profiler.config",
+      "kind": "class",
+      "definedAt": "helia_profiler.config.ClockSelection",
+      "rehomed": false
+    },
+    {
+      "name": "OutputFormat",
+      "home": "helia_profiler.config",
+      "kind": "class",
+      "definedAt": "helia_profiler.config.OutputFormat",
+      "rehomed": false
+    },
+    {
+      "name": "HeartbeatConfig",
+      "home": "helia_profiler.config",
+      "kind": "class",
+      "definedAt": "helia_profiler.config.HeartbeatConfig",
+      "rehomed": false
+    },
+    {
+      "name": "TimeoutsConfig",
+      "home": "helia_profiler.config",
+      "kind": "class",
+      "definedAt": "helia_profiler.config.TimeoutsConfig",
+      "rehomed": false
+    },
+    {
+      "name": "BuildConfig",
+      "home": "helia_profiler.config",
+      "kind": "class",
+      "definedAt": "helia_profiler.config.BuildConfig",
+      "rehomed": false
+    },
+    {
+      "name": "Placement",
+      "home": "helia_profiler.placement",
+      "kind": "class",
+      "definedAt": "helia_profiler.platform.placement.Placement",
+      "rehomed": true
+    },
+    {
+      "name": "PowerMode",
+      "home": "helia_profiler.power.base",
+      "kind": "class",
+      "definedAt": "helia_profiler.power.base.PowerMode",
+      "rehomed": false
+    },
+    {
+      "name": "PowerResult",
+      "home": "helia_profiler.power.base",
+      "kind": "class",
+      "definedAt": "helia_profiler.power.base.PowerResult",
+      "rehomed": false
+    },
+    {
+      "name": "MeasurementScope",
+      "home": "helia_profiler.power.metadata",
+      "kind": "class",
+      "definedAt": "helia_profiler.power.metadata.MeasurementScope",
+      "rehomed": false
+    },
+    {
+      "name": "ObservationMode",
+      "home": "helia_profiler.power.metadata",
+      "kind": "class",
+      "definedAt": "helia_profiler.power.metadata.ObservationMode",
+      "rehomed": false
+    },
+    {
+      "name": "PowerIntegrity",
+      "home": "helia_profiler.power.metadata",
+      "kind": "class",
+      "definedAt": "helia_profiler.power.metadata.PowerIntegrity",
+      "rehomed": false
+    },
+    {
+      "name": "PowerMetadata",
+      "home": "helia_profiler.power.metadata",
+      "kind": "class",
+      "definedAt": "helia_profiler.power.metadata.PowerMetadata",
+      "rehomed": false
+    },
+    {
+      "name": "PowerObservation",
+      "home": "helia_profiler.results",
+      "kind": "class",
+      "definedAt": "helia_profiler.results.artifacts.PowerObservation",
+      "rehomed": true
+    },
+    {
+      "name": "PowerTerminalRecord",
+      "home": "helia_profiler.results",
+      "kind": "class",
+      "definedAt": "helia_profiler.results.artifacts.PowerTerminalRecord",
+      "rehomed": true
+    },
+    {
+      "name": "OnDevicePowerSummary",
+      "home": "helia_profiler.results",
+      "kind": "class",
+      "definedAt": "helia_profiler.results.artifacts.OnDevicePowerSummary",
+      "rehomed": true
+    },
+    {
+      "name": "ResetStrategy",
+      "home": "helia_profiler.target.lifecycle",
+      "kind": "class",
+      "definedAt": "helia_profiler.target.lifecycle.ResetStrategy",
+      "rehomed": false
+    },
+    {
+      "name": "ProfileResult",
+      "home": "helia_profiler.results",
+      "kind": "class",
+      "definedAt": "helia_profiler.results.models.ProfileResult",
+      "rehomed": true
+    },
+    {
+      "name": "PmuResult",
+      "home": "helia_profiler.results",
+      "kind": "class",
+      "definedAt": "helia_profiler.results.models.PmuResult",
+      "rehomed": true
+    },
+    {
+      "name": "PresetResult",
+      "home": "helia_profiler.results",
+      "kind": "class",
+      "definedAt": "helia_profiler.results.models.PresetResult",
+      "rehomed": true
+    },
+    {
+      "name": "LayerResult",
+      "home": "helia_profiler.results",
+      "kind": "class",
+      "definedAt": "helia_profiler.results.models.LayerResult",
+      "rehomed": true
+    },
+    {
+      "name": "FirmwareMeta",
+      "home": "helia_profiler.results",
+      "kind": "class",
+      "definedAt": "helia_profiler.results.models.FirmwareMeta",
+      "rehomed": true
+    },
+    {
+      "name": "RunMetadata",
+      "home": "helia_profiler.results",
+      "kind": "class",
+      "definedAt": "helia_profiler.results.models.RunMetadata",
+      "rehomed": true
+    },
+    {
+      "name": "ModelAnalysis",
+      "home": "helia_profiler.modelcost",
+      "kind": "class",
+      "definedAt": "helia_profiler.modelcost.model_analysis.ModelAnalysis",
+      "rehomed": true
+    },
+    {
+      "name": "CompareResult",
+      "home": "helia_profiler.evaluation",
+      "kind": "class",
+      "definedAt": "helia_profiler.evaluation.compare.CompareResult",
+      "rehomed": true
+    },
+    {
+      "name": "ComparabilityAssessment",
+      "home": "helia_profiler.evaluation",
+      "kind": "class",
+      "definedAt": "helia_profiler.evaluation.comparability.ComparabilityAssessment",
+      "rehomed": true
+    },
+    {
+      "name": "ComparabilityIssue",
+      "home": "helia_profiler.evaluation",
+      "kind": "class",
+      "definedAt": "helia_profiler.evaluation.comparability.ComparabilityIssue",
+      "rehomed": true
+    },
+    {
+      "name": "ComparabilitySeverity",
+      "home": "helia_profiler.evaluation",
+      "kind": "class",
+      "definedAt": "helia_profiler.results.issues.ComparabilitySeverity",
+      "rehomed": true
+    },
+    {
+      "name": "assess_comparability",
+      "home": "helia_profiler.evaluation",
+      "kind": "function",
+      "definedAt": "helia_profiler.evaluation.comparability.assess_comparability",
+      "rehomed": true
+    },
+    {
+      "name": "ComparisonProfile",
+      "home": "helia_profiler.evaluation",
+      "kind": "class",
+      "definedAt": "helia_profiler.evaluation.comparison_profile.ComparisonProfile",
+      "rehomed": true
+    },
+    {
+      "name": "ComparisonVerdict",
+      "home": "helia_profiler.evaluation",
+      "kind": "class",
+      "definedAt": "helia_profiler.evaluation.comparison_profile.ComparisonVerdict",
+      "rehomed": true
+    },
+    {
+      "name": "MetricDirection",
+      "home": "helia_profiler.evaluation",
+      "kind": "class",
+      "definedAt": "helia_profiler.evaluation.comparison_profile.MetricDirection",
+      "rehomed": true
+    },
+    {
+      "name": "MetricPolicy",
+      "home": "helia_profiler.evaluation",
+      "kind": "class",
+      "definedAt": "helia_profiler.evaluation.comparison_profile.MetricPolicy",
+      "rehomed": true
+    },
+    {
+      "name": "MetricVerdict",
+      "home": "helia_profiler.evaluation",
+      "kind": "class",
+      "definedAt": "helia_profiler.evaluation.comparison_profile.MetricVerdict",
+      "rehomed": true
+    },
+    {
+      "name": "MissingMetricPolicy",
+      "home": "helia_profiler.evaluation",
+      "kind": "class",
+      "definedAt": "helia_profiler.evaluation.comparison_profile.MissingMetricPolicy",
+      "rehomed": true
+    },
+    {
+      "name": "VerdictStatus",
+      "home": "helia_profiler.evaluation",
+      "kind": "class",
+      "definedAt": "helia_profiler.evaluation.comparison_profile.VerdictStatus",
+      "rehomed": true
+    },
+    {
+      "name": "evaluate_comparison_profile",
+      "home": "helia_profiler.evaluation",
+      "kind": "function",
+      "definedAt": "helia_profiler.evaluation.comparison_profile.evaluate_comparison_profile",
+      "rehomed": true
+    },
+    {
+      "name": "RunEvaluation",
+      "home": "helia_profiler.evaluation",
+      "kind": "class",
+      "definedAt": "helia_profiler.evaluation.validity.RunEvaluation",
+      "rehomed": true
+    },
+    {
+      "name": "evaluate_run",
+      "home": "helia_profiler.evaluation",
+      "kind": "function",
+      "definedAt": "helia_profiler.evaluation.validity.evaluate_run",
+      "rehomed": true
+    },
+    {
+      "name": "ResultManifest",
+      "home": "helia_profiler.results",
+      "kind": "class",
+      "definedAt": "helia_profiler.results.manifest.ResultManifest",
+      "rehomed": true
+    },
+    {
+      "name": "ResultArtifact",
+      "home": "helia_profiler.results",
+      "kind": "class",
+      "definedAt": "helia_profiler.results.manifest.ResultArtifact",
+      "rehomed": true
+    },
+    {
+      "name": "ResultIssue",
+      "home": "helia_profiler.results",
+      "kind": "class",
+      "definedAt": "helia_profiler.results.manifest.ResultIssue",
+      "rehomed": true
+    },
+    {
+      "name": "ResultValidity",
+      "home": "helia_profiler.results",
+      "kind": "class",
+      "definedAt": "helia_profiler.results.manifest.ResultValidity",
+      "rehomed": true
+    },
+    {
+      "name": "RunStatus",
+      "home": "helia_profiler.results",
+      "kind": "class",
+      "definedAt": "helia_profiler.results.manifest.RunStatus",
+      "rehomed": true
+    },
+    {
+      "name": "load_result_manifest",
+      "home": "helia_profiler.results",
+      "kind": "function",
+      "definedAt": "helia_profiler.results.manifest.load_result_manifest",
+      "rehomed": true
+    },
+    {
+      "name": "DependencyLockProvenance",
+      "home": "helia_profiler.results",
+      "kind": "class",
+      "definedAt": "helia_profiler.results.dependencies.DependencyLockProvenance",
+      "rehomed": true
+    },
+    {
+      "name": "read_dependency_lock_provenance",
+      "home": "helia_profiler.deps.dependencies",
+      "kind": "function",
+      "definedAt": "helia_profiler.deps.dependencies.read_dependency_lock_provenance",
+      "rehomed": false
+    },
+    {
+      "name": "SupportBundleManifest",
+      "home": "helia_profiler.results",
+      "kind": "class",
+      "definedAt": "helia_profiler.results.support_bundle.SupportBundleManifest",
+      "rehomed": true
+    },
+    {
+      "name": "SupportBundleSection",
+      "home": "helia_profiler.results",
+      "kind": "class",
+      "definedAt": "helia_profiler.results.support_bundle.SupportBundleSection",
+      "rehomed": true
+    },
+    {
+      "name": "SupportBundleOptions",
+      "home": "helia_profiler.diagnostics.support_bundle",
+      "kind": "class",
+      "definedAt": "helia_profiler.diagnostics.support_bundle.SupportBundleOptions",
+      "rehomed": false
+    },
+    {
+      "name": "collect_support_bundle",
+      "home": "helia_profiler.diagnostics.support_bundle",
+      "kind": "function",
+      "definedAt": "helia_profiler.diagnostics.support_bundle.collect_support_bundle",
+      "rehomed": false
+    },
+    {
+      "name": "write_support_bundle",
+      "home": "helia_profiler.diagnostics.support_bundle",
+      "kind": "function",
+      "definedAt": "helia_profiler.diagnostics.support_bundle.write_support_bundle",
+      "rehomed": false
+    },
+    {
+      "name": "verify_support_bundle",
+      "home": "helia_profiler.diagnostics.support_bundle",
+      "kind": "function",
+      "definedAt": "helia_profiler.diagnostics.support_bundle.verify_support_bundle",
+      "rehomed": false
+    },
+    {
+      "name": "HpxError",
+      "home": "helia_profiler.errors",
+      "kind": "class",
+      "definedAt": "helia_profiler.errors.HpxError",
+      "rehomed": false
+    },
+    {
+      "name": "ConfigError",
+      "home": "helia_profiler.errors",
+      "kind": "class",
+      "definedAt": "helia_profiler.errors.ConfigError",
+      "rehomed": false
+    },
+    {
+      "name": "DependencyError",
+      "home": "helia_profiler.errors",
+      "kind": "class",
+      "definedAt": "helia_profiler.errors.DependencyError",
+      "rehomed": false
+    },
+    {
+      "name": "VersionError",
+      "home": "helia_profiler.errors",
+      "kind": "class",
+      "definedAt": "helia_profiler.errors.VersionError",
+      "rehomed": false
+    },
+    {
+      "name": "LockError",
+      "home": "helia_profiler.errors",
+      "kind": "class",
+      "definedAt": "helia_profiler.errors.LockError",
+      "rehomed": false
+    },
+    {
+      "name": "PlatformError",
+      "home": "helia_profiler.errors",
+      "kind": "class",
+      "definedAt": "helia_profiler.errors.PlatformError",
+      "rehomed": false
+    },
+    {
+      "name": "EngineError",
+      "home": "helia_profiler.errors",
+      "kind": "class",
+      "definedAt": "helia_profiler.errors.EngineError",
+      "rehomed": false
+    },
+    {
+      "name": "FirmwareError",
+      "home": "helia_profiler.errors",
+      "kind": "class",
+      "definedAt": "helia_profiler.errors.FirmwareError",
+      "rehomed": false
+    },
+    {
+      "name": "BuildError",
+      "home": "helia_profiler.errors",
+      "kind": "class",
+      "definedAt": "helia_profiler.errors.BuildError",
+      "rehomed": false
+    },
+    {
+      "name": "NetworkError",
+      "home": "helia_profiler.errors",
+      "kind": "class",
+      "definedAt": "helia_profiler.errors.NetworkError",
+      "rehomed": false
+    },
+    {
+      "name": "CaptureError",
+      "home": "helia_profiler.errors",
+      "kind": "class",
+      "definedAt": "helia_profiler.errors.CaptureError",
+      "rehomed": false
+    },
+    {
+      "name": "DeterministicCaptureError",
+      "home": "helia_profiler.errors",
+      "kind": "class",
+      "definedAt": "helia_profiler.errors.DeterministicCaptureError",
+      "rehomed": false
+    },
+    {
+      "name": "PowerError",
+      "home": "helia_profiler.errors",
+      "kind": "class",
+      "definedAt": "helia_profiler.errors.PowerError",
+      "rehomed": false
+    },
+    {
+      "name": "ReportError",
+      "home": "helia_profiler.errors",
+      "kind": "class",
+      "definedAt": "helia_profiler.errors.ReportError",
+      "rehomed": false
+    }
+  ],
+  "unresolved": [],
+  "modules": [
+    "helia_profiler",
+    "helia_profiler.api",
+    "helia_profiler.config",
+    "helia_profiler.deps",
+    "helia_profiler.deps.compatibility",
+    "helia_profiler.deps.dependencies",
+    "helia_profiler.diagnostics",
+    "helia_profiler.diagnostics.support_bundle",
+    "helia_profiler.engines",
+    "helia_profiler.errors",
+    "helia_profiler.evaluation",
+    "helia_profiler.examples",
+    "helia_profiler.modelcost",
+    "helia_profiler.pipeline",
+    "helia_profiler.placement",
+    "helia_profiler.power",
+    "helia_profiler.power.base",
+    "helia_profiler.power.metadata",
+    "helia_profiler.results",
+    "helia_profiler.session",
+    "helia_profiler.target",
+    "helia_profiler.target.lifecycle"
+  ]
+}
