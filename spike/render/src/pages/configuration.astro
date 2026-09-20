@@ -1,0 +1,143 @@
+---
+import RefSymbol from '@ambiqai/helia-ui/astro/RefSymbol';
+import RefSection from '@ambiqai/helia-ui/astro/RefSection';
+import RefParams from '@ambiqai/helia-ui/astro/RefParams';
+import RefMembers from '@ambiqai/helia-ui/astro/RefMembers';
+import Shell from '../layouts/Shell.astro';
+import schema from '../data/schema.json';
+
+const defs = schema.$defs;
+const { sections, fieldIndex, enums } = schema['x-hpx'];
+
+// RefParam has name/type/default/description and nothing else, so every JSON
+// Schema constraint has to be folded into the description column.
+const CONSTRAINTS = [
+  ['minimum', 'min'],
+  ['exclusiveMinimum', 'min (exclusive)'],
+  ['maximum', 'max'],
+  ['exclusiveMaximum', 'max (exclusive)'],
+  ['minLength', 'min length'],
+  ['maxLength', 'max length'],
+  ['pattern', 'pattern'],
+  ['minItems', 'min items'],
+  ['maxItems', 'max items'],
+];
+
+function typeLabel(prop) {
+  if (!prop) return '';
+  if (prop.$ref) return prop.$ref.split('/').pop();
+  if (prop.anyOf) return prop.anyOf.map(typeLabel).filter(Boolean).join(' | ');
+  if (prop.enum) return prop.enum.join(' | ');
+  if (prop.type === 'array' && prop.items) return `array of ${typeLabel(prop.items)}`;
+  return prop.type ?? '';
+}
+
+function describe(prop, field) {
+  const notes = [];
+  if (prop?.description) notes.push(prop.description);
+  if (prop?.title && !prop.description) notes.push(prop.title);
+  for (const [key, label] of CONSTRAINTS) {
+    if (prop && prop[key] !== undefined) notes.push(`${label} ${prop[key]}`);
+  }
+  if (field.required) notes.push('Required.');
+  if (field.defaultFromFactory) notes.push('Default built per instance.');
+  return notes.join(' ');
+}
+
+function rows(cls) {
+  const props = defs[cls]?.properties ?? {};
+  return fieldIndex[cls].map((field) => ({
+    name: field.name,
+    type: field.pythonType || typeLabel(props[field.name]),
+    default:
+      field.default === null || field.default === undefined
+        ? ''
+        : typeof field.default === 'object'
+          ? JSON.stringify(field.default)
+          : String(field.default),
+    description: describe(props[field.name], field),
+  }));
+}
+
+const orderedSections = Object.entries(sections);
+const unreachable = schema.counts.unreachableFromRoot;
+const total = schema.counts.declaredFields;
+---
+
+<Shell title="Configuration reference" description="Every hpx.yml key, generated from the ProfileConfig models.">
+  <p>
+    {total} keys across {schema.counts.classes} models. Every model sets
+    <code>extra="forbid"</code>, so an unknown key is a validation error rather than a
+    silent no-op.
+  </p>
+
+  <RefMembers
+    label="Sections"
+    items={orderedSections.map(([key, cls]) => ({
+      id: cls,
+      name: key === '' ? '(top level)' : key,
+      kind: 'class',
+      summary: `${fieldIndex[cls].length} keys`,
+    }))}
+  />
+
+  {
+    orderedSections.map(([key, cls]) => (
+      <RefSymbol
+        id={cls}
+        name={key === '' ? 'hpx.yml (top level)' : key}
+        kind="class"
+        language="python"
+        signature={key === '' ? `${cls}` : `${key}:  # ${cls}`}
+        signatureLanguage="python"
+        summary={defs[cls]?.description ?? undefined}
+        level={2}
+      >
+        <RefSection title="Keys">
+          <RefParams caption={`${cls} keys`} rows={rows(cls)} density="compact" nameLabel="Key" />
+        </RefSection>
+      </RefSymbol>
+    ))
+  }
+
+  {
+    unreachable.map((cls) => (
+      <RefSymbol
+        id={cls}
+        name={cls}
+        kind="class"
+        language="python"
+        signature={cls}
+        signatureLanguage="python"
+        summary="Not reachable from ProfileConfig; surfaced through a lookup table."
+        level={2}
+      >
+        <RefSection title="Keys">
+          <RefParams caption={`${cls} keys`} rows={rows(cls)} density="compact" nameLabel="Key" />
+        </RefSection>
+      </RefSymbol>
+    ))
+  }
+
+  {
+    Object.entries(enums).map(([name, members]) => (
+      <RefSymbol
+        id={name}
+        name={name}
+        kind="enum"
+        language="python"
+        signature={`${name}: ${members.join(' | ')}`}
+        signatureLanguage="python"
+        level={2}
+      >
+        <RefSection title="Values">
+          <RefParams
+            caption={`${name} values`}
+            rows={members.map((m) => ({ name: m, description: '' }))}
+            nameLabel="Value"
+          />
+        </RefSection>
+      </RefSymbol>
+    ))
+  }
+</Shell>

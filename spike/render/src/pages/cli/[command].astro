@@ -1,0 +1,104 @@
+---
+import RefSymbol from '@ambiqai/helia-ui/astro/RefSymbol';
+import RefSection from '@ambiqai/helia-ui/astro/RefSection';
+import RefParams from '@ambiqai/helia-ui/astro/RefParams';
+import RefMembers from '@ambiqai/helia-ui/astro/RefMembers';
+import Shell from '../../layouts/Shell.astro';
+import cli from '../../data/cli.json';
+
+export function getStaticPaths() {
+  return cli.root.commands.map((node) => ({
+    params: { command: node.name },
+    props: { node },
+  }));
+}
+
+const { node } = Astro.props;
+
+const label = (path) => ['hpx', ...path].join(' ');
+
+// rich_help_panel is the authored grouping; options without one come first
+// under the generic caption so nothing is dropped from the page.
+const UNGROUPED = 'Options';
+
+function rows(params) {
+  return params.map((p) => ({
+    name: p.aliases.length ? `${p.declaration}, ${p.aliases.join(', ')}` : p.declaration,
+    type: p.type.choices ? p.type.choices.join(' | ') : (p.python_type ?? p.type.name),
+    default: p.default === null || p.default === undefined ? '' : String(p.default),
+    description: [p.help, p.required ? '**Required.**' : '', p.multiple ? 'Repeatable.' : '']
+      .filter(Boolean)
+      .join(' '),
+  }));
+}
+
+function panels(cmd) {
+  const groups = new Map();
+  for (const option of cmd.options) {
+    const key = option.panel ?? UNGROUPED;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(option);
+  }
+  const ordered = [...groups.entries()].sort((a, b) =>
+    a[0] === UNGROUPED ? -1 : b[0] === UNGROUPED ? 1 : a[0].localeCompare(b[0]),
+  );
+  return ordered;
+}
+
+const commands = node.commands ?? [node];
+const leaves = node.commands ? node.commands : [];
+---
+
+<Shell title={label(node.path)} description={node.short_help ?? undefined}>
+  {node.help && <p>{node.help}</p>}
+
+  {
+    leaves.length > 0 && (
+      <RefMembers
+        label="Subcommands"
+        items={leaves.map((c) => ({
+          id: label(c.path),
+          name: label(c.path),
+          kind: 'command',
+          summary: c.short_help ?? '',
+        }))}
+      />
+    )
+  }
+
+  {
+    commands.map((cmd) => (
+      <RefSymbol
+        id={label(cmd.path)}
+        name={label(cmd.path)}
+        kind={cmd.kind === 'group' ? 'namespace' : 'function'}
+        language="python"
+        signature={cmd.usage}
+        signatureLanguage="bash"
+        summary={cmd.short_help ?? undefined}
+        source={cmd.source ?? undefined}
+        level={2}
+      >
+        {cmd.help && cmd !== node && <p>{cmd.help}</p>}
+
+        {cmd.arguments.length > 0 && (
+          <RefSection title="Arguments">
+            <RefParams caption={`${label(cmd.path)} arguments`} rows={rows(cmd.arguments)} />
+          </RefSection>
+        )}
+
+        {panels(cmd).map(([panel, options]) => (
+          <RefSection title={panel}>
+            <RefParams caption={`${label(cmd.path)} ${panel}`} rows={rows(options)} density="compact" />
+          </RefSection>
+        ))}
+
+        {cmd.epilog && (
+          <RefSection title="Examples">
+            <pre>{cmd.epilog}</pre>
+          </RefSection>
+        )}
+      </RefSymbol>
+    ))
+  }
+</Shell>

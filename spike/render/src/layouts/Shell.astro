@@ -1,0 +1,35 @@
+---
+import '@ambiqai/helia-ui/tokens.css';
+import '@ambiqai/helia-ui/semantic.css';
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description } = Astro.props;
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    {description && <meta name="description" content={description} />}
+  </head>
+  <body>
+    <main class="page">
+      <h1>{title}</h1>
+      <slot />
+    </main>
+    <style>
+      .page {
+        max-width: 60rem;
+        margin: 0 auto;
+        padding: var(--helia-space-6, 2rem);
+        font-family: var(--helia-font-sans, system-ui, sans-serif);
+        color: var(--helia-color-text, #1a1a1a);
+      }
+    </style>
+  </body>
+</html>

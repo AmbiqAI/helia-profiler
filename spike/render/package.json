@@ -1,0 +1,15 @@
+{
+  "name": "hpx-spike-render",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "stage": "node scripts/stage.mjs",
+    "fit": "node scripts/reference-model-fit.mjs",
+    "build": "npm run stage && astro build"
+  },
+  "dependencies": {
+    "@ambiqai/helia-ui": "file:/private/tmp/claude-502/-Users-adam-page-Ambiq-helia-helia-profiler--claude-worktrees-helia-profiler-issue-91-929af4/c31740cf-afb4-474b-bb3f-668b4609b3a2/scratchpad/helia-ui-pkg",
+    "astro": "^7.0.2",
+    "astro-expressive-code": "^0.44.2"
+  }
+}

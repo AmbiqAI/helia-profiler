@@ -1,0 +1,1 @@
+{"compilerOptions":{"target":"ESNext","module":"ESNext","moduleResolution":"bundler","strict":false,"allowJs":true,"resolveJsonModule":true,"jsx":"preserve","jsxImportSource":"astro"},"include":["src/**/*","scripts/**/*"],"exclude":["dist"]}

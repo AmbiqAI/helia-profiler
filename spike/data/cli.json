@@ -1,0 +1,3422 @@
+{
+  "schemaVersion": 1,
+  "kind": "cli",
+  "program": "hpx",
+  "generatedFrom": {
+    "helia_profiler": "0.1.6",
+    "typer": "0.26.8",
+    "click": "8.3.3",
+    "pydantic": "2.13.4"
+  },
+  "counts": {
+    "leaf_commands": 14,
+    "leaf_command_names": [
+      "analyze",
+      "boards",
+      "cache info",
+      "cache purge",
+      "compare",
+      "doctor",
+      "engines",
+      "ports list",
+      "power-on",
+      "probes list",
+      "probes match",
+      "profile",
+      "target reset",
+      "validate"
+    ],
+    "groups": 5,
+    "group_names": [
+      "hpx",
+      "cache",
+      "ports",
+      "probes",
+      "target"
+    ],
+    "top_level_entries": 12,
+    "epilogs": 6,
+    "epilog_commands": [
+      "analyze",
+      "cache",
+      "compare",
+      "power-on",
+      "profile",
+      "validate"
+    ],
+    "options": 102,
+    "arguments": 4,
+    "options_with_panel": 42,
+    "options_with_envvar": 0
+  },
+  "root": {
+    "path": [],
+    "name": "hpx",
+    "kind": "group",
+    "usage": "hpx COMMAND [ARGS]...",
+    "short_help": "Profile LiteRT and ExecuTorch models on Ambiq silicon.",
+    "help": "Profile LiteRT and ExecuTorch models on Ambiq silicon.",
+    "epilog": null,
+    "deprecated": false,
+    "hidden": false,
+    "source": {
+      "path": "/Users/adam.page/.cache/uv/builds-v0/.tmp1hA2py/lib/python3.13/site-packages/typer/main.py",
+      "line": 48
+    },
+    "arguments": [],
+    "options": [
+      {
+        "name": "version",
+        "kind": "option",
+        "declaration": "--version",
+        "opts": [
+          "--version"
+        ],
+        "aliases": [],
+        "secondary_opts": [],
+        "metavar": null,
+        "type": {
+          "name": "boolean",
+          "class": "BoolParamType"
+        },
+        "python_type": "Optional[bool]",
+        "default": null,
+        "required": false,
+        "help": "show program's version number and exit",
+        "panel": null,
+        "is_flag": true,
+        "multiple": false,
+        "count": false,
+        "nargs": 1,
+        "hidden": false,
+        "envvar": []
+      }
+    ],
+    "panels": [],
+    "commands": [
+      {
+        "path": [
+          "analyze"
+        ],
+        "name": "analyze",
+        "kind": "command",
+        "usage": "hpx analyze [OPTIONS] MODEL",
+        "short_help": "Analyze model compute/parameter breakdown (no hardware needed)",
+        "help": "Analyze model compute/parameter breakdown (no hardware needed)",
+        "epilog": "Analyze a .tflite model without hardware:\n\n  hpx analyze model.tflite\n\n  hpx analyze model.tflite --engine helia-aot --board apollo510_evb\n\n  hpx analyze model.tflite --format csv --output analysis.csv\n\n  hpx analyze model.tflite --engine helia-aot --compare",
+        "deprecated": false,
+        "hidden": false,
+        "source": {
+          "path": "/Users/adam.page/.cache/uv/builds-v0/.tmp1hA2py/lib/python3.13/site-packages/typer/main.py",
+          "line": 542
+        },
+        "arguments": [
+          {
+            "name": "model",
+            "kind": "argument",
+            "declaration": "model",
+            "opts": [
+              "model"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Path",
+            "default": null,
+            "required": true,
+            "help": "Path to .tflite model file",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          }
+        ],
+        "options": [
+          {
+            "name": "engine",
+            "kind": "option",
+            "declaration": "--engine",
+            "opts": [
+              "--engine"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "choice",
+              "class": "TyperChoice",
+              "choices": [
+                "tflm",
+                "helia-rt",
+                "helia-aot",
+                "executorch"
+              ]
+            },
+            "python_type": "Optional[str]",
+            "default": null,
+            "required": false,
+            "help": "Analyze as this engine would execute it. Default (no flag) uses the raw tflite graph. 'helia-aot' runs AOT compilation and analyzes the transformed graph. 'helia-rt' analyzes the original tflite graph.",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "compare",
+            "kind": "option",
+            "declaration": "--compare",
+            "opts": [
+              "--compare"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "boolean",
+              "class": "BoolParamType"
+            },
+            "python_type": "bool",
+            "default": false,
+            "required": false,
+            "help": "Show side-by-side comparison of original vs engine-transformed graph",
+            "panel": null,
+            "is_flag": true,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "format",
+            "kind": "option",
+            "declaration": "--format",
+            "opts": [
+              "--format"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "choice",
+              "class": "TyperChoice",
+              "choices": [
+                "table",
+                "csv",
+                "json"
+              ]
+            },
+            "python_type": "str",
+            "default": "table",
+            "required": false,
+            "help": "Output format (default: table)",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "output",
+            "kind": "option",
+            "declaration": "--output",
+            "opts": [
+              "--output",
+              "-o"
+            ],
+            "aliases": [
+              "-o"
+            ],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Optional[Path]",
+            "default": null,
+            "required": false,
+            "help": "Write output to file",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "board",
+            "kind": "option",
+            "declaration": "--board",
+            "opts": [
+              "--board"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "text",
+              "class": "StringParamType"
+            },
+            "python_type": "str",
+            "default": "apollo510_evb",
+            "required": false,
+            "help": "Target board for AOT compilation (default: apollo510_evb)",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          }
+        ],
+        "panels": []
+      },
+      {
+        "path": [
+          "boards"
+        ],
+        "name": "boards",
+        "kind": "command",
+        "usage": "hpx boards",
+        "short_help": "List supported boards and SoC capabilities",
+        "help": "List supported boards and SoC capabilities",
+        "epilog": null,
+        "deprecated": false,
+        "hidden": false,
+        "source": {
+          "path": "/Users/adam.page/.cache/uv/builds-v0/.tmp1hA2py/lib/python3.13/site-packages/typer/main.py",
+          "line": 137
+        },
+        "arguments": [],
+        "options": [],
+        "panels": []
+      },
+      {
+        "path": [
+          "cache"
+        ],
+        "name": "cache",
+        "kind": "group",
+        "usage": "hpx cache COMMAND [ARGS]...",
+        "short_help": "Manage hpx/nsx caches",
+        "help": "Manage hpx/nsx caches",
+        "epilog": "Manage local caches used by hpx and its nsx dependency:\n\n  hpx cache purge      Remove all cached data (module artifacts,\n\n                       git-artifact hashes, resolved refs,\n\n                       generated workspaces).\n\n                       Forces fresh network\n\n                       fetches on next run.\n\n  hpx cache info       Show cache location and size.",
+        "deprecated": false,
+        "hidden": false,
+        "source": {
+          "path": "/Users/adam.page/.cache/uv/builds-v0/.tmp1hA2py/lib/python3.13/site-packages/typer/main.py",
+          "line": 696
+        },
+        "arguments": [],
+        "options": [],
+        "panels": [],
+        "commands": [
+          {
+            "path": [
+              "cache",
+              "info"
+            ],
+            "name": "info",
+            "kind": "command",
+            "usage": "hpx cache info",
+            "short_help": "Show cache location and disk usage",
+            "help": "Show cache location and disk usage",
+            "epilog": null,
+            "deprecated": false,
+            "hidden": false,
+            "source": {
+              "path": "/Users/adam.page/.cache/uv/builds-v0/.tmp1hA2py/lib/python3.13/site-packages/typer/main.py",
+              "line": 710
+            },
+            "arguments": [],
+            "options": [],
+            "panels": []
+          },
+          {
+            "path": [
+              "cache",
+              "purge"
+            ],
+            "name": "purge",
+            "kind": "command",
+            "usage": "hpx cache purge",
+            "short_help": "Remove all NSX caches and HPX workspaces",
+            "help": "Remove all NSX caches and HPX workspaces",
+            "epilog": null,
+            "deprecated": false,
+            "hidden": false,
+            "source": {
+              "path": "/Users/adam.page/.cache/uv/builds-v0/.tmp1hA2py/lib/python3.13/site-packages/typer/main.py",
+              "line": 703
+            },
+            "arguments": [],
+            "options": [],
+            "panels": []
+          }
+        ]
+      },
+      {
+        "path": [
+          "compare"
+        ],
+        "name": "compare",
+        "kind": "command",
+        "usage": "hpx compare [OPTIONS] BASELINE CANDIDATE",
+        "short_help": "Compare two hpx result directories",
+        "help": "Compare two hpx result directories",
+        "epilog": "Examples:\n\n  hpx compare results/rt_gcc results/rt_atfe\n\n  hpx compare results/rt results/aot --output-dir results/rt_vs_aot\n\n  hpx compare results/baseline-validation results/candidate-validation --validation --output-dir results/validation-compare",
+        "deprecated": false,
+        "hidden": false,
+        "source": {
+          "path": "/Users/adam.page/.cache/uv/builds-v0/.tmp1hA2py/lib/python3.13/site-packages/typer/main.py",
+          "line": 625
+        },
+        "arguments": [
+          {
+            "name": "baseline",
+            "kind": "argument",
+            "declaration": "baseline",
+            "opts": [
+              "baseline"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Path",
+            "default": null,
+            "required": true,
+            "help": "Baseline hpx result directory",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "candidate",
+            "kind": "argument",
+            "declaration": "candidate",
+            "opts": [
+              "candidate"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Path",
+            "default": null,
+            "required": true,
+            "help": "Candidate hpx result directory",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          }
+        ],
+        "options": [
+          {
+            "name": "output_dir",
+            "kind": "option",
+            "declaration": "--output-dir",
+            "opts": [
+              "--output-dir"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Optional[Path]",
+            "default": null,
+            "required": false,
+            "help": "Write comparison artifacts to this directory",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "profile",
+            "kind": "option",
+            "declaration": "--profile",
+            "opts": [
+              "--profile"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Optional[Path]",
+            "default": null,
+            "required": false,
+            "help": "Versioned JSON comparison profile for regression verdicts",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "validation",
+            "kind": "option",
+            "declaration": "--validation",
+            "opts": [
+              "--validation"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "boolean",
+              "class": "BoolParamType"
+            },
+            "python_type": "bool",
+            "default": false,
+            "required": false,
+            "help": "Compare portable validation bundles instead of profile runs",
+            "panel": null,
+            "is_flag": true,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "top_layers",
+            "kind": "option",
+            "declaration": "--top-layers",
+            "opts": [
+              "--top-layers"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "integer",
+              "class": "IntParamType"
+            },
+            "python_type": "int",
+            "default": 10,
+            "required": false,
+            "help": "Number of layer deltas to show in terminal output (default: 10)",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          }
+        ],
+        "panels": []
+      },
+      {
+        "path": [
+          "doctor"
+        ],
+        "name": "doctor",
+        "kind": "command",
+        "usage": "hpx doctor [OPTIONS]",
+        "short_help": "Check toolchain and dependencies",
+        "help": "Check toolchain and dependencies",
+        "epilog": null,
+        "deprecated": false,
+        "hidden": false,
+        "source": {
+          "path": "/Users/adam.page/.cache/uv/builds-v0/.tmp1hA2py/lib/python3.13/site-packages/typer/main.py",
+          "line": 49
+        },
+        "arguments": [],
+        "options": [
+          {
+            "name": "json_",
+            "kind": "option",
+            "declaration": "--json",
+            "opts": [
+              "--json"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "boolean",
+              "class": "BoolParamType"
+            },
+            "python_type": "bool",
+            "default": false,
+            "required": false,
+            "help": "Emit machine-readable JSON",
+            "panel": null,
+            "is_flag": true,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "bundle",
+            "kind": "option",
+            "declaration": "--bundle",
+            "opts": [
+              "--bundle"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Optional[Path]",
+            "default": null,
+            "required": false,
+            "help": "Write a sanitized support-bundle archive to this file or directory instead of printing the toolchain table",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "workspace",
+            "kind": "option",
+            "declaration": "--workspace",
+            "opts": [
+              "--workspace"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Optional[Path]",
+            "default": null,
+            "required": false,
+            "help": "Prepared profiler_app directory (or its nsx.lock/hpx-dependencies.json, or the parent fingerprint workspace) to include exact dependency lock provenance in the bundle",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "config",
+            "kind": "option",
+            "declaration": "--config",
+            "opts": [
+              "--config"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Optional[Path]",
+            "default": null,
+            "required": false,
+            "help": "Resolve this YAML config and include a sanitized snapshot in the bundle",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "toolchain",
+            "kind": "option",
+            "declaration": "--toolchain",
+            "opts": [
+              "--toolchain"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "text",
+              "class": "StringParamType"
+            },
+            "python_type": "Optional[str]",
+            "default": null,
+            "required": false,
+            "help": "Toolchain to check (default: arm-none-eabi-gcc)",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "transport",
+            "kind": "option",
+            "declaration": "--transport",
+            "opts": [
+              "--transport"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "choice",
+              "class": "TyperChoice",
+              "choices": [
+                "rtt",
+                "usb_cdc",
+                "swo",
+                "uart"
+              ]
+            },
+            "python_type": "Optional[str]",
+            "default": null,
+            "required": false,
+            "help": "Transport to check (default: rtt)",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "engine",
+            "kind": "option",
+            "declaration": "--engine",
+            "opts": [
+              "--engine"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "choice",
+              "class": "TyperChoice",
+              "choices": [
+                "tflm",
+                "helia-rt",
+                "helia-aot",
+                "executorch"
+              ]
+            },
+            "python_type": "Optional[str]",
+            "default": null,
+            "required": false,
+            "help": "Engine to check (default: helia-rt)",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "no_probes",
+            "kind": "option",
+            "declaration": "--no-probes",
+            "opts": [
+              "--no-probes"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "boolean",
+              "class": "BoolParamType"
+            },
+            "python_type": "bool",
+            "default": false,
+            "required": false,
+            "help": "Skip live J-Link probe enumeration in --bundle",
+            "panel": null,
+            "is_flag": true,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "no_ports",
+            "kind": "option",
+            "declaration": "--no-ports",
+            "opts": [
+              "--no-ports"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "boolean",
+              "class": "BoolParamType"
+            },
+            "python_type": "bool",
+            "default": false,
+            "required": false,
+            "help": "Skip live serial port enumeration in --bundle",
+            "panel": null,
+            "is_flag": true,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "raw_probe_ids",
+            "kind": "option",
+            "declaration": "--raw-probe-ids",
+            "opts": [
+              "--raw-probe-ids"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "boolean",
+              "class": "BoolParamType"
+            },
+            "python_type": "bool",
+            "default": false,
+            "required": false,
+            "help": "Include unredacted device serial numbers in --bundle (opt-in; prints a warning)",
+            "panel": null,
+            "is_flag": true,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          }
+        ],
+        "panels": []
+      },
+      {
+        "path": [
+          "engines"
+        ],
+        "name": "engines",
+        "kind": "command",
+        "usage": "hpx engines",
+        "short_help": "List available inference engines",
+        "help": "List available inference engines",
+        "epilog": null,
+        "deprecated": false,
+        "hidden": false,
+        "source": {
+          "path": "/Users/adam.page/.cache/uv/builds-v0/.tmp1hA2py/lib/python3.13/site-packages/typer/main.py",
+          "line": 130
+        },
+        "arguments": [],
+        "options": [],
+        "panels": []
+      },
+      {
+        "path": [
+          "ports"
+        ],
+        "name": "ports",
+        "kind": "group",
+        "usage": "hpx ports COMMAND [ARGS]...",
+        "short_help": "List host serial ports relevant to HPX transports",
+        "help": "List host serial ports relevant to HPX transports",
+        "epilog": null,
+        "deprecated": false,
+        "hidden": false,
+        "source": {
+          "path": "/Users/adam.page/.cache/uv/builds-v0/.tmp1hA2py/lib/python3.13/site-packages/typer/main.py",
+          "line": 204
+        },
+        "arguments": [],
+        "options": [],
+        "panels": [],
+        "commands": [
+          {
+            "path": [
+              "ports",
+              "list"
+            ],
+            "name": "list",
+            "kind": "command",
+            "usage": "hpx ports list [OPTIONS]",
+            "short_help": "List serial ports with J-Link/CDC hints",
+            "help": "List serial ports with J-Link/CDC hints",
+            "epilog": null,
+            "deprecated": false,
+            "hidden": false,
+            "source": {
+              "path": "/Users/adam.page/.cache/uv/builds-v0/.tmp1hA2py/lib/python3.13/site-packages/typer/main.py",
+              "line": 211
+            },
+            "arguments": [],
+            "options": [
+              {
+                "name": "show_all",
+                "kind": "option",
+                "declaration": "--all",
+                "opts": [
+                  "--all"
+                ],
+                "aliases": [],
+                "secondary_opts": [],
+                "metavar": null,
+                "type": {
+                  "name": "boolean",
+                  "class": "BoolParamType"
+                },
+                "python_type": "bool",
+                "default": false,
+                "required": false,
+                "help": "Show every host serial port, not just HPX-relevant USB/J-Link ports",
+                "panel": null,
+                "is_flag": true,
+                "multiple": false,
+                "count": false,
+                "nargs": 1,
+                "hidden": false,
+                "envvar": []
+              },
+              {
+                "name": "json_",
+                "kind": "option",
+                "declaration": "--json",
+                "opts": [
+                  "--json"
+                ],
+                "aliases": [],
+                "secondary_opts": [],
+                "metavar": null,
+                "type": {
+                  "name": "boolean",
+                  "class": "BoolParamType"
+                },
+                "python_type": "bool",
+                "default": false,
+                "required": false,
+                "help": "Emit machine-readable JSON",
+                "panel": null,
+                "is_flag": true,
+                "multiple": false,
+                "count": false,
+                "nargs": 1,
+                "hidden": false,
+                "envvar": []
+              }
+            ],
+            "panels": []
+          }
+        ]
+      },
+      {
+        "path": [
+          "power-on"
+        ],
+        "name": "power-on",
+        "kind": "command",
+        "usage": "hpx power-on [OPTIONS]",
+        "short_help": "Enable Joulescope current passthrough (keeps board powered)",
+        "help": "Enable Joulescope current passthrough (keeps board powered)",
+        "epilog": "Opens the Joulescope and enables current passthrough so the\n\ntarget board stays powered.  Holds the connection open until\n\nCtrl-C.  Useful when the Joulescope app is not running and the\n\nboard would otherwise be unpowered.",
+        "deprecated": false,
+        "hidden": false,
+        "source": {
+          "path": "/Users/adam.page/.cache/uv/builds-v0/.tmp1hA2py/lib/python3.13/site-packages/typer/main.py",
+          "line": 61
+        },
+        "arguments": [],
+        "options": [
+          {
+            "name": "driver",
+            "kind": "option",
+            "declaration": "--driver",
+            "opts": [
+              "--driver"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "choice",
+              "class": "TyperChoice",
+              "choices": [
+                "joulescope"
+              ]
+            },
+            "python_type": "str",
+            "default": "joulescope",
+            "required": false,
+            "help": "Joulescope driver (default: auto-detect)",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "power_serial",
+            "kind": "option",
+            "declaration": "--power-serial",
+            "opts": [
+              "--power-serial",
+              "--js-serial"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "text",
+              "class": "StringParamType"
+            },
+            "python_type": "Optional[str]",
+            "default": null,
+            "required": false,
+            "help": "Joulescope serial number to select when multiple are connected",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          }
+        ],
+        "panels": []
+      },
+      {
+        "path": [
+          "probes"
+        ],
+        "name": "probes",
+        "kind": "group",
+        "usage": "hpx probes COMMAND [ARGS]...",
+        "short_help": "Inspect connected J-Link probes without opening an interactive SEGGER commander session",
+        "help": "Inspect connected J-Link probes without opening an interactive SEGGER commander session",
+        "epilog": null,
+        "deprecated": false,
+        "hidden": false,
+        "source": {
+          "path": "/Users/adam.page/.cache/uv/builds-v0/.tmp1hA2py/lib/python3.13/site-packages/typer/main.py",
+          "line": 153
+        },
+        "arguments": [],
+        "options": [],
+        "panels": [],
+        "commands": [
+          {
+            "path": [
+              "probes",
+              "list"
+            ],
+            "name": "list",
+            "kind": "command",
+            "usage": "hpx probes list [OPTIONS]",
+            "short_help": "List connected J-Link probes",
+            "help": "List connected J-Link probes",
+            "epilog": null,
+            "deprecated": false,
+            "hidden": false,
+            "source": {
+              "path": "/Users/adam.page/.cache/uv/builds-v0/.tmp1hA2py/lib/python3.13/site-packages/typer/main.py",
+              "line": 160
+            },
+            "arguments": [],
+            "options": [
+              {
+                "name": "board",
+                "kind": "option",
+                "declaration": "--board",
+                "opts": [
+                  "--board"
+                ],
+                "aliases": [],
+                "secondary_opts": [],
+                "metavar": null,
+                "type": {
+                  "name": "text",
+                  "class": "StringParamType"
+                },
+                "python_type": "Optional[str]",
+                "default": null,
+                "required": false,
+                "help": "Inspect each probe against this board's J-Link device string",
+                "panel": null,
+                "is_flag": false,
+                "multiple": false,
+                "count": false,
+                "nargs": 1,
+                "hidden": false,
+                "envvar": []
+              },
+              {
+                "name": "inspect",
+                "kind": "option",
+                "declaration": "--inspect",
+                "opts": [
+                  "--inspect"
+                ],
+                "aliases": [],
+                "secondary_opts": [],
+                "metavar": null,
+                "type": {
+                  "name": "boolean",
+                  "class": "BoolParamType"
+                },
+                "python_type": "bool",
+                "default": false,
+                "required": false,
+                "help": "Inspect target cores. Requires --board.",
+                "panel": null,
+                "is_flag": true,
+                "multiple": false,
+                "count": false,
+                "nargs": 1,
+                "hidden": false,
+                "envvar": []
+              },
+              {
+                "name": "json_",
+                "kind": "option",
+                "declaration": "--json",
+                "opts": [
+                  "--json"
+                ],
+                "aliases": [],
+                "secondary_opts": [],
+                "metavar": null,
+                "type": {
+                  "name": "boolean",
+                  "class": "BoolParamType"
+                },
+                "python_type": "bool",
+                "default": false,
+                "required": false,
+                "help": "Emit machine-readable JSON",
+                "panel": null,
+                "is_flag": true,
+                "multiple": false,
+                "count": false,
+                "nargs": 1,
+                "hidden": false,
+                "envvar": []
+              }
+            ],
+            "panels": []
+          },
+          {
+            "path": [
+              "probes",
+              "match"
+            ],
+            "name": "match",
+            "kind": "command",
+            "usage": "hpx probes match [OPTIONS]",
+            "short_help": "Resolve the J-Link serial for a board using HPX's normal selection policy",
+            "help": "Resolve the J-Link serial for a board using HPX's normal selection policy",
+            "epilog": null,
+            "deprecated": false,
+            "hidden": false,
+            "source": {
+              "path": "/Users/adam.page/.cache/uv/builds-v0/.tmp1hA2py/lib/python3.13/site-packages/typer/main.py",
+              "line": 178
+            },
+            "arguments": [],
+            "options": [
+              {
+                "name": "board",
+                "kind": "option",
+                "declaration": "--board",
+                "opts": [
+                  "--board"
+                ],
+                "aliases": [],
+                "secondary_opts": [],
+                "metavar": null,
+                "type": {
+                  "name": "text",
+                  "class": "StringParamType"
+                },
+                "python_type": "str",
+                "default": null,
+                "required": true,
+                "help": "Target board ID",
+                "panel": null,
+                "is_flag": false,
+                "multiple": false,
+                "count": false,
+                "nargs": 1,
+                "hidden": false,
+                "envvar": []
+              },
+              {
+                "name": "jlink_serial",
+                "kind": "option",
+                "declaration": "--jlink-serial",
+                "opts": [
+                  "--jlink-serial"
+                ],
+                "aliases": [],
+                "secondary_opts": [],
+                "metavar": null,
+                "type": {
+                  "name": "text",
+                  "class": "StringParamType"
+                },
+                "python_type": "Optional[str]",
+                "default": null,
+                "required": false,
+                "help": "Optional requested serial to validate against the selected board",
+                "panel": null,
+                "is_flag": false,
+                "multiple": false,
+                "count": false,
+                "nargs": 1,
+                "hidden": false,
+                "envvar": []
+              },
+              {
+                "name": "json_",
+                "kind": "option",
+                "declaration": "--json",
+                "opts": [
+                  "--json"
+                ],
+                "aliases": [],
+                "secondary_opts": [],
+                "metavar": null,
+                "type": {
+                  "name": "boolean",
+                  "class": "BoolParamType"
+                },
+                "python_type": "bool",
+                "default": false,
+                "required": false,
+                "help": "Emit machine-readable JSON",
+                "panel": null,
+                "is_flag": true,
+                "multiple": false,
+                "count": false,
+                "nargs": 1,
+                "hidden": false,
+                "envvar": []
+              }
+            ],
+            "panels": []
+          }
+        ]
+      },
+      {
+        "path": [
+          "profile"
+        ],
+        "name": "profile",
+        "kind": "command",
+        "usage": "hpx profile [OPTIONS] [MODEL]",
+        "short_help": "Profile a model on target hardware",
+        "help": "Profile a model on target hardware",
+        "epilog": "Quick start:\n\n  hpx profile my_model.tflite\n\n  hpx profile --config hpx.yml\n\n  hpx profile my_model.tflite --engine helia-rt --power -vv",
+        "deprecated": false,
+        "hidden": false,
+        "source": {
+          "path": "/Users/adam.page/.cache/uv/builds-v0/.tmp1hA2py/lib/python3.13/site-packages/typer/main.py",
+          "line": 93
+        },
+        "arguments": [
+          {
+            "name": "model",
+            "kind": "argument",
+            "declaration": "model",
+            "opts": [
+              "model"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Optional[Path]",
+            "default": null,
+            "required": false,
+            "help": "Path to .tflite or .pte model file",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          }
+        ],
+        "options": [
+          {
+            "name": "config",
+            "kind": "option",
+            "declaration": "--config",
+            "opts": [
+              "--config"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Optional[Path]",
+            "default": null,
+            "required": false,
+            "help": "YAML config file (hpx.yml)",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "verbose",
+            "kind": "option",
+            "declaration": "--verbose",
+            "opts": [
+              "-v",
+              "--verbose"
+            ],
+            "aliases": [
+              "-v"
+            ],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "integer",
+              "class": "IntParamType"
+            },
+            "python_type": "int",
+            "default": 0,
+            "required": false,
+            "help": "Increase verbosity",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": true,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "engine",
+            "kind": "option",
+            "declaration": "--engine",
+            "opts": [
+              "--engine"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "choice",
+              "class": "TyperChoice",
+              "choices": [
+                "tflm",
+                "helia-rt",
+                "helia-aot",
+                "executorch"
+              ]
+            },
+            "python_type": "Optional[str]",
+            "default": null,
+            "required": false,
+            "help": "Inference engine (default: helia-rt)",
+            "panel": "engine",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "engine_config",
+            "kind": "option",
+            "declaration": "--engine-config",
+            "opts": [
+              "--engine-config"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Optional[Path]",
+            "default": null,
+            "required": false,
+            "help": "Engine-specific YAML config",
+            "panel": "engine",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "arena_size",
+            "kind": "option",
+            "declaration": "--arena-size",
+            "opts": [
+              "--arena-size"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "integer",
+              "class": "IntParamType"
+            },
+            "python_type": "Optional[int]",
+            "default": null,
+            "required": false,
+            "help": "Tensor arena size in bytes",
+            "panel": "engine",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "runtime_arena_location",
+            "kind": "option",
+            "declaration": "--arena-location",
+            "opts": [
+              "--arena-location"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "choice",
+              "class": "TyperChoice",
+              "choices": [
+                "tcm",
+                "sram",
+                "psram"
+              ]
+            },
+            "python_type": "Optional[str]",
+            "default": null,
+            "required": false,
+            "help": "Tensor arena placement. helia-rt: places the single runtime tensor arena. helia-aot: use engine.config.aot_args.memory.tensors instead. Omit to let the engine and memory planner choose.",
+            "panel": "engine",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "runtime_weights_location",
+            "kind": "option",
+            "declaration": "--weights-location",
+            "opts": [
+              "--weights-location"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "choice",
+              "class": "TyperChoice",
+              "choices": [
+                "tcm",
+                "sram",
+                "mram",
+                "psram"
+              ]
+            },
+            "python_type": "Optional[str]",
+            "default": null,
+            "required": false,
+            "help": "Model weights placement. helia-rt: places the model flatbuffer (psram requires J-Link upload via the RTT transport). helia-aot: use engine.config.aot_args.memory.tensors instead. Omit to let the engine and memory planner choose.",
+            "panel": "engine",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "core_override",
+            "kind": "option",
+            "declaration": "--core-override",
+            "opts": [
+              "--core-override"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "choice",
+              "class": "TyperChoice",
+              "choices": [
+                "cm4",
+                "cm55"
+              ]
+            },
+            "python_type": "Optional[str]",
+            "default": null,
+            "required": false,
+            "help": "Force heliaRT to use a specific core library variant (e.g. cm4 to disable MVE kernels on an M55 board).",
+            "panel": "engine",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "board",
+            "kind": "option",
+            "declaration": "--board",
+            "opts": [
+              "--board"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "text",
+              "class": "StringParamType"
+            },
+            "python_type": "Optional[str]",
+            "default": null,
+            "required": false,
+            "help": "Target board (default: apollo510_evb)",
+            "panel": "target hardware",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "toolchain",
+            "kind": "option",
+            "declaration": "--toolchain",
+            "opts": [
+              "--toolchain"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "text",
+              "class": "StringParamType"
+            },
+            "python_type": "Optional[str]",
+            "default": null,
+            "required": false,
+            "help": "Toolchain (default: arm-none-eabi-gcc)",
+            "panel": "target hardware",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "jlink_serial",
+            "kind": "option",
+            "declaration": "--jlink-serial",
+            "opts": [
+              "--jlink-serial"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "text",
+              "class": "StringParamType"
+            },
+            "python_type": "Optional[str]",
+            "default": null,
+            "required": false,
+            "help": "J-Link probe serial number (default: auto-detect)",
+            "panel": "target hardware",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "transport",
+            "kind": "option",
+            "declaration": "--transport",
+            "opts": [
+              "--transport"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "choice",
+              "class": "TyperChoice",
+              "choices": [
+                "rtt",
+                "usb_cdc",
+                "swo",
+                "uart"
+              ]
+            },
+            "python_type": "Optional[str]",
+            "default": null,
+            "required": false,
+            "help": "Data transport (default: rtt). RTT is recommended for lossless capture.",
+            "panel": "target hardware",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "usb_port",
+            "kind": "option",
+            "declaration": "--usb-port",
+            "opts": [
+              "--usb-port"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "text",
+              "class": "StringParamType"
+            },
+            "python_type": "Optional[str]",
+            "default": null,
+            "required": false,
+            "help": "Explicit USB CDC device path for --transport usb_cdc (for example /dev/ttyACM1).",
+            "panel": "target hardware",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "rtt_buffer_size_up",
+            "kind": "option",
+            "declaration": "--rtt-buffer-size-up",
+            "opts": [
+              "--rtt-buffer-size-up"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": "BYTES",
+            "type": {
+              "name": "integer",
+              "class": "IntParamType"
+            },
+            "python_type": "Optional[int]",
+            "default": null,
+            "required": false,
+            "help": "SEGGER RTT up-buffer size for generated RTT firmware. If too small, non-blocking writes during timed inference may be dropped, while blocking CSV/HPX_END writes may stall long enough to hit host timeouts. If omitted, hpx uses a toolchain-aware default.",
+            "panel": "target hardware",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "cpu_clock",
+            "kind": "option",
+            "declaration": "--cpu-clock",
+            "opts": [
+              "--cpu-clock"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": "SPEED",
+            "type": {
+              "name": "text",
+              "class": "StringParamType"
+            },
+            "python_type": "Optional[str]",
+            "default": null,
+            "required": false,
+            "help": "CPU clock speed for generated firmware (board-specific, e.g. 'lp'/'hp'). Default: the board's lowest-power tier.",
+            "panel": "target hardware",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "frozen",
+            "kind": "option",
+            "declaration": "--frozen",
+            "opts": [
+              "--frozen"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "boolean",
+              "class": "BoolParamType"
+            },
+            "python_type": "bool",
+            "default": false,
+            "required": false,
+            "help": "Deprecated alias for --offline: require the compatible lock and materialized module state without dependency resolution.",
+            "panel": "target hardware",
+            "is_flag": true,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "offline",
+            "kind": "option",
+            "declaration": "--offline",
+            "opts": [
+              "--offline"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "boolean",
+              "class": "BoolParamType"
+            },
+            "python_type": "bool",
+            "default": false,
+            "required": false,
+            "help": "Require exact compatible lock/module reuse without network resolution.",
+            "panel": "build overrides",
+            "is_flag": true,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "update_dependencies",
+            "kind": "option",
+            "declaration": "--update-dependencies",
+            "opts": [
+              "--update-dependencies"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "boolean",
+              "class": "BoolParamType"
+            },
+            "python_type": "bool",
+            "default": false,
+            "required": false,
+            "help": "Explicitly re-resolve dependency refs and rewrite nsx.lock.",
+            "panel": "build overrides",
+            "is_flag": true,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "nsx_channel",
+            "kind": "option",
+            "declaration": "--nsx-channel",
+            "opts": [
+              "--nsx-channel"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "text",
+              "class": "StringParamType"
+            },
+            "python_type": "Optional[str]",
+            "default": null,
+            "required": false,
+            "help": "NSX channel for module resolution (default: the board's registered channel).",
+            "panel": "build overrides",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "nsx_module",
+            "kind": "option",
+            "declaration": "--nsx-module",
+            "opts": [
+              "--nsx-module"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": "NAME:KEY=VALUE",
+            "type": {
+              "name": "text",
+              "class": "StringParamType"
+            },
+            "python_type": "Optional[list[str]]",
+            "default": null,
+            "required": false,
+            "help": "Override an NSX module's source. Repeatable. Keys: path (local dir), ref (git ref/tag), version (pin). Examples: --nsx-module nsx-core:path=/my/nsx-core --nsx-module nsx-cmsis-core:ref=feat/new-cmsis --nsx-module nsx-gpio:version=2.0.0",
+            "panel": "build overrides",
+            "is_flag": false,
+            "multiple": true,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "compiler_launcher",
+            "kind": "option",
+            "declaration": "--compiler-launcher",
+            "opts": [
+              "--compiler-launcher"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": "NAME",
+            "type": {
+              "name": "text",
+              "class": "StringParamType"
+            },
+            "python_type": "Optional[str]",
+            "default": null,
+            "required": false,
+            "help": "CMake compiler launcher to cache compiles (e.g. sccache, ccache). 'auto' (default) uses sccache/ccache if installed; a name or path requires it to be found. Overrides build.compiler_launcher; the HPX_COMPILER_LAUNCHER env var overrides both.",
+            "panel": "build overrides",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "no_compiler_launcher",
+            "kind": "option",
+            "declaration": "--no-compiler-launcher",
+            "opts": [
+              "--no-compiler-launcher"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "boolean",
+              "class": "BoolParamType"
+            },
+            "python_type": "bool",
+            "default": false,
+            "required": false,
+            "help": "Disable the compiler launcher (equivalent to --compiler-launcher none).",
+            "panel": "build overrides",
+            "is_flag": true,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "pmu_counters",
+            "kind": "option",
+            "declaration": "--pmu-counters",
+            "opts": [
+              "--pmu-counters"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": "GROUP:SELECT",
+            "type": {
+              "name": "text",
+              "class": "StringParamType"
+            },
+            "python_type": "Optional[list[str]]",
+            "default": null,
+            "required": false,
+            "help": "PMU counter selection per compute unit. Repeatable. Format: GROUP:SELECT where GROUP is a supported group for the target SoC (for example cpu/mve/memory on Cortex-M55) and SELECT is 'default', 'all', or comma-separated counter names. Examples: --pmu-counters cpu:default --pmu-counters mve:all, --pmu-counters mve:ARM_PMU_MVE_INST_RETIRED,ARM_PMU_MVE_STALL",
+            "panel": "PMU profiling",
+            "is_flag": false,
+            "multiple": true,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "per_layer",
+            "kind": "option",
+            "declaration": "--per-layer",
+            "opts": [
+              "--per-layer"
+            ],
+            "aliases": [],
+            "secondary_opts": [
+              "--no-per-layer"
+            ],
+            "metavar": null,
+            "type": {
+              "name": "boolean",
+              "class": "BoolParamType"
+            },
+            "python_type": "Optional[bool]",
+            "default": null,
+            "required": false,
+            "help": "Per-layer breakdown (default)",
+            "panel": "PMU profiling",
+            "is_flag": true,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "iterations",
+            "kind": "option",
+            "declaration": "--iterations",
+            "opts": [
+              "--iterations"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "integer",
+              "class": "IntParamType"
+            },
+            "python_type": "Optional[int]",
+            "default": null,
+            "required": false,
+            "help": "Inference iterations (default: 100)",
+            "panel": "PMU profiling",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "warmup",
+            "kind": "option",
+            "declaration": "--warmup",
+            "opts": [
+              "--warmup"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "integer",
+              "class": "IntParamType"
+            },
+            "python_type": "Optional[int]",
+            "default": null,
+            "required": false,
+            "help": "Warmup iterations (default: 5)",
+            "panel": "PMU profiling",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "aggregation",
+            "kind": "option",
+            "declaration": "--aggregation",
+            "opts": [
+              "--aggregation"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "choice",
+              "class": "TyperChoice",
+              "choices": [
+                "mean",
+                "median",
+                "trimmed"
+              ]
+            },
+            "python_type": "Optional[str]",
+            "default": null,
+            "required": false,
+            "help": "How per-layer counters are aggregated across iterations (default: median). 'median' rejects corrupted iterations; 'trimmed' drops extremes then means; 'mean' is the raw average.",
+            "panel": "PMU profiling",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "power",
+            "kind": "option",
+            "declaration": "--power",
+            "opts": [
+              "--power"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "boolean",
+              "class": "BoolParamType"
+            },
+            "python_type": "bool",
+            "default": false,
+            "required": false,
+            "help": "Enable power capture",
+            "panel": "power measurement",
+            "is_flag": true,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "power_driver",
+            "kind": "option",
+            "declaration": "--power-driver",
+            "opts": [
+              "--power-driver"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "choice",
+              "class": "TyperChoice",
+              "choices": [
+                "joulescope",
+                "ondevice"
+              ]
+            },
+            "python_type": "Optional[str]",
+            "default": null,
+            "required": false,
+            "help": "Power driver (default: joulescope = auto-detect JS110/JS220/JS320)",
+            "panel": "power measurement",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "power_mode",
+            "kind": "option",
+            "declaration": "--power-mode",
+            "opts": [
+              "--power-mode"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "choice",
+              "class": "TyperChoice",
+              "choices": [
+                "external",
+                "internal"
+              ]
+            },
+            "python_type": "Optional[str]",
+            "default": null,
+            "required": false,
+            "help": "Power mode (default: external)",
+            "panel": "power measurement",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "power_duration",
+            "kind": "option",
+            "declaration": "--power-duration",
+            "opts": [
+              "--power-duration"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "integer",
+              "class": "IntParamType"
+            },
+            "python_type": "Optional[int]",
+            "default": null,
+            "required": false,
+            "help": "Power capture seconds (default: auto-tuned from profile timing)",
+            "panel": "power measurement",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "power_firmware",
+            "kind": "option",
+            "declaration": "--power-firmware",
+            "opts": [
+              "--power-firmware"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "choice",
+              "class": "TyperChoice",
+              "choices": [
+                "dedicated",
+                "shared"
+              ]
+            },
+            "python_type": "Optional[str]",
+            "default": null,
+            "required": false,
+            "help": "Which binary is on target during power capture (default: dedicated). 'dedicated' flashes the transport-free hpx_profiler_power image to avoid SWO/UART/RTT/USB current contamination (measured on AP510 EVBs); 'shared' reuses the already-flashed transport binary.",
+            "panel": "power measurement",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "power_reset_strategy",
+            "kind": "option",
+            "declaration": "--power-reset-strategy",
+            "opts": [
+              "--power-reset-strategy"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "choice",
+              "class": "TyperChoice",
+              "choices": [
+                "auto",
+                "power_cycle",
+                "none",
+                "debug_reset",
+                "swpoi_reset",
+                "debug_reset+swpoi_reset"
+              ]
+            },
+            "python_type": "Optional[str]",
+            "default": null,
+            "required": false,
+            "help": "Reset strategy before power capture (default: auto). Use explicit values only for board bring-up or controlled experiments.",
+            "panel": "power measurement",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "sync_gpio",
+            "kind": "option",
+            "declaration": "--sync-gpio",
+            "opts": [
+              "--sync-gpio"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "integer",
+              "class": "IntParamType"
+            },
+            "python_type": "Optional[int]",
+            "default": null,
+            "required": false,
+            "help": "GPIO pin for external power sync (default: per-board; 10 only for boards without a registered override)",
+            "panel": "power measurement",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "ensure_power",
+            "kind": "option",
+            "declaration": "--ensure-power",
+            "opts": [
+              "--ensure-power"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "boolean",
+              "class": "BoolParamType"
+            },
+            "python_type": "bool",
+            "default": false,
+            "required": false,
+            "help": "Scan for a Joulescope at start-up and enable current passthrough so the board powers on before flashing. Off by default; only needed when the board's power genuinely comes from the Joulescope rail (--power already implies this).",
+            "panel": "power measurement",
+            "is_flag": true,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "no_ensure_power",
+            "kind": "option",
+            "declaration": "--no-ensure-power",
+            "opts": [
+              "--no-ensure-power"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "boolean",
+              "class": "BoolParamType"
+            },
+            "python_type": "bool",
+            "default": false,
+            "required": false,
+            "help": "Explicitly skip the auto power-on step, overriding --ensure-power or a config file's ensure_board_powered: true.",
+            "panel": "power measurement",
+            "is_flag": true,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "power_serial",
+            "kind": "option",
+            "declaration": "--power-serial",
+            "opts": [
+              "--power-serial",
+              "--js-serial"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "text",
+              "class": "StringParamType"
+            },
+            "python_type": "Optional[str]",
+            "default": null,
+            "required": false,
+            "help": "Power instrument serial number to disambiguate when multiple devices are connected (e.g. Joulescope serial '004204'). Alias: --js-serial.",
+            "panel": "power measurement",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "output_dir",
+            "kind": "option",
+            "declaration": "--output-dir",
+            "opts": [
+              "--output-dir"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Optional[Path]",
+            "default": null,
+            "required": false,
+            "help": "Results output directory",
+            "panel": "output",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "output_format",
+            "kind": "option",
+            "declaration": "--output-format",
+            "opts": [
+              "--output-format"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "choice",
+              "class": "TyperChoice",
+              "choices": [
+                "csv",
+                "json"
+              ]
+            },
+            "python_type": "Optional[str]",
+            "default": null,
+            "required": false,
+            "help": "Output format",
+            "panel": "output",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "no_model_explorer",
+            "kind": "option",
+            "declaration": "--no-model-explorer",
+            "opts": [
+              "--no-model-explorer"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "boolean",
+              "class": "BoolParamType"
+            },
+            "python_type": "bool",
+            "default": false,
+            "required": false,
+            "help": "Skip Model Explorer overlay generation",
+            "panel": "output",
+            "is_flag": true,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "detailed",
+            "kind": "option",
+            "declaration": "--detailed",
+            "opts": [
+              "--detailed"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "boolean",
+              "class": "BoolParamType"
+            },
+            "python_type": "bool",
+            "default": false,
+            "required": false,
+            "help": "Emit detailed per-preset/group CSVs and memory breakdown",
+            "panel": "output",
+            "is_flag": true,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "fail_on_invalid",
+            "kind": "option",
+            "declaration": "--fail-on-invalid",
+            "opts": [
+              "--fail-on-invalid"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "boolean",
+              "class": "BoolParamType"
+            },
+            "python_type": "bool",
+            "default": false,
+            "required": false,
+            "help": "Exit 3 when the run evaluates INVALID (artifacts still written)",
+            "panel": "output",
+            "is_flag": true,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "work_dir",
+            "kind": "option",
+            "declaration": "--work-dir",
+            "opts": [
+              "--work-dir"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Optional[Path]",
+            "default": null,
+            "required": false,
+            "help": "Working directory for generated firmware",
+            "panel": "advanced",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "clean",
+            "kind": "option",
+            "declaration": "--clean",
+            "opts": [
+              "--clean"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "boolean",
+              "class": "BoolParamType"
+            },
+            "python_type": "bool",
+            "default": false,
+            "required": false,
+            "help": "Wipe cached build directory before building (forces full rebuild)",
+            "panel": "advanced",
+            "is_flag": true,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          }
+        ],
+        "panels": [
+          "PMU profiling",
+          "advanced",
+          "build overrides",
+          "engine",
+          "output",
+          "power measurement",
+          "target hardware"
+        ]
+      },
+      {
+        "path": [
+          "target"
+        ],
+        "name": "target",
+        "kind": "group",
+        "usage": "hpx target COMMAND [ARGS]...",
+        "short_help": "Run explicit target-side utility operations",
+        "help": "Run explicit target-side utility operations",
+        "epilog": null,
+        "deprecated": false,
+        "hidden": false,
+        "source": {
+          "path": "/Users/adam.page/.cache/uv/builds-v0/.tmp1hA2py/lib/python3.13/site-packages/typer/main.py",
+          "line": 233
+        },
+        "arguments": [],
+        "options": [],
+        "panels": [],
+        "commands": [
+          {
+            "path": [
+              "target",
+              "reset"
+            ],
+            "name": "reset",
+            "kind": "command",
+            "usage": "hpx target reset [OPTIONS]",
+            "short_help": "Reset a target through HPX's non-interactive J-Link wrapper",
+            "help": "Reset a target through HPX's non-interactive J-Link wrapper",
+            "epilog": null,
+            "deprecated": false,
+            "hidden": false,
+            "source": {
+              "path": "/Users/adam.page/.cache/uv/builds-v0/.tmp1hA2py/lib/python3.13/site-packages/typer/main.py",
+              "line": 240
+            },
+            "arguments": [],
+            "options": [
+              {
+                "name": "board",
+                "kind": "option",
+                "declaration": "--board",
+                "opts": [
+                  "--board"
+                ],
+                "aliases": [],
+                "secondary_opts": [],
+                "metavar": null,
+                "type": {
+                  "name": "text",
+                  "class": "StringParamType"
+                },
+                "python_type": "str",
+                "default": null,
+                "required": true,
+                "help": "Target board ID",
+                "panel": null,
+                "is_flag": false,
+                "multiple": false,
+                "count": false,
+                "nargs": 1,
+                "hidden": false,
+                "envvar": []
+              },
+              {
+                "name": "jlink_serial",
+                "kind": "option",
+                "declaration": "--jlink-serial",
+                "opts": [
+                  "--jlink-serial"
+                ],
+                "aliases": [],
+                "secondary_opts": [],
+                "metavar": null,
+                "type": {
+                  "name": "text",
+                  "class": "StringParamType"
+                },
+                "python_type": "Optional[str]",
+                "default": null,
+                "required": false,
+                "help": "J-Link probe serial number",
+                "panel": null,
+                "is_flag": false,
+                "multiple": false,
+                "count": false,
+                "nargs": 1,
+                "hidden": false,
+                "envvar": []
+              },
+              {
+                "name": "kind",
+                "kind": "option",
+                "declaration": "--kind",
+                "opts": [
+                  "--kind"
+                ],
+                "aliases": [],
+                "secondary_opts": [],
+                "metavar": null,
+                "type": {
+                  "name": "choice",
+                  "class": "TyperChoice",
+                  "choices": [
+                    "debug",
+                    "swpoi"
+                  ]
+                },
+                "python_type": "str",
+                "default": "debug",
+                "required": false,
+                "help": "Reset kind: debug r/g reset (default) or SWPOI reset",
+                "panel": null,
+                "is_flag": false,
+                "multiple": false,
+                "count": false,
+                "nargs": 1,
+                "hidden": false,
+                "envvar": []
+              }
+            ],
+            "panels": []
+          }
+        ]
+      },
+      {
+        "path": [
+          "validate"
+        ],
+        "name": "validate",
+        "kind": "command",
+        "usage": "hpx validate [OPTIONS]",
+        "short_help": "Run hardware-in-the-loop validation suite (MLPerf Tiny models)",
+        "help": "Run hardware-in-the-loop validation suite (MLPerf Tiny models)",
+        "epilog": "Hardware validation \u2014 runs canonical MLPerf Tiny models end-to-end\n\nagainst a real EVB + J-Link (and optional Joulescope).\n\nExamples:\n\n  hpx validate                         # Apollo510 reliability matrix, power off\n\n  hpx validate --list                  # preview what would run\n\n  hpx validate --models kws,ic         # subset by model\n\n  hpx validate --engines aot           # subset by engine\n\n  hpx validate --power off             # skip Joulescope (default)\n\n  hpx validate --boards apollo3p_evb --repeat 2 --power off\n\n                                       # require two passing iterations per case\n\n  hpx validate -k kws-aot              # pytest keyword filter\n\n  hpx validate --suite smoke           # quick preset: kws / helia-rt / gcc / rtt / auto\n\n  hpx validate --suite models-rt       # 16-case RT sweep: 2 boards x 4 models x 2 toolchains\n\n  hpx validate --suite models-aot      # 16-case AOT sweep: 2 boards x 4 models x 2 toolchains\n\n  hpx validate --suite complete        # RT + AOT + TFLM + ExecuTorch sweep",
+        "deprecated": false,
+        "hidden": false,
+        "source": {
+          "path": "/Users/adam.page/.cache/uv/builds-v0/.tmp1hA2py/lib/python3.13/site-packages/typer/main.py",
+          "line": 93
+        },
+        "arguments": [],
+        "options": [
+          {
+            "name": "models",
+            "kind": "option",
+            "declaration": "--models",
+            "opts": [
+              "--models"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "text",
+              "class": "StringParamType"
+            },
+            "python_type": "str",
+            "default": "",
+            "required": false,
+            "help": "Comma-separated model IDs (default: all). See `hpx validate --list`.",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "models_file",
+            "kind": "option",
+            "declaration": "--models-file",
+            "opts": [
+              "--models-file"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Optional[Path]",
+            "default": null,
+            "required": false,
+            "help": "YAML registry of custom validation models and comparison groups.",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "model_paths",
+            "kind": "option",
+            "declaration": "--model-paths",
+            "opts": [
+              "--model-paths"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "text",
+              "class": "StringParamType"
+            },
+            "python_type": "str",
+            "default": "",
+            "required": false,
+            "help": "Comma-separated .tflite paths for an ad hoc comparison.",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "comparison_group",
+            "kind": "option",
+            "declaration": "--comparison-group",
+            "opts": [
+              "--comparison-group"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "text",
+              "class": "StringParamType"
+            },
+            "python_type": "str",
+            "default": "custom",
+            "required": false,
+            "help": "Shared decision group for models supplied through --model-paths.",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "model_arena_size",
+            "kind": "option",
+            "declaration": "--model-arena-size",
+            "opts": [
+              "--model-arena-size"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "integer",
+              "class": "IntParamType"
+            },
+            "python_type": "int",
+            "default": 524288,
+            "required": false,
+            "help": "Arena size in bytes for models supplied through --model-paths.",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "engines",
+            "kind": "option",
+            "declaration": "--engines",
+            "opts": [
+              "--engines"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "text",
+              "class": "StringParamType"
+            },
+            "python_type": "str",
+            "default": "",
+            "required": false,
+            "help": "Comma-separated engines: rt,aot,tflm,et,executorch,helia-rt,helia-aot (default: all).",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "executorch_backends",
+            "kind": "option",
+            "declaration": "--executorch-backends",
+            "opts": [
+              "--executorch-backends"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "text",
+              "class": "StringParamType"
+            },
+            "python_type": "str",
+            "default": "both",
+            "required": false,
+            "help": "ExecuTorch CMSIS-NN providers: arm, ns, or both (default: both). TFLM always uses ARM CMSIS-NN; heliaRT and heliaAOT always use ns-cmsis-nn.",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "ns_cmsis_nn_ref",
+            "kind": "option",
+            "declaration": "--ns-cmsis-nn-ref",
+            "opts": [
+              "--ns-cmsis-nn-ref"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "text",
+              "class": "StringParamType"
+            },
+            "python_type": "str",
+            "default": "",
+            "required": false,
+            "help": "Exact ns-cmsis-nn commit/ref used by heliaRT, heliaAOT, and ExecuTorch/ns.",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "power",
+            "kind": "option",
+            "declaration": "--power",
+            "opts": [
+              "--power"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "choice",
+              "class": "TyperChoice",
+              "choices": [
+                "both",
+                "on",
+                "off"
+              ]
+            },
+            "python_type": "str",
+            "default": "off",
+            "required": false,
+            "help": "Power matrix: off (default) | on (only Joulescope runs) | both.",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "power_boards",
+            "kind": "option",
+            "declaration": "--power-boards",
+            "opts": [
+              "--power-boards"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "text",
+              "class": "StringParamType"
+            },
+            "python_type": "str",
+            "default": "",
+            "required": false,
+            "help": "Comma-separated boards allowed to use power capture (default: all selected boards).",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "boards",
+            "kind": "option",
+            "declaration": "--boards",
+            "opts": [
+              "--boards"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "text",
+              "class": "StringParamType"
+            },
+            "python_type": "str",
+            "default": "",
+            "required": false,
+            "help": "Comma-separated board IDs (default: apollo510_evb).",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "toolchains",
+            "kind": "option",
+            "declaration": "--toolchains",
+            "opts": [
+              "--toolchains"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "text",
+              "class": "StringParamType"
+            },
+            "python_type": "str",
+            "default": "",
+            "required": false,
+            "help": "Comma-separated toolchains: gcc,armclang/acfe,atfe (default: board defaults).",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "transports",
+            "kind": "option",
+            "declaration": "--interfaces",
+            "opts": [
+              "--interfaces",
+              "--transports"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "text",
+              "class": "StringParamType"
+            },
+            "python_type": "str",
+            "default": "",
+            "required": false,
+            "help": "Comma-separated interfaces/transports: rtt,uart,swo,usb_cdc (default: board defaults).",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "memories",
+            "kind": "option",
+            "declaration": "--memories",
+            "opts": [
+              "--memories"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "text",
+              "class": "StringParamType"
+            },
+            "python_type": "str",
+            "default": "",
+            "required": false,
+            "help": "Comma-separated model placement presets: auto,tcm,sram,mram,psram (default: board defaults).",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "suite",
+            "kind": "option",
+            "declaration": "--suite",
+            "opts": [
+              "--suite"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "choice",
+              "class": "TyperChoice",
+              "choices": [
+                "smoke",
+                "models-rt",
+                "models-aot",
+                "complete"
+              ]
+            },
+            "python_type": "Optional[str]",
+            "default": null,
+            "required": false,
+            "help": "Preset suite. 'smoke' defaults unset axes to models=kws, engines=helia-rt, toolchains=arm-none-eabi-gcc, interfaces=rtt, memories=auto. 'models-rt' and 'models-aot' default unset axes to all MLPerf Tiny models, Apollo510 + Apollo330mP, gcc + atfe, rtt, auto memory, and the selected engine. 'complete' runs the same axes for helia-rt, helia-aot, TFLM/CMSIS-NN, and both ExecuTorch CMSIS-NN providers. Explicit axis flags always win.",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "jlink_serials",
+            "kind": "option",
+            "declaration": "--jlink-serials",
+            "opts": [
+              "--jlink-serials"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "text",
+              "class": "StringParamType"
+            },
+            "python_type": "str",
+            "default": "",
+            "required": false,
+            "help": "Comma-separated board=serial entries for multi-board validation.",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "power_serials",
+            "kind": "option",
+            "declaration": "--power-serials",
+            "opts": [
+              "--power-serials"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "text",
+              "class": "StringParamType"
+            },
+            "python_type": "str",
+            "default": "",
+            "required": false,
+            "help": "Comma-separated board=Joulescope-serial entries for powered multi-board validation.",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "power_gpios",
+            "kind": "option",
+            "declaration": "--power-gpios",
+            "opts": [
+              "--power-gpios"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "text",
+              "class": "StringParamType"
+            },
+            "python_type": "str",
+            "default": "",
+            "required": false,
+            "help": "Comma-separated board=gate:state:go entries for powered boards without default sync wiring.",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "repeat",
+            "kind": "option",
+            "declaration": "--repeat",
+            "opts": [
+              "--repeat"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "integer",
+              "class": "IntParamType"
+            },
+            "python_type": "int",
+            "default": 1,
+            "required": false,
+            "help": "Repeat each selected case N times for stress testing (default: 1).",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "output_dir",
+            "kind": "option",
+            "declaration": "--output-dir",
+            "opts": [
+              "--output-dir"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Path",
+            "default": "results/validation",
+            "required": false,
+            "help": "Where to write per-case artifacts + summary report (default: ./results/validation).",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "timeout",
+            "kind": "option",
+            "declaration": "--timeout",
+            "opts": [
+              "--timeout"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "float",
+              "class": "FloatParamType"
+            },
+            "python_type": "float",
+            "default": 900.0,
+            "required": false,
+            "help": "Per-case timeout in seconds (default: 900).",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "keyword",
+            "kind": "option",
+            "declaration": "-k",
+            "opts": [
+              "-k"
+            ],
+            "aliases": [
+              "-k"
+            ],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "text",
+              "class": "StringParamType"
+            },
+            "python_type": "str",
+            "default": "",
+            "required": false,
+            "help": "Pytest keyword expression \u2014 filter cases by substring match (e.g. 'kws-aot').",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "junit_xml",
+            "kind": "option",
+            "declaration": "--junit-xml",
+            "opts": [
+              "--junit-xml"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Optional[Path]",
+            "default": null,
+            "required": false,
+            "help": "Emit JUnit-XML report at this path (for CI consumption).",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "list_",
+            "kind": "option",
+            "declaration": "--list",
+            "opts": [
+              "--list"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "boolean",
+              "class": "BoolParamType"
+            },
+            "python_type": "bool",
+            "default": false,
+            "required": false,
+            "help": "List matching cases and exit without running.",
+            "panel": null,
+            "is_flag": true,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "verbose",
+            "kind": "option",
+            "declaration": "--verbose",
+            "opts": [
+              "-v",
+              "--verbose"
+            ],
+            "aliases": [
+              "-v"
+            ],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "integer",
+              "class": "IntParamType"
+            },
+            "python_type": "int",
+            "default": 0,
+            "required": false,
+            "help": null,
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": true,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          }
+        ],
+        "panels": []
+      }
+    ]
+  }
+}
