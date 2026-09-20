@@ -52,41 +52,7 @@ import LinkCard from '@ambiqai/helia-ui/astro/LinkCard';
 import Callout from '@ambiqai/helia-ui/astro/Callout';
 import DocsVersion from '../../components/DocsVersion.astro';
 import ProductLogo from '../../components/ProductLogo.astro';
-import catalog from '../../data/catalog.json';
-
-export const EXPERIMENTAL_BOARDS = new Set([
-  // docs/guide/boards.md:19. Keyed by id, not derived from the registry's
-  // `isFpga`, so a future FPGA board cannot inherit a label no page gave it.
-  'atomiq110_fpga_turbo',
-]);
-
-export const ENGINE_LINES = {
-  // Display name and "best for", docs/guide/engines.md:12-15.
-  tflm: 'Vanilla TFLM (tflm): reference or CMSIS-NN interpreter baseline',
-  'helia-rt': 'heliaRT (helia-rt): Ambiq-optimized interpreter performance',
-  'helia-aot': 'heliaAOT (helia-aot): ahead-of-time compilation and fine-grained placement',
-  executorch: 'ExecuTorch (executorch): Cortex-M PTE programs and CMSIS-NN kernels',
-};
-
-export const engineItems = catalog.engines.map(
-  (engine) => ENGINE_LINES[engine.id] ?? engine.id,
-);
-
-export const boardsIn = (channel, experimental) =>
-  catalog.boards
-    .filter(
-      (board) =>
-        board.channel === channel && EXPERIMENTAL_BOARDS.has(board.id) === experimental,
-    )
-    .map((board) => board.id);
-
-export const boardItems = [
-  ['Stable channel', boardsIn('stable', false)],
-  ['Preview channel', boardsIn('preview', false)],
-  ['Preview channel, experimental', boardsIn('preview', true)],
-]
-  .filter(([, ids]) => ids.length > 0)
-  .map(([label, ids]) => `${label}: ${ids.join(', ')}`);
+import { boardItems, counts, engineItems } from '../../lib/home-catalog.mjs';
 
 <ProductLogo />
 
@@ -102,8 +68,8 @@ export const boardItems = [
   <Button slot="actions" href="/helia-profiler/examples/" variant="secondary">Examples</Button>
 
   <CardGrid slot="aside" columns={3}>
-    <StatCard label="Inference engines">{catalog.counts.engines}</StatCard>
-    <StatCard label="Boards listed">{catalog.counts.boards}</StatCard>
+    <StatCard label="Inference engines">{counts.engines}</StatCard>
+    <StatCard label="Boards listed">{counts.boards}</StatCard>
     <StatCard label="Pipeline steps">8</StatCard>
   </CardGrid>
 
