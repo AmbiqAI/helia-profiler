@@ -1,0 +1,20 @@
+---
+title: Getting started
+description: Install heliaPROFILER, check your hardware and profile a first model.
+---
+
+This section is the one path from an empty machine to a first result: install,
+hardware prerequisites, setup validation, a first profile, and configuring a
+run.
+
+```bash
+pip install helia-profiler
+hpx doctor
+hpx profile model.tflite
+```
+
+`hpx doctor` reports whether the Arm toolchain, J-Link and NSX are available.
+`hpx profile` resolves the engine, generates and builds firmware, flashes the
+board, captures the run and writes the results.
+
+The pages of this section are being migrated and are not published here yet.
