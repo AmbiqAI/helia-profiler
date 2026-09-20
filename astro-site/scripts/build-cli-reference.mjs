@@ -8,11 +8,11 @@
  * because src/ is the wheel and the documented public API, and build tooling
  * is neither.
  *
- * This script owns everything downstream of the JSON: the twelve command
- * pages, the configuration page, the issue-code page, the sidebar that claims
- * them, and the Markdown rendition of each page served beside its JSON. The
- * pages are thin on purpose - a page is frontmatter and one component - so a
- * change to how a command renders is one edit in src/components, not fourteen
+ * This script owns everything downstream of the JSON: the command pages, the
+ * configuration page, the issue-code page, the sidebar that claims them, and
+ * the Markdown rendition of each page served beside its JSON. The pages are
+ * thin on purpose - a page is frontmatter and one component - so a change to
+ * how a command renders is one edit in src/components, not fifteen
  * regenerated files.
  *
  * `--out <dir>` writes the whole set somewhere else, which is how the stale
@@ -159,12 +159,18 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   }
 
   const entries = cli.root.commands;
-  for (const node of entries) {
+  /* `hpx` itself is a page too. Its one global option lives nowhere else, and
+   * a reference that documented every subcommand but not the program would
+   * leave `--version` in the JSON and on no page. */
+  for (const node of [cli.root, ...entries]) {
+    const root = node.path.length === 0;
     write(
       path.join(outRoot, PUBLIC_DIRS.cli, `${node.name}.md`),
       renderCommandMarkdown(node, cli.generatedFrom),
     );
-    const pagePath = path.join(PAGES_DIR, 'cli', node.name, 'index.mdx');
+    const pagePath = root
+      ? path.join(PAGES_DIR, 'cli', 'index.mdx')
+      : path.join(PAGES_DIR, 'cli', node.name, 'index.mdx');
     write(
       path.join(outRoot, pagePath),
       page({
@@ -172,7 +178,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
         title: commandLabel(node.path),
         description: commandDescription(node),
         component: 'CliCommand',
-        props: { command: node.name },
+        props: root ? {} : { command: node.name },
         artifacts: [
           ['cli.json', url('cli', 'cli.json')],
           [`${node.name}.md`, url('cli', `${node.name}.md`)],
@@ -217,10 +223,13 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const sidebar = [
     {
       label: 'Command line',
-      items: entries.map((node) => ({
-        label: commandLabel(node.path),
-        slug: commandSlug(node.name),
-      })),
+      items: [
+        { label: 'Overview', slug: 'reference/cli' },
+        ...entries.map((node) => ({
+          label: commandLabel(node.path),
+          slug: commandSlug(node.name),
+        })),
+      ],
     },
     { label: 'Configuration', slug: 'reference/configuration' },
     { label: 'Issue codes', slug: 'reference/issue-codes' },
@@ -229,7 +238,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
   const counts = cli.counts;
   console.log(
-    `cli reference: ${counts.top_level_entries} command pages (${counts.leaf_commands} leaves, ` +
+    `cli reference: ${counts.top_level_entries + 1} command pages (${counts.leaf_commands} leaves, ` +
       `${counts.groups} groups, ${counts.options} options, ${counts.arguments} arguments), ` +
       `${schema.counts.declaredFields} config fields, ${issues.counts.issues} issue codes, ` +
       `source tree ${tree.slice(0, 7)}.`,

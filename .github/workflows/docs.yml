@@ -87,6 +87,18 @@ jobs:
           python -m pip install --disable-pip-version-check 'griffe==1.7.3'
           griffe --version
 
+      # The CLI, configuration and issue-code extractors import the package to
+      # ask click and pydantic what the contract is, so unlike griffe they need
+      # its runtime dependencies. They run under `uv run --isolated --no-dev`,
+      # which resolves the lock rather than this job's environment, so the
+      # typer, click and pydantic versions recorded in the artifacts are the
+      # package's pins. No board and no secrets: nothing invokes a command
+      # callback.
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
       - name: Install locked site dependencies
         working-directory: astro-site
         run: npm ci
@@ -96,6 +108,23 @@ jobs:
       - name: Regenerate the Python reference
         working-directory: astro-site
         run: npm run prepare:docs
+
+      # The drift gate lives here and not in ci.yml because it is a question
+      # about the documentation artifact, not about the package: it compares
+      # the committed reference JSON with what the source produces, and the
+      # answer is only actionable together with the regenerated site in the
+      # same job. It has to be this job specifically. The pull_request trigger
+      # above is deliberately unfiltered, so a change under src/helia_profiler
+      # reaches it; the push trigger is filtered to astro-site/** and would let
+      # a CLI change land with a stale reference.
+      #
+      # The comparison is semantic, per command and per field, never byte
+      # equality or rendered --help: key order, $defs ordering and a pydantic
+      # upgrade that reshuffles the document without changing the contract all
+      # stay green, and a real change is reported as the command path plus the
+      # option that moved.
+      - name: Check the reference for drift
+        run: uv run --isolated --no-dev python tools/docs/check_reference.py --check
 
       - name: Build the documentation artifact
         working-directory: astro-site

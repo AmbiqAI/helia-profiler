@@ -117,8 +117,18 @@ export function panelsOf(command) {
   );
 }
 
-/** Every command rendered on one top-level entry's page, the entry first. */
-export const commandsOn = (node) => (node.commands ? [node, ...node.commands] : [node]);
+/**
+ * Every command rendered on one page, the page's own entry first.
+ *
+ * A group and its leaves share a page; `hpx` itself does not, because its
+ * twelve entries are twelve pages and repeating them on the overview would
+ * put the whole reference on one route. Encoded here rather than in each
+ * renderer so the page and its Markdown cannot disagree about it.
+ */
+export const commandsOn = (node) =>
+  node.commands && node.path.length > 0 ? [node, ...node.commands] : [node];
+
+export const isRoot = (node) => node.path.length === 0;
 
 const firstSentence = (text) => {
   const flat = (text ?? '').replace(/\s+/g, ' ').trim();
@@ -190,6 +200,13 @@ export function fieldRow(prop, field) {
     description: notes.join(' '),
   };
 }
+
+/* Lookups by class name live here rather than inline in the component: the
+ * imported schema is a JSON literal to TypeScript, and indexing it by a name
+ * only known at runtime is an error there and ordinary JavaScript here. */
+export const fieldCount = (schema, cls) => schema['x-hpx'].fieldIndex[cls].length;
+
+export const classDescription = (schema, cls) => schema.$defs[cls]?.description ?? undefined;
 
 export const fieldRows = (schema, cls) => {
   const props = schema.$defs[cls]?.properties ?? {};
