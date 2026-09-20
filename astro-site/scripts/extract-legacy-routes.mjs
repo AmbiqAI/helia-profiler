@@ -12,16 +12,26 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const site = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const root = path.resolve(site, '..');
 const built = path.join(root, 'site');
 
+const navigation = path.join(root, 'mkdocs.yml');
+
 if (!fs.existsSync(built)) {
   throw new Error(
     `No Zensical build at ${built}. Run "uv run --group docs zensical build" first.`,
+  );
+}
+
+/* A build left over from before the nav changed would record routes that were
+ * never published, and the mismatch is invisible in the output. */
+if (fs.statSync(built).mtimeMs < fs.statSync(navigation).mtimeMs) {
+  throw new Error(
+    `${built} is older than ${navigation}. Rebuild the site before extracting routes.`,
   );
 }
 
@@ -42,14 +52,17 @@ const routes = [
   ),
 ].sort();
 
-const commit = execFileSync('git', ['rev-parse', 'HEAD'], {
-  cwd: root,
-  encoding: 'utf8',
-}).trim();
+/* The digest of the file that decides the routes, not of the commit that
+ * happened to be checked out: the fixture is stale when the nav changes, and
+ * a commit says nothing about whether it did. */
+const sourceSha256 = crypto
+  .createHash('sha256')
+  .update(fs.readFileSync(navigation))
+  .digest('hex');
 
 const fixture = {
   source: 'mkdocs.yml',
-  sourceCommit: commit,
+  sourceSha256,
   command:
     'uv sync --locked --group docs && uv run --group docs zensical build && npm --prefix astro-site run legacy-routes:extract',
   routes,

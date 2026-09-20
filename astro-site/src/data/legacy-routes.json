@@ -1,6 +1,6 @@
 {
   "source": "mkdocs.yml",
-  "sourceCommit": "fd2d510502af0b4a622b48b451ad83f969d8b230",
+  "sourceSha256": "b1a113ea7b266ed1d72e3748a1806bc79589cd486a0f8b22109d05b396572756",
   "command": "uv sync --locked --group docs && uv run --group docs zensical build && npm --prefix astro-site run legacy-routes:extract",
   "routes": [
     "/",
