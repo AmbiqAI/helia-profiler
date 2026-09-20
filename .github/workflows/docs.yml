@@ -1,0 +1,172 @@
+name: Documentation site
+
+# The Astro site is built and validated here on every pull request, and this
+# workflow will own the deployment at cutover (#322). Until then the live site
+# is still produced by deploy-pages.yml from the MkDocs sources, so every step
+# below that would touch GitHub Pages is disabled and the deploy job holds
+# neither the Pages permissions nor the github-pages environment.
+
+on:
+  # Deliberately unfiltered. Reference pages are generated from the package, so
+  # a change under src/helia_profiler/** can change the site even when nothing
+  # under astro-site/ moved.
+  pull_request:
+  push:
+    branches:
+      - main
+    paths:
+      - 'astro-site/**'
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Branch, tag or commit to build the documentation from.
+        type: string
+        default: main
+  workflow_call:
+    inputs:
+      source_ref:
+        description: Branch, tag or commit to build the documentation from.
+        type: string
+        default: ''
+      release_publish:
+        description: Set by publish.yml when the build is for a new release.
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build and validate the documentation artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    outputs:
+      source_commit: ${{ steps.source.outputs.commit }}
+
+    steps:
+      # The ref is always explicit. A called workflow otherwise checks out the
+      # caller's commit, which on a release is the merge of the release pull
+      # request rather than the tag the package was built from.
+      - name: Checkout documentation source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref || github.sha }}
+          # build-info.json reports the distance from the last release tag.
+          fetch-depth: 0
+
+      - name: Record source checkout
+        id: source
+        run: echo "commit=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: astro-site/package-lock.json
+
+      # check:links is a Python script.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install locked site dependencies
+        working-directory: astro-site
+        run: npm ci
+
+      - name: Build the documentation artifact
+        working-directory: astro-site
+        env:
+          DOCS_SOURCE_REF: ${{ inputs.source_ref || github.head_ref || github.ref_name }}
+        run: npm run build
+
+      - name: Validate the artifact
+        working-directory: astro-site
+        run: |
+          npm run check
+          npm run check:links
+          npm run check:output
+          npm run check:search
+          npm run check:redirects
+          npm run check:guard
+
+      - name: Show build provenance
+        run: cat astro-site/dist/build-info.json
+
+      - name: Upload the tested site
+        uses: actions/upload-artifact@v4
+        with:
+          name: heliaprofiler-docs-site
+          path: astro-site/dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  deploy:
+    name: Deploy the documentation artifact
+    needs: build
+    # A pull request never reaches this job: it admits the release call, a
+    # docs-only push to main, and a manual dispatch, and nothing else.
+    if: >-
+      github.repository == 'AmbiqAI/helia-profiler' &&
+      (inputs.release_publish ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # TODO(#322): add pages: write, id-token: write and the github-pages
+    # environment at cutover. Until then this job cannot publish, and a
+    # declared environment would record a deployment that deploy-pages.yml
+    # actually made.
+    permissions:
+      contents: read
+
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout the deploy guard
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build.outputs.source_commit }}
+          sparse-checkout: astro-site/scripts
+          sparse-checkout-cone-mode: false
+
+      - name: Download the tested site
+        uses: actions/download-artifact@v4
+        with:
+          name: heliaprofiler-docs-site
+          path: tested-site
+
+      # Ordering is decided from the live artifact, not from the trigger: a
+      # re-run of an old release must not overwrite newer documentation. A
+      # refusal is a skip, so this step stays green either way.
+      - name: Decide whether this build may replace the live site
+        id: guard
+        env:
+          DOCS_LIVE_BUILD_INFO_URL: https://ambiqai.github.io/helia-profiler/build-info.json
+          DOCS_BUILD_INFO: tested-site/build-info.json
+        run: node astro-site/scripts/deploy-guard.mjs
+
+      - name: Configure Pages
+        if: false # TODO(#322): restore to steps.guard.outputs.publish == 'true'
+        uses: actions/configure-pages@v4
+
+      - name: Upload the Pages artifact
+        if: false # TODO(#322): restore to steps.guard.outputs.publish == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: tested-site
+
+      - name: Deploy to Pages
+        id: deployment
+        if: false # TODO(#322): restore to steps.guard.outputs.publish == 'true'
+        uses: actions/deploy-pages@v4
