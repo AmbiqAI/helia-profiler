@@ -242,12 +242,10 @@ that every listed unit was compiled or linked into either binary. Flags used to
 build precompiled libraries are unavailable. Older workspaces without a compile
 database retain empty flags until regenerated with the updated project.
 
-The flags matter for A/B work. Two builds differing only in
-`-mcpu=cortex-m55` versus `-mcpu=cortex-m55+nomve` are otherwise identical in
-metadata, which leaves the directory name as the only record of which is
-which. `hpx compare` reports the difference as the informative **Architecture
-flags** dimension: a Helium on/off study is a comparison you meant to run, so
-the difference is surfaced rather than blocked.
+The flags make configured ISA differences, such as `-mcpu=cortex-m55` versus
+`-mcpu=cortex-m55+nomve`, interpretable alongside the binary digest. `hpx compare`
+reports them as the informative **Architecture flags** dimension; the difference
+is surfaced without blocking comparison.
 
 ### aot_operator_manifest.json
 
