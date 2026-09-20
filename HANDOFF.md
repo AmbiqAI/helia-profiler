@@ -12,8 +12,38 @@ Done:
   (branch `324-spike-cli-config`, PR #327). Both stay draft and close unmerged.
 - Phase 1, #325, landed on `docs-migration` as d4eec96 (reverted from `main` by
   #329). The migration reaches `main` as one stacked PR, #332.
-- Phase 2, #330, this branch `330-python-api-reference` off `docs-migration`:
-  the Python API reference. No PR opened yet; owner reviews first.
+- Phase 2, #330, branch `330-python-api-reference` off `docs-migration`:
+  the Python API reference. Landed on `docs-migration` at `8420154`.
+- Phase 3f, #335, branch `335-home-design` off `docs-migration` (`8420154`):
+  the Home design pass. Pushed, no PR; the owner reviews the copy first.
+
+Branch `335-home-design` (#335), head `d31fe50`:
+- Home is rebuilt from helia-ui parts: `Hero` (contrast) with `StatCard`s in
+  `aside` and an `AsciiTerminal` in `media`, then five `Band`s alternating
+  muted / plain / tinted / plain / muted. Pipeline band is eight `Card`s with
+  `CardHeader step="S01".."S08"`, the grouping `docs/architecture/index.md:83`
+  and `docs/architecture/pipeline.md:106` already use. The branch-point
+  "where to start" cards, version chip and status wording are unchanged.
+- One local component, `src/components/ProductLogo.astro`: theme-selected
+  wordmark in CSS keyed on `data-theme`. Upstream candidate; helia-ui
+  alpha.15 has no theme-selected image part. The MkDocs `#only-light` /
+  `#only-dark` fragments do not work in Astro, which is why it exists.
+- `src/content.config.ts` now extends `docsSchema` with
+  `heliaFrontmatterSchema`, which is what lets Home set
+  `helia: { pageTitle: false }` so the hero owns the only `h1`.
+- Bytes for Home, branch point `8420154` then head: HTML 33,936 -> 56,965 B
+  (budget 250 KB). External JS 5,489 B unchanged. Inline script
+  6,303 -> 11,172 B; the whole +4,869 B is one block, the
+  `helia-ascii-terminal` custom element, which `AsciiTerminal copy` opts into.
+- Working notes not committed: `SOURCES.md` (every Home sentence mapped to its
+  docs page and line) and `SCREENSHOTS/` (1280 and 375 CSS px, light and dark,
+  from `astro preview` of the built artifact via Playwright).
+- Checks green on this head: `build`, `check`, `check:links`, `check:output`,
+  `check:search`, `check:redirects`, `check:reference`, `check:guard`.
+- Open on this branch: rebase onto the helia-ui alpha.16 pin when it lands on
+  `docs-migration`, then recheck Home's `/index.md` rendition (helia-ui#146
+  should make it keep the hero text, the terminal command and the card
+  titles; at alpha.15 it drops all of them).
 
 This branch (#330):
 - helia-ui pinned to `v0.1.0-alpha.15` (`51aaae91cf7942eb0778be48e4b4c9a1b16772c3`),
@@ -179,6 +209,16 @@ Record the run links on #325 when they exist.
 - helia-ui does not run griffe, it reads the griffe 1.7.3 dump schema. Pin it.
 - typer vendors click: `isinstance(cmd, click.Group)` on top-level `click` is
   always False.
+- An MDX `{/* */}` comment is reproduced verbatim in the page's Markdown
+  rendition, which is the artifact an agent reads. Page-level notes belong in
+  YAML comments in the frontmatter, which the rendition strips. Home's source
+  notes were moved there for that reason.
+- `AsciiTerminal` is inert until `animated`, `copy` or `replay` is set; any one
+  of them emits a 4.9 KB inline script. Ask for it deliberately and attribute
+  the bytes. Home asks for `copy` only.
+- `Band tone="contrast"` and `Hero variant="contrast"` are pinned dark in both
+  themes, so a theme-selected logo cannot sit inside one. Home's wordmark sits
+  above the hero on the page ground.
 - Shared stash across worktrees: WIP commits, never a bare stash.
 - Scratchpad read-only checkouts (may vanish): `hpx-main-audit` (a822b51),
   `helia-ui-audit` (alpha.14), `helia-rt-audit`.
