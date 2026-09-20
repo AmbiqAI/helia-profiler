@@ -146,9 +146,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const run = (command, args, options = {}) =>
     execFileSync(command, args, { cwd: site, stdio: 'inherit', ...options });
 
-  run('node', ['scripts/scope-dump.mjs']);
-
   const commit = sourceCommit(repo);
+  run('node', ['scripts/scope-dump.mjs', '--commit', commit]);
+
   const publicDir = path.join(outRoot, 'public');
   const pagesDir = path.join(outRoot, PAGES_DIR);
 

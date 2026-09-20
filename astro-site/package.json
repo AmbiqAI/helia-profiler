@@ -23,8 +23,8 @@
     "check:output": "node scripts/check-output.mjs && node scripts/check-reference-output.mjs && helia-ui-check-discoverability --root .",
     "check:search": "node scripts/check-search.mjs",
     "check:redirects": "node scripts/check-redirects.mjs",
-    "check:reference": "node scripts/check-reference-stale.mjs",
-    "check:guard": "node --test scripts/deploy-guard.test.mjs",
+    "check:reference": "node scripts/check-committed-artifacts.mjs && node scripts/check-reference-stale.mjs",
+    "check:guard": "node --test scripts/*.test.mjs",
     "legacy-routes:extract": "node scripts/extract-legacy-routes.mjs"
   },
   "dependencies": {
