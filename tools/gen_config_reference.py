@@ -73,28 +73,56 @@ def _section_title(path: tuple[str, ...]) -> str:
     return ".".join(path)
 
 
+def _attributes_block(lines: list[str]) -> tuple[int, int] | None:
+    """Half-open line range of the ``Attributes`` section, in either style.
+
+    The two styles end differently. A Google section indents its body under
+    the header, so it ends at the next unindented line. A numpydoc section
+    does not, so it ends only at the next underlined header.
+    """
+
+    def underlined(i: int) -> bool:
+        return i + 1 < len(lines) and set(lines[i + 1].strip()) == {"-"}
+
+    for i, line in enumerate(lines):
+        if line != line.lstrip():
+            continue
+        stripped = line.strip()
+        if stripped == "Attributes:":
+            end = i + 1
+            while end < len(lines) and (
+                not lines[end].strip() or lines[end] != lines[end].lstrip()
+            ):
+                end += 1
+        elif stripped == "Attributes" and underlined(i):
+            end = i + 2
+            while end < len(lines) and not (
+                lines[end].strip() and lines[end] == lines[end].lstrip() and underlined(end)
+            ):
+                end += 1
+        else:
+            continue
+        return i, end
+    return None
+
+
 def _docstring(cls: type) -> str:
     """Class docstring as Markdown prose.
 
-    ``Attributes`` blocks are stripped in either docstring style: the
+    The ``Attributes`` block is stripped in either docstring style: the
     numpydoc setext underline renders as a broken heading in Markdown, the
     Google-style block renders as an indented code span, and the per-field
-    details are already covered by the generated table.
+    details are already covered by the generated table. Only that block goes:
+    a section after it, such as ``Examples:``, is prose worth keeping.
     """
     doc = inspect.getdoc(cls)
     if not doc:
         return ""
     lines = doc.strip().splitlines()
-    for i, line in enumerate(lines):
-        google = line.strip() == "Attributes:"
-        numpy = (
-            line.strip() == "Attributes"
-            and i + 1 < len(lines)
-            and set(lines[i + 1].strip()) == {"-"}
-        )
-        if google or numpy:
-            lines = lines[:i]
-            break
+    block = _attributes_block(lines)
+    if block:
+        start, end = block
+        lines = lines[:start] + lines[end:]
     return "\n".join(lines).rstrip()
 
 
