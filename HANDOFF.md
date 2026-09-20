@@ -33,10 +33,14 @@ port of the 38 legacy guide pages. No PR opened yet; owner reviews first.
 - Known miss against #334's acceptance box: `/guide/power/` is 209,375 B HTML
   (budget 250,000) but 40,599 B gzip against a 40,000 B budget. Splitting
   `guide/power.md` is out of scope here; plan item 10 does it.
-- Pending: helia-ui alpha.16 lands on `docs-migration` as its own commit. Do
-  not bump it here; rebase on it when told and re-run the check chain. alpha.16
-  changes MDX Markdown renditions (helia-ui#146), so rendition diffs are
-  expected.
+- Pending, in this order, and not before the owner says so: apply the review
+  findings on this branch, then `git fetch && git rebase origin/docs-migration`
+  onto the helia-ui alpha.16 bump (PR #336, merged), then re-run the full chain
+  including `check:port`. Do not bump helia-ui here; #336 owns the pin and the
+  Linux lockfile. alpha.16 changes MDX Markdown renditions (helia-ui#146), so
+  expect rendition diffs in `dist/` and none in the committed pages; if
+  `check:port` reports a committed page differing after the rebase, that is a
+  real conversion change, not #146.
 
 Earlier branch (#330):
 - helia-ui pinned to `v0.1.0-alpha.15` (`51aaae91cf7942eb0778be48e4b4c9a1b16772c3`),
