@@ -1,0 +1,764 @@
+---
+title: "manifest"
+description: "The on-disk index of a run directory: the artifacts it holds, the issues raised against it, and whether its numbers may be used."
+sidebar:
+  order: 1
+---
+
+import RefMembers from '@ambiqai/helia-ui/astro/RefMembers';
+import RefParams from '@ambiqai/helia-ui/astro/RefParams';
+import RefSection from '@ambiqai/helia-ui/astro/RefSection';
+import RefSymbol from '@ambiqai/helia-ui/astro/RefSymbol';
+
+The on-disk index of a run directory: the artifacts it holds, the issues raised against it, and whether its numbers may be used.
+
+Every name on this page is imported from `helia_profiler`.
+
+**API tier:** `experimental`
+
+[Machine-readable model](/helia-profiler/reference/api/helia_profiler/results/manifest.json)
+
+<RefMembers label="On this page" items={[{"id":"helia_profiler.RunStatus","name":"RunStatus","kind":"class","summary":"Publication status of a result bundle."},{"id":"helia_profiler.ResultValidity","name":"ResultValidity","kind":"class","summary":"Whether measurements in a completed bundle are authoritative."},{"id":"helia_profiler.ResultIssue","name":"ResultIssue","kind":"class","summary":"One stable machine-readable issue with optional open context."},{"id":"helia_profiler.ResultArtifact","name":"ResultArtifact","kind":"class","summary":"One content-addressed file in a result bundle."},{"id":"helia_profiler.ResultManifest","name":"ResultManifest","kind":"class","summary":"Stable result envelope with open provenance and extension payloads."},{"id":"helia_profiler.load_result_manifest","name":"load_result_manifest","kind":"function","summary":"Load a result manifest and optionally verify its sibling artifacts."}]} />
+
+<RefSymbol
+  id={"helia_profiler.RunStatus"}
+  name={"RunStatus"}
+  kind={"class"}
+  language={"python"}
+  signature={"RunStatus()"}
+  level={2}
+  summary={"Publication status of a result bundle."}
+  source={{"path":"src/helia_profiler/results/manifest.py","line":18,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L18"}}
+>
+
+  Publication status of a result bundle.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.RunStatus.COMPLETE"}
+    name={"COMPLETE"}
+    kind={"constant"}
+    language={"python"}
+    signature={"COMPLETE = 'complete'"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":21,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L21"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RunStatus.INCOMPLETE"}
+    name={"INCOMPLETE"}
+    kind={"constant"}
+    language={"python"}
+    signature={"INCOMPLETE = 'incomplete'"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":22,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L22"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RunStatus.FAILED"}
+    name={"FAILED"}
+    kind={"constant"}
+    language={"python"}
+    signature={"FAILED = 'failed'"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":23,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L23"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.ResultValidity"}
+  name={"ResultValidity"}
+  kind={"class"}
+  language={"python"}
+  signature={"ResultValidity()"}
+  level={2}
+  summary={"Whether measurements in a completed bundle are authoritative."}
+  source={{"path":"src/helia_profiler/results/manifest.py","line":26,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L26"}}
+>
+
+  Whether measurements in a completed bundle are authoritative.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.ResultValidity.VALID"}
+    name={"VALID"}
+    kind={"constant"}
+    language={"python"}
+    signature={"VALID = 'valid'"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":29,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L29"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultValidity.DEGRADED"}
+    name={"DEGRADED"}
+    kind={"constant"}
+    language={"python"}
+    signature={"DEGRADED = 'degraded'"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":30,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L30"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultValidity.INVALID"}
+    name={"INVALID"}
+    kind={"constant"}
+    language={"python"}
+    signature={"INVALID = 'invalid'"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":31,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L31"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.ResultIssue"}
+  name={"ResultIssue"}
+  kind={"class"}
+  language={"python"}
+  signature={"ResultIssue(\n    code: str,\n    severity: str,\n    message: str,\n    context: dict[str, Any] = dict(),\n    extra: dict[str, Any] = dict(),\n) -> None"}
+  level={2}
+  summary={"One stable machine-readable issue with optional open context."}
+  source={{"path":"src/helia_profiler/results/manifest.py","line":34,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L34"}}
+>
+
+  `dataclass`
+
+  One stable machine-readable issue with optional open context.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.ResultIssue.code"}
+    name={"code"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"code: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":38,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L38"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultIssue.severity"}
+    name={"severity"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"severity: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":39,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L39"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultIssue.message"}
+    name={"message"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"message: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":40,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L40"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultIssue.context"}
+    name={"context"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"context: dict[str, Any] = field(default_factory=dict)"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":41,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L41"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultIssue.extra"}
+    name={"extra"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"extra: dict[str, Any] = field(default_factory=dict, repr=False)"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":42,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L42"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultIssue.from_dict"}
+    name={"from_dict"}
+    kind={"method"}
+    language={"python"}
+    signature={"from_dict(data: dict[str, Any]) -> Self"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":54,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L54"}}
+  >
+
+    `classmethod`
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultIssue.to_dict"}
+    name={"to_dict"}
+    kind={"method"}
+    language={"python"}
+    signature={"to_dict() -> dict[str, Any]"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":58,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L58"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.ResultArtifact"}
+  name={"ResultArtifact"}
+  kind={"class"}
+  language={"python"}
+  signature={"ResultArtifact(\n    path: str,\n    media_type: str,\n    size_bytes: int,\n    sha256: str,\n    role: str | None = None,\n    name: str | None = None,\n    schema: str | None = None,\n    schema_version: int | None = None,\n    producer: str | None = None,\n    optional: bool | None = None,\n    extra: dict[str, Any] = dict(),\n) -> None"}
+  level={2}
+  summary={"One content-addressed file in a result bundle."}
+  source={{"path":"src/helia_profiler/results/manifest.py","line":62,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L62"}}
+>
+
+  `dataclass`
+
+  One content-addressed file in a result bundle.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.ResultArtifact.path"}
+    name={"path"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"path: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":66,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L66"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultArtifact.media_type"}
+    name={"media_type"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"media_type: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":67,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L67"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultArtifact.size_bytes"}
+    name={"size_bytes"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"size_bytes: int"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":68,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L68"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultArtifact.sha256"}
+    name={"sha256"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"sha256: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":69,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L69"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultArtifact.role"}
+    name={"role"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"role: str | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":70,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L70"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultArtifact.name"}
+    name={"name"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"name: str | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":71,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L71"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultArtifact.schema"}
+    name={"schema"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"schema: str | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":72,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L72"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultArtifact.schema_version"}
+    name={"schema_version"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"schema_version: int | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":73,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L73"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultArtifact.producer"}
+    name={"producer"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"producer: str | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":74,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L74"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultArtifact.optional"}
+    name={"optional"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"optional: bool | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":75,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L75"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultArtifact.extra"}
+    name={"extra"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"extra: dict[str, Any] = field(default_factory=dict, repr=False)"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":76,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L76"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultArtifact.from_dict"}
+    name={"from_dict"}
+    kind={"method"}
+    language={"python"}
+    signature={"from_dict(data: dict[str, Any]) -> Self"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":110,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L110"}}
+  >
+
+    `classmethod`
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultArtifact.to_dict"}
+    name={"to_dict"}
+    kind={"method"}
+    language={"python"}
+    signature={"to_dict() -> dict[str, Any]"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":114,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L114"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.ResultManifest"}
+  name={"ResultManifest"}
+  kind={"class"}
+  language={"python"}
+  signature={"ResultManifest(\n    schema: str,\n    schema_version: int,\n    run_id: str,\n    timestamp: str,\n    hpx_version: str,\n    status: RunStatus,\n    validity: ResultValidity,\n    issues: tuple[ResultIssue, ...],\n    provenance: dict[str, Any],\n    comparability: dict[str, Any],\n    artifacts: tuple[ResultArtifact, ...],\n    bundle_type: str | None = None,\n    extensions: dict[str, Any] = dict(),\n    extra: dict[str, Any] = dict(),\n) -> None"}
+  level={2}
+  summary={"Stable result envelope with open provenance and extension payloads."}
+  source={{"path":"src/helia_profiler/results/manifest.py","line":118,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L118"}}
+>
+
+  `dataclass`
+
+  Stable result envelope with open provenance and extension payloads.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.ResultManifest.schema"}
+    name={"schema"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"schema: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":122,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L122"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultManifest.schema_version"}
+    name={"schema_version"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"schema_version: int"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":123,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L123"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultManifest.run_id"}
+    name={"run_id"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"run_id: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":124,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L124"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultManifest.timestamp"}
+    name={"timestamp"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"timestamp: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":125,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L125"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultManifest.hpx_version"}
+    name={"hpx_version"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"hpx_version: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":126,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L126"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultManifest.status"}
+    name={"status"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"status: RunStatus"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":127,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L127"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultManifest.validity"}
+    name={"validity"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"validity: ResultValidity"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":128,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L128"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultManifest.issues"}
+    name={"issues"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"issues: tuple[ResultIssue, ...]"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":129,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L129"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultManifest.provenance"}
+    name={"provenance"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"provenance: dict[str, Any]"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":130,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L130"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultManifest.comparability"}
+    name={"comparability"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"comparability: dict[str, Any]"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":131,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L131"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultManifest.artifacts"}
+    name={"artifacts"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"artifacts: tuple[ResultArtifact, ...]"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":132,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L132"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultManifest.bundle_type"}
+    name={"bundle_type"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"bundle_type: str | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":133,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L133"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultManifest.extensions"}
+    name={"extensions"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"extensions: dict[str, Any] = field(default_factory=dict)"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":134,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L134"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultManifest.extra"}
+    name={"extra"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"extra: dict[str, Any] = field(default_factory=dict, repr=False)"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":135,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L135"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultManifest.from_dict"}
+    name={"from_dict"}
+    kind={"method"}
+    language={"python"}
+    signature={"from_dict(data: dict[str, Any]) -> Self"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":168,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L168"}}
+  >
+
+    `classmethod`
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultManifest.load"}
+    name={"load"}
+    kind={"method"}
+    language={"python"}
+    signature={"load(path: str | Path) -> Self"}
+    level={3}
+    summary={"Load a manifest while preserving unknown fields."}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":184,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L184"}}
+  >
+
+    `classmethod`
+
+    Load a manifest while preserving unknown fields.
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultManifest.to_dict"}
+    name={"to_dict"}
+    kind={"method"}
+    language={"python"}
+    signature={"to_dict() -> dict[str, Any]"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":196,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L196"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultManifest.write"}
+    name={"write"}
+    kind={"method"}
+    language={"python"}
+    signature={"write(path: str | Path) -> Path"}
+    level={3}
+    summary={"Write the manifest without discarding unknown fields."}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":199,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L199"}}
+  >
+
+    Write the manifest without discarding unknown fields.
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResultManifest.verify"}
+    name={"verify"}
+    kind={"method"}
+    language={"python"}
+    signature={"verify(bundle_dir: str | Path) -> None"}
+    level={3}
+    summary={"Verify all declared artifact paths, sizes, and SHA-256 digests."}
+    source={{"path":"src/helia_profiler/results/manifest.py","line":211,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L211"}}
+  >
+
+    Verify all declared artifact paths, sizes, and SHA-256 digests.
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.load_result_manifest"}
+  name={"load_result_manifest"}
+  kind={"function"}
+  language={"python"}
+  signature={"load_result_manifest(path: str | Path, *, verify: bool = False) -> ResultManifest"}
+  level={2}
+  summary={"Load a result manifest and optionally verify its sibling artifacts."}
+  source={{"path":"src/helia_profiler/results/manifest.py","line":243,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/manifest.py#L243"}}
+>
+
+  Load a result manifest and optionally verify its sibling artifacts.
+
+  **API tier:** `experimental`
+
+</RefSymbol>

@@ -9,7 +9,9 @@
     "npm": ">=11"
   },
   "scripts": {
-    "prepare:docs": "node scripts/build-info.mjs",
+    "prepare:docs": "node scripts/build-info.mjs && npm run reference:dump && npm run reference:build",
+    "reference:dump": "node scripts/dump-python.mjs",
+    "reference:build": "node scripts/build-reference.mjs",
     "predev": "npm run prepare:docs",
     "dev": "astro dev",
     "prebuild": "npm run prepare:docs",
@@ -18,9 +20,10 @@
     "precheck": "npm run prepare:docs",
     "check": "astro check",
     "check:links": "python3 scripts/check-site-links.py",
-    "check:output": "node scripts/check-output.mjs && helia-ui-check-discoverability --root .",
+    "check:output": "node scripts/check-output.mjs && node scripts/check-reference-output.mjs && helia-ui-check-discoverability --root .",
     "check:search": "node scripts/check-search.mjs",
     "check:redirects": "node scripts/check-redirects.mjs",
+    "check:reference": "node scripts/check-reference-stale.mjs",
     "check:guard": "node --test scripts/deploy-guard.test.mjs",
     "legacy-routes:extract": "node scripts/extract-legacy-routes.mjs"
   },

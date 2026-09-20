@@ -1,0 +1,577 @@
+{
+  "$schema": "https://ambiqai.github.io/helia-ui/schema/reference-model-1.json",
+  "generatedFrom": {
+    "sourceCommit": "cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8",
+    "tool": "pyref",
+    "version": "1.7.3"
+  },
+  "language": "python",
+  "modules": [
+    {
+      "description": "The fixed vocabularies a configuration selects from: engines, toolchains, capture transports, memory placements and reset strategies.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`",
+      "name": "vocab",
+      "path": "helia_profiler.vocab",
+      "submodules": [],
+      "summary": "The fixed vocabularies a configuration selects from: engines, toolchains, capture transports, memory placements and reset strategies.",
+      "symbols": [
+        {
+          "description": "Supported inference engine identifiers.\n\n``StrEnum`` so values are interchangeable with raw strings — Jinja\ntemplates and YAML configs can compare against the canonical hyphen\nform (``\"helia-aot\"``) without manually unwrapping ``.value``.\n\n**API tier:** `stable`",
+          "examples": [],
+          "id": "helia_profiler.EngineType",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.EngineType.TFLM",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "TFLM",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "TFLM = 'tflm'",
+              "source": {
+                "line": 25,
+                "path": "src/helia_profiler/engines/__init__.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/engines/__init__.py#L25"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.EngineType.HELIA_RT",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "HELIA_RT",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "HELIA_RT = 'helia-rt'",
+              "source": {
+                "line": 26,
+                "path": "src/helia_profiler/engines/__init__.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/engines/__init__.py#L26"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.EngineType.HELIA_AOT",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "HELIA_AOT",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "HELIA_AOT = 'helia-aot'",
+              "source": {
+                "line": 27,
+                "path": "src/helia_profiler/engines/__init__.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/engines/__init__.py#L27"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.EngineType.EXECUTORCH",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "EXECUTORCH",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "EXECUTORCH = 'executorch'",
+              "source": {
+                "line": 28,
+                "path": "src/helia_profiler/engines/__init__.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/engines/__init__.py#L28"
+              },
+              "summary": ""
+            },
+            {
+              "description": "Identifier the firmware emits on the wire (``HPX_ENGINE=``).\n\nThe wire protocol predates the hyphenated config spelling and uses\nC-identifier-safe names, so ``helia-aot`` goes out as ``helia_aot``.\nOwned here rather than derived inline at the render boundary so the\ntwo spellings cannot drift apart.",
+              "examples": [],
+              "id": "helia_profiler.EngineType.wire_name",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "wire_name",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "wire_name: str",
+              "source": {
+                "line": 31,
+                "path": "src/helia_profiler/engines/__init__.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/engines/__init__.py#L31"
+              },
+              "summary": "Identifier the firmware emits on the wire (HPXENGINE=)."
+            },
+            {
+              "description": "Compact identifier used in case IDs and report tables.",
+              "examples": [],
+              "id": "helia_profiler.EngineType.short_slug",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "short_slug",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "short_slug: str",
+              "source": {
+                "line": 42,
+                "path": "src/helia_profiler/engines/__init__.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/engines/__init__.py#L42"
+              },
+              "summary": "Compact identifier used in case IDs and report tables."
+            }
+          ],
+          "name": "EngineType",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "EngineType()",
+          "source": {
+            "line": 17,
+            "path": "src/helia_profiler/engines/__init__.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/engines/__init__.py#L17"
+          },
+          "summary": "Supported inference engine identifiers."
+        },
+        {
+          "description": "Supported cross-compiler toolchains for the profiler firmware.\n\n``GCC`` and ``ARM_NONE_EABI_GCC`` are aliases — both resolve to the\nGNU Arm Embedded toolchain.  ``ARMCLANG`` is Arm Compiler 6 (Keil),\n``ATFE`` is the Arm Toolchain for Embedded (LLVM).\n\n**API tier:** `stable`",
+          "examples": [],
+          "id": "helia_profiler.Toolchain",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.Toolchain.ARM_NONE_EABI_GCC",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "ARM_NONE_EABI_GCC",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "ARM_NONE_EABI_GCC = 'arm-none-eabi-gcc'",
+              "source": {
+                "line": 26,
+                "path": "src/helia_profiler/vocab.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/vocab.py#L26"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.Toolchain.GCC",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "GCC",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "GCC = 'gcc'",
+              "source": {
+                "line": 27,
+                "path": "src/helia_profiler/vocab.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/vocab.py#L27"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.Toolchain.ARMCLANG",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "ARMCLANG",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "ARMCLANG = 'armclang'",
+              "source": {
+                "line": 28,
+                "path": "src/helia_profiler/vocab.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/vocab.py#L28"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.Toolchain.ATFE",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "ATFE",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "ATFE = 'atfe'",
+              "source": {
+                "line": 29,
+                "path": "src/helia_profiler/vocab.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/vocab.py#L29"
+              },
+              "summary": ""
+            }
+          ],
+          "name": "Toolchain",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "Toolchain()",
+          "source": {
+            "line": 18,
+            "path": "src/helia_profiler/vocab.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/vocab.py#L18"
+          },
+          "summary": "Supported cross-compiler toolchains for the profiler firmware."
+        },
+        {
+          "description": "Logical placement region for arenas / weights / model data.\n\nThe four logical regions abstract over the SoC physical layout —\ne.g. ``Placement.TCM`` covers DTCM on AP5 and is unavailable on AP3.\nEngine adapters that emit physical names (heliaAOT's ``DTCM``,\n``ITCM``, …) normalise to this enum at the adapter boundary.\n\n**API tier:** `stable`",
+          "examples": [],
+          "id": "helia_profiler.Placement",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.Placement.TCM",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "TCM",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "TCM = 'tcm'",
+              "source": {
+                "line": 33,
+                "path": "src/helia_profiler/platform/placement.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/platform/placement.py#L33"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.Placement.SRAM",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "SRAM",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "SRAM = 'sram'",
+              "source": {
+                "line": 34,
+                "path": "src/helia_profiler/platform/placement.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/platform/placement.py#L34"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.Placement.MRAM",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "MRAM",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "MRAM = 'mram'",
+              "source": {
+                "line": 35,
+                "path": "src/helia_profiler/platform/placement.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/platform/placement.py#L35"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.Placement.PSRAM",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "PSRAM",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "PSRAM = 'psram'",
+              "source": {
+                "line": 36,
+                "path": "src/helia_profiler/platform/placement.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/platform/placement.py#L36"
+              },
+              "summary": ""
+            }
+          ],
+          "name": "Placement",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "Placement()",
+          "source": {
+            "line": 24,
+            "path": "src/helia_profiler/platform/placement.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/platform/placement.py#L24"
+          },
+          "summary": "Logical placement region for arenas / weights / model data."
+        },
+        {
+          "description": "Host↔target transport for capture and heartbeat traffic.\n\n**API tier:** `stable`",
+          "examples": [],
+          "id": "helia_profiler.Transport",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.Transport.RTT",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "RTT",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "RTT = 'rtt'",
+              "source": {
+                "line": 35,
+                "path": "src/helia_profiler/vocab.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/vocab.py#L35"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.Transport.USB_CDC",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "USB_CDC",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "USB_CDC = 'usb_cdc'",
+              "source": {
+                "line": 36,
+                "path": "src/helia_profiler/vocab.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/vocab.py#L36"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.Transport.SWO",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "SWO",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "SWO = 'swo'",
+              "source": {
+                "line": 37,
+                "path": "src/helia_profiler/vocab.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/vocab.py#L37"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.Transport.UART",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "UART",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "UART = 'uart'",
+              "source": {
+                "line": 38,
+                "path": "src/helia_profiler/vocab.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/vocab.py#L38"
+              },
+              "summary": ""
+            }
+          ],
+          "name": "Transport",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "Transport()",
+          "source": {
+            "line": 32,
+            "path": "src/helia_profiler/vocab.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/vocab.py#L32"
+          },
+          "summary": "Host↔target transport for capture and heartbeat traffic."
+        },
+        {
+          "description": "User-selectable reset policy for target lifecycle preparation.\n\n**API tier:** `stable`",
+          "examples": [],
+          "id": "helia_profiler.ResetStrategy",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.ResetStrategy.AUTO",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "AUTO",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "AUTO = 'auto'",
+              "source": {
+                "line": 45,
+                "path": "src/helia_profiler/target/lifecycle.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/target/lifecycle.py#L45"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.ResetStrategy.POWER_CYCLE",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "POWER_CYCLE",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "POWER_CYCLE = 'power_cycle'",
+              "source": {
+                "line": 46,
+                "path": "src/helia_profiler/target/lifecycle.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/target/lifecycle.py#L46"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.ResetStrategy.NONE",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "NONE",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "NONE = ResetAction.NONE.value",
+              "source": {
+                "line": 47,
+                "path": "src/helia_profiler/target/lifecycle.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/target/lifecycle.py#L47"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.ResetStrategy.DEBUG_RESET",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "DEBUG_RESET",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "DEBUG_RESET = ResetAction.DEBUG_RESET.value",
+              "source": {
+                "line": 48,
+                "path": "src/helia_profiler/target/lifecycle.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/target/lifecycle.py#L48"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.ResetStrategy.SWPOI_RESET",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "SWPOI_RESET",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "SWPOI_RESET = ResetAction.SWPOI_RESET.value",
+              "source": {
+                "line": 49,
+                "path": "src/helia_profiler/target/lifecycle.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/target/lifecycle.py#L49"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.ResetStrategy.DEBUG_RESET_THEN_SWPOI",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "DEBUG_RESET_THEN_SWPOI",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "DEBUG_RESET_THEN_SWPOI = ResetAction.DEBUG_RESET_THEN_SWPOI.value",
+              "source": {
+                "line": 50,
+                "path": "src/helia_profiler/target/lifecycle.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/target/lifecycle.py#L50"
+              },
+              "summary": ""
+            }
+          ],
+          "name": "ResetStrategy",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "ResetStrategy()",
+          "source": {
+            "line": 42,
+            "path": "src/helia_profiler/target/lifecycle.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/target/lifecycle.py#L42"
+          },
+          "summary": "User-selectable reset policy for target lifecycle preparation."
+        }
+      ]
+    }
+  ],
+  "name": "helia_profiler"
+}

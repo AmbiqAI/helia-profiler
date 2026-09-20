@@ -1,0 +1,381 @@
+---
+title: "power"
+description: "Power capture settings: which instrument measures the rail, how it is wired to the board, and which window of the run is integrated."
+sidebar:
+  order: 1
+---
+
+import RefMembers from '@ambiqai/helia-ui/astro/RefMembers';
+import RefParams from '@ambiqai/helia-ui/astro/RefParams';
+import RefSection from '@ambiqai/helia-ui/astro/RefSection';
+import RefSymbol from '@ambiqai/helia-ui/astro/RefSymbol';
+
+Power capture settings: which instrument measures the rail, how it is wired to the board, and which window of the run is integrated.
+
+Every name on this page is imported from `helia_profiler`.
+
+**API tier:** `stable`
+
+[Machine-readable model](/helia-profiler/reference/api/helia_profiler/config/power.json)
+
+<RefMembers label="On this page" items={[{"id":"helia_profiler.PowerConfig","name":"PowerConfig","kind":"class","summary":"Power measurement settings."}]} />
+
+<RefSymbol
+  id={"helia_profiler.PowerConfig"}
+  name={"PowerConfig"}
+  kind={"class"}
+  language={"python"}
+  signature={"PowerConfig()"}
+  level={2}
+  summary={"Power measurement settings."}
+  source={{"path":"src/helia_profiler/config/power.py","line":235,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L235"}}
+>
+
+  Power measurement settings.
+
+  **API tier:** `stable`
+
+  <RefSymbol
+    id={"helia_profiler.PowerConfig.enabled"}
+    name={"enabled"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"enabled: bool = False"}
+    level={3}
+    source={{"path":"src/helia_profiler/config/power.py","line":239,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L239"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerConfig.driver"}
+    name={"driver"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"driver: str = DEFAULT_POWER_DRIVER"}
+    level={3}
+    source={{"path":"src/helia_profiler/config/power.py","line":240,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L240"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerConfig.firmware"}
+    name={"firmware"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"firmware: PowerFirmware = DEFAULT_POWER_FIRMWARE"}
+    level={3}
+    source={{"path":"src/helia_profiler/config/power.py","line":244,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L244"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerConfig.mode"}
+    name={"mode"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"mode: PowerMode = DEFAULT_POWER_MODE"}
+    level={3}
+    source={{"path":"src/helia_profiler/config/power.py","line":245,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L245"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerConfig.duration_s"}
+    name={"duration_s"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"duration_s: int | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/config/power.py","line":250,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L250"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerConfig.io_voltage"}
+    name={"io_voltage"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"io_voltage: float = DEFAULT_IO_VOLTAGE"}
+    level={3}
+    source={{"path":"src/helia_profiler/config/power.py","line":251,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L251"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerConfig.sync_gpio_pin"}
+    name={"sync_gpio_pin"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"sync_gpio_pin: int = DEFAULT_SYNC_GPIO_PIN"}
+    level={3}
+    source={{"path":"src/helia_profiler/config/power.py","line":252,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L252"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerConfig.sync_input_index"}
+    name={"sync_input_index"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"sync_input_index: int = DEFAULT_POWER_SYNC_INPUT_INDEX"}
+    level={3}
+    source={{"path":"src/helia_profiler/config/power.py","line":255,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L255"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerConfig.lockstep"}
+    name={"lockstep"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"lockstep: bool | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/config/power.py","line":265,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L265"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerConfig.state_gpio_pin"}
+    name={"state_gpio_pin"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"state_gpio_pin: int = DEFAULT_STATE_GPIO_PIN"}
+    level={3}
+    source={{"path":"src/helia_profiler/config/power.py","line":266,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L266"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerConfig.go_gpio_pin"}
+    name={"go_gpio_pin"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"go_gpio_pin: int = DEFAULT_GO_GPIO_PIN"}
+    level={3}
+    source={{"path":"src/helia_profiler/config/power.py","line":267,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L267"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerConfig.state_input_index"}
+    name={"state_input_index"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"state_input_index: int = DEFAULT_POWER_STATE_INPUT_INDEX"}
+    level={3}
+    source={{"path":"src/helia_profiler/config/power.py","line":268,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L268"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerConfig.go_output_index"}
+    name={"go_output_index"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"go_output_index: int = DEFAULT_POWER_GO_OUTPUT_INDEX"}
+    level={3}
+    source={{"path":"src/helia_profiler/config/power.py","line":269,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L269"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerConfig.stats_rate_hz"}
+    name={"stats_rate_hz"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"stats_rate_hz: int = DEFAULT_POWER_STATS_RATE_HZ"}
+    level={3}
+    source={{"path":"src/helia_profiler/config/power.py","line":273,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L273"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerConfig.reset_strategy"}
+    name={"reset_strategy"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"reset_strategy: ResetStrategy = ResetStrategy.AUTO"}
+    level={3}
+    source={{"path":"src/helia_profiler/config/power.py","line":276,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L276"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerConfig.serial"}
+    name={"serial"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"serial: str | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/config/power.py","line":280,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L280"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerConfig.ina228"}
+    name={"ina228"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"ina228: Ina228Config | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/config/power.py","line":286,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L286"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerConfig.monitor_selected"}
+    name={"monitor_selected"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"monitor_selected: bool"}
+    level={3}
+    summary={"Whether generated power firmware talks to an on-target monitor."}
+    source={{"path":"src/helia_profiler/config/power.py","line":289,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L289"}}
+  >
+
+    Whether generated power firmware talks to an on-target monitor.
+
+    The single source of truth for both firmware gates: NSX module
+    selection in ``firmware/__init__.py`` and render-context derivation
+    in ``PowerMonitorContext.from_config``. When these two used separate
+    predicates and disagreed, runs silently built no monitor at all
+    while appearing to configure one.
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerConfig.gated_external_capture"}
+    name={"gated_external_capture"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"gated_external_capture: bool"}
+    level={3}
+    summary={"Whether this run asks for host-gated external power capture."}
+    source={{"path":"src/helia_profiler/config/power.py","line":301,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L301"}}
+  >
+
+    Whether this run asks for host-gated *external* power capture.
+
+    The single source of the predicate that gates every piece of GPIO sync
+    machinery: the firmware's ``kPowerSyncEnabled`` (via
+    ``SyncContext.power_sync_enabled`` and the NSX GPIO module selection in
+    ``firmware/__init__.py``) and the host-side lock-step default below.
+    Internal (on-device monitor) mode measures inside the firmware and has
+    no host poller to race, so it is excluded.
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerConfig.lockstep_wiring_available"}
+    name={"lockstep_wiring_available"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"lockstep_wiring_available: bool"}
+    level={3}
+    summary={"Whether the board carries the two extra lock-step wires."}
+    source={{"path":"src/helia_profiler/config/power.py","line":314,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L314"}}
+  >
+
+    Whether the board carries the two extra lock-step wires.
+
+    ``state`` (device -> host) and ``go`` (host -> device); ``0`` means the
+    wire is not assigned. Single-sourced because three consumers ask the
+    same question and must agree: the lock-step default
+    (:attr:`lockstep_resolved`), the ``power.lockstep: true`` config
+    validator, and the ``no_gate_rise`` diagnostic, which only names
+    lock-step as the likely fix when the wiring can actually support it.
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerConfig.lockstep_resolved"}
+    name={"lockstep_resolved"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"lockstep_resolved: bool"}
+    level={3}
+    summary={"Effective 3-wire GPIO lock-step decision for this run."}
+    source={{"path":"src/helia_profiler/config/power.py","line":327,"url":"https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L327"}}
+  >
+
+    Effective 3-wire GPIO lock-step decision for this run.
+
+    An explicit ``power.lockstep`` always wins -- auto-enable is a
+    *default*, never an override, so ``lockstep: false`` still forces the
+    free-running path for bring-up on incomplete wiring.
+
+    Left unset, lock-step is enabled whenever the board is wired for it and
+    gated external capture is requested. The hazard it closes is not
+    family-specific: without lock-step ``kSyncLockstep`` bakes false,
+    ``hpx_sync_wait_go()`` compiles to a no-op, and the target free-runs its
+    measured window straight out of reset. Any reset latency the host
+    spends after that -- flash-tool exit, JLinkExe teardown, poller
+    start-up -- races the gate. Apollo5's default
+    ``debug_reset+swpoi_reset`` makes the gap widest (two sequential
+    JLinkExe invocations; see the AP510 combo+RTT ``t2-gate-race``
+    investigation, which is why the rule was originally AP5-only), but
+    Apollo4 Blue Plus reproduced the same ``no_gate_rise`` degradation on a
+    single-invocation ``debug_reset`` with a ~5 s window (issue #114), and
+    Apollo3 differs only in how narrow the gap is. So the condition is the
+    wiring and the mode, not the SoC family.
+
+    This is the one place both the firmware generator (which bakes
+    ``kSyncLockstep`` in at build time, via ``FirmwareRenderContext``) and
+    the host-side capture path (which must arm/wait/signal accordingly)
+    resolve the *same* answer -- callers must not read
+    :attr:`lockstep` directly.
+
+  </RefSymbol>
+
+</RefSymbol>

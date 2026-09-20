@@ -4,3 +4,4 @@ dist/
 .cache/
 src/data/build-info.json
 public/build-info.json
+.generated/

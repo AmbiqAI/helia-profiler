@@ -1,0 +1,79 @@
+{
+  "label": "helia_profiler",
+  "items": [
+    {
+      "label": "Overview",
+      "slug": "reference/api/helia_profiler"
+    },
+    {
+      "label": "config",
+      "collapsed": true,
+      "items": [
+        {
+          "label": "Overview",
+          "slug": "reference/api/helia_profiler/config"
+        },
+        {
+          "label": "power",
+          "slug": "reference/api/helia_profiler/config/power"
+        }
+      ]
+    },
+    {
+      "label": "deps",
+      "slug": "reference/api/helia_profiler/deps"
+    },
+    {
+      "label": "diagnostics",
+      "slug": "reference/api/helia_profiler/diagnostics"
+    },
+    {
+      "label": "errors",
+      "slug": "reference/api/helia_profiler/errors"
+    },
+    {
+      "label": "evaluation",
+      "slug": "reference/api/helia_profiler/evaluation"
+    },
+    {
+      "label": "examples",
+      "slug": "reference/api/helia_profiler/examples"
+    },
+    {
+      "label": "modelcost",
+      "slug": "reference/api/helia_profiler/modelcost"
+    },
+    {
+      "label": "power",
+      "collapsed": true,
+      "items": [
+        {
+          "label": "Overview",
+          "slug": "reference/api/helia_profiler/power"
+        },
+        {
+          "label": "metadata",
+          "slug": "reference/api/helia_profiler/power/metadata"
+        }
+      ]
+    },
+    {
+      "label": "results",
+      "collapsed": true,
+      "items": [
+        {
+          "label": "Overview",
+          "slug": "reference/api/helia_profiler/results"
+        },
+        {
+          "label": "manifest",
+          "slug": "reference/api/helia_profiler/results/manifest"
+        }
+      ]
+    },
+    {
+      "label": "vocab",
+      "slug": "reference/api/helia_profiler/vocab"
+    }
+  ]
+}

@@ -1,0 +1,710 @@
+{
+  "$schema": "https://ambiqai.github.io/helia-ui/schema/reference-model-1.json",
+  "generatedFrom": {
+    "sourceCommit": "cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8",
+    "tool": "pyref",
+    "version": "1.7.3"
+  },
+  "language": "python",
+  "modules": [
+    {
+      "description": "What a power capture produces: the measured result, the observations behind it, and the on-device summary the firmware reports.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`, `experimental`",
+      "name": "power",
+      "path": "helia_profiler.power",
+      "submodules": [],
+      "summary": "What a power capture produces: the measured result, the observations behind it, and the on-device summary the firmware reports.",
+      "symbols": [
+        {
+          "description": "Power measurement mode.\n\n**API tier:** `stable`",
+          "examples": [],
+          "id": "helia_profiler.PowerMode",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.PowerMode.EXTERNAL",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "EXTERNAL",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "EXTERNAL = 'external'",
+              "source": {
+                "line": 15,
+                "path": "src/helia_profiler/power/base.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/power/base.py#L15"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.PowerMode.INTERNAL",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "INTERNAL",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "INTERNAL = 'internal'",
+              "source": {
+                "line": 16,
+                "path": "src/helia_profiler/power/base.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/power/base.py#L16"
+              },
+              "summary": ""
+            }
+          ],
+          "name": "PowerMode",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "PowerMode()",
+          "source": {
+            "line": 12,
+            "path": "src/helia_profiler/power/base.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/power/base.py#L12"
+          },
+          "summary": "Power measurement mode."
+        },
+        {
+          "description": "`dataclass`\n\nHost instrument observation, independent of firmware terminal status.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.PowerObservation",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.PowerObservation.mode",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "mode",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "mode: ObservationMode",
+              "source": {
+                "line": 70,
+                "path": "src/helia_profiler/results/artifacts.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/artifacts.py#L70"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.PowerObservation.result",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "result",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "result: PowerResult",
+              "source": {
+                "line": 71,
+                "path": "src/helia_profiler/results/artifacts.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/artifacts.py#L71"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.PowerObservation.gate_rise_observed",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "gate_rise_observed",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "gate_rise_observed: bool",
+              "source": {
+                "line": 72,
+                "path": "src/helia_profiler/results/artifacts.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/artifacts.py#L72"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.PowerObservation.gate_fall_observed",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "gate_fall_observed",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "gate_fall_observed: bool",
+              "source": {
+                "line": 73,
+                "path": "src/helia_profiler/results/artifacts.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/artifacts.py#L73"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.PowerObservation.deadline_s",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "deadline_s",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "deadline_s: float",
+              "source": {
+                "line": 74,
+                "path": "src/helia_profiler/results/artifacts.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/artifacts.py#L74"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.PowerObservation.integrity",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "integrity",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "integrity: PowerIntegrity",
+              "source": {
+                "line": 75,
+                "path": "src/helia_profiler/results/artifacts.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/artifacts.py#L75"
+              },
+              "summary": ""
+            }
+          ],
+          "name": "PowerObservation",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "PowerObservation(\n    mode: ObservationMode,\n    result: PowerResult,\n    gate_rise_observed: bool,\n    gate_fall_observed: bool,\n    deadline_s: float,\n    integrity: PowerIntegrity,\n) -> None",
+          "source": {
+            "line": 66,
+            "path": "src/helia_profiler/results/artifacts.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/artifacts.py#L66"
+          },
+          "summary": "Host instrument observation, independent of firmware terminal status."
+        },
+        {
+          "description": "`dataclass`\n\nComplete result of a power capture.\n\n``metadata`` is the typed :class:`~helia_profiler.power.metadata.PowerMetadata`\n(#154 Phase 2 breaking change — previously ``dict[str, Any]``; the flat\ndict view is ``metadata.to_metadata_dict()``). The result is frozen but\nits metadata is deliberately mutable: pipeline stages enrich it after\ncapture, like ``RunMetadata``.\n\n**API tier:** `stable`",
+          "examples": [],
+          "id": "helia_profiler.PowerResult",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.PowerResult.summary",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "summary",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "summary: PowerSummary",
+              "source": {
+                "line": 88,
+                "path": "src/helia_profiler/power/base.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/power/base.py#L88"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.PowerResult.samples",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "samples",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "samples: list[PowerSample] = field(default_factory=list)",
+              "source": {
+                "line": 89,
+                "path": "src/helia_profiler/power/base.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/power/base.py#L89"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.PowerResult.gated_windows",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "gated_windows",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "gated_windows: list[GatedPowerWindow] = field(default_factory=list)",
+              "source": {
+                "line": 90,
+                "path": "src/helia_profiler/power/base.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/power/base.py#L90"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.PowerResult.per_layer",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "per_layer",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "per_layer: dict[str, Any] | None = None",
+              "source": {
+                "line": 91,
+                "path": "src/helia_profiler/power/base.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/power/base.py#L91"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.PowerResult.metadata",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "metadata",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "metadata: PowerMetadata = field(default_factory=PowerMetadata)",
+              "source": {
+                "line": 92,
+                "path": "src/helia_profiler/power/base.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/power/base.py#L92"
+              },
+              "summary": ""
+            }
+          ],
+          "name": "PowerResult",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "PowerResult(\n    summary: PowerSummary,\n    samples: list[PowerSample] = list(),\n    gated_windows: list[GatedPowerWindow] = list(),\n    per_layer: dict[str, Any] | None = None,\n    metadata: PowerMetadata = PowerMetadata(),\n) -> None",
+          "source": {
+            "line": 77,
+            "path": "src/helia_profiler/power/base.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/power/base.py#L77"
+          },
+          "summary": "Complete result of a power capture."
+        },
+        {
+          "description": "`dataclass`\n\nVersioned firmware status emitted only after the power gate is low.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.PowerTerminalRecord",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.PowerTerminalRecord.version",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "version",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "version: int",
+              "source": {
+                "line": 82,
+                "path": "src/helia_profiler/results/artifacts.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/artifacts.py#L82"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.PowerTerminalRecord.status",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "status",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "status: Literal['ok', 'error']",
+              "source": {
+                "line": 83,
+                "path": "src/helia_profiler/results/artifacts.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/artifacts.py#L83"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.PowerTerminalRecord.requested_count",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "requested_count",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "requested_count: int",
+              "source": {
+                "line": 84,
+                "path": "src/helia_profiler/results/artifacts.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/artifacts.py#L84"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.PowerTerminalRecord.completed_count",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "completed_count",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "completed_count: int",
+              "source": {
+                "line": 85,
+                "path": "src/helia_profiler/results/artifacts.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/artifacts.py#L85"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.PowerTerminalRecord.elapsed_us",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "elapsed_us",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "elapsed_us: int | None",
+              "source": {
+                "line": 86,
+                "path": "src/helia_profiler/results/artifacts.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/artifacts.py#L86"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.PowerTerminalRecord.final_phase",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "final_phase",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "final_phase: str",
+              "source": {
+                "line": 87,
+                "path": "src/helia_profiler/results/artifacts.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/artifacts.py#L87"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.PowerTerminalRecord.error_code",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "error_code",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "error_code: int",
+              "source": {
+                "line": 88,
+                "path": "src/helia_profiler/results/artifacts.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/artifacts.py#L88"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.PowerTerminalRecord.gate_asserted",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "gate_asserted",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "gate_asserted: bool",
+              "source": {
+                "line": 89,
+                "path": "src/helia_profiler/results/artifacts.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/artifacts.py#L89"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.PowerTerminalRecord.gate_lowered",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "gate_lowered",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "gate_lowered: bool",
+              "source": {
+                "line": 90,
+                "path": "src/helia_profiler/results/artifacts.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/artifacts.py#L90"
+              },
+              "summary": ""
+            }
+          ],
+          "name": "PowerTerminalRecord",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "PowerTerminalRecord(\n    version: int,\n    status: Literal['ok', 'error'],\n    requested_count: int,\n    completed_count: int,\n    elapsed_us: int | None,\n    final_phase: str,\n    error_code: int,\n    gate_asserted: bool,\n    gate_lowered: bool,\n) -> None",
+          "source": {
+            "line": 78,
+            "path": "src/helia_profiler/results/artifacts.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/artifacts.py#L78"
+          },
+          "summary": "Versioned firmware status emitted only after the power gate is low."
+        },
+        {
+          "description": "`dataclass`\n\nInteger-unit aggregate reported by a firmware-side power monitor.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.OnDevicePowerSummary",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.OnDevicePowerSummary.source",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "source",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "source: str",
+              "source": {
+                "line": 113,
+                "path": "src/helia_profiler/results/artifacts.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/artifacts.py#L113"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.OnDevicePowerSummary.scope",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "scope",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "scope: Literal['fixed_n_inference']",
+              "source": {
+                "line": 114,
+                "path": "src/helia_profiler/results/artifacts.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/artifacts.py#L114"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.OnDevicePowerSummary.energy_nj",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "energy_nj",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "energy_nj: int",
+              "source": {
+                "line": 115,
+                "path": "src/helia_profiler/results/artifacts.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/artifacts.py#L115"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.OnDevicePowerSummary.duration_us",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "duration_us",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "duration_us: int",
+              "source": {
+                "line": 116,
+                "path": "src/helia_profiler/results/artifacts.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/artifacts.py#L116"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.OnDevicePowerSummary.inference_count",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "inference_count",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "inference_count: int",
+              "source": {
+                "line": 117,
+                "path": "src/helia_profiler/results/artifacts.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/artifacts.py#L117"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.OnDevicePowerSummary.overflow",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "overflow",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "overflow: bool",
+              "source": {
+                "line": 118,
+                "path": "src/helia_profiler/results/artifacts.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/artifacts.py#L118"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.OnDevicePowerSummary.charge_nc",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "charge_nc",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "charge_nc: int | None = None",
+              "source": {
+                "line": 119,
+                "path": "src/helia_profiler/results/artifacts.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/artifacts.py#L119"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.OnDevicePowerSummary.bus_voltage_uv",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "bus_voltage_uv",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "bus_voltage_uv: int | None = None",
+              "source": {
+                "line": 120,
+                "path": "src/helia_profiler/results/artifacts.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/artifacts.py#L120"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.OnDevicePowerSummary.calibration_id",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "calibration_id",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "calibration_id: str | None = None",
+              "source": {
+                "line": 121,
+                "path": "src/helia_profiler/results/artifacts.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/artifacts.py#L121"
+              },
+              "summary": ""
+            }
+          ],
+          "name": "OnDevicePowerSummary",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "OnDevicePowerSummary(\n    source: str,\n    scope: Literal['fixed_n_inference'],\n    energy_nj: int,\n    duration_us: int,\n    inference_count: int,\n    overflow: bool,\n    charge_nc: int | None = None,\n    bus_voltage_uv: int | None = None,\n    calibration_id: str | None = None,\n) -> None",
+          "source": {
+            "line": 109,
+            "path": "src/helia_profiler/results/artifacts.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/artifacts.py#L109"
+          },
+          "summary": "Integer-unit aggregate reported by a firmware-side power monitor."
+        }
+      ]
+    }
+  ],
+  "name": "helia_profiler"
+}
