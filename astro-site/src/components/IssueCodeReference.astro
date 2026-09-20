@@ -1,0 +1,129 @@
+---
+/**
+ * The catalogue of machine-readable diagnostic codes, from the registry that
+ * types them at emission.
+ *
+ * The parameterized families are listed as their expanded wire codes, not as
+ * their pattern alone: `metric.power_<dimension>_mismatch` doubles the `power`
+ * prefix for the dimensions whose own name starts with it, so a reader who
+ * expands the pattern by hand gets a code that is never emitted.
+ */
+import RefMembers from '@ambiqai/helia-ui/astro/RefMembers';
+import RefParams from '@ambiqai/helia-ui/astro/RefParams';
+import RefSection from '@ambiqai/helia-ui/astro/RefSection';
+import RefSymbol from '@ambiqai/helia-ui/astro/RefSymbol';
+
+import issues from '../data/issues.json';
+import { severityCell } from '../lib/reference-cli.mjs';
+
+const sections = [
+  {
+    id: 'run-validity',
+    name: 'Run-validity issues',
+    summary:
+      'Emitted by run evaluation into summary.json and result_manifest.json. ' +
+      'An error makes the run invalid; a warning makes it degraded.',
+    rows: issues.issues.map((issue) => ({
+      name: issue.code,
+      type: severityCell(issue),
+      default: issue.metricGroup ?? '',
+      description: issue.description,
+    })),
+  },
+  {
+    id: 'comparability',
+    name: 'Comparability issues',
+    summary:
+      'Emitted by hpx compare. Severity governs scope: blocking stops the comparison, ' +
+      'layer_blocking omits per-layer deltas, metric_blocking omits one metric group, ' +
+      'and informative annotates without blocking anything.',
+    rows: issues.comparability.map((issue) => ({
+      name: issue.code,
+      type: issue.severity,
+      default: issue.metricGroup ?? '',
+      description: issue.description,
+    })),
+  },
+];
+---
+
+<p>
+  {issues.counts.issues} run-validity codes, {issues.counts.comparability} comparability
+  codes, and {issues.counts.families} parameterized families covering {issues.counts.familyCodes}
+  more. A code is a stable wire string: consumers may key on it.
+</p>
+
+<RefMembers
+  label="Code groups"
+  items={[
+    ...sections.map((section) => ({
+      id: section.id,
+      name: section.name,
+      kind: 'enum',
+      summary: `${section.rows.length} codes`,
+    })),
+    ...issues.families.map((family) => ({
+      id: family.pattern,
+      name: family.pattern,
+      kind: 'enum',
+      summary: `${family.codes.length} codes`,
+    })),
+  ]}
+/>
+
+{
+  sections.map((section) => (
+    <RefSymbol
+      id={section.id}
+      name={section.name}
+      kind="enum"
+      language="python"
+      signature={`${section.rows.length} codes`}
+      signatureLanguage="plaintext"
+      summary={section.summary}
+      level={2}
+    >
+      <RefSection title="Codes">
+        <RefParams
+          caption={`${section.name} codes`}
+          rows={section.rows}
+          density="compact"
+          nameLabel="Code"
+          typeLabel="Severity"
+          defaultLabel="Metric group"
+        />
+      </RefSection>
+    </RefSymbol>
+  ))
+}
+
+{
+  issues.families.map((family) => (
+    <RefSymbol
+      id={family.pattern}
+      name={family.pattern}
+      kind="enum"
+      language="python"
+      signature={family.pattern}
+      signatureLanguage="plaintext"
+      summary={family.description}
+      level={2}
+    >
+      <RefSection title="Codes">
+        <RefParams
+          caption={`${family.pattern} codes`}
+          rows={family.codes.map((code, index) => ({
+            name: code,
+            type: family.severity,
+            default: family.metricGroup ?? '',
+            description: `Comparison dimension ${family.dimensions[index]}.`,
+          }))}
+          density="compact"
+          nameLabel="Code"
+          typeLabel="Severity"
+          defaultLabel="Metric group"
+        />
+      </RefSection>
+    </RefSymbol>
+  ))
+}

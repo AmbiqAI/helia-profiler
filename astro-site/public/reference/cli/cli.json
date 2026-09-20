@@ -2733,7 +2733,7 @@
         "usage": "hpx validate [OPTIONS]",
         "short_help": "Run hardware-in-the-loop validation suite (MLPerf Tiny models)",
         "help": "Run hardware-in-the-loop validation suite (MLPerf Tiny models)",
-        "epilog": "Hardware validation \u2014 runs canonical MLPerf Tiny models end-to-end\n\nagainst a real EVB + J-Link (and optional Joulescope).\n\nExamples:\n\n  hpx validate                         # Apollo510 reliability matrix, power off\n\n  hpx validate --list                  # preview what would run\n\n  hpx validate --models kws,ic         # subset by model\n\n  hpx validate --engines aot           # subset by engine\n\n  hpx validate --power off             # skip Joulescope (default)\n\n  hpx validate --boards apollo3p_evb --repeat 2 --power off\n\n                                       # require two passing iterations per case\n\n  hpx validate -k kws-aot              # pytest keyword filter\n\n  hpx validate --suite smoke           # quick preset: kws / helia-rt / gcc / rtt / auto\n\n  hpx validate --suite models-rt       # 16-case RT sweep: 2 boards x 4 models x 2 toolchains\n\n  hpx validate --suite models-aot      # 16-case AOT sweep: 2 boards x 4 models x 2 toolchains\n\n  hpx validate --suite complete        # RT + AOT + TFLM + ExecuTorch sweep",
+        "epilog": "Hardware validation — runs canonical MLPerf Tiny models end-to-end\n\nagainst a real EVB + J-Link (and optional Joulescope).\n\nExamples:\n\n  hpx validate                         # Apollo510 reliability matrix, power off\n\n  hpx validate --list                  # preview what would run\n\n  hpx validate --models kws,ic         # subset by model\n\n  hpx validate --engines aot           # subset by engine\n\n  hpx validate --power off             # skip Joulescope (default)\n\n  hpx validate --boards apollo3p_evb --repeat 2 --power off\n\n                                       # require two passing iterations per case\n\n  hpx validate -k kws-aot              # pytest keyword filter\n\n  hpx validate --suite smoke           # quick preset: kws / helia-rt / gcc / rtt / auto\n\n  hpx validate --suite models-rt       # 16-case RT sweep: 2 boards x 4 models x 2 toolchains\n\n  hpx validate --suite models-aot      # 16-case AOT sweep: 2 boards x 4 models x 2 toolchains\n\n  hpx validate --suite complete        # RT + AOT + TFLM + ExecuTorch sweep",
         "deprecated": false,
         "hidden": false,
         "source": {
@@ -3299,7 +3299,7 @@
               "class": "FloatParamType"
             },
             "python_type": "float",
-            "default": 900.0,
+            "default": 900,
             "required": false,
             "help": "Per-case timeout in seconds (default: 900).",
             "panel": null,
@@ -3329,7 +3329,7 @@
             "python_type": "str",
             "default": "",
             "required": false,
-            "help": "Pytest keyword expression \u2014 filter cases by substring match (e.g. 'kws-aot').",
+            "help": "Pytest keyword expression — filter cases by substring match (e.g. 'kws-aot').",
             "panel": null,
             "is_flag": false,
             "multiple": false,
