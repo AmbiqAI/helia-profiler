@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import enum
 import json
 import re
 import sys
@@ -40,7 +41,7 @@ def _type_name(obj: Any) -> str:
     return _MODULE_PREFIX.sub(r"\1", str(obj).replace("typing.", ""))
 
 
-def _config_classes() -> list[type]:
+def _config_classes() -> list[Any]:
     from helia_profiler import config as cfg
     from helia_profiler.config import power as power_cfg
 
@@ -58,13 +59,11 @@ def _config_classes() -> list[type]:
     return sorted(seen.values(), key=lambda c: c.__name__)
 
 
-def _enums() -> list[type]:
-    import enum
-
+def _enums() -> list[type[enum.StrEnum]]:
     from helia_profiler import config as cfg
     from helia_profiler.config import power as power_cfg
 
-    seen: dict[str, type] = {}
+    seen: dict[str, type[enum.StrEnum]] = {}
     for module in (cfg, power_cfg):
         for name in dir(module):
             obj = getattr(module, name)
@@ -74,7 +73,7 @@ def _enums() -> list[type]:
     return sorted(seen.values(), key=lambda c: c.__name__)
 
 
-def _field_index(cls: type) -> list[dict[str, Any]]:
+def _field_index(cls: Any) -> list[dict[str, Any]]:
     try:
         hints = typing.get_type_hints(cls, include_extras=True)
     except Exception:
@@ -103,12 +102,12 @@ def _field_index(cls: type) -> list[dict[str, Any]]:
     return rows
 
 
-def _sections(classes: dict[str, type]) -> dict[str, str]:
+def _sections(classes: dict[str, Any]) -> dict[str, str]:
     """Map dotted config key to class name by walking down from the root."""
     by_type = {cls: name for name, cls in classes.items()}
     out: dict[str, str] = {"": ROOT_CLASS}
 
-    def visit(cls: type, prefix: str) -> None:
+    def visit(cls: Any, prefix: str) -> None:
         try:
             hints = typing.get_type_hints(cls, include_extras=True)
         except Exception:

@@ -248,7 +248,10 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _report(problems: list[str]) -> None:
-    print("reference drift detected: the committed JSON no longer matches the source.", file=sys.stderr)
+    print(
+        "reference drift detected: the committed JSON no longer matches the source.",
+        file=sys.stderr,
+    )
     for problem in problems:
         print(f"  - {problem}", file=sys.stderr)
     print(

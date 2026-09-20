@@ -86,7 +86,11 @@ def _source(command: Any) -> dict[str, Any] | None:
     try:
         rel = path.relative_to(REPO_ROOT)
     except ValueError:
-        rel = Path(*path.parts[path.parts.index("helia_profiler") :]) if "helia_profiler" in path.parts else path
+        rel = (
+            Path(*path.parts[path.parts.index("helia_profiler") :])
+            if "helia_profiler" in path.parts
+            else path
+        )
     return {"path": str(rel), "line": line}
 
 
