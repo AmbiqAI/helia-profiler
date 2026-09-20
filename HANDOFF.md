@@ -39,10 +39,15 @@ Verified on this branch (all local, all green):
   each symbol once and badged; the 13 implementation names appear as no symbol,
   member, sidebar entry or llms-full.txt section.
 - Largest reference page: `/reference/api/helia_profiler/evaluation/` at
-  214,588 B HTML and 14,542 B gzip, against a 250 KB / 40 KB budget.
+  211,801 B HTML and 14,582 B gzip, against a 250 KB / 40 KB budget.
 - `uv run --no-project --with griffe==1.7.3 griffe dump helia_profiler
-  --search src` produces the same 9,560,212 B dump as the project env, which is
-  what makes the CI job need griffe and nothing else.
+  --search src --docstyle google -f` produces the same dump as the project env,
+  which is what makes the CI job need griffe and nothing else. (Without
+  `--docstyle google -f` the dump is a different size and a different shape;
+  the flags are not cosmetic.)
+- A docs-only commit leaves every generated file untouched: the artifacts
+  committed at `dea74c5` were generated at `d83d145` and `check:reference`
+  still reports them current.
 
 Not verifiable before merge, named as such in #325:
 - the first post-merge push run (artifact, deploy job skipped),
@@ -128,9 +133,36 @@ Record the run links on #325 when they exist.
 - `helia_profiler.examples` is a submodule that `__all__` publishes, so it is a
   page with no symbols rather than an 85th symbol. 85 names = 84 symbols + 1
   module page.
-- Every generated file carries the commit of `src/helia_profiler`, so the stale
-  check normalises 40-hex shas out of its byte comparison and asserts
-  provenance separately.
+- Provenance is the git tree of `src/helia_profiler`
+  (`git rev-parse HEAD:src/helia_profiler`), never a commit and never a ref. A
+  commit sha rewrites 44 of 47 generated files on any change under src/ and
+  does not survive the squash merges this repository uses. `check:reference`
+  refuses a committed artifact that carries any other 40-hex hash or any ref.
+- Source links are committed with the `__DOCS_SOURCE_REF__` placeholder and
+  resolved at build time by `src/integrations/source-ref.mjs`, to the release
+  tag when built from a tag and otherwise `main`. That integration must stay
+  last in `astro.config.mjs`: Starlight and helia-ui write their Markdown
+  renditions and llms exports in `astro:build:done` too, and hooks run in
+  declaration order. `astro dev` shows the raw placeholder; only the build
+  resolves it.
+- Regenerating needs a clean `src/helia_profiler`, since griffe reads the
+  working tree while provenance names the tree of HEAD. `DOCS_ALLOW_DIRTY_SOURCE=1`
+  skips that guard for local preview; CI regenerates from the commit and
+  compares, so the escape hatch cannot reach a merge.
+- The generated pages and artifacts are committed by decision, not by
+  accident: the stale gate is what caught a dropped field during review, and a
+  nav or page change is reviewable in the diff. Tree-sha provenance is what
+  makes that affordable, because the files no longer churn per commit.
+  1.4 MB under `public/reference/api/`, `reference.json` 538 KB of it.
+- The 404 lives at `src/pages/404.astro` and Starlight's own `/404` is turned
+  off with its `disable404Route` option. Both routes at one path is a warning
+  in Astro 7 and a hard error later. Moving the page into the docs collection
+  instead would put it in `llms.txt` and give it an `/404/index.md`, and
+  alpha.15 still has no per-page exclusion hook (helia-ui#122).
+- `public/favicon.ico` is a 16/32 px PNG-in-ICO built from
+  `heliaprofiler-icon.png`. It is served at `/helia-profiler/favicon.ico`; a
+  browser asking for the origin root `/favicon.ico` is asking a different site,
+  which this repository does not own.
 - helia-ui does not run griffe, it reads the griffe 1.7.3 dump schema. Pin it.
 - typer vendors click: `isinstance(cmd, click.Group)` on top-level `click` is
   always False.
