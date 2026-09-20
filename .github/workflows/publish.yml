@@ -165,20 +165,3 @@ jobs:
 
       - name: Publish distributions to PyPI
         run: uv publish --trusted-publishing always dist/*
-
-  # The documentation is built from the release tag so its generated reference
-  # pages match the package that was published. It waits on publish-pypi so the
-  # site never announces a version that is not on PyPI. The permissions here
-  # are the ceiling the called workflow inherits; it deliberately requests less
-  # until cutover (#322).
-  docs:
-    if: needs.release-please.outputs.release_created == 'true'
-    needs: [release-please, publish-pypi]
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    uses: ./.github/workflows/docs.yml
-    with:
-      source_ref: ${{ needs.release-please.outputs.tag_name }}
-      release_publish: true
