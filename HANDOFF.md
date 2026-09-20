@@ -20,6 +20,10 @@ This branch (#330):
   lockfile regenerated on linux/amd64 node:24. alpha.15 moves the Callout
   recipe into the global `recipes.css` and drops `role` for `aria-label`;
   this site overrides neither, so nothing here changed.
+- Now `v0.1.0-alpha.16` (`6430e46effafaf32b5ea694dfa08061e286a6d74`) on branch
+  `chore-helia-ui-alpha16`; helia-ui#146 makes the MDX renditions keep
+  `LinkCard`/`Card` content, so `dist/index.md` and `llms-full.txt` gain the
+  four home-page card links instead of orphan description paragraphs.
 - The last 11 NumPy docstring sections (7 files) are Google style, held there
   by `tests/test_docstring_style.py`.
 - `astro-site/scripts/{dump-python,scope-dump,build-reference}.mjs` produce
