@@ -96,9 +96,7 @@ def _verify_wheel(wheel: Path, expected_version: str) -> None:
     if obsolete:
         raise ValueError(f"Wheel contains obsolete compatibility modules: {sorted(obsolete)}")
 
-    build_tooling = sorted(
-        name for name in names if name.startswith(EXCLUDED_WHEEL_PREFIXES)
-    )
+    build_tooling = sorted(name for name in names if name.startswith(EXCLUDED_WHEEL_PREFIXES))
     if build_tooling:
         raise ValueError(f"Wheel contains build tooling: {build_tooling}")
 
