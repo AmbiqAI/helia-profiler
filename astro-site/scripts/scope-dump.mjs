@@ -95,19 +95,16 @@ export const withNote = (docstring, note) => {
 /**
  * The provenance line every page carries.
  *
- * The commit is of `src/helia_profiler`, not of HEAD: it is what the page was
- * generated from, and it is on the page itself rather than only in the model
- * so a reader who lands on one page can tell what it documents.
+ * It names the git tree of `src/helia_profiler`, not a commit and not a ref.
+ * A commit sha would rewrite every generated file on any change under src/,
+ * and would not survive the squash merges this repository uses; the tree sha
+ * is the identity of the source that was read, and two commits carrying the
+ * same source produce the same bytes here.
  */
-export const provenanceNote = (commit) =>
-  commit
-    ? `Generated from [\`src/helia_profiler\` at \`${commit.slice(0, 7)}\`](` +
-      `${SOURCE_TREE}/${commit}/src/helia_profiler).`
-    : '';
+export const provenanceNote = (tree) =>
+  tree ? `Generated from the \`src/helia_profiler\` tree \`${tree}\`.` : '';
 
-const SOURCE_TREE = 'https://github.com/AmbiqAI/helia-profiler/tree';
-
-export function scope({ dump, tiers, groups: manifest, commit = '' }) {
+export function scope({ dump, tiers, groups: manifest, tree = '' }) {
   const pkg = dump[PACKAGE];
   if (!pkg) throw new Error(`The dump has no package "${PACKAGE}".`);
 
@@ -223,7 +220,7 @@ export function scope({ dump, tiers, groups: manifest, commit = '' }) {
     const note = [
       `Every name on this page is imported from \`${manifest.importFrom}\`.`,
       tierNote(pageTiers),
-      provenanceNote(commit),
+      provenanceNote(tree),
     ]
       .filter(Boolean)
       .join('\n\n');
@@ -294,12 +291,12 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const generated = path.join(site, '.generated');
   const readJson = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
 
-  const commitFlag = process.argv.indexOf('--commit');
+  const treeFlag = process.argv.indexOf('--tree');
   const { scoped, report } = scope({
     dump: readJson(path.join(generated, 'griffe.json')),
     tiers: readJson(path.join(generated, 'api-tiers.json')),
     groups: readJson(path.join(site, 'src/data/api-groups.json')),
-    commit: commitFlag === -1 ? '' : process.argv[commitFlag + 1],
+    tree: treeFlag === -1 ? '' : process.argv[treeFlag + 1],
   });
 
   fs.writeFileSync(path.join(generated, 'griffe.scoped.json'), `${JSON.stringify(scoped)}\n`);

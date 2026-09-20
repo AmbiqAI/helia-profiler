@@ -1,14 +1,14 @@
 {
   "$schema": "https://ambiqai.github.io/helia-ui/schema/reference-model-1.json",
   "generatedFrom": {
-    "sourceCommit": "cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8",
     "tool": "pyref",
-    "version": "1.7.3"
+    "version": "1.7.3",
+    "sourceTree": "0568ba9b9f3ce24b083b9459dd33f86e7d665646"
   },
   "language": "python",
   "modules": [
     {
-      "description": "What this build of heliaPROFILER is qualified against: the board, engine and toolchain matrix, and the locked dependency revisions a run was produced with.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`, `experimental`\n\nGenerated from [`src/helia_profiler` at `cc1c3ed`](https://github.com/AmbiqAI/helia-profiler/tree/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler).",
+      "description": "What this build of heliaPROFILER is qualified against: the board, engine and toolchain matrix, and the locked dependency revisions a run was produced with.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`, `experimental`\n\nGenerated from the `src/helia_profiler` tree `0568ba9b9f3ce24b083b9459dd33f86e7d665646`.",
       "name": "deps",
       "path": "helia_profiler.deps",
       "submodules": [],
@@ -36,7 +36,7 @@
               "source": {
                 "line": 47,
                 "path": "src/helia_profiler/deps/compatibility.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/deps/compatibility.py#L47"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L47"
               },
               "summary": ""
             },
@@ -55,7 +55,7 @@
               "source": {
                 "line": 48,
                 "path": "src/helia_profiler/deps/compatibility.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/deps/compatibility.py#L48"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L48"
               },
               "summary": ""
             },
@@ -74,7 +74,7 @@
               "source": {
                 "line": 49,
                 "path": "src/helia_profiler/deps/compatibility.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/deps/compatibility.py#L49"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L49"
               },
               "summary": ""
             }
@@ -87,7 +87,7 @@
           "source": {
             "line": 44,
             "path": "src/helia_profiler/deps/compatibility.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/deps/compatibility.py#L44"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L44"
           },
           "summary": "Compatibility state of a resolved profiling configuration."
         },
@@ -113,7 +113,7 @@
               "source": {
                 "line": 93,
                 "path": "src/helia_profiler/deps/compatibility.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/deps/compatibility.py#L93"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L93"
               },
               "summary": ""
             },
@@ -132,7 +132,7 @@
               "source": {
                 "line": 94,
                 "path": "src/helia_profiler/deps/compatibility.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/deps/compatibility.py#L94"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L94"
               },
               "summary": ""
             },
@@ -151,7 +151,7 @@
               "source": {
                 "line": 95,
                 "path": "src/helia_profiler/deps/compatibility.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/deps/compatibility.py#L95"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L95"
               },
               "summary": ""
             },
@@ -170,7 +170,7 @@
               "source": {
                 "line": 96,
                 "path": "src/helia_profiler/deps/compatibility.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/deps/compatibility.py#L96"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L96"
               },
               "summary": ""
             },
@@ -189,7 +189,7 @@
               "source": {
                 "line": 97,
                 "path": "src/helia_profiler/deps/compatibility.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/deps/compatibility.py#L97"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L97"
               },
               "summary": ""
             },
@@ -208,7 +208,7 @@
               "source": {
                 "line": 98,
                 "path": "src/helia_profiler/deps/compatibility.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/deps/compatibility.py#L98"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L98"
               },
               "summary": ""
             },
@@ -227,7 +227,7 @@
               "source": {
                 "line": 99,
                 "path": "src/helia_profiler/deps/compatibility.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/deps/compatibility.py#L99"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L99"
               },
               "summary": ""
             },
@@ -246,7 +246,7 @@
               "source": {
                 "line": 100,
                 "path": "src/helia_profiler/deps/compatibility.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/deps/compatibility.py#L100"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L100"
               },
               "summary": ""
             },
@@ -265,7 +265,7 @@
               "source": {
                 "line": 101,
                 "path": "src/helia_profiler/deps/compatibility.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/deps/compatibility.py#L101"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L101"
               },
               "summary": ""
             },
@@ -284,7 +284,7 @@
               "source": {
                 "line": 131,
                 "path": "src/helia_profiler/deps/compatibility.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/deps/compatibility.py#L131"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L131"
               },
               "summary": "Return the canonical SHA-256 identity reserved for Stage 5."
             },
@@ -303,7 +303,7 @@
               "source": {
                 "line": 103,
                 "path": "src/helia_profiler/deps/compatibility.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/deps/compatibility.py#L103"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L103"
               },
               "summary": ""
             },
@@ -322,7 +322,7 @@
               "source": {
                 "line": 112,
                 "path": "src/helia_profiler/deps/compatibility.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/deps/compatibility.py#L112"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L112"
               },
               "summary": ""
             },
@@ -341,7 +341,7 @@
               "source": {
                 "line": 121,
                 "path": "src/helia_profiler/deps/compatibility.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/deps/compatibility.py#L121"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L121"
               },
               "summary": ""
             },
@@ -360,7 +360,7 @@
               "source": {
                 "line": 137,
                 "path": "src/helia_profiler/deps/compatibility.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/deps/compatibility.py#L137"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L137"
               },
               "summary": "Return a stable JSON-safe representation for reports and Stage 5."
             }
@@ -373,7 +373,7 @@
           "source": {
             "line": 89,
             "path": "src/helia_profiler/deps/compatibility.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/deps/compatibility.py#L89"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L89"
           },
           "summary": "Validated, immutable baseline loaded from HPX package data."
         },
@@ -399,7 +399,7 @@
               "source": {
                 "line": 134,
                 "path": "src/helia_profiler/results/dependencies.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/dependencies.py#L134"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L134"
               },
               "summary": ""
             },
@@ -418,7 +418,7 @@
               "source": {
                 "line": 135,
                 "path": "src/helia_profiler/results/dependencies.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/dependencies.py#L135"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L135"
               },
               "summary": ""
             },
@@ -437,7 +437,7 @@
               "source": {
                 "line": 136,
                 "path": "src/helia_profiler/results/dependencies.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/dependencies.py#L136"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L136"
               },
               "summary": ""
             },
@@ -456,7 +456,7 @@
               "source": {
                 "line": 137,
                 "path": "src/helia_profiler/results/dependencies.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/dependencies.py#L137"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L137"
               },
               "summary": ""
             },
@@ -475,7 +475,7 @@
               "source": {
                 "line": 138,
                 "path": "src/helia_profiler/results/dependencies.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/dependencies.py#L138"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L138"
               },
               "summary": ""
             },
@@ -494,7 +494,7 @@
               "source": {
                 "line": 139,
                 "path": "src/helia_profiler/results/dependencies.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/dependencies.py#L139"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L139"
               },
               "summary": ""
             },
@@ -513,7 +513,7 @@
               "source": {
                 "line": 140,
                 "path": "src/helia_profiler/results/dependencies.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/dependencies.py#L140"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L140"
               },
               "summary": ""
             },
@@ -532,7 +532,7 @@
               "source": {
                 "line": 141,
                 "path": "src/helia_profiler/results/dependencies.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/dependencies.py#L141"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L141"
               },
               "summary": ""
             },
@@ -551,7 +551,7 @@
               "source": {
                 "line": 142,
                 "path": "src/helia_profiler/results/dependencies.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/dependencies.py#L142"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L142"
               },
               "summary": ""
             },
@@ -570,7 +570,7 @@
               "source": {
                 "line": 143,
                 "path": "src/helia_profiler/results/dependencies.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/dependencies.py#L143"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L143"
               },
               "summary": ""
             },
@@ -589,7 +589,7 @@
               "source": {
                 "line": 144,
                 "path": "src/helia_profiler/results/dependencies.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/dependencies.py#L144"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L144"
               },
               "summary": ""
             }
@@ -602,7 +602,7 @@
           "source": {
             "line": 130,
             "path": "src/helia_profiler/results/dependencies.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/dependencies.py#L130"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L130"
           },
           "summary": "Read-only lock provenance surface for later diagnostics collectors."
         },
@@ -628,7 +628,7 @@
               "source": {
                 "line": 176,
                 "path": "src/helia_profiler/deps/compatibility.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/deps/compatibility.py#L176"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L176"
               },
               "summary": ""
             },
@@ -647,7 +647,7 @@
               "source": {
                 "line": 177,
                 "path": "src/helia_profiler/deps/compatibility.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/deps/compatibility.py#L177"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L177"
               },
               "summary": ""
             },
@@ -666,7 +666,7 @@
               "source": {
                 "line": 188,
                 "path": "src/helia_profiler/deps/compatibility.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/deps/compatibility.py#L188"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L188"
               },
               "summary": ""
             },
@@ -685,7 +685,7 @@
               "source": {
                 "line": 189,
                 "path": "src/helia_profiler/deps/compatibility.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/deps/compatibility.py#L189"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L189"
               },
               "summary": ""
             },
@@ -704,7 +704,7 @@
               "source": {
                 "line": 192,
                 "path": "src/helia_profiler/deps/compatibility.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/deps/compatibility.py#L192"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L192"
               },
               "summary": ""
             },
@@ -723,7 +723,7 @@
               "source": {
                 "line": 195,
                 "path": "src/helia_profiler/deps/compatibility.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/deps/compatibility.py#L195"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L195"
               },
               "summary": "Return structured result provenance without lossy enum conversion."
             }
@@ -736,7 +736,7 @@
           "source": {
             "line": 172,
             "path": "src/helia_profiler/deps/compatibility.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/deps/compatibility.py#L172"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L172"
           },
           "summary": "Resolved baseline plus explicit override classification."
         },
@@ -755,7 +755,7 @@
           "source": {
             "line": 206,
             "path": "src/helia_profiler/deps/compatibility.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/deps/compatibility.py#L206"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L206"
           },
           "summary": "Load and strictly validate an HPX compatibility baseline."
         },
@@ -774,7 +774,7 @@
           "source": {
             "line": 525,
             "path": "src/helia_profiler/deps/dependencies.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/deps/dependencies.py#L525"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/dependencies.py#L525"
           },
           "summary": "Read typed lock provenance without mutating an app or workspace."
         }

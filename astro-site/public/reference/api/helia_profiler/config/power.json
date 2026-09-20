@@ -1,14 +1,14 @@
 {
   "$schema": "https://ambiqai.github.io/helia-ui/schema/reference-model-1.json",
   "generatedFrom": {
-    "sourceCommit": "cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8",
     "tool": "pyref",
-    "version": "1.7.3"
+    "version": "1.7.3",
+    "sourceTree": "0568ba9b9f3ce24b083b9459dd33f86e7d665646"
   },
   "language": "python",
   "modules": [
     {
-      "description": "Power capture settings: which instrument measures the rail, how it is wired to the board, and which window of the run is integrated.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`\n\nGenerated from [`src/helia_profiler` at `cc1c3ed`](https://github.com/AmbiqAI/helia-profiler/tree/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler).",
+      "description": "Power capture settings: which instrument measures the rail, how it is wired to the board, and which window of the run is integrated.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`\n\nGenerated from the `src/helia_profiler` tree `0568ba9b9f3ce24b083b9459dd33f86e7d665646`.",
       "name": "power",
       "path": "helia_profiler.config.power",
       "submodules": [],
@@ -36,7 +36,7 @@
               "source": {
                 "line": 239,
                 "path": "src/helia_profiler/config/power.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L239"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/power.py#L239"
               },
               "summary": ""
             },
@@ -55,7 +55,7 @@
               "source": {
                 "line": 240,
                 "path": "src/helia_profiler/config/power.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L240"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/power.py#L240"
               },
               "summary": ""
             },
@@ -74,7 +74,7 @@
               "source": {
                 "line": 244,
                 "path": "src/helia_profiler/config/power.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L244"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/power.py#L244"
               },
               "summary": ""
             },
@@ -93,7 +93,7 @@
               "source": {
                 "line": 245,
                 "path": "src/helia_profiler/config/power.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L245"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/power.py#L245"
               },
               "summary": ""
             },
@@ -112,7 +112,7 @@
               "source": {
                 "line": 250,
                 "path": "src/helia_profiler/config/power.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L250"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/power.py#L250"
               },
               "summary": ""
             },
@@ -131,7 +131,7 @@
               "source": {
                 "line": 251,
                 "path": "src/helia_profiler/config/power.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L251"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/power.py#L251"
               },
               "summary": ""
             },
@@ -150,7 +150,7 @@
               "source": {
                 "line": 252,
                 "path": "src/helia_profiler/config/power.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L252"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/power.py#L252"
               },
               "summary": ""
             },
@@ -169,7 +169,7 @@
               "source": {
                 "line": 255,
                 "path": "src/helia_profiler/config/power.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L255"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/power.py#L255"
               },
               "summary": ""
             },
@@ -188,7 +188,7 @@
               "source": {
                 "line": 265,
                 "path": "src/helia_profiler/config/power.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L265"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/power.py#L265"
               },
               "summary": ""
             },
@@ -207,7 +207,7 @@
               "source": {
                 "line": 266,
                 "path": "src/helia_profiler/config/power.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L266"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/power.py#L266"
               },
               "summary": ""
             },
@@ -226,7 +226,7 @@
               "source": {
                 "line": 267,
                 "path": "src/helia_profiler/config/power.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L267"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/power.py#L267"
               },
               "summary": ""
             },
@@ -245,7 +245,7 @@
               "source": {
                 "line": 268,
                 "path": "src/helia_profiler/config/power.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L268"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/power.py#L268"
               },
               "summary": ""
             },
@@ -264,7 +264,7 @@
               "source": {
                 "line": 269,
                 "path": "src/helia_profiler/config/power.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L269"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/power.py#L269"
               },
               "summary": ""
             },
@@ -283,7 +283,7 @@
               "source": {
                 "line": 273,
                 "path": "src/helia_profiler/config/power.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L273"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/power.py#L273"
               },
               "summary": ""
             },
@@ -302,7 +302,7 @@
               "source": {
                 "line": 276,
                 "path": "src/helia_profiler/config/power.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L276"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/power.py#L276"
               },
               "summary": ""
             },
@@ -321,7 +321,7 @@
               "source": {
                 "line": 280,
                 "path": "src/helia_profiler/config/power.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L280"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/power.py#L280"
               },
               "summary": ""
             },
@@ -340,7 +340,7 @@
               "source": {
                 "line": 286,
                 "path": "src/helia_profiler/config/power.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L286"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/power.py#L286"
               },
               "summary": ""
             },
@@ -359,7 +359,7 @@
               "source": {
                 "line": 289,
                 "path": "src/helia_profiler/config/power.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L289"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/power.py#L289"
               },
               "summary": "Whether generated power firmware talks to an on-target monitor."
             },
@@ -378,7 +378,7 @@
               "source": {
                 "line": 301,
                 "path": "src/helia_profiler/config/power.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L301"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/power.py#L301"
               },
               "summary": "Whether this run asks for host-gated external power capture."
             },
@@ -397,7 +397,7 @@
               "source": {
                 "line": 314,
                 "path": "src/helia_profiler/config/power.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L314"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/power.py#L314"
               },
               "summary": "Whether the board carries the two extra lock-step wires."
             },
@@ -416,7 +416,7 @@
               "source": {
                 "line": 327,
                 "path": "src/helia_profiler/config/power.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L327"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/power.py#L327"
               },
               "summary": "Effective 3-wire GPIO lock-step decision for this run."
             }
@@ -429,7 +429,7 @@
           "source": {
             "line": 235,
             "path": "src/helia_profiler/config/power.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/config/power.py#L235"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/power.py#L235"
           },
           "summary": "Power measurement settings."
         }

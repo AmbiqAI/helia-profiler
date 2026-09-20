@@ -17,10 +17,13 @@ import { execFileSync } from 'node:child_process';
 import { gzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 
+import { SOURCE_REF_TOKEN } from '../src/integrations/source-ref.mjs';
+
 const site = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repo = path.resolve(site, '..');
 const dist = path.join(site, 'dist');
 const base = '/helia-profiler/';
+const origin = 'https://ambiqai.github.io';
 const ROUTE_PREFIX = 'reference/api';
 const HTML_BUDGET = 250_000;
 const GZIP_BUDGET = 40_000;
@@ -32,6 +35,15 @@ const check = (condition, message) => {
 };
 const read = (...segments) => fs.readFileSync(path.join(...segments), 'utf8');
 const readJson = (...segments) => JSON.parse(read(...segments));
+const exists = (...segments) => fs.existsSync(path.join(...segments));
+
+const TEXT = new Set(['.html', '.json', '.md', '.txt', '.xml']);
+const walkFiles = (directory) =>
+  fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) return walkFiles(entryPath);
+    return TEXT.has(path.extname(entry.name)) ? [entryPath] : [];
+  });
 
 const artifacts = path.join(dist, ROUTE_PREFIX);
 if (!fs.existsSync(path.join(artifacts, 'reference.json'))) {
@@ -151,46 +163,85 @@ for (const name of implementation) {
   );
 }
 
-/* Completeness against the agent-facing artifacts. */
-const declaredNames = (symbol) => [
-  ...(symbol.params ?? []).map((param) => param.name),
-  ...(symbol.members ?? []).map((member) => member.name),
-];
-const perModule = new Map(pages.map((page) => [page.module.path, page.stem ? read(`${page.stem}.md`) : '']));
+/* Completeness against the agent-facing artifacts.
+ *
+ * Members are asserted as their own heading, not as a substring: "enabled"
+ * occurs in four unrelated places in llms-full.txt, so a substring test
+ * passes on a page that documents none of them. Parameters are asserted
+ * inside the symbol's own section, since the model only carries a parameter
+ * when the docstring documents it and the signature carries the rest. */
+const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const heading = (text, id, level) =>
+  new RegExp(`^#{${level},6} ${escape(id)}$`, 'm').test(text);
+const sectionOf = (text, id) => {
+  const start = new RegExp(`^## ${escape(id)}$`, 'm').exec(text);
+  if (!start) return '';
+  const rest = text.slice(start.index + start[0].length);
+  const end = /^## /m.exec(rest);
+  return end ? rest.slice(0, end.index) : rest;
+};
 
+const perModule = new Map(
+  pages.map((page) => [page.module.path, page.stem ? read(`${page.stem}.md`) : '']),
+);
+
+let memberAssertions = 0;
 for (const symbol of symbols) {
   const markdown = perModule.get(symbol.page.module.path) ?? '';
+  const members = [];
+  for (const member of symbol.members ?? []) flatten(member, members);
+
   for (const [label, text] of [
     ['llms-full.txt', llmsFull],
     [`${path.relative(dist, symbol.page.stem ?? '')}.md`, markdown],
   ]) {
-    check(text.includes(`# ${symbol.id}`), `${symbol.id}: no section in ${label}.`);
+    check(heading(text, symbol.id, 2), `${symbol.id}: no section heading in ${label}.`);
     check(
       Boolean(symbol.signature) && text.includes(symbol.signature),
       `${symbol.id}: signature missing from ${label}.`,
     );
-    for (const member of declaredNames(symbol)) {
+    for (const member of members) {
+      check(heading(text, member.id, 3), `${member.id}: no member heading in ${label}.`);
+      memberAssertions += 1;
+    }
+    const section = sectionOf(text, symbol.id);
+    for (const param of symbol.params ?? []) {
       check(
-        text.includes(member),
-        `${symbol.id}: declared name "${member}" missing from ${label}.`,
+        section.includes(param.name),
+        `${symbol.id}: parameter "${param.name}" missing from its section in ${label}.`,
       );
     }
   }
 }
 
 /* Page budget, description frontmatter and provenance. */
-const sourceCommit = execFileSync(
-  'git',
-  ['log', '-1', '--format=%H', '--', 'src/helia_profiler'],
-  { cwd: repo, encoding: 'utf8' },
-).trim();
+const sourceTree = execFileSync('git', ['rev-parse', 'HEAD:src/helia_profiler'], {
+  cwd: repo,
+  encoding: 'utf8',
+}).trim();
 check(
-  model.generatedFrom?.sourceCommit === sourceCommit,
-  `reference.json was generated from ${model.generatedFrom?.sourceCommit}, src/helia_profiler is at ${sourceCommit}.`,
+  model.generatedFrom?.sourceTree === sourceTree,
+  `reference.json was generated from tree ${model.generatedFrom?.sourceTree}, src/helia_profiler is tree ${sourceTree}.`,
+);
+check(
+  !('sourceCommit' in (model.generatedFrom ?? {})),
+  'reference.json records a source commit, which does not survive a squash merge.',
 );
 check(
   /^[0-9a-f]{40}$/.test(buildInfo.commit ?? ''),
   `build-info.json commit is unusable: ${buildInfo.commit}`,
+);
+
+/* The ref is resolved at build time, so no generated file may still carry the
+ * placeholder and every source link has to name the ref this build is of. */
+const expectedRef = buildInfo.releaseTag || 'main';
+const stillTokenised = walkFiles(dist).filter((file) =>
+  read(file).includes(SOURCE_REF_TOKEN),
+);
+check(
+  stillTokenised.length === 0,
+  `${stillTokenised.length} built files still carry ${SOURCE_REF_TOKEN}, starting with ` +
+    `${stillTokenised[0] && path.relative(dist, stillTokenised[0])}.`,
 );
 
 let largest = { route: '', html: 0, gzip: 0 };
@@ -214,7 +265,40 @@ for (const page of pages) {
     Boolean(description?.trim()),
     `${page.route}: empty description frontmatter. helia-ui's discoverability integration fails the build on one.`,
   );
-  check(html.includes(sourceCommit), `${page.route}: does not record the source commit.`);
+  check(html.includes(sourceTree), `${page.route}: does not record the source tree.`);
+  check(
+    !/blob\/[0-9a-f]{40}\//.test(html),
+    `${page.route}: a source link names a commit sha rather than the build's ref.`,
+  );
+  const links = [...html.matchAll(/blob\/([^/"]+)\//g)].map((match) => match[1]);
+  check(
+    links.every((ref) => ref === expectedRef),
+    `${page.route}: source links name ${[...new Set(links)].join(', ')}, expected ${expectedRef}.`,
+  );
+
+  /* The complete Markdown is the artifact an agent wants and nothing else on
+   * the page points at it: the rendition Starlight writes beside the page is
+   * the lossy one (helia-ui#122). */
+  for (const extension of ['json', 'md']) {
+    const artifact = `${base}${path.relative(dist, page.stem)}.${extension}`;
+    check(
+      html.includes(`href="${artifact}"`),
+      `${page.route}: does not link its ${extension} artifact at ${artifact}.`,
+    );
+    check(exists(dist, artifact.slice(base.length)), `${artifact} is not in the artifact.`);
+  }
+}
+
+/* pyref's own index advertises each module's JSON; the Markdown beside it is
+ * the complete rendition and has to be advertised with it. */
+const referenceIndex = read(artifacts, 'llms.txt');
+for (const page of pages) {
+  if (!page.stem) continue;
+  const url = `${origin}${base}${path.relative(dist, page.stem)}.md`;
+  check(
+    referenceIndex.includes(url),
+    `${page.module.path}: reference/api/llms.txt does not advertise ${url}.`,
+  );
 }
 
 /* Nav: helia-ui's discoverability integration files a page the sidebar never
@@ -248,6 +332,7 @@ for (const symbol of symbols) badged[tierOf(symbol.name)] = (badged[tierOf(symbo
 console.log(
   `Python reference verified: ${inScope.length} published names as ${symbols.length} symbols ` +
     `(${JSON.stringify(badged)}) and ${modulePages.length} module page across ${pages.length} pages; ` +
-    `${implementation.length} implementation names absent; largest page ${largest.route} ` +
-    `${largest.html} B HTML, ${largest.gzip} B gzip; source commit ${sourceCommit.slice(0, 7)}.`,
+    `${implementation.length} implementation names absent; ${memberAssertions} member headings; ` +
+    `largest page ${largest.route} ${largest.html} B HTML, ${largest.gzip} B gzip; ` +
+    `source tree ${sourceTree.slice(0, 7)} at ref ${expectedRef}.`,
 );

@@ -8,17 +8,21 @@
  * the same files before the check runs, so the working tree is never the
  * committed state by the time anything looks at it.
  *
- * Provenance is normalised out of the byte comparison and asserted on its
- * own. Every source link carries the commit of src/helia_profiler, so a
- * commit that touches nothing but a docstring's neighbours would otherwise
- * report every page as content drift and say nothing about what changed.
+ * Provenance no longer moves with the commit, so the comparison is exact:
+ * what is committed must be byte-for-byte what the source produces.
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PAGES_DIR, ROUTE_PREFIX, SIDEBAR_FILE, SOURCE_PATH, sourceCommit } from './build-reference.mjs';
+import {
+  PAGES_DIR,
+  ROUTE_PREFIX,
+  SIDEBAR_FILE,
+  SOURCE_PATH,
+  sourceTree,
+} from './build-reference.mjs';
 
 const site = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repo = path.resolve(site, '..');
@@ -29,9 +33,17 @@ const GENERATED = [PAGES_DIR, SIDEBAR_FILE, `public/${ROUTE_PREFIX}`];
 const git = (args, options = {}) =>
   execFileSync('git', args, { cwd: repo, encoding: 'utf8', maxBuffer: 1 << 28, ...options });
 
-/* A 40-hex commit is provenance wherever it appears: generatedFrom in the
- * model, the source links on every symbol, the line on every page. */
-const withoutProvenance = (text) => text.replace(/\b[0-9a-f]{40}\b/g, '<source-commit>');
+const TRACKED = GENERATED.map((entry) => `astro-site/${entry}`);
+
+/* A local edit to a generated file is the same failure as a stale commit and
+ * says so earlier. CI checks out clean, so this only ever fires locally. */
+const uncommitted = git(['status', '--porcelain', '--', ...TRACKED]).trim();
+if (uncommitted) {
+  console.error('Generated files have uncommitted changes:\n');
+  console.error(uncommitted);
+  console.error('\nCommit them, or run `npm run prepare:docs` and commit the result.');
+  process.exit(1);
+}
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'hpx-reference-'));
 try {
@@ -41,7 +53,7 @@ try {
   });
 
   const committed = new Map();
-  for (const tracked of git(['ls-files', '-z', ...GENERATED.map((entry) => `astro-site/${entry}`)])
+  for (const tracked of git(['ls-files', '-z', ...TRACKED])
     .split('\0')
     .filter(Boolean)) {
     const relative = path.relative('astro-site', tracked);
@@ -70,7 +82,7 @@ try {
   }
   for (const [file, body] of regenerated) {
     if (!committed.has(file)) failures.push(`${file}: generated but not committed.`);
-    else if (withoutProvenance(committed.get(file)) !== withoutProvenance(body)) {
+    else if (committed.get(file) !== body) {
       failures.push(`${file}: the committed copy differs from what the source produces.`);
     }
   }
@@ -78,31 +90,15 @@ try {
     if (!regenerated.has(file)) failures.push(`${file}: committed but no longer generated.`);
   }
 
-  /* Provenance on its own: what the committed pages claim they document, and
-   * whether that commit is in the history this build is made from. */
-  const expected = sourceCommit(repo);
-  const claimed = new Set();
+  /* Provenance on its own: the tree the committed artifacts claim to
+   * document, against the tree this checkout actually holds. */
+  const expected = sourceTree(repo);
   for (const [file, body] of committed) {
-    for (const [, commit] of body.matchAll(/\b([0-9a-f]{40})\b/g)) claimed.add(commit);
-    if (file.startsWith(`public/${ROUTE_PREFIX}/`) && file.endsWith('reference.json')) {
-      const model = JSON.parse(body);
-      if (model.generatedFrom?.sourceCommit !== expected) {
-        failures.push(
-          `${file}: generated from ${model.generatedFrom?.sourceCommit}, ` +
-            `${SOURCE_PATH} is at ${expected}.`,
-        );
-      }
+    if (!file.endsWith('.json') || !file.startsWith(`public/${ROUTE_PREFIX}/`)) continue;
+    const recorded = JSON.parse(body).generatedFrom?.sourceTree;
+    if (recorded !== expected) {
+      failures.push(`${file}: records tree ${recorded}, ${SOURCE_PATH} is tree ${expected}.`);
     }
-  }
-  for (const commit of claimed) {
-    if (commit === expected) continue;
-    failures.push(`A committed artifact records ${commit}; ${SOURCE_PATH} is at ${expected}.`);
-  }
-  const head = git(['rev-parse', 'HEAD']).trim();
-  try {
-    git(['merge-base', '--is-ancestor', expected, head]);
-  } catch {
-    failures.push(`${expected} is not an ancestor of HEAD (${head}); the checkout may be shallow.`);
   }
 
   if (failures.length > 0) {
@@ -114,7 +110,7 @@ try {
 
   console.log(
     `Python reference is current: ${committed.size} committed files match a fresh ` +
-      `generation, source commit ${expected.slice(0, 7)}.`,
+      `generation, source tree ${expected.slice(0, 7)}.`,
   );
 } finally {
   fs.rmSync(scratch, { recursive: true, force: true });

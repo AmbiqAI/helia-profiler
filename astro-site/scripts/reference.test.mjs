@@ -6,20 +6,21 @@
  * they are asserted here rather than met in CI.
  */
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 
 import { tierMap } from './dump-python.mjs';
-import { sourceCommit, splitLlmsFull } from './build-reference.mjs';
-import { groupSummary, scope, tierNote } from './scope-dump.mjs';
+import { sourceTree, splitLlmsFull } from './build-reference.mjs';
+import { groupSummary, provenanceNote, scope, tierNote } from './scope-dump.mjs';
 
-test('the source commit lookup fails by name outside a git checkout', () => {
+test('the source tree lookup fails by name outside a git checkout', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'hpx-nongit-'));
   try {
     assert.throws(
-      () => sourceCommit(directory),
+      () => sourceTree(directory),
       (error) => {
         assert.match(error.message, /not a git checkout/);
         assert.match(error.message, /fetch-depth: 0/);
@@ -31,10 +32,10 @@ test('the source commit lookup fails by name outside a git checkout', () => {
   }
 });
 
-test('the source commit lookup refuses an empty commit', () => {
-  const run = (_cwd, args) => (args[0] === 'rev-parse' ? 'true' : '');
+test('the source tree lookup refuses an empty answer', () => {
+  const run = (_cwd, args) => (args[0] === 'rev-parse' && args[1] === '--is-inside-work-tree' ? 'true' : '');
   assert.throws(
-    () => sourceCommit('/anywhere', { run }),
+    () => sourceTree('/anywhere', { run }),
     (error) => {
       assert.match(error.message, /returned ""/);
       assert.match(error.message, /fetch-depth: 0/);
@@ -43,11 +44,84 @@ test('the source commit lookup refuses an empty commit', () => {
   );
 });
 
+test('uncommitted source is refused, because no tree contains it', () => {
+  const answers = {
+    '--is-inside-work-tree': 'true',
+    status: ' M src/helia_profiler/config/__init__.py',
+  };
+  const run = (_cwd, args) => answers[args[0] === 'status' ? 'status' : args[1]] ?? '';
+  assert.throws(() => sourceTree('/anywhere', { run }), /uncommitted changes/);
+});
+
+/** A repository whose src tree and unrelated files can be moved separately. */
+function scratchRepo() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hpx-tree-'));
+  const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+  git('init', '--quiet');
+  git('config', 'user.email', 'test@example.invalid');
+  git('config', 'user.name', 'Test');
+  fs.mkdirSync(path.join(root, 'src/helia_profiler'), { recursive: true });
+  return { root, git };
+}
+
+test('two commits with the same src tree carry the same provenance', () => {
+  const { root, git } = scratchRepo();
+  try {
+    fs.writeFileSync(path.join(root, 'src/helia_profiler/__init__.py'), 'x = 1\n');
+    fs.writeFileSync(path.join(root, 'README.md'), 'first\n');
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'first');
+    const first = sourceTree(root);
+
+    /* A commit that touches nothing under src/: the reference documents the
+     * same source and must come out byte-identical. */
+    fs.writeFileSync(path.join(root, 'README.md'), 'second\n');
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'second');
+    const second = sourceTree(root);
+
+    assert.equal(second, first);
+    assert.notEqual(git('rev-parse', 'HEAD'), git('rev-parse', 'HEAD~1'));
+    assert.equal(provenanceNote(second), provenanceNote(first));
+    assert.equal(
+      JSON.stringify(scope({ ...identicalInput, tree: second })),
+      JSON.stringify(scope({ ...identicalInput, tree: first })),
+    );
+
+    /* And a change under src/ does move it. */
+    fs.writeFileSync(path.join(root, 'src/helia_profiler/__init__.py'), 'x = 2\n');
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'third');
+    assert.notEqual(sourceTree(root), first);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('a page description survives a group and a module with no docstring', () => {
   const summary = groupSummary({ path: 'helia_profiler.nodocs', members: [] }, undefined);
   assert.ok(summary.trim().length > 0);
   assert.match(summary, /nodocs/);
 });
+
+const identicalInput = {
+  dump: {
+    helia_profiler: {
+      kind: 'module',
+      name: 'helia_profiler',
+      path: 'helia_profiler',
+      members: {
+        Bare: { kind: 'class', name: 'Bare', path: 'helia_profiler.bare.Bare', members: {} },
+      },
+    },
+  },
+  tiers: { all: ['Bare'], stability: { Bare: 'stable' } },
+  groups: {
+    package: 'helia_profiler',
+    importFrom: 'helia_profiler',
+    groups: [{ path: 'helia_profiler', members: ['Bare'] }],
+  },
+};
 
 const dumpWithoutDocstrings = {
   helia_profiler: {

@@ -1,11 +1,20 @@
 #!/usr/bin/env node
 /*
- * No committed artifact may carry an absolute filesystem path.
+ * No committed artifact may carry an absolute filesystem path, a commit sha,
+ * or a git ref.
  *
  * The griffe dump records the absolute path of every source file on the
  * machine that produced it, so anything derived from it leaks that machine's
  * layout unless pyref's --source-root strips it. The dump itself is not
  * committed; this is the assertion that nothing downstream of it is either.
+ *
+ * A ref in a committed file is wrong whatever it names: a branch would send
+ * every build's source links to that branch, and a commit sha would rewrite
+ * every generated file on every change under src/ and would not survive the
+ * squash merges this repository uses. The ref is substituted at build time,
+ * so what is committed is the placeholder. The one 40-hex hash allowed is the
+ * git tree of the documented source, which is the provenance the reference
+ * records.
  *
  * Committed content is read from git rather than from the working tree: the
  * prebuild chain rewrites these files, so by the time a check runs the tree
@@ -14,6 +23,9 @@
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { SOURCE_PATH } from './build-reference.mjs';
+import { SOURCE_REF_TOKEN } from '../src/integrations/source-ref.mjs';
 
 const site = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repo = path.resolve(site, '..');
@@ -35,21 +47,35 @@ if (tracked.length === 0) {
   throw new Error(`git tracks no files under ${SCANNED.join(', ')}; the check would pass vacuously.`);
 }
 
+const sourceTree = git(['rev-parse', `HEAD:${SOURCE_PATH}`]).trim();
+const HASH = /\b[0-9a-f]{40}\b/g;
+const REF = /\/blob\/([^/"'\s)]+)\//g;
+
 const failures = [];
 for (const file of tracked) {
   /* A binary asset has no paths to leak and no encoding to assume. */
   if (/\.(png|jpe?g|gif|webp|avif|ico|woff2?|pdf)$/i.test(file)) continue;
   const body = git(['show', `HEAD:${file}`]);
   body.split('\n').forEach((line, index) => {
-    if (ABSOLUTE.test(line)) failures.push(`${file}:${index + 1}: ${line.trim().slice(0, 160)}`);
-    if (line.includes(repo)) failures.push(`${file}:${index + 1}: carries the checkout path.`);
+    const at = `${file}:${index + 1}`;
+    if (ABSOLUTE.test(line)) failures.push(`${at}: ${line.trim().slice(0, 160)}`);
+    if (line.includes(repo)) failures.push(`${at}: carries the checkout path.`);
+    for (const [hash] of line.matchAll(HASH)) {
+      if (hash !== sourceTree) failures.push(`${at}: carries the hash ${hash}.`);
+    }
+    for (const [, ref] of line.matchAll(REF)) {
+      if (ref !== SOURCE_REF_TOKEN) failures.push(`${at}: a source link names the ref ${ref}.`);
+    }
   });
 }
 
 if (failures.length > 0) {
-  console.error('Committed artifacts carry an absolute filesystem path:\n');
+  console.error('Committed artifacts carry something that is not portable:\n');
   for (const failure of failures.slice(0, 40)) console.error(`- ${failure}`);
   process.exit(1);
 }
 
-console.log(`No absolute paths in ${tracked.length} committed files under ${SCANNED.join(', ')}.`);
+console.log(
+  `${tracked.length} committed files under ${SCANNED.join(', ')} carry no absolute path, ` +
+    `no ref and no hash but the ${SOURCE_PATH} tree ${sourceTree.slice(0, 7)}.`,
+);

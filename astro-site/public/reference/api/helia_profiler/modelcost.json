@@ -1,14 +1,14 @@
 {
   "$schema": "https://ambiqai.github.io/helia-ui/schema/reference-model-1.json",
   "generatedFrom": {
-    "sourceCommit": "cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8",
     "tool": "pyref",
-    "version": "1.7.3"
+    "version": "1.7.3",
+    "sourceTree": "0568ba9b9f3ce24b083b9459dd33f86e7d665646"
   },
   "language": "python",
   "modules": [
     {
-      "description": "The static cost model of a network, read from the model file before anything is built or run.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from [`src/helia_profiler` at `cc1c3ed`](https://github.com/AmbiqAI/helia-profiler/tree/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler).",
+      "description": "The static cost model of a network, read from the model file before anything is built or run.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `0568ba9b9f3ce24b083b9459dd33f86e7d665646`.",
       "name": "modelcost",
       "path": "helia_profiler.modelcost",
       "submodules": [],
@@ -36,7 +36,7 @@
               "source": {
                 "line": 181,
                 "path": "src/helia_profiler/modelcost/model_analysis.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/modelcost/model_analysis.py#L181"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L181"
               },
               "summary": ""
             },
@@ -55,7 +55,7 @@
               "source": {
                 "line": 182,
                 "path": "src/helia_profiler/modelcost/model_analysis.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/modelcost/model_analysis.py#L182"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L182"
               },
               "summary": ""
             },
@@ -74,7 +74,7 @@
               "source": {
                 "line": 183,
                 "path": "src/helia_profiler/modelcost/model_analysis.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/modelcost/model_analysis.py#L183"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L183"
               },
               "summary": ""
             },
@@ -93,7 +93,7 @@
               "source": {
                 "line": 184,
                 "path": "src/helia_profiler/modelcost/model_analysis.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/modelcost/model_analysis.py#L184"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L184"
               },
               "summary": "Approximate parameter count (weights + biases)."
             },
@@ -112,7 +112,7 @@
               "source": {
                 "line": 186,
                 "path": "src/helia_profiler/modelcost/model_analysis.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/modelcost/model_analysis.py#L186"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L186"
               },
               "summary": "Engine/interpreter that produced this analysis ('tflite', 'helia-rt', 'helia-aot')."
             },
@@ -131,7 +131,7 @@
               "source": {
                 "line": 190,
                 "path": "src/helia_profiler/modelcost/model_analysis.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/modelcost/model_analysis.py#L190"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L190"
               },
               "summary": "Number of Vela-generated ethos-u custom ops in the graph."
             },
@@ -150,7 +150,7 @@
               "source": {
                 "line": 195,
                 "path": "src/helia_profiler/modelcost/model_analysis.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/modelcost/model_analysis.py#L195"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L195"
               },
               "summary": "True when the model was compiled by Vela (contains ethos-u ops)."
             }
@@ -163,7 +163,7 @@
           "source": {
             "line": 177,
             "path": "src/helia_profiler/modelcost/model_analysis.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/modelcost/model_analysis.py#L177"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L177"
           },
           "summary": "Full model analysis result."
         }

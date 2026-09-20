@@ -1,14 +1,14 @@
 {
   "$schema": "https://ambiqai.github.io/helia-ui/schema/reference-model-1.json",
   "generatedFrom": {
-    "sourceCommit": "cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8",
     "tool": "pyref",
-    "version": "1.7.3"
+    "version": "1.7.3",
+    "sourceTree": "0568ba9b9f3ce24b083b9459dd33f86e7d665646"
   },
   "language": "python",
   "modules": [
     {
-      "description": "The exception hierarchy every heliaPROFILER failure is raised through, rooted at HpxError.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`, `experimental`\n\nGenerated from [`src/helia_profiler` at `cc1c3ed`](https://github.com/AmbiqAI/helia-profiler/tree/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler).",
+      "description": "The exception hierarchy every heliaPROFILER failure is raised through, rooted at HpxError.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`, `experimental`\n\nGenerated from the `src/helia_profiler` tree `0568ba9b9f3ce24b083b9459dd33f86e7d665646`.",
       "name": "errors",
       "path": "helia_profiler.errors",
       "submodules": [],
@@ -36,7 +36,7 @@
               "source": {
                 "line": 15,
                 "path": "src/helia_profiler/errors.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/errors.py#L15"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L15"
               },
               "summary": ""
             }
@@ -49,7 +49,7 @@
           "source": {
             "line": 11,
             "path": "src/helia_profiler/errors.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/errors.py#L11"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L11"
           },
           "summary": "Base exception for all heliaPROFILER errors."
         },
@@ -68,7 +68,7 @@
           "source": {
             "line": 29,
             "path": "src/helia_profiler/errors.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/errors.py#L29"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L29"
           },
           "summary": "Bad configuration — missing model path, invalid YAML, unknown board."
         },
@@ -87,7 +87,7 @@
           "source": {
             "line": 33,
             "path": "src/helia_profiler/errors.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/errors.py#L33"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L33"
           },
           "summary": "Unsupported board/SoC combination or missing platform capability."
         },
@@ -106,7 +106,7 @@
           "source": {
             "line": 37,
             "path": "src/helia_profiler/errors.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/errors.py#L37"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L37"
           },
           "summary": "Engine adapter failure — AOT compile error, missing static lib, etc."
         },
@@ -125,7 +125,7 @@
           "source": {
             "line": 41,
             "path": "src/helia_profiler/errors.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/errors.py#L41"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L41"
           },
           "summary": "Firmware generation failure — template rendering, file I/O."
         },
@@ -151,7 +151,7 @@
               "source": {
                 "line": 62,
                 "path": "src/helia_profiler/errors.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/errors.py#L62"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L62"
               },
               "summary": ""
             },
@@ -170,7 +170,7 @@
               "source": {
                 "line": 63,
                 "path": "src/helia_profiler/errors.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/errors.py#L63"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L63"
               },
               "summary": ""
             }
@@ -183,7 +183,7 @@
           "source": {
             "line": 45,
             "path": "src/helia_profiler/errors.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/errors.py#L45"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L45"
           },
           "summary": "NSX configure / build / flash / lock / sync failure."
         },
@@ -202,7 +202,7 @@
           "source": {
             "line": 67,
             "path": "src/helia_profiler/errors.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/errors.py#L67"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L67"
           },
           "summary": "Data capture failure — serial timeout, corrupt data, SWO framing."
         },
@@ -221,7 +221,7 @@
           "source": {
             "line": 71,
             "path": "src/helia_profiler/errors.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/errors.py#L71"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L71"
           },
           "summary": "A capture-path refusal no retry or power cycle can change."
         },
@@ -240,7 +240,7 @@
           "source": {
             "line": 82,
             "path": "src/helia_profiler/errors.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/errors.py#L82"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L82"
           },
           "summary": "Transient network failure during sync/lock (git fetch, module download)."
         },
@@ -259,7 +259,7 @@
           "source": {
             "line": 90,
             "path": "src/helia_profiler/errors.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/errors.py#L90"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L90"
           },
           "summary": "Deterministic dependency lock/workspace failure (base class)."
         },
@@ -278,7 +278,7 @@
           "source": {
             "line": 100,
             "path": "src/helia_profiler/errors.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/errors.py#L100"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L100"
           },
           "summary": "A tool, package, engine, or lock schema version is incompatible."
         },
@@ -297,7 +297,7 @@
           "source": {
             "line": 110,
             "path": "src/helia_profiler/errors.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/errors.py#L110"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L110"
           },
           "summary": "A dependency lock file or its recorded provenance is unusable."
         },
@@ -316,7 +316,7 @@
           "source": {
             "line": 120,
             "path": "src/helia_profiler/errors.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/errors.py#L120"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L120"
           },
           "summary": "Power measurement failure — Joulescope not found, calibration error."
         },
@@ -335,7 +335,7 @@
           "source": {
             "line": 124,
             "path": "src/helia_profiler/errors.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/errors.py#L124"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L124"
           },
           "summary": "Report generation failure — output path not writable, format error."
         }

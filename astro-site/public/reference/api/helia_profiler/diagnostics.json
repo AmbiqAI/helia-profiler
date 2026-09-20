@@ -1,14 +1,14 @@
 {
   "$schema": "https://ambiqai.github.io/helia-ui/schema/reference-model-1.json",
   "generatedFrom": {
-    "sourceCommit": "cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8",
     "tool": "pyref",
-    "version": "1.7.3"
+    "version": "1.7.3",
+    "sourceTree": "0568ba9b9f3ce24b083b9459dd33f86e7d665646"
   },
   "language": "python",
   "modules": [
     {
-      "description": "Collecting a redacted support bundle from a run directory, and reading one back.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from [`src/helia_profiler` at `cc1c3ed`](https://github.com/AmbiqAI/helia-profiler/tree/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler).",
+      "description": "Collecting a redacted support bundle from a run directory, and reading one back.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `0568ba9b9f3ce24b083b9459dd33f86e7d665646`.",
       "name": "diagnostics",
       "path": "helia_profiler.diagnostics",
       "submodules": [],
@@ -36,7 +36,7 @@
               "source": {
                 "line": 36,
                 "path": "src/helia_profiler/results/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/support_bundle.py#L36"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/support_bundle.py#L36"
               },
               "summary": ""
             },
@@ -55,7 +55,7 @@
               "source": {
                 "line": 37,
                 "path": "src/helia_profiler/results/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/support_bundle.py#L37"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/support_bundle.py#L37"
               },
               "summary": ""
             },
@@ -74,7 +74,7 @@
               "source": {
                 "line": 38,
                 "path": "src/helia_profiler/results/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/support_bundle.py#L38"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/support_bundle.py#L38"
               },
               "summary": ""
             },
@@ -93,7 +93,7 @@
               "source": {
                 "line": 48,
                 "path": "src/helia_profiler/results/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/support_bundle.py#L48"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/support_bundle.py#L48"
               },
               "summary": ""
             },
@@ -112,7 +112,7 @@
               "source": {
                 "line": 57,
                 "path": "src/helia_profiler/results/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/support_bundle.py#L57"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/support_bundle.py#L57"
               },
               "summary": ""
             }
@@ -125,7 +125,7 @@
           "source": {
             "line": 27,
             "path": "src/helia_profiler/results/support_bundle.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/support_bundle.py#L27"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/support_bundle.py#L27"
           },
           "summary": "One diagnostic section the collector attempted."
         },
@@ -151,7 +151,7 @@
               "source": {
                 "line": 59,
                 "path": "src/helia_profiler/diagnostics/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/diagnostics/support_bundle.py#L59"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L59"
               },
               "summary": ""
             },
@@ -170,7 +170,7 @@
               "source": {
                 "line": 60,
                 "path": "src/helia_profiler/diagnostics/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/diagnostics/support_bundle.py#L60"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L60"
               },
               "summary": ""
             },
@@ -189,7 +189,7 @@
               "source": {
                 "line": 61,
                 "path": "src/helia_profiler/diagnostics/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/diagnostics/support_bundle.py#L61"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L61"
               },
               "summary": ""
             },
@@ -208,7 +208,7 @@
               "source": {
                 "line": 62,
                 "path": "src/helia_profiler/diagnostics/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/diagnostics/support_bundle.py#L62"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L62"
               },
               "summary": ""
             },
@@ -227,7 +227,7 @@
               "source": {
                 "line": 63,
                 "path": "src/helia_profiler/diagnostics/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/diagnostics/support_bundle.py#L63"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L63"
               },
               "summary": ""
             },
@@ -246,7 +246,7 @@
               "source": {
                 "line": 64,
                 "path": "src/helia_profiler/diagnostics/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/diagnostics/support_bundle.py#L64"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L64"
               },
               "summary": ""
             },
@@ -265,7 +265,7 @@
               "source": {
                 "line": 65,
                 "path": "src/helia_profiler/diagnostics/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/diagnostics/support_bundle.py#L65"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L65"
               },
               "summary": ""
             },
@@ -284,7 +284,7 @@
               "source": {
                 "line": 66,
                 "path": "src/helia_profiler/diagnostics/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/diagnostics/support_bundle.py#L66"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L66"
               },
               "summary": ""
             }
@@ -297,7 +297,7 @@
           "source": {
             "line": 50,
             "path": "src/helia_profiler/diagnostics/support_bundle.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/diagnostics/support_bundle.py#L50"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L50"
           },
           "summary": "What hpx doctor --bundle should collect."
         },
@@ -323,7 +323,7 @@
               "source": {
                 "line": 68,
                 "path": "src/helia_profiler/results/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/support_bundle.py#L68"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/support_bundle.py#L68"
               },
               "summary": ""
             },
@@ -342,7 +342,7 @@
               "source": {
                 "line": 69,
                 "path": "src/helia_profiler/results/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/support_bundle.py#L69"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/support_bundle.py#L69"
               },
               "summary": ""
             },
@@ -361,7 +361,7 @@
               "source": {
                 "line": 70,
                 "path": "src/helia_profiler/results/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/support_bundle.py#L70"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/support_bundle.py#L70"
               },
               "summary": ""
             },
@@ -380,7 +380,7 @@
               "source": {
                 "line": 71,
                 "path": "src/helia_profiler/results/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/support_bundle.py#L71"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/support_bundle.py#L71"
               },
               "summary": ""
             },
@@ -399,7 +399,7 @@
               "source": {
                 "line": 72,
                 "path": "src/helia_profiler/results/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/support_bundle.py#L72"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/support_bundle.py#L72"
               },
               "summary": ""
             },
@@ -418,7 +418,7 @@
               "source": {
                 "line": 73,
                 "path": "src/helia_profiler/results/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/support_bundle.py#L73"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/support_bundle.py#L73"
               },
               "summary": ""
             },
@@ -437,7 +437,7 @@
               "source": {
                 "line": 74,
                 "path": "src/helia_profiler/results/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/support_bundle.py#L74"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/support_bundle.py#L74"
               },
               "summary": ""
             },
@@ -456,7 +456,7 @@
               "source": {
                 "line": 75,
                 "path": "src/helia_profiler/results/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/support_bundle.py#L75"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/support_bundle.py#L75"
               },
               "summary": ""
             },
@@ -475,7 +475,7 @@
               "source": {
                 "line": 76,
                 "path": "src/helia_profiler/results/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/support_bundle.py#L76"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/support_bundle.py#L76"
               },
               "summary": ""
             },
@@ -494,7 +494,7 @@
               "source": {
                 "line": 100,
                 "path": "src/helia_profiler/results/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/support_bundle.py#L100"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/support_bundle.py#L100"
               },
               "summary": ""
             },
@@ -513,7 +513,7 @@
               "source": {
                 "line": 106,
                 "path": "src/helia_profiler/results/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/support_bundle.py#L106"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/support_bundle.py#L106"
               },
               "summary": ""
             },
@@ -532,7 +532,7 @@
               "source": {
                 "line": 120,
                 "path": "src/helia_profiler/results/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/support_bundle.py#L120"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/support_bundle.py#L120"
               },
               "summary": ""
             },
@@ -551,7 +551,7 @@
               "source": {
                 "line": 140,
                 "path": "src/helia_profiler/results/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/support_bundle.py#L140"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/support_bundle.py#L140"
               },
               "summary": ""
             },
@@ -570,7 +570,7 @@
               "source": {
                 "line": 151,
                 "path": "src/helia_profiler/results/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/support_bundle.py#L151"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/support_bundle.py#L151"
               },
               "summary": "Verify every declared artifact path, size, and SHA-256 digest."
             }
@@ -583,7 +583,7 @@
           "source": {
             "line": 64,
             "path": "src/helia_profiler/results/support_bundle.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/results/support_bundle.py#L64"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/support_bundle.py#L64"
           },
           "summary": "Stable envelope describing one support-bundle archive's contents."
         },
@@ -602,7 +602,7 @@
           "source": {
             "line": 82,
             "path": "src/helia_profiler/diagnostics/support_bundle.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/diagnostics/support_bundle.py#L82"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L82"
           },
           "summary": "Gather every diagnostic section, redact it, and build the manifest."
         },
@@ -621,7 +621,7 @@
           "source": {
             "line": 518,
             "path": "src/helia_profiler/diagnostics/support_bundle.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/diagnostics/support_bundle.py#L518"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L518"
           },
           "summary": "Write collection as a deterministic ZIP archive and return its path."
         },
@@ -640,7 +640,7 @@
           "source": {
             "line": 591,
             "path": "src/helia_profiler/diagnostics/support_bundle.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/diagnostics/support_bundle.py#L591"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L591"
           },
           "summary": "Verify a support-bundle archive's structure, contents, and digests."
         }

@@ -1,14 +1,14 @@
 {
   "$schema": "https://ambiqai.github.io/helia-ui/schema/reference-model-1.json",
   "generatedFrom": {
-    "sourceCommit": "cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8",
     "tool": "pyref",
-    "version": "1.7.3"
+    "version": "1.7.3",
+    "sourceTree": "0568ba9b9f3ce24b083b9459dd33f86e7d665646"
   },
   "language": "python",
   "modules": [
     {
-      "description": "The fixed vocabularies a configuration selects from: engines, toolchains, capture transports, memory placements and reset strategies.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`\n\nGenerated from [`src/helia_profiler` at `cc1c3ed`](https://github.com/AmbiqAI/helia-profiler/tree/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler).",
+      "description": "The fixed vocabularies a configuration selects from: engines, toolchains, capture transports, memory placements and reset strategies.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`\n\nGenerated from the `src/helia_profiler` tree `0568ba9b9f3ce24b083b9459dd33f86e7d665646`.",
       "name": "vocab",
       "path": "helia_profiler.vocab",
       "submodules": [],
@@ -36,7 +36,7 @@
               "source": {
                 "line": 25,
                 "path": "src/helia_profiler/engines/__init__.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/engines/__init__.py#L25"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/engines/__init__.py#L25"
               },
               "summary": ""
             },
@@ -55,7 +55,7 @@
               "source": {
                 "line": 26,
                 "path": "src/helia_profiler/engines/__init__.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/engines/__init__.py#L26"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/engines/__init__.py#L26"
               },
               "summary": ""
             },
@@ -74,7 +74,7 @@
               "source": {
                 "line": 27,
                 "path": "src/helia_profiler/engines/__init__.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/engines/__init__.py#L27"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/engines/__init__.py#L27"
               },
               "summary": ""
             },
@@ -93,7 +93,7 @@
               "source": {
                 "line": 28,
                 "path": "src/helia_profiler/engines/__init__.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/engines/__init__.py#L28"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/engines/__init__.py#L28"
               },
               "summary": ""
             },
@@ -112,7 +112,7 @@
               "source": {
                 "line": 31,
                 "path": "src/helia_profiler/engines/__init__.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/engines/__init__.py#L31"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/engines/__init__.py#L31"
               },
               "summary": "Identifier the firmware emits on the wire (HPXENGINE=)."
             },
@@ -131,7 +131,7 @@
               "source": {
                 "line": 42,
                 "path": "src/helia_profiler/engines/__init__.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/engines/__init__.py#L42"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/engines/__init__.py#L42"
               },
               "summary": "Compact identifier used in case IDs and report tables."
             }
@@ -144,7 +144,7 @@
           "source": {
             "line": 17,
             "path": "src/helia_profiler/engines/__init__.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/engines/__init__.py#L17"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/engines/__init__.py#L17"
           },
           "summary": "Supported inference engine identifiers."
         },
@@ -170,7 +170,7 @@
               "source": {
                 "line": 26,
                 "path": "src/helia_profiler/vocab.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/vocab.py#L26"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/vocab.py#L26"
               },
               "summary": ""
             },
@@ -189,7 +189,7 @@
               "source": {
                 "line": 27,
                 "path": "src/helia_profiler/vocab.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/vocab.py#L27"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/vocab.py#L27"
               },
               "summary": ""
             },
@@ -208,7 +208,7 @@
               "source": {
                 "line": 28,
                 "path": "src/helia_profiler/vocab.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/vocab.py#L28"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/vocab.py#L28"
               },
               "summary": ""
             },
@@ -227,7 +227,7 @@
               "source": {
                 "line": 29,
                 "path": "src/helia_profiler/vocab.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/vocab.py#L29"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/vocab.py#L29"
               },
               "summary": ""
             }
@@ -240,7 +240,7 @@
           "source": {
             "line": 18,
             "path": "src/helia_profiler/vocab.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/vocab.py#L18"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/vocab.py#L18"
           },
           "summary": "Supported cross-compiler toolchains for the profiler firmware."
         },
@@ -266,7 +266,7 @@
               "source": {
                 "line": 33,
                 "path": "src/helia_profiler/platform/placement.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/platform/placement.py#L33"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/placement.py#L33"
               },
               "summary": ""
             },
@@ -285,7 +285,7 @@
               "source": {
                 "line": 34,
                 "path": "src/helia_profiler/platform/placement.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/platform/placement.py#L34"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/placement.py#L34"
               },
               "summary": ""
             },
@@ -304,7 +304,7 @@
               "source": {
                 "line": 35,
                 "path": "src/helia_profiler/platform/placement.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/platform/placement.py#L35"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/placement.py#L35"
               },
               "summary": ""
             },
@@ -323,7 +323,7 @@
               "source": {
                 "line": 36,
                 "path": "src/helia_profiler/platform/placement.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/platform/placement.py#L36"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/placement.py#L36"
               },
               "summary": ""
             }
@@ -336,7 +336,7 @@
           "source": {
             "line": 24,
             "path": "src/helia_profiler/platform/placement.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/platform/placement.py#L24"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/placement.py#L24"
           },
           "summary": "Logical placement region for arenas / weights / model data."
         },
@@ -362,7 +362,7 @@
               "source": {
                 "line": 35,
                 "path": "src/helia_profiler/vocab.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/vocab.py#L35"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/vocab.py#L35"
               },
               "summary": ""
             },
@@ -381,7 +381,7 @@
               "source": {
                 "line": 36,
                 "path": "src/helia_profiler/vocab.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/vocab.py#L36"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/vocab.py#L36"
               },
               "summary": ""
             },
@@ -400,7 +400,7 @@
               "source": {
                 "line": 37,
                 "path": "src/helia_profiler/vocab.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/vocab.py#L37"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/vocab.py#L37"
               },
               "summary": ""
             },
@@ -419,7 +419,7 @@
               "source": {
                 "line": 38,
                 "path": "src/helia_profiler/vocab.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/vocab.py#L38"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/vocab.py#L38"
               },
               "summary": ""
             }
@@ -432,7 +432,7 @@
           "source": {
             "line": 32,
             "path": "src/helia_profiler/vocab.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/vocab.py#L32"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/vocab.py#L32"
           },
           "summary": "Host↔target transport for capture and heartbeat traffic."
         },
@@ -458,7 +458,7 @@
               "source": {
                 "line": 45,
                 "path": "src/helia_profiler/target/lifecycle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/target/lifecycle.py#L45"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/target/lifecycle.py#L45"
               },
               "summary": ""
             },
@@ -477,7 +477,7 @@
               "source": {
                 "line": 46,
                 "path": "src/helia_profiler/target/lifecycle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/target/lifecycle.py#L46"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/target/lifecycle.py#L46"
               },
               "summary": ""
             },
@@ -496,7 +496,7 @@
               "source": {
                 "line": 47,
                 "path": "src/helia_profiler/target/lifecycle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/target/lifecycle.py#L47"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/target/lifecycle.py#L47"
               },
               "summary": ""
             },
@@ -515,7 +515,7 @@
               "source": {
                 "line": 48,
                 "path": "src/helia_profiler/target/lifecycle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/target/lifecycle.py#L48"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/target/lifecycle.py#L48"
               },
               "summary": ""
             },
@@ -534,7 +534,7 @@
               "source": {
                 "line": 49,
                 "path": "src/helia_profiler/target/lifecycle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/target/lifecycle.py#L49"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/target/lifecycle.py#L49"
               },
               "summary": ""
             },
@@ -553,7 +553,7 @@
               "source": {
                 "line": 50,
                 "path": "src/helia_profiler/target/lifecycle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/target/lifecycle.py#L50"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/target/lifecycle.py#L50"
               },
               "summary": ""
             }
@@ -566,7 +566,7 @@
           "source": {
             "line": 42,
             "path": "src/helia_profiler/target/lifecycle.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/cc1c3ed4a7908d4c5552f800e8b3790188b8bbd8/src/helia_profiler/target/lifecycle.py#L42"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/target/lifecycle.py#L42"
           },
           "summary": "User-selectable reset policy for target lifecycle preparation."
         }
