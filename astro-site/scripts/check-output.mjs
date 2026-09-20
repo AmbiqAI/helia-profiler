@@ -92,6 +92,50 @@ check(
   `Home does not show the source commit ${buildInfo.shortCommit}.`,
 );
 
+/*
+ * Home names hardware, so it is held to the registry rather than to whatever
+ * was typed into the page. `src/data/catalog.json` is read out of
+ * src/helia_profiler by scripts/build-catalog.mjs; these assertions are what
+ * make a board or an engine added there a failing build until Home renders it.
+ *
+ * Read against the artifact, like everything else in this file: a page that
+ * imports the catalog and then drops the list through a component regression
+ * still passes a source-level check.
+ */
+const catalog = JSON.parse(read(site, 'src/data/catalog.json'));
+const home = read(dist, 'index.html');
+
+check(
+  catalog.generatedFrom?.sourceTree ===
+    execFileSync('git', ['rev-parse', `HEAD:${catalog.generatedFrom?.sourcePath}`], {
+      cwd: path.resolve(site, '..'),
+      encoding: 'utf8',
+    }).trim(),
+  `src/data/catalog.json was generated from tree ${catalog.generatedFrom?.sourceTree}, ` +
+    `which is not the committed ${catalog.generatedFrom?.sourcePath}. Run npm run catalog:build.`,
+);
+
+for (const [label, entries] of [
+  ['board', catalog.boards],
+  ['engine', catalog.engines],
+]) {
+  const missing = entries.map((entry) => entry.id).filter((id) => !home.includes(id));
+  check(
+    missing.length === 0,
+    `Home does not name ${missing.length} ${label}(s) the registry carries: ${missing.join(', ')}.`,
+  );
+}
+
+for (const [label, expected] of [
+  ['boards', catalog.counts.boards],
+  ['engines', catalog.counts.engines],
+]) {
+  check(
+    home.includes(`>${expected}<`),
+    `Home shows no figure of ${expected} for ${label}, which is what the catalog counts.`,
+  );
+}
+
 /* Section shape: five in the top navigation, a scoped sidebar on four of
  * them, and Home with the marker that takes the pane's column back. */
 const SECTIONS = [

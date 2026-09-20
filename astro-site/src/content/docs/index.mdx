@@ -19,6 +19,14 @@ description: Profile LiteRT and ExecuTorch models on Ambiq Apollo hardware.
 # AsciiTerminal `copy` is the one opt-in to a script on this page. It is
 # deliberate: the command is there to be pasted.
 #
+# Identity comes from the registry, wording comes from the docs. Board and
+# engine ids and the channel each board sits on are read out of
+# src/helia_profiler into src/data/catalog.json by `npm run catalog:build`, so
+# this page cannot drift from the package; check-output.mjs asserts the built
+# page carries every id. Everything else the hardware band says, the
+# "(experimental)" label and each engine's "best for" line, is quoted from
+# docs/guide/boards.md and docs/guide/engines.md and lives in this file.
+#
 # The hero carries the page's h1, so the shell must not draw a second one from
 # `title`. The anchor stays behind for the skip link; `title` still feeds the
 # tab, the OG card and llms.txt.
@@ -44,6 +52,41 @@ import LinkCard from '@ambiqai/helia-ui/astro/LinkCard';
 import Callout from '@ambiqai/helia-ui/astro/Callout';
 import DocsVersion from '../../components/DocsVersion.astro';
 import ProductLogo from '../../components/ProductLogo.astro';
+import catalog from '../../data/catalog.json';
+
+export const EXPERIMENTAL_BOARDS = new Set([
+  // docs/guide/boards.md:19. Keyed by id, not derived from the registry's
+  // `isFpga`, so a future FPGA board cannot inherit a label no page gave it.
+  'atomiq110_fpga_turbo',
+]);
+
+export const ENGINE_LINES = {
+  // Display name and "best for", docs/guide/engines.md:12-15.
+  tflm: 'Vanilla TFLM (tflm): reference or CMSIS-NN interpreter baseline',
+  'helia-rt': 'heliaRT (helia-rt): Ambiq-optimized interpreter performance',
+  'helia-aot': 'heliaAOT (helia-aot): ahead-of-time compilation and fine-grained placement',
+  executorch: 'ExecuTorch (executorch): Cortex-M PTE programs and CMSIS-NN kernels',
+};
+
+export const engineItems = catalog.engines.map(
+  (engine) => ENGINE_LINES[engine.id] ?? engine.id,
+);
+
+export const boardsIn = (channel, experimental) =>
+  catalog.boards
+    .filter(
+      (board) =>
+        board.channel === channel && EXPERIMENTAL_BOARDS.has(board.id) === experimental,
+    )
+    .map((board) => board.id);
+
+export const boardItems = [
+  ['Stable channel', boardsIn('stable', false)],
+  ['Preview channel', boardsIn('preview', false)],
+  ['Preview channel, experimental', boardsIn('preview', true)],
+]
+  .filter(([, ids]) => ids.length > 0)
+  .map(([label, ids]) => `${label}: ${ids.join(', ')}`);
 
 <ProductLogo />
 
@@ -59,8 +102,8 @@ import ProductLogo from '../../components/ProductLogo.astro';
   <Button slot="actions" href="/helia-profiler/examples/" variant="secondary">Examples</Button>
 
   <CardGrid slot="aside" columns={3}>
-    <StatCard label="Inference engines">4</StatCard>
-    <StatCard label="Boards listed">13</StatCard>
+    <StatCard label="Inference engines">{catalog.counts.engines}</StatCard>
+    <StatCard label="Boards listed">{catalog.counts.boards}</StatCard>
     <StatCard label="Pipeline steps">8</StatCard>
   </CardGrid>
 
@@ -134,27 +177,12 @@ import ProductLogo from '../../components/ProductLogo.astro';
   <CardGrid columns={2} equalize class="not-content">
     <Card>
       <CardHeader titleAs="h3" eyebrow="Pick one per run">Inference engines</CardHeader>
-      <CardList
-        marker="bullet"
-        items={[
-          'Vanilla TFLM (tflm): reference or CMSIS-NN interpreter baseline',
-          'heliaRT (helia-rt): Ambiq-optimized interpreter performance',
-          'heliaAOT (helia-aot): ahead-of-time compilation and fine-grained placement',
-          'ExecuTorch (executorch): Cortex-M PTE programs and CMSIS-NN kernels',
-        ]}
-      />
+      <CardList marker="bullet" items={engineItems} />
       <CardContent>The pipeline, capture protocol and report format are identical for all four engines. Only the firmware payload changes.</CardContent>
     </Card>
     <Card>
       <CardHeader titleAs="h3" eyebrow="Board, then SoC">Boards and platforms</CardHeader>
-      <CardList
-        marker="bullet"
-        items={[
-          'Stable channel: apollo510_evb, apollo3p_evb',
-          'Preview channel: apollo510b_evb, apollo5b_evb, apollo330mP_evb, apollo510dL_evb, apollo4p_evb, apollo4l_evb, apollo4l_blue_evb, apollo4p_blue_kbr_evb, apollo4p_blue_kxr_evb, apollo3p_evb_cygnus',
-          'Preview channel, experimental: atomiq110_fpga_turbo',
-        ]}
-      />
+      <CardList marker="bullet" items={boardItems} />
       <CardContent>The board identifies the physical EVB and the SoC determines CPU architecture, PMU capabilities and memory layout. Run hpx boards for the live list. Without an explicit board, the profiler targets apollo510_evb.</CardContent>
     </Card>
   </CardGrid>
