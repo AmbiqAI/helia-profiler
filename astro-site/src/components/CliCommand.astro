@@ -1,0 +1,106 @@
+---
+/**
+ * One top-level `hpx` entry, and every subcommand under it, as reference parts.
+ *
+ * A group and its leaves share a page because they share a contract: `hpx
+ * cache clear` is meaningless without `hpx cache`, and twelve entries spread
+ * over twenty-six pages costs the reader a navigation step for every one.
+ *
+ * The row mapping lives in src/lib/reference-cli.mjs, which the Markdown
+ * rendition beside this page uses too, so the two cannot disagree about what
+ * the page contains.
+ *
+ * The shared model has no command or group kind and no shell language, so a
+ * group is rendered as a namespace and a leaf as a function, with the usage
+ * line highlighted as the shell it is (helia-ui#74).
+ */
+import RefMembers from '@ambiqai/helia-ui/astro/RefMembers';
+import RefParams from '@ambiqai/helia-ui/astro/RefParams';
+import RefSection from '@ambiqai/helia-ui/astro/RefSection';
+import RefSymbol from '@ambiqai/helia-ui/astro/RefSymbol';
+
+import cli from '../data/cli.json';
+import {
+  commandLabel,
+  commandsOn,
+  panelsOf,
+  paramRow,
+  sourceOf,
+} from '../lib/reference-cli.mjs';
+
+interface Props {
+  /** The top-level entry's name, as it appears under `cli.json`'s root. */
+  command: string;
+}
+
+const { command } = Astro.props;
+const node = cli.root.commands.find((entry) => entry.name === command);
+if (!node) {
+  throw new Error(`cli.json has no top-level entry named "${command}".`);
+}
+
+const subcommands = node.commands ?? [];
+---
+
+{node.help && <p>{node.help}</p>}
+
+{
+  subcommands.length > 0 && (
+    <RefMembers
+      label="Subcommands"
+      items={subcommands.map((child) => ({
+        id: commandLabel(child.path),
+        name: commandLabel(child.path),
+        kind: 'command',
+        summary: child.short_help ?? '',
+      }))}
+    />
+  )
+}
+
+{
+  commandsOn(node).map((cmd) => (
+    <RefSymbol
+      id={commandLabel(cmd.path)}
+      name={commandLabel(cmd.path)}
+      kind={cmd.kind === 'group' ? 'namespace' : 'function'}
+      language="python"
+      signature={cmd.usage}
+      signatureLanguage="bash"
+      summary={cmd.short_help ?? undefined}
+      source={sourceOf(cmd)}
+      deprecated={cmd.deprecated ? 'This command is deprecated.' : undefined}
+      level={2}
+    >
+      {cmd.help && cmd !== node && <p>{cmd.help}</p>}
+
+      {cmd.arguments.length > 0 && (
+        <RefSection title="Arguments">
+          <RefParams
+            caption={`${commandLabel(cmd.path)} arguments`}
+            rows={cmd.arguments.map(paramRow)}
+            density="compact"
+            nameLabel="Argument"
+          />
+        </RefSection>
+      )}
+
+      {panelsOf(cmd).map(([panel, options]) => (
+        <RefSection title={panel}>
+          <RefParams
+            caption={`${commandLabel(cmd.path)} ${panel.toLowerCase()}`}
+            rows={options.map(paramRow)}
+            density="compact"
+            nameLabel="Option"
+          />
+        </RefSection>
+      ))}
+
+      {cmd.epilog && (
+        <RefSection title="Examples">
+          <pre>{cmd.epilog}</pre>
+        </RefSection>
+      )}
+    </RefSymbol>
+  ))
+}

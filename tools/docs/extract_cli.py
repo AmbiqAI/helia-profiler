@@ -72,9 +72,18 @@ def _type_name(obj: Any) -> str:
 
 
 def _source(command: Any) -> dict[str, Any] | None:
+    """Where the command is declared, as a path relative to the repository.
+
+    Typer wraps every callback before handing it to click, and
+    ``inspect.getsourcefile`` does not follow ``__wrapped__`` even though
+    ``getsourcelines`` does. Reading them unwrapped is the difference between
+    the module that declares the command and ``typer/main.py`` inside whatever
+    virtualenv produced the artifact.
+    """
     callback = getattr(command, "callback", None)
     if callback is None:
         return None
+    callback = inspect.unwrap(callback)
     try:
         file = inspect.getsourcefile(callback)
         line = inspect.getsourcelines(callback)[1]
@@ -86,11 +95,13 @@ def _source(command: Any) -> dict[str, Any] | None:
     try:
         rel = path.relative_to(REPO_ROOT)
     except ValueError:
-        rel = (
-            Path(*path.parts[path.parts.index("helia_profiler") :])
-            if "helia_profiler" in path.parts
-            else path
-        )
+        if "helia_profiler" not in path.parts:
+            raise RuntimeError(
+                f"{command.name or 'hpx'} is declared outside the package, at {path}. "
+                "Recording that path would put the build machine's layout in a "
+                "committed artifact."
+            ) from None
+        rel = Path("src", *path.parts[path.parts.index("helia_profiler") :])
     return {"path": str(rel), "line": line}
 
 
