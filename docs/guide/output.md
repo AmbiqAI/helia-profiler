@@ -235,15 +235,17 @@ Full provenance for the run:
 `build_images` records the binary each run actually built — one entry per
 target, so a power run lists both `profile` and `power`. `sha256` is the
 digest of the image itself; `architecture_flags` counts the instruction-set
-flags the compiler received across the build tree, read from the build's own
-`compile_commands.json`.
+flags in the configured build tree's `compile_commands.json`, which HPX enables
+before creating module and application targets. This inventory includes
+potentially unbuilt targets, including the optional power target; it is not proof
+that every listed unit was compiled or linked into either binary. Flags used to
+build precompiled libraries are unavailable. Older workspaces without a compile
+database retain empty flags until regenerated with the updated project.
 
-The flags matter for A/B work. Two builds differing only in
-`-mcpu=cortex-m55` versus `-mcpu=cortex-m55+nomve` are otherwise identical in
-metadata, which leaves the directory name as the only record of which is
-which. `hpx compare` reports the difference as the informative **Architecture
-flags** dimension: a Helium on/off study is a comparison you meant to run, so
-the difference is surfaced rather than blocked.
+The flags make configured ISA differences, such as `-mcpu=cortex-m55` versus
+`-mcpu=cortex-m55+nomve`, interpretable alongside the binary digest. `hpx compare`
+reports them as the informative **Architecture flags** dimension; the difference
+is surfaced without blocking comparison.
 
 ### aot_operator_manifest.json
 

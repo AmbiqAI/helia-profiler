@@ -168,7 +168,7 @@ class DimensionSpec:
 
 
 def derive_architecture_flags(metadata: dict[str, Any]) -> str | None:
-    """Summarize the ISA flags the profiled image was actually built with.
+    """Summarize configured ISA options, preferring the profile build inventory.
 
     Public because the manifest writer calls it on the same serialized list
     it publishes: a value computed two ways is a value that can disagree

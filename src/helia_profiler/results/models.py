@@ -270,8 +270,9 @@ class BuildImage:
     behind the #480 misattribution and the #488 qualification limit.
 
     ``architecture_flags`` maps each ISA-selecting flag to the number of
-    translation units that carried it, over the whole build tree rather than
-    this target alone. Empty when the build left no compile database.
+    configured translation units containing it, across the whole build tree
+    including potentially unbuilt targets. Prebuilt-library flags are unavailable;
+    the mapping is empty when the build left no compile database.
     """
 
     role: str = ""
