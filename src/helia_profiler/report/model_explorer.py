@@ -101,18 +101,15 @@ def build_overlay(
 ) -> ModelNodeData:
     """Build a Model Explorer overlay from a flat {node_key: value} dict.
 
-    Parameters
-    ----------
-    layer_values:
-        Mapping of node key (output tensor name or node id) to a numeric
-        profiling value.
-    metric_name:
-        Human-readable name shown in Model Explorer's overlay selector.
-    graph_id:
-        TFLite graph identifier.  ``"main"`` is the default for single-
-        subgraph models.
-    gradient:
-        Color gradient for the overlay.  Defaults to ``GRADIENT_COST``.
+    Args:
+        layer_values: Mapping of node key (output tensor name or node id) to a
+            numeric profiling value.
+        metric_name: Human-readable name shown in Model Explorer's overlay
+            selector.
+        graph_id: TFLite graph identifier.  ``"main"`` is the default for
+            single-subgraph models.
+        gradient: Color gradient for the overlay.  Defaults to
+            ``GRADIENT_COST``.
     """
     if gradient is None:
         gradient = list(GRADIENT_COST)

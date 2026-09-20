@@ -160,6 +160,11 @@ class PowerDriver(Protocol):
         Only meaningful for external instruments that sit on the power rail
         (e.g. Joulescope).  Drivers that cannot power-cycle should raise
         :class:`PowerError`.
+
+        Args:
+            off_time_s: How long to keep power off (seconds).
+            settle_time_s: How long to wait after restoring power for the
+                target to boot.
         """
         ...
 
@@ -195,11 +200,9 @@ class PowerDriver(Protocol):
           returning ``False``. Power capture cannot proceed without an
           energized rail.
 
-        Parameters
-        ----------
-        required : bool
-            ``True`` when downstream stages need this driver to also
-            *measure* power (strict mode); ``False`` when the call is a
-            best-effort convenience to keep the board alive.
+        Args:
+            required: ``True`` when downstream stages need this driver to also
+                *measure* power (strict mode); ``False`` when the call is a
+                best-effort convenience to keep the board alive.
         """
         ...

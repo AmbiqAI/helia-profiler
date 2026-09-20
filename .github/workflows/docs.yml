@@ -71,15 +71,31 @@ jobs:
           cache: npm
           cache-dependency-path: astro-site/package-lock.json
 
-      # check:links is a Python script.
+      # check:links is a Python script, and the Python API reference is
+      # extracted with griffe. griffe reads the source instead of importing
+      # it, so this job needs neither the package's runtime dependencies nor
+      # a board, and it runs with no secrets.
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
+      # Pinned: the griffe dump is not a versioned format, so an unpinned
+      # griffe would change the reference tree with no signal.
+      - name: Install griffe
+        run: |
+          python -m pip install --disable-pip-version-check 'griffe==1.7.3'
+          griffe --version
+
       - name: Install locked site dependencies
         working-directory: astro-site
         run: npm ci
+
+      # prebuild regenerates it too; doing it here puts the griffe version and
+      # the symbol counts in the log before anything can fail downstream.
+      - name: Regenerate the Python reference
+        working-directory: astro-site
+        run: npm run prepare:docs
 
       - name: Build the documentation artifact
         working-directory: astro-site
@@ -95,6 +111,7 @@ jobs:
           npm run check:output
           npm run check:search
           npm run check:redirects
+          npm run check:reference
           npm run check:guard
 
       - name: Show build provenance
