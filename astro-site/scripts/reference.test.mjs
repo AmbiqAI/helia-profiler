@@ -11,6 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 
+import { tierMap } from './dump-python.mjs';
 import { sourceCommit, splitLlmsFull } from './build-reference.mjs';
 import { groupSummary, scope, tierNote } from './scope-dump.mjs';
 
@@ -121,4 +122,52 @@ test('a page missing from llms-full.txt is a failure, not an empty file', () => 
     () => splitLlmsFull('# helia_profiler\n\nRoot page.\n', ['helia_profiler', 'helia_profiler.gone']),
     /no section for helia_profiler\.gone/,
   );
+});
+
+/* `__api_stability__` as griffe dumps it: a dict of comprehensions, one per
+ * tier, each over a literal set of names. */
+const stabilityDump = (tiers) => ({
+  helia_profiler: {
+    members: {
+      __all__: {
+        value: {
+          cls: 'ExprList',
+          elements: Object.values(tiers).flat().map((name) => `'${name}'`),
+        },
+      },
+      ...Object.fromEntries(
+        Object.entries(tiers).map(([tier, names]) => [
+          `_${tier.toUpperCase()}_API`,
+          { value: { cls: 'ExprSet', elements: names.map((name) => `'${name}'`) } },
+        ]),
+      ),
+      __api_stability__: {
+        value: {
+          cls: 'ExprDict',
+          values: Object.keys(tiers).map((tier) => ({
+            cls: 'ExprDictComp',
+            generators: [{ iterable: { name: `_${tier.toUpperCase()}_API` } }],
+            value: `'${tier}'`,
+          })),
+        },
+      },
+    },
+  },
+});
+
+test('the tier map is read from the definition of __api_stability__', () => {
+  const tiers = tierMap(stabilityDump({ stable: ['A', 'B'], experimental: ['C'] }));
+
+  assert.deepEqual(tiers.tiers, { stable: 2, experimental: 1 });
+  assert.deepEqual(tiers.stability, { A: 'stable', B: 'stable', C: 'experimental' });
+  assert.deepEqual(tiers.all, ['A', 'B', 'C']);
+});
+
+test('a name in two tiers, or in none, stops the dump', () => {
+  const twice = stabilityDump({ stable: ['A'], experimental: ['A'] });
+  assert.throws(() => tierMap(twice), /in both the stable and experimental tiers/);
+
+  const untiered = stabilityDump({ stable: ['A'] });
+  untiered.helia_profiler.members.__all__.value.elements.push("'B'");
+  assert.throws(() => tierMap(untiered), /without a stability tier: B/);
 });
