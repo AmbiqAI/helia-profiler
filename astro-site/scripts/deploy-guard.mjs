@@ -69,6 +69,11 @@ const compareVersions = (a, b) => {
 };
 
 const decide = (candidate, live) => {
+  /* Not the same as "nothing is live". The site may well be there and newer;
+   * replacing it on a guess is the one outcome that loses documentation. */
+  if (live === UNREADABLE) {
+    return { publish: false, reason: 'Could not read the live site.' };
+  }
   if (live === null) {
     return { publish: true, reason: 'No readable build-info.json is live yet.' };
   }
@@ -130,31 +135,59 @@ const readCandidate = () => {
   return candidate;
 };
 
-/* Anything short of a parseable payload means "nothing comparable is live":
- * a 404 before the first Astro deployment, an HTML error page from a CDN, a
- * truncated file. None of those are a reason to hold a good build back. */
-const readLive = async () => {
-  const inline = process.env.DOCS_LIVE_BUILD_INFO;
-  if (inline !== undefined) {
-    try {
-      return JSON.parse(inline);
-    } catch {
-      return null;
-    }
-  }
-  const url = process.env.DOCS_LIVE_BUILD_INFO_URL;
-  if (!url) return null;
+/* Two different answers hide behind a failed fetch, and they call for
+ * opposite decisions.
+ *
+ * "Nothing is live": the URL is genuinely not there. That is 404 and 410, and
+ * it is also a 200 whose body is not build-info, which is what the MkDocs site
+ * serves at this path before cutover. Publishing over that is the point.
+ *
+ * "Cannot tell": a 5xx, a rate limit, a DNS or connection failure. The live
+ * site may be newer than this build. Pages and its CDN are the sort of thing
+ * that is briefly unavailable, so this retries before giving up, and giving up
+ * means skipping rather than overwriting.
+ */
+const UNREADABLE = Symbol('unreadable');
+const ABSENT_STATUS = new Set([404, 410]);
+const ATTEMPTS = 4;
+/* Overridden by the tests so they do not pay the real backoff. */
+const BACKOFF_MS = Number(process.env.DOCS_LIVE_FETCH_BACKOFF_MS ?? 1000);
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const parseLive = (body) => {
   try {
-    const response = await fetch(url, { redirect: 'follow' });
-    if (!response.ok) {
-      console.log(`Live build-info.json fetch returned ${response.status}.`);
-      return null;
-    }
-    return JSON.parse(await response.text());
-  } catch (error) {
-    console.log(`Live build-info.json is unreadable: ${error.message}`);
+    return JSON.parse(body);
+  } catch {
+    console.log('Live response is not build-info.json; treating the site as pre-Astro.');
     return null;
   }
+};
+
+const readLive = async () => {
+  const inline = process.env.DOCS_LIVE_BUILD_INFO;
+  if (inline !== undefined) return parseLive(inline);
+
+  const url = process.env.DOCS_LIVE_BUILD_INFO_URL;
+  if (!url) return null;
+
+  for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
+    let failure;
+    try {
+      const response = await fetch(url, { redirect: 'follow' });
+      if (ABSENT_STATUS.has(response.status)) {
+        console.log(`Live build-info.json fetch returned ${response.status}; nothing is live.`);
+        return null;
+      }
+      if (response.ok) return parseLive(await response.text());
+      failure = `HTTP ${response.status}`;
+    } catch (error) {
+      failure = error.message;
+    }
+    console.log(`Live build-info.json fetch attempt ${attempt} of ${ATTEMPTS} failed: ${failure}`);
+    if (attempt < ATTEMPTS) await sleep(BACKOFF_MS * 2 ** (attempt - 1));
+  }
+  return UNREADABLE;
 };
 
 const candidate = readCandidate();

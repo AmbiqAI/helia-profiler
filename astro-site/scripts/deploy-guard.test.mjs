@@ -19,6 +19,8 @@ const fixtures = path.join(scripts, 'fixtures');
 const guard = path.join(scripts, 'deploy-guard.mjs');
 
 /** Serves a fixture per route; anything else is the pre-cutover 404. */
+const UNSTABLE = '/unstable/build-info.json';
+
 const responses = {
   '/live/build-info.json': ['application/json', 'live-0.2.0.json'],
   '/garbage/build-info.json': ['text/html', 'live-unparseable.txt'],
@@ -26,9 +28,19 @@ const responses = {
 
 let server;
 let origin;
+/* No listener was ever bound here, so a request to it is refused rather than
+ * answered: the DNS and connection failures the guard has to survive. */
+let deadOrigin;
+let unstableRequests = 0;
 
 before(async () => {
   server = http.createServer((request, response) => {
+    if (request.url === UNSTABLE) {
+      unstableRequests += 1;
+      response.writeHead(503, { 'content-type': 'text/plain' });
+      response.end('Service Unavailable');
+      return;
+    }
     const entry = responses[request.url];
     if (!entry) {
       response.writeHead(404, { 'content-type': 'text/plain' });
@@ -41,6 +53,11 @@ before(async () => {
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   origin = `http://127.0.0.1:${server.address().port}`;
+
+  const closed = http.createServer();
+  await new Promise((resolve) => closed.listen(0, '127.0.0.1', resolve));
+  deadOrigin = `http://127.0.0.1:${closed.address().port}`;
+  await new Promise((resolve) => closed.close(resolve));
 });
 
 after(() => server.close());
@@ -50,7 +67,7 @@ after(() => server.close());
  * its own fetch. */
 const runGuard = promisify(execFile);
 
-const run = async (livePath, candidate) => {
+const run = async (livePath, candidate, { url } = {}) => {
   const output = path.join(
     fs.mkdtempSync(path.join(os.tmpdir(), 'deploy-guard-')),
     'output',
@@ -61,8 +78,10 @@ const run = async (livePath, candidate) => {
     env: {
       ...process.env,
       GITHUB_OUTPUT: output,
-      DOCS_LIVE_BUILD_INFO_URL: `${origin}${livePath}`,
+      DOCS_LIVE_BUILD_INFO_URL: url ?? `${origin}${livePath}`,
       DOCS_BUILD_INFO: path.join(fixtures, candidate),
+      /* The retry policy is asserted by attempt count, not by wall time. */
+      DOCS_LIVE_FETCH_BACKOFF_MS: '5',
     },
   });
   const decision = Object.fromEntries(
@@ -107,7 +126,24 @@ test('a higher version proceeds', async () => {
   assert.equal(publish, 'true');
 });
 
+test('a failing live site is retried, then refused rather than overwritten', async () => {
+  unstableRequests = 0;
+  const { publish, reason, log } = await run(UNSTABLE, 'candidate-0.3.0.json');
+  assert.equal(publish, 'false');
+  assert.match(reason, /could not read the live site/i);
+  assert.equal(unstableRequests, 4);
+  assert.match(log, /^Skip: /m);
+});
+
+test('a refused connection is refused rather than overwritten', async () => {
+  const { publish, reason } = await run(null, 'candidate-0.3.0.json', {
+    url: `${deadOrigin}/build-info.json`,
+  });
+  assert.equal(publish, 'false');
+  assert.match(reason, /could not read the live site/i);
+});
+
 test('refusing is a skip, not a failure', async () => {
   const { log } = await run('/live/build-info.json', 'candidate-0.1.9.json');
-  assert.match(log, /^Skip: /);
+  assert.match(log, /^Skip: /m);
 });
