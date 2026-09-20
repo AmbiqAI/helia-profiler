@@ -39,8 +39,27 @@ export function sourceRefArtifacts() {
   return {
     name: 'helia-profiler:source-ref',
     hooks: {
-      'astro:config:setup': ({ config }) => {
+      'astro:config:setup': ({ config, updateConfig }) => {
         siteDir = fileURLToPath(config.root);
+        /* The dev server never reaches astro:build:done, and a source link
+         * reading `__DOCS_SOURCE_REF__` in a preview is a link nobody can
+         * follow. Rewriting the module source covers dev; the build:done pass
+         * still owns public/ and the renditions written after it. */
+        updateConfig({
+          vite: {
+            plugins: [
+              {
+                name: 'helia-profiler:source-ref-mdx',
+                enforce: 'pre',
+                transform(code, id) {
+                  if (!id.endsWith('.mdx') || !code.includes(SOURCE_REF_TOKEN)) return null;
+                  const ref = sourceRef(readBuildInfo(siteDir));
+                  return { code: code.replaceAll(SOURCE_REF_TOKEN, ref), map: null };
+                },
+              },
+            ],
+          },
+        });
       },
       'astro:build:done': ({ dir }) => {
         const ref = sourceRef(readBuildInfo(siteDir));

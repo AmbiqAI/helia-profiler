@@ -143,8 +143,10 @@ Record the run links on #325 when they exist.
   tag when built from a tag and otherwise `main`. That integration must stay
   last in `astro.config.mjs`: Starlight and helia-ui write their Markdown
   renditions and llms exports in `astro:build:done` too, and hooks run in
-  declaration order. `astro dev` shows the raw placeholder; only the build
-  resolves it.
+  declaration order. The dev server never reaches that hook, so the same
+  integration also registers a Vite transform over `.mdx`, which is what makes
+  a source link followable in `astro dev`. A running dev server needs a
+  restart to pick either of them up.
 - Regenerating needs a clean `src/helia_profiler`, since griffe reads the
   working tree while provenance names the tree of HEAD. `DOCS_ALLOW_DIRTY_SOURCE=1`
   skips that guard for local preview; CI regenerates from the commit and
