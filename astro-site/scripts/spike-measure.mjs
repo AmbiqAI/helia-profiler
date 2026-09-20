@@ -55,6 +55,27 @@ const js = files.filter((name) => name.endsWith('.js'));
 let jsBytes = 0;
 for (const file of js) jsBytes += (await stat(file)).size;
 
+const css = files.filter((name) => name.endsWith('.css'));
+let cssBytes = 0;
+for (const file of css) cssBytes += (await stat(file)).size;
+
+/* What a reader of the Examples page actually downloads: the scripts that page
+ * references, not every chunk in the build. */
+async function pageScripts(page) {
+  const html = await readFile(join(root, 'dist', page), 'utf8');
+  const names = new Set(
+    [...html.matchAll(/_astro\/([\w.-]+\.js)/g)].map((match) => match[1]),
+  );
+  let bytes = 0;
+  let gzip = 0;
+  for (const name of names) {
+    const body = await readFile(join(root, 'dist/_astro', name));
+    bytes += body.length;
+    gzip += gzipSync(body, { level: 9 }).length;
+  }
+  return { files: names.size, bytes, gzip };
+}
+
 const lock = await stat(join(root, 'package-lock.json')).catch(() => null);
 
 const result = {
@@ -66,9 +87,11 @@ const result = {
   htmlPages: pages.length,
   clientJsFiles: js.length,
   clientJsBytes: jsBytes,
+  cssBytes,
   lockfileBytes: lock?.size ?? null,
   largestPages: pages.slice(0, 5),
   examplesPage: pages.find((page) => page.path.startsWith('examples/')) ?? null,
+  examplesPageScripts: await pageScripts('examples/index.html'),
 };
 
 await mkdir(join(root, 'spike/results'), { recursive: true });
