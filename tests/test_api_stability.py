@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+from itertools import combinations
 
 import helia_profiler
 
@@ -12,6 +13,32 @@ def test_every_package_export_has_one_stability_tier() -> None:
         "experimental",
         "implementation",
     }
+
+
+def test_stability_tiers_partition_the_public_surface() -> None:
+    """The docs pipeline scopes the rendered Python reference to the stable
+    and experimental tiers and badges each symbol with its tier (#330), so a
+    name in two tiers or in none would silently change what ships. The three
+    private sets are the source; ``__api_stability__`` is built from them."""
+    tiers = {
+        "stable": helia_profiler._STABLE_API,
+        "experimental": helia_profiler._EXPERIMENTAL_API,
+        "implementation": helia_profiler._IMPLEMENTATION_API,
+    }
+    sizes = {name: len(members) for name, members in tiers.items()}
+
+    assert sizes == {"stable": 45, "experimental": 40, "implementation": 13}
+    assert sum(sizes.values()) == 98 == len(helia_profiler.__all__)
+
+    for left, right in combinations(tiers, 2):
+        assert not tiers[left] & tiers[right], (
+            f"{sorted(tiers[left] & tiers[right])} is in both {left} and {right}"
+        )
+    untiered = set(helia_profiler.__all__) - set().union(*tiers.values())
+    assert not untiered, f"{sorted(untiered)} is in __all__ but in no tier"
+
+    # __all__ may repeat a name without any set noticing.
+    assert len(helia_profiler.__all__) == len(set(helia_profiler.__all__))
 
 
 def test_profile_signature_keeps_config_and_keyword_progress_sink() -> None:

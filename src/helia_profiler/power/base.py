@@ -166,12 +166,10 @@ class PowerDriver(Protocol):
         (e.g. Joulescope).  Drivers that cannot power-cycle should raise
         :class:`PowerError`.
 
-        Parameters
-        ----------
-        off_time_s : float
-            How long to keep power off (seconds).
-        settle_time_s : float
-            How long to wait after restoring power for the target to boot.
+        Args:
+            off_time_s: How long to keep power off (seconds).
+            settle_time_s: How long to wait after restoring power for the
+                target to boot.
         """
         ...
 
@@ -207,11 +205,9 @@ class PowerDriver(Protocol):
           returning ``False``. Power capture cannot proceed without an
           energized rail.
 
-        Parameters
-        ----------
-        required : bool
-            ``True`` when downstream stages need this driver to also
-            *measure* power (strict mode); ``False`` when the call is a
-            best-effort convenience to keep the board alive.
+        Args:
+            required: ``True`` when downstream stages need this driver to also
+                *measure* power (strict mode); ``False`` when the call is a
+                best-effort convenience to keep the board alive.
         """
         ...

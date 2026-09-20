@@ -57,5 +57,41 @@ def test_model_placement_domains():
     assert "| `weights_location` | tcm \\| sram \\| mram \\| psram \\| null |" in rendered
 
 
+def test_only_the_attributes_block_is_stripped_from_prose():
+    """The per-field table already carries Attributes, but a section after it
+    is prose the page would otherwise lose."""
+    generator = _load_generator()
+
+    class Google:
+        """Lead paragraph.
+
+        Attributes:
+            enabled: Master switch.
+            every_ms: How often.
+
+        Examples:
+            Keep me.
+        """
+
+    class Numpy:
+        """Lead paragraph.
+
+        Attributes
+        ----------
+        enabled:
+            Master switch.
+
+        Examples
+        --------
+        Keep me.
+        """
+
+    for cls in (Google, Numpy):
+        rendered = generator._docstring(cls)
+        assert "Lead paragraph." in rendered
+        assert "Master switch." not in rendered
+        assert "Keep me." in rendered
+
+
 def teardown_module(module) -> None:  # noqa: ARG001 - pytest hook signature
     sys.modules.pop("gen_config_reference", None)

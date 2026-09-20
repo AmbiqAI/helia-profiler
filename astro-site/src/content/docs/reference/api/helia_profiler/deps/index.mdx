@@ -1,0 +1,619 @@
+---
+title: "deps"
+description: "What this build of heliaPROFILER is qualified against: the board, engine and toolchain matrix, and the locked dependency revisions a run was produced with."
+sidebar:
+  order: 2
+---
+
+import RefMembers from '@ambiqai/helia-ui/astro/RefMembers';
+import RefParams from '@ambiqai/helia-ui/astro/RefParams';
+import RefSection from '@ambiqai/helia-ui/astro/RefSection';
+import RefSymbol from '@ambiqai/helia-ui/astro/RefSymbol';
+
+What this build of heliaPROFILER is qualified against: the board, engine and toolchain matrix, and the locked dependency revisions a run was produced with.
+
+Every name on this page is imported from `helia_profiler`.
+
+**API tier:** `stable`, `experimental`
+
+Generated from the `src/helia_profiler` tree `17bfdf5c68d6c73c3d22f7afb063ac9cd722152f`.
+
+[Machine-readable model](/helia-profiler/reference/api/helia_profiler/deps.json)
+
+<RefMembers label="On this page" items={[{"id":"helia_profiler.QualificationState","name":"QualificationState","kind":"class","summary":"Compatibility state of a resolved profiling configuration."},{"id":"helia_profiler.CompatibilityBaseline","name":"CompatibilityBaseline","kind":"class","summary":"Validated, immutable baseline loaded from HPX package data."},{"id":"helia_profiler.DependencyLockProvenance","name":"DependencyLockProvenance","kind":"class","summary":"Read-only lock provenance surface for later diagnostics collectors."},{"id":"helia_profiler.CompatibilityResolution","name":"CompatibilityResolution","kind":"class","summary":"Resolved baseline plus explicit override classification."},{"id":"helia_profiler.load_compatibility_baseline","name":"load_compatibility_baseline","kind":"function","summary":"Load and strictly validate an HPX compatibility baseline."},{"id":"helia_profiler.read_dependency_lock_provenance","name":"read_dependency_lock_provenance","kind":"function","summary":"Read typed lock provenance without mutating an app or workspace."}]} />
+
+<RefSymbol
+  id={"helia_profiler.QualificationState"}
+  name={"QualificationState"}
+  kind={"class"}
+  language={"python"}
+  signature={"QualificationState()"}
+  level={2}
+  summary={"Compatibility state of a resolved profiling configuration."}
+  source={{"path":"src/helia_profiler/deps/compatibility.py","line":44,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L44"}}
+>
+
+  Compatibility state of a resolved profiling configuration.
+
+  **API tier:** `stable`
+
+  <RefSymbol
+    id={"helia_profiler.QualificationState.QUALIFIED"}
+    name={"QUALIFIED"}
+    kind={"constant"}
+    language={"python"}
+    signature={"QUALIFIED = 'qualified'"}
+    level={3}
+    source={{"path":"src/helia_profiler/deps/compatibility.py","line":47,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L47"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.QualificationState.QUALIFIED_WITH_ENGINE_OVERRIDE"}
+    name={"QUALIFIED_WITH_ENGINE_OVERRIDE"}
+    kind={"constant"}
+    language={"python"}
+    signature={"QUALIFIED_WITH_ENGINE_OVERRIDE = 'qualified-with-engine-override'"}
+    level={3}
+    source={{"path":"src/helia_profiler/deps/compatibility.py","line":48,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L48"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.QualificationState.DEVELOPMENT_OVERRIDES"}
+    name={"DEVELOPMENT_OVERRIDES"}
+    kind={"constant"}
+    language={"python"}
+    signature={"DEVELOPMENT_OVERRIDES = 'development-overrides'"}
+    level={3}
+    source={{"path":"src/helia_profiler/deps/compatibility.py","line":49,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L49"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.CompatibilityBaseline"}
+  name={"CompatibilityBaseline"}
+  kind={"class"}
+  language={"python"}
+  signature={"CompatibilityBaseline(\n    schema: str,\n    schema_version: int,\n    baseline_id: str,\n    neuralspotx_package: str,\n    neuralspotx_version: str,\n    neuralspotx_sha256: str,\n    projects: tuple[CompatibilityProject, ...],\n    modules: tuple[CompatibilityModule, ...],\n    engines: tuple[CompatibilityEngine, ...],\n) -> None"}
+  level={2}
+  summary={"Validated, immutable baseline loaded from HPX package data."}
+  source={{"path":"src/helia_profiler/deps/compatibility.py","line":89,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L89"}}
+>
+
+  `dataclass`
+
+  Validated, immutable baseline loaded from HPX package data.
+
+  **API tier:** `stable`
+
+  <RefSymbol
+    id={"helia_profiler.CompatibilityBaseline.schema"}
+    name={"schema"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"schema: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/deps/compatibility.py","line":93,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L93"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.CompatibilityBaseline.schema_version"}
+    name={"schema_version"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"schema_version: int"}
+    level={3}
+    source={{"path":"src/helia_profiler/deps/compatibility.py","line":94,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L94"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.CompatibilityBaseline.baseline_id"}
+    name={"baseline_id"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"baseline_id: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/deps/compatibility.py","line":95,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L95"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.CompatibilityBaseline.neuralspotx_package"}
+    name={"neuralspotx_package"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"neuralspotx_package: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/deps/compatibility.py","line":96,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L96"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.CompatibilityBaseline.neuralspotx_version"}
+    name={"neuralspotx_version"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"neuralspotx_version: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/deps/compatibility.py","line":97,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L97"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.CompatibilityBaseline.neuralspotx_sha256"}
+    name={"neuralspotx_sha256"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"neuralspotx_sha256: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/deps/compatibility.py","line":98,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L98"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.CompatibilityBaseline.projects"}
+    name={"projects"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"projects: tuple[CompatibilityProject, ...]"}
+    level={3}
+    source={{"path":"src/helia_profiler/deps/compatibility.py","line":99,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L99"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.CompatibilityBaseline.modules"}
+    name={"modules"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"modules: tuple[CompatibilityModule, ...]"}
+    level={3}
+    source={{"path":"src/helia_profiler/deps/compatibility.py","line":100,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L100"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.CompatibilityBaseline.engines"}
+    name={"engines"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"engines: tuple[CompatibilityEngine, ...]"}
+    level={3}
+    source={{"path":"src/helia_profiler/deps/compatibility.py","line":101,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L101"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.CompatibilityBaseline.fingerprint"}
+    name={"fingerprint"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"fingerprint: str"}
+    level={3}
+    summary={"Return the canonical SHA-256 identity reserved for Stage 5."}
+    source={{"path":"src/helia_profiler/deps/compatibility.py","line":131,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L131"}}
+  >
+
+    Return the canonical SHA-256 identity reserved for Stage 5.
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.CompatibilityBaseline.project"}
+    name={"project"}
+    kind={"method"}
+    language={"python"}
+    signature={"project(name: str) -> CompatibilityProject"}
+    level={3}
+    source={{"path":"src/helia_profiler/deps/compatibility.py","line":103,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L103"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.CompatibilityBaseline.module"}
+    name={"module"}
+    kind={"method"}
+    language={"python"}
+    signature={"module(name: str) -> CompatibilityModule"}
+    level={3}
+    source={{"path":"src/helia_profiler/deps/compatibility.py","line":112,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L112"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.CompatibilityBaseline.engine"}
+    name={"engine"}
+    kind={"method"}
+    language={"python"}
+    signature={"engine(name: str) -> CompatibilityEngine"}
+    level={3}
+    source={{"path":"src/helia_profiler/deps/compatibility.py","line":121,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L121"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.CompatibilityBaseline.to_dict"}
+    name={"to_dict"}
+    kind={"method"}
+    language={"python"}
+    signature={"to_dict() -> dict[str, Any]"}
+    level={3}
+    summary={"Return a stable JSON-safe representation for reports and Stage 5."}
+    source={{"path":"src/helia_profiler/deps/compatibility.py","line":137,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L137"}}
+  >
+
+    Return a stable JSON-safe representation for reports and Stage 5.
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.DependencyLockProvenance"}
+  name={"DependencyLockProvenance"}
+  kind={"class"}
+  language={"python"}
+  signature={"DependencyLockProvenance(\n    lock_path: Path,\n    lock_sha256: str,\n    registry_hash: str,\n    requested_refs: tuple[DependencyRequest, ...],\n    resolved: tuple[DependencyModule, ...],\n    overrides: tuple[DependencyOverride, ...],\n    qualification: QualificationState,\n    baseline_fingerprint: str,\n    workspace_fingerprint: str,\n    lock_mode: DependencyLockMode,\n    update_requested: bool,\n) -> None"}
+  level={2}
+  summary={"Read-only lock provenance surface for later diagnostics collectors."}
+  source={{"path":"src/helia_profiler/results/dependencies.py","line":130,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L130"}}
+>
+
+  `dataclass`
+
+  Read-only lock provenance surface for later diagnostics collectors.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.DependencyLockProvenance.lock_path"}
+    name={"lock_path"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"lock_path: Path"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/dependencies.py","line":134,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L134"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.DependencyLockProvenance.lock_sha256"}
+    name={"lock_sha256"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"lock_sha256: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/dependencies.py","line":135,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L135"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.DependencyLockProvenance.registry_hash"}
+    name={"registry_hash"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"registry_hash: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/dependencies.py","line":136,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L136"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.DependencyLockProvenance.requested_refs"}
+    name={"requested_refs"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"requested_refs: tuple[DependencyRequest, ...]"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/dependencies.py","line":137,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L137"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.DependencyLockProvenance.resolved"}
+    name={"resolved"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"resolved: tuple[DependencyModule, ...]"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/dependencies.py","line":138,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L138"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.DependencyLockProvenance.overrides"}
+    name={"overrides"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"overrides: tuple[DependencyOverride, ...]"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/dependencies.py","line":139,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L139"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.DependencyLockProvenance.qualification"}
+    name={"qualification"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"qualification: QualificationState"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/dependencies.py","line":140,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L140"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.DependencyLockProvenance.baseline_fingerprint"}
+    name={"baseline_fingerprint"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"baseline_fingerprint: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/dependencies.py","line":141,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L141"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.DependencyLockProvenance.workspace_fingerprint"}
+    name={"workspace_fingerprint"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"workspace_fingerprint: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/dependencies.py","line":142,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L142"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.DependencyLockProvenance.lock_mode"}
+    name={"lock_mode"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"lock_mode: DependencyLockMode"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/dependencies.py","line":143,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L143"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.DependencyLockProvenance.update_requested"}
+    name={"update_requested"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"update_requested: bool"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/dependencies.py","line":144,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L144"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.CompatibilityResolution"}
+  name={"CompatibilityResolution"}
+  kind={"class"}
+  language={"python"}
+  signature={"CompatibilityResolution(\n    baseline: CompatibilityBaseline,\n    qualification: QualificationState,\n    module_overrides: tuple[str, ...] = (),\n    engine_overrides: tuple[str, ...] = (),\n) -> None"}
+  level={2}
+  summary={"Resolved baseline plus explicit override classification."}
+  source={{"path":"src/helia_profiler/deps/compatibility.py","line":172,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L172"}}
+>
+
+  `dataclass`
+
+  Resolved baseline plus explicit override classification.
+
+  **API tier:** `stable`
+
+  <RefSymbol
+    id={"helia_profiler.CompatibilityResolution.baseline"}
+    name={"baseline"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"baseline: CompatibilityBaseline"}
+    level={3}
+    source={{"path":"src/helia_profiler/deps/compatibility.py","line":176,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L176"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.CompatibilityResolution.qualification"}
+    name={"qualification"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"qualification: QualificationState"}
+    level={3}
+    source={{"path":"src/helia_profiler/deps/compatibility.py","line":177,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L177"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.CompatibilityResolution.module_overrides"}
+    name={"module_overrides"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"module_overrides: tuple[str, ...] = ()"}
+    level={3}
+    source={{"path":"src/helia_profiler/deps/compatibility.py","line":188,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L188"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.CompatibilityResolution.engine_overrides"}
+    name={"engine_overrides"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"engine_overrides: tuple[str, ...] = ()"}
+    level={3}
+    source={{"path":"src/helia_profiler/deps/compatibility.py","line":189,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L189"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.CompatibilityResolution.fingerprint"}
+    name={"fingerprint"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"fingerprint: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/deps/compatibility.py","line":192,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L192"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.CompatibilityResolution.to_dict"}
+    name={"to_dict"}
+    kind={"method"}
+    language={"python"}
+    signature={"to_dict() -> dict[str, Any]"}
+    level={3}
+    summary={"Return structured result provenance without lossy enum conversion."}
+    source={{"path":"src/helia_profiler/deps/compatibility.py","line":195,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L195"}}
+  >
+
+    Return structured result provenance without lossy enum conversion.
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.load_compatibility_baseline"}
+  name={"load_compatibility_baseline"}
+  kind={"function"}
+  language={"python"}
+  signature={"load_compatibility_baseline(path: Path | None = None) -> CompatibilityBaseline"}
+  level={2}
+  summary={"Load and strictly validate an HPX compatibility baseline."}
+  source={{"path":"src/helia_profiler/deps/compatibility.py","line":206,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L206"}}
+>
+
+  Load and strictly validate an HPX compatibility baseline.
+
+  **API tier:** `stable`
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.read_dependency_lock_provenance"}
+  name={"read_dependency_lock_provenance"}
+  kind={"function"}
+  language={"python"}
+  signature={"read_dependency_lock_provenance(app_or_workspace_path: str | Path) -> DependencyLockProvenance"}
+  level={2}
+  summary={"Read typed lock provenance without mutating an app or workspace."}
+  source={{"path":"src/helia_profiler/deps/dependencies.py","line":525,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/dependencies.py#L525"}}
+>
+
+  Read typed lock provenance without mutating an app or workspace.
+
+  *app_or_workspace_path* may name ``profiler_app``, its ``nsx.lock`` or
+  ``hpx-dependencies.json``, or the parent fingerprint workspace containing
+  ``profiler_app``. The exact on-disk lock digest is verified against the
+  recorded run state before a surface is returned.
+
+  **API tier:** `experimental`
+
+</RefSymbol>
+
+---
+
+Machine-readable: [`deps.json`](/helia-profiler/reference/api/helia_profiler/deps.json) · [`deps.md`](/helia-profiler/reference/api/helia_profiler/deps.md), complete and lossless.

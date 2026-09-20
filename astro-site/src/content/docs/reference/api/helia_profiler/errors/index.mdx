@@ -1,0 +1,336 @@
+---
+title: "errors"
+description: "The exception hierarchy every heliaPROFILER failure is raised through, rooted at HpxError."
+sidebar:
+  order: 4
+---
+
+import RefMembers from '@ambiqai/helia-ui/astro/RefMembers';
+import RefParams from '@ambiqai/helia-ui/astro/RefParams';
+import RefSection from '@ambiqai/helia-ui/astro/RefSection';
+import RefSymbol from '@ambiqai/helia-ui/astro/RefSymbol';
+
+The exception hierarchy every heliaPROFILER failure is raised through, rooted at HpxError.
+
+Every name on this page is imported from `helia_profiler`.
+
+**API tier:** `stable`, `experimental`
+
+Generated from the `src/helia_profiler` tree `17bfdf5c68d6c73c3d22f7afb063ac9cd722152f`.
+
+[Machine-readable model](/helia-profiler/reference/api/helia_profiler/errors.json)
+
+<RefMembers label="On this page" items={[{"id":"helia_profiler.HpxError","name":"HpxError","kind":"class","summary":"Base exception for all heliaPROFILER errors."},{"id":"helia_profiler.ConfigError","name":"ConfigError","kind":"class","summary":"Bad configuration — missing model path, invalid YAML, unknown board."},{"id":"helia_profiler.PlatformError","name":"PlatformError","kind":"class","summary":"Unsupported board/SoC combination or missing platform capability."},{"id":"helia_profiler.EngineError","name":"EngineError","kind":"class","summary":"Engine adapter failure — AOT compile error, missing static lib, etc."},{"id":"helia_profiler.FirmwareError","name":"FirmwareError","kind":"class","summary":"Firmware generation failure — template rendering, file I/O."},{"id":"helia_profiler.BuildError","name":"BuildError","kind":"class","summary":"NSX configure / build / flash / lock / sync failure."},{"id":"helia_profiler.CaptureError","name":"CaptureError","kind":"class","summary":"Data capture failure — serial timeout, corrupt data, SWO framing."},{"id":"helia_profiler.DeterministicCaptureError","name":"DeterministicCaptureError","kind":"class","summary":"A capture-path refusal no retry or power cycle can change."},{"id":"helia_profiler.NetworkError","name":"NetworkError","kind":"class","summary":"Transient network failure during sync/lock (git fetch, module download)."},{"id":"helia_profiler.DependencyError","name":"DependencyError","kind":"class","summary":"Deterministic dependency lock/workspace failure (base class)."},{"id":"helia_profiler.VersionError","name":"VersionError","kind":"class","summary":"A tool, package, engine, or lock schema version is incompatible."},{"id":"helia_profiler.LockError","name":"LockError","kind":"class","summary":"A dependency lock file or its recorded provenance is unusable."},{"id":"helia_profiler.PowerError","name":"PowerError","kind":"class","summary":"Power measurement failure — Joulescope not found, calibration error."},{"id":"helia_profiler.ReportError","name":"ReportError","kind":"class","summary":"Report generation failure — output path not writable, format error."}]} />
+
+<RefSymbol
+  id={"helia_profiler.HpxError"}
+  name={"HpxError"}
+  kind={"class"}
+  language={"python"}
+  signature={"HpxError(message: str, *, hint: str | None = None) -> None"}
+  level={2}
+  summary={"Base exception for all heliaPROFILER errors."}
+  source={{"path":"src/helia_profiler/errors.py","line":11,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L11"}}
+>
+
+  Base exception for all heliaPROFILER errors.
+
+  **API tier:** `stable`
+
+  <RefSymbol
+    id={"helia_profiler.HpxError.hint"}
+    name={"hint"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"hint = hint"}
+    level={3}
+    source={{"path":"src/helia_profiler/errors.py","line":15,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L15"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.ConfigError"}
+  name={"ConfigError"}
+  kind={"class"}
+  language={"python"}
+  signature={"ConfigError()"}
+  level={2}
+  summary={"Bad configuration — missing model path, invalid YAML, unknown board."}
+  source={{"path":"src/helia_profiler/errors.py","line":29,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L29"}}
+>
+
+  Bad configuration — missing model path, invalid YAML, unknown board.
+
+  **API tier:** `stable`
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.PlatformError"}
+  name={"PlatformError"}
+  kind={"class"}
+  language={"python"}
+  signature={"PlatformError()"}
+  level={2}
+  summary={"Unsupported board/SoC combination or missing platform capability."}
+  source={{"path":"src/helia_profiler/errors.py","line":33,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L33"}}
+>
+
+  Unsupported board/SoC combination or missing platform capability.
+
+  **API tier:** `stable`
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.EngineError"}
+  name={"EngineError"}
+  kind={"class"}
+  language={"python"}
+  signature={"EngineError()"}
+  level={2}
+  summary={"Engine adapter failure — AOT compile error, missing static lib, etc."}
+  source={{"path":"src/helia_profiler/errors.py","line":37,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L37"}}
+>
+
+  Engine adapter failure — AOT compile error, missing static lib, etc.
+
+  **API tier:** `stable`
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.FirmwareError"}
+  name={"FirmwareError"}
+  kind={"class"}
+  language={"python"}
+  signature={"FirmwareError()"}
+  level={2}
+  summary={"Firmware generation failure — template rendering, file I/O."}
+  source={{"path":"src/helia_profiler/errors.py","line":41,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L41"}}
+>
+
+  Firmware generation failure — template rendering, file I/O.
+
+  **API tier:** `stable`
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.BuildError"}
+  name={"BuildError"}
+  kind={"class"}
+  language={"python"}
+  signature={"BuildError(message: str, *, hint: str | None = None, returncode: int | None = None, details: str | None = None) -> None"}
+  level={2}
+  summary={"NSX configure / build / flash / lock / sync failure."}
+  source={{"path":"src/helia_profiler/errors.py","line":45,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L45"}}
+>
+
+  NSX configure / build / flash / lock / sync failure.
+
+  Carries the underlying tool's diagnostic output (cmake / ninja /
+  SEGGER commander / git stderr, NSX exception message, etc.) in
+  :attr:`details`.  When the source is a real subprocess, the original
+  return code is also captured in :attr:`returncode`.
+
+  **API tier:** `stable`
+
+  <RefSymbol
+    id={"helia_profiler.BuildError.returncode"}
+    name={"returncode"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"returncode = returncode"}
+    level={3}
+    source={{"path":"src/helia_profiler/errors.py","line":62,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L62"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.BuildError.details"}
+    name={"details"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"details = details"}
+    level={3}
+    source={{"path":"src/helia_profiler/errors.py","line":63,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L63"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.CaptureError"}
+  name={"CaptureError"}
+  kind={"class"}
+  language={"python"}
+  signature={"CaptureError()"}
+  level={2}
+  summary={"Data capture failure — serial timeout, corrupt data, SWO framing."}
+  source={{"path":"src/helia_profiler/errors.py","line":67,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L67"}}
+>
+
+  Data capture failure — serial timeout, corrupt data, SWO framing.
+
+  **API tier:** `stable`
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.DeterministicCaptureError"}
+  name={"DeterministicCaptureError"}
+  kind={"class"}
+  language={"python"}
+  signature={"DeterministicCaptureError()"}
+  level={2}
+  summary={"A capture-path refusal no retry or power cycle can change."}
+  source={{"path":"src/helia_profiler/errors.py","line":71,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L71"}}
+>
+
+  A capture-path refusal no retry or power cycle can change.
+
+  Subclass of :class:`CaptureError` so existing ``except CaptureError``
+  handlers still catch it, but recovery paths that would otherwise cycle the
+  target rail and retry (``stages.flash_power``) re-raise it instead: these
+  are configuration/artifact gaps — a missing image, an unknown load
+  address — and cycling the rail only frames them as flaky hardware.
+
+  **API tier:** `stable`
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.NetworkError"}
+  name={"NetworkError"}
+  kind={"class"}
+  language={"python"}
+  signature={"NetworkError()"}
+  level={2}
+  summary={"Transient network failure during sync/lock (git fetch, module download)."}
+  source={{"path":"src/helia_profiler/errors.py","line":82,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L82"}}
+>
+
+  Transient network failure during sync/lock (git fetch, module download).
+
+  Subclass of :class:`BuildError` so existing ``except BuildError`` handlers
+  still catch it, but callers that want to retry can specifically catch this.
+
+  **API tier:** `stable`
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.DependencyError"}
+  name={"DependencyError"}
+  kind={"class"}
+  language={"python"}
+  signature={"DependencyError()"}
+  level={2}
+  summary={"Deterministic dependency lock/workspace failure (base class)."}
+  source={{"path":"src/helia_profiler/errors.py","line":90,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L90"}}
+>
+
+  Deterministic dependency lock/workspace failure (base class).
+
+  Covers workspace fingerprinting, override, and provenance-collection
+  failures that are neither a version mismatch nor a lock-file problem.
+  Prefer :class:`VersionError` or :class:`LockError` when a failure is
+  specifically about an incompatible version or a missing/corrupt lock.
+
+  **API tier:** `experimental`
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.VersionError"}
+  name={"VersionError"}
+  kind={"class"}
+  language={"python"}
+  signature={"VersionError()"}
+  level={2}
+  summary={"A tool, package, engine, or lock schema version is incompatible."}
+  source={{"path":"src/helia_profiler/errors.py","line":100,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L100"}}
+>
+
+  A tool, package, engine, or lock schema version is incompatible.
+
+  Raised when an installed version fails a compatibility baseline check
+  (schema version, minimum/maximum engine version, pinned package
+  version) so callers can distinguish "wrong version" from other
+  dependency failures and surface an actionable upgrade/downgrade hint.
+
+  **API tier:** `experimental`
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.LockError"}
+  name={"LockError"}
+  kind={"class"}
+  language={"python"}
+  signature={"LockError()"}
+  level={2}
+  summary={"A dependency lock file or its recorded provenance is unusable."}
+  source={{"path":"src/helia_profiler/errors.py","line":110,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L110"}}
+>
+
+  A dependency lock file or its recorded provenance is unusable.
+
+  Raised for a missing, unreadable, structurally invalid, or
+  drifted ``nsx.lock`` / ``hpx-dependencies.json``, so field-diagnostics
+  collectors can skip just the lock-provenance section instead of
+  failing an entire report.
+
+  **API tier:** `experimental`
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.PowerError"}
+  name={"PowerError"}
+  kind={"class"}
+  language={"python"}
+  signature={"PowerError()"}
+  level={2}
+  summary={"Power measurement failure — Joulescope not found, calibration error."}
+  source={{"path":"src/helia_profiler/errors.py","line":120,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L120"}}
+>
+
+  Power measurement failure — Joulescope not found, calibration error.
+
+  **API tier:** `stable`
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.ReportError"}
+  name={"ReportError"}
+  kind={"class"}
+  language={"python"}
+  signature={"ReportError()"}
+  level={2}
+  summary={"Report generation failure — output path not writable, format error."}
+  source={{"path":"src/helia_profiler/errors.py","line":124,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L124"}}
+>
+
+  Report generation failure — output path not writable, format error.
+
+  **API tier:** `stable`
+
+</RefSymbol>
+
+---
+
+Machine-readable: [`errors.json`](/helia-profiler/reference/api/helia_profiler/errors.json) · [`errors.md`](/helia-profiler/reference/api/helia_profiler/errors.md), complete and lossless.

@@ -1,0 +1,782 @@
+---
+title: "metadata"
+description: "The provenance of a power number: how it was observed, what the measurement boundary included, and whether the capture holds together."
+sidebar:
+  order: 1
+---
+
+import RefMembers from '@ambiqai/helia-ui/astro/RefMembers';
+import RefParams from '@ambiqai/helia-ui/astro/RefParams';
+import RefSection from '@ambiqai/helia-ui/astro/RefSection';
+import RefSymbol from '@ambiqai/helia-ui/astro/RefSymbol';
+
+The provenance of a power number: how it was observed, what the measurement boundary included, and whether the capture holds together.
+
+Every name on this page is imported from `helia_profiler`.
+
+**API tier:** `experimental`
+
+Generated from the `src/helia_profiler` tree `17bfdf5c68d6c73c3d22f7afb063ac9cd722152f`.
+
+[Machine-readable model](/helia-profiler/reference/api/helia_profiler/power/metadata.json)
+
+<RefMembers label="On this page" items={[{"id":"helia_profiler.MeasurementScope","name":"MeasurementScope","kind":"class","summary":"What the published power numbers actually measured."},{"id":"helia_profiler.ObservationMode","name":"ObservationMode","kind":"class","summary":"How the observation was made -- the single vocabulary (#154)."},{"id":"helia_profiler.PowerIntegrity","name":"PowerIntegrity","kind":"class","summary":"Whether the observation is valid for efficiency metrics."},{"id":"helia_profiler.PowerMetadata","name":"PowerMetadata","kind":"class","summary":"Everything the capture layer tells the rest of HPX about one power run."}]} />
+
+<RefSymbol
+  id={"helia_profiler.MeasurementScope"}
+  name={"MeasurementScope"}
+  kind={"class"}
+  language={"python"}
+  signature={"MeasurementScope()"}
+  level={2}
+  summary={"What the published power numbers actually measured."}
+  source={{"path":"src/helia_profiler/power/metadata.py","line":40,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L40"}}
+>
+
+  What the published power numbers actually measured.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.MeasurementScope.GPIO_GATED_CLEAN_WINDOW"}
+    name={"GPIO_GATED_CLEAN_WINDOW"}
+    kind={"constant"}
+    language={"python"}
+    signature={"GPIO_GATED_CLEAN_WINDOW = 'gpio_gated_clean_window'"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":44,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L44"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.MeasurementScope.FREE_FORM_CAPTURE"}
+    name={"FREE_FORM_CAPTURE"}
+    kind={"constant"}
+    language={"python"}
+    signature={"FREE_FORM_CAPTURE = 'free_form_capture'"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":46,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L46"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.MeasurementScope.ON_DEVICE_GATED_INFERENCE"}
+    name={"ON_DEVICE_GATED_INFERENCE"}
+    kind={"constant"}
+    language={"python"}
+    signature={"ON_DEVICE_GATED_INFERENCE = 'on_device_gated_inference'"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":48,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L48"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.MeasurementScope.WHOLE_CAPTURE_WINDOW"}
+    name={"WHOLE_CAPTURE_WINDOW"}
+    kind={"constant"}
+    language={"python"}
+    signature={"WHOLE_CAPTURE_WINDOW = 'whole_capture_window'"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":50,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L50"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.ObservationMode"}
+  name={"ObservationMode"}
+  kind={"class"}
+  language={"python"}
+  signature={"ObservationMode()"}
+  level={2}
+  summary={"How the observation was made -- the single vocabulary (#154)."}
+  source={{"path":"src/helia_profiler/power/metadata.py","line":53,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L53"}}
+>
+
+  How the observation was made -- the single vocabulary (#154).
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.ObservationMode.GPIO_GATED"}
+    name={"GPIO_GATED"}
+    kind={"constant"}
+    language={"python"}
+    signature={"GPIO_GATED = 'gpio_gated'"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":56,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L56"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ObservationMode.FREE_FORM"}
+    name={"FREE_FORM"}
+    kind={"constant"}
+    language={"python"}
+    signature={"FREE_FORM = 'free_form'"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":57,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L57"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ObservationMode.ON_DEVICE"}
+    name={"ON_DEVICE"}
+    kind={"constant"}
+    language={"python"}
+    signature={"ON_DEVICE = 'on_device'"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":58,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L58"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.PowerIntegrity"}
+  name={"PowerIntegrity"}
+  kind={"class"}
+  language={"python"}
+  signature={"PowerIntegrity()"}
+  level={2}
+  summary={"Whether the observation is valid for efficiency metrics."}
+  source={{"path":"src/helia_profiler/power/metadata.py","line":61,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L61"}}
+>
+
+  Whether the observation is valid for efficiency metrics.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.PowerIntegrity.VALID"}
+    name={"VALID"}
+    kind={"constant"}
+    language={"python"}
+    signature={"VALID = 'valid'"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":64,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L64"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerIntegrity.DEGRADED"}
+    name={"DEGRADED"}
+    kind={"constant"}
+    language={"python"}
+    signature={"DEGRADED = 'degraded'"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":65,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L65"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerIntegrity.INVALID"}
+    name={"INVALID"}
+    kind={"constant"}
+    language={"python"}
+    signature={"INVALID = 'invalid'"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":66,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L66"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.PowerMetadata"}
+  name={"PowerMetadata"}
+  kind={"class"}
+  language={"python"}
+  signature={"PowerMetadata(\n    driver: str | None = None,\n    device: str | None = None,\n    io_voltage: float | None = None,\n    gating_method: str | None = None,\n    sync_input_index: int | None = None,\n    stats_rate_hz: int | None = None,\n    stats_scnt: int | None = None,\n    window_count: int | None = None,\n    gpi_poll_count: int | None = None,\n    stat_packets: int | None = None,\n    early_stopped: bool | None = None,\n    capture_window_s: float | None = None,\n    capture_safety_bound_s: float | None = None,\n    short_gate_pulses_ignored: int | None = None,\n    clean_infer_count: int | None = None,\n    inference_count: int | None = None,\n    source: str | None = None,\n    measurement_scope: MeasurementScope | str | None = None,\n    observation_mode: ObservationMode | None = None,\n    integrity: PowerIntegrity | None = None,\n    gate_rise_observed: bool | None = None,\n    gate_fall_observed: bool | None = None,\n    observation_deadline_s: float | None = None,\n    power_firmware: str | None = None,\n    power_plan: dict[str, Any] | None = None,\n    sync: SyncHandshakeMetadata | None = None,\n    sync_timing_s: GateTransitionTiming | None = None,\n    gate_failure: GateFailure | None = None,\n    gate_duration_integrity: GateDurationIntegrity | None = None,\n    window_clock_ceiling: WindowClockCeiling | None = None,\n    target_lifecycle: 'TargetLifecyclePlan | None' = None,\n    short_gate_pulse_diagnostics: dict[str, Any] | None = None,\n    whole_capture_summary: dict[str, Any] | None = None,\n    fullrate_xcheck: dict[str, Any] | None = None,\n    gating_diagnostics: dict[str, Any] | None = None,\n    gated_vs_whole_current_ok: bool | None = None,\n) -> None"}
+  level={2}
+  summary={"Everything the capture layer tells the rest of HPX about one power run."}
+  source={{"path":"src/helia_profiler/power/metadata.py","line":83,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L83"}}
+>
+
+  `dataclass`
+
+  Everything the capture layer tells the rest of HPX about one power run.
+
+  Mutable by design — enriched progressively, like ``RunMetadata``. The
+  serialized view (:meth:`to_metadata_dict`) emits every non-``None`` field
+  under its historical key name, flattening the typed diagnostics through
+  their ``to_metadata()`` methods.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.driver"}
+    name={"driver"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"driver: str | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":94,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L94"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.device"}
+    name={"device"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"device: str | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":95,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L95"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.io_voltage"}
+    name={"io_voltage"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"io_voltage: float | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":96,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L96"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.gating_method"}
+    name={"gating_method"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"gating_method: str | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":97,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L97"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.sync_input_index"}
+    name={"sync_input_index"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"sync_input_index: int | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":98,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L98"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.stats_rate_hz"}
+    name={"stats_rate_hz"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"stats_rate_hz: int | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":99,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L99"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.stats_scnt"}
+    name={"stats_scnt"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"stats_scnt: int | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":100,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L100"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.window_count"}
+    name={"window_count"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"window_count: int | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":103,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L103"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.gpi_poll_count"}
+    name={"gpi_poll_count"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"gpi_poll_count: int | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":104,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L104"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.stat_packets"}
+    name={"stat_packets"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"stat_packets: int | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":105,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L105"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.early_stopped"}
+    name={"early_stopped"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"early_stopped: bool | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":106,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L106"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.capture_window_s"}
+    name={"capture_window_s"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"capture_window_s: float | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":107,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L107"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.capture_safety_bound_s"}
+    name={"capture_safety_bound_s"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"capture_safety_bound_s: float | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":108,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L108"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.short_gate_pulses_ignored"}
+    name={"short_gate_pulses_ignored"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"short_gate_pulses_ignored: int | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":109,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L109"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.clean_infer_count"}
+    name={"clean_infer_count"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"clean_infer_count: int | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":110,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L110"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.inference_count"}
+    name={"inference_count"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"inference_count: int | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":111,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L111"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.source"}
+    name={"source"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"source: str | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":112,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L112"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.measurement_scope"}
+    name={"measurement_scope"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"measurement_scope: MeasurementScope | str | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":121,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L121"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.observation_mode"}
+    name={"observation_mode"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"observation_mode: ObservationMode | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":122,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L122"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.integrity"}
+    name={"integrity"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"integrity: PowerIntegrity | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":123,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L123"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.gate_rise_observed"}
+    name={"gate_rise_observed"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"gate_rise_observed: bool | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":124,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L124"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.gate_fall_observed"}
+    name={"gate_fall_observed"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"gate_fall_observed: bool | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":125,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L125"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.observation_deadline_s"}
+    name={"observation_deadline_s"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"observation_deadline_s: float | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":126,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L126"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.power_firmware"}
+    name={"power_firmware"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"power_firmware: str | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":129,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L129"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.power_plan"}
+    name={"power_plan"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"power_plan: dict[str, Any] | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":130,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L130"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.sync"}
+    name={"sync"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"sync: SyncHandshakeMetadata | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":133,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L133"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.sync_timing_s"}
+    name={"sync_timing_s"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"sync_timing_s: GateTransitionTiming | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":136,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L136"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.gate_failure"}
+    name={"gate_failure"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"gate_failure: GateFailure | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":137,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L137"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.gate_duration_integrity"}
+    name={"gate_duration_integrity"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"gate_duration_integrity: GateDurationIntegrity | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":138,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L138"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.window_clock_ceiling"}
+    name={"window_clock_ceiling"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"window_clock_ceiling: WindowClockCeiling | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":139,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L139"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.target_lifecycle"}
+    name={"target_lifecycle"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"target_lifecycle: 'TargetLifecyclePlan | None' = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":140,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L140"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.short_gate_pulse_diagnostics"}
+    name={"short_gate_pulse_diagnostics"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"short_gate_pulse_diagnostics: dict[str, Any] | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":143,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L143"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.whole_capture_summary"}
+    name={"whole_capture_summary"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"whole_capture_summary: dict[str, Any] | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":144,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L144"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.fullrate_xcheck"}
+    name={"fullrate_xcheck"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"fullrate_xcheck: dict[str, Any] | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":145,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L145"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.gating_diagnostics"}
+    name={"gating_diagnostics"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"gating_diagnostics: dict[str, Any] | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":147,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L147"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.gated_vs_whole_current_ok"}
+    name={"gated_vs_whole_current_ok"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"gated_vs_whole_current_ok: bool | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":148,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L148"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.to_metadata_dict"}
+    name={"to_metadata_dict"}
+    kind={"method"}
+    language={"python"}
+    signature={"to_metadata_dict() -> dict[str, Any]"}
+    level={3}
+    summary={"Flat dict view, byte-compatible with the pre-#154 metadata bag."}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":165,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L165"}}
+  >
+
+    Flat dict view, byte-compatible with the pre-#154 metadata bag.
+
+    Emits every non-``None`` field under its historical key; typed
+    diagnostics flatten through their own ``to_metadata()``. ``False``
+    is a recorded value and is emitted; ``None`` means "never set" and
+    is omitted (matching the old conditional writes).
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerMetadata.set_observation"}
+    name={"set_observation"}
+    kind={"method"}
+    language={"python"}
+    signature={"set_observation(\n    *,\n    observation_mode: ObservationMode,\n    integrity: PowerIntegrity | str,\n    gate_rise_observed: bool,\n    gate_fall_observed: bool,\n    observation_deadline_s: float,\n) -> None"}
+    level={3}
+    summary={"Publication-time enrichment (the old metadata.update block in PipelineContext.publishpowerobservation)."}
+    source={{"path":"src/helia_profiler/power/metadata.py","line":184,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L184"}}
+  >
+
+    Publication-time enrichment (the old ``metadata.update`` block in
+    ``PipelineContext.publish_power_observation``).
+
+  </RefSymbol>
+
+</RefSymbol>
+
+---
+
+Machine-readable: [`metadata.json`](/helia-profiler/reference/api/helia_profiler/power/metadata.json) · [`metadata.md`](/helia-profiler/reference/api/helia_profiler/power/metadata.md), complete and lossless.

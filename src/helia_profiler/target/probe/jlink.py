@@ -377,31 +377,27 @@ def run_jlink_script(
 ) -> subprocess.CompletedProcess[str]:
     """Run a JLinkExe commander script and return the completed process.
 
-    Parameters
-    ----------
-    script:
-        Newline-terminated commander script.  Must include ``exit`` so
-        ``JLinkExe`` returns control to us.
-    device, jlink_serial, speed_khz, interface:
-        Probe / target configuration.  When *jlink_serial* is given the
-        ``-SelectEmuBySN`` flag is added so the correct probe is selected
-        when multiple J-Links are connected.
-    timeout_s:
-        Wall-clock timeout passed to :func:`subprocess.run`.
-    op_label:
-        Short label used in the timeout / error messages
-        (e.g. ``"reset"`` -> ``"JLinkExe reset"``).
-    check:
-        When False, a non-zero return code is returned to the caller
-        instead of raising (for operations like the SWPOI reset whose
-        register write self-interrupts the debug session).
+    Args:
+        script: Newline-terminated commander script.  Must include ``exit`` so
+            ``JLinkExe`` returns control to us.
+        device: Target device name, part of the probe / target configuration.
+        jlink_serial: Probe serial number.  When given, the
+            ``-SelectEmuBySN`` flag is added so the correct probe is selected
+            when multiple J-Links are connected.
+        speed_khz: Debug clock speed, part of the probe / target
+            configuration.
+        interface: Debug interface, part of the probe / target configuration.
+        timeout_s: Wall-clock timeout passed to :func:`subprocess.run`.
+        op_label: Short label used in the timeout / error messages
+            (e.g. ``"reset"`` -> ``"JLinkExe reset"``).
+        check: When False, a non-zero return code is returned to the caller
+            instead of raising (for operations like the SWPOI reset whose
+            register write self-interrupts the debug session).
 
-    Raises
-    ------
-    CaptureError
-        On non-zero rc (unless ``check=False``), ``FileNotFoundError``
-        (JLinkExe missing), or timeout.  Other unexpected exceptions
-        propagate.
+    Raises:
+        CaptureError: On non-zero rc (unless ``check=False``),
+            ``FileNotFoundError`` (JLinkExe missing), or timeout.  Other
+            unexpected exceptions propagate.
     """
     result = _invoke_jlink(
         _jlink_target_cmd(
