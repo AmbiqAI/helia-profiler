@@ -1,0 +1,63 @@
+---
+/**
+ * The heliaPROFILER wordmark, picked by theme.
+ *
+ * Local because helia-ui has no theme-selected image part at
+ * v0.1.0-alpha.15; listed as an upstream candidate on AmbiqAI/helia-profiler#335.
+ *
+ * Both files ship and CSS hides one. The MkDocs source selected them with
+ * Material's `#only-light` / `#only-dark` URL fragments, which are a Material
+ * stylesheet convention: Astro treats them as part of the URL, so both images
+ * would render. `data-theme` is what the shell actually sets, and it is set
+ * before paint, so neither image flashes.
+ *
+ * One `alt` between the two, on the light file, so a screen reader hears the
+ * wordmark once whichever theme is live.
+ */
+interface Props {
+  /** Rendered width of the wordmark. The intrinsic file is 1710x620. */
+  width?: string;
+}
+
+const { width = '15rem' } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<p class="product-logo" style={`--product-logo-width: ${width}`}>
+  <img
+    class="product-logo__img product-logo__img--light"
+    src={`${base}/heliaprofiler-logo-light.png`}
+    alt="heliaPROFILER"
+    width="1710"
+    height="620"
+  />
+  <img
+    class="product-logo__img product-logo__img--dark"
+    src={`${base}/heliaprofiler-logo-dark.png`}
+    alt=""
+    aria-hidden="true"
+    width="1710"
+    height="620"
+  />
+</p>
+
+<style>
+  .product-logo {
+    margin: 0;
+  }
+
+  .product-logo__img {
+    width: var(--product-logo-width);
+    height: auto;
+    max-width: 100%;
+  }
+
+  :root[data-theme='dark'] .product-logo__img--light,
+  .product-logo__img--dark {
+    display: none;
+  }
+
+  :root[data-theme='dark'] .product-logo__img--dark {
+    display: inline;
+  }
+</style>

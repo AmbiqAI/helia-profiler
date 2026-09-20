@@ -6,66 +6,248 @@ prev: false
 next: false
 ---
 
+{/*
+  Every sentence on this page traces to a docs page or a source file; the map
+  is SOURCES.md on the pull request for AmbiqAI/helia-profiler#335.
+
+  The terminal carries commands and no output on purpose. No page under docs/
+  and no file under examples/ records a profiling run with provenance:
+  docs/examples/basic-profiling.md prints an output block with no validated-on
+  record and docs/getting-started/first-profile.md prints an illustrative
+  summary.json. Home therefore sends the reader to Examples for numbers.
+  Output lands here only when a run with a provenance record exists to quote.
+
+  AsciiTerminal `copy` is the one opt-in to a script on this page. It is
+  deliberate: the command is there to be pasted.
+*/}
+
+import Hero from '@ambiqai/helia-ui/astro/Hero';
+import Band from '@ambiqai/helia-ui/astro/Band';
+import SectionHeader from '@ambiqai/helia-ui/astro/SectionHeader';
+import Button from '@ambiqai/helia-ui/astro/Button';
+import AsciiTerminal from '@ambiqai/helia-ui/astro/AsciiTerminal';
 import CardGrid from '@ambiqai/helia-ui/astro/CardGrid';
+import Card from '@ambiqai/helia-ui/astro/Card';
+import CardHeader from '@ambiqai/helia-ui/astro/CardHeader';
+import CardContent from '@ambiqai/helia-ui/astro/CardContent';
+import CardList from '@ambiqai/helia-ui/astro/CardList';
+import StatCard from '@ambiqai/helia-ui/astro/StatCard';
 import LinkCard from '@ambiqai/helia-ui/astro/LinkCard';
+import Callout from '@ambiqai/helia-ui/astro/Callout';
 import DocsVersion from '../../components/DocsVersion.astro';
+import ProductLogo from '../../components/ProductLogo.astro';
 
-Build, flash, measure and compare models on Ambiq Apollo hardware from one
-command. heliaPROFILER runs a model through heliaRT, heliaAOT, a stock TFLM
-baseline or the Cortex-M ExecuTorch runtime, and returns a result bundle you
-can read, compare and archive.
+<ProductLogo />
 
-<DocsVersion />
+<Hero
+  variant="contrast"
+  eyebrow="Model profiling for Ambiq Apollo"
+  summary="Build, flash, measure and compare models with heliaRT, heliaAOT, a stock TFLM baseline or the Cortex-M ExecuTorch runtime."
+>
+  <Fragment>Profile LiteRT and ExecuTorch models on Ambiq Apollo <em>hardware</em>.</Fragment>
 
-## Where to start
+  <Button slot="actions" href="/helia-profiler/getting-started/">First profile</Button>
 
-<CardGrid columns={2}>
-  <LinkCard
-    title="Getting started"
-    titleAs="h3"
-    eyebrow="First run"
-    href="/helia-profiler/getting-started/"
-  >
-    Install the toolchain, check your hardware and profile a first model.
-  </LinkCard>
-  <LinkCard
-    title="User guide"
-    titleAs="h3"
-    eyebrow="Configure and measure"
+  <Button slot="actions" href="/helia-profiler/examples/" variant="secondary">Examples</Button>
+
+  <CardGrid slot="aside" columns={3}>
+    <StatCard label="Inference engines">4</StatCard>
+    <StatCard label="Boards listed">13</StatCard>
+    <StatCard label="Pipeline stages">8</StatCard>
+  </CardGrid>
+
+  <AsciiTerminal
+    slot="media"
+    title="hpx"
+    copy
+    lines={[
+      { kind: 'command', prompt: '$', text: 'hpx boards' },
+      { kind: 'command', prompt: '$', text: 'hpx profile examples/quickstart/kws_model.tflite --board apollo510_evb' },
+    ]}
+  />
+</Hero>
+
+<Band tone="muted">
+  <SectionHeader
+    slot="header"
+    eyebrow="How a run works"
+    title="One command, eight stages"
+    description="A profiling run resolves the target, builds and flashes firmware for the engine you picked, captures counters on the device and writes the result bundle."
     href="/helia-profiler/guide/"
-  >
-    Engines, boards, toolchains, capture transports, memory placement, PMU
-    counters and power measurement.
-  </LinkCard>
-  <LinkCard
-    title="Examples"
-    titleAs="h3"
-    eyebrow="Worked runs"
-    href="/helia-profiler/examples/"
-  >
-    Complete runs with configuration, captured output and how to read the
-    numbers.
-  </LinkCard>
-  <LinkCard
-    title="Reference"
-    titleAs="h3"
-    eyebrow="Contracts"
-    href="/helia-profiler/reference/"
-  >
-    The `hpx` command line, the configuration schema, issue codes and the
-    Python API.
-  </LinkCard>
-</CardGrid>
+    linkLabel="Read the user guide"
+  />
 
-## What a run produces
+  <CardGrid columns={4} equalize class="not-content">
+    <Card tone="filled">
+      <CardHeader titleAs="h3" step="S01">Resolve platform</CardHeader>
+      <CardContent>Validates the board name, resolves the SoC definition, computes the model file hash and populates platform and model metadata.</CardContent>
+    </Card>
+    <Card tone="filled">
+      <CardHeader titleAs="h3" step="S02">Prepare engine</CardHeader>
+      <CardContent>Instantiates the selected heliaRT, heliaAOT, TFLM or ExecuTorch adapter and calls its prepare method.</CardContent>
+    </Card>
+    <Card tone="filled">
+      <CardHeader titleAs="h3" step="S03">Generate firmware</CardHeader>
+      <CardContent>Renders Jinja2 templates into a complete NSX application: the build config, the module manifest, the entry point and the PMU capture harness.</CardContent>
+    </Card>
+    <Card tone="filled">
+      <CardHeader titleAs="h3" step="S04">Build firmware</CardHeader>
+      <CardContent>Runs the NSX build pipeline, then captures binary section sizes and the compiler and CMake versions.</CardContent>
+    </Card>
+    <Card tone="filled">
+      <CardHeader titleAs="h3" step="S05">Flash firmware</CardHeader>
+      <CardContent>Flashes the built firmware to the target via nsx flash, which uses JLinkExe.</CardContent>
+    </Card>
+    <Card tone="filled">
+      <CardHeader titleAs="h3" step="S06">Capture PMU</CardHeader>
+      <CardContent>Resets the target, attaches the selected transport reader, parses the HPX protocol and aggregates counter values across iterations.</CardContent>
+    </Card>
+    <Card tone="filled">
+      <CardHeader titleAs="h3" step="S07">Capture power</CardHeader>
+      <CardContent>Skipped when power is not enabled. Arms the configured power driver, observes the GPIO-gated clean window and computes statistics from samples inside the accepted gate.</CardContent>
+    </Card>
+    <Card tone="filled">
+      <CardHeader titleAs="h3" step="S08">Generate report</CardHeader>
+      <CardContent>Writes summary.json, the per-layer results, run metadata and the Model Explorer files.</CardContent>
+    </Card>
+  </CardGrid>
+</Band>
 
-A successful run writes a portable result bundle: a machine-readable summary,
-per-layer data, provenance for the firmware and toolchain that produced it, any
-validity issues the run detected, and a manifest with artifact sizes and
-SHA-256 digests. Two bundles can be compared when their measurement conditions
-match.
+<Band>
+  <SectionHeader
+    slot="header"
+    eyebrow="Engines and boards"
+    title="What a run can target"
+    description="Each run uses exactly one engine, chosen at configuration time. There is no run-all mode: comparison is done by running the profiler more than once with different configs."
+  />
 
-## Status
+  <CardGrid columns={2} equalize class="not-content">
+    <Card>
+      <CardHeader titleAs="h3" eyebrow="Pick one per run">Inference engines</CardHeader>
+      <CardList
+        marker="bullet"
+        items={[
+          'Vanilla TFLM (tflm): reference or CMSIS-NN interpreter baseline',
+          'heliaRT (helia-rt): Ambiq-optimized interpreter performance',
+          'heliaAOT (helia-aot): ahead-of-time compilation and fine-grained placement',
+          'ExecuTorch (executorch): Cortex-M PTE programs and CMSIS-NN kernels',
+        ]}
+      />
+      <CardContent>The pipeline, capture protocol and report format are identical for all four engines. Only the firmware payload changes.</CardContent>
+    </Card>
+    <Card>
+      <CardHeader titleAs="h3" eyebrow="Board, then SoC">Boards and platforms</CardHeader>
+      <CardList
+        marker="bullet"
+        items={[
+          'Stable channel: apollo510_evb, apollo3p_evb',
+          'Preview channel: apollo510b_evb, apollo5b_evb, apollo330mP_evb, apollo510dL_evb, apollo4p_evb, apollo4l_evb, apollo4l_blue_evb, apollo4p_blue_kbr_evb, apollo4p_blue_kxr_evb, apollo3p_evb_cygnus',
+          'Preview channel, experimental: atomiq110_fpga_turbo',
+        ]}
+      />
+      <CardContent>The board identifies the physical EVB and the SoC determines CPU architecture, PMU capabilities and memory layout. Run hpx boards for the live list. Without an explicit board, the profiler targets apollo510_evb.</CardContent>
+    </Card>
+  </CardGrid>
 
-heliaPROFILER is pre-1.0. Breaking changes can land on minor versions until
-v1.0, so pin an exact version for anything long-lived.
+  <Callout title="Experimental Atomiq110 support" tone="warning">
+    HPX support for the Atomiq110 SoC and the `atomiq110_fpga_turbo` board is
+    experimental. It is best-effort, is not a release blocker, and may change or
+    be removed in any minor release. It is outside the compatibility guarantees
+    for production-silicon targets. Its clock rates, cycle counts, latency,
+    power and energy measurements describe the FPGA image only and are not
+    representative of production silicon.
+  </Callout>
+</Band>
+
+<Band tone="tinted">
+  <SectionHeader
+    slot="header"
+    eyebrow="Output"
+    title="What a run produces"
+    description="A successful run writes a portable result bundle you can read, compare and archive."
+  />
+
+  <CardGrid columns={2} equalize class="not-content">
+    <Card tone="filled">
+      <CardHeader titleAs="h3">In the bundle</CardHeader>
+      <CardList
+        items={[
+          'summary.json, written on every run',
+          'Per-layer results as CSV, or JSON when the format is set to json',
+          'Run metadata for the firmware and toolchain that produced it',
+          'Model Explorer files, unless disabled',
+          'A detailed subfolder, only with --detailed',
+        ]}
+      />
+    </Card>
+    <Card tone="filled">
+      <CardHeader titleAs="h3">Why it travels</CardHeader>
+      <CardContent>
+        The bundle carries provenance for the firmware and toolchain that
+        produced it, any validity issues the run detected, and a manifest with
+        artifact sizes and SHA-256 digests. Two bundles can be compared when
+        their measurement conditions match.
+      </CardContent>
+    </Card>
+  </CardGrid>
+</Band>
+
+<Band>
+  <SectionHeader
+    slot="header"
+    eyebrow="Routes by goal"
+    title="Where to start"
+  />
+
+  <CardGrid columns={2}>
+    <LinkCard
+      title="Getting started"
+      titleAs="h3"
+      eyebrow="First run"
+      href="/helia-profiler/getting-started/"
+    >
+      Install the toolchain, check your hardware and profile a first model.
+    </LinkCard>
+    <LinkCard
+      title="User guide"
+      titleAs="h3"
+      eyebrow="Configure and measure"
+      href="/helia-profiler/guide/"
+    >
+      Engines, boards, toolchains, capture transports, memory placement, PMU
+      counters and power measurement.
+    </LinkCard>
+    <LinkCard
+      title="Examples"
+      titleAs="h3"
+      eyebrow="Worked runs"
+      href="/helia-profiler/examples/"
+    >
+      Complete runs with configuration, captured output and how to read the
+      numbers.
+    </LinkCard>
+    <LinkCard
+      title="Reference"
+      titleAs="h3"
+      eyebrow="Contracts"
+      href="/helia-profiler/reference/"
+    >
+      The `hpx` command line, the configuration schema, issue codes and the
+      Python API.
+    </LinkCard>
+  </CardGrid>
+</Band>
+
+<Band tone="muted" density="compact">
+  <SectionHeader slot="header" eyebrow="This build" title="Version and machine-readable copies" />
+
+  <DocsVersion />
+
+  heliaPROFILER is pre-1.0. Breaking changes can land on minor versions until
+  v1.0, so pin an exact version for anything long-lived.
+
+  For an agent or a script: [`llms.txt`](/helia-profiler/llms.txt) indexes the
+  site, [`llms-full.txt`](/helia-profiler/llms-full.txt) is every page as one
+  Markdown document, and every page has a `.md` rendition beside it, starting
+  with [this one](/helia-profiler/index.md).
+</Band>
