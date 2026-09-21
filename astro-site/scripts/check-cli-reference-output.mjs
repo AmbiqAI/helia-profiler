@@ -27,7 +27,7 @@ import { fileURLToPath } from 'node:url';
 
 import { BASE, PUBLIC_DIRS, SIDEBAR_FILE } from './build-cli-reference.mjs';
 import {
-  commandLabel,
+  anchorId, commandLabel,
   commandsOn,
   configurationEntries,
   fieldRows,
@@ -171,7 +171,7 @@ for (const page of pages.filter((entry) => entry.node)) {
   for (const command of commandsOn(page.node)) {
     const label = commandLabel(command.path);
     check(hasHeading(markdown, label), `${label}: no section heading in ${page.markdown}.`);
-    check(body.includes(`id="${label}"`), `${label}: no anchor on ${page.route}.`);
+    check(body.includes(`id="${anchorId(label)}"`), `${label}: no anchor on ${page.route}.`);
     check(body.includes(command.usage), `${label}: usage line missing from ${page.route}.`);
     commandAssertions += 1;
 
@@ -182,6 +182,12 @@ for (const page of pages.filter((entry) => entry.node)) {
         hasRow(section, param.declaration),
         `${label}: ${param.declaration} is not a row in its section of ${page.markdown}.`,
       );
+      for (const opt of param.secondary_opts ?? []) {
+        check(
+          section.includes(opt),
+          `${label}: off-switch ${opt} is not published in its section of ${page.markdown}.`,
+        );
+      }
       check(
         hasCode(body, paramName(param)),
         `${label}: ${param.declaration} is not a parameter row on ${page.route}.`,

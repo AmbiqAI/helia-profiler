@@ -79,7 +79,17 @@ const defaultText = (value) => {
  * because `RefParamsRow` has no field for them.
  */
 export const paramName = (param) =>
-  param.aliases?.length ? `${param.declaration}, ${param.aliases.join(', ')}` : param.declaration;
+  [param.declaration, ...(param.secondary_opts ?? []), ...(param.aliases ?? [])].join(', ');
+
+/**
+ * HTML ids cannot carry whitespace or angle brackets, and prose pages link to
+ * these anchors, so the visible label and the id are two different strings.
+ */
+export const anchorId = (text) =>
+  text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 
 export const paramType = (param) =>
   param.type?.choices?.length
@@ -222,11 +232,19 @@ export const fieldRows = (schema, cls) => {
  * would publish a configuration reference missing a documented type.
  */
 export function configurationEntries(schema) {
-  const sections = Object.entries(schema['x-hpx'].sections).map(([key, cls]) => ({
+  /* One class can back several keys; it is documented once, under every key that uses it. */
+  const byClass = new Map();
+  for (const [key, cls] of Object.entries(schema['x-hpx'].sections)) {
+    const entry = byClass.get(cls);
+    if (entry) entry.keys.push(key);
+    else byClass.set(cls, { cls, keys: [key] });
+  }
+  const sections = [...byClass.values()].map(({ cls, keys }) => ({
     cls,
-    key,
-    name: key === '' ? 'hpx.yml (top level)' : key,
-    signature: key === '' ? cls : `${key}:  # ${cls}`,
+    key: keys[0],
+    keys,
+    name: keys.map((key) => (key === '' ? 'hpx.yml (top level)' : key)).join(', '),
+    signature: keys[0] === '' ? cls : `${keys[0]}:  # ${cls}`,
     reachable: true,
   }));
   const unreachable = schema.counts.unreachableFromRoot.map((cls) => ({

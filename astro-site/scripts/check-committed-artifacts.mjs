@@ -65,13 +65,19 @@ const sourceTree = git(['rev-parse', `HEAD:${SOURCE_PATH}`]).trim();
 const HASH = /\b[0-9a-f]{40}\b/g;
 const REF = /\/blob\/([^/"'\s)]+)\//g;
 
-/** Whether the documented source declares this hash as one of its own values. */
+/**
+ * The compatibility baseline pins neuralspotx by commit and by digest, and those
+ * pins are config defaults that reach schema.json. Only that file may vouch for a
+ * hash; anything else under src/ carrying one is still a leak.
+ */
+const PINNED_HASHES = `${SOURCE_PATH}/data/compatibility-baseline-v1.json`;
+
 const declared = new Map();
 const declaredInSource = (hash) => {
   if (!declared.has(hash)) {
     let found = false;
     try {
-      found = git(['grep', '-l', '--fixed-strings', hash, 'HEAD', '--', SOURCE_PATH]).length > 0;
+      found = git(['grep', '-l', '--fixed-strings', hash, 'HEAD', '--', PINNED_HASHES]).length > 0;
     } catch {
       /* git grep exits 1 when nothing matches, which is the answer, not a fault. */
     }

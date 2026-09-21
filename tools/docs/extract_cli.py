@@ -160,11 +160,11 @@ def _param(param: Any, annotations: dict[str, str]) -> dict[str, Any]:
 
 def _usage(command: Any, path: list[str]) -> str:
     pieces = ["hpx", *path]
+    if any(p.param_type_name == "option" for p in command.params):
+        pieces.append("[OPTIONS]")
     if getattr(command, "commands", None):
         pieces.append("COMMAND [ARGS]...")
     else:
-        if any(p.param_type_name == "option" for p in command.params):
-            pieces.append("[OPTIONS]")
         for param in command.params:
             if param.param_type_name != "argument":
                 continue

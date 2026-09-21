@@ -21,7 +21,7 @@ import RefSymbol from '@ambiqai/helia-ui/astro/RefSymbol';
 
 import cli from '../data/cli.json';
 import {
-  commandLabel,
+  anchorId, commandLabel,
   commandSlug,
   commandsOn,
   isRoot,
@@ -52,7 +52,7 @@ const subcommands = node.commands ?? [];
     <RefMembers
       label={isRoot(node) ? 'Commands' : 'Subcommands'}
       items={subcommands.map((child) => ({
-        id: commandLabel(child.path),
+        id: anchorId(commandLabel(child.path)),
         name: commandLabel(child.path),
         kind: 'command',
         summary: child.short_help ?? '',
@@ -65,7 +65,7 @@ const subcommands = node.commands ?? [];
 {
   commandsOn(node).map((cmd) => (
     <RefSymbol
-      id={commandLabel(cmd.path)}
+      id={anchorId(commandLabel(cmd.path))}
       name={commandLabel(cmd.path)}
       kind={cmd.kind === 'group' ? 'namespace' : 'function'}
       language="python"
