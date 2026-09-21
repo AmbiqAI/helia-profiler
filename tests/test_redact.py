@@ -21,10 +21,6 @@ from helia_profiler.diagnostics.redact import (
     redact_value,
 )
 
-# ---------------------------------------------------------------------------
-# Absolute filesystem paths — home dir, workspace dirs, POSIX, Windows, UNC.
-# ---------------------------------------------------------------------------
-
 
 @pytest.mark.parametrize(
     ("raw", "expected"),
@@ -111,11 +107,6 @@ def test_redact_text_paths_disabled_by_policy() -> None:
 
     assert redacted == raw
     assert counts.paths == 0
-
-
-# ---------------------------------------------------------------------------
-# URL credentials and token-shaped query parameters.
-# ---------------------------------------------------------------------------
 
 
 def _userinfo_case(user_pass: str, host_path: str) -> tuple[str, str]:
@@ -275,11 +266,6 @@ def test_redact_text_scrubs_file_uri_path_keeping_basename() -> None:
     assert counts.paths >= 1
 
 
-# ---------------------------------------------------------------------------
-# Common credential/token shapes.
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.parametrize(
     "raw",
     [
@@ -305,11 +291,6 @@ def test_redact_text_scrubs_bearer_token_keeping_prefix() -> None:
 
     assert redacted == "Authorization: Bearer <redacted-token>"
     assert counts.tokens == 1
-
-
-# ---------------------------------------------------------------------------
-# KEY=VALUE / KEY: VALUE secret-shaped assignments ("env values").
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -344,11 +325,6 @@ def test_redact_text_does_not_flag_ordinary_assignments(raw: str) -> None:
 
     assert redacted == raw
     assert counts.total == 0
-
-
-# ---------------------------------------------------------------------------
-# Device serial numbers — structural (by field name), not digit-pattern.
-# ---------------------------------------------------------------------------
 
 
 def test_redact_serial_replaces_with_stable_hash_preview() -> None:
@@ -461,7 +437,6 @@ def test_redact_value_secret_key_routing_redacts_non_string_leaves_too() -> None
     assert redacted["password"] == "<redacted>"
     assert redacted["credentials"]["pin"] == "<redacted>"
     assert redacted["credentials"]["enabled"] == "<redacted>"
-    # Non-secret-shaped branches are left with their original JSON types.
     assert redacted["count"] == 5
     assert redacted["flag"] is True
     # None carries no information either way; left as None rather than
@@ -469,11 +444,6 @@ def test_redact_value_secret_key_routing_redacts_non_string_leaves_too() -> None
     # real value was present and scrubbed.
     assert redacted["empty_secret"]["secret"] is None
     assert counts.env_values == 3
-
-
-# ---------------------------------------------------------------------------
-# Recursive structure handling and no-op / idempotence guarantees.
-# ---------------------------------------------------------------------------
 
 
 def test_redact_value_recurses_through_nested_dicts_and_lists() -> None:

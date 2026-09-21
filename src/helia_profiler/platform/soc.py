@@ -20,29 +20,19 @@ from .placement import Placement
 if TYPE_CHECKING:
     from .capabilities import SocCapabilities
 
-# ---------------------------------------------------------------------------
-# SoC family (determines core, PMU tier, and MVE availability)
-# ---------------------------------------------------------------------------
-
 
 class SocFamily(Enum):
-    """Ambiq SoC generation families."""
-
     AP3 = "ap3"  # Apollo3 / Apollo3P — Cortex-M4F, DWT only
     AP4 = "ap4"  # Apollo4 / Apollo4P / Apollo4L — Cortex-M4F, DWT only
     AP5 = "ap5"  # Apollo5 / Apollo510 / Apollo510L / Apollo330P — Cortex-M55, full PMU + MVE
 
 
 class CoreArch(Enum):
-    """ARM core architectures relevant to profiling capabilities."""
-
     CORTEX_M4 = "cortex-m4"
     CORTEX_M55 = "cortex-m55"
 
 
 class PmuTier(Enum):
-    """PMU capability tiers."""
-
     DWT_ONLY = "dwt"  # Cortex-M4: DWT cycle counter, limited event support
     ARMV8M_PMU = "pmu"  # Cortex-M55: Full Armv8-M PMU, 70+ events, 8 counters
 
@@ -80,11 +70,6 @@ class SocOrigin(Enum):
     CUSTOM = "custom"
 
 
-# ---------------------------------------------------------------------------
-# SoC definition
-# ---------------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
 class MemoryLayout:
     """Memory sizes in KB.  0 means not present on this SoC."""
@@ -106,11 +91,9 @@ class MemoryRange:
 
     @property
     def end(self) -> int:
-        """Exclusive end address."""
         return self.start + self.length
 
     def contains(self, address: int) -> bool:
-        """True if *address* falls inside this range."""
         return self.start <= address < self.end
 
 
@@ -137,8 +120,6 @@ class ClockSpeed:
 
 @dataclass(frozen=True)
 class ClockDomain:
-    """An independently selectable clock domain on a SoC (e.g. cpu)."""
-
     name: str
     speeds: tuple[ClockSpeed, ...]
     default: str  # name of the default speed
@@ -155,17 +136,17 @@ class ClockDomain:
 class SocDef:
     """Definition of an Ambiq SoC relevant to profiling."""
 
-    name: str  # e.g. "apollo510"
+    name: str
     family: SocFamily
     core: CoreArch
     pmu_tier: PmuTier
     has_mve: bool  # Helium / MVE vector extensions
     memory: MemoryLayout
     clocks: tuple[ClockDomain, ...]
-    c_define: str  # e.g. "AM_PART_APOLLO510"
-    cmsis_header: str  # e.g. "apollo510.h"
+    c_define: str
+    cmsis_header: str
     rtt_scan_ranges: tuple[tuple[int, int], ...]
-    jlink_device: str = ""  # J-Link device string (e.g. "AP510NFA-CBR")
+    jlink_device: str = ""
     pmu_max_ops: int = 2048  # Max PMU accumulator operations (layers)
     #: SWO/ITM trace reference clock (MHz), when the TPIU TRACECLKIN is NOT the
     #: CPU clock.  Apollo3 routes a dedicated, CPU-independent clock to the
@@ -343,10 +324,6 @@ class SocDef:
         return tuple(domains)
 
 
-# ---------------------------------------------------------------------------
-# Built-in SoC registry
-# ---------------------------------------------------------------------------
-
 _SOCS: dict[str, SocDef] = {}
 
 
@@ -365,8 +342,6 @@ def _register_soc(soc: SocDef) -> SocDef:
     _SOCS[registered.name] = registered
     return registered
 
-
-# --- AP3 family (Cortex-M4F) ------------------------------------------------
 
 _register_soc(
     SocDef(
@@ -419,8 +394,6 @@ _register_soc(
     )
 )
 
-# --- AP4 family (Cortex-M4F) ------------------------------------------------
-
 _register_soc(
     SocDef(
         name="apollo4p",
@@ -470,8 +443,6 @@ _register_soc(
         jlink_device="AMAP42KL-KBR",
     )
 )
-
-# --- AP5 family (Cortex-M55, full PMU + MVE) --------------------------------
 
 _register_soc(
     SocDef(
@@ -583,7 +554,6 @@ _register_soc(
     )
 )
 
-# AP330 — Cortex-M55, belongs to AP5 family despite the "3" in the name
 _register_soc(
     SocDef(
         name="apollo330P",
@@ -778,10 +748,6 @@ _register_soc(
         npu="ethos-u85-256",
     )
 )
-
-# ---------------------------------------------------------------------------
-# Physical memory address ranges (for build-time placement verification)
-# ---------------------------------------------------------------------------
 
 # MemoryLayout size field backing each placement region.
 _PLACEMENT_SIZE_FIELD: dict[Placement, str] = {

@@ -45,7 +45,6 @@ class ResolvePlatformStage:
         ctx.board = board
         ctx.soc = soc
 
-        # --- Resolve per-domain clock selection ---------------------------
         selection = ctx.config.target.clock
 
         cpu_domain = soc.cpu_clock
@@ -83,7 +82,6 @@ class ResolvePlatformStage:
                 soc.name,
             )
 
-        # Populate platform metadata
         ctx.run_metadata.platform = PlatformInfo(
             board=board.name,
             soc=soc.name,
@@ -98,7 +96,6 @@ class ResolvePlatformStage:
             link_family=str(link_family_for_toolchain(ctx.config.target.toolchain.value)),
         )
 
-        # Validate model path exists early
         model_path = ctx.config.model.path
         if not model_path.exists():
             raise ConfigError(
@@ -106,7 +103,6 @@ class ResolvePlatformStage:
                 hint="Check the 'model.path' in your config or positional argument.",
             )
 
-        # Record model file metadata
         model_bytes = model_path.read_bytes()
         ctx.run_metadata.model = ModelInfo(
             name=model_path.name,

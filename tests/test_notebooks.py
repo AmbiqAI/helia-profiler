@@ -78,7 +78,6 @@ def test_notebook_uses_the_typed_session_api(notebook: Path) -> None:
 
 @pytest.mark.parametrize("notebook", NOTEBOOKS, ids=lambda p: p.stem)
 def test_notebook_runs_from_an_installed_package(notebook: Path) -> None:
-    """No shelling out, and no dependence on a repository checkout."""
     offenders = [pattern for pattern in FORBIDDEN if pattern in _code(notebook)]
 
     assert not offenders, f"{notebook.name} depends on the repo or a shell: {offenders}"

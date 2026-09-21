@@ -1,5 +1,3 @@
-"""Tests for the pipeline primitives and stage sequencing."""
-
 from __future__ import annotations
 
 from tests.pipeline_context_helpers import (
@@ -31,14 +29,8 @@ from helia_profiler.pipeline import (
     Stage,
 )
 
-# ---------------------------------------------------------------------------
-# Helpers: minimal stage implementations for testing
-# ---------------------------------------------------------------------------
-
 
 class PassStage:
-    """A stage that always runs and does nothing."""
-
     def __init__(self, name: str = "pass_stage"):
         self._name = name
 
@@ -54,8 +46,6 @@ class PassStage:
 
 
 class SkipStage:
-    """A stage that always skips."""
-
     @property
     def name(self) -> str:
         return "skip_stage"
@@ -68,8 +58,6 @@ class SkipStage:
 
 
 class FailStage:
-    """A stage that raises an HpxError."""
-
     def __init__(self, error: HpxError | None = None):
         self._error = error or CaptureError("boom")
 
@@ -85,8 +73,6 @@ class FailStage:
 
 
 class UnexpectedFailStage:
-    """A stage that raises a non-HpxError exception."""
-
     @property
     def name(self) -> str:
         return "unexpected_fail"
@@ -99,8 +85,6 @@ class UnexpectedFailStage:
 
 
 class RecordingStage:
-    """A stage that records when it ran."""
-
     def __init__(self, name: str, log: list[str]):
         self._name = name
         self._log = log
@@ -148,15 +132,9 @@ class RecordingConsole:
         pass
 
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
 def _make_config(tmp_path: Path):
-    """Build a minimal ProfileConfig for testing."""
     model_file = tmp_path / "test.tflite"
-    model_file.write_bytes(b"\x00")  # dummy
+    model_file.write_bytes(b"\x00")
     return load_config(
         None,
         {
@@ -165,11 +143,6 @@ def _make_config(tmp_path: Path):
             "work_dir": str(tmp_path / "work"),
         },
     )
-
-
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
 
 
 class TestPipelineRunner:
@@ -487,11 +460,6 @@ def test_pipeline_runner_installs_progress_sink_before_stages(tmp_path: Path):
     assert updates == [ProgressUpdate(message="stage running")]
 
 
-# ---------------------------------------------------------------------------
-# Narrowing accessors (#162 Phase 4)
-# ---------------------------------------------------------------------------
-
-
 #: (accessor property, backing field, stage that produces the field).
 #: The single source of truth for the read surface of ``PipelineContext``.
 NARROWING_ACCESSORS = [
@@ -603,11 +571,11 @@ class TestNarrowingAccessors:
 
 
 def test_no_assert_narrowing_of_context_fields_survives_in_src():
-    """The acceptance criterion of #162 Phase 4, as a test.
+    """A stage-ordering precondition must not hide as a bare assert.
 
-    ``assert ctx.<field> is not None`` is a stage-ordering precondition wearing
-    a crash costume: it is compiled out under ``-O`` and names no producer when
-    it fires.  New sites must read through the narrowing accessors instead.
+    ``assert ctx.<field> is not None`` is compiled out under ``-O`` and names
+    no producer when it fires. New sites must read through the narrowing
+    accessors instead.
     """
     # Two patterns, deliberately scoped:
     #  * ctx-field narrowing anywhere in src/, anchored on `is not None` so a

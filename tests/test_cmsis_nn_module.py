@@ -1,5 +1,3 @@
-"""Local ns-cmsis-nn module validation and vendoring."""
-
 from pathlib import Path
 
 import pytest

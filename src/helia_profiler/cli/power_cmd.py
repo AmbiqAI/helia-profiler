@@ -7,7 +7,6 @@ import threading
 
 
 def _cmd_power_on(driver_name: str, *, power_serial: str | None = None) -> None:
-    """Enable Joulescope current passthrough and hold open until Ctrl-C."""
     from ..power import get_driver
     from ..errors import PowerError
 

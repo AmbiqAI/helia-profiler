@@ -40,7 +40,6 @@ _NM_SYMBOL_RE = re.compile(
 
 
 def _address_from_map(build_dir: Path, target_name: str) -> int | None:
-    """Parse the linker map for the ``_SEGGER_RTT`` symbol address."""
     candidates = sorted(build_dir.glob(f"{target_name}.map")) or sorted(
         build_dir.glob(f"**/{target_name}.map")
     )
@@ -59,7 +58,6 @@ def _address_from_map(build_dir: Path, target_name: str) -> int | None:
 
 
 def _nm_command(toolchain: str) -> str | None:
-    """Return the ``nm`` executable matching *toolchain*, or ``None``."""
     try:
         spec = get_toolchain_spec(toolchain)
         return resolve_toolchain_executable(toolchain, spec.nm)
@@ -74,7 +72,6 @@ def _address_from_nm(
     target_name: str,
     timeout_s: int,
 ) -> int | None:
-    """Read the ``_SEGGER_RTT`` address from the ELF via ``nm``."""
     nm = _nm_command(toolchain)
     if nm is None:
         return None

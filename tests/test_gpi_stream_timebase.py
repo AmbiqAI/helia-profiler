@@ -61,7 +61,6 @@ def test_a_dropped_frame_skews_the_mean_but_not_the_median():
     d = _streamed_gpi_timebase(_frames(with_a_gap))
 
     assert d["tick_per_sample"] == pytest.approx(tick)
-    # A mean over the same input lands far away; this pins the median choice.
     assert d["tick_per_sample"] < sum(with_a_gap) / len(with_a_gap) * 0.9
     assert d["spacing_relative_spread"] > 7.0
     assert d["spacing_max_tick"] == pytest.approx(tick * 9.0)

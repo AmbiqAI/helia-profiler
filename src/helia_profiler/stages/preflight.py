@@ -79,11 +79,6 @@ class PreflightStage:
         log.info("Preflight checks passed.")
 
 
-# ---------------------------------------------------------------------------
-# Individual checks
-# ---------------------------------------------------------------------------
-
-
 def _check_model(path: Path, engine: EngineType) -> None:
     if not path.exists():
         raise ConfigError(

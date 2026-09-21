@@ -56,7 +56,6 @@ def _norm(value: str | None) -> str:
 
 
 def _is_jlink_vcom(info: object) -> bool:
-    """True if *info* describes a SEGGER J-Link virtual COM port."""
     haystack = _norm(
         " ".join(
             str(getattr(info, attr, "") or "")

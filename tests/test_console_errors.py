@@ -1,5 +1,3 @@
-"""Unit tests for HpxConsole error rendering."""
-
 from __future__ import annotations
 
 from rich.console import Console

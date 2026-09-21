@@ -293,11 +293,6 @@ def _arena_region_id_lookup(codegen_ctx: Any) -> dict[tuple[str, str, str], int]
     return lookup
 
 
-# ---------------------------------------------------------------------------
-# Memory-plan extraction (from CodeGenContext)
-# ---------------------------------------------------------------------------
-
-
 def _aot_buffer_symbol(
     prefix: str,
     role: str,
@@ -372,14 +367,6 @@ def _extract_memory_plan_from_render_plan(
     prefix: str = "hpx",
     allocate_arenas: bool = True,
 ) -> MemoryPlan | None:
-    """Build a MemoryPlan from the AOT render plan's concrete arenas.
-
-    ``memory_plan.tensor_allocs`` lists every tensor assignment, including
-    transient tensors that share arena storage.  Summing those records inflates
-    runtime RAM.  The render plan is the source of truth for what generated C
-    actually allocates: one buffer per scratch/persistent/constant arena.
-    """
-
     buckets: dict[str, list[MemoryConsumer]] = {}
     total_weights = 0
 

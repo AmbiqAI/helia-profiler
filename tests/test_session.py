@@ -187,7 +187,6 @@ def test_session_load_rejects_invalid_envelopes(tmp_path: Path, payload) -> None
 
 def test_session_intent_rejects_non_string_mapping_keys() -> None:
     with pytest.raises(ConfigError, match="mapping keys must be strings"):
-        # Deliberate non-string key: must raise ConfigError.
         hpx.Session.from_dict({1: "numeric", "1": "string"})  # ty: ignore[invalid-argument-type]
 
 
@@ -361,4 +360,4 @@ def test_session_reset_rejects_unknown_kind() -> None:
     with pytest.raises(ConfigError, match="reset kind"):
         hpx.Session().reset(
             kind="typo"  # ty: ignore[invalid-argument-type]
-        )  # deliberate: must raise
+        )

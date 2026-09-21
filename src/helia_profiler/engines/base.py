@@ -49,9 +49,6 @@ class ArenaRegion:
     own size, alignment, and target memory.  The firmware template binds
     each region individually via ``bind_arena()``.
 
-    Replaces the previous ``list[dict[str, Any]]`` shuttle so producers
-    and consumers share a typed contract.
-
     Attributes
     ----------
     region_id:
@@ -115,19 +112,10 @@ class EngineArtifacts:
     #: cross-engine default for a new adapter to inherit by accident.
     engine_header: str
 
-    # Additional NSX modules the profiler app needs (e.g. a local heliaRT wrapper)
     extra_modules: list[NsxModuleRef] = field(default_factory=list)
-
-    # Additional CMake variables to pass during configure
     cmake_vars: dict[str, str] = field(default_factory=dict)
-
-    # Paths to engine-specific source files to include in the build
     source_files: list[Path] = field(default_factory=list)
-
-    # Paths to engine-specific include directories
     include_dirs: list[Path] = field(default_factory=list)
-
-    # Paths to static libraries to link
     static_libs: list[Path] = field(default_factory=list)
 
     # Optional memory plan built from engine-specific internals (e.g.
@@ -161,30 +149,24 @@ class EngineArtifacts:
                 f"got {self.engine_type!r}"
             )
 
-    # -- Resolved engine identity (workspace fingerprint inputs) ------------
-    #
-    # ``dependencies.py`` records the identity the adapter actually
-    # resolved.  These four properties keep that call site engine-agnostic:
-    # the base answers ``None`` and each subclass routes to its own fields.
+    # ``dependencies.py`` records the identity the adapter actually resolved.
+    # These four properties keep that call site engine-agnostic: the base
+    # answers ``None`` and each subclass routes to its own fields.
 
     @property
     def resolved_backend(self) -> str | None:
-        """Engine backend the adapter resolved (None when the engine has none)."""
         return None
 
     @property
     def resolved_version(self) -> str | None:
-        """Engine version the adapter resolved (None when the engine has none)."""
         return None
 
     @property
     def resolved_variant(self) -> str | None:
-        """Engine build variant the adapter resolved (None when the engine has none)."""
         return None
 
     @property
     def resolved_toolchain_tag(self) -> str | None:
-        """Engine toolchain tag the adapter resolved (None when the engine has none)."""
         return None
 
 
@@ -244,11 +226,9 @@ class HeliaAotArtifacts(EngineArtifacts):
     #: Symbol prefix of the generated AOT module.  Required: the firmware
     #: template names every generated entry point through it.
     aot_prefix: str
-    #: NSX module name of the generated AOT module.
     aot_module_name: str
     #: CMake target the app links against (``nsx::<module>``).
     aot_cmake_target: str
-    #: Version of the installed ``helia-aot`` compiler that produced this.
     helia_aot_version: str
 
     #: False when the AOT module expects externally bound arenas.
@@ -320,9 +300,7 @@ class EngineAdapter(Protocol):
     """
 
     @property
-    def name(self) -> str:
-        """Human-readable engine name."""
-        ...
+    def name(self) -> str: ...
 
     @property
     def engine_type(self) -> EngineType:

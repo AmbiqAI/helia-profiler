@@ -88,7 +88,7 @@ class PowerMetadata:
     their ``to_metadata()`` methods.
     """
 
-    # -- Capture provenance (set by the driver) ----------------------------
+    # Capture provenance, set by the driver.
     driver: str | None = None
     device: str | None = None
     io_voltage: float | None = None
@@ -97,7 +97,7 @@ class PowerMetadata:
     stats_rate_hz: int | None = None
     stats_scnt: int | None = None
 
-    # -- Window accounting (set by the driver / internal-mode synthesis) ---
+    # Window accounting, set by the driver or internal-mode synthesis.
     window_count: int | None = None
     gpi_poll_count: int | None = None
     stat_packets: int | None = None
@@ -109,7 +109,7 @@ class PowerMetadata:
     inference_count: int | None = None
     source: str | None = None
 
-    # -- Observation classification (set by capture / pipeline publishers) -
+    # Observation classification, set by capture or pipeline publishers.
     #: ``measurement_scope`` is an extension point: registered third-party
     #: drivers may report scopes HPX does not know (a custom gating scheme).
     #: Known values coerce to the enum in ``__post_init__``; unknown strings
@@ -123,11 +123,11 @@ class PowerMetadata:
     gate_fall_observed: bool | None = None
     observation_deadline_s: float | None = None
 
-    # -- Orchestration records (set by capture/__init__.py) ----------------
+    # Orchestration records, set by capture/__init__.py.
     power_firmware: str | None = None
     power_plan: dict[str, Any] | None = None
 
-    # -- Typed diagnostics — the objects, not their dicts ------------------
+    # Typed diagnostics -- the objects, not their dicts.
     sync: SyncHandshakeMetadata | None = None
     #: Assigned only when at least one transition was timed.
     sync_timing_s: GateTransitionTiming | None = None
@@ -136,7 +136,7 @@ class PowerMetadata:
     window_clock_ceiling: WindowClockCeiling | None = None
     target_lifecycle: "TargetLifecyclePlan | None" = None
 
-    # -- Artifact-only diagnostics, retained for wire stability.
+    # Artifact-only diagnostics, retained for wire stability.
     short_gate_pulse_diagnostics: dict[str, Any] | None = None
     whole_capture_summary: dict[str, Any] | None = None
     fullrate_xcheck: dict[str, Any] | None = None

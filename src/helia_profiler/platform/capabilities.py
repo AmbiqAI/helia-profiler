@@ -56,8 +56,6 @@ class ResetCapabilities:
 
 @dataclass(frozen=True)
 class TransportCapabilities:
-    """Transport-related policy for one SoC."""
-
     #: DWT->CYCCNT lives in the core debug power domain on the Cortex-M4F parts
     #: (Apollo3/3P, Apollo4/4P/4L); the released UART/USB readers must hold a
     #: probe attached for the whole capture or per-layer cycles read back 0.
@@ -72,8 +70,6 @@ class TransportCapabilities:
 
 @dataclass(frozen=True)
 class MemoryCapabilities:
-    """Memory/cache policy for one SoC."""
-
     #: Cache-coherent Cortex-M55 (Apollo5) parts have a CPU D-cache and need
     #: explicit maintenance around host-shared RTT buffers.
     has_dcache: bool
@@ -96,8 +92,6 @@ class MemoryCapabilities:
 
 @dataclass(frozen=True)
 class ClockCapabilities:
-    """Clock/perf policy for one SoC."""
-
     #: Base CPU clock (MHz) above which the firmware must enable burst directly
     #: via the AmbiqSuite HAL because NSX's perf-mode switch is a no-op
     #: (Apollo3/3P TurboSPOT).  ``None`` means NSX handles perf switching.
@@ -154,8 +148,6 @@ class ClockCapabilities:
 
 @dataclass(frozen=True)
 class SocCapabilities:
-    """Bundle of the typed capability records for one SoC."""
-
     reset: ResetCapabilities
     transport: TransportCapabilities
     memory: MemoryCapabilities

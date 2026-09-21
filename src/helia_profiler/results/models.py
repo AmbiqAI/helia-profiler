@@ -39,11 +39,6 @@ class ConsumerKind(StrEnum):
     OTHER = "other"
 
 
-# ---------------------------------------------------------------------------
-# PMU / layer-level results
-# ---------------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
 class LayerResult:
     """Profiling result for a single model layer (averaged across iterations).
@@ -188,11 +183,6 @@ class PmuResult:
     groups: dict[str, list[LayerResult]] = field(default_factory=dict)
 
 
-# ---------------------------------------------------------------------------
-# Run metadata (enriched progressively by pipeline stages)
-# ---------------------------------------------------------------------------
-
-
 @dataclass
 class TimingInfo:
     """Host-observed wall-clock timings for a profiling capture."""
@@ -218,9 +208,9 @@ class PlatformInfo:
     has_mve: bool = False
     profiling_backends: list[str] = field(default_factory=list)
     profiling_domains: list[str] = field(default_factory=list)
-    cpu_clock_name: str = ""  # selected CPU speed name (e.g. "hp")
-    cpu_clock_mhz: int = 0  # selected CPU frequency
-    cpu_perf_tier: str = ""  # NSX perf_mode symbol (e.g. "NSX_PERF_HIGH")
+    cpu_clock_name: str = ""
+    cpu_clock_mhz: int = 0
+    cpu_perf_tier: str = ""
     #: Which linker family built the firmware -- "gnu" (gcc, ATfE: *.ld) or
     #: "armlink" (armclang: scatter). Measured memory used/free are only
     #: comparable WITHIN a family (GNU counts the floating stack inside the
@@ -306,11 +296,6 @@ class RunMetadata:
     dependencies: "DependencyProvenance | None" = None
 
 
-# ---------------------------------------------------------------------------
-# Engine module reference (replaces dict in EngineArtifacts.extra_modules)
-# ---------------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
 class BinarySections:
     """ELF binary section sizes (from ``arm-none-eabi-size``).
@@ -363,11 +348,6 @@ class NsxModuleRef:
     #: silently re-key every existing workspace digest. The default stays
     #: ``""`` for the same reason.
     ref: str | None = ""
-
-
-# ---------------------------------------------------------------------------
-# Memory plan — engine-agnostic view of what sits in each SoC memory region
-# ---------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
@@ -451,11 +431,6 @@ class MemoryPlan:
             if r.region is key:
                 return r
         return None
-
-
-# ---------------------------------------------------------------------------
-# Measured memory regions (#133 Phase 2)
-# ---------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
@@ -549,11 +524,6 @@ class MeasuredMemoryRegions:
         return None
 
 
-# ---------------------------------------------------------------------------
-# Plan-vs-measured reconciliation (#133 Phase 3)
-# ---------------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
 class ConsumerReconciliation:
     """One plan consumer held against the linked binary's symbols.
@@ -607,11 +577,6 @@ class MemoryReconciliation:
     regions: tuple[RegionReconciliation, ...] = ()
 
 
-# ---------------------------------------------------------------------------
-# Top-level result (public API return type)
-# ---------------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
 class ProfileResult:
     """Complete profiling result — the public return type of ``hpx.profile()``.
@@ -628,8 +593,6 @@ class ProfileResult:
     metadata: RunMetadata = field(default_factory=RunMetadata)
     report_paths: list[Path] = field(default_factory=list)
 
-    # -- Convenience accessors (progressive disclosure) --------------------
-
     @property
     def layers(self) -> list[LayerResult]:
         """Merged per-layer results across all PMU presets."""
@@ -637,7 +600,6 @@ class ProfileResult:
 
     @property
     def total_cycles(self) -> float:
-        """Total CPU cycles across all layers."""
         return sum(layer.cycles or 0 for layer in self.pmu.layers)
 
     @property

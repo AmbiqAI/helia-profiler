@@ -14,17 +14,12 @@ from helia_profiler.errors import CaptureError
 from helia_profiler.target.probe import jlink as target_jlink
 
 
-# ---------------------------------------------------------------------------
-# poll_until
-# ---------------------------------------------------------------------------
-
-
 def test_poll_until_returns_true_immediately_when_predicate_satisfied(monkeypatch):
     sleeps: list[float] = []
     monkeypatch.setattr(readiness.time, "sleep", lambda s: sleeps.append(s))
 
     assert poll_until(lambda: True, timeout_s=1.0) is True
-    assert sleeps == []  # never slept — predicate was already true
+    assert sleeps == []
 
 
 def test_poll_until_polls_until_predicate_flips(monkeypatch):
@@ -51,11 +46,6 @@ def test_poll_until_times_out(monkeypatch):
 
     assert poll_until(lambda: False, timeout_s=0.5, interval_s=0.1) is False
     assert clock["t"] >= 0.5
-
-
-# ---------------------------------------------------------------------------
-# resume_if_halted
-# ---------------------------------------------------------------------------
 
 
 # _FakeJLink/_RetryJLink implement only the slice of DebugMemorySession the
@@ -87,11 +77,6 @@ def test_resume_if_halted_noop_when_running(monkeypatch):
 
     assert resume_if_halted(jlink) is False  # ty: ignore[invalid-argument-type]
     assert jlink.restart_calls == 0
-
-
-# ---------------------------------------------------------------------------
-# open_jlink_with_retry
-# ---------------------------------------------------------------------------
 
 
 class _FakeJLinkException(Exception):

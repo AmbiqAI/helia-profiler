@@ -70,7 +70,6 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
     toolchain = ctx.config.target.toolchain
     verbose = ctx.config.verbose
 
-    # Map config toolchain names to nsx CLI values
     nsx_tc = nsx_toolchain(toolchain)
     build_dir = app_dir / "build" / board
     ninja_already_configured = (build_dir / "build.ninja").exists()
@@ -98,9 +97,8 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
                 log.info("Reusing configured deterministic workspace: %s", build_dir)
             nsx_cli.build(app_dir, toolchain=nsx_tc, timeout_s=timeouts.build_s, verbose=verbose)
 
-            # Locate build output. Prefer the ELF-form executable because
-            # later reporting stages run size tools against it to capture
-            # text/data/bss.
+            # Prefer the ELF-form executable: later reporting stages run
+            # size tools against it to capture text/data/bss.
             binary_path = find_target_binary(build_dir, "hpx_profiler")
             if binary_path is None:
                 raise BuildError(
@@ -151,7 +149,6 @@ def find_target_binary(build_dir: Path, target_name: str) -> Path | None:
 
 
 def flash_app(ctx: PipelineContext) -> None:
-    """Invoke ``nsx flash`` to deploy the binary to the target."""
     firmware_dir = ctx.resolved_firmware_dir
     toolchain = ctx.config.target.toolchain
     nsx_tc = nsx_toolchain(toolchain)

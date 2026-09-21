@@ -3,22 +3,21 @@
 The snapshot suite (``test_firmware_render_snapshots.py``) pins renders by
 sha256, which cannot see whether a render *compiles* — an undeclared
 identifier in one render arm, a printf format/arg mismatch, or an orphaned
-variable all render fine and stayed invisible until a bench build (#171
-round 2 is the canonical case).  This gate closes that hole: it renders the
-snapshot module's full scenario matrix (every SoC x transport x engine,
-including the power_only and busy_loop variants), the wire census matrix
-(``test_wire_protocol._MATRIX`` — every condition-variant override set),
-the ``hpx_pmu_profiler.cc`` second TU per SoC, and a full-resolver-plan TU,
-then syntax-checks each unique TU with host
-``g++ -fsyntax-only -std=gnu++17 -Wall -Werror -Wformat`` against an
+variable all render fine and stay invisible until a bench build. This gate
+closes that hole: it renders the snapshot module's full scenario matrix
+(every SoC x transport x engine, including the power_only and busy_loop
+variants), the wire census matrix (``test_wire_protocol._MATRIX`` — every
+condition-variant override set), the ``hpx_pmu_profiler.cc`` second TU per
+SoC, and a full-resolver-plan TU, then syntax-checks each unique TU with
+host ``g++ -fsyntax-only -std=gnu++17 -Wall -Werror -Wformat`` against an
 hpx-owned stub include tree (``tests/fixtures/compile_stubs/``): one
 minimal header per vendor include, declaring exactly the symbols the
 templates use.
 
 Stub maintenance rule (#187): a template that starts using a new vendor
-symbol fails this gate until the stub declares it — loud by construction,
-and the stub diff rides the template PR (same discipline as the wire
-census).  See maintainers/compile-gate.md.
+fails this gate until the stub declares it — loud by construction, and the
+stub diff rides the template PR (same discipline as the wire census). See
+maintainers/compile-gate.md.
 
 ``hpx_printf`` has no format attribute in the templates (the vendor printf
 path is variadic), so the harness force-includes a per-case prelude that
@@ -26,22 +25,18 @@ declares it with ``__attribute__((format(printf, 1, 2)))`` before the TU's
 own definition — that is what arms ``-Wformat`` for the profiler's actual
 output path.
 
-The three ``test_gate_fails_on_*`` self-tests are the acceptance criteria
-from #187: each doctors a rendered TU at string level (no template edits)
-and asserts the SAME harness invocation goes red, proving the gate can see
-each observed bug class.
+The three ``test_gate_fails_on_*`` self-tests each doctor a rendered TU at
+string level (no template edits) and assert the SAME harness invocation
+goes red, proving the gate can see each observed bug class.
 
 Scope / CI wiring: the gate runs only where a REAL GNU g++ exists (probed —
 never trusted by name: on macOS ``g++`` is clang, whose ``-Wall`` implies
 extra warnings (-Wunused-const-variable and friends) this flag set is not
 tuned for, and a MinGW g++ on Windows brings the ms_printf format archetype).
 Linux/GNU-on-ELF hosts run it as part of the normal suite; macOS and Windows
-skip.  A clang lane with its own flag set is possible future work; Tier 2
+skip. A clang lane with its own flag set is possible future work; Tier 2
 (real arm-none-eabi-g++ against a dependency workspace) is a separate
 bench-marked concern.
-
-Runs in ~1 s wall: 150 enumerated scenarios dedup to 90 unique TUs
-(~50-100 ms each), compiled in parallel.
 """
 
 from __future__ import annotations
@@ -94,7 +89,7 @@ if _GXX is None:
     )
 
 # Imports live BELOW the module-level skip on purpose (noqa: E402): the
-# census import renders its whole 79-TU matrix at import time, and a host
+# census import renders its whole scenario matrix at import time, and a host
 # with no GNU g++ should skip before paying for that.
 from helia_profiler.firmware import _jinja_env  # noqa: E402
 from helia_profiler.firmware.op_resolver import _ALL_REGISTRATIONS  # noqa: E402
@@ -102,7 +97,7 @@ from helia_profiler.firmware.op_resolver import _ALL_REGISTRATIONS  # noqa: E402
 # Reuse the render machinery and both scenario matrices wholesale: the
 # snapshot module's matrix is the canonical "every arm renders" enumeration
 # (#187 D2) and the wire census matrix carries every condition-variant
-# override set.  Plain package imports (tests/contracts is a package), the
+# Plain package imports (tests/contracts is a package), the
 # same way test_wire_protocol imports the snapshot module — an importlib
 # re-execution would re-run the snapshot module's _maybe_regenerate() and,
 # under HPX_UPDATE_SNAPSHOTS=1, rewrite the snapshot JSON as a side effect.
@@ -122,13 +117,6 @@ from .test_firmware_render_snapshots import (  # noqa: E402
 from .test_wire_protocol import _MATRIX as _CENSUS_MATRIX  # noqa: E402
 
 _STUB_DIR = Path(__file__).parent.parent / "fixtures" / "compile_stubs"
-
-
-# ---------------------------------------------------------------------------
-# Case model: every compiled TU is (id, text, render vars), where the vars
-# carry the SoC facts the generated per-case headers need
-# (cmsis_device_header, profiling_backends, has_armv8m_pmu, pmu_max_ops).
-# ---------------------------------------------------------------------------
 
 
 @dataclass
@@ -251,12 +239,10 @@ def _build_cases() -> list[_CompileCase]:
             )
         )
 
-    # Wire census matrix: 79 renders including every condition-variant
-    # override set (PSRAM placements, AOT external arenas + const blobs,
-    # Apollo3 burst, clean-window trace, auto window, power sync, hb-ms,
-    # INA228).  _Render appends hpx_pmu_profiler.cc to the TFLM/heliaRT text
-    # for its token census; strip that back off — the .cc is compiled as its
-    # own TU below, as production builds it.
+    # Wire census matrix carries every condition-variant override set.
+    # _render appends hpx_pmu_profiler.cc to the TFLM/heliaRT text for its
+    # token census; strip that back off — the .cc is compiled as its own TU
+    # below, as production builds it.
     for render in _CENSUS_MATRIX:
         text = render.text
         if render.engine.value in ("tflm", "helia-rt"):
@@ -269,7 +255,7 @@ def _build_cases() -> list[_CompileCase]:
             text = text[: -len(cc)]
         cases.append(_CompileCase(case_id=f"census:{render.label}", text=text, vars=render.vars))
 
-    # Full resolver plan (mode="all"): all 92 registrations, max_ops sized to
+    # Full resolver plan (mode="all"): every registration, max_ops sized to
     # match, so every Add* call the production plan can emit is compiled.
     registrations = [code for _, code in _ALL_REGISTRATIONS]
     cases.append(
@@ -354,10 +340,6 @@ def _dedup(cases: list[_CompileCase]) -> list[_CompileCase]:
             by_digest[digest] = case
     return list(by_digest.values())
 
-
-# ---------------------------------------------------------------------------
-# Per-case generated files + compile invocation
-# ---------------------------------------------------------------------------
 
 # The snapshot matrix pins weights_region="mram" (see _common_kwargs), and
 # firmware/__init__.py's _model_to_header emits `static const` for mram —
@@ -470,7 +452,6 @@ _socs_by_header = _build_socs_by_header()
 
 
 def _prepare_case_dir(case: _CompileCase, base: Path) -> Path:
-    """Write the TU plus its generated per-case headers into a dir."""
     case_dir = base / re.sub(r"[^A-Za-z0-9_.-]+", "_", case.case_id)
     case_dir.mkdir(parents=True, exist_ok=True)
     (case_dir / "main.cc").write_text(case.text)
@@ -521,18 +502,16 @@ def _compile(case_dir: Path, part_define: str) -> subprocess.CompletedProcess[st
     )
 
 
-#: Known render bugs the gate found on its first census sweep (#171 class) —
-#: pre-existing template defects, recorded here as STRICT expected failures
-#: rather than fixed, because the templates are out of this contract's
-#: write scope.  Each entry keeps its case red-with-reason; fixing the
-#: template makes the case compile and this test then FAILS until the entry
-#: is removed (strict-xfail semantics), so the ledger cannot go stale.
+#: Known render bugs — pre-existing template defects, recorded here as
+#: STRICT expected failures rather than fixed, because the templates are
+#: out of this contract's write scope. Each entry keeps its case
+#: red-with-reason; fixing the template makes the case compile and this
+#: test then FAILS until the entry is removed (strict-xfail semantics), so
+#: the ledger cannot go stale.
 _EXPECTED_RENDER_BUGS: dict[str, str] = {
-    # Empty since the three findings from the gate's first census sweep
-    # were fixed in the same PR (kArenaPsramOffset weights-only arm, the
-    # ExecuTorch psram-metadata include, the blob-less AOT psram offset).
-    # STRICT semantics: an entry whose case starts compiling fails the
-    # gate until removed, so fixes cannot leave stale expectations.
+    # Empty: no known unfixed render bugs. An entry whose case starts
+    # compiling fails the gate until removed, so fixes cannot leave stale
+    # expectations.
 }
 
 
@@ -582,12 +561,9 @@ def test_every_rendered_firmware_tu_compiles(tmp_path):
     )
 
 
-# ---------------------------------------------------------------------------
-# Self-tests (#187 acceptance): the gate must go red on each bug class the
-# reviews kept finding.  Each doctors ONE rendered TU at string level and
-# asserts the identical harness invocation fails with the expected
-# diagnostic.  apollo510|rtt|tflm is an arbitrary representative case.
-# ---------------------------------------------------------------------------
+# Self-tests: each doctors ONE rendered TU at string level and asserts the
+# identical harness invocation fails with the expected diagnostic.
+# apollo510|rtt|tflm is an arbitrary representative case.
 
 _SELFTEST_SOC = "apollo510"
 # The boot call sequence in every render — a stable, code-context anchor for

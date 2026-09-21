@@ -35,7 +35,6 @@ from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 
 
 def _executorch_artifacts(project: str = "arm-cmsis-nn") -> ExecutorchArtifacts:
-    """Create valid ExecuTorch outputs with the selected provider module."""
     return ExecutorchArtifacts(
         engine_header="nsx_executorch.h",
         executorch_method_arena_size=1024,
@@ -606,11 +605,9 @@ def test_concurrent_workspace_identity_is_atomic(tmp_path: Path) -> None:
     )
 
 
-# ---------------------------------------------------------------------------
 # WORKAROUND AmbiqAI/neuralspotx#218: NSX can honor its packaged registry's
 # module revision over the app's project pin, so the lock's resolved
 # commits are verified against the baseline before a run is trusted.
-# ---------------------------------------------------------------------------
 
 
 def _baseline_ref(ctx: PipelineContext, project: str) -> str:
@@ -713,14 +710,9 @@ def test_unpinned_projects_are_not_baseline_checked(
     _write_valid_lock(ctx, project="demo-project", commit="d" * 40)
     monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
 
-    provenance = prepare_locked_dependencies(ctx)  # must not raise
+    provenance = prepare_locked_dependencies(ctx)
 
     assert provenance.modules[0].project == "demo-project"
-
-
-# ---------------------------------------------------------------------------
-# DependencyError taxonomy — VersionError vs LockError classification.
-# ---------------------------------------------------------------------------
 
 
 def test_lock_schema_version_mismatch_raises_version_error(tmp_path: Path) -> None:

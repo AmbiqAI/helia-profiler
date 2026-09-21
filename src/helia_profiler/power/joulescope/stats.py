@@ -180,7 +180,6 @@ def _counter_rate_ratio(packets: list[dict[str, Any]]) -> dict[str, Any] | None:
 
 
 def _stats_arrays(packets: list[dict[str, Any]]) -> dict[str, Any]:
-    """Vectorise the per-packet fields we use from ``s/stats/value`` packets."""
     import numpy as np
     from pyjoulescope_driver import time64
 
@@ -229,7 +228,6 @@ def _stats_arrays(packets: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def _gated_mask_axis(a: dict[str, Any], *, prefer_device_time: bool = False) -> tuple[Any, str]:
-    """Return the timestamp axis used to align packets with GPI polls."""
     if prefer_device_time:
         return a["mid"], "device_packet_midpoint_time64"
     host_time = a.get("host_time")
@@ -247,9 +245,7 @@ def _map_poll_samples_to_packet_time(
     poll_samples: list[tuple[int, int]],
     minimum_window_s: float = 0.0,
 ) -> list[tuple[int, int]]:
-    """Map host-timestamped GPI polls onto the instrument stats timeline.
-
-    JS220/JS320 ``s/stats`` callbacks can arrive in USB bursts. Selecting
+    """JS220/JS320 ``s/stats`` callbacks can arrive in USB bursts. Selecting
     packets by callback arrival time therefore truncates a correctly observed
     GPIO window. Each packet includes both its instrument midpoint and the
     host timestamp captured at callback arrival. Gate edges must be covered
@@ -304,7 +300,6 @@ def _map_poll_samples_to_packet_time(
 
 
 def _whole_summary_from_stats(packets: list[dict[str, Any]]) -> PowerSummary:
-    """Summarise the entire captured window from on-device stat integrals."""
     from pyjoulescope_driver import time64
 
     a = _stats_arrays(packets)
@@ -435,7 +430,6 @@ def _segment_streamed_gpi(
 
 
 def _streamed_gpi_timebase(frames: list[dict[str, Any]]) -> dict[str, Any]:
-    """Report the frame spacing used for streamed-GPI edges and excluded input."""
     import numpy as np
     from pyjoulescope_driver import time64
 
@@ -538,9 +532,7 @@ def _fullrate_energy_over_windows(
     poll_samples: list[tuple[int, int]],
     windows_override: list[tuple[float, float]] | None = None,
 ) -> dict[str, Any] | None:
-    """Integrate raw full-rate current/voltage over the GPI-high windows.
-
-    Uses a signed rectangular sum, ``sum(I * V) / sample_rate``, rather than
+    """Uses a signed rectangular sum, ``sum(I * V) / sample_rate``, rather than
     the packet-rectified integrals used for the primary gated measurement.
 
     Returns per-window and aggregate energy/charge, or ``None`` if there is
@@ -649,9 +641,7 @@ def _process_gated_stats(
     minimum_window_s: float = 0.0,
     windows_override: list[tuple[float, float]] | None = None,
 ) -> tuple[list[GatedPowerWindow], PowerSummary]:
-    """Integrate the gated window(s) from on-device stat-packet integrals.
-
-    Each packet carries the instrument's full-rate charge/energy integral over a
+    """Each packet carries the instrument's full-rate charge/energy integral over a
     ~1 ms sub-window. Select packets by midpoint, retaining packet-scale
     endpoint uncertainty in the window charge/energy. The per-packet
     avg/max samples within the window yield the spike-robust distribution

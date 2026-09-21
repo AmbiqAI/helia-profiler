@@ -145,7 +145,6 @@ def _cmd_doctor_bundle(
 
 
 def _cmd_engines() -> None:
-    """List available inference engines."""
     from ..console import HpxConsole
 
     console = HpxConsole()
@@ -153,7 +152,6 @@ def _cmd_engines() -> None:
 
 
 def _cmd_boards() -> None:
-    """List supported boards and their SoC capabilities."""
     from ..platform import get_soc, list_boards
     from ..console import HpxConsole
 

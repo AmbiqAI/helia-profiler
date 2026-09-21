@@ -21,7 +21,6 @@ def _cmd_analyze(
     output: Path | None = None,
     board: str = "apollo510_evb",
 ) -> None:
-    """Analyze model compute/parameter breakdown without hardware."""
     from ..evaluation import analyze_for_engine
     from ..modelcost import analyze_model, is_available
     from ..console import HpxConsole
@@ -42,13 +41,11 @@ def _cmd_analyze(
 
     is_aot = engine == EngineType.HELIA_AOT.value
 
-    # --- Original tflite analysis (always needed as baseline) ---
     original = analyze_model(str(model))
     if original is None:
         print("Error: failed to analyze model.", file=sys.stderr)
         sys.exit(1)
 
-    # --- Engine-specific analysis ---
     engine_result: ModelAnalysis | None = None
     if is_aot:
         try:
@@ -70,7 +67,6 @@ def _cmd_analyze(
         primary = original
         reference = None
 
-    # --- Output ---
     if format in ("csv", "json"):
         _write_analysis_file(primary, format, output, reference)
     else:
@@ -83,7 +79,6 @@ def _write_analysis_file(
     output: Path | None,
     aot: "ModelAnalysis | None" = None,
 ) -> None:
-    """Write analysis results to CSV or JSON."""
     import csv
     import json
 

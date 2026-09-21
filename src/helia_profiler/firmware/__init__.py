@@ -94,11 +94,6 @@ if TYPE_CHECKING:
 log = logging.getLogger("hpx")
 
 
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
-
-
 def generate_app(ctx: PipelineContext) -> Path:
     """Render firmware templates into an NSX-compatible profiler app.
 
@@ -127,14 +122,12 @@ def generate_app(ctx: PipelineContext) -> Path:
     power_binary_enabled = config.power.enabled and config.power.firmware is PowerFirmware.DEDICATED
     aot_arena_regions = _resolved_aot_arena_regions(ctx)
 
-    # --- Resolve module list ---
     profile_board = getattr(board, "profile_source_board", board.name)
     module_specs = _resolve_module_specs(
         board.name, profile_board=profile_board, registry=config.platform_registry
     )
     profile = _get_starter_profile(board.name, profile_board=profile_board)
 
-    # Add transport modules when using USB CDC transport
     transport = config.target.transport
     if transport == Transport.USB_CDC:
         module_names = {m.name for m in module_specs}
@@ -145,7 +138,6 @@ def generate_app(ctx: PipelineContext) -> Path:
         if "nsx-usb" not in module_names:
             module_specs.append(NsxModuleSpec("nsx-usb", _module_project("nsx-usb", profile)))
 
-    # Add nsx-psram when using PSRAM (for weights or arena)
     psram_needed = (
         arena_region is Placement.PSRAM
         or weights_region is Placement.PSRAM
@@ -220,7 +212,6 @@ def generate_app(ctx: PipelineContext) -> Path:
             _install_local_module_override(local_board_dir, override.path)
             modules.append({"name": spec.name, "project": spec.project, "local": True})
         elif override and override.path:
-            # Local path override — install into app modules/ and mark local
             matched_overrides.add(spec.name)
             local_mod_dir = app_dir / "modules" / spec.name
             _install_local_module_override(local_mod_dir, override.path)
@@ -338,11 +329,9 @@ def generate_app(ctx: PipelineContext) -> Path:
         )
     )
 
-    # --- Source files ---
     src_dir = app_dir / "src"
     src_dir.mkdir(parents=True, exist_ok=True)
 
-    # --- Copy SEGGER RTT source when using RTT transport ---
     if transport == Transport.RTT:
         _copy_segger_rtt(src_dir, config.target.segger_rtt_path)
 
@@ -370,7 +359,6 @@ def generate_app(ctx: PipelineContext) -> Path:
             _jinja_env.get_template("main_executorch.cc.j2").render(**template_vars),
         )
     elif engine_type is EngineType.HELIA_AOT:
-        # --- AOT engine: use AOT-specific main template, no model embedding ---
         # The heliaAOT adapter is the only producer of this engine_type, and
         # HeliaAotArtifacts pins the pairing, so the narrowing is total — but
         # stated as a raise, not an assert: an assert is stripped under -O
@@ -430,7 +418,7 @@ def generate_app(ctx: PipelineContext) -> Path:
                 ),
             )
     else:
-        # --- TFLM / heliaRT: embed model as byte array, use TFLM profiler ---
+        # TFLM / heliaRT: embed model as byte array, use TFLM profiler.
         if weights_region != "psram":
             model_header = _model_to_header(config.model.path, weights_region)
             _write_text(src_dir / "model_data.h", model_header)
@@ -470,7 +458,6 @@ def generate_app(ctx: PipelineContext) -> Path:
             ),
         )
 
-    # --- Engine modules ---
     # Local modules are vendored into the app under their registry-derived
     # project directory so ``nsx lock`` can resolve them. When the module
     # name differs from the project (e.g. nsx-helia-rt in project helia-rt),

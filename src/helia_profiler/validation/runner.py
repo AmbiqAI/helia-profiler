@@ -43,10 +43,6 @@ _TRANSIENT_POWER_LOCK_MARKERS = (
     "busy during open; retrying",
 )
 
-# ---------------------------------------------------------------------------
-# Result schema
-# ---------------------------------------------------------------------------
-
 
 @dataclass
 class CaseResult:
@@ -108,7 +104,6 @@ class CaseResult:
     power_gate_failure_kind: str | None = None
     aot_operator_count: int | None = None
 
-    # Diagnostics
     output_dir: str | None = None
     stdout_tail: str | None = None
     stderr_tail: str | None = None
@@ -117,11 +112,6 @@ class CaseResult:
 
     def to_dict(self) -> dict[str, Any]:
         return {k: v for k, v in asdict(self).items() if v is not None}
-
-
-# ---------------------------------------------------------------------------
-# Config builder
-# ---------------------------------------------------------------------------
 
 
 def _find_local_cmsis_nn_checkout(repo_root: Path) -> Path | None:
@@ -312,11 +302,6 @@ def _tail_text(stream: str | bytes | None, limit: int = 2000) -> str | None:
         return None
     text = stream.decode("utf-8", errors="replace") if isinstance(stream, bytes) else stream
     return text[-limit:]
-
-
-# ---------------------------------------------------------------------------
-# Case runner
-# ---------------------------------------------------------------------------
 
 
 def _env_truthy(name: str) -> bool:
@@ -519,7 +504,6 @@ def run_case(
     stdout_tail = proc.stdout[-2000:] if proc.stdout else None
     stderr_tail = proc.stderr[-2000:] if proc.stderr else None
 
-    # Persist raw logs for debugging.
     (case_dir / "hpx_stdout.log").write_text(proc.stdout or "")
     (case_dir / "hpx_stderr.log").write_text(proc.stderr or "")
 
@@ -566,7 +550,6 @@ def run_case(
             log_path=log_path,
         )
 
-    # Parse artifacts.
     result = CaseResult(
         case_id=case.case_id,
         status="pass",
@@ -674,9 +657,7 @@ def run_case(
     return result
 
 
-# ---------------------------------------------------------------------------
-# Assertion helpers used by the pytest test bodies
-# ---------------------------------------------------------------------------
+# Assertion helpers below are used by the pytest test bodies.
 
 
 def assert_healthy(result: CaseResult) -> None:

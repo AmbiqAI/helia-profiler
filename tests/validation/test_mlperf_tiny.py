@@ -21,7 +21,6 @@ from helia_profiler.validation.runner import CaseResult, assert_healthy, run_cas
 
 
 def _skip_result(case: CaseSpec, reason: str) -> CaseResult:
-    """Build a CaseResult recording a skipped (known-unsupported) case."""
     return CaseResult(
         case_id=case.case_id,
         status="skip",
@@ -50,7 +49,6 @@ def test_mlperf_tiny_case(
     results_accumulator: list,
     request: pytest.FixtureRequest,
 ) -> None:
-    """Drive one (model × engine × power × board) case through hpx profile."""
     # Skip early if the fixture file isn't present — surfaces LFS misfetch
     # cleanly instead of as a cryptic pipeline error.
     fixture = repo_root / case.model.fixture_for(case.engine)

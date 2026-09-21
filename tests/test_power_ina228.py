@@ -26,11 +26,6 @@ from helia_profiler.power import get_driver, list_drivers
 from helia_profiler.results.issues import IssueCode
 
 
-# ---------------------------------------------------------------------------
-# Config validation
-# ---------------------------------------------------------------------------
-
-
 class TestIna228Config:
     def test_defaults(self):
         ina = Ina228Config(shunt_ohms=2.0)
@@ -168,11 +163,6 @@ class TestPowerConfigIna228Coupling:
         assert config.power.ina228.i2c_iom == 3
 
 
-# ---------------------------------------------------------------------------
-# Driver registration and capability flags
-# ---------------------------------------------------------------------------
-
-
 class TestIna228Driver:
     def test_registered(self):
         assert "ina228" in list_drivers()
@@ -201,11 +191,6 @@ class TestIna228Driver:
 
     def test_ensure_target_powered_is_permissive(self):
         assert get_driver("ina228").ensure_target_powered(required=True) is True
-
-
-# ---------------------------------------------------------------------------
-# Render-context derivation
-# ---------------------------------------------------------------------------
 
 
 def _profile_config(tmp_path: Path, power: dict):
@@ -411,11 +396,6 @@ class TestPowerMonitorContext:
         assert PowerMonitorContext.from_config(config).ina228_calibration_id == "bench-A"
 
 
-# ---------------------------------------------------------------------------
-# Envelope wire-format round trip (exactly what _power_terminal.j2 emits)
-# ---------------------------------------------------------------------------
-
-
 def _success_record() -> str:
     return (
         "--- HPX_POWER_TERMINAL_START ---\n"
@@ -442,6 +422,8 @@ def _success_record() -> str:
 
 
 class TestIna228EnvelopeWireFormat:
+    """Must match exactly what _power_terminal.j2 emits."""
+
     def test_success_record_round_trips(self):
         envelope = parse_power_terminal_envelope(_success_record().splitlines())
         measurement = envelope.measurement

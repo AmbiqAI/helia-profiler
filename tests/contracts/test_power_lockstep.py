@@ -9,8 +9,7 @@ Three invariants:
    power gate.
 
 2. **Lock-step defaults ON for every wired board doing gated external
-   capture** (issue #114).  An explicit setting still wins in both
-   directions.
+   capture.**  An explicit setting still wins in both directions.
 
 3. **``auto`` never cycles the rail.** The default/``auto`` reset policy uses
    debug/SWPOI reset primitives only.  Instrument rail power-cycling happens
@@ -172,7 +171,6 @@ class TestLockstepArmBeforeReset:
         result = capture_power(ctx, prepare_target=_prepare_target)
 
         assert result is not None
-        # The arm must happen before the reset that starts the measured run.
         assert events.index("arm") < events.index("lifecycle_reset")
         # The GPI poller must be live BEFORE the lifecycle reset, so the reset
         # + READY handshake happen inside capture_gated's on_started hook:
@@ -333,7 +331,7 @@ class TestLockstepDefaultsOnWhenWired:
         )
         power = ctx.config.power
         rendered = _jinja_env.get_template("_gpio_sync.j2").render(
-            power_sync_enabled=True,  # external power capture is requested
+            power_sync_enabled=True,
             lockstep=resolve_power_lockstep(ctx),
             sync_gpio_pin=power.sync_gpio_pin,
             state_gpio_pin=power.state_gpio_pin,

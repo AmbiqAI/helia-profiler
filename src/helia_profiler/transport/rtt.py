@@ -702,8 +702,6 @@ class RttTransport(BaseCaptureTransport):
         super().prepare(ctx, args)
         from ..capture.rtt_symbol import resolve_rtt_control_block_address
 
-        # Recover the linked RTT control block address from the build artifacts
-        # so capture can attach directly and skip the slow SWD discovery sweep.
         self._known_block_address = resolve_rtt_control_block_address(
             args.build_dir, ctx.config.target.toolchain
         )

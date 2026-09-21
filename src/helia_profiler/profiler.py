@@ -41,7 +41,6 @@ def build_default_pipeline(
     *,
     progress_sink: ProgressSink | None = None,
 ) -> PipelineRunner:
-    """Create the standard profiling pipeline with all stages."""
     return PipelineRunner(
         [
             PreflightStage(),
@@ -74,10 +73,8 @@ def run_profile(
     console: HpxConsole | None = None,
     progress_sink: ProgressSink | None = None,
 ) -> PipelineContext:
-    """Execute the full profiling pipeline.
-
-    Returns the final ``PipelineContext`` with all captured data and report
-    paths.  Raises ``HpxError`` (or a subclass) on failure — errors are never
+    """Return the final ``PipelineContext`` with all captured data and report
+    paths. Raises ``HpxError`` (or a subclass) on failure — errors are never
     swallowed silently.
     """
     if console is None:

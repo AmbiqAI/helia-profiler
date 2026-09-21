@@ -77,10 +77,6 @@ ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "src" / "helia_profiler"
 
 
-# ---------------------------------------------------------------------------
-# Extraction: HPX_ tokens that live inside C string literals
-# ---------------------------------------------------------------------------
-
 #: A token as it appears in a printf format: upper-case identifier characters,
 #: plus the ``%d`` conversions heliaAOT embeds in its per-index key names.
 _TOKEN_RE = re.compile(r"HPX_(?:[A-Z0-9_]|%[a-z])+")
@@ -192,10 +188,6 @@ def _bare_tokens(text: str) -> set[str]:
     """``HPX_`` identifiers in the code itself — the ``#define`` namespace."""
     return set(_TOKEN_RE.findall(_split_c(text)[1]))
 
-
-# ---------------------------------------------------------------------------
-# The render matrix
-# ---------------------------------------------------------------------------
 
 _SOCS = ("apollo3p", "apollo4p", "apollo510")
 _TRANSPORTS = ("rtt", "usb_cdc", "swo", "uart")
@@ -317,7 +309,6 @@ def _matrix() -> list[_Render]:
                 _Render(f"{soc}|rtt|{engine}|power", soc, "rtt", engine, power_only=True)
             )
 
-    # --- targeted condition variants ------------------------------------
     # Each entry flips one declarative condition; the census below asserts
     # that WIRE_CONDITIONS is exactly the set these renders exercise.
     renders += [
@@ -595,11 +586,6 @@ def _matrix() -> list[_Render]:
 _MATRIX = _matrix()
 
 
-# ---------------------------------------------------------------------------
-# The declarative conditions, as predicates over the render inputs
-# ---------------------------------------------------------------------------
-
-
 def _regions(v: dict) -> list[dict]:
     return list(v.get("arena_regions") or [])
 
@@ -703,11 +689,6 @@ def _expected_tokens(render: _Render) -> set[str]:
         if condition is None or _PREDICATES[condition](render.vars):
             expected.add(token)
     return expected
-
-
-# ---------------------------------------------------------------------------
-# Registry self-consistency
-# ---------------------------------------------------------------------------
 
 
 def test_every_condition_has_a_predicate_and_vice_versa():
@@ -910,11 +891,6 @@ def test_the_binary_axis_agrees_with_the_condition():
             )
 
 
-# ---------------------------------------------------------------------------
-# The census
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.parametrize("render", _MATRIX, ids=lambda r: r.label)
 def test_render_emits_exactly_what_the_registry_declares(render: _Render):
     expected = _expected_tokens(render)
@@ -987,11 +963,6 @@ def test_no_macro_name_ever_reaches_a_string():
                 f"{render.label}: {token} is a registered wire token but this "
                 "render references it as a bare identifier"
             )
-
-
-# ---------------------------------------------------------------------------
-# Catalogue pins
-# ---------------------------------------------------------------------------
 
 
 def test_error_code_catalogue():
@@ -1286,11 +1257,6 @@ def test_csv_row_format_is_pinned_per_engine():
     # Cortex-M4 profiler folds it into the single call pinned above.
     for label, text in (("tflm", tflm), ("helia-aot", aot), ("executorch", et)):
         assert 'hpx_printf(",%d\\n"' in text, label
-
-
-# ---------------------------------------------------------------------------
-# Emission discipline
-# ---------------------------------------------------------------------------
 
 
 def _dunder_all_positions(source: str) -> set[tuple[int, int]]:

@@ -36,7 +36,6 @@ def test_profile_help_describes_resolved_defaults() -> None:
 
 
 def test_pmu_counters_repeatable_option_builds_list(monkeypatch) -> None:
-    """Multiple --pmu-counters occurrences replace argparse's old nargs='+' form."""
     import helia_profiler.cli.profile_cmd as profile_cmd
 
     seen: dict[str, dict] = {}
@@ -63,7 +62,6 @@ def test_pmu_counters_repeatable_option_builds_list(monkeypatch) -> None:
 
 
 def test_profile_forwards_fail_on_invalid(monkeypatch) -> None:
-    """#197/#208: --fail-on-invalid must reach the implementation keyword."""
     import helia_profiler.cli.profile_cmd as profile_cmd
 
     seen: dict[str, dict] = {}

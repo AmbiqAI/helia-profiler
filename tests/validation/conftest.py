@@ -19,11 +19,6 @@ from helia_profiler.validation.runner import CaseResult
 from helia_profiler.validation.report import write_validation_reports
 
 
-# ---------------------------------------------------------------------------
-# CLI options
-# ---------------------------------------------------------------------------
-
-
 def pytest_addoption(parser: pytest.Parser) -> None:
     grp = parser.getgroup("mlperf-validation")
     grp.addoption(
@@ -137,11 +132,6 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 
-# ---------------------------------------------------------------------------
-# Parametrisation
-# ---------------------------------------------------------------------------
-
-
 def _split_csv(raw: str) -> list[str] | None:
     raw = (raw or "").strip()
     if not raw:
@@ -224,11 +214,7 @@ def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
     )
 
 
-# ---------------------------------------------------------------------------
-# Session state — collects CaseResult per test, dumps report at end
-# ---------------------------------------------------------------------------
-
-
+# Session state: collects CaseResult per test, dumps report at end.
 _RESULTS_KEY = pytest.StashKey[list[CaseResult]]()
 
 

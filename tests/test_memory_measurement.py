@@ -24,7 +24,6 @@ FIXTURES = Path(__file__).parent / "fixtures" / "readelf"
 
 @pytest.fixture
 def gcc_inventory(monkeypatch):
-    """Route the tool probes at the committed real captures."""
     import helia_profiler.hostenv.toolchain_probe as tp
 
     sections_text = (FIXTURES / "sections.txt").read_text()
@@ -305,11 +304,6 @@ def test_serialised_shape_is_the_contract():
     assert region["free"] == 241_664 - 1000
     assert region["window"] == {"start": 0x20000000, "length": 262_144}
     assert payload["unattributed"] == [{"name": ".x", "address": 0, "size": 1}]
-
-
-# ---------------------------------------------------------------------------
-# Phase 3: symbol inventory + reconciliation
-# ---------------------------------------------------------------------------
 
 
 class TestSymbolInventory:

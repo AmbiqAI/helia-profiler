@@ -1,5 +1,3 @@
-"""Tests for the PMU counter registry module."""
-
 from __future__ import annotations
 
 import pytest

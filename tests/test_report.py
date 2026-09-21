@@ -270,7 +270,6 @@ def test_write_summary_surfaces_the_clean_window_self_check(tmp_path: Path):
     ):
         assert key not in silent["latency"], key
 
-    # And the fallback branch carries them too, for a capture with no timing.
     ctx.run_metadata.timing = None
     set_profile_result(
         ctx,
@@ -1336,12 +1335,10 @@ def test_write_summary_flags_zero_device_cycles_as_suspect(tmp_path: Path):
     assert "gated_window_duration_ratio" not in summary["power"]
 
 
-# ---------------------------------------------------------------------------
 # #240 — TOPS / tops_per_watt divide by the window's own inference count.
 # total_ops is PER-INFERENCE, so a window of N inferences must scale by N;
 # the count is resolved per measurement scope, and suppressed where there is
 # no inference-bracketed window. No test pinned the multiplier before #240.
-# ---------------------------------------------------------------------------
 
 _TOPS_OPS = 5_000_000  # large enough that a real N does not round to 0.0
 

@@ -245,15 +245,15 @@ class TestRunAotCompilerUsesConfigRegistry:
 
         fake_defines = types.ModuleType("helia_aot.cli.defines")
         fake_defines.ConvertArgs = (  # ty: ignore[unresolved-attribute]
-            _FakeConvertArgs  # fake module built dynamically
+            _FakeConvertArgs
         )
         fake_cli = types.ModuleType("helia_aot.cli")
         fake_cli.defines = (  # ty: ignore[unresolved-attribute]
-            fake_defines  # fake module built dynamically
+            fake_defines
         )
         fake_converter_mod = types.ModuleType("helia_aot.converter")
         fake_converter_mod.AotConverter = (  # ty: ignore[unresolved-attribute]
-            _FakeAotConverter  # fake module built dynamically
+            _FakeAotConverter
         )
         fake_top_defines = types.ModuleType("helia_aot.defines")
 
@@ -261,17 +261,17 @@ class TestRunAotCompilerUsesConfigRegistry:
             nsx = "nsx"
 
         fake_top_defines.ModuleType = (  # ty: ignore[unresolved-attribute]
-            _ModuleTypeEnum  # fake module built dynamically
+            _ModuleTypeEnum
         )
         fake_helia_aot = types.ModuleType("helia_aot")
         fake_helia_aot.cli = (  # ty: ignore[unresolved-attribute]
-            fake_cli  # fake module built dynamically
+            fake_cli
         )
         fake_helia_aot.converter = (  # ty: ignore[unresolved-attribute]
-            fake_converter_mod  # fake module built dynamically
+            fake_converter_mod
         )
         fake_helia_aot.defines = (  # ty: ignore[unresolved-attribute]
-            fake_top_defines  # fake module built dynamically
+            fake_top_defines
         )
 
         monkeypatch.setitem(sys.modules, "helia_aot", fake_helia_aot)

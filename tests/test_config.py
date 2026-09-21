@@ -1,5 +1,3 @@
-"""Basic tests for ProfileConfig construction."""
-
 import importlib
 import json
 from pathlib import Path
@@ -29,7 +27,6 @@ from helia_profiler.power.base import PowerMode
 
 
 def test_load_config_from_cli_overrides():
-    """Config should be constructible from CLI overrides alone."""
     cli = {
         "model": {"path": "test.tflite", "arena_size": 32768},
         "engine": {"type": "helia-rt"},
@@ -80,9 +77,6 @@ def test_aggregation_cli_override():
     assert config.profiling.aggregation == "trimmed"
 
 
-# ---------------------------------------------------------------------------
-# Closed config vocabularies (#162 Phase 3)
-# ---------------------------------------------------------------------------
 # Each member VALUE is user- and wire-visible: it is what a config YAML says,
 # what the CLI --choices accept, what the Jinja render compares against, and
 # what lands in config_snapshot / config_sha256 / the run manifest.  Renaming
@@ -193,7 +187,6 @@ def test_config_enum_field_rejects_unknown_value(section, field, enum_cls, defau
 
 
 def test_jlink_serial_from_cli():
-    """jlink_serial should be settable via CLI overrides."""
     cli = {
         "model": {"path": "test.tflite"},
         "engine": {"type": "helia-rt"},
@@ -259,7 +252,6 @@ def test_invalid_psram_clock_rejected():
 
 
 def test_config_is_frozen():
-    """ProfileConfig should be immutable."""
     cli = {
         "model": {"path": "test.tflite"},
         "engine": {"type": "helia-rt"},
@@ -267,7 +259,6 @@ def test_config_is_frozen():
     config = load_config(None, cli)
 
     try:
-        # Deliberate invalid assignment: proves the dataclass is frozen.
         config.verbose = 5  # ty: ignore[invalid-assignment]
         assert False, "Should have raised FrozenInstanceError"
     except AttributeError:
@@ -275,7 +266,6 @@ def test_config_is_frozen():
 
 
 def test_timeouts_defaults():
-    """TimeoutsConfig should be populated with defaults when unspecified."""
     cli = {
         "model": {"path": "test.tflite"},
         "engine": {"type": "helia-rt"},
@@ -292,7 +282,6 @@ def test_timeouts_defaults():
 
 
 def test_timeouts_overrides():
-    """YAML/CLI overrides should flow into TimeoutsConfig."""
     cli = {
         "model": {"path": "test.tflite"},
         "engine": {"type": "helia-rt"},
@@ -307,18 +296,11 @@ def test_timeouts_overrides():
     assert t.build_s == 900
     assert t.flash_s == 60
     assert t.download_asset_s == 1200
-    # Unspecified values retain defaults
     assert t.configure_s == 120
     assert t.toolchain_probe_s == 5
 
 
-# ---------------------------------------------------------------------------
-# BuildConfig / NSX module overrides
-# ---------------------------------------------------------------------------
-
-
 def test_build_config_defaults():
-    """BuildConfig should be present with defaults when unspecified."""
     cli = {
         "model": {"path": "test.tflite"},
         "engine": {"type": "helia-rt"},
@@ -371,7 +353,6 @@ def test_tflm_engine_is_accepted():
 
 
 def test_build_config_channel_override():
-    """Channel override should flow through from YAML/CLI."""
     cli = {
         "model": {"path": "test.tflite"},
         "engine": {"type": "helia-rt"},
@@ -382,7 +363,6 @@ def test_build_config_channel_override():
 
 
 def test_build_config_nsx_module_path_override():
-    """Local path override for an NSX module."""
     cli = {
         "model": {"path": "test.tflite"},
         "engine": {"type": "helia-rt"},
@@ -400,7 +380,6 @@ def test_build_config_nsx_module_path_override():
 
 
 def test_build_config_nsx_module_ref_override():
-    """Git ref override for an NSX module."""
     cli = {
         "model": {"path": "test.tflite"},
         "engine": {"type": "helia-rt"},
@@ -418,7 +397,6 @@ def test_build_config_nsx_module_ref_override():
 
 
 def test_build_config_nsx_module_version_override():
-    """Version pin override for an NSX module."""
     cli = {
         "model": {"path": "test.tflite"},
         "engine": {"type": "helia-rt"},
@@ -436,7 +414,6 @@ def test_build_config_nsx_module_version_override():
 
 
 def test_build_config_multiple_overrides():
-    """Multiple NSX module overrides in one config."""
     cli = {
         "model": {"path": "test.tflite"},
         "engine": {"type": "helia-rt"},
@@ -457,36 +434,22 @@ def test_build_config_multiple_overrides():
     assert config.build.nsx_modules["nsx-gpio"].version == "3.0.0"
 
 
-# ---------------------------------------------------------------------------
-# NsxModuleOverride validation
-# ---------------------------------------------------------------------------
-
-
 def test_nsx_module_override_rejects_no_mode():
-    """NsxModuleOverride must have at least one mode set."""
     with pytest.raises(ConfigError, match="exactly one"):
         NsxModuleOverride()
 
 
 def test_nsx_module_override_rejects_multiple_modes():
-    """NsxModuleOverride rejects more than one mode."""
     with pytest.raises(ConfigError, match="only one"):
         NsxModuleOverride(path=Path("/x"), ref="main")
 
 
 def test_nsx_module_override_rejects_all_three():
-    """NsxModuleOverride rejects all three modes set."""
     with pytest.raises(ConfigError, match="only one"):
         NsxModuleOverride(path=Path("/x"), ref="main", version="1.0.0")
 
 
-# ---------------------------------------------------------------------------
-# Channel validation
-# ---------------------------------------------------------------------------
-
-
 def test_build_config_invalid_channel():
-    """Invalid channel names should raise ConfigError."""
     cli = {
         "model": {"path": "test.tflite"},
         "engine": {"type": "helia-rt"},
@@ -497,7 +460,6 @@ def test_build_config_invalid_channel():
 
 
 def test_build_config_channel_rejects_empty():
-    """Empty string channel should be rejected."""
     cli = {
         "model": {"path": "test.tflite"},
         "engine": {"type": "helia-rt"},
@@ -507,13 +469,7 @@ def test_build_config_channel_rejects_empty():
         load_config(None, cli)
 
 
-# ---------------------------------------------------------------------------
-# Malformed nsx_modules spec
-# ---------------------------------------------------------------------------
-
-
 def test_build_config_malformed_module_spec():
-    """Non-dict module spec should raise ConfigError."""
     cli = {
         "model": {"path": "test.tflite"},
         "engine": {"type": "helia-rt"},
@@ -582,11 +538,6 @@ def test_custom_soc_and_board_are_available_via_platform_registry():
     assert board.profile_source_board == "apollo510_evb"
 
 
-# ---------------------------------------------------------------------------
-# load_config error wrapping (FIX 3)
-# ---------------------------------------------------------------------------
-
-
 def test_load_config_missing_file_raises_config_error(tmp_path: Path):
     """A --config path that doesn't exist should raise ConfigError, not FileNotFoundError."""
     missing = tmp_path / "does-not-exist.yaml"
@@ -603,7 +554,6 @@ def test_load_config_malformed_yaml_raises_config_error(tmp_path: Path):
 
 
 def test_load_config_non_dict_yaml_raises_config_error(tmp_path: Path):
-    """A YAML file whose top-level value is not a mapping should raise ConfigError."""
     not_a_dict = tmp_path / "list.yaml"
     not_a_dict.write_text("- one\n- two\n")
     with pytest.raises(ConfigError, match="must contain a YAML mapping"):
@@ -676,11 +626,6 @@ def test_extreme_mode_and_force_shared_sram_are_mutually_exclusive():
         load_config(None, cli_one)
 
 
-# ---------------------------------------------------------------------------
-# Output format restrictions (FIX 5)
-# ---------------------------------------------------------------------------
-
-
 def test_model_explorer_rejected_as_primary_output_format():
     cli = {
         "model": {"path": "m.tflite"},
@@ -689,11 +634,6 @@ def test_model_explorer_rejected_as_primary_output_format():
     }
     with pytest.raises(ConfigError, match="model-explorer"):
         load_config(None, cli)
-
-
-# ---------------------------------------------------------------------------
-# Toolchain gcc alias normalization (FIX 6)
-# ---------------------------------------------------------------------------
 
 
 def test_gcc_toolchain_alias_normalized_to_arm_none_eabi_gcc():
@@ -706,21 +646,10 @@ def test_gcc_toolchain_alias_normalized_to_arm_none_eabi_gcc():
     assert config.target.toolchain is Toolchain.ARM_NONE_EABI_GCC
 
 
-# ---------------------------------------------------------------------------
-# Public exports (FIX 1)
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.parametrize("name", importlib.import_module("helia_profiler").__all__)
 def test_public_export_resolvable(name: str):
-    """Every name in helia_profiler.__all__ must be importable from the package root."""
     pkg = importlib.import_module("helia_profiler")
     assert hasattr(pkg, name), f"helia_profiler.{name} is not resolvable"
-
-
-# ---------------------------------------------------------------------------
-# ProfileResult.power typing (FIX 2)
-# ---------------------------------------------------------------------------
 
 
 def test_profile_result_power_accepts_power_result_and_none():

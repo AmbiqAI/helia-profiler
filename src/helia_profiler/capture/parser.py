@@ -58,7 +58,6 @@ _HEARTBEAT_COUNT = "heartbeat_count"
 _LAST_HEARTBEAT = "last_heartbeat"
 _ANNOUNCED_CLEAN_ITERS = "announced_clean_iters"
 
-# Columns that carry string identifiers, not numeric values.
 _STRING_COLS = frozenset({"Layer", "Op", "tag", "name", "overflow"})
 
 # A per-layer counter at or above this value is treated as a uint32 underflow
@@ -125,7 +124,6 @@ def parse_firmware_output(
                 meta_kv[_ANNOUNCED_CLEAN_ITERS] = int(m_iters.group(1))
             continue
 
-        # HPX_KEY=value metadata lines
         m = KEY_VALUE_RE.match(line)
         if m:
             key = m.group(1).lower()
@@ -137,7 +135,6 @@ def parse_firmware_output(
             meta_kv[key] = val
             continue
 
-        # --- HPX_PRESET name ---
         m = HPX_PRESET_SENTINEL_RE.match(line)
         if m:
             if current_preset is not None:
@@ -147,7 +144,6 @@ def parse_firmware_output(
             presets[preset_name] = current_preset
             continue
 
-        # Iteration boundary
         m = HPX_ITER_SENTINEL_RE.match(line)
         if m:
             # Auto-create a default preset for legacy single-preset streams
@@ -157,11 +153,9 @@ def parse_firmware_output(
             current_preset.start_iteration()
             continue
 
-        # CSV header or data rows within an iteration
         if current_preset is not None and current_preset.in_iteration:
             current_preset.feed_line(line)
 
-    # Build FirmwareMeta from key-value pairs
     preset_names_str = meta_kv.get(WireKey.PRESETS, "")
     preset_names = (
         tuple(preset_names_str.split(","))
@@ -211,7 +205,6 @@ def parse_firmware_output(
         presets=preset_names,
     )
 
-    # Build per-preset typed results
     typed_presets: dict[str, PresetResult] = {}
     for name, pd in presets.items():
         avg_layers = _average_iterations(pd.iterations, pd.header or [], aggregation=aggregation)
@@ -223,9 +216,6 @@ def parse_firmware_output(
             layers=avg_layers,
         )
 
-    # --- Post-parse validation ---
-
-    # HPX protocol version check
     version = meta_kv.get(WireKey.VERSION)
     if version is not None and version != HPX_PROTOCOL_VERSION:
         log.warning(
@@ -235,7 +225,6 @@ def parse_firmware_output(
             HPX_PROTOCOL_VERSION,
         )
 
-    # Report accumulated parse errors
     total_parse_errors = sum(pd.parse_errors for pd in presets.values())
     if total_parse_errors > 0:
         log.warning(
@@ -244,7 +233,6 @@ def parse_firmware_output(
             total_parse_errors,
         )
 
-    # Check iteration consistency within each preset
     for name, pd in presets.items():
         layer_counts = [len(it) for it in pd.iterations]
         if layer_counts and len(set(layer_counts)) > 1:
@@ -255,15 +243,9 @@ def parse_firmware_output(
                 layer_counts,
             )
 
-    # Merge layers across all presets
     merged_layers = _merge_presets(typed_presets)
-
-    # Build per-group (compute-unit) merged layer sets.
-    # Pass names follow the convention ``<group>_<index>`` (e.g. mve_0,
-    # mve_1) for the new counter system, or plain preset names for legacy.
     groups = _group_presets(typed_presets)
 
-    # Detect overflow across all presets
     overflow_detected = any(
         layer.overflow
         for pr in typed_presets.values()
@@ -287,11 +269,6 @@ def parse_firmware_output(
     )
 
 
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
-
-
 class _PresetData:
     """Accumulator for a single PMU preset's iterations."""
 
@@ -300,7 +277,7 @@ class _PresetData:
         self.header: list[str] | None = None
         self._current_layers: list[dict[str, Any]] | None = None
         self.in_iteration = False
-        self.parse_errors: int = 0  # count of malformed/corrupted rows
+        self.parse_errors: int = 0
 
     def start_iteration(self) -> None:
         if self._current_layers is not None:
@@ -342,13 +319,11 @@ class _PresetData:
             for col, val_str in zip(self.header, row):
                 val_str = val_str.strip()
                 if col in _STRING_COLS:
-                    # String columns: try int for Layer/overflow, else keep string
                     try:
                         layer[col] = int(val_str)
                     except ValueError:
                         layer[col] = val_str
                 else:
-                    # Numeric PMU counter columns: must be numeric
                     try:
                         layer[col] = int(val_str)
                     except ValueError:
@@ -387,7 +362,6 @@ def _row_is_frozen(row: dict[str, Any], numeric_cols: list[str]) -> bool:
 
 
 def _aggregate(vals: list[float], method: Aggregation) -> float:
-    """Reduce per-iteration samples to a single value via *method*."""
     if not vals:
         return 0.0
     if method == Aggregation.MEAN:
@@ -395,8 +369,6 @@ def _aggregate(vals: list[float], method: Aggregation) -> float:
     if method == Aggregation.MEDIAN:
         return float(statistics.median(vals))
     if method == Aggregation.TRIMMED:
-        # Drop one low and one high extreme, then mean.  Needs >=3 samples to
-        # trim; otherwise fall back to a plain mean.
         if len(vals) >= 3:
             ordered = sorted(vals)[1:-1]
             return sum(ordered) / len(ordered)
@@ -527,7 +499,6 @@ def _average_iterations(
 
         cycles = counters.get("ARM_PMU_CPU_CYCLES")
 
-        # Propagate overflow flag (true if ANY iteration had overflow)
         overflow_count = sum(1 for _, row in rows if row.get("overflow", 0) not in (0, "0", False))
 
         averaged.append(
@@ -558,7 +529,6 @@ def _raw_iterations_to_typed(
     iterations: list[list[dict[str, Any]]],
     header: list[str],
 ) -> list[list[LayerResult]]:
-    """Convert raw iteration dicts into typed LayerResult lists."""
     numeric_cols = [c for c in header if c not in _STRING_COLS]
     typed: list[list[LayerResult]] = []
     for iteration in iterations:

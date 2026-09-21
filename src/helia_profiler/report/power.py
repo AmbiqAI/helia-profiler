@@ -46,7 +46,6 @@ def _write_power_csv(power: PowerResult, output_dir: Path) -> Path:
         writer.writerow([scope, "duration_s", summary.duration_s])
         writer.writerow([scope, "sample_count", summary.sample_count])
 
-        # Per-window detail for gated captures.
         for i, w in enumerate(power.gated_windows):
             writer.writerow([f"gated_window_{i}", "start_s", w.start_s])
             writer.writerow([f"gated_window_{i}", "duration_s", w.duration_s])

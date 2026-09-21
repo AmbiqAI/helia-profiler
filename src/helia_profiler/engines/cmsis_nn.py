@@ -21,9 +21,8 @@ from ..results import NsxModuleRef
 
 log = logging.getLogger("hpx")
 
-# NSX registry identity for ns-cmsis-nn.
 CMSIS_NN_PROJECT = "ns-cmsis-nn"  # registry project (path: modules/ns-cmsis-nn)
-CMSIS_NN_MODULE = "nsx-cmsis-nn"  # registry module name
+CMSIS_NN_MODULE = "nsx-cmsis-nn"
 
 
 def _float_compute_types(config: ProfileConfig) -> set[int] | None:
@@ -65,7 +64,6 @@ def cmsis_nn_cmake_vars(config: ProfileConfig) -> dict[str, str]:
 
 
 def _baseline_cmsis_nn_ref(config: ProfileConfig) -> str:
-    """The compatibility baseline's qualified ``nsx-cmsis-nn`` ref."""
     return config.compatibility_baseline.module(CMSIS_NN_MODULE).ref
 
 
@@ -121,7 +119,6 @@ def cmsis_nn_module_ref(config: ProfileConfig, work_dir: Path) -> NsxModuleRef:
 
 
 def _validate_cmsis_nn(path: Path) -> None:
-    """Verify the local source layout before vendoring the native NSX module."""
     if not path.is_dir():
         raise EngineError(f"CMSIS-NN path does not exist: {path}")
     for d in ("Include", "Source"):
@@ -130,11 +127,6 @@ def _validate_cmsis_nn(path: Path) -> None:
                 f"CMSIS-NN path missing '{d}/' directory: {path}",
                 hint="Expected an ns-cmsis-nn repository with Include/ and Source/.",
             )
-
-
-# ---------------------------------------------------------------------------
-# NSX module generation — CMSIS-NN
-# ---------------------------------------------------------------------------
 
 
 def _write_cmsis_nn_wrapper(module_dir: Path, cmsis_nn_path: Path) -> None:
@@ -162,7 +154,6 @@ def _write_cmsis_nn_wrapper(module_dir: Path, cmsis_nn_path: Path) -> None:
 
     log.info("Using native nsx/ module from %s", cmsis_nn_path)
 
-    # Copy the native manifest to the module root
     shutil.copy2(native_nsx / "nsx-module.yaml", module_dir / "nsx-module.yaml")
 
     # Place the native CMakeLists.txt in a subdirectory so its
@@ -172,12 +163,11 @@ def _write_cmsis_nn_wrapper(module_dir: Path, cmsis_nn_path: Path) -> None:
     nsx_subdir.mkdir(exist_ok=True)
     shutil.copy2(native_nsx / "CMakeLists.txt", nsx_subdir / "CMakeLists.txt")
 
-    # Root shim delegates to the native build
     (module_dir / "CMakeLists.txt").write_text(
         "# Shim — delegates to the native ns-cmsis-nn NSX build.\nadd_subdirectory(nsx)\n"
     )
 
-    # Copy the CMSIS-NN source tree into the module (no symlinks — Windows-safe)
+    # No symlinks — Windows-safe.
     for d in ("Include", "Source", "cmake"):
         target = module_dir / d
         source = cmsis_nn_path / d

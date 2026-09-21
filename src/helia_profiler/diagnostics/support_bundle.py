@@ -42,10 +42,6 @@ from ..results.support_bundle import (
     SupportBundleSection,
 )
 
-# ---------------------------------------------------------------------------
-# Options and in-memory collection result
-# ---------------------------------------------------------------------------
-
 
 @dataclass(frozen=True)
 class SupportBundleOptions:
@@ -72,11 +68,6 @@ class SupportBundleCollection:
 
     manifest: SupportBundleManifest
     members: dict[str, bytes]
-
-
-# ---------------------------------------------------------------------------
-# Collection
-# ---------------------------------------------------------------------------
 
 
 def collect_support_bundle(
@@ -480,10 +471,6 @@ def _build_manifest(
         artifacts=artifacts,
     )
 
-
-# ---------------------------------------------------------------------------
-# Deterministic archive writing and verification
-# ---------------------------------------------------------------------------
 
 _ZIP_FIXED_DATE_TIME = (1980, 1, 1, 0, 0, 0)
 _UNSAFE_VERSION_CHARS = re.compile(r"[^A-Za-z0-9_.-]+")

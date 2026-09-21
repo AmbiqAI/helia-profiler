@@ -1,11 +1,3 @@
-"""Tests for the ``hpx doctor --bundle`` field-diagnostics support archive.
-
-Covers: collector partial failure (missing workspace/config/tools), offline
-operation, opt-in raw probe identifiers, exact Stage 5 dependency lock
-provenance inclusion, deterministic archive naming/manifest/member order,
-archive self-verification, and rejection of malformed/hostile archives.
-"""
-
 from __future__ import annotations
 
 import hashlib
@@ -43,13 +35,7 @@ from helia_profiler.diagnostics.support_bundle import (
 pytestmark = pytest.mark.timeout(30)
 
 
-# ---------------------------------------------------------------------------
-# Shared fixture helpers (mirrors tests/test_dependencies.py's _context /
-# _write_valid_lock, kept local so this file has no cross-test-module
-# coupling).
-# ---------------------------------------------------------------------------
-
-
+# Local copy avoids coupling to test_dependencies.py.
 def _prepared_workspace(
     tmp_path: Path, *, credentialed_url: bool = False, url_override: str | None = None
 ) -> Path:
@@ -125,12 +111,6 @@ def _section(options: SupportBundleOptions, name: str) -> SupportBundleSection:
     return section
 
 
-# ---------------------------------------------------------------------------
-# Offline operation and collector partial failure — no workspace, no config,
-# no probes/ports, no network.
-# ---------------------------------------------------------------------------
-
-
 def test_collect_support_bundle_fully_offline_never_raises() -> None:
     options = SupportBundleOptions(include_probes=False, include_ports=False)
 
@@ -173,7 +153,7 @@ def test_collect_support_bundle_marks_unprepared_workspace_unavailable(tmp_path:
 
     dependencies = collection.manifest.section("dependencies")
     assert dependencies is not None and not dependencies.available
-    assert dependencies.reason  # a human-readable LockError message
+    assert dependencies.reason
 
 
 def test_collect_support_bundle_marks_missing_config_unavailable() -> None:
@@ -536,11 +516,6 @@ def test_collect_support_bundle_always_includes_checks_and_compatibility() -> No
     )
 
 
-# ---------------------------------------------------------------------------
-# Exact Stage 5 dependency lock provenance inclusion.
-# ---------------------------------------------------------------------------
-
-
 def test_collect_support_bundle_includes_exact_stage5_provenance(tmp_path: Path) -> None:
     app_dir = _prepared_workspace(tmp_path)
     options = SupportBundleOptions(workspace=app_dir, include_probes=False, include_ports=False)
@@ -689,11 +664,6 @@ def test_collect_support_bundle_module_inventory_baseline_only_without_workspace
     assert modules["resolved"] == {}
 
 
-# ---------------------------------------------------------------------------
-# Opt-in raw probe identifiers.
-# ---------------------------------------------------------------------------
-
-
 def test_collect_support_bundle_redacts_probe_serials_by_default(monkeypatch) -> None:
     from helia_profiler.target.probe.jlink import JLinkProbe
 
@@ -728,11 +698,6 @@ def test_collect_support_bundle_raw_probe_ids_opt_in_keeps_serial(monkeypatch) -
     assert collection.manifest.redaction["raw_probe_ids"] is True
 
 
-# ---------------------------------------------------------------------------
-# No forbidden extensions/content — structural allowlist.
-# ---------------------------------------------------------------------------
-
-
 def test_collect_support_bundle_members_are_json_or_exact_lock_only(tmp_path: Path) -> None:
     app_dir = _prepared_workspace(tmp_path)
     options = SupportBundleOptions(workspace=app_dir, include_probes=False, include_ports=False)
@@ -744,11 +709,6 @@ def test_collect_support_bundle_members_are_json_or_exact_lock_only(tmp_path: Pa
         assert not name.endswith((".tflite", ".elf", ".bin", ".axf", ".hex", ".o", ".a"))
     for artifact in collection.manifest.artifacts:
         assert artifact.path == "nsx.lock" or artifact.path.endswith(".json")
-
-
-# ---------------------------------------------------------------------------
-# Deterministic archive naming, member order, and manifest content.
-# ---------------------------------------------------------------------------
 
 
 def test_content_fingerprint_is_deterministic_for_identical_members() -> None:
@@ -876,11 +836,6 @@ def test_write_support_bundle_manifest_schema_and_version(tmp_path: Path) -> Non
 
     assert collection.manifest.schema == SUPPORT_BUNDLE_SCHEMA
     assert collection.manifest.schema_version == SUPPORT_BUNDLE_SCHEMA_VERSION
-
-
-# ---------------------------------------------------------------------------
-# Archive self-verification.
-# ---------------------------------------------------------------------------
 
 
 def test_verify_support_bundle_round_trips(tmp_path: Path) -> None:
@@ -1012,11 +967,6 @@ def test_verify_support_bundle_still_raises_manifest_from_dict_report_error(
         verify_support_bundle(path)
 
 
-# ---------------------------------------------------------------------------
-# Malformed / hostile archive member paths.
-# ---------------------------------------------------------------------------
-
-
 def _minimal_manifest_json() -> str:
     return json.dumps(
         {
@@ -1099,11 +1049,6 @@ def test_verify_support_bundle_rejects_null_byte_in_member_name(tmp_path: Path) 
         verify_support_bundle(path)
 
 
-# ---------------------------------------------------------------------------
-# SupportBundleManifest contract — schema/version rejection, directory verify.
-# ---------------------------------------------------------------------------
-
-
 def test_support_bundle_manifest_rejects_wrong_schema() -> None:
     with pytest.raises(ReportError, match="Unsupported support bundle schema"):
         SupportBundleManifest(
@@ -1181,11 +1126,6 @@ def test_support_bundle_manifest_round_trips_through_dict() -> None:
     assert reloaded == manifest
     assert reloaded.section("checks") == SupportBundleSection("checks", True)
     assert reloaded.section("missing") is None
-
-
-# ---------------------------------------------------------------------------
-# Zip-editing test helpers.
-# ---------------------------------------------------------------------------
 
 
 def _rewrite_zip_member(path: Path, name: str, content: bytes) -> None:

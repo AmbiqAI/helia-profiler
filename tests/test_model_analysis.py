@@ -203,8 +203,6 @@ class TestVelaAcceleratorConfig:
 
 
 class TestEthosUDetection:
-    """ModelAnalysis Vela/ethos-u helpers (pure dataclass logic)."""
-
     def test_counts_ethos_u_ops(self):
         from helia_profiler.evaluation import ETHOS_U_OP_NAME, LayerOps, ModelAnalysis
 

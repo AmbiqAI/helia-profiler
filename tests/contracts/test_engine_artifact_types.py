@@ -37,7 +37,6 @@ ARTIFACT_TYPE_FOR_ENGINE: dict[EngineType, type[EngineArtifacts]] = {
 
 
 def _required_kwargs(engine_type: EngineType) -> dict[str, object]:
-    """Sentinel values for every field the engine's type requires."""
     required: dict[EngineType, dict[str, object]] = {
         EngineType.TFLM: {"engine_header": TFLM_ENGINE_HEADER},
         EngineType.HELIA_RT: {
@@ -67,16 +66,10 @@ def _required_kwargs(engine_type: EngineType) -> dict[str, object]:
 
 
 def _build(engine_type: EngineType, **overrides: object) -> EngineArtifacts:
-    """Construct the artifact type for *engine_type* with sentinel values."""
     kwargs = {**_required_kwargs(engine_type), **overrides}
     # Heterogeneous per-engine kwargs dispatched through one registry lookup;
     # the constructors themselves validate the sentinel values at runtime.
     return ARTIFACT_TYPE_FOR_ENGINE[engine_type](**kwargs)  # ty: ignore[invalid-argument-type]
-
-
-# ---------------------------------------------------------------------------
-# One type per engine, pinned at construction
-# ---------------------------------------------------------------------------
 
 
 def test_every_engine_has_exactly_one_artifact_type():
@@ -116,7 +109,6 @@ def test_adapter_prepare_returns_its_engine_artifact_type(engine_type: EngineTyp
 
 @pytest.mark.parametrize("engine_type", list(EngineType))
 def test_engine_header_has_no_cross_engine_default(engine_type: EngineType):
-    """Every adapter must state its own header — none is inherited."""
     kwargs = {
         key: value
         for key, value in vars(_build(engine_type)).items()
@@ -125,10 +117,6 @@ def test_engine_header_has_no_cross_engine_default(engine_type: EngineType):
     with pytest.raises(TypeError, match="engine_header"):
         ARTIFACT_TYPE_FOR_ENGINE[engine_type](**kwargs)
 
-
-# ---------------------------------------------------------------------------
-# Identity properties == the pre-split fingerprint field routing
-# ---------------------------------------------------------------------------
 
 #: What the flat ``EngineArtifacts`` actually held per engine before the
 #: split: only the owning adapter ever set its own fields, everything else
@@ -197,11 +185,6 @@ def test_identity_routing_is_engine_specific():
     assert (et.resolved_variant, et.resolved_toolchain_tag) == (None, None)
 
 
-# ---------------------------------------------------------------------------
-# Wrong-engine reads are AttributeErrors, not silent defaults
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.parametrize(
     ("engine_type", "foreign_field"),
     [
@@ -223,7 +206,6 @@ def test_foreign_engine_field_access_raises(engine_type: EngineType, foreign_fie
 
 
 def test_common_core_stays_on_the_base():
-    """Fields every engine produces are readable without narrowing."""
     for engine_type in EngineType:
         artifacts = _build(engine_type)
         assert isinstance(artifacts, EngineArtifacts)
@@ -236,17 +218,12 @@ def test_common_core_stays_on_the_base():
         assert artifacts.memory_plan is None
 
 
-# ---------------------------------------------------------------------------
-# from_pipeline_context: the consumer this split actually rewrote
-# ---------------------------------------------------------------------------
-#
 # The render-snapshot suite hand-mirrors template variables and never calls
-# FirmwareRenderContext.from_pipeline_context, so "snapshots untouched" says
-# nothing about the narrowing branches in firmware/context.py — the #166
-# review proved all four AOT/ExecuTorch branches were dead under the suite
-# (a raise inserted in any of them left 2330 tests green). These contracts
-# drive a real PipelineContext through every branch and pin both the
-# engine-owned values and the neutral values non-owning engines must get.
+# FirmwareRenderContext.from_pipeline_context, so it doesn't exercise the
+# narrowing branches in firmware/context.py (a raise inserted in any of them
+# left the suite green). These contracts drive a real PipelineContext through
+# every branch instead, pinning both the engine-owned values and the neutral
+# values non-owning engines must get.
 
 
 def _render_engine_context(tmp_path, engine: str, artifacts, arena_regions=None):

@@ -25,7 +25,6 @@ from ..target.lifecycle import CapturePhase, prepare_target_for_phase
 
 log = logging.getLogger("hpx")
 
-# Guard periods for estimated-duration auto-terminate
 _BOOT_SETTLE_S = 8.0  # reset/SBL/firmware init allowance
 _SAFETY_MARGIN_S = 6.0  # extra headroom beyond estimated runtime
 
@@ -168,7 +167,6 @@ class CapturePowerStage:
             )
             return lifecycle_plan
 
-        # --- Capture ---
         # Tighten the capture window from PMU timing only when the user left
         # duration unset: an explicit power.duration_s is an operator override
         # and must win -- the PMU-phase estimate can be wrong about the
@@ -219,7 +217,7 @@ class CapturePowerStage:
             ) from exc
 
         # Mode/integrity/edges derive from capture metadata in one place so
-        # this log and publish_power_result cannot disagree; the deadline
+        # this log and publish_power_observation cannot disagree; the deadline
         # stays this stage's own budget.
         obs_mode, obs_integrity, rise, fall, _ = classify_observation(power_result.metadata)
         observation = PowerObservation(

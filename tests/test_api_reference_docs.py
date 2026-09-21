@@ -26,14 +26,9 @@ DIRECTIVE_RE = re.compile(r"^:::\s+helia_profiler\.(\w+)\s*$", re.MULTILINE)
 
 
 def _collect_documented_names() -> dict[str, set[str]]:
-    """Map each API doc page to the set of names it documents.
-
-    A name counts as documented on a page if it appears in a ``:::``
-    directive. ``docs/reference/api/index.md`` is an overview/landing page
-    that links to the other pages and is excluded from this collection, so
-    it can freely reference other pages' names without being mistaken for
-    their canonical documentation page.
-    """
+    """``docs/reference/api/index.md`` is excluded: it links to every other
+    page, so it can reference their names without being mistaken for their
+    canonical documentation page."""
     documented: dict[str, set[str]] = {}
     for md_file in sorted(API_DOCS_DIR.glob("*.md")):
         if md_file.name == "index.md":

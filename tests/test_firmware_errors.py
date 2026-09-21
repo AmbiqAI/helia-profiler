@@ -1,5 +1,3 @@
-"""Tests for the firmware error classifier in capture.__init__."""
-
 from __future__ import annotations
 
 import pytest
@@ -14,7 +12,6 @@ def test_no_error_returns_none():
         "HPX_VERSION=1",
         "--- HPX_END ---",
     ]
-    # Should simply return without raising.
     _raise_on_firmware_error(lines)
 
 
@@ -76,8 +73,6 @@ def test_only_first_error_is_raised():
 
 
 class TestStimerDeadSeverity:
-    """#180 + Sonnet M-new: the severity gate, both directions."""
-
     def test_fatal_when_power_is_enabled(self):
         from helia_profiler.capture import _raise_on_firmware_error
         from helia_profiler.errors import CaptureError

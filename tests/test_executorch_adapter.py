@@ -318,7 +318,6 @@ def test_adapter_explicit_config_overrides_sidecar(tmp_path: Path):
 
     artifacts = ExecuTorchAdapter().prepare(config, tmp_path / "work")
 
-    # Explicit engine.config values win over the sidecar.
     assert artifacts.executorch_planned_arena_size == 2048
     assert artifacts.cmake_vars["NSX_EXECUTORCH_PORTABLE_SELECT_OPS_LIST"] == "aten::clamp.out"
 
@@ -416,8 +415,6 @@ def test_adapter_rejects_wrong_executorch_submodule_commit(
 
 
 def test_adapter_rejects_retired_nsx_subdirectory_layout(tmp_path: Path):
-    # A checkout that only ships the old nsx/ subdirectory layout (no root
-    # nsx-module.yaml/CMakeLists.txt) must be rejected with a clear hint.
     root = tmp_path / "nsx-executorch"
     (root / "nsx").mkdir(parents=True)
     (root / "version.txt").write_text("0.1.0\n", encoding="utf-8")
@@ -443,7 +440,6 @@ def test_adapter_rejects_incomplete_io_contract(tmp_path: Path):
 
 
 def test_executorch_template_has_counter_health_and_true_overflow_mask():
-    # Production's env, not a look-alike -- see issue #119.
     out = _render_executorch_template(
         pmu_passes=[
             {
@@ -474,7 +470,6 @@ def test_executorch_template_has_counter_health_and_true_overflow_mask():
 
 
 def test_executorch_template_places_complete_workspace_in_sram():
-    # Production's env, not a look-alike -- see issue #119.
     out = _render_executorch_template(
         cmsis_device_header="apollo330P.h",
         pmu_max_ops=512,
@@ -566,7 +561,6 @@ def test_adapter_rejects_non_ram_arena_location(tmp_path: Path):
 
 
 def test_executorch_template_splits_buffer_regions():
-    # Production's env, not a look-alike -- see issue #119.
     out = _render_executorch_template(
         executorch_method_arena_region="sram",
         executorch_temporary_arena_region="sram",
@@ -604,11 +598,6 @@ def test_adapter_rejects_sidecar_with_bad_planned_size(tmp_path: Path):
 
     with pytest.raises(EngineError, match="planned_arena_size.*positive integer"):
         ExecuTorchAdapter().prepare(config, tmp_path / "work")
-
-
-# ---------------------------------------------------------------------------
-# Auto-clone resolution (#160) — source_path absent clones the pinned baseline
-# ---------------------------------------------------------------------------
 
 
 def test_adapter_auto_clones_pinned_checkout_when_source_path_absent(

@@ -13,7 +13,6 @@ def _workspace_cache_root() -> Path:
 
 
 def _cmd_cache_purge() -> None:
-    """Purge all NSX persistent caches and HPX workspaces."""
     from neuralspotx import clean_cache
 
     nsx_result = clean_cache()
@@ -34,7 +33,6 @@ def _cmd_cache_purge() -> None:
 
 
 def _cmd_cache_info() -> None:
-    """Show cache location and approximate disk usage."""
     from neuralspotx import cache_info, clean_cache
 
     nsx_info = cache_info()

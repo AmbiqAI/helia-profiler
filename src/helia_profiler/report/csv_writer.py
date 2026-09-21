@@ -62,7 +62,6 @@ def _write_csv(
     analysis: ModelAnalysis | None = None,
     aot_op_manifest: list[dict[str, Any]] | None = None,
 ) -> Path:
-    """Write merged per-layer profiling results as CSV."""
     layers = pmu.layers
     if not layers:
         raise ReportError("No layer data to write.")
@@ -102,7 +101,6 @@ def _write_preset_csv(
     layers: list[LayerResult],
     output_dir: Path,
 ) -> Path:
-    """Write per-layer results for a single PMU preset as CSV."""
     out_path = output_dir / f"profile_{preset_name}.csv"
     if not layers:
         return out_path

@@ -235,9 +235,6 @@ class PowerConfig:
 
     enabled: bool = False
     driver: str = DEFAULT_POWER_DRIVER
-    # "dedicated" flashes hpx_profiler_power (transport-free) before capture;
-    # "shared" reuses the already-flashed transport binary. See
-    # :class:`PowerFirmware` above for the contamination rationale.
     firmware: PowerFirmware = DEFAULT_POWER_FIRMWARE
     mode: PowerMode = DEFAULT_POWER_MODE
     # ``None`` means "not explicitly set": consumers use
@@ -250,15 +247,9 @@ class PowerConfig:
     # Host-side sync input index on external instruments. For Joulescope this
     # is the digital input channel number (validated default wiring is INPUT0).
     sync_input_index: int = DEFAULT_POWER_SYNC_INPUT_INDEX
-    # Optional 3-wire lock-step handshake (AutoDeploy-compatible wiring).
-    # gate=sync_gpio_pin (device->host), state_gpio_pin (device->host),
-    # go_gpio_pin (host->device). 0 disables a wire; lockstep stays off until
-    # the monitor exposes a GO output and both extra pins are configured.
-    # ``None`` means "not explicitly set": callers resolve the effective value
-    # via :attr:`lockstep_resolved` (re-exported as
-    # ``target.lifecycle.resolve_power_lockstep``), which auto-enables
-    # lock-step whenever the board is wired for it and gated external capture
-    # is requested. An explicit ``true``/``false`` here always wins.
+    # 3-wire lock-step (AutoDeploy wiring): gate=sync_gpio_pin, state=state_gpio_pin
+    # (device->host), go=go_gpio_pin (host->device); 0 disables a wire.
+    # ``None`` auto-resolves via :attr:`lockstep_resolved`; explicit True/False wins.
     lockstep: bool | None = None
     state_gpio_pin: int = DEFAULT_STATE_GPIO_PIN
     go_gpio_pin: int = DEFAULT_GO_GPIO_PIN

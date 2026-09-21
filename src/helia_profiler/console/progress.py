@@ -9,7 +9,6 @@ if TYPE_CHECKING:
     from ..pipeline import ProgressUpdate
     from .base import HpxConsole
 
-# Map stage names to friendlier labels + icons.
 _STAGE_LABELS: dict[str, tuple[str, str]] = {
     "preflight": ("Preflight", "✈️"),
     "ensure_board_powered": ("Ensure board powered", "▸"),
@@ -80,7 +79,6 @@ def print_banner(console: HpxConsole) -> None:
 
 
 def stage_start(console: HpxConsole, name: str, index: int = 0, total: int = 0) -> None:
-    """Called when a pipeline stage begins."""
     console._stage_start = time.monotonic()
     console._stage_name = name
     console._stage_index = index
@@ -89,7 +87,6 @@ def stage_start(console: HpxConsole, name: str, index: int = 0, total: int = 0) 
     phase = _phase_for_stage(name)
 
     if console.verbosity >= 1:
-        # Verbose: one line per stage with a live spinner while running.
         stop_spinner(console)
         if phase != console._phase_name:
             console.status_console.print(f"[bold cyan]{phase}[/bold cyan]")
@@ -100,7 +97,6 @@ def stage_start(console: HpxConsole, name: str, index: int = 0, total: int = 0) 
         )
         console._spinner.start()
     else:
-        # Default: compact live spinner showing current stage + progress bar.
         done = max(0, index - 1) if index else len(console._completed_stages)
         total = total or max(1, done + 1)
         bar = _mini_progress_bar(done, total)
@@ -165,7 +161,6 @@ def progress_update(console: HpxConsole, update: ProgressUpdate) -> None:
 
 
 def stage_done(console: HpxConsole, name: str) -> None:
-    """Called when a pipeline stage completes."""
     elapsed = time.monotonic() - (console._stage_start or time.monotonic())
     label, icon = _STAGE_LABELS.get(name, (name, "▸"))
     console._completed_stages.append(name)
@@ -178,7 +173,6 @@ def stage_done(console: HpxConsole, name: str) -> None:
 
 
 def stage_skip(console: HpxConsole, name: str) -> None:
-    """Called when a pipeline stage is skipped."""
     console._completed_stages.append(name)
     if console.verbosity < 1:
         return

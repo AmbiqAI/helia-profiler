@@ -27,7 +27,7 @@ def test_source_modules_stay_below_size_ceiling() -> None:
 
 
 def test_no_engine_adapter_imports_out_of_another_engines_package() -> None:
-    """Shared engine logic lives in engines/, not inside one engine (issue #7).
+    """Shared engine logic lives in engines/, not inside one engine.
 
     ``cmsis_nn_module_ref`` started inside the heliaAOT package, and heliaRT
     and ExecuTorch both grew imports reaching into it -- three engines
@@ -60,7 +60,7 @@ def test_no_engine_adapter_imports_out_of_another_engines_package() -> None:
                 continue
             for other in engine_packages:
                 if other == owner:
-                    continue  # its own package
+                    continue
                 if f".{other} import" in stripped or f".{other}." in stripped:
                     offenders.append(f"{rel}:{line_no}: {stripped}")
 
@@ -172,10 +172,6 @@ def test_wheel_contains_only_canonical_evaluation_modules(tmp_path: Path) -> Non
         "67413548ee7be2adbd49d574e74c9381015f0fc984416c12b5111122295ecb1b",
     ]
 
-
-# ---------------------------------------------------------------------------
-# #229 D2 — layering contracts for the vocabulary leaf and light package inits
-# ---------------------------------------------------------------------------
 
 _SRC = Path(__file__).resolve().parent.parent / "src" / "helia_profiler"
 

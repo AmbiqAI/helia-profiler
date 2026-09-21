@@ -1,15 +1,7 @@
 """Joulescope external power measurement driver package (JS110/JS220/JS320).
 
-Split into focused submodules for maintainability; this ``__init__`` re-exports
-the public surface so callers use ``helia_profiler.power.joulescope`` (the
-``power.joulescope_driver`` shim has been removed — it had no external
-consumers).
-
-- :mod:`.device` — shared ``pyjoulescope_driver`` handle, open/close/enumerate.
-- :mod:`.driver` — :class:`JoulescopeDriver` (capture, gating, power-cycle).
-- :mod:`.sync` — :class:`JoulescopeSyncController` (GPI/GPO lock-step sync).
-- :mod:`.stats` — stats-array processing, window segmentation, energy sums.
-- :mod:`.diagnostics` — Joulescope-local gated-window diagnostics.
+Split into focused submodules to stay under the repo's per-file line budget;
+this ``__init__`` re-exports the public surface.
 """
 
 from __future__ import annotations

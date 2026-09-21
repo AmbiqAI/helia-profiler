@@ -59,13 +59,11 @@ from tests.contracts.test_firmware_render_snapshots import (
 )
 
 
-# ---------------------------------------------------------------------------
 # The matrix (D3) — one row per (workspace leg, target, render arm).
 # rtt-only: power/busy arms are rtt-only and transport variation is Tier 1's
 # job. apollo510 covers every engine family; apollo330P is the divergent-HAL,
 # no-ITCM leg. AP3/AP4 and armclang/ATfE legs are growth points: they join
 # this table when the bench warms their workspaces.
-# ---------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
@@ -198,11 +196,6 @@ _MATRIX: tuple[_HwCase, ...] = (
 _EXPECTED_HW_BUGS: dict[str, str] = {}
 
 
-# ---------------------------------------------------------------------------
-# Workspace resolution (D3/D6) — read-only.
-# ---------------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
 class _Workspace:
     app_dir: Path
@@ -308,11 +301,6 @@ def _rule_block(rules_text: str, rule_prefix: str) -> str:
     return m.group(1) if m else ""
 
 
-# ---------------------------------------------------------------------------
-# build.ninja per-TU stanza parsing (D1).
-# ---------------------------------------------------------------------------
-
-
 def _tu_variables(ninja_text: str, target: str, source: str) -> dict[str, str] | None:
     """DEFINES/FLAGS/INCLUDES for one build statement, ninja-unescaped.
 
@@ -385,11 +373,6 @@ def _compile_command(
     ]
 
 
-# ---------------------------------------------------------------------------
-# Rendering from the current checkout (D6).
-# ---------------------------------------------------------------------------
-
-
 def _prepare_case(case: _HwCase, workspace: _Workspace, tmp_path: Path) -> tuple[Path, list[Path]]:
     scratch = tmp_path / case.case_id
     scratch.mkdir()
@@ -447,11 +430,6 @@ def _aot_prefix_in(app_dir: Path) -> str | None:
     for module in app_dir.glob("modules/*_model"):
         return module.name.removesuffix("_model")
     return None
-
-
-# ---------------------------------------------------------------------------
-# The gate.
-# ---------------------------------------------------------------------------
 
 
 def _require_all_legs() -> bool:
@@ -711,9 +689,7 @@ class TestWorkspaceResolution:
         assert "no build.ninja" in resolved and "deadbeef" in resolved
 
 
-# ---------------------------------------------------------------------------
 # Parser robustness (lens plan): synthetic stanzas, not just the live file.
-# ---------------------------------------------------------------------------
 
 
 _SYNTHETIC_NINJA = """\

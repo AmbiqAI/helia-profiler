@@ -46,7 +46,7 @@ class TestSourceIndexFromOp:
     def test_non_integer_suffix_is_none(self):
         # ExecuTorch labels name chain/instruction, not a tflite operator —
         # with the operator name (#301) or the older kind-only prefix. The
-        # `::` namespace separator must not be mistaken for a suffix either.
+        # namespace separator must not be mistaken for a suffix either.
         assert source_index_from_op("aten::add.out:c3i12") is None
         assert source_index_from_op("cortex_m::quantized_conv2d.out:c0i0") is None
         assert source_index_from_op("OPERATOR_CALL:c3i12") is None
@@ -79,7 +79,7 @@ class TestManifestSourceMap:
 class TestLayerAttributor:
     def test_manifest_join_beats_position(self):
         """The observed #218 shape: position 1 is FULLY_CONNECTED:3 — a
-        positional join would hand it analysis.layers[1]... which here IS
+        a positional join would hand it analysis.layers[1]... which here IS
         the right op, so the analysis list is ordered adversarially."""
         analysis = _skewed_analysis()
         att = LayerAttributor(
@@ -146,8 +146,8 @@ class TestLayerAttributor:
 
     def test_an_aot_run_without_a_manifest_dashes_everything(self):
         """#222: manifest extraction failed => degraded firmware labels
-        layers with POSITIONS; an empty authoritative manifest ([]) must
-        dash rather than let the suffix fallback join positionally."""
+        with POSITIONS; an empty authoritative manifest ([]) must dash
+        rather than let the suffix fallback join positionally."""
         att = LayerAttributor(_skewed_analysis(), [])
         result = att.attribute(1, "SOFTMAX:1")
         assert result.source_index is None
@@ -223,7 +223,7 @@ class TestCsvWriterJoin:
 
 class TestConsumerPlumbing:
     """#222: the resolver's empty-manifest dash rule is only as good
-    as the consumers that build the manifest argument — pin both."""
+    consumers that build the manifest argument — pin both."""
 
     def _aot_ctx(self, tmp_path: Path, manifest):
         from helia_profiler.config import load_config
@@ -315,7 +315,7 @@ class TestConsumerPlumbing:
 class TestConsoleJoin:
     def test_top_layers_table_shows_manifest_joined_macs(self, tmp_path: Path):
         """The console's Top Layers table — where the #218 21x-wrong
-        cycles/MAC was observed — must join on the manifest, not position."""
+        was observed — must join on the manifest, not position."""
         from rich.console import Console
 
         from helia_profiler.config import load_config

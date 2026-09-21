@@ -3,7 +3,7 @@
 `hpx compare` blocks power deltas when `power_clean_window_probe` differs --
 a `busy_loop` window measures a calibrated CPU spin rather than the model, so
 the pair reports the difference between two physical quantities as a
-regression (#125 item 4).
+regression.
 
 Everything downstream of the manifest is checked in tests/test_comparability.py
 against hand-built manifests. That is the wrong place to check the WRITER:

@@ -1,5 +1,3 @@
-"""Tests for AnalyzeModelStage's Vela/ethos-u consistency check."""
-
 from __future__ import annotations
 
 from pathlib import Path

@@ -28,11 +28,7 @@ ALL_TRANSPORTS = [t.value for t in Transport]
 
 @pytest.fixture()
 def reader_recorder(monkeypatch):
-    """Replace every per-transport reader with a kwargs recorder.
-
-    Returns a dict mapping transport-name -> captured kwargs (populated when
-    that reader is invoked).  Exactly one entry should appear per run.
-    """
+    """Maps transport-name -> captured kwargs; exactly one entry per run."""
     calls: dict[str, dict] = {}
 
     def _make(name: str):
@@ -50,11 +46,8 @@ def reader_recorder(monkeypatch):
 
 
 def test_enum_membership_is_frozen():
-    """The transports this contract covers must equal the config enum.
-
-    If someone adds/removes a Transport, this fails first with a clear list —
-    the reader dispatch contract below must then be extended.
-    """
+    """Fails first, with a clear list, if a Transport is added or removed —
+    the reader dispatch contract below must then be extended."""
     assert set(ALL_TRANSPORTS) == {"rtt", "usb_cdc", "swo", "uart"}
 
 
@@ -64,11 +57,9 @@ def test_transport_dispatches_to_exactly_one_reader(transport, reader_recorder, 
 
     result = capture_pmu(ctx)
 
-    # Exactly the reader for this transport ran — no other path was taken.
     assert set(reader_recorder) == {transport}, (
         f"transport {transport!r} dispatched to {sorted(reader_recorder)}"
     )
-    # The canned stream parsed into the expected single layer.
     assert result.layers[0].cycles == 1
 
 
@@ -142,5 +133,4 @@ def test_capture_pmu_requires_resolved_jlink_device(pmu_ctx_factory):
 
 
 def test_capture_package_exposes_capture_pmu():
-    """capture_pmu stays the public capture entry point used by stage 6."""
     assert hasattr(capture_pkg, "capture_pmu")

@@ -237,7 +237,6 @@ _ENGINE_SOURCE_OVERRIDE_KEYS = frozenset({"dist_path", "source_path", "source"})
 # provider) rather than the engine itself — see select_cmsis_nn_override().
 _MODULE_SOURCE_OVERRIDE_KEYS = frozenset({"cmsis_nn_path", "cmsis_nn_ref"})
 
-# The two NSX modules a CMSIS-NN selector can replace.
 CMSIS_NN_PROVIDER_MODULES = frozenset({"arm-cmsis-nn", "nsx-cmsis-nn"})
 
 

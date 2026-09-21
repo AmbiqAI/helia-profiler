@@ -64,11 +64,6 @@ def _hpx_callback(
         raise typer.Exit(0)
 
 
-# ---------------------------------------------------------------------------
-# hpx profile
-# ---------------------------------------------------------------------------
-
-
 _ENGINE_CHOICE = TyperChoice([engine.value for engine in EngineType])
 _ARENA_LOCATION_CHOICE = TyperChoice([p.value for p in Placement if p is not Placement.MRAM])
 _WEIGHTS_LOCATION_CHOICE = TyperChoice([p.value for p in Placement])
@@ -531,11 +526,6 @@ def profile_command(
     _cmd_profile(**params)
 
 
-# ---------------------------------------------------------------------------
-# hpx analyze
-# ---------------------------------------------------------------------------
-
-
 _ANALYZE_FORMAT_CHOICE = TyperChoice(["table", "csv", "json"])
 
 
@@ -604,22 +594,14 @@ def analyze_command(
     )
 
 
-# ---------------------------------------------------------------------------
-# hpx doctor / engines / boards / probes / ports / target
-#
-# Wired from a separate module (cli/inspect_app.py) so this file stays under
-# the project's per-module line ceiling — see tests/test_package_layout.py.
-# ---------------------------------------------------------------------------
+# hpx doctor / engines / boards / probes / ports / target are wired from a
+# separate module (cli/inspect_app.py) so this file stays under the
+# project's per-module line ceiling — see tests/test_package_layout.py.
 
 _inspect_app.register(app)
 
 
 _validation_app.register(app)
-
-
-# ---------------------------------------------------------------------------
-# hpx compare
-# ---------------------------------------------------------------------------
 
 
 @app.command(
@@ -674,10 +656,6 @@ def compare_command(
         validation=validation,
     )
 
-
-# ---------------------------------------------------------------------------
-# hpx cache {purge, info}
-# ---------------------------------------------------------------------------
 
 cache_app = typer.Typer(
     help="Manage hpx/nsx caches",

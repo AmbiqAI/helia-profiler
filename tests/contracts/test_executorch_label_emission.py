@@ -5,7 +5,7 @@ The rendered ``print_layers()`` is lifted verbatim from the real template
 and executed on the host GNU g++ against the compile stubs with a capturing
 ``hpx_printf``, so the ``%s%s%s`` argument order and the ``.overload``
 condition are checked on the bytes a host would parse (#301) — a named
-kernel, a named delegate, an empty overload, and both nullptr fallbacks.
+named delegate, an empty overload, and both nullptr fallbacks.
 """
 
 from __future__ import annotations

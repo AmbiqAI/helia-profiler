@@ -49,10 +49,6 @@ log = logging.getLogger("hpx")
 _LEADING_GLITCH_RE = re.compile(r"^[^\x20-\x7e]+")
 
 
-# ---------------------------------------------------------------------------
-# HPX protocol sentinels
-# ---------------------------------------------------------------------------
-#
 # Declared once in ``helia_profiler.wire`` and re-exported here under the names
 # every transport already imports, so no transport had to change when the
 # registry landed.  ``HPX_PROTOCOL_VERSION`` comes along for the same reason.
@@ -62,10 +58,6 @@ HPX_END = HPX_END_SENTINEL
 #: ``HPX_PROTOCOL_VERSION`` is re-exported by the import above: ``capture``
 #: and ``capture.parser`` both reach it through this module.
 
-
-# ---------------------------------------------------------------------------
-# Default timeouts (seconds)
-# ---------------------------------------------------------------------------
 
 #: Legacy hard overall deadline (kept for back-compat with callers that do
 #: not pass ``overall_timeout_s``).  ``None`` = rely entirely on heartbeats.
@@ -82,10 +74,6 @@ LINE_TIMEOUT_S = 300
 HEARTBEAT_TIMEOUT_S = 30
 
 
-# ---------------------------------------------------------------------------
-# Clean-window "announce and extend"
-# ---------------------------------------------------------------------------
-#
 # Before the silent clean (power) window the firmware emits, e.g.::
 #
 #     HPX_HEARTBEAT phase=clean_window_begin iters=200 est_ms=1000
@@ -150,11 +138,6 @@ def window_budget_s(line: str) -> float | None:
         return None
     budget = est_ms / 1000.0 * WINDOW_BUDGET_SAFETY + WINDOW_BUDGET_MARGIN_S
     return min(budget, WINDOW_BUDGET_CAP_S)
-
-
-# ---------------------------------------------------------------------------
-# Shared line-collection loop (byte-stream transports: RTT, SWO, UART)
-# ---------------------------------------------------------------------------
 
 
 def collect_lines(

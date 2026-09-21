@@ -48,7 +48,6 @@ class BuildFirmwareStage:
 
         log.info("Binary: %s", binary_path)
 
-        # Capture binary section sizes
         toolchain = ctx.config.target.toolchain
         ctx.binary_sections = binary_sections(
             binary_path,
@@ -112,7 +111,6 @@ class BuildFirmwareStage:
         if ctx.binary_sections is not None:
             ready_message += f" · {ctx.binary_sections.total:,} bytes"
         ctx.report_progress(ready_message, kind="checkpoint", min_verbosity=1)
-        # Capture compiler + cmake version banners for run metadata
         probe_s = ctx.config.timeouts.toolchain_probe_s
         ctx.run_metadata.toolchain = ToolchainInfo(
             compiler=toolchain,

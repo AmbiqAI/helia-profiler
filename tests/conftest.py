@@ -8,7 +8,6 @@ import pytest
 
 from helia_profiler.engines.helia_rt import HELIART_VERSION
 
-# Path to the test fixtures directory
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 KWS_MODEL_PATH = FIXTURES_DIR / "kws_ref_model.tflite"
 
@@ -31,18 +30,14 @@ def _isolate_engine_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture()
 def kws_model() -> Path:
-    """Return the path to the KWS reference model (.tflite).
-
-    This is a real quantised keyword-spotting model (~53 KB) used for
-    end-to-end firmware generation testing.
-    """
+    """A real quantised keyword-spotting model, for end-to-end firmware
+    generation tests."""
     assert KWS_MODEL_PATH.exists(), f"KWS model fixture not found: {KWS_MODEL_PATH}"
     return KWS_MODEL_PATH
 
 
 @pytest.fixture()
 def fake_dist(tmp_path: Path) -> Path:
-    """Create a minimal fake heliaRT distribution directory."""
     dist = tmp_path / "heliart_dist"
     dist.mkdir()
     (dist / "lib").mkdir()
@@ -78,9 +73,7 @@ def fake_dist(tmp_path: Path) -> Path:
 
 @pytest.fixture()
 def fake_source_tree(tmp_path: Path) -> Path:
-    """Create a minimal fake heliaRT *source* tree (source-build mode).
-
-    Mirrors the structure expected by ``_install_nsx_module_source``:
+    """Mirrors the structure ``_install_nsx_module_source`` expects:
     - ``nsx/CMakeLists.txt`` and ``nsx/nsx-module.yaml`` (source-build style)
     - ``cmake/helia_rt_sources.cmake`` (presence sentinel)
     - ``tensorflow/lite/micro/helia_rt_version.h``
@@ -119,9 +112,7 @@ def fake_source_tree(tmp_path: Path) -> Path:
 
 @pytest.fixture()
 def fake_cmsis_nn(tmp_path: Path) -> Path:
-    """Create a minimal fake ns-cmsis-nn tree with a native nsx/ module.
-
-    Mirrors ns-cmsis-nn's structure, which ships a native
+    """Mirrors ns-cmsis-nn's structure, which ships a native
     ``nsx/CMakeLists.txt`` and ``nsx/nsx-module.yaml``.
     """
     nn = tmp_path / "ns_cmsis_nn"

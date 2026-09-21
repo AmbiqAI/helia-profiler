@@ -39,21 +39,13 @@ def poll_until(
 ) -> bool:
     """Poll *predicate* until it returns True or *timeout_s* elapses.
 
-    This is the single bounded-wait primitive for the capture path.  Prefer it
-    over ``time.sleep()`` whenever there is an observable signal to wait for.
+    Prefer this over ``time.sleep()`` whenever there is an observable signal
+    to wait for.
 
     Args:
-        predicate: Zero-argument callable returning a truthy value when the
-            awaited condition is satisfied.  Exceptions propagate to the
-            caller unchanged — use ``open_jlink_with_retry`` for the case
-            where the probe call itself may raise while not-yet-ready.
-        timeout_s: Maximum wall-clock time to wait, in seconds.
-        interval_s: Sleep between polls when the predicate is not yet true.
-        description: Human-readable name for log messages.
-
-    Returns:
-        ``True`` if the predicate succeeded within the deadline, else
-        ``False``.
+        predicate: Exceptions propagate to the caller unchanged — use
+            ``open_jlink_with_retry`` for the case where the probe call
+            itself may raise while not-yet-ready.
     """
     deadline = time.monotonic() + timeout_s
     while True:

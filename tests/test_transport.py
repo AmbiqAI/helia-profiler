@@ -1,5 +1,3 @@
-"""Tests for capture/transport.py — heartbeat-aware line collection."""
-
 from __future__ import annotations
 
 import re
@@ -14,7 +12,6 @@ from helia_profiler.transport.protocol import (
 
 
 def _canned_reader(chunks: list[bytes]):
-    """Return a read_fn that yields each chunk on successive calls, then b''."""
     it = iter(chunks + [b""] * 1000)
 
     def read() -> bytes:
@@ -59,10 +56,6 @@ def test_collect_lines_strips_leading_peripheral_reenable_glitch():
 
 
 def test_heartbeat_refreshes_inactivity_timer(monkeypatch):
-    """Heartbeat lines should reset the inactivity deadline."""
-    # Feed: START, then pause, then HEARTBEAT, then pause, then END.
-    # With a 0.2s heartbeat timeout this run would abort without heartbeats,
-    # but each heartbeat must keep it alive to reach HPX_END.
     script = [
         b"--- HPX_START ---\n",
         b"",  # quiet
@@ -115,7 +108,6 @@ def test_hang_detected_when_no_heartbeat():
     elapsed = _t.monotonic() - t0
     # Should bail shortly after heartbeat_timeout_s, nowhere near 600s.
     assert elapsed < 2.0
-    # HPX_END was never seen.
     assert "--- HPX_END ---" not in lines
 
 
@@ -138,11 +130,6 @@ def test_collect_lines_invokes_on_line_callback():
     assert seen == lines
 
 
-# ---------------------------------------------------------------------------
-# Clean-window "announce and extend"
-# ---------------------------------------------------------------------------
-
-
 def test_window_budget_parses_est_ms():
     budget = window_budget_s("HPX_HEARTBEAT phase=clean_window_begin iters=200 est_ms=1000")
     assert budget == 1.0 * WINDOW_BUDGET_SAFETY + WINDOW_BUDGET_MARGIN_S
@@ -160,8 +147,6 @@ def test_window_budget_none_for_zero_or_missing_est():
 
 
 def test_clean_window_announce_survives_blackout_longer_than_heartbeat():
-    """A clean-window announce widens the deadline so a silent window longer
-    than the normal heartbeat timeout still reaches HPX_END."""
     import time as _t
 
     released = _t.monotonic() + 0.4  # quiet > heartbeat_timeout, << budget
@@ -215,7 +200,6 @@ def test_window_budget_survives_a_line_received_inside_the_window():
                 b"--- HPX_START ---\nHPX_HEARTBEAT phase=clean_window_begin iters=100 est_ms=1000\n"
             )
         if state["step"] == 1:
-            # In-window probe line; must not reset the budget.
             state["step"] = 2
             return b"HPX_CLEAN_WINDOW_PROBE=busy_loop\n"
         if _t.monotonic() >= released:

@@ -1,5 +1,3 @@
-"""Tests for PlanMemoryStage and MemoryPlan dataclasses."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -279,7 +277,6 @@ class TestPlanMemorySynthesise:
         assert ctx.weights_region == "sram"
 
     def test_synth_plan_explicit_mram_keeps_weights_in_mram(self, tmp_path: Path):
-        """Explicit MRAM weights retain automatic fast arena placement."""
         ctx = _make_ctx(
             tmp_path,
             {
@@ -303,7 +300,6 @@ class TestPlanMemorySynthesise:
         assert any(c.kind == "arena" and c.size == 65536 for c in dtcm.consumers)
 
     def test_synth_plan_explicit_mram_falls_back_to_sram_when_tcm_too_small(self, tmp_path: Path):
-        """MRAM weights retain automatic SRAM fallback for a large arena."""
         ctx = _make_ctx(
             tmp_path,
             {
@@ -399,8 +395,6 @@ class TestPlanMemorySynthesise:
         ctx = _make_ctx(tmp_path)
         PlanMemoryStage().run(ctx)
 
-        # Apollo510 has DTCM, ITCM and PSRAM — even tflm default plan
-        # doesn't populate them, but they should appear with capacity.
         assert ctx.memory_plan is not None
         dtcm = ctx.memory_plan.region("DTCM")
         assert dtcm is not None
@@ -410,7 +404,6 @@ class TestPlanMemorySynthesise:
 class TestPlanMemoryEngineProvided:
     def test_engine_plan_is_preferred(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path)
-        # Pretend heliaAOT produced a precise plan already.
         plan = MemoryPlan(
             engine=EngineType.HELIA_AOT,
             regions=(
@@ -488,7 +481,7 @@ class TestPlanMemoryOverflow:
 
     def test_fit_does_not_raise(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path)
-        PlanMemoryStage().run(ctx)  # Synthesised plan should fit.
+        PlanMemoryStage().run(ctx)
         assert ctx.memory_plan is not None
         assert not ctx.memory_plan.has_overflow
 
@@ -674,7 +667,6 @@ class TestHpxOwnedConsumers:
                 "target": {"board": "apollo3p_evb", "transport": "usb_cdc"},
             },
         )
-        # Records/USB route to SRAM, not DTCM, so the 32 KB arena fits.
         PlanMemoryStage().run(ctx)
         assert ctx.memory_plan is not None
         dtcm = ctx.memory_plan.region("DTCM")
@@ -688,7 +680,6 @@ class TestHpxOwnedConsumers:
         assert "usb_buffers" not in dtcm_names
 
     def test_usb_buffers_booked_on_usb_cdc_transport(self, tmp_path):
-        """#179: usb_buffers must be booked for the usb_cdc transport."""
         ctx = _make_ctx(tmp_path, {"target": {"transport": "usb_cdc"}})
         PlanMemoryStage().run(ctx)
         assert ctx.memory_plan is not None
@@ -726,4 +717,4 @@ class TestHpxOwnedConsumers:
         ctx = _make_ctx(tmp_path, {"engine": {"type": "helia-aot"}})
         merged = _add_hpx_owned_consumers(engine_plan, ctx)
         records = [c for r in merged.regions for c in r.consumers if c.name == "pmu_layer_records"]
-        assert [c.size for c in records] == [1234]  # engine's entry kept, once
+        assert [c.size for c in records] == [1234]
