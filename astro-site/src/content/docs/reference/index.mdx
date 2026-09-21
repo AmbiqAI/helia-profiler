@@ -1,113 +1,75 @@
 ---
 title: "Reference"
-description: "Every hpx subcommand and flag, the full configuration schema, and the Python API. For learning the tool, the Getting Started and User Guide pages are usually a…"
+description: "The contracts: every hpx command and flag, every configuration field, every issue code, the Python API, the compatibility table and baseline, and the firmware-to-host wire protocol, each generated from or checked against the source tree."
 ---
 
-import Icon from '@ambiqai/helia-ui/astro/Icon';
 import CardGrid from '@ambiqai/helia-ui/astro/CardGrid';
 import LinkCard from '@ambiqai/helia-ui/astro/LinkCard';
 
-Every `hpx` subcommand and flag, the full configuration schema, and the
-Python API. For learning the tool, the
-[Getting Started](../getting-started/) and
-[User Guide](../guide/configuration/) pages are usually a better
-starting point.
-
-## CLI
+Reference is the section that does not explain. Each surface below is
+generated from the source tree this site was built from, or checked
+against it in CI, and says so at the top of its page. To learn the tool,
+start at [Getting started](../getting-started/); to understand a choice,
+the [User guide](../guide/); to see it done, [Examples](../examples/).
 
 <CardGrid>
-  <LinkCard href="profile/" title="hpx profile">
-    <Icon name="play" slot="icon" />
-
-    Build, flash, capture, report.
-
+  <LinkCard href="cli/" title="Command line" eyebrow="Generated" meta="hpx and its subcommands">
+    Every argument and option with type, default and help text, one page
+    per command, plus the JSON and Markdown artifacts an agent can read.
   </LinkCard>
-  <LinkCard href="doctor/" title="hpx doctor">
-    <Icon name="stethoscope" slot="icon" />
-
-    Verify toolchain and probe availability.
-
+  <LinkCard href="configuration/" title="Configuration" eyebrow="Generated" meta="Every YAML field and CLI flag">
+    The `ProfileConfig` schema by top-level key, with the flag that sets
+    each field and its default.
   </LinkCard>
-  <LinkCard href="boards/" title="hpx boards">
-    <Icon name="microchip" slot="icon" />
-
-    List supported boards.
-
+  <LinkCard href="issue-codes/" title="Issue codes" eyebrow="Generated" meta="Run validity and comparability">
+    Every stable code a run or a comparison can report, with its severity
+    and meaning.
   </LinkCard>
-  <LinkCard href="engines/" title="hpx engines">
-    <Icon name="gears" slot="icon" />
-
-    List supported engines.
-
+  <LinkCard href="api/" title="Python API" eyebrow="Generated" meta="Stable and experimental, badged">
+    `profile()`, `Session`, the configuration models, the typed results and
+    the error hierarchy, grouped by what they are for.
   </LinkCard>
-  <LinkCard href="probes/" title="hpx probes">
-    <Icon name="plug" slot="icon" />
-
-    List and match J-Link probes.
-
+  <LinkCard href="compatibility/" title="Compatibility table" eyebrow="From run records" meta="Boards against engines and toolchains">
+    One status per cell, each traced to a nightly hardware validation
+    record or to the sources that label a target experimental.
   </LinkCard>
-  <LinkCard href="ports/" title="hpx ports">
-    <Icon name="plug" slot="icon" />
-
-    List host serial ports.
-
+  <LinkCard href="compatibility-baseline/" title="Compatibility baseline" eyebrow="Qualified revisions" meta="Modules, engines, toolchains">
+    The exact module and engine revisions hpx qualifies, how a run stamps
+    its qualification state, and what the baseline does not cover.
   </LinkCard>
-  <LinkCard href="target/" title="hpx target">
-    <Icon name="arrows-rotate" slot="icon" />
-
-    Run target reset helpers.
-
-  </LinkCard>
-  <LinkCard href="analyze/" title="hpx analyze">
-    <Icon name="chart-bar" slot="icon" />
-
-    Static model analysis, no hardware.
-
-  </LinkCard>
-  <LinkCard href="compare/" title="hpx compare">
-    <Icon name="code-compare" slot="icon" />
-
-    Diff two profile result directories.
-
-  </LinkCard>
-  <LinkCard href="validate/" title="hpx validate">
-    <Icon name="circle-check" slot="icon" />
-
-    Hardware-in-the-loop suite over MLPerf Tiny models.
-
-  </LinkCard>
-  <LinkCard href="power-on/" title="hpx power-on">
-    <Icon name="power-off" slot="icon" />
-
-    Hold Joulescope passthrough power on.
-
-  </LinkCard>
-  <LinkCard href="cache/" title="hpx cache">
-    <Icon name="folder" slot="icon" />
-
-    Inspect or purge local build caches.
-
+  <LinkCard href="wire-protocol/" title="Wire protocol" eyebrow="Internal contract" meta="Firmware to host">
+    Every line the profiler firmware prints and the one command the host
+    writes back, for people changing the templates or the parser, not a
+    user API.
   </LinkCard>
 </CardGrid>
 
-## Configuration Reference
+## Commands at a glance
 
-Every `ProfileConfig` field, its YAML path, CLI flag, default, and type —
-see the [Configuration Reference](configuration/).
+| Command | Does |
+|---|---|
+| [`hpx profile`](cli/profile/) | build, flash, capture, report |
+| [`hpx analyze`](cli/analyze/) | static model analysis on the host |
+| [`hpx compare`](cli/compare/) | compare two result bundles, optionally against a regression profile |
+| [`hpx validate`](cli/validate/) | the hardware-in-the-loop suite over the registered models |
+| [`hpx doctor`](cli/doctor/) | check the toolchains and probes; `--bundle` writes a redacted support archive |
+| [`hpx boards`](cli/boards/), [`hpx engines`](cli/engines/) | list the registered boards and engines |
+| [`hpx probes`](cli/probes/), [`hpx ports`](cli/ports/) | list and match J-Link probes and host serial ports |
+| [`hpx target`](cli/target/) | reset helpers for the attached board |
+| [`hpx power-on`](cli/power-on/) | hold the instrument's passthrough power on |
+| [`hpx cache`](cli/cache/) | inspect or purge the local build caches |
 
-## Python API
+## Conventions
 
-Calling heliaPROFILER from Python instead of the shell? See the
-[Python API reference](api/) for `profile()`, `ProfileConfig`, and
-the typed result and error types.
-
-## Common conventions
-
-- **Positional arg vs `--config`** — `hpx profile model.tflite` is a
-  shortcut for `model.path`. With a config file, omit the positional
-  arg and use `--config hpx.yml`.
-- **CLI overrides YAML** — any flag passed on the command line wins
-  over the matching field in the config file.
-- **Verbose** — `-v` adds `INFO` logs, `-vv` adds `DEBUG`. Useful for
-  diagnosing build/flash/capture failures.
-- **Help** — every subcommand accepts `-h` / `--help`.
+- `hpx profile model.tflite` is a shortcut for `model.path`; with a config
+  file, omit the positional argument and pass `--config hpx.yml`.
+- A flag on the command line overrides the same field in the config file;
+  the resolved configuration is recorded in the run's `run_metadata.json`.
+- `-v` adds `INFO` logs and `-vv` adds `DEBUG`; every subcommand accepts
+  `--help`.
+- Exit codes: 0 on success, non-zero on any `HpxError`, and 3 for an
+  invalid run under `--fail-on-invalid`.
+- Machine-readable copies of the generated surfaces sit beside each page
+  (`cli.json`, `schema.json`, `issues.json`, the Markdown renditions and
+  `llms.txt`), and every page has a Markdown rendition at the same route
+  with `index.md` appended.

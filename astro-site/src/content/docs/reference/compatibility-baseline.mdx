@@ -90,8 +90,7 @@ instead of inheriting the registry's choice.
 The module thereby moves from the registry-governed tier to the hpx-declared
 tier (next section); neuralSPOT-X itself is unchanged. heliaRT 1.19.0 accepts
 any `>= v7.28.0`, so both engines now build against one core with no override,
-and a run stamps `qualified`. A neuralSPOT-X registry bump remains the tidy
-long-term landing but is no longer load-bearing.
+and a run stamps `qualified`.
 
 **Integration change.** The float kernels are opt-in and must be requested
 *before* the ns-cmsis-nn module is added, since an `option()` default cannot be
