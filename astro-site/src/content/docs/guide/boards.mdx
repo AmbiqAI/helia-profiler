@@ -66,9 +66,19 @@ the memory layout.
 | AP3 (Apollo3 Plus) | Cortex-M4 | DWT cycle counter only | cycles only | rejected at preflight | yes |
 
 Apollo330P is a Cortex-M55 part in the AP5 family despite the 3 in its
-name. On an AP4 or AP3 board the profiler warns about ignored PMU
-selections and captures cycles only; the configuration is reduced, not
-rejected. The counter groups themselves are on [PMU counters](../pmu-counters/).
+name. On an AP4 or AP3 board a `memory` or `mve` selection is rejected at
+preflight with the groups that board does expose
+(`platform/counters.py`, `validate_group_selection`); drop those keys to
+capture cycles only. The counter groups themselves are on
+[PMU counters](../pmu-counters/).
+
+Two more facts the registry fixes per board: whether PSRAM is fitted
+(`BoardDef.psram_kb`; the Apollo3 Plus and Apollo4 EVBs register it, the
+Apollo5-family EVBs take the SoC's value, and `apollo510dL_evb` registers
+none because the chip is not fitted on that EVB), and whether the
+`usb_cdc` transport is available (`SocDef.has_usb`; Apollo3P and Atomiq110
+have no compatible `nsx-ambiq-usb` module, so `usb_cdc` is rejected at
+preflight there).
 
 Each family also selects the AmbiqSuite SDK tier and the neuralSPOT-X
 modules the firmware build pulls in (`nsx-ambiqsuite-r5`, `nsx-ambiq-hal-r5`,
@@ -77,12 +87,14 @@ from `target.board` and needs no configuration.
 
 ### 2. CPU clock
 
-`target.clock.cpu` selects the core frequency by the board's named tier
-(`lp` or `hp`; `ulp`, `lp` or `hp` on Atomiq110). hpx validates the name
-against the board's registry entry and maps it onto the matching
-neuralSPOT-X performance mode in the generated firmware. Unset, the board
-runs at its lowest-power tier, which is the number `run_metadata.json`
-records.
+`target.clock.cpu` selects the core frequency by the SoC's named tier
+(`lp` or `hp` on the Apollo parts; `atomiq110_fpga_turbo` exposes `lp`
+only, a single fixed FPGA clock). The tiers and their frequencies are
+registered per SoC in `src/helia_profiler/platform/soc.py`; hpx validates
+the name against them and maps it onto the matching neuralSPOT-X
+performance mode in the generated firmware. Unset, the board runs at its
+lowest-power tier. `run_metadata.json` records the resolved tier and
+frequency for every run, which is the number to quote.
 
 ```yaml
 target:

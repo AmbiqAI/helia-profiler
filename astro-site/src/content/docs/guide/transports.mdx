@@ -22,7 +22,7 @@ default needs nothing beyond the probe you already validated.
 | `rtt` (default) | J-Link only, the flashing cable | no | high | Almost always. |
 | `usb_cdc` | target USB cable plus the J-Link | no (CRC and flow control) | medium | RTT is not available on your host, or the capture is very large. |
 | `uart` | the J-Link OB virtual COM port | best effort | low (115200 8N1) | USB CDC is not available either. |
-| `swo` | J-Link only | yes, silently | about 1 Mbit/s | Diagnostics only: checking the firmware is alive. Never for a measurement. |
+| `swo` | J-Link only | yes, silently | low | Diagnostics only: checking the firmware is alive. Never for a measurement. |
 
 The four values are the `Transport` vocabulary in
 `src/helia_profiler/vocab.py`. hpx does not retry with another transport

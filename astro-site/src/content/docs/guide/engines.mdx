@@ -29,19 +29,23 @@ Each engine's own pipeline, backend and constraints are in its section
 below. What every engine shares: the model block, the target block, the
 counters and the output files.
 
-## heliaRT
+## Steps
+
+Each step is one engine; read the one you chose.
+
+### heliaRT
 
 [heliaRT](https://github.com/AmbiqAI/helia-rt) is Ambiq's TFLM fork with
 three kernel backends: reference, CMSIS-NN and the Ambiq-tuned HELIA
-kernels. hpx ships pinned to heliaRT v1.19.0 and enforces a minimum of
-v1.16.0.
+kernels. hpx ships pinned to heliaRT v1.20.0 (`HELIART_VERSION` in
+`engines/helia_rt/artifacts.py`) and enforces a minimum of v1.16.0.
 
 The generated firmware derives its operator resolver from model analysis
 (`resolver_ops: auto`) and enables the resource-variable runtime when the
 graph contains `VAR_HANDLE`-style operators, so those models need no
 firmware edits.
 
-### Where the runtime comes from
+#### Where the runtime comes from
 
 | Mode | Configuration | When |
 |---|---|---|
@@ -54,7 +58,7 @@ In prebuilt mode the toolchain selects the archive:
 `-armclang-` for `armclang`, `-atfe-` for `atfe`. Registry and source modes
 compile heliaRT with the selected toolchain instead.
 
-### Engine configuration
+#### Engine configuration
 
 | Key | Default | Meaning |
 |---|---|---|
@@ -67,12 +71,12 @@ compile heliaRT with the selected toolchain instead.
 | `cmsis_nn_requantize_inline_asm` | `true` | Use the inline-assembly requantisation path. |
 
 Source builds declare `nsx-cmsis-nn` at the baseline's qualified ref, enable
-its fp32 kernels always (heliaRT 1.19.0 refuses to configure without them)
+its fp32 kernels always (heliaRT refuses to configure without them)
 and its fp16 kernels only when the model carries FLOAT16 tensors on a
 Cortex-M55. Size `model.arena_size` from the measured `allocated_arena`,
 not from a guess.
 
-## heliaAOT
+### heliaAOT
 
 [heliaAOT](https://github.com/AmbiqAI/helia-aot) compiles a `.tflite`
 model into C source: no interpreter, no flatbuffer parsing, no per-operator
@@ -86,23 +90,24 @@ engine:
     module_name: hpx_model      # generated NSX module name
 ```
 
-### How it wires in
+#### How it wires in
 
 1. hpx runs the `helia-aot` Python compiler against the model.
 2. The compiler emits C source plus a description of the operators and
    tensor ids.
 3. hpx declares two NSX modules: `nsx-cmsis-nn` from the registry (or a
-   local checkout when `cmsis_nn_path` or `CMSIS_NN_PATH` is set) and
-   `nsx-heliaaot-model`, the generated code for this model.
+   local checkout when `cmsis_nn_path` or `CMSIS_NN_PATH` is set) and the
+   generated model module, named by `module_name` (`hpx_model` by default).
 4. The two link into the same profiler firmware harness the interpreter
    engines use.
 
-### Version policy
+#### Version policy
 
 heliaAOT is a Python package that runs at build time, so pip owns its
-version. The `aot` extra requires `helia-aot>=0.19.0`; hpx also enforces a
-minimum supported version at engine load and `hpx doctor` reports whether
-the engine is available.
+version. The `aot` extra requires `helia-aot>=0.20.0,<0.21.0`
+(`pyproject.toml`); hpx enforces the same minimum at engine load
+(`HELIAAOT_MIN_VERSION`) and `hpx doctor` reports whether the engine is
+available.
 
 ```bash
 pip install 'helia-profiler[aot]'                                  # a compatible release
@@ -110,7 +115,7 @@ pip install --upgrade 'helia-aot @ git+https://github.com/AmbiqAI/helia-aot.git@
 pip install -e /path/to/helia-aot                                  # a local checkout
 ```
 
-### Constraints
+#### Constraints
 
 :::caution[Ambiq's ns-cmsis-nn fork is required]
 heliaAOT depends on AmbiqAI's `ns-cmsis-nn`, not upstream Arm CMSIS-NN; the
@@ -122,11 +127,12 @@ checkout must contain `Include/`, `Source/`, `nsx/CMakeLists.txt` and
 :::caution[Operator coverage]
 heliaAOT supports a curated subset of TFLite operators (CONV_2D,
 DEPTHWISE_CONV_2D, FULLY_CONNECTED, AVERAGE_POOL_2D, MAX_POOL_2D, SOFTMAX,
-RESHAPE and others). A model with an unsupported operator fails at AOT
-compilation with the operator name.
+RESHAPE and others; the authoritative list is the installed `helia-aot`
+package's own documentation). A model with an unsupported operator fails
+at AOT compilation with the operator name.
 :::
 
-### Engine configuration
+#### Engine configuration
 
 | Key | Default | Meaning |
 |---|---|---|
@@ -138,14 +144,14 @@ compilation with the operator name.
 | `aot_args` | `{}` | Pass-through arguments to the compiler, including the per-tensor memory rules described on [Memory placement](../memory/#heliaaot-per-tensor-placement). |
 | `platform_name` | from the board | Override the board to AOT platform mapping. |
 
-## TFLM
+### TFLM
 
 `tflm` is the upstream interpreter baseline. It uses the separate
 `nsx-tflite-micro` port and selects either reference kernels or upstream
 CMSIS-NN; it does not enable heliaRT's HELIA backend. Use it to measure
 what heliaRT's kernels buy on your model.
 
-## ExecuTorch
+### ExecuTorch
 
 The ExecuTorch engine consumes an exported `.pte` program and builds the
 `nsx-executorch` Cortex-M runtime into the generated firmware. It uses
@@ -173,7 +179,10 @@ engine:
 ```
 
 The sizes and the portable-operator list are explicit because the embedded
-runner runs no export pipeline and cannot infer the program's I/O contract.
+runner runs no export pipeline and cannot infer the program's I/O contract;
+without a sidecar, `portable_ops` must name every ATen operator the PTE
+carries as a portable fallback, read from the serialised program's operator
+list.
 When the PTE was exported with `helia-torch`, a `<model>.pte.json` sidecar
 (schema `nsx-executorch.pte-manifest/1`, SHA-256 bound to the file) supplies
 `backend`, `ns_ops`, `portable_ops`, `planned_arena_size`, `input_size` and
@@ -188,7 +197,7 @@ copies, layer instrumentation and report transport are excluded. The
 profiler validates `nsx_pmu_init()`, self-tests the cycle counter, checks
 every counter read and reports 32-bit chained-counter overflow.
 
-### Runtime and providers
+#### Runtime and providers
 
 By default hpx materialises the `nsx-executorch` checkout itself: it clones
 the repository pinned by the compatibility baseline into
@@ -209,11 +218,11 @@ the provider and stamp `development-overrides`.
 
 | Constraint | State |
 |---|---|
-| Toolchains | Builds under `arm-none-eabi-gcc` and ATfE (`ATFE_ROOT`); `armclang` is not supported and validation skips it with a reason. |
+| Toolchains | Builds under `arm-none-eabi-gcc` and ATfE (`ATFE_ROOT`); `armclang` is not covered by ExecuTorch validation and the matrix skips it with a reason (`validation/matrix.py`). |
 | Power capture | Not supported for this engine; keep `power.enabled: false`. |
 | Verified fixture | `configs/executorch/resnet8_cmsis_nn.yaml` targets `apollo330mP_evb` with `arena_location: sram` and a caller-supplied PTE. |
 
-### NS Tier-1 kernels
+#### NS Tier-1 kernels
 
 PTEs exported with `kernel_provider="ns"` may contain `cortex_m_ns::`
 operators (sub, hardswish, mean, standalone relu, relu6, hardtanh, clamp,
@@ -234,7 +243,7 @@ operators as portable ATen fallbacks in float, which dominate per-operator
 cost; [ExecuTorch NS kernels](../executorch-ns-kernels/) has the measured
 deltas and the reproduction recipe.
 
-### Memory placement
+#### Memory placement
 
 The runner owns five static RAM buffers: the memory-planned activation
 arena, the method arena, the temporary arena, and the input and output

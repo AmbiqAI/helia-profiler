@@ -23,7 +23,7 @@ needs a licence; ATfE needs `ATFE_ROOT`.
 | `target.toolchain` | Compiler | Linker | Cost to set up | Pick it when |
 |---|---|---|---|---|
 | `arm-none-eabi-gcc` (default; `gcc` is the accepted alias) | GNU Arm Embedded | GNU `ld` | free, in every distribution | First setup, CI without a licence, cross-platform reproducibility. The default heliaRT registry module builds with it. |
-| `armclang` | Arm Compiler 6 | `armlink` | licence required | Cycle-count optimisation on Cortex-M55, or confirming a result replicates across compilers. Not supported by the ExecuTorch engine. |
+| `armclang` | Arm Compiler 6 | `armlink` | licence required | Cycle-count optimisation on Cortex-M55, or confirming a result replicates across compilers. Not covered by ExecuTorch validation. |
 | `atfe` | Arm Toolchain for Embedded (LLVM) | LLD | free download, `ATFE_ROOT` | An open LLVM toolchain; preview status in hpx. Builds the heliaRT registry flow and ExecuTorch end to end. |
 
 The four accepted values are the `Toolchain` vocabulary in
@@ -152,4 +152,4 @@ Isolate it by holding everything else constant.
 
 [Capture transports](../transports/) for how the data leaves the board, or
 [Engines](../engines/) if the engine you want constrains the toolchain
-(ExecuTorch builds with GCC and ATfE only).
+(ExecuTorch is validated on GCC and ATfE).

@@ -52,7 +52,7 @@ target:
 profiling:
   pmu_counters:
     cpu: all
-    memory: all
+    memory: all               # AP5 boards only; an AP3 or AP4 board rejects memory and mve
     mve: all
   per_layer: true
   iterations: 5
@@ -73,7 +73,7 @@ output:
 ```
 
 ```bash
-hpx profile --config hpx.yml --board apollo3p_evb --iterations 50 --engine helia-aot --output-dir ./my_results
+hpx profile --config hpx.yml --board apollo510b_evb --iterations 50 --engine helia-aot --output-dir ./my_results
 ```
 
 | Block | Page |

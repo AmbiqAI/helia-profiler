@@ -20,7 +20,7 @@ Cortex-M. [Engines](../engines/) explains which engine reads which.
 
 | Format | Engines that read it | Notes |
 |---|---|---|
-| `.tflite` (LiteRT flatbuffer) | `tflm`, `helia-rt`, `helia-aot` | The interpreter engines load the flatbuffer at runtime; `helia-aot` compiles it to C at build time. Quantised int8 models are the target; float models run but exercise reference kernels. |
+| `.tflite` (LiteRT flatbuffer) | `tflm`, `helia-rt`, `helia-aot` | The interpreter engines load the flatbuffer at runtime; `helia-aot` compiles it to C at build time. Quantised int8 models are the target. |
 | `.pte` (ExecuTorch program) | `executorch` | Exported with `helia-torch` or the ExecuTorch Cortex-M flow. A `<model>.pte.json` sidecar next to it fills in the runner sizes; see [Engines](../engines/#executorch). |
 
 The engine, not the file extension, decides how the model is used: the same
@@ -40,7 +40,7 @@ model:
 | Key | What it sets | Default |
 |---|---|---|
 | `path` | The model file. Also the positional argument of `hpx profile`. | none; required |
-| `arena_size` | The tensor arena in bytes: activations and scratch for the interpreter engines. `helia-aot` plans its own memory and ignores it unless external arenas are enabled. | engine default |
+| `arena_size` | The tensor arena in bytes: activations and scratch for the interpreter engines. `helia-aot` plans its own memory and ignores it unless external arenas are enabled. | `DEFAULT_ARENA_SIZE_BYTES`, 256 KiB; ExecuTorch takes the sidecar's `planned_arena_size` when present |
 | `arena_location` | Which memory tier holds the arena. | automatic placement |
 | `weights_location` | Which memory tier holds the weights (the flatbuffer, the AOT constant blobs, or the PTE program). | automatic placement |
 
@@ -48,7 +48,9 @@ Every key has a flag: `--arena-size`, `--arena-location`,
 `--weights-location`. The generated [configuration reference](../../reference/configuration/)
 carries the exact types and validators.
 
-## Sizing the arena
+## Steps
+
+### 1. Sizing the arena
 
 `arena_size` is a request; `memory.allocated_arena` in `summary.json` is
 what the runtime used. The loop:
@@ -70,7 +72,7 @@ A request that does not fit fails before any firmware is built, with the
 regions and the knobs to turn; [Memory placement](../memory/) shows that
 message and what each option costs.
 
-## What hpx learns from the model
+### 2. What hpx learns from the model
 
 Before building, hpx analyses the model: the operators it contains, the
 tensors and their sizes, and, for the interpreter engines, which builtin
@@ -87,7 +89,7 @@ The `analysis` extra (`pip install 'helia-profiler[analysis]'`) adds
 compute and parameter counts per operator with no hardware attached; the
 same numbers appear in the run's report when the extra is installed.
 
-## Models that ship with hpx
+### 3. Models that ship with hpx
 
 | Model | Where | Use |
 |---|---|---|

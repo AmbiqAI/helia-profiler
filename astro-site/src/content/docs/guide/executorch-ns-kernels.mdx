@@ -30,7 +30,8 @@ ns-cmsis-nn, so those operators stay int8 end to end.
 Captured 2026-08-19 on an Apollo510 EVB (Cortex-M55, the board's `lp`
 clock tier, RTT transport), 25 iterations and 5 warm-up runs, median
 aggregation, CPU, MVE and memory PMU presets. Every run reported
-`validity: valid`. Runtime: nsx-executorch `main` at `4a257def`,
+`validity: valid`. Runtime: nsx-executorch `main` at `4a257def` (the PR #2 merge that added
+the out-of-tree `cortex_m_ns::` operators),
 ExecuTorch submodule `3a97429` (v1.3.0), arm-cmsis-nn `6d21a6f`,
 ns-cmsis-nn v7.29.2 `6317264`. The numbers come from one bench and one
 runtime pin; the ratios are the transferable result, the absolute cycle

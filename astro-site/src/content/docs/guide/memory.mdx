@@ -78,7 +78,7 @@ against the SoC's verified windows); the planning table replaces it only
 when the measured view is unavailable, for instance on a custom SoC:
 
 ```text
-Memory (measured) (gnu link):
+Memory (measured) (gnu link):          # captured on atomiq110_fpga_turbo; capacities are that SoC's
   DTCM     16.3 KB   479.7 KB  of 496.0 KB   3%   Reserved 479.7 KB
   MRAM     45.0 KB   3.9 MB    of 3.9 MB     1%
 ```
@@ -145,7 +145,9 @@ power-gate MRAM during inference; compare the captured traces.
 
 ### 5. Tighten the arena
 
-`arena_size` is a request. After a representative run, set it a little
+`arena_size` is a request. Unset, the interpreter engines and heliaAOT use
+`DEFAULT_ARENA_SIZE_BYTES`, 256 KiB (`config/__init__.py`); ExecuTorch
+takes the sidecar's `planned_arena_size` when present. After a representative run, set it a little
 above the reported `allocated_arena` (the existing guidance in this
 repository ranges from 1.15x to 1.5x depending on input variation), run
 again, and confirm `allocated_arena` did not move and no region is over
@@ -186,7 +188,7 @@ panel.
 A placement that does not fit fails before any firmware is built:
 
 ```text
-Error: Memory plan does not fit:
+Error: Memory plan does not fit:        # an Apollo5-family part; the capacity is that SoC's registry value
   DTCM: 540672 B used > 524288 B capacity (over by 16384 B)
   Hint: DTCM is over capacity.  Try one of:
     * shrink the tensor arena (--arena-size);
