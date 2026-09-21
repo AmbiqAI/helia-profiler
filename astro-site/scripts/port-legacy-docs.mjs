@@ -81,6 +81,13 @@ const SKIP = [
   'guide/output.md',
   'guide/analysis-comparison.md',
   'guide/model-explorer.md',
+  'architecture/index.md',
+  'architecture/pipeline.md',
+  'architecture/engine-adapters.md',
+  'architecture/firmware.md',
+  'architecture/capture.md',
+  'architecture/field-diagnostics.md',
+  'architecture/adding-an-engine.md',
 ];
 
 /*
@@ -135,6 +142,13 @@ const PRESERVE = [
   'guide/model-explorer.mdx',
   'guide/parsing-outputs.mdx',
   'guide/troubleshooting.mdx',
+  'guide/concepts/index.mdx',
+  'guide/concepts/pipeline.mdx',
+  'guide/concepts/engine-adapters.mdx',
+  'guide/concepts/firmware.mdx',
+  'guide/concepts/capture.mdx',
+  'guide/concepts/field-diagnostics.mdx',
+  'guide/concepts/adding-an-engine.mdx',
 ];
 
 const BASE = '/helia-profiler/';
