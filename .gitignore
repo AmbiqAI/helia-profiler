@@ -66,3 +66,8 @@ result-*
 
 # Claude Code worktrees live under the shared .claude dir
 .claude/worktrees/
+# Review artifacts kept beside a branch, never committed
+/SCREENSHOTS/
+/SOURCES.md
+/ROUTES.md
+/STALE-CLAIMS.md

@@ -1,20 +1,38 @@
 ---
-title: Getting started
-description: Install heliaPROFILER, check your hardware and profile a first model.
+title: "Getting Started"
+description: "Three short steps. Each one builds on the previous."
 ---
 
-This section is the one path from an empty machine to a first result: install,
-hardware prerequisites, setup validation, a first profile, and configuring a
-run.
+import Icon from '@ambiqai/helia-ui/astro/Icon';
+import CardGrid from '@ambiqai/helia-ui/astro/CardGrid';
+import LinkCard from '@ambiqai/helia-ui/astro/LinkCard';
 
-```bash
-pip install helia-profiler
-hpx doctor
-hpx profile model.tflite
-```
+Three short steps. Each one builds on the previous.
 
-`hpx doctor` reports whether the Arm toolchain, J-Link and NSX are available.
-`hpx profile` resolves the engine, generates and builds firmware, flashes the
-board, captures the run and writes the results.
+<CardGrid>
+  <LinkCard href="install/" title="1. Install">
+    <Icon name="download" slot="icon" />
 
-The pages of this section are being migrated and are not published here yet.
+    Get heliaPROFILER, the ARM GCC toolchain, CMake/Ninja, and J-Link onto your machine. NSX is installed with heliaPROFILER.
+
+  </LinkCard>
+  <LinkCard href="first-profile/" title="2. First profile">
+    <Icon name="rocket" slot="icon" />
+
+    Plug in an Apollo EVB, run one command, see cycle counts.
+
+  </LinkCard>
+  <LinkCard href="quickstart/" title="3. Use a config file">
+    <Icon name="file-code" slot="icon" />
+
+    Move from one-liners to repeatable YAML configs you can check into git.
+
+  </LinkCard>
+</CardGrid>
+
+:::tip[After the basics]
+Once you've got a profile in hand, the [User Guide](../guide/configuration/)
+is the next stop. It introduces engines, toolchains, transports, memory
+placement, and power capture one topic at a time — pick whichever is
+relevant to what you want to measure next.
+:::

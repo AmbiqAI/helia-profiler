@@ -1,14 +1,79 @@
 ---
-title: Examples
-description: Complete heliaPROFILER runs with configuration, captured output and how to read the numbers.
+title: "Examples"
+description: "Short, runnable recipes for common profiling scenarios. Each page is a recipe, not a guide — a minimal config, the command to run, and a peek at the output.…"
 ---
 
-Each example is one run end to end: what you will learn, the hardware and
-wiring, the software prerequisites, the complete configuration file, the
-command, the output it produced, and how to read that output.
+import Icon from '@ambiqai/helia-ui/astro/Icon';
+import CardGrid from '@ambiqai/helia-ui/astro/CardGrid';
+import LinkCard from '@ambiqai/helia-ui/astro/LinkCard';
 
-Every example states what it was validated on, or says plainly that it has not
-been reproduced on hardware yet. A compile-only result is never described as
-profiled.
+Short, runnable recipes for common profiling scenarios. Each page is a
+**recipe, not a guide** — a minimal config, the command to run, and a peek
+at the output. For the full mechanics behind a topic (counter selection,
+placement policy, power wiring), follow the "Where to go deeper" links at
+the end of each page into the [User Guide](../guide/configuration/).
 
-The catalogue is being migrated and is not published here yet.
+Every recipe follows the same shape:
+
+1. **Goal** — what you'll accomplish, in one sentence.
+2. **Setup** — the config (YAML and/or CLI flags) you need.
+3. **Run** — the command.
+4. **What you get** — a short excerpt of the output.
+5. **Where to go deeper** — links to the guide pages with full depth.
+
+:::note[About the numbers]
+Sample outputs on these pages (cycle counts, mA, mW, µJ) are
+illustrative placeholders, not real captured measurements — see the
+note on the [home page](../).
+:::
+
+<CardGrid>
+  <LinkCard href="interactive-python/" title="Interactive Python">
+    <Icon name="book" slot="icon" />
+
+    Explore typed results and branch immutable experiments in a notebook.
+
+  </LinkCard>
+  <LinkCard href="basic-profiling/" title="Basic Profiling">
+    <Icon name="play" slot="icon" />
+
+    Profile a model with default settings.
+
+  </LinkCard>
+  <LinkCard href="per-layer/" title="Per-Layer Breakdown">
+    <Icon name="layer-group" slot="icon" />
+
+    Analyze operator-level cycle counts and PMU events.
+
+  </LinkCard>
+  <LinkCard href="tflm-baseline/" title="Vanilla TFLM Baseline">
+    <Icon name="scale-balanced" slot="icon" />
+
+    Measure the vanilla TFLM port with reference kernels or upstream CMSIS-NN.
+
+  </LinkCard>
+  <LinkCard href="engine-comparison/" title="Engine Comparison">
+    <Icon name="right-left" slot="icon" />
+
+    Compare heliaRT and heliaAOT on the same model.
+
+  </LinkCard>
+  <LinkCard href="power-profiling/" title="Power Profiling">
+    <Icon name="bolt" slot="icon" />
+
+    Capture current/voltage traces with Joulescope.
+
+  </LinkCard>
+  <LinkCard href="toolchain-comparison/" title="Toolchain Comparison">
+    <Icon name="screwdriver-wrench" slot="icon" />
+
+    Compare GCC, armclang, and ATfE on the same model and engine.
+
+  </LinkCard>
+  <LinkCard href="atomiq110-npu-profiling/" title="Atomiq110 NPU Profiling (Experimental)">
+    <Icon name="memory" slot="icon" />
+
+    Profile a Vela-compiled model on the experimental Atomiq110 FPGA target. FPGA performance and power results are not representative of silicon.
+
+  </LinkCard>
+</CardGrid>

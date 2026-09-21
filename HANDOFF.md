@@ -12,10 +12,47 @@ Done:
   (branch `324-spike-cli-config`, PR #327). Both stay draft and close unmerged.
 - Phase 1, #325, landed on `docs-migration` as d4eec96 (reverted from `main` by
   #329). The migration reaches `main` as one stacked PR, #332.
-- Phase 2, #330, this branch `330-python-api-reference` off `docs-migration`:
-  the Python API reference. No PR opened yet; owner reviews first.
+- Phase 2, #330, landed on `docs-migration` as `8420154` (PR #333).
 
-This branch (#330):
+This branch (#334, `334-content-port` off `docs-migration`): the mechanical
+port of the 38 legacy guide pages. No PR opened yet; owner reviews first.
+- `astro-site/scripts/port-legacy-docs.mjs` is the whole port: it stages a copy
+  of `docs/`, runs `helia-ui-mkdocs-convert` with the 23 `--skip` paths and
+  `--keep index.mdx --keep reference`, then moves paths and rewrites links for
+  the five-section IA. `npm run check:port` regenerates into a scratch tree and
+  compares byte for byte; it is in `docs.yml`.
+- Path moves: `architecture/*` to `guide/concepts/*`,
+  `architecture/compatibility-baseline` to `reference/compatibility-baseline`,
+  `guides/*` to `guide/in-depth/*`. Legacy routes redirect to the new ones.
+- Mermaid renders at build time: `rehype-mermaid` + `playwright` pinned,
+  `@ambiqai/helia-ui/mermaid.css` in `customCss`, and a
+  `npx playwright install --with-deps chromium chromium-headless-shell` step
+  before the build in `docs.yml`. Astro 7 wants the plugin list through
+  `unified()` from `@astrojs/markdown-remark`, which is now a direct dep.
+- `redirects.json`: deferred 49 to 14, the 14 being #331's.
+- Known miss against #334's acceptance box: `/guide/power/` is 209,375 B HTML
+  against a 250,000 B budget, and 40,599 B gzip at gzip -6 (40,316 B at -9)
+  against a 40,000 B budget. The box stays unticked with the number beside it;
+  the budget is not re-baselined. The fix is the page split, so the miss
+  carries into the Measure revamp issue (plan item 10), which owns it.
+- `markdown.processor: unified()` replaces the site's Markdown engine, because
+  Astro 7's default (satteri) does not read `rehypePlugins` and mermaid would
+  silently render as a code block. A/B at this head (satteri vs unified, same
+  content): 47 non-mermaid pages differ, in whitespace and entity serialisation
+  only; the four mermaid pages differ by the rendered SVG. `astro` is pinned to an exact version for the
+  same reason helia-ui, playwright and rehype-mermaid are: a minor bump that
+  renames or re-homes the processor key reverts the site to satteri without
+  failing anything, so the pin is what makes that a deliberate change.
+- Pending, in this order, and not before the owner says so: apply the review
+  findings on this branch, then `git fetch && git rebase origin/docs-migration`
+  onto the helia-ui alpha.16 bump (PR #336, merged), then re-run the full chain
+  including `check:port`. Do not bump helia-ui here; #336 owns the pin and the
+  Linux lockfile. alpha.16 changes MDX Markdown renditions (helia-ui#146), so
+  expect rendition diffs in `dist/` and none in the committed pages; if
+  `check:port` reports a committed page differing after the rebase, that is a
+  real conversion change, not #146.
+
+Earlier branch (#330):
 - helia-ui pinned to `v0.1.0-alpha.15` (`51aaae91cf7942eb0778be48e4b4c9a1b16772c3`),
   lockfile regenerated on linux/amd64 node:24. alpha.15 moves the Callout
   recipe into the global `recipes.css` and drops `role` for `aria-label`;
@@ -33,12 +70,13 @@ This branch (#330):
   the committed pages match a fresh regeneration into a scratch directory),
   `check:output` now also runs `check-reference-output.mjs`.
 
-Verified on this branch (all local, all green):
+Verified (all local, all green; the route counts are `334-content-port`, the
+rest carried from #330):
 - `npm ci` from the Linux lockfile.
 - `npm run build`, `check`, `check:links`, `check:output`, `check:search`,
-  `check:redirects`, `check:reference`, `check:guard`.
-- 61 legacy routes covered: 57 redirected (49 still deferred to a section
-  landing page, down 8), 4 already served by a page of the same path.
+  `check:redirects`, `check:reference`, `check:port`, `check:guard`.
+- 61 legacy routes covered: 34 redirected (14 still deferred to a section
+  landing page), 27 served by a page of the same path.
 - 85 published names render as 84 symbols and one module page across 14 pages,
   each symbol once and badged; the 13 implementation names appear as no symbol,
   member, sidebar entry or llms-full.txt section.
@@ -93,13 +131,17 @@ Record the run links on #325 when they exist.
 
 ## Next
 
-1. Owner reviews this branch, then a PR into `docs-migration` (label
+1. Owner reviews `334-content-port`, then a PR into `docs-migration` (label
    `agent-generated`). The docs workflow only runs on a pull request, so the
-   "no board, no secrets" run link on #330 cannot exist until the PR is open.
-2. #331: CLI, configuration and issue-code reference. It collides with this
-   branch in `package.json`, `astro.config.mjs` (one Reference sidebar array),
-   `src/data/redirects.json` and `docs.yml`, so it rebases on this rather than
-   running beside it.
+   "no board, no secrets" run link cannot exist until the PR is open.
+   `ROUTES.md` and `STALE-CLAIMS.md` at the repo root are for the PR body and
+   the #334 comment; they are working files, not site content.
+2. #331 (CLI, configuration and issue-code reference) runs in parallel and
+   collides with this branch in `package.json`, `astro.config.mjs` (the
+   Reference sidebar array), `src/data/redirects.json` and `docs.yml`.
+   Whichever lands second rebases. #331 owns the 14 deferred routes and should
+   clear them, and should restore the fragments this port dropped from links
+   into its pages (see `unbuilt` in `port-legacy-docs.mjs`).
 3. Draft the remaining child issues (plan s5 items 4-17) as their phase arrives.
 
 ## Gotchas
