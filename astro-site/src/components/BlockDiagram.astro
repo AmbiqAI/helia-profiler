@@ -1,0 +1,83 @@
+---
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026, Ambiq
+/**
+ * The canvas a set of `Block`s is drawn on: a figure, an optional caption, and
+ * the arrangement of the blocks directly inside it.
+ *
+ * It draws no arrows and no connectors. What a block diagram on a product page
+ * is asked for is the shape of a thing -- what it is made of, and what those
+ * pieces are made of -- and containment carries that without a line between
+ * any two boxes. A page that needs a sequence with branches wants a mermaid
+ * fence instead; see the diagrams page.
+ *
+ * The recursion is in `Block`, which holds a set of its own. This part is the
+ * outermost set and the caption over it, so a diagram is one figure however
+ * deep it goes, and a screen reader walks the nesting as nested lists.
+ *
+ * @slot default -- The top-level blocks, in reading order.
+ */
+import type { HTMLAttributes } from 'astro/types';
+import Eyebrow from '@ambiqai/helia-ui/astro/Eyebrow';
+
+interface Props extends HTMLAttributes<'figure'> {
+  /** The diagram's name, set over it as the first line of the caption. */
+  title?: string;
+  /** A sentence under the title. What the diagram is of, not what it shows. */
+  caption?: string;
+  /** How the top-level blocks are laid out. A row stacks below 42rem. */
+  flow?: 'row' | 'column' | 'grid';
+  /** Columns at the wide end of the `grid` flow. Halves at 62rem, stacks at 42rem. */
+  columns?: 2 | 3 | 4 | 5;
+  /** The gap between the top-level blocks, and the tighter one inside them. */
+  density?: 'compact' | 'default' | 'comfortable';
+  /** The ground under the diagram. `muted` frames it; `plain` lets the page through. */
+  tone?: 'plain' | 'muted';
+  /** Accessible name for the figure when it carries no `title`. */
+  ariaLabel?: string;
+}
+
+const {
+  title,
+  caption,
+  flow = 'row',
+  columns = 3,
+  density = 'default',
+  tone = 'plain',
+  ariaLabel,
+  class: className,
+  ...rest
+} = Astro.props;
+
+const named = Boolean(title || caption);
+---
+
+<figure
+  class:list={[
+    'helia-block-diagram',
+    'not-content',
+    tone !== 'plain' && `helia-block-diagram--${tone}`,
+    density !== 'default' && `helia-layout--${density}`,
+    className,
+  ]}
+  aria-label={named ? undefined : ariaLabel}
+  {...rest}
+>
+  {
+    named && (
+      <figcaption class="helia-block-diagram__caption">
+        {title && <Eyebrow as="span">{title}</Eyebrow>}
+        {caption && <span class="helia-block-diagram__note">{caption}</span>}
+      </figcaption>
+    )
+  }
+  <ul
+    class:list={[
+      'helia-block-set',
+      `helia-block-set--${flow}`,
+      flow === 'grid' && `helia-block-set--cols-${columns}`,
+    ]}
+  >
+    <slot />
+  </ul>
+</figure>

@@ -19,7 +19,9 @@ export default defineConfig({
   base,
   /* Legacy MkDocs routes. `served` entries are already real pages at the same
    * path, so they must stay out of this map or Astro sees a route collision. */
-  redirects: redirects.redirects,
+  /* `redirects` covers the legacy MkDocs routes (checked against the fixture);
+     `moved` covers routes this site published and later moved. */
+  redirects: { ...redirects.redirects, ...(redirects.moved ?? {}) },
   /* Diagrams are rendered to SVG at build time by a headless Chromium, so a
    * reader needs no client JS and the page needs no layout shift. The browser
    * is installed by the docs workflow; without it the build fails loudly. */
@@ -40,7 +42,7 @@ export default defineConfig({
        * routes at one path is a hard error in a coming Astro. */
       disable404Route: true,
       /* Opt-in: it paints the build-time mermaid SVGs from the token set. */
-      customCss: ['@ambiqai/helia-ui/mermaid.css'],
+      customCss: ['@ambiqai/helia-ui/mermaid.css', './src/styles/block-diagram.css'],
       plugins: [
         heliaStarlight({
           accent: 'helia-profiler',
@@ -59,9 +61,12 @@ export default defineConfig({
               href: `${basePath}getting-started/`,
               sidebar: [
                 { label: 'Overview', slug: 'getting-started' },
-                { label: 'Installation', slug: 'getting-started/install' },
-                { label: 'First Profile', slug: 'getting-started/first-profile' },
-                { label: 'Quick Start', slug: 'getting-started/quickstart' },
+                { label: 'Install', slug: 'getting-started/install' },
+                { label: 'Hardware prerequisites', slug: 'getting-started/hardware-prerequisites' },
+                { label: 'Validate your setup', slug: 'getting-started/validate-your-setup' },
+                { label: 'First profile', slug: 'getting-started/first-profile' },
+                { label: 'Configure a run', slug: 'getting-started/configure-a-run' },
+                { label: 'Where next', slug: 'getting-started/where-next' },
               ],
             },
             {
@@ -105,10 +110,6 @@ export default defineConfig({
                   label: 'In-depth guides',
                   items: [
                     { label: 'Overview', slug: 'guide/in-depth' },
-                    {
-                      label: 'Validating a Board Setup',
-                      slug: 'guide/in-depth/validating-a-board-setup',
-                    },
                     {
                       label: 'Memory Placement Tuning',
                       slug: 'guide/in-depth/memory-placement-tuning',

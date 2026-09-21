@@ -1,0 +1,94 @@
+---
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026, Ambiq
+/**
+ * One node of a `BlockDiagram`: a label, an optional second line, and, when it
+ * is given children, the set of blocks inside it.
+ *
+ * A block that holds blocks is the part's reason for existing. The children go
+ * in the default slot as more `Block`s rather than as a nested `BlockDiagram`,
+ * so the markup is one figure with nested lists in it and the hierarchy a
+ * screen reader walks is the hierarchy the page draws. Depth is read off the
+ * markup: a subtree takes the ground of wherever it is moved to.
+ *
+ * The label is a name, not a sentence. One to three words is what the box was
+ * drawn for; a block that needs a paragraph is a card.
+ *
+ * @slot default -- The blocks inside this one. A block with no slot is a leaf.
+ */
+import type { HTMLAttributes } from 'astro/types';
+import type { IconName } from '@fortawesome/fontawesome-svg-core';
+import Icon from '@ambiqai/helia-ui/astro/Icon';
+
+interface Props extends HTMLAttributes<'li'> {
+  /** What the block is. One to three words. */
+  label: string;
+  /** A second line under the label: a qualifier, a count, a unit. */
+  sublabel?: string;
+  /** The ground. `accent` takes the product color of whatever subtree it sits in. */
+  tone?: 'neutral' | 'muted' | 'accent';
+  /** The edge. `filled` drops it for a stronger ground, `dashed` marks a block as proposed. */
+  emphasis?: 'outline' | 'filled' | 'dashed';
+  /** Columns the block covers in a `row` or `grid` set. Dropped when the set stacks. */
+  span?: 2 | 3 | 4;
+  /** How the blocks inside this one are laid out. */
+  flow?: 'row' | 'column' | 'grid';
+  /** Columns at the wide end of the `grid` flow. */
+  columns?: 2 | 3 | 4 | 5;
+  /** Makes the label a link. The block itself stays a list item. */
+  href?: string;
+  /** Font Awesome solid name, drawn before the label as decoration. */
+  icon?: IconName;
+}
+
+const {
+  label,
+  sublabel,
+  tone = 'neutral',
+  emphasis = 'outline',
+  span,
+  flow = 'column',
+  columns = 3,
+  href,
+  icon,
+  class: className,
+  ...rest
+} = Astro.props;
+
+const Face = href ? 'a' : 'div';
+---
+
+<li
+  class:list={[
+    'helia-block',
+    tone !== 'neutral' && `helia-block--${tone}`,
+    emphasis !== 'outline' && `helia-block--${emphasis}`,
+    span && `helia-block--span-${span}`,
+    className,
+  ]}
+  {...rest}
+>
+  <Face
+    class:list={['helia-block__face', href && 'helia-focus-ring']}
+    href={href}
+  >
+    {icon && <Icon name={icon} class="helia-block__icon" />}
+    <span class="helia-block__text">
+      <span class="helia-block__label">{label}</span>
+      {sublabel && <span class="helia-block__sub">{sublabel}</span>}
+    </span>
+  </Face>
+  {
+    Astro.slots.has('default') && (
+      <ul
+        class:list={[
+          'helia-block-set',
+          `helia-block-set--${flow}`,
+          flow === 'grid' && `helia-block-set--cols-${columns}`,
+        ]}
+      >
+        <slot />
+      </ul>
+    )
+  }
+</li>

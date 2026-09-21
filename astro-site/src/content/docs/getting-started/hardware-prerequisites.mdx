@@ -1,0 +1,81 @@
+---
+title: "Hardware prerequisites"
+description: "The board, probe, cable and optional power instrument a first profile needs, with the host and tool versions hpx expects, each traced to its source."
+---
+
+## Purpose
+
+Know what to plug in before you run anything. A profile needs a board hpx
+knows, a J-Link path to it, and a host with the tools from
+[Install](../install/). Power measurement needs one more instrument and comes
+later; it is listed here so you can plan for it, not so you can skip it.
+
+## Prerequisites
+
+The tools from [Install](../install/). Nothing on this page runs a command.
+
+## What you need
+
+| Item | Requirement | Where this comes from |
+|---|---|---|
+| Host OS | Linux, macOS or Windows | `ci.yml` runs the unit tests on all three; the Nix flake covers x86-64 Linux, ARM64 Linux and Apple Silicon macOS |
+| Python | 3.11 or newer; 3.11 or 3.12 for the `aot` extra | `pyproject.toml` `requires-python`; `helia-aot` declares `<3.13` |
+| Arm GNU toolchain | `arm-none-eabi-gcc` 13.x or 14.x | `hpx doctor` row; the toolchain table hpx validates against in `hostenv/toolchains.py` |
+| CMake | 3.24 or newer | `hpx doctor` row label `CMake (>= 3.24)` |
+| Ninja | any | `hpx doctor` row |
+| SEGGER J-Link software | 7.80 or newer | J-Link Commander is required for flashing; the RTT transport uses `pylink-square` |
+| neuralSPOT-X | `neuralspotx==0.8.1`, installed with hpx | `pyproject.toml` dependency pin |
+| Board | An Ambiq Apollo EVB from `hpx boards` | `src/helia_profiler/platform/board.py` registry; the channel column is `BoardDef.channel` |
+| Probe | The EVB's on-board J-Link, over its debug USB port | `hpx probes list` enumerates J-Link probes; `probes match` picks one per board |
+| Cable | One USB cable to the debug port; a second only if you use the `usb_cdc` or `uart` transport | [Capture transports](../../guide/transports/) |
+| Power instrument (optional) | Joulescope JS110, JS220 or JS320, or an INA228 breakout wired to the board | [Power measurement](../../guide/power/); the Joulescope driver `pyjoulescope_driver` ships with hpx |
+
+Board names, cores and the stable or preview channel of each board are on
+[Boards and platforms](../../guide/boards/), which is generated from the same
+registry `hpx boards` prints. Do not copy them from here; that table is the
+source.
+
+## Which board
+
+Every Apollo EVB has an on-board J-Link on its debug USB connector. That is
+the port hpx flashes through and, with the default `rtt` transport, captures
+through. Boards with more than one USB connector label the debug port on the
+silkscreen or the quick-start card; if `hpx probes list` prints nothing after
+you plug in, you have the other connector.
+
+The default board is `apollo510_evb`. Pass `--board <name>` for any other,
+using the exact name from `hpx boards`. A board on the `preview` channel
+works with the same commands; the channel records how much hardware
+validation backs it, not whether hpx will drive it.
+
+## Which probe
+
+hpx uses SEGGER J-Link, either the on-board probe or an external J-Link
+plugged into the EVB's SWD header. With one probe attached nothing needs
+configuring. With several, `hpx probes match --board <name>` shows which
+serial hpx will pick, and `--jlink-serial` pins it.
+
+## Power measurement, for later
+
+Cycle counts need no instrument. Power needs one of:
+
+- A Joulescope in the supply path to the board, with its GPIO inputs wired
+  to the board pins hpx toggles to mark the measurement window. The per-board
+  pin tables and the sense wiring are on [Power measurement](../../guide/power/).
+- An INA228 current monitor on the board's I2C, read by the firmware itself,
+  which needs no host instrument during capture.
+
+Both are optional for everything in this section. Leave them for
+[Where next](../where-next/).
+
+## Expected output
+
+There is no command on this page. When the board is on the bench and the
+debug USB cable is in, the next page's `hpx probes list` prints one line per
+probe; when it is not, it prints `No J-Link probes detected.`
+
+## What next
+
+[Validate your setup](../validate-your-setup/) runs the five commands that
+prove the host, the probe and the board agree before you spend a build on
+them.
