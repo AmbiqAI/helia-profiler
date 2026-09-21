@@ -36,29 +36,23 @@ comments on #320.
   keep verifying. Their `run_metadata.json` carries the runner's paths and
   the probe serial; the owner has not yet ruled on that.
 
-## State (2026-09-21, end of day)
+## State (2026-09-21, close)
 
-Merged into `docs-migration`: Phase 1 (#325), Phase 2 (#330), content port
-(#334), alpha.16 pin (#336), Getting started (#339), Set up a run (#340),
-Measure (#341), Read results (#342), Concepts (#343), Examples (#344), the
-host-only half of the power examples (#345, PR #356), Reference polish
-(#346, PR #355).
+Every sub-PR is merged into `docs-migration` (#333 to #362): skeleton, the
+generated references, the content port, Getting started, Set up a run,
+Measure, Read results, Concepts, Examples, the host-only power pages,
+Reference polish, the helia-ui alpha.19 pin and the cutover. `main` is
+merged in (4f2afae). PR #332 carries the branch to `main` as one squash and
+is marked ready; merging it deploys the Astro site (the owner's call).
 
-In flight:
-- #337 Home: PR awaiting owner copy sign-off.
-
-- #322 cutover: branch `322-cutover` (worktree `hpx-322`): docs/, mkdocs.yml,
-  the docs dependency group, deploy-pages.yml, the port scripts and the two
-  legacy generators are gone; the wire generator writes the MDX page; the
-  mermaid renderer and playwright are gone; the deploy job holds the Pages
-  permissions and the guard condition again. The live site switches when the
-  stack (#332) lands on main, which is the owner's call.
-- helia-ui alpha.18 pin: PR #361 (worktree `hpx-alpha18`), drops the
-  BlockDiagram mirror; the sidecar line-join defect is helia-ui#171.
-
-Not started: the `load_run_summary` export for the API reference (draft
-issue `issues/draft-run-summary-api-export.md`); the bench captures for the
-not-yet-validated example pages (draft `issues/draft-power-bench-captures.md`).
+Open, owner decisions:
+- #337 Home copy sign-off (PR open against docs-migration).
+- The shipped bundles' `run_metadata.json` (runner paths, probe serial),
+  kept unmodified so the manifests verify; see PR #354.
+- Two issue drafts in the session scratchpad: bench captures for the
+  not-yet-validated example pages and the remaining #345 pages; exporting
+  `load_run_summary` and the `RunSummary` sections for the API reference.
+- Post-deploy verification on #322 after #332 lands.
 
 ## Decisions
 
