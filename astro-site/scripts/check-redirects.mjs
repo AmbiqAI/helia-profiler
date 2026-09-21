@@ -12,10 +12,9 @@
  *   deferred  a subset of the redirect keys whose real target is not built
  *             yet, so it forwards to its section landing page for now
  *
- * TODO(#322): the deferred list has to be empty at cutover. Until then it is
- * the list of readers who land one level above what they asked for. Set
- * DOCS_REQUIRE_NO_DEFERRED=1 to make a non-empty list a failure; #322 turns
- * that on for good.
+ * The deferred list is empty since the cutover and the docs workflow sets
+ * DOCS_REQUIRE_NO_DEFERRED=1, so a route that forwards to a section landing
+ * page instead of its own target fails the build.
  */
 import fs from 'node:fs';
 import path from 'node:path';

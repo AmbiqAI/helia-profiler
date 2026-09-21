@@ -1,7 +1,7 @@
 """Emit ``issues.json``: every machine-readable diagnostic code HPX can emit.
 
 The registries in ``helia_profiler.results.issues`` are the source, the same
-ones ``tools/gen_issue_code_reference.py`` renders into the MkDocs page. This
+ones ``tools/gen_wire_protocol_reference.py`` renders into the MkDocs page. This
 is the structured rendition of that page: a reader wanting the prose gets the
 generated page, a consumer wanting to key on a code gets this file.
 

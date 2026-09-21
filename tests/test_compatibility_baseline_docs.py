@@ -1,4 +1,4 @@
-"""Drift guard: docs/architecture/compatibility-baseline.md vs the baseline.
+"""Drift guard: the Reference compatibility-baseline page vs the baseline.
 
 The page's qualified-reference table is hand-maintained prose mirroring
 ``src/helia_profiler/data/compatibility-baseline-v1.json`` plus two code
@@ -26,7 +26,9 @@ from helia_profiler.engines.helia_rt.artifacts import (
 )
 
 _REPO = Path(__file__).resolve().parents[1]
-_DOC = _REPO / "docs" / "architecture" / "compatibility-baseline.md"
+_DOC = (
+    _REPO / "astro-site" / "src" / "content" / "docs" / "reference" / "compatibility-baseline.mdx"
+)
 _JSON = _REPO / "src" / "helia_profiler" / "data" / "compatibility-baseline-v1.json"
 
 #: Engine names as the doc table spells them (prose, not JSON keys).
@@ -59,7 +61,7 @@ def test_every_baseline_entry_has_a_doc_row_with_its_ref():
         row_name = "heliaRT" if name == "helia-rt" else f"`{name}`"
         assert row_name in table, (
             f"project '{name}' has no row in the compatibility-baseline.md "
-            "table — update docs/architecture/compatibility-baseline.md and "
+            "table — update astro-site/src/content/docs/reference/compatibility-baseline.mdx and "
             "src/helia_profiler/data/compatibility-baseline-v1.json together"
         )
         assert project["ref"][:8] in table, (
