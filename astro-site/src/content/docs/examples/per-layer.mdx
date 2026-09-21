@@ -1,26 +1,41 @@
 ---
-title: "Per-Layer Breakdown"
-description: "Goal: capture every available PMU counter (CPU, memory, MVE) for each layer in a model, not just the default CPU counter selection."
+title: "Every counter, every layer"
+description: "Capture the full CPU, memory and MVE counter catalogue per layer in one run, understand the multi-pass firmware that makes it possible, and read the merged per-layer table."
 ---
 
-**Goal:** capture every available PMU counter (CPU, memory, MVE) for each
-layer in a model, not just the default CPU counter selection.
+## Goal
 
-## Setup
+Get the complete counter picture of a model rather than the default four.
+You will learn how hpx schedules more counters than the hardware holds at
+once, what the merged CSV looks like, and which derived ratios to compute.
 
-```yaml title="hpx_full.yml"
+## Hardware and wiring
+
+An Apollo510 EVB (Cortex-M55 with the Armv8-M PMU and MVE) on its J-Link
+USB port. A Cortex-M4 board cannot run this recipe: it exposes the DWT
+cycle counter only ([Boards and targets](../../guide/boards/)).
+
+## Software prerequisites
+
+hpx with the `aot` extra (the config uses heliaAOT), the GNU Arm
+toolchain, CMake, Ninja and J-Link software.
+
+## Config file
+
+[`examples/quickstart/hpx_full_sweep.yml`](https://github.com/AmbiqAI/helia-profiler/blob/main/examples/quickstart/hpx_full_sweep.yml):
+
+```yaml
 model:
-  path: my_model.tflite
+  path: kws_model.tflite
   arena_size: 131072
-
 engine:
-  type: helia-rt
+  type: helia-aot
   config:
-    variant: release-with-logs
-
+    prefix: hpx
+    module_name: hpx_model
 target:
   board: apollo510_evb
-
+  toolchain: arm-none-eabi-gcc
 profiling:
   pmu_counters:
     cpu: all
@@ -29,52 +44,81 @@ profiling:
   per_layer: true
   iterations: 5
   warmup: 2
-
+power:
+  enabled: false
 output:
   format: csv
-  dir: ./results/full_sweep
+  dir: ./results/results_full_sweep
   model_explorer: true
-  detailed: true             # get per-preset CSVs and memory.json
+  detailed: true
 ```
+
+`all` on three groups asks for every counter the SoC's catalogue lists for
+that group; the [PMU counters](../../guide/pmu-counters/) page carries the
+catalogue per SoC.
 
 ## Run
 
 ```bash
-hpx profile --config hpx_full.yml
+cd examples/quickstart
+hpx profile --config hpx_full_sweep.yml
 ```
 
-Requesting `all` for three groups runs multiple PMU passes to cover every
-counter — see [Multi-pass profiling](../../guide/pmu-counters/#multi-pass-profiling)
-for how passes are scheduled and merged.
+## Expected output
 
-## What you get
+Not yet captured for this config. The shape of the per-layer file is the
+same as the default-counter bundle shipped with
+[Profile a model](../basic-profiling/), which has four CPU counters:
 
-```bash
-cat results/full_sweep/summary.json | python -m json.tool
+```
+id,op,ARM_PMU_CPU_CYCLES,ARM_PMU_INST_RETIRED,ARM_PMU_STALL_FRONTEND,ARM_PMU_STALL_BACKEND,cycles,cycles_pct,overflow,macs,ops,cycles_per_mac
+0,CONV_2D,337348.0,262360.0,1907.0,39945.0,337348.0,16.4,False,320000,640000,1.05
+1,DEPTHWISE_CONV_2D,216205.0,155556.0,1358.0,48006.0,216205.0,10.5,False,72000,144000,3.0
+2,CONV_2D,209934.0,164568.0,7.0,24863.0,209934.0,10.2,False,512000,1024000,0.41
 ```
 
-```json
-{
-  "layers": 13,
-  "total_cycles": 2016376,
-  "cache": {
-    "l1d_hit_rate_pct": 91.2
-  },
-  "top_layers": [
-    {"op": "CONV_2D", "cycles": 338176, "pct": 16.8}
-  ]
-}
-```
+With the three groups on `all`, the same rows carry one column per
+counter in the catalogue, and `output.detailed: true` adds
+`detailed/profile_<preset>.csv` per firmware pass and
+`detailed/profile_<group>.csv` per group, plus `detailed/memory.json`.
 
-`profile_results.csv` has one row per layer with every requested counter as
-a column. With `--detailed`, `detailed/memory.json` adds per-layer cache
-counters and arena allocation.
+## How to read it
 
-## Where to go deeper
+- The SoC holds a fixed number of PMU counters at once, so the firmware
+  runs the model once per counter preset (`<group>_<index>`, for example
+  `cpu_0`, `cpu_1`, `memory_0`) and the host merges the presets by layer
+  id. Every row is therefore the same operator measured in several passes;
+  `cycles` comes from the pass that carried `ARM_PMU_CPU_CYCLES`
+  ([Data capture](../../guide/concepts/capture/)).
+- Ratios are more useful than raw counts: `ARM_PMU_L1D_CACHE_REFILL /
+  ARM_PMU_L1D_CACHE` is the data-cache miss rate, `ARM_PMU_MVE_INST_RETIRED
+  / ARM_PMU_INST_RETIRED` the vector share, `STALL_BACKEND / CPU_CYCLES`
+  the fraction of cycles waiting on memory or the pipeline. The
+  [PMU counters](../../guide/pmu-counters/#5-read-the-results) page lists
+  the derived metrics hpx computes and the ones to compute yourself.
+- `overflow` is `True` when a 32-bit counter saturated in any pass; the
+  run is then `invalid` for that counter and fewer iterations or fewer
+  counters per pass fix it.
+- `macs`, `ops` and `cycles_per_mac` join the host-side model analysis to
+  the measured row by the operator's original index, so heliaAOT rows
+  line up with the model even where the compiler skipped operators.
 
-- [PMU Counters](../../guide/pmu-counters/) — counter groups, aggregation,
-  derived metrics (L1D hit rate, MVE instruction share), and how to read
-  `profile_results.csv` with pandas.
-- [Model Explorer Overlays](../../guide/model-explorer/) — visualize
-  per-layer hot spots on the model graph.
-- [Basic Profiling](../basic-profiling/) — the minimal-counter starting point.
+## Variations
+
+- One group at a time: `pmu_counters: {memory: all}` keeps the run short
+  and the passes few.
+- Explicit lists: `memory: [ARM_PMU_L1D_CACHE, ARM_PMU_L1D_CACHE_MISS_RD]`
+  names counters under the group that owns them; an unsupported name or
+  group for the SoC is rejected at preflight.
+- heliaRT instead of heliaAOT: the counters are engine-independent; only
+  the operator rows differ.
+- Overlays: `output.model_explorer: true` writes one overlay per counter
+  for [Model Explorer](../model-explorer-overlay/).
+
+## Validated on
+
+Not yet validated. The nightly suite captures the default `cpu` group
+only, so no bundle with the `memory` and `mve` groups exists; the CSV
+excerpt above is from `apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto`
+(nightly [run 35078330526](https://github.com/AmbiqAI/helia-profiler/actions/runs/35078330526),
+2026-09-16, hpx 0.1.6 at `0714893`), which ran the default four counters.

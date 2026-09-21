@@ -1,0 +1,15 @@
+id,op,ARM_PMU_CPU_CYCLES,ARM_PMU_INST_RETIRED,ARM_PMU_STALL_FRONTEND,ARM_PMU_STALL_BACKEND,cycles,cycles_pct,overflow
+0,cortex_m::quantized_depthwise_conv2d.out:c0i0,360884.0,279532.0,2300.0,43057.0,360884.0,16.8,False
+1,dim_order_ops::_clone_dim_order.out:c0i1,5327.0,5003.0,195.0,59.0,5327.0,0.2,False
+2,cortex_m::quantized_depthwise_conv2d.out:c0i2,225066.0,157471.0,1368.0,55238.0,225066.0,10.5,False
+3,cortex_m::quantized_conv2d.out:c0i3,216818.0,167098.0,82.0,28972.0,216818.0,10.1,False
+4,cortex_m::quantized_depthwise_conv2d.out:c0i4,222717.0,157471.0,1334.0,52877.0,222717.0,10.4,False
+5,cortex_m::quantized_conv2d.out:c0i5,215631.0,167098.0,42.0,27862.0,215631.0,10.0,False
+6,cortex_m::quantized_depthwise_conv2d.out:c0i6,222534.0,157471.0,1335.0,52691.0,222534.0,10.3,False
+7,cortex_m::quantized_conv2d.out:c0i7,217672.0,167098.0,42.0,29875.0,217672.0,10.1,False
+8,cortex_m::quantized_depthwise_conv2d.out:c0i8,222825.0,157471.0,1332.0,52988.0,222825.0,10.4,False
+9,cortex_m::quantized_conv2d.out:c0i9,215926.0,167098.0,42.0,28174.0,215926.0,10.0,False
+10,dim_order_ops::_clone_dim_order.out:c0i10,5186.0,5003.0,22.0,106.0,5186.0,0.2,False
+11,cortex_m::pad.out:c0i11,4293.0,2346.0,209.0,1484.0,4293.0,0.2,False
+12,cortex_m::quantized_avg_pool2d.out:c0i12,14846.0,9041.0,139.0,4636.0,14846.0,0.7,False
+13,cortex_m::quantized_linear.out:c0i13,1435.0,881.0,346.0,175.0,1435.0,0.1,False

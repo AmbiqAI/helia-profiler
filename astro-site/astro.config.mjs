@@ -144,29 +144,17 @@ export default defineConfig({
               href: `${basePath}examples/`,
               sidebar: [
                 { label: 'Overview', slug: 'examples' },
-                {
-                  label: 'Interactive Python',
-                  slug: 'examples/interactive-python',
-                },
-                { label: 'Basic Profiling', slug: 'examples/basic-profiling' },
-                {
-                  label: 'Atomiq110 NPU Profiling (Experimental)',
-                  slug: 'examples/atomiq110-npu-profiling',
-                },
-                {
-                  label: 'Vanilla TFLM Baseline',
-                  slug: 'examples/tflm-baseline',
-                },
-                { label: 'Per-Layer Breakdown', slug: 'examples/per-layer' },
-                {
-                  label: 'Engine Comparison',
-                  slug: 'examples/engine-comparison',
-                },
-                {
-                  label: 'Toolchain Comparison',
-                  slug: 'examples/toolchain-comparison',
-                },
-                { label: 'Power Profiling', slug: 'examples/power-profiling' },
+                { label: 'Profile a model', slug: 'examples/basic-profiling' },
+                { label: 'Every counter, every layer', slug: 'examples/per-layer' },
+                { label: 'Vanilla TFLM baseline', slug: 'examples/tflm-baseline' },
+                { label: 'Compare engines', slug: 'examples/engine-comparison' },
+                { label: 'Compare toolchains', slug: 'examples/toolchain-comparison' },
+                { label: 'Power capture', slug: 'examples/power-profiling' },
+                { label: 'Atomiq110 NPU (experimental)', slug: 'examples/atomiq110-npu-profiling' },
+                { label: 'Interactive Python', slug: 'examples/interactive-python' },
+                { label: 'Batch runs from YAML', slug: 'examples/batch-runs' },
+                { label: 'Re-analyse saved results', slug: 'examples/reanalyse-results' },
+                { label: 'Model Explorer overlay', slug: 'examples/model-explorer-overlay' },
               ],
             },
             {

@@ -1,0 +1,538 @@
+{
+  "artifacts": [
+    {
+      "media_type": "text/csv",
+      "name": "hpx.profile-layers",
+      "optional": false,
+      "path": "profile_results.csv",
+      "producer": "hpx",
+      "role": "core",
+      "sha256": "8a87c704a1acacf7515414a415d7ed9189a636cf1b2b4aa2e38d455c1ed34609",
+      "size_bytes": 1188
+    },
+    {
+      "media_type": "application/json",
+      "name": "hpx.summary",
+      "optional": false,
+      "path": "summary.json",
+      "producer": "hpx",
+      "role": "core",
+      "schema": "hpx.run-summary",
+      "schema_version": 5,
+      "sha256": "4d58f4d4486330381b3e89e32346607f8b524862a87ce7f7ee83ca6aacbbc2b6",
+      "size_bytes": 21817
+    },
+    {
+      "media_type": "application/json",
+      "name": "hpx.run-metadata",
+      "optional": false,
+      "path": "run_metadata.json",
+      "producer": "hpx",
+      "role": "core",
+      "schema": "hpx.run-metadata",
+      "schema_version": 1,
+      "sha256": "c183fe65d161dbb31034afd2862d387eae1f15f67aea5d21c2873ee99af9422d",
+      "size_bytes": 44415
+    },
+    {
+      "media_type": "application/yaml",
+      "name": "hpx.nsx-lock",
+      "optional": false,
+      "path": "nsx.lock",
+      "producer": "neuralspotx",
+      "role": "core",
+      "sha256": "4690a0a91eb6719b9bc05efa931aa5d91b6581c5e87b4193663cd4e6ce41b8e1",
+      "size_bytes": 6206
+    }
+  ],
+  "bundle_type": "profile",
+  "comparability": {
+    "architecture_flags": null,
+    "arena_location": null,
+    "board": "apollo510_evb",
+    "compiler_version": "arm-none-eabi-gcc (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+    "cpu_clock": "lp",
+    "engine": "tflm",
+    "engine_version": null,
+    "hpx_version": "0.1.6",
+    "link_family": "gnu",
+    "model_sha256": "935c513a5f4dbfe6458c16b0a791e916f5e89d6c9b02ffbefce49c06fbbdf038",
+    "run_metadata_schema_version": 1,
+    "run_summary_schema_version": 5,
+    "soc": "apollo510",
+    "system_clock_hz": 96000000,
+    "toolchain": "arm-none-eabi-gcc",
+    "transport": "rtt",
+    "weights_location": null
+  },
+  "extensions": {},
+  "hpx_version": "0.1.6",
+  "issues": [],
+  "provenance": {
+    "build_images": [
+      {
+        "architecture_flags": {},
+        "binary_name": "hpx_profiler",
+        "role": "profile",
+        "sha256": "5c040b7192de6388e0c49b6aadd94f844329bab6732e0d5b150967a30bc72e8c",
+        "size_bytes": 11145652,
+        "target_name": "hpx_profiler",
+        "translation_units": 0
+      }
+    ],
+    "compatibility": {
+      "baseline": {
+        "baseline_id": "hpx-neuralspotx-0.8.1-2026-09",
+        "engines": {
+          "executorch": {
+            "ref": "5514ac1ea8439b3fe615d180bf68c75a9dabb48e",
+            "version": "0.1.0"
+          },
+          "helia-aot": {
+            "max_version_exclusive": "0.21.0",
+            "min_version": "0.20.0"
+          },
+          "helia-rt": {
+            "ref": "edb3a25fc96c8e9b634dabdb9cd31cb22aa43440",
+            "version": "1.20.0"
+          },
+          "tflm": {
+            "governed_by_modules": true
+          }
+        },
+        "modules": {
+          "arm-cmsis-nn": {
+            "project": "arm-cmsis-nn",
+            "ref": "6d21a6f821fb72541173a6c4d05d83329fa74f7c"
+          },
+          "nsx-ambiq-bsp": {
+            "project": "nsx-ambiq-sdk",
+            "ref": "a9f4ec25a162f6f3700623feb691423bb5a51132"
+          },
+          "nsx-cmsis-nn": {
+            "project": "ns-cmsis-nn",
+            "ref": "aaeb145a67c3decd9869f96474e36e7dbdc2030c"
+          },
+          "nsx-executorch": {
+            "project": "nsx-executorch",
+            "ref": "5514ac1ea8439b3fe615d180bf68c75a9dabb48e"
+          },
+          "nsx-helia-rt": {
+            "project": "helia-rt",
+            "ref": "edb3a25fc96c8e9b634dabdb9cd31cb22aa43440"
+          },
+          "nsx-pmu-armv8m": {
+            "project": "nsx-pmu-armv8m",
+            "ref": "5725c065a0c3603132f1064ee2684d1fa8587c88"
+          },
+          "nsx-sensors": {
+            "project": "nsx-sensors",
+            "ref": "c219a2bc98c62f96819fae20ab6c8911fcea3e25"
+          },
+          "nsx-tflite-micro": {
+            "project": "nsx-tflite-micro",
+            "ref": "7afcf2b4170e039caf4c49f91e2c45d5869be333"
+          }
+        },
+        "neuralspotx": {
+          "package": "neuralspotx",
+          "sha256": "7aac6f1b2e89ebf41dfe087c7588e0db11d65e8a11cac2cda03f6d7c510a9094",
+          "version": "0.8.1"
+        },
+        "projects": {
+          "arm-cmsis-nn": {
+            "ref": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",
+            "url": "https://github.com/AmbiqAI/arm-cmsis-nn.git"
+          },
+          "helia-rt": {
+            "ref": "edb3a25fc96c8e9b634dabdb9cd31cb22aa43440",
+            "url": "https://github.com/AmbiqAI/helia-rt.git"
+          },
+          "neuralspotx": {
+            "ref": "2dbe12a2799fd8c3df85f1a103b0adca340c901f",
+            "url": "https://github.com/AmbiqAI/neuralspotx.git"
+          },
+          "ns-cmsis-nn": {
+            "ref": "aaeb145a67c3decd9869f96474e36e7dbdc2030c",
+            "url": "https://github.com/AmbiqAI/ns-cmsis-nn.git"
+          },
+          "nsx-ambiq-sdk": {
+            "ref": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+            "url": "https://github.com/AmbiqAI/nsx-ambiq-sdk.git"
+          },
+          "nsx-executorch": {
+            "ref": "5514ac1ea8439b3fe615d180bf68c75a9dabb48e",
+            "url": "https://github.com/AmbiqAI/nsx-executorch.git"
+          },
+          "nsx-pmu-armv8m": {
+            "ref": "5725c065a0c3603132f1064ee2684d1fa8587c88",
+            "url": "https://github.com/AmbiqAI/nsx-pmu-armv8m.git"
+          },
+          "nsx-sensors": {
+            "ref": "c219a2bc98c62f96819fae20ab6c8911fcea3e25",
+            "url": "https://github.com/AmbiqAI/nsx-sensors.git"
+          },
+          "nsx-tflite-micro": {
+            "ref": "7afcf2b4170e039caf4c49f91e2c45d5869be333",
+            "url": "https://github.com/AmbiqAI/nsx-tflite-micro.git"
+          }
+        },
+        "schema": "hpx.compatibility-baseline",
+        "schema_version": 1
+      },
+      "baseline_fingerprint": "ec2f81db229825ea772a2594e50decd55acb7ff84fbe6536bc4af44c8107068b",
+      "engine_overrides": [],
+      "module_overrides": [],
+      "qualification": "qualified"
+    },
+    "config_sha256": "2fdba2f3ebd7198794bae308b8389d459b5e9a67176e634b2217029614306da3",
+    "dependencies": {
+      "lock": {
+        "frozen_sync": true,
+        "manifest_hash": {
+          "algorithm": "sha256",
+          "value": "c2d0fc004fbfea9593b225a901625202f8fa00b2bee46ad196343be30a75b607"
+        },
+        "mode": "reused",
+        "offline": false,
+        "schema_version": 4,
+        "sha256": {
+          "algorithm": "sha256",
+          "value": "4690a0a91eb6719b9bc05efa931aa5d91b6581c5e87b4193663cd4e6ce41b8e1"
+        },
+        "update_requested": false
+      },
+      "modules": [
+        {
+          "content_hash": {
+            "algorithm": "sha256",
+            "value": "869c880135085f099aedb1d37c86805488afdac3d2f9091cd9aafacc9ea32573"
+          },
+          "kind": "git",
+          "name": "arm-cmsis-nn",
+          "peeled_commit": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",
+          "project": "arm-cmsis-nn",
+          "requested_ref": "v0.1.0",
+          "requested_tag": "v0.1.0",
+          "url": "https://github.com/AmbiqAI/arm-cmsis-nn.git",
+          "vendored_at": "modules/arm-cmsis-nn"
+        },
+        {
+          "content_hash": {
+            "algorithm": "sha256",
+            "value": "0ac391d563bfcde836670ee8d5a384c804c8324ef51bb40f5b842f3cfa3a2b01"
+          },
+          "kind": "git",
+          "name": "helia-rt-source",
+          "peeled_commit": "7c1b162c0fd2336876b69daaa20c87a1e7e2f508",
+          "project": "helia-rt-source",
+          "requested_ref": "7c1b162c0fd2336876b69daaa20c87a1e7e2f508",
+          "requested_tag": null,
+          "url": "https://github.com/AmbiqAI/helia-rt.git",
+          "vendored_at": "modules/helia-rt-source"
+        },
+        {
+          "content_hash": {
+            "algorithm": "sha256",
+            "value": "4ca0d4e197abbb9a0165baebb6b7832d24b6fd23f1a47e424e9f5a01fbd459c6"
+          },
+          "kind": "git",
+          "name": "nsx-ambiq-bsp",
+          "peeled_commit": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+          "project": "nsx-ambiq-sdk",
+          "requested_ref": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+          "requested_tag": null,
+          "url": "https://github.com/AmbiqAI/nsx-ambiq-sdk.git",
+          "vendored_at": "modules/nsx-ambiq-sdk"
+        },
+        {
+          "content_hash": {
+            "algorithm": "sha256",
+            "value": "4ca0d4e197abbb9a0165baebb6b7832d24b6fd23f1a47e424e9f5a01fbd459c6"
+          },
+          "kind": "git",
+          "name": "nsx-ambiq-hal",
+          "peeled_commit": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+          "project": "nsx-ambiq-sdk",
+          "requested_ref": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+          "requested_tag": null,
+          "url": "https://github.com/AmbiqAI/nsx-ambiq-sdk.git",
+          "vendored_at": "modules/nsx-ambiq-sdk"
+        },
+        {
+          "content_hash": {
+            "algorithm": "sha256",
+            "value": "4ca0d4e197abbb9a0165baebb6b7832d24b6fd23f1a47e424e9f5a01fbd459c6"
+          },
+          "kind": "git",
+          "name": "nsx-ambiqsuite",
+          "peeled_commit": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+          "project": "nsx-ambiq-sdk",
+          "requested_ref": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+          "requested_tag": null,
+          "url": "https://github.com/AmbiqAI/nsx-ambiq-sdk.git",
+          "vendored_at": "modules/nsx-ambiq-sdk"
+        },
+        {
+          "content_hash": {
+            "algorithm": "sha256",
+            "value": "2ebb8c832db7c052dc4236004f4f4e106e15b4747bfde16fc22474a1cd9b34bb"
+          },
+          "kind": "packaged",
+          "name": "nsx-board-apollo510-evb",
+          "peeled_commit": null,
+          "project": "neuralspotx",
+          "requested_ref": "packaged",
+          "requested_tag": null,
+          "url": null,
+          "vendored_at": "boards/apollo510_evb"
+        },
+        {
+          "content_hash": {
+            "algorithm": "sha256",
+            "value": "4ca0d4e197abbb9a0165baebb6b7832d24b6fd23f1a47e424e9f5a01fbd459c6"
+          },
+          "kind": "git",
+          "name": "nsx-cmsis-core",
+          "peeled_commit": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+          "project": "nsx-ambiq-sdk",
+          "requested_ref": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+          "requested_tag": null,
+          "url": "https://github.com/AmbiqAI/nsx-ambiq-sdk.git",
+          "vendored_at": "modules/nsx-ambiq-sdk"
+        },
+        {
+          "content_hash": {
+            "algorithm": "sha256",
+            "value": "4ca0d4e197abbb9a0165baebb6b7832d24b6fd23f1a47e424e9f5a01fbd459c6"
+          },
+          "kind": "git",
+          "name": "nsx-cmsis-startup",
+          "peeled_commit": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+          "project": "nsx-ambiq-sdk",
+          "requested_ref": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+          "requested_tag": null,
+          "url": "https://github.com/AmbiqAI/nsx-ambiq-sdk.git",
+          "vendored_at": "modules/nsx-ambiq-sdk"
+        },
+        {
+          "content_hash": {
+            "algorithm": "sha256",
+            "value": "4ca0d4e197abbb9a0165baebb6b7832d24b6fd23f1a47e424e9f5a01fbd459c6"
+          },
+          "kind": "git",
+          "name": "nsx-core",
+          "peeled_commit": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+          "project": "nsx-ambiq-sdk",
+          "requested_ref": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+          "requested_tag": null,
+          "url": "https://github.com/AmbiqAI/nsx-ambiq-sdk.git",
+          "vendored_at": "modules/nsx-ambiq-sdk"
+        },
+        {
+          "content_hash": {
+            "algorithm": "sha256",
+            "value": "cbecc30022858bc177555bf2389fdf0e8c4c3f59f11c07265d2f461d53ca848b"
+          },
+          "kind": "git",
+          "name": "nsx-pmu-armv8m",
+          "peeled_commit": "5725c065a0c3603132f1064ee2684d1fa8587c88",
+          "project": "nsx-pmu-armv8m",
+          "requested_ref": "5725c065a0c3603132f1064ee2684d1fa8587c88",
+          "requested_tag": null,
+          "url": "https://github.com/AmbiqAI/nsx-pmu-armv8m.git",
+          "vendored_at": "modules/nsx-pmu-armv8m"
+        },
+        {
+          "content_hash": {
+            "algorithm": "sha256",
+            "value": "4ca0d4e197abbb9a0165baebb6b7832d24b6fd23f1a47e424e9f5a01fbd459c6"
+          },
+          "kind": "git",
+          "name": "nsx-soc-hal",
+          "peeled_commit": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+          "project": "nsx-ambiq-sdk",
+          "requested_ref": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+          "requested_tag": null,
+          "url": "https://github.com/AmbiqAI/nsx-ambiq-sdk.git",
+          "vendored_at": "modules/nsx-ambiq-sdk"
+        },
+        {
+          "content_hash": {
+            "algorithm": "sha256",
+            "value": "ace1ad2334e85de3b48be8add06c5dcde44d080eba09b6375dc39a309bbe0f50"
+          },
+          "kind": "git",
+          "name": "nsx-tflite-micro",
+          "peeled_commit": "7afcf2b4170e039caf4c49f91e2c45d5869be333",
+          "project": "nsx-tflite-micro",
+          "requested_ref": "v0.1.0",
+          "requested_tag": "v0.1.0",
+          "url": "https://github.com/AmbiqAI/nsx-tflite-micro.git",
+          "vendored_at": "modules/nsx-tflite-micro"
+        },
+        {
+          "content_hash": {
+            "algorithm": "sha256",
+            "value": "04de1c1329109e872fea5c65ce36e8ccec02fb2492eb5450a341b0c488d96528"
+          },
+          "kind": "packaged",
+          "name": "nsx-tooling",
+          "peeled_commit": null,
+          "project": "neuralspotx",
+          "requested_ref": "packaged",
+          "requested_tag": null,
+          "url": null,
+          "vendored_at": "cmake/nsx"
+        }
+      ],
+      "overrides": [],
+      "qualification": "qualified",
+      "workspace": {
+        "baseline_fingerprint": "ec2f81db229825ea772a2594e50decd55acb7ff84fbe6536bc4af44c8107068b",
+        "baseline_id": "hpx-neuralspotx-0.8.1-2026-09",
+        "fingerprint": "ad4052881e33404104d81a2a65e9cfd779d343256378835cec69703506d3daa1",
+        "inputs": {
+          "baseline": {
+            "fingerprint": "ec2f81db229825ea772a2594e50decd55acb7ff84fbe6536bc4af44c8107068b",
+            "id": "hpx-neuralspotx-0.8.1-2026-09"
+          },
+          "board": {
+            "ble_reset_gpio_pin": null,
+            "channel": "stable",
+            "default_go_gpio_pin": 14,
+            "default_state_gpio_pin": 36,
+            "default_sync_gpio_pin": 29,
+            "description": "",
+            "name": "apollo510_evb",
+            "psram_kb": null,
+            "soc": "apollo510",
+            "starter_profile_board": null
+          },
+          "build": {
+            "channel": null,
+            "compiler_launcher": "auto",
+            "explicit_overrides": [],
+            "module_overrides": {}
+          },
+          "engine": {
+            "backend": "cmsis_nn",
+            "cmake_vars": {
+              "NSX_TFLITE_MICRO_BACKEND": "cmsis_nn"
+            },
+            "config": {},
+            "config_path_hash": null,
+            "extra_modules": [
+              {
+                "local": false,
+                "name": "arm-cmsis-nn",
+                "project": "arm-cmsis-nn",
+                "ref": "",
+                "version": ""
+              },
+              {
+                "local": false,
+                "name": "nsx-tflite-micro",
+                "project": "nsx-tflite-micro",
+                "ref": "",
+                "version": ""
+              }
+            ],
+            "resolved_backend": null,
+            "resolved_variant": null,
+            "resolved_version": null,
+            "toolchain_tag": null,
+            "type": "tflm"
+          },
+          "hpx_version": "0.1.6",
+          "registry_hash": {
+            "algorithm": "sha256",
+            "value": "22f9bb7a8023bd01840a6aeea29b1c5a58b9310dcbd7c28710bcb4d25d9f8911"
+          },
+          "soc": {
+            "app_flash_load_addr": null,
+            "c_define": "AM_PART_APOLLO510",
+            "clocks": [
+              {
+                "default": "lp",
+                "name": "cpu",
+                "speeds": [
+                  {
+                    "mhz": 96,
+                    "name": "lp",
+                    "perf_tier": "NSX_PERF_LOW"
+                  },
+                  {
+                    "mhz": 250,
+                    "name": "hp",
+                    "perf_tier": "NSX_PERF_HIGH"
+                  }
+                ]
+              }
+            ],
+            "cmsis_header": "apollo510.h",
+            "core": "cortex-m55",
+            "family": "ap5",
+            "has_mve": true,
+            "has_radio_subsystem": false,
+            "has_usb": true,
+            "jlink_device": "AP510NFA-CBR",
+            "memory": {
+              "dtcm_kb": 512,
+              "itcm_kb": 256,
+              "mram_kb": 4096,
+              "nvm_kb": 8192,
+              "psram_kb": 65536,
+              "sram_kb": 3072
+            },
+            "name": "apollo510",
+            "origin": "builtin",
+            "pmu_max_ops": 4096,
+            "pmu_tier": "pmu",
+            "registered_name": "apollo510",
+            "rtt_scan_ranges": [
+              [
+                536870912,
+                524288
+              ]
+            ],
+            "ssram_full_power_enum": "AM_HAL_PWRCTRL_SRAM_3M",
+            "swo_trace_clock_mhz": null
+          },
+          "target": {
+            "clock": {
+              "cpu": null
+            },
+            "psram": {
+              "clock_hz": 48000000
+            },
+            "segger_rtt_source_hash": null,
+            "toolchain": "arm-none-eabi-gcc",
+            "transport": "rtt"
+          }
+        },
+        "registry_hash": {
+          "algorithm": "sha256",
+          "value": "22f9bb7a8023bd01840a6aeea29b1c5a58b9310dcbd7c28710bcb4d25d9f8911"
+        },
+        "schema_version": 1
+      }
+    },
+    "model": {
+      "name": "kws_ref_model.tflite",
+      "sha256": "935c513a5f4dbfe6458c16b0a791e916f5e89d6c9b02ffbefce49c06fbbdf038",
+      "size_bytes": 53744
+    },
+    "toolchain": {
+      "cmake_version": "cmake version 4.1.2",
+      "compiler": "arm-none-eabi-gcc",
+      "compiler_version": "arm-none-eabi-gcc (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203"
+    }
+  },
+  "run_id": "da83b7c2-15ac-4204-9969-aca95aa37ba1",
+  "schema": "hpx.result-manifest",
+  "schema_version": 1,
+  "status": "complete",
+  "timestamp": "2026-09-16T09:17:16.734360+00:00",
+  "validity": "valid"
+}

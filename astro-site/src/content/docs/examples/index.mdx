@@ -1,79 +1,71 @@
 ---
 title: "Examples"
-description: "Short, runnable recipes for common profiling scenarios. Each page is a recipe, not a guide — a minimal config, the command to run, and a peek at the output.…"
+description: "Runnable recipes on one fixed template, from the first profile to batch runs and saved-result analysis, each stating what it was validated on and shipping its config and, where one exists, its captured bundle."
 ---
 
-import Icon from '@ambiqai/helia-ui/astro/Icon';
 import CardGrid from '@ambiqai/helia-ui/astro/CardGrid';
 import LinkCard from '@ambiqai/helia-ui/astro/LinkCard';
 
-Short, runnable recipes for common profiling scenarios. Each page is a
-**recipe, not a guide** — a minimal config, the command to run, and a peek
-at the output. For the full mechanics behind a topic (counter selection,
-placement policy, power wiring), follow the "Where to go deeper" links at
-the end of each page into the [User Guide](../guide/configuration/).
-
-Every recipe follows the same shape:
-
-1. **Goal** — what you'll accomplish, in one sentence.
-2. **Setup** — the config (YAML and/or CLI flags) you need.
-3. **Run** — the command.
-4. **What you get** — a short excerpt of the output.
-5. **Where to go deeper** — links to the guide pages with full depth.
-
-:::note[About the numbers]
-Sample outputs on these pages (cycle counts, mA, mW, µJ) are
-illustrative placeholders, not real captured measurements — see the
-note on the [home page](../).
-:::
+Every example is a complete recipe on the same nine headings: goal,
+hardware and wiring, software prerequisites, config file, run, expected
+output, how to read it, variations, validated on. The config is a file in
+the repository. The output is either a captured run with its board, nsx
+module versions, date and source commit named, or the page says "not yet
+captured". Nothing on these pages is illustrative.
 
 <CardGrid>
-  <LinkCard href="interactive-python/" title="Interactive Python">
-    <Icon name="book" slot="icon" />
-
-    Explore typed results and branch immutable experiments in a notebook.
-
+  <LinkCard href="basic-profiling/" title="First results" eyebrow="Start here" meta="Profile a model, every counter per layer, the TFLM baseline">
+    One valid bundle from a board, then the full counter catalogue and the
+    upstream baseline the Ambiq engines are measured against.
   </LinkCard>
-  <LinkCard href="basic-profiling/" title="Basic Profiling">
-    <Icon name="play" slot="icon" />
-
-    Profile a model with default settings.
-
+  <LinkCard href="engine-comparison/" title="Comparisons" eyebrow="hpx compare" meta="Engines and toolchains on one model">
+    The same model through three engines and two toolchains, with the real
+    comparison reports and the rules that withhold a delta.
   </LinkCard>
-  <LinkCard href="per-layer/" title="Per-Layer Breakdown">
-    <Icon name="layer-group" slot="icon" />
-
-    Analyze operator-level cycle counts and PMU events.
-
+  <LinkCard href="power-profiling/" title="Power" eyebrow="Joulescope" meta="Energy per inference beside the profile">
+    The power capture recipe and the measurement pages that explain the
+    wiring, the window and the health checks.
   </LinkCard>
-  <LinkCard href="tflm-baseline/" title="Vanilla TFLM Baseline">
-    <Icon name="scale-balanced" slot="icon" />
-
-    Measure the vanilla TFLM port with reference kernels or upstream CMSIS-NN.
-
+  <LinkCard href="atomiq110-npu-profiling/" title="NPU" eyebrow="Experimental" meta="Ethos-U85 on the Atomiq110 FPGA">
+    A Vela-compiled model on the NPU with both counter families, under the
+    experimental label its sources carry.
   </LinkCard>
-  <LinkCard href="engine-comparison/" title="Engine Comparison">
-    <Icon name="right-left" slot="icon" />
-
-    Compare heliaRT and heliaAOT on the same model.
-
-  </LinkCard>
-  <LinkCard href="power-profiling/" title="Power Profiling">
-    <Icon name="bolt" slot="icon" />
-
-    Capture current/voltage traces with Joulescope.
-
-  </LinkCard>
-  <LinkCard href="toolchain-comparison/" title="Toolchain Comparison">
-    <Icon name="screwdriver-wrench" slot="icon" />
-
-    Compare GCC, armclang, and ATfE on the same model and engine.
-
-  </LinkCard>
-  <LinkCard href="atomiq110-npu-profiling/" title="Atomiq110 NPU Profiling (Experimental)">
-    <Icon name="memory" slot="icon" />
-
-    Profile a Vela-compiled model on the experimental Atomiq110 FPGA target. FPGA performance and power results are not representative of silicon.
-
+  <LinkCard href="interactive-python/" title="Automation and analysis" eyebrow="Python and batch" meta="Sessions, hpx validate, saved bundles, overlays">
+    Drive hpx from Python, run a matrix in one command, re-analyse bundles
+    without a board, and put per-layer cost on the model graph.
   </LinkCard>
 </CardGrid>
+
+## Index
+
+| Example | Engine | Toolchain | Board | Measurement | Validated on |
+|---|---|---|---|---|---|
+| [Profile a model](basic-profiling/) | heliaRT | GNU Arm | apollo510_evb (also 330mP, 3P, 4 Lite Blue) | cycles, default counters | nightly 2026-09-16, `0714893` |
+| [Every counter, every layer](per-layer/) | heliaAOT | GNU Arm | apollo510_evb | cpu, memory, mve groups | not yet validated |
+| [Vanilla TFLM baseline](tflm-baseline/) | TFLM (CMSIS-NN) | GNU Arm | apollo510_evb | cycles, default counters | nightly 2026-09-16, `0714893` |
+| [Compare engines](engine-comparison/) | heliaRT, heliaAOT, TFLM (ExecuTorch as a variation) | GNU Arm | apollo510_evb | cycles, binary size | nightly 2026-09-16, `0714893`; compare run on host 2026-09-21 |
+| [Compare toolchains](toolchain-comparison/) | heliaRT, heliaAOT | GNU Arm, ATfE (armclang not yet) | apollo510_evb | cycles | nightly 2026-09-16, `0714893` |
+| [Power capture with a Joulescope](power-profiling/) | heliaAOT | GNU Arm | apollo510_evb | energy per inference | not yet validated |
+| [Atomiq110 NPU profiling](atomiq110-npu-profiling/) | heliaRT, heliaAOT | GNU Arm | atomiq110_fpga_turbo (experimental) | cpu and NPU counters | not yet validated |
+| [Interactive Python session](interactive-python/) | heliaRT, heliaAOT | GNU Arm | apollo510_evb | resolve, profile, compare | host steps 2026-09-21; profile not yet |
+| [Batch runs from YAML](batch-runs/) | all | GNU Arm, ATfE | four boards | suite manifest | nightly 2026-09-16, `0714893` |
+| [Re-analyse saved results](reanalyse-results/) | any | any | none | loaders, compare, regression | host 2026-09-21 on the shipped bundles |
+| [Per-layer cost on the model graph](model-explorer-overlay/) | any | any | none for viewing | overlays | not yet validated |
+
+## The evidence rule
+
+"Validated on" names a hardware run record: board, nsx module versions
+(from the bundle's `nsx.lock`), date and source commit. Nine bundles from
+the nightly hardware validation run of 2026-09-16 ship under
+[`examples/results/hardware-validation-2026-09-16/`](https://github.com/AmbiqAI/helia-profiler/tree/main/examples/results/hardware-validation-2026-09-16),
+unmodified, so `load_result_manifest(..., verify=True)` passes on each.
+A page whose recipe has no such record says "not yet validated", and a
+compile-only run is never called profiled. Host-only steps (loaders,
+`hpx compare`, `Session.resolve()`) record the date and hpx version they
+were executed with.
+
+## What next
+
+[Getting started](../getting-started/) if hpx is not installed yet; the
+[User guide](../guide/) for the mechanics behind every recipe; the
+[Reference](../reference/) for every command, key and field.
