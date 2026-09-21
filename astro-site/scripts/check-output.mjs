@@ -87,14 +87,50 @@ check(
   !Number.isNaN(Date.parse(buildInfo.buildTime ?? "")),
   `build-info.json buildTime is unusable: ${buildInfo.buildTime}`,
 );
+/* Home shows the released version and nothing about the build that produced
+ * the page: a commit hash or a commits-since-tag count is provenance for the
+ * deploy guard, not for a reader. */
+const home = read(dist, "index.html");
 check(
-  read(dist, "index.html").includes(buildInfo.display),
-  `Home does not show the build version "${buildInfo.display}".`,
+  home.includes(`v${buildInfo.version}`),
+  `Home does not show the version v${buildInfo.version}.`,
 );
 check(
-  read(dist, "index.html").includes(buildInfo.shortCommit),
-  `Home does not show the source commit ${buildInfo.shortCommit}.`,
+  !home.includes(buildInfo.shortCommit),
+  `Home shows the source commit ${buildInfo.shortCommit}; the site carries the version only.`,
 );
+
+/* Home names hardware, so it is held to the registry rather than to whatever
+ * was typed into the page. src/data/catalog.json is read out of
+ * src/helia_profiler by scripts/build-catalog.mjs; an engine added there is a
+ * failing build until Home names it, and the two figures on the page are the
+ * registry's counts. Read against the artifact, like everything else here. */
+const catalog = JSON.parse(read(site, "src/data/catalog.json"));
+check(
+  catalog.generatedFrom?.sourceTree ===
+    execFileSync("git", ["rev-parse", `HEAD:${catalog.generatedFrom?.sourcePath}`], {
+      cwd: path.resolve(site, ".."),
+      encoding: "utf8",
+    }).trim(),
+  `src/data/catalog.json was generated from tree ${catalog.generatedFrom?.sourceTree}, ` +
+    `which is not the committed ${catalog.generatedFrom?.sourcePath}. Run npm run catalog:build.`,
+);
+const missingEngines = catalog.engines
+  .map((entry) => entry.id)
+  .filter((id) => !home.includes(`<code>${id}</code>`));
+check(
+  missingEngines.length === 0,
+  `Home does not name ${missingEngines.length} engine(s) the registry carries: ${missingEngines.join(", ")}.`,
+);
+for (const [label, expected] of [
+  ["boards", catalog.counts.boards],
+  ["engines", catalog.counts.engines],
+]) {
+  check(
+    new RegExp(`>${expected} ${label}<`).test(home),
+    `Home shows no figure of ${expected} ${label}, which is what the catalog counts.`,
+  );
+}
 
 /* Section shape: five in the top navigation, a scoped sidebar on four of
  * them, and Home with the marker that takes the pane's column back. */
