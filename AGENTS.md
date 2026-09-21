@@ -67,11 +67,13 @@ runner contract are described in `maintainers/hardware-ci.md`.
 
 - Conventional Commits.
 - Tests are fast, local, and mock external tools.
-- Comments state **what** in one or two lines. When the why is an external
-  fact, link it: `# WORKAROUND helia-aot#349: their module checks ARM_NN_*`.
-  No third-party version numbers, bench numbers, or review history in code or
-  docstrings; those belong in `docs/architecture/compatibility-baseline.md`,
-  the issue, or git history. `rg WORKAROUND` is the cleanup pass.
+- Default to no comment. Add one only when the **why** is non-obvious: a
+  hidden constraint, an invariant, or a workaround. When the why is an
+  external fact, link it: `# WORKAROUND helia-aot#349: their module checks
+  ARM_NN_*`. No third-party version numbers, bench numbers, or review history
+  in code or docstrings; those belong in
+  `docs/architecture/compatibility-baseline.md`, the issue, or git history.
+  `rg WORKAROUND` is the cleanup pass.
 - Every `TODO(...)`/`FIXME(...)`/`HACK(...)` needs an issue or name reference
   (pre-commit enforces it).
 
