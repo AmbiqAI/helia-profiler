@@ -64,6 +64,9 @@ const SKIP = [
   'getting-started/first-profile.md',
   'getting-started/quickstart.md',
   'guides/validating-a-board-setup.md',
+  /* Rewritten by the Measure revamp (#341). */
+  'guide/power.md',
+  'guide/pmu-counters.md',
 ];
 
 /*
@@ -92,6 +95,13 @@ const PRESERVE = [
   'reference/issue-codes',
   /* Authored journey; the port no longer owns this tree. */
   'getting-started',
+  /* Authored by the Measure revamp (#341). */
+  'guide/pmu-counters.mdx',
+  'guide/power.mdx',
+  'guide/power-joulescope.mdx',
+  'guide/power-ina228.mdx',
+  'guide/power-windows.mdx',
+  'guide/power-verify.mdx',
 ];
 
 const BASE = '/helia-profiler/';

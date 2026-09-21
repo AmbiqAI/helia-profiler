@@ -42,6 +42,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import extract_cli  # noqa: E402
 import extract_issues  # noqa: E402
+import extract_pmu  # noqa: E402
 import extract_schema  # noqa: E402
 from _common import dump, source_tree  # noqa: E402
 from source_audit import audit  # noqa: E402
@@ -50,7 +51,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DATA_DIR = REPO_ROOT / "astro-site" / "src" / "data"
 
 #: Artifact stem to extractor, in the order the summary prints them.
-ARTIFACTS = ("cli", "schema", "issues")
+ARTIFACTS = ("cli", "schema", "issues", "pmu-catalog")
 
 _PARAM_KEYS = (
     "kind",
@@ -292,6 +293,7 @@ def main(argv: list[str] | None = None) -> int:
             "cli": extract_cli.build(args.source_tree),
             "schema": extract_schema.build(args.source_tree),
             "issues": extract_issues.build(args.source_tree),
+            "pmu-catalog": extract_pmu.build(args.source_tree),
         }
         for stem, payload in payloads.items():
             dump(payload, paths[stem])
@@ -316,6 +318,7 @@ def main(argv: list[str] | None = None) -> int:
             "cli": extract_cli.build(claimed),
             "schema": extract_schema.build(claimed),
             "issues": extract_issues.build(claimed),
+            "pmu-catalog": extract_pmu.build(claimed),
         }
         problems += diff_cli(committed["cli"], fresh["cli"])
         problems += diff_schema(committed["schema"], fresh["schema"])

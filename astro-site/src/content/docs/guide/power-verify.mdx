@@ -1,0 +1,159 @@
+---
+title: "Verifying a capture"
+description: "The power block of summary.json, the health signals to check before trusting a number, the window clock issue codes, bring-up diagnostics and the troubleshooting table."
+---
+
+## Purpose
+
+Decide whether a power number is a measurement. Every capture writes the
+numbers and the signals that say how they were obtained; this page lists
+those signals, the issue codes behind them, and what each failure looks
+like on the bench.
+
+## Prerequisites
+
+A completed power run, whichever instrument produced it.
+
+## Steps
+
+### 1. Read the terminal table
+
+```text
+                 Power
+┏━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┓
+┃ Metric         ┃        Value ┃
+┡━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━┩
+│ Avg current    │   12.345 mA  │
+│ Avg power      │   22.222 mW  │
+│ Peak current   │   14.567 mA  │
+│ Energy         │  666.630 µJ  │
+└────────────────┴──────────────┘
+```
+
+The values are placeholders; the shape is what a run prints. Real figures
+depend on the board, the model and the clock, and the
+[power examples](../../examples/) carry captured ones.
+
+### 2. Read the `power` block
+
+```json
+{
+  "power": {
+    "measurement_scope": "gpio_gated_clean_window",
+    "avg_current_a": 0.012345,
+    "avg_power_w": 0.022222,
+    "median_current_a": 0.012300,
+    "p95_current_a": 0.012900,
+    "p99_current_a": 0.013100,
+    "energy_per_inference_j": 0.00001305,
+    "inferences_per_joule": 76628.4,
+    "gated_window_count": 1,
+    "gated_window_duration_ratio": 0.998,
+    "gated_vs_whole_current_ok": true,
+    "power_firmware": "dedicated"
+  }
+}
+```
+
+Placeholder values again; the keys are the contract, generated from
+`run_summary.schema.v1.json` on [Output files](../output/).
+
+| Signal | Healthy | What else it can mean |
+|---|---|---|
+| `gated_window_duration_ratio` | 0.99 to 1.01 for warm back-to-back captures | far from 1.0 with `gated_window_reference_drift` present: the firmware's own clock confirmed the gate and only the profile-phase reference is stale (cold-start HFRC drift, harmless); far from 1.0 without it: the gate did not line up with the inference loop |
+| `gated_vs_whole_current_ok` | `true` | `false` means the gated average was not above the whole-capture average; usually a gate or timing fault, but legitimate for a very light or bursty model whose boot and handshake draw more than the gated steady state; compare the `whole_capture_window` row in `detailed/power_summary.csv` |
+| `power.sync.ready_observed` | `true` with lock-step | `false` or absent with lock-step enabled points at wiring or the GO line |
+| `gated_window_duration_suspect` | absent | set when the gate is under the 1 s floor, when the firmware's window clock disagrees with the gate, when the terminal reported failed or incomplete work, when the duration check fails with no envelope to arbitrate, or when the device-reported timing is corrupt; per-inference metrics are suppressed |
+| `power.power_firmware` | `dedicated` | `shared` carries transport contamination |
+| `measurement_scope` | `gpio_gated_clean_window` or `on_device_gated_inference` | a whole-capture or busy-loop scope is not an inference measurement |
+
+`tops` and `tops_per_watt` appear for any power run whose model can be
+analysed for MACs (heliaRT, TFLM and heliaAOT `.tflite` models; not
+ExecuTorch) and only when the window is inference-bracketed.
+
+### 3. Check the window clocks
+
+The dedicated power firmware times its own window and reports it as
+`power.terminal.elapsed_us`. Nothing else on the host depends on that
+clock, so it is the one number that can be wrong while every other check
+passes; hpx cross-checks it and four codes come out:
+
+| Code | Mode | Severity | Meaning |
+|---|---|---|---|
+| `power.window_clock_frozen` | internal: error; external: warning | fails the run in internal mode (the duration is the denominator for average power and current); degrades it in external mode (the instrument owns the numbers, only `elapsed_us` is meaningless) | the firmware completed its inferences but reported zero elapsed time: a `DWT->CYCCNT`-timed window on a Cortex-M4F part whose debug power domain is down, or a STIMER window whose 32.768 kHz crystal is stopped or unpopulated |
+| `power.window_observer_mismatch` | external | error; per-inference metrics suppressed; the run is invalid for the `power` family only, `hpx compare` still computes cycle, latency, memory and per-layer deltas | the firmware's window disagrees with the host-timed gate beyond 1% plus the quantisation allowance; two independent clocks in the same boot cannot drift apart, so the gate did not bracket what the firmware timed |
+| `power.window_clock_mismatch` | internal | warning | the firmware's window disagrees with `inference_count x reference_inference_us` by more than 25%, a loose tolerance because the reference comes from a different binary and boot |
+| `power.window_clock_exceeds_host_time` | internal | warning | the reported window is longer than the host wall time that contained it; a blunt backstop that needs roughly 2 to 3x inflation to fire |
+
+`power.window_clock_ceiling` in `summary.json` records the envelope
+behind the last one on every internal-mode run: `elapsed_us`,
+`elapsed_s`, `host_envelope_s`, `slack_s` and `ratio`.
+
+The profile binary's clean window has its own clock checks:
+
+- `profile.clean_window_stalled` (warning): one or more clean-window
+  iterations lost their cycle measurement. On the Cortex-M4F families
+  `DWT->CYCCNT` only advances while a debugger asserts `CDBGPWRUPREQ`, and
+  nothing does between the J-Link reset subprocess exiting and the host
+  attach completing, so the window reads short and everything sized from
+  it (`clean_infer_avg_us`, the latency, a power window) is short by the
+  same factor. `stalled_iters` counts deltas of exactly zero;
+  `partial_iters` counts deltas below an eighth of the run's own warm
+  reference; `understatement_lower_bound` charges a frozen iteration the
+  full `1/total` and a partial `0.875/total` and stays a lower bound.
+- `profile.clean_window_clock_rate_low` (warning): before the window the
+  firmware times a fixed `nsx_delay_us` interval with DWT, a reference
+  that does not depend on the debug power domain; the warning fires
+  below half the expected `SystemCoreClock x probe_us / 1e6`. It exists
+  because the two counts above are DWT-relative and cannot see a uniform
+  slowdown.
+- `profile.clean_window_check_inoperative` (warning): every warm sample
+  was itself frozen, so no iteration could fall below the floor and zero
+  counts are not evidence of health.
+
+None of them cover a slowdown that begins exactly at window open, ends at
+window close and is uniform throughout; a GPIO-gated run catches that
+through `gated_window_duration_ratio`. RTT builds reduce the exposure by
+waiting, before the window opens, for the host to drain the RTT up-buffer
+(bounded at 1 s by default, `HPX_CLEAN_WINDOW_ATTACH_WAIT_MS`, reported as
+`HPX_CLEAN_ATTACH_WAIT_US`).
+
+### 4. Bring-up diagnostics
+
+- `profiling.clean_window_trace` (default `false`) makes the firmware emit
+  `HPX_CLEAN_ITER=<n>` over the transport every clean-window iteration,
+  proving the device is looping for the whole gate. It perturbs the
+  measurement; leave it off for real runs.
+- `profiling.clean_window_probe: busy_loop` (default `infer`) replaces the
+  inference loop with a calibrated CPU spin, to separate "the gate
+  semantics are wrong" from "the model's behaviour is wrong". The duration
+  reported is always the one STIMER measured, never the nominal target.
+- `detailed/power_summary.csv` (`output.detailed: true`) breaks the
+  signals down per gated window with a `whole_capture_window` row.
+
+## Expected output
+
+A run whose `power` block has `gated_window_count: 1`, a ratio near 1.0,
+`ready_observed: true` under lock-step, no `*_suspect` flag and no
+`power.window_*` code in `issues`.
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `joulescope: device not found` | driver not installed, or the device is claimed by another process | on Linux confirm the udev rule and replug; `pyjoulescope_driver` ships with hpx |
+| Current negative or implausibly high | another supply feeds the EVB | disconnect target USB, debug USB power and any coin cell for the capture |
+| `no_gate_rise` | lock-step disabled while state and GO pins are configured: the firmware opens and closes its window before the poller is armed; the run comes back `integrity: degraded (no_gate_rise)` and looks like a dead wire | set `power.lockstep: true` or remove an explicit `false`; only then check the gate wire, `sync_gpio_pin` and `sync_input_index` |
+| `no_gate_fall` | the firmware entered the window but did not close it before the safety bound; not a lock-step problem, the gate was seen rising | raise `power.duration_s` or look for a hang inside the clean window |
+| gate always low or always high | wrong `io_voltage`, floating Vref on JS220 or JS320, or the wrong `INPUTn` | match `io_voltage` and Vref to the board's I/O rail; check the index keys against the physical wiring |
+| `ready_observed: false` or ratio far from 1.0 | handshake or gate timing; or a firmware clock fault that only looks similar | compare `power.terminal.elapsed_us` with `power.capture_duration_s`: agreement to well under 1% means the wiring is fine and only the reference is off (drift); `0` or several times the gate means the firmware timed with a clock it could not read, a rebuild not a rewire |
+| gated average not above whole-capture average | gate or timing; or a genuinely light model | compare the `whole_capture_window` row in `detailed/power_summary.csv` |
+| `driver: ondevice` raises `PowerError` | the generic on-device driver has no firmware producer | use `power.driver: ina228` with a wired INA228, or `joulescope` |
+| TOPS per watt missing | the model cannot be analysed for MACs (ExecuTorch), or the window is not inference-bracketed | expected |
+| power differs between transports | `power.firmware: shared` is set | use `dedicated`; all transports then agree within 0.3% on the bench that measured it |
+
+## What next
+
+[Analysis and comparison](../analysis-comparison/) for comparing two power
+runs and the rules that make them comparable; the
+[issue codes](../../reference/issue-codes/) reference for every code above.

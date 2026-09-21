@@ -1,0 +1,191 @@
+---
+title: "Windows and the clean window"
+description: "The dedicated power firmware, how the clean window is sized and bounded, the two-clock check that verifies it, reset strategies, and the advanced power floors."
+---
+
+## Purpose
+
+Understand the window a power number describes. hpx measures a clean
+window: a dedicated firmware build with no transport runs back-to-back
+inferences with the gate high, and the host accepts the result only when
+the firmware's own clock and the instrument's agree about that window.
+This page covers the four scopes a measurement can have, the dedicated
+firmware, window sizing, reset strategies and the floors you can lower on
+purpose.
+
+## Prerequisites
+
+Wiring done ([Joulescope](../power-joulescope/) or [INA228](../power-ina228/)).
+
+## Which scope
+
+Every power result carries a `measurement_scope`; the four values are
+defined in `src/helia_profiler/power/metadata.py`, and the window logic
+lives in `src/helia_profiler/power/clean_window.py`.
+
+| `measurement_scope` | What was integrated | Produced by |
+|---|---|---|
+| `gpio_gated_clean_window` | the packets inside the GPIO gate around the clean window | Joulescope, `power.mode: external` |
+| `on_device_gated_inference` | the chip's accumulators around a fixed number of inferences | INA228, `power.mode: internal` |
+| whole capture, free-form | the entire capture, when no qualifying gate was found | a degraded external run (`power.observation_degraded`); per-inference metrics withheld |
+| busy-loop probe | a calibrated CPU spin in place of inference | `profiling.clean_window_probe: busy_loop`, for bring-up only |
+
+## Steps
+
+### 1. The dedicated power firmware
+
+PMU capture needs a host transport to get per-layer counters off the
+target, and a transport left initialised during the power window
+contaminates the current: UART peripherals stay clocked, SWO keeps the
+debug power domain up, USB CDC keeps the PHY powered (the largest
+effect). Tearing the transport down at run time only partly helps, because
+pad and pinmux residue still shifts the draw.
+
+So hpx renders the firmware template a second time with `power_only=true`
+into `src/main_power.cc`: no transport at all (`NSX_DEBUG_NONE`,
+`hpx_printf` compiled to a no-op), model init, warm-up, the three-wire
+lock-step, the gated clean window, then park. `hpx_profiler` (PMU capture)
+and `hpx_profiler_power` (power capture) build from one NSX and CMake
+project, and the power stage flashes the second binary right before
+arming the capture. On the Apollo510 EVB bench that measured it, all four
+transports then agree on current and energy within 0.3%.
+
+`power.firmware` (default `dedicated`) controls this and
+`summary.json`'s `power.power_firmware` records which mode produced the
+result. `shared` (`--power-firmware shared`) measures on the
+already-flashed transport binary instead: useful for bring-up or when no
+probe is free to reflash, and it carries the contamination above. Use
+`dedicated` for any number you will report or compare.
+
+AOT clean windows restore every input to raw zero bytes before each
+invocation, because input storage can be reused as scratch during
+inference; the clean timing and the energy include that restoration, and
+the workload is identified as `aot_raw_zero_refill_included_v1` in
+`latency.clean_workload` and `power.clean_workload`. Power comparison
+omits deltas between this workload and an unknown or different one.
+Raw zero bytes are not generally a quantised real zero, and refilling
+inputs does not reset persistent model state.
+
+### 2. How the window is sized
+
+`profiling.window_mode` (default `auto`) sizes the clean window at run
+time: the firmware targets `profiling.window_target_ms` of wall time,
+clamped to `[window_min, window_max]` inferences, and reports exactly how
+many it ran. `fixed` runs exactly `profiling.iterations` inferences.
+
+| Key | Default | Role |
+|---|---|---|
+| `profiling.window_mode` | `auto` | `auto` sizes by wall time; `fixed` runs `iterations` |
+| `profiling.window_target_ms` | `1000` | target wall time; raised to at least 5000 ms when `power.enabled` and `window_mode: auto`, because GPIO polling and packet alignment need longer to settle |
+| `profiling.window_min`, `window_max` | `10`, `500000` | clamp on the auto-sized inference count |
+| `power.duration_s` | unset | the host-side safety bound for the whole capture; unset auto-tunes from the PMU-phase timing, an explicit value wins |
+
+Gates shorter than 1 s are discarded as glitches during window extraction,
+so a `fixed` target at or below about 1000 ms usually yields no qualifying
+window: the capture is recorded as a degraded free-form observation
+(`power.observation_degraded`, warning, whole-capture energy kept,
+per-inference metrics withheld). In the hairline case where a window
+passes edge extraction but its packet-integral duration is still under
+the floor, `power.gate_below_minimum` (error) invalidates the run. Either
+way the run completes and writes its bundle.
+
+For a model whose inference takes a few milliseconds, widen the window so
+gate-edge jitter becomes negligible as a fraction of the total:
+
+```yaml
+profiling:
+  window_target_ms: 8000
+  window_max: 10000
+```
+
+### 3. How the window is verified
+
+External captures verify the window in two layers before reporting energy
+per inference.
+
+The authoritative check compares the firmware's own STIMER-timed window
+(`power.terminal.elapsed_us`) against the instrument-timed gate. Two
+independent clocks watched the same physical window in the same boot, so
+they must agree within 1% plus a small absolute allowance for packet and
+poll quantisation; disagreement is `power.window_observer_mismatch`, an
+error that suppresses per-inference metrics.
+
+The `clean_infer_count x clean_infer_avg_us` expectation is a reference
+diagnostic: the profile boot timed it in a different thermal state, and
+the LP core clock is HFRC-derived, so a cold power boot can run the window
+about 10% short of it with every published number still correct (the
+denominator is the inference count, which drift cannot change). When the
+firmware envelope confirms the gate and the miss is within 15%, it is
+published as `gated_window_reference_drift` beside the ratio instead of
+degrading the run. When no envelope exists to arbitrate (shared firmware,
+a lost terminal, or a terminal reporting failed or incomplete work), the
+`est x count` band keeps its authority as `power.gate_duration_mismatch`,
+a warning, with an allowance of the larger of two packets, half an
+inference, or a cross-boot margin (10% for a counted window, 25% for a
+busy-loop window predicted from calibration). The accepted ratio and any
+ignored pulse count are recorded in `summary.json`.
+
+Packets are selected by their midpoints, so gate endpoints carry packet
+quantisation; JS220 and JS320 streamed edges stay on the instrument
+clock, and the snapshot-poll fallback records its measured brackets as
+`gating_diagnostics.poll_edge_uncertainty_s`. Gated statistics sum the
+magnitude of each packet's signed net charge and energy: opposite signs
+can cancel within a packet but not between packets, so noise-dominated
+readings can depend on `power.stats_rate_hz` (default 1000). The
+net-negative gated-charge check still rejects substantial reverse flow.
+One clean window per invocation is supported.
+
+### 4. Reset strategies
+
+`power.reset_strategy` (default `auto`) decides how the target is reset
+before capture:
+
+| Value | Meaning |
+|---|---|
+| `auto` | the board or SoC family default; use this |
+| `power_cycle` | cycle the Joulescope passthrough off and on |
+| `none` | no reset; assumes the firmware is already running |
+| `debug_reset` | J-Link debug reset only |
+| `swpoi_reset` | software point-of-interest reset only |
+| `debug_reset+swpoi_reset` | both in sequence; the Apollo5 family default |
+
+Explicit values are bring-up tools.
+
+### 5. Advanced power floors
+
+These lower the measured floor on purpose; use them knowing the trade:
+
+- `profiling.extreme_mode` (default `false`) powers down the shared SSRAM
+  and collapses MRAM to a single bank (NVM0). Only safe when the model's
+  weights and arena are entirely TCM-resident: code keeps running from
+  MRAM, but any SRAM or MRAM data access faults or reads garbage.
+- `profiling.force_shared_sram` (default `false`) unconditionally powers
+  and retains the full shared SSRAM at boot, to measure its static
+  contribution to the floor. The two are mutually exclusive and the
+  configuration is rejected if both are set.
+- The dedicated power binary shuts down the crypto and OTP subsystems, and
+  the radio where the HAL exposes it, on AP5-family SoCs; capability-gated,
+  no configuration.
+
+### 6. `hpx power-on`
+
+```bash
+hpx power-on [--driver joulescope] [--power-serial SERIAL]
+```
+
+Opens the Joulescope and enables current passthrough so the board stays
+powered until Ctrl-C, for manual debugging without a profiling session.
+With several instruments attached `--power-serial` is required.
+`target.ensure_board_powered` (default `false`) does the same before a
+run and is always on when `power.enabled: true`.
+
+## Expected output
+
+A run with one gated window, `gated_window_duration_ratio` near 1.0, no
+`gated_window_duration_suspect`, and `power.power_firmware: dedicated` in
+`summary.json`.
+
+## What next
+
+[Verifying a capture](../power-verify/) reads every signal this page
+produces.

@@ -1,0 +1,223 @@
+---
+title: "Joulescope setup and wiring"
+description: "Series supply wiring, the per-board GPIO pins for the gate, state and GO lines, Vref on JS220 and JS320, io_voltage, the lock-step handshake and the minimal power configuration."
+---
+
+import BlockDiagram from '../../../components/BlockDiagram.astro';
+import Block from '../../../components/Block.astro';
+
+## Purpose
+
+Wire a Joulescope so a capture is valid on the first try: the instrument
+in series with the board's supply, one to three GPIO wires for the
+handshake, and the two settings (`io_voltage`, Vref) that decide whether
+the instrument sees the gate at all.
+
+## Prerequisites
+
+A Joulescope JS110, JS220 or JS320 (`pyjoulescope_driver` ships with hpx),
+the board's power input reachable on a header, a J-Link for flashing, and
+on Linux the udev rule from [Install](../../getting-started/install/#5-linux-usb-permissions).
+
+## Which Joulescope
+
+| | JS110 | JS220 | JS320 |
+|---|---|---|---|
+| Current range | nA to 3 A, auto-ranging | nA to 10 A, auto-ranging | nA to 10 A, auto-ranging |
+| Sample rate | 250 kSPS | up to 2 MSPS | up to 2 MSPS |
+| Voltage range | 0 to 15 V | 0 to 15 V | 0 to 15 V |
+| GPIO threshold | fixed; `io_voltage` tells hpx how to read it | set by the Vref pin, which must be wired | set by the Vref pin, which must be wired |
+| Lock-step GO command | per-output value | GPO bitmap set and clear | GPO bitmap set and clear |
+
+All three use the same `JoulescopeDriver` in hpx and `power.driver:
+joulescope` auto-detects whichever is attached; `power.serial` (or
+`--power-serial`) pins one when several are connected. The instrument
+figures are the manufacturer's; hpx does not restate them anywhere else.
+
+## Steps
+
+### 1. Wire the supply through the instrument
+
+<BlockDiagram
+  title="Bench power path"
+  caption="The Joulescope is the board's only supply during a capture. The J-Link and the Joulescope each have their own USB link to the host."
+  flow="row"
+>
+  <Block label="Supply" sublabel="bench or adapter" />
+  <Block label="Joulescope" sublabel="IN to OUT" tone="accent" flow="column">
+    <Block label="INPUT0" sublabel="gate" emphasis="filled" />
+    <Block label="INPUT1" sublabel="state" emphasis="filled" />
+    <Block label="OUTPUT0" sublabel="GO" emphasis="filled" />
+    <Block label="Vref" sublabel="JS220, JS320" emphasis="dashed" />
+  </Block>
+  <Block label="EVB" sublabel="VBAT, GND, GPIO" tone="accent" />
+  <Block label="Host" sublabel="two USB links" />
+</BlockDiagram>
+
+The same structure as a list, for readers of the Markdown rendition:
+
+- Supply: bench or adapter
+- Joulescope: IN to OUT
+  - INPUT0: gate
+  - INPUT1: state
+  - OUTPUT0: GO
+  - Vref: JS220, JS320
+- EVB: VBAT, GND, GPIO
+- Host: two USB links
+
+1. Disconnect every other supply from the EVB: target USB, debug USB
+   power, coin cell. A second source makes the current wrong, sometimes
+   negative.
+2. Wire the Joulescope `IN+` and `IN-` to the bench supply or wall adapter,
+   and `OUT+` and `OUT-` to the EVB's `VBAT` and `GND`, matching polarity.
+3. Connect the J-Link USB for flashing and the Joulescope's own USB to the
+   host.
+4. Wire the GPIO lines from the table in step 2.
+5. On a JS220 or JS320, connect `Vref` to the target MCU's I/O rail on the
+   EVB side of the passthrough and digital ground to EVB ground. Do not
+   reference the upstream supply when it differs from the GPIO voltage.
+
+When Vref comes from the target-side rail, normal capture keeps
+passthrough enabled through flash, reset, handshake and measurement;
+cycling passthrough would remove both target power and the logic
+reference, so it is reserved for explicit recovery. GPIO observations made
+during flash and reset are discarded; only stable samples after a short
+reset grace period take part in the READY, GO and gate protocol.
+
+### 2. Wire the GPIO lines
+
+The minimum is one wire: the board's gate GPIO into `INPUT0`. The
+three-wire lock-step handshake adds a state line (device to host,
+`INPUT1`) and a GO line (host to device, `OUTPUT0`). Joulescope channels
+are always `INPUT0`, `INPUT1`, `OUTPUT0`; the numbers below are Apollo
+GPIO pad numbers.
+
+| Signal | Direction | Key | Joulescope channel | Index key and default |
+|---|---|---|---|---|
+| Gate | device to instrument | `power.sync_gpio_pin` | `INPUT0` | `power.sync_input_index = 0` |
+| State (lock-step) | device to instrument | `power.state_gpio_pin` | `INPUT1` | `power.state_input_index = 1` |
+| GO (lock-step) | instrument to device | `power.go_gpio_pin` | `OUTPUT0` | `power.go_output_index = 0` |
+
+| Board | Registered default (gate, state, GO) | Bench-verified wiring | Note |
+|---|---|---|---|
+| `apollo510_evb` | 29, 36, 14 | 29, 36, 14, verified with a JS320 | Defaults are the verified wiring |
+| `apollo510b_evb` | 29, 36, 14 | 22, 23, 24 | The default pins are not readily broken out on the 510B; set 22, 23, 24 explicitly (their only BSP claim is IOM7, which the power binary never uses) |
+| `apollo4p_evb`, `apollo4p_blue_kbr_evb`, `apollo4p_blue_kxr_evb` | 22, 23, 24 | AutoDeploy AP4P wiring | Blue boards also register `ble_reset_gpio_pin` (42 on KBR, 55 on KXR) |
+| `apollo4l_evb`, `apollo4l_blue_evb` | 61, 23, 24 | as registered | 22 is unavailable on AP4L; the Blue board registers `ble_reset_gpio_pin` 55 |
+| `apollo3p_evb`, `apollo3p_evb_cygnus` | 26, 24, 25 | as registered | 22 and 23 are the J-Link OB VCOM UART |
+| `apollo330mP_evb` | 10, 0, 0 (generic fallback; state and GO disabled) | 5, 6, 7 on the J8 header, verified with a JS110 | Set all three explicitly; the shipped `configs/mlperf_tiny/*_ap330*.yaml` do |
+| `apollo5b_evb`, `apollo510dL_evb`, `atomiq110_fpga_turbo` | 10, 0, 0 | none recorded | Set the pins for your wiring; these boards stay on the gate-only path until state and GO are assigned |
+
+The registered defaults are `get_default_sync_gpio_pin`,
+`get_default_state_gpio_pin` and `get_default_go_gpio_pin` in
+`src/helia_profiler/platform/registry.py`; the bench-verified column is
+the wiring recorded on the pages this one replaces. For the two boards
+where the columns differ, set the pins explicitly rather than trust the
+defaults.
+
+:::danger[Apollo510B: avoid GPIO 47, 48 and 49]
+They are on the header but double as `VDD18_SWITCH`, `VDDUSB33_SWITCH` and
+`VDDUSB0P9_SWITCH`; driving them as GPIO during a measurement can toggle
+supply rails. Check `am_bsp_pins.h` for your board before choosing
+alternatives, and avoid whichever IOM carries an on-target power monitor
+(`power.ina228.i2c_iom`; IOM1 is GPIO 8 and 9 on the 510B).
+:::
+
+### 3. Vref and `io_voltage`
+
+The JS110's GPI thresholds are fixed; `power.io_voltage` only tells hpx
+how to interpret them. The JS220 and JS320 GPIO connector carries a Vref
+pin that sets both the input threshold and the output drive level, and hpx
+never programs it: it must be wired. The JS220 user's guide says to connect
+Vref to the supply voltage of the device under test. Left floating, the
+thresholds are undefined and the usual symptom is a gate that never reads
+high, so every capture degrades to "rose but did not fall" or free-run.
+The instrument can fall back to an internal 3.3 V reference, which does
+not match a 1.8 V rail; wire Vref to the board's GPIO rail, keep
+`Vref < VUSB - 0.5 V`, and note that a connected Vref also stops the GPOs
+back-powering the target.
+
+`power.io_voltage` (default `1.8`, `DEFAULT_IO_VOLTAGE` in
+`config/power.py`) must describe the same rail. It is host-side
+interpretation only.
+
+### 4. Lock-step
+
+`power.lockstep` (default unset, which means automatic) adds the GO and
+state handshake: the firmware parks in a wait state until the host
+confirms its GPIO poller is armed and asserts GO, so reset latency and
+host scheduling jitter cannot race the start of the window.
+
+- It enables itself when both `state_gpio_pin` and `go_gpio_pin` are wired
+  (greater than 0) and the run is a gated external capture. It is not
+  family-specific: without it the firmware free-runs its window straight
+  out of reset on any board.
+- An explicit `true` or `false` wins. `true` with either pin at 0 is a
+  configuration error.
+- Internal (INA228) mode never enables it; the measurement happens inside
+  the firmware, so there is no host poller to race.
+
+| Mode | Wiring | Use |
+|---|---|---|
+| Gated capture | gate only (`INPUT0`) | Bring-up, or a bench without state and GO wiring. The host can miss a short window after a slow reset. |
+| Lock-step capture (preferred) | gate, state and GO | Measurements you will report. The firmware waits at `READY`; the host arms the poller and asserts GO before inference begins. |
+
+A run captured lock-stepped is not comparable with one captured
+free-running: lock-step changes the rails (the state pin becomes an
+output, the GO pin's input buffer is enabled, the host holds GO high into
+it until the gate rises), so `hpx compare` reports
+`metric.power_power_lockstep_mismatch` and omits the power deltas. Record
+baselines with the wiring you will keep.
+
+JS220 and JS320 open and close the target-power relay through
+`s/i/range/mode` (`off` or `auto`); the JS110 uses its own range selector.
+`hpx power-on` and the profiler's preflight set the relay to `auto`.
+Releasing the host's passthrough handle does not turn target power off;
+the relay stays latched until a power cycle or an explicit relay-off.
+
+### 5. The minimal configuration
+
+On a board whose registered pins are the verified wiring, two lines are
+enough:
+
+```yaml
+target:
+  board: apollo510_evb
+power:
+  enabled: true
+```
+
+```bash
+hpx profile model.tflite --board apollo510_evb --power
+```
+
+On `apollo330mP_evb`, name the pins and, with more than one instrument
+attached, the serial:
+
+```yaml
+target:
+  board: apollo330mP_evb
+power:
+  enabled: true
+  serial: "004204"
+  sync_gpio_pin: 5
+  state_gpio_pin: 6
+  go_gpio_pin: 7
+```
+
+`power.driver` defaults to `joulescope`, `power.mode` to `external`, and
+`power.firmware` to `dedicated`; [Windows and the clean window](../power-windows/)
+covers what those do.
+
+## Expected output
+
+A run that reports `power.sync.ready_observed: true`, one gated window,
+and a `gated_window_duration_ratio` near 1.0 in `summary.json`;
+[Verifying a capture](../power-verify/) explains each signal. A gate that
+never rises is almost always Vref, `io_voltage` or lock-step, in that
+order, before it is the wire.
+
+## What next
+
+[Windows and the clean window](../power-windows/) for the firmware side of
+the measurement, then [Verifying a capture](../power-verify/).

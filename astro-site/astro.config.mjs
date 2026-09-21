@@ -92,8 +92,12 @@ export default defineConfig({
                 {
                   label: 'Measure',
                   items: [
-                    { label: 'PMU Counters', slug: 'guide/pmu-counters' },
-                    { label: 'Power Measurement', slug: 'guide/power' },
+                    { label: 'PMU counters', slug: 'guide/pmu-counters' },
+                    { label: 'Power measurement', slug: 'guide/power' },
+                    { label: 'Joulescope setup and wiring', slug: 'guide/power-joulescope' },
+                    { label: 'INA228 on the target', slug: 'guide/power-ina228' },
+                    { label: 'Windows and the clean window', slug: 'guide/power-windows' },
+                    { label: 'Verifying a capture', slug: 'guide/power-verify' },
                   ],
                 },
                 {

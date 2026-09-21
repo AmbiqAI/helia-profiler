@@ -1,0 +1,91 @@
+---
+/**
+ * Tables from the generated PMU catalogue (src/data/pmu-catalog.json).
+ *
+ * `section="socs"` renders the SoC family against counter group table;
+ * `section="groups"` renders one table per group with the curated default
+ * selection named first. Plain tables, so the Markdown rendition carries every
+ * row and an agent reading the page gets the same catalogue a human does.
+ */
+import catalog from '../data/pmu-catalog.json' with { type: 'json' };
+
+interface Props {
+  section: 'socs' | 'groups';
+}
+
+const { section } = Astro.props;
+const { groups, socs, generatedFrom } = catalog;
+const defaults = new Map(groups.map((group) => [group.group, new Set(group.default)]));
+---
+
+{
+  section === 'socs' && (
+    <table>
+      <thead>
+        <tr>
+          <th>SoC</th>
+          <th>Family</th>
+          <th>Profiling domains</th>
+          <th>Counter groups</th>
+          <th>Per-operator record budget</th>
+        </tr>
+      </thead>
+      <tbody>
+        {socs.map((soc) => (
+          <tr>
+            <td>
+              <code>{soc.soc}</code>
+            </td>
+            <td>{soc.family}</td>
+            <td>{soc.domains.join(', ')}</td>
+            <td>{soc.groups.map((group) => <code>{group}</code>).reduce((acc, el, i) => (i === 0 ? [el] : [...acc, ', ', el]), [])}</td>
+            <td>{soc.pmuMaxOps}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+{
+  section === 'groups' &&
+    groups.map((group) => (
+      <section>
+        <h4 id={`group-${group.group}`}>
+          <code>{group.group}</code>: {group.counters.length} counters
+        </h4>
+        <p>
+          <code>default</code> selects {group.default.map((name) => <code>{name}</code>).reduce((acc, el, i) => (i === 0 ? [el] : [...acc, ', ', el]), [])}.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Counter</th>
+              <th>Event</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            {group.counters.map((counter) => (
+              <tr>
+                <td>
+                  <code>{counter.name}</code>
+                  {defaults.get(group.group)?.has(counter.name) && ' (default)'}
+                </td>
+                <td>{counter.eventId}</td>
+                <td>{counter.description}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+    ))
+}
+
+{
+  section === 'groups' && (
+    <p>
+      Generated from the counter registry at source tree <code>{generatedFrom.sourceTree.slice(0, 7)}</code>.
+    </p>
+  )
+}

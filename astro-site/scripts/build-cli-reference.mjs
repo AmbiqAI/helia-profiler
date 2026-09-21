@@ -65,6 +65,7 @@ export const GENERATED = [
   `${DATA_DIR}/cli.json`,
   `${DATA_DIR}/schema.json`,
   `${DATA_DIR}/issues.json`,
+  `${DATA_DIR}/pmu-catalog.json`,
   ...Object.values(PUBLIC_DIRS),
 ];
 
