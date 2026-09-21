@@ -98,10 +98,10 @@ def test_every_soc_declares_cmsis_header_and_rtt_scan_ranges():
 
 
 def test_ap5_socs_expose_expected_psram_capacity():
-    # apollo510b_evb populates a 64 MB APS512XXN part (hardware-proven via
-    # XIP address-aliasing, 2026-07-05); other AP5 boards assume 32 MB until
-    # validated on hardware. atomiq110's only realization is the FPGA
-    # "turbo" board, which has no PSRAM/MSPI populated at all.
+    # apollo510b_evb populates a 64 MB APS512XXN part (confirmed via XIP
+    # address-aliasing); other AP5 boards assume 32 MB until validated on
+    # hardware. atomiq110's only realization is the FPGA "turbo" board,
+    # which has no PSRAM/MSPI populated at all.
     expected_kb = {"apollo510": 65536, "apollo510b": 65536, "atomiq110": 0}
     for soc in list_socs():
         if soc.family is SocFamily.AP5:
@@ -352,11 +352,9 @@ def test_custom_soc_registry_can_override_jlink_and_rtt():
 
     assert soc.jlink_device == "AP510-CUSTOM"
     assert soc.rtt_scan_ranges == ((0x21000000, 0x100000),)
-    # Stated rather than left implicit because it CHANGED with issue #149, and
-    # nothing here noticed: this SocDef used to resolve 0x00410000 off its AP5
-    # family tag and now resolves None.  The programmatic path has no
-    # ``based_on`` to inherit through, so a caller building a SocDef by hand
-    # must pass ``app_flash_load_addr=`` to get an address at all.
+    # The programmatic path has no ``based_on`` to inherit through, so a
+    # caller building a SocDef by hand must pass ``app_flash_load_addr=``
+    # to get an address at all (#149).
     assert soc.origin is SocOrigin.CUSTOM
     assert soc.capabilities.memory.app_flash_load_addr is None
 
@@ -496,11 +494,10 @@ def test_an_unusable_declared_address_is_rejected_with_a_typed_error(value, expe
     program the image at address 0x1.
 
     ``0x220000000`` is the typo this field invites -- one hex digit too many on
-    an otherwise plausible value.  Magnitude was unchecked while sign and type
-    were, so it resolved verbatim and reached the J-Link recipe's
-    ``LoadFile ..., 0x{addr:08X}`` as a 36-bit literal.  No 32-bit Cortex-M
-    part has such an address, which makes it cheap to reject and expensive to
-    accept.
+    an otherwise plausible value.  Without a magnitude check it would resolve
+    verbatim and reach the J-Link recipe's ``LoadFile ..., 0x{addr:08X}`` as a
+    36-bit literal.  No 32-bit Cortex-M part has such an address, which makes
+    it cheap to reject and expensive to accept.
     """
     with pytest.raises(ConfigError) as exc_info:
         _custom_soc("oem4", _scratch_soc_spec(app_flash_load_addr=value))
@@ -535,9 +532,8 @@ def test_the_widest_32_bit_address_is_still_accepted():
 def test_a_custom_soc_inherits_the_npu_of_the_part_it_is_based_on():
     """``based_on`` an NPU part must keep the NPU capability.
 
-    A lab overlay derived from atomiq110 previously lost ``npu`` because the
-    custom constructor omitted it, so the ethos_u preflight gate rejected a
-    board that has the silicon.
+    Omitting ``npu`` in the custom constructor would make the ethos_u
+    preflight gate reject a board that has the silicon.
     """
     soc = _custom_soc("atomiq_lab", {"based_on": "atomiq110"})
 
@@ -641,15 +637,14 @@ def test_based_on_inheritance_chains_through_another_custom_soc():
 
 
 def test_a_custom_soc_with_no_address_and_no_based_on_refuses_to_guess():
-    """THE decision this change makes: unstated and underived means unknown.
+    """Unstated and underived means unknown.
 
     This is the issue's failure scenario -- an OEM part declared ``family:
     ap4`` whose secure bootloader reserves more than stock Apollo4's 0x18000.
     Handing it 0x18000 would be a *plausible* wrong answer: mapped on that
     family, likely accepted by the silicon, and landing the image at the wrong
     offset.  ``None`` instead reaches the J-Link fallback's "refuse to guess"
-    guard, which until now could not fire for a custom SoC at all because
-    ``family`` is enum-validated and every member is mapped.
+    guard.
     """
     soc = _custom_soc("oem4", _scratch_soc_spec())
 
@@ -664,8 +659,7 @@ def test_a_custom_soc_named_after_an_override_part_still_refuses_to_guess():
     gate: ``atomiq110`` is a real ``_SOC_APP_FLASH_LOAD_ADDR`` entry, so a
     custom SoC that borrows the name has a live table value waiting under it.
     With no address and no ``based_on`` there is nothing else that could
-    answer, so a non-``None`` result here means the name reached the table --
-    the forgery df34b6e closed.
+    answer, so a non-``None`` result here means the name reached the table.
 
     Deliberately not monkeypatched: this uses the production table, so it keeps
     holding when PR #98 registers ``atomiq110`` as a built-in and the entry
@@ -807,7 +801,7 @@ def test_a_self_stamped_registered_name_does_not_confer_builtin_provenance():
     registry that re-keys on merge, a fixture builder that copies a built-in
     "properly" -- the name half stops being sufficient and ``origin`` is the
     only thing still refusing.  Untested, that refusal could be deleted in a
-    tidy-up with zero signal, reopening the df34b6e forgery against a live
+    tidy-up with zero signal, reopening the address forgery against a live
     per-SoC override: ``atomiq110``'s address read for an object that is
     holding Apollo510's platform facts.
 
@@ -882,10 +876,10 @@ def test_a_custom_soc_is_stamped_custom_even_when_named_after_a_builtin():
 def test_an_unknown_key_in_a_custom_soc_is_rejected():
     """Silence is the worst answer to a key the user reached for deliberately.
 
-    Before this, every unrecognised key was discarded without a word -- so a
-    user who correctly diagnosed a wrong flash address and wrote
-    ``app_flash_load_addr:`` on a version that did not support it saw their
-    config accepted and their part flashed at the old address anyway.
+    A silently discarded unknown key means a user who correctly diagnosed a
+    wrong flash address and wrote ``app_flash_load_addr:`` on a version that
+    doesn't support it would see their config accepted and their part
+    flashed at the old address anyway.
     """
     with pytest.raises(ConfigError) as exc_info:
         _custom_soc("oem4", _scratch_soc_spec(flash_load_address=0x00040000))
@@ -903,10 +897,8 @@ def test_an_unknown_key_error_names_every_offender_and_lists_what_is_supported()
     Neither offender here is close enough to earn a suggestion -- ``jlink``
     scores 0.588 against ``jlink_device``, just under difflib's 0.6 cutoff --
     which is the point: the supported-key listing is unconditional, so the user
-    is never left with only the news that they were wrong.  (This test once
-    read ``assert "jlink_device" in hint  # close-match suggestion``, which
-    matched the listing.  The suggestion it named does not fire for this input
-    at all; the dedicated test below uses keys that do.)
+    is never left with only the news that they were wrong.  The dedicated test
+    below covers keys close enough to earn a suggestion.
     """
     with pytest.raises(ConfigError) as exc_info:
         _custom_soc("oem4", _scratch_soc_spec(jlink="OEM4", nonsense=1))
@@ -1062,9 +1054,9 @@ def test_the_custom_board_keys_cover_every_board_definition_field():
 def test_both_custom_blocks_accept_the_same_free_form_description():
     """Annotating a custom SoC must not be a hard error when boards allow it.
 
-    Unknown keys are now rejected outright, so a key one block accepts and the
-    other does not is no longer a difference in what gets stored -- it is a
-    config that loads or does not.  ``description:`` is the obvious thing to
+    Since unknown keys are rejected outright, a key one block accepts and the
+    other does not is a config that loads or does not, not just a difference
+    in what gets stored.  ``description:`` is the obvious thing to
     write on either, and a user who commented their custom board the same way
     has every reason to expect it.
     """
@@ -1107,14 +1099,9 @@ def test_a_quoted_string_is_fpga_is_rejected_not_coerced():
 def test_a_custom_board_inherits_the_ble_reset_pin_of_the_board_it_is_based_on():
     """A Blue board's Cooper radio reset line must survive ``based_on``.
 
-    ``_build_custom_boards`` never passed this through, so a custom board
-    derived from a Blue EVB silently lost it (55 -> None).  The consequence is
-    not cosmetic: ``_ble_reset.j2`` only emits the gating when the pin is set,
-    so the power binary leaves the radio ungated and the board reads a higher
-    idle current than the EVB it was copied from -- with nothing in the config
-    to point at.  Rejecting unknown keys turned the obvious workaround (write
-    the key) into a hard error, which is what makes passing it through the fix
-    rather than a nicety.
+    Without it, ``_ble_reset.j2`` never emits the gating, so the power binary
+    leaves the radio ungated -- read as a higher idle current than the EVB it
+    was copied from, with nothing in the config to point at.
     """
     base = get_board("apollo4p_blue_kxr_evb")
     registry = build_custom_platform_registry(
@@ -1201,14 +1188,14 @@ def _custom_board(spec, *, based_on="apollo510_evb"):
 def test_a_boolean_is_not_a_gpio_pad_number(field, value):
     """``bool`` is an ``int`` subclass, and on these fields that is a power bug.
 
-    ``ble_reset_gpio_pin: true`` resolved to pad 1 and had the power binary
-    configure GPIO 1 as an output and hold it low for the entire measured
-    window -- an arbitrary, unrelated pin driven underneath a power capture,
-    which is the exact silent corruption this field exists to prevent.
-    ``false`` resolved to pad 0.  Nothing echoes the resolved pin back, so
-    neither is recoverable by the user.
+    Without this check, ``ble_reset_gpio_pin: true`` would resolve to pad 1
+    and have the power binary configure GPIO 1 as an output and hold it low
+    for the entire measured window -- an arbitrary, unrelated pin driven
+    underneath a power capture, the exact silent corruption this field
+    exists to prevent.  ``false`` would resolve to pad 0.  Nothing echoes
+    the resolved pin back, so neither would be recoverable by the user.
 
-    The three sibling pins had the same hazard, so all four go through one
+    The three sibling pins have the same hazard, so all four go through one
     shared parser and one test shape.  A new pin field that skips the parser
     fails as soon as it joins the list above.
     """
@@ -1222,14 +1209,12 @@ def test_a_boolean_is_not_a_gpio_pad_number(field, value):
 @pytest.mark.parametrize("field", _BOARD_PIN_FIELDS)
 @pytest.mark.parametrize("value", ["abc", -1, 29.5, [29], None])
 def test_a_gpio_pin_that_is_not_a_pad_number_raises_config_error_not_a_traceback(field, value):
-    """``load_config`` documents "never a raw exception"; a bare ``int()`` broke it.
+    """``load_config`` documents "never a raw exception" for this path.
 
-    ``_prepare_merged_config`` is called *outside* ``load_config``'s ``try``,
-    so ``int("abc")`` there escaped as ``ValueError: invalid literal for int()``
-    with a traceback -- breaking the same contract this change's ``key=str``
-    sort fix cites.  ``None`` covers an explicit ``null`` (``TypeError`` from
-    ``int()``); ``29.5`` covers a float, which used to be truncated to pad 29
-    without a word.
+    ``_prepare_merged_config`` runs *outside* ``load_config``'s ``try``, so a
+    bare ``int()`` failure would escape as a traceback instead of a
+    ``ConfigError``.  ``None`` covers an explicit ``null``; ``29.5`` covers a
+    float, which is rejected rather than silently truncated to pad 29.
     """
     if field == "ble_reset_gpio_pin" and value is None:
         pytest.skip("null is a meaningful statement on this field -- see the test below")
@@ -1262,8 +1247,8 @@ def test_zero_is_refused_for_the_ble_reset_pin():
     meaning either "disabled" (to anyone going by the siblings) or pad 0.  Read
     as pad 0, the power binary drives an unrelated pad low for the whole
     window.  Read as disabled, a board genuinely wired to pad 0 leaves its
-    radio free-running and reads high -- this change's own documented failure.
-    Refusing it turns both into an error naming the field and both meanings.
+    radio free-running and reads high.  Refusing it turns both into an error
+    naming the field and both meanings.
     """
     with pytest.raises(ConfigError) as exc_info:
         _custom_board({"ble_reset_gpio_pin": 0}, based_on="apollo4p_blue_kxr_evb")
@@ -1289,13 +1274,13 @@ def test_an_explicit_null_ble_reset_pin_declares_a_board_with_no_radio():
 def test_every_gate_on_the_ble_reset_pin_agrees_about_pad_zero():
     """Three gates read this field, and they must not disagree about 0.
 
-    ``firmware/context.py`` (``power_binary_needs_gpio``) and
-    ``firmware/__init__.py`` (nsx-gpio module selection) test ``is not None``;
-    ``_ble_reset.j2`` used to test Jinja *truthiness*.  At pad 0 those split:
-    the module got linked and ``nsx_gpio.h`` emitted for a block that never
-    rendered.  The YAML surface now refuses 0, but ``BoardDef`` is public, so
-    this pins the model rather than only the parser -- past the parser, 0 is
-    an ordinary pad number everywhere.
+    ``firmware/context.py`` (``power_binary_needs_gpio``),
+    ``firmware/__init__.py`` (nsx-gpio module selection), and
+    ``_ble_reset.j2`` all test ``is not None``, never truthiness -- at pad 0
+    those would otherwise split: the module linked and ``nsx_gpio.h`` emitted
+    for a block that never rendered.  The YAML surface refuses 0, but
+    ``BoardDef`` is public, so this pins the model rather than only the
+    parser -- past the parser, 0 is an ordinary pad number everywhere.
     """
     from helia_profiler.firmware.render import _jinja_env
 

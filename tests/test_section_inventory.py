@@ -225,8 +225,7 @@ class TestFromelfInventory:
     def test_duplicated_field_first_occurrence_wins(self):
         """The .comment section body echoes the armlink command line, which
         can contain field-shaped text — the first occurrence of each field
-        within a block must win (#176: the last-wins mutant
-        survived before this test)."""
+        within a block must win (#176)."""
         listing = (
             "** Section #1\n"
             "\n"
@@ -269,8 +268,8 @@ class TestFromelfInventory:
 
 
 class TestSectionInventoryDispatch:
-    """End-to-end through section_inventory() itself — both branches were
-    previously only tested below the dispatch (#176)."""
+    """End-to-end through section_inventory() itself, covering both
+    branches (#176)."""
 
     def test_gcc_dispatch_runs_readelf_twice_and_threads_results(self, monkeypatch):
         import helia_profiler.hostenv.toolchain_probe as tp

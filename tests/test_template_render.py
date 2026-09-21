@@ -534,7 +534,7 @@ class TestMainCcRender:
         assert "nsx_gpio_init" in out
         assert "nsx_gpio_write" in out
         assert "am_hal_gpio_" not in out
-        # nsx-core now owns ns_core_initialized(); the firmware must not
+        # nsx-core owns ns_core_initialized(); the firmware must not
         # redefine it (that would be a duplicate symbol at link time).
         assert "ns_core_initialized" not in out
 
@@ -667,7 +667,7 @@ class TestMainAotCcRender:
         hi = out.index("hpx_sync_window_begin();")
         lo = out.index("hpx_sync_window_end();")
         assert hi < out.index("clean_cycles +=") < lo
-        # The instrumented profiled loop no longer toggles the sync GPIO.
+        # The instrumented profiled loop does not toggle the sync GPIO.
         assert out.count("hpx_sync_window_begin();") == 1
         assert out.count("hpx_sync_window_end();") == 1
 
@@ -677,16 +677,16 @@ class TestMainAotCcRender:
             out = render(transport="rtt")
             assert "const int clean_iters_n = 3;" in out
             # Keyed on the SIZING machinery, not on clean_warm_cyc: fixed mode
-            # now measures the warm cost too (it is the floor the in-window
+            # measures the warm cost too (it is the floor the in-window
             # stall check compares against, #121), it just does not size the
-            # window from it. Asserting the variable's absence would have been
-            # asserting the wrong thing.
+            # window from it. Asserting the variable's absence would assert
+            # the wrong thing.
             assert "target_cyc" not in out
-            # est_ms is no longer 0 here: a DWT-timed fixed window measures the
-            # warm cost for its stall floor (#121), so the blackout estimate is
-            # derivable and is emitted, which lets the host widen its capture
-            # deadline instead of falling back to the flat heartbeat timeout.
-            # What "fixed" still means is that clean_iters_n is a literal.
+            # A DWT-timed fixed window measures the warm cost for its stall
+            # floor (#121), so the blackout estimate est_ms is derivable and
+            # emitted, letting the host widen its capture deadline instead of
+            # falling back to the flat heartbeat timeout. "Fixed" means only
+            # that clean_iters_n is a literal.
             assert "phase=clean_window_begin iters=%d est_ms=%llu" in out
 
     def test_auto_window_mode_computes_clean_iters_at_runtime(self):
@@ -727,11 +727,10 @@ class TestMainAotCcRender:
             # pre-window (#170) — no adaptive sizing, no DWT warm bracket;
             # the DWT window's stall floor is declared zeroed so the render
             # stays compilable, with the low-floor comparison inert. The
-            # positive half matters: this helper renders power_window_timer
-            # "dwt", and deleting the zeroed declaration left the whole suite
-            # green in the #171 while the render regressed to
-            # uncompilable C (clean_warm_min_cyc consumed by the window body,
-            # declared nowhere).
+            # positive assertion matters (#171): without it, deleting the
+            # zeroed declaration would go undetected while the render
+            # becomes uncompilable C (clean_warm_min_cyc consumed by the
+            # window body, declared nowhere).
             assert "target_cyc" not in out
             assert "uint32_t wt0 = DWT->CYCCNT;" not in out
             assert "uint32_t clean_warm_min_cyc = 0U;" in out
@@ -739,12 +738,8 @@ class TestMainAotCcRender:
     def test_busy_loop_terminal_count_agrees_in_all_three_places(self):
         """The busy-loop work count must be 1 in the plan, the terminal
         success path, AND the terminal failure path — as a property, not a
-        coincidence (#139).
-
-        The failure path previously rendered the plan's raw clean_iters and
-        agreed only because plan_power pins that count to 1 for this probe;
-        the success partial declared 1U itself. Pin the host half and both
-        rendered halves against each other so no one place can drift.
+        coincidence (#139). Pin the host half and both rendered halves
+        against each other so no one place can drift.
 
         Scope: the agreement is a property of the FIXED-mode power render —
         the only kind render_power_source ever pins for flashing. The infer
@@ -791,8 +786,7 @@ class TestMainAotCcRender:
         # window itself runs a plain bounded counter loop with no live clock
         # reads at all — DWT lives in the debug power domain this probe
         # disables, so a live "while (DWT->CYCCNT - t0 < target)" loop as the
-        # exit condition would hang forever once that domain is off
-        # (regression found 2026-07-03: real firmware hang on hardware).
+        # exit condition would hang forever once that domain is off.
         assert "for (volatile uint32_t bi = 0; bi < busy_loop_iters; bi++)" in tflm_out
         assert "clean_count = 1;" in tflm_out
 
@@ -835,16 +829,13 @@ class TestMainAotCcRender:
 
         The Cortex-M4F power binaries cannot read DWT->CYCCNT: AP4 powers the
         debug domain down itself, and neither AP3 nor AP4 has a debugger
-        holding that domain up once the binary free-runs.  The busy-loop probe
-        used to size its iteration count from a DWT delta anyway; the delta
-        read 0, ``if (busy_calib_cyc > 0U)`` was skipped, the count kept its
-        hardcoded 100000 seed, and the window ran for an arbitrary length.
+        holding that domain up once the binary free-runs. The busy-loop probe
+        must size its iteration count from STIMER, not a DWT delta.
 
         These renders are AP3/AP4-shaped (has_armv8m_pmu=False,
-        power_window_timer="stimer") -- the combination the snapshot suite did
-        not cover, because it pins clean_window_probe="infer", and that the
-        busy-loop case here did not cover either, because it used AP5-shaped
-        defaults.
+        power_window_timer="stimer"); the snapshot suite does not cover this
+        combination since it pins clean_window_probe="infer", and other
+        busy-loop tests use AP5-shaped defaults instead.
         """
         for render in (_render_tflm, _render_aot):
             out = render(
@@ -865,9 +856,8 @@ class TestMainAotCcRender:
             assert "static inline uint32_t hpx_stimer_init(void)" in out
             shutdown = "am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_DEBUG);"
             if soc_shape["broad_peripheral_shutdown"]:
-                # The AP4 shape: pin the ordering the original comment got
-                # wrong -- the domain is gone long BEFORE the calibration, not
-                # after it.
+                # The AP4 shape: the debug domain shuts down long BEFORE the
+                # calibration, not after it.
                 assert out.index(shutdown) < out.index("busy_calib_t0")
             else:
                 assert shutdown not in out
@@ -876,11 +866,11 @@ class TestMainAotCcRender:
     def test_busy_loop_window_duration_is_measured_not_the_nominal_target(self, window_mode: str):
         """Regression, issue #112 (second half).
 
-        ``clean_cycles = clean_probe_target_cyc`` made the terminal report echo
-        window_target_ms as the measured duration, so a mis-sized window was
-        indistinguishable from a correct one -- and in internal mode that
-        duration is the denominator for average power and current.  The STIMER
-        bracket around the window is now the only source of elapsed_us.
+        In internal mode, window duration is the denominator for average
+        power and current, so the STIMER bracket around the window must be
+        the only source of elapsed_us -- not the nominal
+        ``window_target_ms``, which would make a mis-sized window
+        indistinguishable from a correct one.
         """
         for render in (_render_tflm, _render_aot):
             out = render(
@@ -982,7 +972,7 @@ class TestMainAotCcRender:
         """layer_tag()/current_layer() exist for the Ethos-U PMU hooks only.
         Rendering them into non-NPU firmware would change the header hashed
         by measured_power_fingerprint, invalidating every existing board's
-        power artifacts against post-merge runs (#284 review)."""
+        power artifacts (#284)."""
         template = _env.get_template("hpx_pmu_profiler.h.j2")
         kwargs = dict(
             cmsis_device_header="apollo510.h",
@@ -1069,8 +1059,7 @@ class TestEthosURender:
         assert "ETHOSU_PMU_Set_CNTR_OVS(drv, mask);" in out
         # Hardware overflow read back and latched per layer.
         assert "ETHOSU_PMU_Get_CNTR_OVS(drv)" in out
-        # Multiple dispatches from one layer ACCUMULATE — the overflow check
-        # alone survives a mutant that drops the addition (#284 review).
+        # Multiple dispatches from one layer must ACCUMULATE (#284).
         assert "const uint32_t before = g_npu_acc[layer][i];" in out
         assert "g_npu_acc[layer][i] = before + ETHOSU_PMU_Get_EVCNTR(drv, (uint32_t)i);" in out
         # Accumulation wrap across dispatches latched per layer.
@@ -1090,10 +1079,9 @@ class TestEthosURender:
 
     def test_ethos_npu_pass_uses_npu_csv(self):
         # Render a CPU pass alongside the NPU pass so the per-pass toggle at
-        # pass setup is observable: NPU tracking must be enabled ONLY for the
-        # ethos_npu pass. A bare `"...(false);" in out` was satisfied by the
-        # unrelated end-of-passes disable in engine_profiled_summary (#284
-        # review: a mutant flipping the toggle survived).
+        # pass setup is observable: NPU tracking must be enabled ONLY for
+        # the ethos_npu pass, not just disabled later by the unrelated
+        # end-of-passes disable in engine_profiled_summary (#284).
         out = _render_tflm(has_ethos_u=True, pmu_passes=_sample_pmu_passes() + [_npu_pmu_pass()])
         # Pass programs NPU events symbolically and prints via the NPU path.
         assert "ETHOSU_PMU_CYCLE, ETHOSU_PMU_NPU_ACTIVE" in out
@@ -1317,10 +1305,10 @@ class TestIna228PowerRender:
 
 def test_pmu_storage_seam_rejects_unknown_vocabulary(monkeypatch):
     """#172: the engine_pmu_storage_sram_resident seam accepts exactly
-    "true"/"false" — a Python-spelled "True" used to silently mean false,
-    shipping a profile binary with its SRAM-resident per-layer storage
-    unbacked (the hang _ssram_power.j2 warns about). The dict lookup leaves
-    anything else undefined and StrictUndefined makes the render fail loudly.
+    "true"/"false". The dict lookup leaves anything else, including a
+    Python-spelled "True", undefined, and StrictUndefined makes the render
+    fail loudly instead of shipping a profile binary with its SRAM-resident
+    per-layer storage unbacked (the hang _ssram_power.j2 warns about).
     """
     from jinja2 import ChoiceLoader, DictLoader
     from jinja2.exceptions import UndefinedError

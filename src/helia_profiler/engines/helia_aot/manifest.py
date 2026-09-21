@@ -309,7 +309,7 @@ def _aot_buffer_symbol(
 ) -> str | None:
     """The symbol heliaAOT's templates ACTUALLY emit for an arena
     consumer, per the installed wheel's tensors.c.j2 / constants.c.j2 and
-    hpx's main_aot.cc.j2 (#179 review M-3/M-4 corrected both families):
+    hpx's main_aot.cc.j2 (#179):
 
     * cold constant -> {prefix}_arena_const_{mem}__blob (constants.c.j2,
       emitted regardless of allocate_arenas);
@@ -428,7 +428,7 @@ def _extract_memory_plan_from_render_plan(
                             kind=ConsumerKind.WEIGHTS,
                             # constants.c.j2:44 — the staged SOURCE blob
                             # is named by the RUNTIME memory, placed in
-                            # source memory (#179 review M-3).
+                            # source memory (#179).
                             symbol=(f"{prefix}_arena_const_{runtime_key.lower()}__source"),
                         )
                     )

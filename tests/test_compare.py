@@ -565,8 +565,8 @@ def test_compare_includes_aot_memory_placement_diffs(tmp_path: Path):
 
 def test_memory_rows_join_on_the_source_index_not_position(tmp_path: Path):
     """#223: the memory CSV row for original op 5 sits at position 0 after
-    fusion. The old dual layer_id/layer_idx key matched EITHER, so position
-    0's row could attach to whichever layer probed first; the join must key
+    fusion. Keying on execution position instead of the original index
+    could attach it to whichever layer probed first; the join must key
     on the layer's resolved source index only."""
     baseline = tmp_path / "gcc"
     candidate = tmp_path / "atfe"
@@ -947,9 +947,7 @@ class TestMemoryRegionRows:
         from helia_profiler.evaluation.run_metrics import _METRIC_FIELDS
 
         directions = {f.name: f.lower_is_better for f in _METRIC_FIELDS}
-        # The complete table, so a direction cannot change unnoticed. Note
-        # power.inferences_per_joule: main's ``name != "layers"`` hack
-        # coloured a throughput DROP green; the declaration corrects it.
+        # The complete table, so a direction cannot change unnoticed.
         assert {n for n, lower in directions.items() if not lower} == {
             "layers",
             "power.inferences_per_joule",

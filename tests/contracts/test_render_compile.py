@@ -441,13 +441,13 @@ def _part_define(vars: dict) -> str:
     """The part macro for this render's SoC — from the REGISTRY's c_define.
 
     Production gets the part macro from the toolchain command line (CMake),
-    sourced from SocDef.c_define — NOT reconstructed from the header name.
-    The PR #98 review caught the earlier reconstruction
-    (AM_PART_{STEM.upper()}) defining a macro production never defines:
-    atomiq110 deliberately declares c_define="PART_atomiq110" because that
-    part has no AM_PART_* macro. Keying on the registry keeps the gate's
-    part gates (burst, debug domain, SRAM config, cache capabilities)
-    aligned with the real build for every current and future part.
+    sourced from SocDef.c_define — NOT reconstructed from the header name:
+    atomiq110 declares c_define="PART_atomiq110" because it has no
+    AM_PART_* macro, so reconstructing ``AM_PART_{STEM.upper()}`` would
+    define a macro production never defines. Keying on the registry keeps
+    the gate's part gates (burst, debug domain, SRAM config, cache
+    capabilities) aligned with the real build for every current and future
+    part.
     """
     header_stem = Path(str(vars["cmsis_device_header"])).stem
     for soc in _socs_by_header.get(header_stem, ()):

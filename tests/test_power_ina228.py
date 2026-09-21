@@ -548,7 +548,7 @@ class TestAccumulatorCadenceGuard:
 
     def test_slowest_settings_rejected(self, tmp_path: Path):
         # 1024 x 2 x 4120 us = 8.44 s per update against a ~5 s window:
-        # zero completed updates, previously published as a healthy 0 W.
+        # zero completed updates.
         with pytest.raises(PowerError, match="accumulator would update only"):
             self._plan(
                 tmp_path,

@@ -649,9 +649,9 @@ def test_capture_rtt_output_does_not_send_down_channel_command(monkeypatch):
         rtt_scan_ranges=((0x20000000, 0x4000),),
     )
 
-    # The firmware now streams the HPX_START header losslessly on the up-channel
-    # and never waits on a host->target command, so the host must not write to
-    # the RTT down-channel during the ready handshake.
+    # The firmware streams the HPX_START header losslessly on the up-channel
+    # and never waits on a host->target command, so the host must not write
+    # to the RTT down-channel during the ready handshake.
     assert fake_jlink.commands == []
 
 

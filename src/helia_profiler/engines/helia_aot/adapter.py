@@ -254,7 +254,7 @@ class HeliaAOTAdapter:
         # physical memory layout.
         # Extract arena binding info for external-arena mode — resolved
         # BEFORE plan extraction, which needs it to hint the symbols the
-        # templates actually emit in each mode (#179 review M-4).
+        # templates actually emit in each mode (#179).
         allocate_arenas = not _external_arena_mode(config)
         memory_plan = _extract_memory_plan(codegen_ctx, prefix, allocate_arenas=allocate_arenas)
         arena_regions = _extract_arena_regions(codegen_ctx, prefix)

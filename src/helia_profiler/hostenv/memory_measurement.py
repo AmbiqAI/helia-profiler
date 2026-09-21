@@ -91,7 +91,7 @@ def measure_memory_regions(
     # script maps, so anything landing there is just as anomalous as an
     # address outside every window — classifying it silently would disable
     # the police flag on exactly the region this block cannot report
-    # (#177 review m2).
+    # (#177).
     attributable = tuple(w for w in windows if w.section_attributable)
 
     regions: list[MeasuredRegion] = []
@@ -143,7 +143,7 @@ def measure_memory_regions(
             ", ".join(f"{u.name}@0x{u.address:08X}" for u in unattributed[:5]),
         )
 
-    # Segments have the same police problem as sections (#177 review m3):
+    # Segments have the same police problem as sections (#177):
     # PT_LOAD file bytes whose physical address classifies nowhere would
     # otherwise vanish from load_image with no trace.
     unattributed_load = sum(
@@ -202,7 +202,7 @@ _CONSUMER_SYMBOLS: dict[str, tuple[str, ...]] = {
 def _name_matches(symbol_name: str, candidate: str) -> bool:
     """Exact name, or GCC's file-static mangling ``_ZL<len><name>``.
 
-    NOT a bare suffix test (#179 review M-1): real HAL globals like
+    NOT a bare suffix test (#179): real HAL globals like
     ``am_hal_gpio_pincfg_input`` END WITH ``g_input`` and would flip
     verdicts with 4-byte MRAM constants."""
     return symbol_name == candidate or symbol_name == f"_ZL{len(candidate)}{candidate}"
@@ -216,7 +216,7 @@ def _match_symbols(
     e.g. an extern alias plus the mangled static) must not double the
     sum. Zero-size symbols are ignored: llvm-nm reports st_size verbatim
     and armlink's linker-defined markers carry none, so a zero-size
-    "match" would manufacture measured_size=0 (#179 review M-5)."""
+    "match" would manufacture measured_size=0 (#179)."""
     matched: list[SymbolEntry] = []
     seen: set[tuple[int, int]] = set()
     for sym in symbols:
@@ -261,7 +261,7 @@ def reconcile_memory(
                 # pointer itself IS a 4-byte sized symbol carrying the
                 # same name (verified: _ZL10model_data size 4 on the
                 # PSRAM-weights render). Matching it would report the
-                # planned megabytes as delta shortfall (#179 review M-2).
+                # planned megabytes as delta shortfall (#179).
                 status, matched = "unmatchable", ()
             elif not candidates:
                 # Structural: armlink's stack is a scatter region and AOT

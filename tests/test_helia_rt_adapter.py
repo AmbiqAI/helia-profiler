@@ -198,7 +198,7 @@ class TestHeliaRTAdapter:
     ):
         """With no dist_path/source_path/source configured, prepare()
         resolves nsx-helia-rt from the NSX registry (no local vendoring) and
-        declares nsx-cmsis-nn at the baseline's qualified ref (#246)."""
+        declares nsx-cmsis-nn at the baseline's qualified ref."""
         monkeypatch.delenv("HELIART_DIST_PATH", raising=False)
         monkeypatch.delenv("HELIART_SOURCE_PATH", raising=False)
         config = _make_config(tmp_path)
@@ -445,7 +445,7 @@ class TestEthosUBackend:
         artifacts = adapter.prepare(config, tmp_path)
         names = [m.name for m in artifacts.extra_modules]
         # cmsis-nn is declared unconditionally for the registry-default path
-        # (#246) regardless of backend — the NPU module is appended after it.
+        # regardless of backend — the NPU module is appended after it.
         assert names == ["nsx-helia-rt", "nsx-cmsis-nn", "nsx-npu"]
         npu = artifacts.extra_modules[2]
         assert npu.local is False

@@ -1,11 +1,11 @@
 """A malformed reported model size must survive the whole output path.
 
-The #281 warning is worthless if the artifacts it belongs in cannot be written
-or rendered. Two independent reviews found exactly that: the raw string reached
-``summary.json``'s strict round-trip and the console's numeric memory panel, and
-each raised instead of publishing. These drive the real chain -- wire text
-through the parser, evaluation, ``write_report`` and the full console render --
-because every seam that broke sits downstream of hand-built metadata.
+The #281 warning is worthless if the artifacts it belongs in cannot be
+written or rendered: a raw string can reach ``summary.json``'s strict
+round-trip and the console's numeric memory panel, and each must raise
+instead of publishing malformed data. Wire text through the parser,
+evaluation, ``write_report`` and the full console render, since every
+seam that could break sits downstream of hand-built metadata.
 """
 
 from __future__ import annotations

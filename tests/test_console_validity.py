@@ -1,12 +1,10 @@
-"""Console validity footer + the fail-on-invalid exit policy (#197).
+"""Console validity footer + the fail-on-invalid exit policy.
 
-Since #142/#181 a broken gate no longer aborts the run; without this footer
-an INVALID run showed a normal-looking table and exited 0. The footer
-consumes the single RunEvaluation ``write_report`` stores on the context
-(#204 D5), and ``output.fail_on_invalid`` turns INVALID into exit 3 —
-deliberately opt-in, because automation that treats nonzero as abort (the
-validation runner's subprocess path) must not silently re-abort the
-degrade-don't-abort runs #195 built.
+A broken gate does not abort the run; the footer surfaces the verdict so
+an INVALID run isn't hidden behind a normal-looking table. It consumes
+the RunEvaluation stored on the context, and ``output.fail_on_invalid``
+turns INVALID into exit 3 -- opt-in, since automation that treats nonzero
+as abort must not silently re-abort a degrade-don't-abort run.
 """
 
 from __future__ import annotations
@@ -207,10 +205,10 @@ def test_unknown_severity_renders_instead_of_vanishing(tmp_path: Path) -> None:
 
 
 def test_write_report_stores_the_evaluation_it_rendered(tmp_path: Path) -> None:
-    """#208 retro review: the write_report -> ctx.run_evaluation store is the
-    one link in the fail-on-invalid chain nothing pinned. Dropping it fails
-    OPEN — the footer falls back to a fresh evaluation but exit 3 silently
-    never fires — so the store gets its own test."""
+    """The write_report -> ctx.run_evaluation store is the one link in the
+    fail-on-invalid chain nothing pinned. Dropping it fails OPEN — the
+    footer falls back to a fresh evaluation but exit 3 silently never
+    fires — so the store gets its own test."""
     import json
 
     from helia_profiler.report import write_report
@@ -247,9 +245,9 @@ def test_write_report_stores_the_evaluation_it_rendered(tmp_path: Path) -> None:
 
 
 def test_fail_on_invalid_defaults_off_behaviorally(tmp_path: Path) -> None:
-    """#208 retro review: the False default was pinned only by the config
-    docs-drift test, which a coordinated doc+code flip would satisfy. The
-    opt-in design is behavior; pin it as behavior."""
+    """The False default was pinned only by the config docs-drift test,
+    which a coordinated doc+code flip would satisfy. The opt-in design is
+    behavior; pin it as behavior."""
     config = load_config(
         None,
         {"model": {"path": "test.tflite"}, "engine": {"type": "helia-rt"}},

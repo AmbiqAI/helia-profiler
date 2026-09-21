@@ -657,14 +657,9 @@ class ProfileConfig:
 
         ``profiling.window_target_ms`` is raised to a power-usable floor only
         in ``window_mode: auto`` -- ``fixed`` means "use my number". This is a
-        derived property rather than a helper each caller re-implements
-        because the rule spans two config sections and had drifted into three
-        hand-rolled copies, one of which disagreed: the firmware render used
-        the mode-gated form while the power planner clamped unconditionally,
-        so a ``fixed`` window shorter than the floor produced a plan
-        describing a 5 s window against firmware built to spin for 1 s. That
-        is invisible under the default ``auto``, which is why nothing caught
-        it (found by review of #136).
+        derived property rather than a helper each caller re-implements,
+        because the rule spans two config sections and every caller (firmware
+        render, power planner) must agree on the same effective value (#136).
         """
         if self.power.enabled and self.profiling.window_mode is WindowMode.AUTO:
             return max(self.profiling.window_target_ms, DEFAULT_POWER_WINDOW_TARGET_MS)

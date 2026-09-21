@@ -35,7 +35,7 @@ BAD_MODEL = FIXTURES / "softmax_scale_unsupported.tflite"
 # The root-level copy, NOT tests/fixtures/mlperf_tiny/kws/: everything under
 # mlperf_tiny/** is Git-LFS-tracked and the unit-test CI checks out without
 # LFS, so those paths hold 130-byte pointer files there -- the reader then
-# "parses" ASCII pointer text as offsets. Found by CI on the first push.
+# "parses" ASCII pointer text as offsets.
 KWS_MODEL = FIXTURES / "kws_ref_model.tflite"
 
 #: Ground truth from issue #57, verbatim.
@@ -57,9 +57,6 @@ class TestMultiplier:
 
         Reachable in a real file -- 2^-26 is float32-exact, so a quantizer
         emitting a power-of-two scale lands the product exactly on 1.0.
-        Review found the `>` unpinned: flipping it to `>=` survived the whole
-        suite (the PR's own mutation battery had reported it CAUGHT, off
-        stale bytecode a second time).
         """
         from helia_profiler.modelcost.softmax_preflight import SoftmaxScaling
 
@@ -144,9 +141,7 @@ class TestScan:
         """The printed 'needs input_scale > X' must use the op's OWN beta.
 
         The beta-rescued op (beta=1e9) needs a scale 1e9 smaller than a
-        beta=1 op needs. Review found the beta term unpinned: dropping it
-        from minimum_scale survived the whole suite while the user-facing
-        error printed a bound a billion times too large.
+        beta=1 op needs.
         """
         rescued = scan_softmax_scaling(BAD_MODEL)[1]
 
@@ -174,13 +169,11 @@ class TestPreflightGate:
     def test_each_engine_gets_its_own_verdict_and_message(self):
         """Three engine behaviours, each established by running real code.
 
-        This test has been wrong twice. v1 gated heliaAOT with TFLM's message
-        after misreading the issue. v2 exempted heliaAOT entirely after
-        verifying its preprocess_softmax_scaling handles the failing scale --
-        one call short: calculate_input_radius does `1 << shift` on the
-        result and raises `negative shift count` for multipliers below 0.5,
-        so the issue's model (0.289) crashes the AOT compiler at stage 2 with
-        a message naming nothing. The gate now catches it with the cause.
+        heliaAOT's own preprocess_softmax_scaling chain calls
+        calculate_input_radius, which does `1 << shift` on the result and
+        raises `negative shift count` for multipliers below 0.5 -- so the
+        issue's model (0.289) crashes the AOT compiler at stage 2. The gate
+        catches it and names the cause.
         """
         for engine in (EngineType.HELIA_RT, EngineType.TFLM):
             with pytest.raises(ConfigError, match="AllocateTensors"):
@@ -197,14 +190,10 @@ class TestPreflightGate:
     def test_the_aot_error_band_is_bounded_at_BOTH_ends(self):
         """helia-aot raises in [2**-32, 0.5) -- and only there.
 
-        The first version errored on everything below 0.5. Review found the
-        lower edge: `quantize_multiplier` FLUSHES to (0, 0) once the frexp
-        exponent would fall below -31, so a smaller multiplier gets shift 0
-        and compiles again. The gate blocked that sub-flush band -- the same
-        over-blocking as gating heliaAOT at all, one dimension over, and
-        found only because nobody had swept below 0.5.
-
-        Measured against the pinned helia-aot 0.18 by running its real path.
+        `quantize_multiplier` FLUSHES to (0, 0) once the frexp exponent
+        would fall below -31, so a multiplier smaller than 2**-32 gets
+        shift 0 and compiles. Measured against the pinned helia-aot 0.18
+        by running its real path.
         """
         from helia_profiler.modelcost.softmax_preflight import aot_softmax_verdict
 
@@ -248,11 +237,9 @@ class TestPreflightGate:
     def test_has_usable_beta_rejects_zero(self):
         """Pure, so it pins the predicate in the BARE environment.
 
-        The end-to-end no-beta test below needs the generator (litert), so it
-        skips in CI's unit matrix -- where a mutation making has_usable_beta
-        always True went unnoticed. A guardrail that only runs in the
-        environment least likely to hit the bug is the shape this whole PR
-        keeps rediscovering.
+        The end-to-end no-beta test below needs the generator (litert), so
+        it skips in CI's unit matrix; without this pin, a mutation making
+        has_usable_beta always True would go unnoticed there.
         """
         from helia_profiler.modelcost.softmax_preflight import SoftmaxScaling
 
@@ -309,9 +296,9 @@ class TestPreflightGate:
         TFLM value-initialises beta to 0.0 when SoftmaxOptions is absent;
         helia-aot's field default is 1.0. The engines disagree about what the
         model even says, and neither runs it. Reporting it through the scale
-        path printed "needs input_scale > inf" (no scale can rescue a zero
-        beta) and, for helia-aot, named a crash in a function that model
-        never reaches -- both found by review.
+        path would print "needs input_scale > inf" (no scale can rescue a
+        zero beta) and, for helia-aot, name a crash in a function the model
+        never reaches.
         """
         import importlib.util
 
@@ -340,11 +327,10 @@ class TestPreflightGate:
         """Pin the CALL, not just the function.
 
         Every gate test above drives `_check_softmax_scaling` directly, so
-        deleting the one line in `PreflightStage.run` that invokes it left all
-        of them green while the pipeline stopped checking anything -- the
-        untested-write-site gap #137 found, in its preflight shape.
-        (First caught here by a mutation run whose "3 failed" turned out to be
-        stale bytecode; in a clean run it was 15 passed.)
+        deleting the one line in `PreflightStage.run` that invokes it would
+        leave all of them green while the pipeline stopped checking
+        anything -- the untested-write-site gap #137 found, in its
+        preflight shape.
         """
         from helia_profiler.config import load_config
         from helia_profiler.pipeline import PipelineContext
@@ -367,12 +353,10 @@ class TestPreflightGate:
     def test_a_damaged_flatbuffer_is_an_error_not_a_stack_trace(self, tmp_path, engine):
         """Stage 0 must catch a corrupt file for EVERY TFLite engine.
 
-        The round-1 whitelist returned before the parse for helia-aot, so a
-        malformed model sailed through preflight and surfaced at stage 5 --
-        after the board was powered and the probe resolved, or on a laptop
-        with no board as a misleading "J-Link probe not found" (found by
-        review). The parse now runs for all TFLite engines; only the
-        VERDICTS are per-engine.
+        A malformed model must not sail through preflight and surface later
+        as an unrelated hardware error (e.g. a misleading "J-Link probe not
+        found" after the board was powered). The parse runs for all TFLite
+        engines; only the VERDICTS are per-engine.
         """
         mangled = tmp_path / "mangled.tflite"
         mangled.write_bytes(b"TFL3" + b"\xff" * 64)
@@ -491,8 +475,7 @@ def test_reader_agrees_with_litert_on_every_fixture():
 _AOT_SWEEP = [
     # (label, multiplier, what the pinned helia-aot 0.18 measurably does)
     # Negatives are swept too (#172): the Q31 promotion fires only
-    # at +2**31, so the negative boundaries do NOT mirror the positive ones
-    # — a sign-blind guard disagreed with the compiler on 218/689 points.
+    # at +2**31, so the negative boundaries do NOT mirror the positive ones.
     ("negative in the raise band", -0.25, "raises"),
     ("negative half-up edge keeps its shift", -0.49999999999999994, "raises"),
     ("negative 0.5 has exponent 0", -0.5, "compiles"),
@@ -621,10 +604,9 @@ def test_aot_absent_beta_is_one_in_every_environment():
 
 
 def test_negative_multipliers_mirror_the_real_chain_not_a_blanket_error():
-    """#172: the first fix blanket-errored negatives; the real chain
-    compiles most of that domain. The asymmetry is the Q31 promotion (fires
-    only at +2**31), so the verdict mirrors the SHIFT — a sign-blind band
-    disagreed on 218 of 689 negative sweep points."""
+    """#172: the real chain compiles most of the negative multiplier
+    domain. The asymmetry is the Q31 promotion (fires only at +2**31), so
+    the verdict mirrors the SHIFT, not a sign-blind band."""
     from helia_profiler.modelcost.softmax_preflight import aot_softmax_verdict
 
     # In the negative raise band (shift in [-31, -1]):
@@ -678,9 +660,9 @@ def test_reader_constants_re_derive_from_the_installed_litert():
     assert r.TENSOR_TYPE_INT8 == g.TensorType.INT8
     assert r.BUILTIN_OPTIONS_SOFTMAX == g.BuiltinOptions.SoftmaxOptions
 
-    # Tuples, NOT a dict: slot values collide across tables (four distinct
-    # fields sit at slot 10 alone), and a value-keyed dict silently dropped
-    # 9 of these 14 checks (#235).
+    # Tuples, not a dict: slot values collide across tables (four distinct
+    # fields sit at slot 10 alone), so a value-keyed dict would merge
+    # distinct checks (#235).
     expected_slots = [
         (r._MODEL_OPERATOR_CODES, g.Model.OperatorCodes),
         (r._MODEL_SUBGRAPHS, g.Model.Subgraphs),

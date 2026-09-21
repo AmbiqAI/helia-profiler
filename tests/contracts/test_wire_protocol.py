@@ -1034,12 +1034,10 @@ def test_error_hints_are_keyed_by_the_enum_and_agree_with_the_registry():
 
 
 def test_every_error_code_carries_a_hint():
-    """Adding a code without deciding on a hint has to be a conscious act.
+    """Every ``FirmwareErrorCode`` must carry a hint in ``_ERROR_HINTS``.
 
-    #163 disclosed six codes that reached the user with a generic "the
-    payload is shown above" message; #165 closed that gap. This pin makes
-    reopening it — an error code whose remediation nobody wrote down — a
-    review decision rather than an accident.
+    A new code with no remediation hint fails this test instead of reaching
+    users as a generic "the payload is shown above" message.
     """
     hintless = {code.value for code in FirmwareErrorCode} - {code.value for code in _ERROR_HINTS}
     assert hintless == set()
@@ -1078,18 +1076,12 @@ def test_clean_window_begin_is_the_protocol_critical_phase():
 def test_the_est_ms_gap_is_told_once_and_is_true_of_the_firmware():
     """The gap statement is single-sourced, and the firmware agrees with it.
 
-    The claim has narrowed three times. First (#163) from "every apollo510
-    profile build" to "fixed+STIMER only": ``config.DEFAULT_WINDOW_MODE`` is
-    ``auto``, and the auto branch measures a warm DWT reference and sends a
-    real estimate whatever clock times the window. Then (#164) the
-    fixed+STIMER profile *infer* arm gained the same pre-window DWT
-    measurement — the debug domain is gated only inside the window, so DWT is
-    valid where the measurement happens. Then (#170) busy-loop windows gained
-    the honest compile-time ``window_target_ms`` announce in both window
-    modes, and ``power_only`` became the template's first arm — so the
-    hardcoded zero survives only in dedicated power binaries (announce
-    compiled to a no-op, no host listener). The statement lives once, in
-    :data:`EST_MS_GAP`. The renders below prove its printf-placement clauses;
+    Every profile build announces a real duration: infer windows send a
+    measured warm-DWT estimate in both window modes, busy-loop windows send
+    the compile-time ``window_target_ms``. The hardcoded zero survives only
+    in dedicated power binaries, where the announce compiles to a no-op with
+    no host listener. The statement lives once, in :data:`EST_MS_GAP`. The
+    renders below prove its printf-placement clauses;
     the *runtime and host-policy* clauses (the no-op ``hpx_printf``
     definition, an estimate degrading to 0 under a frozen DWT, the host's
     hold-floor and cap) are firmware/runtime/host facts a render census

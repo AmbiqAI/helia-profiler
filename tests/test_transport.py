@@ -200,11 +200,9 @@ def test_window_budget_is_capped():
 
 
 def test_window_budget_survives_a_line_received_inside_the_window():
-    """The announce's budget is a FLOOR until it expires, not a one-shot
-    raise: a busy-loop window prints HPX_CLEAN_WINDOW_PROBE=busy_loop right
-    after the announce, and before #170 that line reset the inactivity
-    deadline to the flat heartbeat timeout — the widened deadline evaporated
-    and the silent window was reported as a hang."""
+    """The announce's budget is a floor until it expires, not a one-shot
+    raise: a busy-loop window's HPX_CLEAN_WINDOW_PROBE=busy_loop line must
+    not reset the inactivity deadline to the flat heartbeat timeout."""
     import time as _t
 
     released = _t.monotonic() + 0.4  # silence > heartbeat_timeout, << budget
@@ -217,7 +215,7 @@ def test_window_budget_survives_a_line_received_inside_the_window():
                 b"--- HPX_START ---\nHPX_HEARTBEAT phase=clean_window_begin iters=100 est_ms=1000\n"
             )
         if state["step"] == 1:
-            # The in-window line that used to discard the held budget.
+            # In-window probe line; must not reset the budget.
             state["step"] = 2
             return b"HPX_CLEAN_WINDOW_PROBE=busy_loop\n"
         if _t.monotonic() >= released:

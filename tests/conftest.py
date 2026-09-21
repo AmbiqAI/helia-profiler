@@ -62,12 +62,10 @@ def fake_dist(tmp_path: Path) -> Path:
     (dist / "third_party").mkdir()
     (dist / "third_party" / "flatbuffers").mkdir()
     (dist / "signal").mkdir()
-    # Copy the bundled test snapshot of heliaRT's nsx/ module into the dist
-    # so that _install_nsx_module finds the upstream-style files. Only
-    # module.version tracks the qualified release; the REST of both files
-    # is a pre-1.16 prebuilt-era snapshot (summary still says "prebuilt
-    # static libraries") that _install_nsx_module never reads — it copies
-    # nsx-module.yaml and GENERATES its own wrapper (#191/#192 reviews).
+    # Copy the bundled test snapshot of heliaRT's nsx/ module into dist so
+    # _install_nsx_module finds the upstream-style files. It reads only
+    # nsx-module.yaml and generates its own wrapper, so the rest of the
+    # snapshot is unused and can look stale.
     import shutil
 
     nsx_src = FIXTURES_DIR / "heliart_nsx"
@@ -123,7 +121,7 @@ def fake_source_tree(tmp_path: Path) -> Path:
 def fake_cmsis_nn(tmp_path: Path) -> Path:
     """Create a minimal fake ns-cmsis-nn tree with a native nsx/ module.
 
-    Mirrors the structure of ns-cmsis-nn >= v7.23.0 which ships a native
+    Mirrors ns-cmsis-nn's structure, which ships a native
     ``nsx/CMakeLists.txt`` and ``nsx/nsx-module.yaml``.
     """
     nn = tmp_path / "ns_cmsis_nn"

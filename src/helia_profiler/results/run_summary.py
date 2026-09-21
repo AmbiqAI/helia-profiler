@@ -1,29 +1,26 @@
-"""Typed model of ``summary.json`` — the schema as code (#202 Part A).
+"""Typed model of ``summary.json`` — the schema as code.
 
 One class owns the artifact's shape for BOTH sides of the boundary:
 
 * the **producer** (``report/summary.py``) routes its assembled content
   through this model -- ``from_dict`` -> a write-time round-trip equality
   check -> :meth:`RunSummary.to_dict` -- whose emission order and
-  omit-when-``None`` conditionality reproduce the historical hand-built dict
+  omit-when-``None`` conditionality reproduce the hand-built dict
   byte-for-byte (``tests/contracts/test_report_golden.py`` is the proof, and
   the equality check makes any divergence a loud producer-time failure);
 * **consumers** (``validation/runner.py`` today; more as they migrate) load
   artifacts through :func:`load_run_summary` / :meth:`RunSummary.from_dict`,
   a *tolerant* reader: missing fields become ``None``, unknown keys are
   preserved on ``extras`` for inspection, and cross-version interpretation
-  (legacy key spellings, the #142/#181 drift arbitration) lives in
+  (legacy key spellings, drift arbitration between schema versions) lives in
   properties here instead of being re-derived at every read site.
 
-That split is the point: the three shipped shadow-consumer defects (the
-stage/validity window-clock split, #192's phantom compare dimension, #195's
-runner misreading v4 artifacts with v3 semantics) all came from consumers
-re-deriving semantics the producer never promised. A field's meaning now has
-one home.
+A field's meaning has one home: consumers read it here instead of
+re-deriving semantics the producer never promised.
 
 Layering: this module sits in ``results/`` (bottom of the import graph) and
 imports nothing from ``evaluation/`` or ``report/`` — ``evaluation`` imports
-``results``, so a ``RunEvaluation`` reference here would cycle (#204 review).
+``results``, so a ``RunEvaluation`` reference here would cycle.
 
 Reader vs writer asymmetry, stated honestly: ``to_dict`` serializes only the
 canonical schema — it does NOT re-emit ``extras``. The producer never
@@ -119,13 +116,13 @@ class BinarySection:
     """``summary["binary"]`` — ELF section byte totals."""
 
     #: Optional so a partial or unparseable foreign block reads as absent
-    #: fields, never as fabricated zero-byte sections (#205 review). The
-    #: producer always supplies all four.
+    #: fields, never as fabricated zero-byte sections. The producer always
+    #: supplies all four.
     text: int | None = None
     data: int | None = None
     bss: int | None = None
     total: int | None = None
-    #: Emitted only when truthy, matching the historical writer.
+    #: Emitted only when truthy.
     reserved: int | None = None
     extras: Mapping[str, Any] = field(default_factory=dict)
 
@@ -156,9 +153,8 @@ class BinarySection:
 class LatencySection:
     """``summary["latency"]`` — host timing plus device-reported windows.
 
-    Field order is emission order. The historical writer had two branches
-    (with and without host ``run_metadata.timing``); both emitted the device
-    keys in this relative order, so one section covers both.
+    Field order is emission order, covering both the with- and
+    without-host-timing cases.
     """
 
     #: JSON numbers carried VERBATIM: the producer writes ints for the
@@ -409,9 +405,7 @@ class PowerSection:
 
         Precedence: explicit-unit legacy keys, then the canonical SI field
         scaled. A null or garbage legacy value falls through to the next
-        source instead of crashing -- the old read sites raised TypeError
-        there, and these properties are the reader every future consumer
-        inherits (#205 review).
+        source instead of raising.
         """
         for legacy in ("total_energy_uj", "energy_uJ"):
             value = _opt_float(self.extras.get(legacy))
@@ -467,12 +461,9 @@ class PowerSection:
     def gate_duration_unarbitrated_failure(self) -> bool:
         """The est*count band failed with nothing to reclassify it.
 
-        ``valid: false`` alone stopped meaning "bad capture" at schema v4
-        (#142/#181): when the firmware's own window clock confirmed the gate,
-        the artifact carries ``gated_window_reference_drift`` and the miss is
-        a stale reference. This property is that arbitration, stated once —
-        the misreading of it is exactly how the validation runner failed
-        healthy cold-boot runs (#195, found by two lenses independently).
+        True when the gate failed and the firmware's own window clock did
+        not confirm it via ``gated_window_reference_drift`` (which marks a
+        stale reference, not a bad capture).
         """
         return (
             self.gate_duration_integrity_valid is False
@@ -486,8 +477,8 @@ class RunSummary:
 
     engine: str
     layers: int
-    #: Historically a float (a sum of per-layer cycle floats) -- carried
-    #: verbatim; use :attr:`total_cycles_int` for a rounded reading.
+    #: A float (sum of per-layer cycle floats), carried verbatim; use
+    #: :attr:`total_cycles_int` for a rounded reading.
     total_cycles: float
     overflow_detected: bool
     validity: str | None = None

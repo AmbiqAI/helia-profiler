@@ -159,7 +159,7 @@ class DimensionSpec:
     #: data, not comparator special-casing. Used by the firmware fingerprint:
     #: cross-platform renders trivially differ, and board/SoC differences are
     #: documented as visible-not-blocking — a fingerprint mismatch only means
-    #: something when the platform and firmware mode agree (#138 regression 3).
+    #: something when the platform and firmware mode agree.
     #: If a scope dimension is absent on either side (a legacy artifact), the
     #: platform match cannot be established and the dimension is skipped —
     #: the same conservative non-blocking rule as an absent value itself.

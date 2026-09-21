@@ -13,8 +13,8 @@ owners exist in the baseline and this contract freezes both:
 
 * **Power capture** — ``target_lifecycle.prepare_target_for_phase`` owns the
   reset.  The ``auto`` policy resolves to ``debug_reset`` on AP3/AP4 and to
-  ``debug_reset`` **then** ``swpoi_reset`` on AP5 (the RSTGEN SWPOI deep reset
-  added in the transport-hardening PR, which also clears PMU/power state).
+  ``debug_reset`` **then** ``swpoi_reset`` on AP5 (the RSTGEN SWPOI deep
+  reset, which also clears PMU/power state).
 
 External tools are never touched: reset primitives are monkeypatched to record
 their invocation, and — for the reader paths — to stop execution immediately

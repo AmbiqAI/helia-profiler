@@ -52,9 +52,9 @@ def test_missing_binary_sections_does_not_fail_successful_build(
 
 
 def test_measured_regions_wiring_passes_soc_and_linker_profile(tmp_path: Path, monkeypatch) -> None:
-    """#177 (Sonnet m2): the stage->measure_memory_regions wiring —
-    the ctx.soc gate, the engine-config linker_profile extraction, and the
-    argument order — pinned end-to-end through the stage."""
+    """#177: the stage->measure_memory_regions wiring — the ctx.soc gate,
+    the engine-config linker_profile extraction, and the argument order —
+    pinned end-to-end through the stage."""
     from helia_profiler.platform import get_soc
 
     model = tmp_path / "model.tflite"

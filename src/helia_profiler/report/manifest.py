@@ -231,8 +231,8 @@ def _comparability(ctx: PipelineContext) -> dict[str, Any]:
     }
     if ctx.power_result is not None:
         # A run that measured no power has nothing to say about how it
-        # measured it; a value on this side would block a power-vs-no-power
-        # comparison that used to work.
+        # measured it; leaving this dimension unset lets a power-vs-no-power
+        # comparison proceed.
         values.update(
             {
                 ComparisonDimension.POWER_SCOPE: ctx.power_result.metadata.measurement_scope,

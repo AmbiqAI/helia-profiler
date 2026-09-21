@@ -1352,8 +1352,7 @@ class TestGatedCaptureContracts:
         # Read brackets come from the host clock. Drive it from the fake
         # read so the timeline is deterministic: each read takes 10 ms and
         # its stats packet lands a hair before the sample tick, as on a real
-        # host. A real clock with 15.6 ms resolution (Windows, Python 3.11)
-        # measured two 10 ms brackets as 0.032 s and failed the floor below.
+        # host.
         host_ticks = 0
         monkeypatch.setattr(module, "_host_monotonic_time64", lambda _time64: host_ticks)
 
@@ -2148,12 +2147,10 @@ class TestTargetLifecycle:
 class TestEstimateCaptureDuration:
     """Regression coverage for the auto-tuned capture-duration estimate.
 
-    Bug: the estimate previously only accounted for the per-layer PMU
-    passes (presets x (warmup + iterations)) and ignored the separately
-    configured GPIO-gated clean window, so a long clean window (window_mode
-    'auto' with a large window_target_ms, or a large 'fixed' iterations
-    count) produced a safety bound shorter than the actual firmware run,
-    causing the Joulescope poller to miss the window's falling edge.
+    The estimate accounts for both the per-layer PMU passes (presets x
+    (warmup + iterations)) and the separately configured GPIO-gated clean
+    window, so the safety bound covers the actual firmware run and the
+    Joulescope poller does not miss the window's falling edge.
     """
 
     def _make_ctx(self, tmp_path: Path, *, profiling_overrides: dict):
@@ -2299,11 +2296,9 @@ class TestEstimateCaptureDuration:
         assert estimated == pytest.approx(expected, rel=1e-6)
 
     def test_auto_window_regression_reproduces_prior_underestimate_bug(self, tmp_path: Path):
-        # This mirrors the real config that triggered "No GPIO-high windows
+        # Mirrors the real config that triggered "No GPIO-high windows
         # detected": a model with representative per-inference timing and
-        # window_target_ms 8000 needs ~379 clean iterations (~8s), which the
-        # old estimate (based only on the 4 profiled PMU passes) undercounted
-        # as ~7.1s.
+        # window_target_ms 8000 needs ~379 clean iterations (~8s).
         from helia_profiler.stages.capture_power import _estimate_capture_duration
         from helia_profiler.results import FirmwareMeta, LayerResult, PmuResult
 
@@ -2401,8 +2396,8 @@ class TestCapturePowerWrapper:
         gated = dict(captured_kwargs)
         on_started = gated.pop("on_started")
         assert callable(on_started)
-        # GO backfeed fix: the gate-rise hook must be wired so the GO line is
-        # dropped as soon as the window is observed high.
+        # The gate-rise hook must be wired so the GO line is dropped as
+        # soon as the window is observed high.
         on_gate_rise = gated.pop("on_gate_rise")
         assert callable(on_gate_rise)
         phase_getter = gated.pop("phase_getter")
@@ -2510,9 +2505,9 @@ class TestCapturePowerWrapper:
 
         result = capture_power(ctx, duration_override_s=7.0, prepare_target=prepare_target)
 
-        # Revised ordering (AP510 combo-reset gate-race fix): capture_gated
-        # starts the GPI poller first; prepare/wait_ready/go run inside its
-        # on_started hook so no reset can race an unobserved gate window.
+        # capture_gated starts the GPI poller first; prepare/wait_ready/go
+        # run inside its on_started hook so no reset can race an unobserved
+        # gate window.
         assert calls == [
             "check",
             "make_sync",
@@ -2537,10 +2532,9 @@ class TestCapturePowerWrapper:
     ):
         """``sync.release()`` must run even if prepare_target raises after arm().
 
-        Regression test: previously ``sync.arm()`` and ``_prepare_target_once()``
-        executed before the try/finally that guarantees ``sync.release()``, so a
-        prepare-time exception (e.g. a failed reset) left the host GO line held
-        low with no release.
+        ``sync.arm()`` and ``_prepare_target_once()`` run inside the
+        try/finally that guarantees ``sync.release()``, so a prepare-time
+        exception (e.g. a failed reset) still releases the host GO line.
         """
         from helia_profiler.capture import capture_power
         from helia_profiler.config import load_config
@@ -3098,10 +3092,9 @@ class TestPowerFirmwareSelection:
 
         assert plan.count_source == "probe_window"
         assert plan.inference_count == 1, "still sizing a spin window in inferences"
-        # Against the config property the FIRMWARE render reads -- not against
-        # plan.target_duration_ms, which is the plan restating itself. Review
-        # found the earlier form tautological: inflating the probe target 3x
-        # left every test in this file passing.
+        # Against the config property the FIRMWARE render reads -- not
+        # against plan.target_duration_ms, which would make the assertion
+        # tautological (the plan merely restating itself).
         assert plan.reference_inference_us == ctx.config.effective_window_target_ms * 1000
         assert plan.target_duration_ms == ctx.config.effective_window_target_ms
 
@@ -3111,11 +3104,9 @@ class TestPowerFirmwareSelection:
         In `firmware: shared` the plan carries no count, so capture fills both
         the count and the reference from `pmu_result.meta` -- the PROFILE
         boot's spin -- and compares them against the POWER boot's gate. Two
-        boots, not one measurement. The `firmware_auto` band was 0.01 on the
-        claim that they were the same measurement, which only stayed harmless
-        while the per-unit slack (half the whole spin) dominated it. Gating
-        that slack on count > 1 exposed the 1% band, and `capture_gated`
-        RAISES: two boots' spins differing 1.2% killed a healthy run.
+        boots' spins differing by ordinary jitter (here 1.2%) must still pass
+        the `firmware_auto` gate-duration band; `capture_gated` RAISES if it
+        does not.
         """
         from helia_profiler.power.diagnostics import (
             assess_gate_duration,
@@ -3140,10 +3131,8 @@ class TestPowerFirmwareSelection:
         """`shared` produces no count, but still publishes a window length.
 
         `target_duration_ms` reaches summary.json verbatim, and the
-        firmware-mode branch is tested before the probe branch -- so a shared
-        busy_loop run used to report the counted-window goal (5000 ms) for a
-        window the firmware spun for 1000 ms. The window length is a property
-        of the PROBE, not of the plan's firmware mode.
+        firmware-mode branch is tested before the probe branch. The window
+        length is a property of the PROBE, not of the plan's firmware mode.
         """
         from helia_profiler.stages.plan_power import plan_power_run
         from helia_profiler.results import FirmwareMeta, PmuResult
@@ -3404,9 +3393,7 @@ class TestPowerFirmwareSelection:
             "stalled clean-window reference" in record.getMessage() for record in caplog.records
         )
 
-        # A pure-partial stall must report a real magnitude. The bound used to
-        # be frozen-only, so this case printed "reads at least ~0.0% low" in a
-        # sentence that then said "short by about the same factor".
+        # A pure-partial stall must report a real magnitude, not "~0.0% low".
         caplog.clear()
         set_profile_result(
             ctx,

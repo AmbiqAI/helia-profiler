@@ -606,9 +606,8 @@ def _build_warnings(
 def _read_layer_memory_csv(path: Path) -> dict[Any, list[dict[str, Any]]]:
     """Memory rows keyed by ``layer_id`` — the ORIGINAL tflite index — only.
 
-    The old dual ``layer_id``/``layer_idx`` key silently matched the wrong
-    layer's memory whenever heliaAOT skipped ops (``idx != id``) — the #218
-    misattribution class, in its second home (#223).
+    A ``layer_idx`` key would misattribute whenever heliaAOT skips ops
+    (``idx != id``) — the #218 misattribution class (#223).
     """
     rows = _read_layer_csv(path)
     by_key: dict[Any, list[dict[str, Any]]] = {}

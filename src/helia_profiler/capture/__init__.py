@@ -483,10 +483,9 @@ def capture_power(
 # Maps a registered ``HPX_ERROR=<code>`` to a human-readable hint.  The
 # firmware emits these after its own preflight checks so the host can point
 # the user at the real cause instead of blaming the arena for every failure.
-# Every code in ``wire.FirmwareErrorCode`` has an entry here (#165 closed the
-# six-code gap #163 documented); that completeness is pinned by
-# tests/contracts/test_wire_protocol.py, so adding a code without deciding on
-# its hint stays a review decision.
+# Every code in ``wire.FirmwareErrorCode`` has an entry here; that
+# completeness is pinned by tests/contracts/test_wire_protocol.py, so a new
+# code without a hint fails that test.
 _ERROR_HINTS: dict[FirmwareErrorCode, str] = {
     FirmwareErrorCode.SCHEMA_MISMATCH: (
         "The model's schema version does not match what the firmware was "

@@ -30,13 +30,12 @@ class PowerFirmware(StrEnum):
     """Which binary is on the target during power capture.
 
     ``DEDICATED`` flashes the transport-free ``hpx_profiler_power`` image
-    (see ``firmware/__init__.py`` WP2) before capture; SWO/UART/RTT/USB
-    traffic on the shared transport binary was measured to add significant
-    current contamination into the GPIO-gated Joulescope window on AP510
-    depending on transport, so ``DEDICATED`` is the default.  ``SHARED``
-    restores the pre-WP2 behavior of reusing the already-flashed transport
-    binary for power capture (useful when no J-Link is free to reflash, or
-    for bring-up comparisons against the contaminated baseline).
+    (see ``firmware/__init__.py`` WP2) before capture, avoiding SWO/UART/
+    RTT/USB current contamination in the GPIO-gated Joulescope window, so
+    ``DEDICATED`` is the default.  ``SHARED`` reuses the already-flashed
+    transport binary for power capture (useful when no J-Link is free to
+    reflash, or for bring-up comparisons against the contaminated
+    baseline).
     """
 
     DEDICATED = "dedicated"
@@ -102,9 +101,7 @@ INA228_BOARD_PRESETS: dict[str, MonitorBoardPreset] = {
         ),
     ),
     # Onboard 15 mOhm shunt (R1 = HoLLR2512-2W-15mR-1% per Adafruit's
-    # schematic; the product page advertises 0.1%, so treat ~1% as the
-    # systematic floor when comparing against another instrument) and the
-    # INA228 default 0x40 address strapping.
+    # schematic) and the INA228 default 0x40 address strapping.
     "adafruit-ina228": MonitorBoardPreset(
         label="Adafruit INA228 breakout (5832)",
         i2c_address=0x40,
@@ -291,9 +288,8 @@ class PowerConfig:
 
         The single source of truth for both firmware gates: NSX module
         selection in ``firmware/__init__.py`` and render-context derivation
-        in ``PowerMonitorContext.from_config``. When these two used separate
-        predicates and disagreed, runs silently built no monitor at all
-        while appearing to configure one.
+        in ``PowerMonitorContext.from_config`` must agree, or a run could
+        silently build no monitor while appearing to configure one.
         """
         return self.enabled and self.ina228 is not None
 
@@ -338,12 +334,9 @@ class PowerConfig:
         measured window straight out of reset. Any reset latency the host
         spends after that -- flash-tool exit, JLinkExe teardown, poller
         start-up -- races the gate. Apollo5's default
-        ``debug_reset+swpoi_reset`` makes the gap widest (two sequential
-        JLinkExe invocations; see the AP510 combo+RTT ``t2-gate-race``
-        investigation, which is why the rule was originally AP5-only), but
-        Apollo4 Blue Plus reproduced the same ``no_gate_rise`` degradation on a
-        single-invocation ``debug_reset`` with a ~5 s window (issue #114), and
-        Apollo3 differs only in how narrow the gap is. So the condition is the
+        ``debug_reset+swpoi_reset`` widens the gap most (two sequential
+        JLinkExe invocations), but every family can reproduce the same
+        ``no_gate_rise`` degradation (issue #114). The condition is the
         wiring and the mode, not the SoC family.
 
         This is the one place both the firmware generator (which bakes

@@ -56,10 +56,9 @@ def _format_mve_cells(counters: dict[str, float], cycles: float) -> list[str]:
 def measured_memory_is_renderable(measured: Any) -> bool:
     """True when the measured block has anything worth a table or a police
     line: a nonzero region row, an unattributed section, or unattributed
-    load bytes. The all-zero-and-clean case falls back to the plan table
-    (#177 reviews n7 + follow-up MINOR-1: the police lines must not be
-    hidden by the very anomaly — everything landing outside the
-    characterized windows — they exist to surface)."""
+    load bytes. The all-zero-and-clean case falls back to the plan table;
+    the police lines must not be hidden by the very anomaly — everything
+    landing outside the characterized windows — they exist to surface."""
     return (
         any(r.used or r.load_image or r.reserved for r in measured.regions)
         or bool(measured.unattributed)
@@ -124,7 +123,7 @@ def render_memory_regions(console: HpxConsole, measured: Any) -> None:
     for u in measured.unattributed:
         # Section names are attacker-ish input from the ELF: escape them so
         # a name containing rich markup can neither restyle nor crash the
-        # one line whose job is to report it exactly (#177 review M3).
+        # one line whose job is to report it exactly.
         console._console.print(
             f"  [bold red]unattributed[/bold red] {escape(u.name)} "
             f"@0x{u.address:08X} ({_fmt_bytes(u.size)}) — outside every "
@@ -257,13 +256,12 @@ def render_memory_plan(console: HpxConsole, plan: Any) -> None:
 
 
 def render_validity(console: HpxConsole, ctx: PipelineContext) -> None:
-    """The run's verdict, in the #178 police-line spirit: lines, not a table.
+    """The run's verdict, as lines rather than a table.
 
-    Since #142/#181 a broken gate no longer aborts the run -- the artifact is
-    written and validity carries the verdict. Without this footer an INVALID
-    run showed a normal-looking table and exited 0 (#197). Consumes the
-    single evaluation ``write_report`` stored on the context (#204 D5);
-    computes one only for direct callers that never wrote a report.
+    A broken gate does not abort the run; the artifact is written and
+    validity carries the verdict, so this footer surfaces it. Uses the
+    evaluation stored on the context when present; computes one only for
+    direct callers that never wrote a report.
     """
     evaluation = ctx.run_evaluation
     if evaluation is None:
@@ -282,13 +280,13 @@ def render_validity(console: HpxConsole, ctx: PipelineContext) -> None:
     if verdict == "invalid":
         console._console.print("  [bold red]Validity: INVALID[/bold red]")
     elif verdict == "valid":
-        # Unreachable from evaluate_run (_validity_for: any issue => at
-        # least DEGRADED) -- but a hand-built or rehydrated evaluation must
-        # not have its causes swallowed by the quiet-VALID early return (#208).
+        # Unreachable from evaluate_run (any issue implies at least
+        # DEGRADED), but a hand-built or rehydrated evaluation must still
+        # show its causes here, not the quiet-VALID path.
         console._console.print("  [green]Validity: VALID[/green]")
     else:
-        # Count every issue, not just warnings: DEGRADED can carry causes of a
-        # severity that is not a warning (#208).
+        # Count every issue, not just warnings: DEGRADED can carry causes of
+        # a severity that is not a warning.
         count = len(evaluation.issues)
         console._console.print(
             f"  [yellow]Validity: DEGRADED ({count} issue{'s' if count != 1 else ''})[/yellow]"
@@ -301,9 +299,9 @@ def render_validity(console: HpxConsole, ctx: PipelineContext) -> None:
         console._console.print(
             f"    [yellow]{escape(issue.code)}[/yellow] — {escape(issue.message)}"
         )
-    # Issues carrying a severity this renderer predates (severity is a plain
-    # str on ResultIssue) must still show -- a verdict header with invisible
-    # causes is worse than an unstyled line (#208 review).
+    # Issues with a severity this renderer doesn't style (severity is a
+    # plain str on ResultIssue) still show -- an unstyled line beats a
+    # verdict header with invisible causes.
     for issue in evaluation.issues:
         if issue.severity not in ("error", "warning"):
             console._console.print(

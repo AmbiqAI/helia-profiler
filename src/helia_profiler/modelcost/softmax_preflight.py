@@ -22,8 +22,7 @@ install and from the CI unit-test environment, and a preflight that silently
 skips on exactly the installs that hit the bug is not a preflight. The reader
 is cross-validated against litert wherever litert is present.
 
-Engine scope -- established by running each engine's actual code, after two
-wrong versions of this paragraph:
+Engine scope, established by running each engine's actual code:
 
 * **TFLM and heliaRT** run TFLM's interpreter on target; all three vendored
   kernel implementations share the aborting ``CalculateSoftmaxParams`` chain.
@@ -108,7 +107,7 @@ def _read_aot_absent_beta() -> float:
     for every engine, so a helia-aot bump that makes the field required or
     renames it must not turn into "hpx won't start" — it degrades here and
     fails LOUDLY in analysis-tests instead, where the aot-guarded pinning
-    test compares this value against the real default (#172 review).
+    test compares this value against the real default (#172).
     """
     if _AirSoftmaxOptions is None:
         return 1.0
@@ -130,10 +129,9 @@ def _aot_quantized_shift(multiplier: float) -> int:
     ``== 1 << 31`` promotion fires only for positive fractions, so ``-0.5``
     arises both from exponent 0 (compiles) and from ``-0.49999999999999994``
     rounding to ``-2**31`` at exponent -1 (raises). Positives never hit the
-    ambiguity, which is why the band constants stayed exact there; the
-    round-2 review's negative sweep is what exposed the asymmetry (218/689
-    disagreements under a sign-blind guard). Mirrors the pinned
-    ``helia_aot.air.utils.quantize_multiplier`` expression for expression:
+    ambiguity, which is why the band constants stayed exact there. Mirrors
+    the pinned ``helia_aot.air.utils.quantize_multiplier`` expression for
+    expression:
     zero early-out, frexp, Q31 round-half-up, positive-only promotion, the
     ``shift < -31`` flush to (0, 0), and the ``shift > 30`` clamp.
     """
@@ -164,10 +162,8 @@ def aot_softmax_verdict(multiplier: float) -> str:
     comparison against it is False, so falling through returned 'ok' for a
     model helia-aot raises on). ``-inf`` errors: ``preprocess_softmax_scaling``
     overflows the Q31 floor on it. Other negatives get the SAME shift mirror
-    as positives — the first #172 fix blanket-errored them, and the round-2
-    negative sweep showed the real chain compiles most of that domain
-    (e.g. -0.75, shift 0); the corrupt-file smell is real but the verdict's
-    contract is the compiler's fate, nothing else.
+    as positives (e.g. -0.75, shift 0, compiles); the corrupt-file smell is
+    real but the verdict's contract is the compiler's fate, nothing else.
     """
     if multiplier != multiplier:  # NaN
         return "error"
@@ -220,8 +216,7 @@ class SoftmaxScaling:
         """The smallest input scale this op's beta could run with.
 
         ``inf`` when :attr:`has_usable_beta` is False -- callers must not
-        print it raw, which produced 'needs input_scale > inf' (found by
-        review).
+        print it raw ('needs input_scale > inf' is not a useful message).
         """
         if not self.has_usable_beta:
             return float("inf")

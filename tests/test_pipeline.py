@@ -561,11 +561,11 @@ class TestNarrowingAccessors:
     def test_named_producer_is_a_real_stage(self, accessor: str, field: str, stage: str):
         """The stage named in the error must exist AND produce the field.
 
-        Review-hardened: the existence half alone let a wrong-but-real
-        producer pass (naming BuildFirmwareStage for dependency_workspace
-        stayed green), so the error text could lie. The source check pins
-        the attribution: the named stage's module must assign the field
-        (or publish it through a ctx.publish_* method — pmu_result's path).
+        Checking existence alone lets a wrong-but-real producer pass
+        (naming BuildFirmwareStage for dependency_workspace would still be
+        green), so the error text could lie. The source check pins the
+        attribution: the named stage's module must assign the field (or
+        publish it through a ctx.publish_* method — pmu_result's path).
         """
         del accessor
         import inspect
@@ -579,9 +579,8 @@ class TestNarrowingAccessors:
         assert module is not None
         module_src = inspect.getsource(module)
         # (?!=) so a comparison (`ctx.field == x`) cannot count as producing
-        # the field, and the publish hatch is per-field, not module-wide —
-        # both holes let a wrong-but-real producer pass until the second
-        # review round mutation-proved them.
+        # the field, and the publish hatch is per-field, not module-wide, so
+        # neither hole lets a wrong-but-real producer pass.
         assigns = re.search(rf"ctx\.{field}\s*=(?!=)", module_src) is not None
         field_publisher = {
             "binary_path": "ctx.publish_profile_firmware(",
@@ -610,22 +609,19 @@ def test_no_assert_narrowing_of_context_fields_survives_in_src():
     a crash costume: it is compiled out under ``-O`` and names no producer when
     it fires.  New sites must read through the narrowing accessors instead.
     """
-    # Two patterns, deliberately scoped (the review round proved both blind
-    # spots with mutations):
+    # Two patterns, deliberately scoped:
     #  * ctx-field narrowing anywhere in src/, anchored on `is not None` so a
     #    legitimate absence assertion is not banned with a misleading
     #    use-the-accessor message;
     #  * `assert self.<field> is not None` within pipeline.py itself, where
-    #    PipelineContext lives — one such assert falsified this test's claim
-    #    until the review round caught it. Other files' self-asserts narrow
-    #    their own objects, not pipeline products, and stay legal.
+    #    PipelineContext lives. Other files' self-asserts narrow their own
+    #    objects, not pipeline products, and stay legal.
     # Any assert rooted at ctx.<field> — is-not-None, truthiness, or the
     # parenthesised forms — EXCEPT a deliberate absence assertion
     # (`assert ctx.x is None`), which is an invariant check, not narrowing.
     # The guard is SYNTACTIC: narrowing through an intermediate local or a
-    # walrus still evades it (one such survivor was found by review inside
-    # firmware/context.py and converted to an explicit raise) — reviewers
-    # stay the backstop for those spellings.
+    # walrus still evades it; reviewers stay the backstop for those
+    # spellings.
     ctx_assert = re.compile(r"^\s*assert\s+\(?(self\.)?ctx\.")
     absence_only = re.compile(r"^\s*assert\s+\(?(self\.)?ctx\.[\w.]+\s+is\s+None\b")
     self_pattern = re.compile(r"^\s*assert\s+\(?self\.\w+(\s+is\s+not\s+None\b|\s*\)?\s*(#.*)?$)")
@@ -644,9 +640,9 @@ def test_no_assert_narrowing_of_context_fields_survives_in_src():
 
 
 def test_docs_accessor_table_matches_the_code():
-    """docs/architecture/pipeline.md hand-duplicates the accessor table; the
-    second review round showed a mutated producer left the docs silently
-    divergent. Parse the table and hold it to NARROWING_ACCESSORS."""
+    """docs/architecture/pipeline.md hand-duplicates the accessor table.
+    Parse the table and hold it to NARROWING_ACCESSORS so a mutated
+    producer cannot leave the docs silently divergent."""
     doc = (Path(__file__).resolve().parents[1] / "docs" / "architecture" / "pipeline.md").read_text(
         encoding="utf-8"
     )
@@ -698,8 +694,7 @@ def test_render_context_tolerates_npu_power_ack_only_on_fpga_boards(tmp_path: Pa
     """npu_tolerate_power_ack is derived from board.is_fpga in
     FirmwareRenderContext.from_pipeline_context — the FPGA NPU power domain
     may not report an ACK. The template-render tests pass the variable
-    directly, so only this pins the derivation (#284 review: a mutant
-    forcing it False survived the suite)."""
+    directly, so only this test pins the derivation (#284)."""
     from helia_profiler.engines.base import EngineType, HeliaRtArtifacts
     from helia_profiler.firmware.context import FirmwareRenderContext
     from helia_profiler.platform import get_board, get_soc

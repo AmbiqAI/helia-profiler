@@ -1,8 +1,8 @@
 """Tests for the nsx wrapper — error translation and timeout behaviour.
 
-After the migration to the :mod:`neuralspotx.api` Python entry points the
-shim no longer shells out to a binary. These tests now patch the API
-functions directly and verify that:
+The shim wraps :mod:`neuralspotx.api` Python entry points; it does not
+shell out to a binary. These tests patch the API functions directly and
+verify that:
 
 * ``BuildError`` is raised on ``NSXError`` translation;
 * ``flash`` forwards ``jlink_serial`` to ``flash_app`` as ``probe_serial``;

@@ -32,24 +32,14 @@ class BoardDef:
     # (the NPU is always-on), so NPU init must tolerate a failed handshake.
     is_fpga: bool = False
     description: str = ""
-    # GPIO that drives the onboard Cooper BLE controller's hardware RESET
-    # line (SiP "Blue" packages only). Mirrors AutoDeploy's
-    # AM_DEVICES_BLECTRLR_RESET_PIN / ns_power_down_peripherals(): held low
-    # (in reset) whenever a power capture doesn't need Bluetooth, since an
-    # un-reset Cooper radio idles at non-trivial standby current that a
-    # non-Blue board doesn't have to begin with. None = no onboard BLE
-    # radio on this board (nothing to hold in reset).
+    # GPIO holding the onboard Cooper BLE controller in RESET (SiP "Blue"
+    # packages only). Held low during a power capture that doesn't need
+    # Bluetooth. None = no onboard BLE radio.
     #
-    # Note the asymmetry with the three pins above: those are plain ints, so
-    # they need 0 as their "wire not present" sentinel. This one is
-    # `int | None` and spells that as None, so 0 here is an ordinary pad
-    # number and every gate on this field tests `is not None`, never
-    # truthiness (firmware/context.py's power_binary_needs_gpio,
-    # firmware/__init__.py's nsx-gpio selection, and _ble_reset.j2). Because
-    # 0 reads as a sentinel to anyone going by the siblings, and either
-    # reading of it corrupts a power capture in silence, the YAML surface
-    # refuses a literal 0 outright -- see platform/custom.py's
-    # _ble_reset_gpio_pin.
+    # Unlike the sentinel-0 pins above, 0 is a valid pin here, so every
+    # consumer checks `is not None`, never truthiness (firmware/context.py,
+    # firmware/__init__.py, _ble_reset.j2). The YAML surface refuses a
+    # literal 0 for the same reason (see custom.py's _ble_reset_gpio_pin).
     ble_reset_gpio_pin: int | None = None
 
     @property
