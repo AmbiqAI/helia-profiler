@@ -5,7 +5,7 @@ Profile LiteRT and ExecuTorch models on Ambiq silicon.
 ## hpx
 
 ```bash
-hpx COMMAND [ARGS]...
+hpx [OPTIONS] COMMAND [ARGS]...
 ```
 
 Profile LiteRT and ExecuTorch models on Ambiq silicon.
