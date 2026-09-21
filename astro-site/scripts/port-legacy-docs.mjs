@@ -81,6 +81,9 @@ const SKIP = [
   'guide/output.md',
   'guide/analysis-comparison.md',
   'guide/model-explorer.md',
+  /* Rewritten by the Reference polish (#346). */
+  'reference/index.md',
+  'architecture/compatibility-baseline.md',
 ];
 
 /*
@@ -135,6 +138,10 @@ const PRESERVE = [
   'guide/model-explorer.mdx',
   'guide/parsing-outputs.mdx',
   'guide/troubleshooting.mdx',
+  /* Authored by the Reference polish (#346). */
+  'reference/index.mdx',
+  'reference/compatibility-baseline.mdx',
+  'reference/compatibility.mdx',
 ];
 
 const BASE = '/helia-profiler/';
