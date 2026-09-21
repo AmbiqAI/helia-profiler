@@ -1,0 +1,133 @@
+---
+title: "Configure a run"
+description: "Move the flags from your first profile into an hpx.yml you can check in, learn how the file and the command line merge, and set the fields you will change most."
+---
+
+## Purpose
+
+Turn a one-off command into a run you can repeat, diff and hand to
+someone else. This page introduces the configuration file, shows the fields
+a first profile actually touches, and explains how the file and the
+command line combine. The full key-by-key reference is generated from the
+source on [Configuration](../../reference/configuration/).
+
+## Prerequisites
+
+A completed [First profile](../first-profile/), so you have a
+`summary.json` to take the arena size from.
+
+## Steps
+
+### 1. Write a minimal file
+
+```yaml title="hpx.yml"
+model:
+  path: examples/quickstart/kws_model.tflite
+
+engine:
+  type: helia-rt
+
+target:
+  board: apollo510_evb
+  toolchain: gcc
+```
+
+Run it:
+
+```bash
+hpx profile --config hpx.yml
+```
+
+Everything not in the file falls back to the defaults you saw on First
+profile: the `rtt` transport, the CPU counter group, 100 iterations, results
+in `./results/`. `gcc` is the accepted short name for `arm-none-eabi-gcc`.
+
+### 2. Understand the merge
+
+The file is the baseline and every flag overrides the matching key, so a
+file holds what does not change and the command line holds the experiment:
+
+```bash
+hpx profile --config hpx.yml --iterations 10 --board apollo3p_evb
+hpx profile --config hpx.yml --toolchain armclang
+hpx profile --config hpx.yml --power --power-duration 10
+```
+
+Every key in the file has a flag and every flag has a key; the generated
+[command reference](../../reference/cli/profile/) lists them side by side.
+Unknown keys are an error, not a silent no-op: every configuration model
+sets `extra="forbid"`.
+
+### 3. Set the fields a first profile touches
+
+```yaml title="hpx.yml"
+model:
+  path: examples/quickstart/kws_model.tflite
+  arena_size: 131072            # bytes; set from allocated_arena in summary.json
+  arena_location: tcm           # tcm | sram | mram | psram, or omit for auto
+  weights_location: mram
+
+engine:
+  type: helia-rt
+  config:
+    variant: release-with-logs  # keeps SWO printf; release is leaner
+
+target:
+  board: apollo510_evb
+  toolchain: arm-none-eabi-gcc
+  transport: rtt
+
+profiling:
+  pmu_counters:
+    cpu: default                # a curated group; all runs every counter in passes
+    memory: default
+  per_layer: true
+  iterations: 100
+  warmup: 5
+
+output:
+  format: csv
+  dir: ./results
+  model_explorer: true
+```
+
+| Block | What it decides | Read more |
+|---|---|---|
+| `model` | The model file, the tensor arena size, and where the arena and the weights live | [Memory placement](../../guide/memory/) |
+| `engine` | Which runtime executes the model and its build variant | [Engines](../../guide/engines/) |
+| `target` | The board, the compiler and the capture transport | [Boards](../../guide/boards/), [Toolchains](../../guide/toolchains/), [Transports](../../guide/transports/) |
+| `profiling` | Which counters, how many iterations, per-layer or whole-model | [PMU counters](../../guide/pmu-counters/) |
+| `output` | Format, directory and the Model Explorer overlay | [Output files](../../guide/output/) |
+
+The three top-level blocks not shown here, `power`, `timeouts` and `build`, and the
+nested ones (`target.clock`, `target.psram`, `target.heartbeat`,
+`power.ina228`, `build.nsx_modules`) exist for specific situations and are
+documented with their defaults in the generated reference.
+
+### 4. Keep runs apart
+
+Two configurations side by side, two output directories:
+
+```bash
+hpx profile --config hpx_rt.yml  --output-dir results/rt
+hpx profile --config hpx_aot.yml --output-dir results/aot
+hpx compare results/rt results/aot
+```
+
+`hpx compare` reads both bundles and reports what changed and whether the
+two runs are comparable at all; [Analysis and comparison](../../guide/analysis-comparison/)
+covers the rules it applies.
+
+## Expected output
+
+The same `results/` directory as First profile, now produced by
+`hpx profile --config hpx.yml` with no other flags, and a file you can commit
+next to the model. `run_metadata.json` in the bundle records the resolved
+configuration, so a bundle always says which file produced it.
+
+## What next
+
+[Where next](../where-next/) routes you by what you want to measure. The
+shipped configurations under `examples/quickstart/` and `configs/` are
+complete files for common cases; the [Examples](../../examples/) section
+walks through them.

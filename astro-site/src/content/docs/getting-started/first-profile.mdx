@@ -1,180 +1,165 @@
 ---
-title: "First Profile"
-description: "A guided, no-config first run: from unboxing an Apollo EVB to a per-layer cycle-count table in about five commands."
+title: "First profile"
+description: "One command, one model, one board: run hpx profile on the bundled keyword-spotting model, then read the four files it writes and the three numbers that matter."
 ---
 
-A guided, no-config first run: from unboxing an Apollo EVB to a per-layer
-cycle-count table in about five commands.
+## Purpose
 
-## Before you start
+Run one profile end to end and read the result. By the end you have a
+`results/` directory from your own board and know which three numbers to
+look at first.
 
-- [Installed heliaPROFILER and the toolchain](../install/) — `hpx doctor`
-  shows all required tools as ✓.
-- An Ambiq Apollo EVB, powered and connected to your host over its J-Link
-  USB connector (the on-board debug USB port — check your specific EVB's
-  quick-start card if it has more than one USB connector).
+## Prerequisites
 
-You also need a LiteRT `.tflite` model. Replace `/path/to/model.tflite` below with
-your model path. If you installed with `pip` into the active Python
-environment, heliaPROFILER includes a small deterministic example model:
+- [Validate your setup](../validate-your-setup/) passed, or at least
+  `hpx doctor` is green and `hpx probes list` shows your probe.
+- A LiteRT `.tflite` model. The commands below use
+  `examples/quickstart/kws_model.tflite`, the keyword-spotting model in a
+  source checkout (`git clone https://github.com/AmbiqAI/helia-profiler.git`
+  if you installed with uv or pip). A `pip` install into an active
+  environment also bundles a different, smaller model, a tiny CNN, at
+  `python -c "from helia_profiler.examples import tiny_cnn; print(tiny_cnn())"`;
+  its layer count and operators differ from the outputs below.
+- Network access on the first run: neuralSPOT-X resolves and clones the
+  pinned heliaRT and firmware modules into its cache.
 
-```bash
-python -c "from helia_profiler.examples import tiny_cnn; print(tiny_cnn())"
-```
+## Steps
 
-Use the printed path in the commands below. A source checkout also contains
-`examples/quickstart/kws_model.tflite`. `uv tool install` keeps packages in an
-isolated environment, so supply your own model or use the source-checkout path.
-
-## 1. Confirm the toolchain
-
-```bash
-hpx doctor
-```
-
-All required rows should show `✓` (see [Installation](../install/) if not).
-
-## 2. Find your J-Link probe
+### 1. Run the profiler
 
 ```bash
-hpx probes list
+hpx profile examples/quickstart/kws_model.tflite --board apollo510_evb
 ```
 
-```text
-serial      product                    connection
-----------  -------------------------  ----------
-801000001  J-Link-OB-Apollo4-CortexM  USB
-```
+With no other flags hpx uses these defaults:
 
-If nothing is listed, check the USB cable and that the SEGGER J-Link
-software from [Installation](../install/#4-segger-j-link-software) is
-installed.
+| Setting | Default | Where it is defined |
+|---|---|---|
+| Engine | `helia-rt`, resolved from the neuralSPOT-X registry and built from source | `EngineConfig.type` in `config/__init__.py` |
+| Toolchain | `arm-none-eabi-gcc` | `TargetConfig.toolchain` |
+| Transport | `rtt`, lossless capture over the J-Link | `TargetConfig.transport` |
+| Counters | the CPU default group: cycles, instructions, frontend and backend stalls; on a Cortex-M4 board only the DWT cycle count is captured and the rest is reported as reduced | `ProfilingConfig.pmu_counters` |
+| Iterations | 100 inferences after 5 warm-up runs | `ProfilingConfig.iterations`, `warmup` |
+| Output | `./results/` | `OutputConfig.dir` |
 
-## 3. Find your board name
-
-heliaPROFILER needs a `--board` value that matches your EVB. List every
-board it knows about:
+Progress prints one line per pipeline stage, which group into the six
+blocks on the section overview (configure, analyse, build, flash, capture,
+report); a power run adds its own build, flash and capture stages. The
+first run is the slow one because of the module fetch and the cold build;
+later runs reuse the cached modules and build tree. A second run into the
+same `--output-dir` overwrites the files in place, so give each run its own
+directory when you want to keep both. Once a run has succeeded, `--offline` skips
+dependency resolution entirely:
 
 ```bash
-hpx boards
+hpx profile examples/quickstart/kws_model.tflite --board apollo510_evb --offline
 ```
 
-Match the silkscreen/part number on your EVB against the `Board` column
-(for example `apollo510_evb` for an Apollo510 EVB). The default board is
-`apollo510_evb` — pass `--board <name>` explicitly if yours is different.
-
-## 4. Run the profiler
-
-```bash
-hpx profile /path/to/model.tflite --board apollo510_evb
-```
-
-With no other flags, heliaPROFILER:
-
-| Default | Value |
-|---|---|
-| Engine | `helia-rt` (resolved from the NSX registry and built from source) |
-| Toolchain | `arm-none-eabi-gcc` |
-| Transport | `rtt` (lossless RTT capture over J-Link) |
-| Counters | CPU defaults — cycles, instructions, frontend/backend stalls |
-| Iterations | 100 inferences, 5 warmup |
-| Output | `./results/` |
-
-Progress prints stage-by-stage. The first run takes longer because NSX resolves
-and clones the pinned heliaRT and firmware modules, then configures, builds,
-flashes, and captures. Subsequent runs are faster because module and build
-artifacts are cached.
-
-:::tip[Rerunning without touching the network]
-Once a run has succeeded, `hpx profile ... --offline` skips NSX
-dependency resolution and reuses the existing `nsx.lock`/module state
-— useful for fast, reproducible reruns once your setup is stable.
-:::
-
-## 5. Look at the result
-
-Four files matter on your first run:
+### 2. Open the result directory
 
 ```text
 results/
-├── result_manifest.json ← bundle validity, provenance, and artifact digests
-├── summary.json         ← headline metrics; read this first
-├── profile_results.csv  ← per-layer breakdown for spreadsheets
-└── run_metadata.json    ← resolved config and environment provenance
+├── result_manifest.json   validity, provenance and artifact digests
+├── summary.json           headline metrics; read this first
+├── profile_results.csv    one row per layer, one column per counter
+├── run_metadata.json      the resolved configuration and host environment
+└── nsx.lock               the exact resolved module lock for this run
 ```
 
-Open `summary.json`:
+Each file is written by the report stage from the same capture (`nsx.lock`
+is copied from the build and is always present); the manifest lists every
+other file with its digest so a bundle can be checked for completeness
+later. The schema of every file is on
+[Output files](../../guide/output/).
+
+### 3. Read the three numbers
+
+Open `summary.json`. The block below is illustrative: the field names and
+shape are the summary schema, the values are placeholders until this page
+carries a captured run. Replace them with what your board printed.
 
 ```json
 {
+  "schema": "hpx.run-summary",
+  "schema_version": 6,
   "engine": "helia-rt",
   "layers": 13,
-  "total_cycles": 123456.0,
+  "total_cycles": 0,
   "overflow_detected": false,
   "top_layers": [
-    {"index": 1, "op": "CONV_2D", "cycles": 34567},
-    {"index": 4, "op": "DEPTHWISE_CONV_2D", "cycles": 23456}
+    {"op": "CONV_2D", "cycles": 0, "pct": 0.0},
+    {"op": "DEPTHWISE_CONV_2D", "cycles": 0, "pct": 0.0}
   ],
-  "memory": { "arena_size": 131072, "allocated_arena": 29780 }
+  "memory": {"arena_size": 131072, "allocated_arena": 0},
+  "validity": "valid",
+  "issues": []
 }
 ```
 
-Three things to read off:
+`top_layers` carries `op`, `cycles` and `pct` (the share of `total_cycles`),
+written by `report/summary.py`.
 
-- **`total_cycles`** — the headline cost of one inference, averaged across
-  iterations.
-- **`top_layers`** — which ops dominate runtime. Optimization effort goes here.
-- **`memory.allocated_arena`** — how much RAM TFLM actually used. If it's
-  much smaller than `arena_size`, you can shrink the arena.
+- `total_cycles` is the cost of one inference, averaged over the measured
+  iterations. It is the headline.
+- `top_layers` names the operators that dominate. Optimisation effort goes
+  there first.
+- `memory.allocated_arena` is how much of the tensor arena the runtime used.
+  If it is far below `arena_size`, the arena can shrink; the next page shows
+  where to set it. On the first run leave `arena_size` at the engine default
+  and let this number tell you the size.
 
-Before consuming the headline metrics, check `validity` and `issues` in
-`summary.json` or `result_manifest.json`. A result is `valid`, `degraded`, or
-`invalid`; structured issues explain any capture or integrity problem.
+Before you quote any of them, look at `validity` and `issues`. A result is
+`valid`, `degraded` or `invalid`; each issue is a structured code explained
+on the [issue codes](../../reference/issue-codes/) page. A `degraded` result
+is still a measurement with a caveat; an `invalid` one is not a measurement.
 
-## 6. View the per-layer table
+### 4. Look at the per-layer table
 
-`profile_results.csv` has one row per layer, one column per counter. See
-[Output & Reports](../../guide/output/) for the full column reference and
-what each counter means. The same data is also rendered as
-[Model Explorer overlays](../../guide/model-explorer/) under
-`results/model_explorer/`.
+`profile_results.csv` has one row per layer and one column per counter.
+Open it in a spreadsheet, sort by cycles, and you have the same picture as
+`top_layers` for every layer. [Output files](../../guide/output/) lists
+every column and its unit, and what `result_manifest.json` records beyond
+the digests. The same data is rendered as a
+[Model Explorer overlay](../../guide/model-explorer/) under
+`results/model_explorer/` when `output.model_explorer` is on.
 
-## 7. Keep going
+## Expected output
 
-Now that you've got a baseline:
-
-- **Repeatable runs?** → [Quick Start with a config file](../quickstart/)
-- **Different model placement?** → [Memory Placement](../../guide/memory/)
-- **Try heliaAOT?** → [Inference Engines](../../guide/engines/)
-- **Faster build with armclang?** → [Toolchains](../../guide/toolchains/)
-- **Add power numbers?** → [Power Measurement](../../guide/power/)
+A `results/` directory with the four files above and, when the run was
+clean, `"validity": "valid"` and `"overflow_detected": false` in
+`summary.json`.
 
 ## Troubleshooting the first run
 
 :::caution[`hpx doctor` reports missing tools]
-See [Installation](../install/). Required: `arm-none-eabi-gcc`, `cmake`,
-`ninja`, `JLinkExe`, `neuralspotx`.
+Go back to [Install](../install/). The required rows are the Arm GCC
+toolchain, CMake, Ninja, the J-Link commander and the neuralspotx package.
 :::
 
 :::caution[`hpx probes list` shows nothing]
-Replug the J-Link USB cable and confirm the SEGGER J-Link software is
-installed. On Linux, replug after installing so udev rules take effect.
+Replug the debug USB cable and confirm the SEGGER J-Link software is
+installed. On Linux, replug after installing so the udev rules apply.
 :::
 
-:::caution[Build fails downloading heliaRT]
-Set `engine.config.dist_path` in a YAML config to point at a local
-distribution, or unblock GitHub release access. See
-[Engines](../../guide/engines/#heliart).
+:::caution[The build cannot download heliaRT]
+Point `engine.config.dist_path` at a local distribution in a config file, or
+unblock GitHub release access. See [Engines](../../guide/engines/).
 :::
 
 :::caution[Capture times out]
-The default RTT transport requires a working J-Link connection. Run
-`hpx probes list` again with the EVB plugged in. If RTT is unavailable
-on your setup, switch to USB CDC — see [Transports](../../guide/transports/).
+The default RTT transport needs a working J-Link connection; run
+`hpx probes list` again with the board attached. If RTT is not available on
+your setup, switch to USB CDC on [Capture transports](../../guide/transports/).
 :::
 
-:::caution[`overflow_detected: true` in summary]
-A PMU counter overflowed during measurement, so the result is invalid.
-Lower `--iterations`, reduce the requested counter set, or run with
-`--detailed` to diagnose the affected pass before using the metrics.
+:::caution[`overflow_detected: true`]
+A PMU counter wrapped during the run, so the result is invalid. Lower
+`--iterations`, request fewer counters, or run with `--detailed` to find the
+pass that overflowed.
 :::
+
+## What next
+
+[Configure a run](../configure-a-run/) moves these flags into a file you can
+check in and shows the fields you will change most: arena size, memory
+placement, counters and iterations.
