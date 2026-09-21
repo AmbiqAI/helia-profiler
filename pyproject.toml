@@ -71,12 +71,6 @@ lint = [
 ]
 test = ["pytest>=8.0", "pytest-timeout>=2.3"]
 notebook = ["ipykernel>=6,<8"]
-docs = [
-    "mkdocs-material>=9.0",
-    "mkdocstrings[python]>=0.27",
-    "pymdown-extensions>=10.15",
-    "zensical>=0.0.51,<0.1",
-]
 
 [tool.uv]
 # Security floors for transitive dependencies. HPX does not depend on these

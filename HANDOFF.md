@@ -14,12 +14,12 @@ comments on #320.
 - A sub-PR branch is rebased by merging `origin/docs-migration` into it
   (force pushes are blocked locally). A PR that is CONFLICTING gets no
   workflow runs at all; merge the base first. After a rebase re-run
-  `npm run check:port` and `check:redirects`. `port-legacy-docs.mjs`
-  SKIP/PRESERVE, `redirects.json` and the sidebar are append-only.
-- New worktree: `npm ci` and `npm run reference:dump` before any check; the
-  port script deletes ported pages if it fails midway, so commit first.
+  `check:redirects`. `redirects.json` and the sidebar are append-only.
+- New worktree: `npm ci` and `npm run reference:dump` before any check.
+- `uv lock` strips the `# x-release-please-version` marker from `uv.lock`;
+  re-add it on the helia-profiler version line before committing.
 - Check chain, all in `docs.yml`: `build, check, check:links, check:output,
-  check:search, check:redirects, check:reference, check:port, check:guard`.
+  check:search, check:redirects, check:reference, check:guard`.
   `check:output` enforces 250,000 B HTML and 40,000 B gzip per page;
   `check:guard` runs `scripts/*.test.mjs`, including the examples template
   and config-path tests.
@@ -40,20 +40,25 @@ comments on #320.
 
 Merged into `docs-migration`: Phase 1 (#325), Phase 2 (#330), content port
 (#334), alpha.16 pin (#336), Getting started (#339), Set up a run (#340),
-Measure (#341), Read results (#342), Concepts (#343), Examples (#344).
+Measure (#341), Read results (#342), Concepts (#343), Examples (#344), the
+host-only half of the power examples (#345, PR #356), Reference polish
+(#346, PR #355).
 
 In flight:
-- #346 Reference polish: PR #355 (worktree `hpx-346`), two review passes
-  applied; merges last, after #356.
-- #345 power examples: PR #356 (worktree `hpx-345`) carries the two host-only
-  pages; the other three need captured power bundles (draft issue in the
-  session scratchpad `issues/draft-power-bench-captures.md`).
 - #337 Home: PR awaiting owner copy sign-off.
 
-Not started: #322 cutover (retire docs/, mkdocs, gates, Pages deploy
-`if: false`; also rehype-mermaid, playwright and the CI browser install,
-since no page carries mermaid now); the `load_run_summary` export for the
-API reference (draft issue `issues/draft-run-summary-api-export.md`).
+- #322 cutover: branch `322-cutover` (worktree `hpx-322`): docs/, mkdocs.yml,
+  the docs dependency group, deploy-pages.yml, the port scripts and the two
+  legacy generators are gone; the wire generator writes the MDX page; the
+  mermaid renderer and playwright are gone; the deploy job holds the Pages
+  permissions and the guard condition again. The live site switches when the
+  stack (#332) lands on main, which is the owner's call.
+- helia-ui alpha.18 pin: PR #361 (worktree `hpx-alpha18`), drops the
+  BlockDiagram mirror; the sidecar line-join defect is helia-ui#171.
+
+Not started: the `load_run_summary` export for the API reference (draft
+issue `issues/draft-run-summary-api-export.md`); the bench captures for the
+not-yet-validated example pages (draft `issues/draft-power-bench-captures.md`).
 
 ## Decisions
 

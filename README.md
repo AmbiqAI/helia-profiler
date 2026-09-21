@@ -91,7 +91,6 @@ uv sync --locked --all-groups --extra aot --extra analysis
 uv run ruff check .
 uv run ty check src/helia_profiler tests
 uv run pytest -q
-uv run --group docs zensical build
 ```
 
 `pytest` deselects the `hardware` marker by default, so the whole unit suite
@@ -163,9 +162,10 @@ CI runs the identical `.pre-commit-config.yaml`, so a clean local run means
 a clean CI run. Hook revisions are bumped deliberately via `pre-commit
 autoupdate` in its own reviewed PR, not ad hoc.
 
-The docs site is built with [zensical](https://github.com/squidfunk/zensical)
-from `mkdocs.yml` and deployed to GitHub Pages from `main`; `uv run mkdocs
-build --strict` still works if you prefer it locally.
+The docs site lives in `astro-site/` (Astro and Starlight on `@ambiqai/helia-ui`);
+`npm ci && npm run build` there builds it, `npm run dev` serves it, and the
+check chain in `.github/workflows/docs.yml` is what CI runs. It deploys to
+GitHub Pages on a release and on docs-only pushes to `main`.
 
 Repository workflows use the committed `uv.lock` for reproducibility. PyPI
 installations continue to resolve the compatible dependency ranges published in

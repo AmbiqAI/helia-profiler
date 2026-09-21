@@ -76,4 +76,4 @@ Examples:
   hpx validate --suite complete        # RT + AOT + TFLM + ExecuTorch sweep
 ```
 
-Generated from the `src/helia_profiler` tree `17bfdf5c68d6c73c3d22f7afb063ac9cd722152f` with typer 0.26.8 and click 8.3.3.
+Generated from the `src/helia_profiler` tree `411e58fd9f2f268366576b621932ae2bc4f2f0c2` with typer 0.26.8 and click 8.3.3.

@@ -1,7 +1,7 @@
 {
   "source": "mkdocs.yml",
   "sourceSha256": "b1a113ea7b266ed1d72e3748a1806bc79589cd486a0f8b22109d05b396572756",
-  "command": "uv sync --locked --group docs && uv run --group docs zensical build && npm --prefix astro-site run legacy-routes:extract",
+  "command": "frozen at the cutover (#322); the mkdocs.yml that produced it is gone, so a legacy route is added here by hand",
   "routes": [
     "/",
     "/architecture/",
