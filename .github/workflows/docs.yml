@@ -99,22 +99,6 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Install locked site dependencies
-        working-directory: astro-site
-        run: npm ci
-
-      # rehype-mermaid renders the diagrams at build time in the headless
-      # shell, so the browser has to be on the runner before the build.
-      - name: Install the headless browser mermaid renders in
-        working-directory: astro-site
-        run: npx playwright install --with-deps chromium chromium-headless-shell
-
-      # prebuild regenerates it too; doing it here puts the griffe version and
-      # the symbol counts in the log before anything can fail downstream.
-      - name: Regenerate the Python reference
-        working-directory: astro-site
-        run: npm run prepare:docs
-
       # The drift gate lives here and not in ci.yml because it is a question
       # about the documentation artifact, not about the package: it compares
       # the committed reference JSON with what the source produces, and the
@@ -135,6 +119,12 @@ jobs:
       - name: Install locked site dependencies
         working-directory: astro-site
         run: npm ci
+
+      # rehype-mermaid renders the diagrams at build time in the headless
+      # shell, so the browser has to be on the runner before the build.
+      - name: Install the headless browser mermaid renders in
+        working-directory: astro-site
+        run: npx playwright install --with-deps chromium chromium-headless-shell
 
       # prebuild regenerates it too; doing it here puts the griffe version and
       # the symbol counts in the log before anything can fail downstream.
