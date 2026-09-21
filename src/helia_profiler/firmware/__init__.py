@@ -247,6 +247,24 @@ def generate_app(ctx: PipelineContext) -> Path:
     # `build.nsx_modules` — call that out explicitly. Other extra modules
     # (e.g. TFLM's nsx-tflite-micro / arm-cmsis-nn) have no engine.config
     # equivalent, so they fall back to the generic "unrecognized name" hint.
+    # Path overrides naming a registry *project* that no board module belongs
+    # to (a transitive dependency such as nsx-ethos-u-driver under nsx-npu) are
+    # honoured through NSX's module_registry ``local_path`` instead of a
+    # modules/ copy, so the closure resolver picks the local tree up.
+    project_local_paths: dict[str, str] = {}
+    for name in sorted(set(nsx_overrides.keys()) - matched_overrides):
+        override_spec = nsx_overrides[name]
+        if override_spec.path is None or name in ENGINE_OWNED_MODULE_NAMES:
+            continue
+        if nsx_cli.registry_project(name) is None:
+            continue
+        source = override_spec.path.expanduser().resolve()
+        if not (source / "nsx-module.yaml").is_file():
+            continue
+        project_local_paths[name] = str(source)
+        matched_overrides.add(name)
+        log.info("Local project override (module_registry.local_path): %s -> %s", name, source)
+
     unmatched = set(nsx_overrides.keys()) - matched_overrides
     for name in sorted(unmatched):
         if name in ENGINE_OWNED_MODULE_NAMES:
@@ -324,6 +342,7 @@ def generate_app(ctx: PipelineContext) -> Path:
                     if not module.local and module.ref
                 },
                 app_modules={spec.name: spec.project for spec in module_specs},
+                project_local_paths=project_local_paths,
             ),
             render_context=render_context,
             arena_regions=aot_arena_regions,

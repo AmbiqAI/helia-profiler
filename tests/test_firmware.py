@@ -212,6 +212,15 @@ def fake_nsx_registry(monkeypatch: pytest.MonkeyPatch) -> None:
             "revision": "r5.3",
             "path": "modules/nsx-ambiq-sdk",
         },
+        # A standalone project that no board module belongs to; it enters the
+        # closure transitively (nsx-npu depends on it), so build.nsx_modules
+        # can only reach it as a project-level path override.
+        "nsx-ethos-u-driver": {
+            "name": "nsx-ethos-u-driver",
+            "url": "https://github.com/AmbiqAI/nsx-ethos-u-driver.git",
+            "revision": "nsx-ethos-u-driver-v0.1.2",
+            "path": "modules/nsx-ethos-u-driver",
+        },
     }
 
     monkeypatch.setattr(
@@ -2220,6 +2229,64 @@ class TestNsxModuleOverrides:
             generate_app(ctx)
 
         assert any("nsx-nonexistent-module" in rec.message for rec in caplog.records)
+
+    def test_transitive_project_path_override_renders_local_path(
+        self, tmp_path: Path, fake_dist: Path, caplog
+    ):
+        """A path override naming a registry project that no board module belongs
+        to (a transitive dependency such as nsx-ethos-u-driver under nsx-npu) is
+        honoured through module_registry.projects.<name>.local_path, not dropped."""
+        import logging
+
+        local_driver = tmp_path / "my-ethos-u-driver"
+        local_driver.mkdir()
+        (local_driver / "nsx-module.yaml").write_text(
+            "schema_version: 1\nmodule:\n  name: nsx-ethos-u-driver\n"
+        )
+        ctx = self._make_ctx_with_overrides(
+            tmp_path,
+            fake_dist,
+            {"nsx_modules": {"nsx-ethos-u-driver": {"path": str(local_driver)}}},
+        )
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+
+        with caplog.at_level(logging.WARNING):
+            app_dir = generate_app(ctx)
+
+        assert not any("did not match any module" in rec.message for rec in caplog.records)
+        registry = yaml.safe_load((app_dir / "nsx.yml").read_text())["module_registry"]
+        project = registry["projects"]["nsx-ethos-u-driver"]
+        assert project["local_path"] == str(local_driver.resolve())
+        assert "revision" not in project and "url" not in project
+        for module in registry.get("modules", {}).values():
+            if module.get("project") == "nsx-ethos-u-driver":
+                assert "revision" not in module
+        # Not a board module: nothing is copied into modules/.
+        assert not (app_dir / "modules" / "nsx-ethos-u-driver").exists()
+
+    def test_transitive_project_path_override_without_module_yaml_warns(
+        self, tmp_path: Path, fake_dist: Path, caplog
+    ):
+        import logging
+
+        bad_dir = tmp_path / "not-a-module"
+        bad_dir.mkdir()
+        ctx = self._make_ctx_with_overrides(
+            tmp_path,
+            fake_dist,
+            {"nsx_modules": {"nsx-ethos-u-driver": {"path": str(bad_dir)}}},
+        )
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+
+        with caplog.at_level(logging.WARNING):
+            app_dir = generate_app(ctx)
+
+        assert any("did not match any module" in rec.message for rec in caplog.records)
+        nsx_yml = yaml.safe_load((app_dir / "nsx.yml").read_text())
+        projects = (nsx_yml.get("module_registry") or {}).get("projects") or {}
+        assert "local_path" not in (projects.get("nsx-ethos-u-driver") or {})
 
     def test_engine_module_override_logs_engine_config_hint(
         self,

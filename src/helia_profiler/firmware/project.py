@@ -168,6 +168,7 @@ def _render_module_registry(
     project_ref_overrides: dict[str, tuple[str, str]],
     module_ref_overrides: dict[str, tuple[str, str]],
     app_modules: dict[str, str] | None = None,
+    project_local_paths: dict[str, str] | None = None,
 ) -> str:
     """Render the ``module_registry`` block for nsx.yml from the profile.
 
@@ -236,6 +237,24 @@ def _render_module_registry(
             aligned["project"] = project
             aligned["revision"] = ref_overrides_by_project[project]
             module_overrides[name] = aligned
+    # Transitive registry projects (not board modules, e.g. nsx-ethos-u-driver
+    # pulled in by nsx-npu) can be taken from a local tree through NSX's own
+    # ``local_path`` mechanism; it replaces the packaged git URL and produces a
+    # ``local`` lock entry keyed by the tree's content hash, so ``revision`` is
+    # dropped here rather than left contradicting the path.
+    for project, local_path in (project_local_paths or {}).items():
+        override = dict(project_overrides.get(project) or {})
+        if not override:
+            override = nsx_cli.registry_project(project) or {"name": project}
+        override.pop("revision", None)
+        override.pop("url", None)
+        override["local_path"] = local_path
+        project_overrides[project] = override
+        for name, module_override in list(module_overrides.items()):
+            if isinstance(module_override, dict) and module_override.get("project") == project:
+                aligned = dict(module_override)
+                aligned.pop("revision", None)
+                module_overrides[name] = aligned
     if not project_overrides and not module_overrides:
         return ""
     registry: dict[str, Any] = {}
