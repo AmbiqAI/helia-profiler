@@ -100,10 +100,10 @@ output:
 | `power` | Whether and how power is captured | [Power measurement](../../guide/power/) |
 | `output` | Format, directory and the Model Explorer overlay | [Output files](../../guide/output/) |
 
-The blocks not shown here (`heartbeat`, `clock`, `psram`,
-`nsx_module_override`, `compatibility_baseline`) exist for specific
-situations and are documented with their defaults in the generated
-reference.
+The two top-level blocks not shown here, `timeouts` and `build`, and the
+nested ones (`target.clock`, `target.psram`, `target.heartbeat`,
+`power.ina228`, `build.nsx_modules`) exist for specific situations and are
+documented with their defaults in the generated reference.
 
 ### 4. Keep runs apart
 
