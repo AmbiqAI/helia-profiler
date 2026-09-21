@@ -1,80 +1,112 @@
 ---
-title: "Power Profiling"
-description: "Goal: capture current, voltage, and energy alongside PMU data using a Joulescope, in addition to the normal cycle-count profile."
+title: "Power capture with a Joulescope"
+description: "Add a Joulescope to the bench and capture energy per inference alongside the profile: the config, the run, and the summary fields to read, with the measurement pages that explain each step."
 ---
 
-**Goal:** capture current, voltage, and energy alongside PMU data using a
-Joulescope, in addition to the normal cycle-count profile.
+## Goal
 
-## Setup
+Capture current, charge and energy for the clean inference window of a
+profile run. You will learn what the config adds, what the run does after
+the profile pass, and which health signals decide whether the energy
+number can be quoted.
 
-A Joulescope JS110, JS220, or JS320 wired in series with the EVB (`pyjoulescope_driver`
-ships as a core dependency — see [Installation](../../getting-started/install/)
-for udev/USB setup).
+## Hardware and wiring
 
-```yaml title="hpx_power.yml"
+An Apollo510 EVB, a J-Link, and a Joulescope JS110, JS220 or JS320 in
+series with the board's supply, with its GPIO input on the board's sync
+pin and, on the JS220 and JS320, its Vref pin wired. The wiring, the pin
+table and the instrument differences are on
+[Joulescope](../../guide/power-joulescope/); read it before plugging
+anything in.
+
+## Software prerequisites
+
+hpx with the `aot` extra (`pyjoulescope_driver` ships with hpx), the
+toolchain and J-Link software, and on Linux the Joulescope udev rule.
+`hpx power-on` is the smoke test that the instrument is seen.
+
+## Config file
+
+[`examples/quickstart/hpx_aot_power.yml`](https://github.com/AmbiqAI/helia-profiler/blob/main/examples/quickstart/hpx_aot_power.yml):
+
+```yaml
 model:
-  path: my_model.tflite
+  path: kws_model.tflite
   arena_size: 131072
-
 engine:
-  type: helia-rt
+  type: helia-aot
   config:
-    variant: release-with-logs
-
+    prefix: hpx
+    module_name: hpx_model
 target:
   board: apollo510_evb
-
+  toolchain: arm-none-eabi-gcc
 profiling:
   pmu_counters:
-    cpu: all
+    cpu: default
   per_layer: true
-  iterations: 5
-  warmup: 2
-
+  iterations: 3
+  warmup: 1
 power:
   enabled: true
-  driver: joulescope          # auto-detects JS110, JS220, or JS320
+  driver: joulescope
   mode: external
-  duration_s: 30
-
+  duration_s: 20
+  io_voltage: 1.8
+  sync_gpio_pin: 29
 output:
   format: csv
-  dir: ./results/power_run
-  detailed: true
+  dir: ./results/results_aot_power
 ```
+
+`power.enabled` turns the five power stages on; `driver`, `mode`,
+`duration_s`, `io_voltage` and `sync_gpio_pin` are explained on
+[Power measurement](../../guide/power/) and the generated
+[configuration reference](../../reference/configuration/).
 
 ## Run
 
 ```bash
-hpx profile --config hpx_power.yml
+cd examples/quickstart
+hpx power-on --driver joulescope
+hpx profile --config hpx_aot_power.yml
 ```
 
-The profiler runs the normal PMU passes, then power-cycles the EVB and
-captures current/voltage for `duration_s` seconds during a clean,
-uninstrumented inference window.
+The run profiles as usual, then builds and flashes a dedicated power
+binary, arms the Joulescope, resets the board and captures the gated
+clean window.
 
-## What you get
+## Expected output
 
-```
-  Power:
-    avg_current:  12.345 mA
-    avg_power:    22.221 mW
-    peak_current: 45.678 mA
-    energy:       666.630 µJ
-```
+Not yet captured on this bench. A completed run adds a `power` block to
+`summary.json` with `measurement_scope`, `energy_per_inference_j`,
+`capture_duration_s`, the gated-window statistics and the health signals;
+the fields are listed on [Output files](../../guide/output/) and the
+terminal panel is described on [Verifying a capture](../../guide/power-verify/).
 
-`summary.json` gets a matching `power` section (`avg_current_a`,
-`avg_power_w`, `peak_current_a`, `energy_j`), and `--detailed` adds
-`detailed/power_summary.csv`.
+## How to read it
 
-:::tip[Comparing engines]
-Run the same power config with different engines to compare energy
-efficiency — see [Engine Comparison](../engine-comparison/).
-:::
+- `measurement_scope` must read `gpio_gated_clean_window` for the energy
+  per inference to mean one inference; the other scopes are explained on
+  [Windows and lock-step](../../guide/power-windows/).
+- The `power.window_*` and `gated_window_duration_suspect` codes in
+  `issues` are the health checks; a `degraded` verdict with one of them
+  means the number is a caveat, not a measurement.
+- Compare two power runs only through `hpx compare`, which withholds the
+  power deltas when the scope, mode, firmware, probe or clean workload
+  differ ([Analysis and comparison](../../guide/analysis-comparison/)).
 
-## Where to go deeper
+## Variations
 
-- [Power Measurement](../../guide/power/) — wiring, sync GPIO, dedicated
-  power firmware, window sizing, and troubleshooting a bad capture.
-- [Output & Results](../../guide/output/) — every result file and field.
+- heliaRT instead of heliaAOT: copy the `power` block into `hpx_rt.yml`.
+- INA228 on the board instead of a Joulescope: `power.driver: ina228`, a
+  different measurement scope, on [INA228](../../guide/power-ina228/).
+- Longer captures for tighter statistics: raise `duration_s`; the fixed
+  inference count is derived from the profile pass's clean timing.
+
+## Validated on
+
+Not yet validated. The nightly hardware validation runs with `power: off`,
+and no captured power bundle is shipped with the documentation. The
+configuration above is the checked-in quickstart file; the bench facts on
+the linked measurement pages are cited there.

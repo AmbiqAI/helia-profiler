@@ -1,0 +1,70 @@
+layer_idx,layer_id,op_type,op_name,tensor_role,tensor_id,tensor_name,tensor_kind,memory,source_memory,staged,arena_role,arena_region_id,offset,size,shape
+0,0,CONV_2D,conv_2d_0,input,,tensor_0,scratch,dtcm,dtcm,False,scratch,0,0,490,"[1, 49, 10, 1]"
+0,0,CONV_2D,conv_2d_0,output,,tensor_22,scratch,dtcm,dtcm,False,scratch,0,496,8000,"[1, 25, 5, 64]"
+0,0,CONV_2D,conv_2d_0,local,,tensor_17,constant,dtcm,mram,True,constant,1,0,2560,"[64, 10, 4, 1]"
+0,0,CONV_2D,conv_2d_0,local,,tensor_conv_2d_0_scratch,scratch,dtcm,dtcm,False,scratch,0,8496,192,[192]
+0,0,CONV_2D,conv_2d_0,local,,tensor_conv_2d_0_weight_sum,constant,dtcm,mram,True,constant,1,2560,256,[64]
+0,0,CONV_2D,conv_2d_0,local,,tensor_conv_2d_0_multiplier,constant,dtcm,mram,True,constant,1,2816,256,[64]
+0,0,CONV_2D,conv_2d_0,local,,tensor_conv_2d_0_shift,constant,dtcm,mram,True,constant,1,3072,256,[64]
+1,1,DEPTHWISE_CONV_2D,depthwise_conv_2d_1,input,,tensor_22,scratch,dtcm,dtcm,False,scratch,0,496,8000,"[1, 25, 5, 64]"
+1,1,DEPTHWISE_CONV_2D,depthwise_conv_2d_1,output,,tensor_23,scratch,dtcm,dtcm,False,scratch,0,8496,8000,"[1, 25, 5, 64]"
+1,1,DEPTHWISE_CONV_2D,depthwise_conv_2d_1,local,,tensor_5,constant,dtcm,mram,True,constant,1,3328,576,"[1, 3, 3, 64]"
+1,1,DEPTHWISE_CONV_2D,depthwise_conv_2d_1,local,,tensor_depthwise_conv_2d_1_scratch,scratch,dtcm,dtcm,False,scratch,0,16496,4464,[4464]
+1,1,DEPTHWISE_CONV_2D,depthwise_conv_2d_1,local,,tensor_depthwise_conv_2d_1_weight_sum,constant,dtcm,mram,True,constant,1,3904,256,[64]
+1,1,DEPTHWISE_CONV_2D,depthwise_conv_2d_1,local,,tensor_depthwise_conv_2d_1_multiplier,constant,dtcm,mram,True,constant,1,4160,256,[64]
+1,1,DEPTHWISE_CONV_2D,depthwise_conv_2d_1,local,,tensor_depthwise_conv_2d_1_shift,constant,dtcm,mram,True,constant,1,4416,256,[64]
+2,2,CONV_2D,conv_2d_2,input,,tensor_23,scratch,dtcm,dtcm,False,scratch,0,8496,8000,"[1, 25, 5, 64]"
+2,2,CONV_2D,conv_2d_2,output,,tensor_24,scratch,dtcm,dtcm,False,scratch,0,0,8000,"[1, 25, 5, 64]"
+2,2,CONV_2D,conv_2d_2,local,,tensor_18,constant,dtcm,mram,True,constant,1,4672,4096,"[64, 1, 1, 64]"
+2,2,CONV_2D,conv_2d_2,local,,tensor_conv_2d_2_weight_sum,constant,dtcm,mram,True,constant,1,8768,256,[64]
+2,2,CONV_2D,conv_2d_2,local,,tensor_conv_2d_2_multiplier,constant,dtcm,mram,True,constant,1,9024,256,[64]
+2,2,CONV_2D,conv_2d_2,local,,tensor_conv_2d_2_shift,constant,dtcm,mram,True,constant,1,9280,256,[64]
+3,3,DEPTHWISE_CONV_2D,depthwise_conv_2d_3,input,,tensor_24,scratch,dtcm,dtcm,False,scratch,0,0,8000,"[1, 25, 5, 64]"
+3,3,DEPTHWISE_CONV_2D,depthwise_conv_2d_3,output,,tensor_25,scratch,dtcm,dtcm,False,scratch,0,8000,8000,"[1, 25, 5, 64]"
+3,3,DEPTHWISE_CONV_2D,depthwise_conv_2d_3,local,,tensor_8,constant,dtcm,mram,True,constant,1,9536,576,"[1, 3, 3, 64]"
+3,3,DEPTHWISE_CONV_2D,depthwise_conv_2d_3,local,,tensor_depthwise_conv_2d_3_scratch,scratch,dtcm,dtcm,False,scratch,0,16000,4464,[4464]
+3,3,DEPTHWISE_CONV_2D,depthwise_conv_2d_3,local,,tensor_depthwise_conv_2d_3_weight_sum,constant,dtcm,mram,True,constant,1,10112,256,[64]
+3,3,DEPTHWISE_CONV_2D,depthwise_conv_2d_3,local,,tensor_depthwise_conv_2d_3_multiplier,constant,dtcm,mram,True,constant,1,10368,256,[64]
+3,3,DEPTHWISE_CONV_2D,depthwise_conv_2d_3,local,,tensor_depthwise_conv_2d_3_shift,constant,dtcm,mram,True,constant,1,10624,256,[64]
+4,4,CONV_2D,conv_2d_4,input,,tensor_25,scratch,dtcm,dtcm,False,scratch,0,8000,8000,"[1, 25, 5, 64]"
+4,4,CONV_2D,conv_2d_4,output,,tensor_26,scratch,dtcm,dtcm,False,scratch,0,0,8000,"[1, 25, 5, 64]"
+4,4,CONV_2D,conv_2d_4,local,,tensor_19,constant,dtcm,mram,True,constant,1,10880,4096,"[64, 1, 1, 64]"
+4,4,CONV_2D,conv_2d_4,local,,tensor_conv_2d_4_weight_sum,constant,dtcm,mram,True,constant,1,14976,256,[64]
+4,4,CONV_2D,conv_2d_4,local,,tensor_conv_2d_4_multiplier,constant,dtcm,mram,True,constant,1,15232,256,[64]
+4,4,CONV_2D,conv_2d_4,local,,tensor_conv_2d_4_shift,constant,dtcm,mram,True,constant,1,15488,256,[64]
+5,5,DEPTHWISE_CONV_2D,depthwise_conv_2d_5,input,,tensor_26,scratch,dtcm,dtcm,False,scratch,0,0,8000,"[1, 25, 5, 64]"
+5,5,DEPTHWISE_CONV_2D,depthwise_conv_2d_5,output,,tensor_27,scratch,dtcm,dtcm,False,scratch,0,8000,8000,"[1, 25, 5, 64]"
+5,5,DEPTHWISE_CONV_2D,depthwise_conv_2d_5,local,,tensor_11,constant,dtcm,mram,True,constant,1,15744,576,"[1, 3, 3, 64]"
+5,5,DEPTHWISE_CONV_2D,depthwise_conv_2d_5,local,,tensor_depthwise_conv_2d_5_scratch,scratch,dtcm,dtcm,False,scratch,0,16000,4464,[4464]
+5,5,DEPTHWISE_CONV_2D,depthwise_conv_2d_5,local,,tensor_depthwise_conv_2d_5_weight_sum,constant,dtcm,mram,True,constant,1,16320,256,[64]
+5,5,DEPTHWISE_CONV_2D,depthwise_conv_2d_5,local,,tensor_depthwise_conv_2d_5_multiplier,constant,dtcm,mram,True,constant,1,16576,256,[64]
+5,5,DEPTHWISE_CONV_2D,depthwise_conv_2d_5,local,,tensor_depthwise_conv_2d_5_shift,constant,dtcm,mram,True,constant,1,16832,256,[64]
+6,6,CONV_2D,conv_2d_6,input,,tensor_27,scratch,dtcm,dtcm,False,scratch,0,8000,8000,"[1, 25, 5, 64]"
+6,6,CONV_2D,conv_2d_6,output,,tensor_28,scratch,dtcm,dtcm,False,scratch,0,0,8000,"[1, 25, 5, 64]"
+6,6,CONV_2D,conv_2d_6,local,,tensor_20,constant,dtcm,mram,True,constant,1,17088,4096,"[64, 1, 1, 64]"
+6,6,CONV_2D,conv_2d_6,local,,tensor_conv_2d_6_weight_sum,constant,dtcm,mram,True,constant,1,21184,256,[64]
+6,6,CONV_2D,conv_2d_6,local,,tensor_conv_2d_6_multiplier,constant,dtcm,mram,True,constant,1,21440,256,[64]
+6,6,CONV_2D,conv_2d_6,local,,tensor_conv_2d_6_shift,constant,dtcm,mram,True,constant,1,21696,256,[64]
+7,7,DEPTHWISE_CONV_2D,depthwise_conv_2d_7,input,,tensor_28,scratch,dtcm,dtcm,False,scratch,0,0,8000,"[1, 25, 5, 64]"
+7,7,DEPTHWISE_CONV_2D,depthwise_conv_2d_7,output,,tensor_29,scratch,dtcm,dtcm,False,scratch,0,8000,8000,"[1, 25, 5, 64]"
+7,7,DEPTHWISE_CONV_2D,depthwise_conv_2d_7,local,,tensor_14,constant,dtcm,mram,True,constant,1,21952,576,"[1, 3, 3, 64]"
+7,7,DEPTHWISE_CONV_2D,depthwise_conv_2d_7,local,,tensor_depthwise_conv_2d_7_scratch,scratch,dtcm,dtcm,False,scratch,0,16000,4464,[4464]
+7,7,DEPTHWISE_CONV_2D,depthwise_conv_2d_7,local,,tensor_depthwise_conv_2d_7_weight_sum,constant,dtcm,mram,True,constant,1,22528,256,[64]
+7,7,DEPTHWISE_CONV_2D,depthwise_conv_2d_7,local,,tensor_depthwise_conv_2d_7_multiplier,constant,dtcm,mram,True,constant,1,22784,256,[64]
+7,7,DEPTHWISE_CONV_2D,depthwise_conv_2d_7,local,,tensor_depthwise_conv_2d_7_shift,constant,dtcm,mram,True,constant,1,23040,256,[64]
+8,8,CONV_2D,conv_2d_8,input,,tensor_29,scratch,dtcm,dtcm,False,scratch,0,8000,8000,"[1, 25, 5, 64]"
+8,8,CONV_2D,conv_2d_8,output,,tensor_30,scratch,dtcm,dtcm,False,scratch,0,0,8000,"[1, 25, 5, 64]"
+8,8,CONV_2D,conv_2d_8,local,,tensor_21,constant,dtcm,mram,True,constant,1,23296,4096,"[64, 1, 1, 64]"
+8,8,CONV_2D,conv_2d_8,local,,tensor_conv_2d_8_weight_sum,constant,dtcm,mram,True,constant,1,27392,256,[64]
+8,8,CONV_2D,conv_2d_8,local,,tensor_conv_2d_8_multiplier,constant,dtcm,mram,True,constant,1,27648,256,[64]
+8,8,CONV_2D,conv_2d_8,local,,tensor_conv_2d_8_shift,constant,dtcm,mram,True,constant,1,27904,256,[64]
+9,9,AVERAGE_POOL_2D,average_pool_2d_9,input,,tensor_30,scratch,dtcm,dtcm,False,scratch,0,0,8000,"[1, 25, 5, 64]"
+9,9,AVERAGE_POOL_2D,average_pool_2d_9,output,,tensor_31,scratch,dtcm,dtcm,False,scratch,0,8000,64,"[1, 1, 1, 64]"
+10,10,RESHAPE,reshape_10,input,,tensor_31,scratch,dtcm,dtcm,False,scratch,0,8000,64,"[1, 1, 1, 64]"
+10,10,RESHAPE,reshape_10,output,,tensor_32,scratch,dtcm,dtcm,False,scratch,0,8000,64,"[1, 64]"
+11,11,FULLY_CONNECTED,fully_connected_11,input,,tensor_32,scratch,dtcm,dtcm,False,scratch,0,8000,64,"[1, 64]"
+11,11,FULLY_CONNECTED,fully_connected_11,output,,tensor_33,scratch,dtcm,dtcm,False,scratch,0,0,12,"[1, 12]"
+11,11,FULLY_CONNECTED,fully_connected_11,local,,tensor_16,constant,dtcm,mram,True,constant,1,28160,768,"[12, 64]"
+11,11,FULLY_CONNECTED,fully_connected_11,local,,tensor_fully_connected_11_weight_sum,constant,dtcm,mram,True,constant,1,28928,48,[12]
+12,12,SOFTMAX,softmax_12,input,,tensor_33,scratch,dtcm,dtcm,False,scratch,0,0,12,"[1, 12]"
+12,12,SOFTMAX,softmax_12,output,,tensor_34,scratch,dtcm,dtcm,False,scratch,0,16,12,"[1, 12]"

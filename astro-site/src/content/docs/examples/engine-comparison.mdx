@@ -1,110 +1,146 @@
 ---
-title: "Engine Comparison"
-description: "Goal: run the same model through heliaRT and heliaAOT to compare binary size, cycles, and memory usage."
+title: "Compare engines on one model"
+description: "Profile the same KWS model through heliaRT, heliaAOT and the vanilla TFLM port on one board, then let hpx compare say what changed in cycles, binary size and memory, and which deltas it refuses to show."
 ---
 
-**Goal:** run the same model through heliaRT and heliaAOT to compare binary
-size, cycles, and memory usage.
+## Goal
 
-## Setup
+Measure what the engine choice costs and buys for one model, holding
+board, toolchain, transport, counters and iterations fixed. You will learn
+how to run the same recipe three times, how `hpx compare` reports the
+result, and why it withholds per-layer deltas across engines.
 
-One config per engine, same model and board:
+## Hardware and wiring
 
-```yaml title="hpx_rt.yml"
-model:
-  path: my_model.tflite
-  arena_size: 131072
+An Apollo510 EVB on its USB J-Link port; no power instrument. The board,
+its default RTT transport and the J-Link are described on
+[Boards and targets](../../guide/boards/) and
+[Capture transports](../../guide/transports/).
 
-engine:
-  type: helia-rt
-  config:
-    variant: release-with-logs
+## Software prerequisites
 
-target:
-  board: apollo510_evb
+hpx with the `aot` extra for heliaAOT (`pip install 'helia-profiler[aot]'`),
+the GNU Arm toolchain, CMake and Ninja, SEGGER J-Link software
+([Install](../../getting-started/install/)). `hpx doctor` must pass.
 
-profiling:
-  pmu_counters:
-    cpu: all
-  per_layer: true
-  iterations: 5
-  warmup: 2
+## Config file
 
-output:
-  format: csv
-  dir: ./results/comparison_rt
-  detailed: true
-```
+Three checked-in configs share the model, board, toolchain and counter set
+and differ only in the `engine` block and the output directory:
 
-```yaml title="hpx_aot.yml"
-model:
-  path: my_model.tflite
-  arena_size: 131072
+| Engine | Config |
+|---|---|
+| heliaRT | [`examples/quickstart/hpx_rt.yml`](https://github.com/AmbiqAI/helia-profiler/blob/main/examples/quickstart/hpx_rt.yml) |
+| heliaAOT | [`examples/quickstart/hpx_aot.yml`](https://github.com/AmbiqAI/helia-profiler/blob/main/examples/quickstart/hpx_aot.yml) |
+| TFLM | [`examples/quickstart/hpx_tflm_baseline.yml`](https://github.com/AmbiqAI/helia-profiler/blob/main/examples/quickstart/hpx_tflm_baseline.yml) |
 
-engine:
-  type: helia-aot
-  config:
-    prefix: hpx
-    module_name: hpx_model
-
-target:
-  board: apollo510_evb
-
-profiling:
-  pmu_counters:
-    cpu: all
-  per_layer: true
-  iterations: 5
-  warmup: 2
-
-output:
-  format: csv
-  dir: ./results/comparison_aot
-  detailed: true
-```
+The heliaRT and TFLM configs also ask for the `memory` counter group;
+`hpx_aot.yml` asks for `cpu` only, so add `memory: default` to it before
+comparing per-layer columns, or expect them to differ.
 
 ## Run
 
+From the repository root (the model paths in the configs are relative):
+
 ```bash
-hpx profile --config hpx_rt.yml
-hpx profile --config hpx_aot.yml
+hpx profile --config examples/quickstart/hpx_rt.yml
+hpx profile --config examples/quickstart/hpx_aot.yml
+hpx profile --config examples/quickstart/hpx_tflm_baseline.yml
+hpx compare results/results_rt results/results_aot --output-dir results/rt-vs-aot
+hpx compare results/results_rt results/results_tflm_baseline
 ```
 
-## What you get
+## Expected output
 
-```python
-import json
-
-rt = json.load(open("results/comparison_rt/summary.json"))
-aot = json.load(open("results/comparison_aot/summary.json"))
-
-print(f"{'Metric':<20} {'heliaRT':>12} {'heliaAOT':>12}")
-print(f"{'Total cycles':<20} {rt['total_cycles']:>12,} {aot['total_cycles']:>12,}")
-print(f"{'Binary (total)':<20} {rt['binary']['total']:>12,} {aot['binary']['total']:>12,}")
-```
+The comparison below is the real `hpx compare` output for the heliaRT and
+heliaAOT bundles named under Validated on, run on the host against the
+shipped bundles (paths shortened; the Config table and the per-region
+memory rows are elided, marked with `…`):
 
 ```
-Metric                    heliaRT     heliaAOT
-Total cycles            2,016,376    2,010,842
-Binary (total)             752,436       96,100
+  Total cycles     2,060,239 cyc → 2,054,228 cyc  -6,011 cyc (-0.3%)
+  Avg inference    21,717 us → 21,649 us  -68 us (-0.3%)
+
+╭─ Warnings ─────────────────────────────────────────────────────────╮
+│    - Per-layer deltas omitted because operation sequences differ.  │
+│    - Comparison dimension differs: engine.                         │
+│    - Comparison dimension differs: engine_version.                 │
+│    - Comparison dimension differs: architecture_flags.             │
+│    - Some run-level metrics are missing in one run: memory.arena_size,
+│  memory.allocated_arena, memory.model_size                         │
+│    - AOT memory placement artifacts are present in only one run;   │
+│  placement diffs may be partial.                                   │
+╰────────────────────────────────────────────────────────────────────╯
+
+ …
+
+ Metric                         Baseline      Candidate              Change
+ Total cycles                  2.06M cyc      2.05M cyc   -6.0k cyc (-0.3%)
+ Layers                               13             13           0 (+0.0%)
+ Binary .text                     279k B         151k B    -127k B (-45.7%)
+ Binary .data                     155k B         2.8k B    -152k B (-98.2%)
+ Binary .bss                       86k B         185k B     99k B (+114.9%)
+ Binary total                     885k B         741k B    -144k B (-16.3%)
+ …
 ```
 
-| Metric | What to expect |
+The three single-engine runs, from their `summary.json`:
+
+| Engine | `total_cycles` (per-layer sum) | `latency.device_clean_infer_avg_cycles` | `binary.total` bytes | `binary.text` bytes |
+|---|---|---|---|---|
+| heliaRT 1.20.0 | 2,060,239 | 2,051,232 | 885,056 | 278,596 |
+| heliaAOT 0.20.0 | 2,054,228 | 2,044,512 | 740,984 | 151,160 |
+| TFLM (CMSIS-NN backend) | 2,118,339 | 2,109,120 | 1,114,392 | 507,932 |
+
+## How to read it
+
+- The cycles are close because all three engines run the same CMSIS-NN
+  kernels for this model; the engine decides dispatch, not arithmetic.
+  A model with operators heliaRT fuses or heliaAOT specialises will show a
+  larger gap.
+- `binary.text` is where the engines differ: heliaAOT links only the
+  operators the model uses, so `.text` is 45.7% smaller than heliaRT and
+  `.data` shrinks because the model is compiled rather than embedded as a
+  flatbuffer; `.bss` grows because the compiled model's activation and
+  constant areas are static allocations. TFLM's `.text` carries the full
+  upstream interpreter.
+- `hpx compare` omits per-layer deltas when the operation sequences differ
+  (heliaAOT reports the model's original operator indices, the
+  interpreters report the runtime's), and it lists `engine`,
+  `engine_version` and `architecture_flags` as informative dimensions so
+  the report says what changed rather than hiding it. The rules are on
+  [Analysis and comparison](../../guide/analysis-comparison/).
+- Quote `latency.device_clean_infer_avg_cycles` as the inference cost;
+  `total_cycles` is the instrumented per-layer sum
+  ([Latency and per-layer](../../guide/latency/)).
+
+## Variations
+
+- ExecuTorch: the same nightly run profiled the KWS model as a `.pte`
+  through `nsx-executorch` (14 layers, clean window 2,148,976 cycles on
+  the same board); the bundle
+  `apollo510_evb-kws-executorch-ns-arm-none-eabi-gcc-rtt-auto` sits beside
+  the others. The export path is on [Engines](../../guide/engines/).
+- TFLM reference kernels: copy `hpx_tflm_baseline.yml` and set
+  `engine.backend: reference` to measure the un-optimised interpreter.
+- A different model: keep the three configs and change `model.path` and
+  `model.arena_size` in each; `hpx analyze model.tflite --engine helia-aot --compare`
+  shows operator coverage before you build.
+- Placement: `model.arena_location` and `model.weights_location` change
+  the numbers more than the engine does for memory-bound models; keep them
+  identical across the three runs ([Memory placement](../../guide/memory/)).
+
+## Validated on
+
+| | |
 |---|---|
-| Binary size | heliaAOT is typically much smaller — no interpreter, dispatch tables, or op resolver |
-| Total cycles | Similar for models using the same CMSIS-NN kernels underneath |
-| Arena usage | heliaAOT's per-tensor placement can pack the arena tighter than a single runtime arena |
+| Board | `apollo510_evb` (Apollo510, Cortex-M55, `lp` clock tier) |
+| Run | nightly hardware validation [run 35078330526](https://github.com/AmbiqAI/helia-profiler/actions/runs/35078330526), 2026-09-16, suite `complete`, hpx 0.1.6 at source commit `0714893` |
+| Cases | `apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto`, `apollo510_evb-kws-aot-ns-arm-none-eabi-gcc-rtt-auto`, `apollo510_evb-kws-tflm-arm-arm-none-eabi-gcc-rtt-auto`, all `valid` |
+| nsx modules | baseline `hpx-neuralspotx-0.8.1-2026-09`: `nsx-helia-rt` helia-rt-v1.20.0, `nsx-cmsis-nn` aaeb145, `nsx-tflite-micro` 7afcf2b, `arm-cmsis-nn` 6d21a6f, `nsx-ambiq-sdk` a9f4ec2, `nsx-pmu-armv8m` 5725c06 (each bundle's `nsx.lock`) |
+| Toolchain | arm-none-eabi-gcc 15.2.1 (Arm GNU Toolchain 15.2.Rel1), CMake 4.1.2 |
+| Differences from the configs above | the nightly cases use `arena_size: 32768`, `pmu_counters: {cpu: default}`, `iterations: 3`, `warmup: 1`, `output.format: csv`; the quickstart configs use a 131,072-byte arena and, for heliaRT and TFLM, the `memory` group too |
+| Bundles | [`examples/results/hardware-validation-2026-09-16/`](https://github.com/AmbiqAI/helia-profiler/tree/main/examples/results/hardware-validation-2026-09-16) |
 
-:::tip[Isolate the engine effect]
-Keep toolchain, board, and PMU counters identical across both configs so
-the only variable is the engine. See
-[Toolchain Comparison](../toolchain-comparison/) if you also want to vary
-the compiler.
-:::
-
-## Where to go deeper
-
-- [Inference Engines](../../guide/engines/) — heliaRT vs. heliaAOT trade-offs.
-- [Output & Results](../../guide/output/) — every `summary.json` field.
-- [Memory Placement](../../guide/memory/) — why arena/weights usage differs
-  between engines.
+The `hpx compare` output above was produced on the host from those
+bundles on 2026-09-21 with hpx 0.1.6; the compare step needs no hardware.

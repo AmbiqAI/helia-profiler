@@ -1,97 +1,120 @@
 ---
-title: "Toolchain Comparison"
-description: "Goal: run the same model/engine/board through GCC, armclang, and ATfE to see how compiler choice affects cycle counts."
+title: "Compare toolchains"
+description: "Build the same model and engine with the GNU Arm toolchain and the Arm Toolchain for Embedded, then compare cycle counts with hpx compare; armclang follows the same recipe."
 ---
 
-**Goal:** run the same model/engine/board through GCC, armclang, and ATfE to
-see how compiler choice affects cycle counts.
+## Goal
 
-## Setup
+See how much of a cycle count is the compiler's doing. You will learn how to
+vary only `target.toolchain`, what `hpx compare` marks as different, and how
+to line up per-layer rows to find where a toolchain gains.
 
-No config file needed — pass `--toolchain` on the CLI and keep everything
-else constant. Confirm all three toolchains are installed first (see
-[Toolchains](../../guide/toolchains/)) and run `hpx doctor` to check the
-baseline tool checks pass.
+## Hardware and wiring
+
+An Apollo510 EVB on its J-Link USB port; no power instrument.
+
+## Software prerequisites
+
+Two or three toolchains installed and on `PATH`: the GNU Arm toolchain
+(`gcc`), the Arm Toolchain for Embedded (`atfe`) and, if licensed, Arm
+Compiler 6 (`armclang`). [Toolchains](../../guide/toolchains/) has the
+install notes and the aliases; `hpx doctor` reports which ones it can see.
+
+## Config file
+
+No new file: pass `--toolchain` on the command line over one of the
+checked-in configs, and give each run its own output directory. The
+armclang variants exist as files for the two engines:
+[`examples/quickstart/hpx_rt_armclang.yml`](https://github.com/AmbiqAI/helia-profiler/blob/main/examples/quickstart/hpx_rt_armclang.yml)
+and
+[`examples/quickstart/hpx_aot_armclang.yml`](https://github.com/AmbiqAI/helia-profiler/blob/main/examples/quickstart/hpx_aot_armclang.yml).
 
 ## Run
 
-Six commands, six result directories — three toolchains × two engines:
+```bash
+hpx profile --config examples/quickstart/hpx_rt.yml --toolchain gcc  --output-dir results/rt_gcc
+hpx profile --config examples/quickstart/hpx_rt.yml --toolchain atfe --output-dir results/rt_atfe
+hpx compare results/rt_gcc results/rt_atfe --output-dir results/rt_gcc-vs-atfe
+```
+
+Add `--toolchain armclang` for a third run when Arm Compiler 6 is
+installed. Keep `--engine`, the board, the counters and the iteration
+count identical across runs.
+
+## Expected output
+
+The real `hpx compare` output for the two heliaRT bundles under Validated
+on (paths shortened; the rest of the Config table and the Run table are
+elided, marked with `…`):
+
+```
+  Total cycles     2,060,239 cyc → 1,947,189 cyc  -113,050 cyc (-5.5%)
+  Avg inference    21,717 us → 20,526 us  -1,191 us (-5.5%)
+
+╭─ Warnings ──────────────────────────────────────────────╮
+│    - Comparison dimension differs: toolchain.           │
+│    - Comparison dimension differs: compiler_version.    │
+│    - Comparison dimension differs: architecture_flags.  │
+╰─────────────────────────────────────────────────────────╯
+
+ Field              Baseline                 Candidate                  Status
+ Engine             helia-rt                 helia-rt                    same
+ Toolchain          arm-none-eabi-gcc        atfe                        diff
+ Link family        gnu                      gnu                         same
+ Compiler version   arm-none-eabi-...15.2…   clang version 22.1.0        diff
+ …
+```
+
+Clean-window cycles per inference from the four bundles:
+
+| Engine | GNU Arm 15.2.1 | ATfE (clang 22.1.0) | Change |
+|---|---|---|---|
+| heliaRT | 2,051,232 | 1,938,240 | -5.5% |
+| heliaAOT | 2,044,512 | 1,931,904 | -5.5% |
+
+## How to read it
+
+- The toolchain dimension is informative, not blocking: `hpx compare`
+  shows every delta and tells you the compiler changed. Per-layer deltas
+  stay because the operation sequence is identical.
+- Both engines gain the same 5.5% from ATfE on this model, which says the
+  gain is in the shared CMSIS-NN kernels rather than in engine code.
+- To see where the gain lands, sort `layer_diff.csv` in the compare output
+  directory, or line the two per-layer files up:
 
 ```bash
-MODEL=examples/quickstart/kws_model.tflite
-
-hpx profile $MODEL --engine helia-rt --toolchain gcc      \
-    --output-dir results_compare/rt_gcc
-
-hpx profile $MODEL --engine helia-rt --toolchain armclang \
-    --output-dir results_compare/rt_armclang
-
-hpx profile $MODEL --engine helia-rt --toolchain atfe     \
-    --output-dir results_compare/rt_atfe
-
-hpx profile $MODEL --engine helia-aot --toolchain gcc      \
-    --output-dir results_compare/aot_gcc
-
-hpx profile $MODEL --engine helia-aot --toolchain armclang \
-    --output-dir results_compare/aot_armclang
-
-hpx profile $MODEL --engine helia-aot --toolchain atfe     \
-    --output-dir results_compare/aot_atfe
+cycles() { awk -F, 'NR==1{for(i=1;i<=NF;i++)if($i=="cycles")c=i}{print $1","$2","$c}' "$1"; }
+paste -d, <(cycles results/rt_gcc/profile_results.csv) <(cycles results/rt_atfe/profile_results.csv | cut -d, -f3) | head
 ```
 
-No engine config is needed by default — heliaAOT resolves its CMSIS-NN
-kernels from the NSX registry. To override that (or set other
-`engine.config` options), pass `--engine-config aot.yml` with a YAML file
-such as:
+The column position of `cycles` depends on how many counters the run
+captured, which is why the helper finds it by name.
 
-```yaml
-cmsis_nn_path: /path/to/ns-cmsis-nn
-```
+- `link_family` stays `gnu` for ATfE, so the per-region memory rows remain
+  comparable; armclang links with `armlink`, and the comparison omits the
+  per-region `used` and `free` rows for that pair while keeping the
+  section sizes ([Output files](../../guide/output/)).
 
-See [Engines → heliaAOT](../../guide/engines/#heliaaot).
+## Variations
 
-## What you get
+- armclang: run the two armclang configs above, or `--toolchain armclang`;
+  the `link_family` note applies.
+- Vary the engine as well and you have the six-run grid; compare within a
+  toolchain to isolate the engine, within an engine to isolate the
+  toolchain ([Compare engines](../engine-comparison/)).
+- `--cpu-clock hp` on Apollo510 changes microseconds and, through memory
+  timing, cycles; keep the tier fixed across a toolchain comparison
+  ([Boards and targets](../../guide/boards/#2-cpu-clock)).
 
-```bash
-for dir in results_compare/*/; do
-  total=$(jq -r '.total_cycles' "$dir/summary.json")
-  printf "%-30s %12s cycles\n" "$(basename "$dir")" "$total"
-done
-```
+## Validated on
 
-```
-rt_gcc                            2,014,841 cycles
-rt_armclang                       1,874,429 cycles
-rt_atfe                           1,881,203 cycles
-aot_gcc                           1,965,501 cycles
-aot_armclang                      1,869,210 cycles
-aot_atfe                          1,872,977 cycles
-```
-
-(Illustrative — the relative gap between toolchains, not the absolute
-counts, is what to look at. Run the commands above to get your own numbers
-for your model and board.)
-
-To see *where* the toolchain difference comes from, line up the per-layer
-CSVs for one engine:
-
-```bash
-paste -d, \
-    <(cut -d, -f2,3 results_compare/rt_gcc/profile_results.csv) \
-    <(cut -d, -f3   results_compare/rt_armclang/profile_results.csv) \
-  | head
-```
-
-## What this is not
-
-This does **not** isolate the engine choice from the toolchain choice — it
-varies both. To isolate the engine effect, hold toolchain constant and only
-flip `--engine` (see [Engine Comparison](../engine-comparison/)). To isolate
-placement effects, also hold `--arena-location` / `--weights-location`
-constant (see [Memory Placement Tuning](../../guides/memory-placement-tuning/)).
-
-## Where to go deeper
-
-- [Toolchains](../../guide/toolchains/) — install steps and trade-offs.
-- [Engine Comparison](../engine-comparison/) — engine-only sweep.
-- [Per-Layer Breakdown](../per-layer/) — drill into individual ops.
+| | |
+|---|---|
+| Board | `apollo510_evb`, `lp` clock tier |
+| Run | nightly hardware validation [run 35078330526](https://github.com/AmbiqAI/helia-profiler/actions/runs/35078330526), 2026-09-16, hpx 0.1.6 at `0714893` |
+| Cases | `apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto`, `apollo510_evb-kws-rt-ns-atfe-rtt-auto`, `apollo510_evb-kws-aot-ns-arm-none-eabi-gcc-rtt-auto`, `apollo510_evb-kws-aot-ns-atfe-rtt-auto`, all `valid` |
+| nsx modules | as recorded in each bundle's `nsx.lock` (baseline `hpx-neuralspotx-0.8.1-2026-09`, `nsx-helia-rt` helia-rt-v1.20.0, `nsx-cmsis-nn` aaeb145) |
+| Toolchains | arm-none-eabi-gcc 15.2.1; ATfE clang 22.1.0 |
+| armclang | not yet validated: no armclang case runs in the nightly suite |
+| Differences from the configs above | the nightly cases use `arena_size: 32768`, `pmu_counters: {cpu: default}`, `iterations: 3`, `warmup: 1` |
+| Bundles | [`examples/results/hardware-validation-2026-09-16/`](https://github.com/AmbiqAI/helia-profiler/tree/main/examples/results/hardware-validation-2026-09-16) |
