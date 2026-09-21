@@ -74,30 +74,30 @@ so the terminal always names the stage that failed and the error's `hint`.
 
 ### What each stage sets
 
-| Stage | Class | Sets on the context | Skipped when |
+| Stage | Class (module under `stages/`) | Sets on the context | Skipped when |
 |---|---|---|---|
-| preflight | `PreflightStage` | nothing; fails fast on missing host tools and config problems | never |
-| ensure powered | `EnsureBoardPoweredStage` | `target_power_ensured`, `passthrough_skipped` | never; degrades to a no-op without a power driver |
-| resolve platform | `ResolvePlatformStage` | `soc`, `board`, `run_metadata.platform`, `run_metadata.model` (SHA-256 of the model) | never |
-| resolve probe | `ResolveJLinkProbeStage` | `resolved_jlink_serial`, `probe`, `reset_controller` | never |
-| prepare engine | `PrepareEngineStage` | `engine_adapter`, `engine_artifacts` | never |
-| analyze model | `AnalyzeModelStage` | `model_analysis` | the engine is `executorch` (no host-side PTE analysis) |
-| plan memory | `PlanMemoryStage` | `arena_region`, `weights_region`, `memory_plan` | never |
-| generate firmware | `GenerateFirmwareStage` | `firmware_dir`, `dependency_workspace` | never |
-| build firmware | `BuildFirmwareStage` | `binary_sections`, `memory_regions`, `memory_symbols`, `memory_reconciliation`, `profile_run.firmware`, `run_metadata.toolchain` | never |
-| verify placement | `VerifyPlacementStage` | nothing; raises when the linker did not honour the plan | never |
-| flash | `FlashFirmwareStage` | `profile_run.deployment` | never |
-| capture PMU | `CapturePmuStage` | `profile_run.result` through `publish_profile_result()` | never |
-| plan power run | `PlanPowerRunStage` | `power_run.plan` (fixed inference count from the clean timing) | `power.enabled` is false |
-| build power firmware | `BuildPowerFirmwareStage` | `power_run.firmware` | `power.enabled` is false, or `power.firmware` is not `dedicated` |
-| flash power | `FlashPowerFirmwareStage` | `power_run.deployment` | as above |
-| capture power | `CapturePowerStage` | `power_run.observation` | `power.enabled` is false |
-| collect terminal | `CollectPowerTerminalStage` | `power_run.terminal` | `power.enabled` is false |
-| generate report | `GenerateReportStage` | `report_paths`, `run_evaluation` | never |
+| preflight | `PreflightStage` (`preflight.py`) | nothing; fails fast on missing host tools and config problems | never |
+| ensure powered | `EnsureBoardPoweredStage` (`ensure_powered.py`) | `target_power_ensured`, `passthrough_skipped` | neither `target.ensure_board_powered` nor `power.enabled` is set |
+| resolve platform | `ResolvePlatformStage` (`resolve_platform.py`) | `soc`, `board`, `run_metadata.platform`, `run_metadata.model` (SHA-256 of the model) | never |
+| resolve probe | `ResolveJLinkProbeStage` (`resolve_probe.py`) | `resolved_jlink_serial`, `probe`, `reset_controller` | the SoC declares no `jlink_device` (a custom overlay without one) |
+| prepare engine | `PrepareEngineStage` (`prepare_engine.py`) | `engine_adapter`, `engine_artifacts` | never |
+| analyze model | `AnalyzeModelStage` (`analyze_model.py`) | `model_analysis` | the engine is `executorch`, or `ai-edge-litert` is not installed |
+| plan memory | `PlanMemoryStage` (`plan_memory.py`) | `arena_region`, `weights_region`, `memory_plan` | never |
+| generate firmware | `GenerateFirmwareStage` (`generate_firmware.py`) | `firmware_dir`, `dependency_workspace` | never |
+| build firmware | `BuildFirmwareStage` (`build_firmware.py`) | `binary_sections`, `memory_regions`, `memory_symbols`, `memory_reconciliation`, `profile_run.firmware`, `run_metadata.toolchain` | never |
+| verify placement | `VerifyPlacementStage` (`verify_placement.py`) | nothing; raises when the linker did not honour the plan | no binary, SoC or arena region is resolved; the arena is in PSRAM (a runtime pointer, nothing to verify statically); or the engine is `helia-aot` (per-region arena symbols) |
+| flash | `FlashFirmwareStage` (`flash.py`) | `profile_run.deployment` | never |
+| capture PMU | `CapturePmuStage` (`capture_pmu.py`) | `profile_run.result` through `publish_profile_result()` | never |
+| plan power run | `PlanPowerRunStage` (`plan_power.py`) | `power_run.plan` (fixed inference count from the clean timing) | `power.enabled` is false |
+| build power firmware | `BuildPowerFirmwareStage` (`build_power_firmware.py`) | `power_run.firmware` | `power.enabled` is false, `power.firmware` is not `dedicated`, or the plan fixed no inference count |
+| flash power | `FlashPowerFirmwareStage` (`flash_power.py`) | `power_run.deployment` | `power.enabled` is false, or the planned firmware mode is not `dedicated` |
+| capture power | `CapturePowerStage` (`capture_power.py`) | `power_run.observation` | `power.enabled` is false, or `power.mode` is `internal` (the on-device path reports through the terminal record instead) |
+| collect terminal | `CollectPowerTerminalStage` (`collect_power_terminal.py`) | `power_run.terminal`, and `power_run.observation` on the internal path | `power.enabled` is false, or the planned firmware mode is not `dedicated` |
+| generate report | `GenerateReportStage` (`report.py`) | `report_paths`, `run_evaluation` | never |
 
-The stage list is the body of `build_default_pipeline()` in `profiler.py`;
-the table names are the `stages/` module names with the underscores
-removed. The terminal prints the same groups.
+The stage list is the body of `build_default_pipeline()` in `profiler.py`,
+and `stages/__init__.py` re-exports every class from the module named
+beside it. The terminal prints the same groups.
 
 ### The context
 
@@ -136,7 +136,7 @@ its own result type and its own stage list, not a flag.
 |---|---|
 | `Stage`, `PipelineContext`, `PipelineRunner` | `pipeline.py` |
 | `build_default_pipeline()` | `profiler.py` |
-| every stage | `stages/<name>.py`, re-exported by `stages/__init__.py` |
+| every stage | the module named in the table, re-exported by `stages/__init__.py` |
 | `ProfileRun`, `PowerRun`, `PowerRunPlan` | `results/artifacts.py` |
 | the accessor rule | `tests/test_pipeline.py` |
 

@@ -32,21 +32,21 @@ Merged into `docs-migration`: Phase 1 (#325), Phase 2 (#330), content port
 (#334), helia-ui alpha.16 pin (#336), Getting started (#339), Set up a run
 (#340, PR #350).
 
+Merged as well: #341 Measure (PR #351) and #342 Read results (PR #352).
+
 In flight:
-- #341 Measure: PR #351 at 6f31077, reviewer verdict merge-ready, waiting on
-  CI, then squash-merge.
-- #342 Read results: branch `342-guide-results` (d56cf89, worktree `hpx-342`)
-  contains the 341 branch merged in; review round two in progress. After #351
-  merges: merge `origin/docs-migration`, re-run the chain, open the PR.
-- #343 Concepts: branch `343-guide-concepts` (worktree `hpx-343`), seven pages
-  rewritten around one block diagram each; `check:links` needs the 341 and
-  342 pages (`power-verify`, `troubleshooting`) so it merges after them.
+- #343 Concepts: PR #353 from `343-guide-concepts` (worktree `hpx-343`),
+  seven pages around one block diagram each; review round two.
+- #344 Examples: PR #354 from `344-examples` (worktree `hpx-344`), twelve
+  pages on the nine-heading template with nine captured bundles under
+  `examples/results/`; review round one.
+- #346 Reference polish: branch `346-reference-polish` (worktree `hpx-346`),
+  compatibility table, landing cards, authored intros, wire-protocol header.
 - #337 Home: PR awaiting owner copy sign-off.
 
-Not started: #344 Examples programme, #345 Examples power, #346 Reference
-polish (compat table status vocabulary, wire-protocol header, authored intros
-on generated landings, run_summary loaders in the API reference), #322
-cutover (retire docs/, mkdocs, gates, Pages deploy `if: false`).
+Not started: #345 Examples power (two pages can ship without bench time),
+#322 cutover (retire docs/, mkdocs, gates, Pages deploy `if: false`; also
+rehype-mermaid and playwright, since no page carries mermaid now).
 
 ## Decisions
 

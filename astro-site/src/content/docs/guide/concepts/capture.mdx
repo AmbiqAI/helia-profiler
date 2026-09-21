@@ -155,7 +155,7 @@ signals are on [Power measurement](../../power/) and
 | no output at all | the overall timeout expires and `CaptureError` names the transport |
 | firmware stalls mid-run | no line for `HEARTBEAT_TIMEOUT_S` raises `CaptureError` with the last line seen |
 | silent clean window | the `clean_window_begin` heartbeat carries the estimated duration and extends the deadline |
-| firmware reports a fault | the fault line maps to a `DeterministicCaptureError` with the catalogue's hint |
+| firmware reports a fault | the `HPX_ERROR` line maps to a `CaptureError` carrying the catalogue's hint |
 | identity mismatch across iterations | `CaptureError`; nothing partial is published |
 
 ## Where the code lives

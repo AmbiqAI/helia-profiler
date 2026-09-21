@@ -18,7 +18,7 @@ before it is written. Users who only run `hpx profile` need the
 
 <BlockDiagram
   title="The hpx package"
-  caption="Every package under src/helia_profiler, grouped by what it owns. Leaves are modules or subpackages; the diagram omits the vendored code, the console renderers and the CLI command modules."
+  caption="Every package under src/helia_profiler, grouped by what it owns. Leaves are modules or subpackages; the diagram omits the vendored code, the packaged data files, the console renderers and the CLI command modules."
   flow="grid"
   columns={4}
 >
@@ -124,7 +124,7 @@ and writes a result bundle. Four rules shape every package:
 
 | Rule | What it means in code | Where it is enforced |
 |---|---|---|
-| Immutable configuration | `ProfileConfig` is resolved once from the CLI and YAML, then frozen; every stage reads the same object and none mutates it | `config/__init__.py` (frozen dataclasses with `extra="forbid"` validation) |
+| Immutable configuration | `ProfileConfig` is resolved once from the CLI and YAML, then frozen; every stage reads the same object and none mutates it | `config/__init__.py` (frozen pydantic models with `extra="forbid"`) |
 | One engine per run | the engine is explicit; comparing engines means two runs and `hpx compare` | `engines/__init__.py` (`get_adapter` takes one `EngineType`) |
 | Typed stage boundaries | stages exchange dataclasses from `results/`, never dicts; the one dynamic field is `LayerResult.counters` because counter names come from the SoC | `results/models.py`, `results/artifacts.py` |
 | Subprocess isolation | GCC, CMake, J-Link and the heliaAOT compiler run through `subprocess.run()` with argument lists, never a shell | `deps/nsx.py`, `target/probe/jlink.py`, `engines/helia_aot/compile.py` |
@@ -150,7 +150,7 @@ the CLI prints under the message. The subclass says which package failed:
 | `EngineError` | `engines/` | adapter failure |
 | `FirmwareError` | `firmware/` | template rendering failure |
 | `BuildError` | `deps/`, `firmware/build.py` | NSX configure or build failure; `NetworkError` and `DependencyError` (`VersionError`, `LockError`) narrow it |
-| `CaptureError` | `capture/`, `transport/` | transport or protocol failure; `DeterministicCaptureError` marks the firmware-reported faults |
+| `CaptureError` | `capture/`, `transport/`, `target/probe/` | transport, protocol or firmware-reported failure; `DeterministicCaptureError` narrows it for refusals a retry cannot change, such as a missing image or an unknown load address on the flash path |
 | `PowerError` | `power/` | driver failure |
 | `ReportError` | `report/` | output failure; `ValidationBundleError` narrows it for `hpx validate` bundles |
 

@@ -97,8 +97,11 @@ missing one ships firmware with that engine's code absent):
 `engine_reset_inputs`, `engine_reset_inputs_warm`, `engine_start_metadata`.
 The optional seams (`engine_model_storage`, `engine_model_setup`,
 `engine_clean_window`, `engine_window_prologue`, `engine_window_restore`,
-`engine_profiler_on`, `engine_psram_metadata`, `engine_profiled_summary`
-and the pass-arming pair) have working defaults.
+`engine_profiler_on`, `engine_psram_metadata`, `engine_profiled_summary`,
+`engine_io_metadata`, `engine_early_globals`, `engine_pre_start`,
+`engine_pass_preamble`, `engine_pmu_storage_sram_resident` and the
+pass-arming pair) have working defaults; the inventory is pinned by
+`tests/contracts/test_template_blocks.py`.
 
 Inheritance fails silently by nature: a child block whose name matches
 nothing in the base is ignored and the default renders. Because the render
