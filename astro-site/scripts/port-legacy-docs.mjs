@@ -175,6 +175,9 @@ const PRESERVE = [
   'examples/batch-runs.mdx',
   'examples/reanalyse-results.mdx',
   'examples/model-explorer-overlay.mdx',
+  /* Authored by the power examples (#345). */
+  'examples/power-read-summary.mdx',
+  'examples/power-compare.mdx',
   /* Authored by the Reference polish (#346). */
   'reference/index.mdx',
   'reference/compatibility-baseline.mdx',
