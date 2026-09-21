@@ -77,10 +77,6 @@ ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "src" / "helia_profiler"
 
 
-# ---------------------------------------------------------------------------
-# Extraction: HPX_ tokens that live inside C string literals
-# ---------------------------------------------------------------------------
-
 #: A token as it appears in a printf format: upper-case identifier characters,
 #: plus the ``%d`` conversions heliaAOT embeds in its per-index key names.
 _TOKEN_RE = re.compile(r"HPX_(?:[A-Z0-9_]|%[a-z])+")
@@ -192,10 +188,6 @@ def _bare_tokens(text: str) -> set[str]:
     """``HPX_`` identifiers in the code itself — the ``#define`` namespace."""
     return set(_TOKEN_RE.findall(_split_c(text)[1]))
 
-
-# ---------------------------------------------------------------------------
-# The render matrix
-# ---------------------------------------------------------------------------
 
 _SOCS = ("apollo3p", "apollo4p", "apollo510")
 _TRANSPORTS = ("rtt", "usb_cdc", "swo", "uart")
@@ -317,7 +309,6 @@ def _matrix() -> list[_Render]:
                 _Render(f"{soc}|rtt|{engine}|power", soc, "rtt", engine, power_only=True)
             )
 
-    # --- targeted condition variants ------------------------------------
     # Each entry flips one declarative condition; the census below asserts
     # that WIRE_CONDITIONS is exactly the set these renders exercise.
     renders += [
@@ -595,11 +586,6 @@ def _matrix() -> list[_Render]:
 _MATRIX = _matrix()
 
 
-# ---------------------------------------------------------------------------
-# The declarative conditions, as predicates over the render inputs
-# ---------------------------------------------------------------------------
-
-
 def _regions(v: dict) -> list[dict]:
     return list(v.get("arena_regions") or [])
 
@@ -703,11 +689,6 @@ def _expected_tokens(render: _Render) -> set[str]:
         if condition is None or _PREDICATES[condition](render.vars):
             expected.add(token)
     return expected
-
-
-# ---------------------------------------------------------------------------
-# Registry self-consistency
-# ---------------------------------------------------------------------------
 
 
 def test_every_condition_has_a_predicate_and_vice_versa():
@@ -910,11 +891,6 @@ def test_the_binary_axis_agrees_with_the_condition():
             )
 
 
-# ---------------------------------------------------------------------------
-# The census
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.parametrize("render", _MATRIX, ids=lambda r: r.label)
 def test_render_emits_exactly_what_the_registry_declares(render: _Render):
     expected = _expected_tokens(render)
@@ -989,11 +965,6 @@ def test_no_macro_name_ever_reaches_a_string():
             )
 
 
-# ---------------------------------------------------------------------------
-# Catalogue pins
-# ---------------------------------------------------------------------------
-
-
 def test_error_code_catalogue():
     assert {code.value for code in FirmwareErrorCode} == {
         "schema_mismatch",
@@ -1034,12 +1005,10 @@ def test_error_hints_are_keyed_by_the_enum_and_agree_with_the_registry():
 
 
 def test_every_error_code_carries_a_hint():
-    """Adding a code without deciding on a hint has to be a conscious act.
+    """Every ``FirmwareErrorCode`` must carry a hint in ``_ERROR_HINTS``.
 
-    #163 disclosed six codes that reached the user with a generic "the
-    payload is shown above" message; #165 closed that gap. This pin makes
-    reopening it — an error code whose remediation nobody wrote down — a
-    review decision rather than an accident.
+    A new code with no remediation hint fails this test instead of reaching
+    users as a generic "the payload is shown above" message.
     """
     hintless = {code.value for code in FirmwareErrorCode} - {code.value for code in _ERROR_HINTS}
     assert hintless == set()
@@ -1078,18 +1047,12 @@ def test_clean_window_begin_is_the_protocol_critical_phase():
 def test_the_est_ms_gap_is_told_once_and_is_true_of_the_firmware():
     """The gap statement is single-sourced, and the firmware agrees with it.
 
-    The claim has narrowed three times. First (#163) from "every apollo510
-    profile build" to "fixed+STIMER only": ``config.DEFAULT_WINDOW_MODE`` is
-    ``auto``, and the auto branch measures a warm DWT reference and sends a
-    real estimate whatever clock times the window. Then (#164) the
-    fixed+STIMER profile *infer* arm gained the same pre-window DWT
-    measurement — the debug domain is gated only inside the window, so DWT is
-    valid where the measurement happens. Then (#170) busy-loop windows gained
-    the honest compile-time ``window_target_ms`` announce in both window
-    modes, and ``power_only`` became the template's first arm — so the
-    hardcoded zero survives only in dedicated power binaries (announce
-    compiled to a no-op, no host listener). The statement lives once, in
-    :data:`EST_MS_GAP`. The renders below prove its printf-placement clauses;
+    Every profile build announces a real duration: infer windows send a
+    measured warm-DWT estimate in both window modes, busy-loop windows send
+    the compile-time ``window_target_ms``. The hardcoded zero survives only
+    in dedicated power binaries, where the announce compiles to a no-op with
+    no host listener. The statement lives once, in :data:`EST_MS_GAP`. The
+    renders below prove its printf-placement clauses;
     the *runtime and host-policy* clauses (the no-op ``hpx_printf``
     definition, an estimate degrading to 0 under a frozen DWT, the host's
     hold-floor and cap) are firmware/runtime/host facts a render census
@@ -1294,11 +1257,6 @@ def test_csv_row_format_is_pinned_per_engine():
     # Cortex-M4 profiler folds it into the single call pinned above.
     for label, text in (("tflm", tflm), ("helia-aot", aot), ("executorch", et)):
         assert 'hpx_printf(",%d\\n"' in text, label
-
-
-# ---------------------------------------------------------------------------
-# Emission discipline
-# ---------------------------------------------------------------------------
 
 
 def _dunder_all_positions(source: str) -> set[tuple[int, int]]:

@@ -20,29 +20,19 @@ from .placement import Placement
 if TYPE_CHECKING:
     from .capabilities import SocCapabilities
 
-# ---------------------------------------------------------------------------
-# SoC family (determines core, PMU tier, and MVE availability)
-# ---------------------------------------------------------------------------
-
 
 class SocFamily(Enum):
-    """Ambiq SoC generation families."""
-
     AP3 = "ap3"  # Apollo3 / Apollo3P — Cortex-M4F, DWT only
     AP4 = "ap4"  # Apollo4 / Apollo4P / Apollo4L — Cortex-M4F, DWT only
     AP5 = "ap5"  # Apollo5 / Apollo510 / Apollo510L / Apollo330P — Cortex-M55, full PMU + MVE
 
 
 class CoreArch(Enum):
-    """ARM core architectures relevant to profiling capabilities."""
-
     CORTEX_M4 = "cortex-m4"
     CORTEX_M55 = "cortex-m55"
 
 
 class PmuTier(Enum):
-    """PMU capability tiers."""
-
     DWT_ONLY = "dwt"  # Cortex-M4: DWT cycle counter, limited event support
     ARMV8M_PMU = "pmu"  # Cortex-M55: Full Armv8-M PMU, 70+ events, 8 counters
 
@@ -80,11 +70,6 @@ class SocOrigin(Enum):
     CUSTOM = "custom"
 
 
-# ---------------------------------------------------------------------------
-# SoC definition
-# ---------------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
 class MemoryLayout:
     """Memory sizes in KB.  0 means not present on this SoC."""
@@ -106,11 +91,9 @@ class MemoryRange:
 
     @property
     def end(self) -> int:
-        """Exclusive end address."""
         return self.start + self.length
 
     def contains(self, address: int) -> bool:
-        """True if *address* falls inside this range."""
         return self.start <= address < self.end
 
 
@@ -137,8 +120,6 @@ class ClockSpeed:
 
 @dataclass(frozen=True)
 class ClockDomain:
-    """An independently selectable clock domain on a SoC (e.g. cpu)."""
-
     name: str
     speeds: tuple[ClockSpeed, ...]
     default: str  # name of the default speed
@@ -155,17 +136,17 @@ class ClockDomain:
 class SocDef:
     """Definition of an Ambiq SoC relevant to profiling."""
 
-    name: str  # e.g. "apollo510"
+    name: str
     family: SocFamily
     core: CoreArch
     pmu_tier: PmuTier
     has_mve: bool  # Helium / MVE vector extensions
     memory: MemoryLayout
     clocks: tuple[ClockDomain, ...]
-    c_define: str  # e.g. "AM_PART_APOLLO510"
-    cmsis_header: str  # e.g. "apollo510.h"
+    c_define: str
+    cmsis_header: str
     rtt_scan_ranges: tuple[tuple[int, int], ...]
-    jlink_device: str = ""  # J-Link device string (e.g. "AP510NFA-CBR")
+    jlink_device: str = ""
     pmu_max_ops: int = 2048  # Max PMU accumulator operations (layers)
     #: SWO/ITM trace reference clock (MHz), when the TPIU TRACECLKIN is NOT the
     #: CPU clock.  Apollo3 routes a dedicated, CPU-independent clock to the
@@ -188,19 +169,17 @@ class SocDef:
     #: though it maps to the same "power everything" register value
     #: (PWRENSSRAM_ALL) on every AP5 part: AP510/AP510B/AP5B have 3 MB of
     #: SSRAM (AM_HAL_PWRCTRL_SRAM_3M), while apollo330P has only ~1.75 MB
-    #: (AM_HAL_PWRCTRL_SRAM_1P75M) -- confirmed 2026-07 against the real
-    #: synced HAL headers for each part; the two are NOT interchangeable
+    #: (AM_HAL_PWRCTRL_SRAM_1P75M); the two are NOT interchangeable
     #: (apollo330P's am_hal_pwrctrl.h does not define SRAM_3M at all).
     ssram_full_power_enum: str = "AM_HAL_PWRCTRL_SRAM_3M"
 
     #: Whether this part's HAL exposes am_hal_pwrctrl_rss_pwroff() (the
     #: internal radio subsystem / BLE-radio power-down AutoDeploy calls in
     #: ns_power_platform_config() when the app doesn't need Bluetooth).
-    #: Confirmed 2026-07 by checking the synced AmbiqSuite HAL headers
-    #: directly: apollo330P and apollo510L define it; the plain apollo510
-    #: (non-L) HAL this project's "apollo510"/"apollo510b" SocDefs use does
-    #: NOT -- calling it there would be a link error, so this must stay
-    #: per-part rather than assumed true for the whole AP5 family.
+    #: apollo330P and apollo510L define it; the plain apollo510 (non-L) HAL
+    #: this project's "apollo510"/"apollo510b" SocDefs use does NOT --
+    #: calling it there would be a link error, so this must stay per-part
+    #: rather than assumed true for the whole AP5 family.
     has_radio_subsystem: bool = False
 
     #: Attached microNPU accelerator config string (Vela's
@@ -262,8 +241,7 @@ class SocDef:
           cannot catch.
           ``replace(get_soc("apollo510"), name="atomiq110")`` would otherwise
           keep ``BUILTIN`` and read atomiq110's per-SoC override -- an address
-          belonging to a different part, which is the df34b6e forgery reopened
-          one dimension over.
+          belonging to a different part.
         * An ``is _SOCS[name]`` identity check alone is too strict, and was the
           bug ``origin`` replaced: ``get_soc_for_board`` returns a ``replace``
           copy whenever the board overrides ``psram_kb`` (7 built-in boards do),
@@ -314,11 +292,9 @@ class SocDef:
         a debugger attached incidentally, but the UART/USB readers release the
         probe, so per-layer cycles read back as 0.  When this is True those
         readers must hold a pylink session open for the whole capture (see
-        ``attached_reset_session``).  AP3 gating was confirmed empirically
-        (2026-06-27): AOT-over-UART read 0 cycles until the probe was held
-        attached, after which it matched the RTT/SWO cycle counts.  AP5
-        (Cortex-M55) uses the resettable Armv8-M PMU and its secure bootloader
-        prefers the probe released, so it stays False.
+        ``attached_reset_session``).  AP5 (Cortex-M55) uses the resettable
+        Armv8-M PMU and its secure bootloader prefers the probe released, so
+        it stays False.
         """
         return self.capabilities.transport.requires_attached_probe_for_cycles
 
@@ -348,10 +324,6 @@ class SocDef:
         return tuple(domains)
 
 
-# ---------------------------------------------------------------------------
-# Built-in SoC registry
-# ---------------------------------------------------------------------------
-
 _SOCS: dict[str, SocDef] = {}
 
 
@@ -371,8 +343,6 @@ def _register_soc(soc: SocDef) -> SocDef:
     return registered
 
 
-# --- AP3 family (Cortex-M4F) ------------------------------------------------
-
 _register_soc(
     SocDef(
         name="apollo3p",
@@ -385,14 +355,12 @@ _register_soc(
         # 0x10000000, and 700 KB main SRAM ("RWMEM") at 0x10011000.
         #
         # The TCM is genuine tightly-coupled memory in silicon (datasheet: "64
-        # kB TCM", zero-wait-state, DMA-excluded) — but the nsx linker's
-        # default `.bss`/`.data` targets RWMEM, not TCM; historically only
-        # `.tcm` *code* (NSX_MEM_FAST_CODE) reached the real TCM. Data placed
-        # there via NSX_MEM_FAST_BSS silently fell back to RWMEM (a no-op
-        # macro) until nsx-ambiq-sdk#29 added a dedicated NOLOAD `.tcm_bss`
-        # section. dtcm_kb=64 here (and the Placement.TCM base below) reflect
-        # that fix — hpx build against an nsx-ambiq-sdk revision without it
-        # will silently place the "TCM" arena in RWMEM instead.
+        # kB TCM", zero-wait-state, DMA-excluded); the nsx linker's default
+        # `.bss`/`.data` targets RWMEM, not TCM. dtcm_kb=64 here (and the
+        # Placement.TCM base below) require nsx-ambiq-sdk#29's dedicated
+        # NOLOAD `.tcm_bss` section for NSX_MEM_FAST_BSS data placement — an
+        # nsx-ambiq-sdk revision without it silently places the "TCM" arena
+        # in RWMEM instead.
         memory=MemoryLayout(mram_kb=2000, sram_kb=700, dtcm_kb=64),
         clocks=(
             ClockDomain(
@@ -425,8 +393,6 @@ _register_soc(
         has_usb=False,
     )
 )
-
-# --- AP4 family (Cortex-M4F) ------------------------------------------------
 
 _register_soc(
     SocDef(
@@ -478,8 +444,6 @@ _register_soc(
     )
 )
 
-# --- AP5 family (Cortex-M55, full PMU + MVE) --------------------------------
-
 _register_soc(
     SocDef(
         name="apollo510",
@@ -493,9 +457,8 @@ _register_soc(
             dtcm_kb=512,
             itcm_kb=256,
             # apollo510_evb populates an AP Memory APS512XXB (512 Mbit =
-            # 64 MB) hex PSRAM on MSPI0 — proven on real hardware via XIP
-            # address-aliasing (+32 MB holds distinct data) during the
-            # 2026-07-05 non-B PSRAM validation, matching the 510B finding.
+            # 64 MB) hex PSRAM on MSPI0, confirmed via XIP address-aliasing
+            # (+32 MB holds distinct data).
             psram_kb=65536,
             nvm_kb=8192,
         ),
@@ -535,10 +498,8 @@ _register_soc(
             dtcm_kb=512,
             itcm_kb=256,
             # apollo510b_evb populates an AP Memory APS512XXN (512 Mbit =
-            # 64 MB) hex PSRAM on MSPI0 — proven by XIP address-aliasing on
-            # real hardware (+32 MB is distinct storage, +64 MB wraps) during
-            # the 2026-07-05 PSRAM bring-up. The 32 MB value was inherited
-            # from the apollo510_evb assumption and under-reported capacity.
+            # 64 MB) hex PSRAM on MSPI0, confirmed via XIP address-aliasing
+            # (+32 MB is distinct storage, +64 MB wraps).
             psram_kb=65536,
         ),
         clocks=(
@@ -593,7 +554,6 @@ _register_soc(
     )
 )
 
-# AP330 — Cortex-M55, belongs to AP5 family despite the "3" in the name
 _register_soc(
     SocDef(
         name="apollo330P",
@@ -602,31 +562,20 @@ _register_soc(
         pmu_tier=PmuTier.ARMV8M_PMU,
         has_mve=True,
         memory=MemoryLayout(
-            # Corrected 2026-07 against the actual synced NSX linker script
-            # (nsx-core/src/apollo330P/gcc/linker_script_sbl.ld) for this
-            # Rev1 EVB -- the previous values were copy-pasted from
-            # apollo510 (same address map/family) but this SoC's real
-            # memory regions are substantially smaller:
-            #   MCU_TCM     0x20000000, LENGTH=245760  ->  240 KB (was 512)
-            #   SHARED_SRAM 0x20080000, LENGTH=1835008 -> 1792 KB (was 3072)
-            #   MCU_MRAM    0x00410000, LENGTH=2031616 -> 1984 KB app-usable
-            #               (post-SBL; was 4096, the AP510 full-part value)
-            # This board's linker script does not declare a separate ITCM
-            # region at all (unlike AP510's split ITCM/DTCM banks) -- TCM is
-            # unified into the single MCU_TCM region above, so itcm_kb=0
-            # rather than carrying over AP510's 256.
+            # Values match this Rev1 EVB's NSX linker script
+            # (nsx-core/src/apollo330P/gcc/linker_script_sbl.ld): MCU_TCM
+            # 240 KB, SHARED_SRAM 1792 KB, MCU_MRAM 1984 KB app-usable
+            # (post-SBL). No separate ITCM region is declared -- TCM is
+            # unified into MCU_TCM, so itcm_kb=0.
+            #
             # dtcm_kb/sram_kb/mram_kb are direct arena/weights placement
-            # CAPACITY CHECKS (plan_memory.py, validation/matrix.py) --
-            # the previous inflated values would have silently accepted
-            # placements that overflow the real linked memory and only
-            # fail at build/link time (confirmed on real hardware: a KWS
-            # capture's .bss+.data overflowed the true 240 KB MCU_TCM by
-            # 776 bytes while claiming to fit comfortably under 512 KB).
-            # NB: 240 KB is the gcc LINKER region, the right ceiling for
-            # these capacity checks; the hardware DTCM aperture is 256 KB
-            # (SDK DTCM_MAX_SIZE — armlink's scatter tiles to exactly
-            # that). memory_map.py records the aperture; do not cite this
-            # block as "hardware-confirmed 240" (#176 review M-1).
+            # CAPACITY CHECKS (plan_memory.py, validation/matrix.py), so
+            # they must reflect the linker region, not the larger hardware
+            # aperture. 240 KB is the gcc LINKER region, the right ceiling
+            # for these checks; the hardware DTCM aperture is 256 KB (SDK
+            # DTCM_MAX_SIZE). memory_map.py records that aperture
+            # separately (#176); do not cite this block as
+            # "hardware-confirmed 240".
             mram_kb=1984,
             sram_kb=1792,
             dtcm_kb=240,
@@ -661,24 +610,14 @@ _register_soc(
         # (JLinkExe still resets generically via -autoconnect without
         # full device-DB knowledge, but never prints the "Cortex-M55
         # identified" banner _inspect_probe_target()/probes match parses,
-        # so probe resolution always reports "unknown target"). Confirmed
-        # 2026-07 against real Apollo330mP Rev1 EVB hardware.
+        # so probe resolution always reports "unknown target").
         jlink_device="Apollo330P_510L",
-        # Corrected 2026-07 alongside the memory-layout fix above: heliaRT's
-        # per-layer PMU profiler (HpxPmuProfiler/g_profiler) statically
-        # reserves ~24 bytes per pmu_max_ops entry regardless of the actual
-        # model's layer count -- at 4096 (copied from apollo510, which has
-        # over 2x this board's real TCM) that alone is ~96 KB, over a third
-        # of this board's real 240 KB MCU_TCM budget, for models that only
-        # use a small fraction of it (KWS: 13 layers, VWW/heliaAOT: 31).
-        # 512 keeps ~16x headroom over the largest layer count seen in this
-        # profiler's own MLPerf Tiny fixtures while freeing ~84 KB of the
-        # real budget back for the arena/model/RTT buffers that actually
-        # need it on this more memory-constrained board.
+        # Bounds the static per-layer PMU buffer (HpxPmuProfiler/g_profiler
+        # reserves ~24 bytes per entry). Smaller than apollo510's 4096 to
+        # fit this board's tighter 240 KB MCU_TCM budget.
         pmu_max_ops=512,
-        # This board's real SSRAM capacity is ~1.75 MB (confirmed via the
-        # linker script fix above), not AP510's 3 MB -- its HAL only
-        # defines AM_HAL_PWRCTRL_SRAM_1P75M (does not have SRAM_3M at all).
+        # This board's SSRAM capacity is ~1.75 MB, not AP510's 3 MB -- its
+        # HAL only defines AM_HAL_PWRCTRL_SRAM_1P75M (no SRAM_3M).
         ssram_full_power_enum="AM_HAL_PWRCTRL_SRAM_1P75M",
         # AP330P's TPIU trace clock is a FIXED 48 MHz XTAL_HS, NOT the CPU
         # clock -- unlike apollo510/5B (core-clocked HFRC_96MHz path).
@@ -805,15 +744,10 @@ _register_soc(
         # would be a link error, unlike apollo330P/apollo510L where the
         # symbol is genuinely present. Left at the dataclass default (False).
         # Ethos-U85 in the 256-MAC configuration (matches the Vela
-        # --accelerator-config the NPU bitstream was generated for; validated
-        # on hardware via nsx npu_person_detect, 2026-08).
+        # --accelerator-config the NPU bitstream was generated for).
         npu="ethos-u85-256",
     )
 )
-
-# ---------------------------------------------------------------------------
-# Physical memory address ranges (for build-time placement verification)
-# ---------------------------------------------------------------------------
 
 # MemoryLayout size field backing each placement region.
 _PLACEMENT_SIZE_FIELD: dict[Placement, str] = {

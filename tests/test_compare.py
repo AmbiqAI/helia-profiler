@@ -1,5 +1,3 @@
-"""Tests for hpx compare result diffs."""
-
 from __future__ import annotations
 
 import csv
@@ -420,7 +418,6 @@ def test_compare_memory_gate_leaves_power_rows_alone(tmp_path: Path):
 
 
 def test_compare_emits_no_dash_rows_for_a_group_neither_run_measured(tmp_path: Path):
-    """Group rows absent on both sides are skipped, not rendered as dashes."""
     for name in ("baseline", "candidate"):
         _write_run(
             tmp_path / name,
@@ -476,7 +473,6 @@ def test_compare_layer_rows_type_dynamic_pmu_counters_as_counter_diffs(tmp_path:
     assert counter.baseline == 800
     assert counter.candidate == 600
     assert counter.delta == -200
-    # Rows with no memory placement data leave the memory fields unset.
     assert row.baseline_memory is None
     assert row.memory_changed is None
 
@@ -565,8 +561,8 @@ def test_compare_includes_aot_memory_placement_diffs(tmp_path: Path):
 
 def test_memory_rows_join_on_the_source_index_not_position(tmp_path: Path):
     """#223: the memory CSV row for original op 5 sits at position 0 after
-    fusion. The old dual layer_id/layer_idx key matched EITHER, so position
-    0's row could attach to whichever layer probed first; the join must key
+    fusion. Keying on execution position instead of the original index
+    could attach it to whichever layer probed first; the join must key
     on the layer's resolved source index only."""
     baseline = tmp_path / "gcc"
     candidate = tmp_path / "atfe"
@@ -751,7 +747,6 @@ def test_derived_analysis_fields_are_not_counter_diffs(tmp_path: Path):
 
 
 def test_layer_diff_row_is_frozen_and_flattens_for_csv(tmp_path: Path):
-    """LayerDiffRow is immutable and its to_flat_dict() output drives the CSV writer."""
     baseline = tmp_path / "gcc"
     candidate = tmp_path / "atfe"
     _write_run(
@@ -947,9 +942,7 @@ class TestMemoryRegionRows:
         from helia_profiler.evaluation.run_metrics import _METRIC_FIELDS
 
         directions = {f.name: f.lower_is_better for f in _METRIC_FIELDS}
-        # The complete table, so a direction cannot change unnoticed. Note
-        # power.inferences_per_joule: main's ``name != "layers"`` hack
-        # coloured a throughput DROP green; the declaration corrects it.
+        # The complete table, so a direction cannot change unnoticed.
         assert {n for n, lower in directions.items() if not lower} == {
             "layers",
             "power.inferences_per_joule",
@@ -987,7 +980,6 @@ def test_compare_survives_a_wider_than_header_layer_row(tmp_path: Path):
         _write_run(
             d, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800]
         )
-    # Append a stray extra column to the baseline's first data row.
     rows = (baseline / "profile_results.csv").read_text().splitlines()
     rows[1] = rows[1] + ",SURPRISE"
     (baseline / "profile_results.csv").write_text("\n".join(rows) + "\n")
@@ -1014,7 +1006,6 @@ def test_compare_summary_json_is_valid_when_a_metric_is_non_finite(tmp_path: Pat
         _write_run(
             d, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800]
         )
-    # Inject a non-finite headline metric into one summary.json.
     summ = json.loads((candidate / "summary.json").read_text())
     summ["total_cycles"] = float("inf")
     (candidate / "summary.json").write_text(json.dumps(summ))

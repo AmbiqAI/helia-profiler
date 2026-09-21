@@ -1,5 +1,3 @@
-"""Tests for the firmware build pipeline stage."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -52,9 +50,9 @@ def test_missing_binary_sections_does_not_fail_successful_build(
 
 
 def test_measured_regions_wiring_passes_soc_and_linker_profile(tmp_path: Path, monkeypatch) -> None:
-    """#177 (Sonnet m2): the stage->measure_memory_regions wiring —
-    the ctx.soc gate, the engine-config linker_profile extraction, and the
-    argument order — pinned end-to-end through the stage."""
+    """#177: the stage->measure_memory_regions wiring — the ctx.soc gate,
+    ctx.soc gate, the engine-config linker_profile extraction, and the
+    argument order."""
     from helia_profiler.platform import get_soc
 
     model = tmp_path / "model.tflite"
@@ -196,7 +194,7 @@ def test_find_target_binary_is_deterministic(tmp_path: Path) -> None:
     (deep / "hpx_profiler.axf").write_bytes(b"deep")
     (tmp_path / "sub" / "hpx_profiler.axf").write_bytes(b"shallow")
     found = find_target_binary(tmp_path, "hpx_profiler")
-    assert found == tmp_path / "sub" / "hpx_profiler.axf"  # shortest path
+    assert found == tmp_path / "sub" / "hpx_profiler.axf"
 
     # extension precedence: .axf pattern is tried before .elf, so even a
     # shallower .elf loses to a deeper .axf.

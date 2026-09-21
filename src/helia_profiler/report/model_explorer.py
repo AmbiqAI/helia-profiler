@@ -31,11 +31,6 @@ if TYPE_CHECKING:
 Num = Union[float, int]
 
 
-# ---------------------------------------------------------------------------
-# Data classes (mirror Model Explorer's node_data_builder.py)
-# ---------------------------------------------------------------------------
-
-
 @dataclass
 class GradientItem:
     """A gradient stop mapping a normalized position [0,1] to a color."""
@@ -47,8 +42,6 @@ class GradientItem:
 
 @dataclass
 class NodeDataResult:
-    """A single per-node value."""
-
     value: Num
     bgColor: str | None = None
     textColor: str | None = None
@@ -75,7 +68,6 @@ class ModelNodeData:
         return json.dumps(data, indent=indent)
 
     def save(self, path: Path | str, indent: int | None = 2) -> None:
-        """Write JSON overlay file."""
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
@@ -85,28 +77,19 @@ class ModelNodeData:
         )
 
 
-# ---------------------------------------------------------------------------
-# Pre-built gradient palettes for common profiling metrics
-# ---------------------------------------------------------------------------
-
 #: Cool-to-hot gradient (green → yellow → red) for cost metrics.
 GRADIENT_COST: list[GradientItem] = [
-    GradientItem(stop=0, bgColor="#22c55e"),  # green-500
-    GradientItem(stop=0.5, bgColor="#eab308"),  # yellow-500
-    GradientItem(stop=1, bgColor="#ef4444"),  # red-500
+    GradientItem(stop=0, bgColor="#22c55e"),
+    GradientItem(stop=0.5, bgColor="#eab308"),
+    GradientItem(stop=1, bgColor="#ef4444"),
 ]
 
 #: Inverted gradient (red → green) for efficiency metrics.
 GRADIENT_EFFICIENCY: list[GradientItem] = [
-    GradientItem(stop=0, bgColor="#ef4444"),  # red-500
-    GradientItem(stop=0.5, bgColor="#eab308"),  # yellow-500
-    GradientItem(stop=1, bgColor="#22c55e"),  # green-500
+    GradientItem(stop=0, bgColor="#ef4444"),
+    GradientItem(stop=0.5, bgColor="#eab308"),
+    GradientItem(stop=1, bgColor="#22c55e"),
 ]
-
-
-# ---------------------------------------------------------------------------
-# Builder helpers
-# ---------------------------------------------------------------------------
 
 
 def build_overlay(
@@ -164,11 +147,6 @@ def build_multi_metric_overlays(
     return overlays
 
 
-# ---------------------------------------------------------------------------
-# Internals
-# ---------------------------------------------------------------------------
-
-
 def _strip_none(d: dict) -> dict:
     """Recursively remove None values from a dict (mirrors ME's remove_none)."""
     cleaned: dict = {}
@@ -182,11 +160,6 @@ def _strip_none(d: dict) -> dict:
         else:
             cleaned[k] = v
     return cleaned
-
-
-# ---------------------------------------------------------------------------
-# Report-stage entry point — builds and saves overlays into model_explorer/
-# ---------------------------------------------------------------------------
 
 
 def _write_model_explorer_overlays(
@@ -215,10 +188,8 @@ def _write_model_explorer_overlays(
     for layer in layers:
         op_str = str(layer.op) if layer.op else ""
         if ":" in op_str:
-            # AOT format — "CONV_2D:3" → use "3" as node key
             node_key = op_str.rsplit(":", 1)[1]
         else:
-            # TFLM / generic — use sequential layer index
             node_key = str(layer.id)
         for key, val in layer.counters.items():
             metrics.setdefault(key, {})[node_key] = val

@@ -293,11 +293,6 @@ def _arena_region_id_lookup(codegen_ctx: Any) -> dict[tuple[str, str, str], int]
     return lookup
 
 
-# ---------------------------------------------------------------------------
-# Memory-plan extraction (from CodeGenContext)
-# ---------------------------------------------------------------------------
-
-
 def _aot_buffer_symbol(
     prefix: str,
     role: str,
@@ -309,7 +304,7 @@ def _aot_buffer_symbol(
 ) -> str | None:
     """The symbol heliaAOT's templates ACTUALLY emit for an arena
     consumer, per the installed wheel's tensors.c.j2 / constants.c.j2 and
-    hpx's main_aot.cc.j2 (#179 review M-3/M-4 corrected both families):
+    hpx's main_aot.cc.j2 (#179):
 
     * cold constant -> {prefix}_arena_const_{mem}__blob (constants.c.j2,
       emitted regardless of allocate_arenas);
@@ -372,14 +367,6 @@ def _extract_memory_plan_from_render_plan(
     prefix: str = "hpx",
     allocate_arenas: bool = True,
 ) -> MemoryPlan | None:
-    """Build a MemoryPlan from the AOT render plan's concrete arenas.
-
-    ``memory_plan.tensor_allocs`` lists every tensor assignment, including
-    transient tensors that share arena storage.  Summing those records inflates
-    runtime RAM.  The render plan is the source of truth for what generated C
-    actually allocates: one buffer per scratch/persistent/constant arena.
-    """
-
     buckets: dict[str, list[MemoryConsumer]] = {}
     total_weights = 0
 
@@ -428,7 +415,7 @@ def _extract_memory_plan_from_render_plan(
                             kind=ConsumerKind.WEIGHTS,
                             # constants.c.j2:44 — the staged SOURCE blob
                             # is named by the RUNTIME memory, placed in
-                            # source memory (#179 review M-3).
+                            # source memory (#179).
                             symbol=(f"{prefix}_arena_const_{runtime_key.lower()}__source"),
                         )
                     )

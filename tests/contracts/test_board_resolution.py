@@ -45,7 +45,6 @@ def test_gpio_pins_resolve_from_board_metadata(board):
     state = get_default_state_gpio_pin(board.name, fallback=_SENTINEL)
     go = get_default_go_gpio_pin(board.name, fallback=_SENTINEL)
 
-    # Never the fallback: the value came from the board definition.
     assert sync != _SENTINEL
     assert state != _SENTINEL
     assert go != _SENTINEL
@@ -116,7 +115,6 @@ def test_no_stage_compares_board_name_strings():
 
 
 def test_atomiq110_fpga_quickstart_loads_with_expected_board():
-    """The checked-in FPGA quickstart must stay loadable and board-specific."""
     config_path = (
         pathlib.Path(__file__).resolve().parents[2]
         / "examples"

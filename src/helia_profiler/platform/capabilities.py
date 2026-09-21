@@ -42,14 +42,10 @@ class ResetCapabilities:
     :class:`helia_profiler.target.lifecycle.ResetStrategy` member.
 
     There is deliberately no per-family "needs lock-step for gated power"
-    flag here.  There used to be (``requires_lockstep_for_gated_power``, set
-    for Apollo5 only, justified by ``debug_reset+swpoi_reset`` spending
-    several seconds in *two* sequential JLinkExe invocations).  The hazard it
-    described is not family-specific: without lock-step the firmware
-    free-runs its measured window straight out of reset, so *any* host-side
-    reset latency can race the gate.  Apollo4 Blue Plus reproduced the same
-    degradation on a single-invocation ``debug_reset`` (issue #114), so the
-    default now keys on the wiring and the capture mode instead -- see
+    flag here: without lock-step the firmware free-runs its measured window
+    straight out of reset, so *any* host-side reset latency can race the
+    gate, regardless of family (issue #114).  The default keys on the wiring
+    and the capture mode instead -- see
     :attr:`helia_profiler.config.PowerConfig.lockstep_resolved`, which is the
     single place that policy lives.
     """
@@ -60,8 +56,6 @@ class ResetCapabilities:
 
 @dataclass(frozen=True)
 class TransportCapabilities:
-    """Transport-related policy that used to be a SoC-family branch."""
-
     #: DWT->CYCCNT lives in the core debug power domain on the Cortex-M4F parts
     #: (Apollo3/3P, Apollo4/4P/4L); the released UART/USB readers must hold a
     #: probe attached for the whole capture or per-layer cycles read back 0.
@@ -76,8 +70,6 @@ class TransportCapabilities:
 
 @dataclass(frozen=True)
 class MemoryCapabilities:
-    """Memory/cache policy that used to be a SoC-family branch."""
-
     #: Cache-coherent Cortex-M55 (Apollo5) parts have a CPU D-cache and need
     #: explicit maintenance around host-shared RTT buffers.
     has_dcache: bool
@@ -100,8 +92,6 @@ class MemoryCapabilities:
 
 @dataclass(frozen=True)
 class ClockCapabilities:
-    """Clock/perf policy that used to be a SoC-family branch."""
-
     #: Base CPU clock (MHz) above which the firmware must enable burst directly
     #: via the AmbiqSuite HAL because NSX's perf-mode switch is a no-op
     #: (Apollo3/3P TurboSPOT).  ``None`` means NSX handles perf switching.
@@ -144,37 +134,20 @@ class ClockCapabilities:
     #: ``broad_peripheral_shutdown`` disables the same domain earlier and
     #: holds it off longer, which is strictly stronger.
     gate_debug_domain_in_window: bool
-    #: Mirrors AutoDeploy's ns_power_down_peripherals(): AP4's implementation
-    #: explicitly powers down IOM/UART/ADC/MSPI(-when-unused)/GFX/DISP/USB/
-    #: PDM/I2S/SDIO/AUDADC/Crypto/VCOMP and the DEBUG power domain at boot;
-    #: AP3's and AP5's implementations are near-empty (AP3:
-    #: ns_power_down_peripherals() is a no-op; AP5 only clears XTAL/VCOMP) --
-    #: those families already read close to the reference baseline without
-    #: this,
-    #: so this is scoped to AP4 only rather than applied everywhere
-    #: speculatively (see AGENTS.md AP4 power-parity investigation, 2026-07).
+    #: Whether firmware powers down IOM/UART/ADC/MSPI(-when-unused)/GFX/
+    #: DISP/USB/PDM/I2S/SDIO/AUDADC/Crypto/VCOMP and the DEBUG power domain
+    #: at boot. True on AP4 only.
     broad_peripheral_shutdown: bool
-    #: Mirrors AutoDeploy's ns_power_platform_config(): on every AP5-family
-    #: run (both AP510 and AP330P -- confirmed identical between
-    #: neuralspot's apollo5/ns_power.c and apollo330/ns_power.c) AutoDeploy
-    #: unconditionally disables the CRYPTO and OTP power domains and the
-    #: voltage comparator (VCOMP) before running the model, since none of
-    #: MLPerf-Tiny-style inference needs them. hpx never did this on any
-    #: board -- confirmed by an audit showing NSX's own nsx_system_init()
-    #: only *transiently* powers CRYPTO/OTP on/off during the SWO
-    #: DCU-unlock handshake, never leaving them off persistently. This is
-    #: deliberately narrower than ``broad_peripheral_shutdown`` (no
-    #: IOM/UART/GFX/etc, no full-SRAM power-off -- those are either
-    #: AP4-specific already-validated behavior or belong in extreme_mode,
-    #: not a normal-use default) and only touches domains no user-facing
-    #: hpx feature (any transport, any engine) ever needs powered.
+    #: Whether firmware disables the CRYPTO and OTP power domains and the
+    #: voltage comparator (VCOMP) before running the model. True on
+    #: AP5-family parts (AP510, AP330P). Narrower than
+    #: ``broad_peripheral_shutdown``: no IOM/UART/GFX/etc, no full-SRAM
+    #: power-off.
     crypto_otp_shutdown: bool
 
 
 @dataclass(frozen=True)
 class SocCapabilities:
-    """Bundle of the typed capability records for one SoC."""
-
     reset: ResetCapabilities
     transport: TransportCapabilities
     memory: MemoryCapabilities
@@ -259,16 +232,8 @@ class SocCapabilities:
         ``CDBGPWRUPREQ`` until the pylink attach completes, and for that span
         ``DWT->CYCCNT`` simply stops advancing.  Any per-iteration delta taken
         across it silently loses exactly that span, so the window reads SHORT
-        -- never long, and never zero, which is why it looks plausible.
-
-        Measured on Apollo4 Blue Plus KBR (#121): two of five otherwise
-        identical runs lost ~204 ms of a ~950 ms window, 21% low, while the
-        later profiled loop -- which runs with the host fully attached -- held
-        at 875-876 us in all five.  Across 7 runs the missing cycles regress on
-        that run's own ``sbl_settle + attach + api_probe`` host phases at
-        r = 0.996, slope 1.04.  Runs whose firmware happened to burn >= 500 ms
-        before the window lost 0-1 ms: the exposure is a race against boot, not
-        a constant.
+        -- never long, and never zero, which is why it looks plausible.  Measured
+        impact of an unguarded window: issue #121.
 
         True exactly when the window is DWT-timed AND DWT depends on an
         attached probe.  Both conjuncts are load-bearing: Apollo5 times the
@@ -423,7 +388,7 @@ def resolve_app_flash_load_addr(soc: SocDef) -> int | None:
       name -- those entries replace built-ins in the merged registry, so a name
       match alone would let a user-chosen string silently outrank the ``family``
       that same user declared, handing their part an address belonging to
-      something else entirely (df34b6e).
+      something else entirely.
     * Tier 3 is only as good as its verification, and that verification is
       per-part: the table's addresses were checked against the NSX facts file
       of every *registered* SoC.  Nothing was checked for a part hpx has never

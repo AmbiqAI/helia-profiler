@@ -25,7 +25,6 @@ def _firmware_meta_to_dict(meta: FirmwareMeta) -> dict[str, Any]:
 
 
 def _metadata_to_dict(meta: RunMetadata) -> dict[str, Any]:
-    """Convert RunMetadata to a JSON-safe dict."""
     d: dict[str, Any] = {
         "schema": RUN_METADATA_SCHEMA,
         "schema_version": RUN_METADATA_SCHEMA_VERSION,
@@ -60,7 +59,6 @@ def _write_run_metadata(ctx: PipelineContext, output_dir: Path) -> Path:
 
     meta_dict = _metadata_to_dict(ctx.run_metadata)
 
-    # Enrich with firmware-reported values from the capture
     if ctx.pmu_result is not None:
         meta_dict["firmware"] = _firmware_meta_to_dict(ctx.pmu_result.meta)
     if ctx.power_result is not None:

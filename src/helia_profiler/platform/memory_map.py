@@ -31,8 +31,7 @@ Aperture rule (applied uniformly): every RAM classification ``window``
 opinion of it — because the two link families carve the same silicon
 differently (gcc may decline to use the top of a TCM that armlink tiles
 exactly full). What differs per link family is only ``app_window``,
-which IS a linker-script fact. (#176 review M-1/M-2 corrected two windows
-that had drifted from this rule.) MRAM windows are deliberately NOT the
+which IS a linker-script fact. MRAM windows are deliberately NOT the
 hardware flash aperture: they start at the SBL-excluded app origin both
 scripts link at (e.g. 0x00410000 on AP5, where hardware MRAM begins at
 0x00400000) — an app section can only ever land in the app window, and
@@ -151,7 +150,7 @@ class LinkedRegionWindow:
     #: headers — the RAM regions), "linker-app-origin" (MRAM: app link
     #: origin to hardware flash top), or "board-knowledge" (PSRAM). The
     #: window and the app extents genuinely have different provenances;
-    #: one string covering both published a false claim (#176 fresh-review).
+    #: one string covering both published a false claim (#176).
     window_provenance: str = "hardware-aperture"
     #: Where the app extents came from — linker-script characterization,
     #: or board knowledge (PSRAM).
@@ -331,7 +330,7 @@ _APOLLO330P = (
     # .dtcm_text precedes .stack into MCU_TCM (and hpx's AOT engine emits
     # .dtcm_text via HELIAAOT_PUT_IN_ITCM on ITCM-less parts), so the
     # stack's position is link-dependent — a fixed carve-out was wrong
-    # (#176 fresh-eyes on a50e63d). armlink extent = MCU_TCM.
+    # (#176). armlink extent = MCU_TCM.
     _window(
         MemoryRegion.DTCM,
         0x20000000,
@@ -417,7 +416,7 @@ def linked_memory_map(
     to CMake, and its scripts declare DIFFERENT regions — on apollo330P,
     AP510-sized ones (the upstream NSX bug in PR #176's report) — so any
     profile other than ``default`` returns empty: the honest "unavailable"
-    instead of a confidently wrong map (#176 fresh-review M-3).
+    instead of a confidently wrong map.
     """
     if linker_profile != "default":
         return ()

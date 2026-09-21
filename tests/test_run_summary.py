@@ -212,7 +212,7 @@ def test_minimal_old_artifact_loads(tmp_path: Path) -> None:
 
 def test_legacy_pair_precedence() -> None:
     """Both spellings present: the older explicit-unit key wins, in the
-    documented order (kills the lens-2 surviving precedence mutants)."""
+    documented order."""
     both_energy = PowerSection.from_dict({"total_energy_uj": 1.0, "energy_uJ": 2.0})
     assert both_energy.energy_uj == 1.0
     both_current = PowerSection.from_dict({"avg_current_ma": 3.0, "avg_current_a": 0.004})

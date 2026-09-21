@@ -148,10 +148,9 @@ def _model_identity_issues(ctx: PipelineContext) -> list[ResultIssue]:
 
     A reported size that is not an integer is neither a match nor a mismatch.
     The wire parser keeps an unparseable ``HPX_MODEL_SIZE`` value as the raw
-    string it received, so a corrupted or foreign line arrives here as text
-    (found by review of the first cut, which formatted it and crashed). That
-    is reported as its own warning rather than coerced away, because silence
-    would read as a verified identity.
+    string it received, so a corrupted or foreign line arrives here as text.
+    That is reported as its own warning rather than coerced away, because
+    silence would read as a verified identity.
     """
     if ctx.pmu_result is None:
         return []

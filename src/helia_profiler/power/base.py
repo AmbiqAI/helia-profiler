@@ -18,8 +18,6 @@ class PowerMode(str, Enum):
 
 @dataclass(frozen=True)
 class PowerSample:
-    """A single power measurement sample."""
-
     timestamp_s: float
     current_a: float
     voltage_v: float
@@ -31,8 +29,6 @@ class PowerSample:
 
 @dataclass(frozen=True)
 class PowerSummary:
-    """Aggregate statistics from a power capture."""
-
     avg_current_a: float
     avg_power_w: float
     peak_current_a: float
@@ -79,10 +75,9 @@ class PowerResult:
     """Complete result of a power capture.
 
     ``metadata`` is the typed :class:`~helia_profiler.power.metadata.PowerMetadata`
-    (#154 Phase 2 breaking change — previously ``dict[str, Any]``; the flat
-    dict view is ``metadata.to_metadata_dict()``). The result is frozen but
-    its metadata is deliberately mutable: pipeline stages enrich it after
-    capture, like ``RunMetadata``.
+    (#154 Phase 2); the flat dict view is ``metadata.to_metadata_dict()``.
+    The result is frozen but its metadata is deliberately mutable: pipeline
+    stages enrich it after capture, like ``RunMetadata``.
     """
 
     summary: PowerSummary
@@ -94,8 +89,6 @@ class PowerResult:
 
 @runtime_checkable
 class PowerDriver(Protocol):
-    """Interface that each power measurement driver must implement."""
-
     #: Whether this driver implements a working host-side GPIO-gated capture
     #: (:meth:`capture_gated`). ``capture_power`` uses this — rather than a
     #: hardcoded driver-name allowlist — to decide whether to arm the
@@ -165,11 +158,6 @@ class PowerDriver(Protocol):
         Only meaningful for external instruments that sit on the power rail
         (e.g. Joulescope).  Drivers that cannot power-cycle should raise
         :class:`PowerError`.
-
-        Args:
-            off_time_s: How long to keep power off (seconds).
-            settle_time_s: How long to wait after restoring power for the
-                target to boot.
         """
         ...
 

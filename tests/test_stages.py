@@ -117,8 +117,8 @@ class TestPrepareEngineStage:
         ctx = _make_ctx(tmp_path, {"engine": {"type": "helia-aot"}})
         ResolvePlatformStage().run(ctx)
         stage = PrepareEngineStage()
-        # Without helia-aot CLI + CMSIS-NN path, prepare() raises EngineError.
-        # Verify the adapter is correctly instantiated by checking the error.
+        # Test env lacks the helia-aot CLI/CMSIS-NN path, so prepare() raises;
+        # the error message is how we confirm the adapter was instantiated.
         with pytest.raises(EngineError, match="helia-aot|heliaAOT|CMSIS-NN"):
             stage.run(ctx)
 

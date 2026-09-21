@@ -114,10 +114,6 @@ class PlanMemoryStage:
                     pct,
                 )
 
-    # ------------------------------------------------------------------
-    # Plan construction
-    # ------------------------------------------------------------------
-
     def _select_plan(self, ctx: PipelineContext) -> MemoryPlan:
         """Prefer the engine-supplied plan; synthesise one otherwise.
 
@@ -247,10 +243,6 @@ class PlanMemoryStage:
             model_weight_bytes=model_bytes,
         )
 
-    # ------------------------------------------------------------------
-    # Capacity + validation
-    # ------------------------------------------------------------------
-
     def _apply_capacities(
         self,
         plan: MemoryPlan,
@@ -314,7 +306,7 @@ class PlanMemoryStage:
             if r.capacity == 0 and r.used > 0:
                 # overflow cannot fire on a 0-capacity region (custom SoC
                 # declared without this memory); say so instead of
-                # validating clean and failing at link (#179 review m10).
+                # validating clean and failing at link (#179).
                 log.warning(
                     "%s: %d B planned into a region with no declared "
                     "capacity — the overflow check cannot see this.",
@@ -349,14 +341,11 @@ class PlanMemoryStage:
         )
 
 
-# ---------------------------------------------------------------------------
 # hpx-owned consumers (#133 Phase 3)
-# ---------------------------------------------------------------------------
 #
 # Sizes the firmware reserves that hpx decides HOST-SIDE, a priori — they
-# belong in the PLAN (the decision record), and their absence was exactly
-# how a plan could "fit" while the link failed. Every constant below is a
-# frozen mirror of a template/vendor fact; the citation is the contract and
+# belong in the PLAN (the decision record) so the overflow check accounts
+# for them. Every constant below mirrors a template/vendor fact;
 # tests/test_plan_memory.py pins the values so drift is a reviewed edit.
 
 #: sizeof of the per-layer record each engine's firmware reserves,
@@ -418,7 +407,7 @@ _BOOT_STACK_BYTES: dict[SocFamily, int] = {
 def _default_bss_region(family: SocFamily) -> MemoryRegion:
     """Where an unattributed static (plain ``.bss``) lands per family.
 
-    AP3 is the exception (#179 review B-1): its gcc script sends ``.bss``
+    AP3 is the exception (#179 B-1): its gcc script sends ``.bss``
     to RWMEM — main SRAM at 0x10011000 — because TCM is only 64 KB
     (apollo3p/gcc/linker_script.ld). AP4/AP5 default ``.bss`` into
     MCU_TCM (DTCM)."""
@@ -603,11 +592,6 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
         model_weight_bytes=plan.model_weight_bytes,
         has_overflow=plan.has_overflow,
     )
-
-
-# ---------------------------------------------------------------------------
-# Placement resolver
-# ---------------------------------------------------------------------------
 
 
 def _resolve_placement(ctx: PipelineContext) -> tuple[Placement, Placement]:

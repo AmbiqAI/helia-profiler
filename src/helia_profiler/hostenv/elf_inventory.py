@@ -50,11 +50,11 @@ def _is_reserved_section_name(name: str) -> bool:
     for the same reason ``.stack`` does not: it is the live stack (armlink
     points the initial SP at its top), so it belongs in the footprint.
 
-    Reachability (updated for #133 Phase 1): originally only the fromelf
-    path saw armlink-style names (the reserved-path readelf regex anchors
-    on a leading dot), but the INVENTORY readelf path takes general names,
-    so ARM_LIB_HEAP now reaches this predicate from both tools — the
-    case-insensitivity is load-bearing on both. Known accepted false
+    Reachability (#133 Phase 1): both the fromelf path and the INVENTORY
+    readelf path (which takes general names, unlike the reserved-path
+    readelf regex anchored on a leading dot) can produce armlink-style
+    names like ARM_LIB_HEAP, so the case-insensitivity is load-bearing on
+    both. Known accepted false
     positive: a user section whose name tokenizes to a heap token (e.g.
     MY_HEAP_STATS, .heap_manager_state) counts as reserved when it is
     NOBITS+allocated; no shipped NSX linker script or scatter produces
@@ -64,10 +64,6 @@ def _is_reserved_section_name(name: str) -> bool:
     return bool(tokens & _RESERVED_NOBITS_NAMES)
 
 
-# ---------------------------------------------------------------------------
-# Section inventory (#133 Phase 1)
-# ---------------------------------------------------------------------------
-#
 # The measured half of the memory model starts here: the full per-section
 # (name, address, size) inventory plus the PT_LOAD segments, captured from
 # the SAME tools the reserved/bss split already runs — readelf kept only
@@ -420,11 +416,6 @@ def section_inventory(
     return SectionInventory(sections=sections, segments=segments, unparsed_rows=unparsed)
 
 
-# ---------------------------------------------------------------------------
-# Symbol inventory (#133 Phase 3)
-# ---------------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
 class SymbolEntry:
     """One sized symbol from the linked image (``nm -S``).
@@ -447,7 +438,7 @@ class SymbolEntry:
 #: nm -S --size-sort row: addr, size, one-letter type, name. GNU nm
 #: emits only sized rows under --size-sort; llvm-nm ALSO emits size-0
 #: rows and undefined/absolute rows (verified on real output — the two
-#: tools are NOT row-identical, #179 review M-5). Sized rows parse;
+#: tools are NOT row-identical, #179). Sized rows parse;
 #: recognisable unsized/undefined shapes are SKIPPED silently; anything
 #: else counts as unparsed.
 _NM_SIZED_ROW_RE = re.compile(r"^([0-9a-fA-F]+)\s+([0-9a-fA-F]+)\s+(\S)\s+(\S+)\s*$")
@@ -466,7 +457,7 @@ def symbol_inventory(
     plus an unparsed-row count, or None on tool failure.
 
     One probe SHAPE serves all four toolchains, with a documented
-    asymmetry (#179 review M-5): GNU nm SYNTHESIZES sizes for some
+    asymmetry (#179): GNU nm SYNTHESIZES sizes for some
     linker-defined symbols from the gap to the next symbol, where
     llvm-nm reports st_size verbatim (often 0) and also prints
     undefined/absolute rows. Real objects (arrays, buffers — everything

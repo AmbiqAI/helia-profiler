@@ -1,5 +1,3 @@
-"""Tests for the error hierarchy."""
-
 import pytest
 
 from helia_profiler.errors import (
@@ -39,8 +37,6 @@ class TestHpxErrorBase:
 
 
 class TestSubclassHierarchy:
-    """All error types should be subclasses of HpxError."""
-
     @pytest.mark.parametrize(
         "cls",
         [

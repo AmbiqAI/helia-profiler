@@ -72,10 +72,7 @@ def _aot_manifest(ctx: PipelineContext) -> list[dict[str, Any]] | None:
 
 
 def write_report(ctx: PipelineContext) -> list[Path]:
-    """Generate all configured report outputs.
-
-    Returns a list of paths to the files written.
-    """
+    """Generate all configured report outputs."""
     pmu = ctx.captured_pmu
 
     output_dir = ctx.config.output.dir.resolve()
@@ -88,7 +85,6 @@ def write_report(ctx: PipelineContext) -> list[Path]:
     detailed = ctx.config.output.detailed
     analysis = ctx.model_analysis
 
-    # --- Always: primary profile results ---
     if fmt == "csv":
         p = _write_csv(pmu, output_dir, analysis, aot_op_manifest=_aot_manifest(ctx))
         paths.append(p)
@@ -113,7 +109,6 @@ def write_report(ctx: PipelineContext) -> list[Path]:
     else:
         raise ReportError(f"Unknown output format: '{fmt}'")
 
-    # --- Always: summary.json ---
     # One evaluation per publication (#202 D5): the summary renders it and
     # the manifest records it -- the same object, so they cannot disagree.
     # Stored on the context (#197) so the console footer and the
@@ -123,18 +118,15 @@ def write_report(ctx: PipelineContext) -> list[Path]:
     p = _write_summary(ctx, output_dir, evaluation)
     paths.append(p)
 
-    # --- Always: run metadata ---
     p = _write_run_metadata(ctx, output_dir)
     paths.append(p)
 
-    # --- Always: exact dependency lock used by this run ---
     if ctx.dependency_lock_path is None or not ctx.dependency_lock_path.is_file():
         raise ReportError("The exact resolved nsx.lock is unavailable for the result bundle.")
     lock_output = output_dir / "nsx.lock"
     shutil.copyfile(ctx.dependency_lock_path, lock_output)
     paths.append(lock_output)
 
-    # --- heliaAOT operator manifest (engine-specific) ---
     p = _write_aot_manifest(ctx, output_dir)
     if p is not None:
         paths.append(p)
@@ -142,7 +134,6 @@ def write_report(ctx: PipelineContext) -> list[Path]:
         if p is not None:
             paths.append(p)
 
-    # --- Model Explorer overlays → model_explorer/ subfolder ---
     if ctx.config.output.model_explorer:
         try:
             me_dir = output_dir / "model_explorer"
@@ -153,12 +144,10 @@ def write_report(ctx: PipelineContext) -> list[Path]:
                 f"Model Explorer overlay generation failed: {exc}",
             ) from exc
 
-    # --- Detailed outputs → detailed/ subfolder ---
     if detailed:
         detail_dir = output_dir / "detailed"
         detail_dir.mkdir(parents=True, exist_ok=True)
 
-        # Per-preset CSV breakdowns
         if len(pmu.presets) > 1:
             for preset_name, pr in pmu.presets.items():
                 if preset_name.startswith("_"):
@@ -166,17 +155,14 @@ def write_report(ctx: PipelineContext) -> list[Path]:
                 p = _write_preset_csv(preset_name, pr.layers, detail_dir)
                 paths.append(p)
 
-        # Per-group (compute-unit) unified CSVs
         if pmu.groups:
             for group_name, group_layers in pmu.groups.items():
                 p = _write_preset_csv(group_name, group_layers, detail_dir)
                 paths.append(p)
 
-        # Memory breakdown JSON
         p = _write_memory_breakdown(ctx, detail_dir)
         paths.append(p)
 
-        # Power summary CSV
         if ctx.power_result is not None:
             p = _write_power_csv(ctx.power_result, detail_dir)
             paths.append(p)

@@ -30,8 +30,6 @@ if TYPE_CHECKING:
 
 
 class GateFailureKind(StrEnum):
-    """Classified gated-capture transition failure."""
-
     NO_GATE_RISE = "no_gate_rise"
     NO_GATE_FALL = "no_gate_fall"
     NO_STATS_WINDOW = "no_stats_window"
@@ -203,18 +201,13 @@ def assess_gate_duration(
     )
 
 
-# ---------------------------------------------------------------------------
-# Firmware window-clock integrity
-# ---------------------------------------------------------------------------
-#
 # The dedicated power binary times its own measured window and reports the
 # result as HPX_POWER_ELAPSED_US. That clock is independent of every host
-# measurement, which makes it the one number that can be silently wrong without
-# anything else looking unhealthy: the completed/requested counts still match,
-# and the gate edges are still observed. Two real regressions have taken
-# exactly this shape -- Apollo4 over-reported its window ~7x (the debug domain
-# the binary powers down holds DWT), and Apollo3 reported exactly 0 (nothing
-# holds that domain up on a free-running binary).
+# measurement, which makes it the one number that can be silently wrong
+# without anything else looking unhealthy: the completed/requested counts
+# still match, and the gate edges are still observed (WORKAROUND
+# helia-profiler#107: a powered-down debug domain or a dead crystal can
+# corrupt this clock without any other signal noticing).
 #
 # What that costs depends on the mode, and the difference matters:
 #   * INTERNAL: the firmware clock IS the denominator. capture/power_terminal.py
@@ -222,9 +215,8 @@ def assess_gate_duration(
 #     current are computed from the broken number and are wrong by the same
 #     factor. Only the integrated energy and charge survive.
 #   * EXTERNAL: the instrument owns every published power number. A broken
-#     firmware clock corrupts elapsed_us and nothing else -- the Apollo3
-#     baseline capture reported elapsed_us=0 and still had average power correct
-#     to 0.19% against the fixed run.
+#     firmware clock corrupts elapsed_us and nothing else; average power and
+#     current stay correct.
 # Severity follows that split; see the collect stage and evaluation.validity.
 #
 # The policy lives here so the collect stage (which raises/warns at capture
@@ -681,11 +673,9 @@ class GateSuppressionReason(StrEnum):
 class GateArbitration:
     """The single composition of the #142/#181 gate verdict.
 
-    The single composition of the gate verdict, replacing hand-composed copies
-    in ``evaluation.validity`` and ``report.summary`` (#195).
-    ``evaluation.validity`` builds one of these per run; the summary
-    renders it; every verdict below is DERIVED from the stored facts, never
-    cached (same rule as :class:`GateDurationIntegrity`).
+    ``evaluation.validity`` builds one of these per run; the summary renders
+    it. Every verdict below is DERIVED from the stored facts, never cached
+    (same rule as :class:`GateDurationIntegrity`).
     """
 
     #: The est*count band verdict, or ``None`` when neither a recorded

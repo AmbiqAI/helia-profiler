@@ -72,9 +72,6 @@ def _load_executorch_adapter() -> "EngineAdapter":
     return ExecuTorchAdapter()
 
 
-# ---------------------------------------------------------------------------
-# Engine adapter registry
-# ---------------------------------------------------------------------------
 # One factory per EngineType — the sole dispatch point for "which adapter
 # implements this engine".  Factories are deferred (not adapter instances)
 # so registering an engine doesn't force-import its heavy module (e.g.

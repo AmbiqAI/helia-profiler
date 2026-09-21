@@ -43,14 +43,13 @@ from .protocol import (
 
 log = logging.getLogger("hpx")
 
-_ENUM_TIMEOUT_S = 15  # max time to wait for USB enumeration
+_ENUM_TIMEOUT_S = 15
 BAUD = 115200  # CDC ignores baud, but pyserial requires a value
 _CDC_PATTERNS = ["/dev/tty.usbmodem*", "/dev/ttyACM*"]
 _JLINK_MARKERS = ("segger", "j-link")
 
 
 def _snapshot_cdc_ports() -> set[str]:
-    """Return set of currently-visible CDC serial ports."""
     ports: set[str] = set()
     for pat in _CDC_PATTERNS:
         ports.update(glob.glob(pat))
@@ -58,7 +57,6 @@ def _snapshot_cdc_ports() -> set[str]:
 
 
 def _is_jlink_port(port: str) -> bool:
-    """Return True when a serial port belongs to the SEGGER J-Link VCOM."""
     for info in list_ports.comports():
         if info.device != port:
             continue
@@ -105,7 +103,6 @@ def _is_foreign_hpx_port(port: str, expected_marker: str | None) -> bool:
 
 
 def _drop_foreign_hpx_ports(ports: list[str], expected_marker: str | None) -> list[str]:
-    """Drop ports that belong to a *different* hpx board from *ports*."""
     return [p for p in ports if not _is_foreign_hpx_port(p, expected_marker)]
 
 
@@ -124,7 +121,6 @@ def _find_port_by_marker(marker: str) -> str | None:
 
 
 def _describe_port(port: str) -> str:
-    """Return a human-readable description of *port* for diagnostics."""
     for info in list_ports.comports():
         if info.device == port:
             bits = [b for b in (info.manufacturer, info.product, info.serial_number) if b]
@@ -133,7 +129,6 @@ def _describe_port(port: str) -> str:
 
 
 def _ambiguous_cdc_error(candidates: list[str]) -> CaptureError:
-    """Build the error raised when the target CDC port cannot be disambiguated."""
     listing = ", ".join(_describe_port(port) for port in candidates)
     return CaptureError(
         "Multiple application USB CDC devices are present and the target could "
@@ -280,7 +275,6 @@ def capture_usb_output(
     def finalize_timing() -> None:
         timing.finalize(timing_out)
 
-    # --- Step 0: snapshot existing CDC ports before reset ---
     pre_existing = _snapshot_cdc_ports()
     log.info("Pre-existing CDC ports: %s", sorted(pre_existing) or "(none)")
 
@@ -315,7 +309,6 @@ def capture_usb_output(
         else:
             port = resolve_cdc_port(marker=usb_marker, pre_existing=pre_existing)
 
-        # --- Step 3: open port with DTR ---
         log.info("Opening USB CDC port: %s", port)
         ser = serial.Serial(
             port=port,
@@ -326,7 +319,6 @@ def capture_usb_output(
         ser.dtr = True
         ser.reset_input_buffer()
 
-        # --- Step 4: collect lines ---
         deadline = time.monotonic() + timeout_s
 
         while time.monotonic() < deadline:

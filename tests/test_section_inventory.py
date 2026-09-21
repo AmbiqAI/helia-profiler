@@ -1,10 +1,9 @@
 """Tests for toolchain_probe's section inventory (#133 Phase 1).
 
 Fixtures are UNEDITED real captures: tests/fixtures/readelf/* from
-Arm GNU Toolchain 15.2.Rel1 (GNU readelf 2.45.1) on an ELF built by the
-committed linker.ld + main.c, and tests/fixtures/fromelf/fw_text_v.txt
-from Arm Compiler 6.23 (the #132 capture). Regeneration commands live in
-the fixture comments.
+Arm GNU Toolchain on an ELF built by the committed linker.ld + main.c,
+and tests/fixtures/fromelf/fw_text_v.txt from Arm Compiler. Regeneration
+commands live in the fixture comments.
 """
 
 from __future__ import annotations
@@ -76,8 +75,8 @@ class TestReadelfInventory:
     def test_null_row_is_skipped_not_misparsed(self, monkeypatch):
         """The NULL row has a BLANK name column — a general (\\S+) name
         group would swallow "NULL" as the name and misalign every column.
-        The type-constrained regex skips it (#133 Phase 1 design note),
-        and it does NOT count as an unparsed row."""
+        The type-constrained regex skips it, and it does NOT count as an
+        unparsed row."""
         inventory = self._inventory(monkeypatch)
         sections, unparsed = inventory
         assert all(s.name != "NULL" for s in sections)
@@ -116,9 +115,9 @@ class TestReadelfInventory:
 
     def test_armlink_style_names_are_captured(self, monkeypatch):
         """The reserved-path regex anchors on a leading dot; the inventory
-        must also see armlink-style names (readelf reads armclang ELFs —
-        the #173 parity proof relied on it). ARM_LIB_HEAP is a linker
-        reservation; ARM_LIB_STACK is live memory."""
+        must also see armlink-style names (readelf reads armclang ELFs).
+        ARM_LIB_HEAP is a linker reservation; ARM_LIB_STACK is live
+        memory."""
         rows = (
             "  [ 4] ARM_LIB_HEAP      NOBITS          200000fc 000174 05faf8 00  WA  0   0  1\n"
             "  [ 5] ARM_LIB_STACK     NOBITS          2005fbf4 000174 001000 00  WA  0   0  1\n"
@@ -158,8 +157,8 @@ class TestReadelfInventory:
 class TestReadelfSegments:
     def test_real_capture_carries_the_load_image_fact(self, monkeypatch):
         """#133 D3: .data runs at 0x20004000 but LOADS at 0x0041003c —
-        the paddr != vaddr segment is why MRAM accounting needs program
-        headers, and the real capture proves the shape."""
+        != vaddr segment is why MRAM accounting needs program headers,
+        and the real capture proves the shape."""
         import helia_profiler.hostenv.toolchain_probe as tp
 
         class _Result:
@@ -225,8 +224,7 @@ class TestFromelfInventory:
     def test_duplicated_field_first_occurrence_wins(self):
         """The .comment section body echoes the armlink command line, which
         can contain field-shaped text — the first occurrence of each field
-        within a block must win (#176: the last-wins mutant
-        survived before this test)."""
+        within a block must win (#176)."""
         listing = (
             "** Section #1\n"
             "\n"
@@ -269,8 +267,8 @@ class TestFromelfInventory:
 
 
 class TestSectionInventoryDispatch:
-    """End-to-end through section_inventory() itself — both branches were
-    previously only tested below the dispatch (#176)."""
+    """End-to-end through section_inventory() itself, covering both
+    branches (#176)."""
 
     def test_gcc_dispatch_runs_readelf_twice_and_threads_results(self, monkeypatch):
         import helia_profiler.hostenv.toolchain_probe as tp
@@ -337,10 +335,10 @@ def test_unknown_readelf_toolchain_degrades(monkeypatch):
 
 
 def test_llvm_readelf_atfe_captures_parse_identically_to_gnu():
-    """D5's ATfE leg: llvm-readelf (what ATfE's spec resolves ``readelf``
-    to) on the same fixture ELF must yield the same inventory and segments
-    as GNU readelf — the captures differ only in header wording the parser
-    never reads."""
+    """llvm-readelf (what ATfE's spec resolves ``readelf`` to) on the same
+    fixture ELF must yield the same inventory and segments as GNU readelf
+    — the captures differ only in header wording the parser never
+    reads."""
     from helia_profiler.hostenv.toolchain_probe import (
         _READELF_INVENTORY_RE,
         _READELF_LOAD_RE,

@@ -1,5 +1,3 @@
-"""Focused tests for phase-aware, verbosity-sensitive progress rendering."""
-
 from __future__ import annotations
 
 from helia_profiler.console.progress import _format_eta, _phase_for_stage, progress_update

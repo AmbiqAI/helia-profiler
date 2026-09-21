@@ -1,7 +1,4 @@
-"""Tests for :class:`EnsureBoardPoweredStage` (driver-agnostic shell) and
-the Joulescope-specific decision matrix that lives on the driver.
-
-The stage is intentionally thin: it instantiates the configured driver and
+"""The stage is intentionally thin: it instantiates the configured driver and
 delegates the whole \"power the board on\" decision to
 :meth:`PowerDriver.ensure_target_powered`. The vendor-specific behavior
 (enumeration, multi-device handling, serial matching) is exercised
@@ -33,11 +30,6 @@ def _ctx(tmp_path: Path, power: dict | None = None) -> PipelineContext:
         overrides["power"] = power
     config = load_config(None, overrides)
     return PipelineContext(config=config, work_dir=tmp_path)
-
-
-# ---------------------------------------------------------------------------
-# Stage-level: it should be a thin shell that just delegates.
-# ---------------------------------------------------------------------------
 
 
 class TestShouldSkip:
@@ -97,11 +89,6 @@ class TestStageDelegation:
         with patch("helia_profiler.power.get_driver", return_value=driver):
             with pytest.raises(PowerError, match="no device"):
                 EnsureBoardPoweredStage().run(ctx)
-
-
-# ---------------------------------------------------------------------------
-# Driver-level: full Joulescope decision matrix.
-# ---------------------------------------------------------------------------
 
 
 def _patch_devices(devices):

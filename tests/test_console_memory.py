@@ -1,7 +1,6 @@
-"""Unit tests for the measured-memory console rendering (#133 Phase 2).
+"""Unit tests for the measured-memory console rendering.
 
-The renderer previously shipped with zero coverage (#177),
-which hid a rich-markup injection through ELF section names (M3).
+Covers escaping ELF section names against rich-markup injection.
 """
 
 from __future__ import annotations
@@ -80,7 +79,6 @@ def test_hostile_section_names_render_escaped_and_do_not_crash():
             ),
         )
     )
-    # The literal names survive, tags un-swallowed:
     assert "[red]evil[/red] .oops" in text
     assert ".weird[/bold]" in text
     assert "unattributed" in text
@@ -102,7 +100,7 @@ def test_all_zero_measured_block_falls_back_to_the_plan_table():
     """#177: a measured block whose every region is idle must
     not suppress the plan table with a header-only shell. The call site
     uses measured_memory_is_renderable — the REAL predicate, not a
-    mirror (follow-up NIT-3)."""
+    mirror."""
     idle = MeasuredMemoryRegions(
         link_family="gnu",
         linker_profile="default",
@@ -114,7 +112,7 @@ def test_all_zero_measured_block_falls_back_to_the_plan_table():
 
 
 def test_police_lines_render_even_when_every_region_is_zero():
-    """Follow-up MINOR-1: everything landing OUTSIDE the characterized
+    """Everything landing OUTSIDE the characterized
     windows is the anomaly the police lines exist for — an all-zero
     region set with unattributed content must still render, not fall back
     to the plan table."""
@@ -138,7 +136,7 @@ def test_police_lines_render_even_when_every_region_is_zero():
 
 
 def test_reserved_only_region_renders_a_row():
-    """Follow-up NIT-2: an armlink DTCM holding only the fixed heap+stack
+    """An armlink DTCM holding only the fixed heap+stack
     reservation is real information — the row must not vanish."""
     reserved_only = MeasuredMemoryRegions(
         link_family="armlink",
@@ -198,7 +196,6 @@ def test_reconciliation_table_renders_all_three_statuses():
     # test_wrong_region_match_renders_the_region below owns that pin.
     # consumer names are escaped like every other ELF-adjacent string:
     assert "[red]sneaky[/red]" in text
-    # the nonzero region delta line renders:
     assert "SRAM" in text and ("96.0 KB" in text or "98,304" in text)
 
 

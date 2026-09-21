@@ -43,7 +43,6 @@ def _cmd_validate(
     list_: bool = False,
     verbose: int = 0,
 ) -> None:
-    """Drive the hardware validation suite via pytest."""
     from ..validation import BOARDS, case_validity
     from ..validation.plan import resolve_plan
 

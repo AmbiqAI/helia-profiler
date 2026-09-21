@@ -53,7 +53,6 @@ log = logging.getLogger("hpx")
 
 
 def _host_monotonic_time64(time64: Any) -> int:
-    """Return a strictly monotonic host timestamp in Joulescope time64 ticks."""
     return time.monotonic_ns() * time64.SECOND // 1_000_000_000
 
 
@@ -227,12 +226,9 @@ def capture_gated(
     # window edges live on the instrument clock — the same axis as the stat
     # packets — at sample-period resolution.  The snapshot poller below stays
     # as the *control* plane (early-stop, GO release, READY qualification) and
-    # as the edge fallback, but its ~5-10 ms cadence plus callback latency can
+    # as the edge fallback, but its poll cadence plus callback latency can
     # merge a pre-window coupling pulse into the true rise (or hold a fall)
-    # under host load, inflating the measured window by ~100 ms — the CI
-    # "gated window duration is suspect" failures.  A streamed edge cannot be
-    # merged: the real quiesce/idle gaps around the window are tens of ms,
-    # orders of magnitude above stream resolution.
+    # under host load.  A streamed edge cannot be merged this way.
     gpi_stream_frames: list[dict[str, Any]] = []
 
     def _on_gpi_data(_topic: str, value: Any) -> None:
@@ -288,7 +284,6 @@ def capture_gated(
         fr_volt_spans.append(_fullrate_sample_span(value, len(data)))
 
     def _stop_fullrate_streams() -> None:
-        """Stop each requested channel and release every attempted subscription."""
         for channel in ("i", "v"):
             try:
                 driver.publish(f"{device_path}/s/{channel}/ctrl", 0, timeout=0)
@@ -463,7 +458,6 @@ def capture_gated(
                     go_release_at = time.monotonic()
                 except Exception:
                     log.warning("on_started hook failed", exc_info=True)
-            # Block until the poller early-stops or the safety bound elapses.
             stop.wait(timeout=duration_s)
         finally:
             stop.set()
@@ -513,11 +507,10 @@ def capture_gated(
                 # The firmware asserts the gate exactly once per run, as the
                 # LAST thing the sync line does before the device parks and
                 # the capture early-stops.  Any earlier qualifying stretch is
-                # the undriven line coupling to pre-window device activity —
-                # observed on an AP510 EVB as a >1 s continuous high through
-                # the busy setup phase, which a duration floor alone cannot
-                # reject.  Sub-minimum segments before OR after are noise
-                # pulses; the raw list goes to diagnostics unfiltered.
+                # the undriven line coupling to pre-window device activity,
+                # which a duration floor alone cannot reject.  Sub-minimum
+                # segments before OR after are noise pulses; the raw list
+                # goes to diagnostics unfiltered.
                 streamed_gate_windows = [qualifying[-1]]
                 gate_edge_source = "gpi_stream"
                 if len(qualifying) > 1:

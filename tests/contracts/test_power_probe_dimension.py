@@ -3,7 +3,7 @@
 `hpx compare` blocks power deltas when `power_clean_window_probe` differs --
 a `busy_loop` window measures a calibrated CPU spin rather than the model, so
 the pair reports the difference between two physical quantities as a
-regression (#125 item 4).
+regression.
 
 Everything downstream of the manifest is checked in tests/test_comparability.py
 against hand-built manifests. That is the wrong place to check the WRITER:
@@ -11,14 +11,11 @@ mutating `report/manifest.py` to stop recording the dimension, or to record it
 for a run that measured no power, left those tests green. This file drives
 `_comparability()` itself so both halves are pinned.
 
-The second test is the one that matters most. An earlier, broader version of
-this dimension was a digest of the whole window context, recorded
-unconditionally -- and because the power floor raises `window_target_ms` only
-when power is enabled, it moved on `power.enabled` alone. Comparing a quick
-latency run against a power-instrumented one then suppressed the candidate's
-real power numbers and reported "the measured window differs", which the user
-had not chosen. Recording only for runs that measured power is what prevents
-that, and it is the same gate every sibling power dimension already uses.
+The second test is the one that matters most: recording the probe only for
+runs that measured power -- the same gate every sibling power dimension
+uses -- keeps a quick latency run comparable against a power-instrumented
+one instead of forcing an unrelated window-context difference into the
+comparison.
 """
 
 from __future__ import annotations

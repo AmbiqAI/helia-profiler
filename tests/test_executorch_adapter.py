@@ -200,8 +200,7 @@ def test_adapter_wraps_root_layout_checkout_for_arm_provider(tmp_path: Path):
     assert "add_subdirectory(" in cmake_text
     assert "include(" not in cmake_text
     assert (wrapper / "nsx-module.yaml").read_text() == (source / "nsx-module.yaml").read_text()
-    # No more work-dir symlink alias — the wrapper delegates straight to the
-    # checkout's own real root layout.
+    # Wrapper delegates straight to the checkout's root layout.
     assert not (tmp_path / "work" / "engine" / "executorch").exists()
 
 
@@ -319,7 +318,6 @@ def test_adapter_explicit_config_overrides_sidecar(tmp_path: Path):
 
     artifacts = ExecuTorchAdapter().prepare(config, tmp_path / "work")
 
-    # Explicit engine.config values win over the sidecar.
     assert artifacts.executorch_planned_arena_size == 2048
     assert artifacts.cmake_vars["NSX_EXECUTORCH_PORTABLE_SELECT_OPS_LIST"] == "aten::clamp.out"
 
@@ -417,8 +415,6 @@ def test_adapter_rejects_wrong_executorch_submodule_commit(
 
 
 def test_adapter_rejects_retired_nsx_subdirectory_layout(tmp_path: Path):
-    # A checkout that only ships the old nsx/ subdirectory layout (no root
-    # nsx-module.yaml/CMakeLists.txt) must be rejected with a clear hint.
     root = tmp_path / "nsx-executorch"
     (root / "nsx").mkdir(parents=True)
     (root / "version.txt").write_text("0.1.0\n", encoding="utf-8")
@@ -444,7 +440,6 @@ def test_adapter_rejects_incomplete_io_contract(tmp_path: Path):
 
 
 def test_executorch_template_has_counter_health_and_true_overflow_mask():
-    # Production's env, not a look-alike -- see issue #119.
     out = _render_executorch_template(
         pmu_passes=[
             {
@@ -461,21 +456,9 @@ def test_executorch_template_has_counter_health_and_true_overflow_mask():
     assert "HPX_PMU_SELFTEST_CPU_CYCLES" in out
     assert 'hpx_printf("HPX_READY\\n")' in out
     assert "HPX_ERROR=operator_count_exceeds_capacity" in out
-    # g_layers is SRAM-resident, so the AP5 shared SSRAM domain must be powered
-    # on for it -- with the HAL declarations for that call actually in scope
-    # via the narrow header, not merely by accident of some other guard pulling
-    # in the umbrella.
-    #
-    # This assertion was briefly weakened to `am_mcu_apollo.h OR
-    # am_hal_pwrctrl.h` when the template became a child of _main_base.cc.j2,
-    # on the theory that the narrow guard "deliberately does not fire a second
-    # time". That was wrong: the extraction had moved
-    # `{% set pmu_profiler_sram_resident %}` 160 lines BELOW the
-    # _system_includes.j2 include that reads it, so the guard's third disjunct
-    # was simply testing an undefined name -- dead, not deliberate, and
-    # invisible under StrictUndefined because the guard spells it
-    # `| default(false)`. The flag is set at the top of the base now, so the
-    # narrow include is emitted again for every SRAM-resident render.
+    # g_layers is SRAM-resident, so the AP5 shared SSRAM domain must be
+    # powered for it, via am_hal_pwrctrl.h included through the narrow
+    # header (not merely pulled in by the umbrella) on every render.
     assert "am_hal_pwrctrl_sram_config(&sramCfg)" in out
     assert '#include "am_hal_pwrctrl.h"' in out
     assert "g_logical_overflow_mask |= 1UL << (2 * i + 1)" in out
@@ -487,7 +470,6 @@ def test_executorch_template_has_counter_health_and_true_overflow_mask():
 
 
 def test_executorch_template_places_complete_workspace_in_sram():
-    # Production's env, not a look-alike -- see issue #119.
     out = _render_executorch_template(
         cmsis_device_header="apollo330P.h",
         pmu_max_ops=512,
@@ -579,7 +561,6 @@ def test_adapter_rejects_non_ram_arena_location(tmp_path: Path):
 
 
 def test_executorch_template_splits_buffer_regions():
-    # Production's env, not a look-alike -- see issue #119.
     out = _render_executorch_template(
         executorch_method_arena_region="sram",
         executorch_temporary_arena_region="sram",
@@ -617,11 +598,6 @@ def test_adapter_rejects_sidecar_with_bad_planned_size(tmp_path: Path):
 
     with pytest.raises(EngineError, match="planned_arena_size.*positive integer"):
         ExecuTorchAdapter().prepare(config, tmp_path / "work")
-
-
-# ---------------------------------------------------------------------------
-# Auto-clone resolution (#160) — source_path absent clones the pinned baseline
-# ---------------------------------------------------------------------------
 
 
 def test_adapter_auto_clones_pinned_checkout_when_source_path_absent(

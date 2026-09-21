@@ -70,11 +70,6 @@ def _packet(
     }
 
 
-# ---------------------------------------------------------------------------
-# One packet
-# ---------------------------------------------------------------------------
-
-
 def test_a_packets_duration_comes_from_its_counter_span():
     p = _packet(index=0)
     t = p["time"]
@@ -115,11 +110,6 @@ def test_a_packet_without_a_counter_span_falls_back_to_utc():
 )
 def test_an_unusable_counter_span_falls_back_rather_than_returning_nonsense(block):
     assert _packet_duration_ticks(block, 100.0, 350.0, time64.SECOND) == 250.0
-
-
-# ---------------------------------------------------------------------------
-# The window built from them
-# ---------------------------------------------------------------------------
 
 
 def _window(packets, *, bounds=None):
@@ -213,11 +203,6 @@ def test_a_scale_error_cancels_out_of_the_selection_at_a_real_boundary():
     assert selected["drifting"] == pytest.approx(selected["converged"], rel=1e-9)
 
 
-# ---------------------------------------------------------------------------
-# The diagnostic
-# ---------------------------------------------------------------------------
-
-
 def test_the_filters_error_is_published_as_a_range():
     d = _counter_rate_ratio([_packet(index=i) for i in range(5)])
 
@@ -245,11 +230,6 @@ def test_packets_without_a_time_map_report_nothing_rather_than_a_default():
         del p["time"]["time_map"]
 
     assert _counter_rate_ratio(packets) is None
-
-
-# ---------------------------------------------------------------------------
-# A fit that moves during the capture -- the case the diagnostic exists for
-# ---------------------------------------------------------------------------
 
 
 def _converging(count: int, *, start=COLD_COUNTER_RATE, end=NAMEPLATE):
@@ -295,7 +275,6 @@ def test_a_steady_fit_reports_no_sweep():
 
 
 def test_a_single_rate_excursion_remains_visible():
-    """Even one fitted-rate excursion must remain visible in the range."""
     packets = [_packet(index=i, counter_rate=NAMEPLATE) for i in range(40)]
     packets[7] = _packet(index=7, counter_rate=NAMEPLATE / 2.0)
 
@@ -319,11 +298,6 @@ def test_partial_time_map_coverage_is_reported_as_a_fraction_not_a_count():
     assert d is not None
     assert d["packets_with_time_map"] == 6
     assert d["packets_total"] == 10
-
-
-# ---------------------------------------------------------------------------
-# Cross-checks against the instrument's own statement
-# ---------------------------------------------------------------------------
 
 
 def test_the_recomputed_duration_matches_the_delta_the_driver_reports():
@@ -351,11 +325,6 @@ def test_a_decreasing_counter_pair_falls_back_instead_of_going_negative():
     }
 
     assert _packet_duration_ticks(t, 100.0, 350.0, time64.SECOND) == 250.0
-
-
-# ---------------------------------------------------------------------------
-# The driver's own divisor, and the cross-check path
-# ---------------------------------------------------------------------------
 
 
 def test_delta_is_preferred_because_it_is_the_integrals_own_divisor():
@@ -507,11 +476,6 @@ def test_the_fullrate_axis_follows_a_fit_that_moves_mid_capture():
     assert out["windows"][0]["duration_s"] == pytest.approx(0.010, rel=1e-12)
 
 
-# ---------------------------------------------------------------------------
-# The fallback and its counter must agree about what "usable" means
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.parametrize(
     "block, why",
     [
@@ -525,9 +489,9 @@ def test_the_fullrate_axis_follows_a_fit_that_moves_mid_capture():
     ],
 )
 def test_an_unusable_packet_falls_back_and_is_counted_as_such(block, why):
-    """The count and the fallback share one predicate. They did not: the count
-    used container truthiness where the fallback used validity, so a zero-span
-    packet took the utc path while the diagnostic reported that none had."""
+    """The count and the fallback share one predicate: both treat a packet
+    as unusable by the same validity check, so a packet that falls back to
+    utc is also counted as having done so."""
     t = dict(block)
     t["utc"] = {"value": [0, 250]}
 

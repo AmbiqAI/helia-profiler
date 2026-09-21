@@ -62,7 +62,6 @@ def _write_summary(
     if ctx.run_metadata.dependencies is not None:
         summary["dependencies"] = ctx.run_metadata.dependencies.to_dict()
 
-    # Top layers by cycles
     summary["top_layers"] = [
         {
             "op": l.op,
@@ -72,7 +71,6 @@ def _write_summary(
         for l in sorted_layers[:5]
     ]
 
-    # Memory from firmware meta
     mem: dict[str, Any] = {}
     if meta.arena_size is not None:
         mem["arena_size"] = meta.arena_size
@@ -110,7 +108,6 @@ def _write_summary(
             ctx.memory_reconciliation
         )
 
-    # Binary sections
     if ctx.binary_sections is not None:
         bs = ctx.binary_sections
         summary["binary"] = {
@@ -122,12 +119,10 @@ def _write_summary(
         if bs.reserved:
             summary["binary"]["reserved"] = bs.reserved
 
-    # Cache / memory counter totals (summed across all layers)
     cache = _cache_totals(layers)
     if cache:
         summary["cache"] = cache
 
-    # Model analysis — MACs, OPS, TOPS
     if ctx.model_analysis is not None:
         ma = ctx.model_analysis
         # Vela ethos-u custom ops are opaque to the analyzer: their MACs,
@@ -146,7 +141,6 @@ def _write_summary(
             analysis_dict["cycles_per_op"] = round(total_cycles / ma.total_ops, 2)
         summary["model_analysis"] = analysis_dict
 
-    # Power summary
     if ctx.power_result is not None:
         ps = ctx.power_result.summary
         # Serialization boundary: the report is built from the flat view.
@@ -223,12 +217,9 @@ def _write_summary(
                 f"clean_window_probe={ctx.config.profiling.clean_window_probe} runs no inferences"
             )
         elif arbitration is not None and arbitration.suppress_per_inference:
-            # Name the gate verdict in the artifact, not only in the log.
-            # This field used to be written for the busy_loop probe alone, so
-            # a summary.json reader could see the per-inference figures
-            # missing with nothing to say which of the four verdicts withheld
-            # them. Written here rather than beside the suppression itself so
-            # the key lands in its model-declared position.
+            # Records which gate verdict suppressed the per-inference figures.
+            # Written here, not beside the suppression, so the key lands in
+            # its model-declared position.
             summary["power"]["per_inference_metrics_omitted"] = str(arbitration.suppression_reason)
         if measurement_scope == "gpio_gated_clean_window":
             if ctx.power_result.gated_windows:
@@ -449,8 +440,8 @@ def _write_summary(
         # TOPS is ops-derived: a busy-loop window ran ZERO model ops, so
         # publishing a TOPS/W figure for it would be fabricated — the same
         # probe guard every other per-inference derivation in this function
-        # applies (#172 review; the busy-loop clean_count of 1 would
-        # otherwise silently price one window as one inference).
+        # applies (the busy-loop clean_count of 1 would otherwise silently
+        # price one window as one inference).
         infer_count = window_inference_count(ctx)
         if (
             probe_ran_inferences
@@ -497,7 +488,7 @@ def _write_summary(
 def _assert_model_owns_the_shape(model: RunSummary, rendered: str, summary: dict[str, Any]) -> None:
     """The written bytes must equal what this function assembled.
 
-    Full round-trip equality, not just a keyset check (#205 review): a
+    Full round-trip equality, not just a keyset check: a
     wrong-typed section silently becomes ``None`` in ``from_dict`` and
     would VANISH from the artifact without tripping an unknown-keys scan,
     and a value the reader coerces would ship altered. Any divergence --

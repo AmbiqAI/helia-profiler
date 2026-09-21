@@ -113,7 +113,7 @@ class CollectPowerTerminalStage:
                 # error_code carries the last settle probe's tick count
                 # PLUS ONE (the envelope forbids error_code 0 with
                 # status=error, and 0 ticks is the stopped-crystal
-                # signature — #180 review B2).
+                # signature — see #180).
                 last_ticks = max(0, terminal.error_code - 1)
                 hint = (
                     "The 32.768 kHz crystal (XT) that clocks the "

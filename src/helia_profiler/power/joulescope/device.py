@@ -21,11 +21,6 @@ log = logging.getLogger("hpx")
 _OPEN_RETRY_TIMEOUT_S = 3.0
 _OPEN_RETRY_INTERVAL_S = 0.25
 
-
-# ---------------------------------------------------------------------------
-# Family-specific topic / value tables
-# ---------------------------------------------------------------------------
-
 #: Stats topic per family.  JS110 has an always-on instrument-side stats
 #: stream (``s/sstats/value``) that does not need to be enabled; JS220/JS320 use
 #: the host-side ``s/stats/value`` stream gated by ``s/stats/ctrl``.
@@ -87,17 +82,12 @@ def _family_from_path(device_path: str) -> str:
     )
 
 
-# ---------------------------------------------------------------------------
-# Process-wide pyjoulescope_driver.Driver singleton
-#
 # ``pyjoulescope_driver`` is implemented in C/Cython and is designed for a
 # single long-lived ``Driver`` instance per process.  Constructing and
 # ``finalize()``-ing it repeatedly (e.g. once per capture, once per power-
 # cycle) leads to USB-state confusion and, in practice, hard segfaults on
 # macOS.  We keep one shared instance, opened lazily on first use, and
 # released only at interpreter shutdown via ``atexit``.
-# ---------------------------------------------------------------------------
-
 _shared_driver: Any = None
 
 #: Per-device-path open refcount.  Several callers can hold a logical "open"
@@ -178,9 +168,7 @@ def _is_device_busy_error(message: str) -> bool:
 
 
 def _open_device(serial: str | None) -> tuple[Any, str, str]:
-    """Open the selected device on the shared driver, returning ``(driver, path, family)``.
-
-    The caller must release the device with :func:`_close_device` (or ignore
+    """The caller must release the device with :func:`_close_device` (or ignore
     that step if the device handle should remain open across calls — e.g.
     passthrough).
     """
@@ -261,9 +249,7 @@ def _open_device(serial: str | None) -> tuple[Any, str, str]:
 
 
 def _close_device(drv: Any, device_path: str) -> None:
-    """Release one logical open on *device_path*.
-
-    Only calls ``drv.close`` once every :func:`_open_device` caller for this
+    """Only calls ``drv.close`` once every :func:`_open_device` caller for this
     path has released it, so one caller finishing early (e.g. a sync
     controller during an active gated capture) never tears down another
     caller's still-active handle.
@@ -281,9 +267,7 @@ def _close_device(drv: Any, device_path: str) -> None:
 
 
 def enumerate_devices() -> list[tuple[str, str]]:
-    """Return ``[(device_path, family), ...]`` for connected Joulescopes.
-
-    Lightweight discovery: opens the shared :mod:`pyjoulescope_driver`
+    """Lightweight discovery: opens the shared :mod:`pyjoulescope_driver`
     handle but does **not** open any individual device. Raises
     :class:`PowerError` if the driver package is missing or the underlying
     enumeration call fails (e.g. libusb permissions).
@@ -307,9 +291,7 @@ def enumerate_devices() -> list[tuple[str, str]]:
 
 
 def _extract_scalar(node: Any, default: float = 0.0) -> float:
-    """Return a float from an stats sub-node.
-
-    The ``pyjoulescope_driver`` stats packet wraps numeric values in a
+    """The ``pyjoulescope_driver`` stats packet wraps numeric values in a
     ``{'value': <number>, 'units': <str>}`` dict.  Older packets (and the
     JS220 host-side stream variant) use bare floats.  Handle both.
     """

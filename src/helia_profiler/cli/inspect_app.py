@@ -41,11 +41,6 @@ def register(app: typer.Typer) -> None:
     app.add_typer(target_app, name="target")
 
 
-# ---------------------------------------------------------------------------
-# hpx doctor / engines / boards
-# ---------------------------------------------------------------------------
-
-
 def doctor_command(
     json_: Annotated[bool, typer.Option("--json", help="Emit machine-readable JSON")] = False,
     bundle: Annotated[
@@ -141,10 +136,6 @@ def boards_command() -> None:
     _cmd_boards()
 
 
-# ---------------------------------------------------------------------------
-# hpx probes {list, match}
-# ---------------------------------------------------------------------------
-
 probes_app = typer.Typer(
     help="Inspect connected J-Link probes without opening an interactive SEGGER commander session",
 )
@@ -194,10 +185,6 @@ def probes_match_command(
     _cmd_probes_match(board=board, jlink_serial=jlink_serial, json_=json_)
 
 
-# ---------------------------------------------------------------------------
-# hpx ports {list}
-# ---------------------------------------------------------------------------
-
 ports_app = typer.Typer(help="List host serial ports relevant to HPX transports")
 
 
@@ -222,10 +209,6 @@ def ports_list_command(
 
     _cmd_ports_list(show_all=show_all, json_=json_)
 
-
-# ---------------------------------------------------------------------------
-# hpx target {reset}
-# ---------------------------------------------------------------------------
 
 target_app = typer.Typer(help="Run explicit target-side utility operations")
 

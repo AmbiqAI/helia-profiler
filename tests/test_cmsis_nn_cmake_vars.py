@@ -73,7 +73,7 @@ def _assert_policy(cmake_vars: dict[str, str], *, fp16: bool, fp32: bool = True)
         (M55, FP16, True, True),
         (M55, FP16_WEIGHTS, True, True),  # widening f16 weights is f16 work on an MVE-F core
         (M55, FP32, True, False),  # fp32 compute needs no fp16 sources
-        (M55, INT8, False, False),  # neither: ~33 KB of kernels stay out of the image
+        (M55, INT8, False, False),  # neither: fp32/fp16 kernels stay out of the image
         (M4, FP16, True, False),  # no MVE-F core, whatever the model asks
         (M4, FP16_WEIGHTS, True, False),
         (M4, INT8, False, False),

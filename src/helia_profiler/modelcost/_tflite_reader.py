@@ -227,9 +227,8 @@ def read_quantized_softmax_ops(buf: bytes) -> list[SoftmaxOp]:
                     subgraph_index=sg_index,
                     op_index=op_index,
                     # Placeholder only when the field is ABSENT; an empty
-                    # string is a real (if useless) name and stays '' -- `or`
-                    # conflated the two, diverging from litert on 12 of 8,424
-                    # fuzz mutants (cosmetic, but the oracle should agree).
+                    # string is a real (if useless) name and stays '' --
+                    # cosmetic, but the oracle should agree with litert.
                     input_tensor=name if name is not None else f"tensor_{tensor_index}",
                     input_type=tensor_type,
                     input_scale=scale,

@@ -27,7 +27,7 @@ def test_source_modules_stay_below_size_ceiling() -> None:
 
 
 def test_no_engine_adapter_imports_out_of_another_engines_package() -> None:
-    """Shared engine logic lives in engines/, not inside one engine (issue #7).
+    """Shared engine logic lives in engines/, not inside one engine.
 
     ``cmsis_nn_module_ref`` started inside the heliaAOT package, and heliaRT
     and ExecuTorch both grew imports reaching into it -- three engines
@@ -60,7 +60,7 @@ def test_no_engine_adapter_imports_out_of_another_engines_package() -> None:
                 continue
             for other in engine_packages:
                 if other == owner:
-                    continue  # its own package
+                    continue
                 if f".{other} import" in stripped or f".{other}." in stripped:
                     offenders.append(f"{rel}:{line_no}: {stripped}")
 
@@ -173,10 +173,6 @@ def test_wheel_contains_only_canonical_evaluation_modules(tmp_path: Path) -> Non
     ]
 
 
-# ---------------------------------------------------------------------------
-# #229 D2 — layering contracts for the vocabulary leaf and light package inits
-# ---------------------------------------------------------------------------
-
 _SRC = Path(__file__).resolve().parent.parent / "src" / "helia_profiler"
 
 
@@ -240,9 +236,8 @@ def test_engines_package_init_stays_stdlib_light() -> None:
 
 def test_platform_never_imports_the_config_layer() -> None:
     """The silicon-info package must not know the config resolver exists —
-    the old lazy ``config.Toolchain`` import was the one documented
-    config<->platform cycle, inverted in #229 D2 (platform owns the
-    toolchain-name map). Lazy and guarded imports count too."""
+    platform owns the toolchain-name map (#229 D2). Lazy and guarded
+    imports count too."""
     offenders = {
         path.name: hits
         for path in sorted((_SRC / "platform").glob("*.py"))

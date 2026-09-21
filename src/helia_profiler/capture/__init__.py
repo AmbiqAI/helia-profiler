@@ -61,7 +61,6 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
     heartbeat_timeout_s = hb.host_timeout_s if hb.enabled else 300
     overall_timeout_s = hb.overall_timeout_s
 
-    # Resolve J-Link device string from the SoC registry — hard error if missing
     if ctx.soc is None or not ctx.soc.jlink_device:
         raise CaptureError(
             "No J-Link device string — platform resolution did not run.",
@@ -103,10 +102,8 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
             hint="Ensure the firmware is running. Try resetting the board.",
         )
 
-    # --- Firmware error triage --------------------------------------------
-    # Scan for HPX_ERROR= lines before parsing.  A firmware-reported error
-    # is more specific than any "no layer data" fallback message, so surface
-    # it with the best hint we can generate.
+    # A firmware-reported error is more specific than any "no layer data"
+    # fallback message below, so surface it first with the best hint we can.
     _raise_on_firmware_error(lines, power_enabled=bool(ctx.config.power.enabled))
 
     # Pre-parse validation: check for protocol sentinels.  Scan the whole
@@ -292,7 +289,6 @@ def capture_power(
     driver_name = ctx.config.power.driver
     driver = get_driver(driver_name, serial=ctx.config.power.serial)
 
-    # Verify driver is usable
     driver.check_available()
     lifecycle_plan = None
 
@@ -476,17 +472,12 @@ def capture_power(
     )
 
 
-# ---------------------------------------------------------------------------
-# Firmware error classifier
-# ---------------------------------------------------------------------------
-
 # Maps a registered ``HPX_ERROR=<code>`` to a human-readable hint.  The
 # firmware emits these after its own preflight checks so the host can point
 # the user at the real cause instead of blaming the arena for every failure.
-# Every code in ``wire.FirmwareErrorCode`` has an entry here (#165 closed the
-# six-code gap #163 documented); that completeness is pinned by
-# tests/contracts/test_wire_protocol.py, so adding a code without deciding on
-# its hint stays a review decision.
+# Every code in ``wire.FirmwareErrorCode`` has an entry here; that
+# completeness is pinned by tests/contracts/test_wire_protocol.py, so a new
+# code without a hint fails that test.
 _ERROR_HINTS: dict[FirmwareErrorCode, str] = {
     FirmwareErrorCode.SCHEMA_MISMATCH: (
         "The model's schema version does not match what the firmware was "

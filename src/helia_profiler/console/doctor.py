@@ -14,7 +14,6 @@ if TYPE_CHECKING:
 
 
 def print_error(console: HpxConsole, exc: Exception) -> None:
-    """Render a user-facing error."""
     from ..errors import HpxError
 
     if isinstance(exc, HpxError):
@@ -110,6 +109,5 @@ def print_boards(console: HpxConsole, boards: list[tuple[str, str, str, str, str
 
 
 def print_engines(console: HpxConsole, engines: list[str]) -> None:
-    """Render the engine list."""
     for engine in engines:
         console._console.print(f"  [bold]{engine}[/bold]")

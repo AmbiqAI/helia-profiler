@@ -61,10 +61,10 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
     assert {project.name: project.ref for project in baseline.projects} == {
         "neuralspotx": "2dbe12a2799fd8c3df85f1a103b0adca340c901f",
         "nsx-ambiq-sdk": "aefce2ca858795e783c76726ebe7d14d9d4bde7c",
-        # Vendored Arm Ethos-U core driver pulled transitively by nsx-npu.
-        # The packaged registry pins it at the mutable tag
-        # nsx-ethos-u-driver-v0.1.2; the baseline records the peeled commit
-        # so _verify_baseline_resolution covers the NPU sampling path.
+        # Vendored Arm Ethos-U core driver pulled transitively by nsx-npu;
+        # the baseline records the resolved commit, not the registry's
+        # mutable tag, so _verify_baseline_resolution covers the NPU
+        # sampling path.
         "nsx-ethos-u-driver": "f0f99bb124b22486ef55694c76567008680cb5a8",
         "nsx-pmu-armv8m": "5725c065a0c3603132f1064ee2684d1fa8587c88",
         "nsx-tflite-micro": "7afcf2b4170e039caf4c49f91e2c45d5869be333",
@@ -72,15 +72,9 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "ns-cmsis-nn": "aaeb145a67c3decd9869f96474e36e7dbdc2030c",
         "nsx-executorch": "5514ac1ea8439b3fe615d180bf68c75a9dabb48e",
         "helia-rt": "edb3a25fc96c8e9b634dabdb9cd31cb22aa43440",
-        # nsx-sensors v0.3.0 — full datasheet audit of the INA228 driver.
-        # Cumulative fixes that matter here: SHUNT_CAL scaling (v0.2.0),
-        # ADCRANGE moved to its real register (CONFIG bit 4 — earlier code
-        # wrote a VTCT bit, making range-1 calibrations 4x wrong), DEVICE_ID
-        # rev-nibble masking, corrected DIAG_ALRT alert bit positions, and
-        # the SHUNT_CAL write that silently left the register at zero on
-        # Apollo510B (found here — see the hardware bring-up commit). Adds
-        # the raw 40-bit accumulator reads this firmware uses. Pinned for
-        # power.driver: ina228 (issue #95).
+        # nsx-sensors: INA228 driver pinned for the shunt-cal register
+        # fixes and raw 40-bit accumulator reads power.driver: ina228
+        # needs (issue #95).
         "nsx-sensors": "c219a2bc98c62f96819fae20ab6c8911fcea3e25",
     }
     assert {module.name: module.ref for module in baseline.modules} == {
@@ -578,7 +572,6 @@ def test_helia_aot_single_sided_baseline_range_is_not_backfilled_from_constants(
     # a lightweight stand-in avoids ProfileConfig's init=False `compatibility`
     # field (which dataclasses.replace() cannot target directly).
     def _config_with_baseline(new_baseline: object) -> ProfileConfig:
-        # Duck-typed fake: only config.compatibility.baseline is read.
         return cast(
             "ProfileConfig",
             SimpleNamespace(compatibility=SimpleNamespace(baseline=new_baseline)),

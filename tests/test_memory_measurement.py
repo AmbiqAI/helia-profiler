@@ -24,7 +24,6 @@ FIXTURES = Path(__file__).parent / "fixtures" / "readelf"
 
 @pytest.fixture
 def gcc_inventory(monkeypatch):
-    """Route the tool probes at the committed real captures."""
     import helia_profiler.hostenv.toolchain_probe as tp
 
     sections_text = (FIXTURES / "sections.txt").read_text()
@@ -307,11 +306,6 @@ def test_serialised_shape_is_the_contract():
     assert payload["unattributed"] == [{"name": ".x", "address": 0, "size": 1}]
 
 
-# ---------------------------------------------------------------------------
-# Phase 3: symbol inventory + reconciliation
-# ---------------------------------------------------------------------------
-
-
 class TestSymbolInventory:
     def _symbols(self, monkeypatch, text=None):
         import helia_profiler.hostenv.toolchain_probe as tp
@@ -451,9 +445,7 @@ class TestReconciliation:
 
     def test_alias_pair_is_not_double_counted(self):
         """Two MATCHING names over one object (the extern alias plus the
-        mangled static) must sum once. The #179 proved the earlier
-        version of this test vacuous — its alias (_ssdata) never matched
-        a candidate, so the dedup branch never ran."""
+        mangled static) must sum once."""
         from helia_profiler.hostenv.memory_measurement import reconcile_memory
         from helia_profiler.results import MemoryConsumer
         from helia_profiler.hostenv.toolchain_probe import SymbolEntry

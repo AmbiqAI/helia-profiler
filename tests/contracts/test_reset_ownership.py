@@ -13,8 +13,8 @@ owners exist in the baseline and this contract freezes both:
 
 * **Power capture** — ``target_lifecycle.prepare_target_for_phase`` owns the
   reset.  The ``auto`` policy resolves to ``debug_reset`` on AP3/AP4 and to
-  ``debug_reset`` **then** ``swpoi_reset`` on AP5 (the RSTGEN SWPOI deep reset
-  added in the transport-hardening PR, which also clears PMU/power state).
+  ``debug_reset`` **then** ``swpoi_reset`` on AP5 (the RSTGEN SWPOI deep
+  reset, which also clears PMU/power state).
 
 External tools are never touched: reset primitives are monkeypatched to record
 their invocation, and — for the reader paths — to stop execution immediately
@@ -63,8 +63,6 @@ class _ResetStop(CaptureError):
 
 
 class _FakeDriver:
-    """Records rail power-cycle requests; everything else is a no-op."""
-
     def __init__(self) -> None:
         self.power_cycle_calls: list[dict] = []
 
@@ -73,11 +71,6 @@ class _FakeDriver:
 
     def power_cycle(self, *, off_time_s: float = 0.5, settle_time_s: float = 1.0) -> None:
         self.power_cycle_calls.append({"off_time_s": off_time_s, "settle_time_s": settle_time_s})
-
-
-# ---------------------------------------------------------------------------
-# Recorder helpers
-# ---------------------------------------------------------------------------
 
 
 def _install_lifecycle_recorder(monkeypatch) -> list[str]:
@@ -126,11 +119,6 @@ def _install_reader_reset_recorder(monkeypatch, module: str) -> list[str]:
     return events
 
 
-# ---------------------------------------------------------------------------
-# Power-capture lifecycle reset sequences
-# ---------------------------------------------------------------------------
-
-
 class TestPowerLifecycleResetSequences:
     @pytest.mark.parametrize(
         "family,expected",
@@ -152,7 +140,6 @@ class TestPowerLifecycleResetSequences:
             power_driver_name="joulescope",  # duck-typed fake: only the lifecycle surface
         )
         assert events == expected
-        # Plan metadata mirrors the executed sequence.
         if family == "ap5":
             assert plan.reset_action is ResetAction.DEBUG_RESET_THEN_SWPOI
         else:
@@ -222,11 +209,6 @@ class TestPmuPhaseHasNoLifecycleReset:
         assert events == []
         assert plan.reset_action is ResetAction.NONE
         assert plan.actions == ()
-
-
-# ---------------------------------------------------------------------------
-# PMU-capture reader reset ownership
-# ---------------------------------------------------------------------------
 
 
 class TestReaderResetOwnership:
@@ -306,10 +288,6 @@ class TestReaderResetOwnership:
         assert events == [expected]
 
 
-# ---------------------------------------------------------------------------
-# Full (SoC family x transport x power on/off) reset-owner snapshot
-# ---------------------------------------------------------------------------
-
 # For SWO/RTT the reader always releases the probe (JLinkExe reset).  For
 # UART/USB the owner tracks the SoC debug-domain capability: AP3/AP4 hold the
 # probe attached (pylink), AP5 releases it (JLinkExe).
@@ -324,7 +302,6 @@ def _expected_pmu_reset_owner(family: str, transport: str) -> str:
 
 
 def _drive_reader_reset(monkeypatch, tmp_path, family: str, transport: str) -> list[str]:
-    """Return the reset-owner label sequence the PMU reader emits for a combo."""
     module = {
         "swo": "helia_profiler.transport.swo",
         "rtt": "helia_profiler.transport.rtt",
@@ -413,5 +390,4 @@ def test_reset_owner_matrix(monkeypatch, tmp_path, family, transport, power_on):
         expected = ["debug_reset", "swpoi_reset"] if family == "ap5" else ["debug_reset"]
         assert lifecycle_events == expected
     else:
-        # No power capture => no lifecycle reset is issued at all.
         assert lifecycle_events == []

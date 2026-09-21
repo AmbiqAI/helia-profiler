@@ -69,3 +69,5 @@ result-*
 /SOURCES.md
 /ROUTES.md
 /STALE-CLAIMS.md
+# Claude Code worktrees live under the shared .claude dir
+.claude/worktrees/

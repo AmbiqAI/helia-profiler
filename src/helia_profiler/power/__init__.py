@@ -58,10 +58,6 @@ __all__ = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Driver registry
-# ---------------------------------------------------------------------------
-
 _DRIVERS: dict[str, type[PowerDriver]] = {}
 
 
@@ -122,6 +118,5 @@ def get_driver(name: str, *, serial: str | None = None) -> PowerDriver:
 
 
 def list_drivers() -> list[str]:
-    """Return the names of all registered power drivers."""
     _register_builtins()
     return sorted(_DRIVERS)

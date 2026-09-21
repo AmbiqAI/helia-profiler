@@ -1,5 +1,3 @@
-"""Tests for PlanMemoryStage and MemoryPlan dataclasses."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -279,7 +277,6 @@ class TestPlanMemorySynthesise:
         assert ctx.weights_region == "sram"
 
     def test_synth_plan_explicit_mram_keeps_weights_in_mram(self, tmp_path: Path):
-        """Explicit MRAM weights retain automatic fast arena placement."""
         ctx = _make_ctx(
             tmp_path,
             {
@@ -303,7 +300,6 @@ class TestPlanMemorySynthesise:
         assert any(c.kind == "arena" and c.size == 65536 for c in dtcm.consumers)
 
     def test_synth_plan_explicit_mram_falls_back_to_sram_when_tcm_too_small(self, tmp_path: Path):
-        """MRAM weights retain automatic SRAM fallback for a large arena."""
         ctx = _make_ctx(
             tmp_path,
             {
@@ -399,8 +395,6 @@ class TestPlanMemorySynthesise:
         ctx = _make_ctx(tmp_path)
         PlanMemoryStage().run(ctx)
 
-        # Apollo510 has DTCM, ITCM and PSRAM — even tflm default plan
-        # doesn't populate them, but they should appear with capacity.
         assert ctx.memory_plan is not None
         dtcm = ctx.memory_plan.region("DTCM")
         assert dtcm is not None
@@ -410,7 +404,6 @@ class TestPlanMemorySynthesise:
 class TestPlanMemoryEngineProvided:
     def test_engine_plan_is_preferred(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path)
-        # Pretend heliaAOT produced a precise plan already.
         plan = MemoryPlan(
             engine=EngineType.HELIA_AOT,
             regions=(
@@ -488,7 +481,7 @@ class TestPlanMemoryOverflow:
 
     def test_fit_does_not_raise(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path)
-        PlanMemoryStage().run(ctx)  # Synthesised plan should fit.
+        PlanMemoryStage().run(ctx)
         assert ctx.memory_plan is not None
         assert not ctx.memory_plan.has_overflow
 
@@ -646,9 +639,9 @@ class TestHpxOwnedConsumers:
         assert [c.size for c in stack3] == [4_096]
 
     def test_aot_extraction_failure_no_longer_fabricates_a_tflm_plan(self, tmp_path):
-        """#133 Phase 3 D5: a failed AOT extraction used to fall into the
-        TFLM synthesiser, booking a tensor_arena and model_flatbuffer
-        that do not exist in an AOT binary."""
+        """#133 Phase 3 D5: a failed AOT extraction must not book a
+        tensor_arena or model_flatbuffer, since neither exists in an AOT
+        binary."""
         ctx = _make_ctx(tmp_path, {"engine": {"type": "helia-aot"}})
         assert ctx.engine_artifacts is None or ctx.engine_artifacts.memory_plan is None
         PlanMemoryStage().run(ctx)
@@ -665,8 +658,8 @@ class TestHpxOwnedConsumers:
 
     def test_ap3_bss_consumers_route_to_main_sram_not_dtcm(self, tmp_path):
         """#179 B-1: AP3's gcc script sends .bss to RWMEM (main
-        SRAM) — TCM is only 64 KB. Booking records/USB into DTCM refused
-        VALID builds with a spurious 'shrink your arena' PlatformError."""
+        SRAM) — TCM is only 64 KB, so records/USB route to SRAM, not
+        DTCM."""
         ctx = _make_ctx(
             tmp_path,
             {
@@ -674,8 +667,6 @@ class TestHpxOwnedConsumers:
                 "target": {"board": "apollo3p_evb", "transport": "usb_cdc"},
             },
         )
-        # arena at 32 KB in 64 KB TCM + records + usb would have "overflowed"
-        # DTCM under the inverted routing; it must pass now.
         PlanMemoryStage().run(ctx)
         assert ctx.memory_plan is not None
         dtcm = ctx.memory_plan.region("DTCM")
@@ -689,8 +680,6 @@ class TestHpxOwnedConsumers:
         assert "usb_buffers" not in dtcm_names
 
     def test_usb_buffers_booked_on_usb_cdc_transport(self, tmp_path):
-        """#179: the USB branch was untested (a mutation of the
-        size constant survived)."""
         ctx = _make_ctx(tmp_path, {"target": {"transport": "usb_cdc"}})
         PlanMemoryStage().run(ctx)
         assert ctx.memory_plan is not None
@@ -728,4 +717,4 @@ class TestHpxOwnedConsumers:
         ctx = _make_ctx(tmp_path, {"engine": {"type": "helia-aot"}})
         merged = _add_hpx_owned_consumers(engine_plan, ctx)
         records = [c for r in merged.regions for c in r.consumers if c.name == "pmu_layer_records"]
-        assert [c.size for c in records] == [1234]  # engine's entry kept, once
+        assert [c.size for c in records] == [1234]

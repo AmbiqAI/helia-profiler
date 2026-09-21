@@ -92,11 +92,6 @@ class JLinkProbeMatch:
     detected_core: CoreArch | None
 
 
-# ------------------------------------------------------------------
-# Executable discovery
-# ------------------------------------------------------------------
-
-
 def find_jlink_exe() -> str:
     """Return the absolute path to ``JLinkExe`` or raise :class:`CaptureError`.
 
@@ -304,11 +299,6 @@ def _format_probe_matches(matches: list[JLinkProbeMatch]) -> str:
     )
 
 
-# ------------------------------------------------------------------
-# Generic JLinkExe driver
-# ------------------------------------------------------------------
-
-
 def _jlink_target_cmd(
     *,
     device: str,
@@ -425,11 +415,6 @@ def run_jlink_script(
             hint=f"{'stderr' if stderr else 'stdout tail'}: {detail[:600]}",
         )
     return result
-
-
-# ------------------------------------------------------------------
-# Target reset
-# ------------------------------------------------------------------
 
 
 def reset_target(
@@ -717,7 +702,6 @@ def _pylink_module():
 
 
 def is_jlink_exception(exc: BaseException) -> bool:
-    """Return True when *exc* is a pylink J-Link exception."""
     try:
         pylink = _pylink_module()
     except CaptureError:
@@ -726,7 +710,6 @@ def is_jlink_exception(exc: BaseException) -> bool:
 
 
 def is_jlink_rtt_exception(exc: BaseException) -> bool:
-    """Return True when *exc* is a pylink RTT exception."""
     try:
         pylink = _pylink_module()
     except CaptureError:

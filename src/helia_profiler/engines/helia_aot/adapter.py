@@ -190,13 +190,9 @@ class HeliaAOTAdapter:
         prefix = config.engine.config.get("prefix", _DEFAULT_PREFIX)
         module_name = config.engine.config.get("module_name", _DEFAULT_MODULE_NAME)
 
-        # 0. Verify installed helia-aot satisfies the floor.
         aot_version = _check_helia_aot_version(config)
-
-        # 1. Resolve AOT platform from profiler board
         aot_platform = _resolve_aot_platform(config)
 
-        # 2. Run AOT compilation (programmatic API → CodeGenContext)
         aot_output_dir = work_dir / "aot_output"
         aot_module_dir = aot_output_dir / module_name
         codegen_ctx = _run_aot_compiler(
@@ -207,10 +203,9 @@ class HeliaAOTAdapter:
             aot_platform,
         )
 
-        # 3. Extract operator manifest from the CodeGenContext.
-        #    heliaAOT transforms/fuses ops — the AIR graph may differ
-        #    significantly from the original TFLite flatbuffer.  The
-        #    manifest captures what the AOT compiler *actually* emits.
+        # heliaAOT transforms/fuses ops — the AIR graph may differ
+        # significantly from the original TFLite flatbuffer.  The
+        # manifest captures what the AOT compiler *actually* emits.
         op_manifest = _extract_operator_manifest(codegen_ctx)
         if op_manifest:
             manifest_path = work_dir / "aot_operator_manifest.json"
@@ -225,16 +220,11 @@ class HeliaAOTAdapter:
                 "per-layer names will fall back to op_N."
             )
 
-        # 4. Validate memory-placement pragmas in generated code
         _validate_pragmas(aot_module_dir, prefix)
-
-        # 5. Resolve the ns-cmsis-nn NSX module (declared at the baseline's
-        #    qualified ref by default; a user ref or vendored path overrides).
         cmsis_nn_ref = cmsis_nn_module_ref(config, work_dir)
 
-        # 6. AOT output is already a valid NSX module (ModuleType.nsx).
-        # Just generate the memory-placement attribute header and tell
-        # the AOT module's CMakeLists.txt where to find it.
+        # AOT output is already a valid NSX module (ModuleType.nsx), so no
+        # wrapper is generated here — just the attribute header.
         attr_header = _write_attributes_header(aot_module_dir, prefix)
         cmake_name = module_name.replace("-", "_")
         attr_var = f"{cmake_name.upper()}_ATTRIBUTES_HEADER"
@@ -254,7 +244,7 @@ class HeliaAOTAdapter:
         # physical memory layout.
         # Extract arena binding info for external-arena mode — resolved
         # BEFORE plan extraction, which needs it to hint the symbols the
-        # templates actually emit in each mode (#179 review M-4).
+        # templates actually emit in each mode (#179).
         allocate_arenas = not _external_arena_mode(config)
         memory_plan = _extract_memory_plan(codegen_ctx, prefix, allocate_arenas=allocate_arenas)
         arena_regions = _extract_arena_regions(codegen_ctx, prefix)

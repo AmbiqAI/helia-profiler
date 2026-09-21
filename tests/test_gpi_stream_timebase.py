@@ -3,8 +3,8 @@
 `_segment_streamed_gpi` places both gate edges with a per-sample spacing
 inferred from frame timestamps, because the JS320 reports its raw sample rate
 while delivering decimated samples. When a gate window disagrees with the
-firmware clock, that inference is the first suspect — and until now nothing
-recorded what it saw.
+firmware clock, that inference is the first suspect, so these tests pin
+what it saw.
 """
 
 from __future__ import annotations
@@ -61,7 +61,6 @@ def test_a_dropped_frame_skews_the_mean_but_not_the_median():
     d = _streamed_gpi_timebase(_frames(with_a_gap))
 
     assert d["tick_per_sample"] == pytest.approx(tick)
-    # A mean over the same input lands far away; this pins the median choice.
     assert d["tick_per_sample"] < sum(with_a_gap) / len(with_a_gap) * 0.9
     assert d["spacing_relative_spread"] > 7.0
     assert d["spacing_max_tick"] == pytest.approx(tick * 9.0)
@@ -91,13 +90,12 @@ def test_no_frames_reports_an_empty_capture_rather_than_raising():
 
 
 def test_frame_spacing_divides_by_the_frame_it_started_from():
-    """Uneven frames, which is the only shape that can tell the two apart.
+    """Uneven frames are the only shape that can tell the two apart.
 
     Frame `cur` begins at its own utc and holds `N_cur` samples, so the next
     frame's first sample sits at `utc_cur + N_cur * spacing`. Dividing by the
-    NEXT frame's count gives the same answer whenever sizes are equal — which
-    every other fixture here is, and which is why this expression was
-    unpinned on both the diagnostic and the segmenter that places the edges.
+    NEXT frame's count gives the same answer whenever sizes are equal, which
+    every other fixture here is — only uneven sizes pin this expression.
     """
     from helia_profiler.power.joulescope.stats import _frame_spacings
 

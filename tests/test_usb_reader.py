@@ -162,7 +162,6 @@ def test_find_port_by_marker_matches_serial_number():
 
 
 def test_resolve_cdc_port_prefers_marker(monkeypatch):
-    """When a marker is given, the matching device wins over other CDC ports."""
     marker = usb_marker_serial("1160001350")
     monkeypatch.setattr(usb_reader.time, "sleep", lambda *_: None)
     monkeypatch.setattr(
@@ -228,7 +227,6 @@ def test_find_cdc_port_rejects_foreign_hpx_device(monkeypatch):
 
 
 def test_resolve_cdc_port_does_not_fall_back_to_foreign_hpx(monkeypatch):
-    """With a marker set, a stale other-board HPX device is not selected."""
     expected = usb_marker_serial("1160001350")
     foreign = usb_marker_serial("1160002204")
     monkeypatch.setattr(usb_reader.time, "sleep", lambda *_: None)

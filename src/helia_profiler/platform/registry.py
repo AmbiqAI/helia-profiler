@@ -43,11 +43,6 @@ def _freeze_registry(
     )
 
 
-# ---------------------------------------------------------------------------
-# Public lookup API
-# ---------------------------------------------------------------------------
-
-
 def build_platform_registry(
     *,
     base: PlatformRegistry | None = None,
@@ -78,7 +73,6 @@ def get_soc(name: str, *, registry: PlatformRegistry | None = None) -> SocDef:
 
 
 def get_board(name: str, *, registry: PlatformRegistry | None = None) -> BoardDef:
-    """Look up a board definition by name."""
     active = registry or build_platform_registry()
     if name not in active.boards:
         known = ", ".join(sorted(active.boards))
@@ -141,12 +135,10 @@ def get_default_go_gpio_pin(
 
 
 def list_boards(*, registry: PlatformRegistry | None = None) -> list[BoardDef]:
-    """Return all registered boards."""
     active = registry or build_platform_registry()
     return list(active.boards.values())
 
 
 def list_socs(*, registry: PlatformRegistry | None = None) -> list[SocDef]:
-    """Return all registered SoCs."""
     active = registry or build_platform_registry()
     return list(active.socs.values())

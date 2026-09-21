@@ -36,10 +36,6 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("hpx")
 
-# ---------------------------------------------------------------------------
-# Availability guard — keep ai-edge-litert / flatbuffers optional
-# ---------------------------------------------------------------------------
-
 _HAS_LITERT = False
 try:
     from ai_edge_litert import schema_py_generated as _schema
@@ -50,13 +46,8 @@ except ImportError:
 
 
 def is_available() -> bool:
-    """Return True if model analysis dependencies are installed."""
     return _HAS_LITERT
 
-
-# ---------------------------------------------------------------------------
-# Availability guard — keep helia-aot optional (for AirModel analysis)
-# ---------------------------------------------------------------------------
 
 _HAS_AOT = False
 _AirModel: type[AirModel] | None
@@ -74,15 +65,12 @@ except ImportError:
 
 
 def is_aot_available() -> bool:
-    """Return True if helia-aot is installed (for AirModel analysis)."""
     return _HAS_AOT
 
 
 #: Display name of the Vela-generated Ethos-U custom op (see _display_name).
 ETHOS_U_OP_NAME = "CUSTOM(ethos-u)"
 
-# --- Vela accelerator-config extraction ------------------------------------
-#
 # Vela stores the accelerator it compiled for inside the ethos-u custom op's
 # payload ("Custom Operator Payload 1"), not in tflite metadata.  Layout, per
 # ethos-u-core-driver ethosu_driver.c:
@@ -197,10 +185,6 @@ class ModelAnalysis:
         return self.ethos_u_op_count > 0
 
 
-# ---------------------------------------------------------------------------
-# BuiltinOperator code → human name mapping
-# ---------------------------------------------------------------------------
-
 _OP_NAMES: dict[int, str] = {}
 
 
@@ -220,11 +204,6 @@ def _ensure_op_names() -> None:
 def _op_name(code: int) -> str:
     _ensure_op_names()
     return _OP_NAMES.get(code, f"CUSTOM({code})")
-
-
-# ---------------------------------------------------------------------------
-# MAC computation per operator type
-# ---------------------------------------------------------------------------
 
 
 def _conv2d_macs(
@@ -333,22 +312,11 @@ def _elementwise_ops(output_shape: list[int]) -> int:
     return math.prod(output_shape) if output_shape else 0
 
 
-# ---------------------------------------------------------------------------
-# Parameter counting
-# ---------------------------------------------------------------------------
-
-
 def _count_tensor_elements(sg: Any, tensor_idx: int) -> int:
-    """Count elements in a tensor by its index."""
     if tensor_idx < 0:
         return 0
     t = sg.Tensors(tensor_idx)
     return math.prod(t.Shape(d) for d in range(t.ShapeLength()))
-
-
-# ---------------------------------------------------------------------------
-# Main analysis entry point
-# ---------------------------------------------------------------------------
 
 
 def analyze_model(model_path: str | Path) -> ModelAnalysis | None:
@@ -372,7 +340,6 @@ def analyze_model(model_path: str | Path) -> ModelAnalysis | None:
     layers: list[LayerOps] = []
     total_params = 0
 
-    # Build opcode → builtin-code lookup
     def _builtin_code(opcode_idx: int) -> int:
         oc = model.OperatorCodes(opcode_idx)
         code = oc.BuiltinCode()
@@ -493,7 +460,6 @@ def analyze_model(model_path: str | Path) -> ModelAnalysis | None:
         params: dict[str, Any] = {}
         has_bias = op.InputsLength() >= 3 and op.Inputs(2) >= 0
 
-        # ---- CONV_2D ----
         if builtin == bo.CONV_2D and len(in_shapes) >= 2:
             conv_opts = _schema.Conv2DOptions()
             conv_opts.Init(op.BuiltinOptions().Bytes, op.BuiltinOptions().Pos)
@@ -520,7 +486,6 @@ def analyze_model(model_path: str | Path) -> ModelAnalysis | None:
             if has_bias:
                 total_params += _count_tensor_elements(sg, op.Inputs(2))
 
-        # ---- DEPTHWISE_CONV_2D ----
         elif builtin == bo.DEPTHWISE_CONV_2D and len(in_shapes) >= 2:
             dw_opts = _schema.DepthwiseConv2DOptions()
             dw_opts.Init(op.BuiltinOptions().Bytes, op.BuiltinOptions().Pos)
@@ -545,7 +510,6 @@ def analyze_model(model_path: str | Path) -> ModelAnalysis | None:
             if has_bias:
                 total_params += _count_tensor_elements(sg, op.Inputs(2))
 
-        # ---- FULLY_CONNECTED ----
         elif builtin == bo.FULLY_CONNECTED and len(in_shapes) >= 2:
             macs = _fully_connected_macs(in_shapes[0], in_shapes[1], has_bias)
             ops = 2 * macs
@@ -553,7 +517,6 @@ def analyze_model(model_path: str | Path) -> ModelAnalysis | None:
             if has_bias:
                 total_params += _count_tensor_elements(sg, op.Inputs(2))
 
-        # ---- TRANSPOSE_CONV ----
         elif builtin == bo.TRANSPOSE_CONV and len(in_shapes) >= 3:
             tc_opts = _schema.TransposeConvOptions()
             tc_opts.Init(op.BuiltinOptions().Bytes, op.BuiltinOptions().Pos)
@@ -573,7 +536,6 @@ def analyze_model(model_path: str | Path) -> ModelAnalysis | None:
             if op.InputsLength() >= 4 and op.Inputs(3) >= 0:
                 total_params += _count_tensor_elements(sg, op.Inputs(3))
 
-        # ---- AVERAGE_POOL_2D / MAX_POOL_2D ----
         elif builtin in (bo.AVERAGE_POOL_2D, bo.MAX_POOL_2D):
             pool_opts = _schema.Pool2DOptions()
             pool_opts.Init(op.BuiltinOptions().Bytes, op.BuiltinOptions().Pos)
@@ -589,23 +551,20 @@ def analyze_model(model_path: str | Path) -> ModelAnalysis | None:
                 out_elems = math.prod(out_shapes[0])
                 ops = out_elems * pool_opts.FilterHeight() * pool_opts.FilterWidth()
 
-        # ---- SOFTMAX ----
         elif builtin == bo.SOFTMAX:
             # ~5 ops per element (exp, sum, div, max, sub)
             if out_shapes:
                 ops = 5 * math.prod(out_shapes[0])
 
-        # ---- Element-wise ops ----
         elif builtin in _ELEMENTWISE_OPS:
             if out_shapes:
                 ops = _elementwise_ops(out_shapes[0])
 
-        # ---- Zero-cost ops ----
         elif builtin in _ZERO_OPS:
             ops = 0
 
-        # ---- Unknown — log but don't crash ----
         else:
+            # Unknown ops are logged, not fatal — analysis stays best-effort.
             log.debug("model_analysis: unhandled op %s (builtin=%d)", name, builtin)
 
         layers.append(
@@ -631,11 +590,6 @@ def analyze_model(model_path: str | Path) -> ModelAnalysis | None:
         num_parameters=total_params,
         engine="tflite",
     )
-
-
-# ---------------------------------------------------------------------------
-# AirModel analysis (heliaAOT post-transform graph)
-# ---------------------------------------------------------------------------
 
 
 def analyze_air_model(air_model: Any) -> ModelAnalysis | None:
@@ -689,7 +643,6 @@ def analyze_air_model(air_model: Any) -> ModelAnalysis | None:
 
         ot = op.op_type
 
-        # ---- CONV_2D ----
         if ot == _AirOpType.CONV_2D and weight_shape and out_shapes:
             opts = op.options
             params = {
@@ -710,7 +663,6 @@ def analyze_air_model(air_model: Any) -> ModelAnalysis | None:
             )
             ops = 2 * macs
 
-        # ---- DEPTHWISE_CONV_2D ----
         elif ot == _AirOpType.DEPTHWISE_CONV_2D and weight_shape and out_shapes:
             opts = op.options
             dm = getattr(opts, "depth_multiplier", 1)
@@ -730,7 +682,6 @@ def analyze_air_model(air_model: Any) -> ModelAnalysis | None:
             )
             ops = 2 * macs
 
-        # ---- FULLY_CONNECTED ----
         elif ot == _AirOpType.FULLY_CONNECTED and weight_shape:
             macs = _fully_connected_macs(
                 in_shapes[0] if in_shapes else [],
@@ -739,12 +690,10 @@ def analyze_air_model(air_model: Any) -> ModelAnalysis | None:
             )
             ops = 2 * macs
 
-        # ---- TRANSPOSE_CONV ----
         elif ot == _AirOpType.TRANSPOSE_CONV and weight_shape and out_shapes:
             macs = _transpose_conv_macs(weight_shape, out_shapes[0])
             ops = 2 * macs
 
-        # ---- AVERAGE_POOL_2D / MAX_POOL_2D ----
         elif ot in (_AirOpType.AVERAGE_POOL_2D, _AirOpType.MAX_POOL_2D):
             opts = op.options
             fh = getattr(opts, "filter_height", 1)
@@ -753,12 +702,10 @@ def analyze_air_model(air_model: Any) -> ModelAnalysis | None:
             if out_shapes:
                 ops = math.prod(out_shapes[0]) * fh * fw
 
-        # ---- SOFTMAX ----
         elif ot == _AirOpType.SOFTMAX:
             if out_shapes:
                 ops = 5 * math.prod(out_shapes[0])
 
-        # ---- Element-wise ops ----
         elif ot.name in {
             "RELU",
             "RELU6",
@@ -780,7 +727,6 @@ def analyze_air_model(air_model: Any) -> ModelAnalysis | None:
             if out_shapes:
                 ops = _elementwise_ops(out_shapes[0])
 
-        # ---- Zero-cost / data-movement ops ----
         elif ot.name in {
             "RESHAPE",
             "SQUEEZE",

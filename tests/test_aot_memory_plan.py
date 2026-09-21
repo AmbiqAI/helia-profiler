@@ -42,11 +42,6 @@ class _FakeCodegenCtx:
             self.memory_plan = plan
 
 
-# ---------------------------------------------------------------------------
-# _extract_arena_regions — placement normalisation
-# ---------------------------------------------------------------------------
-
-
 @dataclass
 class _FakeArena:
     region_id: int
@@ -157,8 +152,6 @@ class TestExtractArenaRegions:
         assert _extract_arena_regions(ctx, "hpx") == []
 
     def test_all_known_physical_names_mapped(self):
-        """Every entry in _AOT_MEMORY_TO_PLACEMENT should map to a
-        :class:`Placement` member recognised by the firmware templates."""
         for phys, logical in _AOT_MEMORY_TO_PLACEMENT.items():
             assert isinstance(logical, Placement), (
                 f"physical '{phys}' maps to '{logical!r}' which is not a Placement member"

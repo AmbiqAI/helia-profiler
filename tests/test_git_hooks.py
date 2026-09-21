@@ -29,11 +29,6 @@ todo_needs_issue = _load("todo_needs_issue")
 strip_ai_trailers = _load("strip_ai_trailers")
 
 
-# --------------------------------------------------------------------------
-# todo_needs_issue
-# --------------------------------------------------------------------------
-
-
 def test_todo_with_issue_reference_passes(tmp_path: Path) -> None:
     target = tmp_path / "ok.py"
     target.write_text("# TODO(#123): follow up later\n")
@@ -90,11 +85,6 @@ def test_git_lfs_pointer_skipped(tmp_path: Path) -> None:
 
 def test_missing_file_skipped(tmp_path: Path) -> None:
     assert todo_needs_issue.main([str(tmp_path / "does-not-exist.py")]) == 0
-
-
-# --------------------------------------------------------------------------
-# strip_ai_trailers
-# --------------------------------------------------------------------------
 
 
 def test_removes_claude_co_authored_by() -> None:

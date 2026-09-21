@@ -270,7 +270,6 @@ def test_write_summary_surfaces_the_clean_window_self_check(tmp_path: Path):
     ):
         assert key not in silent["latency"], key
 
-    # And the fallback branch carries them too, for a capture with no timing.
     ctx.run_metadata.timing = None
     set_profile_result(
         ctx,
@@ -847,7 +846,7 @@ def test_write_summary_suppresses_when_terminal_reports_incomplete_work(
     """An early-exit firmware agrees with its own gate BY CONSTRUCTION (it
     times the same short window it gated), so terminal health must gate the
     arbitration: energy / planned_count would be wrong by the shortfall, with
-    a drift note vouching for it (found by review)."""
+    a drift note vouching for it."""
     ctx = _gated_power_ctx(
         tmp_path, clean_infer_count=233, clean_infer_avg_us=21532, duration_s=2.5
     )
@@ -880,8 +879,8 @@ def test_write_summary_no_drift_note_beyond_the_plausible_envelope(tmp_path: Pat
 
 
 def test_write_summary_renders_the_evaluation_verdict(tmp_path: Path):
-    """#202 Part B: the summary no longer composes the gate verdict -- it
-    renders the one RunEvaluation carries. The published drift note IS the
+    """The summary renders the one RunEvaluation carries, rather than
+    composing the gate verdict itself. The published drift note IS the
     arbitration's string, by identity of source."""
     from helia_profiler.evaluation import evaluate_run
 
@@ -905,7 +904,7 @@ def test_write_summary_renders_the_evaluation_verdict(tmp_path: Path):
 def test_write_report_evaluates_the_run_exactly_once(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
-    """#202 D5: one RunEvaluation per publication -- the summary renders the
+    """One RunEvaluation per publication -- the summary renders the
     same object the manifest records, so the two artifacts cannot disagree
     (and the evaluation is not silently computed twice)."""
     import helia_profiler.report as report_pkg
@@ -1000,11 +999,9 @@ def test_write_summary_uses_fixed_power_plan_count(tmp_path: Path):
 
 
 def test_write_summary_surfaces_window_clock_ceiling(tmp_path: Path):
-    # #115: window_clock_ceiling (added by #107's collect_power_terminal
-    # stage) must reach summary.json -- previously report/summary.py's power
-    # metadata allowlist omitted it, so a power.window_clock_exceeds_host_time
-    # warning had no envelope numbers a user could see outside the validity
-    # issue's context.
+    # window_clock_ceiling (from collect_power_terminal) must reach
+    # summary.json so a window_clock_exceeds_host_time warning carries
+    # envelope numbers a user can see outside the validity issue's context.
     # Built from the real producer, not a hand-written literal: the point is
     # that whatever WindowClockCeiling emits reaches summary.json intact. A
     # fabricated dict would keep passing after to_metadata() renamed a key,
@@ -1100,10 +1097,7 @@ def test_busy_loop_probe_publishes_no_per_inference_power_metrics(tmp_path: Path
     figure under an ordinary field name -- driving the pre-guard code with THIS
     fixture publishes `energy_per_inference_j: 0.0016` and
     `inferences_per_joule: 625.0` for a window with no inferences in it,
-    alongside `gated_window_duration_ratio: 1.0` looking perfectly healthy
-    (#125; an earlier draft quoted a reviewer's fixture's digits here, which
-    was exactly the unreproducible-number discipline failure this arc keeps
-    finding in others).
+    alongside `gated_window_duration_ratio: 1.0` looking perfectly healthy.
 
     The integrity check cannot catch this and never could: "N inferences" and
     "one spin of the same total length" are timing-identical by construction.
@@ -1133,11 +1127,10 @@ def test_busy_loop_probe_publishes_no_per_inference_power_metrics(tmp_path: Path
 
 
 def test_busy_loop_probe_publishes_no_active_window_estimates_either(tmp_path: Path):
-    """The OTHER fabrication branch (#125): internal-mode estimates.
+    """The OTHER fabrication branch: internal-mode estimates.
 
-    The first version of this guard covered only the gpio-gated branch.
-    Review reproduced, on that version, `active_window_estimated_energy_per_
-    inference_j` still publishing for a zero-inference internal-mode window.
+    `active_window_estimated_energy_per_inference_j` must not publish for a
+    zero-inference internal-mode window.
     The estimated branch is worse than it looks: every figure in it scales
     `ps.avg_power_w` -- the WHOLE-CAPTURE average, which for busy_loop
     measured the CPU spin -- by real profiled inference time. Real time,
@@ -1342,12 +1335,10 @@ def test_write_summary_flags_zero_device_cycles_as_suspect(tmp_path: Path):
     assert "gated_window_duration_ratio" not in summary["power"]
 
 
-# ---------------------------------------------------------------------------
 # #240 — TOPS / tops_per_watt divide by the window's own inference count.
 # total_ops is PER-INFERENCE, so a window of N inferences must scale by N;
 # the count is resolved per measurement scope, and suppressed where there is
 # no inference-bracketed window. No test pinned the multiplier before #240.
-# ---------------------------------------------------------------------------
 
 _TOPS_OPS = 5_000_000  # large enough that a real N does not round to 0.0
 
@@ -1486,7 +1477,7 @@ def test_opaque_ethos_u_analysis_publishes_null_not_zero(tmp_path: Path):
     """A Vela ethos-u custom op is opaque to the analyzer: its MACs, ops and
     folded weights are unknown, not zero. The summary must publish null
     totals and suppress TOPS — a 0.000000 TOPS headline for an NPU would be
-    a fabricated measurement (#284 review)."""
+    a fabricated measurement."""
     ctx = _tops_ctx(
         tmp_path,
         scope=MeasurementScope.ON_DEVICE_GATED_INFERENCE,

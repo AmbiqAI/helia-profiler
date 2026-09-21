@@ -1,5 +1,3 @@
-"""Tests for the hardware-validation workflow contract."""
-
 from __future__ import annotations
 
 import json

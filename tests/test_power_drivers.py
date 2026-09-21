@@ -138,8 +138,6 @@ class _FakeJsDriver:
 
 
 class TestJoulescopeSyncControllerRelease:
-    """``JoulescopeSyncController.release()`` device-close behaviour."""
-
     def _make_controller(self, monkeypatch: pytest.MonkeyPatch, fake_drv: _FakeJsDriver):
         from helia_profiler.power.joulescope.sync import JoulescopeSyncController
         from helia_profiler.power.sync import SyncWiring

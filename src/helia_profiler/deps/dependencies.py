@@ -629,12 +629,11 @@ def _verify_baseline_resolution(ctx: PipelineContext, provenance: DependencyProv
 
     The generated manifest *asserts* qualified refs; the NSX lock is the
     *outcome*. The qualified-compatibility claim is only meaningful if the
-    two agree, and NSX gives a packaged registry's module-level revision
-    precedence over an app's project-level override — found 2026-08-12 when
-    eight hardware runs silently built nsx-sensors v0.1.0 while every
-    generated manifest and provenance artifact claimed the baseline commit.
-    Runs whose divergence is intentional must say so through overrides
-    (which reclassify qualification) rather than drift silently.
+    two agree. WORKAROUND neuralspotx#218: NSX gives a packaged registry's
+    module-level revision precedence over an app's project-level override,
+    so this verifies the lock actually resolved the pinned commit. Runs
+    whose divergence is intentional must say so through overrides (which
+    reclassify qualification) rather than drift silently.
     """
     compatibility = ctx.config.compatibility
     if compatibility is None:

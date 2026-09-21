@@ -126,8 +126,7 @@ def test_degraded_observation_and_duration_mismatch_are_structured(tmp_path: Pat
 def test_below_minimum_gate_is_an_error(tmp_path: Path):
     """The 1 s floor never needed arbitration: a below-floor gate is too
     short for the stats integral to be trusted regardless of what the
-    firmware clock says (#142/#181 D1 -- previously this aborted the run at
-    capture time with no artifact at all)."""
+    firmware clock says (#142/#181 D1)."""
     ctx = _context(tmp_path)
     assert ctx.power_run is not None and ctx.power_run.observation is not None
     observation = ctx.power_run.observation
@@ -200,13 +199,10 @@ class TestWindowClockValidity:
     module is the downstream authority over an already-captured run and must
     reach the SAME verdict. A run the stage would reject must never evaluate
     as VALID here just because it arrived by another path (a replayed or
-    resumed artifact, or a caller that skipped the stage) -- the half-fix where
-    a stage gate and this policy disagreed has already happened once in this
-    repo (see power.on_device_overflow).
+    resumed artifact, or a caller that skipped the stage). See
+    power.on_device_overflow for the paired stage-side check.
 
-    Values are the Apollo3 Blue Plus bench pair (2026-08): pre-fix reported
-    elapsed_us=0 for 24/24 against a 4.963 s gate; fixed reported 4.970184 s
-    against 4.967 s.
+    BENCH_* constants below are an Apollo3 Blue Plus capture (2026-08).
     """
 
     BENCH_COUNT = 24
@@ -389,12 +385,9 @@ class TestWindowClockValidity:
 
     def test_degraded_capture_gains_no_window_clock_issue(self, tmp_path: Path):
         """A degraded capture has no gated window, only a whole-capture
-        free-form summary. Comparing the firmware clock against THAT invents a
-        disagreement out of an unrelated interval: on two real Apollo4
-        artifacts the firmware clock was accurate to 0.16% while the free-form
-        capture ran 19.2 s against a ~5 s window -- a fabricated 73.9%
-        mismatch stacked on top of the power.observation_degraded that already
-        described the real failure. The run must carry exactly one issue."""
+        free-form summary. Comparing the firmware clock against that interval
+        would double-report the failure power.observation_degraded already
+        describes. The run must carry exactly one issue."""
         ctx = _context(tmp_path)
         assert ctx.power_run is not None and ctx.power_run.observation is not None
         observation = ctx.power_run.observation
@@ -471,9 +464,8 @@ class TestWindowClockValidity:
         assert mismatch[0].context["reference_source"] == "planned_window"
 
     def test_internal_threshold_is_25_percent_not_50(self, tmp_path: Path):
-        """30% from the plan warns, 14% does not -- the band the threshold
-        revision moved. Mirrors the stage-side pin so a revert in either layer
-        alone shows up here too."""
+        """30% from the plan warns, 14% does not. Mirrors the stage-side pin
+        so a revert in either layer alone shows up here too."""
         near = _context(tmp_path, mode="internal")
         self._bench_run(
             near,
@@ -598,8 +590,7 @@ class TestGateArbitration:
         """THE #181 scenario: est*count missed by 11.8%, but the firmware's
         own window clock confirms the gate bracketed exactly what it timed.
         The reference is stale, the capture is sound, and the per-inference
-        denominator (the count) is untouched by drift -- a fully valid run.
-        Before the redesign this aborted at capture time with no artifact."""
+        denominator (the count) is untouched by drift -- a fully valid run."""
         ctx = _context(tmp_path)
         self._drift_run(ctx, elapsed_us=self.DRIFT_ELAPSED_US)
 
@@ -704,10 +695,9 @@ class TestGateArbitration:
     def test_unhealthy_terminal_downgrades_the_observer_error(self, tmp_path: Path):
         """The other half of the harmonization (#204, cell 03b): with
         an unhealthy terminal whose elapsed_us ALSO disagrees with the gate,
-        validity previously emitted the observer ERROR from an envelope that
-        had no standing to arbitrate. Now the observer is withheld, the
-        est*count fallback WARNING carries the duration story, and the
-        terminal ERRORs carry the failure -- the run stays INVALID."""
+        the observer is withheld, the est*count fallback WARNING carries the
+        duration story, and the terminal ERRORs carry the failure -- the run
+        stays INVALID."""
         ctx = _context(tmp_path)
         # elapsed 5.017s vs gate 4.427s (would disagree), only 116/233 done.
         self._drift_run(ctx, elapsed_us=5_017_000, completed_count=116)
@@ -849,10 +839,10 @@ class TestProfileCleanWindowFrozen:
 
     The power binary's frozen-clock rule (firmware_window_clock_is_frozen)
     only runs at the power terminal. Profile-only STIMER windows -- every
-    Apollo5 profile build, and AP3/AP4 busy_loop -- had NO dead-clock check
-    at all: a dead 32.768 kHz crystal yielded silent zeros with no issue code
-    (found by review of #128). Detection belongs everywhere; attributing the
-    fault (dead crystal vs dead debug domain) stays open on #110.
+    Apollo5 profile build, and AP3/AP4 busy_loop -- need their own check
+    (#128), since a dead 32.768 kHz crystal would otherwise yield silent
+    zeros with no issue code. Detection belongs everywhere; attributing
+    the fault (dead crystal vs dead debug domain) stays open on #110.
     """
 
     def _profile_only(
@@ -1146,17 +1136,12 @@ class TestCleanWindowStall:
 class TestNoInferenceProbeWindowDuration:
     """The replay path must check a busy_loop window, like the stage does.
 
-    #125 item 2: with the plan-derived reference withheld, an internal-mode
-    busy_loop run had NO duration check anywhere -- and `elapsed_us` is the
-    denominator for average power and current, so a mis-sized window scales
-    both. Restoring the reference in the collect stage fixed capture time;
-    `evaluate_run` is the second consumer, and it is the one `hpx compare`
-    and replayed artifacts go through. Leaving it withheld here also made the
-    two modules disagree, which the comment above the call denies is possible.
-
-    Verified before the fix: a 7x inflated busy_loop window evaluated VALID
-    with no issues while the collect stage warned; the same window under
-    `infer` evaluated DEGRADED with power.window_clock_mismatch.
+    #125 item 2: an internal-mode busy_loop run needs a duration check
+    because `elapsed_us` is the denominator for average power and current,
+    so a mis-sized window scales both. `evaluate_run` is the second
+    consumer of the plan-derived reference the collect stage sets, since
+    it is the one `hpx compare` and replayed artifacts go through; the
+    comment above the call requires the two modules to agree.
     """
 
     #: The #125 plan shape for busy_loop: one unit of work lasting the target
@@ -1227,13 +1212,10 @@ class TestGateToleranceAgreesAcrossCaptureAndEvaluate:
     """The fallback duration check must use the tolerance capture used.
 
     `_assess_unrecorded_duration` runs only for an artifact with no recorded
-    `gate_duration_integrity` -- an older or replayed capture. It took
-    `assess_gate_duration`'s conservative 1% default while capture picked the
-    band from `count_source`, so the same window could be accepted at capture
-    time and warned about here. That is the capture-vs-evaluate divergence
-    this module already closed for the window-clock check; leaving it open for
-    the sibling check is the same bug in the same shape (found by review
-    of #136).
+    `gate_duration_integrity` -- an older or replayed capture. It derives the
+    tolerance band from `count_source`, matching `assess_gate_duration` at
+    capture time, so the window-clock check and this sibling check agree
+    (#136).
     """
 
     def _ctx_with_plan(
@@ -1281,18 +1263,13 @@ class TestGateToleranceAgreesAcrossCaptureAndEvaluate:
 class TestReplayedBusyLoopPlanCount:
     """`evaluate_run` must use the probe-aware expected count, like the stage.
 
-    #125 item 5. `expected_terminal_requested_count()` returns 1 for a probe
-    that runs no inferences, whatever the plan says, because the firmware
-    reports one unit of work (#112). Reverting `validity.py` to read
-    `plan.inference_count` directly left the whole suite green, because on
-    every plan `plan_power_run` can now produce the two agree -- busy_loop
-    plans exactly 1.
-
-    They part company on a plan this build did not make: a busy_loop artifact
-    stored BEFORE #136, whose plan carries the old derived count of 10 against
-    a firmware report of 1/1. That is the replay contract validity.py's own
-    comment says it defends, and `evaluate_run` is what `hpx compare` and
-    every stored-artifact path go through.
+    `expected_terminal_requested_count()` returns 1 for a probe that runs no
+    inferences, whatever the plan says, because the firmware reports one unit
+    of work (#112, #125 item 5). This also covers replaying a busy_loop
+    artifact stored before #136, whose plan carries the old derived count of
+    10 against a firmware report of 1/1 -- the replay contract `evaluate_run`
+    must honor, since `hpx compare` and every stored-artifact path go
+    through it.
     """
 
     def test_a_pre_fix_artifact_is_not_reported_as_a_count_mismatch(self, tmp_path: Path):
@@ -1399,11 +1376,10 @@ class TestModelIdentity:
 class TestModelIdentityFromTheWire:
     """Drive the check with real parser output, not hand-built metadata.
 
-    The first cut of this check assumed ``model_size`` was an integer. The wire
-    parser keeps an unparseable value as the raw string it received, so a
-    corrupted or foreign ``HPX_MODEL_SIZE`` line reached the formatter and
-    raised ``ValueError`` instead of producing a result. Building
-    :class:`FirmwareMeta` by hand cannot catch that; only the parser can.
+    The wire parser keeps an unparseable ``HPX_MODEL_SIZE`` value as the
+    raw string it received, so a corrupted or foreign line arrives as
+    text, not an integer. Building :class:`FirmwareMeta` by hand cannot
+    reproduce that; only the parser can.
     """
 
     @staticmethod

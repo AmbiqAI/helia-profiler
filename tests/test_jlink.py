@@ -1,5 +1,3 @@
-"""Tests for J-Link probe enumeration and selection."""
-
 from __future__ import annotations
 
 import logging
@@ -333,9 +331,8 @@ class TestFlashBinaryFallback:
         if bank_addr is not None:
             # Whatever else each caller asserts, the flash must have gone
             # through the real address check rather than the fail-open branch.
-            # Without this, dropping the bank line from ``_jlink_output`` would
-            # leave every test here green while silently testing nothing --
-            # which is what the stub used to do.
+            # Dropping the bank line from ``_jlink_output`` must not leave
+            # this test green while testing nothing.
             assert "UNVERIFIED FLASH DESTINATION" not in warnings.text
         return run.call_args.args[0]
 
@@ -598,8 +595,8 @@ def test_a_per_soc_address_overrides_its_family(monkeypatch: pytest.MonkeyPatch)
 def test_the_atomiq110_override_value_is_pinned() -> None:
     """Pin atomiq110's address while it is still unreachable data.
 
-    It is not a registered SoC yet (PR #98 adds it), so no behavioural test can
-    reach this entry and a wrong value would land on main unnoticed.  The value
+    atomiq110 is not yet a registered SoC, so no behavioural test can reach
+    this entry and a wrong value would land on main unnoticed.  The value
     is nsx's ``NSX_SEGGER_PF_ADDR`` for the part and is the **nbl** origin,
     because atomiq110.cmake makes nbl the default profile -- the FPGA
     realization is flashed straight over J-Link with no secure bootloader.  Its
@@ -640,9 +637,7 @@ def test_a_custom_soc_cannot_forge_a_per_soc_override(monkeypatch: pytest.Monkey
     of them answers before the origin gate is ever consulted.  With both
     absent, the *only* thing that can produce a non-``None`` answer here is the
     name matching the patched override -- which is exactly the forgery, so the
-    gate is what this observes.  (An earlier revision carried
-    ``based_on: apollo4p``, which made the assertion a statement about
-    inheritance and left the gate untested: deleting it kept the test green.)
+    gate is what this observes.
     """
     from helia_profiler.platform import capabilities
     from helia_profiler.platform.custom import build_custom_platform_registry
@@ -1225,9 +1220,9 @@ class TestFlashRecipeValidation(_FlashRecipeFixtures):
         preamble is legal JLinkExe, and fail-fast is armed before anything
         programs flash, so the flash is fully protected.  Demanding the
         directive be the literal first line would refuse it: a new hard
-        refusal of a recipe that flashes correctly, which is the regression
-        this module already declined to risk when it widened the accepted
-        ``LoadFile`` shapes.
+        refusal of a recipe that flashes correctly -- the same regression
+        this module already declines to risk for the accepted ``LoadFile``
+        shapes.
         """
         self._flash(
             tmp_path,
@@ -1259,12 +1254,12 @@ class TestFlashRecipeValidation(_FlashRecipeFixtures):
     ) -> None:
         """``LoadFile`` is not J-Link's only way to write flash.
 
-        This branch fires on the absence of ``LoadFile``, and it used to report
-        that absence as "so it programs nothing".  ``LoadBin "<image>",
-        0x410000`` programs flash and is not a ``LoadFile``, so a hand-edited
-        recipe using it lands here and is told, falsely, that it flashes
-        nothing -- then sent hunting for a load command that is right there.  A
-        ``w4`` sequence writes flash the same way with even less to recognise.
+        This branch fires on the absence of ``LoadFile``.  ``LoadBin
+        "<image>", 0x410000`` programs flash and is not a ``LoadFile``, so a
+        hand-edited recipe using it lands here and must not be told, falsely,
+        that it flashes nothing -- doing so sends the user hunting for a load
+        command that is right there.  A ``w4`` sequence writes flash the same
+        way with even less to recognise.
 
         The same defect class as the addressless-``LoadFile`` message below, one
         command over: a refusal asserting more than the check actually
@@ -1428,9 +1423,9 @@ class TestFlashRecipeValidation(_FlashRecipeFixtures):
         an untyped escape surfaces to the user as "Unexpected error in stage
         'flash_power_firmware' ... likely a bug in heliaPROFILER. Please file an
         issue" for what is a mis-encoded file on their own disk, and slips past
-        that stage's power-cycle retry on the way.  The same commit added
-        exactly this conversion for the unresolvable-path case a few lines
-        below; this is the same class of problem.
+        that stage's power-cycle retry on the way.  The unresolvable-path case
+        a few lines below converts the same way; this is the same class of
+        problem.
 
         Written with real cp1252 BYTES because the bug is in the decode: a
         ``str`` fixture would be re-encoded as UTF-8 on write and never fail.

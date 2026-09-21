@@ -257,10 +257,6 @@ def _inspect_dependency(spec: _DependencySpec) -> DoctorCheck:
     )
 
 
-# ---------------------------------------------------------------------------
-# Version checks — informational, safe offline, never raise.
-# ---------------------------------------------------------------------------
-
 _VERSION_RE = re.compile(r"(\d+)\.(\d+)(?:\.(\d+))?")
 _CMAKE_MIN_VERSION = (3, 24, 0)
 

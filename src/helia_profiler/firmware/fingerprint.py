@@ -60,7 +60,7 @@ def canonical_code(text: str) -> str:
                 # state must survive onto the next physical line — resetting
                 # it here let a continued macro body's real terminating
                 # newline collapse, hashing two semantically different
-                # programs equal (#173 round-2 review M-A).
+                # programs equal (#173).
                 if not (line_is_directive and last_char == "\\"):
                     line_is_directive = False
                 line_has_content = line_is_directive
@@ -98,7 +98,7 @@ def canonical_code(text: str) -> str:
                 # The newline guard outranks the escape pair: consuming a
                 # backslash-newline as an "escape" let an unterminated
                 # literal on a continued line swallow the next physical line
-                # (#173 round-2 review M-A, second route).
+                # (#173).
                 if text[j] == "\\" and j + 1 < n and text[j + 1] != "\n":
                     buf.append(text[j : j + 2])
                     j += 2
@@ -150,20 +150,19 @@ def measured_power_fingerprint(ctx: PipelineContext) -> str | None:
     except (OSError, ValueError):
         # ValueError covers UnicodeDecodeError: a partially-written or
         # corrupt source must degrade to the absent/legacy value, never
-        # fail the run at report time (#173 round-2 review m-F).
+        # fail the run at report time (#173).
         return None
     # The scheme tag makes hasher changes legible: a canonicalizer or
     # file-set change shifts every fingerprint, and without the tag that
     # mismatch would present as "the firmware changed" — asserting a cause
-    # that is false (#173 round-2 review m-C). Bump it whenever the
-    # construction below changes.
+    # that is false (#173). Bump it whenever the construction below changes.
     parts = ["scheme\x00hpx-power-fingerprint-v2", f"{main_name}\x00{main_digest}"]
     # The TFLM/heliaRT builds compile these into the SAME target (AOT and
     # ExecuTorch render no profiler TU — they fold in as "absent", matching
     # not-compiled). In the dedicated power binary the profiler's hooks
     # early-return, but its code is linked and its prologue runs in-window —
     # hashing only the main TU let a profiler-template edit reproduce the
-    # #115 shape undetected (#173 review M1). A missing file folds in as
+    # #115 shape undetected (#173). A missing file folds in as
     # "absent": deterministic, and distinct from any present content.
     for name in ("hpx_pmu_profiler.cc", "hpx_pmu_profiler.h"):
         try:

@@ -32,9 +32,6 @@ def test_apollo4_board_variants_map_to_aot_platform():
         assert _BOARD_TO_AOT_PLATFORM.get(board) == board
 
 
-# ---------- fake AotOperator surface -----------------------------------------
-
-
 @dataclass
 class _FakeTensor:
     name: str = "t"
@@ -113,9 +110,6 @@ class _FakeArena:
     source_memory: str | None
 
 
-# ---------- _tensor_metadata -------------------------------------------------
-
-
 class TestTensorMetadata:
     def test_full_tensor_produces_full_metadata(self):
         t = _FakeTensor(name="conv_in", shape=[1, 8, 8, 3], dtype="int8", nbytes=192)
@@ -160,9 +154,6 @@ class TestTensorMetadata:
         assert meta["offset"] == 128
         assert meta["allocation_size"] == 256
         assert meta["staged"] is False
-
-
-# ---------- _extract_operator_manifest ---------------------------------------
 
 
 class TestExtractOperatorManifest:
@@ -258,7 +249,6 @@ class TestExtractOperatorManifest:
 
         out = _extract_operator_manifest(_FakeCtx([_BadOp()]))
         assert len(out) == 1
-        # inputs field is omitted when access fails; outputs still captured.
         assert "inputs" not in out[0]
         assert out[0]["outputs"] == []
 
@@ -276,9 +266,6 @@ class TestExtractOperatorManifest:
         lookup = _arena_region_id_lookup(_FakeCtx([], render_plan=render_plan))
 
         assert lookup[("constant", "dtcm", "dtcm")] == 2
-
-
-# ---------- _write_aot_manifest ----------------------------------------------
 
 
 def _aot_artifacts(manifest: list[dict[str, Any]] | None) -> HeliaAotArtifacts:
@@ -410,8 +397,8 @@ class TestWriteAotMemoryLayers:
 
 
 class TestAotSymbolHints:
-    """#179 M-3/M-4: the hints must name symbols the templates
-    ACTUALLY emit, per mode and staging."""
+    """The hints must name symbols the templates ACTUALLY emit,
+    per mode and staging (#179)."""
 
     def _hint(self, role, *, staged=False, allocate=True, region_id=0):
         from helia_profiler.engines.helia_aot.manifest import _aot_buffer_symbol
@@ -428,7 +415,7 @@ class TestAotSymbolHints:
     def test_cold_constant_is_the_blob_only_with_internal_arenas(self):
         assert self._hint("constant") == "hpx_arena_const_dtcm__blob"
         # External-arena mode emits NO constant symbols (sidecar files);
-        # a __blob hint there produced a false "missing" (#179).
+        # a __blob hint there would be a false "missing" (#179).
         assert self._hint("constant", allocate=False) is None
 
     def test_staged_constant_is_the_gated_runtime_buffer(self):

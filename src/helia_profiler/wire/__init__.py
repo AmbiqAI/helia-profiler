@@ -1,11 +1,9 @@
 """The HPX wire protocol: one declaration of everything firmware and host exchange.
 
 Every byte the profiler firmware puts on a transport, and the one command the
-host writes back, is declared here once. Before this module the protocol lived
-as string literals scattered across sixteen Jinja templates and six host
-modules — ``"--- HPX_START ---"`` alone existed as three independent copies —
-and nothing anywhere said which keys a given engine, transport, or binary is
-supposed to produce. :data:`WIRE_REGISTRY` is that statement, and
+host writes back, is declared here once, so nothing elsewhere has to say which
+keys a given engine, transport, or binary is supposed to produce.
+:data:`WIRE_REGISTRY` is that statement, and
 ``tests/contracts/test_wire_protocol.py`` holds the rendered firmware to it.
 
 Five grammars
@@ -65,21 +63,21 @@ Registry-documented gaps
 
 These are true of the shipped protocol and recorded rather than silently
 fixed — closing one is a deliberate wire change (disclose + snapshot regen),
-not a host-side edit. #163's documented gaps were closed by #165 —
-every :class:`FirmwareErrorCode` now carries a host hint, the never-emitted
-``HPX_POWER_SAMPLE_COUNT`` was retired outright (removed from
-:class:`PowerTerminalKey` and the envelope schema; ``HPX_POWER_MEASUREMENT_COUNT``
-already carries the accumulator count), and ExecuTorch's ``HPX_ARENA_SIZE`` now
-reports the summed arena size (planned + method + temporary; I/O buffers are
-separate keys), so the figure is comparable with TFLM's single-arena number:
+not a host-side edit. Every :class:`FirmwareErrorCode` carries a host hint,
+the never-emitted ``HPX_POWER_SAMPLE_COUNT`` was retired outright (removed
+from :class:`PowerTerminalKey` and the envelope schema;
+``HPX_POWER_MEASUREMENT_COUNT`` already carries the accumulator count), and
+ExecuTorch's ``HPX_ARENA_SIZE`` reports the summed arena size (planned +
+method + temporary; I/O buffers are separate keys), so the figure is
+comparable with TFLM's single-arena number:
 
 * The ``clean_window_begin`` heartbeat carries a hardcoded ``est_ms=0`` only
   in dedicated power binaries, where the announce compiles to a no-op and no
   host listens. #164 gave infer windows a measured estimate in both window
-  modes; #170 gave busy-loop windows the compile-time ``window_target_ms``
-  and made the power exclusion structural. The exact statement is
-  single-sourced as :data:`EST_MS_GAP`, which the heartbeat's spec note and
-  the generated reference both quote.
+  modes, and busy-loop windows announce the compile-time
+  ``window_target_ms`` itself, with the power exclusion structural. The
+  exact statement is single-sourced as :data:`EST_MS_GAP`, which the
+  heartbeat's spec note and the generated reference both quote.
 * ``HPX_VERSION`` is checked against :data:`HPX_PROTOCOL_VERSION` and then
   discarded — it never reaches ``FirmwareMeta`` or ``summary.json``.
 * ``HPX_CONST_BLOB_LOADED region=… size=…`` looks like a key/value line but is

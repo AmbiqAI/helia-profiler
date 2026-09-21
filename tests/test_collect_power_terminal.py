@@ -211,8 +211,8 @@ def test_internal_terminal_measurement_becomes_power_result(
     assert ctx.power_result is not None
     assert ctx.power_result.summary.energy_j == pytest.approx(0.09)
     # Artifact-level POWER_FIRMWARE (#173): without it, a
-    # manifest-less INTERNAL-mode pair — the very mode of #115's phantom
-    # delta — cannot establish the fingerprint's platform scope and the
+    # INTERNAL-mode pair — the same mode behind a past phantom delta —
+    # cannot establish the fingerprint's platform scope and the
     # POWER_METRIC_BLOCKING gate silently degrades to nothing.
     assert ctx.power_result.metadata.power_firmware == "dedicated"
     assert ctx.power_result.summary.duration_s == pytest.approx(0.005)
@@ -337,13 +337,9 @@ class TestFirmwareWindowClockIntegrity:
     matched, both gate edges seen, energy integrated in hardware -- and the run
     publishes confidently wrong average power and current.
 
-    Numbers below are the real Apollo3 Blue Plus bench pair (2026-08,
-    apollo3p_evb, KWS/heliaRT, JS110 external): the pre-fix build reported
-    elapsed_us=0 for 24/24 completed inferences against a 4.963 s measured
-    gate, and the fixed build reported 4.970184 s against a 4.967 s gate.
+    BENCH_* constants below come from a real Apollo3 Blue Plus bench pair.
     """
 
-    # --- Apollo3 bench pair -------------------------------------------------
     BENCH_COUNT = 24
     BENCH_REFERENCE_US = 208_744  # host plan, from the profile binary
     BENCH_GATE_S = 4.967  # JS110 gated window, fixed build
@@ -402,8 +398,6 @@ class TestFirmwareWindowClockIntegrity:
         # enforces duration_us == elapsed_us, so mirror that here.
         return _measurement(duration_us=elapsed_us, inference_count=self.BENCH_COUNT)
 
-    # --- 1. frozen clock: fatal internally, warning externally ---------------
-
     def test_zero_elapsed_is_terminal_in_internal_mode(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
@@ -422,10 +416,10 @@ class TestFirmwareWindowClockIntegrity:
     def test_zero_elapsed_only_warns_in_external_mode(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
     ):
-        """The exact pre-fix Apollo3 signature: 24/24 inferences in 0 us. The
-        JS110 owns this run's power numbers and they were correct to 0.19%
-        despite it, so raising would discard a good capture -- and would do it
-        before GenerateReportStage, leaving no artifact at all."""
+        """The Apollo3 zero-elapsed signature: 24/24 inferences in 0 us. The
+        JS110 owns this run's power numbers, so raising would discard a good
+        capture -- and would do it before GenerateReportStage, leaving no
+        artifact at all."""
         ctx = self._bench_ctx(tmp_path, gate_s=self.BASELINE_GATE_S)
         record = self._bench_record(elapsed_us=0)
         with caplog.at_level("WARNING", logger="hpx"):
@@ -452,8 +446,6 @@ class TestFirmwareWindowClockIntegrity:
         )
         with pytest.raises(PowerError, match="reported error 4"):
             self._run(ctx, record, monkeypatch)
-
-    # --- 2. external-mode warning -------------------------------------------
 
     def test_bench_agreement_logs_no_window_clock_warning(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
@@ -496,10 +488,8 @@ class TestFirmwareWindowClockIntegrity:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
     ):
         """A degraded capture has no gated window, only a whole-capture
-        free-form summary. Falling back to it fabricates a disagreement out of
-        an unrelated interval -- reproduced on two real Apollo4 artifacts
-        (ap4-js110-2, ap4-js110-smoke), where a firmware clock accurate to
-        0.16% "disagreed" by 73.9% with a 19.2 s free-form capture. There must
+        free-form summary. Falling back to it fabricates a disagreement out
+        of an unrelated interval (WORKAROUND helia-profiler#107). There must
         be no window-clock warning here; power.observation_degraded already
         says what actually went wrong."""
         ctx = self._bench_ctx(tmp_path)
@@ -521,8 +511,6 @@ class TestFirmwareWindowClockIntegrity:
         with caplog.at_level("WARNING", logger="hpx"):
             self._run(ctx, self._bench_record(), monkeypatch)
         assert "window clock" not in caplog.text
-
-    # --- 3. internal-mode warning -------------------------------------------
 
     def test_internal_window_clock_disagreement_warns(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
@@ -566,8 +554,8 @@ class TestFirmwareWindowClockIntegrity:
     def test_internal_threshold_is_25_percent_not_50(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog, skew: float
     ):
-        """30% off the plan must warn.  Pins the band at the 25% bound (rationale
-        at diagnostics.py's tolerance comment), not the old 50%, both ways."""
+        """30% off the plan must warn. Pins the tolerance band at 25%
+        (rationale at diagnostics.py's tolerance comment), both ways."""
         ctx = self._bench_ctx(tmp_path, internal=True)
         skewed = int(self.BENCH_COUNT * self.BENCH_REFERENCE_US * skew)
         with caplog.at_level("WARNING", logger="hpx"):
@@ -579,8 +567,6 @@ class TestFirmwareWindowClockIntegrity:
             )
         assert "window clock and the reference disagree" in caplog.text
         assert "planned_window" in caplog.text
-
-    # --- 4. internal-mode host wall-clock ceiling ---------------------------
 
     def test_internal_window_longer_than_host_wall_time_warns(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
@@ -631,8 +617,6 @@ class TestFirmwareWindowClockIntegrity:
             self._run(ctx, self._bench_record(), monkeypatch)
         assert "cannot outlast" not in caplog.text
 
-    # --- 4. mode-awareness ---------------------------------------------------
-
     def test_the_two_modes_apply_different_tolerances_to_the_same_skew(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
     ):
@@ -672,13 +656,6 @@ class TestBusyLoopProbeCompletesARun:
     it reports 1 requested / 1 completed for this probe
     (``_power_terminal_success.j2``) and the host expects the same via
     ``power.diagnostics.expected_terminal_requested_count``.
-
-    Before that agreement existed, firmware reported ``clean_iters_n``
-    requested against ``clean_count == 1`` completed and this stage raised
-    "Power firmware reported incomplete inference execution. Completed 1/5
-    inferences." on every busy_loop run -- so the probe could not finish a run
-    on any board, and ``elapsed_us``, the number it exists to produce, was
-    never consumed.
     """
 
     def test_busy_loop_terminal_is_accepted(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -791,12 +768,9 @@ class TestBusyLoopProbeCompletesARun:
     ):
         """A busy_loop window matching its plan must not warn.
 
-        #112 withheld the plan-derived reference here, because the plan then
-        multiplied a per-inference time that described nothing the firmware
-        did (5 x 1000 us against a ~1 s spin -- a ~200x false disagreement on
-        every correct run). #125 fixed the PLAN instead: a busy_loop window is
-        one unit lasting window_target_ms, so `count x reference_us` is now
-        exactly the window and the reference is passed through again.
+        A busy_loop window is one unit lasting window_target_ms, so
+        `count x reference_us` equals the window and the reference passes
+        through unchanged.
         """
         import logging
 
@@ -824,14 +798,10 @@ class TestBusyLoopProbeCompletesARun:
     ):
         """And a window that is NOT the length it was planned to be must warn.
 
-        This is the half #125 flagged as missing: after #112 withheld the
-        reference, internal-mode busy_loop had no duration check at all --
-        a window inflated or deflated by any factor passed silently. That
-        matters because in internal mode `elapsed_us` is the denominator for
-        average power and current, so a wrong window scales both.
-
-        Here the firmware reports a 7 s window against a 1 s plan -- the
-        calibration-fallback shape `_busy_loop_calibration.j2` warns about.
+        In internal mode `elapsed_us` is the denominator for average power
+        and current, so a wrong window scales both. Here the firmware
+        reports a 7 s window against a 1 s plan -- the calibration-fallback
+        shape `_busy_loop_calibration.j2` warns about.
         """
         import logging
 

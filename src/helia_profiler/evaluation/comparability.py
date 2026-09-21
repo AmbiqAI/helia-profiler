@@ -94,21 +94,13 @@ def _issue(code: ComparabilityCode, message: str, **context: Any) -> Comparabili
 def _invalid_result_issues(role: str, manifest: "ResultManifest") -> list[ComparabilityIssue]:
     """Confine an invalid result to the metric families its errors broke.
 
-    An INVALID verdict used to block the whole comparison, which threw away
-    cycles, latency, memory and per-layer deltas that no failing check had
-    anything to say about — a power run whose gate disagreed with the firmware
-    clock produced no comparison at all, rather than one without power rows.
-
     An error confined to a metric family says so in the registry
-    (``IssueSpec.metric_group``). When every error on the run is confined, and
-    every family named has a METRIC_BLOCKING code to express it, those codes
-    replace the blanket block. Anything else — an unconfined error, an
-    unrecognized code from a newer hpx, or a family with no code — falls back
-    to blocking everything, so the partial comparison is only ever reached
-    when it is provably safe.
+    (``IssueSpec.metric_group``). When every error on the run is confined,
+    and every family named has a METRIC_BLOCKING code, those codes replace
+    blocking the whole comparison. An unconfined error, an unrecognized
+    code, or a family with no code falls back to blocking everything.
 
-    The verdict itself is untouched: the run is still INVALID, ``--fail-on-
-    invalid`` still exits non-zero, and the console still shows the error.
+    The verdict itself is unaffected: the run is still INVALID.
     """
     errors = [issue for issue in manifest.issues if issue.severity == Severity.ERROR]
     groups: list[str] = []

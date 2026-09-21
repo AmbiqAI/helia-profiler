@@ -1,11 +1,10 @@
 """An invalid run blocks the metrics its errors broke, not every metric.
 
-A power run whose gate disagreed with the firmware's own window clock used to
-produce no comparison at all: the INVALID verdict blocked cycles, latency,
-memory and per-layer deltas that no failing check had anything to say about.
-The disagreement is between the host's gate and the device's STIMER window, so
-it confines itself to power — the cycle counts came off a different binary in
-an earlier stage, on a different clock.
+A power run whose gate disagrees with the firmware's own window clock
+confines its INVALID verdict to power: the disagreement is between the
+host's gate and the device's STIMER window, and the cycle counts came off
+a different binary in an earlier stage, on a different clock, so cycles,
+latency, memory and per-layer deltas stay unblocked.
 """
 
 from __future__ import annotations
@@ -70,11 +69,6 @@ def _assess(*issues: ResultIssue):
     return assess_comparability(baseline, _run(_manifest(*issues)))
 
 
-# ---------------------------------------------------------------------------
-# The registry tag
-# ---------------------------------------------------------------------------
-
-
 def test_the_observer_mismatch_is_confined_to_power():
     assert error_metric_group(IssueCode.POWER_WINDOW_OBSERVER_MISMATCH.value) == POWER
 
@@ -96,11 +90,6 @@ def test_every_tagged_group_has_a_code_that_can_express_it():
 
     tagged = {spec.metric_group for spec in ISSUE_REGISTRY.values() if spec.metric_group}
     assert tagged <= set(METRIC_BLOCKING_CODE_BY_GROUP)
-
-
-# ---------------------------------------------------------------------------
-# What a comparison does with it
-# ---------------------------------------------------------------------------
 
 
 def test_a_power_only_invalidity_still_compares_cycles_and_latency():

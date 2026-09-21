@@ -46,8 +46,6 @@ _ARENA_SYMBOL = "g_arena_storage"
 
 
 class VerifyPlacementStage:
-    """Assert the arena symbol landed in its intended memory region."""
-
     @property
     def name(self) -> str:
         return "verify_placement"
@@ -144,10 +142,9 @@ class VerifyPlacementStage:
         )
 
     def _run_legacy(self, ctx: PipelineContext, soc, arena_region) -> None:
-        """The pre-#133 check against the user-declared placement table —
-        kept for custom SoCs, which the verified map deliberately does not
-        cover but whose declared bases are still worth holding the linker
-        to."""
+        """Check against the user-declared placement table — used for
+        custom SoCs, which the verified map does not cover but whose
+        declared bases are still worth holding the linker to."""
         ranges = soc_placement_ranges(soc)
         expected = ranges.get(arena_region)
         if expected is None:

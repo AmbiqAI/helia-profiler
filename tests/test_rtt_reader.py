@@ -649,9 +649,9 @@ def test_capture_rtt_output_does_not_send_down_channel_command(monkeypatch):
         rtt_scan_ranges=((0x20000000, 0x4000),),
     )
 
-    # The firmware now streams the HPX_START header losslessly on the up-channel
-    # and never waits on a host->target command, so the host must not write to
-    # the RTT down-channel during the ready handshake.
+    # The firmware streams the HPX_START header losslessly on the up-channel
+    # and never waits on a host->target command, so the host must not write
+    # to the RTT down-channel during the ready handshake.
     assert fake_jlink.commands == []
 
 
@@ -1346,14 +1346,7 @@ def test_capture_swo_output_returns_partial_after_final_attempt(monkeypatch):
     assert collect_call_count["count"] == _MAX_CAPTURE_ATTEMPTS
 
 
-# ---------------------------------------------------------------------------
-# PSRAM model upload — HPX_PSRAM_READY handoff
-# ---------------------------------------------------------------------------
-
-
 class _FakePsramSession:
-    """Minimal DebugMemorySession fake for the PSRAM upload path."""
-
     def __init__(self, rtt_chunks=()):
         self._chunks = list(rtt_chunks)
         self.memory_writes = []
@@ -1385,7 +1378,7 @@ def test_psram_upload_ready_line_already_in_initial_buf(tmp_path):
     model = tmp_path / "m.tflite"
     model.write_bytes(b"\xaa" * 100)
 
-    session = _FakePsramSession()  # rtt_read always returns nothing
+    session = _FakePsramSession()
     _upload_model_to_psram(
         session,  # ty: ignore[invalid-argument-type]  # fake J-Link: only the surface under test
         model,
@@ -1400,7 +1393,6 @@ def test_psram_upload_ready_line_already_in_initial_buf(tmp_path):
 
 
 def test_psram_upload_ready_line_arrives_in_later_chunk(tmp_path):
-    """Ready line split across the probe buffer and a later RTT chunk."""
     from helia_profiler.transport.rtt import _upload_model_to_psram
 
     model = tmp_path / "m.tflite"
@@ -1491,7 +1483,7 @@ def test_psram_upload_gated_on_engine_capability(
     ctx = PipelineContext(config=config, work_dir=tmp_path)
     ResolvePlatformStage().run(ctx)
     set_profile_firmware(ctx, build_dir=tmp_path / "build")
-    assert ctx.build_dir is not None  # set_profile_firmware just populated it
+    assert ctx.build_dir is not None
     ctx.build_dir.mkdir()
     ctx.resolved_jlink_serial = "1160002204"
     ctx.weights_region = weights_region

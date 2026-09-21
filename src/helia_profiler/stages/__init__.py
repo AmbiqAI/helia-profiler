@@ -1,8 +1,7 @@
 """Pipeline stages — one module per stage, re-exported here.
 
 The canonical execution order is ``profiler.build_default_pipeline()``;
-stage docstrings deliberately carry no position numbers (three ad-hoc
-numbering schemes fossilized here before #229 dropped them).
+stage docstrings carry no position numbers.
 """
 
 from .preflight import PreflightStage

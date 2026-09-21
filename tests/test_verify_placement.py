@@ -1,5 +1,3 @@
-"""Tests for the build-time arena placement guard (stage 4b)."""
-
 from __future__ import annotations
 
 from tests.pipeline_context_helpers import clear_profile_run, set_profile_firmware
@@ -19,11 +17,6 @@ from helia_profiler.platform import (
 )
 from helia_profiler.stages import verify_placement
 from helia_profiler.stages.verify_placement import VerifyPlacementStage
-
-
-# ---------------------------------------------------------------------------
-# MemoryRange / soc_placement_ranges
-# ---------------------------------------------------------------------------
 
 
 class TestMemoryRange:
@@ -63,11 +56,6 @@ class TestSocPlacementRanges:
         assert ranges[Placement.SRAM].contains(0x10011000)
         # A small KWS-sized arena lands near the base of RWMEM.
         assert ranges[Placement.SRAM].contains(0x10011010)
-
-
-# ---------------------------------------------------------------------------
-# VerifyPlacementStage
-# ---------------------------------------------------------------------------
 
 
 def _ctx(
@@ -169,8 +157,7 @@ class TestMigrationBehaviorPins:
     def test_arena_inside_a_stack_reservation_now_fails(self, tmp_path, monkeypatch):
         """0x2003C000 on apollo330P is the armlink fixed stack (and one
         byte past gcc's MCU_TCM top) — inside the hardware WINDOW but
-        outside every app extent. The pre-#133 stage never saw this
-        address class; the extent yardstick rejects it."""
+        outside every app extent; the extent yardstick rejects it (#133)."""
         ctx = _ctx(tmp_path, board="apollo330mP_evb", arena_region=Placement.TCM)
         monkeypatch.setattr(verify_placement, "symbol_address", lambda *a, **k: (0x2003C000, "b"))
         with pytest.raises(BuildError, match="app window"):

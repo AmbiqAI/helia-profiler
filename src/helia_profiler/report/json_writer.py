@@ -26,7 +26,6 @@ def _write_json(
     power_terminal: dict[str, Any] | None = None,
     on_device_summary: dict[str, Any] | None = None,
 ) -> Path:
-    """Write full profiling results as JSON."""
     out_path = output_dir / "profile_results.json"
     total_cycles = sum(layer.cycles or 0 for layer in pmu.layers)
     preset_totals = {

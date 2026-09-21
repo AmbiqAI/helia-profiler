@@ -84,7 +84,6 @@ class TestInstallNsxModule:
         assert (module_dir / "signal").is_dir()
 
     def test_missing_nsx_raises(self, tmp_path: Path, fake_dist: Path):
-        """A dist without nsx/nsx-module.yaml should fail."""
         import shutil
 
         shutil.rmtree(fake_dist / "nsx")
@@ -198,7 +197,7 @@ class TestHeliaRTAdapter:
     ):
         """With no dist_path/source_path/source configured, prepare()
         resolves nsx-helia-rt from the NSX registry (no local vendoring) and
-        declares nsx-cmsis-nn at the baseline's qualified ref (#246)."""
+        declares nsx-cmsis-nn at the baseline's qualified ref."""
         monkeypatch.delenv("HELIART_DIST_PATH", raising=False)
         monkeypatch.delenv("HELIART_SOURCE_PATH", raising=False)
         config = _make_config(tmp_path)
@@ -249,7 +248,6 @@ class TestHeliaRTAdapter:
         assert len(artifacts.extra_modules) == 1
 
     def test_prepare_via_stage(self, tmp_path: Path, fake_dist: Path):
-        """Integration: verify the stage dispatches to HeliaRTAdapter."""
         from helia_profiler.pipeline import PipelineContext
         from helia_profiler.stages.resolve_platform import ResolvePlatformStage
         from helia_profiler.stages.prepare_engine import PrepareEngineStage
@@ -318,11 +316,9 @@ class TestSourceBuildMode:
         assert 'HELIA_RT_VARIANT "release-with-logs"' in cmake
         assert f'HELIA_RT_TFLM_ROOT "{fake_source_tree.as_posix()}"' in cmake
 
-        # nsx-module.yaml is copied from the source tree.
         yaml_text = (module_dir / "nsx-module.yaml").read_text()
         assert "nsx-helia-rt" in yaml_text
 
-        # No prebuilt lib/ tree was installed.
         assert not (module_dir / "lib").exists()
 
     def test_invalid_source_path_raises(self, tmp_path: Path):
@@ -389,7 +385,6 @@ class TestSourceBuildMode:
         fake_cmsis_nn: Path,
         monkeypatch: pytest.MonkeyPatch,
     ):
-        """When source_path is set, prebuilt dist_path is ignored entirely."""
         from helia_profiler.pipeline import PipelineContext
         from helia_profiler.stages.resolve_platform import ResolvePlatformStage
         from helia_profiler.stages.prepare_engine import PrepareEngineStage
@@ -445,7 +440,7 @@ class TestEthosUBackend:
         artifacts = adapter.prepare(config, tmp_path)
         names = [m.name for m in artifacts.extra_modules]
         # cmsis-nn is declared unconditionally for the registry-default path
-        # (#246) regardless of backend — the NPU module is appended after it.
+        # regardless of backend — the NPU module is appended after it.
         assert names == ["nsx-helia-rt", "nsx-cmsis-nn", "nsx-npu"]
         npu = artifacts.extra_modules[2]
         assert npu.local is False

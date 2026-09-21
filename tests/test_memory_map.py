@@ -108,12 +108,11 @@ def test_apollo510_windows_are_the_linker_script_values():
 
 # Every known divergence between capabilities._FAMILY_MEMORY_BASES (via
 # soc_placement_ranges) and the verified windows, pinned EXACTLY per SoC
-# (#176, lengths added in the fresh-eyes round): real MRAM start
-# plus (legacy length, verified length) for MRAM / TCM / SRAM. Every legacy
-# MRAM base is 0x0 except atomiq110's (asserted in the test body); a Phase-2
-# edit that turns
-# any known divergence into agreement — or vice versa — must consciously
-# edit this table.
+# (#176): real MRAM start plus (legacy length, verified length) for
+# MRAM / TCM / SRAM. Every legacy MRAM base is 0x0 except atomiq110's
+# (asserted in the test body); a Phase-2 edit that turns any known
+# divergence into agreement — or vice versa — must consciously edit this
+# table.
 _EXPECTED_LEGACY_VS_VERIFIED = {
     #  name         real MRAM    (legacy, verified) lengths for MRAM / TCM / SRAM
     "apollo3p": (0x0000C000, (2_048_000, 2_048_000), (65_536, 65_536), (716_800, 720_896)),
@@ -171,8 +170,7 @@ def test_apollo330P_has_no_itcm_and_dtcm_is_the_256k_hardware_aperture():
     """No ITCM window on the default script. The DTCM window is the SDK's
     DTCM_MAX_SIZE = 256 KB — armlink tiles to exactly that (0x3B000 TCM +
     0x1000 heap + 0x4000 stack), so its 16 KB stack at 0x2003C000 IS DTCM;
-    gcc's script merely declines the top 16 KB (#176 corrected
-    an earlier 240 KB window that pinned that stack as unclassifiable)."""
+    gcc's script merely declines the top 16 KB (#176)."""
     windows = linked_memory_map(get_soc("apollo330P"))
     by_region = {w.region: w for w in windows}
     assert MemoryRegion.ITCM not in by_region
@@ -327,15 +325,14 @@ def test_real_gcc_fixture_inventory_classifies_correctly():
     )
     assert occupancy == 0x4000 + 0x20 + 0xF8  # .stack + .data + .bss
     # .heap fills to the region top, so its size IS ground-truth free —
-    # and the formula reproduces it exactly (robust to WHERE the stack
-    # sits, the a50e63d fresh-eyes failure mode on apollo330P):
+    # and the formula reproduces it exactly, robust to WHERE the stack
+    # sits (script-order-dependent on apollo330P).
     assert gcc_app.length - occupancy == heap.size
 
 
 # Every app extent pinned exactly, per (soc, region, family): (start, length).
-# The app extents are the PR's headline deliverable — window starts/lengths
-# are pinned by _EXPECTED_LEGACY_VS_VERIFIED, but a transposed digit in an
-# extent would otherwise ship silently (#176). GNU DTCM
+# Window starts/lengths are pinned by _EXPECTED_LEGACY_VS_VERIFIED, but a
+# transposed digit in an extent would otherwise ship silently (#176). GNU DTCM
 # extents are the FULL script MCU_TCM regions (the floating .stack counts
 # as occupancy — its position is script-order-dependent); armlink DTCM
 # extents are MCU_TCM with the fixed heap/stack carved out by extent;
@@ -451,7 +448,7 @@ def test_every_app_window_extent_is_pinned_exactly():
 def test_psram_window_is_board_knowledge_and_not_section_attributable():
     """No linker region maps PSRAM on any SoC — Phase 2 must reconcile it
     from the plan, never report used=0/free=capacity off an inventory that
-    structurally cannot see it (#176 M-1's PSRAM corollary)."""
+    structurally cannot see it (#176)."""
     for name in CHARACTERIZED_SOCS:
         for w in linked_memory_map(get_soc(name)):
             if w.region is MemoryRegion.PSRAM:

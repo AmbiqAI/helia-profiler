@@ -88,11 +88,6 @@ def _require(value: _T | None, field_name: str, stage: str) -> _T:
     return value
 
 
-# ---------------------------------------------------------------------------
-# Pipeline context — mutable accumulator passed through every stage
-# ---------------------------------------------------------------------------
-
-
 @dataclass
 class PipelineContext:
     """Mutable state bag that flows through all pipeline stages.
@@ -236,58 +231,46 @@ class PipelineContext:
             return None
         return self.power_run.observation.result
 
-    # -- Narrowing accessors -------------------------------------------------
-    #
-    # The fields and typed records above are the *write* surface: each is set by
-    # the one stage that produces it.  These properties are the *read* surface — they
-    # return the non-optional type and, when the producing stage has not run,
-    # raise a :class:`PipelineError` naming both the field and that stage
-    # instead of an ``assert`` (which vanishes under ``-O``) or a ``None`` that
-    # propagates until something far away fails obscurely.
+    # Narrowing accessors: the *write* surface above is set by the stage
+    # that produces it; these are the *read* surface, returning the
+    # non-optional type or raising :class:`PipelineError` naming the
+    # missing field and its stage — not a bare ``assert`` (stripped by
+    # ``-O``) or a ``None`` that fails obscurely somewhere else.
 
     @property
     def resolved_soc(self) -> SocDef:
-        """The resolved SoC definition (produced by ``ResolvePlatformStage``)."""
         return _require(self.soc, "soc", "ResolvePlatformStage")
 
     @property
     def resolved_board(self) -> BoardDef:
-        """The resolved board definition (produced by ``ResolvePlatformStage``)."""
         return _require(self.board, "board", "ResolvePlatformStage")
 
     @property
     def prepared_artifacts(self) -> EngineArtifacts:
-        """The engine's prepared artifacts (produced by ``PrepareEngineStage``)."""
         return _require(self.engine_artifacts, "engine_artifacts", "PrepareEngineStage")
 
     @property
     def prepared_adapter(self) -> EngineAdapter:
-        """The prepared engine adapter (produced by ``PrepareEngineStage``)."""
         return _require(self.engine_adapter, "engine_adapter", "PrepareEngineStage")
 
     @property
     def resolved_firmware_dir(self) -> Path:
-        """The generated NSX app directory (produced by ``GenerateFirmwareStage``)."""
         return _require(self.firmware_dir, "firmware_dir", "GenerateFirmwareStage")
 
     @property
     def resolved_workspace(self) -> DependencyWorkspace:
-        """The deterministic dependency workspace (produced by ``GenerateFirmwareStage``)."""
         return _require(self.dependency_workspace, "dependency_workspace", "GenerateFirmwareStage")
 
     @property
     def built_binary_path(self) -> Path:
-        """The built profile ELF (produced by ``BuildFirmwareStage``)."""
         return _require(self.binary_path, "binary_path", "BuildFirmwareStage")
 
     @property
     def captured_pmu(self) -> PmuResult:
-        """The captured PMU result (produced by ``CapturePmuStage``)."""
         return _require(self.pmu_result, "pmu_result", "CapturePmuStage")
 
     @property
     def planned_arena_region(self) -> Placement:
-        """The resolved arena placement (produced by ``PlanMemoryStage``)."""
         return _require(self.arena_region, "arena_region", "PlanMemoryStage")
 
     def publish_profile_firmware(self, firmware: FirmwareArtifact) -> None:
@@ -405,40 +388,21 @@ class PipelineContext:
             )
 
 
-# ---------------------------------------------------------------------------
-# Stage protocol — each pipeline step implements this
-# ---------------------------------------------------------------------------
-
-
 @runtime_checkable
 class Stage(Protocol):
-    """Interface for a single pipeline stage."""
-
     @property
     def name(self) -> str:
         """Short human-readable stage name shown in logs."""
         ...
 
-    def should_skip(self, ctx: PipelineContext) -> bool:
-        """Return True if this stage should be skipped for this run."""
-        ...
+    def should_skip(self, ctx: PipelineContext) -> bool: ...
 
     def run(self, ctx: PipelineContext) -> None:
-        """Execute the stage, reading from and writing to *ctx*.
-
-        Raise a specific ``HpxError`` subclass on failure.
-        """
+        """Raise a specific ``HpxError`` subclass on failure."""
         ...
-
-
-# ---------------------------------------------------------------------------
-# Pipeline runner — lightweight sequential executor
-# ---------------------------------------------------------------------------
 
 
 class PipelineRunner:
-    """Executes a sequence of ``Stage`` objects against a ``PipelineContext``."""
-
     def __init__(
         self,
         stages: list[Stage],
@@ -450,7 +414,6 @@ class PipelineRunner:
         self._progress_sink = progress_sink
 
     def run(self, config: ProfileConfig) -> PipelineContext:
-        """Set up the working directory, run all stages, and clean up."""
         work_dir, should_cleanup = _resolve_work_dir(config)
         lock_path = work_dir / ".hpx-run.lock"
         with file_mutex(lock_path):
@@ -484,7 +447,6 @@ class PipelineRunner:
         elif self._console is not None:
             ctx.progress_sink = self._console.progress_update
 
-        # Seed run metadata with immutable fields
         ctx.run_metadata.hpx_version = __version__
         ctx.run_metadata.run_id = str(uuid.uuid4())
         ctx.run_metadata.timestamp = datetime.now(timezone.utc).isoformat()
@@ -530,10 +492,6 @@ class PipelineRunner:
                 self._console.pipeline_done()
 
         finally:
-            # Release any long-lived power driver handle stashed by an
-            # earlier stage (e.g. EnsureBoardPoweredStage).  Most drivers
-            # latch the relay in hardware and release the handle eagerly,
-            # so this is a no-op for typical runs.
             handle = ctx.power_driver_handle
             if handle is not None:
                 try:
@@ -544,11 +502,6 @@ class PipelineRunner:
                 shutil.rmtree(work_dir, ignore_errors=True)
 
         return ctx
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 def _cache_work_key(config: ProfileConfig) -> str:
@@ -571,9 +524,8 @@ def _resolve_work_dir(config: ProfileConfig) -> tuple[Path, bool]:
        :func:`helia_profiler.hostenv.cache_dirs.hpx_cache_root`) keyed on
        ``{board}-{toolchain}-{engine}``.  Enables incremental cmake builds
        across runs.  Never cleaned up automatically.
-    3. If that cache directory cannot be created (read-only service homes —
-       the hardware-validation runner crashed here before ``HPX_CACHE_DIR``
-       existed), fall back to ``.hpx-cache/`` under the working directory
+    3. If that cache directory cannot be created (e.g. read-only service
+       homes), fall back to ``.hpx-cache/`` under the working directory
        with a warning.  Builds still work; incrementality only lasts as
        long as the directory does.
     """
@@ -582,7 +534,6 @@ def _resolve_work_dir(config: ProfileConfig) -> tuple[Path, bool]:
         wd.mkdir(parents=True, exist_ok=True)
         return wd, False
 
-    # Persistent cache directory — enables incremental builds
     wd = _default_cache_work_dir(config)
     try:
         wd.mkdir(parents=True, exist_ok=True)
@@ -604,13 +555,11 @@ def _resolve_work_dir(config: ProfileConfig) -> tuple[Path, bool]:
 def serialize_config(config: ProfileConfig) -> dict[str, Any]:
     """Produce a JSON-safe snapshot of the active configuration.
 
-    Walks the full :class:`ProfileConfig` dataclass tree via
-    :func:`dataclasses.asdict`, then coerces non-JSON-native leaves
-    (``Path`` \u2192 ``str``, ``Enum`` \u2192 ``.value``, ``set``/``tuple`` \u2192
-    ``list``) so the resulting dict can be round-tripped through
-    ``json.dumps``.  Adding new fields to any sub-config is automatically
-    reflected in the run-metadata snapshot \u2014 no hand-maintained mirror
-    to drift.
+    Walks the full :class:`ProfileConfig` dataclass tree, coercing
+    non-JSON-native leaves (``Path`` \u2192 ``str``, ``Enum`` \u2192 ``.value``,
+    ``set``/``tuple`` \u2192 ``list``) so the result round-trips through
+    ``json.dumps``. New sub-config fields are picked up automatically \u2014
+    no hand-maintained mirror to drift.
     """
     from dataclasses import fields, is_dataclass
     from enum import Enum

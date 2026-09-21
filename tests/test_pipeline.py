@@ -1,5 +1,3 @@
-"""Tests for the pipeline primitives and stage sequencing."""
-
 from __future__ import annotations
 
 from tests.pipeline_context_helpers import (
@@ -31,14 +29,8 @@ from helia_profiler.pipeline import (
     Stage,
 )
 
-# ---------------------------------------------------------------------------
-# Helpers: minimal stage implementations for testing
-# ---------------------------------------------------------------------------
-
 
 class PassStage:
-    """A stage that always runs and does nothing."""
-
     def __init__(self, name: str = "pass_stage"):
         self._name = name
 
@@ -54,8 +46,6 @@ class PassStage:
 
 
 class SkipStage:
-    """A stage that always skips."""
-
     @property
     def name(self) -> str:
         return "skip_stage"
@@ -68,8 +58,6 @@ class SkipStage:
 
 
 class FailStage:
-    """A stage that raises an HpxError."""
-
     def __init__(self, error: HpxError | None = None):
         self._error = error or CaptureError("boom")
 
@@ -85,8 +73,6 @@ class FailStage:
 
 
 class UnexpectedFailStage:
-    """A stage that raises a non-HpxError exception."""
-
     @property
     def name(self) -> str:
         return "unexpected_fail"
@@ -99,8 +85,6 @@ class UnexpectedFailStage:
 
 
 class RecordingStage:
-    """A stage that records when it ran."""
-
     def __init__(self, name: str, log: list[str]):
         self._name = name
         self._log = log
@@ -148,15 +132,9 @@ class RecordingConsole:
         pass
 
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
 def _make_config(tmp_path: Path):
-    """Build a minimal ProfileConfig for testing."""
     model_file = tmp_path / "test.tflite"
-    model_file.write_bytes(b"\x00")  # dummy
+    model_file.write_bytes(b"\x00")
     return load_config(
         None,
         {
@@ -165,11 +143,6 @@ def _make_config(tmp_path: Path):
             "work_dir": str(tmp_path / "work"),
         },
     )
-
-
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
 
 
 class TestPipelineRunner:
@@ -487,11 +460,6 @@ def test_pipeline_runner_installs_progress_sink_before_stages(tmp_path: Path):
     assert updates == [ProgressUpdate(message="stage running")]
 
 
-# ---------------------------------------------------------------------------
-# Narrowing accessors (#162 Phase 4)
-# ---------------------------------------------------------------------------
-
-
 #: (accessor property, backing field, stage that produces the field).
 #: The single source of truth for the read surface of ``PipelineContext``.
 NARROWING_ACCESSORS = [
@@ -561,11 +529,11 @@ class TestNarrowingAccessors:
     def test_named_producer_is_a_real_stage(self, accessor: str, field: str, stage: str):
         """The stage named in the error must exist AND produce the field.
 
-        Review-hardened: the existence half alone let a wrong-but-real
-        producer pass (naming BuildFirmwareStage for dependency_workspace
-        stayed green), so the error text could lie. The source check pins
-        the attribution: the named stage's module must assign the field
-        (or publish it through a ctx.publish_* method — pmu_result's path).
+        Checking existence alone lets a wrong-but-real producer pass
+        (naming BuildFirmwareStage for dependency_workspace would still be
+        green), so the error text could lie. The source check pins the
+        attribution: the named stage's module must assign the field (or
+        publish it through a ctx.publish_* method — pmu_result's path).
         """
         del accessor
         import inspect
@@ -579,9 +547,8 @@ class TestNarrowingAccessors:
         assert module is not None
         module_src = inspect.getsource(module)
         # (?!=) so a comparison (`ctx.field == x`) cannot count as producing
-        # the field, and the publish hatch is per-field, not module-wide —
-        # both holes let a wrong-but-real producer pass until the second
-        # review round mutation-proved them.
+        # the field, and the publish hatch is per-field, not module-wide, so
+        # neither hole lets a wrong-but-real producer pass.
         assigns = re.search(rf"ctx\.{field}\s*=(?!=)", module_src) is not None
         field_publisher = {
             "binary_path": "ctx.publish_profile_firmware(",
@@ -604,28 +571,25 @@ class TestNarrowingAccessors:
 
 
 def test_no_assert_narrowing_of_context_fields_survives_in_src():
-    """The acceptance criterion of #162 Phase 4, as a test.
+    """A stage-ordering precondition must not hide as a bare assert.
 
-    ``assert ctx.<field> is not None`` is a stage-ordering precondition wearing
-    a crash costume: it is compiled out under ``-O`` and names no producer when
-    it fires.  New sites must read through the narrowing accessors instead.
+    ``assert ctx.<field> is not None`` is compiled out under ``-O`` and names
+    no producer when it fires. New sites must read through the narrowing
+    accessors instead.
     """
-    # Two patterns, deliberately scoped (the review round proved both blind
-    # spots with mutations):
+    # Two patterns, deliberately scoped:
     #  * ctx-field narrowing anywhere in src/, anchored on `is not None` so a
     #    legitimate absence assertion is not banned with a misleading
     #    use-the-accessor message;
     #  * `assert self.<field> is not None` within pipeline.py itself, where
-    #    PipelineContext lives — one such assert falsified this test's claim
-    #    until the review round caught it. Other files' self-asserts narrow
-    #    their own objects, not pipeline products, and stay legal.
+    #    PipelineContext lives. Other files' self-asserts narrow their own
+    #    objects, not pipeline products, and stay legal.
     # Any assert rooted at ctx.<field> — is-not-None, truthiness, or the
     # parenthesised forms — EXCEPT a deliberate absence assertion
     # (`assert ctx.x is None`), which is an invariant check, not narrowing.
     # The guard is SYNTACTIC: narrowing through an intermediate local or a
-    # walrus still evades it (one such survivor was found by review inside
-    # firmware/context.py and converted to an explicit raise) — reviewers
-    # stay the backstop for those spellings.
+    # walrus still evades it; reviewers stay the backstop for those
+    # spellings.
     ctx_assert = re.compile(r"^\s*assert\s+\(?(self\.)?ctx\.")
     absence_only = re.compile(r"^\s*assert\s+\(?(self\.)?ctx\.[\w.]+\s+is\s+None\b")
     self_pattern = re.compile(r"^\s*assert\s+\(?self\.\w+(\s+is\s+not\s+None\b|\s*\)?\s*(#.*)?$)")
@@ -644,9 +608,9 @@ def test_no_assert_narrowing_of_context_fields_survives_in_src():
 
 
 def test_docs_accessor_table_matches_the_code():
-    """The Concepts pipeline page hand-duplicates the accessor table; the
-    second review round showed a mutated producer left the docs silently
-    divergent. Parse the table and hold it to NARROWING_ACCESSORS."""
+    """The Concepts pipeline page hand-duplicates the accessor table.
+    Parse the table and hold it to NARROWING_ACCESSORS so a mutated
+    producer cannot leave the docs silently divergent."""
     doc = (
         Path(__file__).resolve().parents[1]
         / "astro-site"
@@ -705,8 +669,7 @@ def test_render_context_tolerates_npu_power_ack_only_on_fpga_boards(tmp_path: Pa
     """npu_tolerate_power_ack is derived from board.is_fpga in
     FirmwareRenderContext.from_pipeline_context — the FPGA NPU power domain
     may not report an ACK. The template-render tests pass the variable
-    directly, so only this pins the derivation (#284 review: a mutant
-    forcing it False survived the suite)."""
+    directly, so only this test pins the derivation (#284)."""
     from helia_profiler.engines.base import EngineType, HeliaRtArtifacts
     from helia_profiler.firmware.context import FirmwareRenderContext
     from helia_profiler.platform import get_board, get_soc

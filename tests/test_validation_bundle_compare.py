@@ -1,5 +1,3 @@
-"""Tests for portable validation-bundle loading and comparison."""
-
 from __future__ import annotations
 
 import csv

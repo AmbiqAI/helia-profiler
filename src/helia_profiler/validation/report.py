@@ -174,7 +174,6 @@ def build_manifest(
 
 
 def render_markdown(results: list[CaseResult]) -> str:
-    """Render the human-readable validation report."""
     stats = summary_stats(results)
     lines = [
         "# heliaPROFILER - Hardware Validation Report",

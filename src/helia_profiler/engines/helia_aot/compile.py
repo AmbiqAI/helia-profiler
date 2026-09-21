@@ -26,9 +26,6 @@ from ...platform import SocDef, get_soc_for_board
 
 log = logging.getLogger("hpx")
 
-# ---------------------------------------------------------------------------
-# heliaAOT version policy
-#
 # heliaAOT ships as a Python package, so version resolution is handled
 # entirely by pip. heliaAOT is not on PyPI, so the [aot] extra in
 # helia-aot is published on PyPI. Users get three install modes:
@@ -42,11 +39,9 @@ log = logging.getLogger("hpx")
 # does that better. We just enforce a minimum-supported version at runtime
 # so a user with an older install gets a clear error instead of a confusing
 # build failure (e.g. missing ModuleType.nsx).
-# ---------------------------------------------------------------------------
 HELIAAOT_MIN_VERSION = "0.20.0"
 HELIAAOT_MAX_VERSION_EXCLUSIVE = "0.21.0"
 
-# Default AOT configuration
 _DEFAULT_PREFIX = "hpx"
 _DEFAULT_MODULE_NAME = "hpx_model"
 
@@ -56,15 +51,6 @@ _jinja_env = jinja2.Environment(
     keep_trailing_newline=True,
     undefined=jinja2.StrictUndefined,
 )
-
-# ---------------------------------------------------------------------------
-# Board → heliaAOT platform name mapping
-#
-# heliaAOT has its own platform registry (apollo3p_evb, apollo4p_evb,
-# apollo510_evb, …).  The profiler board names are close but not always
-# identical.  Boards without a direct match fall back to the closest
-# compatible AOT platform.
-# ---------------------------------------------------------------------------
 
 _BOARD_TO_AOT_PLATFORM: dict[str, str] = {
     "apollo3p_evb": "apollo3p_evb",
@@ -107,7 +93,6 @@ def _resolve_aot_platform(config: ProfileConfig) -> str:
     2. Built-in ``_BOARD_TO_AOT_PLATFORM`` mapping.
     3. Raise ``EngineError`` with guidance.
     """
-    # Explicit override always wins
     explicit = config.engine.config.get("platform_name")
     if explicit:
         log.info("Using explicit AOT platform override: %s", explicit)
@@ -135,15 +120,11 @@ def _resolve_aot_platform(config: ProfileConfig) -> str:
     return aot_platform
 
 
-# ---------------------------------------------------------------------------
-# Per-kind tensor placement → heliaAOT attribute rulesets
-#
 # heliaAOT splits the model into three AIR tensor kinds — ``constant``
 # (read-only weights), ``persistent`` (read-write state) and ``scratch``
 # (transient activations) — each planned into its own arena. Coarse model
 # arena/weights controls map onto these kinds, while precise AOT placement
 # belongs in ``engine.config.aot_args.memory.tensors``.
-# ---------------------------------------------------------------------------
 
 _PLACEMENT_TO_AOT_MEMTYPE: dict[Placement, str] = {
     Placement.TCM: "dtcm",
@@ -260,7 +241,6 @@ def _run_aot_compiler(
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Start from a user-supplied YAML config if provided
     base_data: dict[str, Any] = {}
     if config.engine.config_path is not None:
         import yaml
@@ -280,7 +260,6 @@ def _run_aot_compiler(
             )
         base_data = loaded
 
-    # Merge any engine.config.aot_args overrides (dict form)
     extra = config.engine.config.get("aot_args", {})
     if isinstance(extra, dict):
         _deep_merge(base_data, extra)
@@ -339,7 +318,6 @@ def _run_aot_compiler(
             hint=str(exc)[:500],
         )
 
-    # Verify output exists
     module_dir = output_dir / module_name
     if not module_dir.is_dir():
         raise EngineError(
@@ -423,17 +401,12 @@ def _summarize_aot_tensor_rulesets(
 
 
 def _deep_merge(base: dict, override: dict) -> None:
-    """Recursively merge *override* into *base* in place."""
     for k, v in override.items():
         if k in base and isinstance(base[k], dict) and isinstance(v, dict):
             _deep_merge(base[k], v)
         else:
             base[k] = v
 
-
-# ---------------------------------------------------------------------------
-# Pragma / memory-placement validation
-# ---------------------------------------------------------------------------
 
 _PRAGMA_RE = re.compile(r"#ifndef\s+(\w+_PUT_IN_\w+)")
 
@@ -455,7 +428,6 @@ def _validate_pragmas(aot_module_dir: Path, prefix: str) -> None:
 
     content = platform_h.read_text(encoding="utf-8")
 
-    # Collect all PUT_IN_* macros that the generated code expects
     found_macros = set(_PRAGMA_RE.findall(content))
 
     prefix_upper = prefix.upper()
@@ -482,11 +454,6 @@ def _validate_pragmas(aot_module_dir: Path, prefix: str) -> None:
         )
 
 
-# ---------------------------------------------------------------------------
-# Attribute header generation (memory placement overrides)
-# ---------------------------------------------------------------------------
-
-
 def _write_attributes_header(aot_module_dir: Path, prefix: str) -> Path:
     """Generate the memory-placement attribute header inside the AOT module.
 
@@ -503,11 +470,6 @@ def _write_attributes_header(aot_module_dir: Path, prefix: str) -> Path:
         encoding="utf-8",
     )
     return header_path
-
-
-# ---------------------------------------------------------------------------
-# helia-aot version check
-# ---------------------------------------------------------------------------
 
 
 def _check_helia_aot_version(config: ProfileConfig | None = None) -> str:
@@ -548,13 +510,9 @@ def _check_helia_aot_version(config: ProfileConfig | None = None) -> str:
     if config is not None and config.compatibility is not None:
         policy = config.compatibility.baseline.engine("helia-aot")
         if policy.min_version is not None or policy.max_version_exclusive is not None:
-            # The baseline sets an explicit range policy (validated to allow
-            # a single-sided range — see _parse_baseline()). Use it standalone
-            # rather than layering it on top of the local constants: falling
-            # back to HELIAAOT_MAX_VERSION_EXCLUSIVE for a baseline that only
-            # sets min_version (or vice versa) could silently re-bound the
-            # baseline's floor with an unrelated constant ceiling, rejecting
-            # every version instead of leaving that side unbounded.
+            # Falling back to the local constant for an unset baseline bound
+            # could silently re-bound the baseline's floor with an unrelated
+            # ceiling, rejecting every version instead of leaving it open.
             minimum = (
                 _parse_semver(policy.min_version) if policy.min_version is not None else (0, 0, 0)
             )

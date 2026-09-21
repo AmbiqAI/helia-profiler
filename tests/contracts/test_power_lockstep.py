@@ -9,10 +9,7 @@ Three invariants:
    power gate.
 
 2. **Lock-step defaults ON for every wired board doing gated external
-   capture** (issue #114).  The rule used to be SoC-family-gated
-   (Apollo5-only), which silently degraded every Apollo3/Apollo4 gated capture
-   to ``no_gate_rise`` unless the user hand-set ``power.lockstep: true``.  An
-   explicit setting still wins in both directions.
+   capture.**  An explicit setting still wins in both directions.
 
 3. **``auto`` never cycles the rail.** The default/``auto`` reset policy uses
    debug/SWPOI reset primitives only.  Instrument rail power-cycling happens
@@ -174,7 +171,6 @@ class TestLockstepArmBeforeReset:
         result = capture_power(ctx, prepare_target=_prepare_target)
 
         assert result is not None
-        # The arm must happen before the reset that starts the measured run.
         assert events.index("arm") < events.index("lifecycle_reset")
         # The GPI poller must be live BEFORE the lifecycle reset, so the reset
         # + READY handshake happen inside capture_gated's on_started hook:
@@ -230,10 +226,9 @@ def _board_is_wired_for_lockstep(board_name: str) -> bool:
 class TestLockstepDefaultsOnWhenWired:
     """Issue #114: the lock-step default keys on wiring + mode, not SoC family.
 
-    Before this contract, ``resolve_power_lockstep`` auto-enabled only for
-    families flagged ``requires_lockstep_for_gated_power`` (Apollo5 only), so
-    a wired Apollo4 or Apollo3 board silently free-ran its measured window and
-    every gated capture came back ``integrity: degraded (no_gate_rise)``.
+    ``resolve_power_lockstep`` auto-enables for any board wired for it
+    (state + GO pins present) doing an external gated capture, not just a
+    family flagged ``requires_lockstep_for_gated_power``.
     """
 
     def test_apollo4_blue_plus_auto_enables_lockstep(self, tmp_path):
@@ -276,11 +271,8 @@ class TestLockstepDefaultsOnWhenWired:
         ``power.lockstep: false`` is the documented escape hatch for bringing
         up incomplete wiring, and it must keep working on a fully wired board
         -- which is precisely where the new default would otherwise stomp it.
-
-        This one cannot fail against the pre-#114 code, which returned False
-        here for the *wrong* reason (the family gate) and so agreed by
-        accident. What it does catch is the obvious wrong fix: an auto-enable
-        that forgets to check ``power.lockstep is not None`` first.
+        Catches an auto-enable that forgets to check
+        ``power.lockstep is not None`` first.
         """
         ctx = make_pmu_ctx(
             tmp_path, board=board, transport="rtt", power_enabled=True, lockstep=False
@@ -293,8 +285,8 @@ class TestLockstepDefaultsOnWhenWired:
 
         The measurement happens inside the firmware, so there is no gate for
         reset latency to outrun and no reason to add a handshake the host
-        would have to drive. Like the test above, this guards the wrong fix
-        (auto-enable keyed on wiring alone), not the pre-#114 code.
+        would have to drive. Guards against auto-enable keyed on wiring
+        alone, without checking mode.
         """
         ctx = make_pmu_ctx(
             tmp_path,
@@ -308,7 +300,7 @@ class TestLockstepDefaultsOnWhenWired:
         assert resolve_power_lockstep(ctx) is False
 
     def test_power_disabled_never_auto_enables(self, tmp_path):
-        """Also a wrong-fix guard, not a pre-#114 regression test."""
+        """Also a wrong-fix guard: auto-enable must not fire when power is disabled."""
         ctx = make_pmu_ctx(
             tmp_path,
             board="apollo4p_blue_kbr_evb",
@@ -339,7 +331,7 @@ class TestLockstepDefaultsOnWhenWired:
         )
         power = ctx.config.power
         rendered = _jinja_env.get_template("_gpio_sync.j2").render(
-            power_sync_enabled=True,  # external power capture is requested
+            power_sync_enabled=True,
             lockstep=resolve_power_lockstep(ctx),
             sync_gpio_pin=power.sync_gpio_pin,
             state_gpio_pin=power.state_gpio_pin,
@@ -349,13 +341,12 @@ class TestLockstepDefaultsOnWhenWired:
         assert "static constexpr bool     kPowerSyncEnabled = true;" in rendered
 
     # Three scenarios chosen so that power_sync_enabled and lockstep DISAGREE
-    # in at least one, and so that the expected answer is False in two. A
-    # single all-True fixture (the first version of this test) was shown by
-    # adversarial review to leave three realistic mutations of context.py
+    # in at least one, and so that the expected answer is False in two. An
+    # all-True fixture leaves three realistic mutations of context.py
     # completely green: reading `lockstep_wiring_available` instead of the
     # resolved decision, hardcoding `True` in to_template_vars, and swapping
-    # the power_sync_enabled/lockstep arguments -- because in that one fixture
-    # all three sources happened to be True at once.
+    # the power_sync_enabled/lockstep arguments -- because all three sources
+    # would agree at once.
     @pytest.mark.parametrize(
         "scenario,extra,expect_sync,expect_lockstep",
         [
@@ -381,21 +372,21 @@ class TestLockstepDefaultsOnWhenWired:
 
         That test calls ``resolve_power_lockstep`` itself and hands the result
         straight to the template, re-implementing the very hand-off it claims
-        to verify. Adversarial review proved the gap twice over: first that
-        replacing ``FirmwareRenderContext``'s
-        ``lockstep=resolve_power_lockstep(ctx)`` with a bare ``False`` left the
-        whole suite green, then that a single all-True fixture here still let
-        three further mutations through.
+        to verify. Replacing ``FirmwareRenderContext``'s
+        ``lockstep=resolve_power_lockstep(ctx)`` with a bare ``False`` leaves
+        the whole suite green, and a single all-True fixture here still lets
+        three further mutations through -- so this test drives scenarios
+        where sync and lockstep disagree.
 
         A divergence between host and baked constant is #114 with the polarity
-        reversed, and worse than the bug this PR fixes: the host arms lock-step
-        and holds GO low while the binary free-runs, so the run blocks for the
-        full ``power.duration_s`` and dies with "Target did not signal READY",
-        pointing the user at wiring that is fine.
+        reversed: the host arms lock-step and holds GO low while the binary
+        free-runs, so the run blocks for the full ``power.duration_s`` and
+        dies with "Target did not signal READY", pointing the user at wiring
+        that is fine.
 
-        So take the REAL context through the REAL template and read the emitted
-        C back -- which also covers the rendered ``false`` case, previously
-        pinned nowhere (the render snapshots hardcode both values to False and
+        So take the REAL context through the REAL template and read the
+        emitted C back -- this is the only place the rendered ``false`` case
+        is pinned (the render snapshots hardcode both values to False and
         their marker is a substring test that is true regardless).
         """
         from helia_profiler.engines import TFLM_ENGINE_HEADER
