@@ -13,11 +13,13 @@ look at first.
 
 - [Validate your setup](../validate-your-setup/) passed, or at least
   `hpx doctor` is green and `hpx probes list` shows your probe.
-- A LiteRT `.tflite` model. A source checkout has
-  `examples/quickstart/kws_model.tflite`, a keyword-spotting model; a `pip`
-  install into an active environment has the same model reachable with
-  `python -c "from helia_profiler.examples import tiny_cnn; print(tiny_cnn())"`.
-  The commands below use the checkout path; substitute your own.
+- A LiteRT `.tflite` model. The commands below use
+  `examples/quickstart/kws_model.tflite`, the keyword-spotting model in a
+  source checkout (`git clone https://github.com/AmbiqAI/helia-profiler.git`
+  if you installed with uv or pip). A `pip` install into an active
+  environment also bundles a different, smaller model, a tiny CNN, at
+  `python -c "from helia_profiler.examples import tiny_cnn; print(tiny_cnn())"`;
+  its layer count and operators differ from the outputs below.
 - Network access on the first run: neuralSPOT-X resolves and clones the
   pinned heliaRT and firmware modules into its cache.
 
@@ -36,14 +38,17 @@ With no other flags hpx uses these defaults:
 | Engine | `helia-rt`, resolved from the neuralSPOT-X registry and built from source | `EngineConfig.type` in `config/__init__.py` |
 | Toolchain | `arm-none-eabi-gcc` | `TargetConfig.toolchain` |
 | Transport | `rtt`, lossless capture over the J-Link | `TargetConfig.transport` |
-| Counters | the CPU default group: cycles, instructions, frontend and backend stalls | `ProfilingConfig.pmu_counters` |
+| Counters | the CPU default group: cycles, instructions, frontend and backend stalls; on a Cortex-M4 board only the DWT cycle count is captured and the rest is reported as reduced | `ProfilingConfig.pmu_counters` |
 | Iterations | 100 inferences after 5 warm-up runs | `ProfilingConfig.iterations`, `warmup` |
 | Output | `./results/` | `OutputConfig.dir` |
 
-Progress prints one line per stage: preflight, model analysis, memory
-planning, firmware build, flash, capture, report. The first run is the slow
-one because of the module fetch and the cold build; later runs reuse the
-cached modules and build tree. Once a run has succeeded, `--offline` skips
+Progress prints one line per pipeline stage, which group into the six
+blocks on the section overview (configure, analyse, build, flash, capture,
+report); a power run adds its own build, flash and capture stages. The
+first run is the slow one because of the module fetch and the cold build;
+later runs reuse the cached modules and build tree. A second run into the
+same `--output-dir` overwrites the files in place, so give each run its own
+directory when you want to keep both. Once a run has succeeded, `--offline` skips
 dependency resolution entirely:
 
 ```bash
@@ -57,12 +62,14 @@ results/
 ├── result_manifest.json   validity, provenance and artifact digests
 ├── summary.json           headline metrics; read this first
 ├── profile_results.csv    one row per layer, one column per counter
-└── run_metadata.json      the resolved configuration and host environment
+├── run_metadata.json      the resolved configuration and host environment
+└── nsx.lock               the exact resolved module lock for this run
 ```
 
-Each file is written by the report stage from the same capture; the
-manifest lists every other file with its digest so a bundle can be checked
-for completeness later. The schema of every file is on
+Each file is written by the report stage from the same capture (`nsx.lock`
+is copied from the build and is always present); the manifest lists every
+other file with its digest so a bundle can be checked for completeness
+later. The schema of every file is on
 [Output files](../../guide/output/).
 
 ### 3. Read the three numbers
@@ -73,13 +80,15 @@ carries a captured run. Replace them with what your board printed.
 
 ```json
 {
+  "schema": "hpx.run-summary",
+  "schema_version": 6,
   "engine": "helia-rt",
   "layers": 13,
   "total_cycles": 0,
   "overflow_detected": false,
   "top_layers": [
-    {"index": 1, "op": "CONV_2D", "cycles": 0},
-    {"index": 4, "op": "DEPTHWISE_CONV_2D", "cycles": 0}
+    {"op": "CONV_2D", "cycles": 0, "pct": 0.0},
+    {"op": "DEPTHWISE_CONV_2D", "cycles": 0, "pct": 0.0}
   ],
   "memory": {"arena_size": 131072, "allocated_arena": 0},
   "validity": "valid",
@@ -87,13 +96,17 @@ carries a captured run. Replace them with what your board printed.
 }
 ```
 
+`top_layers` carries `op`, `cycles` and `pct` (the share of `total_cycles`),
+written by `report/summary.py`.
+
 - `total_cycles` is the cost of one inference, averaged over the measured
   iterations. It is the headline.
 - `top_layers` names the operators that dominate. Optimisation effort goes
   there first.
 - `memory.allocated_arena` is how much of the tensor arena the runtime used.
   If it is far below `arena_size`, the arena can shrink; the next page shows
-  where to set it.
+  where to set it. On the first run leave `arena_size` at the engine default
+  and let this number tell you the size.
 
 Before you quote any of them, look at `validity` and `issues`. A result is
 `valid`, `degraded` or `invalid`; each issue is a structured code explained
@@ -104,7 +117,9 @@ is still a measurement with a caveat; an `invalid` one is not a measurement.
 
 `profile_results.csv` has one row per layer and one column per counter.
 Open it in a spreadsheet, sort by cycles, and you have the same picture as
-`top_layers` for every layer. The same data is rendered as a
+`top_layers` for every layer. [Output files](../../guide/output/) lists
+every column and its unit, and what `result_manifest.json` records beyond
+the digests. The same data is rendered as a
 [Model Explorer overlay](../../guide/model-explorer/) under
 `results/model_explorer/` when `output.model_explorer` is on.
 

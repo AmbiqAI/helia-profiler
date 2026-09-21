@@ -24,8 +24,8 @@ uses real commands and shows the output the command prints.
 
 ## Prerequisites
 
-A host running Linux, macOS or Windows with Python 3.11 or newer, and an
-Ambiq Apollo EVB with its on-board J-Link. Power capture needs a Joulescope
+A host running Linux, macOS or Windows, and an Ambiq Apollo EVB with its
+on-board debug probe. Power capture needs a Joulescope
 or an INA228 wired to the board; it is optional and comes later. The exact
 versions are on [Hardware prerequisites](hardware-prerequisites/).
 
@@ -107,8 +107,8 @@ The same sequence as a list, for readers of the Markdown rendition:
 ## Expected output
 
 At the end of step 4 you have a `results/` directory holding
-`result_manifest.json`, `summary.json`, `profile_results.csv` and
-`run_metadata.json`, and a per-layer table you can open in a spreadsheet.
+`result_manifest.json`, `summary.json`, `profile_results.csv`,
+`run_metadata.json` and `nsx.lock`, and a per-layer table you can open in a spreadsheet.
 Step 5 leaves you with an `hpx.yml` that reproduces that run from one
 command.
 

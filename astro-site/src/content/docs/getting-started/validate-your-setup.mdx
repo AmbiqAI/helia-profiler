@@ -55,6 +55,9 @@ find them too.
 hpx boards
 ```
 
+Captured on macOS 26.6, 2026-09-21 (the table is printed from the registry
+and does not depend on attached hardware):
+
 ```text
  Board                    SoC            Core           Backends             Domains             Channel
  apollo3p_evb             apollo3p       cortex-m4      dwt                  cpu                 stable
@@ -124,6 +127,9 @@ Only the `usb_cdc` and `uart` transports use a serial port; the default
 hpx ports list --all
 ```
 
+Captured on macOS 26.6, 2026-09-21, no board attached; on Windows the
+devices read `COM3` and similar:
+
 ```text
 device                           kind    serial_number  description  product
 -------------------------------  ------  -------------  -----------  -------
@@ -144,6 +150,8 @@ without touching hardware:
 ```bash
 hpx validate --suite smoke --list
 ```
+
+Captured on macOS 26.6, 2026-09-21:
 
 ```text
 Registered models: ad, ic, kws, vww
@@ -191,5 +199,5 @@ one you can trust the chain to have measured.
 
 [First profile](../first-profile/) runs your own model through the same
 chain and shows you how to read what it writes. If validation failed, the
-[Troubleshooting the first run](../first-profile/#troubleshooting-the-first-run) page maps each failure to its
-cause.
+troubleshooting section of [First profile](../first-profile/#troubleshooting-the-first-run) maps each failure to
+its cause.

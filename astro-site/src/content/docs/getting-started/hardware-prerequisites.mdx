@@ -14,16 +14,18 @@ later; it is listed here so you can plan for it, not so you can skip it.
 
 The tools from [Install](../install/). Nothing on this page runs a command.
 
-## What you need
+## Steps
+
+### What you need
 
 | Item | Requirement | Where this comes from |
 |---|---|---|
 | Host OS | Linux, macOS or Windows | `ci.yml` runs the unit tests on all three; the Nix flake covers x86-64 Linux, ARM64 Linux and Apple Silicon macOS |
 | Python | 3.11 or newer; 3.11 or 3.12 for the `aot` extra | `pyproject.toml` `requires-python`; `helia-aot` declares `<3.13` |
-| Arm GNU toolchain | `arm-none-eabi-gcc` 13.x or 14.x | `hpx doctor` row; the toolchain table hpx validates against in `hostenv/toolchains.py` |
+| Arm GNU toolchain | `arm-none-eabi-gcc`, any recent release; hpx checks presence, not version (`hostenv/doctor.py` passes `required=None` for the compiler) | The doctor output on Install was captured with 15.2.rel1 |
 | CMake | 3.24 or newer | `hpx doctor` row label `CMake (>= 3.24)` |
 | Ninja | any | `hpx doctor` row |
-| SEGGER J-Link software | 7.80 or newer | J-Link Commander is required for flashing; the RTT transport uses `pylink-square` |
+| SEGGER J-Link software | J-Link Commander for flashing, `pylink-square` for RTT; no version floor is enforced | `hostenv` discovery order; Install step 4 |
 | neuralSPOT-X | `neuralspotx==0.8.1`, installed with hpx | `pyproject.toml` dependency pin |
 | Board | An Ambiq Apollo EVB from `hpx boards` | `src/helia_profiler/platform/board.py` registry; the channel column is `BoardDef.channel` |
 | Probe | The EVB's on-board J-Link, over its debug USB port | `hpx probes list` enumerates J-Link probes; `probes match` picks one per board |
@@ -35,7 +37,7 @@ Board names, cores and the stable or preview channel of each board are on
 registry `hpx boards` prints. Do not copy them from here; that table is the
 source.
 
-## Which board
+### Which board
 
 Every Apollo EVB has an on-board J-Link on its debug USB connector. That is
 the port hpx flashes through and, with the default `rtt` transport, captures
@@ -48,14 +50,14 @@ using the exact name from `hpx boards`. A board on the `preview` channel
 works with the same commands; the channel records how much hardware
 validation backs it, not whether hpx will drive it.
 
-## Which probe
+### Which probe
 
 hpx uses SEGGER J-Link, either the on-board probe or an external J-Link
 plugged into the EVB's SWD header. With one probe attached nothing needs
 configuring. With several, `hpx probes match --board <name>` shows which
 serial hpx will pick, and `--jlink-serial` pins it.
 
-## Power measurement, for later
+### Power measurement, for later
 
 Cycle counts need no instrument. Power needs one of:
 

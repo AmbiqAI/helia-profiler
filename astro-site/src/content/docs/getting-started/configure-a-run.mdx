@@ -63,7 +63,7 @@ sets `extra="forbid"`.
 ```yaml title="hpx.yml"
 model:
   path: examples/quickstart/kws_model.tflite
-  arena_size: 131072            # bytes; about 1.5x allocated_arena from summary.json
+  arena_size: 131072            # bytes; set from allocated_arena in summary.json
   arena_location: tcm           # tcm | sram | mram | psram, or omit for auto
   weights_location: mram
 
@@ -97,10 +97,9 @@ output:
 | `engine` | Which runtime executes the model and its build variant | [Engines](../../guide/engines/) |
 | `target` | The board, the compiler and the capture transport | [Boards](../../guide/boards/), [Toolchains](../../guide/toolchains/), [Transports](../../guide/transports/) |
 | `profiling` | Which counters, how many iterations, per-layer or whole-model | [PMU counters](../../guide/pmu-counters/) |
-| `power` | Whether and how power is captured | [Power measurement](../../guide/power/) |
 | `output` | Format, directory and the Model Explorer overlay | [Output files](../../guide/output/) |
 
-The two top-level blocks not shown here, `timeouts` and `build`, and the
+The three top-level blocks not shown here, `power`, `timeouts` and `build`, and the
 nested ones (`target.clock`, `target.psram`, `target.heartbeat`,
 `power.ina228`, `build.nsx_modules`) exist for specific situations and are
 documented with their defaults in the generated reference.

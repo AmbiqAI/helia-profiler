@@ -1,3 +1,4 @@
+/* TODO(AmbiqAI/helia-ui#154): delete this mirror when the parts ship in @ambiqai/helia-ui. */
 /* Mirror of helia-ui recipes.css block-diagram rules (helia-ui 8617342, PR #158); delete when the alpha that ships BlockDiagram/Block is pinned. */
 .helia-block-diagram__note {
   color: var(--helia-ink-muted);
