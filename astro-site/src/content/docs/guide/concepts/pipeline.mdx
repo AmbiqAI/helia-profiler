@@ -91,7 +91,7 @@ so the terminal always names the stage that failed and the error's `hint`.
 | plan power run | `PlanPowerRunStage` (`plan_power.py`) | `power_run.plan` (fixed inference count from the clean timing) | `power.enabled` is false |
 | build power firmware | `BuildPowerFirmwareStage` (`build_power_firmware.py`) | `power_run.firmware` | `power.enabled` is false, `power.firmware` is not `dedicated`, or the plan fixed no inference count |
 | flash power | `FlashPowerFirmwareStage` (`flash_power.py`) | `power_run.deployment` | `power.enabled` is false, or the planned firmware mode is not `dedicated` |
-| capture power | `CapturePowerStage` (`capture_power.py`) | `power_run.observation` | `power.enabled` is false, or `power.mode` is `internal` (the on-device path reports through the terminal record instead) |
+| capture power | `CapturePowerStage` (`capture_power.py`) | `power_run.observation` | `power.enabled` is false, or `power.mode` is `internal` (the on-device path reports through the terminal record when the power firmware is `dedicated`) |
 | collect terminal | `CollectPowerTerminalStage` (`collect_power_terminal.py`) | `power_run.terminal`, and `power_run.observation` on the internal path | `power.enabled` is false, or the planned firmware mode is not `dedicated` |
 | generate report | `GenerateReportStage` (`report.py`) | `report_paths`, `run_evaluation` | never |
 

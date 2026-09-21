@@ -41,7 +41,8 @@ In flight:
   pages on the nine-heading template with nine captured bundles under
   `examples/results/`; review round one.
 - #346 Reference polish: branch `346-reference-polish` (worktree `hpx-346`),
-  compatibility table, landing cards, authored intros, wire-protocol header.
+  first commit 9e0df17: compatibility table, landing cards, authored intros,
+  wire-protocol header; needs #344 merged for its links, no PR yet.
 - #337 Home: PR awaiting owner copy sign-off.
 
 Not started: #345 Examples power (two pages can ship without bench time),
