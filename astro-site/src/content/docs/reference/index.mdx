@@ -1,29 +1,113 @@
 ---
-title: Reference
-description: The hpx command line, configuration schema, issue codes and Python API.
+title: "Reference"
+description: "Every hpx subcommand and flag, the full configuration schema, and the Python API. For learning the tool, the Getting Started and User Guide pages are usually a…"
 ---
 
-Reference covers the contracts heliaPROFILER exposes:
+import Icon from '@ambiqai/helia-ui/astro/Icon';
+import CardGrid from '@ambiqai/helia-ui/astro/CardGrid';
+import LinkCard from '@ambiqai/helia-ui/astro/LinkCard';
 
-- **CLI**: every `hpx` command, its arguments and its options.
-- **Configuration**: the schema behind a `ProfileConfig`, field by field.
-- **Issue codes**: every validity issue a run can report.
-- **[Python API](/helia-profiler/reference/api/helia_profiler/)**: the 85
-  published names, badged stable or experimental.
-- **Compatibility**: boards against engines and toolchains, with the evidence
-  behind each cell.
-- **Wire protocol**: the firmware and host contract, for maintainers rather
-  than users.
+Every `hpx` subcommand and flag, the full configuration schema, and the
+Python API. For learning the tool, the
+[Getting Started](../getting-started/) and
+[User Guide](../guide/configuration/) pages are usually a better
+starting point.
 
-These pages are generated from the source that defines them, so they arrive
-with the reference generation work rather than being hand-copied. The Python
-API is generated; the rest are not published here yet.
+## CLI
 
-Machine-readable, for an agent or a script:
-[`reference.json`](/helia-profiler/reference/api/reference.json) is the whole
-Python API as one document,
-[`llms-full.txt`](/helia-profiler/reference/api/llms-full.txt) is every page of
-it as Markdown, and
-[`llms.txt`](/helia-profiler/reference/api/llms.txt) indexes both along with
-the per-module `.json` and `.md`. These carry the verbatim signatures and the
-enum members and fields that the site-wide Markdown renditions drop.
+<CardGrid>
+  <LinkCard href="profile/" title="hpx profile">
+    <Icon name="play" slot="icon" />
+
+    Build, flash, capture, report.
+
+  </LinkCard>
+  <LinkCard href="doctor/" title="hpx doctor">
+    <Icon name="stethoscope" slot="icon" />
+
+    Verify toolchain and probe availability.
+
+  </LinkCard>
+  <LinkCard href="boards/" title="hpx boards">
+    <Icon name="microchip" slot="icon" />
+
+    List supported boards.
+
+  </LinkCard>
+  <LinkCard href="engines/" title="hpx engines">
+    <Icon name="gears" slot="icon" />
+
+    List supported engines.
+
+  </LinkCard>
+  <LinkCard href="probes/" title="hpx probes">
+    <Icon name="plug" slot="icon" />
+
+    List and match J-Link probes.
+
+  </LinkCard>
+  <LinkCard href="ports/" title="hpx ports">
+    <Icon name="plug" slot="icon" />
+
+    List host serial ports.
+
+  </LinkCard>
+  <LinkCard href="target/" title="hpx target">
+    <Icon name="arrows-rotate" slot="icon" />
+
+    Run target reset helpers.
+
+  </LinkCard>
+  <LinkCard href="analyze/" title="hpx analyze">
+    <Icon name="chart-bar" slot="icon" />
+
+    Static model analysis, no hardware.
+
+  </LinkCard>
+  <LinkCard href="compare/" title="hpx compare">
+    <Icon name="code-compare" slot="icon" />
+
+    Diff two profile result directories.
+
+  </LinkCard>
+  <LinkCard href="validate/" title="hpx validate">
+    <Icon name="circle-check" slot="icon" />
+
+    Hardware-in-the-loop suite over MLPerf Tiny models.
+
+  </LinkCard>
+  <LinkCard href="power-on/" title="hpx power-on">
+    <Icon name="power-off" slot="icon" />
+
+    Hold Joulescope passthrough power on.
+
+  </LinkCard>
+  <LinkCard href="cache/" title="hpx cache">
+    <Icon name="folder" slot="icon" />
+
+    Inspect or purge local build caches.
+
+  </LinkCard>
+</CardGrid>
+
+## Configuration Reference
+
+Every `ProfileConfig` field, its YAML path, CLI flag, default, and type —
+see the [Configuration Reference](configuration/).
+
+## Python API
+
+Calling heliaPROFILER from Python instead of the shell? See the
+[Python API reference](api/) for `profile()`, `ProfileConfig`, and
+the typed result and error types.
+
+## Common conventions
+
+- **Positional arg vs `--config`** — `hpx profile model.tflite` is a
+  shortcut for `model.path`. With a config file, omit the positional
+  arg and use `--config hpx.yml`.
+- **CLI overrides YAML** — any flag passed on the command line wins
+  over the matching field in the config file.
+- **Verbose** — `-v` adds `INFO` logs, `-vv` adds `DEBUG`. Useful for
+  diagnosing build/flash/capture failures.
+- **Help** — every subcommand accepts `-h` / `--help`.
