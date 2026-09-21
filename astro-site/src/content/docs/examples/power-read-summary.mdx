@@ -53,8 +53,9 @@ else:
 
 Not yet captured: no bundle with a `power` block ships with the
 documentation, so no figures appear here. The keys are the contract in
-`PowerSection` (`results/run_summary.py`), pinned by
-`tests/contracts/snapshots/power_metadata_census.json`; a healthy Joulescope capture answers the
+`PowerSection` (`results/run_summary.py`), written by `report/summary.py`;
+the capture-side metadata keys it carries through are pinned by
+`tests/contracts/snapshots/power_metadata_census.json`. A healthy Joulescope capture answers the
 first `jq` line with `measurement_scope: "gpio_gated_clean_window"`,
 `gated_window_count: 1`, a `gated_window_duration_ratio` near `1.0`,
 `gated_window_duration_suspect` null in the `jq` output (the writer never
