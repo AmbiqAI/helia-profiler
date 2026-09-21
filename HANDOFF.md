@@ -37,8 +37,9 @@ port of the 38 legacy guide pages. No PR opened yet; owner reviews first.
   carries into the Measure revamp issue (plan item 10), which owns it.
 - `markdown.processor: unified()` replaces the site's Markdown engine, because
   Astro 7's default (satteri) does not read `rehypePlugins` and mermaid would
-  silently render as a code block. A/B over the non-mermaid pages showed the
-  only delta is entity escaping. `astro` is pinned to an exact version for the
+  silently render as a code block. A/B at this head (satteri vs unified, same
+  content): 47 non-mermaid pages differ, in whitespace and entity serialisation
+  only; the four mermaid pages differ by the rendered SVG. `astro` is pinned to an exact version for the
   same reason helia-ui, playwright and rehype-mermaid are: a minor bump that
   renames or re-homes the processor key reverts the site to satteri without
   failing anything, so the pin is what makes that a deliberate change.
