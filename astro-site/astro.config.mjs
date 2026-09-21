@@ -170,6 +170,7 @@ export default defineConfig({
                   label: 'Compatibility Baseline',
                   slug: 'reference/compatibility-baseline',
                 },
+                { label: 'Compatibility table', slug: 'reference/compatibility' },
                 { label: 'Wire Protocol', slug: 'reference/wire-protocol' },
               ],
             },
