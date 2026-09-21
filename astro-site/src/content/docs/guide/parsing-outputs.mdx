@@ -114,7 +114,7 @@ from helia_profiler.results.run_summary import load_run_summary
 
 a = load_run_summary(Path("results/place_tcm_tcm/summary.json"))
 b = load_run_summary(Path("results/place_tcm_mram/summary.json"))
-print(f"{b.total_cycles / a.total_cycles:.3f}x cycles")
+print(f"{b.latency.device_clean_infer_avg_cycles / a.latency.device_clean_infer_avg_cycles:.3f}x clean-window cycles")
 ```
 
 For anything beyond a ratio, use `hpx compare`, which applies the

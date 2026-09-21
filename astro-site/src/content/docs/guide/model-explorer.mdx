@@ -32,11 +32,12 @@ and red at the maximum. The colour is relative to the range in that one
 overlay, so a node's colour says nothing about absolute cost and cannot be
 compared between two overlays or two runs.
 
-The file is Model Explorer's node-data format: one `graph_id` (`main` for a
-single-subgraph model), a `name` shown in the overlay selector (the counter
-name), a `results` map from node key to `{"value": <number>}`, and the
-`gradient` list. It is plain JSON, so a script can read `results` directly
-when the graph view is not needed; [Parsing outputs](../parsing-outputs/)
+The file is Model Explorer's node-data format: a top-level key per graph id
+(`main` for a single-subgraph model) holding a `name` shown in the overlay
+selector (the counter name), a `results` map from node key to
+`{"value": <number>}`, and the `gradient` list. It is plain JSON, so
+`jq '.main.results'` reads the per-node values when the graph view is not
+needed; [Parsing outputs](../parsing-outputs/)
 covers the CSV and summary that carry the same numbers with more context.
 
 ## Steps
