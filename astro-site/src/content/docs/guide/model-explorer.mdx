@@ -24,9 +24,20 @@ browser.
 |---|---|
 | `model_explorer/me_overlay_<COUNTER>.json` | that counter's per-layer aggregate, one file per counter captured, for example `me_overlay_ARM_PMU_CPU_CYCLES.json`, `me_overlay_ARM_PMU_INST_RETIRED.json`, `me_overlay_ARM_PMU_MVE_INST_RETIRED.json` |
 
-Each overlay maps graph node ids to a number with a five-stop gradient:
-minimum green, 25th percentile light green, median yellow, 75th percentile
-orange, maximum red; a zero-valued node renders neutral grey.
+Each overlay maps graph node ids to that counter's raw per-layer value and
+carries a three-stop gradient (`GRADIENT_COST` in
+`report/model_explorer.py`): Model Explorer interpolates it across the
+range of values in the file, green at the minimum, yellow at the midpoint
+and red at the maximum. The colour is relative to the range in that one
+overlay, so a node's colour says nothing about absolute cost and cannot be
+compared between two overlays or two runs.
+
+The file is Model Explorer's node-data format: one `graph_id` (`main` for a
+single-subgraph model), a `name` shown in the overlay selector (the counter
+name), a `results` map from node key to `{"value": <number>}`, and the
+`gradient` list. It is plain JSON, so a script can read `results` directly
+when the graph view is not needed; [Parsing outputs](../parsing-outputs/)
+covers the CSV and summary that carry the same numbers with more context.
 
 ## Steps
 
@@ -37,6 +48,16 @@ orange, maximum red; a zero-valued node renders neutral grey.
 4. Read the colours: red is the highest value of that counter, green the
    lowest. Switch overlays to compare, for instance cycles against
    `ARM_PMU_L1D_CACHE_MISS_RD` to see whether a hot layer is memory-bound.
+5. Check the picture against the table: the reddest node of the cycles
+   overlay is the first row of `summary.top_layers`, and its `pct` says how
+   much of the instrumented total it holds. A hot node that is green on the
+   cache-miss overlay is compute-bound; one that is red on both is waiting
+   on memory, and [Memory placement](../memory/) is the page to open.
+
+A layer that ran in several PMU passes has one value per counter, taken
+from the pass that captured that counter, so every overlay covers every
+operator the firmware instrumented; a counter the SoC could not capture
+has no overlay file rather than a file of zeros.
 
 Node matching depends on the engine. heliaRT and TFLM overlays match by the
 sequential operator index (0, 1, 2, ...). heliaAOT overlays use the original

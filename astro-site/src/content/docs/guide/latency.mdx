@@ -17,7 +17,7 @@ A result bundle and [Output files](../output/) for the field names.
 
 | I want | Read | Boundary | Shaped by |
 |---|---|---|---|
-| The cost of one inference | `summary.total_cycles` (cycles), `latency.device_clean_infer_avg_us` (microseconds) | the clean window: warm, back to back, no per-layer instrumentation; aggregated over `device_clean_infer_count` inferences | `profiling.iterations`, `warmup`, `window_mode`, `window_target_ms`, `aggregation`; the clock tier `target.clock.cpu` |
+| The cost of one inference | `latency.device_clean_infer_avg_cycles` (cycles), `latency.device_clean_infer_avg_us` (microseconds) | the clean window: warm, back to back, no per-layer instrumentation; aggregated over `device_clean_infer_count` inferences | `profiling.iterations`, `warmup`, `window_mode`, `window_target_ms`, `aggregation`; the clock tier `target.clock.cpu` |
 | Where the cycles go | `profile_results.csv` rows, `summary.top_layers` | the instrumented passes: each layer bracketed by counter reads, aggregated over the measured iterations by `profiling.aggregation` | `profiling.pmu_counters`, `per_layer`, `iterations`, `warmup` |
 | How long the profiled passes took on the device | `latency.device_profiled_infer_avg_us`, `_total_us`, `_count` | the instrumented passes, on the device clock | as above |
 | How long the whole capture took | `latency.capture_duration_s`, `hpx_start_latency_s`, `protocol_duration_s`, `boot_phases_s` | host-side: boot, handshake, transport, everything; never an inference number | `target.transport`, `timeouts` |
@@ -27,11 +27,15 @@ A result bundle and [Output files](../output/) for the field names.
 
 ### 1. Quote the clean window
 
-`total_cycles` and `device_clean_infer_avg_us` describe the same window:
-the firmware's clean loop with the gate high and no per-layer reads. That
-is the number to publish. The per-layer sum is a different quantity; the
-terminal prints both, and a small gap between them is the instrumentation
-overhead, shown as a delta.
+`device_clean_infer_avg_cycles` and `device_clean_infer_avg_us` describe
+the same window: the firmware's clean loop with the gate high and no
+per-layer reads. That is the number to publish. `summary.total_cycles` is
+a different quantity: the sum of the instrumented per-layer rows, which
+includes a counter read around every operator and changes when
+`profiling.pmu_counters` changes. The terminal prints both, as `Total
+cycles` and `Clean E2E cycles` with the percentage difference against the
+per-layer sum; that gap is the instrumentation overhead (plus input
+restoration on heliaAOT, where the label says `includes input refill`).
 
 ### 2. Use per-layer rows to explain, not to total
 
@@ -46,10 +50,11 @@ compute.
 
 ### 3. Convert cycles to time honestly
 
-Cycles are clock-independent; microseconds are not. The clock tier the run
-used is in `run_metadata.json` (`platform`), so a cycles-per-inference
-figure transfers between clock tiers and a microseconds figure does not.
-When you convert, say which tier.
+Cycles transfer between clock tiers far better than microseconds do, but
+not perfectly: memory latency is fixed in time, so a faster core waits
+more cycles on MRAM or PSRAM ([Boards and targets](../boards/#2-cpu-clock)).
+The clock tier the run used is in `run_metadata.json` (`platform`). When
+you convert or transfer a figure, say which tier.
 
 ### 4. Watch the boundaries a comparison crosses
 

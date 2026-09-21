@@ -62,7 +62,8 @@ per-layer deltas. `--output-dir` also writes `compare_summary.json` and
 | Either result is incomplete or degraded | blocked or annotated | `result.incomplete`, `result.degraded` |
 | Different model hash | blocked | `identity.model_mismatch` |
 | Different layer count or operator sequence | per-layer deltas suppressed; totals still compared | `topology.layer_count_mismatch`, `topology.operation_sequence_mismatch` |
-| Power scope, mode, firmware, monitor presence, lock-step, integrity, clean-window probe, or (same platform only) firmware code fingerprint differs | power deltas suppressed; everything else compared | the `metric.power_<dimension>_mismatch` family, `metric.power_integrity_invalid` |
+| Power scope, mode, firmware, monitor presence, lock-step, clean-window probe, clean workload, or (same platform only) firmware code fingerprint differs | power deltas suppressed; everything else compared | the `metric.power_<dimension>_mismatch` family; the dimension names already start with `power_`, so the emitted codes read `metric.power_power_scope_mismatch`, `metric.power_power_clean_workload_mismatch` and so on |
+| Either result's power integrity check failed | power deltas suppressed | `metric.power_integrity_invalid` |
 | Memory dimension differs (link family) | the per-region measured-memory rows suppressed; section sizes still compared | the `metric.memory_<dimension>_mismatch` family |
 | Engine (type and measured runtime version), toolchain, board, clock, transport, placement, architecture flags differ | shown as informative dimensions; nothing suppressed | the `dimension.<dimension>_differs` family |
 
@@ -100,10 +101,11 @@ host timing.
 
 Runs recorded before a dimension existed carry no value for it and are
 skipped, so a stored comparison does not flip to failing when hpx learns a
-new rule. Runs recorded before lock-step enabled itself by default, or
-across a summary schema boundary, are the exception: those are real
-measurement changes, and the pages that describe them say to re-record the
-baseline.
+rule. The code makes no exception for a lock-step default change or a
+summary schema boundary; those are real measurement changes all the same,
+which is why [Windows and lock-step](../power-windows/) and
+[Output files](../output/) say to re-record the baseline rather than rely
+on the skip.
 
 ### 4. Add a regression policy
 

@@ -48,7 +48,7 @@ print(summary.engine, summary.layers, summary.total_cycles)
 print(summary.memory.allocated_arena, "of", summary.memory.arena_size, "bytes")
 if summary.power is not None:
     print(summary.power.measurement_scope, summary.power.energy_per_inference_j, "J per inference")
-    if summary.gate_duration_unarbitrated_failure:
+    if summary.power.gate_duration_unarbitrated_failure:
         print("gate duration failed without arbitration; do not quote per-inference energy")
 ```
 
@@ -89,6 +89,8 @@ jq '.platform, .toolchain, .build_images[].sha256' results/run_metadata.json
 
 ### 5. Validate against the packaged schemas
 
+`jsonschema` is not an hpx dependency; `pip install jsonschema` first.
+
 ```python
 import json
 from importlib.resources import files
@@ -106,6 +108,8 @@ working across the additive versions listed on [Output files](../output/).
 ### 6. Compare in code
 
 ```python
+from pathlib import Path
+
 from helia_profiler.results.run_summary import load_run_summary
 
 a = load_run_summary(Path("results/place_tcm_tcm/summary.json"))
@@ -122,8 +126,9 @@ window against an inference without noticing.
 
 A script that refuses a broken bundle, reads the verdict before the
 numbers, and validates against the shipped schema. The
-[Python API reference](../../reference/api/) documents every loader and
-model used above.
+[Python API reference](../../reference/api/) documents
+`load_result_manifest`; `load_run_summary` and the section dataclasses are
+in `helia_profiler.results.run_summary`.
 
 ## What next
 

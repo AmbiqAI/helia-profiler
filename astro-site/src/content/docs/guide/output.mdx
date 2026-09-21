@@ -26,15 +26,17 @@ A `results/` directory from [First profile](../../getting-started/first-profile/
 | `aot_operator_manifest.json` | engine extension | the operators the AOT compiler emitted with tensor placement | `helia-aot` runs |
 | `aot_memory_layers.csv` | engine extension | the same placement data flattened for a spreadsheet | `helia-aot` runs |
 | `model_explorer/me_overlay_<COUNTER>.json` | Model Explorer overlay format | one overlay per counter | unless `output.model_explorer: false` |
-| `detailed/memory.json`, `detailed/profile_<group>.csv`, `detailed/profile_<group>_<pass>.csv`, `detailed/power_summary.csv` | projections and diagnostics | merged and per-pass counters, memory breakdown, per-window power | `output.detailed: true` |
+| `detailed/memory.json`, `detailed/profile_<group>.csv`, `detailed/profile_<preset>.csv`, `detailed/power_summary.csv` | projections and diagnostics | counters merged per compute-unit group and per PMU preset, memory breakdown, per-window power | `output.detailed: true` |
 
 The manifest's artifact entries carry `role` (`core`, `projection`,
 `extension`, `export`, `diagnostic`), `name`, `producer`, `optional`, and
 `schema` plus `schema_version` only where a published schema exists. A
 complete `profile` bundle requires the core artifacts `summary.json`,
-`run_metadata.json`, `nsx.lock` and the selected primary result.
+`run_metadata.json` and the selected primary result, plus `nsx.lock`
+when the run's dependency provenance recorded one.
 `load_result_manifest(path, verify=True)` rejects missing, modified or
-path-escaping artifacts. The packaged JSON Schemas are under
+path-escaping artifacts; `verify` defaults to `False`, so a loader that
+omits it reads the manifest without checking the files. The packaged JSON Schemas are under
 `helia_profiler/data/` (`result_manifest.schema.v1.json`,
 `run_summary.schema.v1.json`, `run_metadata.schema.v1.json`,
 `profile_results.schema.v1.json`); they fix the stable root fields and stay
@@ -52,7 +54,7 @@ Written by `report/summary.py` from the `RunSummary` model. Top level:
 | `schema`, `schema_version` | string, int | none | `hpx.run-summary`, currently 6 |
 | `engine` | string | none | the engine that ran |
 | `layers` | int | count | operators in the profiled graph |
-| `total_cycles` | number | CPU cycles | the clean end-to-end inference, aggregated over the measured iterations; excludes per-layer instrumentation |
+| `total_cycles` | number | CPU cycles | the sum of the per-layer instrumented cycle counts (`report/summary.py`), so it includes the per-layer counter reads; the clean window is `latency.device_clean_infer_avg_cycles` |
 | `overflow_detected` | bool | none | any counter saturated its 32-bit accumulator in any pass |
 | `top_layers[]` | `op`, `cycles`, `pct` | cycles, percent of `total_cycles` | the heaviest layers |
 | `validity` | `valid`, `degraded`, `invalid` | none | the run's verdict from the same evaluation the manifest records |
@@ -89,8 +91,8 @@ name):
 
 `cache`: the aggregated memory-group counters (`ARM_PMU_L1D_CACHE`,
 `ARM_PMU_L1D_CACHE_RD`, `ARM_PMU_L1D_CACHE_REFILL`,
-`ARM_PMU_L1D_CACHE_MISS_RD`, `ARM_PMU_DTCM_ACCESS`, `ARM_PMU_MEM_ACCESS`)
-as event counts over the profiled passes, plus `l1d_hit_rate_pct` derived
+`ARM_PMU_L1D_CACHE_MISS_RD`, `ARM_PMU_DTCM_ACCESS`, `ARM_PMU_MEM_ACCESS`
+among others; `report/memory.py` holds the list) as event counts over the profiled passes, plus `l1d_hit_rate_pct` derived
 as on [PMU counters](../pmu-counters/#5-read-the-results).
 
 `power` (from `PowerSection`, present only when power was captured):
@@ -136,8 +138,15 @@ re-sourced the gate-duration verdict (`power.gate_duration_integrity`
 with `gated_window_reference_drift`); v5 preferred the driver's packet
 duration for gated power; v6 added `clean_workload`. `hpx compare` reports
 a version difference as informative and reads artifacts through
-`load_run_summary`, whose `gate_duration_unarbitrated_failure` property
-applies the v4 arbitration.
+`load_run_summary`, whose `PowerSection.gate_duration_unarbitrated_failure`
+property applies the v4 arbitration.
+
+Four more top-level sections appear when the run produced them and are
+owned by other pages: `compatibility` and `dependencies` (the qualified
+baseline and the lock provenance, [Toolchains](../toolchains/)), `psram`
+([Memory placement](../memory/#6-psram)) and `model_analysis`
+(`cycles_per_mac` and `cycles_per_op` from `hpx analyze`,
+[Analysis and comparison](../analysis-comparison/)).
 
 ### 2. `profile_results.csv`
 
@@ -198,8 +207,9 @@ after graph transforms, each with inputs, outputs and local tensors
 With `output.detailed: true`: `memory.json` (binary sections, the arena
 block, `per_layer_memory` with each layer's memory-group counters,
 `cache_totals`, and `memory_symbols`: the top 32 sized symbols per region),
-`profile_<group>.csv` merged per group and `profile_<group>_<pass>.csv`
-per pass, and `power_summary.csv` with one row per gated window plus a
+`profile_<group>.csv` merged per compute-unit group and, when the run
+needed more than one PMU pass, `profile_<preset>.csv` per preset (presets
+are named `<group>_<index>`, for example `cpu_0`), and `power_summary.csv` with one row per gated window plus a
 `whole_capture_window` reference row.
 
 ### 6. The terminal summary
