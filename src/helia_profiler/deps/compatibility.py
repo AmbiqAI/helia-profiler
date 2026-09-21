@@ -452,8 +452,7 @@ def _parse_baseline(raw: Any) -> CompatibilityBaseline:
                 "is allowed."
             )
         if engine.version is not None:
-            # A pinned version is documented (docs/architecture/
-            # compatibility-baseline.md) as a version/ref *pair*, and must
+            # A pinned version is documented (the Reference compatibility-baseline page) as a version/ref *pair*, and must
             # itself be strict major.minor.patch like the range bounds —
             # otherwise a malformed pin would silently produce incomplete
             # provenance instead of failing loudly at load time.

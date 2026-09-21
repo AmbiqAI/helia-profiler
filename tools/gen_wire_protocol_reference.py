@@ -1,4 +1,4 @@
-"""Generate docs/reference/wire-protocol.md from the wire registry.
+"""Generate the Reference wire-protocol page from the wire registry.
 
 The generated page is the authoritative description of the HPX wire protocol:
 every token firmware and host exchange, with its grammar, engine and binary
@@ -14,6 +14,8 @@ is stale relative to the registry.
 """
 
 from __future__ import annotations
+
+import re
 
 from pathlib import Path
 
@@ -33,14 +35,17 @@ from helia_profiler.wire import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-OUTPUT_PATH = ROOT / "docs" / "reference" / "wire-protocol.md"
+OUTPUT_PATH = ROOT / "astro-site" / "src" / "content" / "docs" / "reference" / "wire-protocol.mdx"
 
 _HEADER = """\
-# Wire protocol
+---
+title: "Wire protocol"
+description: "The firmware-to-host contract: every line the profiler firmware puts on a transport and the one command the host writes back, generated from the registry in helia_profiler.wire. Internal, not a user API."
+---
 
-<!-- GENERATED FILE — do not edit by hand.
+{/* GENERATED FILE — do not edit by hand.
      Source: src/helia_profiler/wire/
-     Regenerate: uv run python tools/gen_wire_protocol_reference.py -->
+     Regenerate: uv run python tools/gen_wire_protocol_reference.py */}
 
 This page is the contract between the profiler firmware hpx generates and
 the host that reads it. It is not a user API: no line here is something you
@@ -59,7 +64,7 @@ emit is exactly what this page says.
 AOT clean inference timing includes raw-zero input restoration before each call;
 profiled per-layer timing excludes that preparation. The existing clean wire
 fields retain their units and count meaning. Exported summaries identify this
-workload with `clean_workload`; see [power measurement semantics](../guide/power.md#aot-input-preparation).
+workload with `clean_workload`; see [power measurement semantics](../../guide/power/#aot-input-preparation).
 
 ## How to read the tables
 
@@ -307,8 +312,29 @@ _GAPS = (
 )
 
 
+_TAG_LIKE = re.compile(r"<(/?[A-Za-z][^<>`]*)>")
+
+
+def _escape_prose(line: str) -> str:
+    """Escape tag-shaped text outside inline code, where MDX would read it as
+    JSX; a lone `>` or `->` is plain text to MDX and inside backticks
+    everything is literal already."""
+    parts = line.split("`")
+    for i in range(0, len(parts), 2):
+        parts[i] = _TAG_LIKE.sub(lambda m: f"&lt;{m.group(1)}&gt;", parts[i])
+    return "`".join(parts)
+
+
+def render_mdx() -> str:
+    """The page as MDX. The header carries no angle bracket; the body is
+    escaped line by line."""
+    body = render()
+    head, sep, rest = body.partition("*/}\n")
+    return head + sep + "\n".join(_escape_prose(line) for line in rest.split("\n"))
+
+
 def main() -> None:
-    OUTPUT_PATH.write_text(render(), encoding="utf-8")
+    OUTPUT_PATH.write_text(render_mdx(), encoding="utf-8")
     print(f"wrote {OUTPUT_PATH.relative_to(ROOT)}")
 
 

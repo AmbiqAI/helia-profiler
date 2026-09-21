@@ -3,19 +3,19 @@
   "generatedFrom": {
     "tool": "pyref",
     "version": "1.7.3",
-    "sourceTree": "17bfdf5c68d6c73c3d22f7afb063ac9cd722152f"
+    "sourceTree": "411e58fd9f2f268366576b621932ae2bc4f2f0c2"
   },
   "language": "python",
   "modules": [
     {
-      "description": "Collecting a redacted support bundle from a run directory, and reading one back.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `17bfdf5c68d6c73c3d22f7afb063ac9cd722152f`.",
+      "description": "Collecting a redacted support bundle from a run directory, and reading one back.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `411e58fd9f2f268366576b621932ae2bc4f2f0c2`.",
       "name": "diagnostics",
       "path": "helia_profiler.diagnostics",
       "submodules": [],
       "summary": "Collecting a redacted support bundle from a run directory, and reading one back.",
       "symbols": [
         {
-          "description": "`dataclass`\n\nOne diagnostic section the collector attempted.\n\n``available=False`` records *why* a section was skipped (missing\nworkspace, offline, optional tool absent, ...) rather than failing the\nwhole bundle — see ``docs/architecture/field-diagnostics.md``.\n\n**API tier:** `experimental`",
+          "description": "`dataclass`\n\nOne diagnostic section the collector attempted.\n\n``available=False`` records *why* a section was skipped (missing\nworkspace, offline, optional tool absent, ...) rather than failing the\nwhole bundle — see the Concepts page ``guide/concepts/field-diagnostics``.\n\n**API tier:** `experimental`",
           "examples": [],
           "id": "helia_profiler.SupportBundleSection",
           "kind": "class",

@@ -47,7 +47,28 @@ open to additive extension, and the typed models in
 
 ### 1. `summary.json`
 
-Written by `report/summary.py` from the `RunSummary` model. Top level:
+Written by `report/summary.py` from the `RunSummary` model. The file opens
+with its identity; abridged here, the full file also carries `binary`,
+`latency`, `memory`, `compatibility`, `dependencies`, `top_layers` and the
+nested memory and analysis tables described below:
+
+```json
+{
+  "schema": "hpx.run-summary",
+  "schema_version": 6,
+  "engine": "helia-rt",
+  "layers": 13,
+  "total_cycles": 2060239.0,
+  "overflow_detected": false,
+  "validity": "valid",
+  "issues": []
+}
+```
+
+(the engine, layer and cycle values are from the shipped bundle
+`examples/results/hardware-validation-2026-09-16/apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto/`,
+which was written at schema version 5; the version this tree writes, shown
+above, is 6). Top level:
 
 | Field | Type | Unit | What it measures |
 |---|---|---|---|

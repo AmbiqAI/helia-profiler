@@ -112,7 +112,7 @@ If raw `JLinkExe` is unavoidable, use a non-interactive script that ends with
 | `redact.py` | Deterministic redaction of paths, URL credentials/tokens, secret assignments, and device serials for diagnostics output |
 | `support_bundle.py` | `hpx doctor --bundle` field-diagnostics collector and deterministic archive writer/verifier |
 | `errors.py` | Typed error hierarchy with `hint` field |
-| `session.py` | Immutable, branchable `Session` API for notebooks and scripts (backs `docs/reference/api/session.md`) |
+| `session.py` | Immutable, branchable `Session` API for notebooks and scripts (documented on the generated Python API reference) |
 | `validation/` | `hpx validate` hardware-in-the-loop harness — case matrix, runner, report, and portable bundle |
 | `dependencies.py` | Locked-dependency preparation (`prepare_locked_dependencies`) for reproducible firmware builds |
 
@@ -139,7 +139,7 @@ the `results/` package, never bare `dict[str, Any]`. The main exception is
   explaining it: `# WORKAROUND helia-aot#349: their module checks ARM_NN_*`.
 - Never put third-party version numbers, "X requires/refuses Y", bench
   numbers, or review history in code. Those live in
-  `docs/architecture/compatibility-baseline.md`, the issue, or git history.
+  `astro-site/src/content/docs/reference/compatibility-baseline.mdx`, the issue, or git history.
 - Tag workarounds for upstream defects with `WORKAROUND <repo>#<n>` so the
   cleanup pass is `rg WORKAROUND`. Docstrings describe the contract, not the
   history. This applies to tests.

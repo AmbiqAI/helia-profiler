@@ -18,11 +18,11 @@ result bundles round-trip across HPX versions, so rehydration must tolerate
 codes this build does not know. The registry types a code at *emission*, not
 at load.
 
-``docs/reference/issue-codes.md`` is generated from this module by
-``tools/gen_issue_code_reference.py`` and drift-tested like the configuration
-reference.
+The Reference issue-codes page is rendered from this module through
+``tools/docs/extract_issues.py`` and drift-tested by
+``tools/docs/check_reference.py`` like the configuration reference.
 
-CODEGEN-STABLE SURFACE (#229 D8): tools/gen_issue_code_reference.py
+CODEGEN-STABLE SURFACE (#229 D8): tools/docs/extract_issues.py
 generates the published issue-code reference from these registries —
 treat their names and structure as a stable surface for that generator.
 """

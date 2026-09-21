@@ -86,7 +86,7 @@ separate keys), so the figure is comparable with TFLM's single-arena number:
   space-separated, so the generic regex never matches it: it is
   :attr:`WireKind.RECORD` and reaches no consumer at all.
 
-``docs/reference/wire-protocol.md`` is generated from this module by
+``astro-site/src/content/docs/reference/wire-protocol.mdx`` is generated from this module by
 ``tools/gen_wire_protocol_reference.py`` and drift-tested.
 
 The registry is split across ``_model`` (vocabulary) and three spec catalogues

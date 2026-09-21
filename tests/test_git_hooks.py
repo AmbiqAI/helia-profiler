@@ -1,7 +1,7 @@
 """Unit coverage for the pre-commit local hooks under tools/hooks/.
 
 Imports each hook script as a module (matching the pattern used for
-tools/gen_issue_code_reference.py) so these stay fast, local, and
+tools/gen_wire_protocol_reference.py) so these stay fast, local, and
 subprocess-free -- the hooks themselves are exercised end-to-end in
 CI's `pre-commit` job.
 """

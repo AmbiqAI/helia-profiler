@@ -30,7 +30,7 @@ class SupportBundleSection:
 
     ``available=False`` records *why* a section was skipped (missing
     workspace, offline, optional tool absent, ...) rather than failing the
-    whole bundle — see ``docs/architecture/field-diagnostics.md``.
+    whole bundle — see the Concepts page ``guide/concepts/field-diagnostics``.
     """
 
     name: str
