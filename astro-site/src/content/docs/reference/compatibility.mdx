@@ -1,0 +1,108 @@
+---
+title: "Compatibility table"
+description: "Every registered board against the four engines and three toolchains, each cell carrying the status its source states: hardware-validated from a nightly run record, experimental where the sources say so, unknown where no record exists."
+---
+
+## Purpose
+
+Answer "does this engine and toolchain run on this board" from records
+rather than from memory. Every cell names one of four states and every
+non-empty state points at its source.
+
+## Prerequisites
+
+None. To reproduce a hardware-validated cell you need the board named in
+the row and the [Batch runs from YAML](../../examples/batch-runs/) recipe,
+which is the nightly workflow.
+
+## Status vocabulary
+
+| Cell | Meaning | Source that can set it |
+|---|---|---|
+| hardware-validated | a case with this board, engine and toolchain passed in a recorded run of `.github/workflows/hardware-validation.yml` | the run's `validation_manifest.json` |
+| compile-only | firmware for this combination built in CI without a board | no CI job builds firmware without hardware at the source tree this site was built from, so no cell carries it |
+| experimental | the sources label the target best-effort and outside the compatibility guarantees | `guide/boards.mdx`, the board's config comments, `platform/board.py` (`is_fpga`) |
+| unknown | no record either way | the absence of a source |
+
+The board list is `hpx boards`, in registry order (`platform/registry.py`,
+`list_boards()`); `channel` is the registry's `stable` or `preview` field.
+The toolchains are the `Toolchain` enum in `vocab.py`: `arm-none-eabi-gcc`
+and its alias `gcc` are one column, since both resolve to the GNU Arm
+Embedded toolchain; `armclang` is Arm Compiler 6; `atfe` is the Arm
+Toolchain for Embedded. The engines are the `EngineType` enum.
+
+## Steps
+
+### 1. Boards against engines
+
+| Board | Channel | Core | heliaRT | heliaAOT | TFLM | ExecuTorch |
+|---|---|---|---|---|---|---|
+| `apollo3p_evb` | stable | Cortex-M4 | hardware-validated | hardware-validated | hardware-validated | unknown |
+| `apollo3p_evb_cygnus` | preview | Cortex-M4 | unknown | unknown | unknown | unknown |
+| `apollo4p_evb` | preview | Cortex-M4 | unknown | unknown | unknown | unknown |
+| `apollo4l_evb` | preview | Cortex-M4 | unknown | unknown | unknown | unknown |
+| `apollo4l_blue_evb` | preview | Cortex-M4 | hardware-validated | hardware-validated | hardware-validated | unknown |
+| `apollo4p_blue_kbr_evb` | preview | Cortex-M4 | unknown | unknown | unknown | unknown |
+| `apollo4p_blue_kxr_evb` | preview | Cortex-M4 | unknown | unknown | unknown | unknown |
+| `apollo510_evb` | stable | Cortex-M55 | hardware-validated | hardware-validated | hardware-validated | hardware-validated |
+| `apollo510b_evb` | preview | Cortex-M55 | unknown | unknown | unknown | unknown |
+| `apollo5b_evb` | preview | Cortex-M55 | unknown | unknown | unknown | unknown |
+| `apollo330mP_evb` | preview | Cortex-M55 | hardware-validated | hardware-validated | hardware-validated | hardware-validated |
+| `apollo510dL_evb` | preview | Cortex-M55 | unknown | unknown | unknown | unknown |
+| `atomiq110_fpga_turbo` | preview | Cortex-M55 (FPGA) | experimental | experimental | experimental | experimental |
+
+### 2. Boards against toolchains
+
+| Board | GNU Arm (`arm-none-eabi-gcc`, `gcc`) | Arm Compiler 6 (`armclang`) | ATfE (`atfe`) |
+|---|---|---|---|
+| `apollo3p_evb` | hardware-validated | unknown | hardware-validated |
+| `apollo3p_evb_cygnus` | unknown | unknown | unknown |
+| `apollo4p_evb` | unknown | unknown | unknown |
+| `apollo4l_evb` | unknown | unknown | unknown |
+| `apollo4l_blue_evb` | hardware-validated | unknown | unknown; the nightly run skipped every ATfE case with "NSX board module nsx-board-apollo4l-blue-evb does not declare the atfe toolchain" |
+| `apollo4p_blue_kbr_evb` | unknown | unknown | unknown |
+| `apollo4p_blue_kxr_evb` | unknown | unknown | unknown |
+| `apollo510_evb` | hardware-validated | unknown | hardware-validated |
+| `apollo510b_evb` | unknown | unknown | unknown |
+| `apollo5b_evb` | unknown | unknown | unknown |
+| `apollo330mP_evb` | hardware-validated | unknown | hardware-validated |
+| `apollo510dL_evb` | unknown | unknown | unknown |
+| `atomiq110_fpga_turbo` | experimental | experimental | experimental |
+
+### 3. The record behind every hardware-validated cell
+
+Nightly hardware validation [run 35078330526](https://github.com/AmbiqAI/helia-profiler/actions/runs/35078330526)
+of 2026-09-16, suite `complete`, hpx 0.1.6 at source commit `0714893` (the
+runner's tree was not clean, per the manifests' `repo.dirty`), over the
+MLPerf Tiny models `kws`, `vww`, `ic` and `ad`:
+
+| Board | Cases | Passed | Engines run | Toolchains run |
+|---|---|---|---|---|
+| `apollo510_evb` | 32 | 32 | heliaRT, heliaAOT, TFLM, ExecuTorch | GNU Arm, ATfE |
+| `apollo330mP_evb` | 32 | 32 | heliaRT, heliaAOT, TFLM, ExecuTorch | GNU Arm, ATfE |
+| `apollo3p_evb` | 24 | 24 | heliaRT, heliaAOT, TFLM | GNU Arm, ATfE |
+| `apollo4l_blue_evb` | 24 | 12 passed, 12 skipped | heliaRT, heliaAOT, TFLM | GNU Arm (ATfE skipped) |
+
+Nine of the run's bundles ship in the repository under
+`examples/results/hardware-validation-2026-09-16/`, described on
+[Batch runs from YAML](../../examples/batch-runs/); each `nsx.lock` records
+the module revisions the cell was validated with.
+An `armclang` case does not exist in the nightly suite, so no cell in that
+column is hardware-validated. ExecuTorch cases exist only for Cortex-M55
+boards and only for models carrying an ExecuTorch variant
+(`validation/matrix.py`), so the Cortex-M4 rows record unknown for it: no
+case was enumerated, and no other source states support either way.
+
+## Expected output
+
+A cell you can act on: hardware-validated means the recipe on
+[Batch runs from YAML](../../examples/batch-runs/) reproduces it;
+experimental means the wording on [Boards and targets](../../guide/boards/)
+applies; unknown means nobody has recorded a result and a run of yours
+would be the first.
+
+## What next
+
+[Compatibility baseline](../compatibility-baseline/) for the module and
+engine revisions hpx qualifies; [Boards and targets](../../guide/boards/)
+and [Engines](../../guide/engines/) for what each row and column means.
