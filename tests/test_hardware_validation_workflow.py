@@ -256,6 +256,82 @@ def test_board_and_probes_come_from_the_runner(validate_job: dict[str, Any]) -> 
         assert "HPX_VALIDATION_BOARDS" not in script
 
 
+def _fake_bench_agent(tmp_path: Path, body: str) -> dict[str, str]:
+    """Executable stand-in; ``env -u`` bypasses shell functions."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(exist_ok=True)
+    fake = bin_dir / "bench-agent"
+    fake.write_text(f"#!/usr/bin/env bash\n{body}\n")
+    fake.chmod(0o755)
+    return {
+        "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+        "BENCH_BOARD": "apollo510_evb_2",
+        "GITHUB_SERVER_URL": "https://github.com",
+        "GITHUB_REPOSITORY": "AmbiqAI/helia-profiler",
+        "GITHUB_RUN_ID": "42",
+    }
+
+
+def test_ci_takes_the_board_lock(validate_job: dict[str, Any], tmp_path: Path) -> None:
+    names = [step.get("name") for step in validate_job["steps"]]
+    lock = _step(validate_job, "Take the board lock")
+    assert lock["id"] == "lock"
+    # After the contract guard, before anything opens the probe.
+    assert (
+        names.index("Resolve board and probes from the runner")
+        < names.index("Take the board lock")
+        < names.index("Check the runner can open its probe")
+    )
+    script = lock["run"]
+    assert "command -v bench-agent" in script
+    assert 'env -u RUNNER_TRACKING_ID bench-agent lock "${BENCH_BOARD}"' in script
+    assert "--holder ci" in script
+    assert (
+        '--reason "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"'
+        in script
+    )
+    assert "--timeout 1800" in script
+    # The ttl must outlive the job so a killed job frees its board.
+    assert "--ttl 21600" in script
+    assert 21600 > validate_job["timeout-minutes"] * 60
+
+    env = _fake_bench_agent(tmp_path, 'echo "bench-agent: $2 held by nishant" >&2; exit 1')
+    with pytest.raises(subprocess.CalledProcessError) as failure:
+        _run_bash(script, env, tmp_path)
+    assert failure.value.returncode == 1
+    assert "apollo510_evb_2 held by nishant" in failure.value.stderr
+
+    env = _fake_bench_agent(tmp_path, 'printf "%s\\n" "$@"; [[ -z "${RUNNER_TRACKING_ID:-}" ]]')
+    args = _run_bash(script, {**env, "RUNNER_TRACKING_ID": "tracked"}, tmp_path).splitlines()
+    assert args[:2] == ["lock", "apollo510_evb_2"]
+    assert args[args.index("--reason") + 1] == (
+        "https://github.com/AmbiqAI/helia-profiler/actions/runs/42"
+    )
+    with pytest.raises(subprocess.CalledProcessError) as failure:
+        _run_bash(script, {**env, "BENCH_BOARD": ""}, tmp_path)
+    assert failure.value.returncode == 2
+    with pytest.raises(subprocess.CalledProcessError) as failure:
+        _run_bash(script, {**env, "PATH": str(tmp_path / "empty")}, tmp_path)
+    assert failure.value.returncode == 2
+    assert "no bench-agent on PATH" in failure.value.stderr
+
+    release = _step(validate_job, "Release the board lock")
+    assert release["if"] == "always() && steps.lock.outcome == 'success'"
+    assert names.index("Run hardware validation") < names.index("Release the board lock")
+    script = release["run"]
+    assert 'bench-agent unlock "${BENCH_BOARD}"' in script
+    env = _fake_bench_agent(tmp_path, 'printf "%s\\n" "$@"')
+    assert _run_bash(script, env, tmp_path).splitlines() == ["unlock", "apollo510_evb_2"]
+    # A board the ttl or a person already freed is not an error.
+    env = _fake_bench_agent(tmp_path, 'echo "bench-agent: $2 is free" >&2; exit 1')
+    assert "is free" in _run_bash(script, env, tmp_path)
+    env = _fake_bench_agent(
+        tmp_path, 'echo "bench-agent: $2 held by nishant; add --force" >&2; exit 1'
+    )
+    with pytest.raises(subprocess.CalledProcessError):
+        _run_bash(script, env, tmp_path)
+
+
 def test_artifact_is_uploaded_per_board(validate_job: dict[str, Any]) -> None:
     upload = _step(validate_job, "Upload validation artifacts")
     assert upload["if"] == "always()"
