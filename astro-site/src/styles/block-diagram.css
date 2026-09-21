@@ -1,33 +1,4 @@
-/* Mirror of helia-ui recipes.css block-diagram rules; re-synced from feat/block-diagram (helia-ui#158). */
-.helia-block-diagram {
-  /* The gap inside a block, held apart from the gap between the top-level
-     blocks so a nested set reads as contained rather than as a second row. */
-  --helia-block-nest-gap: var(--helia-space-2);
-
-  margin: 0;
-  min-width: 0;
-}
-
-.helia-block-diagram.helia-layout--compact {
-  --helia-block-nest-gap: var(--helia-space-1);
-}
-
-.helia-block-diagram.helia-layout--comfortable {
-  --helia-block-nest-gap: var(--helia-space-3);
-}
-
-.helia-block-diagram--muted {
-  background: var(--helia-surface-card-muted);
-  border-radius: var(--helia-radius-lg);
-  padding: var(--helia-space-4);
-}
-
-.helia-block-diagram__caption {
-  display: grid;
-  gap: var(--helia-space-1);
-  margin-block-end: var(--helia-space-3);
-}
-
+/* Mirror of helia-ui recipes.css block-diagram rules (helia-ui 8617342, PR #158); delete when the alpha that ships BlockDiagram/Block is pinned. */
 .helia-block-diagram__note {
   color: var(--helia-ink-muted);
   font-size: var(--helia-text-caption);
@@ -200,4 +171,73 @@
   display: flex;
   gap: var(--helia-space-2);
   min-width: 0;
+}
+
+a.helia-block__face {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* The underline is the whole hover: a block that moved or lifted would be a
+   card, and a diagram of them would never settle. */
+a.helia-block__face:hover .helia-block__label {
+  text-decoration: underline;
+}
+
+.helia-block__icon {
+  color: var(--helia-ink-muted);
+  flex: none;
+}
+
+.helia-block__text {
+  display: grid;
+  min-width: 0;
+}
+
+.helia-block__label {
+  font-size: var(--helia-text-label);
+  font-weight: var(--helia-weight-semibold);
+  line-height: var(--helia-leading-tight);
+  overflow-wrap: anywhere;
+}
+
+.helia-block__sub {
+  color: var(--helia-block-sub-ink);
+  font-size: var(--helia-text-caption);
+  line-height: var(--helia-leading-tight);
+  overflow-wrap: anywhere;
+}
+
+/*
+ * A row of blocks is a row for as long as the labels fit. Below the reading
+ * breakpoint it stacks, and the spans come off with it: a cell told to cover
+ * two columns of a single column grid is an empty column beside it.
+ */
+@media (width < 62rem) {
+  .helia-block-set--grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (width < 42rem) {
+  .helia-block-set--row,
+  .helia-block-set--grid {
+    grid-auto-columns: auto;
+    grid-auto-flow: row;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .helia-block--span-2,
+  .helia-block--span-3,
+  .helia-block--span-4 {
+    grid-column: auto;
+  }
+}
+
+/* A block split across a page break is a diagram that has to be read twice. */
+@media print {
+  .helia-block,
+  .helia-block-diagram {
+    break-inside: avoid;
+  }
 }
