@@ -107,6 +107,9 @@ its deployment and its `PmuResult`) and `PowerRun` (the power plan,
 firmware, deployment, observation and terminal record). Read a product
 through its narrowing accessor rather than the raw field:
 
+{/* tests/test_pipeline.py parses this table: one accessor per row, all
+    three cells in backticks, the third the producing stage class. */}
+
 | Accessor | Field | Produced by |
 |---|---|---|
 | `resolved_soc` | `soc` | `ResolvePlatformStage` |

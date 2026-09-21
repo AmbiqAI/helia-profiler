@@ -48,7 +48,9 @@ open to additive extension, and the typed models in
 ### 1. `summary.json`
 
 Written by `report/summary.py` from the `RunSummary` model. The file opens
-with its identity, then the top-level fields:
+with its identity; abridged here, the full file also carries `binary`,
+`latency`, `memory`, `compatibility`, `dependencies`, `top_layers` and the
+nested memory and analysis tables described below:
 
 ```json
 {
@@ -63,9 +65,10 @@ with its identity, then the top-level fields:
 }
 ```
 
-(the values are from the shipped bundle
+(the engine, layer and cycle values are from the shipped bundle
 `examples/results/hardware-validation-2026-09-16/apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto/`,
-written at schema version 5; the version this tree writes is 6). Top level:
+which was written at schema version 5; the version this tree writes, shown
+above, is 6). Top level:
 
 | Field | Type | Unit | What it measures |
 |---|---|---|---|

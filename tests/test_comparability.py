@@ -263,7 +263,7 @@ def test_real_pre_change_baselines_do_block_power_comparison():
     is pinned here because the consequence is easy to miss: a power-gated
     comparison against a stored baseline flips from pass to fail, since
     ``MissingMetricPolicy.FAIL`` is the default. Documented in
-    docs/guide/power.md."""
+    the guide/power page."""
     pre_change = _run(
         power={
             "measurement_scope": "gpio_gated_clean_window",
