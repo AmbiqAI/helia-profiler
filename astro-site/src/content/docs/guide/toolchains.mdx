@@ -1,193 +1,155 @@
 ---
 title: "Toolchains"
-description: "heliaPROFILER builds firmware through NSX, which supports three Cortex-M cross-compilers. The choice of toolchain affects build time, binary size, and…"
+description: "GCC, Arm Compiler 6 and the Arm Toolchain for Embedded: which to pick, how hpx finds each one, how to install it, and how to compare them on your own model."
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
-heliaPROFILER builds firmware through [NSX](https://github.com/AmbiqAI/neuralspotx),
-which supports three Cortex-M cross-compilers. The choice of toolchain
-affects build time, binary size, and inference performance.
+## Purpose
 
-## Supported toolchains
+Choose the cross-compiler that builds the firmware. hpx builds through
+neuralSPOT-X, which supports three Cortex-M toolchains; the choice changes
+build time, binary size and cycle counts, and every other axis of a run is
+independent of it.
 
-| `target.toolchain` value | Compiler | Linker | Status |
-|---|---|---|---|
-| `arm-none-eabi-gcc` *(default)*, `gcc` | GCC | GNU `ld` | Stable |
-| `armclang` | Arm Compiler 6 | `armlink` | Stable |
-| `atfe` | Arm Toolchain for Embedded (LLVM-based) | LLD | Preview |
+## Prerequisites
 
-Selection happens via:
+At least one toolchain installed and found by `hpx doctor`
+([Install](../../getting-started/install/) covers GCC). Arm Compiler 6
+needs a licence; ATfE needs `ATFE_ROOT`.
+
+## Which toolchain
+
+| `target.toolchain` | Compiler | Linker | Cost to set up | Pick it when |
+|---|---|---|---|---|
+| `arm-none-eabi-gcc` (default; `gcc` is the accepted alias) | GNU Arm Embedded | GNU `ld` | free, in every distribution | First setup, CI without a licence, cross-platform reproducibility. The default heliaRT registry module builds with it. |
+| `armclang` | Arm Compiler 6 | `armlink` | licence required | Cycle-count optimisation on Cortex-M55, or confirming a result replicates across compilers. Not supported by the ExecuTorch engine. |
+| `atfe` | Arm Toolchain for Embedded (LLVM) | LLD | free download, `ATFE_ROOT` | An open LLVM toolchain; preview status in hpx. Builds the heliaRT registry flow and ExecuTorch end to end. |
+
+The four accepted values are the `Toolchain` vocabulary in
+`src/helia_profiler/vocab.py`: `arm-none-eabi-gcc`, `gcc`, `armclang`,
+`atfe`. Arm Compiler 5 is not among them and is not supported; there is no
+flag or key for it.
+
+## Steps
+
+### 1. Select it
 
 ```bash
 hpx profile model.tflite --toolchain armclang
 ```
-
-or in YAML:
 
 ```yaml
 target:
   toolchain: armclang
 ```
 
-The default is `arm-none-eabi-gcc`, which is what `gcc` aliases to.
+The selection flows to `nsx configure --toolchain`. GCC is the special
+case: when `arm-none-eabi-gcc` or `gcc` is selected hpx omits the flag so
+neuralSPOT-X uses its default GCC configuration; `armclang` and `atfe` are
+passed through. Binary sections are probed with `arm-none-eabi-size` for
+GCC, `fromelf` for Arm Compiler 6 and `llvm-size` from `ATFE_ROOT/bin` for
+ATfE.
 
-## How heliaPROFILER drives the toolchain
-
-The selected toolchain flows through to NSX:
-
-```text
-hpx profile --toolchain X
-   └─► firmware build stage
-       └─► nsx configure --toolchain X
-```
-
-GCC is special-cased: when `arm-none-eabi-gcc`/`gcc` is selected the
-profiler omits the `--toolchain` flag entirely so NSX uses its default
-GCC configuration. `armclang` and `atfe` are passed through explicitly.
-
-The profiler also probes binary sections with `arm-none-eabi-size` for GCC,
-`fromelf` for Arm Compiler 6, or `llvm-size` from `ATFE_ROOT/bin` for ATfE.
-
-## GCC (default)
-
-Free, widely available, well-documented.
-
-### Install
+### 2. Install the one you chose
 
 <Tabs>
-<TabItem label="macOS">
+<TabItem label="GCC">
 
-```bash
-# Download from https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads
-# Extract to /Applications/ArmGNUToolchain/<version>/
-export PATH="/Applications/ArmGNUToolchain/14.3.rel1/arm-none-eabi/bin:$PATH"
-```
-
-</TabItem>
-<TabItem label="Linux">
-
-```bash
-sudo apt install gcc-arm-none-eabi
-# Or download a newer release from developer.arm.com
-```
-
-</TabItem>
-<TabItem label="Windows">
-
-Use the official installer from
-[developer.arm.com](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads).
-
-</TabItem>
-</Tabs>
-
-Verify:
+Install as on [Install](../../getting-started/install/#2-arm-gnu-toolchain),
+then verify:
 
 ```bash
 arm-none-eabi-gcc --version
 arm-none-eabi-size --version
 ```
 
-### When to use GCC
+</TabItem>
+<TabItem label="Arm Compiler 6">
 
-- First-time setup or CI on machines without a paid Arm Compiler license.
-- Cross-platform build reproducibility — works the same on all OSes.
-- The default heliaRT registry module is built with GCC through NSX.
-
-## armclang (Arm Compiler 6)
-
-Commercial Arm Compiler 6. Generally produces faster code than GCC on
-Cortex-M55 workloads, particularly for MVE-heavy kernels.
-
-### Install
-
-armclang ships with [Arm Development Studio](https://developer.arm.com/Tools%20and%20Software/Arm%20Development%20Studio)
-or the standalone Arm Compiler for Embedded. A license is required.
+`armclang` ships with
+[Arm Development Studio](https://developer.arm.com/Tools%20and%20Software/Arm%20Development%20Studio)
+or the standalone Arm Compiler for Embedded, under licence:
 
 ```bash
-# Add the toolchain bin/ to PATH
 export PATH="/path/to/ArmCompilerForEmbedded/<version>/bin:$PATH"
-
-# Point at the license server (or an offline license file)
-export ARMLMD_LICENSE_FILE="<port>@<server>"
-```
-
-Verify:
-
-```bash
+export ARMLMD_LICENSE_FILE="<port>@<server>"   # or an offline licence file
 armclang --version
 fromelf --version
 ```
 
-### When to use armclang
+`armclang --version` works without consuming a licence; the build fails at
+the first compile if the licence server is unreachable.
 
-- You have an Arm Compiler license available.
-- You're optimizing for cycle count on Apollo510 / Cortex-M55.
-- You want to validate that performance numbers replicate across
-  toolchains before committing to one.
-
-## ATfE (Arm Toolchain for Embedded)
-
-Arm's newer LLVM-based toolchain. Free and open-source. Currently in
-preview within heliaPROFILER.
-
-### Install
+</TabItem>
+<TabItem label="ATfE">
 
 Download from
 [developer.arm.com](https://developer.arm.com/downloads/-/arm-toolchain-for-embedded)
-and set `ATFE_ROOT` to the extracted toolchain root:
+and set `ATFE_ROOT` to the extracted toolchain root, not its `bin/`:
 
 ```bash
 export ATFE_ROOT="/path/to/atfe/<version>"
-
 "$ATFE_ROOT/bin/clang" --version
 "$ATFE_ROOT/bin/llvm-size" --version
 ```
 
-HPX expects `clang`, `clang++`, `llvm-ar`, `llvm-objcopy`, `llvm-size`, and
-`llvm-nm` under `$ATFE_ROOT/bin`. The default heliaRT registry flow builds the
-runtime and profiler firmware with ATfE end to end.
+hpx expects `clang`, `clang++`, `llvm-ar`, `llvm-objcopy`, `llvm-size` and
+`llvm-nm` under `$ATFE_ROOT/bin`.
 
-## Toolchain comparison
+</TabItem>
+</Tabs>
 
-Compiler results depend on the model, engine, optimization settings, and target
-clock. Use the [toolchain comparison example](../../examples/toolchain-comparison/)
-to measure the trade-off on your own workload.
+### 3. Compare on your own model
 
-## Switching toolchains mid-experiment
+Compiler results depend on the model, the engine, the optimisation settings
+and the clock, so measure rather than assume. Same model, three
+toolchains, three directories:
 
 ```bash
-# Same model, three toolchains, three result directories
 hpx profile model.tflite --toolchain gcc      --output-dir results/gcc
 hpx profile model.tflite --toolchain armclang --output-dir results/armclang
 hpx profile model.tflite --toolchain atfe     --output-dir results/atfe
+hpx compare results/gcc results/armclang
 ```
 
-The work directory is not shared between toolchains — each run
-re-configures and re-builds from scratch.
+The work directory is not shared between toolchains; each run configures
+and builds from scratch. Hold the engine, board and counters constant and
+vary only `--toolchain`, otherwise a cycle delta could be any of them. The
+[toolchain comparison example](../../examples/toolchain-comparison/) is
+that recipe with captured output.
+
+## Expected output
+
+`run_metadata.json` records the resolved toolchain and the compiler
+version it found; the terminal report's memory table names the size tool
+used. Different toolchains produce different cycle counts for the same
+model, which is the point of measuring.
 
 ## Troubleshooting
 
 :::caution[`armclang: command not found`]
-The Arm Compiler `bin/` directory is not on `PATH`. Source the
-setup script that ships with Arm Development Studio, or add the path
-manually.
+The Arm Compiler `bin/` directory is not on `PATH`. Source the setup script
+that ships with Arm Development Studio, or add the path.
 :::
 
 :::caution[`License checkout failed (-15)`]
-Set `ARMLMD_LICENSE_FILE` to point at your license server or file.
-`armclang --version` works without consuming a license; the build
-will fail when the actual compile step requests one.
+Set `ARMLMD_LICENSE_FILE` to the licence server or file. The version check
+passes without a licence; the compile step does not.
 :::
 
 :::caution[`ATFE_ROOT` is missing or incomplete]
-Set `ATFE_ROOT` to the extracted toolchain root, not its `bin/`
-directory. Confirm that `$ATFE_ROOT/bin/clang` and
-`$ATFE_ROOT/bin/llvm-size` exist.
+Point `ATFE_ROOT` at the extracted root, not `bin/`, and confirm
+`$ATFE_ROOT/bin/clang` and `$ATFE_ROOT/bin/llvm-size` exist.
 :::
 
 :::caution[Different cycle counts on different toolchains]
-Expected. Toolchain choice is one of several variables that affect
-code generation. To isolate, hold the engine, board, and counter
-config constant; only vary `--toolchain`.
+Expected: the compiler is one of the variables that decide code generation.
+Isolate it by holding everything else constant.
 :::
+
+## What next
+
+[Capture transports](../transports/) for how the data leaves the board, or
+[Engines](../engines/) if the engine you want constrains the toolchain
+(ExecuTorch builds with GCC and ATfE only).

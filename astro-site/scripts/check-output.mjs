@@ -160,8 +160,7 @@ for (const route of redirects.served) {
  * halves are asserted, the SVG being there and the fence not.
  */
 const MERMAID_ROUTES = [
-  'guide/transports/',
-  'guide/engines/',
+  /* Engines and transports replaced their flowcharts with decision tables (#340). */
   'guide/concepts/capture/',
   'guide/concepts/',
 ];
