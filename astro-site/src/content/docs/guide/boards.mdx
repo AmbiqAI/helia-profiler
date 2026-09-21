@@ -1,142 +1,123 @@
 ---
-title: "Boards & Platforms"
-description: "heliaPROFILER uses a two-level hardware model: Board → SoC. The board identifies the physical EVB and dictates J-Link device strings, USB IDs, and pin…"
+title: "Boards and targets"
+description: "The board registry hpx profiles against, what each SoC family can capture, the CPU clock selection, probe pinning, and how to add a custom board or SoC."
 ---
 
-heliaPROFILER uses a two-level hardware model: **Board → SoC**. The board
-identifies the physical EVB and dictates J-Link device strings, USB IDs,
-and pin defaults. The SoC determines CPU architecture, PMU capabilities,
-and memory layout.
+## Purpose
 
-## Supported boards
+Choose the board and everything the `target` block decides about it: which
+counters exist, which clock the core runs at, which probe flashes it, and
+what to do when your board is not in the registry.
 
-Run `hpx boards` to see the live list. As of this release:
+## Prerequisites
 
-| Board | SoC | Core | PMU | MVE | PSRAM | Channel |
-|---|---|---|---|---|---|---|
-| `apollo510_evb` | apollo510 | Cortex-M55 | Full Armv8-M | Yes | Yes | Stable |
-| `apollo510b_evb` | apollo510b | Cortex-M55 | Full Armv8-M | Yes | Yes | Preview |
-| `apollo5b_evb` | apollo5b | Cortex-M55 | Full Armv8-M | Yes | Yes | Preview |
-| `apollo330mP_evb` | apollo330P | Cortex-M55 | Full Armv8-M | Yes | Yes | Preview |
-| `apollo510dL_evb` | apollo510L | Cortex-M55 | Full Armv8-M | Yes | No[^510l-psram] | Preview |
-| `atomiq110_fpga_turbo` **(experimental)** | atomiq110 | Cortex-M55 | Full Armv8-M | Yes | No | Preview |
-| `apollo4p_evb` | apollo4p | Cortex-M4 | DWT only | No | Yes | Preview |
-| `apollo4l_evb` | apollo4l | Cortex-M4 | DWT only | No | Yes | Preview |
-| `apollo4l_blue_evb` | apollo4l | Cortex-M4 | DWT only | No | Yes | Preview |
-| `apollo4p_blue_kbr_evb` | apollo4p | Cortex-M4 | DWT only | No | Yes | Preview |
-| `apollo4p_blue_kxr_evb` | apollo4p | Cortex-M4 | DWT only | No | Yes | Preview |
-| `apollo3p_evb` | apollo3p | Cortex-M4 | DWT only | No | Yes | Stable |
-| `apollo3p_evb_cygnus` | apollo3p | Cortex-M4 | DWT only | No | Yes | Preview |
+`hpx boards` from [Validate your setup](../../getting-started/validate-your-setup/)
+prints the registry for the hpx you installed; the tables here explain its
+columns. Nothing on this page needs a board attached until the clock and
+probe steps.
 
-[^510l-psram]: The SoC supports PSRAM, but the rev 2 EVB does not have the chip fitted.
+## Which board
 
-:::tip[Apollo510 EVB is the default]
-If `--board` is not specified, the profiler targets `apollo510_evb`.
-This is the most fully-featured target and the recommended starting
-point.
+| If you have | Set `target.board` to | Core | Counters | Channel |
+|---|---|---|---|---|
+| Apollo510 EVB | `apollo510_evb` (the default) | Cortex-M55 | DWT and Armv8-M PMU: `cpu`, `memory`, `mve` | stable |
+| Apollo510B EVB | `apollo510b_evb` | Cortex-M55 | DWT and Armv8-M PMU | preview |
+| Apollo5B EVB | `apollo5b_evb` | Cortex-M55 | DWT and Armv8-M PMU | preview |
+| Apollo330P EVB | `apollo330mP_evb` | Cortex-M55 | DWT and Armv8-M PMU | preview |
+| Apollo510 Lite EVB | `apollo510dL_evb` | Cortex-M55 | DWT and Armv8-M PMU | preview |
+| Atomiq110 FPGA carrier | `atomiq110_fpga_turbo` | Cortex-M55 | DWT and Armv8-M PMU plus `ethos_npu` | preview, experimental |
+| Apollo4 Plus EVB | `apollo4p_evb` | Cortex-M4 | DWT cycle count only | preview |
+| Apollo4 Lite EVB | `apollo4l_evb` | Cortex-M4 | DWT cycle count only | preview |
+| Apollo4 Lite Blue EVB | `apollo4l_blue_evb` | Cortex-M4 | DWT cycle count only | preview |
+| Apollo4 Plus Blue KBR EVB | `apollo4p_blue_kbr_evb` | Cortex-M4 | DWT cycle count only | preview |
+| Apollo4 Plus Blue KXR EVB | `apollo4p_blue_kxr_evb` | Cortex-M4 | DWT cycle count only | preview |
+| Apollo3 Plus EVB | `apollo3p_evb` | Cortex-M4 | DWT cycle count only | stable |
+| Apollo3 Plus Cygnus EVB | `apollo3p_evb_cygnus` | Cortex-M4 | DWT cycle count only | preview |
+
+The rows are the registry in `src/helia_profiler/platform/board.py`; the
+channel is each board's `BoardDef.channel` and records how much hardware
+validation backs it, not whether hpx will drive it. `hpx boards` is the
+live list for your installed version and wins over this table.
+
+:::caution[Atomiq110 support is experimental]
+hpx support for the Atomiq110 SoC and the `atomiq110_fpga_turbo` board is
+experimental: best effort, not a release blocker, and outside the
+compatibility guarantees for production-silicon targets. The only upstream
+realisation is a Cortex-M55 plus Ethos-U85 FPGA carrier with no PSRAM and
+no onboard radio; its clock rates, cycle counts, latency, power and energy
+describe the FPGA image only. The FPGA exposes the full PMU and MVE
+profiling and the Ethos-U NPU through the `ethos_u` engine backend with the
+`ethos_npu` counter group; see the
+[NPU profiling example](../../examples/atomiq110-npu-profiling/).
 :::
 
-## SoC families
+## Steps
 
-### AP5 — Cortex-M55 (Apollo510, Apollo510b, Apollo5b, Apollo330P, Apollo510 Lite, Atomiq110)
+### 1. Know what the SoC family can capture
 
-- Full **Armv8-M PMU** with 8 configurable event counters plus a
-  dedicated cycle counter.
-- 70+ PMU events across CPU, memory, and MVE groups.
-- **MVE / Helium** SIMD support — vectorized CMSIS-NN kernels.
-- Per-layer counter breakdown is fully supported.
+hpx models hardware as board over SoC. The board fixes the J-Link device
+string, USB ids and pin defaults; the SoC fixes the core, the counters and
+the memory layout.
 
-:::note[Apollo330P is in the AP5 family]
-Despite the "3" in the name, Apollo330P uses a Cortex-M55 core. It
-belongs to the AP5 family and gets full PMU + MVE.
-:::
+| Family | Cores | Counters | Per-layer detail | MVE group | Power capture |
+|---|---|---|---|---|---|
+| AP5 (Apollo510, Apollo510B, Apollo5B, Apollo330P, Apollo510 Lite, Atomiq110) | Cortex-M55 | Armv8-M PMU: 8 configurable event counters plus a cycle counter, events across the `cpu`, `memory` and `mve` groups | full | yes | yes |
+| AP4 (Apollo4 Plus, Apollo4 Lite) | Cortex-M4 | DWT cycle counter only | cycles only | rejected at preflight | yes |
+| AP3 (Apollo3 Plus) | Cortex-M4 | DWT cycle counter only | cycles only | rejected at preflight | yes |
 
-:::caution[Experimental Atomiq110 support]
-HPX support for the Atomiq110 SoC and `atomiq110_fpga_turbo` board is
-experimental. It is best-effort, is not a release blocker, and may change
-or be removed in any minor release. It is outside the compatibility
-guarantees for production-silicon targets.
+Apollo330P is a Cortex-M55 part in the AP5 family despite the 3 in its
+name. On an AP4 or AP3 board a `memory` or `mve` selection is rejected at
+preflight with the groups that board does expose
+(`platform/counters.py`, `validate_group_selection`); drop those keys to
+capture cycles only. The counter groups themselves are on
+[PMU counters](../pmu-counters/).
 
-The only upstream Atomiq110 realization is currently a Cortex-M55 +
-Ethos-U85 NPU FPGA carrier running at a single fixed 25 MHz clock (no
-PSRAM and no onboard BLE radio). Its clock rates, cycle counts, latency,
-power, and energy measurements describe the FPGA image only and are not
-representative of production silicon. The registered channel remains
-`preview`; this documentation-only status does not change target selection
-or NSX module resolution.
+Two more facts the registry fixes per board: whether PSRAM is fitted
+(`BoardDef.psram_kb`; the Apollo3 Plus and Apollo4 EVBs register it, the
+Apollo5-family EVBs take the SoC's value, and `apollo510dL_evb` registers
+none because the chip is not fitted on that EVB), and whether the
+`usb_cdc` transport is available (`SocDef.has_usb`; Apollo3P and Atomiq110
+have no compatible `nsx-ambiq-usb` module, so `usb_cdc` is rejected at
+preflight there).
 
-The FPGA exposes full PMU + MVE profiling and the Ethos-U NPU through the
-`ethos_u` engine backend with the `ethos_npu` counter group (see the
-[NPU profiling example](../../examples/atomiq110-npu-profiling/)).
-:::
+Each family also selects the AmbiqSuite SDK tier and the neuralSPOT-X
+modules the firmware build pulls in (`nsx-ambiqsuite-r5`, `nsx-ambiq-hal-r5`,
+`nsx-ambiq-bsp-r5` for AP5; `-r4` and `-r3` for the others). This follows
+from `target.board` and needs no configuration.
 
-### AP4 — Cortex-M4 (Apollo4p)
+### 2. CPU clock
 
-- **DWT cycle counter only** — no configurable PMU events.
-- No MVE/Helium support.
-- PMU group selections (`cpu`, `memory`, `mve`) are ignored — only the
-  cycle count is captured.
+`target.clock.cpu` selects the core frequency by the SoC's named tier
+(`lp` or `hp` on the Apollo parts; `atomiq110_fpga_turbo` exposes `lp`
+only, a single fixed FPGA clock). The tiers and their frequencies are
+registered per SoC in `src/helia_profiler/platform/soc.py`; hpx validates
+the name against them and maps it onto the matching neuralSPOT-X
+performance mode in the generated firmware. Unset, the board runs at its
+lowest-power tier. `run_metadata.json` records the resolved tier and
+frequency for every run, which is the number to quote.
 
-### AP3 — Cortex-M4 (Apollo3p)
+```yaml
+target:
+  board: apollo510_evb
+  clock:
+    cpu: hp
+```
 
-- Same DWT-only profile as AP4.
-- Smallest memory budget of the supported boards.
+Cycle counts depend on the clock only through memory timing; energy and
+latency depend on it directly, so record it with every comparison.
 
-## What this means for your config
+### 3. Pin the probe
 
-| Capability | AP5 | AP4 / AP3 |
-|---|---|---|
-| Per-layer cycle counts | ✓ | ✓ |
-| Per-layer PMU counter detail | ✓ | (cycles only) |
-| MVE counter group | ✓ | (rejected at preflight) |
-| `weights_location: psram` | ✓ | ✓ (all built-in EVBs ship PSRAM) |
-| Power capture | ✓ | ✓ |
+With one probe attached nothing needs setting. With several,
+`hpx probes match --board <name>` shows the pick, and `target.jlink_serial`
+(or `--jlink-serial`) pins it. hpx passes the board's J-Link device string
+itself; the values are in the registry (`AP510NFA-CBR` for `apollo510_evb`,
+`AMA3B2KK-KBR` for `apollo3p_evb`, and so on) and never need typing.
 
-When you target an AP4/AP3 board, the profiler **warns** about ignored
-PMU/MVE selections and falls back to cycle-count-only capture. The
-config itself is not rejected — it's reduced.
+### 4. Add a custom board or SoC
 
-## SDK / NSX module mapping
-
-Each SoC family maps to an AmbiqSuite SDK tier, which determines which
-NSX modules are pulled into the firmware build. This is fully automatic;
-you only choose `target.board`.
-
-| Family | SDK Tier | NSX modules |
-|---|---|---|
-| AP5 | r5 | `nsx-ambiqsuite-r5`, `nsx-ambiq-hal-r5`, `nsx-ambiq-bsp-r5` |
-| AP4 | r4 | `nsx-ambiqsuite-r4`, `nsx-ambiq-hal-r4`, `nsx-ambiq-bsp-r4` |
-| AP3 | r3 | `nsx-ambiqsuite-r3`, `nsx-ambiq-hal-r3`, `nsx-ambiq-bsp-r3` |
-
-## J-Link device strings
-
-The profiler passes the right device string to JLinkExe automatically.
-For reference:
-
-| Board | J-Link device |
-|---|---|
-| `apollo510_evb` | `AP510NFA-CBR` |
-| `apollo510b_evb` | `AP510BFA-CBR` |
-| `apollo5b_evb` | `AP510NFA-CBR` |
-| `apollo330mP_evb` | `Apollo330P_510L` |
-| `apollo510dL_evb` | `AP510L` |
-| `atomiq110_fpga_turbo` | `Atomiq110` |
-| `apollo4p_evb` | `AMAP42KP-KBR` |
-| `apollo4l_evb` | `AMAP42KL-KBR` |
-| `apollo4l_blue_evb` | `AMAP42KL-KBR` |
-| `apollo4p_blue_kbr_evb` | `AMAP42KP-KBR` |
-| `apollo4p_blue_kxr_evb` | `AMAP42KP-KBR` |
-| `apollo3p_evb` | `AMA3B2KK-KBR` |
-| `apollo3p_evb_cygnus` | `AMA3B2KK-KBR` |
-
-If you have multiple probes connected, pin one with
-`--jlink-serial <SN>` or `target.jlink_serial: "<SN>"`.
-
-## Adding a new board
-
-HPX now supports config-scoped custom boards. For a board that behaves like an
-existing EVB, add a `target.custom_boards` entry in your config and inherit from
-the closest built-in board:
+A board that behaves like a built-in EVB is a `target.custom_boards` entry
+that inherits from it:
 
 ```yaml
 target:
@@ -148,8 +129,7 @@ target:
       default_sync_gpio_pin: 27
 ```
 
-If you are bringing up a genuinely new SoC/board combination, define a custom
-SoC first, then point a custom board at it:
+A genuinely new SoC and board pair declares the SoC first:
 
 ```yaml
 target:
@@ -167,165 +147,59 @@ target:
       starter_profile_board: apollo510_evb
 ```
 
-The important fields are still the same platform facts as the built-in registry:
+The facts a custom entry carries are the registry's: board name and SoC
+family, J-Link device string, memory layout, the application flash load
+address, and the default sync GPIO pin (most built-in EVBs register their
+own; `10` is only the fallback for a board without one).
+`starter_profile_board` reuses a built-in board's neuralSPOT-X starter
+profile while keeping the custom board's own id, channel, pin and SoC facts.
+Unrecognised keys are rejected with the list of supported keys and a
+close-match suggestion.
 
-- Board name and SoC family
-- J-Link device string
-- Memory layout (MRAM/SRAM/TCM/PSRAM sizes)
-- App flash load address (see below)
-- Default sync GPIO pin (most built-in EVBs register a board-specific pin,
-  e.g. `29` for `apollo510_evb` / `apollo510b_evb`, `22` for the Apollo4
-  Plus EVBs, `61` for the Apollo4 Lite EVBs, and `26` for the Apollo3 Plus
-  EVBs; `10` is only the fallback for boards without a registered override)
-- `ble_reset_gpio_pin` on a "Blue" board — the GPIO wired to the onboard
-  Cooper BLE controller's reset line, held low during power captures so an
-  idling radio does not sit in your measurement. Inherited from `based_on`;
-  set it explicitly only if your board routes it differently. Leave it unset
-  on boards with no onboard radio, or write `null` to drop a pin inherited
-  from a `based_on` board whose radio yours does not have.
+Pins are plain integer pad numbers; booleans are rejected because a pin
+here is driven for the whole measured window. `0` on
+`default_state_gpio_pin` or `default_go_gpio_pin` disables that wire and
+degrades the 3-wire handshake to the 1-wire gate; `0` on
+`ble_reset_gpio_pin` is rejected as ambiguous (omit it, or write `null`,
+on a board without an onboard radio). `ble_reset_gpio_pin` names the GPIO
+wired to a Blue board's Cooper BLE controller reset line, held low during
+power captures so an idling radio stays out of the measurement.
 
-All four GPIO pin keys take a plain integer pad number. `true` / `false` are
-rejected rather than read as pads 1 and 0 — a pin here is configured as an
-output and driven for the whole measured window, so a typo'd boolean would
-put an unrelated GPIO underneath your power capture.
+#### Application flash load address
 
-`0` means different things on different pins, so read this before writing it:
+`app_flash_load_addr` is the first flash address above the part's
+bootloader-reserved region, where neuralSPOT-X programs application
+images. hpx uses it only as a fallback for flashing the dedicated
+power-measurement binary when the generated `flash_cmds.jlink` recipe is
+missing; when the recipe exists it wins, and a disagreement between the two
+logs `DECLARED FLASH ADDRESS IGNORED` naming both. Investigate that warning
+rather than filter it: it means the build and the declaration disagree
+about which part this is.
 
-- `default_state_gpio_pin: 0` and `default_go_gpio_pin: 0` **disable that
-  wire**, degrading the 3-wire lock-step handshake to the 1-wire gate-only
-  form. That is the documented sentinel for those pins.
-- `ble_reset_gpio_pin: 0` is **rejected**. That field says "no onboard radio"
-  by being absent, so `0` could equally mean the sentinel above or pad 0 — and
-  both readings quietly spoil a measurement (an unrelated pad driven low, or a
-  radio left free-running and reading high). Omit the key, or write `null`.
+- `based_on: <soc>` inherits the address with everything else; the usual
+  case.
+- Set it explicitly when the bootloader reservation differs from the part
+  you based on.
+- A custom SoC with neither `based_on` nor `app_flash_load_addr` has no
+  address, and hpx refuses the fallback flash rather than guess one from
+  `family`, which records a core tier, not a memory map. Writing
+  `app_flash_load_addr: null` explicitly is the same refusal and overrides
+  inheritance.
 
-`starter_profile_board` lets a custom board reuse the NSX starter-profile module
-graph from a built-in board while keeping its own board ID, channel, sync pin,
-and SoC metadata in HPX.
+The programmatic API has no `based_on`: a `SocDef` you construct for
+`build_platform_registry(socs=...)` carries the address as a field, or
+`soc.capabilities.memory.app_flash_load_addr` is `None`. The
+[platform API reference](../../reference/api/)
+documents `get_soc`, `SocDef` and `build_platform_registry`.
 
-Unrecognized keys are rejected, in `custom_socs`, `custom_boards`, and the
-`memory` block alike. A misspelt key used to be discarded in silence, leaving
-the built-in value in place while the config looked accepted.
+## Expected output
 
-### App flash load address
+`run_metadata.json` records the resolved board, SoC, clock tier and probe
+serial for every run. `hpx boards` prints the registry your installed hpx
+carries; if a board is missing there, a custom entry is the way to add it.
 
-`app_flash_load_addr` is the first flash address above your part's
-bootloader-reserved region — the address NSX programs application images at.
-It is *not* the base of the MRAM region.
+## What next
 
-You rarely need to set it. HPX only uses it as a fallback for one operation
-(flashing the dedicated power-measurement binary when the NSX-generated
-`flash_cmds.jlink` recipe is missing); when that recipe exists it is used
-verbatim and this value is ignored.
-
-"Ignored" is not "unnoticed", though, and the split matters: what you declare
-here is authoritative only on the path where HPX builds the flash command
-itself. Once NSX has baked a recipe, the recipe wins — and whenever the two
-addresses disagree HPX logs a `DECLARED FLASH ADDRESS IGNORED` warning naming
-both. Investigate that warning rather than filtering it. It means the build and
-your declaration disagree about which part this is, and if the *declared*
-address is the right one, then the image is landing at the wrong offset and the
-run's power numbers describe stale firmware.
-
-- `based_on: <soc>` inherits the address of that part, along with everything
-  else. This is the usual case and needs nothing from you.
-- Set it explicitly when your part's bootloader reservation differs from the
-  part you based it on:
-
-    ```yaml
-    target:
-      custom_socs:
-        oem_ap5_variant:
-          based_on: apollo510
-          app_flash_load_addr: 0x22000000
-    ```
-
-    Expect that warning from this entry for as long as the NSX build is still
-    an `apollo510` build, whose recipe bakes `0x00410000` — a normal state
-    during bring-up, and the reason the warning is a warning and not a refusal.
-    The declaration is not lost (it is what the fallback flash would use), but
-    the two cannot both be right about your silicon, so the entry is finished
-    only once NSX is generating a recipe for your part.
-
-- A custom SoC with no `app_flash_load_addr` **and** no `based_on` has no
-  address at all, and HPX will refuse the fallback flash rather than guess one
-  from your `family:` tag. `family` records a core tier here, not a memory map
-  — two parts can share it and load at completely different addresses — and a
-  guessed address is likely enough to be accepted by the silicon while landing
-  your image at the wrong offset. Declare the address, or declare a `based_on`.
-- Writing `app_flash_load_addr: null` explicitly is the same refusal, and it
-  overrides inheritance: use it when you want a `based_on` part's memory and
-  clock facts but do not trust its flash window. Leaving the key out is what
-  inherits.
-
-#### Upgrading an existing config
-
-:::caution[Behaviour change]
-A custom SoC that declares **no `based_on` and no `app_flash_load_addr`**
-used to inherit its family's address. It now resolves to *no address*, and
-the fallback flash refuses to run instead of programming at that inherited
-value. The values that stop being handed out are `0x00410000` (`ap5`),
-`0x00018000` (`ap4`) and `0x0000c000` (`ap3`).
-
-Nothing else changes: an entry with a `based_on` keeps inheriting exactly
-what it inherited before, including the worked example above.
-
-If you hit this, add **one** of these two keys to the `custom_socs` entry
-you already have. Both snippets below are *fragments* — they show the key
-to add, not a config that loads on its own, so keep the rest of the
-entry's platform facts (`family`, `core`, `memory`, `clocks`, ...) exactly
-as they are.
-
-Either name the characterised part to inherit from:
-
-```yaml
-target:
-  custom_socs:
-    my_part:
-      based_on: apollo510
-      # ...the rest of your existing entry, unchanged...
-```
-
-...or state the address yourself:
-
-```yaml
-target:
-  custom_socs:
-    my_part:
-      app_flash_load_addr: 0x00410000
-      # ...the rest of your existing entry, unchanged...
-```
-
-Only pass the old family value verbatim if you have checked it against your
-part's own bootloader reservation. Being handed it unchecked is the failure
-this change exists to close.
-:::
-
-The same applies to the programmatic API. `build_platform_registry(socs=...)`
-takes `SocDef` objects directly and has no `based_on` mechanism at all, so a
-`SocDef` you construct yourself must carry the address as a field:
-
-```python
-from helia_profiler.platform import SocDef, build_platform_registry, get_soc
-
-base = get_soc("apollo510")
-registry = build_platform_registry(
-    socs={
-        "apollo510_custom": SocDef(
-            name="apollo510_custom",
-            # ...platform facts...
-            app_flash_load_addr=0x00410000,  # required; previously implied by `family`
-        )
-    }
-)
-```
-
-Without it, `soc.capabilities.memory.app_flash_load_addr` is `None`. That is
-also true of a `SocDef` built for a test fixture — only the built-in registry
-is treated as characterised.
-
-See [Architecture → Adding an Engine](../../architecture/adding-an-engine/)
-for the analogous engine path.
-
-See the [Platform API reference](../../reference/api/platform/) for the
-full `get_soc` / `SocDef` / `build_platform_registry` documentation.
+[Toolchains](../toolchains/) for the compiler, [Capture transports](../transports/)
+for how data leaves the board, and [Memory placement](../memory/) for the
+memory layout each SoC exposes.

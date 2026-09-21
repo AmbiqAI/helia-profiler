@@ -1,52 +1,113 @@
 ---
-title: "Memory Placement"
-description: "Where you place the tensor arena (activations / scratch space) and the model weights (the .tflite flatbuffer or AOT weight blobs) often matters more than the…"
+title: "Memory placement"
+description: "Where the tensor arena and the model weights live, what each memory tier costs, how automatic placement decides, how to pin and tune placement, and how each engine exposes it."
 ---
 
-Where you place the **tensor arena** (activations / scratch space) and the
-**model weights** (the `.tflite` flatbuffer or AOT weight blobs) often
-matters more than the model itself. heliaPROFILER lets you control both
-explicitly with `arena_location` and `weights_location`. Omit either field to
-let the engine and memory planner choose that placement automatically.
+import BlockDiagram from '../../../components/BlockDiagram.astro';
+import Block from '../../../components/Block.astro';
 
-This guide explains the memory tiers on Ambiq SoCs, how split placement works,
-and how to read the placement decisions in your reports.
+## Purpose
 
----
+Decide where the two big objects of a run live: the tensor arena
+(activations and scratch) and the model weights (the flatbuffer, the AOT
+constant blobs or the PTE program). Placement often changes cycle counts
+more than the model does. This page covers the tiers, the automatic
+policy, the explicit controls, the tuning loop and the engine differences.
 
-## The memory tiers
+## Prerequisites
 
-Ambiq SoCs typically expose four tiers of memory. From fastest to slowest:
+A model that profiles with default placement, so you have a Memory table
+and an `allocated_arena` to start from ([First profile](../../getting-started/first-profile/)).
 
-| Tier        | What it is                                          | Latency          | Where it sits         | Typical size (AP510) |
-|-------------|------------------------------------------------------|------------------|------------------------|----------------------|
-| **TCM**     | Tightly-Coupled Memory — DTCM/ITCM private to the CM55 core | Single-cycle     | Inside the core        | DTCM 512 KB, ITCM 256 KB |
-| **SRAM**    | Shared on-chip SRAM                                  | A few cycles     | On-chip, outside core  | 3 MB                  |
-| **MRAM**    | Non-volatile flash (program + rodata)                | Slowest on-chip  | On-chip, NVM           | 4 MB                  |
-| **PSRAM**   | External pseudo-static RAM                           | External-bus     | Off-chip               | up to 64 MB          |
+## Which tier
 
-Two things to remember:
+| Tier | What it is | Relative latency | Boot-time copy | `arena_location` | `weights_location` |
+|---|---|---|---|---|---|
+| TCM (DTCM) | Tightly coupled memory inside the Cortex-M55 core; AP3 and AP4 parts expose one combined TCM. hpx places data in DTCM only; ITCM is for code. | single-cycle | yes, from flash at boot | `tcm` | `tcm` |
+| SRAM | Shared on-chip SRAM outside the core | a few cycles | yes | `sram` | `sram` |
+| MRAM | On-chip non-volatile memory; program and read-only data | slowest on chip | no; read in place | not allowed | `mram` |
+| PSRAM | External pseudo-static RAM over the external bus | external bus | no; uploaded or written at run time | `psram` | `psram` |
 
-* **TCM is *not* SRAM.** TCM is private to the CM55 core and runs at
-  single-cycle latency. SRAM is shared, on-chip, but lives *outside* the
-  core and is a few cycles slower. Reports keep the two distinct.
-* **MRAM is flash.** Putting weights "in MRAM" means they stay in
-  rodata and are read from non-volatile memory. There's no boot-time
-  copy.
-* **TCM/SRAM placement of weights costs boot-time copy.** When weights
-  live in TCM or SRAM the runtime initialises those sections from NVM at
-  boot. The benchmark numbers don't include that cost, but the binary
-  does include the source bytes.
+Capacities differ per SoC and are registered in
+`src/helia_profiler/platform/soc.py` (`MemoryLayout`: `dtcm_kb`, `sram_kb`,
+`mram_kb`, `psram_kb`, with some boards overriding `psram_kb`). The run
+report prints the capacity next to the usage for every region, which is
+the number to trust for your board.
 
-> AP3 / AP4 boards expose a single combined TCM region; AP510 splits it
-> into DTCM (data) and ITCM (instructions). heliaPROFILER only places
-> data in DTCM — ITCM is reserved for code.
+## The memory plan
 
----
+<BlockDiagram
+  title="Memory planning"
+  caption="Consumers on the left are placed into the regions on the right by the planner or by the two placement keys."
+  flow="row"
+>
+  <Block label="Consumers" tone="muted" flow="column">
+    <Block label="Arena" sublabel="activations, scratch" emphasis="filled" />
+    <Block label="Weights" sublabel="flatbuffer, blobs, PTE" emphasis="filled" />
+    <Block label="Firmware" sublabel="stack, heap, BSS slack" emphasis="filled" />
+  </Block>
+  <Block label="Planner" sublabel="fastest fit, arena first" tone="accent" />
+  <Block label="Regions" tone="muted" flow="column">
+    <Block label="DTCM" emphasis="filled" />
+    <Block label="SRAM" emphasis="filled" />
+    <Block label="MRAM" emphasis="filled" />
+    <Block label="PSRAM" sublabel="opt-in only" emphasis="dashed" />
+  </Block>
+</BlockDiagram>
 
-## Split placement controls
+The same structure as a list, for readers of the Markdown rendition:
 
-Use the explicit split controls when placement is part of the experiment:
+- Consumers
+  - Arena: activations, scratch
+  - Weights: flatbuffer, blobs, PTE
+  - Firmware: stack, heap, BSS slack
+- Planner: fastest fit, arena first
+- Regions
+  - DTCM
+  - SRAM
+  - MRAM
+  - PSRAM: opt-in only
+
+## Steps
+
+### 1. Read what automatic placement chose
+
+Run with no placement keys and read the terminal report. It prints a
+measured table per region (used, reserved, free, from the linked ELF
+against the SoC's verified windows); the planning table replaces it only
+when the measured view is unavailable, for instance on a custom SoC:
+
+```text
+Memory (measured) (gnu link):          # captured on atomiq110_fpga_turbo; capacities are that SoC's
+  DTCM     16.3 KB   479.7 KB  of 496.0 KB   3%   Reserved 479.7 KB
+  MRAM     45.0 KB   3.9 MB    of 3.9 MB     1%
+```
+
+`summary.json` carries both: `memory_regions` (measured) and `memory_plan`
+(the pre-build decision with `regions[]`, each with `region`, `capacity`,
+`used` and named `consumers`). `memory.allocated_arena` is what the
+firmware actually used of the arena you requested.
+
+```bash
+python -c "import json; d=json.load(open('results/summary.json')); print(d['memory']['allocated_arena'], d['memory_plan']['regions'])"
+```
+
+### 2. Understand the policy
+
+With both keys omitted the interpreter engines use a greedy fastest-fit
+policy with the arena placed before the weights, walking down the tiers:
+
+1. Both arena and weights fit in TCM: both go to TCM.
+2. Otherwise arena in TCM, weights in SRAM (or MRAM if SRAM is full).
+3. Otherwise arena in SRAM, weights in MRAM.
+4. Otherwise the placement validator reports an overflow before any build.
+
+The arena wins ties because every inference touches it; weights stream
+once per layer and gain less from a single-cycle tier. A slack budget is
+reserved in TCM and SRAM for stack, heap and BSS so the firmware still
+links. Automatic placement never chooses PSRAM.
+
+### 3. Pin placement
 
 ```yaml
 model:
@@ -60,55 +121,56 @@ model:
 hpx profile model.tflite --arena-location tcm --weights-location mram
 ```
 
-`arena_location` accepts `tcm`, `sram`, or `psram`. `weights_location` accepts
-`tcm`, `sram`, `mram`, or `psram`. Split placement makes the policy explicit:
-the arena is mutable activation/scratch storage, while weights are the model
-flatbuffer or read-only constants. To place both objects in one region, set
-both fields to that region.
+`arena_location` accepts `tcm`, `sram` or `psram`; `weights_location`
+accepts `tcm`, `sram`, `mram` or `psram`. Pin both to one region to place
+both objects together. Pin placement whenever a comparison must not drift:
+a small model-size change can otherwise cross a tier boundary between two
+runs and the delta is the tier, not the change you made.
 
----
+### 4. Compare placements fairly
 
-## How automatic placement decides
+Hold every other axis constant and flip only the placement keys:
 
-When both fields are omitted, runtime engines use a **greedy fastest-fit policy,
-with the arena prioritised over weights**.
-It walks down the memory hierarchy and places things where they fit:
+```bash
+hpx profile model.tflite --arena-location tcm --weights-location tcm  --output-dir results/place_tcm_tcm
+hpx profile model.tflite --arena-location tcm --weights-location mram --output-dir results/place_tcm_mram
+hpx compare results/place_tcm_tcm results/place_tcm_mram
+```
 
-1. If both arena and weights fit in TCM → both go in TCM.
-2. Else, arena in TCM, weights in SRAM (or MRAM if SRAM is full).
-3. Else, arena in SRAM, weights in MRAM.
-4. Else (arena doesn't fit anywhere fast) → MRAM weights, SRAM arena, and
-   you'll see a memory-overflow error from the placement validator.
+Read the result as a ratio ("weights in MRAM cost about this much more on
+this model") rather than as absolute counts; the ratio transfers between
+benches, the counts do not. The TCM-versus-MRAM gap is the cost of running
+weights from flash. For power experiments, weights in TCM may let the SoC
+power-gate MRAM during inference; compare the captured traces.
 
-The arena gets the faster region on ties because it's accessed every
-inference cycle, whereas weights are streamed once per layer and benefit
-less from a single-cycle hit.
+### 5. Tighten the arena
 
-Automatic placement **never** chooses PSRAM — you opt in explicitly with
-`weights_location: psram` or `--weights-location psram`. How the data then
-reaches PSRAM depends on the engine:
+`arena_size` is a request. Unset, the interpreter engines and heliaAOT use
+`DEFAULT_ARENA_SIZE_BYTES`, 256 KiB (`config/__init__.py`); ExecuTorch
+takes the sidecar's `planned_arena_size` when present. After a representative run, set it a little
+above the reported `allocated_arena` (the existing guidance in this
+repository ranges from 1.15x to 1.5x depending on input variation), run
+again, and confirm `allocated_arena` did not move and no region is over
+capacity.
 
-- **tflm / helia-rt** — the firmware initialises PSRAM, signals the host, and
-  the host uploads the model flatbuffer over J-Link (this path requires
-  `transport: rtt`).
-- **helia-aot** — the firmware writes its own flash-resident constant blobs
-  into PSRAM at boot; no host upload and no transport requirement. This path
-  only exists in external-arena mode, so PSRAM placement additionally requires:
+### 6. PSRAM
 
-  ```yaml
-  engine:
-    type: helia-aot
-    config:
-      aot_args:
-        memory:
-          allocate_arenas: false
-  ```
+PSRAM is opt-in with `weights_location: psram` (or `--weights-location
+psram`). How the data gets there depends on the engine:
 
-  Without it preflight refuses the run — under the default the generated
-  firmware would contain no PSRAM code at all while the memory plan claims
-  tensors live there.
+- `tflm` and `helia-rt`: the firmware initialises PSRAM and signals the
+  host, which uploads the model over J-Link. This path requires
+  `transport: rtt`.
+- `helia-aot`: the firmware writes its own flash-resident constant blobs
+  into PSRAM at boot, with no host upload and no transport requirement.
+  The path exists only in external-arena mode, so PSRAM placement also
+  requires `engine.config.aot_args.memory.allocate_arenas: false`;
+  otherwise preflight refuses the run, because the generated firmware would
+  contain no PSRAM code while the plan claims tensors live there.
 
-When using PSRAM, select its interface clock explicitly under the target:
+Select the PSRAM interface clock under the target; hpx validates the
+choice and the resolved neuralSPOT-X board module rejects clocks the part
+does not offer. The default is `48000000` (`PsramConfig.clock_hz`):
 
 ```yaml
 target:
@@ -117,144 +179,70 @@ target:
     clock_hz: 125000000
 ```
 
-HPX reports the initialized capacity, clock, XIP state, timing status, and RXDQS
-delay in `summary.json`, `run_metadata.json`, and the terminal memory panel. The
-default remains 48 MHz. Supported clock choices are validated by HPX, while the
-resolved NSX board module rejects choices unavailable on that specific target.
+hpx reports the initialised capacity, clock, XIP state, timing status and
+RXDQS delay in `summary.json`, `run_metadata.json` and the terminal memory
+panel.
 
-A slack budget is reserved in TCM and SRAM for
-stack, heap, and BSS so the rest of the firmware still builds.
+### 7. What an overflow looks like
 
----
+A placement that does not fit fails before any firmware is built:
 
-## Worked examples (Apollo510)
-
-Apollo510 has DTCM 512 KB, SRAM 3 MB, MRAM 4 MB, PSRAM up to 64 MB.
-
-### Tiny KWS model (~50 KB weights, ~30 KB arena)
-
-```bash
-hpx profile kws.tflite --arena-size 30720
+```text
+Error: Memory plan does not fit:        # an Apollo5-family part; the capacity is that SoC's registry value
+  DTCM: 540672 B used > 524288 B capacity (over by 16384 B)
+  Hint: DTCM is over capacity.  Try one of:
+    * shrink the tensor arena (--arena-size);
+    * pick a less-aggressive arena or weights placement;
+    * move weights to PSRAM (--weights-location psram) if the
+      board has PSRAM;
+    * reduce model size (quantise / prune); or
+    * pick a larger-memory board.
 ```
 
-Automatic policy → both fit in DTCM with room to spare → arena=TCM,
-weights=TCM. Best-case latency.
+Requesting a region the board does not have (`tcm` on a board without
+DTCM, `psram` with no PSRAM fitted) fails the same way.
 
-### Mid-size vision model (~700 KB weights, 256 KB arena)
+## Placement models
 
-Automatic policy → arena fits in DTCM, weights too big for DTCM → arena=TCM,
-weights=SRAM. Still much faster than MRAM weights.
+| | heliaRT and TFLM | heliaAOT | ExecuTorch |
+|---|---|---|---|
+| Placement unit | one arena, one weights blob | individual tensors (or tensor kinds) | five fixed runtime buffers |
+| Who owns the memory | the interpreter | the generated code; every tensor is a named C object | the caller; the runtime receives five opaque blocks |
+| Configuration | `arena_location`, `weights_location` | the same two keys as coarse control, plus `engine.config.aot_args.memory.tensors` rules over `constant`, `persistent` and `scratch` | `arena_location` (`tcm` or `sram`) for all five, plus `planned_arena_location`, `method_arena_location`, `temporary_arena_location`, `io_location` |
+| Activations | packed in the arena | each tensor placeable | packed into the planned arena at export time; invisible to the firmware |
 
-### Large model (~5 MB weights, 1 MB arena)
+### heliaAOT per-tensor placement
 
-Automatic policy → arena too big for DTCM, fits in SRAM; weights too big for
-SRAM → arena=SRAM, weights=MRAM. Or, opt in to PSRAM with
-`weights_location: psram` to free up SRAM.
+The AOT compiler emits per-tensor section attributes (`PUT_IN_DTCM`,
+`PUT_IN_SRAM` and so on). The two placement keys give coarse control:
+arena placement covers scratch and persistent tensors, weights placement
+covers constants. `engine.config.aot_args.memory.tensors` rules over
+`constant`, `persistent` and `scratch` override the coarse keys.
 
----
+### ExecuTorch buffers
 
-## Reading placement in reports
-
-The run report's **Memory Plan** table lists every consumer (arena, model
-weights, AOT per-tensor allocations) by physical region (DTCM, SRAM,
-MRAM, PSRAM) along with the SoC's capacity. Overflow triggers an early
-`PlatformError` *before* firmware is built, with a hint pointing at the
-knobs you can turn.
-
-```
-Memory plan (tflm):
-  DTCM     65,536 /  512,000 B (12.8%)
-  SRAM     50,176 / 3,145,728 B ( 1.6%)
-  MRAM          0 / 4,194,304 B ( 0.0%)
-```
-
-In this run, the planner decided arena fits in DTCM (the 65 KB row) and the
-model flatbuffer (50 KB) goes in SRAM.
-
----
-
-## When to override automatic placement
-
-* **Repeatable benchmarks across configs:** pin to `tcm` or `mram` so a
-  small model-size change doesn't cross a tier boundary mid-experiment.
-* **Compare placement effects:** run the same model with `--arena-location
-  tcm --weights-location tcm` vs `--arena-location tcm --weights-location mram`
-  and diff the cycle counts. The TCM-vs-MRAM gap is the cost of running weights
-  from flash.
-* **Power experiments:** weights in TCM may let the SoC power-gate MRAM
-  during inference. Use `--arena-location tcm --weights-location tcm` and compare Joulescope
-  traces.
-* **Large models:** `--weights-location psram` is the option once weights exceed
-  SRAM capacity.
-
----
-
-## Engine-specific notes
-
-* **heliaRT / TFLM** (interpreter): a single tensor arena holds all
-  activations; weights are the model flatbuffer. Both can be steered by
-  `arena_location` and `weights_location`.
-* **heliaAOT**: the AOT compiler emits per-tensor section attributes
-  (`PUT_IN_DTCM`, `PUT_IN_SRAM`, …). The split fields provide coarse placement:
-  arena placement controls scratch/persistent tensors and weights placement
-  controls constants. Use
-  `engine.config.aot_args.memory.tensors` to specify `constant`, `persistent`,
-  and `scratch` placement more precisely; those rules override the coarse fields.
-* **ExecuTorch**: the runner owns five static RAM buffers — the memory-planned
-  (activation) arena, method arena, temporary arena, and the input/output
-  buffers. `arena_location` (tcm or sram only) places all of them; each can be
-  moved individually with `engine.config.planned_arena_location`,
-  `method_arena_location`, `temporary_arena_location`, and `io_location`
-  (e.g. planned arena in DTCM for speed, the cold-after-load method arena and
-  large I/O buffers in SRAM). `weights_location` places the PTE program.
-  Splitting *within* the planned arena (per-tensor, heliaAOT-style) is not
-  supported yet; the exporter pins the PTE to a single memory-planned buffer.
-
----
-
-## Placement models: heliaAOT vs ExecuTorch
-
-The two engines expose placement at different granularities because they own
-memory differently. This is deliberate, not an inconsistency:
-
-| | heliaAOT | ExecuTorch |
-|---|---|---|
-| Placement unit | individual **tensors** (or tensor kinds) | five fixed **runtime buffers** |
-| Who owns the memory | the generated code — every tensor is a named C object | the caller — the runtime receives five opaque blocks |
-| Config surface | `engine.config.aot_args.memory.tensors` rules over `constant` / `persistent` / `scratch` | flat keys: `planned_arena_location`, `method_arena_location`, `temporary_arena_location`, `io_location` |
-| Where placement is enacted | AOT compiler emits per-tensor section attributes into generated C | HPX firmware template attributes each static buffer |
-| Activations | each activation tensor individually placeable | packed into the single planned arena **at export time**; individual tensors are invisible to the firmware |
-
-Rough vocabulary mapping: heliaAOT `scratch` ≈ ExecuTorch planned +
-temporary arenas; `persistent` ≈ (loosely) the method arena; `constant` ≈
-the PTE program, placed with `weights_location` like every other engine.
-
-Why the ceiling differs: heliaAOT is a code generator, so every tensor
-exists as a symbol the compiler can attribute. ExecuTorch is an interpreter
-with caller-owned arenas — the export-time memory planner bakes each
-activation's *offset within the planned arena* into the PTE, so the
-firmware's finest placement unit is that arena as a whole. A per-tensor rule
-language for ExecuTorch would promise control the engine cannot deliver.
-
-Practical guidance: only the planned arena is touched by every kernel on
-every inference, so it is the one buffer that rewards DTCM. Place it in
-`tcm`, leave the load-time method arena, kernel-scratch temporary arena, and
-once-per-inference I/O buffers in `sram`. Measured on `apollo510_evb`, that
-split recovered ~2.3% end-to-end versus an all-SRAM workspace — with a
-planned arena that fits DTCM only because the other buffers no longer have
-to move with it.
-
-Planned convergence: ExecuTorch's memory planner natively supports multiple
-memory-planned buffers, so a future export option can partition activations
-across two planned arenas (hot/small → DTCM, large → SRAM) — per-tensor
-placement decided at export by helia-torch, with HPX still placing whole
-buffers. Tracked in
+Only the planned arena is touched by every kernel on every inference, so
+it is the one buffer that rewards DTCM; the method arena (cold after
+load), the temporary arena (kernel scratch) and the I/O buffers (one copy
+per inference) belong in SRAM. Rough vocabulary: heliaAOT `scratch` is
+roughly the planned plus temporary arenas, `persistent` roughly the method
+arena, `constant` the PTE program placed by `weights_location`. Per-tensor
+placement inside the planned arena is not available: the export-time
+planner bakes each activation's offset into the PTE, so the firmware's
+finest unit is that arena. ExecuTorch's planner supports several planned
+buffers, so a future export option could split activations across two
+arenas; tracked in
 [nsx-executorch#3](https://github.com/AmbiqAI/nsx-executorch/issues/3).
 
----
+## Expected output
 
-## See also
+A run whose report shows every region under capacity, an `allocated_arena`
+that matches the request with a little headroom, and `run_metadata.json`
+recording the resolved placement so a comparison can prove both runs used
+the same one.
 
-* [`hpx profile` reference](../../reference/profile/) — full CLI flags
-* [Boards and SoCs](../boards/) — per-SoC memory capacities
-* [Engines](../engines/) — heliaRT vs heliaAOT trade-offs
+## What next
+
+[Engines](../engines/) for the engine whose placement model you are
+using; the [Python API](../../reference/api/) for the placement types when
+you script runs.
