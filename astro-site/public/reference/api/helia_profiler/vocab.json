@@ -3,12 +3,12 @@
   "generatedFrom": {
     "tool": "pyref",
     "version": "1.7.3",
-    "sourceTree": "17bfdf5c68d6c73c3d22f7afb063ac9cd722152f"
+    "sourceTree": "d8fc7a994d8f2b900482cdc6119d92751a2b7315"
   },
   "language": "python",
   "modules": [
     {
-      "description": "The fixed vocabularies a configuration selects from: engines, toolchains, capture transports, memory placements and reset strategies.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`\n\nGenerated from the `src/helia_profiler` tree `17bfdf5c68d6c73c3d22f7afb063ac9cd722152f`.",
+      "description": "The fixed vocabularies a configuration selects from: engines, toolchains, capture transports, memory placements and reset strategies.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`\n\nGenerated from the `src/helia_profiler` tree `d8fc7a994d8f2b900482cdc6119d92751a2b7315`.",
       "name": "vocab",
       "path": "helia_profiler.vocab",
       "submodules": [],
