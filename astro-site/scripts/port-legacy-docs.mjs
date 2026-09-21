@@ -74,6 +74,9 @@ const SKIP = [
   'guides/index.md',
   'guides/memory-placement-tuning.md',
   'guides/executorch-ns-kernels.md',
+  /* Rewritten by the Measure revamp (#341). */
+  'guide/power.md',
+  'guide/pmu-counters.md',
 ];
 
 /*
@@ -114,6 +117,13 @@ const PRESERVE = [
   'guide/memory.mdx',
   'guide/executorch-ns-kernels.mdx',
   'guide/configuration.mdx',
+  /* Authored by the Measure revamp (#341). */
+  'guide/pmu-counters.mdx',
+  'guide/power.mdx',
+  'guide/power-joulescope.mdx',
+  'guide/power-ina228.mdx',
+  'guide/power-windows.mdx',
+  'guide/power-verify.mdx',
 ];
 
 const BASE = '/helia-profiler/';
