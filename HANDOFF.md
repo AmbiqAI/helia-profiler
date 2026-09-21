@@ -224,3 +224,22 @@ Record the run links on #325 when they exist.
 - Shared stash across worktrees: WIP commits, never a bare stash.
 - Scratchpad read-only checkouts (may vanish): `hpx-main-audit` (a822b51),
   `helia-ui-audit` (alpha.14), `helia-rt-audit`.
+
+## CLI, configuration and issue-code reference (#331)
+
+- Extractors in `tools/docs/` (`extract_cli.py`, `extract_schema.py`,
+  `extract_issues.py`, `check_reference.py`, `source_audit.py`); never in the
+  wheel (`tools/verify_distribution.py` asserts it). They take
+  `--source-tree` from the build chain and stamp it as provenance; paths are
+  POSIX on every platform.
+- `npm run cli-reference:build` (in `prepare:docs`) writes `cli.json`,
+  `schema.json`, `issues.json` to `src/data/` and `public/reference/…`, 13
+  CLI pages plus configuration and issue codes through `Ref*` parts, and a
+  Markdown rendition per page from the same mapping (`src/lib/reference-cli.mjs`).
+- Drift gate: `check_reference.py --check` runs in `docs.yml` BEFORE
+  `prepare:docs`, semantic comparison only. `check:reference` also runs the
+  CLI stale check. Anchor ids are slugs; off-switch options are published.
+- Reference sidebar order: Overview, Command line, Configuration, Issue codes,
+  Python API, Compatibility baseline, Wire protocol.
+- Redirects: the 14 CLI/config/issue-code legacy routes resolve; deferred is
+  now empty, so `DOCS_REQUIRE_NO_DEFERRED` can be turned on at cutover (#322).

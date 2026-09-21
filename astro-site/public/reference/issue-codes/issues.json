@@ -1,0 +1,394 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue-codes",
+  "generatedFrom": {
+    "sourceTree": "17bfdf5c68d6c73c3d22f7afb063ac9cd722152f",
+    "helia_profiler": "0.1.6",
+    "typer": "0.26.8",
+    "click": "8.3.3",
+    "pydantic": "2.13.4"
+  },
+  "counts": {
+    "issues": 27,
+    "comparability": 8,
+    "families": 3,
+    "familyCodes": 25
+  },
+  "issues": [
+    {
+      "code": "firmware.model_identity_unverifiable",
+      "description": "The firmware's reported model size is not an integer, so the model identity check could not run; no mismatch is not evidence of a match.",
+      "severity": "warning",
+      "modeDependent": false,
+      "internalSeverity": null,
+      "externalSeverity": null,
+      "metricGroup": null
+    },
+    {
+      "code": "firmware.model_mismatch",
+      "description": "The model the firmware reports executing is not the model HPX sent; every measurement in the run belongs to an unknown graph.",
+      "severity": "error",
+      "modeDependent": false,
+      "internalSeverity": null,
+      "externalSeverity": null,
+      "metricGroup": null
+    },
+    {
+      "code": "pmu.counter_overflow",
+      "description": "One or more PMU counters overflowed during capture.",
+      "severity": "error",
+      "modeDependent": false,
+      "internalSeverity": null,
+      "externalSeverity": null,
+      "metricGroup": null
+    },
+    {
+      "code": "pmu.missing",
+      "description": "The run has no PMU result.",
+      "severity": "error",
+      "modeDependent": false,
+      "internalSeverity": null,
+      "externalSeverity": null,
+      "metricGroup": null
+    },
+    {
+      "code": "power.gate_below_minimum",
+      "description": "Measured power gate is shorter than the minimum accepted window.",
+      "severity": "error",
+      "modeDependent": false,
+      "internalSeverity": null,
+      "externalSeverity": null,
+      "metricGroup": null
+    },
+    {
+      "code": "power.gate_duration_mismatch",
+      "description": "Measured power-gate duration does not agree with the expected window.",
+      "severity": "warning",
+      "modeDependent": false,
+      "internalSeverity": null,
+      "externalSeverity": null,
+      "metricGroup": null
+    },
+    {
+      "code": "power.gate_duration_unverifiable",
+      "description": "Power-gate duration cannot be verified because clean inference timing is invalid.",
+      "severity": "warning",
+      "modeDependent": false,
+      "internalSeverity": null,
+      "externalSeverity": null,
+      "metricGroup": null
+    },
+    {
+      "code": "power.gate_edges_missing",
+      "description": "GPIO-gated power capture is missing a gate edge.",
+      "severity": "error",
+      "modeDependent": false,
+      "internalSeverity": null,
+      "externalSeverity": null,
+      "metricGroup": null
+    },
+    {
+      "code": "power.gate_not_lowered",
+      "description": "Power firmware did not confirm GATE low.",
+      "severity": "error",
+      "modeDependent": false,
+      "internalSeverity": null,
+      "externalSeverity": null,
+      "metricGroup": null
+    },
+    {
+      "code": "power.observation_degraded",
+      "description": "Power observation is diagnostic and not valid for efficiency metrics.",
+      "severity": "warning",
+      "modeDependent": false,
+      "internalSeverity": null,
+      "externalSeverity": null,
+      "metricGroup": null
+    },
+    {
+      "code": "power.observation_invalid",
+      "description": "Power observation integrity is invalid.",
+      "severity": "error",
+      "modeDependent": false,
+      "internalSeverity": null,
+      "externalSeverity": null,
+      "metricGroup": null
+    },
+    {
+      "code": "power.observation_missing",
+      "description": "Power observation is missing.",
+      "severity": "error",
+      "modeDependent": false,
+      "internalSeverity": null,
+      "externalSeverity": null,
+      "metricGroup": null
+    },
+    {
+      "code": "power.on_device_count_mismatch",
+      "description": "On-device measurement count differs from completed work.",
+      "severity": "error",
+      "modeDependent": false,
+      "internalSeverity": null,
+      "externalSeverity": null,
+      "metricGroup": null
+    },
+    {
+      "code": "power.on_device_measurement_missing",
+      "description": "Internal power mode has no on-device measurement.",
+      "severity": "error",
+      "modeDependent": false,
+      "internalSeverity": null,
+      "externalSeverity": null,
+      "metricGroup": null
+    },
+    {
+      "code": "power.on_device_overflow",
+      "description": "On-device power monitor reported accumulator overflow.",
+      "severity": null,
+      "modeDependent": true,
+      "internalSeverity": "error",
+      "externalSeverity": "warning",
+      "metricGroup": null
+    },
+    {
+      "code": "power.plan_count_mismatch",
+      "description": "Power firmware requested count differs from the host plan.",
+      "severity": "error",
+      "modeDependent": false,
+      "internalSeverity": null,
+      "externalSeverity": null,
+      "metricGroup": null
+    },
+    {
+      "code": "power.terminal_error",
+      "description": "Power firmware reported an error.",
+      "severity": "error",
+      "modeDependent": false,
+      "internalSeverity": null,
+      "externalSeverity": null,
+      "metricGroup": null
+    },
+    {
+      "code": "power.terminal_incomplete",
+      "description": "Power firmware completed a different inference count than requested.",
+      "severity": "error",
+      "modeDependent": false,
+      "internalSeverity": null,
+      "externalSeverity": null,
+      "metricGroup": null
+    },
+    {
+      "code": "power.terminal_missing",
+      "description": "Dedicated power firmware did not publish terminal status.",
+      "severity": "error",
+      "modeDependent": false,
+      "internalSeverity": null,
+      "externalSeverity": null,
+      "metricGroup": null
+    },
+    {
+      "code": "power.window_clock_exceeds_host_time",
+      "description": "Firmware-reported window is longer than the host wall time that contained it.",
+      "severity": "warning",
+      "modeDependent": false,
+      "internalSeverity": null,
+      "externalSeverity": null,
+      "metricGroup": null
+    },
+    {
+      "code": "power.window_clock_frozen",
+      "description": "Power firmware reported zero elapsed time for completed inferences.",
+      "severity": null,
+      "modeDependent": true,
+      "internalSeverity": "error",
+      "externalSeverity": "warning",
+      "metricGroup": null
+    },
+    {
+      "code": "power.window_clock_mismatch",
+      "description": "Firmware-reported window duration does not agree with the independently measured window.",
+      "severity": "warning",
+      "modeDependent": false,
+      "internalSeverity": null,
+      "externalSeverity": null,
+      "metricGroup": null
+    },
+    {
+      "code": "power.window_observer_mismatch",
+      "description": "The instrument-timed gate and the firmware's own window clock disagree about the same physical window.",
+      "severity": "error",
+      "modeDependent": false,
+      "internalSeverity": null,
+      "externalSeverity": null,
+      "metricGroup": "power"
+    },
+    {
+      "code": "profile.clean_window_check_inoperative",
+      "description": "The clean window's partial-stall check could not run; absence of stalls is not evidence of a healthy window.",
+      "severity": "warning",
+      "modeDependent": false,
+      "internalSeverity": null,
+      "externalSeverity": null,
+      "metricGroup": null
+    },
+    {
+      "code": "profile.clean_window_clock_rate_low",
+      "description": "The clean window's cycle counter ran far below its expected rate, measured against an independent clock.",
+      "severity": "warning",
+      "modeDependent": false,
+      "internalSeverity": null,
+      "externalSeverity": null,
+      "metricGroup": null
+    },
+    {
+      "code": "profile.clean_window_frozen",
+      "description": "The clean window completed inferences in zero elapsed time; the clock timing it never advanced.",
+      "severity": "warning",
+      "modeDependent": false,
+      "internalSeverity": null,
+      "externalSeverity": null,
+      "metricGroup": null
+    },
+    {
+      "code": "profile.clean_window_stalled",
+      "description": "The clean-inference window's cycle counter stalled; derived timings understate the true per-inference time.",
+      "severity": "warning",
+      "modeDependent": false,
+      "internalSeverity": null,
+      "externalSeverity": null,
+      "metricGroup": null
+    }
+  ],
+  "comparability": [
+    {
+      "code": "identity.model_mismatch",
+      "severity": "blocking",
+      "description": "Model SHA-256 differs; run-level performance deltas are not comparable.",
+      "metricGroup": null
+    },
+    {
+      "code": "metric.power_integrity_invalid",
+      "severity": "metric_blocking",
+      "description": "Power metrics omitted because a power result's integrity is not valid.",
+      "metricGroup": "power"
+    },
+    {
+      "code": "result.degraded",
+      "severity": "informative",
+      "description": "A result is degraded; affected metrics should be interpreted cautiously.",
+      "metricGroup": null
+    },
+    {
+      "code": "result.incomplete",
+      "severity": "blocking",
+      "description": "A result bundle is not complete; no comparison is possible.",
+      "metricGroup": null
+    },
+    {
+      "code": "result.invalid",
+      "severity": "blocking",
+      "description": "A result is invalid and cannot be compared.",
+      "metricGroup": null
+    },
+    {
+      "code": "result.invalid_pmu_overflow",
+      "severity": "blocking",
+      "description": "A legacy result without a manifest has PMU counter overflow.",
+      "metricGroup": null
+    },
+    {
+      "code": "topology.layer_count_mismatch",
+      "severity": "layer_blocking",
+      "description": "Per-layer deltas omitted because layer counts differ.",
+      "metricGroup": null
+    },
+    {
+      "code": "topology.operation_sequence_mismatch",
+      "severity": "layer_blocking",
+      "description": "Per-layer deltas omitted because operation sequences differ.",
+      "metricGroup": null
+    }
+  ],
+  "families": [
+    {
+      "pattern": "metric.power_<dimension>_mismatch",
+      "severity": "metric_blocking",
+      "description": "Power metrics omitted because a power comparison dimension differs between the runs.",
+      "metricGroup": "power",
+      "dimensions": [
+        "power_scope",
+        "power_mode",
+        "power_firmware",
+        "power_monitor",
+        "power_lockstep",
+        "power_clean_window_probe",
+        "power_clean_workload",
+        "power_firmware_fingerprint"
+      ],
+      "codes": [
+        "metric.power_power_scope_mismatch",
+        "metric.power_power_mode_mismatch",
+        "metric.power_power_firmware_mismatch",
+        "metric.power_power_monitor_mismatch",
+        "metric.power_power_lockstep_mismatch",
+        "metric.power_power_clean_window_probe_mismatch",
+        "metric.power_power_clean_workload_mismatch",
+        "metric.power_power_firmware_fingerprint_mismatch"
+      ]
+    },
+    {
+      "pattern": "metric.memory_<dimension>_mismatch",
+      "severity": "metric_blocking",
+      "description": "Per-region memory metrics omitted because a memory comparison dimension differs between the runs.",
+      "metricGroup": "memory",
+      "dimensions": [
+        "link_family"
+      ],
+      "codes": [
+        "metric.memory_link_family_mismatch"
+      ]
+    },
+    {
+      "pattern": "dimension.<dimension>_differs",
+      "severity": "informative",
+      "description": "A comparison dimension differs between the runs; deltas remain comparable but should be read in that light.",
+      "metricGroup": null,
+      "dimensions": [
+        "hpx_version",
+        "engine",
+        "board",
+        "soc",
+        "cpu_clock",
+        "toolchain",
+        "compiler_version",
+        "system_clock_hz",
+        "run_summary_schema_version",
+        "run_metadata_schema_version",
+        "transport",
+        "arena_location",
+        "weights_location",
+        "engine_version",
+        "architecture_flags",
+        "engine_backend"
+      ],
+      "codes": [
+        "dimension.hpx_version_differs",
+        "dimension.engine_differs",
+        "dimension.board_differs",
+        "dimension.soc_differs",
+        "dimension.cpu_clock_differs",
+        "dimension.toolchain_differs",
+        "dimension.compiler_version_differs",
+        "dimension.system_clock_hz_differs",
+        "dimension.run_summary_schema_version_differs",
+        "dimension.run_metadata_schema_version_differs",
+        "dimension.transport_differs",
+        "dimension.arena_location_differs",
+        "dimension.weights_location_differs",
+        "dimension.engine_version_differs",
+        "dimension.architecture_flags_differs",
+        "dimension.engine_backend_differs"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,94 @@
+---
+/**
+ * Every `hpx.yml` key, from the JSON Schema the config models generate.
+ *
+ * The sections are the dotted keys a file actually nests under, so the reader
+ * sees `power.monitor`, not the class name that implements it; the class is
+ * the anchor and the signature, because that is what the API reference and the
+ * error messages call it.
+ */
+import RefMembers from '@ambiqai/helia-ui/astro/RefMembers';
+import RefParams from '@ambiqai/helia-ui/astro/RefParams';
+import RefSection from '@ambiqai/helia-ui/astro/RefSection';
+import RefSymbol from '@ambiqai/helia-ui/astro/RefSymbol';
+
+import schema from '../data/schema.json';
+import {
+  classDescription,
+  configurationEntries,
+  fieldCount,
+  fieldRows,
+} from '../lib/reference-cli.mjs';
+
+const entries = configurationEntries(schema);
+const enums = Object.entries(schema['x-hpx'].enums);
+---
+
+<p>
+  {schema.counts.declaredFields} keys across {schema.counts.classes} models. Every model
+  sets <code>extra="forbid"</code>, so an unknown key is a validation error rather than a
+  silent no-op.
+</p>
+
+<RefMembers
+  label="Sections"
+  items={entries.map((entry) => ({
+    id: entry.cls,
+    name: entry.name,
+    kind: 'class',
+    summary: `${fieldCount(schema, entry.cls)} keys`,
+  }))}
+/>
+
+{
+  entries.map((entry) => (
+    <RefSymbol
+      id={entry.cls}
+      name={entry.name}
+      kind="class"
+      language="python"
+      signature={entry.signature}
+      signatureLanguage="python"
+      summary={classDescription(schema, entry.cls)}
+      level={2}
+    >
+      {!entry.reachable && (
+        <p>
+          Not reachable from <code>ProfileConfig</code>; surfaced through a lookup table.
+        </p>
+      )}
+      <RefSection title="Keys">
+        <RefParams
+          caption={`${entry.cls} keys`}
+          rows={fieldRows(schema, entry.cls)}
+          density="compact"
+          nameLabel="Key"
+        />
+      </RefSection>
+    </RefSymbol>
+  ))
+}
+
+{
+  enums.map(([name, members]) => (
+    <RefSymbol
+      id={name}
+      name={name}
+      kind="enum"
+      language="python"
+      signature={`${name}: ${members.join(' | ')}`}
+      signatureLanguage="python"
+      summary={`Accepted values for every key typed ${name}.`}
+      level={2}
+    >
+      <RefSection title="Values">
+        <RefParams
+          caption={`${name} values`}
+          rows={members.map((member) => ({ name: member, description: '' }))}
+          nameLabel="Value"
+          density="compact"
+        />
+      </RefSection>
+    </RefSymbol>
+  ))
+}

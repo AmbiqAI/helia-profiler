@@ -22,6 +22,14 @@ REQUIRED_PACKAGE_FILES = {
     "helia_profiler/vendor/segger_rtt/RTT/SEGGER_RTT.h",
     "helia_profiler/vendor/segger_rtt/RTT/SEGGER_RTT_ConfDefaults.h",
 }
+#: Directories that must never reach the wheel.
+#:
+#: ``tools/docs`` generates the published CLI, configuration and issue-code
+#: reference. It lives outside ``src`` so that build tooling stays out of the
+#: distribution and out of the documented public API; ``packages.find
+#: where=["src"]`` is what keeps it there, and this is the assertion that the
+#: packaging configuration has not quietly changed.
+EXCLUDED_WHEEL_PREFIXES = ("tools/",)
 OBSOLETE_WHEEL_FILES = {
     "helia_profiler/artifacts.py",
     "helia_profiler/comparability.py",
@@ -87,6 +95,10 @@ def _verify_wheel(wheel: Path, expected_version: str) -> None:
     obsolete = OBSOLETE_WHEEL_FILES & names
     if obsolete:
         raise ValueError(f"Wheel contains obsolete compatibility modules: {sorted(obsolete)}")
+
+    build_tooling = sorted(name for name in names if name.startswith(EXCLUDED_WHEEL_PREFIXES))
+    if build_tooling:
+        raise ValueError(f"Wheel contains build tooling: {build_tooling}")
 
     license_files = {name for name in names if ".dist-info/licenses/" in name}
     required_license_suffixes = {
