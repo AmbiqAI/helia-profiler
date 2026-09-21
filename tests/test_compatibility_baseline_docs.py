@@ -60,7 +60,7 @@ def test_every_baseline_entry_has_a_doc_row_with_its_ref():
         # helia-rt's project ref is documented on the heliaRT engine row.
         row_name = "heliaRT" if name == "helia-rt" else f"`{name}`"
         assert row_name in table, (
-            f"project '{name}' has no row in the compatibility-baseline.md "
+            f"project '{name}' has no row in the compatibility-baseline.mdx "
             "table — update astro-site/src/content/docs/reference/compatibility-baseline.mdx and "
             "src/helia_profiler/data/compatibility-baseline-v1.json together"
         )
@@ -134,7 +134,7 @@ def test_doc_identity_and_code_constants_are_current():
     # and that is exactly the bump-forgets-doc case (#207, mutation l).
     assert data["baseline_id"] in doc, (
         f"the doc headline no longer names the current baseline id "
-        f"'{data['baseline_id']}' -- update compatibility-baseline.md"
+        f"'{data['baseline_id']}' -- update compatibility-baseline.mdx"
     )
 
     # The heliaRT row mirrors the canonical code constants (the JSON side of

@@ -255,7 +255,7 @@ class SocDef:
           by design -- that is the point, see :class:`SocOrigin` -- but so does
           a ``replace`` that *changes the name*, which is the obvious way to
           build a custom ``SocDef`` from a built-in programmatically.  Nothing
-          documents that path -- ``docs/guide/boards.md`` shows a fresh
+          documents that path -- the ``guide/boards`` page shows a fresh
           ``SocDef(...)`` constructor instead, which defaults to
           ``CUSTOM``/``None`` and is safe -- but a caller reaching for
           ``replace`` unprompted is precisely the case a default-safe field

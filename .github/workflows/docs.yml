@@ -158,11 +158,12 @@ jobs:
     name: Deploy the documentation artifact
     needs: build
     # A pull request never reaches this job: it admits the release call, a
-    # docs-only push to main, and a manual dispatch, and nothing else.
+    # docs-only push to main, and a manual dispatch from main (the github-pages
+    # environment deploys from main only), and nothing else.
     if: >-
       github.repository == 'AmbiqAI/helia-profiler' &&
       (inputs.release_publish ||
-      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'push' && github.ref == 'refs/heads/main'))
     runs-on: ubuntu-latest
     timeout-minutes: 10

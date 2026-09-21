@@ -109,14 +109,18 @@ through its narrowing accessor rather than the raw field:
 
 | Accessor | Field | Produced by |
 |---|---|---|
-| `resolved_soc`, `resolved_board` | `soc`, `board` | resolve platform |
-| `prepared_adapter`, `prepared_artifacts` | `engine_adapter`, `engine_artifacts` | prepare engine |
-| `planned_arena_region` | `arena_region` | plan memory |
-| `resolved_firmware_dir`, `resolved_workspace` | `firmware_dir`, `dependency_workspace` | generate firmware |
-| `built_binary_path` | `profile_run.firmware` | build firmware |
-| `captured_pmu` | `profile_run.result` | capture PMU |
+| `resolved_soc` | `soc` | `ResolvePlatformStage` |
+| `resolved_board` | `board` | `ResolvePlatformStage` |
+| `prepared_artifacts` | `engine_artifacts` | `PrepareEngineStage` |
+| `prepared_adapter` | `engine_adapter` | `PrepareEngineStage` |
+| `resolved_firmware_dir` | `firmware_dir` | `GenerateFirmwareStage` |
+| `resolved_workspace` | `dependency_workspace` | `GenerateFirmwareStage` |
+| `built_binary_path` | `binary_path` | `BuildFirmwareStage` |
+| `captured_pmu` | `pmu_result` | `CapturePmuStage` |
+| `planned_arena_region` | `arena_region` | `PlanMemoryStage` |
 
-Each accessor returns the non-optional type and raises `PipelineError`
+`binary_path` and `pmu_result` are the read side of `profile_run.firmware`
+and `profile_run.result`. Each accessor returns the non-optional type and raises `PipelineError`
 naming the field and its producing stage when that stage has not run.
 `tests/test_pipeline.py` rejects any `assert ctx.<field> is not None`
 narrowing in `src/`, because an `assert` is compiled out under `-O` and

@@ -2,7 +2,7 @@
  * Every route the MkDocs site publishes has to keep resolving after cutover.
  *
  * src/data/legacy-routes.json is the fixture of what is published today,
- * generated from a real Zensical build (see scripts/extract-legacy-routes.mjs).
+ * generated from a real Zensical build (see the retired MkDocs nav (frozen in legacy-routes.json at the cutover)).
  * src/data/redirects.json answers it in three ways, and a route that fits none
  * of them fails this check:
  *

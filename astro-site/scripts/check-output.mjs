@@ -167,13 +167,6 @@ for (const route of redirects.served) {
   );
 }
 
-/*
- * Mermaid. The diagrams are rendered at build time by a headless browser, and
- * the failure mode is silent: with the browser missing or the markdown
- * processor swapped back, the fence renders as a code block and the page still
- * builds, still passes every other assertion here and still deploys. So both
- * halves are asserted, the SVG being there and the fence not.
- */
 /* Every flowchart became a decision table or a block diagram (#340, #343) and
  * the mermaid renderer is gone, so a fence that reaches a page can only come
  * out as a code block. */

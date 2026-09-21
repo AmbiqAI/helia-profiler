@@ -19,7 +19,7 @@ comments on #320.
 - `uv lock` strips the `# x-release-please-version` marker from `uv.lock`;
   re-add it on the helia-profiler version line before committing.
 - Check chain, all in `docs.yml`: `build, check, check:links, check:output,
-  check:search, check:redirects, check:reference, check:port, check:guard`.
+  check:search, check:redirects, check:reference, check:guard`.
   `check:output` enforces 250,000 B HTML and 40,000 B gzip per page;
   `check:guard` runs `scripts/*.test.mjs`, including the examples template
   and config-path tests.
