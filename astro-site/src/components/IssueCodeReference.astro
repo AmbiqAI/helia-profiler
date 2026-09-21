@@ -8,6 +8,7 @@
  * prefix for the dimensions whose own name starts with it, so a reader who
  * expands the pattern by hand gets a code that is never emitted.
  */
+import { anchorId } from '../lib/reference-cli.mjs';
 import RefMembers from '@ambiqai/helia-ui/astro/RefMembers';
 import RefParams from '@ambiqai/helia-ui/astro/RefParams';
 import RefSection from '@ambiqai/helia-ui/astro/RefSection';
@@ -34,9 +35,10 @@ const sections = [
     id: 'comparability',
     name: 'Comparability issues',
     summary:
-      'Emitted by hpx compare. Severity governs scope: blocking stops the comparison, ' +
-      'layer_blocking omits per-layer deltas, metric_blocking omits one metric group, ' +
-      'and informative annotates without blocking anything.',
+      'Emitted by hpx compare. Severities in use: ' +
+      [...new Set(issues.comparability.map((issue) => issue.severity))].join(', ') +
+      '. A severity names how much of the comparison the issue withholds; ' +
+      'ComparabilitySeverity in results/issues.py is the contract.',
     rows: issues.comparability.map((issue) => ({
       name: issue.code,
       type: issue.severity,
@@ -100,7 +102,7 @@ const sections = [
 {
   issues.families.map((family) => (
     <RefSymbol
-      id={family.pattern}
+      id={anchorId(family.pattern)}
       name={family.pattern}
       kind="enum"
       language="python"

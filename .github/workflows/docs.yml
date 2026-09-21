@@ -132,6 +132,16 @@ jobs:
       - name: Check the reference for drift
         run: uv run --isolated --no-dev python tools/docs/check_reference.py --check
 
+      - name: Install locked site dependencies
+        working-directory: astro-site
+        run: npm ci
+
+      # prebuild regenerates it too; doing it here puts the griffe version and
+      # the symbol counts in the log before anything can fail downstream.
+      - name: Regenerate the Python reference
+        working-directory: astro-site
+        run: npm run prepare:docs
+
       - name: Build the documentation artifact
         working-directory: astro-site
         env:
