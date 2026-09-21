@@ -163,7 +163,7 @@ def measured_power_fingerprint(ctx: PipelineContext) -> str | None:
     # not-compiled). In the dedicated power binary the profiler's hooks
     # early-return, but its code is linked and its prologue runs in-window —
     # hashing only the main TU let a profiler-template edit reproduce the
-    # #115 shape undetected (#173 review M1). A missing file folds in as
+    # #115 shape undetected (#173). A missing file folds in as
     # "absent": deterministic, and distinct from any present content.
     for name in ("hpx_pmu_profiler.cc", "hpx_pmu_profiler.h"):
         try:

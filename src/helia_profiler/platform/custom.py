@@ -87,9 +87,8 @@ class CustomMemoryField(Enum):
     """Keys accepted inside a ``target.custom_socs.<name>.memory`` mapping.
 
     One per :class:`~helia_profiler.platform.soc.MemoryLayout` size field.  A
-    typo here used to vanish silently and leave the ``based_on`` part's size in
-    place -- and these sizes are the arena/weights capacity checks, so the
-    consequence is a placement that only fails at link time.
+    mistyped key is rejected rather than silently discarded, since these
+    sizes gate the arena/weights capacity checks.
     """
 
     MRAM_KB = "mram_kb"

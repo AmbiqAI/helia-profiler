@@ -209,8 +209,8 @@ def _recipe_load_address(
     # recipe's first directive".  Both accept every recipe that exists in
     # practice — NSX's ``flash_cmds.jlink.in`` emits ``ExitOnError 1`` first,
     # and every NSX-generated recipe observed leads with it — so the two
-    # differ only in what they refuse of a HAND-EDITED recipe, which is the
-    # case this module widened ``_ADDRESSED_LOAD_FILE_RE`` for one round earlier.
+    # differ only in what they refuse of a HAND-EDITED recipe -- the same
+    # shapes ``_ADDRESSED_LOAD_FILE_RE`` accepts.
     # "First directive" additionally refuses a ``Reset`` / ``Halt`` /
     # ``SelectInterface`` preamble that JLinkExe accepts and that leaves the
     # LoadFile fully protected: a hard refusal of a working recipe, the same

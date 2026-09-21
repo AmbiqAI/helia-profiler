@@ -1,19 +1,17 @@
 """Typed model behind ``PowerResult.metadata`` (#154 Phase 2).
 
-``PowerMetadata`` replaces the ``dict[str, Any]`` bag that six writer sites
-used to fill by string key. It follows the ``RunMetadata`` precedent: a plain
-**mutable** dataclass whose optional fields are enriched across pipeline
-stages (capture → publication → terminal collection), holding the existing
-frozen diagnostics dataclasses as objects rather than their flattened dicts.
+``PowerMetadata`` is a plain **mutable** dataclass, not a ``dict[str, Any]``
+bag: its optional fields are enriched across pipeline stages (capture →
+publication → terminal collection), holding the existing frozen diagnostics
+dataclasses as objects rather than their flattened dicts.
 
 Serialization happens once, in :meth:`PowerMetadata.to_metadata_dict`, which
-reproduces the byte-exact key/value surface of the old dict (the report
-golden digests are the referee). Fields default to ``None`` = "never set";
-a boolean ``False`` is a real recorded value and is emitted. The fields
-marked *artifact-only* are written by capture and read by nothing in
-``src/`` except the report passthrough — they exist for the artifact record
-and are documented here so that distinction is visible in one place
-(previously nothing separated load-bearing keys from write-only ones).
+produces a byte-exact key/value dict (the report golden digests are the
+referee). Fields default to ``None`` = "never set"; a boolean ``False`` is a
+real recorded value and is emitted. The fields marked *artifact-only* are
+written by capture and read by nothing in ``src/`` except the report
+passthrough — they exist for the artifact record and are documented here so
+that distinction is visible in one place.
 
 The full key inventory this model must cover is pinned by
 ``tests/contracts/snapshots/power_metadata_census.json``.
@@ -115,7 +113,7 @@ class PowerMetadata:
     #: ``measurement_scope`` is an extension point: registered third-party
     #: drivers may report scopes HPX does not know (a custom gating scheme).
     #: Known values coerce to the enum in ``__post_init__``; unknown strings
-    #: are kept verbatim and classify as not-gated, exactly as before.
+    #: are kept verbatim and classify as not-gated.
     #: ``observation_mode`` and ``integrity`` are HPX-owned closed
     #: vocabularies and coerce strictly.
     measurement_scope: MeasurementScope | str | None = None
@@ -131,8 +129,7 @@ class PowerMetadata:
 
     # -- Typed diagnostics — the objects, not their dicts ------------------
     sync: SyncHandshakeMetadata | None = None
-    #: Assigned only when at least one transition was timed (the old writer
-    #: skipped the key when ``to_metadata()`` came back empty).
+    #: Assigned only when at least one transition was timed.
     sync_timing_s: GateTransitionTiming | None = None
     gate_failure: GateFailure | None = None
     gate_duration_integrity: GateDurationIntegrity | None = None
@@ -168,7 +165,7 @@ class PowerMetadata:
         Emits every non-``None`` field under its historical key; typed
         diagnostics flatten through their own ``to_metadata()``. ``False``
         is a recorded value and is emitted; ``None`` means "never set" and
-        is omitted (matching the old conditional writes).
+        is omitted.
         """
         out: dict[str, Any] = {}
         for f in fields(self):
@@ -190,8 +187,7 @@ class PowerMetadata:
         gate_fall_observed: bool,
         observation_deadline_s: float,
     ) -> None:
-        """Publication-time enrichment (the old ``metadata.update`` block in
-        ``PipelineContext.publish_power_observation``)."""
+        """Enrich metadata with the observation classification at publication."""
         self.observation_mode = observation_mode
         self.integrity = PowerIntegrity(integrity)
         self.gate_rise_observed = gate_rise_observed
@@ -205,10 +201,8 @@ def classify_observation(
     """Derive observation mode, integrity, observed edges, and deadline from
     capture metadata.
 
-    The single source for the classification that previously existed twice
-    with different defaults (``stages/capture_power.py`` vs
-    ``PipelineContext.publish_power_result``): a gated clean-window scope is a
-    valid ``gpio_gated`` observation; anything else is a degraded
+    The single source for this classification: a gated clean-window scope is
+    a valid ``gpio_gated`` observation; anything else is a degraded
     ``free_form`` one. Edge observations default to the scope verdict unless
     the capture recorded them explicitly.
     """

@@ -1,11 +1,10 @@
 """An invalid run blocks the metrics its errors broke, not every metric.
 
-A power run whose gate disagreed with the firmware's own window clock used to
-produce no comparison at all: the INVALID verdict blocked cycles, latency,
-memory and per-layer deltas that no failing check had anything to say about.
-The disagreement is between the host's gate and the device's STIMER window, so
-it confines itself to power — the cycle counts came off a different binary in
-an earlier stage, on a different clock.
+A power run whose gate disagrees with the firmware's own window clock
+confines its INVALID verdict to power: the disagreement is between the
+host's gate and the device's STIMER window, and the cycle counts came off
+a different binary in an earlier stage, on a different clock, so cycles,
+latency, memory and per-layer deltas stay unblocked.
 """
 
 from __future__ import annotations

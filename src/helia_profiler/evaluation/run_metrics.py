@@ -25,10 +25,8 @@ class MetricDiff:
     delta: float | None = None
     delta_pct: float | None = None
     unit: str = ""
-    #: Declared row metadata (#206) -- replaces the name-string hacks that
-    #: used to decide gating (``startswith("power.")``) and direction
-    #: (``name != "layers"``). Not serialized: compare_summary.json's
-    #: metrics[] shape is unchanged.
+    #: Declared gating group and comparison direction (#206). Not
+    #: serialized: compare_summary.json's metrics[] shape is unchanged.
     group: str | None = None
     lower_is_better: bool = True
 

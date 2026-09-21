@@ -190,11 +190,9 @@ def test_reserved_exceeding_bss_is_not_subtracted(tmp_path: Path, monkeypatch) -
 def test_the_live_stack_is_not_treated_as_a_reservation(tmp_path: Path, monkeypatch) -> None:
     """`.stack` is NOBITS and allocated, but it is NOT a reservation.
 
-    An earlier version of this probe matched `.stack` alongside `.heap` and
-    justified it as "never written at runtime". Review showed that is simply
-    false: on every NSX SoC `startup_gcc.c` loads the initial MSP from the top
-    of `.stack` and sets MSPLIM/PSPLIM from its base. It is live memory the
-    firmware needs, so it belongs in the reported footprint.
+    On every NSX SoC `startup_gcc.c` loads the initial MSP from the top
+    of `.stack` and sets MSPLIM/PSPLIM from its base. It is live memory
+    the firmware needs, so it belongs in the reported footprint.
 
     `.heap` is excluded for a different reason -- NSX scripts run it to the
     end of the region rather than sizing it to a requirement, so its size
@@ -239,10 +237,10 @@ def test_a_non_allocated_section_named_like_a_reservation_is_ignored(
 def test_a_region_qualified_heap_name_is_matched(tmp_path: Path, monkeypatch) -> None:
     """`.ram_heap` / `.tcm_heap` are real reservations under a qualified name.
 
-    First-token-only stem matching kept "ram"/"tcm" and silently missed them;
-    review proved it on a real ELF. Matching any dot- or underscore-separated
-    token fixes it, and is safe because the NOBITS+alloc filter has already
-    excluded everything outside `size`'s bss column.
+    Matching any dot- or underscore-separated token catches a
+    region-qualified name like this, not just a first-token-only stem
+    match, and is safe because the NOBITS+alloc filter already excludes
+    everything outside `size`'s bss column.
     """
     berkeley = "text data bss dec hex filename\n32 4 8452 8488 2128 firmware\n"
     readelf = """Section Headers:
@@ -345,10 +343,10 @@ def test_armclang_degrades_to_unadjusted_totals_without_section_detail(
 
 
 def test_armclang_legacy_grand_totals_line_still_parses(tmp_path: Path, monkeypatch) -> None:
-    """The label-first `Grand Totals:` shape the old parser expected (no real
-    fromelf we have seen emits it) stays as the last-resort fallback, and on
-    its own reproduces the pre-#132 numbers -- the #132 reviewer's exact
-    BinarySections(text=608, data=4, bss=392188, total=392800, reserved=0)."""
+    """The label-first `Grand Totals:` shape (no real fromelf we have seen
+    emits it) stays as the last-resort fallback, reproducing
+    BinarySections(text=608, data=4, bss=392188, total=392800, reserved=0)
+    (#132)."""
     legacy = "  Grand Totals: 600 8 4 392188\n"
     _fromelf_stub(monkeypatch, legacy, "some unexpected tool output\n")
 
@@ -400,7 +398,7 @@ def test_size_and_fromelf_parsers_agree_on_the_same_binary_shape(
     -- the real armclang capture on one side, and the gcc tool output a
     binary with identical sections would produce on the other -- and require
     the identical (text, data, bss, reserved) split, so a cross-toolchain
-    compare no longer shows a ~1500x bss artifact of the measuring tool.
+    compare reports consistent bss regardless of which measuring tool ran.
     """
     berkeley = "text data bss dec hex filename\n320 4 396272 396596 60d34 firmware\n"
     readelf = """Section Headers:

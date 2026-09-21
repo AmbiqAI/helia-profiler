@@ -328,7 +328,7 @@ def _reserved_from_section_listing(stdout: str) -> int | None:
     """Parse a ``fromelf --text -v`` section listing for reserved bytes.
 
     Split from :func:`_reserved_via_fromelf` so the classification rules are
-    testable without spawning the tool (#175 review)."""
+    testable without spawning the tool (#175)."""
     reserved = 0
     seen_section = False
     block: dict[str, str] | None = None
@@ -392,8 +392,7 @@ def _fromelf_totals(stdout: str) -> tuple[int, int, int, int] | None:
         # substring: fromelf prints the full input path in the Object Name
         # column, so a build directory containing "Totals" made the
         # substring test skip the image row too and the probe silently
-        # returned no sections (#175 review m1, reproduced on the real
-        # tool).
+        # returned no sections (#175, reproduced on the real tool).
         if _FROMELF_TOTALS_LABEL_RE.fullmatch(name):
             continue
         image_rows.append(row)
@@ -402,7 +401,7 @@ def _fromelf_totals(stdout: str) -> tuple[int, int, int, int] | None:
     # tool). More than one data row means we were handed something else —
     # a library or object listing, or multiple images at once — where
     # "first row" would be silently wrong (or arbitrarily chosen) numbers;
-    # degrade instead (#175 review m2/round-2 m-2).
+    # degrade instead (#175).
     if len(image_rows) == 1:
         return image_rows[0]
     for line in stdout.splitlines():

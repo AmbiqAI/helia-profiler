@@ -174,7 +174,7 @@ def _resolve_source_path(config: ProfileConfig) -> Path | None:
         raise EngineError(
             f"heliaRT source tree at {p} is missing required files: {', '.join(missing)}",
             # Release zips ship nsx/CMakeLists.txt but omit the two repo-root
-            # files below (#191).
+            # files below.
             hint=(
                 "Source-build requires a full heliaRT repo checkout "
                 "(>= v1.16.0), not a release zip: zips omit the repo-root "

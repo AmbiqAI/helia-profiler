@@ -451,9 +451,7 @@ class TestReconciliation:
 
     def test_alias_pair_is_not_double_counted(self):
         """Two MATCHING names over one object (the extern alias plus the
-        mangled static) must sum once. The #179 proved the earlier
-        version of this test vacuous — its alias (_ssdata) never matched
-        a candidate, so the dedup branch never ran."""
+        mangled static) must sum once."""
         from helia_profiler.hostenv.memory_measurement import reconcile_memory
         from helia_profiler.results import MemoryConsumer
         from helia_profiler.hostenv.toolchain_probe import SymbolEntry

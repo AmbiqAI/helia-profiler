@@ -1,7 +1,6 @@
-"""Unit tests for the measured-memory console rendering (#133 Phase 2).
+"""Unit tests for the measured-memory console rendering.
 
-The renderer previously shipped with zero coverage (#177),
-which hid a rich-markup injection through ELF section names (M3).
+Covers escaping ELF section names against rich-markup injection.
 """
 
 from __future__ import annotations

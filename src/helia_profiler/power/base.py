@@ -79,10 +79,9 @@ class PowerResult:
     """Complete result of a power capture.
 
     ``metadata`` is the typed :class:`~helia_profiler.power.metadata.PowerMetadata`
-    (#154 Phase 2 breaking change — previously ``dict[str, Any]``; the flat
-    dict view is ``metadata.to_metadata_dict()``). The result is frozen but
-    its metadata is deliberately mutable: pipeline stages enrich it after
-    capture, like ``RunMetadata``.
+    (#154 Phase 2); the flat dict view is ``metadata.to_metadata_dict()``.
+    The result is frozen but its metadata is deliberately mutable: pipeline
+    stages enrich it after capture, like ``RunMetadata``.
     """
 
     summary: PowerSummary

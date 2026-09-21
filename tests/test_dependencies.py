@@ -607,10 +607,9 @@ def test_concurrent_workspace_identity_is_atomic(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Baseline resolution integrity — the lock must agree with the manifest's
-# qualified-ref claims (found 2026-08-12: NSX honoured its packaged registry's
-# module revision over the app's project pin, so eight hardware runs built
-# nsx-sensors v0.1.0 while every artifact claimed the baseline commit).
+# WORKAROUND AmbiqAI/neuralspotx#218: NSX can honor its packaged registry's
+# module revision over the app's project pin, so the lock's resolved
+# commits are verified against the baseline before a run is trusted.
 # ---------------------------------------------------------------------------
 
 

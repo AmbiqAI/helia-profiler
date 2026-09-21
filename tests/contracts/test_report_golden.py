@@ -193,14 +193,11 @@ def _sample_power() -> PowerResult:
                 p99_power_w=0.108,
             ),
         ],
-        # Well-formed typed metadata. The previous fixture deliberately held
-        # the degenerate shapes shipped before #154 Phase 2 ("sync": True,
-        # "target_lifecycle": "flashed", "sync_timing_s": 0.002) — the exact
-        # bool-`sync` state behind the #135 crash. The typed PowerMetadata
-        # makes those states unrepresentable, so this fixture (and the golden
-        # digests derived from it) moved to the shapes production actually
-        # writes. Reader-side tolerance for old on-disk artifacts lives in
-        # evaluation/comparability.py's _nested and is tested separately.
+        # Well-formed typed metadata, matching the shapes production actually
+        # writes. PowerMetadata's typed fields make the degenerate `sync`
+        # states behind the #135 crash unrepresentable. Reader-side tolerance
+        # for old on-disk artifacts lives in evaluation/comparability.py's
+        # _nested and is tested separately.
         metadata=PowerMetadata(
             measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW,
             # #240: plan count (10) differs from the profile phase's

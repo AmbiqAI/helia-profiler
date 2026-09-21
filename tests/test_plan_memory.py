@@ -646,9 +646,9 @@ class TestHpxOwnedConsumers:
         assert [c.size for c in stack3] == [4_096]
 
     def test_aot_extraction_failure_no_longer_fabricates_a_tflm_plan(self, tmp_path):
-        """#133 Phase 3 D5: a failed AOT extraction used to fall into the
-        TFLM synthesiser, booking a tensor_arena and model_flatbuffer
-        that do not exist in an AOT binary."""
+        """#133 Phase 3 D5: a failed AOT extraction must not book a
+        tensor_arena or model_flatbuffer, since neither exists in an AOT
+        binary."""
         ctx = _make_ctx(tmp_path, {"engine": {"type": "helia-aot"}})
         assert ctx.engine_artifacts is None or ctx.engine_artifacts.memory_plan is None
         PlanMemoryStage().run(ctx)
@@ -665,8 +665,8 @@ class TestHpxOwnedConsumers:
 
     def test_ap3_bss_consumers_route_to_main_sram_not_dtcm(self, tmp_path):
         """#179 B-1: AP3's gcc script sends .bss to RWMEM (main
-        SRAM) — TCM is only 64 KB. Booking records/USB into DTCM refused
-        VALID builds with a spurious 'shrink your arena' PlatformError."""
+        SRAM) — TCM is only 64 KB, so records/USB route to SRAM, not
+        DTCM."""
         ctx = _make_ctx(
             tmp_path,
             {
@@ -674,8 +674,7 @@ class TestHpxOwnedConsumers:
                 "target": {"board": "apollo3p_evb", "transport": "usb_cdc"},
             },
         )
-        # arena at 32 KB in 64 KB TCM + records + usb would have "overflowed"
-        # DTCM under the inverted routing; it must pass now.
+        # Records/USB route to SRAM, not DTCM, so the 32 KB arena fits.
         PlanMemoryStage().run(ctx)
         assert ctx.memory_plan is not None
         dtcm = ctx.memory_plan.region("DTCM")
@@ -689,8 +688,7 @@ class TestHpxOwnedConsumers:
         assert "usb_buffers" not in dtcm_names
 
     def test_usb_buffers_booked_on_usb_cdc_transport(self, tmp_path):
-        """#179: the USB branch was untested (a mutation of the
-        size constant survived)."""
+        """#179: usb_buffers must be booked for the usb_cdc transport."""
         ctx = _make_ctx(tmp_path, {"target": {"transport": "usb_cdc"}})
         PlanMemoryStage().run(ctx)
         assert ctx.memory_plan is not None

@@ -240,9 +240,8 @@ def test_engines_package_init_stays_stdlib_light() -> None:
 
 def test_platform_never_imports_the_config_layer() -> None:
     """The silicon-info package must not know the config resolver exists —
-    the old lazy ``config.Toolchain`` import was the one documented
-    config<->platform cycle, inverted in #229 D2 (platform owns the
-    toolchain-name map). Lazy and guarded imports count too."""
+    platform owns the toolchain-name map (#229 D2). Lazy and guarded
+    imports count too."""
     offenders = {
         path.name: hits
         for path in sorted((_SRC / "platform").glob("*.py"))

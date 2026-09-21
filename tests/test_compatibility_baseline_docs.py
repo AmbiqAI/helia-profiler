@@ -2,9 +2,8 @@
 
 The page's qualified-reference table is hand-maintained prose mirroring
 ``src/helia_profiler/data/compatibility-baseline-v1.json`` plus two code
-constants — and until #193 it had no guard (unlike pipeline.md, pinned by
-test_pipeline.py): its first run caught two rows that were never added
-to the doc (``nsx-executorch`` as both a project and an engine entry).
+constants (#193), the same drift-guard precedent as pipeline.md
+(pinned by test_pipeline.py).
 
 Mechanics follow the pipeline.md precedent: the doc stays hand-written, the
 test extracts the table region and cross-checks it against the data. Refs in
@@ -80,8 +79,7 @@ def test_every_baseline_entry_has_a_doc_row_with_its_ref():
             )
         for key in ("min_version", "max_version_exclusive"):
             # Key-scoped, not table-wide: a one-sided range bump can alias an
-            # unrelated value elsewhere in the table (#207, mutation r
-            # -- raising min to the old max passed a bare substring check).
+            # unrelated value elsewhere in the table (#207).
             if key in engine:
                 assert f"{key}={engine[key]}" in table, (
                     f"engine '{name}' {key}={engine[key]} missing from the doc "
@@ -109,8 +107,8 @@ def test_every_doc_ref_exists_in_the_baseline():
     known_hex.add(data["neuralspotx"]["sha256"])
 
     # Hygiene first: a stale ref typed with an ASCII "..." or truncated below
-    # 8 hex would be INVISIBLE to the reverse check below -- refuse the format
-    # outright (#207, mutations j/c2).
+    # 8 hex would be INVISIBLE to the reverse check below -- refuse the
+    # format outright (#207).
     malformed = re.findall(r"`[0-9a-f]{4,7}…|`[0-9a-f]{4,}\.{2,}", table)
     assert not malformed, (
         f"doc table refs must be >=8 hex chars followed by a real ellipsis "
@@ -128,8 +126,8 @@ def test_doc_identity_and_code_constants_are_current():
     data = json.loads(_JSON.read_text(encoding="utf-8"))
 
     # The headline identity line carries the FULL baseline id, not just the
-    # version: a re-pin within the same nsx version changes only the id date,
-    # and that is exactly the bump-forgets-doc case (#207, mutation l).
+    # version: a re-pin within the same nsx version changes only the id
+    # date, and that is exactly the bump-forgets-doc case (#207).
     assert data["baseline_id"] in doc, (
         f"the doc headline no longer names the current baseline id "
         f"'{data['baseline_id']}' -- update compatibility-baseline.md"

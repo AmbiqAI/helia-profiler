@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Export the Tier-1 ns-ops comparison models for both kernel providers.
 
-Two deterministic random-weight int8 models cover every Tier-1 op that
-nsx-executorch PR #2 can lower to cortex_m_ns:: kernels:
+Two deterministic random-weight int8 models cover every Tier-1 op
+lowerable to cortex_m_ns:: kernels:
 
 - tier1: a channels_last conv trunk exercising hardswish, leaky_relu, sub
   and standalone relu on 16x32x32 tensors. mean is excluded here — the ns
@@ -181,9 +181,8 @@ def _export_one(spec: ModelSpec, provider: str, output_dir: Path) -> dict:
             f"{spec.name}: arm export must not contain cortex_m_ns ops: {ns_ops_in_pte}"
         )
 
-    # engine.config.portable_ops must register every serialized operator
-    # outside the cortex_m/cortex_m_ns namespaces. The ExportResult fallback
-    # report only tracks NS-candidate ops, so derive the list from the PTE.
+    # portable_ops needs every non-cortex_m op; ExportResult's fallback
+    # report only tracks NS-candidate ops, so derive it from the PTE.
     portable_ops = sorted(
         name for name in facts["operators"] if not name.startswith(("cortex_m::", "cortex_m_ns::"))
     )

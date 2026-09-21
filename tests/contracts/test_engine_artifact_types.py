@@ -296,8 +296,8 @@ def test_from_pipeline_context_carries_the_executorch_fields(tmp_path):
 def test_from_pipeline_context_neutralizes_foreign_engine_fields(tmp_path, engine_name):
     """The neutral values non-owning engines receive are a contract, not an
     accident: aot_prefix reaches main_aot.cc.j2 only, so no render digest can
-    see it change for a TFLM run — the #166 review's mutation of "" to "x"
-    left the whole suite green. Pinned here directly instead."""
+    see it change for a TFLM run. Mutating "" to "x" would leave the whole
+    suite green, so it's pinned here directly (#166)."""
     engine_type = EngineType(engine_name)
     engine = _render_engine_context(tmp_path, engine_name, _build(engine_type))
     assert engine.engine_type is engine_type

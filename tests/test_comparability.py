@@ -73,7 +73,7 @@ def test_engine_difference_is_informative():
 
 def test_engine_version_difference_is_informative():
     """#193: a runtime promotion (heliaRT 1.16 -> 1.17, the #191 A/B) must
-    surface -- previously the one axis that changed was invisible."""
+    surface as a comparability difference."""
     assessment = assess_comparability(_run(engine_version="1.16.0"), _run(engine_version="1.17.0"))
 
     assert assessment.run_metrics_comparable
@@ -191,10 +191,10 @@ def test_lockstep_mismatch_omits_power_metrics_only():
     host holds GO high into that input until gate rise -- the same class of
     real, rail-level difference that makes monitor-presence power-blocking.
 
-    Adversarial review found both runs comparing clean with integrity: valid,
-    which is #115's phantom-delta failure mode: only the runs that LOST the
-    gate race are marked degraded, so the ones that won compare silently
-    against post-change runs."""
+    Both runs here compare clean with integrity: valid, guarding #115's
+    phantom-delta failure mode: only runs that LOST the gate race are
+    marked degraded, so the ones that won would otherwise compare
+    silently against post-change runs."""
     free_running = _run(
         power={
             "measurement_scope": "gpio_gated_clean_window",
@@ -228,14 +228,12 @@ def test_lockstep_mismatch_omits_power_metrics_only():
 def test_bundles_with_no_sync_record_at_all_are_skipped():
     """Only bundles carrying no sync record skip the dimension.
 
-    An earlier version of this test claimed pre-#114 runs "have no
-    sync.lockstep key at all". Adversarial review showed that is false:
-    capture writes ``SyncHandshakeMetadata(lockstep=...)`` on BOTH branches, so
-    a real pre-#114 gated external baseline carries ``sync.lockstep: False``
-    and IS compared -- correctly, since it genuinely ran with the rail in the
-    other state (see the test below). What actually skips is a bundle with no
-    sync record at all: internal-mode runs, free-form captures, and anything
-    predating the field."""
+    Capture writes ``SyncHandshakeMetadata(lockstep=...)`` on BOTH branches,
+    so a real pre-#114 gated external baseline carries ``sync.lockstep:
+    False`` and IS compared -- correctly, since it genuinely ran with the
+    rail in the other state (see the test below). What skips is a bundle
+    with no sync record at all: internal-mode runs, free-form captures,
+    and anything predating the field."""
     legacy = _run(power={"measurement_scope": "gpio_gated_clean_window", "integrity": "valid"})
     current = _run(
         power={
@@ -289,9 +287,10 @@ def test_a_non_dict_sync_record_does_not_crash_comparison():
     """``report/summary.py`` copies power metadata's ``sync`` through on an
     is-not-None check alone, so it reaches disk as whatever was stored -- the
     repo's own report golden fixture holds the bool ``True``. An unguarded
-    dereference raised ``AttributeError``, which is not an ``HpxError``: the
-    CLI printed a traceback and ``validation/compare.py`` aborted an entire
-    multi-case run instead of recording one ``COMPARE_ERROR``."""
+    dereference would raise ``AttributeError``, which is not an
+    ``HpxError``: the CLI would print a traceback and
+    ``validation/compare.py`` would abort an entire multi-case run instead
+    of recording one ``COMPARE_ERROR``."""
     weird = _run(
         power={
             "measurement_scope": "gpio_gated_clean_window",
@@ -436,15 +435,14 @@ def test_a_baseline_predating_the_dimension_is_skipped_not_blocked():
 
 
 def test_a_run_that_measured_no_power_does_not_block_one_that_did():
-    """The regression an earlier, broader version of this dimension caused.
+    """A run with no power result has nothing to say about how it measured
+    power.
 
-    A digest over the whole window context moved on `power.enabled` alone --
-    the power floor raises `window_target_ms` only when power is on -- so
-    comparing a quick latency run against a power-instrumented one suppressed
-    the candidate's real power numbers and told the user "the measured window
-    differs", which they had not chosen. Recording the dimension only for runs
-    that measured power is what keeps that from happening: a run with no power
-    result has nothing to say about how it measured power.
+    A digest over the whole window context that moved on `power.enabled`
+    alone would suppress the candidate's real power numbers whenever a
+    quick latency run is compared against a power-instrumented one -- the
+    power floor raises `window_target_ms` only when power is on.
+    Recording the dimension only for runs that measured power avoids that.
     """
     unpowered = replace(_run(), manifest=_manifest_with_probe(None))
 
@@ -460,12 +458,12 @@ def test_a_run_that_measured_no_power_does_not_block_one_that_did():
 def test_two_socs_running_the_same_probe_stay_power_comparable():
     """Cross-SoC power comparison is a supported question, not a defect.
 
-    The same earlier version folded 8 SoC capability values into the digest,
-    so apollo510 vs apollo4p stopped comparing on power entirely -- silently
-    reversing the documented decision that board differences stay visible as
-    experimental dimensions rather than blocking. What the probe dimension
-    asks is narrower and correct: given whatever hardware, did the two runs
-    put the same thing inside the window?
+    Folding SoC capability values into the digest would make apollo510 vs
+    apollo4p stop comparing on power entirely -- reversing the documented
+    decision that board differences stay visible as experimental
+    dimensions rather than blocking. What the probe dimension asks is
+    narrower and correct: given whatever hardware, did the two runs put
+    the same thing inside the window?
     """
     baseline = _powered("infer")
     candidate = replace(

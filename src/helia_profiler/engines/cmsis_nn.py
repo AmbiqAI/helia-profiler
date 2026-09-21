@@ -45,7 +45,7 @@ def cmsis_nn_cmake_vars(config: ProfileConfig) -> dict[str, str]:
     default cannot be overridden afterwards). Requantize inline-asm is
     configurable. Float kernels follow the model: fp32 for one that computes
     in float at all, fp16 additionally for FLOAT16 tensors on an MVE-F core.
-    An integer-only model links neither, keeping ~33 KB of fp32 kernels out of
+    An integer-only model links neither, keeping fp32 kernels out of
     its image; a model that cannot be read enables fp32 rather than silently
     profiling float work on the reference path (#279).
 
@@ -140,7 +140,7 @@ def _validate_cmsis_nn(path: Path) -> None:
 def _write_cmsis_nn_wrapper(module_dir: Path, cmsis_nn_path: Path) -> None:
     """Write the NSX module for ns-cmsis-nn.
 
-    Uses the native ``nsx/`` module that ships with ns-cmsis-nn (>= v7.23.0).
+    Uses the native ``nsx/`` module that ships with ns-cmsis-nn.
     A thin root shim delegates to ``nsx/CMakeLists.txt`` so that its
     ``../Source`` relative paths resolve correctly against the copied
     Source/ tree.

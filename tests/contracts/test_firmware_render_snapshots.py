@@ -169,31 +169,24 @@ _MARKERS: dict[str, str | tuple[str, ...]] = {
 def test_no_test_builds_a_look_alike_env_over_production_templates():
     """Firmware/engine templates are only rendered through production envs (#119).
 
-    Tests used to build their own ``jinja2.Environment`` with ``trim_blocks``
-    and ``lstrip_blocks`` enabled, which production does not set. Output then
-    differed from what ships -- 42 lines on the ExecuTorch template alone -- so
-    those tests were structurally blind to whitespace-control mistakes. Three
-    such near-misses were caught in this arc only by hand-diffing full renders.
+    A test that builds its own ``jinja2.Environment`` with ``trim_blocks``/
+    ``lstrip_blocks`` enabled renders output that differs from what ships,
+    and is structurally blind to whitespace-control mistakes.
 
-    The first version of this guard matched ``jinja2.Environment(...)`` and was
-    proven evadable three ways by adversarial review: a loader hoisted into a
-    variable (the non-greedy match stopped at PackageLoader's own paren), an
-    env built in a helper module (only ``test_*.py`` was scanned), and
-    ``conftest.py`` (same glob gap) -- plus ``from jinja2 import Environment``
-    and ``_jinja_env.overlay(trim_blocks=True)``.
+    Matching ``jinja2.Environment(...)`` directly is evadable: a loader
+    hoisted into a variable, an env built in a helper module, or
+    ``conftest.py`` (glob gaps), plus ``from jinja2 import Environment`` and
+    ``_jinja_env.overlay(trim_blocks=True)`` all slip past a literal match.
+    So this scans every Python file under tests/ for the one thing an
+    evader cannot avoid: constructing a loader over a production template
+    package (``helia_profiler.firmware`` / ``helia_profiler.engines``, the
+    heliaAOT compile env), or overlaying the production env with the
+    divergent flags. Neither production env sets either trim flag.
 
-    So key on what an evader cannot avoid instead: to render production
-    templates you must construct a loader over a production template package
-    (or overlay the production env with the divergent flags). Scan EVERY
-    Python file under tests/ for those constructions, wherever the Environment
-    itself is assembled. Production template packages are
-    ``helia_profiler.firmware`` and ``helia_profiler.engines`` (the heliaAOT
-    compile env) -- both envs set neither trim flag.
-
-    Known limits, stated rather than implied: a loader built outside tests/
-    or a path assembled dynamically at runtime is not caught. Byte-level
-    protection against actual render drift lives in the sha256 snapshots;
-    this guard polices the authoring pattern that made tests blind to it.
+    Known limits: a loader built outside tests/ or a path assembled
+    dynamically at runtime is not caught. Byte-level protection against
+    actual render drift lives in the sha256 snapshots; this guard polices
+    the authoring pattern that made tests blind to it.
     """
     import re
 
@@ -242,12 +235,11 @@ def _sample_pmu_passes() -> list[dict[str, object]]:
     ``FirmwareRenderContext._resolve_pmu_passes`` builds every pass with
     ``custom=True``, real ``0xNNNN`` event ids and ``c_enum=None`` -- the
     preset branch of the pass-init blocks is unreachable from a real run.
-    This used to pin ``custom=False`` with an EMPTY ``event_ids``, which is
-    not a shape production can produce, and on the ExecuTorch template (whose
-    ``engine_pass_init`` has no preset branch) it snapshotted invalid C: a
-    zero-size ``static const uint32_t ids[]`` that ``profiler_init`` then
-    indexes. Mirroring production keeps the pinned renders compilable and
-    keeps the snapshotted branch the one that ships.
+    A ``custom=False`` sample with empty ``event_ids`` is not a shape
+    production can produce, and on the ExecuTorch template it snapshots
+    invalid C: a zero-size ``static const uint32_t ids[]`` that
+    ``profiler_init`` then indexes. Mirroring production keeps the pinned
+    renders compilable and keeps the snapshotted branch the one that ships.
 
     tests/test_template_render.py keeps a ``custom=False`` sample on purpose --
     its smoke coverage of the preset branch is the only thing exercising it.
@@ -955,13 +947,10 @@ def test_stimer_init_verifies_the_crystal_against_an_independent_clock():
             assert init_body.rstrip().endswith("return 0U;\n}"), case
             init = init[: init.index("\n}")]
 
-            # Review proved the first version of these assertions vacuous
-            # against the exact design this PR rejects: replacing the whole
-            # verify loop with a blind nsx_delay_us(1s) fixed delay passed
-            # them all (they were substring checks for the constants). So
-            # assert the MEASUREMENT, not the vocabulary: the init must read
-            # the counter, compare against both band edges, and demand more
-            # than one in-band probe.
+            # Assert the MEASUREMENT, not the vocabulary: substring checks for
+            # the constants pass even a blind nsx_delay_us(1s) fixed delay. The
+            # init must read the counter, compare against both band edges, and
+            # demand more than one in-band probe.
             assert "HPX_STIMER_SETTLE_MAX_US" in init, (
                 f"{case}: hpx_stimer_init() configures the XT and returns without "
                 "waiting for it to settle; the first reads land in the restart "
@@ -1010,10 +999,9 @@ def test_no_render_reports_a_clean_cycles_it_never_accumulated():
     Why it needs its own test rather than riding on the snapshots: the busy_loop
     branch's assignment (``clean_cycles = clean_probe_target_cyc;``) was deleted
     in #112 because that path moved to STIMER, so the declaration is now the
-    only thing standing between a reverted prelude and a zero duration.  A
-    reviewer reverted the STIMER forcing in main_aot.cc.j2 ALONE -- the exact
-    single-template drift shape filed as #118 -- and the whole suite stayed
-    green while the AOT render did exactly this.
+    only thing standing between a reverted prelude and a zero duration. A
+    single-template STIMER-forcing revert in main_aot.cc.j2 alone (#118) left
+    the whole suite green while the AOT render did exactly this.
 
     Swept over every SoC x transport x engine x probe, power and profile, so
     neither template can drift alone and neither half of the probe matrix is
@@ -1731,11 +1719,9 @@ def test_crypto_otp_shutdown_ap5_power_only_only():
 
 def test_extreme_mode_power_only_only():
     """extreme_mode (SSRAM off + MRAM collapsed to a single NVM bank) only
-    fires in the dedicated power binary (2026-07 finding: it used to fire
-    unconditionally in both binaries, risking a firmware-size overflow
-    crash in the larger transport-attached PMU-phase binary for zero
-    measurement benefit -- DWT/PMU cycle counts don't depend on SSRAM/NVM
-    power state). Requires arena+weights both in TCM.
+    fires in the dedicated power binary: DWT/PMU cycle counts don't depend
+    on SSRAM/NVM power state, so the transport binary never needs it.
+    Requires arena+weights both in TCM.
     """
     kwargs = _common_kwargs("apollo510", "rtt")
     kwargs.update(
@@ -1804,10 +1790,9 @@ def test_pmu_profiler_sram_placement_transport_only_on_ap5():
     # main_aot.cc.j2's per-layer storage (g_layers, NSX_MEM_SRAM_BSS -- POD,
     # so NOLOAD zero-fill is safe, unlike the polymorphic g_profiler) follows
     # the same rule: SRAM-resident in the transport binary only, with the
-    # SSRAM domain powered on AP5. Regression pin: the AOT template used to
-    # leave pmu_profiler_sram_resident unset, so an AP5 render with a
-    # TCM-resident arena never powered the domain and per-layer profiling
-    # wrote to an unbacked SSRAM bank.
+    # SSRAM domain powered on AP5. Regression pin (#159): an AP5 render
+    # with a TCM-resident arena must power the domain, or per-layer
+    # profiling writes land in an unbacked SSRAM bank.
     aot_transport = _render("apollo510", "rtt", "helia-aot", power_only=False)
     assert "NSX_MEM_SRAM_BSS static HpxLayerRecord g_layers[kMaxLayers];" in aot_transport
     assert "Shared SSRAM power-on" in aot_transport
@@ -1823,9 +1808,9 @@ def test_pmu_profiler_sram_placement_transport_only_on_ap5():
     # test_executorch_power_tripwire.py), so there is no power render to
     # assert the negative against and none is attempted here.
     #
-    # Regression pin for the same bug shape the AOT lines above pin: the flag
+    # Regression pin (#159), same bug shape as the AOT lines above: the flag
     # that drives this (pmu_profiler_sram_resident) is set once by
-    # _main_base.cc.j2, and ExecuTorch is the child that used to set it itself.
+    # _main_base.cc.j2, not by the ExecuTorch child template.
     et_transport = _render("apollo510", "rtt", "executorch", power_only=False)
     assert "NSX_MEM_SRAM_BSS static LayerRecord g_layers[kMaxLayers];" in et_transport
     assert "Shared SSRAM power-on" in et_transport

@@ -240,9 +240,8 @@ def _upload_model_to_psram(
 
     if psram_addr is None:
         # The buffered firmware output IS the diagnosis — discarding it
-        # turns every PSRAM fault into the same opaque timeout (#219 was
-        # mis-diagnosed twice as a hardware problem for exactly this
-        # reason).  Surface the tail of whatever the firmware did say.
+        # turns every PSRAM fault into the same opaque timeout.  Surface
+        # the tail of whatever the firmware did say.
         said = buf.decode("ascii", errors="replace").strip()
         said_tail = said[-500:] if said else "<nothing>"
         raise CaptureError(

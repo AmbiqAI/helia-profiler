@@ -208,12 +208,8 @@ def test_expected_pragma_suffixes_track_current_heliaaot_platform_header():
 
 
 class TestRunAotCompilerUsesConfigRegistry:
-    """``_run_aot_compiler`` must resolve the SoC via ``config.platform_registry``.
-
-    A custom board registered only in the profiler config (not the built-in
-    platform registry) previously resolved to the wrong SoC or raised
-    ``ValueError`` because ``get_soc_for_board`` was called without
-    ``registry=config.platform_registry``.
+    """``_run_aot_compiler`` resolves the SoC via ``config.platform_registry``,
+    including a custom board registered only in the profiler config.
     """
 
     def _install_fake_helia_aot(self, monkeypatch):

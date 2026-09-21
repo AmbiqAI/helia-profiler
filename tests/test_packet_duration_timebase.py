@@ -525,9 +525,9 @@ def test_the_fullrate_axis_follows_a_fit_that_moves_mid_capture():
     ],
 )
 def test_an_unusable_packet_falls_back_and_is_counted_as_such(block, why):
-    """The count and the fallback share one predicate. They did not: the count
-    used container truthiness where the fallback used validity, so a zero-span
-    packet took the utc path while the diagnostic reported that none had."""
+    """The count and the fallback share one predicate: both treat a packet
+    as unusable by the same validity check, so a packet that falls back to
+    utc is also counted as having done so."""
     t = dict(block)
     t["utc"] = {"value": [0, 250]}
 

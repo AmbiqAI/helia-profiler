@@ -866,12 +866,9 @@ class TestGenerateApp:
         assert "nsx-i2c" in nsx_yml
         assert "nsx-sensors" in nsx_yml
         assert "nsx::sensors" in cmake
-        # The baseline pin must reach BOTH the module entry and the
-        # module_registry's module-level override. NSX honours a module-level
-        # revision over its owning project's, so a project-only pin silently
-        # resolves the packaged registry's commit while nsx.yml still claims
-        # the baseline ref — hardware bring-up built nsx-sensors v0.1.0 for
-        # eight runs that way.
+        # WORKAROUND neuralspotx#218: NSX honours a module's own revision
+        # over its project's, so the pin must reach both the module entry
+        # and the module_registry's module-level override.
         pinned = "c219a2bc98c62f96819fae20ab6c8911fcea3e25"
         assert pinned in nsx_yml
         modules_block = nsx_yml.split("module_registry:", 1)[1].split("modules:", 1)[1]
@@ -2142,13 +2139,9 @@ class TestNsxModuleOverrides:
             registry["projects"]["neuralspotx"]["revision"]
             == "2dbe12a2799fd8c3df85f1a103b0adca340c901f"
         )
-        # Standalone baseline-pinned projects need a module-level revision
-        # too. NSX honours a module's own revision over its project's, so a
-        # project-only pin leaves the packaged registry's module entry in
-        # charge: nsx-pmu-armv8m resolved correctly only because the
-        # registry's tag happens to point at the commit we pin, and
-        # nsx-sensors (whose registry tag does not) silently built v0.1.0
-        # through eight hardware runs.
+        # WORKAROUND neuralspotx#218: NSX honours a module's own revision
+        # over its project's, so standalone baseline-pinned projects need a
+        # module-level revision too, not just a project one.
         assert registry["modules"]["nsx-pmu-armv8m"]["revision"] == (
             "5725c065a0c3603132f1064ee2684d1fa8587c88"
         )

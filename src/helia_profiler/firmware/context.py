@@ -96,9 +96,8 @@ class PowerMonitorContext:
         # (on-device vs host instrument), so `driver: joulescope` with an
         # ina228 block builds identical firmware and lets an external
         # instrument observe the monitor's own cost. This must stay in step
-        # with the module-selection gate in firmware/__init__.py: when the two
-        # disagreed, runs silently built no monitor at all while appearing to
-        # configure one, which invalidated a bench sweep.
+        # with the module-selection gate in firmware/__init__.py (#99): a
+        # mismatch silently builds no monitor while appearing configured.
         ina = power.ina228
         if not power.monitor_selected or ina is None:
             return cls(power_monitor=None)
@@ -583,16 +582,12 @@ def resolve_window_timer(
     three trades DWT's cycle resolution for STIMER's ~30.5 us tick,
     negligible on a multi-millisecond window and cheap next to a second
     code path whose only reachable configuration is the one family
-    combination that does not need it. What the probe used to do instead —
-    inherit the per-family answer — meant calibrating against an
-    already-dead DWT on AP3/AP4 power binaries, which fabricated the
-    reported window duration (#112).
+    combination that does not need it. The per-family answer would instead
+    calibrate against an already-dead DWT on AP3/AP4 power binaries,
+    fabricating the reported window duration (#112).
 
-    This resolution used to live as three ``{% set %}`` lines duplicated
-    verbatim at the top of ``main.cc.j2`` and ``main_aot.cc.j2`` — the
-    exact drift vector ``SocCapabilities.power_window_timer`` was created
-    to close, one layer up (#118). The templates now read the resolved
-    names and carry no policy of their own.
+    The templates read the resolved names from
+    ``SocCapabilities.power_window_timer`` and carry no policy of their own.
     """
     # ``==`` rather than ``is``: the parameter is annotated ``str`` because
     # this is the render boundary — production passes the config's

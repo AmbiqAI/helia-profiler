@@ -873,12 +873,10 @@ def test_config_snapshot_serialization_is_json_safe():
 def test_effective_window_target_applies_the_power_floor_only_when_auto_sized(
     power_enabled: bool, window_mode: str, window_target_ms: int, expected_ms: int
 ):
-    """The single source both the firmware render and the power plan read.
-
-    These two used to derive the rule separately and disagreed: the render
-    gated the floor on ``window_mode == "auto"`` while the plan applied it
-    unconditionally, so a ``fixed`` sub-floor window produced a plan
-    describing a 5 s window against firmware built to spin for 1 s.
+    """The single source both the firmware render and the power plan read
+    (#136): both callers must agree on the same effective window, or a
+    ``fixed`` sub-floor window could describe a plan longer than what the
+    firmware was built to spin for.
     """
     config = load_config(
         None,

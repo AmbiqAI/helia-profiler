@@ -36,7 +36,7 @@ from .context import FirmwareRenderContext, _resolve_pmu_passes
 # NB: measured_power_fingerprint and _resolve_module_list below look unused
 # in this module but are LIVE re-export surface — report/manifest.py,
 # report/summary.py, and tests import them from the package root. Do not
-# remove in a dead-import cleanup (#194 review).
+# remove in a dead-import cleanup (#194).
 from .fingerprint import measured_power_fingerprint
 from .project import (
     NsxModuleSpec,
@@ -373,8 +373,8 @@ def generate_app(ctx: PipelineContext) -> Path:
         # --- AOT engine: use AOT-specific main template, no model embedding ---
         # The heliaAOT adapter is the only producer of this engine_type, and
         # HeliaAotArtifacts pins the pairing, so the narrowing is total — but
-        # stated as a raise, not an assert: this was the last place a stage
-        # product's narrowing rode on an -O-strippable assert.
+        # stated as a raise, not an assert: an assert is stripped under -O
+        # and would silently skip this check (#162).
         if not isinstance(artifacts, HeliaAotArtifacts):
             raise FirmwareError(
                 f"engine_type is helia-aot but the prepared artifacts are "

@@ -650,7 +650,7 @@ def run_case(
                 result.power_gate_failure_kind = power.gate_failure_kind
                 result.gate_duration_unarbitrated_failure = power.gate_duration_unarbitrated_failure
         except (ValueError, TypeError, OSError) as exc:
-            # TypeError included (#205 review): a hostile artifact shape must
+            # TypeError included (#205): a hostile artifact shape must
             # fail THIS case, not crash the whole validation sweep.
             result.error = f"could not parse summary.json: {exc}"
             result.status = "fail"
@@ -710,7 +710,7 @@ def validation_health_issues(result: CaseResult) -> tuple[str, ...]:
         # Legacy record (parsed before the verdict field existed): fall back
         # to the two-field predicate. New records carry the model's own
         # PowerSection.gate_duration_unarbitrated_failure, so the #142/#181
-        # interpretation lives in exactly one place (#205 review).
+        # interpretation lives in exactly one place (#205).
         unarbitrated = (
             result.gate_duration_integrity_valid is False
             and result.gated_window_reference_drift is None

@@ -44,9 +44,8 @@ from ..platform.counters import (
 log = logging.getLogger("hpx")
 
 
-# TFLite flatbuffers start with a 4-byte file identifier.  Some flatc
-# versions emit the identifier at offset 4 (after the root-table offset),
-# so we accept either placement.
+# TFLite flatbuffers carry a 4-byte file identifier near the start;
+# match it within the first bytes rather than at a fixed offset.
 _TFLITE_MAGIC = b"TFL3"
 _VALID_RUNTIME_ARENA_LOCATIONS: tuple[Placement, ...] = (
     Placement.TCM,

@@ -242,8 +242,7 @@ class HeliaAotArtifacts(EngineArtifacts):
     engine_type: EngineType = EngineType.HELIA_AOT
 
     #: Symbol prefix of the generated AOT module.  Required: the firmware
-    #: template names every generated entry point through it (the consumer
-    #: used to assert it non-None).
+    #: template names every generated entry point through it.
     aot_prefix: str
     #: NSX module name of the generated AOT module.
     aot_module_name: str

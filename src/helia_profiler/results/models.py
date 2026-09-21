@@ -578,7 +578,7 @@ class ConsumerReconciliation:
     #: (None when nothing matched or the address is outside every
     #: window). A matched consumer whose measured_region differs from
     #: ``region`` landed somewhere the plan did not intend — the check
-    #: that catches wrong-region "clean" matches (#179 review M-6).
+    #: that catches wrong-region "clean" matches.
     measured_region: str | None = None
     delta: int | None = None
 
