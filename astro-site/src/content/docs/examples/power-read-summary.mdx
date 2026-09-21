@@ -1,0 +1,116 @@
+---
+title: "Read a power summary"
+description: "Take the power block of a completed capture apart: the scope it was integrated over, the energy and current figures and their units, the health signals that decide whether energy per inference may be quoted, and the jq lines that pull each out."
+---
+
+## Goal
+
+Decide, from `summary.json` alone, whether a power capture is a
+measurement and which number to publish. You will learn the order to read
+the `power` block in, what each health signal can mean, and how to script
+the same check.
+
+## Hardware and wiring
+
+None. This page reads a bundle a power run already wrote; producing one is
+[Power capture with a Joulescope](../power-profiling/).
+
+## Software prerequisites
+
+hpx (`pip install helia-profiler`) for the typed loader, and `jq` for the
+shell lines.
+
+## Config file
+
+None. The bundle's own configuration is recorded in `run_metadata.json`
+under `config`, and the power stages that produced the block are listed in
+`summary.json` under `power.power_plan` and `power.target_lifecycle`.
+
+## Run
+
+```bash
+jq '.power | {measurement_scope, gated_window_count, gated_window_duration_ratio, gated_window_duration_suspect, integrity, power_firmware}' results/summary.json
+jq '.power | {energy_per_inference_j, inferences_per_joule, avg_current_a, avg_power_w}' results/summary.json
+jq '[.issues[] | select(.code | startswith("power."))]' results/summary.json
+```
+
+```python
+from pathlib import Path
+from helia_profiler.results.run_summary import load_run_summary
+
+summary = load_run_summary(Path("results/summary.json"))
+power = summary.power
+if power is None:
+    raise SystemExit("no power block: the run captured no power")
+print(power.measurement_scope, power.gated_window_count, power.gated_window_duration_ratio)
+if power.gate_duration_unarbitrated_failure or power.gated_window_duration_suspect:
+    print("do not quote energy per inference; see the power.* issue codes")
+else:
+    print(power.energy_per_inference_j, "J per inference,", power.avg_current_a, "A average")
+```
+
+## Expected output
+
+Not yet captured: no bundle with a `power` block ships with the
+documentation, so no figures appear here. The keys are the contract from
+`run_summary.schema.v1.json`; a healthy Joulescope capture answers the
+first `jq` line with `measurement_scope: "gpio_gated_clean_window"`,
+`gated_window_count: 1`, a `gated_window_duration_ratio` near `1.0`,
+`gated_window_duration_suspect` absent, `integrity: "valid"` and
+`power_firmware: "dedicated"`; the Python block then prints the energy per
+inference and the average current.
+
+## How to read it
+
+Read the block in this order; each step can stop the next.
+
+1. **Scope.** `measurement_scope` says what the numbers were integrated
+   over. `gpio_gated_clean_window` (Joulescope, `power.mode: external`) and
+   `on_device_gated_inference` (INA228, `power.mode: internal`) are
+   per-inference measurements; `free_form_capture` means no qualifying
+   gate was found and the numbers cover the whole capture, with the
+   per-inference fields withheld ([Windows and lock-step](../../guide/power-windows/)).
+2. **Health.** `gated_window_duration_suspect` set, or
+   `gate_duration_unarbitrated_failure` true on the loaded `PowerSection`,
+   means the gate did not line up with the inference loop or the firmware
+   reported failed work; `gated_window_duration_ratio` far from 1.0 without
+   `gated_window_reference_drift` says the same. The `issues[]` entries
+   whose code starts with `power.` name the reason; each is on the
+   [issue codes](../../reference/issue-codes/) page and its fix on
+   [Verifying a capture](../../guide/power-verify/).
+3. **Provenance.** `power_firmware` must be `dedicated` for a clean
+   number (`shared` carries the transport's own draw); `clean_workload`
+   and `firmware_code_fingerprint` record what ran inside the window and
+   are what `hpx compare` uses to refuse a comparison.
+4. **The numbers.** `energy_per_inference_j` is the scope's integrated
+   energy divided by the inferences it counted; `inferences_per_joule` is
+   its inverse; `avg_current_a`, `median_current_a`, `p95_current_a` and
+   `p99_current_a` are in amperes inside the scope (the percentiles exist
+   for the Joulescope only); `avg_power_w` in watts; `capture_duration_s`
+   is the scope's duration, not the host's. Units are the SI base units
+   the field names carry.
+5. **The terminal.** The run printed the same figures as a `Power` table
+   in milliamps, milliwatts and microjoules; the JSON is the record.
+
+An INA228 run answers step 1 with `on_device_gated_inference` and carries
+`on_device_summary` under `power` instead of the Joulescope percentiles;
+its fields are on [INA228](../../guide/power-ina228/).
+
+## Variations
+
+- `detailed/power_summary.csv` (with `output.detailed: true`) has one row
+  per gated window plus a `whole_capture_window` reference row, which is
+  where to look when `gated_vs_whole_current_ok` is `false`.
+- A `busy_loop` window (`profiling.clean_window_probe: busy_loop`, for
+  bring-up) carries the same scope and health fields but measures a
+  calibrated spin, not an inference; `power.clean_window_probe` says
+  which ran.
+- Two captures: [Compare two power runs](../power-compare/).
+
+## Validated on
+
+Not yet validated. No captured power bundle ships with the documentation,
+so the page carries no figures; the field names and the health rules are
+quoted from `results/run_summary.py`, `power/metadata.py` and the
+[Output files](../../guide/output/) contract at the source tree this site
+was built from. The nightly hardware validation runs with `power: off`.
