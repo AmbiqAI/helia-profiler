@@ -14,7 +14,6 @@ uv sync --locked --all-groups --extra aot --extra analysis
 uv run ruff check . && uv run ruff format --check .
 uv run ty check src/helia_profiler tests
 uv run pytest -q                      # unit suite; hardware/compile_hw markers deselected
-uv run --group docs zensical build    # docs site (zensical, not mkdocs, is what Pages runs)
 pre-commit run --all-files            # identical to the CI pre-commit job
 uv --directory <repo-root> run hpx ...   # run the CLI from anywhere
 ```

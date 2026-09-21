@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "kind": "config-schema",
   "generatedFrom": {
-    "sourceTree": "411e58fd9f2f268366576b621932ae2bc4f2f0c2",
+    "sourceTree": "872d67ad4e9083b1eacd7d6d3859148437b96b59",
     "helia_profiler": "0.1.6",
     "typer": "0.26.8",
     "click": "8.3.3",
@@ -1058,7 +1058,6 @@
       "type": "string"
     },
     "ClockDomain": {
-      "description": "An independently selectable clock domain on a SoC (e.g. cpu).",
       "properties": {
         "name": {
           "title": "Name",
@@ -1346,7 +1345,6 @@
       "type": "object"
     },
     "CoreArch": {
-      "description": "ARM core architectures relevant to profiling capabilities.",
       "enum": [
         "cortex-m4",
         "cortex-m55"
@@ -1809,7 +1807,6 @@
       "type": "object"
     },
     "PmuTier": {
-      "description": "PMU capability tiers.",
       "enum": [
         "dwt",
         "pmu"
@@ -1935,7 +1932,7 @@
       "type": "object"
     },
     "PowerFirmware": {
-      "description": "Which binary is on the target during power capture.\n\n``DEDICATED`` flashes the transport-free ``hpx_profiler_power`` image\n(see ``firmware/__init__.py`` WP2) before capture; SWO/UART/RTT/USB\ntraffic on the shared transport binary was measured to add significant\ncurrent contamination into the GPIO-gated Joulescope window on AP510\ndepending on transport, so ``DEDICATED`` is the default.  ``SHARED``\nrestores the pre-WP2 behavior of reusing the already-flashed transport\nbinary for power capture (useful when no J-Link is free to reflash, or\nfor bring-up comparisons against the contaminated baseline).",
+      "description": "Which binary is on the target during power capture.\n\n``DEDICATED`` flashes the transport-free ``hpx_profiler_power`` image\n(see ``firmware/__init__.py`` WP2) before capture, avoiding SWO/UART/\nRTT/USB current contamination in the GPIO-gated Joulescope window, so\n``DEDICATED`` is the default.  ``SHARED`` reuses the already-flashed\ntransport binary for power capture (useful when no J-Link is free to\nreflash, or for bring-up comparisons against the contaminated\nbaseline).",
       "enum": [
         "dedicated",
         "shared"
@@ -2311,7 +2308,6 @@
       "type": "object"
     },
     "SocFamily": {
-      "description": "Ambiq SoC generation families.",
       "enum": [
         "ap3",
         "ap4",

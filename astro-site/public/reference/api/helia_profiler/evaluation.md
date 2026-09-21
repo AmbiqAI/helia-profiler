@@ -6,7 +6,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `experimental`
 
-Generated from the `src/helia_profiler` tree `411e58fd9f2f268366576b621932ae2bc4f2f0c2`.
+Generated from the `src/helia_profiler` tree `872d67ad4e9083b1eacd7d6d3859148437b96b59`.
 
 ## helia_profiler.MetricDirection
 
@@ -687,7 +687,7 @@ Compare identity, validity, topology, and intentional run dimensions.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/evaluation/comparability.py:162`
+Source: `src/helia_profiler/evaluation/comparability.py:154`
 
 ## helia_profiler.MetricVerdict
 
@@ -806,7 +806,7 @@ Evaluate captured results without mutating pipeline state.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/evaluation/validity.py:193`
+Source: `src/helia_profiler/evaluation/validity.py:192`
 
 ## helia_profiler.ComparisonVerdict
 

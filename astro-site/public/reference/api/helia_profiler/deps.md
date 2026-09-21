@@ -6,7 +6,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`, `experimental`
 
-Generated from the `src/helia_profiler` tree `411e58fd9f2f268366576b621932ae2bc4f2f0c2`.
+Generated from the `src/helia_profiler` tree `872d67ad4e9083b1eacd7d6d3859148437b96b59`.
 
 ## helia_profiler.QualificationState
 
@@ -248,7 +248,7 @@ Read-only lock provenance surface for later diagnostics collectors.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/results/dependencies.py:130`
+Source: `src/helia_profiler/results/dependencies.py:128`
 
 ### helia_profiler.DependencyLockProvenance.lock_path
 
@@ -258,7 +258,7 @@ Source: `src/helia_profiler/results/dependencies.py:130`
 lock_path: Path
 ```
 
-Source: `src/helia_profiler/results/dependencies.py:134`
+Source: `src/helia_profiler/results/dependencies.py:132`
 
 ### helia_profiler.DependencyLockProvenance.lock_sha256
 
@@ -268,7 +268,7 @@ Source: `src/helia_profiler/results/dependencies.py:134`
 lock_sha256: str
 ```
 
-Source: `src/helia_profiler/results/dependencies.py:135`
+Source: `src/helia_profiler/results/dependencies.py:133`
 
 ### helia_profiler.DependencyLockProvenance.registry_hash
 
@@ -278,7 +278,7 @@ Source: `src/helia_profiler/results/dependencies.py:135`
 registry_hash: str
 ```
 
-Source: `src/helia_profiler/results/dependencies.py:136`
+Source: `src/helia_profiler/results/dependencies.py:134`
 
 ### helia_profiler.DependencyLockProvenance.requested_refs
 
@@ -288,7 +288,7 @@ Source: `src/helia_profiler/results/dependencies.py:136`
 requested_refs: tuple[DependencyRequest, ...]
 ```
 
-Source: `src/helia_profiler/results/dependencies.py:137`
+Source: `src/helia_profiler/results/dependencies.py:135`
 
 ### helia_profiler.DependencyLockProvenance.resolved
 
@@ -298,7 +298,7 @@ Source: `src/helia_profiler/results/dependencies.py:137`
 resolved: tuple[DependencyModule, ...]
 ```
 
-Source: `src/helia_profiler/results/dependencies.py:138`
+Source: `src/helia_profiler/results/dependencies.py:136`
 
 ### helia_profiler.DependencyLockProvenance.overrides
 
@@ -308,7 +308,7 @@ Source: `src/helia_profiler/results/dependencies.py:138`
 overrides: tuple[DependencyOverride, ...]
 ```
 
-Source: `src/helia_profiler/results/dependencies.py:139`
+Source: `src/helia_profiler/results/dependencies.py:137`
 
 ### helia_profiler.DependencyLockProvenance.qualification
 
@@ -318,7 +318,7 @@ Source: `src/helia_profiler/results/dependencies.py:139`
 qualification: QualificationState
 ```
 
-Source: `src/helia_profiler/results/dependencies.py:140`
+Source: `src/helia_profiler/results/dependencies.py:138`
 
 ### helia_profiler.DependencyLockProvenance.baseline_fingerprint
 
@@ -328,7 +328,7 @@ Source: `src/helia_profiler/results/dependencies.py:140`
 baseline_fingerprint: str
 ```
 
-Source: `src/helia_profiler/results/dependencies.py:141`
+Source: `src/helia_profiler/results/dependencies.py:139`
 
 ### helia_profiler.DependencyLockProvenance.workspace_fingerprint
 
@@ -338,7 +338,7 @@ Source: `src/helia_profiler/results/dependencies.py:141`
 workspace_fingerprint: str
 ```
 
-Source: `src/helia_profiler/results/dependencies.py:142`
+Source: `src/helia_profiler/results/dependencies.py:140`
 
 ### helia_profiler.DependencyLockProvenance.lock_mode
 
@@ -348,7 +348,7 @@ Source: `src/helia_profiler/results/dependencies.py:142`
 lock_mode: DependencyLockMode
 ```
 
-Source: `src/helia_profiler/results/dependencies.py:143`
+Source: `src/helia_profiler/results/dependencies.py:141`
 
 ### helia_profiler.DependencyLockProvenance.update_requested
 
@@ -358,7 +358,7 @@ Source: `src/helia_profiler/results/dependencies.py:143`
 update_requested: bool
 ```
 
-Source: `src/helia_profiler/results/dependencies.py:144`
+Source: `src/helia_profiler/results/dependencies.py:142`
 
 ## helia_profiler.CompatibilityResolution
 

@@ -3,12 +3,12 @@
   "generatedFrom": {
     "tool": "pyref",
     "version": "1.7.3",
-    "sourceTree": "411e58fd9f2f268366576b621932ae2bc4f2f0c2"
+    "sourceTree": "872d67ad4e9083b1eacd7d6d3859148437b96b59"
   },
   "language": "python",
   "modules": [
     {
-      "description": "Collecting a redacted support bundle from a run directory, and reading one back.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `411e58fd9f2f268366576b621932ae2bc4f2f0c2`.",
+      "description": "Collecting a redacted support bundle from a run directory, and reading one back.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `872d67ad4e9083b1eacd7d6d3859148437b96b59`.",
       "name": "diagnostics",
       "path": "helia_profiler.diagnostics",
       "submodules": [],
@@ -149,9 +149,9 @@
               "returns": [],
               "signature": "workspace: Path | None = None",
               "source": {
-                "line": 59,
+                "line": 55,
                 "path": "src/helia_profiler/diagnostics/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L59"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L55"
               },
               "summary": ""
             },
@@ -168,9 +168,9 @@
               "returns": [],
               "signature": "config_path: Path | None = None",
               "source": {
-                "line": 60,
+                "line": 56,
                 "path": "src/helia_profiler/diagnostics/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L60"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L56"
               },
               "summary": ""
             },
@@ -187,9 +187,9 @@
               "returns": [],
               "signature": "toolchain: Toolchain = Toolchain.ARM_NONE_EABI_GCC",
               "source": {
-                "line": 61,
+                "line": 57,
                 "path": "src/helia_profiler/diagnostics/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L61"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L57"
               },
               "summary": ""
             },
@@ -206,9 +206,9 @@
               "returns": [],
               "signature": "transport: Transport = Transport.RTT",
               "source": {
-                "line": 62,
+                "line": 58,
                 "path": "src/helia_profiler/diagnostics/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L62"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L58"
               },
               "summary": ""
             },
@@ -225,9 +225,9 @@
               "returns": [],
               "signature": "engine: EngineType = EngineType.HELIA_RT",
               "source": {
-                "line": 63,
+                "line": 59,
                 "path": "src/helia_profiler/diagnostics/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L63"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L59"
               },
               "summary": ""
             },
@@ -244,9 +244,9 @@
               "returns": [],
               "signature": "include_probes: bool = True",
               "source": {
-                "line": 64,
+                "line": 60,
                 "path": "src/helia_profiler/diagnostics/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L64"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L60"
               },
               "summary": ""
             },
@@ -263,9 +263,9 @@
               "returns": [],
               "signature": "include_ports: bool = True",
               "source": {
-                "line": 65,
+                "line": 61,
                 "path": "src/helia_profiler/diagnostics/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L65"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L61"
               },
               "summary": ""
             },
@@ -282,9 +282,9 @@
               "returns": [],
               "signature": "raw_probe_ids: bool = False",
               "source": {
-                "line": 66,
+                "line": 62,
                 "path": "src/helia_profiler/diagnostics/support_bundle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L66"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L62"
               },
               "summary": ""
             }
@@ -295,9 +295,9 @@
           "returns": [],
           "signature": "SupportBundleOptions(\n    workspace: Path | None = None,\n    config_path: Path | None = None,\n    toolchain: Toolchain = Toolchain.ARM_NONE_EABI_GCC,\n    transport: Transport = Transport.RTT,\n    engine: EngineType = EngineType.HELIA_RT,\n    include_probes: bool = True,\n    include_ports: bool = True,\n    raw_probe_ids: bool = False,\n) -> None",
           "source": {
-            "line": 50,
+            "line": 46,
             "path": "src/helia_profiler/diagnostics/support_bundle.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L50"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L46"
           },
           "summary": "What hpx doctor --bundle should collect."
         },
@@ -600,9 +600,9 @@
           "returns": [],
           "signature": "collect_support_bundle(options: SupportBundleOptions = SupportBundleOptions()) -> SupportBundleCollection",
           "source": {
-            "line": 82,
+            "line": 73,
             "path": "src/helia_profiler/diagnostics/support_bundle.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L82"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L73"
           },
           "summary": "Gather every diagnostic section, redact it, and build the manifest."
         },
@@ -619,9 +619,9 @@
           "returns": [],
           "signature": "write_support_bundle(collection: SupportBundleCollection, output: Path) -> Path",
           "source": {
-            "line": 518,
+            "line": 505,
             "path": "src/helia_profiler/diagnostics/support_bundle.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L518"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L505"
           },
           "summary": "Write collection as a deterministic ZIP archive and return its path."
         },
@@ -638,9 +638,9 @@
           "returns": [],
           "signature": "verify_support_bundle(path: Path) -> SupportBundleManifest",
           "source": {
-            "line": 591,
+            "line": 578,
             "path": "src/helia_profiler/diagnostics/support_bundle.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L591"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/diagnostics/support_bundle.py#L578"
           },
           "summary": "Verify a support-bundle archive's structure, contents, and digests."
         }

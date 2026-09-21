@@ -3,12 +3,12 @@
   "generatedFrom": {
     "tool": "pyref",
     "version": "1.7.3",
-    "sourceTree": "411e58fd9f2f268366576b621932ae2bc4f2f0c2"
+    "sourceTree": "872d67ad4e9083b1eacd7d6d3859148437b96b59"
   },
   "language": "python",
   "modules": [
     {
-      "description": "The run description: what to profile, on what, how, and what to write out. Every field of a YAML config file lands in one of these.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`\n\nGenerated from the `src/helia_profiler` tree `411e58fd9f2f268366576b621932ae2bc4f2f0c2`.",
+      "description": "The run description: what to profile, on what, how, and what to write out. Every field of a YAML config file lands in one of these.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`\n\nGenerated from the `src/helia_profiler` tree `872d67ad4e9083b1eacd7d6d3859148437b96b59`.",
       "name": "config",
       "path": "helia_profiler.config",
       "submodules": [],
@@ -1647,7 +1647,7 @@
               "summary": ""
             },
             {
-              "description": "The clean-window target the firmware is actually built with.\n\n``profiling.window_target_ms`` is raised to a power-usable floor only\nin ``window_mode: auto`` -- ``fixed`` means \"use my number\". This is a\nderived property rather than a helper each caller re-implements\nbecause the rule spans two config sections and had drifted into three\nhand-rolled copies, one of which disagreed: the firmware render used\nthe mode-gated form while the power planner clamped unconditionally,\nso a ``fixed`` window shorter than the floor produced a plan\ndescribing a 5 s window against firmware built to spin for 1 s. That\nis invisible under the default ``auto``, which is why nothing caught\nit (found by review of #136).",
+              "description": "The clean-window target the firmware is actually built with.\n\n``profiling.window_target_ms`` is raised to a power-usable floor only\nin ``window_mode: auto`` -- ``fixed`` means \"use my number\". This is a\nderived property rather than a helper each caller re-implements,\nbecause the rule spans two config sections and every caller (firmware\nrender, power planner) must agree on the same effective value (#136).",
               "examples": [],
               "id": "helia_profiler.ProfileConfig.effective_window_target_ms",
               "kind": "attribute",

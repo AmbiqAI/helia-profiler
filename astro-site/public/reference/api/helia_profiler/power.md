@@ -6,7 +6,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`, `experimental`
 
-Generated from the `src/helia_profiler` tree `411e58fd9f2f268366576b621932ae2bc4f2f0c2`.
+Generated from the `src/helia_profiler` tree `872d67ad4e9083b1eacd7d6d3859148437b96b59`.
 
 ## helia_profiler.PowerMode
 
@@ -144,14 +144,13 @@ PowerResult(
 Complete result of a power capture.
 
 ``metadata`` is the typed :class:`~helia_profiler.power.metadata.PowerMetadata`
-(#154 Phase 2 breaking change — previously ``dict[str, Any]``; the flat
-dict view is ``metadata.to_metadata_dict()``). The result is frozen but
-its metadata is deliberately mutable: pipeline stages enrich it after
-capture, like ``RunMetadata``.
+(#154 Phase 2); the flat dict view is ``metadata.to_metadata_dict()``.
+The result is frozen but its metadata is deliberately mutable: pipeline
+stages enrich it after capture, like ``RunMetadata``.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/power/base.py:77`
+Source: `src/helia_profiler/power/base.py:73`
 
 ### helia_profiler.PowerResult.summary
 
@@ -161,7 +160,7 @@ Source: `src/helia_profiler/power/base.py:77`
 summary: PowerSummary
 ```
 
-Source: `src/helia_profiler/power/base.py:88`
+Source: `src/helia_profiler/power/base.py:83`
 
 ### helia_profiler.PowerResult.samples
 
@@ -171,7 +170,7 @@ Source: `src/helia_profiler/power/base.py:88`
 samples: list[PowerSample] = field(default_factory=list)
 ```
 
-Source: `src/helia_profiler/power/base.py:89`
+Source: `src/helia_profiler/power/base.py:84`
 
 ### helia_profiler.PowerResult.gated_windows
 
@@ -181,7 +180,7 @@ Source: `src/helia_profiler/power/base.py:89`
 gated_windows: list[GatedPowerWindow] = field(default_factory=list)
 ```
 
-Source: `src/helia_profiler/power/base.py:90`
+Source: `src/helia_profiler/power/base.py:85`
 
 ### helia_profiler.PowerResult.per_layer
 
@@ -191,7 +190,7 @@ Source: `src/helia_profiler/power/base.py:90`
 per_layer: dict[str, Any] | None = None
 ```
 
-Source: `src/helia_profiler/power/base.py:91`
+Source: `src/helia_profiler/power/base.py:86`
 
 ### helia_profiler.PowerResult.metadata
 
@@ -201,7 +200,7 @@ Source: `src/helia_profiler/power/base.py:91`
 metadata: PowerMetadata = field(default_factory=PowerMetadata)
 ```
 
-Source: `src/helia_profiler/power/base.py:92`
+Source: `src/helia_profiler/power/base.py:87`
 
 ## helia_profiler.PowerTerminalRecord
 

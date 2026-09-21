@@ -6,7 +6,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `experimental`
 
-Generated from the `src/helia_profiler` tree `411e58fd9f2f268366576b621932ae2bc4f2f0c2`.
+Generated from the `src/helia_profiler` tree `872d67ad4e9083b1eacd7d6d3859148437b96b59`.
 
 ## helia_profiler.SupportBundleSection
 
@@ -107,7 +107,7 @@ bundle can be built entirely offline with no attached hardware.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/diagnostics/support_bundle.py:50`
+Source: `src/helia_profiler/diagnostics/support_bundle.py:46`
 
 ### helia_profiler.SupportBundleOptions.workspace
 
@@ -117,7 +117,7 @@ Source: `src/helia_profiler/diagnostics/support_bundle.py:50`
 workspace: Path | None = None
 ```
 
-Source: `src/helia_profiler/diagnostics/support_bundle.py:59`
+Source: `src/helia_profiler/diagnostics/support_bundle.py:55`
 
 ### helia_profiler.SupportBundleOptions.config_path
 
@@ -127,7 +127,7 @@ Source: `src/helia_profiler/diagnostics/support_bundle.py:59`
 config_path: Path | None = None
 ```
 
-Source: `src/helia_profiler/diagnostics/support_bundle.py:60`
+Source: `src/helia_profiler/diagnostics/support_bundle.py:56`
 
 ### helia_profiler.SupportBundleOptions.toolchain
 
@@ -137,7 +137,7 @@ Source: `src/helia_profiler/diagnostics/support_bundle.py:60`
 toolchain: Toolchain = Toolchain.ARM_NONE_EABI_GCC
 ```
 
-Source: `src/helia_profiler/diagnostics/support_bundle.py:61`
+Source: `src/helia_profiler/diagnostics/support_bundle.py:57`
 
 ### helia_profiler.SupportBundleOptions.transport
 
@@ -147,7 +147,7 @@ Source: `src/helia_profiler/diagnostics/support_bundle.py:61`
 transport: Transport = Transport.RTT
 ```
 
-Source: `src/helia_profiler/diagnostics/support_bundle.py:62`
+Source: `src/helia_profiler/diagnostics/support_bundle.py:58`
 
 ### helia_profiler.SupportBundleOptions.engine
 
@@ -157,7 +157,7 @@ Source: `src/helia_profiler/diagnostics/support_bundle.py:62`
 engine: EngineType = EngineType.HELIA_RT
 ```
 
-Source: `src/helia_profiler/diagnostics/support_bundle.py:63`
+Source: `src/helia_profiler/diagnostics/support_bundle.py:59`
 
 ### helia_profiler.SupportBundleOptions.include_probes
 
@@ -167,7 +167,7 @@ Source: `src/helia_profiler/diagnostics/support_bundle.py:63`
 include_probes: bool = True
 ```
 
-Source: `src/helia_profiler/diagnostics/support_bundle.py:64`
+Source: `src/helia_profiler/diagnostics/support_bundle.py:60`
 
 ### helia_profiler.SupportBundleOptions.include_ports
 
@@ -177,7 +177,7 @@ Source: `src/helia_profiler/diagnostics/support_bundle.py:64`
 include_ports: bool = True
 ```
 
-Source: `src/helia_profiler/diagnostics/support_bundle.py:65`
+Source: `src/helia_profiler/diagnostics/support_bundle.py:61`
 
 ### helia_profiler.SupportBundleOptions.raw_probe_ids
 
@@ -187,7 +187,7 @@ Source: `src/helia_profiler/diagnostics/support_bundle.py:65`
 raw_probe_ids: bool = False
 ```
 
-Source: `src/helia_profiler/diagnostics/support_bundle.py:66`
+Source: `src/helia_profiler/diagnostics/support_bundle.py:62`
 
 ## helia_profiler.SupportBundleManifest
 
@@ -381,7 +381,7 @@ instead. Only truly unexpected internal errors propagate.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/diagnostics/support_bundle.py:82`
+Source: `src/helia_profiler/diagnostics/support_bundle.py:73`
 
 ## helia_profiler.write_support_bundle
 
@@ -407,7 +407,7 @@ file, ...), so CLI callers only ever need to catch ``HpxError``.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/diagnostics/support_bundle.py:518`
+Source: `src/helia_profiler/diagnostics/support_bundle.py:505`
 
 ## helia_profiler.verify_support_bundle
 
@@ -429,4 +429,4 @@ itself.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/diagnostics/support_bundle.py:591`
+Source: `src/helia_profiler/diagnostics/support_bundle.py:578`
