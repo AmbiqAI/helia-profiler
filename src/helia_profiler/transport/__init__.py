@@ -34,9 +34,6 @@ from .swo import SwoTransport
 from .uart import UartTransport
 from .usb_cdc import UsbCdcTransport
 
-# ---------------------------------------------------------------------------
-# CaptureTransport backend registry
-# ---------------------------------------------------------------------------
 # One factory per Transport enum member — the sole dispatch point for "which
 # backend drives this transport".  Adding a transport means registering a
 # backend factory here; nothing downstream branches on the transport string.

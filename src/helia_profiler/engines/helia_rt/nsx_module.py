@@ -47,9 +47,6 @@ def _install_nsx_module(
 
     shutil.copy2(src_yaml, module_dir / "nsx-module.yaml")
 
-    # --- Generate a prebuilt-wrapper CMakeLists.txt ---
-    # The dist's nsx/CMakeLists.txt is source-build-only (needs the full
-    # repo); generate a wrapper that links the static library directly.
     core_override_block = ""
     if core_override:
         tag = core_override.lower()
@@ -63,7 +60,6 @@ def _install_nsx_module(
     )
     (module_dir / "CMakeLists.txt").write_text(cmake_text)
 
-    # --- Copy distribution content (lib/, tensorflow/, third_party/, …) ---
     for d in _DIST_DIRS:
         target = module_dir / d
         source = dist_path / d

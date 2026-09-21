@@ -22,9 +22,7 @@ from helia_profiler.pipeline import PipelineContext
 from helia_profiler.placement import Placement
 from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 
-# A minimal, fully parseable firmware capture: one preset, one iteration,
-# one CONV_2D layer, framed by the protocol sentinels.  Mirrors the canned
-# stream used in ``tests/test_rtt_reader.py``.
+# Mirrors the canned stream used in ``tests/test_rtt_reader.py``.
 CANNED_PMU_LINES: list[str] = [
     "--- HPX_START ---",
     "--- HPX_PRESET basic_cpu ---",
@@ -53,9 +51,7 @@ def make_pmu_ctx(
     lockstep: bool | None = False,
     extra: dict | None = None,
 ) -> PipelineContext:
-    """Build a resolved :class:`PipelineContext` ready for a capture stage.
-
-    ``lockstep=None`` leaves ``power.lockstep`` *unset* rather than writing an
+    """``lockstep=None`` leaves ``power.lockstep`` *unset* rather than writing an
     explicit ``null``, so the auto-resolution path is what gets exercised.
     (Both spellings mean the same thing to ``PowerConfig``, but leaving the key
     out matches what a real user config looks like.)
@@ -93,8 +89,6 @@ def make_pmu_ctx(
 
 @pytest.fixture()
 def pmu_ctx_factory(tmp_path: Path):
-    """Return a factory building resolved capture contexts under ``tmp_path``."""
-
     def _factory(**kwargs) -> PipelineContext:
         return make_pmu_ctx(tmp_path, **kwargs)
 

@@ -461,10 +461,7 @@ def test_reader_agrees_with_litert_on_every_fixture():
     )
 
 
-# ---------------------------------------------------------------------------
 # #147: tripwire the hand-mirrored helia-aot boundary constants
-# ---------------------------------------------------------------------------
-
 #: Every observable edge of the pinned helia-aot 0.18 raise band, measured by
 #: running its real code (the six points from the module comment plus the
 #: one-rounding-step neighbours of each boundary). ``quantize_multiplier``

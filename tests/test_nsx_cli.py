@@ -1,14 +1,7 @@
-"""Tests for the nsx wrapper — error translation and timeout behaviour.
+"""Tests for the nsx wrapper.
 
-The shim wraps :mod:`neuralspotx.api` Python entry points; it does not
-shell out to a binary. These tests patch the API functions directly and
-verify that:
-
-* ``BuildError`` is raised on ``NSXError`` translation;
-* ``flash`` forwards ``jlink_serial`` to ``flash_app`` as ``probe_serial``;
-* ``timeout_s`` is forwarded to the underlying API entry points so the
-  in-subprocess process-tree watchdog can enforce it; on timeout NSX
-  raises ``NSXError`` which surfaces as ``BuildError``.
+The shim wraps :mod:`neuralspotx.api` directly and never shells out,
+so these tests patch the API functions instead of a subprocess.
 """
 
 from __future__ import annotations
@@ -44,9 +37,8 @@ class TestNsxBuild:
         )
 
     def test_target_forwarded_to_api(self, tmp_path: Path) -> None:
-        # WP2: the dedicated power binary is built via a second
-        # `cmake --build --target hpx_profiler_power` from the same
-        # configure — verify the target kwarg reaches the nsx API.
+        # The power binary is built via a second `cmake --build --target`
+        # from the same configure; verify the target kwarg reaches the API.
         with patch("helia_profiler.deps.nsx.nsx_api.build_app") as build_mock:
             nsx.build(tmp_path, toolchain="armclang", target="hpx_profiler_power", timeout_s=42)
         build_mock.assert_called_once_with(
@@ -66,11 +58,8 @@ class TestNsxBuild:
         assert "boom" in (err.details or "")
 
     def test_timeout_surfaces_as_build_error(self, tmp_path: Path) -> None:
-        # The real subprocess-tree watchdog lives in
-        # ``neuralspotx.subprocess_utils``; from the helia-profiler side
-        # all we need to verify is that the resulting NSXError
-        # ("Subprocess timed out after Ns: ...") is translated into a
-        # BuildError carrying the same message.
+        # The watchdog lives in neuralspotx; here we only verify the
+        # resulting NSXError translates into a BuildError with the same message.
         timeout_err = NSXError("Subprocess timed out after 1.0s: cmake -B build")
         with patch("helia_profiler.deps.nsx.nsx_api.build_app", side_effect=timeout_err):
             with pytest.raises(BuildError) as exc_info:
@@ -181,8 +170,6 @@ class TestBoardModuleCompatibility:
     """``board_module_compatibility`` reads the packaged NSX board module."""
 
     def test_reads_the_qualified_boards_toolchain_declaration(self) -> None:
-        # The canonical declarations the matrix keys on: gcc only for
-        # apollo4l_blue_evb, all three toolchains for apollo3p_evb.
         assert nsx.board_module_compatibility("apollo4l_blue_evb") == (
             "nsx-board-apollo4l-blue-evb",
             ("arm-none-eabi-gcc",),
@@ -193,8 +180,8 @@ class TestBoardModuleCompatibility:
         assert set(declared[1]) == {"arm-none-eabi-gcc", "armclang", "atfe"}
 
     def test_follows_the_starter_profiles_module_name(self) -> None:
-        # The registry spells this module in lower case; deriving the name
-        # from the board ID would miss it.
+        # Registry spells the module lower-case; deriving it from the
+        # board ID would miss it.
         declared = nsx.board_module_compatibility("apollo330mP_evb")
         assert declared is not None
         assert declared[0] == "nsx-board-apollo330mp-evb"

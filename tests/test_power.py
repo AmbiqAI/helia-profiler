@@ -40,7 +40,6 @@ _SECOND = 1 << 30
 
 
 def _mark_power_firmware_deployed(ctx, tmp_path: Path) -> None:
-    """Mark a synthetic dedicated artifact as deployed for capture-only tests."""
     binary = tmp_path / "hpx_profiler_power"
     binary.touch()
     artifact = FirmwareArtifact(
@@ -153,10 +152,9 @@ class TestPowerDiagnostics:
 
         Lock-step off + state/GO pins present means the firmware never waits
         for the host, so the window can open and close before the GPI poller
-        is armed. That reads as a dead gate wire, and cost real bench time
-        (headers re-seated on an Apollo4 Blue Plus) before the flag was found.
-        Both the message -- which is what the degraded-path ``log.warning``
-        prints -- and the hint must name the fix.
+        is armed. That reads as a dead gate wire. Both the message -- which
+        is what the degraded-path ``log.warning`` prints -- and the hint must
+        name the fix.
         """
         from helia_profiler.power.diagnostics import GateFailureKind, classify_gate_failure
 
@@ -1076,11 +1074,12 @@ class TestStreamedGateSelection:
 class TestMissedGateWarningNamesTheFix:
     """End-to-end: the degraded-path ``log.warning`` must name the fix.
 
-    Issue #114's whole cost was that the user only ever saw "no GPIO gate
-    rising edge detected" and went looking for a wiring fault. This drives the
-    real :func:`capture_gated` against a fake instrument whose GPI never goes
-    high -- the exact bench signature -- and reads the log record back, so it
-    pins what the operator actually sees rather than what a helper returns.
+    The whole cost of this failure mode was that the user only ever saw "no
+    GPIO gate rising edge detected" and went looking for a wiring fault. This
+    drives the real :func:`capture_gated` against a fake instrument whose GPI
+    never goes high -- the exact bench signature -- and reads the log record
+    back, so it pins what the operator actually sees rather than what a
+    helper returns.
     """
 
     class _FakeJoulescopeDriver:
@@ -1474,12 +1473,10 @@ class TestJoulescopeDriver:
         assert driver.mode is PowerMode.EXTERNAL
 
     def test_check_available_raises_without_package(self):
-        """Joulescope check_available should raise PowerError if not installed."""
         driver = get_driver("joulescope")
         try:
             import pyjoulescope_driver  # noqa: F401
 
-            # If pyjoulescope_driver is actually installed, skip this test
             pytest.skip("pyjoulescope_driver is installed — cannot test import failure")
         except ImportError:
             with pytest.raises(PowerError, match="not installed"):
@@ -3070,9 +3067,6 @@ class TestPowerFirmwareSelection:
         that mismatch rather than warning, so the default `firmware:
         dedicated` path could not finish. `firmware: shared` only worked by
         accident, because both binaries spin.
-
-        Verified against the pre-fix code: `count=10, ref_us=5,000,000`,
-        expected 50.000 s vs measured 5.000 s, ratio 0.100.
         """
         from helia_profiler.stages.plan_power import plan_power_run
         from helia_profiler.results import FirmwareMeta, PmuResult
@@ -3175,9 +3169,9 @@ class TestPowerFirmwareSelection:
         The busy_loop window runs exactly one calibrated spin whatever the
         host asked for, so a `configured` plan of N spins describes a window
         that cannot happen -- and every consumer computing `count x
-        reference_us` would then disagree with the real window by N, which is
-        the spurious-mismatch shape #112 removed. Reachable through the public
-        `plan_power_run(ctx, inference_count=...)` API; the shipping pipeline
+        reference_us` would then disagree with the real window by N, the
+        spurious mismatch this test guards against. Reachable through the
+        public `plan_power_run(ctx, inference_count=...)` API; the shipping pipeline
         constructs `PlanPowerRunStage()` with no count.
         """
         from helia_profiler.stages.plan_power import plan_power_run
@@ -3205,7 +3199,7 @@ class TestPowerFirmwareSelection:
         So the shared case -- which has MORE error, being two independent
         per-boot calibrations rather than one -- got the tighter band, on a
         check that RAISES. A spin 11% off target raised on shared and passed
-        on dedicated (found by review).
+        on dedicated.
         """
         from helia_profiler.power.diagnostics import (
             COUNTED_WINDOW_TOLERANCE,
@@ -3799,9 +3793,8 @@ def test_plan_power_progress_message_is_probe_aware(tmp_path, monkeypatch):
 class TestObserverAbsoluteSlack:
     """The observer comparison's reference is a packet integral bounded by
     GPI polls, so its mechanical error is ABSOLUTE. A purely relative 1% band
-    shrinks below instrument resolution on short windows (found by review of
-    the #142/#181 promotion; assess_gate_duration always modelled the packet
-    term via packet_slack_s)."""
+    shrinks below instrument resolution on short windows; assess_gate_duration
+    always modelled the packet term via packet_slack_s."""
 
     def test_slack_arithmetic_mirrors_the_gate_duration_packet_term(self):
         from helia_profiler.power.diagnostics import external_observer_slack_s

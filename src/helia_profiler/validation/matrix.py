@@ -25,10 +25,6 @@ from ..engines import EngineType
 from ..hostenv.toolchains import get_toolchain_spec
 from ..platform import SocFamily, get_soc_for_board
 
-# ---------------------------------------------------------------------------
-# Registry types
-# ---------------------------------------------------------------------------
-
 
 class MemoryProfile(StrEnum):
     """Coarse placement profiles exercised by the hardware validation matrix."""
@@ -80,7 +76,7 @@ class ModelSpec:
     """One canonical benchmark model."""
 
     id: str  # short stable ID (used on CLI + in reports)
-    name: str  # human-readable name
+    name: str
     category: str  # MLPerf Tiny category (kws / vww / ic / ad)
     fixture_path: str  # path relative to helia-profiler root
     arena_size: int  # tensor arena in bytes (RT / TFLM)
@@ -90,11 +86,9 @@ class ModelSpec:
 
     @property
     def decision_group(self) -> str:
-        """Return the workload group used for performance decisions."""
         return self.comparison_group or self.id
 
     def fixture_for(self, engine: EngineType) -> str:
-        """Return the model artifact consumed by ``engine``."""
         if engine is EngineType.EXECUTORCH and self.executorch is not None:
             return self.executorch.fixture_path
         return self.fixture_path
@@ -111,8 +105,8 @@ class BoardSpec:
     """One target board supported by the validation suite."""
 
     id: str  # CLI-facing ID (e.g. apollo510_evb)
-    display_name: str  # human-readable name
-    jlink_device: str  # device name for J-Link / probes
+    display_name: str
+    jlink_device: str
     has_psram: bool = False
     transports: tuple[Transport, ...] = (Transport.RTT, Transport.SWO, Transport.UART)
     toolchains: tuple[Toolchain, ...] = (
@@ -162,7 +156,6 @@ class CaseSpec:
 
     @property
     def cmsis_nn_provider(self) -> CmsisNNProvider:
-        """Return the concrete CMSIS-NN implementation used by this case."""
         if self.engine is EngineType.EXECUTORCH:
             if self.cmsis_nn_backend is None:
                 raise ValueError("ExecuTorch validation case is missing a CMSIS-NN provider")
@@ -262,11 +255,8 @@ def _board_spec(board_id: str, display_name: str, description: str = "") -> Boar
     )
 
 
-# ---------------------------------------------------------------------------
-# Registries — the single source of truth for what's validated
-# ---------------------------------------------------------------------------
+# Registries below are the single source of truth for what's validated.
 
-#: Supported inference engines for validation.
 ENGINES: tuple[EngineType, ...] = (
     EngineType.HELIA_RT,
     EngineType.HELIA_AOT,
@@ -493,13 +483,7 @@ BOARDS: dict[str, BoardSpec] = {
         "Apollo510 Lite EVB",
         description="Ambiq Apollo510 Lite evaluation board (Cortex-M55)",
     ),
-    # Future boards plug in here.
 }
-
-
-# ---------------------------------------------------------------------------
-# Matrix expansion
-# ---------------------------------------------------------------------------
 
 
 def build_matrix(
@@ -584,7 +568,6 @@ def build_matrix(
                 unknown.append(str(e))
         if unknown:
             raise ValueError(f"Unknown engine(s): {unknown}. Known: {[e.value for e in ENGINES]}")
-        # Reject engines outside the validation matrix.
         out_of_matrix = [e.value for e in engine_ids if e not in ENGINES]
         if out_of_matrix:
             raise ValueError(

@@ -167,10 +167,6 @@ def measure_memory_regions(
     )
 
 
-# ---------------------------------------------------------------------------
-# Plan-vs-measured reconciliation (#133 Phase 3)
-# ---------------------------------------------------------------------------
-
 #: Plan-consumer name -> candidate symbol suffixes in the linked image.
 #: Matching is by SUFFIX (the symbol_address idiom), so C++ mangling
 #: (_ZL15g_arena_storage) resolves. Multi-piece consumers list every

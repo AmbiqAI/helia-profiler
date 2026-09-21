@@ -24,7 +24,6 @@ NOMVE = "-mcpu=cortex-m55+nomve"
 def _build_tree(
     root: Path, flags: list[str], *, units: int = 3, nest: int = 0
 ) -> tuple[Path, Path]:
-    """Write a fake build tree: one binary and one compile database."""
     build_dir = root / "build" / "apollo510_evb"
     build_dir.mkdir(parents=True)
     binary = build_dir / "hpx_profiler.elf"
@@ -175,11 +174,6 @@ def test_an_unreadable_binary_records_nothing_rather_than_a_digestless_image(tmp
     )
 
 
-# ---------------------------------------------------------------------------
-# Recording into run metadata
-# ---------------------------------------------------------------------------
-
-
 def _record(metadata: RunMetadata, root: Path, flags: list[str], *, role: str) -> None:
     build_dir, binary = _build_tree(root, flags)
     record_build_image(
@@ -218,11 +212,6 @@ def test_an_unreadable_binary_leaves_run_metadata_untouched(tmp_path):
     )
 
     assert meta.build_images == ()
-
-
-# ---------------------------------------------------------------------------
-# The comparison dimension
-# ---------------------------------------------------------------------------
 
 
 def _record_dict(role: str, flags: dict[str, int]) -> dict:

@@ -33,7 +33,6 @@ def print_analysis(
     console._console.print(Rule(title, style="bright_blue"))
     console._console.print()
 
-    # ── Summary ───────────────────────────────────────────────
     summary = Table(show_header=False, box=None, padding=(0, 2), expand=False)
     summary.add_column("key", style="dim", no_wrap=True)
     summary.add_column("value")
@@ -48,7 +47,6 @@ def print_analysis(
     console._console.print(summary)
     console._console.print()
 
-    # ── Per-layer breakdown ───────────────────────────────────
     layer_table = Table(
         title="[bold]Per-Layer Breakdown[/bold]",
         box=box.SIMPLE_HEAVY,
@@ -101,7 +99,6 @@ def print_analysis(
     console._console.print(layer_table)
     console._console.print()
 
-    # ── Reference comparison ──────────────────────────────────
     if reference is not None:
         ref_label = reference.engine if hasattr(reference, "engine") else "tflite"
         console._console.print(
@@ -161,7 +158,6 @@ def print_analysis(
         console._console.print(cmp_table)
         console._console.print()
 
-        # Per-layer mapped comparison using original_id
         ref_by_id: dict[int, Any] = {la.id: la for la in reference.layers}
 
         mapped_table = Table(

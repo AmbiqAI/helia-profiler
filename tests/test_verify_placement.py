@@ -1,5 +1,3 @@
-"""Tests for the build-time arena placement guard (stage 4b)."""
-
 from __future__ import annotations
 
 from tests.pipeline_context_helpers import clear_profile_run, set_profile_firmware
@@ -19,11 +17,6 @@ from helia_profiler.platform import (
 )
 from helia_profiler.stages import verify_placement
 from helia_profiler.stages.verify_placement import VerifyPlacementStage
-
-
-# ---------------------------------------------------------------------------
-# MemoryRange / soc_placement_ranges
-# ---------------------------------------------------------------------------
 
 
 class TestMemoryRange:
@@ -63,11 +56,6 @@ class TestSocPlacementRanges:
         assert ranges[Placement.SRAM].contains(0x10011000)
         # A small KWS-sized arena lands near the base of RWMEM.
         assert ranges[Placement.SRAM].contains(0x10011010)
-
-
-# ---------------------------------------------------------------------------
-# VerifyPlacementStage
-# ---------------------------------------------------------------------------
 
 
 def _ctx(

@@ -12,8 +12,6 @@ from ..deps.compatibility import QualificationState
 
 @dataclass(frozen=True)
 class ContentDigest:
-    """A typed content digest."""
-
     algorithm: str
     value: str
 

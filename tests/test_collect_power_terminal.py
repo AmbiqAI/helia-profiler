@@ -211,8 +211,8 @@ def test_internal_terminal_measurement_becomes_power_result(
     assert ctx.power_result is not None
     assert ctx.power_result.summary.energy_j == pytest.approx(0.09)
     # Artifact-level POWER_FIRMWARE (#173): without it, a
-    # manifest-less INTERNAL-mode pair — the very mode of #115's phantom
-    # delta — cannot establish the fingerprint's platform scope and the
+    # INTERNAL-mode pair — the same mode behind a past phantom delta —
+    # cannot establish the fingerprint's platform scope and the
     # POWER_METRIC_BLOCKING gate silently degrades to nothing.
     assert ctx.power_result.metadata.power_firmware == "dedicated"
     assert ctx.power_result.summary.duration_s == pytest.approx(0.005)
@@ -340,7 +340,6 @@ class TestFirmwareWindowClockIntegrity:
     BENCH_* constants below come from a real Apollo3 Blue Plus bench pair.
     """
 
-    # --- Apollo3 bench pair -------------------------------------------------
     BENCH_COUNT = 24
     BENCH_REFERENCE_US = 208_744  # host plan, from the profile binary
     BENCH_GATE_S = 4.967  # JS110 gated window, fixed build
@@ -399,8 +398,6 @@ class TestFirmwareWindowClockIntegrity:
         # enforces duration_us == elapsed_us, so mirror that here.
         return _measurement(duration_us=elapsed_us, inference_count=self.BENCH_COUNT)
 
-    # --- 1. frozen clock: fatal internally, warning externally ---------------
-
     def test_zero_elapsed_is_terminal_in_internal_mode(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
@@ -449,8 +446,6 @@ class TestFirmwareWindowClockIntegrity:
         )
         with pytest.raises(PowerError, match="reported error 4"):
             self._run(ctx, record, monkeypatch)
-
-    # --- 2. external-mode warning -------------------------------------------
 
     def test_bench_agreement_logs_no_window_clock_warning(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
@@ -517,8 +512,6 @@ class TestFirmwareWindowClockIntegrity:
             self._run(ctx, self._bench_record(), monkeypatch)
         assert "window clock" not in caplog.text
 
-    # --- 3. internal-mode warning -------------------------------------------
-
     def test_internal_window_clock_disagreement_warns(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
     ):
@@ -575,8 +568,6 @@ class TestFirmwareWindowClockIntegrity:
         assert "window clock and the reference disagree" in caplog.text
         assert "planned_window" in caplog.text
 
-    # --- 4. internal-mode host wall-clock ceiling ---------------------------
-
     def test_internal_window_longer_than_host_wall_time_warns(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
     ):
@@ -625,8 +616,6 @@ class TestFirmwareWindowClockIntegrity:
         with caplog.at_level("WARNING", logger="hpx"):
             self._run(ctx, self._bench_record(), monkeypatch)
         assert "cannot outlast" not in caplog.text
-
-    # --- 4. mode-awareness ---------------------------------------------------
 
     def test_the_two_modes_apply_different_tolerances_to_the_same_skew(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog

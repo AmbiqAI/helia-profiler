@@ -1563,7 +1563,6 @@ def test_hal_umbrella_header_is_included_at_most_once():
 
 
 def test_snapshot_covers_exactly_the_current_matrix():
-    """The committed snapshot must match the code's supported matrix exactly."""
     expected_keys = (
         {_key(*c) for c in _all_combos()}
         | {_key(*c, power_only=True) for c in _power_combos()}

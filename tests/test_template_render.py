@@ -1,6 +1,4 @@
-"""Template rendering smoke tests — ensure main.cc.j2 / main_aot.cc.j2
-render successfully across the transport + engine matrix after the
-dedup refactor introduced shared Jinja partials.
+"""Template rendering smoke tests for main.cc.j2 / main_aot.cc.j2.
 
 These tests do not compile the output; they verify that:
   * every expected shared block appears exactly once
@@ -14,21 +12,15 @@ import re
 
 import pytest
 
-# The PRODUCTION environment, not a look-alike (issue #119). These tests used
-# to build their own with trim_blocks/lstrip_blocks on, which production does
-# not set -- so they rendered whitespace differently from what actually ships
-# and were structurally blind to whitespace-control mistakes. Three such slips
-# got through this suite and were caught only by hand-diffing full renders:
-# a `{% for %}` rewrite, a hoisted `{% set %}`, and a `-%}` that reindented
-# 128 renders. Importing the real env removes the divergence at the source.
+# The PRODUCTION environment, not a look-alike (issue #119): a separate env
+# built here previously diverged in whitespace control (trim_blocks/
+# lstrip_blocks) and let real rendering bugs through undetected.
 from helia_profiler.firmware import _jinja_env as _env
 
-# The window-clock resolution moved host-side (#118); renders receive the
-# derived busy_loop_probe / window_timer / use_stimer_window variables. The
-# helpers derive them through the production resolver so these smoke tests
-# exercise exactly the values FirmwareRenderContext.to_template_vars() ships;
-# the rendered-output guard tests in tests/contracts/ stay the independent
-# check on the resolution itself.
+# Window-clock resolution happens host-side (#118); deriving the vars here
+# through the production resolver keeps these smoke tests exercising exactly
+# what FirmwareRenderContext.to_template_vars() ships. tests/contracts/
+# independently checks the resolution itself.
 from helia_profiler.firmware.context import resolve_window_timer
 
 
@@ -271,7 +263,6 @@ class TestMainCcRender:
 
     def test_rtt_transport_switches_to_blocking_for_csv_and_end(self):
         out = _render_tflm(transport="rtt")
-        # Lossless mode-switch helpers must be defined and used.
         assert "hpx_rtt_set_blocking" in out
         assert "hpx_rtt_set_nonblocking" in out
         # Lossless writes are done by our own cache-coherent writer, not by
@@ -279,7 +270,6 @@ class TestMainCcRender:
         # cached M55 over SWD).
         assert "hpx_rtt_write_lossless" in out
         assert "SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL" not in out
-        # Lossless mode is engaged around the CSV dump and restored afterwards.
         assert out.count("hpx_rtt_set_blocking();") >= 2  # per-iter dump + HPX_END
         assert out.count("hpx_rtt_set_nonblocking();") >= 1
 
@@ -693,7 +683,6 @@ class TestMainAotCcRender:
         """Auto mode measures warm cycles and clamps N to fill the target window."""
         for render in (_render_tflm, _render_aot):
             out = render(transport="rtt", window_mode="auto")
-            # Runtime adaptive computation present, no compile-time literal.
             assert "const int clean_iters_n = 3;" not in out
             assert "uint32_t clean_warm_cyc = 0U;" in out
             assert "((uint64_t)SystemCoreClock / 1000ULL) * (uint64_t)250U" in out
@@ -705,7 +694,6 @@ class TestMainAotCcRender:
             assert "if (wc > clean_warm_cyc) clean_warm_cyc = wc;" in out
             assert "int clean_iters_n = 10;" in out
             assert "int clean_iters_n = 200;" not in out
-            # The gated loop still iterates over the computed count.
             assert "for (int iter = 0; iter < clean_iters_n; iter++)" in out
             # Auto mode announces the window with a runtime duration estimate
             # (iters * warm cycles / clock) so the host can widen its deadline.
@@ -944,9 +932,9 @@ class TestMainAotCcRender:
         """kMaxLayers is templated from the target SoC's pmu_max_ops, not a
         hardcoded constant -- this static array's footprint (~24 bytes/entry)
         must fit inside the real, sometimes much smaller, TCM budget of the
-        target board (2026-07 finding: apollo330P's real 240 KB TCM vs
-        apollo510's ~496 KB; a hardcoded 4096 alone reserved ~96 KB on
-        apollo330P, over a third of its actual budget).
+        target board (apollo330P's real 240 KB TCM vs apollo510's ~496 KB; a
+        hardcoded 4096 alone would reserve ~96 KB on apollo330P, over a third
+        of its actual budget).
         """
         template = _env.get_template("hpx_pmu_profiler.h.j2")
 
@@ -1297,7 +1285,7 @@ class TestIna228PowerRender:
     @pytest.mark.parametrize("power_only", [False, True])
     def test_renders_without_monitor_stay_clean(self, render, power_only: bool):
         """No power_monitor var at all (StrictUndefined would raise on a bad
-        gate) and no ina228 content — the WP2 byte-identical guarantee."""
+        gate) and no ina228 content leaks into the render."""
         out = render(power_only=power_only)
         assert "ina228" not in out
         assert "HPX_POWER_MEASUREMENT_SOURCE" not in out

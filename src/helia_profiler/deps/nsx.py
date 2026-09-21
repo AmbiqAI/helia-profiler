@@ -108,12 +108,6 @@ def _is_network_error(msg: str) -> bool:
     return any(kw in msg for kw in _NETWORK_KEYWORDS)
 
 
-# ---------------------------------------------------------------------------
-# Public API — kwargs preserved from the previous subprocess-based shim so
-# call sites in :mod:`helia_profiler.firmware` remain unchanged.
-# ---------------------------------------------------------------------------
-
-
 def configure(
     app_dir: Path,
     *,
@@ -205,11 +199,6 @@ def flash(
     )
 
 
-# ---------------------------------------------------------------------------
-# Lock / sync — used by the lock-aware build flow.
-# ---------------------------------------------------------------------------
-
-
 _RESOLVE_TTL_S: float = 1800  # 30 min — safe for typical profiling sessions
 
 
@@ -263,7 +252,6 @@ def sync(
             return
         except NetworkError:
             if attempt >= retries:
-                # All retries exhausted — propagate the last NetworkError.
                 raise
             delay = 2**attempt
             log.warning(
@@ -276,15 +264,11 @@ def sync(
     raise ValueError(f"retries must be >= 1, got {retries}")
 
 
-# ---------------------------------------------------------------------------
-# NSX module registry / starter-profile access
-#
 # The NSX registry (registry.lock.yaml shipped inside neuralspotx) is the
 # single source of truth for which NSX project owns each module and which
 # starter profile a board resolves to. The firmware generator consults it so
 # module/project ownership is *derived* rather than hand-maintained — the same
 # data ``nsx create-app`` uses to scaffold a manifest.
-# ---------------------------------------------------------------------------
 
 
 @functools.lru_cache(maxsize=1)

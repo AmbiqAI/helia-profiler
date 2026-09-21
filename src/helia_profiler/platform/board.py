@@ -11,16 +11,11 @@ DEFAULT_STATE_GPIO_PIN = 0
 DEFAULT_GO_GPIO_PIN = 0
 
 
-# ---------------------------------------------------------------------------
-# Board definition
-# ---------------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
 class BoardDef:
     """Definition of an evaluation board."""
 
-    name: str  # e.g. "apollo510_evb"
+    name: str
     soc: str  # SoC name key (matches SocDef.name)
     channel: str  # "stable" or "preview"
     psram_kb: int | None = None  # None = inherit SoC default
@@ -47,10 +42,6 @@ class BoardDef:
         """Board name used to derive starter-profile-owned NSX metadata."""
         return self.starter_profile_board or self.name
 
-
-# ---------------------------------------------------------------------------
-# Built-in board registry
-# ---------------------------------------------------------------------------
 
 _BOARDS: dict[str, BoardDef] = {}
 

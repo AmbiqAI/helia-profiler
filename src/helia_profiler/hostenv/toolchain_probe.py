@@ -46,11 +46,6 @@ from .elf_inventory import (
 log = logging.getLogger("hpx")
 
 
-# ---------------------------------------------------------------------------
-# Compiler / cmake --version probes
-# ---------------------------------------------------------------------------
-
-
 def _compiler_command(toolchain: str) -> str:
     """Return the executable name to query for ``--version`` info.
 
@@ -78,18 +73,11 @@ def _run_version(cmd: str, *, timeout_s: int) -> str:
 
 
 def compiler_version(toolchain: str, *, timeout_s: int) -> str:
-    """Return the first line of the compiler's ``--version`` banner."""
     return _run_version(_compiler_command(toolchain), timeout_s=timeout_s)
 
 
 def cmake_version(*, timeout_s: int) -> str:
-    """Return the first line of ``cmake --version``."""
     return _run_version("cmake", timeout_s=timeout_s)
-
-
-# ---------------------------------------------------------------------------
-# Binary section size probes
-# ---------------------------------------------------------------------------
 
 
 def _sections_via_size(
@@ -503,11 +491,6 @@ def binary_sections(
         ),
         timeout_s=timeout_s,
     )
-
-
-# ---------------------------------------------------------------------------
-# Symbol address probe (for build-time placement verification)
-# ---------------------------------------------------------------------------
 
 
 def _nm_command(toolchain: str) -> str:

@@ -29,9 +29,7 @@ log = logging.getLogger("hpx")
 class JoulescopeDriver:
     """External power driver for Joulescope JS110, JS220, and JS320.
 
-    Always uses :mod:`pyjoulescope_driver`.  The device family is auto-
-    detected from the enumerated device path. JS320 uses the JS220
-    publish/subscribe topic protocol.
+    JS320 uses the JS220 publish/subscribe topic protocol.
     """
 
     def __init__(self, *, serial: str | None = None) -> None:
@@ -60,14 +58,9 @@ class JoulescopeDriver:
         return True
 
     def make_sync_controller(self, wiring: SyncWiring) -> SyncController:
-        """Return a 3-wire lock-step controller, or a gate-only fallback."""
         if not wiring.lockstep or not self.has_gpo:
             return NullSyncController()
         return JoulescopeSyncController(serial=self._serial, wiring=wiring)
-
-    # ------------------------------------------------------------------
-    # Availability check
-    # ------------------------------------------------------------------
 
     def check_available(self) -> None:
         try:
@@ -86,10 +79,6 @@ class JoulescopeDriver:
                 "pip install --force-reinstall 'pyjoulescope-driver' 'pyjls'.",
             ) from exc
 
-    # ------------------------------------------------------------------
-    # Capture
-    # ------------------------------------------------------------------
-
     def capture(
         self,
         *,
@@ -98,9 +87,7 @@ class JoulescopeDriver:
         sampling_frequency: int = 1_000_000,
         **kwargs: Any,
     ) -> PowerResult:
-        """Capture aggregate power statistics for *duration_s* seconds.
-
-        Uses the on-instrument 1–2 Hz statistics stream rather than raw
+        """Uses the on-instrument 1–2 Hz statistics stream rather than raw
         samples.  This avoids buffering millions of points on the host and
         gives accurate avg/peak/energy summaries for whole-inference timing.
         The firmware is expected to bracket the inference with a GPIO sync
@@ -196,20 +183,10 @@ class JoulescopeDriver:
         finally:
             _close_device(driver, device_path)
 
-    # ``capture_gated`` is a long, self-contained method (GPIO polling,
-    # full-rate cross-check, on-device stat integration); it lives in
-    # ``capture_gated.py`` and is attached below to keep module sizes down.
-
-    # ------------------------------------------------------------------
-    # Power cycle
-    # ------------------------------------------------------------------
-
     def power_cycle(self, *, off_time_s: float = 0.5, settle_time_s: float = 1.0) -> None:
-        """Cut and restore target power via the Joulescope current shunt.
-
-        Uses the family-appropriate current-range topic.  Setting it to the
-        "off" value opens the input relay, disconnecting the target from
-        its supply; restoring "auto" re-enables it for a clean hardware reset.
+        """Setting the current range to "off" opens the input relay,
+        disconnecting the target from its supply; restoring "auto"
+        re-enables it for a clean hardware reset.
         """
         log.info(
             "Power-cycle reset via Joulescope (off=%.1fs, settle=%.1fs)",
@@ -239,10 +216,7 @@ class JoulescopeDriver:
 
         log.info("Power-cycle reset complete")
 
-    # ------------------------------------------------------------------
-    # Passthrough (used by EnsureBoardPoweredStage to keep target alive)
-    # ------------------------------------------------------------------
-
+    # Used by EnsureBoardPoweredStage to keep the target powered.
     def enable_passthrough(self) -> None:
         """Open the Joulescope and enable current passthrough (close relay)."""
         driver, device_path, family = _open_device(self._serial)
@@ -259,16 +233,11 @@ class JoulescopeDriver:
         log.info("Joulescope passthrough enabled (%s)", family.upper())
 
     def disable_passthrough(self) -> None:
-        """Release the Joulescope opened by :meth:`enable_passthrough`."""
         device_path = getattr(self, "_pt_device_path", None)
         if device_path is not None:
             _close_device(_get_shared_driver(), device_path)
             self._pt_device_path = None
             log.info("Joulescope passthrough released")
-
-    # ------------------------------------------------------------------
-    # High-level vendor-neutral hook
-    # ------------------------------------------------------------------
 
     def ensure_target_powered(self, *, required: bool) -> bool:
         """Best-effort or strict passthrough enable, per the decision matrix.
@@ -285,7 +254,6 @@ class JoulescopeDriver:
             log.log(level, "%s — skipping Joulescope passthrough.", msg)
             return False
 
-        # --- Check the driver package is importable.
         try:
             self.check_available()
         except PowerError as exc:
@@ -294,7 +262,6 @@ class JoulescopeDriver:
             log.debug("Joulescope driver unavailable (%s) — skipping passthrough.", exc)
             return False
 
-        # --- Enumerate devices without opening any.
         try:
             devices = enumerate_devices()
         except PowerError as exc:
@@ -310,7 +277,6 @@ class JoulescopeDriver:
                 level=logging.DEBUG,
             )
 
-        # --- Pick a device.
         if self._serial is not None:
             wanted = str(self._serial).lstrip("0") or "0"
             matched = [d for d in devices if wanted in d[0]]
@@ -327,10 +293,9 @@ class JoulescopeDriver:
                 f"{len(devices)} Joulescopes connected — please disambiguate",
                 hint=f"Set power.serial / --power-serial to one of: {paths}",
             )
-        # else: exactly one device, no serial needed.
 
-        # --- Enable passthrough; release USB handle immediately (relay is
-        # latched in hardware so the board stays powered).
+        # Release the USB handle immediately after enabling passthrough —
+        # the relay latches in hardware, so the board stays powered.
         try:
             self.enable_passthrough()
         except PowerError as exc:

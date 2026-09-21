@@ -1,5 +1,3 @@
-"""Tests for typed, configuration-aware dependency reporting."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -115,11 +113,6 @@ def test_inspect_environment_reports_missing_jlink(monkeypatch) -> None:
 
     assert not result.ok
     assert [check.name for check in result.missing_required] == ["JLinkExe"]
-
-
-# ---------------------------------------------------------------------------
-# Version checks and machine-readable (--json) output.
-# ---------------------------------------------------------------------------
 
 
 def test_check_versions_reports_hpx_own_version() -> None:

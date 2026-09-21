@@ -196,9 +196,8 @@ def test_write_validation_reports_includes_manifest_with_relative_paths(
         "used": 32_768,
         "consumers": [{"name": "tensor_arena", "size": 32_768, "kind": "arena"}],
     }
-    # Schema v6 (#177): the measured block passes through
-    # verbatim — this assert is what makes deleting the passthrough line a
-    # red test instead of a silent contract regression.
+    # Guards the measured block passing through verbatim; deleting the
+    # passthrough line must fail this assert, not go silently unnoticed.
     assert case["resources"]["memory_regions"]["regions"][0]["free"] == 343_784
     assert case["resources"]["memory_regions"]["link_family"] == "gnu"
     report = json.loads((tmp_path / "validation_report.json").read_text())

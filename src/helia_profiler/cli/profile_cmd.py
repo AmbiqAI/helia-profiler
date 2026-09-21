@@ -224,7 +224,6 @@ def _build_cli_overrides(**params: Any) -> dict:
 
 
 def _cmd_profile(*, config: Path | None = None, verbose: int = 0, **params: Any) -> None:
-    """Run the profiling pipeline."""
     from ..config import load_config
     from ..console import HpxConsole
     from ..errors import HpxError

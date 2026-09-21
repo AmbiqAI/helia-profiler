@@ -24,10 +24,6 @@ import math
 from dataclasses import dataclass
 from typing import Collection, Mapping
 
-# ---------------------------------------------------------------------------
-# Counter descriptor
-# ---------------------------------------------------------------------------
-
 
 @dataclass(frozen=True)
 class PmuCounter:
@@ -39,13 +35,9 @@ class PmuCounter:
     description: str = ""
 
 
-# ---------------------------------------------------------------------------
-# M55 / ARMv8-M counter catalogue
-#
 # Source: data/armv8m_pmu_events.json, synced from the upstream
 # nsx-pmu-armv8m export generated from nsx_pmu_map[] in
 # nsx-pmu-armv8m/src/armv8m/nsx_pmu_utils.c
-# ---------------------------------------------------------------------------
 
 
 def _load_counter_catalog() -> dict[str, PmuCounter]:
@@ -64,15 +56,12 @@ def _load_counter_catalog() -> dict[str, PmuCounter]:
 
 _COUNTERS: dict[str, PmuCounter] = _load_counter_catalog()
 
-# ---------------------------------------------------------------------------
-# Ethos-U NPU counter catalogue (group "ethos_npu")
-#
-# These are sampled from the Ethos-U's own PMU via the core-driver API, not
-# the ARM PMU. Names double as the driver's symbolic event-type enum
-# (enum ethosu_pmu_event_type) — the header explicitly warns that raw HW
-# event values differ between NPUs, so firmware is generated from the
-# symbol, never a numeric ID (event_id below is a placeholder).
-# ---------------------------------------------------------------------------
+# Ethos-U counters (group "ethos_npu") are sampled from the Ethos-U's own PMU
+# via the core-driver API, not the ARM PMU. Names double as the driver's
+# symbolic event-type enum (enum ethosu_pmu_event_type) — the header
+# explicitly warns that raw HW event values differ between NPUs, so firmware
+# is generated from the symbol, never a numeric ID (event_id below is a
+# placeholder).
 
 _ETHOS_NPU_EVENTS: tuple[tuple[str, str], ...] = (
     ("ETHOSU_PMU_CYCLE", "Total NPU cycles while the command stream runs"),
@@ -95,11 +84,6 @@ for _name, _desc in _ETHOS_NPU_EVENTS:
     )
 
 
-# ---------------------------------------------------------------------------
-# Compute-unit groups and curated defaults
-# ---------------------------------------------------------------------------
-
-#: All group names that have counters registered.
 GROUPS: dict[str, list[str]] = {}
 for _ctr in _COUNTERS.values():
     GROUPS.setdefault(_ctr.group, []).append(_ctr.name)
@@ -143,11 +127,6 @@ DEFAULT_COUNTERS: dict[str, list[str]] = {
 MAX_COUNTERS_PER_PASS = 4
 
 
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
 class CounterPass:
     """A batch of counters that fit in a single firmware PMU pass."""
@@ -173,7 +152,6 @@ def get_counter(name: str) -> PmuCounter:
 
 
 def list_counters(group: str | None = None) -> list[PmuCounter]:
-    """Return all registered counters, optionally filtered by group."""
     if group is not None:
         names = GROUPS.get(group, [])
         return [_COUNTERS[n] for n in names]
@@ -181,7 +159,6 @@ def list_counters(group: str | None = None) -> list[PmuCounter]:
 
 
 def list_groups() -> list[str]:
-    """Return all registered group names."""
     return sorted(GROUPS.keys())
 
 
@@ -273,7 +250,6 @@ def plan_passes(
     batches of *max_per_pass*.  This produces the minimal number of
     firmware inference passes needed to capture all requested counters.
     """
-    # Group counters by compute unit
     by_group: dict[str, list[PmuCounter]] = {}
     for ctr in counters:
         by_group.setdefault(ctr.group, []).append(ctr)

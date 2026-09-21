@@ -1,5 +1,3 @@
-"""Tests for J-Link probe enumeration and selection."""
-
 from __future__ import annotations
 
 import logging
@@ -639,9 +637,7 @@ def test_a_custom_soc_cannot_forge_a_per_soc_override(monkeypatch: pytest.Monkey
     of them answers before the origin gate is ever consulted.  With both
     absent, the *only* thing that can produce a non-``None`` answer here is the
     name matching the patched override -- which is exactly the forgery, so the
-    gate is what this observes.  (An earlier revision carried
-    ``based_on: apollo4p``, which made the assertion a statement about
-    inheritance and left the gate untested: deleting it kept the test green.)
+    gate is what this observes.
     """
     from helia_profiler.platform import capabilities
     from helia_profiler.platform.custom import build_custom_platform_registry

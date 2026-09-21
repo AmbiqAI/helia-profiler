@@ -62,7 +62,6 @@ def _write_summary(
     if ctx.run_metadata.dependencies is not None:
         summary["dependencies"] = ctx.run_metadata.dependencies.to_dict()
 
-    # Top layers by cycles
     summary["top_layers"] = [
         {
             "op": l.op,
@@ -72,7 +71,6 @@ def _write_summary(
         for l in sorted_layers[:5]
     ]
 
-    # Memory from firmware meta
     mem: dict[str, Any] = {}
     if meta.arena_size is not None:
         mem["arena_size"] = meta.arena_size
@@ -110,7 +108,6 @@ def _write_summary(
             ctx.memory_reconciliation
         )
 
-    # Binary sections
     if ctx.binary_sections is not None:
         bs = ctx.binary_sections
         summary["binary"] = {
@@ -122,12 +119,10 @@ def _write_summary(
         if bs.reserved:
             summary["binary"]["reserved"] = bs.reserved
 
-    # Cache / memory counter totals (summed across all layers)
     cache = _cache_totals(layers)
     if cache:
         summary["cache"] = cache
 
-    # Model analysis — MACs, OPS, TOPS
     if ctx.model_analysis is not None:
         ma = ctx.model_analysis
         # Vela ethos-u custom ops are opaque to the analyzer: their MACs,
@@ -146,7 +141,6 @@ def _write_summary(
             analysis_dict["cycles_per_op"] = round(total_cycles / ma.total_ops, 2)
         summary["model_analysis"] = analysis_dict
 
-    # Power summary
     if ctx.power_result is not None:
         ps = ctx.power_result.summary
         # Serialization boundary: the report is built from the flat view.

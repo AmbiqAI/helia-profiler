@@ -38,7 +38,6 @@ _SPIN_TARGET_RE = re.compile(r"HPX_STIMER_HZ \* \(uint64_t\)(\d+)U\) / 1000ULL")
 
 
 def _firmware_spin_target_ms(ctx: PipelineContext) -> int:
-    """The window length the generated C is actually built to spin for."""
     # from_pipeline_context asserts the engine stage has run; nothing about the
     # window target depends on which engine.
     ctx.engine_artifacts = TflmArtifacts(engine_header=TFLM_ENGINE_HEADER)

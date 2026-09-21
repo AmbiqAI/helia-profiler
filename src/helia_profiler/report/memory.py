@@ -21,7 +21,6 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("hpx")
 
-# Memory-related PMU counter names used for cache/memory summaries.
 _CACHE_COUNTERS = (
     "ARM_PMU_L1D_CACHE",
     "ARM_PMU_L1D_CACHE_RD",
@@ -219,7 +218,6 @@ def _write_memory_breakdown(ctx: PipelineContext, detail_dir: Path) -> Path:
 
     data: dict[str, Any] = {}
 
-    # Binary sections
     if ctx.binary_sections is not None:
         bs = ctx.binary_sections
         data["binary_sections"] = {
@@ -237,7 +235,6 @@ def _write_memory_breakdown(ctx: PipelineContext, detail_dir: Path) -> Path:
             # counted here -- it is the live MSP/PSP stack.)
             data["binary_sections"]["reserved"] = bs.reserved
 
-    # Arena / tensor info from firmware meta
     arena: dict[str, Any] = {}
     if meta.arena_size is not None:
         arena["arena_size"] = meta.arena_size
@@ -274,7 +271,6 @@ def _write_memory_breakdown(ctx: PipelineContext, detail_dir: Path) -> Path:
     if ctx.memory_symbols is not None and ctx.memory_regions is not None:
         data["memory_symbols"] = _serialise_memory_symbols(ctx.memory_regions, ctx.memory_symbols)
 
-    # Per-layer cache/memory counters
     per_layer: list[dict[str, Any]] = []
     for layer in layers:
         row: dict[str, Any] = {"op": layer.op}
@@ -285,7 +281,6 @@ def _write_memory_breakdown(ctx: PipelineContext, detail_dir: Path) -> Path:
     if per_layer:
         data["per_layer_memory"] = per_layer
 
-    # Aggregate cache totals
     totals = _cache_totals(layers)
     if totals:
         data["cache_totals"] = totals

@@ -15,10 +15,6 @@ from typing import Mapping
 
 from ..engines import EngineType
 
-# ---------------------------------------------------------------------------
-# Generic parse constants
-# ---------------------------------------------------------------------------
-
 #: Namespace prefix shared by every token in the protocol.
 HPX_PREFIX = "HPX_"
 
@@ -30,10 +26,6 @@ KEY_VALUE_RE = re.compile(KEY_VALUE_PATTERN)
 
 #: Protocol version emitted as ``HPX_VERSION`` and expected by the parser.
 HPX_PROTOCOL_VERSION = 1
-
-# ---------------------------------------------------------------------------
-# Sentinels, handshake lines and line prefixes — single source
-# ---------------------------------------------------------------------------
 
 HPX_START_SENTINEL = "--- HPX_START ---"
 HPX_END_SENTINEL = "--- HPX_END ---"
@@ -73,12 +65,7 @@ HPX_WARN_PREFIX = "HPX_WARN="
 
 #: The one statement of the ``est_ms`` contract, single-sourced because it is
 #: told in three places (the ``clean_window_begin`` spec note, the package
-#: docstring's gap list and the generated reference's). #164 gave the
-#: fixed+STIMER profile infer arm the auto arm's pre-window DWT measurement
-#: (the debug domain is gated only *inside* the window, so pre-window DWT is
-#: valid even where STIMER times the window itself); #170 gave busy-loop
-#: windows the honest compile-time target and structurally excluded power
-#: renders from measuring at all.
+#: docstring's gap list and the generated reference's).
 EST_MS_GAP = (
     "Every profile build's `clean_window_begin` heartbeat carries a real "
     "duration statement: infer windows announce a measured warm-inference "
@@ -106,11 +93,6 @@ EST_MS_GAP = (
     "mismatch. (Per-inference energy is never derived for busy windows — "
     "the summary omits it by probe.)"
 )
-
-
-# ---------------------------------------------------------------------------
-# Vocabularies
-# ---------------------------------------------------------------------------
 
 
 class WireKind(StrEnum):
@@ -256,7 +238,7 @@ class WireKey(StrEnum):
     :attr:`wire` recovers the ``HPX_…`` spelling for census and docs.
     """
 
-    # --- start header -----------------------------------------------------
+    # Start header
     VERSION = "version"
     ENGINE = "engine"
     EXTREME_MODE = "extreme_mode"
@@ -270,15 +252,15 @@ class WireKey(StrEnum):
     BURST_AVAIL = "burst_avail"
     BURST_ENGAGED = "burst_engaged"
 
-    # --- NPU bring-up -------------------------------------------------------
+    # NPU bring-up
     NPU = "npu"
 
-    # --- heartbeat configuration -----------------------------------------
+    # Heartbeat configuration
     HEARTBEAT_ENABLED = "heartbeat_enabled"
     HEARTBEAT_EVERY_N_OPS = "heartbeat_every_n_ops"
     HEARTBEAT_EVERY_MS = "heartbeat_every_ms"
 
-    # --- model / memory ---------------------------------------------------
+    # Model / memory
     MODEL_SIZE = "model_size"
     ARENA_SIZE = "arena_size"
     ALLOCATED_ARENA = "allocated_arena"
@@ -291,7 +273,7 @@ class WireKey(StrEnum):
     OUTPUT_INDEXED_SIZE = "output_%d_size"
     ARENAS_BOUND = "arenas_bound"
 
-    # --- PSRAM ------------------------------------------------------------
+    # PSRAM
     PSRAM_SIZE_BYTES = "psram_size_bytes"
     PSRAM_CLOCK_HZ = "psram_clock_hz"
     PSRAM_CAPABILITIES = "psram_capabilities"
@@ -304,7 +286,7 @@ class WireKey(StrEnum):
     PSRAM_READY = "psram_ready"
     PSRAM_ARENA_REGION = "psram_arena_region"
 
-    # --- clean window -----------------------------------------------------
+    # Clean window
     CLEAN_WINDOW_PROBE = "clean_window_probe"
     CLEAN_ITER = "clean_iter"
     CLEAN_INFER_COUNT = "clean_infer_count"
@@ -318,12 +300,12 @@ class WireKey(StrEnum):
     CLEAN_DWT_RATE_US = "clean_dwt_rate_us"
     CLEAN_ATTACH_WAIT_US = "clean_attach_wait_us"
 
-    # --- profiled summary -------------------------------------------------
+    # Profiled summary
     PROFILED_INFER_COUNT = "profiled_infer_count"
     PROFILED_INFER_TOTAL_US = "profiled_infer_total_us"
     PROFILED_INFER_AVG_US = "profiled_infer_avg_us"
 
-    # --- ExecuTorch PMU bring-up -----------------------------------------
+    # ExecuTorch PMU bring-up
     PMU_INIT_STATUS = "pmu_init_status"
     PMU_SELFTEST_CPU_CYCLES = "pmu_selftest_cpu_cycles"
 
@@ -346,7 +328,7 @@ class PowerTerminalKey(StrEnum):
     markers and never lower-cases anything.
     """
 
-    # --- required envelope (9) -------------------------------------------
+    # Required envelope (9)
     TERMINAL_VERSION = "HPX_POWER_TERMINAL_VERSION"
     STATUS = "HPX_POWER_STATUS"
     REQUESTED_COUNT = "HPX_POWER_REQUESTED_COUNT"
@@ -357,7 +339,7 @@ class PowerTerminalKey(StrEnum):
     GATE_ASSERTED = "HPX_POWER_GATE_ASSERTED"
     GATE_LOWERED = "HPX_POWER_GATE_LOWERED"
 
-    # --- optional measurement payload (all-or-none) ----------------------
+    # Optional measurement payload (all-or-none)
     MEASUREMENT_SOURCE = "HPX_POWER_MEASUREMENT_SOURCE"
     MEASUREMENT_SCOPE = "HPX_POWER_MEASUREMENT_SCOPE"
     ENERGY_NJ = "HPX_POWER_ENERGY_NJ"
@@ -372,7 +354,7 @@ class PowerTerminalKey(StrEnum):
     # as an unknown field, like any other unregistered key.
     CALIBRATION_ID = "HPX_POWER_CALIBRATION_ID"
 
-    # --- pre-record diagnostics (outside the envelope) -------------------
+    # Pre-record diagnostics (outside the envelope)
     INA228_DIAG = "HPX_POWER_INA228_DIAG"
     INA228_BYSTANDER_FAILED = "HPX_POWER_INA228_BYSTANDER_FAILED"
 
@@ -390,11 +372,6 @@ def error_token(code: FirmwareErrorCode) -> str:
 def warn_token(code: FirmwareWarnCode) -> str:
     """Registry key for one warning code (also its literal line prefix)."""
     return f"{HPX_WARN_PREFIX}{code.value}"
-
-
-# ---------------------------------------------------------------------------
-# Spec
-# ---------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)

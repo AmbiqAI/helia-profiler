@@ -1,5 +1,3 @@
-"""Unit tests for the validation runner retry behavior."""
-
 from __future__ import annotations
 
 import json

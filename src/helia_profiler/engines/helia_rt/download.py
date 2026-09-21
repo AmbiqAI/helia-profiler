@@ -40,14 +40,10 @@ def _fetch_github_release(
     cache_key = f"{repo.replace('/', '_')}_{ref}"
     cache_dir = _cache_dir() / cache_key
 
-    # Cache hit — validate and return
     if cache_dir.is_dir() and _is_valid_dist(cache_dir):
         log.info("Cache hit: %s", cache_dir)
         return cache_dir, _detect_version(cache_dir)
 
-    # Resolve the release tag.
-    # If ref looks like a tag (HeliaRT-v*, v*), use it directly.
-    # Otherwise treat it as a branch and find the latest release.
     tag = _resolve_release_tag(repo, ref, api_s=api_s)
     if tag is None:
         raise EngineError(
@@ -58,7 +54,6 @@ def _fetch_github_release(
             ),
         )
 
-    # Try downloading: NSX bundle first, legacy bundle as fallback
     asset_url = _find_release_asset(repo, tag, api_s=api_s)
     if asset_url is None:
         raise EngineError(
@@ -80,7 +75,6 @@ def _resolve_release_tag(repo: str, ref: str, *, api_s: float = 30) -> str | Non
     If *ref* already looks like a release tag, verify it exists.
     Otherwise query the releases API for the latest release.
     """
-    # Direct tag reference — verify it exists
     api = f"https://api.github.com/repos/{repo}/releases/tags/{ref}"
     data = _github_api_get(api, timeout_s=api_s)
     if data is not None:
@@ -123,12 +117,10 @@ def _find_release_asset(repo: str, tag: str, *, api_s: float = 30) -> str | None
     assets = data.get("assets", [])
     asset_names = {a["name"]: a["browser_download_url"] for a in assets}
 
-    # Exact match first.
     name = _ASSET_FMT.format(tag=tag)
     if name in asset_names:
         return asset_names[name]
 
-    # Tighter glob fallback: helia-rt-*.zip only.
     candidates = sorted(n for n in asset_names if n.startswith("helia-rt-") and n.endswith(".zip"))
     if not candidates:
         return None
@@ -188,7 +180,6 @@ def _download_and_extract(url: str, dest: Path, *, timeout_s: float = 300) -> No
         ) from exc
 
     with zipfile.ZipFile(io.BytesIO(data)) as zf:
-        # Detect single top-level directory (common in GitHub release zips)
         top_dirs = {n.split("/")[0] for n in zf.namelist() if "/" in n}
         strip_prefix = ""
         if len(top_dirs) == 1:

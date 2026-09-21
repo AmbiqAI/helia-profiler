@@ -73,8 +73,6 @@ class TestRegistry:
             assert Toolchain.ARM_NONE_EABI_GCC in toolchains, board_id
 
     def test_default_axis_stays_inside_the_nsx_toolchain_contract(self):
-        # Every default-axis case must use a toolchain its NSX board module
-        # declares.
         for case in build_matrix():
             declared = nsx_declared_toolchains(case.board.id)
             assert declared is not None, case.board.id

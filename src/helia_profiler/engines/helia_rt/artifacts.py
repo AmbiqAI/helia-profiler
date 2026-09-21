@@ -28,16 +28,12 @@ from ...platform import CoreArch, PlatformRegistry, get_board, get_soc
 
 log = logging.getLogger("hpx")
 
-# ---------------------------------------------------------------------------
-# heliaRT version policy.
-#
 # - HELIART_VERSION     : pinned default. Used when the user provides no
 #                         override. Bump when a new release is adopted.
 # - HELIART_MIN_VERSION : minimum-supported version. Any resolved
 #                         distribution (default download, custom GitHub
 #                         ref, or local dist_path) must be >= this.
 #                         Bump only on incompatible API changes.
-# ---------------------------------------------------------------------------
 HELIART_VERSION = "1.20.0"
 HELIART_MIN_VERSION = "1.16.0"
 HELIART_GH_REPO = "AmbiqAI/helia-rt"
@@ -52,23 +48,18 @@ HELIART_SOURCE_COMMIT = "edb3a25fc96c8e9b634dabdb9cd31cb22aa43440"
 # lets NSX clone it from the registered GitHub upstream; a user-provided
 # local path (source_path / dist_path / source) vendors it instead.
 HELIART_PROJECT = "helia-rt"  # registry project (path: modules/helia-rt)
-HELIART_MODULE = "nsx-helia-rt"  # registry module name
+HELIART_MODULE = "nsx-helia-rt"
 
 
 def _cache_dir() -> Path:
-    """Cache directory for downloaded heliaRT distributions."""
     from ...hostenv.cache_dirs import hpx_cache_root
 
     return hpx_cache_root() / "heliart"
 
 
-# Directories required in a valid heliaRT distribution.
 _DIST_DIRS = ("lib", "tensorflow", "third_party", "signal")
-
-# GitHub release asset naming: helia-rt-{TAG}.zip
 _ASSET_FMT = "helia-rt-{tag}.zip"
 
-# Files that must exist in the source tree to qualify as a heliaRT source build.
 _SOURCE_REQUIRED_FILES = (
     "CMakeLists.txt",
     "nsx/CMakeLists.txt",
@@ -100,7 +91,6 @@ def _core_tag(
 
 
 def _board_to_soc(board: str, *, registry: PlatformRegistry | None = None) -> str:
-    """Resolve board name to SoC name via the platform registry."""
     return get_board(board, registry=registry).soc
 
 
@@ -135,15 +125,6 @@ def _verify_prebuilt_archive(
                 f"{', '.join(available) if available else '(none)'}"
             ),
         )
-
-
-# ---------------------------------------------------------------------------
-# heliaRT source-build mode
-# ---------------------------------------------------------------------------
-#
-# Opt-in by setting ``engine.config.source_path`` or ``HELIART_SOURCE_PATH``
-# to a heliaRT source-repo root.  The repo must ship the source-build NSX
-# module (HELIART_MIN_VERSION or newer).
 
 
 def _resolve_source_path(config: ProfileConfig) -> Path | None:
@@ -184,11 +165,6 @@ def _resolve_source_path(config: ProfileConfig) -> Path | None:
     return p
 
 
-# ---------------------------------------------------------------------------
-# heliaRT distribution resolution (multi-mode)
-# ---------------------------------------------------------------------------
-
-
 def _resolve_distribution(config: ProfileConfig) -> tuple[Path, str | None]:
     """Resolve the heliaRT distribution directory.
 
@@ -205,21 +181,18 @@ def _resolve_distribution(config: ProfileConfig) -> tuple[Path, str | None]:
     # this module, so importing it back at module scope would be circular.
     from .download import _fetch_github_release
 
-    # --- 1. Explicit local path ---
     raw = config.engine.config.get("dist_path")
     if raw:
         p = Path(raw).expanduser().resolve()
         _validate_dist(p)
         return p, _detect_version(p)
 
-    # --- 2. Environment variable ---
     env = os.environ.get("HELIART_DIST_PATH")
     if env:
         p = Path(env).expanduser().resolve()
         _validate_dist(p)
         return p, _detect_version(p)
 
-    # --- 3. Source config (repo + ref) ---
     source = config.engine.config.get("source")
     api_s = config.timeouts.download_api_s
     asset_s = config.timeouts.download_asset_s
@@ -228,7 +201,6 @@ def _resolve_distribution(config: ProfileConfig) -> tuple[Path, str | None]:
         ref = source.get("ref", HELIART_RELEASE_TAG)
         return _fetch_github_release(repo, ref, api_s=api_s, asset_s=asset_s)
 
-    # --- 4. Default: pinned version from default repo ---
     log.info(
         "No dist_path or source configured — fetching heliaRT %s from %s",
         HELIART_RELEASE_TAG,
@@ -242,13 +214,7 @@ def _resolve_distribution(config: ProfileConfig) -> tuple[Path, str | None]:
     )
 
 
-# ---------------------------------------------------------------------------
-# Distribution validation
-# ---------------------------------------------------------------------------
-
-
 def _validate_dist(dist: Path) -> None:
-    """Verify that *dist* looks like a heliaRT release directory."""
     if not dist.is_dir():
         raise EngineError(
             f"heliaRT dist path does not exist: {dist}",
@@ -263,13 +229,7 @@ def _validate_dist(dist: Path) -> None:
 
 
 def _is_valid_dist(dist: Path) -> bool:
-    """Return True if *dist* has the required directories."""
     return all((dist / d).is_dir() for d in _DIST_DIRS)
-
-
-# ---------------------------------------------------------------------------
-# Version detection and compatibility
-# ---------------------------------------------------------------------------
 
 
 def _detect_version(dist: Path) -> str | None:
@@ -280,7 +240,6 @@ def _detect_version(dist: Path) -> str | None:
        (falls back to legacy ``heliart_version.h`` / ``HELIART_VERSION``)
     2. ``MANIFEST.txt`` — ``neuralspot-helios-rt HeliaRT-v1.7.0``
     """
-    # 1. Version header (v1.16.0+ naming)
     version_h = dist / "tensorflow" / "lite" / "micro" / "helia_rt_version.h"
     if version_h.is_file():
         text = version_h.read_text(errors="replace")
@@ -288,7 +247,6 @@ def _detect_version(dist: Path) -> str | None:
         if m:
             return m.group(1)
 
-    # 1b. Legacy header (pre-v1.16.0)
     legacy_h = dist / "tensorflow" / "lite" / "micro" / "heliart_version.h"
     if legacy_h.is_file():
         text = legacy_h.read_text(errors="replace")
@@ -296,7 +254,6 @@ def _detect_version(dist: Path) -> str | None:
         if m:
             return m.group(1)
 
-    # 2. MANIFEST.txt
     manifest = dist / "MANIFEST.txt"
     if manifest.is_file():
         first_line = manifest.read_text(errors="replace").split("\n")[0]

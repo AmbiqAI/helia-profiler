@@ -234,9 +234,9 @@ def _sample_power() -> PowerResult:
 
 def _sample_memory_regions() -> MeasuredMemoryRegions:
     """The measured block (#133 Phase 2), with every emission path live:
-    a reserved figure, a nonzero load_image, and one unattributed section
-    (with those at defaults the corresponding summary/console lines are
-    dead and the digests could not see them — the #24 lesson)."""
+    figure, a nonzero load_image, and one unattributed section (with those
+    at defaults the corresponding summary/console lines are dead and the
+    digests could not see them)."""
     return MeasuredMemoryRegions(
         link_family="gnu",
         linker_profile="default",
@@ -270,7 +270,7 @@ def _sample_memory_regions() -> MeasuredMemoryRegions:
 def _sample_memory_reconciliation() -> MemoryReconciliation:
     """Every emission path live: matched-with-delta, missing,
     unmatchable, and a nonzero region delta (the #24 lesson — a default
-    leaves its console/summary line dead and invisible to digests)."""
+    console/summary line dead and invisible to digests)."""
     return MemoryReconciliation(
         consumers=(
             ConsumerReconciliation(
@@ -410,7 +410,7 @@ def _make_ctx(tmp_path: Path, engine: EngineType, fmt: str) -> PipelineContext:
     ctx.memory_symbols = _sample_memory_symbols()
     # reserved is non-zero on purpose: with it at the default 0 every
     # `if bs.reserved:` emission is dead in the golden path, so the digests
-    # could not see the summary.json / memory.json / console additions at all
+    # could not see the summary.json / memory.json / console additions at
     # (issue #24). total stays the tool's own inclusive sum.
     ctx.binary_sections = BinarySections(
         text=45000, data=1200, bss=8000, total=54200, reserved=32000

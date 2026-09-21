@@ -43,21 +43,20 @@ class TestCanonicalCode:
 
     def test_directive_line_structure_survives(self):
         """#173: newline is significant to the preprocessor — a
-        directive line joined with the next code line is semantically
-        different and must not hash equal."""
+        joined with the next code line is semantically different and must
+        not hash equal."""
         split = canonical_code("#define A 1\nint x;")
         joined = canonical_code("#define A 1 int x;")
         assert split != joined
         assert split == "#define A 1\nint x;"
-        # #if/#endif structure likewise:
         assert canonical_code("#if X\nint a;\n#endif\nint b;") == ("#if X\nint a;\n#endif\nint b;")
-        # ...but a block comment INSIDE a directive is phase-3 whitespace,
+        # A block comment INSIDE a directive is phase-3 whitespace,
         # not a directive break:
         assert canonical_code("#define A 1 /* c\n c */ + 2\nint x;") == ("#define A 1 + 2\nint x;")
 
     def test_stray_apostrophe_cannot_swallow_the_file(self):
         """#173: a digit separator (1'000) is not a char literal —
-        literal scanning stops at the newline, so stripping keeps working."""
+        scanning stops at the newline, so stripping keeps working."""
         src = "int a = 1'000;\n// gone\nint b = 2; // gone too\nchar c = 'x';"
         out = canonical_code(src)
         assert "gone" not in out
@@ -147,8 +146,8 @@ class TestMeasuredPowerFingerprint:
 
     def test_profiler_translation_unit_is_part_of_the_hash(self, tmp_path):
         """#173: hpx_pmu_profiler.cc is compiled into the measured
-        target and its per-op hooks run inside the gated window — an edit
-        there must shift the fingerprint like any main-TU edit."""
+        per-op hooks run inside the gated window — an edit there must shift
+        the fingerprint like any main-TU edit."""
         ctx = self._ctx(tmp_path, "dedicated")
         before = measured_power_fingerprint(ctx)
         prof = ctx.firmware_dir / "src" / "hpx_pmu_profiler.cc"
@@ -180,11 +179,11 @@ class TestMeasuredPowerFingerprint:
 
 
 class TestCompositeConstruction:
-    """#173 M-B: two of the three ways to silently change
-    every emitted fingerprint (part reorder, separator change) left the
-    whole suite green. This pin duplicates the framing ON PURPOSE — it is
-    the independent statement of the composite's wire format, scheme tag
-    included; changing the construction must be a reviewed edit here too."""
+    """Two of three ways to silently change every emitted fingerprint (part
+    reorder, separator change) left the whole suite green. This pin
+    duplicates the framing ON PURPOSE — it is the independent statement of
+    the composite's wire format, scheme tag included; changing the
+    construction must be a reviewed edit here too."""
 
     def test_composite_framing_is_pinned(self, tmp_path):
         import hashlib
@@ -229,8 +228,8 @@ class TestCompositeConstruction:
 
 
 class TestContinuationHardening:
-    """#173 M-A: backslash continuation defeated the
-    directive carve-out in the dangerous (false-equal) direction."""
+    """Backslash continuation defeated the directive carve-out in the
+    dangerous (false-equal) direction."""
 
     def test_continued_macro_body_boundary_survives(self):
         a = "#define FOO(x) \\\n  do { bar(x); } while (0)\nint main(void) { return 0; }\n"

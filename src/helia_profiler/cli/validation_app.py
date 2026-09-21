@@ -51,10 +51,6 @@ def register(app: typer.Typer) -> None:
     )(validate_command)
 
 
-# ---------------------------------------------------------------------------
-# hpx power-on
-# ---------------------------------------------------------------------------
-
 _POWER_ON_DRIVER_CHOICE = TyperChoice(["joulescope"])
 
 
@@ -81,10 +77,6 @@ def power_on_command(
 
     _cmd_power_on(driver, power_serial=power_serial)
 
-
-# ---------------------------------------------------------------------------
-# hpx validate
-# ---------------------------------------------------------------------------
 
 _VALIDATE_POWER_CHOICE = TyperChoice(["both", "on", "off"])
 _VALIDATE_SUITE_CHOICE = TyperChoice(["smoke", "models-rt", "models-aot", "complete"])

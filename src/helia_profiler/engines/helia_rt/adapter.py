@@ -44,7 +44,6 @@ _ETHOSU_CMAKE_FLAG = "NSX_HELIA_RT_ENABLE_ETHOSU"
 
 
 def _add_ethos_u_artifacts(extra_modules: list[NsxModuleRef], cmake_vars: dict[str, str]) -> None:
-    """Append the NPU module + kernel flag for the ``ethos_u`` backend."""
     extra_modules.append(
         NsxModuleRef(
             name=NSX_NPU_MODULE,
@@ -91,7 +90,6 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
         # runtime selection — only "ethos_u" changes hpx behavior here.
         ethos_u = backend == "ethos_u"
 
-        # Validate variant
         valid_variants = ("debug", "release-with-logs", "release")
         if variant not in valid_variants:
             raise EngineError(
@@ -118,9 +116,6 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
         cmake_vars: dict[str, str] = {}
 
         if not use_local:
-            # --- Default: resolve nsx-helia-rt from the NSX registry ---
-            # A source build: declare the core hpx qualified (not the one the
-            # registry would pick) and forward its kernel options.
             version = HELIART_VERSION
             log.info(
                 "heliaRT %s — resolving %s from NSX registry "
@@ -157,14 +152,12 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
                 heliart_toolchain_tag=toolchain_tag,
             )
 
-        # --- Local / custom heliaRT module ---
         # Vendor under the registry-derived project directory
         # (modules/helia-rt) so NSX's registry-aware lock resolves it.
         module_dir = work_dir / "modules" / HELIART_PROJECT
         module_dir.mkdir(parents=True, exist_ok=True)
 
         if source_path is not None:
-            # --- Source build ---
             resolved_version = _detect_version(source_path)
             _check_version_compatibility(source_path, resolved_version)
             version = resolved_version or HELIART_VERSION
@@ -195,8 +188,6 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
                 source_path,
             )
         else:
-            # --- Prebuilt distribution (explicit dist_path or custom
-            #     GitHub release) ---
             if ethos_u:
                 raise EngineError(
                     "backend 'ethos_u' requires a heliaRT source build — "

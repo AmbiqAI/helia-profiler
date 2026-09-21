@@ -1,5 +1,3 @@
-"""Tests for the platform model."""
-
 import pytest
 
 from helia_profiler.errors import ConfigError
@@ -109,7 +107,6 @@ def test_ap5_socs_expose_expected_psram_capacity():
 
 
 def test_apollo330_is_ap5_family():
-    """AP330 is Cortex-M55 and belongs to AP5 family."""
     soc = get_soc_for_board("apollo330mP_evb")
     assert soc.family is SocFamily.AP5
     assert soc.core is CoreArch.CORTEX_M55
@@ -168,7 +165,6 @@ def test_apollo510_lite_hardware_facts_match_apollo330P_not_apollo510():
 
 
 def test_atomiq110_is_ap5_family():
-    """atomiq110 is Cortex-M55 and belongs to AP5 family, like apollo330P."""
     soc = get_soc_for_board("atomiq110_fpga_turbo")
     assert soc.family is SocFamily.AP5
     assert soc.core is CoreArch.CORTEX_M55
@@ -357,11 +353,6 @@ def test_custom_soc_registry_can_override_jlink_and_rtt():
     # to get an address at all (#149).
     assert soc.origin is SocOrigin.CUSTOM
     assert soc.capabilities.memory.app_flash_load_addr is None
-
-
-# ---------------------------------------------------------------------------
-# target.custom_socs: app-image flash load address (issue #149)
-# ---------------------------------------------------------------------------
 
 
 def _scratch_soc_spec(**overrides):
@@ -868,11 +859,6 @@ def test_a_custom_soc_is_stamped_custom_even_when_named_after_a_builtin():
     assert soc.origin is SocOrigin.CUSTOM
 
 
-# ---------------------------------------------------------------------------
-# target.custom_socs / custom_boards: unknown keys (issue #149)
-# ---------------------------------------------------------------------------
-
-
 def test_an_unknown_key_in_a_custom_soc_is_rejected():
     """Silence is the worst answer to a key the user reached for deliberately.
 
@@ -1162,10 +1148,6 @@ def test_an_unknown_key_in_a_custom_board_is_rejected():
     assert "default_sync_gpio_pin" in (exc_info.value.hint or "")
 
 
-# ---------------------------------------------------------------------------
-# target.custom_boards: GPIO pin validation (issue #149)
-# ---------------------------------------------------------------------------
-
 #: The four ``custom_boards`` keys that name a GPIO pad.  Every one of them
 #: ends up configuring that pad as an output inside the measured window, so
 #: every one of them carries the same hazards; the tests below are parametrized
@@ -1291,11 +1273,6 @@ def test_every_gate_on_the_ble_reset_pin_agrees_about_pad_zero():
 
     assert board.ble_reset_gpio_pin is not None  # what both firmware gates read
     assert "nsx_gpio_init" in rendered  # ...and now what the template reads
-
-
-# ---------------------------------------------------------------------------
-# The key enums vs. what the builders actually read
-# ---------------------------------------------------------------------------
 
 
 def _keys_the_builders_read() -> set[str]:

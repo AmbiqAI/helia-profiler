@@ -106,7 +106,6 @@ def test_family_membership_and_order_are_the_documented_sets():
         "architecture_flags",
         "engine_backend",
     ]
-    # #206: the first non-power metric group, its own family and wire prefix.
     assert [d.value for d in MEMORY_DIMENSION_MISMATCH.dimensions] == ["link_family"]
     assert MEMORY_DIMENSION_MISMATCH.code_for(ComparisonDimension.LINK_FAMILY) == (
         "metric.memory_link_family_mismatch"

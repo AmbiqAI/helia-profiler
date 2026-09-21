@@ -103,7 +103,6 @@ def _sync_executorch_cache(url: str, ref: str) -> Path:
                 raise
             log.warning("nsx-executorch: unusable cache at %s — recloning", cache)
     if head is None:
-        # Remove stale partial clone
         if cache.exists():
             shutil.rmtree(cache)
         cache.parent.mkdir(parents=True, exist_ok=True)

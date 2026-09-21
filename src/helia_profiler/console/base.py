@@ -56,20 +56,11 @@ class HpxConsole:
         self._stage_total = 0
         self._phase_name: str | None = None
 
-    # ------------------------------------------------------------------
-    # Banner
-    # ------------------------------------------------------------------
-
     def print_banner(self) -> None:
         """Print the startup banner (verbosity >= 1)."""
         progress.print_banner(self)
 
-    # ------------------------------------------------------------------
-    # Pipeline progress (verbosity >= 1)
-    # ------------------------------------------------------------------
-
     def stage_start(self, name: str, index: int = 0, total: int = 0) -> None:
-        """Called when a pipeline stage begins."""
         progress.stage_start(self, name, index, total)
 
     def progress_update(self, update: ProgressUpdate) -> None:
@@ -77,11 +68,9 @@ class HpxConsole:
         progress.progress_update(self, update)
 
     def stage_done(self, name: str) -> None:
-        """Called when a pipeline stage completes."""
         progress.stage_done(self, name)
 
     def stage_skip(self, name: str) -> None:
-        """Called when a pipeline stage is skipped."""
         progress.stage_skip(self, name)
 
     def pipeline_done(self) -> None:
@@ -91,17 +80,9 @@ class HpxConsole:
     def _stop_spinner(self) -> None:
         progress.stop_spinner(self)
 
-    # ------------------------------------------------------------------
-    # Final results display (always shown)
-    # ------------------------------------------------------------------
-
     def print_results(self, ctx: PipelineContext) -> None:
         """Render the rich results panel after a successful run."""
         results.print_results(self, ctx)
-
-    # ------------------------------------------------------------------
-    # Compare display
-    # ------------------------------------------------------------------
 
     def print_compare(
         self,
@@ -122,10 +103,6 @@ class HpxConsole:
         """Render a completed validation sweep and its decision candidates."""
         validation.print_validation(self, report, output_paths=output_paths)
 
-    # ------------------------------------------------------------------
-    # Standalone model analysis display
-    # ------------------------------------------------------------------
-
     def print_analysis(
         self,
         primary: Any,
@@ -140,21 +117,12 @@ class HpxConsole:
         """
         analysis.print_analysis(self, primary, model_name, reference)
 
-    # ------------------------------------------------------------------
-    # Error display
-    # ------------------------------------------------------------------
-
     def print_error(self, exc: Exception) -> None:
-        """Render a user-facing error."""
         doctor.print_error(self, exc)
 
     def print_interrupted(self) -> None:
         """Print a clean one-liner on Ctrl-C."""
         doctor.print_interrupted(self)
-
-    # ------------------------------------------------------------------
-    # Doctor
-    # ------------------------------------------------------------------
 
     def print_doctor(
         self,
@@ -162,10 +130,6 @@ class HpxConsole:
     ) -> None:
         """Render a typed ``hpx doctor`` result."""
         doctor.print_doctor(self, result)
-
-    # ------------------------------------------------------------------
-    # Boards & Engines
-    # ------------------------------------------------------------------
 
     def print_boards(self, boards: list[tuple[str, str, str, str, str, str]]) -> None:
         """Render the boards list.
@@ -175,5 +139,4 @@ class HpxConsole:
         doctor.print_boards(self, boards)
 
     def print_engines(self, engines: list[str]) -> None:
-        """Render the engine list."""
         doctor.print_engines(self, engines)

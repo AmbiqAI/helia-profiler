@@ -18,7 +18,6 @@ from helia_profiler.firmware import _resolve_compiler_launcher
 
 
 def _config_with_launcher(value: str, toolchain: str = "arm-none-eabi-gcc") -> ProfileConfig:
-    """Minimal stand-in exposing ``config.build.compiler_launcher`` and toolchain."""
     # Duck-typed fake: the resolver only reads build.compiler_launcher and
     # target.toolchain, so a SimpleNamespace stands in for ProfileConfig.
     return cast(
@@ -146,7 +145,6 @@ class TestLauncherToolchainCompatibility:
 
     def test_env_overrides_config(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("HPX_COMPILER_LAUNCHER", "none")
-        # Config says auto + sccache present, but env disables it.
         monkeypatch.setattr(
             "helia_profiler.firmware.shutil.which", lambda _name: "/usr/bin/sccache"
         )

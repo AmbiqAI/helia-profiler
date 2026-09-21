@@ -572,7 +572,6 @@ def test_helia_aot_single_sided_baseline_range_is_not_backfilled_from_constants(
     # a lightweight stand-in avoids ProfileConfig's init=False `compatibility`
     # field (which dataclasses.replace() cannot target directly).
     def _config_with_baseline(new_baseline: object) -> ProfileConfig:
-        # Duck-typed fake: only config.compatibility.baseline is read.
         return cast(
             "ProfileConfig",
             SimpleNamespace(compatibility=SimpleNamespace(baseline=new_baseline)),

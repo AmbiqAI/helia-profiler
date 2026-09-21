@@ -1070,7 +1070,8 @@ class TestGenerateApp:
         assert read_back > end, f"{label}: the STIMER bracket never closes"
 
     def test_ap4_power_binary_window_is_not_timed_by_dwt(self, tmp_path: Path, fake_dist: Path):
-        """End-to-end guard for the #106/#107 bug class, through generate_app.
+        """End-to-end guard for the DWT-vs-STIMER window-timing bug class,
+        through generate_app.
 
         ``power_only`` decides whether ``power_window_timer`` or
         ``clean_window_timer`` wins (``resolve_window_timer``), so the power
@@ -1138,7 +1139,7 @@ class TestGenerateApp:
         assert "hpx_profiler_power" not in cmake
 
     def test_power_binary_not_generated_when_firmware_shared(self, tmp_path: Path, fake_dist: Path):
-        """WP3: power.firmware=shared skips the dedicated-binary render/build."""
+        """power.firmware=shared skips the dedicated-binary render/build."""
         model = tmp_path / "model.tflite"
         model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
         config = load_config(
@@ -1561,7 +1562,7 @@ class TestBuildApp:
     def test_power_firmware_shared_does_not_build_power_target(
         self, tmp_path: Path, fake_dist: Path, monkeypatch
     ):
-        """WP3: power.firmware=shared skips the second hpx_profiler_power build."""
+        """power.firmware=shared skips the second hpx_profiler_power build."""
         model = tmp_path / "model.tflite"
         model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
         config = load_config(
@@ -1777,7 +1778,6 @@ class TestKwsModel:
         model_h = (app_dir / "src" / "model_data.h").read_text()
         assert "model_data_len = 53936" in model_h
 
-        # Verify main.cc references the profiler
         main_cc = (app_dir / "src" / "main.cc").read_text()
         assert "MicroMutableOpResolver" in main_cc
         assert "get_resolver" in main_cc
@@ -2147,7 +2147,6 @@ class TestNsxModuleOverrides:
         )
 
     def test_path_override_installs_local_module(self, tmp_path: Path, fake_dist: Path):
-        # Create a fake local module with nsx-module.yaml
         local_module = tmp_path / "my-nsx-core"
         local_module.mkdir()
         (local_module / "nsx-module.yaml").write_text(
@@ -2164,13 +2163,11 @@ class TestNsxModuleOverrides:
         PrepareEngineStage().run(ctx)
         app_dir = generate_app(ctx)
 
-        # Module should be installed as local
         installed = app_dir / "modules" / "nsx-core"
         assert installed.is_dir()
         assert (installed / "nsx-module.yaml").is_file()
         assert (installed / "CMakeLists.txt").read_text() == "# custom nsx-core cmake\n"
 
-        # nsx.yml should mark it as a vendored (local) module under schema v2
         nsx_yml = (app_dir / "nsx.yml").read_text()
         assert "vendored: true" in nsx_yml
 
@@ -2179,7 +2176,6 @@ class TestNsxModuleOverrides:
 
         bad_dir = tmp_path / "bad-module"
         bad_dir.mkdir()
-        # No nsx-module.yaml
 
         ctx = self._make_ctx_with_overrides(
             tmp_path,
@@ -2198,7 +2194,6 @@ class TestNsxModuleOverrides:
         fake_dist: Path,
         caplog,
     ):
-        """Override for a module not in the build should emit a warning."""
         import logging
 
         ctx = self._make_ctx_with_overrides(

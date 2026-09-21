@@ -21,7 +21,6 @@ if TYPE_CHECKING:
     from ..pipeline import PipelineContext
     from .base import HpxConsole
 
-# Cache counters used in the summary display.
 _CACHE_DISPLAY = (
     "ARM_PMU_L1D_CACHE",
     "ARM_PMU_L1D_CACHE_RD",
@@ -324,13 +323,11 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
 
     console._console.print()
 
-    # ── Header ────────────────────────────────────────────────
     console._console.print(
         Rule("[bold]Results[/bold]", style="bright_blue"),
     )
     console._console.print()
 
-    # ── Overview table ────────────────────────────────────────
     total_cycles = sum(l.cycles or 0 for l in layers)
 
     overview = Table(
@@ -370,7 +367,6 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
             f"[bold green]{clean_cycles:,.0f}[/bold green]{delta_txt}",
         )
 
-    # Model analysis summary
     if ctx.model_analysis is not None:
         ma = ctx.model_analysis
         if ma.has_ethos_u_op:
@@ -394,7 +390,6 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
     console._console.print(overview)
     console._console.print()
 
-    # ── Top layers by cycles ──────────────────────────────────
     sorted_layers = sorted(layers, key=lambda l: l.cycles or 0, reverse=True)
     top_n = sorted_layers[:5]
 
@@ -445,7 +440,6 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
         cyc = layer.cycles or 0
         pct = cyc / total_cycles * 100 if total_cycles else 0
 
-        # Color-coded percentage
         if pct >= 20:
             pct_style = "bold red"
         elif pct >= 10:
@@ -474,7 +468,6 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
     console._console.print(layer_table)
     console._console.print()
 
-    # ── Memory panel ──────────────────────────────────────────
     mem_parts: list[str] = []
     if meta.allocated_arena and meta.arena_size:
         pct = meta.allocated_arena / meta.arena_size * 100
@@ -519,7 +512,7 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
         bin_table.add_row("[bold]total[/bold]", f"[bold]{bs.total:,}[/bold]")
 
         if mem_parts:
-            mem_parts.append("")  # blank line
+            mem_parts.append("")
         mem_parts.append("[bold]Binary Sections[/bold]")
 
     if mem_parts:
@@ -535,13 +528,11 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
             ),
         )
 
-        # Binary table below the panel if present
         if ctx.binary_sections is not None:
             console._console.print(bin_table)
 
         console._console.print()
 
-    # ── Memory plan (per-region capacity vs used) ─────────────────
     if ctx.memory_regions is not None and measured_memory_is_renderable(ctx.memory_regions):
         # Measured first (#133): region truth comes from the ELF. The plan
         # renders only as a fallback — its numbers are the pre-build
@@ -552,7 +543,6 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
     elif ctx.memory_plan is not None and ctx.memory_plan.regions:
         render_memory_plan(console, ctx.memory_plan)
 
-    # ── Cache/memory counters ─────────────────────────────────
     cache_totals: dict[str, float] = {}
     for layer in layers:
         for cname in _CACHE_DISPLAY:
@@ -575,7 +565,6 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
                 short = cname.replace("ARM_PMU_", "")
                 cache_table.add_row(short, f"{cache_totals[cname]:,.0f}")
 
-        # Derived: L1D hit rate
         l1d_acc = cache_totals.get("ARM_PMU_L1D_CACHE_RD", cache_totals.get("ARM_PMU_L1D_CACHE", 0))
         l1d_miss = cache_totals.get(
             "ARM_PMU_L1D_CACHE_MISS_RD",
@@ -592,7 +581,6 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
         console._console.print(cache_table)
         console._console.print()
 
-    # ── Power ─────────────────────────────────────────────────
     if ctx.power_result is not None:
         ps = ctx.power_result.summary
         degraded = ctx.power_result.metadata.integrity is PowerIntegrity.DEGRADED
@@ -645,10 +633,8 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
         console._console.print(power_table)
         console._console.print()
 
-    # ── Validity ──────────────────────────────────────────────
     render_validity(console, ctx)
 
-    # ── Output files ──────────────────────────────────────────
     output_dir = ctx.config.output.dir.resolve()
     elapsed = time.monotonic() - console._run_start
 

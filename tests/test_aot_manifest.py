@@ -32,9 +32,6 @@ def test_apollo4_board_variants_map_to_aot_platform():
         assert _BOARD_TO_AOT_PLATFORM.get(board) == board
 
 
-# ---------- fake AotOperator surface -----------------------------------------
-
-
 @dataclass
 class _FakeTensor:
     name: str = "t"
@@ -113,9 +110,6 @@ class _FakeArena:
     source_memory: str | None
 
 
-# ---------- _tensor_metadata -------------------------------------------------
-
-
 class TestTensorMetadata:
     def test_full_tensor_produces_full_metadata(self):
         t = _FakeTensor(name="conv_in", shape=[1, 8, 8, 3], dtype="int8", nbytes=192)
@@ -160,9 +154,6 @@ class TestTensorMetadata:
         assert meta["offset"] == 128
         assert meta["allocation_size"] == 256
         assert meta["staged"] is False
-
-
-# ---------- _extract_operator_manifest ---------------------------------------
 
 
 class TestExtractOperatorManifest:
@@ -258,7 +249,6 @@ class TestExtractOperatorManifest:
 
         out = _extract_operator_manifest(_FakeCtx([_BadOp()]))
         assert len(out) == 1
-        # inputs field is omitted when access fails; outputs still captured.
         assert "inputs" not in out[0]
         assert out[0]["outputs"] == []
 
@@ -276,9 +266,6 @@ class TestExtractOperatorManifest:
         lookup = _arena_region_id_lookup(_FakeCtx([], render_plan=render_plan))
 
         assert lookup[("constant", "dtcm", "dtcm")] == 2
-
-
-# ---------- _write_aot_manifest ----------------------------------------------
 
 
 def _aot_artifacts(manifest: list[dict[str, Any]] | None) -> HeliaAotArtifacts:

@@ -41,9 +41,6 @@ class NsxModuleSpec:
     project: str
 
 
-# ---------------------------------------------------------------------------
-# SDK tier → module set mapping
-#
 # hpx owns the *selection* of modules a profiler app needs (a deliberately lean
 # set — e.g. it uses nsx-core's runtime helpers directly rather than the legacy
 # nsx-harness / nsx-utils modules). The *ownership* of each module (which NSX
@@ -51,7 +48,6 @@ class NsxModuleSpec:
 # starter profile for the target board so it always tracks the upstream
 # registry (which repoints migrated Ambiq modules onto the unified
 # nsx-ambiq-sdk project). See ``_module_project``.
-# ---------------------------------------------------------------------------
 
 
 def _soc_has_backend(soc: Any, backend: str) -> bool:
@@ -86,7 +82,6 @@ def _usb_provider_module_names(
 
 
 def _board_module_name(board: str) -> str:
-    """Derive the NSX board module name from a board name."""
     return f"nsx-board-{board.replace('_', '-')}"
 
 

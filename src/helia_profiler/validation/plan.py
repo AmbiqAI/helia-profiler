@@ -75,7 +75,6 @@ def _normalise_csv_aliases(
 
 
 def normalise_engines(raw: str) -> str:
-    """Translate short engine aliases to canonical names."""
     return _normalise_csv_aliases(
         raw,
         aliases=_ENGINE_ALIASES,
@@ -85,7 +84,6 @@ def normalise_engines(raw: str) -> str:
 
 
 def normalise_executorch_backends(raw: str) -> str:
-    """Translate ExecuTorch CMSIS-NN provider selection to canonical names."""
     if (raw or "").strip() == "both":
         return "arm,ns"
     return _normalise_csv_aliases(
@@ -97,7 +95,6 @@ def normalise_executorch_backends(raw: str) -> str:
 
 
 def normalise_toolchains(raw: str) -> str:
-    """Translate toolchain aliases (gcc, acfe) to config values."""
     return _normalise_csv_aliases(
         raw,
         aliases=_TOOLCHAIN_ALIASES,
@@ -107,7 +104,6 @@ def normalise_toolchains(raw: str) -> str:
 
 
 def normalise_transports(raw: str) -> str:
-    """Translate interface aliases (usb) to transport config values."""
     return _normalise_csv_aliases(
         raw,
         aliases=_TRANSPORT_ALIASES,
@@ -117,7 +113,6 @@ def normalise_transports(raw: str) -> str:
 
 
 def normalise_memories(raw: str) -> str:
-    """Translate memory aliases to model placement presets."""
     return _normalise_csv_aliases(
         raw,
         aliases=_MEMORY_ALIASES,
@@ -264,7 +259,6 @@ class ValidationPlan:
         junit_xml: Path | None = None,
         verbose: int = 0,
     ) -> list[str]:
-        """Build the pytest argument list that runs this plan."""
         args: list[str] = [
             str(tests_dir),
             "-m",

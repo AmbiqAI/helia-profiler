@@ -64,10 +64,6 @@ def _is_reserved_section_name(name: str) -> bool:
     return bool(tokens & _RESERVED_NOBITS_NAMES)
 
 
-# ---------------------------------------------------------------------------
-# Section inventory (#133 Phase 1)
-# ---------------------------------------------------------------------------
-#
 # The measured half of the memory model starts here: the full per-section
 # (name, address, size) inventory plus the PT_LOAD segments, captured from
 # the SAME tools the reserved/bss split already runs — readelf kept only
@@ -418,11 +414,6 @@ def section_inventory(
     sections, unparsed = inventory
     segments = _segments_via_readelf(binary_path, readelf_cmd=readelf_cmd, timeout_s=timeout_s)
     return SectionInventory(sections=sections, segments=segments, unparsed_rows=unparsed)
-
-
-# ---------------------------------------------------------------------------
-# Symbol inventory (#133 Phase 3)
-# ---------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)

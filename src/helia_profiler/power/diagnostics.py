@@ -30,8 +30,6 @@ if TYPE_CHECKING:
 
 
 class GateFailureKind(StrEnum):
-    """Classified gated-capture transition failure."""
-
     NO_GATE_RISE = "no_gate_rise"
     NO_GATE_FALL = "no_gate_fall"
     NO_STATS_WINDOW = "no_stats_window"
@@ -203,10 +201,6 @@ def assess_gate_duration(
     )
 
 
-# ---------------------------------------------------------------------------
-# Firmware window-clock integrity
-# ---------------------------------------------------------------------------
-#
 # The dedicated power binary times its own measured window and reports the
 # result as HPX_POWER_ELAPSED_US. That clock is independent of every host
 # measurement, which makes it the one number that can be silently wrong

@@ -114,10 +114,6 @@ class PlanMemoryStage:
                     pct,
                 )
 
-    # ------------------------------------------------------------------
-    # Plan construction
-    # ------------------------------------------------------------------
-
     def _select_plan(self, ctx: PipelineContext) -> MemoryPlan:
         """Prefer the engine-supplied plan; synthesise one otherwise.
 
@@ -247,10 +243,6 @@ class PlanMemoryStage:
             model_weight_bytes=model_bytes,
         )
 
-    # ------------------------------------------------------------------
-    # Capacity + validation
-    # ------------------------------------------------------------------
-
     def _apply_capacities(
         self,
         plan: MemoryPlan,
@@ -349,9 +341,7 @@ class PlanMemoryStage:
         )
 
 
-# ---------------------------------------------------------------------------
 # hpx-owned consumers (#133 Phase 3)
-# ---------------------------------------------------------------------------
 #
 # Sizes the firmware reserves that hpx decides HOST-SIDE, a priori — they
 # belong in the PLAN (the decision record) so the overflow check accounts
@@ -602,11 +592,6 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
         model_weight_bytes=plan.model_weight_bytes,
         has_overflow=plan.has_overflow,
     )
-
-
-# ---------------------------------------------------------------------------
-# Placement resolver
-# ---------------------------------------------------------------------------
 
 
 def _resolve_placement(ctx: PipelineContext) -> tuple[Placement, Placement]:

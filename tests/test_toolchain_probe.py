@@ -35,15 +35,12 @@ def test_atfe_binary_sections_uses_llvm_size_from_atfe_root(tmp_path: Path, monk
     )
 
     assert sections == BinarySections(text=10, data=20, bss=30, total=60)
-    # Both probes must resolve llvm-size from ATFE_ROOT: the Berkeley call for
-    # the totals, and the `-A` call that separates linker-reserved NOBITS from
-    # real bss (#24). The stub returns Berkeley output for both, so `-A` finds
-    # no section lines and the reserved adjustment is correctly skipped.
-    # Both probes must resolve from ATFE_ROOT: `size` for the Berkeley totals
-    # and `readelf` for the section types that separate the linker's reserved
-    # NOBITS regions from real bss (#24). The stub returns Berkeley output for
-    # both, so no section headers parse and the adjustment is correctly
-    # skipped -- which also covers the unreadable-headers fallback.
+    # Both probes must resolve llvm-size/llvm-readelf from ATFE_ROOT: the
+    # Berkeley call for totals, and readelf -S for the section types that
+    # separate linker-reserved NOBITS from real bss. The stub returns
+    # Berkeley output for both, so no section headers parse and the reserved
+    # adjustment is correctly skipped -- which also covers the
+    # unreadable-headers fallback.
     assert calls == [
         [str(tmp_path / "atfe" / "bin" / "llvm-size"), str(tmp_path / "firmware")],
         [
@@ -258,9 +255,7 @@ def test_a_region_qualified_heap_name_is_matched(tmp_path: Path, monkeypatch) ->
     assert sections.bss == 8452 - (0x0FA0 + 0x1004)
 
 
-# ---------------------------------------------------------------------------
-# armclang / fromelf (#132: the gap #131 left open)
-# ---------------------------------------------------------------------------
+# armclang / fromelf: the gap left open by the readelf-only probe above.
 #
 # Real output captured from Arm Compiler for Embedded 6.23 (fromelf
 # [5f102800] — fromelf's own --vsn serial; the capture's ELF headers show
@@ -304,7 +299,7 @@ def _fromelf_stub(monkeypatch, z_out: str, v_out: str, calls: list | None = None
 def test_armclang_linker_reservation_is_not_counted_as_bss(tmp_path: Path, monkeypatch) -> None:
     """#132: fromelf's ZI figure folds ARM_LIB_HEAP in, exactly as Berkeley
     `size` folded `.heap` into bss (#24). The per-section probe must pull the
-    reservation out so armclang reports the same meaning of bss as gcc."""
+    out so armclang reports the same meaning of bss as gcc."""
     calls: list = []
     _fromelf_stub(monkeypatch, _FROMELF_Z, _FROMELF_V, calls)
 
@@ -345,8 +340,7 @@ def test_armclang_degrades_to_unadjusted_totals_without_section_detail(
 def test_armclang_legacy_grand_totals_line_still_parses(tmp_path: Path, monkeypatch) -> None:
     """The label-first `Grand Totals:` shape (no real fromelf we have seen
     emits it) stays as the last-resort fallback, reproducing
-    BinarySections(text=608, data=4, bss=392188, total=392800, reserved=0)
-    (#132)."""
+    BinarySections(text=608, data=4, bss=392188, total=392800, reserved=0)."""
     legacy = "  Grand Totals: 600 8 4 392188\n"
     _fromelf_stub(monkeypatch, legacy, "some unexpected tool output\n")
 
@@ -429,8 +423,8 @@ def test_size_and_fromelf_parsers_agree_on_the_same_binary_shape(
 def _section_listing(name: str) -> str:
     """A -v section block in the REAL fromelf shape: bare '** Section #N'
     header, fields on indented lines (#175 — the first
-    version put the fields inline on the header, where the parser never
-    reads them, so it returned 0 for ANY name and pinned nothing)."""
+    inline on the header, where the parser never read them, so it returned
+    0 for ANY name and pinned nothing."""
     return (
         "** Section #4\n"
         "\n"
@@ -445,9 +439,9 @@ def test_combined_stackheap_region_stays_bss():
     """ARM_LIB_STACKHEAP (combined region) contains the live stack and
     cannot be split — per #131's never-invent rule it stays in bss with
     reserved=0. Verified against a real armlink build by the #175
-    (bss=65784, reserved=0). The ARM_LIB_HEAP positive control proves the
-    parser actually READ the name — without it, "correctly classified as
-    live stack" is indistinguishable from "parser saw nothing"."""
+    reserved=0). The ARM_LIB_HEAP positive control proves the parser
+    actually READ the name — without it, "correctly classified as live
+    stack" is indistinguishable from "parser saw nothing"."""
     assert _reserved_from_section_listing(_section_listing("ARM_LIB_STACKHEAP")) == 0
     assert _reserved_from_section_listing(_section_listing("ARM_LIB_HEAP")) == 65536
     assert _reserved_from_section_listing(_section_listing(".heap")) == 65536
@@ -455,10 +449,10 @@ def test_combined_stackheap_region_stays_bss():
 
 def test_totals_label_in_the_image_path_is_not_a_totals_row():
     """#175: fromelf echoes the input path in the Object Name
-    column, so a relative path whose LEADING component is a totals label
-    must still parse as the image row. The prefix-match version of the fix
-    skipped it (verified against the real tool: 'ROM Totals/fw.axf' ->
-    None); the full-match version reads it correctly."""
+    relative path whose LEADING component is a totals label must still
+    parse as the image row. The prefix-match version of the fix skipped it
+    (verified against the real tool: 'ROM Totals/fw.axf' -> None); the
+    full-match version reads it correctly."""
     table = (
         "** Object/Image Component Sizes\n"
         "\n"

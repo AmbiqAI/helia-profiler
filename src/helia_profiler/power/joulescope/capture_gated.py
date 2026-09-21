@@ -53,7 +53,6 @@ log = logging.getLogger("hpx")
 
 
 def _host_monotonic_time64(time64: Any) -> int:
-    """Return a strictly monotonic host timestamp in Joulescope time64 ticks."""
     return time.monotonic_ns() * time64.SECOND // 1_000_000_000
 
 
@@ -285,7 +284,6 @@ def capture_gated(
         fr_volt_spans.append(_fullrate_sample_span(value, len(data)))
 
     def _stop_fullrate_streams() -> None:
-        """Stop each requested channel and release every attempted subscription."""
         for channel in ("i", "v"):
             try:
                 driver.publish(f"{device_path}/s/{channel}/ctrl", 0, timeout=0)
@@ -460,7 +458,6 @@ def capture_gated(
                     go_release_at = time.monotonic()
                 except Exception:
                     log.warning("on_started hook failed", exc_info=True)
-            # Block until the poller early-stops or the safety bound elapses.
             stop.wait(timeout=duration_s)
         finally:
             stop.set()

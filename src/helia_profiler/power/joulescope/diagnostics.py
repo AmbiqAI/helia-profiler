@@ -18,7 +18,6 @@ from .stats import _gated_mask_axis, _segment_gpi_windows, _stats_arrays
 def _poll_edge_uncertainty_s(
     reads: list[tuple[int, int, int]], *, minimum_window_s: float = 0.0
 ) -> float:
-    """Sum the measured read brackets at both edges of qualifying windows."""
     from pyjoulescope_driver import time64
 
     rise: int | None = None
@@ -45,7 +44,6 @@ def _gated_stats_diagnostics(
     gate_edge_source: str = "gpi_snapshot_poll",
     stream_segment_count: int | None = None,
 ) -> dict[str, Any]:
-    """Summarise how the GPIO windows intersect the stats packets."""
     import numpy as np
 
     a = _stats_arrays(packets)

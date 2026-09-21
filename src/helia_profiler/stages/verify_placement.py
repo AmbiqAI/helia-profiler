@@ -46,8 +46,6 @@ _ARENA_SYMBOL = "g_arena_storage"
 
 
 class VerifyPlacementStage:
-    """Assert the arena symbol landed in its intended memory region."""
-
     @property
     def name(self) -> str:
         return "verify_placement"

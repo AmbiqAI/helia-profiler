@@ -1,5 +1,3 @@
-"""Tests for the preflight pipeline stage."""
-
 from __future__ import annotations
 
 import os
@@ -48,7 +46,6 @@ class TestPreflightHappyPath:
         ctx = _make_ctx(tmp_path)
         with patch("shutil.which", side_effect=_all_tools_present):
             PreflightStage().run(ctx)
-        # Output dir should have been created.
         assert (tmp_path / "out").is_dir()
 
     def test_passes_with_executorch_pte(self, tmp_path: Path):
@@ -549,13 +546,13 @@ class TestPreflightNpuBackend:
         from helia_profiler.stages.preflight import _check_npu_backend
 
         with patch("helia_profiler.evaluation.is_available", return_value=True):
-            _check_npu_backend(ctx.config)  # must not raise
+            _check_npu_backend(ctx.config)
 
     def test_default_backend_not_gated(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path, {"engine": {"type": "helia-rt"}})
         from helia_profiler.stages.preflight import _check_npu_backend
 
-        _check_npu_backend(ctx.config)  # must not raise
+        _check_npu_backend(ctx.config)
 
 
 class TestVelaAcceleratorConfigMatch:
@@ -589,7 +586,7 @@ class TestVelaAcceleratorConfigMatch:
             "helia_profiler.evaluation.vela_accelerator_config",
             return_value="ethos-u85-256",
         ):
-            _check_npu_backend(ctx.config)  # must not raise
+            _check_npu_backend(ctx.config)
 
     def test_mismatched_config_rejected(self, tmp_path: Path):
         ctx = self._npu_ctx(tmp_path)
@@ -602,7 +599,6 @@ class TestVelaAcceleratorConfigMatch:
             with pytest.raises(ConfigError) as excinfo:
                 _check_npu_backend(ctx.config)
         message = str(excinfo.value)
-        # The error must name BOTH configs so the fix is obvious.
         assert "ethos-u55-128" in message
         assert "ethos-u85-256" in message
 
@@ -619,7 +615,6 @@ class TestVelaAcceleratorConfigMatch:
                 _check_npu_backend(ctx.config)
 
     def test_undeterminable_config_skipped(self, tmp_path: Path):
-        """Unknown must never be reported as a mismatch."""
         ctx = self._npu_ctx(tmp_path)
         from helia_profiler.stages.preflight import _check_npu_backend
 
@@ -627,7 +622,7 @@ class TestVelaAcceleratorConfigMatch:
             "helia_profiler.evaluation.vela_accelerator_config",
             return_value=None,
         ):
-            _check_npu_backend(ctx.config)  # must not raise
+            _check_npu_backend(ctx.config)
 
     def test_case_insensitive_match(self, tmp_path: Path):
         ctx = self._npu_ctx(tmp_path)
@@ -637,7 +632,7 @@ class TestVelaAcceleratorConfigMatch:
             "helia_profiler.evaluation.vela_accelerator_config",
             return_value="ETHOS-U85-256",
         ):
-            _check_npu_backend(ctx.config)  # must not raise
+            _check_npu_backend(ctx.config)
 
     def test_missing_parser_is_a_dependency_error_not_a_silent_skip(self, tmp_path: Path):
         """Without ai-edge-litert the check cannot run at all — that must
@@ -679,7 +674,7 @@ class TestPreflightEthosNpuCounters:
         )
         from helia_profiler.stages.preflight import _check_pmu_selection
 
-        _check_pmu_selection(ctx.config)  # must not raise
+        _check_pmu_selection(ctx.config)
 
     def test_cpu_counters_not_gated_on_backend(self, tmp_path: Path):
         ctx = _make_ctx(
@@ -688,7 +683,7 @@ class TestPreflightEthosNpuCounters:
         )
         from helia_profiler.stages.preflight import _check_pmu_selection
 
-        _check_pmu_selection(ctx.config)  # must not raise
+        _check_pmu_selection(ctx.config)
 
     def test_npu_counter_smuggled_under_another_key_still_rejected(self, tmp_path: Path):
         """The gate is on resolved counter GROUPS, not the selection keys:
@@ -717,7 +712,7 @@ class TestPreflightEthosNpuCounters:
         )
         from helia_profiler.stages.preflight import _check_pmu_selection
 
-        _check_pmu_selection(ctx.config)  # must not raise
+        _check_pmu_selection(ctx.config)
 
 
 class TestPreflightNpuBackendEngineGate:
@@ -747,4 +742,4 @@ class TestPreflightNpuBackendEngineGate:
         from helia_profiler.stages.preflight import _check_npu_backend
 
         with patch("helia_profiler.evaluation.is_available", return_value=True):
-            _check_npu_backend(ctx.config)  # must not raise
+            _check_npu_backend(ctx.config)
