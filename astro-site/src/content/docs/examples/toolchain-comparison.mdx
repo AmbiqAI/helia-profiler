@@ -59,6 +59,7 @@ elided, marked with `…`):
 
  Field              Baseline                 Candidate                  Status
  Engine             helia-rt                 helia-rt                    same
+ …
  Toolchain          arm-none-eabi-gcc        atfe                        diff
  Link family        gnu                      gnu                         same
  Compiler version   arm-none-eabi-...15.2…   clang version 22.1.0        diff
@@ -87,9 +88,8 @@ cycles() { awk -F, 'NR==1{for(i=1;i<=NF;i++)if($i=="cycles")c=i}{print $1","$2",
 paste -d, <(cycles results/rt_gcc/profile_results.csv) <(cycles results/rt_atfe/profile_results.csv | cut -d, -f3) | head
 ```
 
-The column position of `cycles` depends on how many counters the run
-captured, which is why the helper finds it by name.
-
+- The column position of `cycles` depends on how many counters the run
+  captured, which is why the helper above finds it by name.
 - `link_family` stays `gnu` for ATfE, so the per-region memory rows remain
   comparable; armclang links with `armlink`, and the comparison omits the
   per-region `used` and `free` rows for that pair while keeping the
