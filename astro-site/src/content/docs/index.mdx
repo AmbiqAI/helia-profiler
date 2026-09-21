@@ -20,7 +20,6 @@ import IconRow from '@ambiqai/helia-ui/astro/IconRow';
 import BlockDiagram from '@ambiqai/helia-ui/astro/BlockDiagram';
 import Block from '@ambiqai/helia-ui/astro/Block';
 import DocsVersion from '../../components/DocsVersion.astro';
-import { counts } from '../../lib/home-catalog.mjs';
 
 <DocsVersion />
 
@@ -117,7 +116,7 @@ result = profile(load_config(Path("hpx.yml"), {}))`}
 
 <CardGrid columns={4} equalize>
   <Card>
-    <CardHeader>{counts.engines} engines</CardHeader>
+    <CardHeader>4 engines</CardHeader>
     <CardContent>
       heliaRT, heliaAOT, a stock LiteRT for Microcontrollers baseline and
       ExecuTorch, on one harness.
@@ -135,7 +134,7 @@ result = profile(load_config(Path("hpx.yml"), {}))`}
     </CardContent>
   </Card>
   <Card>
-    <CardHeader>{counts.boards} boards</CardHeader>
+    <CardHeader>13 boards</CardHeader>
     <CardContent>
       Apollo3, Apollo4 and Apollo5 family EVBs, plus custom SoC definitions
       based on a known part.

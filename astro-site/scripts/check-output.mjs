@@ -104,7 +104,10 @@ check(
  * was typed into the page. src/data/catalog.json is read out of
  * src/helia_profiler by scripts/build-catalog.mjs; an engine added there is a
  * failing build until Home names it, and the two figures on the page are the
- * registry's counts. Read against the artifact, like everything else here. */
+ * registry's counts. The figures are typed into the page as text rather than
+ * imported, because the Markdown rendition drops a JSX expression and the
+ * rendition is the copy an agent reads; this check is what keeps the typed
+ * figure honest. Read against the artifact, like everything else here. */
 const catalog = JSON.parse(read(site, "src/data/catalog.json"));
 check(
   catalog.generatedFrom?.sourceTree ===
