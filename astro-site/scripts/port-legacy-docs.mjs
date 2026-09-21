@@ -77,6 +77,10 @@ const SKIP = [
   /* Rewritten by the Measure revamp (#341). */
   'guide/power.md',
   'guide/pmu-counters.md',
+  /* Rewritten by the Read results revamp (#342). */
+  'guide/output.md',
+  'guide/analysis-comparison.md',
+  'guide/model-explorer.md',
 ];
 
 /*
@@ -124,6 +128,13 @@ const PRESERVE = [
   'guide/power-ina228.mdx',
   'guide/power-windows.mdx',
   'guide/power-verify.mdx',
+  /* Authored by the Read results revamp (#342). */
+  'guide/output.mdx',
+  'guide/latency.mdx',
+  'guide/analysis-comparison.mdx',
+  'guide/model-explorer.mdx',
+  'guide/parsing-outputs.mdx',
+  'guide/troubleshooting.mdx',
 ];
 
 const BASE = '/helia-profiler/';
