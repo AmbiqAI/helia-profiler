@@ -46,7 +46,7 @@ export default defineConfig({
        * routes at one path is a hard error in a coming Astro. */
       disable404Route: true,
       /* Opt-in: it paints the build-time mermaid SVGs from the token set. */
-      customCss: ['@ambiqai/helia-ui/mermaid.css', './src/styles/block-diagram.css'],
+      customCss: ['@ambiqai/helia-ui/mermaid.css'],
       plugins: [
         heliaStarlight({
           accent: 'helia-profiler',

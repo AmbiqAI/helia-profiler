@@ -23,10 +23,10 @@ comments on #320.
   `check:output` enforces 250,000 B HTML and 40,000 B gzip per page;
   `check:guard` runs `scripts/*.test.mjs`, including the examples template
   and config-path tests.
-- Diagrams use the `BlockDiagram`/`Block` mirror in
-  `astro-site/src/components/` (helia-ui#154; swap for the package export when
-  the owner cuts alpha.17). Every diagram page repeats its hierarchy as a
-  nested Markdown list (helia-ui#155).
+- Diagrams use `@ambiqai/helia-ui/astro/{BlockDiagram,Block}` (alpha.19); the
+  local mirror is gone. Every diagram page repeats its hierarchy as a nested
+  Markdown list; the alpha.19 rendition sidecar also carries it into the
+  Markdown twins.
 - Every external URL is fetched before it is cited; `check:links` skips
   external hosts. Numbers come from a shipped bundle or a source of record
   with a link, or the page says "not yet validated".
