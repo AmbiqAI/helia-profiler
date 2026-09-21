@@ -58,6 +58,12 @@ const SKIP = [
   'reference/profile.md',
   'reference/target.md',
   'reference/validate.md',
+  /* Rewritten by the Getting started journey (#339); the port no longer owns them. */
+  'getting-started/index.md',
+  'getting-started/install.md',
+  'getting-started/first-profile.md',
+  'getting-started/quickstart.md',
+  'guides/validating-a-board-setup.md',
 ];
 
 /*
@@ -65,7 +71,10 @@ const SKIP = [
  * keeping all of reference/; the stale pages this port owns underneath it are
  * deleted here instead.
  */
-const KEEP = ['index.mdx', 'reference'];
+const KEEP = ['index.mdx', 'reference',
+  /* Authored journey; the converter must not prune it. */
+  'getting-started',
+];
 
 /*
  * Authored pages the converter would otherwise delete, because the legacy tree
@@ -81,6 +90,8 @@ const PRESERVE = [
   'reference/cli',
   'reference/configuration',
   'reference/issue-codes',
+  /* Authored journey; the port no longer owns this tree. */
+  'getting-started',
 ];
 
 const BASE = '/helia-profiler/';

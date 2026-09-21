@@ -13,7 +13,6 @@
     "/getting-started/",
     "/getting-started/first-profile/",
     "/getting-started/install/",
-    "/getting-started/quickstart/",
     "/guide/analysis-comparison/",
     "/guide/boards/",
     "/guide/configuration/",
@@ -40,10 +39,11 @@
     "/architecture/field-diagnostics/": "/helia-profiler/guide/concepts/field-diagnostics/",
     "/architecture/firmware/": "/helia-profiler/guide/concepts/firmware/",
     "/architecture/pipeline/": "/helia-profiler/guide/concepts/pipeline/",
+    "/getting-started/quickstart/": "/helia-profiler/getting-started/configure-a-run/",
     "/guides/": "/helia-profiler/guide/in-depth/",
     "/guides/executorch-ns-kernels/": "/helia-profiler/guide/in-depth/executorch-ns-kernels/",
     "/guides/memory-placement-tuning/": "/helia-profiler/guide/in-depth/memory-placement-tuning/",
-    "/guides/validating-a-board-setup/": "/helia-profiler/guide/in-depth/validating-a-board-setup/",
+    "/guides/validating-a-board-setup/": "/helia-profiler/getting-started/validate-your-setup/",
     "/reference/analyze/": "/helia-profiler/reference/cli/analyze/",
     "/reference/api/": "/helia-profiler/reference/api/helia_profiler/",
     "/reference/api/config/": "/helia-profiler/reference/api/helia_profiler/config/",
@@ -64,5 +64,8 @@
     "/reference/profile/": "/helia-profiler/reference/cli/profile/",
     "/reference/target/": "/helia-profiler/reference/cli/target/",
     "/reference/validate/": "/helia-profiler/reference/cli/validate/"
+  },
+  "moved": {
+    "/guide/in-depth/validating-a-board-setup/": "/helia-profiler/getting-started/validate-your-setup/"
   }
 }

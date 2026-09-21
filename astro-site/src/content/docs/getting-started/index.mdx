@@ -1,38 +1,119 @@
 ---
-title: "Getting Started"
-description: "Three short steps. Each one builds on the previous."
+title: "Getting started"
+description: "One ordered journey from a clean machine to a first profile you can read: install, hardware, validate, first profile, configure a run, where next."
 ---
 
-import Icon from '@ambiqai/helia-ui/astro/Icon';
 import CardGrid from '@ambiqai/helia-ui/astro/CardGrid';
 import LinkCard from '@ambiqai/helia-ui/astro/LinkCard';
+import Icon from '@ambiqai/helia-ui/astro/Icon';
+import BlockDiagram from '../../../components/BlockDiagram.astro';
+import Block from '../../../components/Block.astro';
 
-Three short steps. Each one builds on the previous.
+heliaPROFILER (`hpx`) builds firmware around a model, flashes it to an Ambiq
+board, captures cycle counts and optionally power, and writes a result bundle
+you can read, compare and script against. This section takes you from a
+clean machine to that first bundle in six steps. Each step assumes the one
+before it, so read them in order the first time.
+
+## Purpose
+
+By the end of this section you will have run one profile of a small
+keyword-spotting model on an Apollo EVB, opened the summary it wrote, and
+know which page to read next for the thing you want to measure. Every step
+uses real commands and shows the output the command prints.
+
+## Prerequisites
+
+A host running Linux, macOS or Windows, and an Ambiq Apollo EVB with its
+on-board debug probe. Power capture needs a Joulescope
+or an INA228 wired to the board; it is optional and comes later. The exact
+versions are on [Hardware prerequisites](hardware-prerequisites/).
+
+## Steps
 
 <CardGrid>
   <LinkCard href="install/" title="1. Install">
     <Icon name="download" slot="icon" />
 
-    Get heliaPROFILER, the ARM GCC toolchain, CMake/Ninja, and J-Link onto your machine. NSX is installed with heliaPROFILER.
+    Put `hpx`, the Arm GNU toolchain, CMake, Ninja and the SEGGER J-Link
+    software on your machine, with one path per operating system.
 
   </LinkCard>
-  <LinkCard href="first-profile/" title="2. First profile">
+  <LinkCard href="hardware-prerequisites/" title="2. Hardware prerequisites">
+    <Icon name="microchip" slot="icon" />
+
+    What to plug in: the board, its debug USB port, the probe hpx will
+    use, and the instruments you need only for power.
+
+  </LinkCard>
+  <LinkCard href="validate-your-setup/" title="3. Validate your setup">
+    <Icon name="stethoscope" slot="icon" />
+
+    Five commands that prove the chain works before you trust a number:
+    `doctor`, `boards`, `probes`, `ports` and `validate`.
+
+  </LinkCard>
+  <LinkCard href="first-profile/" title="4. First profile">
     <Icon name="rocket" slot="icon" />
 
-    Plug in an Apollo EVB, run one command, see cycle counts.
+    One command, one model, one board. Then the four files it writes and
+    the three numbers to read off them.
 
   </LinkCard>
-  <LinkCard href="quickstart/" title="3. Use a config file">
+  <LinkCard href="configure-a-run/" title="5. Configure a run">
     <Icon name="file-code" slot="icon" />
 
-    Move from one-liners to repeatable YAML configs you can check into git.
+    Move the flags into a YAML file you can check in, and learn how the
+    file and the command line merge.
+
+  </LinkCard>
+  <LinkCard href="where-next/" title="6. Where next">
+    <Icon name="signs-post" slot="icon" />
+
+    Pick the User guide page, the example or the reference that matches
+    what you want to measure.
 
   </LinkCard>
 </CardGrid>
 
-:::tip[After the basics]
-Once you've got a profile in hand, the [User Guide](../guide/configuration/)
-is the next stop. It introduces engines, toolchains, transports, memory
-placement, and power capture one topic at a time — pick whichever is
-relevant to what you want to measure next.
-:::
+## What a run does
+
+Every `hpx profile` invocation is the same sequence of blocks. The diagram
+below is the shape to keep in mind while you read the rest of the section;
+the [Concepts pages](../guide/concepts/) open each block up.
+
+<BlockDiagram
+  title="One profile, six blocks"
+  caption="Configure, analyse, build, flash, capture, report. Power capture is an optional block beside capture."
+  flow="row"
+>
+  <Block label="Configure" sublabel="YAML and flags" />
+  <Block label="Analyse" sublabel="model and memory" />
+  <Block label="Build" sublabel="firmware" />
+  <Block label="Flash" sublabel="J-Link" />
+  <Block label="Capture" sublabel="PMU, power" />
+  <Block label="Report" sublabel="result bundle" />
+</BlockDiagram>
+
+The same sequence as a list, for readers of the Markdown rendition:
+
+- Configure: YAML and flags
+- Analyse: model and memory
+- Build: firmware
+- Flash: J-Link
+- Capture: PMU, power
+- Report: result bundle
+
+## Expected output
+
+At the end of step 4 you have a `results/` directory holding
+`result_manifest.json`, `summary.json`, `profile_results.csv`,
+`run_metadata.json` and `nsx.lock`, and a per-layer table you can open in a spreadsheet.
+Step 5 leaves you with an `hpx.yml` that reproduces that run from one
+command.
+
+## What next
+
+Start with [Install](install/). If your tools are already in place, jump to
+[Validate your setup](validate-your-setup/) and let `hpx doctor` tell you
+whether that is true.
