@@ -64,6 +64,16 @@ const SKIP = [
   'getting-started/first-profile.md',
   'getting-started/quickstart.md',
   'guides/validating-a-board-setup.md',
+  /* Rewritten by the Set up a run revamp (#340); the port no longer owns them. */
+  'guide/configuration.md',
+  'guide/engines.md',
+  'guide/toolchains.md',
+  'guide/boards.md',
+  'guide/transports.md',
+  'guide/memory.md',
+  'guides/index.md',
+  'guides/memory-placement-tuning.md',
+  'guides/executorch-ns-kernels.md',
 ];
 
 /*
@@ -74,6 +84,8 @@ const SKIP = [
 const KEEP = ['index.mdx', 'reference',
   /* Authored journey; the converter must not prune it. */
   'getting-started',
+  /* The User guide holds authored pages beside ported ones; never prune it. */
+  'guide',
 ];
 
 /*
@@ -92,6 +104,16 @@ const PRESERVE = [
   'reference/issue-codes',
   /* Authored journey; the port no longer owns this tree. */
   'getting-started',
+  /* Authored by the Set up a run revamp (#340). */
+  'guide/index.mdx',
+  'guide/models.mdx',
+  'guide/engines.mdx',
+  'guide/boards.mdx',
+  'guide/toolchains.mdx',
+  'guide/transports.mdx',
+  'guide/memory.mdx',
+  'guide/executorch-ns-kernels.mdx',
+  'guide/configuration.mdx',
 ];
 
 const BASE = '/helia-profiler/';

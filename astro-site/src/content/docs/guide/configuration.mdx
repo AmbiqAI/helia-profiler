@@ -1,170 +1,174 @@
 ---
 title: "Configuration"
-description: "heliaPROFILER uses a layered configuration system: a YAML file merged with CLI flags, resolved once at startup into an immutable config object."
+description: "How the YAML file and the command line merge into one frozen configuration, a worked file, and the behaviour a schema table cannot express: engine notes, target overrides, build resolution and the compiler launcher."
 ---
 
-heliaPROFILER uses a layered configuration system: a YAML file merged with CLI
-flags, resolved once at startup into an immutable config object.
+## Purpose
 
-For the complete key-by-key schema, see the
-[Configuration Reference](../../reference/configuration/). Calling
-heliaPROFILER from Python directly? See the
-[Python API configuration reference](../../reference/api/config/) for
-`ProfileConfig` and its section classes.
+Understand the configuration model well enough to predict what a run will
+do: the merge order, what is validated, and the behaviours that follow
+from a key but are not visible in its type. The key-by-key schema is
+generated from the source on the [configuration reference](../../reference/configuration/);
+the Python types are on the [API reference](../../reference/api/).
 
-## Config file
+## Prerequisites
 
-Create an `hpx.yml` (any name works — pass it with `--config`):
+A completed [Configure a run](../../getting-started/configure-a-run/), which
+introduces the file and the blocks a first profile touches.
+
+## Steps
+
+### 1. How the layers merge
+
+1. The YAML file named by `--config` is loaded, if given.
+2. Command-line flags override the matching keys. Every key has a flag;
+   the model path can also be the positional argument of `hpx profile`.
+3. Defaults fill any key still unset.
+4. The result is frozen into an immutable `ProfileConfig`. Every stage
+   reads the same object; nothing mutates it afterwards.
+
+Unknown keys anywhere in the tree are rejected at load time with a
+did-you-mean suggestion from the real field names; every model sets
+`extra="forbid"`. Every configuration error is a `ConfigError` carrying a
+`hint`.
+
+### 2. A worked file
 
 ```yaml title="hpx.yml"
 model:
-  path: my_model.tflite       # (1)!
-  arena_size: 131072           # (2)!
+  path: my_model.tflite
+  arena_size: 131072
 
 engine:
-  type: helia-rt               # (3)!
-  config:                      # (4)!
+  type: helia-rt
+  config:
     variant: release-with-logs
 
 target:
-  board: apollo510_evb         # (5)!
-  toolchain: arm-none-eabi-gcc # (6)!
-  jlink_serial: ""             # (7)!
+  board: apollo510_evb
+  toolchain: arm-none-eabi-gcc
+  jlink_serial: ""              # pin one probe by serial when several are attached
 
 profiling:
-  pmu_counters:                # (8)!
+  pmu_counters:
     cpu: all
-    memory: all
+    memory: all               # AP5 boards only; an AP3 or AP4 board rejects memory and mve
     mve: all
-  per_layer: true              # (9)!
-  iterations: 5                # (10)!
+  per_layer: true
+  iterations: 5
   warmup: 2
 
 power:
-  enabled: false               # (11)!
+  enabled: false
   driver: joulescope
   mode: external
   duration_s: 30
   io_voltage: 1.8
 
 output:
-  format: csv                  # (12)!
+  format: csv
   dir: ./results
-  model_explorer: true         # (13)!
-  detailed: false              # (14)!
+  model_explorer: true
+  detailed: false
 ```
-
-1. Path to the `.tflite` model file.
-2. Optional tensor arena override in bytes. Start with the default, then tune
-   from the reported `allocated_arena`. heliaAOT uses its own memory plan.
-3. Engine: `tflm`, `helia-rt`, `helia-aot`, or `executorch`.
-4. Engine-specific config (passed through to the adapter).
-5. Target board — run `hpx boards` to see options.
-6. Toolchain selection. GCC and armclang are discovered on `PATH`; ATfE is
-   resolved through `ATFE_ROOT`.
-7. Optional — select a specific J-Link probe by serial number.
-8. PMU counter groups and selections. See [PMU Counters](../pmu-counters/).
-9. Per-layer breakdown (vs. whole-model aggregate).
-10. Inference iterations per PMU pass (averaged in results).
-11. Enable Joulescope power capture. See [Power Measurement](../power/).
-12. Output format: `csv` or `json`.
-13. Generate Model Explorer overlay JSONs. See [Model Explorer](../model-explorer/).
-14. Emit detailed per-preset CSVs and memory breakdown (`--detailed`).
-
-## CLI overrides
-
-CLI flags override YAML values. Anything you can set in YAML can also be
-specified on the command line:
 
 ```bash
-hpx profile --config hpx.yml \
-    --board apollo3p_evb \
-    --iterations 50 \
-    --engine helia-aot \
-    --output-dir ./my_results
+hpx profile --config hpx.yml --board apollo510b_evb --iterations 50 --engine helia-aot --output-dir ./my_results
 ```
 
-The model path can also be a positional argument:
+| Block | Page |
+|---|---|
+| `model` | [Models](../models/), [Memory placement](../memory/) |
+| `engine` | [Engines](../engines/) |
+| `target` | [Boards and targets](../boards/), [Toolchains](../toolchains/), [Capture transports](../transports/) |
+| `profiling` | [PMU counters](../pmu-counters/) |
+| `power` | [Power measurement](../power/) |
+| `output` | [Output files](../output/), [Model Explorer](../model-explorer/) |
+| `timeouts`, `build` | This page, below |
 
-```bash
-hpx profile my_model.tflite --board apollo510_evb
-```
+### 3. Behaviour a schema table cannot express
 
-## Config resolution order
+#### heliaRT
 
-1. Load YAML config file (if `--config` provided)
-2. Override with CLI flags
-3. Apply defaults for any unset fields
-4. Freeze into an immutable `ProfileConfig` dataclass
+- `engine.config.resolver_ops` defaults to `auto`; leave it unless you want
+  the broader `all` resolver surface.
+- With no engine path override hpx resolves the pinned `nsx-helia-rt`
+  module through the neuralSPOT-X registry; `source_path`, `dist_path` or
+  `source` are for an explicit local or custom runtime.
+- `target.clock.cpu` selects the CPU frequency by the board's named tier;
+  unset means the board's lowest-power tier.
+- Models with `CALL_ONCE`, `VAR_HANDLE`, `ASSIGN_VARIABLE` or
+  `READ_VARIABLE` get the resource-variable runtime enabled from model
+  analysis; no firmware patch is configured.
+- After a successful run, tighten `model.arena_size` from the reported
+  `allocated_arena` rather than growing it blindly.
 
-After this point, the config is **never mutated**. Every stage reads from the
-same frozen object.
+#### Target overrides
 
-## Field notes
+- `target.custom_boards` adds config-scoped board definitions and
+  `target.custom_socs` config-scoped SoC definitions;
+  [Boards and targets](../boards/#4-add-a-custom-board-or-soc) walks the
+  fields, the pin rules and the application flash load address.
+- The four `*_gpio_pin` keys take a plain integer pad number; booleans are
+  rejected. `ble_reset_gpio_pin` is inherited from `based_on`, and `0` is
+  rejected there as ambiguous.
+- A custom SoC with neither `based_on` nor `app_flash_load_addr` has no
+  flash address and the fallback flash refuses to run rather than guess.
+- Unrecognised keys in either block are rejected with the supported list
+  and a close-match suggestion; both blocks accept a free-form
+  `description`.
 
-The complete key-by-key schema (types, defaults, deprecations) lives in the
-generated [Configuration Reference](../../reference/configuration/). The notes
-below cover behavior that a schema table can't express.
+#### Build resolution
 
-### heliaRT config notes
-
-- `engine.config.resolver_ops` now defaults to `auto` for `helia-rt`. Leave it
-  unset unless you specifically want the broader `all` resolver surface.
-- With no engine path override, HPX resolves the pinned `nsx-helia-rt` module
-  through the NSX registry. Use `source_path`, `dist_path`, or `source` only
-  for an explicit local/custom runtime.
-- `target.clock.cpu` is the supported way to choose CPU frequency. Set it to
-  one of the board's named speeds (`lp`/`hp`, or `ulp`/`lp`/`hp` on Atomiq);
-  HPX validates the selection against the chosen board's platform registry
-  entry and maps it onto the correct NSX perf mode in the generated firmware.
-  Leave it unset to use the board's lowest-power tier.
-- Models with `CALL_ONCE`, `VAR_HANDLE`, `ASSIGN_VARIABLE`, or
-  `READ_VARIABLE` do not need special-case firmware patches in config; HPX now
-  enables the resource-variable runtime automatically when model analysis sees
-  those ops.
-- If a `helia-rt` run succeeds, use the reported `allocated_arena` to tighten
-  `model.arena_size` instead of growing the arena blindly.
-
-### Advanced target overrides
-
-- `target.custom_boards` adds config-scoped board definitions without editing the built-in platform registry.
-- `target.custom_socs` adds config-scoped SoC definitions for bring-up cases where the built-in SoC metadata is not sufficient.
-- `target.custom_boards.<name>.based_on` clones an existing built-in board and lets you override fields like `channel`, `psram_kb`, and `default_sync_gpio_pin`.
-- `target.custom_boards.<name>.starter_profile_board` reuses the NSX starter profile from a built-in board when the custom board should inherit its module graph.
-- `target.custom_boards.<name>.ble_reset_gpio_pin` is the GPIO wired to an onboard Cooper BLE controller's reset line on a "Blue" board, held low during power captures. Inherited from `based_on`; leave it unset (or write `null`) on boards with no onboard radio. Unlike its three sibling pin keys, `0` does **not** mean "disabled" here and is rejected as ambiguous — see [Boards → Adding a new board](../boards/#adding-a-new-board).
-- The four `target.custom_boards.<name>.*_gpio_pin` keys take a plain integer pad number. Booleans are rejected rather than resolving to pads 1 and 0: these pins are driven for the duration of a power capture, so a typo'd `true` would silently put an unrelated GPIO inside your measurement.
-- `target.custom_socs.<name>.app_flash_load_addr` declares the first flash address above the part's bootloader-reserved region. It is inherited from `based_on` when you name one; with neither — or with an explicit `null`, which overrides inheritance — HPX treats the address as unknown and refuses the fallback flash rather than guessing from `family`. **This changed:** an entry with no `based_on` previously inherited its family's address. See [Boards → App flash load address](../boards/#app-flash-load-address) for the upgrade note.
-- Unrecognized keys in `target.custom_socs` and `target.custom_boards` are rejected with the list of supported keys, a close-match suggestion where one applies, and no silent discarding. Both blocks accept a free-form `description:`.
-
-### Build-resolution notes
-
-- By default, generated profiler apps keep the board's normal NSX `channel`, but HPX pins the verified peeled commits for `neuralspotx-v0.8.1` (`2dbe12a2…901f`) and `nsx-ambiq-sdk` v5.2.25 (`aefce2ca…de7c`) in the qualified compatibility baseline.
-- `build.nsx_modules.<module>.ref` or `.version` overrides win over that default for the owning project.
-- `build.nsx_modules.<module>.path` installs a local module checkout into the generated app and bypasses registry resolution for that module only.
-- Ordinary profiles reuse a compatible `nsx.lock` byte-for-byte and run
-  `nsx sync --frozen`; they do not check or advance upstream refs. A lock is
-  resolved only when missing or structurally incompatible.
-- Set `build.update_dependencies: true` (CLI:
-  `--update-dependencies`) for the explicit operation that refreshes refs and
-  rewrites the lock. It cannot be combined with offline mode.
-- Set `build.offline: true` (CLI: `--offline`) to require both a compatible
-  lock and already-materialized exact module trees. The legacy `--frozen` flag
-  is retained as an alias for this strict mode.
+- Generated profiler applications keep the board's normal neuralSPOT-X
+  channel, and hpx pins the verified commits for `neuralspotx` and
+  `nsx-ambiq-sdk` recorded in the compatibility baseline
+  (`src/helia_profiler/data/compatibility-baseline-v1.json`).
+- `build.nsx_modules.<module>.ref` or `.version` overrides that default
+  for the owning project; `.path` installs a local checkout for that module
+  and bypasses registry resolution for it alone.
+- Ordinary profiles reuse a compatible `nsx.lock` byte for byte and run
+  `nsx sync --frozen`; a lock is resolved only when missing or structurally
+  incompatible. `build.update_dependencies: true` (`--update-dependencies`)
+  is the explicit operation that refreshes refs and rewrites the lock; it
+  cannot be combined with offline mode.
+- `build.offline: true` (`--offline`) requires a compatible lock and
+  already-materialised module trees. `--frozen` remains as an alias for
+  this strict mode.
 - Cached applications are isolated by a deterministic workspace fingerprint
-  covering the compatibility baseline and registry hashes, target/toolchain,
-  engine backend/variant/version, overrides (including local content hashes),
-  and module-relevant build settings.
+  over the compatibility baseline and registry hashes, target and
+  toolchain, engine backend, variant and version, overrides (including
+  local content hashes) and the module-relevant build settings.
 
-### Compiler-launcher notes
+#### Compiler launcher
 
-- `auto` (the default) wraps every compile with [`sccache`](https://github.com/mozilla/sccache) or [`ccache`](https://ccache.dev) if either is found on `PATH`, and does nothing otherwise — so simply installing the binary opts you in. Caching is correctness-safe (the launcher hashes the full compile inputs) and only accelerates the compile step, not NSX lock/sync/configure or flash.
-- `none` (also `off`/`false`) disables the launcher.
-- An explicit tool name or path (e.g. `sccache`) is **required**: the build fails if it cannot be found.
-- The `HPX_COMPILER_LAUNCHER` environment variable overrides this field, and the `--compiler-launcher` / `--no-compiler-launcher` CLI flags override both.
+- `auto` (the default) wraps every compile with
+  [sccache](https://github.com/mozilla/sccache) or [ccache](https://ccache.dev)
+  if either is on `PATH`, and does nothing otherwise; installing the binary
+  opts you in. The launcher hashes the full compile inputs, so caching is
+  correctness-safe, and it accelerates only the compile step, not
+  neuralSPOT-X lock, sync, configure or flash.
+- `none` (also `off` or `false`) disables it; an explicit tool name or path
+  is required and fails the build if not found.
+- `HPX_COMPILER_LAUNCHER` overrides the field; `--compiler-launcher` and
+  `--no-compiler-launcher` override both.
 
-## Validation
+#### Timeouts
 
-- Unknown keys anywhere in the config tree are rejected at load time, with
-  did-you-mean suggestions based on the real field names.
-- Every config error raised is a `ConfigError` carrying a `hint` describing
-  how to fix it.
+The `timeouts` block sets limits in seconds for the host-side steps:
+`configure_s` (120), `build_s` (300), `flash_s` (120), `toolchain_probe_s`
+(5), `binary_probe_s` (10), `download_api_s` (30) and `download_asset_s`
+(300), as `TimeoutsConfig` defines them. Raise a limit rather than remove
+it when a slow bench trips one.
+
+## Expected output
+
+`run_metadata.json` in every bundle holds the fully resolved configuration
+after the merge, so the file, the flags and the defaults that produced a
+result are always recoverable from the result.
+
+## What next
+
+The [configuration reference](../../reference/configuration/) for every
+key, type and default; [Boards and targets](../boards/) for the custom
+board fields this page only summarises.

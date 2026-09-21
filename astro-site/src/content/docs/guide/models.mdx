@@ -1,0 +1,113 @@
+---
+title: "Models"
+description: "The model formats each engine accepts, the four keys of the model block, the tensor arena and how to size it from a measurement, and the models that ship with hpx."
+---
+
+## Purpose
+
+Point hpx at a model and give it the memory it needs. The `model` block has
+four keys; this page says what each one does, which engines read which
+format, and how to turn the first run's measurement into a right-sized
+arena.
+
+## Prerequisites
+
+A model exported for a microcontroller: an int8 LiteRT `.tflite` for the
+interpreter and ahead-of-time engines, or an ExecuTorch `.pte` exported for
+Cortex-M. [Engines](../engines/) explains which engine reads which.
+
+## Which format
+
+| Format | Engines that read it | Notes |
+|---|---|---|
+| `.tflite` (LiteRT flatbuffer) | `tflm`, `helia-rt`, `helia-aot` | The interpreter engines load the flatbuffer at runtime; `helia-aot` compiles it to C at build time. Quantised int8 models are the target. |
+| `.pte` (ExecuTorch program) | `executorch` | Exported with `helia-torch` or the ExecuTorch Cortex-M flow. A `<model>.pte.json` sidecar next to it fills in the runner sizes; see [Engines](../engines/#executorch). |
+
+The engine, not the file extension, decides how the model is used: the same
+`.tflite` profiles as an interpreted graph under `helia-rt` and as generated
+C under `helia-aot`.
+
+## The model block
+
+```yaml title="hpx.yml"
+model:
+  path: examples/quickstart/kws_model.tflite
+  arena_size: 131072          # bytes; omit to take the engine default
+  arena_location: tcm         # tcm | sram | psram; omit for automatic
+  weights_location: mram      # tcm | sram | mram | psram; omit for automatic
+```
+
+| Key | What it sets | Default |
+|---|---|---|
+| `path` | The model file. Also the positional argument of `hpx profile`. | none; required |
+| `arena_size` | The tensor arena in bytes: activations and scratch for the interpreter engines. `helia-aot` plans its own memory and ignores it unless external arenas are enabled. | `DEFAULT_ARENA_SIZE_BYTES`, 256 KiB; ExecuTorch takes the sidecar's `planned_arena_size` when present |
+| `arena_location` | Which memory tier holds the arena. | automatic placement |
+| `weights_location` | Which memory tier holds the weights (the flatbuffer, the AOT constant blobs, or the PTE program). | automatic placement |
+
+Every key has a flag: `--arena-size`, `--arena-location`,
+`--weights-location`. The generated [configuration reference](../../reference/configuration/)
+carries the exact types and validators.
+
+## Steps
+
+### 1. Sizing the arena
+
+`arena_size` is a request; `memory.allocated_arena` in `summary.json` is
+what the runtime used. The loop:
+
+1. Run once with a generous arena, or the engine default.
+2. Read `allocated_arena`:
+
+   ```bash
+   python -c "import json; print(json.load(open('results/summary.json'))['memory']['allocated_arena'])"
+   ```
+
+3. Set `arena_size` to a little above it. The existing guidance in this
+   repository uses 1.15x to 1.5x depending on how much the inputs vary; the
+   headroom is for input variation, not the original guess.
+4. Run again and confirm `allocated_arena` did not move and the Memory
+   table shows no region over capacity.
+
+A request that does not fit fails before any firmware is built, with the
+regions and the knobs to turn; [Memory placement](../memory/) shows that
+message and what each option costs.
+
+### 2. What hpx learns from the model
+
+Before building, hpx analyses the model: the operators it contains, the
+tensors and their sizes, and, for the interpreter engines, which builtin
+operators the resolver must register. Two things follow from that analysis
+without configuration:
+
+- The heliaRT resolver registers only the builtins the model uses
+  (`engine.config.resolver_ops: auto`), which keeps the firmware small.
+- Models that use resource variables (`CALL_ONCE`, `VAR_HANDLE`,
+  `ASSIGN_VARIABLE`, `READ_VARIABLE`) get the resource-variable runtime
+  enabled automatically.
+
+The `analysis` extra (`pip install 'helia-profiler[analysis]'`) adds
+compute and parameter counts per operator with no hardware attached; the
+same numbers appear in the run's report when the extra is installed.
+
+### 3. Models that ship with hpx
+
+| Model | Where | Use |
+|---|---|---|
+| `kws_model.tflite` | `examples/quickstart/` in a source checkout | The keyword-spotting model every Getting started command uses. |
+| `kws_model_vela.tflite` | `examples/quickstart/` | The same model compiled for the Ethos-U NPU path. |
+| `tiny_cnn()` | `helia_profiler.examples`, in the installed package | A small deterministic model reachable from Python when hpx is installed into an active environment. |
+| MLPerf Tiny (`kws`, `ic`, `vww`, `ad`) | Resolved by `hpx validate` | The reference models the validation suites run. |
+| `tier1`, `tier1mean` | `examples/models/tier1/` | The ExecuTorch pairs behind the [NS kernels](../executorch-ns-kernels/) measurements. |
+
+## Expected output
+
+After this page you have a `model` block whose `arena_size` matches a
+measurement and whose placement is either deliberate or left to the
+planner on purpose. `run_metadata.json` records the resolved block, so a
+bundle always says which model and which sizes produced it.
+
+## What next
+
+[Memory placement](../memory/) for where the arena and weights go and what
+each tier costs; [Engines](../engines/) for the runtime choice that decides
+how the model is executed.
