@@ -159,11 +159,9 @@ for (const route of redirects.served) {
  * builds, still passes every other assertion here and still deploys. So both
  * halves are asserted, the SVG being there and the fence not.
  */
-const MERMAID_ROUTES = [
-  /* Engines and transports replaced their flowcharts with decision tables (#340). */
-  'guide/concepts/capture/',
-  'guide/concepts/',
-];
+/* Every flowchart became a decision table or a block diagram (#340, #343); the
+ * list stays so a page that brings mermaid back is asserted, not forgotten. */
+const MERMAID_ROUTES = [];
 for (const segment of MERMAID_ROUTES) {
   const file = path.join(dist, segment, 'index.html');
   if (!check(exists(file), `Mermaid route ${base}${segment} is not in the artifact.`)) {

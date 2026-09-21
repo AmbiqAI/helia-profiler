@@ -116,22 +116,22 @@ export default defineConfig({
                   label: 'Concepts',
                   items: [
                     { label: 'Overview', slug: 'guide/concepts' },
-                    { label: 'Pipeline & Stages', slug: 'guide/concepts/pipeline' },
+                    { label: 'Pipeline', slug: 'guide/concepts/pipeline' },
                     {
-                      label: 'Engine Adapters',
+                      label: 'Engine adapters',
                       slug: 'guide/concepts/engine-adapters',
                     },
                     {
-                      label: 'Firmware Generation',
+                      label: 'Firmware generation',
                       slug: 'guide/concepts/firmware',
                     },
-                    { label: 'Data Capture', slug: 'guide/concepts/capture' },
+                    { label: 'Data capture', slug: 'guide/concepts/capture' },
                     {
-                      label: 'Field Diagnostics',
+                      label: 'Field diagnostics',
                       slug: 'guide/concepts/field-diagnostics',
                     },
                     {
-                      label: 'Contributing an Engine',
+                      label: 'Adding an engine',
                       slug: 'guide/concepts/adding-an-engine',
                     },
                   ],

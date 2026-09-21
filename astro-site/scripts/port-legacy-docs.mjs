@@ -74,6 +74,13 @@ const SKIP = [
   'guides/index.md',
   'guides/memory-placement-tuning.md',
   'guides/executorch-ns-kernels.md',
+  'architecture/index.md',
+  'architecture/pipeline.md',
+  'architecture/engine-adapters.md',
+  'architecture/firmware.md',
+  'architecture/capture.md',
+  'architecture/field-diagnostics.md',
+  'architecture/adding-an-engine.md',
 ];
 
 /*
@@ -114,6 +121,13 @@ const PRESERVE = [
   'guide/memory.mdx',
   'guide/executorch-ns-kernels.mdx',
   'guide/configuration.mdx',
+  'guide/concepts/index.mdx',
+  'guide/concepts/pipeline.mdx',
+  'guide/concepts/engine-adapters.mdx',
+  'guide/concepts/firmware.mdx',
+  'guide/concepts/capture.mdx',
+  'guide/concepts/field-diagnostics.mdx',
+  'guide/concepts/adding-an-engine.mdx',
 ];
 
 const BASE = '/helia-profiler/';
