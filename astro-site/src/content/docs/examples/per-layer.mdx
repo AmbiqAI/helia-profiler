@@ -107,9 +107,9 @@ counter in the catalogue, and `output.detailed: true` adds
 
 - One group at a time: `pmu_counters: {memory: all}` keeps the run short
   and the passes few.
-- Explicit lists: `cpu: [ARM_PMU_CPU_CYCLES, ARM_PMU_L1D_CACHE_MISS_RD]`
-  names counters; an unsupported name or group for the SoC is rejected at
-  preflight.
+- Explicit lists: `memory: [ARM_PMU_L1D_CACHE, ARM_PMU_L1D_CACHE_MISS_RD]`
+  names counters under the group that owns them; an unsupported name or
+  group for the SoC is rejected at preflight.
 - heliaRT instead of heliaAOT: the counters are engine-independent; only
   the operator rows differ.
 - Overlays: `output.model_explorer: true` writes one overlay per counter

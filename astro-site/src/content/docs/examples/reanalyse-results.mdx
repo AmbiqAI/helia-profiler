@@ -39,6 +39,8 @@ jq '{validity, engine, layers, total_cycles, clean: .latency.device_clean_infer_
 hpx compare $RT $AOT --output-dir /tmp/rt-vs-aot
 ```
 
+From the repository root:
+
 ```python
 from pathlib import Path
 from helia_profiler.results.manifest import load_result_manifest

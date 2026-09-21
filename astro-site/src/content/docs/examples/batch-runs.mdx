@@ -118,7 +118,8 @@ The nightly hardware validation workflow is this recipe: on 2026-09-16
 [run 35078330526](https://github.com/AmbiqAI/helia-profiler/actions/runs/35078330526)
 ran `hpx validate --suite complete` at source commit `0714893` with hpx
 0.1.6 on `apollo510_evb` (32 of 32 passed), `apollo330mP_evb` (32),
-`apollo3p_evb` (24) and `apollo4l_blue_evb` (12), with the nsx modules
+`apollo3p_evb` (24 of 24) and `apollo4l_blue_evb` (12 of 24, 12 skipped
+because its NSX board module does not declare the ATfE toolchain), with the nsx modules
 recorded in each bundle's `nsx.lock`. Nine of those bundles ship under
 [`examples/results/hardware-validation-2026-09-16/`](https://github.com/AmbiqAI/helia-profiler/tree/main/examples/results/hardware-validation-2026-09-16).
 The `--list` output above was produced on the host on 2026-09-21. The

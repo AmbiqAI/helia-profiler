@@ -34,9 +34,9 @@ and differ only in the `engine` block and the output directory:
 | heliaAOT | [`examples/quickstart/hpx_aot.yml`](https://github.com/AmbiqAI/helia-profiler/blob/main/examples/quickstart/hpx_aot.yml) |
 | TFLM | [`examples/quickstart/hpx_tflm_baseline.yml`](https://github.com/AmbiqAI/helia-profiler/blob/main/examples/quickstart/hpx_tflm_baseline.yml) |
 
-The heliaRT config also asks for the `memory` counter group; when you
-compare, ask for the same groups on every side or expect the per-layer
-columns to differ.
+The heliaRT and TFLM configs also ask for the `memory` counter group;
+`hpx_aot.yml` asks for `cpu` only, so add `memory: default` to it before
+comparing per-layer columns, or expect them to differ.
 
 ## Run
 
@@ -54,7 +54,8 @@ hpx compare results/results_rt results/results_tflm_baseline
 
 The comparison below is the real `hpx compare` output for the heliaRT and
 heliaAOT bundles named under Validated on, run on the host against the
-shipped bundles (paths shortened):
+shipped bundles (paths shortened; the Config table and the per-region
+memory rows are elided, marked with `…`):
 
 ```
   Total cycles     2,060,239 cyc → 2,054,228 cyc  -6,011 cyc (-0.3%)
@@ -65,7 +66,13 @@ shipped bundles (paths shortened):
 │    - Comparison dimension differs: engine.                         │
 │    - Comparison dimension differs: engine_version.                 │
 │    - Comparison dimension differs: architecture_flags.             │
+│    - Some run-level metrics are missing in one run: memory.arena_size,
+│  memory.allocated_arena, memory.model_size                         │
+│    - AOT memory placement artifacts are present in only one run;   │
+│  placement diffs may be partial.                                   │
 ╰────────────────────────────────────────────────────────────────────╯
+
+ …
 
  Metric                         Baseline      Candidate              Change
  Total cycles                  2.06M cyc      2.05M cyc   -6.0k cyc (-0.3%)
@@ -74,6 +81,7 @@ shipped bundles (paths shortened):
  Binary .data                     155k B         2.8k B    -152k B (-98.2%)
  Binary .bss                       86k B         185k B     99k B (+114.9%)
  Binary total                     885k B         741k B    -144k B (-16.3%)
+ …
 ```
 
 The three single-engine runs, from their `summary.json`:
@@ -131,7 +139,7 @@ The three single-engine runs, from their `summary.json`:
 | Cases | `apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto`, `apollo510_evb-kws-aot-ns-arm-none-eabi-gcc-rtt-auto`, `apollo510_evb-kws-tflm-arm-arm-none-eabi-gcc-rtt-auto`, all `valid` |
 | nsx modules | baseline `hpx-neuralspotx-0.8.1-2026-09`: `nsx-helia-rt` helia-rt-v1.20.0, `nsx-cmsis-nn` aaeb145, `nsx-tflite-micro` 7afcf2b, `arm-cmsis-nn` 6d21a6f, `nsx-ambiq-sdk` a9f4ec2, `nsx-pmu-armv8m` 5725c06 (each bundle's `nsx.lock`) |
 | Toolchain | arm-none-eabi-gcc 15.2.1 (Arm GNU Toolchain 15.2.Rel1), CMake 4.1.2 |
-| Differences from the configs above | the nightly cases use `arena_size: 32768`, `pmu_counters: {cpu: default}`, `iterations: 3`, `warmup: 1`, `output.format: csv`; the quickstart configs use a 131,072-byte arena and, for heliaRT, the `memory` group too |
+| Differences from the configs above | the nightly cases use `arena_size: 32768`, `pmu_counters: {cpu: default}`, `iterations: 3`, `warmup: 1`, `output.format: csv`; the quickstart configs use a 131,072-byte arena and, for heliaRT and TFLM, the `memory` group too |
 | Bundles | [`examples/results/hardware-validation-2026-09-16/`](https://github.com/AmbiqAI/helia-profiler/tree/main/examples/results/hardware-validation-2026-09-16) |
 
 The `hpx compare` output above was produced on the host from those

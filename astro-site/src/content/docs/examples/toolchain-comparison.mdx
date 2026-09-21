@@ -44,7 +44,8 @@ count identical across runs.
 ## Expected output
 
 The real `hpx compare` output for the two heliaRT bundles under Validated
-on (paths shortened):
+on (paths shortened; the rest of the Config table and the Run table are
+elided, marked with `…`):
 
 ```
   Total cycles     2,060,239 cyc → 1,947,189 cyc  -113,050 cyc (-5.5%)
@@ -61,6 +62,7 @@ on (paths shortened):
  Toolchain          arm-none-eabi-gcc        atfe                        diff
  Link family        gnu                      gnu                         same
  Compiler version   arm-none-eabi-...15.2…   clang version 22.1.0        diff
+ …
 ```
 
 Clean-window cycles per inference from the four bundles:
@@ -81,9 +83,12 @@ Clean-window cycles per inference from the four bundles:
   directory, or line the two per-layer files up:
 
 ```bash
-paste -d, <(cut -d, -f1,2,7 results/rt_gcc/profile_results.csv) \
-          <(cut -d, -f7 results/rt_atfe/profile_results.csv) | head
+cycles() { awk -F, 'NR==1{for(i=1;i<=NF;i++)if($i=="cycles")c=i}{print $1","$2","$c}' "$1"; }
+paste -d, <(cycles results/rt_gcc/profile_results.csv) <(cycles results/rt_atfe/profile_results.csv | cut -d, -f3) | head
 ```
+
+The column position of `cycles` depends on how many counters the run
+captured, which is why the helper finds it by name.
 
 - `link_family` stays `gnu` for ATfE, so the per-region memory rows remain
   comparable; armclang links with `armlink`, and the comparison omits the

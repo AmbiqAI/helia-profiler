@@ -19,7 +19,8 @@ confirms the probe sees the board.
 
 ## Software prerequisites
 
-hpx (`pip install helia-profiler`), the GNU Arm toolchain, CMake and Ninja
+hpx (`pip install helia-profiler`) and a clone of the repository for the
+quickstart config and model, the GNU Arm toolchain, CMake and Ninja
 on `PATH`, SEGGER J-Link software, and on Linux the udev rule
 ([Install](../../getting-started/install/)). `hpx doctor` must report the
 toolchain and J-Link as found.
@@ -77,7 +78,8 @@ takes minutes; later runs reuse it.
 
 The results panel of the nightly case named under Validated on (the
 `Memory` and `Plan vs measured` tables that follow it are on
-[Memory placement](../../guide/memory/)):
+[Memory placement](../../guide/memory/); the arena progress bar and the
+host wall-clock subtitle are omitted):
 
 ```
 ─────────────────────────────────── Results ────────────────────────────────────
@@ -100,6 +102,7 @@ Top Layers by Cycles
    5   DEPTHWISE_CONV_2D           216,192     10.5%         72,000        3.0
   Arena      29,780 / 32,768 bytes  91%
   Model      53,744 bytes
+  Binary Sections
   Section        Size
   text        278,596
   data        154,796
@@ -113,7 +116,7 @@ Top Layers by Cycles
 │    run_metadata.json           │
 │    nsx.lock                    │
 │    result_manifest.json        │
-╰──────────────── 12.9s total ───╯
+╰────────────────────────────────╯
 ```
 
 ## How to read it
