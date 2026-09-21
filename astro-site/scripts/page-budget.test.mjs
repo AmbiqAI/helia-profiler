@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import test from "node:test";
 
 import {
@@ -25,8 +26,7 @@ test("a page over the gzip budget is reported even when the HTML fits", () => {
 });
 
 test("incompressible content over the gzip budget is measured, not assumed", () => {
-  const noise = Array.from({ length: 60_000 }, (_, i) =>
-    String.fromCharCode(33 + ((i * 7919) % 90)),
-  ).join("");
-  assert.ok(overBudget(measure(noise)).some((r) => /gzip/.test(r)));
+  /* Random bytes do not compress, so 60,000 of them gzip to more than the budget. */
+  const noise = crypto.randomBytes(60_000).toString("base64");
+  assert.ok(overBudget(measure(noise)).some((reason) => /gzip/.test(reason)));
 });
