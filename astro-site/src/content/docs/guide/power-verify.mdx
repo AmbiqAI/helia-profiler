@@ -65,7 +65,7 @@ Placeholder values again; the keys are the contract, generated from
 | `power.sync.ready_observed` | `true` with lock-step | `false` or absent with lock-step enabled points at wiring or the GO line |
 | `gated_window_duration_suspect` | absent | set when the gate is under the 1 s floor, when the firmware's window clock disagrees with the gate, when the terminal reported failed or incomplete work, when the duration check fails with no envelope to arbitrate, or when the device-reported timing is corrupt; per-inference metrics are suppressed |
 | `power.power_firmware` | `dedicated` | `shared` carries transport contamination |
-| `measurement_scope` | `gpio_gated_clean_window` or `on_device_gated_inference` | a whole-capture or busy-loop scope is not an inference measurement |
+| `measurement_scope` | `gpio_gated_clean_window` or `on_device_gated_inference` | `free_form_capture` means gating failed and the numbers cover the whole capture; the probe that ran inside the window is a separate field, and a `busy_loop` window is not an inference measurement |
 
 `tops` and `tops_per_watt` appear for any power run whose model can be
 analysed for MACs (heliaRT, TFLM and heliaAOT `.tflite` models; not
@@ -80,7 +80,7 @@ passes; hpx cross-checks it and four codes come out:
 
 | Code | Mode | Severity | Meaning |
 |---|---|---|---|
-| `power.window_clock_frozen` | internal: error; external: warning | fails the run in internal mode (the duration is the denominator for average power and current); degrades it in external mode (the instrument owns the numbers, only `elapsed_us` is meaningless) | the firmware completed its inferences but reported zero elapsed time: a `DWT->CYCCNT`-timed window on a Cortex-M4F part whose debug power domain is down, or a STIMER window whose 32.768 kHz crystal is stopped or unpopulated |
+| `power.window_clock_frozen` | internal, external | error (internal), warning (external) | the firmware completed its inferences but reported zero elapsed time; fails the run in internal mode because the duration is the denominator for average power and current, degrades it in external mode where the instrument owns the numbers and only `elapsed_us` is meaningless. Causes: a `DWT->CYCCNT`-timed window on a Cortex-M4F part whose debug power domain is down, or a STIMER window whose 32.768 kHz crystal is stopped or unpopulated |
 | `power.window_observer_mismatch` | external | error; per-inference metrics suppressed; the run is invalid for the `power` family only, `hpx compare` still computes cycle, latency, memory and per-layer deltas | the firmware's window disagrees with the host-timed gate beyond 1% plus the quantisation allowance; two independent clocks in the same boot cannot drift apart, so the gate did not bracket what the firmware timed |
 | `power.window_clock_mismatch` | internal | warning | the firmware's window disagrees with `inference_count x reference_inference_us` by more than 25%, a loose tolerance because the reference comes from a different binary and boot |
 | `power.window_clock_exceeds_host_time` | internal | warning | the reported window is longer than the host wall time that contained it; a blunt backstop that needs roughly 2 to 3x inflation to fire |

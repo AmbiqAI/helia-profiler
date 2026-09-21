@@ -3,7 +3,7 @@ title: "PMU counters"
 description: "Which hardware counters each SoC family can capture, how to select groups and counters, how multi-pass capture and aggregation work, and how to read the per-layer results."
 ---
 
-import PmuCatalog from '../../../components/PmuCatalog.astro';
+{/* Generated from src/templates/pmu-counters.mdx by scripts/render-pmu-catalog.mjs; edit the template, not this file. */}
 
 ## Purpose
 
@@ -20,7 +20,17 @@ and a board whose family you know from [Boards and targets](../boards/).
 
 ## Which groups your board has
 
-<PmuCatalog section="socs" />
+| SoC | Profiling domains | Counter groups | Per-operator record budget |
+|---|---|---|---|
+| `apollo3p` | cpu | `cpu` | 2048 |
+| `apollo4p` | cpu | `cpu` | 2048 |
+| `apollo4l` | cpu | `cpu` | 2048 |
+| `apollo510` | cpu, memory, mve | `cpu`, `memory`, `mve` | 4096 |
+| `apollo510b` | cpu, memory, mve | `cpu`, `memory`, `mve` | 4096 |
+| `apollo5b` | cpu, memory, mve | `cpu`, `memory`, `mve` | 4096 |
+| `apollo330P` | cpu, memory, mve | `cpu`, `memory`, `mve` | 512 |
+| `apollo510L` | cpu, memory, mve | `cpu`, `memory`, `mve` | 512 |
+| `atomiq110` | cpu, memory, mve, ethos_npu | `cpu`, `ethos_npu`, `memory`, `mve` | 4096 |
 
 The rows come from `list_socs()` and `SocDef.profiling_domains` through
 `supported_groups_for_domains()` in `src/helia_profiler/platform/`. On a
@@ -62,7 +72,114 @@ catalogue exactly; an unknown name fails with the full sorted list.
 Each group below lists every counter hpx knows, with the curated `default`
 selection first.
 
-<PmuCatalog section="groups" />
+#### `cpu`: 21 counters
+
+`default` selects `ARM_PMU_CPU_CYCLES`, `ARM_PMU_INST_RETIRED`, `ARM_PMU_STALL_FRONTEND`, `ARM_PMU_STALL_BACKEND`.
+
+| Counter | Event | Description |
+|---|---|---|
+| `ARM_PMU_BR_IMMED_RETIRED` | 13 | Immediate branch architecturally executed |
+| `ARM_PMU_BR_MIS_PRED_RETIRED` | 34 | Mispredicted branch instruction architecturally executed |
+| `ARM_PMU_BR_RETIRED` | 33 | Branch instruction architecturally executed |
+| `ARM_PMU_BR_RETURN_RETIRED` | 14 | Function return instruction architecturally executed and the condition code check pass |
+| `ARM_PMU_CPU_CYCLES` (default) | 17 | Cycle |
+| `ARM_PMU_EXC_RETURN` | 10 | Exception return instruction architecturally executed and the condition code check pass |
+| `ARM_PMU_EXC_TAKEN` | 9 | Exception entry |
+| `ARM_PMU_INST_RETIRED` (default) | 8 | Instruction architecturally executed |
+| `ARM_PMU_L1I_CACHE_REFILL` | 1 | L1 I-Cache refill |
+| `ARM_PMU_LD_RETIRED` | 6 | Memory-reading instruction architecturally executed and condition code check pass |
+| `ARM_PMU_LE_CANCEL` | 264 | Loop end instruction not taken |
+| `ARM_PMU_LE_RETIRED` | 256 | Loop end instruction executed |
+| `ARM_PMU_PC_WRITE_RETIRED` | 12 | Software change to the Program Counter (PC). Instruction is architecturally executed and condition code check pass |
+| `ARM_PMU_SE_CALL_NS` | 277 | Call to non-secure function, resulting in Security state change |
+| `ARM_PMU_SE_CALL_S` | 276 | Call to secure function, resulting in Security state change |
+| `ARM_PMU_STALL` | 60 | Stall cycle for instruction or operation not sent for execution |
+| `ARM_PMU_STALL_BACKEND` (default) | 36 | No operation issued because of the backend |
+| `ARM_PMU_STALL_FRONTEND` (default) | 35 | No operation issued because of the frontend |
+| `ARM_PMU_ST_RETIRED` | 7 | Memory-writing instruction architecturally executed and condition code check pass |
+| `ARM_PMU_SW_INCR` | 0 | Software update to the PMU_SWINC register, architecturally executed and condition code check pass |
+| `ARM_PMU_UNALIGNED_LDST_RETIRED` | 15 | Unaligned memory memory-reading or memory-writing instruction architecturally executed and condition code check pass |
+
+#### `ethos_npu`: 9 counters
+
+`default` selects `ETHOSU_PMU_CYCLE`, `ETHOSU_PMU_NPU_ACTIVE`, `ETHOSU_PMU_MAC_ACTIVE`, `ETHOSU_PMU_SRAM_RD_DATA_BEAT_RECEIVED`.
+
+| Counter | Event | Description |
+|---|---|---|
+| `ETHOSU_PMU_CYCLE` (default) | 0 | Total NPU cycles while the command stream runs |
+| `ETHOSU_PMU_EXT_RD_DATA_BEAT_RECEIVED` | 0 | External (flash/MRAM) read data beats |
+| `ETHOSU_PMU_EXT_WR_DATA_BEAT_WRITTEN` | 0 | External (flash/MRAM) write data beats |
+| `ETHOSU_PMU_MAC_ACTIVE` (default) | 0 | Cycles the MAC engine is active |
+| `ETHOSU_PMU_NPU_ACTIVE` (default) | 0 | Cycles the NPU is active (not idle/stalled) |
+| `ETHOSU_PMU_NPU_IDLE` | 0 | Cycles the NPU is idle |
+| `ETHOSU_PMU_SRAM_RD_DATA_BEAT_RECEIVED` (default) | 0 | SRAM interface read data beats |
+| `ETHOSU_PMU_SRAM_WR_DATA_BEAT_WRITTEN` | 0 | SRAM interface write data beats |
+| `ETHOSU_PMU_WD_ACTIVE` | 0 | Cycles the weight decoder is active |
+
+#### `memory`: 15 counters
+
+`default` selects `ARM_PMU_MEM_ACCESS`, `ARM_PMU_L1D_CACHE_REFILL`, `ARM_PMU_BUS_ACCESS`, `ARM_PMU_BUS_CYCLES`.
+
+| Counter | Event | Description |
+|---|---|---|
+| `ARM_PMU_BUS_ACCESS` (default) | 25 | Bus access |
+| `ARM_PMU_BUS_CYCLES` (default) | 29 | Bus cycles |
+| `ARM_PMU_DTCM_ACCESS` | 16392 | Data TCM access |
+| `ARM_PMU_ITCM_ACCESS` | 16391 | Instruction TCM access |
+| `ARM_PMU_L1D_CACHE` | 4 | L1 D-Cache access |
+| `ARM_PMU_L1D_CACHE_ALLOCATE` | 31 | Level 1 data cache allocation without refill |
+| `ARM_PMU_L1D_CACHE_MISS_RD` | 57 | Level 1 data cache read miss |
+| `ARM_PMU_L1D_CACHE_RD` | 64 | Level 1 data cache read |
+| `ARM_PMU_L1D_CACHE_REFILL` (default) | 3 | L1 D-Cache refill |
+| `ARM_PMU_L1D_CACHE_WB` | 21 | Level 1 data cache write-back |
+| `ARM_PMU_L1I_CACHE` | 20 | Level 1 instruction cache access |
+| `ARM_PMU_LL_CACHE_MISS_RD` | 55 | Last level data cache read miss |
+| `ARM_PMU_LL_CACHE_RD` | 54 | Last level data cache read |
+| `ARM_PMU_MEMORY_ERROR` | 26 | Local memory error |
+| `ARM_PMU_MEM_ACCESS` (default) | 19 | Data memory access |
+
+#### `mve`: 34 counters
+
+`default` selects `ARM_PMU_MVE_INST_RETIRED`, `ARM_PMU_MVE_INT_MAC_RETIRED`, `ARM_PMU_MVE_LDST_RETIRED`, `ARM_PMU_MVE_STALL`.
+
+| Counter | Event | Description |
+|---|---|---|
+| `ARM_PMU_MVE_FP_HP_RETIRED` | 520 | MVE half-precision floating-point instruction architecturally executed |
+| `ARM_PMU_MVE_FP_MAC_RETIRED` | 532 | MVE floating-point multiply or multiply-accumulate instruction architecturally executed |
+| `ARM_PMU_MVE_FP_RETIRED` | 516 | MVE floating-point instruction architecturally executed |
+| `ARM_PMU_MVE_FP_SP_RETIRED` | 524 | MVE single-precision floating-point instruction architecturally executed |
+| `ARM_PMU_MVE_INST_RETIRED` (default) | 512 | MVE instruction architecturally executed |
+| `ARM_PMU_MVE_INT_MAC_RETIRED` (default) | 552 | MVE multiply or multiply-accumulate instruction architecturally executed |
+| `ARM_PMU_MVE_INT_RETIRED` | 548 | MVE integer instruction architecturally executed |
+| `ARM_PMU_MVE_LDST_CONTIG_RETIRED` | 580 | MVE contiguous load or store instruction architecturally executed |
+| `ARM_PMU_MVE_LDST_MULTI_RETIRED` | 604 | MVE memory instruction targeting multiple registers architecturally executed |
+| `ARM_PMU_MVE_LDST_NONCONTIG_RETIRED` | 592 | MVE non-contiguous load or store instruction architecturally executed |
+| `ARM_PMU_MVE_LDST_RETIRED` (default) | 568 | MVE load or store instruction architecturally executed |
+| `ARM_PMU_MVE_LDST_UNALIGNED_NONCONTIG_RETIRED` | 664 | MVE unaligned noncontiguous load or store instruction architecturally executed |
+| `ARM_PMU_MVE_LDST_UNALIGNED_RETIRED` | 652 | MVE unaligned memory load or store instruction architecturally executed |
+| `ARM_PMU_MVE_LD_CONTIG_RETIRED` | 584 | MVE contiguous load instruction architecturally executed |
+| `ARM_PMU_MVE_LD_MULTI_RETIRED` | 608 | MVE memory load instruction targeting multiple registers architecturally executed |
+| `ARM_PMU_MVE_LD_NONCONTIG_RETIRED` | 596 | MVE non-contiguous load instruction architecturally executed |
+| `ARM_PMU_MVE_LD_RETIRED` | 572 | MVE load instruction architecturally executed |
+| `ARM_PMU_MVE_LD_UNALIGNED_RETIRED` | 656 | MVE unaligned load instruction architecturally executed |
+| `ARM_PMU_MVE_PRED` | 696 | Cycles where one or more predicated beats architecturally executed |
+| `ARM_PMU_MVE_STALL` (default) | 716 | Stall cycles caused by an MVE instruction |
+| `ARM_PMU_MVE_STALL_BREAK` | 723 | Stall cycles caused by an MVE chain break |
+| `ARM_PMU_MVE_STALL_DEPENDENCY` | 724 | Stall cycles caused by MVE register dependency |
+| `ARM_PMU_MVE_STALL_RESOURCE` | 717 | Stall cycles caused by an MVE instruction because of resource conflicts |
+| `ARM_PMU_MVE_STALL_RESOURCE_FP` | 719 | Stall cycles caused by an MVE instruction because of floating-point resource conflicts |
+| `ARM_PMU_MVE_STALL_RESOURCE_INT` | 720 | Stall cycles caused by an MVE instruction because of integer resource conflicts |
+| `ARM_PMU_MVE_STALL_RESOURCE_MEM` | 718 | Stall cycles caused by an MVE instruction because of memory resource conflicts |
+| `ARM_PMU_MVE_ST_CONTIG_RETIRED` | 588 | MVE contiguous store instruction architecturally executed |
+| `ARM_PMU_MVE_ST_MULTI_RETIRED` | 612 | MVE memory store instruction targeting multiple registers architecturally executed |
+| `ARM_PMU_MVE_ST_NONCONTIG_RETIRED` | 600 | MVE non-contiguous store instruction architecturally executed |
+| `ARM_PMU_MVE_ST_RETIRED` | 576 | MVE store instruction architecturally executed |
+| `ARM_PMU_MVE_ST_UNALIGNED_RETIRED` | 660 | MVE unaligned store instruction architecturally executed |
+| `ARM_PMU_MVE_VREDUCE_FP_RETIRED` | 676 | MVE floating-point vector reduction instruction architecturally executed |
+| `ARM_PMU_MVE_VREDUCE_INT_RETIRED` | 680 | MVE integer vector reduction instruction architecturally executed |
+| `ARM_PMU_MVE_VREDUCE_RETIRED` | 672 | MVE vector reduction instruction architecturally executed |
+
+Generated from the counter registry at source tree `17bfdf5`: 79 counters in 4 groups across 9 SoCs.
 
 The Ethos-U counters are sampled from the NPU's own PMU through the core
 driver, per command stream, and only mean something for Vela-compiled

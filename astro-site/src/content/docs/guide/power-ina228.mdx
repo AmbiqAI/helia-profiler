@@ -45,7 +45,7 @@ power:
     board: mikroe-power-monitor-click   # fills i2c_address 0x4A
     shunt_ohms: 0.5         # required for this board: the resistor you wired
     max_current_a: 0.05     # size to your real peak, not the shunt rating
-    i2c_iom: 1              # the Ambiq IOM wired to the monitor
+    i2c_iom: 1              # the Ambiq IOM wired to the monitor; its pads are in the board's am_bsp_pins.h
     # conversion_time_us: 540   # 50 | 84 | 150 | 280 | 540 | 1052 | 2074 | 4120
     # averaging_count: 16       # 1 | 4 | 16 | 64 | 128 | 256 | 512 | 1024
 ```
@@ -118,10 +118,19 @@ on a sleepy target, wire your own resistor.
 
 ### 4. Read the on-device summary
 
-`summary.json` gains an `on_device_summary` block with integrated energy
-(nJ), charge (nC), bus voltage and the inference count, under
-`measurement_scope: on_device_gated_inference`. Energy divided by count is
-energy per inference; average power is energy over the window duration.
+`summary.json` gains an `on_device_summary` block under
+`measurement_scope: on_device_gated_inference`:
+
+| Field | Unit | Meaning |
+|---|---|---|
+| `energy_nj` | nanojoules | energy integrated by the chip over the window |
+| `charge_nc` | nanocoulombs | charge integrated over the window; signed, clamped at zero |
+| `bus_voltage_uv` | microvolts | the rail as the chip saw it; independent of the shunt |
+| `inference_count` | count | inferences the firmware ran inside the window |
+| `elapsed_us` | microseconds | the window as the firmware timed it |
+
+Energy divided by count is energy per inference; average power is energy
+over `elapsed_us`.
 
 :::caution[The duration comes from the firmware, not the instrument]
 Energy and charge are integrated in hardware over real time and are

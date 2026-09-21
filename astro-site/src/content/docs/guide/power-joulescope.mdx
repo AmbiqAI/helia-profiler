@@ -23,7 +23,7 @@ on Linux the udev rule from [Install](../../getting-started/install/#5-linux-usb
 
 | | JS110 | JS220 | JS320 |
 |---|---|---|---|
-| Current range | nA to 3 A, auto-ranging | nA to 10 A, auto-ranging | nA to 10 A, auto-ranging |
+| Current range | nA to 3 A, auto-ranging | nA to 10 A, auto-ranging | see the manufacturer's specification |
 | Sample rate | 250 kSPS | up to 2 MSPS | up to 2 MSPS |
 | Voltage range | 0 to 15 V | 0 to 15 V | 0 to 15 V |
 | GPIO threshold | fixed; `io_voltage` tells hpx how to read it | set by the Vref pin, which must be wired | set by the Vref pin, which must be wired |
@@ -31,8 +31,14 @@ on Linux the udev rule from [Install](../../getting-started/install/#5-linux-usb
 
 All three use the same `JoulescopeDriver` in hpx and `power.driver:
 joulescope` auto-detects whichever is attached; `power.serial` (or
-`--power-serial`) pins one when several are connected. The instrument
-figures are the manufacturer's; hpx does not restate them anywhere else.
+`--power-serial`) pins one when several are connected, using the serial
+printed on the instrument's label. The instrument figures are quoted from
+the manufacturer's product pages for the
+[JS110](https://www.joulescope.com/products/joulescope-js110),
+[JS220](https://www.joulescope.com/products/joulescope-js220) and
+[JS320](https://www.joulescope.com/products/joulescope-js320); the GPIO
+connector pinout (which physical pin is `INPUT0`, `INPUT1`, `OUTPUT0` and
+`Vref`) is in each instrument's user's guide, and hpx does not restate it.
 
 ## Steps
 
@@ -65,9 +71,13 @@ The same structure as a list, for readers of the Markdown rendition:
 - EVB: VBAT, GND, GPIO
 - Host: two USB links
 
-1. Disconnect every other supply from the EVB: target USB, debug USB
-   power, coin cell. A second source makes the current wrong, sometimes
-   negative.
+1. Make the Joulescope the board's only supply: disconnect the target USB
+   cable and any coin cell, and on an EVB whose debug USB connector also
+   feeds the board, set the jumper that isolates USB power (the EVB user
+   guide names it) so the J-Link data link stays and its power does not.
+   Set the bench supply to the input the EVB's user guide rates for that
+   connector; hpx does not set or check it. A second source shows up as
+   wrong current, sometimes negative.
 2. Wire the Joulescope `IN+` and `IN-` to the bench supply or wall adapter,
    and `OUT+` and `OUT-` to the EVB's `VBAT` and `GND`, matching polarity.
 3. Connect the J-Link USB for flashing and the Joulescope's own USB to the
@@ -111,7 +121,9 @@ GPIO pad numbers.
 The registered defaults are `get_default_sync_gpio_pin`,
 `get_default_state_gpio_pin` and `get_default_go_gpio_pin` in
 `src/helia_profiler/platform/registry.py`; the bench-verified column is
-the wiring recorded on the pages this one replaces. For the two boards
+the wiring recorded on the pages this one replaces. The numbers are Apollo
+GPIO pad numbers; the header pin that carries a pad is in the EVB
+schematic, and only the Apollo330 Plus wiring above names its header (J8). For the two boards
 where the columns differ, set the pins explicitly rather than trust the
 defaults.
 
@@ -128,8 +140,9 @@ alternatives, and avoid whichever IOM carries an on-target power monitor
 The JS110's GPI thresholds are fixed; `power.io_voltage` only tells hpx
 how to interpret them. The JS220 and JS320 GPIO connector carries a Vref
 pin that sets both the input threshold and the output drive level, and hpx
-never programs it: it must be wired. The JS220 user's guide says to connect
-Vref to the supply voltage of the device under test. Left floating, the
+never programs it: it must be wired. The
+[JS220 User's Guide](https://download.joulescope.com/products/JS220/JS220-K000/users_guide/Joulescope%20JS220%20User's%20Guide.pdf)
+says to connect Vref to the supply voltage of the device under test. Left floating, the
 thresholds are undefined and the usual symptom is a gate that never reads
 high, so every capture degrades to "rose but did not fall" or free-run.
 The instrument can fall back to an internal 3.3 V reference, which does
@@ -208,6 +221,15 @@ power:
 `power.driver` defaults to `joulescope`, `power.mode` to `external`, and
 `power.firmware` to `dedicated`; [Windows and the clean window](../power-windows/)
 covers what those do.
+
+Before the first full run, `hpx power-on` is the wiring smoke test: it
+opens the instrument, enables passthrough and holds the board powered
+until Ctrl-C, so you can confirm the supply path and the board's boot
+before any firmware is involved:
+
+```bash
+hpx power-on --driver joulescope
+```
 
 ## Expected output
 

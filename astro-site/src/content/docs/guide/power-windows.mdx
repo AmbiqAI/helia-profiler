@@ -27,8 +27,13 @@ lives in `src/helia_profiler/power/clean_window.py`.
 |---|---|---|
 | `gpio_gated_clean_window` | the packets inside the GPIO gate around the clean window | Joulescope, `power.mode: external` |
 | `on_device_gated_inference` | the chip's accumulators around a fixed number of inferences | INA228, `power.mode: internal` |
-| whole capture, free-form | the entire capture, when no qualifying gate was found | a degraded external run (`power.observation_degraded`); per-inference metrics withheld |
-| busy-loop probe | a calibrated CPU spin in place of inference | `profiling.clean_window_probe: busy_loop`, for bring-up only |
+| `free_form_capture` | the whole free-running capture, because no qualifying gate was found | a degraded external run (`power.observation_degraded`); per-inference metrics withheld |
+| `whole_capture_window` | the whole capture | the reader-side default for artifacts that predate the key; not written by current runs |
+
+The scope says what was integrated, not what ran inside it: a window that
+ran the busy-loop probe (`profiling.clean_window_probe: busy_loop`, for
+bring-up) still carries a gated scope, and `hpx compare` reads the probe
+separately.
 
 ## Steps
 
@@ -56,6 +61,8 @@ result. `shared` (`--power-firmware shared`) measures on the
 already-flashed transport binary instead: useful for bring-up or when no
 probe is free to reflash, and it carries the contamination above. Use
 `dedicated` for any number you will report or compare.
+
+#### AOT input preparation
 
 AOT clean windows restore every input to raw zero bytes before each
 invocation, because input storage can be reused as scratch during

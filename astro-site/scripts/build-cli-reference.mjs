@@ -24,6 +24,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { sourceTree } from './build-reference.mjs';
+import { renderInto as renderPmuCatalog } from './render-pmu-catalog.mjs';
 import {
   commandDescription,
   commandLabel,
@@ -66,6 +67,7 @@ export const GENERATED = [
   `${DATA_DIR}/schema.json`,
   `${DATA_DIR}/issues.json`,
   `${DATA_DIR}/pmu-catalog.json`,
+  'src/content/docs/guide/pmu-counters.mdx',
   ...Object.values(PUBLIC_DIRS),
 ];
 
@@ -244,4 +246,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       `${schema.counts.declaredFields} config fields, ${issues.counts.issues} issue codes, ` +
       `source tree ${tree.slice(0, 7)}.`,
   );
+  renderPmuCatalog(outRoot);
 }
