@@ -98,6 +98,9 @@ const SKIP = [
   'examples/tflm-baseline.md',
   'examples/toolchain-comparison.md',
   'examples/atomiq110-npu-profiling.md',
+  /* Rewritten by the Reference polish (#346). */
+  'reference/index.md',
+  'architecture/compatibility-baseline.md',
 ];
 
 /*
@@ -175,6 +178,10 @@ const PRESERVE = [
   /* Authored by the power examples (#345). */
   'examples/power-read-summary.mdx',
   'examples/power-compare.mdx',
+  /* Authored by the Reference polish (#346). */
+  'reference/index.mdx',
+  'reference/compatibility-baseline.mdx',
+  'reference/compatibility.mdx',
 ];
 
 const BASE = '/helia-profiler/';

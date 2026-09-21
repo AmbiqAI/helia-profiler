@@ -1,10 +1,3 @@
----
-title: "Configuration"
-description: "Every hpx.yml key: 106 fields across 15 configuration models, generated from the package."
----
-
-import ConfigurationReference from '../../../../components/ConfigurationReference.astro';
-
 Every field a YAML config file or a `Session` can set, generated from the
 `ProfileConfig` models in `src/helia_profiler/config/` by
 `tools/docs/extract_schema.py` at the source tree this site was built from.
@@ -15,9 +8,3 @@ the CLI flag where one exists, the type and the default. Unknown keys are
 rejected at load time, so a key that is not on this page is not a key.
 [Configuration](../../guide/configuration/) covers how files, flags and
 defaults combine.
-
-<ConfigurationReference />
-
----
-
-Machine-readable: [`schema.json`](/helia-profiler/reference/configuration/schema.json) · [`configuration.md`](/helia-profiler/reference/configuration/configuration.md), complete and lossless.

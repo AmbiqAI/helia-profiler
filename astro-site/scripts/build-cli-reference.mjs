@@ -88,7 +88,22 @@ const yaml = (value) => JSON.stringify(value);
  * writes beside the page reduces the reference parts to their prose
  * (helia-ui#122), so it is the wrong one to find.
  */
-function page({ pagePath, title, description, component, props, artifacts }) {
+/** Authored prose for a landing page, kept beside the templates so it
+ * survives regeneration and the stale check alike. */
+const INTROS_DIR = 'src/templates/reference-intros';
+function intro(name) {
+  const file = path.join(site, INTROS_DIR, `${name}.md`);
+  if (!fs.existsSync(file)) {
+    throw new Error(`Missing authored intro ${INTROS_DIR}/${name}.md`);
+  }
+  const body = fs.readFileSync(file, 'utf8').trim();
+  if (!body) {
+    throw new Error(`Empty authored intro ${INTROS_DIR}/${name}.md`);
+  }
+  return body;
+}
+
+function page({ pagePath, title, description, component, props, artifacts, introName }) {
   const importPath = path.posix.relative(
     path.posix.dirname(pagePath.split(path.sep).join('/')),
     `${COMPONENTS_DIR}/${component}.astro`,
@@ -107,6 +122,7 @@ function page({ pagePath, title, description, component, props, artifacts }) {
     '',
     `import ${component} from '${importPath}';`,
     '',
+    ...(introName ? [intro(introName), ''] : []),
     `<${component}${attributes} />`,
     '',
     '---',
@@ -182,6 +198,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
         description: commandDescription(node),
         component: 'CliCommand',
         props: root ? {} : { command: node.name },
+        introName: root ? 'cli' : undefined,
         artifacts: [
           ['cli.json', url('cli', 'cli.json')],
           [`${node.name}.md`, url('cli', `${node.name}.md`)],
@@ -198,6 +215,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       title: 'Configuration',
       description: configurationDescription(schema),
       component: 'ConfigurationReference',
+      introName: 'configuration',
       artifacts: [
         ['schema.json', url('configuration', 'schema.json')],
         ['configuration.md', url('configuration', 'configuration.md')],
@@ -213,6 +231,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       title: 'Issue codes',
       description: issuesDescription(issues),
       component: 'IssueCodeReference',
+      introName: 'issue-codes',
       artifacts: [
         ['issues.json', url('issues', 'issues.json')],
         ['issue-codes.md', url('issues', 'issue-codes.md')],
