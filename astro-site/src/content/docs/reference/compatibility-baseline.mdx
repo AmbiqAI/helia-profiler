@@ -48,8 +48,8 @@ nsx-sensors `v0.3.0`, and still `ns-cmsis-nn v7.29.2` under the hpx-declared
 are worth knowing: the Python floor rose to 3.11 (HPX already requires it),
 and the packaged board and tooling modules changed content hash
 (neuralspotx#247), so an `nsx.lock` produced under 0.7.17 cannot be
-`nsx sync --frozen`'d against 0.8.1, the dependency workspace is keyed on the
-baseline fingerprint and registry hash; so a promoted run resolves a fresh
+`nsx sync --frozen`'d against 0.8.1; the dependency workspace is keyed on the
+baseline fingerprint and registry hash, so a promoted run resolves a fresh
 lock rather than reusing a stale one. With this baseline `apollo4l_blue_evb`
 joins the nightly hardware-validation default board list.
 
@@ -96,7 +96,7 @@ and a run stamps `qualified`.
 *before* the ns-cmsis-nn module is added, since an `option()` default cannot be
 overridden afterwards. `engines/cmsis_nn.py::cmsis_nn_cmake_vars` derives
 the switches from the model: `ARM_NN_ENABLE_F32` when it computes in float at
-all, and `ARM_NN_ENABLE_F16` additionally when it carries FLOAT16 tensors,
+all, and `ARM_NN_ENABLE_F16` additionally when it carries FLOAT16 tensors
 (computed or dequantized weights) on a Cortex-M55, since ns-cmsis-nn below
 v7.30.0 ICEs on GCC 14 for its fp16 sources (PR 118460). An integer-only model
 links neither: measured on the int8 KWS DS-CNN, dropping the forced fp32
@@ -183,8 +183,8 @@ version stays 1.16.0 for the CPU backends (which rely on nothing
 neuralSPOT-X 0.8.0 added the `atomiq110_fpga_turbo` starter profile
 (retained in 0.8.1), and `nsx-ambiq-sdk` v5.2.25 adds the `nsx-npu` module
 (Ethos-U core driver and bring-up) that both engines' `ethos_u` backend
-declares. Those are the two reasons this revision moved off `v5.2.24`. 0.7.17 had fixed the J-Link
-flash-verification false negative that
+declares. Those are the two reasons this revision moved off `v5.2.24`.
+0.7.17 had fixed the J-Link flash-verification false negative that
 aborted idempotent re-flashes of an unchanged image, and enforces
 `ExitOnError 1` in generated flash recipes (AmbiqAI/neuralspotx#220). The
 packaged registry still resolves `ns-cmsis-nn` at `v7.29.2`; that promotion
@@ -211,7 +211,7 @@ registry-governed tier: hpx renders informational manifest revisions
 for them, but NSX locking reads only the registry's module revision. For
 this whole tier the post-lock validation refuses to build when the
 resolved commit disagrees with this baseline, so a promotion must advance
-exactly these refs together with the tool; never "adopt the registry"
+exactly these refs together with the tool, never "adopt the registry"
 for the pinned tier.
 `nsx-nanopb` (promoted in 0.7.16) is outside HPX's qualified module graph.
 The neuralSPOT-X tag is verified and stored as its peeled commit. The

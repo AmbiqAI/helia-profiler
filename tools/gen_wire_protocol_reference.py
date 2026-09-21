@@ -44,7 +44,7 @@ _HEADER = """\
 
 This page is the contract between the profiler firmware hpx generates and
 the host that reads it. It is not a user API: no line here is something you
-invoke, and hpx's parser is its only consumer. Your configuration decides
+invoke, and hpx is the only reader. Your configuration decides
 which lines appear (the transport, PSRAM placement, `profiling.clean_window_trace`);
 the formats themselves are internal and change with the templates or the
 parser. It is for people changing `firmware/templates/`, `capture/parser.py`

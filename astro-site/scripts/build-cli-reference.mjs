@@ -96,7 +96,11 @@ function intro(name) {
   if (!fs.existsSync(file)) {
     throw new Error(`Missing authored intro ${INTROS_DIR}/${name}.md`);
   }
-  return fs.readFileSync(file, 'utf8').trim();
+  const body = fs.readFileSync(file, 'utf8').trim();
+  if (!body) {
+    throw new Error(`Empty authored intro ${INTROS_DIR}/${name}.md`);
+  }
+  return body;
 }
 
 function page({ pagePath, title, description, component, props, artifacts, introName }) {
