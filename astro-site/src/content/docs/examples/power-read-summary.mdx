@@ -52,11 +52,13 @@ else:
 ## Expected output
 
 Not yet captured: no bundle with a `power` block ships with the
-documentation, so no figures appear here. The keys are the contract from
-`run_summary.schema.v1.json`; a healthy Joulescope capture answers the
+documentation, so no figures appear here. The keys are the contract in
+`PowerSection` (`results/run_summary.py`), pinned by
+`tests/contracts/snapshots/power_metadata_census.json`; a healthy Joulescope capture answers the
 first `jq` line with `measurement_scope: "gpio_gated_clean_window"`,
 `gated_window_count: 1`, a `gated_window_duration_ratio` near `1.0`,
-`gated_window_duration_suspect` absent, `integrity: "valid"` and
+`gated_window_duration_suspect` null in the `jq` output (the writer never
+emits `false`), `integrity: "valid"` and
 `power_firmware: "dedicated"`; the Python block then prints the energy per
 inference and the average current.
 
@@ -98,13 +100,15 @@ its fields are on [INA228](../../guide/power-ina228/).
 
 ## Variations
 
-- `detailed/power_summary.csv` (with `output.detailed: true`) has one row
-  per gated window plus a `whole_capture_window` reference row, which is
+- `detailed/power_summary.csv` (with `output.detailed: true`) has
+  `scope,metric,value` rows for each gated window plus `whole_capture_window`
+  reference rows when the whole-capture summary was recorded, which is
   where to look when `gated_vs_whole_current_ok` is `false`.
 - A `busy_loop` window (`profiling.clean_window_probe: busy_loop`, for
   bring-up) carries the same scope and health fields but measures a
-  calibrated spin, not an inference; `power.clean_window_probe` says
-  which ran.
+  calibrated spin, not an inference: the per-inference figures are
+  withheld and `power.per_inference_metrics_omitted` names the probe; the
+  `power_clean_window_probe` dimension lives in `result_manifest.json`.
 - Two captures: [Compare two power runs](../power-compare/).
 
 ## Validated on

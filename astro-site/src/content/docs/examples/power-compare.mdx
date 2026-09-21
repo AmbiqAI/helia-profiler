@@ -31,7 +31,7 @@ the energy metric; save it beside the bundles:
   "schema": "hpx.comparison-profile",
   "schema_version": 1,
   "name": "kws-energy",
-  "required_dimensions": ["board", "cpu_clock", "power_scope", "power_mode", "power_firmware"],
+  "required_dimensions": ["board", "cpu_clock"],
   "metrics": {
     "power.energy_per_inference_j": {"direction": "smaller", "unit": "J", "max_regression_pct": 5.0, "missing": "fail"}
   }
@@ -70,15 +70,23 @@ between the two runs, and reports the code from the
 | lock-step on or off | `metric.power_power_lockstep_mismatch` | the gate is timed differently |
 | the clean-window probe (`infer`, `busy_loop`) | `metric.power_power_clean_window_probe_mismatch` | a spin is not an inference |
 | the clean workload (`clean_workload`) | `metric.power_power_clean_workload_mismatch` | heliaAOT's window includes input restoration, the interpreters' does not |
-| the firmware code fingerprint, same board and mode only | `metric.power_power_firmware_fingerprint_mismatch` | different rendered firmware ran inside the window |
+| the firmware code fingerprint, same SoC, board and power firmware only | `metric.power_power_firmware_fingerprint_mismatch` | different rendered firmware ran inside the window |
 | either run's `integrity` is not `valid` | `metric.power_integrity_invalid` | a capture whose own checks failed is not a measurement |
 
 The dimension names already start with `power_`, which is why the emitted
 codes double the prefix. A run recorded before a dimension existed carries
 no value for it and is skipped rather than failed, so an old baseline does
-not become incomparable when hpx learns a rule; the pages that describe a
-default change (lock-step, a summary schema version) say to re-record
-instead ([Analysis and comparison](../../guide/analysis-comparison/)).
+not become incomparable when hpx learns a rule. The one exception is the
+clean workload: an unknown value on either side counts as a mismatch, so a
+baseline that predates that field must be re-recorded; the pages that
+describe a default change (lock-step, a summary schema version) say the
+same ([Analysis and comparison](../../guide/analysis-comparison/)).
+
+The profile above names no power dimension on purpose: `required_dimensions`
+is matched against the report's Config rows, which carry no power entries,
+so a power name there fails every comparison. A power mismatch is caught
+anyway, because it withholds `power.energy_per_inference_j` from the Run
+table and `"missing": "fail"` then fails the verdict.
 
 The `power.duration_s` row reads each summary's `capture_duration_s`, the
 duration of the selected scope, so it compares window against window and
