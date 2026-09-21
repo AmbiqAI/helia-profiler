@@ -43,10 +43,12 @@ _HEADER = """\
      Regenerate: uv run python tools/gen_wire_protocol_reference.py -->
 
 This page is the contract between the profiler firmware hpx generates and
-the host that reads it. It is not a user API: nothing here is called from
-YAML, the command line or the Python API, and it changes when the templates
-or the parser do. It is for people changing `firmware/templates/`,
-`capture/parser.py` or `wire/`, and for anyone reading a raw capture log.
+the host that reads it. It is not a user API: no line here is something you
+invoke, and hpx's parser is its only consumer. Your configuration decides
+which lines appear (the transport, PSRAM placement, `profiling.clean_window_trace`);
+the formats themselves are internal and change with the templates or the
+parser. It is for people changing `firmware/templates/`, `capture/parser.py`
+or `wire/`, and for anyone reading a raw capture log.
 
 Every line the profiler firmware puts on a transport, and the one command the
 host writes back, generated from the registry in `helia_profiler.wire`.

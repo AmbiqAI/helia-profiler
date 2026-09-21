@@ -93,7 +93,10 @@ const yaml = (value) => JSON.stringify(value);
 const INTROS_DIR = 'src/templates/reference-intros';
 function intro(name) {
   const file = path.join(site, INTROS_DIR, `${name}.md`);
-  return fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim() : '';
+  if (!fs.existsSync(file)) {
+    throw new Error(`Missing authored intro ${INTROS_DIR}/${name}.md`);
+  }
+  return fs.readFileSync(file, 'utf8').trim();
 }
 
 function page({ pagePath, title, description, component, props, artifacts, introName }) {
@@ -115,7 +118,7 @@ function page({ pagePath, title, description, component, props, artifacts, intro
     '',
     `import ${component} from '${importPath}';`,
     '',
-    ...(introName && intro(introName) ? [intro(introName), ''] : []),
+    ...(introName ? [intro(introName), ''] : []),
     `<${component}${attributes} />`,
     '',
     '---',

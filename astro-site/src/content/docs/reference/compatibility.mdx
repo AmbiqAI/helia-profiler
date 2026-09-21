@@ -59,7 +59,7 @@ Toolchain for Embedded. The engines are the `EngineType` enum.
 | `apollo3p_evb_cygnus` | unknown | unknown | unknown |
 | `apollo4p_evb` | unknown | unknown | unknown |
 | `apollo4l_evb` | unknown | unknown | unknown |
-| `apollo4l_blue_evb` | hardware-validated | unknown | unknown; the nightly run skipped every ATfE case because the NSX board module `nsx-board-apollo4l-blue-evb` does not declare the toolchain |
+| `apollo4l_blue_evb` | hardware-validated | unknown | unknown; the nightly run skipped every ATfE case with "NSX board module nsx-board-apollo4l-blue-evb does not declare the atfe toolchain" |
 | `apollo4p_blue_kbr_evb` | unknown | unknown | unknown |
 | `apollo4p_blue_kxr_evb` | unknown | unknown | unknown |
 | `apollo510_evb` | hardware-validated | unknown | hardware-validated |
@@ -72,8 +72,9 @@ Toolchain for Embedded. The engines are the `EngineType` enum.
 ### 3. The record behind every hardware-validated cell
 
 Nightly hardware validation [run 35078330526](https://github.com/AmbiqAI/helia-profiler/actions/runs/35078330526)
-of 2026-09-16, suite `complete`, hpx 0.1.6 at source commit `0714893`,
-over the MLPerf Tiny models `kws`, `vww`, `ic` and `ad`:
+of 2026-09-16, suite `complete`, hpx 0.1.6 at source commit `0714893` (the
+runner's tree was not clean, per the manifests' `repo.dirty`), over the
+MLPerf Tiny models `kws`, `vww`, `ic` and `ad`:
 
 | Board | Cases | Passed | Engines run | Toolchains run |
 |---|---|---|---|---|
@@ -82,12 +83,15 @@ over the MLPerf Tiny models `kws`, `vww`, `ic` and `ad`:
 | `apollo3p_evb` | 24 | 24 | heliaRT, heliaAOT, TFLM | GNU Arm, ATfE |
 | `apollo4l_blue_evb` | 24 | 12 passed, 12 skipped | heliaRT, heliaAOT, TFLM | GNU Arm (ATfE skipped) |
 
-Nine of the run's bundles ship under
-[`examples/results/hardware-validation-2026-09-16/`](https://github.com/AmbiqAI/helia-profiler/tree/main/examples/results/hardware-validation-2026-09-16);
-each `nsx.lock` records the module revisions the cell was validated with.
+Nine of the run's bundles ship in the repository under
+`examples/results/hardware-validation-2026-09-16/`, described on
+[Batch runs from YAML](../../examples/batch-runs/); each `nsx.lock` records
+the module revisions the cell was validated with.
 An `armclang` case does not exist in the nightly suite, so no cell in that
-column is hardware-validated. ExecuTorch runs only in the Apollo5-family
-cases of the suite; the Cortex-M4 rows are unknown for it, not unsupported.
+column is hardware-validated. ExecuTorch cases exist only for Cortex-M55
+boards and only for models carrying an ExecuTorch variant
+(`validation/matrix.py`), so the Cortex-M4 rows record unknown for it: no
+case was enumerated, and no other source states support either way.
 
 ## Expected output
 
