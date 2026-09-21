@@ -31,8 +31,17 @@ port of the 38 legacy guide pages. No PR opened yet; owner reviews first.
   `unified()` from `@astrojs/markdown-remark`, which is now a direct dep.
 - `redirects.json`: deferred 49 to 14, the 14 being #331's.
 - Known miss against #334's acceptance box: `/guide/power/` is 209,375 B HTML
-  (budget 250,000) but 40,599 B gzip against a 40,000 B budget. Splitting
-  `guide/power.md` is out of scope here; plan item 10 does it.
+  against a 250,000 B budget, and 40,599 B gzip at gzip -6 (40,316 B at -9)
+  against a 40,000 B budget. The box stays unticked with the number beside it;
+  the budget is not re-baselined. The fix is the page split, so the miss
+  carries into the Measure revamp issue (plan item 10), which owns it.
+- `markdown.processor: unified()` replaces the site's Markdown engine, because
+  Astro 7's default (satteri) does not read `rehypePlugins` and mermaid would
+  silently render as a code block. A/B over the non-mermaid pages showed the
+  only delta is entity escaping. `astro` is pinned to an exact version for the
+  same reason helia-ui, playwright and rehype-mermaid are: a minor bump that
+  renames or re-homes the processor key reverts the site to satteri without
+  failing anything, so the pin is what makes that a deliberate change.
 - Pending, in this order, and not before the owner says so: apply the review
   findings on this branch, then `git fetch && git rebase origin/docs-migration`
   onto the helia-ui alpha.16 bump (PR #336, merged), then re-run the full chain

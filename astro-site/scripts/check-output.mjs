@@ -152,6 +152,37 @@ for (const route of redirects.served) {
   );
 }
 
+/*
+ * Mermaid. The diagrams are rendered at build time by a headless browser, and
+ * the failure mode is silent: with the browser missing or the markdown
+ * processor swapped back, the fence renders as a code block and the page still
+ * builds, still passes every other assertion here and still deploys. So both
+ * halves are asserted, the SVG being there and the fence not.
+ */
+const MERMAID_ROUTES = [
+  'guide/transports/',
+  'guide/engines/',
+  'guide/concepts/capture/',
+  'guide/concepts/',
+];
+for (const segment of MERMAID_ROUTES) {
+  const file = path.join(dist, segment, 'index.html');
+  if (!check(exists(file), `Mermaid route ${base}${segment} is not in the artifact.`)) {
+    continue;
+  }
+  const html = read(file);
+  check(
+    /<svg[^>]*\baria-roledescription="flowchart-v2"/.test(html),
+    `${base}${segment}: no build-time mermaid SVG.`,
+  );
+}
+for (const file of htmlFiles) {
+  check(
+    !/<pre[^>]*>[\s\S]{0,200}?language-mermaid/.test(pages.get(file)),
+    `${routeOf(file)}: a mermaid fence reached the page as a code block.`,
+  );
+}
+
 /* Canonical URLs and Markdown renditions on every content route. */
 for (const file of contentPages) {
   const route = routeOf(file);

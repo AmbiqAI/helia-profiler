@@ -28,11 +28,21 @@ const walk = (dir, prefix = '') =>
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'hpx-port-check-'));
 try {
-  execFileSync(
-    process.execPath,
-    [path.join(here, 'port-legacy-docs.mjs'), '--out', scratch],
-    { cwd: site, stdio: 'pipe' },
-  );
+  try {
+    execFileSync(
+      process.execPath,
+      [path.join(here, 'port-legacy-docs.mjs'), '--out', scratch],
+      { cwd: site, stdio: 'pipe', encoding: 'utf8' },
+    );
+  } catch (err) {
+    /* The port's own diagnostics are the useful part; without this the
+     * failure reads as "Command failed" and says nothing about which page. */
+    console.error(err.stdout ?? '');
+    console.error(err.stderr ?? '');
+    /* process.exit skips the finally below, so the scratch tree goes here. */
+    fs.rmSync(scratch, { recursive: true, force: true });
+    process.exit(1);
+  }
 
   const fresh = new Set(walk(scratch));
   const have = new Set(walk(committed));

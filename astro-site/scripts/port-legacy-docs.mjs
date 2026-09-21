@@ -435,11 +435,21 @@ console.log(
     `rewritten, ${stats.anchorsDropped} anchors dropped, ${stats.cardGrids} card ` +
     `grid(s) rebuilt, ${stats.descriptions} with a description).`,
 );
-for (const item of unhandled) console.log(`  ${item}`);
-
+/*
+ * A page the rewrites could not read is a page that ships broken, and the only
+ * run that would show it is this one: check-legacy-port.mjs pipes this output
+ * and compares bytes, so a bare list with literal shortcodes in it reproduces
+ * happily. Both of these are therefore failures, not warnings.
+ */
+const failures = unhandled.slice();
 if (stats.descriptions !== ported.length) {
-  console.error(
-    `port-legacy-docs: ${ported.length - stats.descriptions} ported page(s) carry no description.`,
+  failures.push(
+    `${ported.length - stats.descriptions} ported page(s) carry no description`,
   );
+}
+
+if (failures.length > 0) {
+  console.error('port-legacy-docs: conversion needs a look:\n');
+  for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
