@@ -63,3 +63,9 @@ result-*
 # Adam's local bench sweep script — never tracked (swept into #232 by an
 # over-broad git add; removed in the follow-up PR)
 /tools/run_ap3_sweep.py
+
+# Review artifacts kept beside a branch, never committed
+/SCREENSHOTS/
+/SOURCES.md
+/ROUTES.md
+/STALE-CLAIMS.md
