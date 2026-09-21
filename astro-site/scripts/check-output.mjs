@@ -174,11 +174,10 @@ for (const route of redirects.served) {
  * builds, still passes every other assertion here and still deploys. So both
  * halves are asserted, the SVG being there and the fence not.
  */
-const MERMAID_ROUTES = [
-  /* Engines and transports replaced their flowcharts with decision tables (#340). */
-  "guide/concepts/capture/",
-  "guide/concepts/",
-];
+/* Every flowchart became a decision table or a block diagram (#340, #343). A
+ * route listed here must carry a build-time mermaid SVG; the site-wide fence
+ * check below is what catches a mermaid block that reached a page as code. */
+const MERMAID_ROUTES = [];
 for (const segment of MERMAID_ROUTES) {
   const file = path.join(dist, segment, "index.html");
   if (

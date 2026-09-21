@@ -1,235 +1,152 @@
 ---
-title: "Engine Adapters"
-description: "The engine adapter layer decouples the profiling pipeline from specific inference frameworks. Each engine implements the same EngineAdapter protocol, letting…"
+title: "Engine adapters"
+description: "How one engine type becomes an adapter, a typed artifact bundle and a firmware template: the registry, the four adapters, the shared CMSIS-NN and Ethos-U helpers, and the consumers that read the artifacts."
 ---
 
-The engine adapter layer decouples the profiling pipeline from specific
-inference frameworks. Each engine implements the same `EngineAdapter` protocol,
-letting the pipeline treat them uniformly.
+import BlockDiagram from '../../../../components/BlockDiagram.astro';
+import Block from '../../../../components/Block.astro';
 
-## The EngineAdapter protocol
+## Purpose
 
-```python
-class EngineAdapter(Protocol):
-    """Prepares engine-specific build artifacts for NSX firmware."""
+Show the seam that keeps the pipeline engine-agnostic. Everything an
+engine contributes to a run passes through one `prepare()` call and one
+typed artifact object; the rest of hpx reads those and never imports an
+engine package.
 
-    @property
-    def name(self) -> str: ...
+## Diagram
 
-    @property
-    def engine_type(self) -> EngineType: ...
+<BlockDiagram
+  title="Engine dispatch"
+  caption="From the engine.type key to the objects the rest of the pipeline reads. The shared helpers are called by more than one adapter; the consumers never import an adapter."
+  flow="grid"
+  columns={3}
+>
+  <Block label="Registry" sublabel="engines/__init__.py" tone="accent" flow="column">
+    <Block label="EngineType" emphasis="filled" />
+    <Block label="adapter factories" emphasis="filled" />
+    <Block label="get_adapter" emphasis="filled" />
+  </Block>
+  <Block label="Adapters" tone="accent" flow="column">
+    <Block label="tflm" emphasis="filled" />
+    <Block label="helia_rt" emphasis="filled" />
+    <Block label="helia_aot" emphasis="filled" />
+    <Block label="executorch" emphasis="filled" />
+  </Block>
+  <Block label="Shared helpers" tone="accent" flow="column">
+    <Block label="cmsis_nn" emphasis="filled" />
+    <Block label="ethos_u" emphasis="filled" />
+  </Block>
+  <Block label="Artifacts" sublabel="engines/base.py" tone="accent" flow="column">
+    <Block label="EngineArtifacts" emphasis="filled" />
+    <Block label="TflmArtifacts" emphasis="filled" />
+    <Block label="HeliaRtArtifacts" emphasis="filled" />
+    <Block label="HeliaAotArtifacts" emphasis="filled" />
+    <Block label="ExecutorchArtifacts" emphasis="filled" />
+  </Block>
+  <Block label="Consumers" tone="accent" flow="column">
+    <Block label="firmware render" emphasis="filled" />
+    <Block label="memory planning" emphasis="filled" />
+    <Block label="workspace fingerprint" emphasis="filled" />
+    <Block label="model analysis" emphasis="filled" />
+  </Block>
+</BlockDiagram>
 
-    def prepare(
-        self,
-        config: ProfileConfig,
-        work_dir: Path,
-    ) -> EngineArtifacts:
-        ...
-```
+The same structure as a list, for readers of the Markdown rendition:
 
-Every adapter receives:
+- Registry (`engines/__init__.py`): `EngineType`, adapter factories, `get_adapter`
+- Adapters: `tflm`, `helia_rt`, `helia_aot`, `executorch`
+- Shared helpers: `cmsis_nn`, `ethos_u`
+- Artifacts (`engines/base.py`): `EngineArtifacts`, `TflmArtifacts`, `HeliaRtArtifacts`, `HeliaAotArtifacts`, `ExecutorchArtifacts`
+- Consumers: firmware render, memory planning, workspace fingerprint, model analysis
 
-| Parameter | Purpose |
-|---|---|
-| `config` | Resolved profile config, including engine-specific settings |
-| `work_dir` | Writable directory for generated files |
+## The blocks
 
-And returns its own `EngineArtifacts` subclass — `TflmArtifacts`,
-`HeliaRtArtifacts`, `HeliaAotArtifacts`, or `ExecutorchArtifacts`. The base
-carries only what every engine produces:
+### Registry
 
-```python
-@dataclass(frozen=True, kw_only=True)
-class EngineArtifacts:
-    engine_type: EngineType          # pinned by each subclass
-    engine_header: str               # no default — every adapter states its own
-    extra_modules: list[NsxModuleRef] = field(default_factory=list)
-    cmake_vars: dict[str, str] = field(default_factory=dict)
-    source_files: list[Path] = field(default_factory=list)
-    include_dirs: list[Path] = field(default_factory=list)
-    static_libs: list[Path] = field(default_factory=list)
-    memory_plan: MemoryPlan | None = None
-```
+`EngineType` is a `StrEnum` with four members, `tflm`, `helia-rt`,
+`helia-aot` and `executorch`, so YAML and Jinja compare against the hyphen
+form without unwrapping. `_ADAPTER_FACTORIES` maps each member to a
+deferred import, so registering an engine does not import its package
+until `get_adapter(engine_type)` asks for it; `register_engine_adapter()`
+lets tests substitute a stub.
 
-Engine-specific outputs live on the subclass, so reading another engine's field
-is an `AttributeError` at the access site rather than a silent `None`;
-consumers narrow with `isinstance` at the `engine_type` branch points they
-already have. The base also exposes four identity properties —
-`resolved_backend`, `resolved_version`, `resolved_variant`,
-`resolved_toolchain_tag` — which each subclass routes to its own fields so the
-workspace fingerprint in `dependencies.py` stays engine-agnostic.
+### The adapter protocol
 
-See `engines/base.py` for the full type list — it is the single source of
-truth and grows as engines need new template inputs.
+`EngineAdapter` in `engines/base.py` has a `name`, an `engine_type`, and
+`prepare(config, work_dir)` returning that engine's artifact subtype. Three
+optional hooks let an engine shape memory placement:
+`default_auto_placement()` (return `None` to accept the shared greedy
+policy), `apply_arena_placement_override()` for engines that emit typed
+arena regions, and `check_psram_placement()` together with
+`psram_weights_source`, which is how the PSRAM preflight on
+[Memory placement](../../memory/#6-psram) is enforced per engine.
 
-## heliaRT adapter
+### What each adapter's `prepare()` does
 
-**File:** `engines/helia_rt/adapter.py`
+| Engine | Module | Steps | Modules it adds |
+|---|---|---|---|
+| tflm | `engines/tflm.py` | resolves the `nsx-tflite-micro` module and the reference or CMSIS-NN backend | `nsx-tflite-micro` (plus the CMSIS-NN provider for that backend) |
+| helia-rt | `engines/helia_rt/` | validates the variant and toolchain; with no override returns the pinned registry module; `source_path` installs a local tree as a module; `dist_path` or a release source verifies the matching core and toolchain archive and generates a wrapper (`nsx_module.py`, `artifacts.py`, `download.py`) | `nsx-helia-rt` |
+| helia-aot | `engines/helia_aot/` | maps the board to a compiler platform and runs the `helia-aot` compiler (`compile.py`); extracts the operator manifest and memory plan from the compiler's context (`manifest.py`); vendors the generated model as a local module named by `engine.config.module_name` (default `hpx_model`); resolves the CMSIS-NN provider | `nsx-cmsis-nn`, the model module |
+| executorch | `engines/executorch.py` | resolves the `nsx-executorch` checkout at the commit the compatibility baseline pins (auto-cloned into the hpx cache, or `engine.config.source_path`); reads the optional `<model>.pte.json` sidecar for the provider, op lists, planned arena and I/O sizes; resolves the region of each static RAM buffer; generates a wrapper module and emits the provider module before it | the CMSIS-NN provider, the `nsx-executorch` wrapper |
 
-heliaRT is Ambiq's optimized TFLM fork. The normal flow resolves the pinned
-`nsx-helia-rt` registry module and builds it with the selected toolchain.
-Advanced users can instead provide a local source checkout or an explicit
-prebuilt distribution.
+The shared helpers sit beside the adapters: `engines/cmsis_nn.py` resolves
+the `nsx-cmsis-nn` module reference and its CMake variables for every
+engine that links it, and `engines/ethos_u.py` holds the NSX module
+identity of the Ethos-U backend. Support for each engine and backend per
+SoC is a registry question, answered on [Engines](../../engines/) and
+[Boards and targets](../../boards/), not here.
 
-### What `prepare()` does
+### Artifacts
 
-1. Validates the requested heliaRT variant and selected toolchain.
-2. With no override, returns the pinned registry module reference for NSX.
-3. With `source_path`, installs the local source tree as an NSX module.
-4. With `dist_path` or a custom release source, verifies the matching
-   core/toolchain archive and generates a temporary NSX wrapper.
-5. Returns the module references and interpreter metadata needed by firmware
-   generation.
+`EngineArtifacts` carries only what every engine produces: `engine_type`,
+`engine_header` (no default; each adapter states its own), `extra_modules`,
+`cmake_vars`, `source_files`, `include_dirs`, `static_libs` and
+`memory_plan`. Engine-specific fields live on the subclass, so reading
+another engine's field is an `AttributeError` at the access site rather
+than a silent `None`; each subclass pins its `engine_type` and raises
+`ValueError` if constructed with another. Four `resolved_*` properties
+(`backend`, `version`, `variant`, `toolchain_tag`) are how the dependency
+workspace fingerprint records engine identity without knowing which engine
+it holds. `tests/contracts/test_engine_artifact_types.py` asserts the
+adapter-to-artifact map is complete over `EngineType`.
 
-### Assumptions
+### Consumers
 
-- Explicit prebuilt archives must match the target core, toolchain, and
-  requested variant.
-- The default registry and local-source modes build heliaRT with the selected
-  toolchain.
-
-## heliaAOT adapter
-
-**File:** `engines/helia_aot/adapter.py`
-
-heliaAOT compiles the TFLite model into optimized C code at build time,
-eliminating the interpreter overhead.
-
-### What `prepare()` does
-
-1. Runs the `helia-aot` CLI compiler on the model file:
-    - Reads the model ops → generates operator manifest
-    - Emits C source files for each layer
-    - Produces `hpx_model.h` and `hpx_model.cc`
-2. Creates or resolves two NSX modules:
-    - **hpx_model** — the generated C code, vendored as a local module
-      (default name; override with `engine.config.module_name`)
-    - **nsx-cmsis-nn** — AmbiqAI's CMSIS-NN fork, from the registry by
-      default or an explicit local override
-3. Returns the artifact bundle and AOT-specific metadata
-
-### AOT fields on `EngineArtifacts`
-
-```python
-HeliaAotArtifacts(
-    engine_type=EngineType.HELIA_AOT,
-    extra_modules=[cmsis_nn_ref, NsxModuleRef(name="hpx_model", ...)],
-    aot_prefix=...,            # C symbol prefix of the generated model API
-    aot_module_name="hpx_model",
-    aot_cmake_target=...,      # CMake target the firmware links against
-    aot_op_manifest=[...],     # ordered per-op descriptors for main_aot.cc.j2
-    aot_arena_regions=[...],   # typed ArenaRegion list bound by bind_arena()
-)
-```
-
-### Assumptions
-
-- The `helia-aot` pip package must be installed (`pip install helia-aot`)
-- The AOT compiler version must match the ns-cmsis-nn module version
-- The model must use only ops supported by the AOT compiler
-- Uses a different `main.cc` template (`main_aot.cc.j2`) because AOT
-  inference calls are direct function invocations, not interpreter runs
-
-## TFLM adapter
-
-**File:** `engines/tflm.py`
-
-Stock TensorFlow Lite for Microcontrollers adapter for interpreter baselines.
-It is exposed as `--engine tflm` and supports reference or upstream CMSIS-NN
-backends.
-
-### What `prepare()` does
-
-1. Resolves the `nsx-tflite-micro` module
-2. Selects the reference or CMSIS-NN backend
-3. Returns module refs with standard TFLM template variables
-
-### When to use
-
-TFLM is primarily useful for:
-
-- Establishing an upstream interpreter baseline
-- Generating baseline numbers for comparison with heliaRT/heliaAOT
-
-## ExecuTorch adapter
-
-**File:** `engines/executorch.py`
-
-ExecuTorch runs a `.pte` program — a graph lowered ahead of time by
-`helia-torch`/`nsx_cortex_m` — through the `nsx-executorch` runtime. Unlike
-the LiteRT engines, HPX does not compile the model itself; the PTE arrives
-already lowered against a chosen CMSIS-NN provider.
-
-### What `prepare()` does
-
-1. Resolves the `nsx-executorch` checkout: by default it auto-clones the
-   repository pinned by the compatibility baseline into
-   `~/.cache/helia-profiler/nsx-executorch/` (exact pinned commit, minimal
-   Cortex-M submodule set, re-synced when the pin moves);
-   `engine.config.source_path` overrides with a local development checkout.
-   Either way it then validates the checkout — a `nsx-executorch` tree
-   whose `version.txt` **and commit** match the qualified pin in the
-   [compatibility baseline](../../../architecture/compatibility-baseline/), including its
-   `external/executorch` submodule gitlink and pinned torchgen sources.
-2. Loads the optional `<model>.pte.json` sidecar and uses it to default the
-   CMSIS-NN provider, `ns_ops`, portable op list, planned arena size, and
-   I/O sizes. Explicit config always wins; a hash mismatch is a hard error.
-3. Resolves the memory region and size for each of the five static RAM
-   buffers (planned arena, method arena, temporary arena, input, output).
-4. Generates a thin NSX wrapper module that `add_subdirectory()`s the
-   checkout, and emits the provider module ref **before** it so NSX
-   configures the provider exactly once.
-5. Returns both module refs plus the `NSX_EXECUTORCH_*` CMake variables.
-
-### Assumptions
-
-- The checkout is at the exact pinned commit — HPX refuses to build an
-  unqualified runtime rather than reporting drifted numbers.
-- The PTE was exported against the same provider being built. A
-  `cortex_m_ns::` PTE on a non-NS build fails at `Method::load()`, and HPX
-  rejects that combination at config time.
-- `arena_location` and the per-buffer overrides may only name RAM regions
-  (`tcm`, `sram`).
-- Power capture is not supported yet; keep `power.enabled: false`.
-
-## How engines affect the firmware
-
-The engine choice affects three things in the generated firmware:
-
-### 1. Template selection
-
-| Engine | Main template | Includes |
+| Consumer | Reads | Module |
 |---|---|---|
-| heliaRT | `main.cc.j2` | Interpreter setup, arena allocation |
-| heliaAOT | `main_aot.cc.j2` | Direct function calls, `arm_mve.h` pre-include |
-| TFLM | `main.cc.j2` | Standard TFLM interpreter path |
-| ExecuTorch | `main_executorch.cc.j2` | `Module`/`Method` load, five static RAM buffers |
+| firmware render | `engine_header`, `cmake_vars`, `extra_modules`, the subtype's fields (AOT operator manifest and arena regions, ExecuTorch buffer sizes) | `firmware/context.py`, `firmware/project.py` |
+| memory planning | `memory_plan`, the adapter's placement hooks | `stages/plan_memory.py`, `placement.py` |
+| workspace fingerprint | the `resolved_*` properties | `deps/dependencies.py` |
+| model analysis | the engine's view of the graph for `hpx analyze --engine` | `evaluation/engine_analysis.py` |
 
-### 2. NSX module graph
+### How the engine shapes the firmware
 
-Every run starts from the board's NSX starter profile modules (`nsx-core`,
-`nsx-cmsis-core`, the Ambiq SDK/BSP tier, the board module, ... — see
-[Firmware Generation](../../../architecture/firmware/)); the adapter appends its
-`extra_modules` on top:
+| Engine | Main template | Module graph on top of the board's starter profile |
+|---|---|---|
+| tflm | `main.cc.j2` | `nsx-tflite-micro`, with the CMSIS-NN provider first for that backend |
+| helia-rt | `main.cc.j2` | `nsx-helia-rt` |
+| helia-aot | `main_aot.cc.j2` | `nsx-cmsis-nn`, then the generated model module |
+| executorch | `main_executorch.cc.j2` | the CMSIS-NN provider, then `nsx-executorch` |
 
-```
-heliaRT:     base + [nsx-helia-rt]
-heliaAOT:    base + [nsx-cmsis-nn, hpx_model]
-TFLM:        base + [nsx-tflite-micro]        (arm-cmsis-nn first for the cmsis_nn backend)
-ExecuTorch:  base + [<arm|nsx>-cmsis-nn, nsx-executorch]
-```
+The provider is ordered before `nsx-executorch` on purpose: NSX must
+configure exactly one CMSIS-NN provider before the runtime creates its
+bridge target. The binary section sizes in `summary.json` record what the
+engine choice cost in flash and RAM for the run at hand.
 
-The ExecuTorch provider module is ordered *before* `nsx-executorch` on
-purpose — NSX must configure exactly one CMSIS-NN provider before the
-runtime creates its idempotent bridge target.
+## Where the code lives
 
-### 3. Binary size and layout
+| Block | Path under `src/helia_profiler/` |
+|---|---|
+| registry | `engines/__init__.py` |
+| protocol and artifacts | `engines/base.py` |
+| adapters | `engines/tflm.py`, `engines/helia_rt/`, `engines/helia_aot/`, `engines/executorch.py` |
+| shared helpers | `engines/cmsis_nn.py`, `engines/ethos_u.py` |
+| stage | `stages/prepare_engine.py` |
+| contract test | `tests/contracts/test_engine_artifact_types.py` |
 
-- **heliaRT** produces the largest binaries (~500KB+) because the full
-  interpreter and all op kernels are linked
-- **heliaAOT** produces the smallest binaries (~80–120KB) because only the
-  required ops are compiled as direct code
-- **TFLM** is similar to heliaRT in size
+## What next
 
-This is why `summary.json` includes binary section sizes — they reveal the
-practical impact of engine choice on flash usage.
+[Firmware generation](../firmware/) for what the render context does with
+the artifacts; [Adding an engine](../adding-an-engine/) for the touch
+points a fifth adapter has to cover.

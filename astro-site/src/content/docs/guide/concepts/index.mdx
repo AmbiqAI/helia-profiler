@@ -1,225 +1,187 @@
 ---
-title: "Architecture Overview"
-description: "This section is for contributors, developers, and AI agents working on heliaPROFILER internals. It covers the design philosophy, system architecture, and…"
+title: "Concepts"
+description: "How heliaPROFILER is built: the packages inside hpx, what each one owns, the frozen configuration and the mutable pipeline context that flow through them, and the typed error hierarchy."
 ---
 
-This section is for **contributors, developers, and AI agents** working on
-heliaPROFILER internals. It covers the design philosophy, system architecture,
-and conventions you need to understand before modifying the codebase.
+import BlockDiagram from '../../../../components/BlockDiagram.astro';
+import Block from '../../../../components/Block.astro';
 
-## What heliaPROFILER is
+## Purpose
 
-`hpx` is a **profiler** — it generates temporary firmware, flashes it, captures
-hardware performance data, and writes reports. It is:
+This section is for contributors and for agents that change hpx rather
+than run it. It names the packages, says what each one owns and hands on,
+and points at the module behind every block, so a change can be placed
+before it is written. Users who only run `hpx profile` need the
+[User guide](../../guide/), not this.
 
-- A CLI tool (`hpx profile`) and a Python API (`helia_profiler.profile()`)
-- Pipeline-based: sequential stages, each with a single responsibility
-- Engine-agnostic: the same pipeline serves all four engines — `tflm`, `helia-rt`, `helia-aot`, and `executorch`
+## Diagram
 
-## What heliaPROFILER is NOT
+<BlockDiagram
+  title="The hpx package"
+  caption="Every package under src/helia_profiler, grouped by what it owns. Leaves are modules or subpackages; the diagram omits the vendored code, the packaged data files, the console renderers and the CLI command modules."
+  flow="grid"
+  columns={4}
+>
+  <Block label="Entry points" sublabel="cli, api, session" tone="accent" flow="column">
+    <Block label="cli" sublabel="Typer commands" emphasis="filled" />
+    <Block label="api" sublabel="profile()" emphasis="filled" />
+    <Block label="session" sublabel="notebooks" emphasis="filled" />
+  </Block>
+  <Block label="Configuration" tone="accent" flow="column">
+    <Block label="config" sublabel="ProfileConfig, frozen" emphasis="filled" />
+    <Block label="vocab" sublabel="shared enums" emphasis="filled" />
+    <Block label="placement" sublabel="policy" emphasis="filled" />
+  </Block>
+  <Block label="Pipeline" tone="accent" flow="column">
+    <Block label="pipeline" sublabel="Stage, context, runner" emphasis="filled" />
+    <Block label="profiler" sublabel="default stage list" emphasis="filled" />
+    <Block label="stages" sublabel="one module each" emphasis="filled" />
+  </Block>
+  <Block label="Engines" tone="accent" flow="column">
+    <Block label="base" sublabel="adapter protocol" emphasis="filled" />
+    <Block label="tflm" emphasis="filled" />
+    <Block label="helia_rt" emphasis="filled" />
+    <Block label="helia_aot" emphasis="filled" />
+    <Block label="executorch" emphasis="filled" />
+  </Block>
+  <Block label="Firmware" tone="accent" flow="column">
+    <Block label="templates" sublabel="Jinja2" emphasis="filled" />
+    <Block label="project" sublabel="NSX files" emphasis="filled" />
+    <Block label="build" sublabel="nsx configure, build" emphasis="filled" />
+    <Block label="fingerprint" emphasis="filled" />
+  </Block>
+  <Block label="Dependencies" tone="accent" flow="column">
+    <Block label="compatibility" sublabel="baseline" emphasis="filled" />
+    <Block label="dependencies" sublabel="workspaces, locks" emphasis="filled" />
+    <Block label="nsx" sublabel="subprocess" emphasis="filled" />
+    <Block label="sync" emphasis="filled" />
+  </Block>
+  <Block label="Platform" tone="accent" flow="column">
+    <Block label="soc" emphasis="filled" />
+    <Block label="board" emphasis="filled" />
+    <Block label="counters" sublabel="PMU registry" emphasis="filled" />
+    <Block label="memory_map" emphasis="filled" />
+    <Block label="custom" sublabel="overlays" emphasis="filled" />
+  </Block>
+  <Block label="Target" tone="accent" flow="column">
+    <Block label="lifecycle" sublabel="reset policy" emphasis="filled" />
+    <Block label="probe" sublabel="J-Link" emphasis="filled" />
+  </Block>
+  <Block label="Transport" tone="accent" flow="column">
+    <Block label="rtt" emphasis="filled" />
+    <Block label="usb_cdc" emphasis="filled" />
+    <Block label="uart" emphasis="filled" />
+    <Block label="swo" emphasis="filled" />
+    <Block label="protocol" sublabel="line loop" emphasis="filled" />
+  </Block>
+  <Block label="Capture" tone="accent" flow="column">
+    <Block label="parser" sublabel="stream to PmuResult" emphasis="filled" />
+    <Block label="readiness" emphasis="filled" />
+    <Block label="power_terminal" emphasis="filled" />
+  </Block>
+  <Block label="Power" tone="accent" flow="column">
+    <Block label="joulescope" emphasis="filled" />
+    <Block label="ina228_driver" emphasis="filled" />
+    <Block label="ondevice_driver" emphasis="filled" />
+    <Block label="sync" sublabel="gate contract" emphasis="filled" />
+  </Block>
+  <Block label="Results" tone="accent" flow="column">
+    <Block label="results" sublabel="typed models" emphasis="filled" />
+    <Block label="report" sublabel="writers" emphasis="filled" />
+    <Block label="evaluation" sublabel="validity, compare" emphasis="filled" />
+    <Block label="modelcost" sublabel="MACs, attribution" emphasis="filled" />
+  </Block>
+  <Block label="Host and wire" tone="accent" flow="column">
+    <Block label="hostenv" sublabel="doctor, toolchains" emphasis="filled" />
+    <Block label="diagnostics" sublabel="support bundle" emphasis="filled" />
+    <Block label="validation" sublabel="hpx validate" emphasis="filled" />
+    <Block label="wire" sublabel="protocol spec" emphasis="filled" />
+  </Block>
+</BlockDiagram>
 
-| Anti-pattern | heliaPROFILER approach |
+The same structure as a list, for readers of the Markdown rendition:
+
+- Entry points: `cli` (Typer commands), `api` (`profile()`), `session` (notebooks)
+- Configuration: `config` (`ProfileConfig`, frozen), `vocab` (shared enums), `placement` (policy)
+- Pipeline: `pipeline` (`Stage`, `PipelineContext`, `PipelineRunner`), `profiler` (default stage list), `stages` (one module each)
+- Engines: `base` (adapter protocol), `tflm`, `helia_rt`, `helia_aot`, `executorch`
+- Firmware: `templates` (Jinja2), `project` (NSX files), `build` (nsx configure, build), `fingerprint`
+- Dependencies: `compatibility` (baseline), `dependencies` (workspaces, locks), `nsx` (subprocess), `sync`
+- Platform: `soc`, `board`, `counters` (PMU registry), `memory_map`, `custom` (overlays)
+- Target: `lifecycle` (reset policy), `probe` (J-Link)
+- Transport: `rtt`, `usb_cdc`, `uart`, `swo`, `protocol` (line loop)
+- Capture: `parser` (stream to `PmuResult`), `readiness`, `power_terminal`
+- Power: `joulescope`, `ina228_driver`, `ondevice_driver`, `sync` (gate contract)
+- Results: `results` (typed models), `report` (writers), `evaluation` (validity, compare), `modelcost` (MACs, attribution)
+- Host and wire: `hostenv` (doctor, toolchains), `diagnostics` (support bundle), `validation` (`hpx validate`), `wire` (protocol spec)
+
+## The blocks
+
+hpx is a profiler, not a build system, an SDK exporter or an application
+framework. It generates a disposable firmware app for one model and one
+engine, builds it with NSX, flashes it, captures what the firmware prints,
+and writes a result bundle. Four rules shape every package:
+
+| Rule | What it means in code | Where it is enforced |
+|---|---|---|
+| Immutable configuration | `ProfileConfig` is resolved once from the CLI and YAML, then frozen; every stage reads the same object and none mutates it | `config/__init__.py` (frozen pydantic models with `extra="forbid"`) |
+| One engine per run | the engine is explicit; comparing engines means two runs and `hpx compare` | `engines/__init__.py` (`get_adapter` takes one `EngineType`) |
+| Typed stage boundaries | stages exchange dataclasses from `results/`, never dicts; the one dynamic field is `LayerResult.counters` because counter names come from the SoC | `results/models.py`, `results/artifacts.py` |
+| Subprocess isolation | GCC, CMake, J-Link and the heliaAOT compiler run through `subprocess.run()` with argument lists, never a shell | `deps/nsx.py`, `target/probe/jlink.py`, `engines/helia_aot/compile.py` |
+
+### Two objects flow through everything
+
+`ProfileConfig` is the read-only input. `PipelineContext` is the mutable
+state bag the stages fill: each stage sets the fields it owns and reads the
+fields earlier stages set, through narrowing accessors that raise
+`PipelineError` naming the producing stage when it has not run. The
+[Pipeline](pipeline/) page lists both.
+
+### Errors are typed
+
+Every failure is a subclass of `HpxError` carrying an optional `hint` that
+the CLI prints under the message. The subclass says which package failed:
+
+| Error | Raised by | Meaning |
+|---|---|---|
+| `PipelineError` | `pipeline.py` | a stage product was read before its stage ran |
+| `ConfigError` | `config/` | bad YAML, unknown key, missing field |
+| `PlatformError` | `platform/` | unknown board or SoC |
+| `EngineError` | `engines/` | adapter failure |
+| `FirmwareError` | `firmware/` | template rendering failure |
+| `BuildError` | `deps/`, `firmware/build.py` | NSX configure or build failure; `NetworkError` and `DependencyError` (`VersionError`, `LockError`) narrow it |
+| `CaptureError` | `capture/`, `transport/`, `target/probe/` | transport, protocol or firmware-reported failure; `DeterministicCaptureError` narrows it for refusals a retry cannot change, such as a missing image or an unknown load address on the flash path |
+| `PowerError` | `power/` | driver failure |
+| `ReportError` | `report/` | output failure; `ValidationBundleError` narrows it for `hpx validate` bundles |
+
+The list is `src/helia_profiler/errors.py`; the CLI maps every `HpxError`
+to a non-zero exit and the codes in the run's `issues` are a separate
+vocabulary, documented on the [issue codes](../../reference/issue-codes/)
+page.
+
+## Where the code lives
+
+| Block | Path under `src/helia_profiler/` |
 |---|---|
-| Build system | Uses NSX (`nsx configure && nsx build`) — does not reinvent CMake |
-| SDK exporter | No code export. Generated firmware is temporary and disposable |
-| Application framework | No runtime library. The firmware is a thin profiling harness |
-| Multi-engine runner | One engine per run. Always explicit, never auto-detected |
+| Entry points | `cli/`, `api.py`, `session.py` |
+| Configuration | `config/`, `vocab.py`, `placement.py` |
+| Pipeline | `pipeline.py`, `profiler.py`, `stages/` |
+| Engines | `engines/` |
+| Firmware | `firmware/` |
+| Dependencies | `deps/` |
+| Platform | `platform/` |
+| Target | `target/` |
+| Transport | `transport/` |
+| Capture | `capture/` |
+| Power | `power/` |
+| Results | `results/`, `report/`, `evaluation/`, `modelcost/` |
+| Host and wire | `hostenv/`, `diagnostics/`, `validation/`, `wire/` |
 
-## Design principles
+## What next
 
-These principles were learned from the [AutoDeploy](https://github.com/AmbiqAI/neuralSPOT)
-experience and are non-negotiable:
-
-### 1. Immutable config
-
-The config is resolved **once** at startup and frozen. No field is mutated
-after construction. Every stage reads the same `ProfileConfig` object.
-
-```python
-# ✅ Correct — read from frozen config
-board = ctx.config.target.board
-
-# ❌ Wrong — never mutate config mid-run
-ctx.config.target.board = "apollo3p_evb"  # will raise FrozenInstanceError
-```
-
-### 2. One engine per run
-
-The user specifies the engine explicitly. There is no "run all engines" mode.
-Compare engines by running `hpx profile` twice with different configs.
-
-### 3. Typed stage boundaries
-
-Structured stage outputs use typed dataclasses from the `results/` package.
-The one exception is `LayerResult.counters: dict[str, float]` — PMU counter
-names are dynamic and can't be enumerated as fields.
-
-### 4. Subprocess isolation
-
-External tools (GCC, CMake, J-Link, heliaAOT compiler) run via
-`subprocess.run()` with argument lists. No `os.system()`, no shell=True,
-no monkey-patching `sys.exit`.
-
-### 5. Clear error hierarchy
-
-Every error is a typed subclass of `HpxError` with an optional `hint` field
-for actionable guidance:
-
-```
-HpxError
-├── PipelineError        # A stage's product was read before the stage ran
-├── ConfigError          # Bad YAML, missing fields
-├── PlatformError        # Unknown board/SoC
-├── EngineError          # Engine adapter failure
-├── FirmwareError        # Template rendering failure
-├── BuildError           # NSX build failure
-│   ├── NetworkError     # Transient network failure during sync/lock
-│   └── DependencyError  # Dependency lock/workspace failure
-│       ├── VersionError # Incompatible tool/package/engine/schema version
-│       └── LockError    # Missing, corrupt, or drifted lock file
-├── CaptureError         # Transport/PMU capture failure
-├── PowerError           # Joulescope driver failure
-└── ReportError          # Report generation failure
-    └── ValidationBundleError  # Malformed or unsafe validation bundle
-```
-
-## High-level flow
-
-```mermaid
-graph TD
-    A[CLI / API] --> B[Config resolve]
-    B --> C[S01: Resolve platform]
-    C --> D[S02: Prepare engine]
-    D --> E[S03: Generate firmware]
-    E --> F[S04: Build firmware]
-    F --> G[S05: Flash firmware]
-    G --> H[S06: Capture PMU]
-    H --> I[S07: Capture power]
-    I --> J[S08: Generate report]
-
-    style A fill:#e8f5e9
-    style J fill:#e8f5e9
-```
-
-Each stage is a class implementing the `Stage` protocol:
-
-```python
-class Stage(Protocol):
-    name: str
-    def run(self, ctx: PipelineContext) -> None: ...
-```
-
-The `PipelineRunner` executes stages sequentially. If a stage fails, it
-raises a typed error and the pipeline stops with a clear message.
-
-## Module layout
-
-```
-src/helia_profiler/
-├── cli/                # Typer CLI package
-├── api.py              # profile() entry point → PipelineRunner
-├── vocab.py           # Bottom-layer enum leaf (Toolchain/Transport/Aggregation)
-├── config/           # ProfileConfig (frozen dataclasses)
-├── profiler.py         # build_default_pipeline(), run_profile()
-├── pipeline.py         # PipelineContext, Stage protocol, PipelineRunner
-├── results/            # Result models, workflow artifacts, bundle manifests
-├── modelcost/          # Model-cost core: MAC/OPS analysis + layer attribution (#229 seam)
-├── evaluation/         # Run validity, comparability/compare, engine-dispatched analysis
-├── errors.py           # HpxError hierarchy
-├── platform/           # SoC/board registry, memory maps, placement vocabulary, custom overlays
-├── nsx.py              # NSX subprocess wrapper (configure/build/flash)
-├── counters.py         # PMU counter registry and pass planning
-├── doctor.py           # hpx doctor — tool checks
-│
-├── target/             # Target lifecycle + probe backends
-│   ├── lifecycle.py    # Reset/power-cycle policy before capture phases
-│   └── probe/
-│       └── jlink.py    # J-Link helpers (flash, SWO, reset)
-│
-├── transport/          # CaptureTransport backend registry
-│   ├── protocol.py     # Shared line-collection loop (wire constants live in wire/)
-│   ├── rtt.py          # RTT capture lifecycle/orchestration
-│   ├── rtt_control.py  # Direct RTT control-block/ring-buffer access
-│   ├── swo.py          # SWO capture via pylink/J-Link API
-│   ├── uart.py         # UART capture backend
-│   └── usb_cdc.py      # USB CDC capture backend
-│
-├── engines/            # Engine adapters
-│   ├── base.py         # EngineAdapter protocol, EngineArtifacts + subtypes
-│   ├── tflm.py         # Stock TFLM adapter
-│   ├── executorch.py   # ExecuTorch adapter
-│   ├── helia_rt/       # heliaRT adapter package
-│   └── helia_aot/      # heliaAOT adapter package
-│
-├── stages/             # Pipeline stages
-│   ├── preflight.py
-│   ├── ensure_powered.py
-│   ├── resolve_platform.py
-│   ├── resolve_probe.py
-│   ├── prepare_engine.py
-│   ├── analyze_model.py
-│   ├── plan_memory.py
-│   ├── generate_firmware.py
-│   ├── build_firmware.py
-│   ├── verify_placement.py
-│   ├── flash.py
-│   ├── capture_pmu.py
-│   ├── plan_power.py
-│   ├── build_power_firmware.py
-│   ├── flash_power.py
-│   ├── capture_power.py
-│   ├── collect_power_terminal.py
-│   └── report.py
-│
-├── firmware/           # Firmware generation
-│   ├── __init__.py     # Template rendering, model→header, build/flash
-│   └── templates/      # Jinja2 templates (CMakeLists, main.cc, etc.)
-│
-├── capture/            # Data acquisition dispatch (capture_pmu/capture_power)
-│   ├── parser.py         # HPX protocol parser → PmuResult
-│   ├── power_terminal.py # Parser for power-firmware terminal status records
-│   ├── readiness.py      # Post-reset readiness helpers for capture transports
-│   ├── terminal_transport.py # Post-power envelope collection registry (per transport)
-│   └── rtt_symbol.py     # RTT control-block address lookup from build artifacts
-│
-├── power/              # Power measurement drivers
-│   ├── base.py         # PowerDriver protocol, PowerResult
-│   ├── ina228_driver.py  # INA228 in-series power monitor driver
-│   ├── ondevice_driver.py # On-device (SoC-internal) power measurement driver
-│   └── joulescope/     # Joulescope JS110/JS220/JS320 driver package
-│
-└── report/             # Output formatting
-    ├── __init__.py     # write_report() dispatcher
-    └── model_explorer.py  # ME overlay builder
-```
-
-## Key data flow
-
-```
-ProfileConfig (frozen)
-    ↓
-PipelineContext (mutable state bag)
-    │
-    ├── .config          → ProfileConfig (read-only)
-    ├── .run_metadata.platform → PlatformInfo (set by ResolvePlatformStage)
-    ├── .engine_artifacts→ EngineArtifacts (set by S02)
-    ├── .build_dir       → Path (set by S04)
-    ├── .binary_path     → Path (set by S04)
-    ├── .binary_sections → BinarySections (set by S04)
-    ├── .pmu_result      → PmuResult (set by S06)
-    ├── .power_result    → PowerResult (set by S07)
-    └── .run_metadata    → RunMetadata (accumulated across stages)
-```
-
-Each stage reads what it needs from the context, does its work, and writes
-its output back to the context. Stages never reach into other stages' internals.
-
-## Next
-
-- [Compatibility Baseline](../../architecture/compatibility-baseline/) — the qualified NSX project/module/engine baseline
-- [Pipeline & Stages](../../architecture/pipeline/) — detailed stage-by-stage walkthrough
-- [Engine Adapters](../../architecture/engine-adapters/) — how engines wire into the pipeline
-- [Firmware Generation](../../architecture/firmware/) — templates, NSX modules, build process
-- [Data Capture](../../architecture/capture/) — HPX protocol, transports, parsing, multi-pass merging
-- [Field Diagnostics](../../architecture/field-diagnostics/) — redaction and the `hpx doctor --bundle` support bundle
-- [Contributing an Engine](../../architecture/adding-an-engine/) — step-by-step guide
+- [Pipeline](pipeline/): the eighteen stages in order, what each sets and when it is skipped.
+- [Engine adapters](engine-adapters/): how one `EngineType` becomes an adapter, its artifacts and a firmware template.
+- [Firmware generation](firmware/): the template skeleton, the NSX project files and the build.
+- [Data capture](capture/): target lifecycle, transports, the wire stream and the parser.
+- [Field diagnostics](field-diagnostics/): what `hpx doctor --bundle` collects, redacts and archives.
+- [Adding an engine](adding-an-engine/): the touch points a fifth engine has to cover.
