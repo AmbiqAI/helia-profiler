@@ -1,147 +1,114 @@
 ---
-title: "Analysis and Run Comparison"
-description: "Profiling answers what happened on a board. Two related workflows help before and after that measurement:"
+title: "Analysis and comparison"
+description: "Inspect a model on the host with hpx analyze, compare two result bundles with hpx compare, the comparability rules that decide which deltas are shown, and regression profiles for CI."
 ---
 
-Profiling answers what happened on a board. Two related workflows help before
-and after that measurement:
+## Purpose
 
-- `hpx analyze` inspects a model on the host without hardware.
-- `hpx compare` compares two completed, compatible profile result bundles.
+Answer two questions a single profile cannot: what is in the model before
+you build anything, and what changed between two runs. `hpx analyze` needs
+no hardware; `hpx compare` reads two completed bundles, verifies them, and
+applies typed comparability rules before it shows a delta.
 
-## Analyze a model without hardware
+## Prerequisites
 
-Install the analysis dependencies once:
+The `analysis` extra for `hpx analyze` (`pip install 'helia-profiler[analysis]'`),
+and two result bundles in separate directories for `hpx compare`.
 
-```bash
-pip install 'helia-profiler[analysis]'
-```
+## Which tool
 
-Then inspect the raw LiteRT graph:
+| Question | Command | Needs hardware |
+|---|---|---|
+| What operators, MACs, parameters and tensor sizes does this model have? | `hpx analyze model.tflite` | no |
+| How does heliaAOT transform the graph? | `hpx analyze model.tflite --engine helia-aot --compare` | no (the `aot` extra) |
+| What changed between two runs, and is the comparison fair? | `hpx compare results/a results/b` | no; two bundles |
+| Should CI pass or fail on this change? | `hpx compare ... --profile regression-profile.json` | no |
+
+## Steps
+
+### 1. Analyse a model
 
 ```bash
 hpx analyze model.tflite
 hpx analyze model.tflite --format json --output analysis.json
-```
-
-The report includes per-operator MACs, parameter counts, and tensor sizes.
-`--engine helia-rt` evaluates the original graph as the interpreter sees it.
-With the AOT extra installed, `--engine helia-aot` compiles and analyzes the
-transformed graph; add `--compare` to show original and transformed graphs
-side by side:
-
-```bash
-pip install 'helia-profiler[aot]'
 hpx analyze model.tflite --engine helia-aot --compare
 ```
 
-This is useful for checking operator coverage and graph transforms before
-starting a firmware build. See the [`hpx analyze` reference](../../reference/analyze/)
-for every option.
+The report lists per-operator MACs, parameter counts and tensor sizes.
+`--engine helia-rt` evaluates the graph as the interpreter sees it;
+`--engine helia-aot` compiles and analyses the transformed graph, and
+`--compare` shows both side by side, which is the way to check operator
+coverage before a firmware build. The generated
+[`hpx analyze` reference](../../reference/cli/analyze/) lists every option.
 
-## Compare two profile runs
-
-Keep each run in a separate output directory:
+### 2. Compare two runs
 
 ```bash
-hpx profile model.tflite --engine helia-rt \
-  --output-dir results/rt
-hpx profile model.tflite --engine helia-aot \
-  --output-dir results/aot
-hpx compare results/rt results/aot \
-  --output-dir results/rt-vs-aot
+hpx profile model.tflite --engine helia-rt  --output-dir results/rt
+hpx profile model.tflite --engine helia-aot --output-dir results/aot
+hpx compare results/rt results/aot --output-dir results/rt-vs-aot
 ```
 
-The `power.duration_s` comparison row reads `power.capture_duration_s` from
-`summary.json`: the duration of the selected power measurement. Read it with
-`power.measurement_scope`; the built-in scopes are:
+hpx first verifies each bundle's manifest (paths, sizes, SHA-256 digests),
+then applies the comparability rules, then prints totals and the largest
+per-layer deltas. `--output-dir` also writes `compare_summary.json` and
+`layer_diff.csv`.
 
-- `gpio_gated_clean_window`: the host instrument's GPIO-high clean window.
-- `on_device_gated_inference`: the on-device monitor's firmware-gated inference window.
-- `free_form_capture`: the whole free-running capture when gating failed.
-- `whole_capture_window`: the legacy whole-capture scope used when producing a
-  summary from power metadata without a scope.
+### 3. The comparability rules
 
-The row does not use host timing (`latency.capture_duration_s`) or replace the
-selected duration with separate whole-capture diagnostics. Scope and integrity
-comparability rules still determine whether power rows are emitted.
+| Rule | Effect on the comparison | Code raised |
+|---|---|---|
+| Either result is invalid | blocked | `result.invalid`, `result.invalid_pmu_overflow` |
+| Either result is incomplete or degraded | blocked or annotated | `result.incomplete`, `result.degraded` |
+| Different model hash | blocked | `identity.model_mismatch` |
+| Different layer count or operator sequence | per-layer deltas suppressed; totals still compared | `topology.layer_count_mismatch`, `topology.operation_sequence_mismatch` |
+| Power scope, mode, firmware, monitor presence, lock-step, integrity, clean-window probe, or (same platform only) firmware code fingerprint differs | power deltas suppressed; everything else compared | the `metric.power_<dimension>_mismatch` family, `metric.power_integrity_invalid` |
+| Memory dimension differs (link family) | the per-region measured-memory rows suppressed; section sizes still compared | the `metric.memory_<dimension>_mismatch` family |
+| Engine (type and measured runtime version), toolchain, board, clock, transport, placement, architecture flags differ | shown as informative dimensions; nothing suppressed | the `dimension.<dimension>_differs` family |
 
-HPX verifies declared result-manifest paths, sizes, and SHA-256 digests before
-reading a bundle. It then applies typed comparability rules:
+Every code and its severity (`blocking`, `layer_blocking`,
+`metric_blocking`, `informative`) is on the generated
+[issue codes](../../reference/issue-codes/) page, which is the contract;
+this table is the reading guide. Three dimensions deserve a sentence each:
 
-- invalid results or different model hashes block the comparison;
-- different layer topology suppresses only per-layer deltas;
-- incompatible power scope, mode, firmware, monitor presence, lock-step,
-  integrity, **clean-window probe**, or (same platform only) the measured
-  **firmware code fingerprint** suppresses only power deltas;
-- a different **link family** suppresses only the per-region
-  measured-memory rows (see below);
-- engine (type and measured runtime version), toolchain, board, clock,
-  transport, and placement differences remain visible as informative
-  dimensions. The engine version is the *measured* identity
-  (`run_metadata.engine.version`, e.g. a heliaRT promotion) — runs recorded
-  before the dimension existed, and tflm/executorch runs (no resolved
-  version), are skipped like any other absent dimension.
+- The clean-window probe is what ran inside the measured window. A
+  `busy_loop` window measures a calibrated spin, not an inference, so
+  `hpx compare` omits power deltas against an `infer` window and says which
+  probe each side used. It is recorded only for runs that measured power,
+  and it says nothing about the board, so two SoCs running the same probe
+  stay power-comparable.
+- The firmware code fingerprint (`summary.power.firmware_code_fingerprint`)
+  hashes the measured target's rendered C sources with comments and
+  whitespace normalised away. Two runs on the same board, SoC and firmware
+  mode with different fingerprints ran different code, so their power
+  numbers are not the same question and the deltas are omitted. It is
+  consulted only on a matching platform, and baselines predating it are
+  skipped like any absent dimension.
+- The link family (`run_metadata.platform.link_family`, `gnu` or `armlink`)
+  gates the per-region `used` and `free` rows, because GNU ld counts the
+  floating stack inside the app extent and armlink's fixed reservations sit
+  outside it; when the families differ those rows are omitted and the
+  comparison says why, while `text`, `data` and `bss` remain comparable.
+  Canonical regions render first (ITCM, MRAM, DTCM, SRAM); a region on one
+  side only renders with a dash.
 
-The clean-window probe is what ran *inside* the measured window. A
-`busy_loop` window measures a calibrated CPU spin rather than a model
-inference, so comparing one against an `infer` window reports the difference
-between two different physical quantities — `hpx compare` omits power deltas
-and says which probe each side used.
+The `power.duration_s` row reads `power.capture_duration_s` from each
+summary, the duration of the selected measurement scope
+(`gpio_gated_clean_window`, `on_device_gated_inference`,
+`free_form_capture`, or the legacy `whole_capture_window`); it does not use
+host timing.
 
-Two things it deliberately does not do. It is recorded only for runs that
-actually measured power, so comparing a plain profiling run against a
-power-instrumented one is unaffected. And it says nothing about the board, so
-two SoCs running the same probe stay power-comparable, as the dimension list
-above intends.
+Runs recorded before a dimension existed carry no value for it and are
+skipped, so a stored comparison does not flip to failing when hpx learns a
+new rule. Runs recorded before lock-step enabled itself by default, or
+across a summary schema boundary, are the exception: those are real
+measurement changes, and the pages that describe them say to re-record the
+baseline.
 
-Baselines recorded before this dimension existed carry no value and are
-skipped, so stored comparisons do not flip to failing.
+### 4. Add a regression policy
 
-**Power firmware fingerprint.** Every power run also records a code hash of
-the measured target's rendered C sources — the main source plus the PMU
-profiler translation unit compiled into the same binary
-(`summary.power.firmware_code_fingerprint`; comments and whitespace are
-normalized away, so documentation-only firmware changes leave it
-untouched — rendered build configuration and external module sources are
-deliberately outside the hash). When two runs on the *same board, SoC, and
-firmware mode* carry different fingerprints, the measured binaries ran
-different code, and hpx cannot vouch that their power numbers answer the same
-question — power deltas are omitted and the comparison says so. This closes
-the failure where a firmware-semantics fix produced a +678% "regression"
-against a stored baseline that every other dimension called fully comparable.
-The fingerprint is consulted **only** on a matching platform: cross-board
-comparisons keep the behavior documented above, and baselines predating the
-fingerprint are skipped like any other absent dimension.
-
-**Link family and per-region memory.** Every run records which linker family
-built its firmware (`run_metadata.platform.link_family`: `gnu` for gcc and
-ATfE, `armlink` for armclang), and `hpx compare` shows the measured
-per-region `used`/`free` figures (`memory_regions.DTCM.used`, `.free`, and so
-on for ITCM/SRAM/MRAM) as run-level rows — the "does it fit, how much
-headroom" question, A/B'd. Those figures are only the same quantity within a
-family: GNU ld counts the floating stack inside the app extent while
-armlink's fixed reservations sit outside it, so a cross-family compare would
-show a large, meaningless delta. When the families differ, the per-region
-rows are omitted and the comparison says why; binary section sizes (`text`,
-`data`, `bss`) remain comparable across toolchains. Canonical regions render
-first (ITCM, MRAM, DTCM, SRAM), any other region the summary lists after
-them. A region present on one side only (ITCM exists on the Apollo510
-family alone) renders with a dash rather than being hidden — that is an
-SoC-axis change worth seeing. Runs that predate the platform record fall
-back to the family the memory measurer wrote into
-`summary.memory_regions.link_family`, so the gate holds on existing bundles;
-only runs with no family anywhere are skipped like any other absent
-dimension. `Link family` appears in the Config table so a comparison profile
-can require it to match.
-
-The terminal highlights totals and the largest layer deltas.
-`--output-dir` also writes `compare_summary.json` and `layer_diff.csv`.
-
-## Add a regression policy
-
-A versioned comparison profile turns selected metrics into a deterministic
-pass, warning, or failure:
+A versioned comparison profile turns selected metrics into a pass, warning
+or failure:
 
 ```json title="regression-profile.json"
 {
@@ -166,12 +133,28 @@ pass, warning, or failure:
 ```
 
 ```bash
-hpx compare results/baseline results/change \
-  --profile regression-profile.json \
-  --output-dir results/regression
+hpx compare results/baseline results/change --profile regression-profile.json --output-dir results/regression
 ```
 
-Profiles support `smaller`, `larger`, and `equal` directions, percentage and
-absolute tolerances, required configuration dimensions, and explicit policy
-for missing metrics. A failed regression returns a non-zero exit status. See
-the [`hpx compare` reference](../../reference/compare/) for the full contract.
+Profiles support `smaller`, `larger` and `equal` directions, percentage and
+absolute tolerances, required configuration dimensions, and an explicit
+policy for missing metrics; a failed regression exits non-zero. The
+generated [`hpx compare` reference](../../reference/cli/compare/) has the
+full contract. The keys that most often make two runs incomparable are
+the ones this table maps: `model.path`, `engine.type`, `target.board`,
+`target.clock.cpu`, `target.toolchain`, `target.transport`,
+`model.arena_location`, `model.weights_location`, `power.mode`,
+`power.firmware`, `power.lockstep`, `profiling.clean_window_probe`.
+
+## Expected output
+
+A terminal report with totals, the largest layer deltas, an informative
+dimension table, and one line per suppressed metric family naming the code
+that suppressed it; with `--output-dir`, `compare_summary.json` and
+`layer_diff.csv`.
+
+## What next
+
+[Output files](../output/) for the fields the comparison reads;
+[Parsing outputs](../parsing-outputs/) to script your own comparisons
+against the same JSON.

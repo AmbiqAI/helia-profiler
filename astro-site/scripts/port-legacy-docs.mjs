@@ -74,6 +74,10 @@ const SKIP = [
   'guides/index.md',
   'guides/memory-placement-tuning.md',
   'guides/executorch-ns-kernels.md',
+  /* Rewritten by the Read results revamp (#342). */
+  'guide/output.md',
+  'guide/analysis-comparison.md',
+  'guide/model-explorer.md',
 ];
 
 /*
@@ -114,6 +118,13 @@ const PRESERVE = [
   'guide/memory.mdx',
   'guide/executorch-ns-kernels.mdx',
   'guide/configuration.mdx',
+  /* Authored by the Read results revamp (#342). */
+  'guide/output.mdx',
+  'guide/latency.mdx',
+  'guide/analysis-comparison.mdx',
+  'guide/model-explorer.mdx',
+  'guide/parsing-outputs.mdx',
+  'guide/troubleshooting.mdx',
 ];
 
 const BASE = '/helia-profiler/';

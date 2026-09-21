@@ -1,53 +1,54 @@
 ---
-title: "Model Explorer Overlays"
-description: "heliaPROFILER exports per-layer profiling metrics as JSON overlays compatible with Model Explorer. This lets you visually inspect which operators are hot spots."
+title: "Model Explorer overlays"
+description: "See per-layer cost on the model graph: one overlay per counter, loaded into Model Explorer beside the model, with the node matching rules for each engine."
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
-heliaPROFILER exports per-layer profiling metrics as JSON overlays compatible
-with [Model Explorer](https://github.com/google-ai-edge/model-explorer).
-This lets you visually inspect which operators are hot spots.
+## Purpose
 
-## How it works
+Look at where the cycles go on the graph rather than in a table. hpx
+writes one overlay JSON per captured counter that
+[Model Explorer](https://github.com/google-ai-edge/model-explorer) renders
+as a colour over each operator node.
 
-After profiling, overlay files are written to the `model_explorer/` subfolder:
+## Prerequisites
 
-```
-results/
-├── summary.json
-├── profile_results.csv
-└── model_explorer/
-    ├── me_overlay_ARM_PMU_CPU_CYCLES.json
-    ├── me_overlay_ARM_PMU_INST_RETIRED.json
-    ├── me_overlay_ARM_PMU_L1D_CACHE.json
-    ├── me_overlay_ARM_PMU_MVE_INST_RETIRED.json
-    └── ...
-```
+A result bundle with `model_explorer/` in it (the default; `output.model_explorer`
+is `true`), the `.tflite` model that produced it, and Model Explorer in a
+browser.
 
-Each overlay maps graph node IDs to a numeric value with a gradient color
-palette (green → yellow → red). One overlay file is generated per PMU counter.
+## Which overlay
 
-## Using with Model Explorer
+| File | Value on each node |
+|---|---|
+| `model_explorer/me_overlay_<COUNTER>.json` | that counter's per-layer aggregate, one file per counter captured, for example `me_overlay_ARM_PMU_CPU_CYCLES.json`, `me_overlay_ARM_PMU_INST_RETIRED.json`, `me_overlay_ARM_PMU_MVE_INST_RETIRED.json` |
 
-1. Open [Model Explorer](https://google-ai-edge.github.io/model-explorer/)
-2. Load your `.tflite` model
-3. Click **Add Overlay** and select one of the `me_overlay_*.json` files
-4. Nodes are colored by the counter value — red = highest, green = lowest
+Each overlay maps graph node ids to a number with a five-stop gradient:
+minimum green, 25th percentile light green, median yellow, 75th percentile
+orange, maximum red; a zero-valued node renders neutral grey.
 
-:::tip[Node ID matching]
-For **heliaRT** models, nodes are matched by sequential operator
-index (0, 1, 2, ...). For **heliaAOT**, nodes use the original TFLite
-operator index preserved through AOT compilation (e.g. the `3` in
-`CONV_2D:3`).
-:::
+## Steps
+
+1. Open [Model Explorer](https://google-ai-edge.github.io/model-explorer/).
+2. Load the `.tflite` model the run profiled (the same file; the overlay
+   matches nodes by operator index).
+3. Choose **Add Overlay** and pick one of the `me_overlay_*.json` files.
+4. Read the colours: red is the highest value of that counter, green the
+   lowest. Switch overlays to compare, for instance cycles against
+   `ARM_PMU_L1D_CACHE_MISS_RD` to see whether a hot layer is memory-bound.
+
+Node matching depends on the engine. heliaRT and TFLM overlays match by the
+sequential operator index (0, 1, 2, ...). heliaAOT overlays use the original
+TFLite operator index preserved through compilation (the `3` in
+`CONV_2D:3`), because the compiler skips operators such as `VAR_HANDLE`
+without renumbering; see the `source_index` column on
+[Output files](../output/#2-profile_resultscsv).
 
 ## Disabling
 
-If you don't need overlays, disable them to skip file generation:
-
 <Tabs>
-<TabItem label="CLI">
+<TabItem label="Command line">
 
 ```bash
 hpx profile model.tflite --no-model-explorer
@@ -64,16 +65,16 @@ output:
 </TabItem>
 </Tabs>
 
-## Gradient palette
+The `model_explorer/` directory is then absent and the manifest lists no
+overlay export; nothing else in the bundle changes.
 
-Overlays use a 5-stop gradient for value visualization:
+## Expected output
 
-| Value range | Color |
-|---|---|
-| Minimum | Green |
-| 25th percentile | Light green |
-| 50th percentile | Yellow |
-| 75th percentile | Orange |
-| Maximum | Red |
+A graph whose hottest operators match `top_layers` in `summary.json` for
+the cycles overlay, and whose colour pattern shifts by counter.
 
-Zero-value nodes are rendered in neutral gray.
+## What next
+
+[PMU counters](../pmu-counters/) for what each counter measures;
+[Memory placement](../memory/) when the cache-miss overlay points at
+weights or activations in a slow tier.

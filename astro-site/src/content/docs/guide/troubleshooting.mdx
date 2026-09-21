@@ -1,0 +1,117 @@
+---
+title: "Troubleshooting"
+description: "What a failed or invalid run writes, how to read its issue codes, where each kind of failure sends you, and how to produce a redacted support bundle with hpx doctor --bundle."
+---
+
+## Purpose
+
+Turn a bad run into a diagnosis. hpx writes a bundle for invalid runs too,
+labels every problem with a stable code, and can package the host
+environment into a redacted archive for a support request.
+
+## Prerequisites
+
+The bundle of the run in question, or the terminal output if the run
+stopped before writing one.
+
+## Which failure
+
+| What you saw | Where it is recorded | Go to |
+|---|---|---|
+| The run stopped before capture: a configuration error, a preflight refusal, a build or flash failure | the terminal, with a `hint` on every `ConfigError`; no bundle for a configuration error, a partial bundle otherwise | the table in step 2 |
+| The run completed but `validity` is `degraded` or `invalid` | `summary.json` and `result_manifest.json`: `validity` plus `issues[]` with code, severity, message and context | step 3 and the [issue codes](../../reference/issue-codes/) |
+| `hpx compare` omitted a metric or refused | the comparison report names the comparability code | [Analysis and comparison](../analysis-comparison/#3-the-comparability-rules) |
+| A power number looks wrong | the `power` block's health signals | [Verifying a capture](../power-verify/) |
+| A number is zero, or a whole counter column is missing | the run's `issues` and the counter notes | [PMU counters](../pmu-counters/#troubleshooting) |
+| The host cannot see the board | `hpx doctor`, `hpx probes list`, `hpx ports list --all` | [Validate your setup](../../getting-started/validate-your-setup/) |
+
+## Steps
+
+### 1. Read the verdict, then the codes
+
+Every completed run ends with a validity footer in the terminal and the
+same verdict in `summary.json` and the manifest: `VALID`, `DEGRADED` with
+one `code: message` line per warning, or `INVALID` with the errors first.
+An invalid run still exits 0 and writes its bundle so you can inspect it;
+`output.fail_on_invalid` (`--fail-on-invalid`) makes it exit 3 instead,
+which is the setting for CI.
+
+```bash
+jq '{validity, issues: [.issues[] | {code, severity, message}]}' results/summary.json
+```
+
+Each code is documented once, on the generated
+[issue codes](../../reference/issue-codes/) page, with its severity
+(`error` or `warning`) and, for the two codes whose severity depends on the
+power mode, both severities. The pages that own each subsystem explain the
+fix: the power codes on [Verifying a capture](../power-verify/), the
+clean-window clock codes there too, the comparability codes on
+[Analysis and comparison](../analysis-comparison/).
+
+### 2. Failures before capture
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `ConfigError` with a did-you-mean suggestion | an unknown key; every model sets `extra="forbid"` | use the suggested key; the generated [configuration reference](../../reference/configuration/) lists them all |
+| `Memory plan does not fit` before any build | the arena or weights do not fit the requested tier | [Memory placement](../memory/#7-what-an-overflow-looks-like) |
+| `PMU counter groups not supported for this target` | `memory` or `mve` requested on a Cortex-M4 board | drop the groups; [Boards and targets](../boards/#1-know-what-the-soc-family-can-capture) |
+| `usb_cdc` rejected at preflight | the SoC has no compatible `nsx-ambiq-usb` module (Apollo3P, Atomiq110) | use `rtt`; [Capture transports](../transports/) |
+| PSRAM placement refused | the interpreter path needs `transport: rtt`; the heliaAOT path needs `aot_args.memory.allocate_arenas: false` | [Memory placement](../memory/#6-psram) |
+| The build cannot fetch modules | no network on the first run, or a blocked GitHub release | `--offline` only works after one successful run; `engine.config.dist_path` for a local runtime; [Engines](../engines/) |
+| `Cannot connect to RTT control block` | the SEGGER software is missing or old, or the firmware wedged before the protocol | `hpx doctor`, then `--verbose` to see where it stopped; [Capture transports](../transports/#troubleshooting) |
+| Flash fails on a custom SoC | no `app_flash_load_addr` and no `based_on` | [Boards and targets](../boards/#application-flash-load-address) |
+| A stage timed out | a slow bench tripped a `timeouts` limit | raise the limit; [Configuration](../configuration/#timeouts) |
+
+The pipeline stages and what each one can refuse are on
+[Concepts: pipeline](../concepts/pipeline/); the stage name in the terminal
+line tells you which page to open.
+
+### 3. Failures after capture
+
+`degraded` means a measurement with a caveat; `invalid` means the bundle
+is not a measurement. The issue's `context` carries the numbers behind the
+verdict (for the clean-window checks, the stalled and partial iteration
+counts and the understatement bound). Typical causes:
+
+- Overflow: a counter saturated (`overflow_detected: true`); fewer
+  iterations or fewer counters.
+- A gate or window problem on a power run: `gated_window_duration_suspect`
+  and the `power.window_*` codes.
+- A clean window that lost cycles on a Cortex-M4F board:
+  `profile.clean_window_stalled`.
+- A comparability dimension that changed between two runs: not a failure
+  of either run, but the reason `hpx compare` withheld a delta.
+
+### 4. Produce a support bundle
+
+```bash
+hpx doctor --bundle support.zip
+hpx doctor --bundle support.zip --config hpx.yml --workspace results/
+```
+
+`hpx doctor --bundle` collects the toolchain check with versions, the
+compatibility baseline, the dependency lock provenance and a redacted copy
+of `nsx.lock`, the qualified and resolved modules, the configuration when
+`--config` is given, and the probes and ports unless `--no-probes` or
+`--no-ports`. It embeds the host platform and Python version but never
+the hostname or a username. Models, firmware and generated sources, ELF
+and binary outputs, proprietary payloads, credentials and secret
+environment values are never read; the archive writer and
+`verify_support_bundle()` allow only members named `nsx.lock` or ending in
+`.json`, and reject absolute paths and traversal before trusting any
+bytes. [Concepts: field diagnostics](../concepts/field-diagnostics/)
+explains the redaction policy and the deterministic archiving.
+
+Attach the bundle and the run's `results/` directory (which contains no
+model, only its name, size and hash in `run_metadata.json`) to a support
+request.
+
+## Expected output
+
+A code you can look up, a page that explains its fix, and, when you need
+help, an archive that carries the environment without the model.
+
+## What next
+
+[Issue codes](../../reference/issue-codes/) for the full catalogue;
+[Verifying a capture](../power-verify/) when the failure is a power one.
