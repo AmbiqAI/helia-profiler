@@ -81,6 +81,16 @@ const SKIP = [
   'guide/output.md',
   'guide/analysis-comparison.md',
   'guide/model-explorer.md',
+  /* Rewritten by the Examples programme (#344). */
+  'examples/index.md',
+  'examples/basic-profiling.md',
+  'examples/engine-comparison.md',
+  'examples/interactive-python.md',
+  'examples/per-layer.md',
+  'examples/power-profiling.md',
+  'examples/tflm-baseline.md',
+  'examples/toolchain-comparison.md',
+  'examples/atomiq110-npu-profiling.md',
 ];
 
 /*
@@ -135,6 +145,19 @@ const PRESERVE = [
   'guide/model-explorer.mdx',
   'guide/parsing-outputs.mdx',
   'guide/troubleshooting.mdx',
+  /* Authored by the Examples programme (#344). */
+  'examples/index.mdx',
+  'examples/basic-profiling.mdx',
+  'examples/per-layer.mdx',
+  'examples/tflm-baseline.mdx',
+  'examples/engine-comparison.mdx',
+  'examples/toolchain-comparison.mdx',
+  'examples/power-profiling.mdx',
+  'examples/atomiq110-npu-profiling.mdx',
+  'examples/interactive-python.mdx',
+  'examples/batch-runs.mdx',
+  'examples/reanalyse-results.mdx',
+  'examples/model-explorer-overlay.mdx',
 ];
 
 const BASE = '/helia-profiler/';

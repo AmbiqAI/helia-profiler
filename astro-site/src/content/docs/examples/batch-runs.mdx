@@ -1,0 +1,126 @@
+---
+title: "Batch runs from YAML"
+description: "Run a matrix of profiles without a script per case: hpx validate over the registered models, boards, engines and toolchains, or a shell loop over checked-in configs, with the run manifest as the record."
+---
+
+## Goal
+
+Profile many combinations in one command and keep a manifest that says
+what ran, on what, and whether it passed. You will learn the difference
+between a config loop and `hpx validate`, how to list a matrix before
+running it, and what the run leaves behind.
+
+## Hardware and wiring
+
+One or more boards on J-Link, each with a known probe serial when more
+than one is attached (`hpx probes list`). No power instrument unless the
+cases enable it.
+
+## Software prerequisites
+
+hpx with the extras the engines need (`aot` for heliaAOT), every toolchain
+the matrix names, and the MLPerf Tiny fixture models the validation matrix
+registers (they ship in the repository under `tests/fixtures/mlperf_tiny/`).
+
+## Config file
+
+`hpx validate` builds its cases from the registry, not from a file: models
+`kws`, `vww`, `ic`, `ad`; engines, toolchains, transports and memory
+presets from its flags. A config loop uses the checked-in files under
+[`configs/mlperf_tiny/`](https://github.com/AmbiqAI/helia-profiler/tree/main/configs/mlperf_tiny),
+for example
+[`configs/mlperf_tiny/kws_rt_power.yaml`](https://github.com/AmbiqAI/helia-profiler/blob/main/configs/mlperf_tiny/kws_rt_power.yaml),
+each of which pins a board, engine, toolchain, placement and power setup.
+
+## Run
+
+List before running:
+
+```bash
+hpx validate --list --suite smoke --boards apollo510_evb
+hpx validate --list --suite complete --boards apollo510_evb
+```
+
+Run a suite:
+
+```bash
+hpx validate --suite models-rt --boards apollo510_evb --output-dir results/validation --junit-xml results/validation/junit.xml
+```
+
+Or loop over configs:
+
+```bash
+for cfg in configs/mlperf_tiny/kws_rt_power_ap510.yaml configs/mlperf_tiny/vww_rt_power_ap510.yaml; do
+  hpx profile --config "$cfg" --fail-on-invalid || echo "FAILED $cfg"
+done
+```
+
+## Expected output
+
+`--list` for the smoke suite, run on the host on 2026-09-21:
+
+```
+Registered models: ad, ic, kws, vww
+Registered boards: apollo330mP_evb, apollo3p_evb, apollo4l_blue_evb, apollo4p_blue_kxr_evb, apollo510_evb, apollo510dL_evb
+
+1 case(s) would run:
+
+  apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto    helia-rt/ns     arm-none-eabi-gcc   rtt      auto
+```
+
+A completed suite writes one bundle directory per case plus
+`validation_manifest.json`, `validation_report.md` and `junit.xml`. The
+nightly `complete` suite on 2026-09-16 recorded, for `apollo510_evb`:
+
+```
+- total: 32
+- pass: 32
+- fail: 0
+- skip: 0
+
+| Case | Status | Duration (s) | Toolchain | Interface | Memory | Layers | Cycles |
+| apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto | pass | 13.7 | arm-none-eabi-gcc | rtt | auto | 13 | 2051232 |
+| apollo510_evb-kws-rt-ns-atfe-rtt-auto              | pass | 15.2 | atfe              | rtt | auto | 13 | 1938240 |
+| apollo510_evb-kws-aot-ns-arm-none-eabi-gcc-rtt-auto | pass | 32.4 | arm-none-eabi-gcc | rtt | auto | 13 | 2044512 |
+```
+
+## How to read it
+
+- A case id encodes the matrix point: board, model, engine, CMSIS-NN
+  provider (`ns` or `arm`), toolchain, transport and memory preset. The
+  `Cycles` column of the report is the clean-window average.
+- `validation_manifest.json` records the hpx version, the source commit,
+  the suite flags and, per case, the identity, provenance (model hash,
+  compiler version, system clock, engine version) and health issues. It is
+  the record a "validated on" claim points at.
+- The loop form gives you full control of each config and `--fail-on-invalid`
+  makes an invalid run exit 3; the suite form gives you the manifest and
+  JUnit output CI can consume. Use the loop for your own models and the
+  suite for the registered ones.
+- Each case's bundle is an ordinary result bundle, so
+  [Re-analyse saved results](../reanalyse-results/) applies to any of them.
+
+## Variations
+
+- Several boards at once: `--boards apollo510_evb,apollo330mP_evb --jlink-serials <serial>,<serial>`.
+- Your own models: `--model-paths a.tflite,b.tflite` or `--models-file models.txt`
+  registers them for one run with `--model-arena-size`.
+- Power: `--power on --power-boards apollo510_evb --power-serials <joulescope serial>`
+  turns the power stages on for the named boards ([Power measurement](../../guide/power/)).
+- Repeats for statistics: `--repeat 3` runs every case three times with
+  `attempt` in the case id.
+- The full option list is the generated [`hpx validate`](../../reference/cli/validate/)
+  reference.
+
+## Validated on
+
+The nightly hardware validation workflow is this recipe: on 2026-09-16
+[run 35078330526](https://github.com/AmbiqAI/helia-profiler/actions/runs/35078330526)
+ran `hpx validate --suite complete` at source commit `0714893` with hpx
+0.1.6 on `apollo510_evb` (32 of 32 passed), `apollo330mP_evb` (32),
+`apollo3p_evb` (24) and `apollo4l_blue_evb` (12), with the nsx modules
+recorded in each bundle's `nsx.lock`. Nine of those bundles ship under
+[`examples/results/hardware-validation-2026-09-16/`](https://github.com/AmbiqAI/helia-profiler/tree/main/examples/results/hardware-validation-2026-09-16).
+The `--list` output above was produced on the host on 2026-09-21. The
+config loop over `configs/mlperf_tiny/` is not yet validated on this page:
+those configs pin a bench-specific `jlink_serial`.
