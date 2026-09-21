@@ -1,254 +1,148 @@
 ---
-title: "Pipeline & Stages"
-description: "The profiling pipeline is a flat, ordered sequence of stages. Each stage reads from the shared PipelineContext and writes its outputs back."
+title: "Pipeline"
+description: "The eighteen stages hpx profile runs in order, grouped into preflight, prepare, build, capture, power and report, with the context field each one sets and the condition under which it is skipped."
 ---
 
-The profiling pipeline is a flat, ordered sequence of stages. Each stage
-reads from the shared `PipelineContext` and writes its outputs back.
+import BlockDiagram from '../../../../components/BlockDiagram.astro';
+import Block from '../../../../components/Block.astro';
 
-## Stage execution
+## Purpose
 
-The full list, from `profiler.py`:
+Name the stage behind every line `hpx profile` prints, so a failure can be
+placed in the code and a change can be scoped to one stage. The pipeline is
+a flat ordered list; nothing runs in parallel and nothing runs twice.
 
-```python
-def build_default_pipeline() -> PipelineRunner:
-    return PipelineRunner([
-        PreflightStage(),              # host-only dependency + config checks
-        EnsureBoardPoweredStage(),     # restore the rail before touching the probe
-        ResolvePlatformStage(),        # board -> SoC, model hash
-        ResolveJLinkProbeStage(),      # pick and open the probe
-        PrepareEngineStage(),          # engine adapter prepare()
-        AnalyzeModelStage(),           # host-side model analysis (optional)
-        PlanMemoryStage(),             # arena / weights placement
-        GenerateFirmwareStage(),       # render the NSX app
-        BuildFirmwareStage(),          # nsx configure + build
-        VerifyPlacementStage(),        # confirm the linker honoured the plan
-        FlashFirmwareStage(),
-        CapturePmuStage(),
-        PlanPowerRunStage(),           # fixed N from clean profile timing
-        BuildPowerFirmwareStage(),     # transport-free power image
-        FlashPowerFirmwareStage(),
-        CapturePowerStage(),
-        CollectPowerTerminalStage(),   # post-gate diagnostics from the target
-        GenerateReportStage(),
-    ])
-```
+## Diagram
 
-The five power stages are no-ops when `power.enabled` is false.
-`PipelineRunner` executes everything sequentially; if any stage raises, the
-pipeline stops and reports the error with its typed hint.
+<BlockDiagram
+  title="The default pipeline"
+  caption="The eighteen stages of build_default_pipeline() in profiler.py, in execution order, grouped the way the terminal reports them. The power group is skipped when power.enabled is false."
+  flow="grid"
+  columns={3}
+>
+  <Block label="Preflight" sublabel="host and target" tone="accent" flow="column">
+    <Block label="preflight" emphasis="filled" />
+    <Block label="ensure powered" emphasis="filled" />
+    <Block label="resolve platform" emphasis="filled" />
+    <Block label="resolve probe" emphasis="filled" />
+  </Block>
+  <Block label="Prepare" sublabel="engine and plan" tone="accent" flow="column">
+    <Block label="prepare engine" emphasis="filled" />
+    <Block label="analyze model" emphasis="filled" />
+    <Block label="plan memory" emphasis="filled" />
+  </Block>
+  <Block label="Build" sublabel="firmware to flash" tone="accent" flow="column">
+    <Block label="generate firmware" emphasis="filled" />
+    <Block label="build firmware" emphasis="filled" />
+    <Block label="verify placement" emphasis="filled" />
+    <Block label="flash" emphasis="filled" />
+  </Block>
+  <Block label="Capture" tone="accent" flow="column">
+    <Block label="capture PMU" emphasis="filled" />
+  </Block>
+  <Block label="Power" sublabel="when enabled" tone="accent" emphasis="dashed" flow="column">
+    <Block label="plan power run" emphasis="filled" />
+    <Block label="build power firmware" emphasis="filled" />
+    <Block label="flash power" emphasis="filled" />
+    <Block label="capture power" emphasis="filled" />
+    <Block label="collect terminal" emphasis="filled" />
+  </Block>
+  <Block label="Report" tone="accent" flow="column">
+    <Block label="generate report" emphasis="filled" />
+  </Block>
+</BlockDiagram>
 
-The sections below detail the stages most contributors touch.
+The same structure as a list, for readers of the Markdown rendition:
 
-## PipelineContext
+- Preflight (host and target): preflight, ensure powered, resolve platform, resolve probe
+- Prepare (engine and plan): prepare engine, analyze model, plan memory
+- Build (firmware to flash): generate firmware, build firmware, verify placement, flash
+- Capture: capture PMU
+- Power (when enabled): plan power run, build power firmware, flash power, capture power, collect terminal
+- Report: generate report
 
-The `PipelineContext` is a mutable state bag passed through all stages:
+## The blocks
 
-```python
-@dataclass
-class PipelineContext:
-    config: ProfileConfig
-    work_dir: Path
-    soc: SocDef | None = None
-    board: BoardDef | None = None
-    resolved_jlink_serial: str | None = None
-    engine_artifacts: EngineArtifacts | None = None
-    firmware_dir: Path | None = None
-    build_dir: Path | None = None
-    binary_path: Path | None = None
-    binary_sections: BinarySections | None = None
-    pmu_result: PmuResult | None = None
-    power_result: PowerResult | None = None
-    report_paths: list[Path] = field(default_factory=list)
-    run_metadata: RunMetadata = field(default_factory=RunMetadata)
-```
+### The contract every stage signs
 
-(Abridged — `pipeline.py` carries the full field list, including the
-probe/flash/reset handles, dependency workspace, power plan, and the grouped
-`ProfileRun`/`PowerRun` workflow records.)
+A stage is a class with three members, from the `Stage` protocol in
+`pipeline.py`: a `name` shown in logs, `should_skip(ctx)` returning whether
+the run needs it, and `run(ctx)` which reads from and writes to the
+`PipelineContext` and raises a typed `HpxError` on failure.
+`PipelineRunner` calls them in list order and stops at the first exception,
+so the terminal always names the stage that failed and the error's `hint`.
 
-Stages are expected to **set** their designated fields and **read** fields
-set by earlier stages. No stage should modify another stage's output after
-it's been set.
+### What each stage sets
 
-### Narrowing accessors
+| Stage | Class (module under `stages/`) | Sets on the context | Skipped when |
+|---|---|---|---|
+| preflight | `PreflightStage` (`preflight.py`) | nothing; fails fast on missing host tools and config problems | never |
+| ensure powered | `EnsureBoardPoweredStage` (`ensure_powered.py`) | `target_power_ensured`, `passthrough_skipped` | neither `target.ensure_board_powered` nor `power.enabled` is set |
+| resolve platform | `ResolvePlatformStage` (`resolve_platform.py`) | `soc`, `board`, `run_metadata.platform`, `run_metadata.model` (SHA-256 of the model) | never |
+| resolve probe | `ResolveJLinkProbeStage` (`resolve_probe.py`) | `resolved_jlink_serial`, `probe`, `reset_controller` | the SoC declares no `jlink_device` (a custom overlay without one) |
+| prepare engine | `PrepareEngineStage` (`prepare_engine.py`) | `engine_adapter`, `engine_artifacts` | never |
+| analyze model | `AnalyzeModelStage` (`analyze_model.py`) | `model_analysis` | the engine is `executorch`, or `ai-edge-litert` is not installed |
+| plan memory | `PlanMemoryStage` (`plan_memory.py`) | `arena_region`, `weights_region`, `memory_plan` | never |
+| generate firmware | `GenerateFirmwareStage` (`generate_firmware.py`) | `firmware_dir`, `dependency_workspace` | never |
+| build firmware | `BuildFirmwareStage` (`build_firmware.py`) | `binary_sections`, `memory_regions`, `memory_symbols`, `memory_reconciliation`, `profile_run.firmware`, `run_metadata.toolchain` | never |
+| verify placement | `VerifyPlacementStage` (`verify_placement.py`) | nothing; raises when the linker did not honour the plan | no binary, SoC or arena region is resolved; the arena is in PSRAM (a runtime pointer, nothing to verify statically); or the engine is `helia-aot` (per-region arena symbols) |
+| flash | `FlashFirmwareStage` (`flash.py`) | `profile_run.deployment` | never |
+| capture PMU | `CapturePmuStage` (`capture_pmu.py`) | `profile_run.result` through `publish_profile_result()` | never |
+| plan power run | `PlanPowerRunStage` (`plan_power.py`) | `power_run.plan` (fixed inference count from the clean timing) | `power.enabled` is false |
+| build power firmware | `BuildPowerFirmwareStage` (`build_power_firmware.py`) | `power_run.firmware` | `power.enabled` is false, `power.firmware` is not `dedicated`, or the plan fixed no inference count |
+| flash power | `FlashPowerFirmwareStage` (`flash_power.py`) | `power_run.deployment` | `power.enabled` is false, or the planned firmware mode is not `dedicated` |
+| capture power | `CapturePowerStage` (`capture_power.py`) | `power_run.observation` | `power.enabled` is false, or `power.mode` is `internal` (the on-device path reports through the terminal record when the power firmware is `dedicated`) |
+| collect terminal | `CollectPowerTerminalStage` (`collect_power_terminal.py`) | `power_run.terminal`, and `power_run.observation` on the internal path | `power.enabled` is false, or the planned firmware mode is not `dedicated` |
+| generate report | `GenerateReportStage` (`report.py`) | `report_paths`, `run_evaluation` | never |
 
-The optional fields above are the **write** surface — each is set by the one
-stage that produces it. The **read** surface is a matching set of narrowing
-accessors, one per stage product:
+The stage list is the body of `build_default_pipeline()` in `profiler.py`,
+and `stages/__init__.py` re-exports every class from the module named
+beside it. The terminal prints the same groups.
 
-| accessor | field | produced by |
-| --- | --- | --- |
-| `resolved_soc` | `soc` | `ResolvePlatformStage` |
-| `resolved_board` | `board` | `ResolvePlatformStage` |
-| `prepared_artifacts` | `engine_artifacts` | `PrepareEngineStage` |
-| `prepared_adapter` | `engine_adapter` | `PrepareEngineStage` |
-| `resolved_firmware_dir` | `firmware_dir` | `GenerateFirmwareStage` |
-| `resolved_workspace` | `dependency_workspace` | `GenerateFirmwareStage` |
-| `built_binary_path` | `binary_path` | `BuildFirmwareStage` |
-| `captured_pmu` | `pmu_result` | `CapturePmuStage` |
-| `planned_arena_region` | `arena_region` | `PlanMemoryStage` |
+### The context
 
-Each returns the non-optional type, so downstream code needs no narrowing of
-its own; when the producing stage has not run it raises `PipelineError` naming
-both the field and that stage:
+`PipelineContext` holds one field per stage product plus the run metadata
+and the two grouped workflow records: `ProfileRun` (the profile firmware,
+its deployment and its `PmuResult`) and `PowerRun` (the power plan,
+firmware, deployment, observation and terminal record). Read a product
+through its narrowing accessor rather than the raw field:
 
-```python
-soc = ctx.resolved_soc          # SocDef, not SocDef | None
-# ctx.pmu_result is not available — CapturePmuStage has not run.
-```
+| Accessor | Field | Produced by |
+|---|---|---|
+| `resolved_soc`, `resolved_board` | `soc`, `board` | resolve platform |
+| `prepared_adapter`, `prepared_artifacts` | `engine_adapter`, `engine_artifacts` | prepare engine |
+| `planned_arena_region` | `arena_region` | plan memory |
+| `resolved_firmware_dir`, `resolved_workspace` | `firmware_dir`, `dependency_workspace` | generate firmware |
+| `built_binary_path` | `profile_run.firmware` | build firmware |
+| `captured_pmu` | `profile_run.result` | capture PMU |
 
-Read stage products through the accessors rather than through
-`assert ctx.<field> is not None`: an `assert` is compiled out under `-O` and
-names no producer when it fires. A test in `tests/test_pipeline.py` enforces
-this — no `assert`-narrowing of `ctx.<field>` survives anywhere in `src/`,
-nor of `self.<field>` inside `pipeline.py` itself. Reads that
-already handle `None` deliberately (`ctx.arena_region or Placement.TCM`, or an
-early return when a field is unset) stay on the raw field.
+Each accessor returns the non-optional type and raises `PipelineError`
+naming the field and its producing stage when that stage has not run.
+`tests/test_pipeline.py` rejects any `assert ctx.<field> is not None`
+narrowing in `src/`, because an `assert` is compiled out under `-O` and
+names no producer.
 
-## Stage-by-stage detail
+### Why there is no power-only run
 
-### Resolve Platform
+The profile capture is not optional even for a power measurement: its clean
+inference timing is the denominator that fixes the power run's inference
+count and verifies the measured gate duration, and the report, validity and
+comparison code all require a `PmuResult`. A power-only workflow would need
+its own result type and its own stage list, not a flag.
 
-**File:** `stages/resolve_platform.py`
-**Sets:** `ctx.soc`, `ctx.board`, `ctx.run_metadata.platform`, `ctx.run_metadata.model`
+## Where the code lives
 
-Validates the board name, resolves the SoC definition, computes the model file
-hash (SHA-256), and populates platform and model metadata.
+| Block | Path under `src/helia_profiler/` |
+|---|---|
+| `Stage`, `PipelineContext`, `PipelineRunner` | `pipeline.py` |
+| `build_default_pipeline()` | `profiler.py` |
+| every stage | the module named in the table, re-exported by `stages/__init__.py` |
+| `ProfileRun`, `PowerRun`, `PowerRunPlan` | `results/artifacts.py` |
+| the accessor rule | `tests/test_pipeline.py` |
 
-If the board has `DWT_ONLY` PMU, logs a warning that only cycle counts will be
-captured.
+## What next
 
-### Prepare Engine
-
-**File:** `stages/prepare_engine.py`
-**Sets:** `ctx.engine_artifacts`
-
-Instantiates the selected heliaRT, heliaAOT, TFLM, or ExecuTorch adapter and calls its
-`prepare()` method. The adapter produces its engine's `EngineArtifacts` subtype that records
-engine identity plus any local NSX modules, static libraries, and memory-planning
-metadata needed by later stages.
-
-For **heliaRT**, this normally declares the pinned registry module, with local
-source/prebuilt overrides available. For **heliaAOT**, this runs the compiler
-and creates the model module while resolving CMSIS-NN. For **TFLM**, it resolves
-the stock interpreter module and selected backend. For **ExecuTorch**, it
-validates the pinned `nsx-executorch` checkout and wraps it as a local module
-behind the selected CMSIS-NN provider.
-
-### Generate Firmware
-
-**File:** `stages/generate_firmware.py`
-**Reads:** `ctx.engine_artifacts`, `ctx.config`
-**Sets:** writes firmware app to `ctx.firmware_dir`
-
-Renders Jinja2 templates into a complete NSX application:
-
-- `CMakeLists.txt` — project build config
-- `nsx.yml` — NSX module manifest
-- `src/main.cc` — entry point (`main_aot.cc.j2` for AOT, `main.cc.j2` for the shared interpreter path)
-- `src/hpx_pmu_profiler.cc/.h` — PMU capture harness
-- `modules.cmake` — local module paths
-
-The template context includes engine-specific variables (e.g. operator manifest
-for AOT, library path for RT).
-
-### Build Firmware
-
-**File:** `stages/build_firmware.py`
-**Sets:** `ctx.build_dir`, `ctx.binary_path`, `ctx.binary_sections`, `ctx.run_metadata.toolchain`
-
-Runs the NSX build pipeline:
-
-1. `nsx configure --app-dir <app>` — CMake configure
-2. `nsx build --app-dir <app>` — compile and link
-
-After building, captures:
-- **Binary section sizes** via the toolchain-specific size probe (`arm-none-eabi-size` or `fromelf`)
-- **Toolchain info** — compiler and CMake versions
-
-### Flash Firmware
-
-**File:** `stages/flash.py`
-**Reads:** `ctx.binary_path`
-
-Flashes the built firmware to the target via `nsx flash` (which uses JLinkExe).
-
-If the debug domain is locked (common after power issues), retries with a
-power-cycle reset via the Joulescope (if available).
-
-### Capture PMU
-
-**File:** `stages/capture_pmu.py`
-**Sets:** `ctx.pmu_result`
-
-The core data collection stage:
-
-1. **Reset the target** — J-Link reset to start firmware from the beginning
-2. **Attach the selected transport reader** — `pylink` drives RTT/SWO capture
-    and `pyserial` reads USB CDC / UART when selected
-3. **Parse HPX protocol** — firmware prints structured data over the selected transport:
-    - `HPX_START` / `HPX_END` markers
-    - Metadata key-value pairs (arena size, model size, tensor count)
-    - CSV rows: one row per layer per iteration with counter values
-4. **Aggregate iterations** — counter values are combined across iterations using the selected aggregation mode
-5. **Merge presets** — if multi-pass, layers from each pass are merged into
-   unified results with all counters
-
-The parser handles multi-preset firmware (one firmware binary can profile
-multiple PMU counter sets in sequence).
-
-### Capture Power
-
-**File:** `stages/capture_power.py`
-**Sets:** `ctx.power_result`
-
-Skipped if `power.enabled` is false. Three stages run ahead of it:
-`PlanPowerRunStage` derives a fixed inference count from the clean profile
-timing, `BuildPowerFirmwareStage` rerenders and incrementally rebuilds the
-dedicated transport-free power target, and `FlashPowerFirmwareStage` deploys
-it. Capture then arms the configured power driver, resets the target without
-normally cycling its rail, observes the GPIO-gated clean window, and computes
-summary statistics from samples inside the accepted gate.
-`CollectPowerTerminalStage` follows, reading the target's one terminal record
-after the gate has closed.
-
-**Why there is no `--power-only` flag.** The profile phase does more than
-collect optional PMU counters — its clean inference timing is the
-authoritative denominator used to choose fixed `N` and to verify the measured
-gate duration, and `ProfileResult`, reporting, and validity all currently
-require a `PmuResult`. Skipping `CapturePmuStage` would either remove that
-denominator or leave later stages with an invalid contract, so a real
-power-only workflow needs its own result type and pipeline composition rather
-than a flag.
-
-### Generate Report
-
-**File:** `stages/report.py`
-**Reads:** everything from `ctx`
-
-Delegates to `report.write_report()` which produces:
-
-- `summary.json` — always
-- `profile_results.csv` — always (or `.json` if format=json)
-- `run_metadata.json` — always
-- `model_explorer/*.json` — unless disabled
-- `detailed/` subfolder — only with `--detailed`
-
-See [Output & Results](../../output/) for file format details.
-
-## Multi-pass profiling
-
-When the requested PMU counters exceed the 8-counter hardware limit, the
-firmware runs **multiple counter passes** within one profiling session. The
-counter planning is handled by `counters.py`:
-
-```
-Pass 1: [CPU_CYCLES, INST_RETIRED, LD_RETIRED, ST_RETIRED, BR_RETIRED, ...]
-Pass 2: [STALL_FRONTEND, STALL_BACKEND, STALL, EXC_TAKEN, EXC_RETURN, ...]
-Pass 3: [L1D_CACHE, L1D_CACHE_RD, L1D_CACHE_REFILL, L1D_CACHE_MISS_RD, ...]
-...
-```
-
-Each pass produces its own `PresetResult`. After all passes complete, results
-are merged into unified `LayerResult` objects with all counter columns.
+[Engine adapters](../engine-adapters/) for what the prepare group does;
+[Firmware generation](../firmware/) for the build group;
+[Data capture](../capture/) for the capture and power groups;
+[Output files](../../output/) for what the report group writes.
