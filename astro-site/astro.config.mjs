@@ -35,7 +35,6 @@ export default defineConfig({
        * nobody serves. Starlight injects a static /404 of its own, and two
        * routes at one path is a hard error in a coming Astro. */
       disable404Route: true,
-      customCss: ['./src/styles/block-diagram.css'],
       plugins: [
         heliaStarlight({
           accent: 'helia-profiler',
