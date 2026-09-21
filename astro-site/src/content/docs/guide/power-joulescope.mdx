@@ -23,20 +23,21 @@ on Linux the udev rule from [Install](../../getting-started/install/#5-linux-usb
 
 | | JS110 | JS220 | JS320 |
 |---|---|---|---|
-| Current range | nA to 3 A, auto-ranging | nA to 10 A, auto-ranging | see the manufacturer's specification |
-| Sample rate | 250 kSPS | up to 2 MSPS | up to 2 MSPS |
-| Voltage range | 0 to 15 V | 0 to 15 V | 0 to 15 V |
+| Current range | see the JS110 User's Guide | ±3 A continuous, 10 A pulses, 0.5 nA resolution | ±3 A continuous, 10 A pulses, 0.1 nA resolution |
+| Bandwidth and sampling | see the JS110 User's Guide | 300 kHz, 2 million samples per second, 16-bit | 200 kHz, 1 million samples per second, 24-bit |
+| Voltage range | see the JS110 User's Guide | ±15 V | ±15 V |
 | GPIO threshold | fixed; `io_voltage` tells hpx how to read it | set by the Vref pin, which must be wired | set by the Vref pin, which must be wired |
 | Lock-step GO command | per-output value | GPO bitmap set and clear | GPO bitmap set and clear |
 
 All three use the same `JoulescopeDriver` in hpx and `power.driver:
 joulescope` auto-detects whichever is attached; `power.serial` (or
 `--power-serial`) pins one when several are connected, using the serial
-printed on the instrument's label. The instrument figures are quoted from
-the manufacturer's product pages for the
-[JS110](https://www.joulescope.com/products/joulescope-js110),
-[JS220](https://www.joulescope.com/products/joulescope-js220) and
-[JS320](https://www.joulescope.com/products/joulescope-js320); the GPIO
+printed on the instrument's label. The JS220 and JS320 figures are quoted
+from the manufacturer's product pages
+([JS220](https://www.joulescope.com/products/js220-joulescope-precision-energy-analyzer),
+[JS320](https://www.joulescope.com/products/js320)); no JS110 product page
+of record was found, so that column defers to the JS110 User's Guide
+shipped with the instrument; the GPIO
 connector pinout (which physical pin is `INPUT0`, `INPUT1`, `OUTPUT0` and
 `Vref`) is in each instrument's user's guide, and hpx does not restate it.
 
