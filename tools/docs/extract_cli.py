@@ -102,7 +102,7 @@ def _source(command: Any) -> dict[str, Any] | None:
                 "committed artifact."
             ) from None
         rel = Path("src", *path.parts[path.parts.index("helia_profiler") :])
-    return {"path": str(rel), "line": line}
+    return {"path": rel.as_posix(), "line": line}
 
 
 def _param_type(param: Any) -> dict[str, Any]:
