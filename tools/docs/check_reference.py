@@ -42,6 +42,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import extract_cli  # noqa: E402
 import extract_issues  # noqa: E402
+import extract_pmu  # noqa: E402
 import extract_schema  # noqa: E402
 from _common import dump, source_tree  # noqa: E402
 from source_audit import audit  # noqa: E402
@@ -50,7 +51,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DATA_DIR = REPO_ROOT / "astro-site" / "src" / "data"
 
 #: Artifact stem to extractor, in the order the summary prints them.
-ARTIFACTS = ("cli", "schema", "issues")
+ARTIFACTS = ("cli", "schema", "issues", "pmu-catalog")
 
 _PARAM_KEYS = (
     "kind",
@@ -210,6 +211,44 @@ def diff_issues(committed: dict[str, Any], fresh: dict[str, Any]) -> list[str]:
     return problems
 
 
+def diff_pmu(committed: dict[str, Any], fresh: dict[str, Any]) -> list[str]:
+    """Groups, counters and SoC domains, by name; provenance is checked separately."""
+    problems: list[str] = []
+    old = {g["group"]: {c["name"]: c for c in g["counters"]} for g in committed["groups"]}
+    new = {g["group"]: {c["name"]: c for c in g["counters"]} for g in fresh["groups"]}
+    for group in sorted(set(new) - set(old)):
+        problems.append(f"pmu group added in source, absent from pmu-catalog.json: {group}")
+    for group in sorted(set(old) - set(new)):
+        problems.append(f"pmu group in pmu-catalog.json no longer in source: {group}")
+    for group in sorted(set(old) & set(new)):
+        for name in sorted(set(new[group]) - set(old[group])):
+            problems.append(
+                f"{group}: counter added in source, absent from pmu-catalog.json: {name}"
+            )
+        for name in sorted(set(old[group]) - set(new[group])):
+            problems.append(f"{group}: counter in pmu-catalog.json no longer in source: {name}")
+        for name in sorted(set(old[group]) & set(new[group])):
+            for key in ("eventId", "description"):
+                if old[group][name].get(key) != new[group][name].get(key):
+                    problems.append(f"{group}.{name}: {key} changed in source")
+    old_defaults = {g["group"]: g["default"] for g in committed["groups"]}
+    new_defaults = {g["group"]: g["default"] for g in fresh["groups"]}
+    for group in sorted(set(old_defaults) & set(new_defaults)):
+        if old_defaults[group] != new_defaults[group]:
+            problems.append(f"{group}: default selection changed in source")
+    old_socs = {s["soc"]: s for s in committed["socs"]}
+    new_socs = {s["soc"]: s for s in fresh["socs"]}
+    for soc in sorted(set(new_socs) - set(old_socs)):
+        problems.append(f"soc registered in source, absent from pmu-catalog.json: {soc}")
+    for soc in sorted(set(old_socs) - set(new_socs)):
+        problems.append(f"soc in pmu-catalog.json no longer registered: {soc}")
+    for soc in sorted(set(old_socs) & set(new_socs)):
+        for key in ("groups", "domains", "pmuMaxOps"):
+            if old_socs[soc].get(key) != new_socs[soc].get(key):
+                problems.append(f"{soc}: {key} changed in source")
+    return problems
+
+
 def cross_check_source(payload: dict[str, Any]) -> list[str]:
     """Compare cli.json against an AST parse of the same CLI modules."""
     source = audit()
@@ -292,6 +331,7 @@ def main(argv: list[str] | None = None) -> int:
             "cli": extract_cli.build(args.source_tree),
             "schema": extract_schema.build(args.source_tree),
             "issues": extract_issues.build(args.source_tree),
+            "pmu-catalog": extract_pmu.build(args.source_tree),
         }
         for stem, payload in payloads.items():
             dump(payload, paths[stem])
@@ -316,10 +356,12 @@ def main(argv: list[str] | None = None) -> int:
             "cli": extract_cli.build(claimed),
             "schema": extract_schema.build(claimed),
             "issues": extract_issues.build(claimed),
+            "pmu-catalog": extract_pmu.build(claimed),
         }
         problems += diff_cli(committed["cli"], fresh["cli"])
         problems += diff_schema(committed["schema"], fresh["schema"])
         problems += diff_issues(committed["issues"], fresh["issues"])
+        problems += diff_pmu(committed["pmu-catalog"], fresh["pmu-catalog"])
         problems += cross_check_source(fresh["cli"])
 
         for name, old_version in committed["cli"]["generatedFrom"].items():
@@ -332,6 +374,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     cli_counts = committed["cli"]["counts"]
+
+    pmu_counts = fresh["pmu-catalog"]["counts"]
     schema_counts = committed["schema"]["counts"]
     issue_counts = committed["issues"]["counts"]
     versions = committed["cli"]["generatedFrom"]
@@ -346,7 +390,8 @@ def main(argv: list[str] | None = None) -> int:
         f"{issue_counts['issues']} issue codes, {issue_counts['comparability']} comparability "
         f"codes, {issue_counts['families']} families ({issue_counts['familyCodes']} codes); "
         f"typer {versions['typer']}, click {versions['click']}, pydantic {versions['pydantic']}, "
-        f"source tree {versions['sourceTree'][:7]}."
+        f"source tree {versions['sourceTree'][:7]}"
+        f"; pmu catalogue {pmu_counts['counters']} counters in {pmu_counts['groups']} groups, {pmu_counts['socs']} SoCs."
     )
     return 0
 
