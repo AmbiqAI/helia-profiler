@@ -2,15 +2,26 @@
 
 from __future__ import annotations
 
+import importlib.util
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO_ROOT / "tools" / "docs"))
-
-import extract_pmu  # noqa: E402
-
+TOOLS_DOCS = Path(__file__).resolve().parents[1] / "tools" / "docs"
 TREE = "0" * 40
+
+
+def _load_extractor():
+    """Load tools/docs/extract_pmu.py by path; tools/ is not a package on the import path."""
+    if str(TOOLS_DOCS) not in sys.path:
+        sys.path.insert(0, str(TOOLS_DOCS))
+    spec = importlib.util.spec_from_file_location("extract_pmu", TOOLS_DOCS / "extract_pmu.py")
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+extract_pmu = _load_extractor()
 
 
 def test_catalog_covers_every_group_and_counter() -> None:
