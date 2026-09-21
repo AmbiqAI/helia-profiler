@@ -155,6 +155,8 @@ export default defineConfig({
                 { label: 'Batch runs from YAML', slug: 'examples/batch-runs' },
                 { label: 'Re-analyse saved results', slug: 'examples/reanalyse-results' },
                 { label: 'Model Explorer overlay', slug: 'examples/model-explorer-overlay' },
+                { label: 'Read a power summary', slug: 'examples/power-read-summary' },
+                { label: 'Compare two power runs', slug: 'examples/power-compare' },
               ],
             },
             {

@@ -23,8 +23,8 @@ captured". Nothing on these pages is illustrative.
     comparison reports and the rules that withhold a delta.
   </LinkCard>
   <LinkCard href="power-profiling/" title="Power" eyebrow="Joulescope" meta="Energy per inference beside the profile">
-    The power capture recipe and the measurement pages that explain the
-    wiring, the window and the health checks.
+    The power capture recipe, how to read the power block a capture
+    writes, and the rules that decide whether two captures compare.
   </LinkCard>
   <LinkCard href="atomiq110-npu-profiling/" title="NPU" eyebrow="Experimental" meta="Ethos-U85 on the Atomiq110 FPGA">
     A Vela-compiled model on the NPU with both counter families, under the
@@ -51,6 +51,8 @@ captured". Nothing on these pages is illustrative.
 | [Batch runs from YAML](batch-runs/) | all | GNU Arm, ATfE | four boards | suite manifest | nightly 2026-09-16, `0714893` |
 | [Re-analyse saved results](reanalyse-results/) | any | any | none | loaders, compare, regression | host 2026-09-21 on the shipped bundles |
 | [Per-layer cost on the model graph](model-explorer-overlay/) | any | any | none for viewing | overlays | not yet validated |
+| [Read a power summary](power-read-summary/) | any | any | none | the `power` block, health signals | not yet validated (no captured power bundle) |
+| [Compare two power runs](power-compare/) | any | any | none | power comparability rules | not yet validated (no captured power bundle) |
 
 ## The evidence rule
 
