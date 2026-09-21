@@ -3,12 +3,12 @@
   "generatedFrom": {
     "tool": "pyref",
     "version": "1.7.3",
-    "sourceTree": "411e58fd9f2f268366576b621932ae2bc4f2f0c2"
+    "sourceTree": "872d67ad4e9083b1eacd7d6d3859148437b96b59"
   },
   "language": "python",
   "modules": [
     {
-      "description": "What this build of heliaPROFILER is qualified against: the board, engine and toolchain matrix, and the locked dependency revisions a run was produced with.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`, `experimental`\n\nGenerated from the `src/helia_profiler` tree `411e58fd9f2f268366576b621932ae2bc4f2f0c2`.",
+      "description": "What this build of heliaPROFILER is qualified against: the board, engine and toolchain matrix, and the locked dependency revisions a run was produced with.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`, `experimental`\n\nGenerated from the `src/helia_profiler` tree `872d67ad4e9083b1eacd7d6d3859148437b96b59`.",
       "name": "deps",
       "path": "helia_profiler.deps",
       "submodules": [],
@@ -397,9 +397,9 @@
               "returns": [],
               "signature": "lock_path: Path",
               "source": {
-                "line": 134,
+                "line": 132,
                 "path": "src/helia_profiler/results/dependencies.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L134"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L132"
               },
               "summary": ""
             },
@@ -416,9 +416,9 @@
               "returns": [],
               "signature": "lock_sha256: str",
               "source": {
-                "line": 135,
+                "line": 133,
                 "path": "src/helia_profiler/results/dependencies.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L135"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L133"
               },
               "summary": ""
             },
@@ -435,9 +435,9 @@
               "returns": [],
               "signature": "registry_hash: str",
               "source": {
-                "line": 136,
+                "line": 134,
                 "path": "src/helia_profiler/results/dependencies.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L136"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L134"
               },
               "summary": ""
             },
@@ -454,9 +454,9 @@
               "returns": [],
               "signature": "requested_refs: tuple[DependencyRequest, ...]",
               "source": {
-                "line": 137,
+                "line": 135,
                 "path": "src/helia_profiler/results/dependencies.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L137"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L135"
               },
               "summary": ""
             },
@@ -473,9 +473,9 @@
               "returns": [],
               "signature": "resolved: tuple[DependencyModule, ...]",
               "source": {
-                "line": 138,
+                "line": 136,
                 "path": "src/helia_profiler/results/dependencies.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L138"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L136"
               },
               "summary": ""
             },
@@ -492,9 +492,9 @@
               "returns": [],
               "signature": "overrides: tuple[DependencyOverride, ...]",
               "source": {
-                "line": 139,
+                "line": 137,
                 "path": "src/helia_profiler/results/dependencies.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L139"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L137"
               },
               "summary": ""
             },
@@ -511,9 +511,9 @@
               "returns": [],
               "signature": "qualification: QualificationState",
               "source": {
-                "line": 140,
+                "line": 138,
                 "path": "src/helia_profiler/results/dependencies.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L140"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L138"
               },
               "summary": ""
             },
@@ -530,9 +530,9 @@
               "returns": [],
               "signature": "baseline_fingerprint: str",
               "source": {
-                "line": 141,
+                "line": 139,
                 "path": "src/helia_profiler/results/dependencies.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L141"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L139"
               },
               "summary": ""
             },
@@ -549,9 +549,9 @@
               "returns": [],
               "signature": "workspace_fingerprint: str",
               "source": {
-                "line": 142,
+                "line": 140,
                 "path": "src/helia_profiler/results/dependencies.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L142"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L140"
               },
               "summary": ""
             },
@@ -568,9 +568,9 @@
               "returns": [],
               "signature": "lock_mode: DependencyLockMode",
               "source": {
-                "line": 143,
+                "line": 141,
                 "path": "src/helia_profiler/results/dependencies.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L143"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L141"
               },
               "summary": ""
             },
@@ -587,9 +587,9 @@
               "returns": [],
               "signature": "update_requested: bool",
               "source": {
-                "line": 144,
+                "line": 142,
                 "path": "src/helia_profiler/results/dependencies.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L144"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L142"
               },
               "summary": ""
             }
@@ -600,9 +600,9 @@
           "returns": [],
           "signature": "DependencyLockProvenance(\n    lock_path: Path,\n    lock_sha256: str,\n    registry_hash: str,\n    requested_refs: tuple[DependencyRequest, ...],\n    resolved: tuple[DependencyModule, ...],\n    overrides: tuple[DependencyOverride, ...],\n    qualification: QualificationState,\n    baseline_fingerprint: str,\n    workspace_fingerprint: str,\n    lock_mode: DependencyLockMode,\n    update_requested: bool,\n) -> None",
           "source": {
-            "line": 130,
+            "line": 128,
             "path": "src/helia_profiler/results/dependencies.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L130"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/dependencies.py#L128"
           },
           "summary": "Read-only lock provenance surface for later diagnostics collectors."
         },

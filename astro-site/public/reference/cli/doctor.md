@@ -10,7 +10,7 @@ hpx doctor [OPTIONS]
 
 Check toolchain and dependencies
 
-Defined in `src/helia_profiler/cli/inspect_app.py` line 49.
+Defined in `src/helia_profiler/cli/inspect_app.py` line 44.
 
 ### Options
 
@@ -27,4 +27,4 @@ Defined in `src/helia_profiler/cli/inspect_app.py` line 49.
 | `--no-ports` | `bool` | false | Skip live serial port enumeration in --bundle |
 | `--raw-probe-ids` | `bool` | false | Include unredacted device serial numbers in --bundle (opt-in; prints a warning) |
 
-Generated from the `src/helia_profiler` tree `411e58fd9f2f268366576b621932ae2bc4f2f0c2` with typer 0.26.8 and click 8.3.3.
+Generated from the `src/helia_profiler` tree `872d67ad4e9083b1eacd7d6d3859148437b96b59` with typer 0.26.8 and click 8.3.3.

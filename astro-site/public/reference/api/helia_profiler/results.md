@@ -6,7 +6,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`
 
-Generated from the `src/helia_profiler` tree `411e58fd9f2f268366576b621932ae2bc4f2f0c2`.
+Generated from the `src/helia_profiler` tree `872d67ad4e9083b1eacd7d6d3859148437b96b59`.
 
 ## helia_profiler.LayerResult
 
@@ -34,7 +34,7 @@ original index — helia-aot skips ops without renumbering.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/results/models.py:47`
+Source: `src/helia_profiler/results/models.py:42`
 
 ### helia_profiler.LayerResult.id
 
@@ -44,7 +44,7 @@ Source: `src/helia_profiler/results/models.py:47`
 id: int | str
 ```
 
-Source: `src/helia_profiler/results/models.py:57`
+Source: `src/helia_profiler/results/models.py:52`
 
 ### helia_profiler.LayerResult.op
 
@@ -54,7 +54,7 @@ Source: `src/helia_profiler/results/models.py:57`
 op: str
 ```
 
-Source: `src/helia_profiler/results/models.py:58`
+Source: `src/helia_profiler/results/models.py:53`
 
 ### helia_profiler.LayerResult.counters
 
@@ -64,7 +64,7 @@ Source: `src/helia_profiler/results/models.py:58`
 counters: dict[str, float] = field(default_factory=dict)
 ```
 
-Source: `src/helia_profiler/results/models.py:59`
+Source: `src/helia_profiler/results/models.py:54`
 
 ### helia_profiler.LayerResult.cycles
 
@@ -74,7 +74,7 @@ Source: `src/helia_profiler/results/models.py:59`
 cycles: float | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:60`
+Source: `src/helia_profiler/results/models.py:55`
 
 ### helia_profiler.LayerResult.overflow
 
@@ -84,7 +84,7 @@ Source: `src/helia_profiler/results/models.py:60`
 overflow: bool = False
 ```
 
-Source: `src/helia_profiler/results/models.py:61`
+Source: `src/helia_profiler/results/models.py:56`
 
 ### helia_profiler.LayerResult.source_index
 
@@ -94,7 +94,7 @@ Source: `src/helia_profiler/results/models.py:61`
 source_index: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:62`
+Source: `src/helia_profiler/results/models.py:57`
 
 ## helia_profiler.PresetResult
 
@@ -115,7 +115,7 @@ Results for a single PMU counter preset (e.g. ``basic_cpu``).
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/results/models.py:71`
+Source: `src/helia_profiler/results/models.py:66`
 
 ### helia_profiler.PresetResult.name
 
@@ -125,7 +125,7 @@ Source: `src/helia_profiler/results/models.py:71`
 name: str
 ```
 
-Source: `src/helia_profiler/results/models.py:75`
+Source: `src/helia_profiler/results/models.py:70`
 
 ### helia_profiler.PresetResult.header
 
@@ -135,7 +135,7 @@ Source: `src/helia_profiler/results/models.py:75`
 header: list[str] = field(default_factory=list)
 ```
 
-Source: `src/helia_profiler/results/models.py:76`
+Source: `src/helia_profiler/results/models.py:71`
 
 ### helia_profiler.PresetResult.iterations
 
@@ -145,7 +145,7 @@ Source: `src/helia_profiler/results/models.py:76`
 iterations: list[list[LayerResult]] = field(default_factory=list)
 ```
 
-Source: `src/helia_profiler/results/models.py:77`
+Source: `src/helia_profiler/results/models.py:72`
 
 ### helia_profiler.PresetResult.layers
 
@@ -155,7 +155,7 @@ Source: `src/helia_profiler/results/models.py:77`
 layers: list[LayerResult] = field(default_factory=list)
 ```
 
-Source: `src/helia_profiler/results/models.py:78`
+Source: `src/helia_profiler/results/models.py:73`
 
 ## helia_profiler.FirmwareMeta
 
@@ -200,7 +200,7 @@ every field.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/results/models.py:95`
+Source: `src/helia_profiler/results/models.py:90`
 
 ### helia_profiler.FirmwareMeta.model_size
 
@@ -210,7 +210,7 @@ Source: `src/helia_profiler/results/models.py:95`
 model_size: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:103`
+Source: `src/helia_profiler/results/models.py:98`
 
 ### helia_profiler.FirmwareMeta.arena_size
 
@@ -220,7 +220,7 @@ Source: `src/helia_profiler/results/models.py:103`
 arena_size: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:104`
+Source: `src/helia_profiler/results/models.py:99`
 
 ### helia_profiler.FirmwareMeta.allocated_arena
 
@@ -230,7 +230,7 @@ Source: `src/helia_profiler/results/models.py:104`
 allocated_arena: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:105`
+Source: `src/helia_profiler/results/models.py:100`
 
 ### helia_profiler.FirmwareMeta.input_size
 
@@ -240,7 +240,7 @@ Source: `src/helia_profiler/results/models.py:105`
 input_size: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:106`
+Source: `src/helia_profiler/results/models.py:101`
 
 ### helia_profiler.FirmwareMeta.output_size
 
@@ -250,7 +250,7 @@ Source: `src/helia_profiler/results/models.py:106`
 output_size: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:107`
+Source: `src/helia_profiler/results/models.py:102`
 
 ### helia_profiler.FirmwareMeta.num_tensors
 
@@ -260,7 +260,7 @@ Source: `src/helia_profiler/results/models.py:107`
 num_tensors: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:108`
+Source: `src/helia_profiler/results/models.py:103`
 
 ### helia_profiler.FirmwareMeta.num_inputs
 
@@ -270,7 +270,7 @@ Source: `src/helia_profiler/results/models.py:108`
 num_inputs: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:109`
+Source: `src/helia_profiler/results/models.py:104`
 
 ### helia_profiler.FirmwareMeta.num_outputs
 
@@ -280,7 +280,7 @@ Source: `src/helia_profiler/results/models.py:109`
 num_outputs: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:110`
+Source: `src/helia_profiler/results/models.py:105`
 
 ### helia_profiler.FirmwareMeta.num_presets
 
@@ -290,7 +290,7 @@ Source: `src/helia_profiler/results/models.py:110`
 num_presets: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:111`
+Source: `src/helia_profiler/results/models.py:106`
 
 ### helia_profiler.FirmwareMeta.system_clock_hz
 
@@ -300,7 +300,7 @@ Source: `src/helia_profiler/results/models.py:111`
 system_clock_hz: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:114`
+Source: `src/helia_profiler/results/models.py:109`
 
 ### helia_profiler.FirmwareMeta.profiled_infer_count
 
@@ -310,7 +310,7 @@ Source: `src/helia_profiler/results/models.py:114`
 profiled_infer_count: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:115`
+Source: `src/helia_profiler/results/models.py:110`
 
 ### helia_profiler.FirmwareMeta.profiled_infer_total_us
 
@@ -320,7 +320,7 @@ Source: `src/helia_profiler/results/models.py:115`
 profiled_infer_total_us: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:116`
+Source: `src/helia_profiler/results/models.py:111`
 
 ### helia_profiler.FirmwareMeta.profiled_infer_avg_us
 
@@ -330,7 +330,7 @@ Source: `src/helia_profiler/results/models.py:116`
 profiled_infer_avg_us: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:117`
+Source: `src/helia_profiler/results/models.py:112`
 
 ### helia_profiler.FirmwareMeta.clean_infer_count
 
@@ -340,7 +340,7 @@ Source: `src/helia_profiler/results/models.py:117`
 clean_infer_count: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:121`
+Source: `src/helia_profiler/results/models.py:116`
 
 ### helia_profiler.FirmwareMeta.clean_infer_total_cycles
 
@@ -350,7 +350,7 @@ Source: `src/helia_profiler/results/models.py:121`
 clean_infer_total_cycles: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:122`
+Source: `src/helia_profiler/results/models.py:117`
 
 ### helia_profiler.FirmwareMeta.clean_infer_avg_cycles
 
@@ -360,7 +360,7 @@ Source: `src/helia_profiler/results/models.py:122`
 clean_infer_avg_cycles: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:123`
+Source: `src/helia_profiler/results/models.py:118`
 
 ### helia_profiler.FirmwareMeta.clean_infer_avg_us
 
@@ -370,7 +370,7 @@ Source: `src/helia_profiler/results/models.py:123`
 clean_infer_avg_us: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:124`
+Source: `src/helia_profiler/results/models.py:119`
 
 ### helia_profiler.FirmwareMeta.clean_stalled_iters
 
@@ -380,7 +380,7 @@ Source: `src/helia_profiler/results/models.py:124`
 clean_stalled_iters: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:129`
+Source: `src/helia_profiler/results/models.py:124`
 
 ### helia_profiler.FirmwareMeta.clean_partial_iters
 
@@ -390,7 +390,7 @@ Source: `src/helia_profiler/results/models.py:129`
 clean_partial_iters: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:134`
+Source: `src/helia_profiler/results/models.py:129`
 
 ### helia_profiler.FirmwareMeta.clean_ref_cycles
 
@@ -400,7 +400,7 @@ Source: `src/helia_profiler/results/models.py:134`
 clean_ref_cycles: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:144`
+Source: `src/helia_profiler/results/models.py:139`
 
 ### helia_profiler.FirmwareMeta.clean_dwt_rate_cyc
 
@@ -410,7 +410,7 @@ Source: `src/helia_profiler/results/models.py:144`
 clean_dwt_rate_cyc: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:150`
+Source: `src/helia_profiler/results/models.py:145`
 
 ### helia_profiler.FirmwareMeta.clean_dwt_rate_us
 
@@ -420,7 +420,7 @@ Source: `src/helia_profiler/results/models.py:150`
 clean_dwt_rate_us: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:151`
+Source: `src/helia_profiler/results/models.py:146`
 
 ### helia_profiler.FirmwareMeta.clean_attach_wait_us
 
@@ -430,7 +430,7 @@ Source: `src/helia_profiler/results/models.py:151`
 clean_attach_wait_us: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:156`
+Source: `src/helia_profiler/results/models.py:151`
 
 ### helia_profiler.FirmwareMeta.psram
 
@@ -440,7 +440,7 @@ Source: `src/helia_profiler/results/models.py:156`
 psram: PsramInfo | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:157`
+Source: `src/helia_profiler/results/models.py:152`
 
 ### helia_profiler.FirmwareMeta.presets
 
@@ -450,7 +450,7 @@ Source: `src/helia_profiler/results/models.py:157`
 presets: tuple[str, ...] = ()
 ```
 
-Source: `src/helia_profiler/results/models.py:158`
+Source: `src/helia_profiler/results/models.py:153`
 
 ### helia_profiler.FirmwareMeta.reported_model_bytes
 
@@ -468,7 +468,7 @@ as text. Anything that needs a number asks here instead of assuming;
 the raw value stays on ``model_size`` so diagnostics can still quote
 what the device actually said (#281).
 
-Source: `src/helia_profiler/results/models.py:161`
+Source: `src/helia_profiler/results/models.py:156`
 
 ## helia_profiler.PmuResult
 
@@ -490,7 +490,7 @@ Complete PMU profiling result across all presets.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/results/models.py:176`
+Source: `src/helia_profiler/results/models.py:171`
 
 ### helia_profiler.PmuResult.meta
 
@@ -500,7 +500,7 @@ Source: `src/helia_profiler/results/models.py:176`
 meta: FirmwareMeta
 ```
 
-Source: `src/helia_profiler/results/models.py:180`
+Source: `src/helia_profiler/results/models.py:175`
 
 ### helia_profiler.PmuResult.presets
 
@@ -510,7 +510,7 @@ Source: `src/helia_profiler/results/models.py:180`
 presets: dict[str, PresetResult] = field(default_factory=dict)
 ```
 
-Source: `src/helia_profiler/results/models.py:181`
+Source: `src/helia_profiler/results/models.py:176`
 
 ### helia_profiler.PmuResult.layers
 
@@ -520,7 +520,7 @@ Source: `src/helia_profiler/results/models.py:181`
 layers: list[LayerResult] = field(default_factory=list)
 ```
 
-Source: `src/helia_profiler/results/models.py:182`
+Source: `src/helia_profiler/results/models.py:177`
 
 ### helia_profiler.PmuResult.overflow_detected
 
@@ -530,7 +530,7 @@ Source: `src/helia_profiler/results/models.py:182`
 overflow_detected: bool = False
 ```
 
-Source: `src/helia_profiler/results/models.py:183`
+Source: `src/helia_profiler/results/models.py:178`
 
 ### helia_profiler.PmuResult.groups
 
@@ -540,7 +540,7 @@ Source: `src/helia_profiler/results/models.py:183`
 groups: dict[str, list[LayerResult]] = field(default_factory=dict)
 ```
 
-Source: `src/helia_profiler/results/models.py:188`
+Source: `src/helia_profiler/results/models.py:183`
 
 ## helia_profiler.RunMetadata
 
@@ -571,7 +571,7 @@ Accumulated run metadata — enriched by stages, consumed by reports.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/results/models.py:287`
+Source: `src/helia_profiler/results/models.py:277`
 
 ### helia_profiler.RunMetadata.hpx_version
 
@@ -581,7 +581,7 @@ Source: `src/helia_profiler/results/models.py:287`
 hpx_version: str = ''
 ```
 
-Source: `src/helia_profiler/results/models.py:291`
+Source: `src/helia_profiler/results/models.py:281`
 
 ### helia_profiler.RunMetadata.run_id
 
@@ -591,7 +591,7 @@ Source: `src/helia_profiler/results/models.py:291`
 run_id: str = ''
 ```
 
-Source: `src/helia_profiler/results/models.py:292`
+Source: `src/helia_profiler/results/models.py:282`
 
 ### helia_profiler.RunMetadata.timestamp
 
@@ -601,7 +601,7 @@ Source: `src/helia_profiler/results/models.py:292`
 timestamp: str = ''
 ```
 
-Source: `src/helia_profiler/results/models.py:293`
+Source: `src/helia_profiler/results/models.py:283`
 
 ### helia_profiler.RunMetadata.config_snapshot
 
@@ -611,7 +611,7 @@ Source: `src/helia_profiler/results/models.py:293`
 config_snapshot: dict[str, Any] = field(default_factory=dict)
 ```
 
-Source: `src/helia_profiler/results/models.py:294`
+Source: `src/helia_profiler/results/models.py:284`
 
 ### helia_profiler.RunMetadata.platform
 
@@ -621,7 +621,7 @@ Source: `src/helia_profiler/results/models.py:294`
 platform: PlatformInfo | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:295`
+Source: `src/helia_profiler/results/models.py:285`
 
 ### helia_profiler.RunMetadata.model
 
@@ -631,7 +631,7 @@ Source: `src/helia_profiler/results/models.py:295`
 model: ModelInfo | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:296`
+Source: `src/helia_profiler/results/models.py:286`
 
 ### helia_profiler.RunMetadata.toolchain
 
@@ -641,7 +641,7 @@ Source: `src/helia_profiler/results/models.py:296`
 toolchain: ToolchainInfo | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:297`
+Source: `src/helia_profiler/results/models.py:287`
 
 ### helia_profiler.RunMetadata.build_images
 
@@ -651,7 +651,7 @@ Source: `src/helia_profiler/results/models.py:297`
 build_images: tuple[BuildImage, ...] = ()
 ```
 
-Source: `src/helia_profiler/results/models.py:300`
+Source: `src/helia_profiler/results/models.py:290`
 
 ### helia_profiler.RunMetadata.engine
 
@@ -661,7 +661,7 @@ Source: `src/helia_profiler/results/models.py:300`
 engine: EngineInfo | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:301`
+Source: `src/helia_profiler/results/models.py:291`
 
 ### helia_profiler.RunMetadata.firmware
 
@@ -671,7 +671,7 @@ Source: `src/helia_profiler/results/models.py:301`
 firmware: FirmwareMeta | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:302`
+Source: `src/helia_profiler/results/models.py:292`
 
 ### helia_profiler.RunMetadata.memory_plan
 
@@ -681,7 +681,7 @@ Source: `src/helia_profiler/results/models.py:302`
 memory_plan: 'MemoryPlan | None' = None
 ```
 
-Source: `src/helia_profiler/results/models.py:303`
+Source: `src/helia_profiler/results/models.py:293`
 
 ### helia_profiler.RunMetadata.timing
 
@@ -691,7 +691,7 @@ Source: `src/helia_profiler/results/models.py:303`
 timing: TimingInfo | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:304`
+Source: `src/helia_profiler/results/models.py:294`
 
 ### helia_profiler.RunMetadata.compatibility
 
@@ -701,7 +701,7 @@ Source: `src/helia_profiler/results/models.py:304`
 compatibility: CompatibilityResolution | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:305`
+Source: `src/helia_profiler/results/models.py:295`
 
 ### helia_profiler.RunMetadata.dependencies
 
@@ -711,7 +711,7 @@ Source: `src/helia_profiler/results/models.py:305`
 dependencies: 'DependencyProvenance | None' = None
 ```
 
-Source: `src/helia_profiler/results/models.py:306`
+Source: `src/helia_profiler/results/models.py:296`
 
 ## helia_profiler.ProfileResult
 
@@ -738,7 +738,7 @@ PMU data, optional power data, run metadata, and report file paths.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/results/models.py:615`
+Source: `src/helia_profiler/results/models.py:580`
 
 ### helia_profiler.ProfileResult.pmu
 
@@ -748,7 +748,7 @@ Source: `src/helia_profiler/results/models.py:615`
 pmu: PmuResult
 ```
 
-Source: `src/helia_profiler/results/models.py:623`
+Source: `src/helia_profiler/results/models.py:588`
 
 ### helia_profiler.ProfileResult.power
 
@@ -758,7 +758,7 @@ Source: `src/helia_profiler/results/models.py:623`
 power: PowerResult | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:624`
+Source: `src/helia_profiler/results/models.py:589`
 
 ### helia_profiler.ProfileResult.power_observation
 
@@ -768,7 +768,7 @@ Source: `src/helia_profiler/results/models.py:624`
 power_observation: PowerObservation | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:625`
+Source: `src/helia_profiler/results/models.py:590`
 
 ### helia_profiler.ProfileResult.power_terminal
 
@@ -778,7 +778,7 @@ Source: `src/helia_profiler/results/models.py:625`
 power_terminal: PowerTerminalRecord | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:626`
+Source: `src/helia_profiler/results/models.py:591`
 
 ### helia_profiler.ProfileResult.on_device_power
 
@@ -788,7 +788,7 @@ Source: `src/helia_profiler/results/models.py:626`
 on_device_power: OnDevicePowerSummary | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:627`
+Source: `src/helia_profiler/results/models.py:592`
 
 ### helia_profiler.ProfileResult.metadata
 
@@ -798,7 +798,7 @@ Source: `src/helia_profiler/results/models.py:627`
 metadata: RunMetadata = field(default_factory=RunMetadata)
 ```
 
-Source: `src/helia_profiler/results/models.py:628`
+Source: `src/helia_profiler/results/models.py:593`
 
 ### helia_profiler.ProfileResult.report_paths
 
@@ -808,7 +808,7 @@ Source: `src/helia_profiler/results/models.py:628`
 report_paths: list[Path] = field(default_factory=list)
 ```
 
-Source: `src/helia_profiler/results/models.py:629`
+Source: `src/helia_profiler/results/models.py:594`
 
 ### helia_profiler.ProfileResult.layers
 
@@ -820,7 +820,7 @@ layers: list[LayerResult]
 
 Merged per-layer results across all PMU presets.
 
-Source: `src/helia_profiler/results/models.py:634`
+Source: `src/helia_profiler/results/models.py:597`
 
 ### helia_profiler.ProfileResult.total_cycles
 
@@ -830,9 +830,7 @@ Source: `src/helia_profiler/results/models.py:634`
 total_cycles: float
 ```
 
-Total CPU cycles across all layers.
-
-Source: `src/helia_profiler/results/models.py:639`
+Source: `src/helia_profiler/results/models.py:602`
 
 ### helia_profiler.ProfileResult.layer_count
 
@@ -842,7 +840,7 @@ Source: `src/helia_profiler/results/models.py:639`
 layer_count: int
 ```
 
-Source: `src/helia_profiler/results/models.py:644`
+Source: `src/helia_profiler/results/models.py:606`
 
 ### helia_profiler.ProfileResult.overflow_detected
 
@@ -852,4 +850,4 @@ Source: `src/helia_profiler/results/models.py:644`
 overflow_detected: bool
 ```
 
-Source: `src/helia_profiler/results/models.py:648`
+Source: `src/helia_profiler/results/models.py:610`

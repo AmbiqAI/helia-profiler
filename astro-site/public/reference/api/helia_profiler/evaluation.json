@@ -3,12 +3,12 @@
   "generatedFrom": {
     "tool": "pyref",
     "version": "1.7.3",
-    "sourceTree": "411e58fd9f2f268366576b621932ae2bc4f2f0c2"
+    "sourceTree": "872d67ad4e9083b1eacd7d6d3859148437b96b59"
   },
   "language": "python",
   "modules": [
     {
-      "description": "Comparing two runs and judging one: the comparability rules that decide whether a comparison is meaningful, and the metric policies that turn numbers into a verdict.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `411e58fd9f2f268366576b621932ae2bc4f2f0c2`.",
+      "description": "Comparing two runs and judging one: the comparability rules that decide whether a comparison is meaningful, and the metric policies that turn numbers into a verdict.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `872d67ad4e9083b1eacd7d6d3859148437b96b59`.",
       "name": "evaluation",
       "path": "helia_profiler.evaluation",
       "submodules": [],
@@ -1138,9 +1138,9 @@
           "returns": [],
           "signature": "assess_comparability(baseline: RunArtifacts, candidate: RunArtifacts) -> ComparabilityAssessment",
           "source": {
-            "line": 162,
+            "line": 154,
             "path": "src/helia_profiler/evaluation/comparability.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparability.py#L162"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparability.py#L154"
           },
           "summary": "Compare identity, validity, topology, and intentional run dimensions."
         },
@@ -1329,9 +1329,9 @@
           "returns": [],
           "signature": "evaluate_run(ctx: PipelineContext) -> RunEvaluation",
           "source": {
-            "line": 193,
+            "line": 192,
             "path": "src/helia_profiler/evaluation/validity.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L193"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L192"
           },
           "summary": "Evaluate captured results without mutating pipeline state."
         },

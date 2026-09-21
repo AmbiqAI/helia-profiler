@@ -3,12 +3,12 @@
   "generatedFrom": {
     "tool": "pyref",
     "version": "1.7.3",
-    "sourceTree": "411e58fd9f2f268366576b621932ae2bc4f2f0c2"
+    "sourceTree": "872d67ad4e9083b1eacd7d6d3859148437b96b59"
   },
   "language": "python",
   "modules": [
     {
-      "description": "What a power capture produces: the measured result, the observations behind it, and the on-device summary the firmware reports.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`, `experimental`\n\nGenerated from the `src/helia_profiler` tree `411e58fd9f2f268366576b621932ae2bc4f2f0c2`.",
+      "description": "What a power capture produces: the measured result, the observations behind it, and the on-device summary the firmware reports.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`, `experimental`\n\nGenerated from the `src/helia_profiler` tree `872d67ad4e9083b1eacd7d6d3859148437b96b59`.",
       "name": "power",
       "path": "helia_profiler.power",
       "submodules": [],
@@ -207,7 +207,7 @@
           "summary": "Host instrument observation, independent of firmware terminal status."
         },
         {
-          "description": "`dataclass`\n\nComplete result of a power capture.\n\n``metadata`` is the typed :class:`~helia_profiler.power.metadata.PowerMetadata`\n(#154 Phase 2 breaking change — previously ``dict[str, Any]``; the flat\ndict view is ``metadata.to_metadata_dict()``). The result is frozen but\nits metadata is deliberately mutable: pipeline stages enrich it after\ncapture, like ``RunMetadata``.\n\n**API tier:** `stable`",
+          "description": "`dataclass`\n\nComplete result of a power capture.\n\n``metadata`` is the typed :class:`~helia_profiler.power.metadata.PowerMetadata`\n(#154 Phase 2); the flat dict view is ``metadata.to_metadata_dict()``.\nThe result is frozen but its metadata is deliberately mutable: pipeline\nstages enrich it after capture, like ``RunMetadata``.\n\n**API tier:** `stable`",
           "examples": [],
           "id": "helia_profiler.PowerResult",
           "kind": "class",
@@ -226,9 +226,9 @@
               "returns": [],
               "signature": "summary: PowerSummary",
               "source": {
-                "line": 88,
+                "line": 83,
                 "path": "src/helia_profiler/power/base.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L88"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L83"
               },
               "summary": ""
             },
@@ -245,9 +245,9 @@
               "returns": [],
               "signature": "samples: list[PowerSample] = field(default_factory=list)",
               "source": {
-                "line": 89,
+                "line": 84,
                 "path": "src/helia_profiler/power/base.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L89"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L84"
               },
               "summary": ""
             },
@@ -264,9 +264,9 @@
               "returns": [],
               "signature": "gated_windows: list[GatedPowerWindow] = field(default_factory=list)",
               "source": {
-                "line": 90,
+                "line": 85,
                 "path": "src/helia_profiler/power/base.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L90"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L85"
               },
               "summary": ""
             },
@@ -283,9 +283,9 @@
               "returns": [],
               "signature": "per_layer: dict[str, Any] | None = None",
               "source": {
-                "line": 91,
+                "line": 86,
                 "path": "src/helia_profiler/power/base.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L91"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L86"
               },
               "summary": ""
             },
@@ -302,9 +302,9 @@
               "returns": [],
               "signature": "metadata: PowerMetadata = field(default_factory=PowerMetadata)",
               "source": {
-                "line": 92,
+                "line": 87,
                 "path": "src/helia_profiler/power/base.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L92"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L87"
               },
               "summary": ""
             }
@@ -315,9 +315,9 @@
           "returns": [],
           "signature": "PowerResult(\n    summary: PowerSummary,\n    samples: list[PowerSample] = list(),\n    gated_windows: list[GatedPowerWindow] = list(),\n    per_layer: dict[str, Any] | None = None,\n    metadata: PowerMetadata = PowerMetadata(),\n) -> None",
           "source": {
-            "line": 77,
+            "line": 73,
             "path": "src/helia_profiler/power/base.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L77"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L73"
           },
           "summary": "Complete result of a power capture."
         },

@@ -16,7 +16,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `experimental`
 
-Generated from the `src/helia_profiler` tree `411e58fd9f2f268366576b621932ae2bc4f2f0c2`.
+Generated from the `src/helia_profiler` tree `872d67ad4e9083b1eacd7d6d3859148437b96b59`.
 
 [Machine-readable model](/helia-profiler/reference/api/helia_profiler/modelcost.json)
 
@@ -30,7 +30,7 @@ Generated from the `src/helia_profiler` tree `411e58fd9f2f268366576b621932ae2bc4
   signature={"ModelAnalysis(\n    layers: list[LayerOps],\n    total_macs: int,\n    total_ops: int,\n    num_parameters: int,\n    engine: str = 'tflite',\n) -> None"}
   level={2}
   summary={"Full model analysis result."}
-  source={{"path":"src/helia_profiler/modelcost/model_analysis.py","line":177,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L177"}}
+  source={{"path":"src/helia_profiler/modelcost/model_analysis.py","line":165,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L165"}}
 >
 
   `dataclass`
@@ -46,7 +46,7 @@ Generated from the `src/helia_profiler` tree `411e58fd9f2f268366576b621932ae2bc4
     language={"python"}
     signature={"layers: list[LayerOps]"}
     level={3}
-    source={{"path":"src/helia_profiler/modelcost/model_analysis.py","line":181,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L181"}}
+    source={{"path":"src/helia_profiler/modelcost/model_analysis.py","line":169,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L169"}}
   >
 
 
@@ -60,7 +60,7 @@ Generated from the `src/helia_profiler` tree `411e58fd9f2f268366576b621932ae2bc4
     language={"python"}
     signature={"total_macs: int"}
     level={3}
-    source={{"path":"src/helia_profiler/modelcost/model_analysis.py","line":182,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L182"}}
+    source={{"path":"src/helia_profiler/modelcost/model_analysis.py","line":170,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L170"}}
   >
 
 
@@ -74,7 +74,7 @@ Generated from the `src/helia_profiler` tree `411e58fd9f2f268366576b621932ae2bc4
     language={"python"}
     signature={"total_ops: int"}
     level={3}
-    source={{"path":"src/helia_profiler/modelcost/model_analysis.py","line":183,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L183"}}
+    source={{"path":"src/helia_profiler/modelcost/model_analysis.py","line":171,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L171"}}
   >
 
 
@@ -89,7 +89,7 @@ Generated from the `src/helia_profiler` tree `411e58fd9f2f268366576b621932ae2bc4
     signature={"num_parameters: int"}
     level={3}
     summary={"Approximate parameter count (weights + biases)."}
-    source={{"path":"src/helia_profiler/modelcost/model_analysis.py","line":184,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L184"}}
+    source={{"path":"src/helia_profiler/modelcost/model_analysis.py","line":172,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L172"}}
   >
 
     Approximate parameter count (weights + biases).
@@ -104,7 +104,7 @@ Generated from the `src/helia_profiler` tree `411e58fd9f2f268366576b621932ae2bc4
     signature={"engine: str = 'tflite'"}
     level={3}
     summary={"Engine/interpreter that produced this analysis ('tflite', 'helia-rt', 'helia-aot')."}
-    source={{"path":"src/helia_profiler/modelcost/model_analysis.py","line":186,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L186"}}
+    source={{"path":"src/helia_profiler/modelcost/model_analysis.py","line":174,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L174"}}
   >
 
     Engine/interpreter that produced this analysis ('tflite', 'helia-rt', 'helia-aot').
@@ -119,7 +119,7 @@ Generated from the `src/helia_profiler` tree `411e58fd9f2f268366576b621932ae2bc4
     signature={"ethos_u_op_count: int"}
     level={3}
     summary={"Number of Vela-generated ethos-u custom ops in the graph."}
-    source={{"path":"src/helia_profiler/modelcost/model_analysis.py","line":190,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L190"}}
+    source={{"path":"src/helia_profiler/modelcost/model_analysis.py","line":178,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L178"}}
   >
 
     Number of Vela-generated ethos-u custom ops in the graph.
@@ -134,7 +134,7 @@ Generated from the `src/helia_profiler` tree `411e58fd9f2f268366576b621932ae2bc4
     signature={"has_ethos_u_op: bool"}
     level={3}
     summary={"True when the model was compiled by Vela (contains ethos-u ops)."}
-    source={{"path":"src/helia_profiler/modelcost/model_analysis.py","line":195,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L195"}}
+    source={{"path":"src/helia_profiler/modelcost/model_analysis.py","line":183,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L183"}}
   >
 
     True when the model was compiled by Vela (contains ethos-u ops).

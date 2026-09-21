@@ -16,7 +16,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`, `experimental`
 
-Generated from the `src/helia_profiler` tree `411e58fd9f2f268366576b621932ae2bc4f2f0c2`.
+Generated from the `src/helia_profiler` tree `872d67ad4e9083b1eacd7d6d3859148437b96b59`.
 
 [Machine-readable model](/helia-profiler/reference/api/helia_profiler/power.json)
 
@@ -178,7 +178,7 @@ Generated from the `src/helia_profiler` tree `411e58fd9f2f268366576b621932ae2bc4
   signature={"PowerResult(\n    summary: PowerSummary,\n    samples: list[PowerSample] = list(),\n    gated_windows: list[GatedPowerWindow] = list(),\n    per_layer: dict[str, Any] | None = None,\n    metadata: PowerMetadata = PowerMetadata(),\n) -> None"}
   level={2}
   summary={"Complete result of a power capture."}
-  source={{"path":"src/helia_profiler/power/base.py","line":77,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L77"}}
+  source={{"path":"src/helia_profiler/power/base.py","line":73,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L73"}}
 >
 
   `dataclass`
@@ -186,10 +186,9 @@ Generated from the `src/helia_profiler` tree `411e58fd9f2f268366576b621932ae2bc4
   Complete result of a power capture.
 
   ``metadata`` is the typed :class:`~helia_profiler.power.metadata.PowerMetadata`
-  (#154 Phase 2 breaking change — previously ``dict[str, Any]``; the flat
-  dict view is ``metadata.to_metadata_dict()``). The result is frozen but
-  its metadata is deliberately mutable: pipeline stages enrich it after
-  capture, like ``RunMetadata``.
+  (#154 Phase 2); the flat dict view is ``metadata.to_metadata_dict()``.
+  The result is frozen but its metadata is deliberately mutable: pipeline
+  stages enrich it after capture, like ``RunMetadata``.
 
   **API tier:** `stable`
 
@@ -200,7 +199,7 @@ Generated from the `src/helia_profiler` tree `411e58fd9f2f268366576b621932ae2bc4
     language={"python"}
     signature={"summary: PowerSummary"}
     level={3}
-    source={{"path":"src/helia_profiler/power/base.py","line":88,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L88"}}
+    source={{"path":"src/helia_profiler/power/base.py","line":83,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L83"}}
   >
 
 
@@ -214,7 +213,7 @@ Generated from the `src/helia_profiler` tree `411e58fd9f2f268366576b621932ae2bc4
     language={"python"}
     signature={"samples: list[PowerSample] = field(default_factory=list)"}
     level={3}
-    source={{"path":"src/helia_profiler/power/base.py","line":89,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L89"}}
+    source={{"path":"src/helia_profiler/power/base.py","line":84,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L84"}}
   >
 
 
@@ -228,7 +227,7 @@ Generated from the `src/helia_profiler` tree `411e58fd9f2f268366576b621932ae2bc4
     language={"python"}
     signature={"gated_windows: list[GatedPowerWindow] = field(default_factory=list)"}
     level={3}
-    source={{"path":"src/helia_profiler/power/base.py","line":90,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L90"}}
+    source={{"path":"src/helia_profiler/power/base.py","line":85,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L85"}}
   >
 
 
@@ -242,7 +241,7 @@ Generated from the `src/helia_profiler` tree `411e58fd9f2f268366576b621932ae2bc4
     language={"python"}
     signature={"per_layer: dict[str, Any] | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/power/base.py","line":91,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L91"}}
+    source={{"path":"src/helia_profiler/power/base.py","line":86,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L86"}}
   >
 
 
@@ -256,7 +255,7 @@ Generated from the `src/helia_profiler` tree `411e58fd9f2f268366576b621932ae2bc4
     language={"python"}
     signature={"metadata: PowerMetadata = field(default_factory=PowerMetadata)"}
     level={3}
-    source={{"path":"src/helia_profiler/power/base.py","line":92,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L92"}}
+    source={{"path":"src/helia_profiler/power/base.py","line":87,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L87"}}
   >
 
 

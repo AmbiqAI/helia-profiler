@@ -3,7 +3,7 @@
   "kind": "cli",
   "program": "hpx",
   "generatedFrom": {
-    "sourceTree": "411e58fd9f2f268366576b621932ae2bc4f2f0c2",
+    "sourceTree": "872d67ad4e9083b1eacd7d6d3859148437b96b59",
     "helia_profiler": "0.1.6",
     "typer": "0.26.8",
     "click": "8.3.3",
@@ -118,7 +118,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 542
+          "line": 532
         },
         "arguments": [
           {
@@ -320,7 +320,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/inspect_app.py",
-          "line": 137
+          "line": 132
         },
         "arguments": [],
         "options": [],
@@ -340,7 +340,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 696
+          "line": 674
         },
         "arguments": [],
         "options": [],
@@ -361,7 +361,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 710
+              "line": 688
             },
             "arguments": [],
             "options": [],
@@ -382,7 +382,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 703
+              "line": 681
             },
             "arguments": [],
             "options": [],
@@ -404,7 +404,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 625
+          "line": 607
         },
         "arguments": [
           {
@@ -602,7 +602,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/inspect_app.py",
-          "line": 49
+          "line": 44
         },
         "arguments": [],
         "options": [
@@ -910,7 +910,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/inspect_app.py",
-          "line": 130
+          "line": 125
         },
         "arguments": [],
         "options": [],
@@ -930,7 +930,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/inspect_app.py",
-          "line": 204
+          "line": 191
         },
         "arguments": [],
         "options": [],
@@ -951,7 +951,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/inspect_app.py",
-              "line": 211
+              "line": 198
             },
             "arguments": [],
             "options": [
@@ -1026,7 +1026,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/validation_app.py",
-          "line": 61
+          "line": 57
         },
         "arguments": [],
         "options": [
@@ -1103,7 +1103,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/inspect_app.py",
-          "line": 153
+          "line": 144
         },
         "arguments": [],
         "options": [],
@@ -1124,7 +1124,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/inspect_app.py",
-              "line": 160
+              "line": 151
             },
             "arguments": [],
             "options": [
@@ -1224,7 +1224,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/inspect_app.py",
-              "line": 178
+              "line": 169
             },
             "arguments": [],
             "options": [
@@ -1325,7 +1325,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 93
+          "line": 88
         },
         "arguments": [
           {
@@ -2612,7 +2612,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/inspect_app.py",
-          "line": 233
+          "line": 216
         },
         "arguments": [],
         "options": [],
@@ -2633,7 +2633,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/inspect_app.py",
-              "line": 240
+              "line": 223
             },
             "arguments": [],
             "options": [
@@ -2738,7 +2738,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/validation_app.py",
-          "line": 93
+          "line": 85
         },
         "arguments": [],
         "options": [
