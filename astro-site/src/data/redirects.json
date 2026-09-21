@@ -40,9 +40,9 @@
     "/architecture/firmware/": "/helia-profiler/guide/concepts/firmware/",
     "/architecture/pipeline/": "/helia-profiler/guide/concepts/pipeline/",
     "/getting-started/quickstart/": "/helia-profiler/getting-started/configure-a-run/",
-    "/guides/": "/helia-profiler/guide/in-depth/",
-    "/guides/executorch-ns-kernels/": "/helia-profiler/guide/in-depth/executorch-ns-kernels/",
-    "/guides/memory-placement-tuning/": "/helia-profiler/guide/in-depth/memory-placement-tuning/",
+    "/guides/": "/helia-profiler/guide/",
+    "/guides/executorch-ns-kernels/": "/helia-profiler/guide/executorch-ns-kernels/",
+    "/guides/memory-placement-tuning/": "/helia-profiler/guide/memory/",
     "/guides/validating-a-board-setup/": "/helia-profiler/getting-started/validate-your-setup/",
     "/reference/analyze/": "/helia-profiler/reference/cli/analyze/",
     "/reference/api/": "/helia-profiler/reference/api/helia_profiler/",
@@ -66,6 +66,9 @@
     "/reference/validate/": "/helia-profiler/reference/cli/validate/"
   },
   "moved": {
+    "/guide/in-depth/": "/helia-profiler/guide/",
+    "/guide/in-depth/executorch-ns-kernels/": "/helia-profiler/guide/executorch-ns-kernels/",
+    "/guide/in-depth/memory-placement-tuning/": "/helia-profiler/guide/memory/",
     "/guide/in-depth/validating-a-board-setup/": "/helia-profiler/getting-started/validate-your-setup/"
   }
 }

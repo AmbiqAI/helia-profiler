@@ -81,12 +81,14 @@ export default defineConfig({
                 {
                   label: 'Set up a run',
                   items: [
-                    { label: 'Configuration', slug: 'guide/configuration' },
-                    { label: 'Inference Engines', slug: 'guide/engines' },
+                    { label: 'Engines', slug: 'guide/engines' },
+                    { label: 'Models', slug: 'guide/models' },
+                    { label: 'Boards and targets', slug: 'guide/boards' },
                     { label: 'Toolchains', slug: 'guide/toolchains' },
-                    { label: 'Boards & Platforms', slug: 'guide/boards' },
-                    { label: 'Capture Transports', slug: 'guide/transports' },
-                    { label: 'Memory Placement', slug: 'guide/memory' },
+                    { label: 'Capture transports', slug: 'guide/transports' },
+                    { label: 'Memory placement', slug: 'guide/memory' },
+                    { label: 'ExecuTorch NS kernels', slug: 'guide/executorch-ns-kernels' },
+                    { label: 'Configuration', slug: 'guide/configuration' },
                   ],
                 },
                 {
@@ -107,20 +109,6 @@ export default defineConfig({
                     {
                       label: 'Model Explorer Overlays',
                       slug: 'guide/model-explorer',
-                    },
-                  ],
-                },
-                {
-                  label: 'In-depth guides',
-                  items: [
-                    { label: 'Overview', slug: 'guide/in-depth' },
-                    {
-                      label: 'Memory Placement Tuning',
-                      slug: 'guide/in-depth/memory-placement-tuning',
-                    },
-                    {
-                      label: 'ExecuTorch NS Tier-1 Kernels',
-                      slug: 'guide/in-depth/executorch-ns-kernels',
                     },
                   ],
                 },

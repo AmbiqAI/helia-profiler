@@ -1,185 +1,143 @@
 ---
-title: "Capture Transports"
-description: "heliaPROFILER supports four ways to get profiling data off the target. The transport affects reliability, throughput, and what hardware you need plugged in.…"
+title: "Capture transports"
+description: "RTT, USB CDC, UART and SWO: what each needs plugged in, what it can lose, how hpx uses it, and when to leave the default alone."
 ---
 
-heliaPROFILER supports four ways to get profiling data off the target.
-The transport affects reliability, throughput, and what hardware you need
-plugged in. **RTT is the default and is recommended.**
+## Purpose
 
-| `target.transport` | Hardware | Reliability | Throughput | When to use |
+Choose how profiling data leaves the board. hpx supports four transports;
+the choice affects reliability, throughput and which cables you need, and
+it is fixed for the whole run.
+
+## Prerequisites
+
+A board attached over its debug USB port for `rtt`, `swo` and `uart`; a
+second cable from the board's target USB connector for `usb_cdc`. The
+default needs nothing beyond the probe you already validated.
+
+## Which transport
+
+| `target.transport` | Hardware | Loses data | Throughput | Pick it when |
 |---|---|---|---|---|
-| `rtt` *(default)* | J-Link only | Lossless | High | Almost always |
-| `usb_cdc` | Target USB cable + J-Link | Lossless (CRC + flow control) | Medium | When RTT isn't available; large data |
-| `uart` | J-Link OB VCOM | Best-effort | Low (~11.5 KB/s) | Fallback when USB CDC isn't available |
-| `swo` | J-Link only | Lossy | ~1 Mbps | Diagnostics only — drops data silently |
+| `rtt` (default) | J-Link only, the flashing cable | no | high | Almost always. |
+| `usb_cdc` | target USB cable plus the J-Link | no (CRC and flow control) | medium | RTT is not available on your host, or the capture is very large. |
+| `uart` | the J-Link OB virtual COM port | best effort | low (115200 8N1) | USB CDC is not available either. |
+| `swo` | J-Link only | yes, silently | low | Diagnostics only: checking the firmware is alive. Never for a measurement. |
 
-## How transport selection works
+The four values are the `Transport` vocabulary in
+`src/helia_profiler/vocab.py`. hpx does not retry with another transport
+after a failure, because the transport changes both the generated firmware
+and the capture reliability.
+
+With the default `power.firmware: dedicated`, power capture flashes a
+separate transport-free binary, so the transport affects PMU capture only
+and does not bias current or energy results. Only `power.firmware: shared`
+puts the transport inside the power measurement; see
+[Power measurement](../power/).
+
+## Steps
+
+### 1. Select it
 
 ```bash
-hpx profile model.tflite --transport rtt       # default
+hpx profile model.tflite --transport rtt        # default
 hpx profile model.tflite --transport usb_cdc
 hpx profile model.tflite --transport uart
 hpx profile model.tflite --transport swo
 ```
-
-or in YAML:
 
 ```yaml
 target:
   transport: rtt
 ```
 
-The choice is global across the run — every PMU pass and metadata block
-flows over the same transport. `uart` uses the J-Link OB virtual COM port at
-115200 8N1, so it is the low-throughput fallback when USB CDC is unavailable.
-HPX does not automatically retry with another transport after failure because
-the transport changes both generated firmware and capture reliability.
+### 2. RTT
 
-:::note[Transport choice no longer affects power numbers]
-With the default `power.firmware: dedicated` (see
-[Dedicated power firmware](../power/#dedicated-power-firmware)), power
-capture flashes a separate transport-free binary, so the transport you
-pick here only affects **PMU capture reliability and throughput** — it
-no longer biases current/energy results. That transport-dependent power
-contamination (largest with USB CDC) only applies if you opt into
-`power.firmware: shared`.
-:::
+[SEGGER Real-Time Transfer](https://www.segger.com/products/debug-probes/j-link/technology/about-real-time-transfer/)
+uses buffers in target RAM that the host reads over SWD. No target
+peripheral is involved in the transfer, which keeps the PMU data clean.
 
-## RTT (recommended)
+- Hardware: the J-Link over the same USB cable used for flashing. The RTT
+  target sources are bundled; `target.segger_rtt_path` or
+  `SEGGER_RTT_PATH` test another checkout.
+- hpx opens the RTT session through `pylink` after J-Link Commander resets
+  the target, and uses a toolchain-aware up-buffer (32 KB for GCC and
+  armclang, 12 KB for ATfE by default; `--rtt-buffer-size-up` overrides it
+  when a measured capture needs different sizing). Lines are scanned for the
+  hpx protocol sentinels.
+- RTT carries the PSRAM model handshake: the firmware emits
+  `HPX_PSRAM_READY`, the host writes the model into PSRAM over J-Link, and
+  the firmware proceeds on `HPX_GO`. PSRAM model placement on the
+  interpreter engines therefore requires `rtt`.
 
-[Segger Real-Time Transfer](https://www.segger.com/products/debug-probes/j-link/technology/about-real-time-transfer/)
-uses dedicated buffers in target RAM that the host reads over SWD. No
-target peripherals are involved during transfer, which keeps PMU data
-clean.
+### 3. USB CDC
 
-### Hardware
+The target enumerates as a USB CDC ACM serial device (TinyUSB) and the
+host reads the same protocol stream from that port.
 
-- J-Link probe connected via SWD to the target.
-- The same USB connection used for flashing — no extra cables.
-- SEGGER RTT target sources bundled with heliaPROFILER. Use
-  `target.segger_rtt_path` or `SEGGER_RTT_PATH` only to test an explicit
-  alternate checkout.
+- Hardware: a cable from the EVB's target USB connector (not the J-Link
+  connector) to the host, with the J-Link still attached for flashing and
+  reset. Both stay plugged in for the run.
+- hpx matches the firmware's `HPX-<jlink_serial>` USB serial-number marker
+  when available; otherwise it falls back to `/dev/tty.usbmodem*` (macOS)
+  and `/dev/ttyACM*` (Linux), excluding SEGGER ports and other `HPX-*`
+  devices, and asks for an explicit `--usb-port` when candidates are
+  ambiguous. Reads go through `pyserial`, line-buffered.
+- The firmware pauses USB polling (Timer 3) around each PMU window so USB
+  interrupts stay out of the counters; on some boards residual activity
+  remains, so RTT is quieter when PMU consistency matters.
 
-### How heliaPROFILER uses it
+### 4. UART
 
-- Opens an RTT session through `pylink` after `JLinkExe` resets the target.
-- Uses a toolchain-aware firmware up-buffer (32 KB for GCC/armclang and
-  12 KB for ATfE by default). Override it with `--rtt-buffer-size-up` only
-  when a measured capture requires different sizing. Lines are scanned for
-  HPX protocol sentinels.
-- Supports the PSRAM model handshake: firmware emits `HPX_PSRAM_READY`,
-  the host writes the model directly to PSRAM via J-Link, and the
-  firmware proceeds with `HPX_GO`.
+The J-Link OB virtual COM port at 115200 8N1. Low throughput, best-effort
+delivery, no extra cable. It is the fallback when a board does not expose a
+usable target USB path.
 
-### Pros / cons
-
-| ✓ | ✗ |
-|---|---|
-| Lossless | In-flight capacity is bounded by the configured RTT up-buffer |
-| Zero target CPU/peripheral interrupts during transfer | Requires J-Link probe |
-| Same USB cable as flashing — no extra wiring | |
-
-## USB CDC
-
-The target enumerates as a USB CDC ACM serial device (TinyUSB). The host
-opens that serial port and reads the same HPX protocol stream.
-
-### Hardware
-
-- USB cable from the EVB's **target USB** connector (not the J-Link USB)
-  to the host.
-- A J-Link is still required for **flashing** and target reset.
-- Both cables stay plugged in throughout the run.
-
-### How heliaPROFILER uses it
-
-- Matches the firmware's `HPX-<jlink_serial>` USB serial-number marker when
-  available. Otherwise, falls back to `/dev/tty.usbmodem*` (macOS) and
-  `/dev/ttyACM*` (Linux), excluding SEGGER/J-Link ports and devices with a
-  different `HPX-*` marker. Ambiguous candidates require an explicit `--usb-port`.
-- Reads through `pyserial`, line-buffered.
-- The firmware **pauses USB polling** (Timer 3) around each PMU
-  measurement window so USB interrupts don't pollute the counters.
-
-### Pros / cons
-
-| ✓ | ✗ |
-|---|---|
-| Lossless — CRC + flow control built into USB | Requires a second USB cable |
-| Higher throughput than RTT for very large captures | Target USB stack costs flash and RAM |
-| Works on hosts where pylink/RTT is flaky | Some EVBs route the target USB through a hub or switch |
-
-## SWO (legacy / diagnostic)
+### 5. SWO
 
 [Serial Wire Output](https://developer.arm.com/documentation/100748/0623/Debugging-your-application/Using-the-Serial-Wire-Viewer)
-streams data over the SWO pin via the target's ITM stimulus port 0.
-Captured via the J-Link probe using the `pylink` API.
+streams ITM stimulus port 0 over the SWO pin, captured through `pylink`.
+Most Ambiq EVBs route SWO through the J-Link header.
 
-### Hardware
-
-- J-Link probe with the SWO pin connected. Most Ambiq EVBs route SWO
-  through the J-Link header by default.
-
-### Caveats
-
-:::caution[SWO can drop data]
-SWO has no flow control. At ~1 Mbps the firmware can saturate the
-link during preset transitions and lose lines. The HPX parser
-detects truncated output, but you may see fewer iterations than
-requested or missing layers.
-
-SWO is retained for diagnostic use — checking that the firmware is
-alive when RTT or USB CDC misbehaves. Switch back to RTT for real
-measurements.
+:::caution[SWO drops data]
+SWO has no flow control. The firmware can saturate the link during preset
+transitions and lose lines; the parser detects truncation, but you will see
+fewer iterations than requested or missing layers. Use it to confirm the
+firmware is alive, then switch back to RTT for the measurement.
 :::
 
-## Choosing a transport
+## Expected output
 
-```mermaid
-graph TD
-    A[Start] --> B{Is RTT working?}
-    B -->|Yes| C[rtt — default]
-    B -->|No| D{Need lossless?}
-    D -->|No| E[swo]
-    D -->|Yes| F{Target USB CDC available?}
-    F -->|Yes| G[usb_cdc]
-    F -->|No| H[uart]
-```
-
-For 95% of runs, the default `rtt` is correct. Switch to `usb_cdc` when:
-
-- You're capturing extremely large per-layer data and the configured RTT
-  buffer is filling; consider an explicit larger `--rtt-buffer-size-up`.
-- Your host has flaky `pylink`/J-Link RTT support but the target USB
-  works fine.
-- Your board does not expose a usable target USB CDC path, but the J-Link OB
-  virtual COM port is available — use `uart` as the fallback.
+`run_metadata.json` records the transport, the RTT buffer size or the USB
+port used. A clean run reports every requested iteration and layer; a
+short count on `swo` or `uart` is the transport, not the model.
 
 ## Troubleshooting
 
-:::caution[RTT capture hangs / no data after flash]
-Most often: the firmware is wedged before reaching the HPX protocol.
-Try `--verbose` to see where it stopped. If JLinkExe reports
-`Cannot connect to RTT control block`, run `hpx doctor` to check that
-J-Link Commander is available. Doctor does not check its version;
-verify the installed version separately and update the SEGGER J-Link
-software if needed.
+:::caution[RTT capture hangs or shows no data after flash]
+Usually the firmware wedged before reaching the protocol. Run with
+`--verbose` to see where it stopped. `Cannot connect to RTT control block`
+from J-Link Commander means the SEGGER software is missing or old;
+`hpx doctor` checks presence, not version.
 :::
 
 :::caution[USB CDC: serial port not found]
-Replug the **target USB** cable (not just the J-Link). On Linux you
-may need udev rules for the device VID/PID. Use `hpx ports list --all --json`
-to inspect the port's `hwid` (including VID/PID when available); `--verbose`
-reports marker matching and port discovery, not an expected VID/PID.
+Replug the target USB cable, not only the J-Link. On Linux the device may
+need a udev rule for its VID and PID; `hpx ports list --all --json` shows
+each port's `hwid`, and `--verbose` reports the marker matching.
 :::
 
 :::caution[USB CDC numbers look noisier than RTT]
-The firmware pauses Timer 3 (USB poll) around PMU windows, but on
-some boards there can still be residual USB activity. RTT is
-quieter — switch back if PMU consistency matters.
+Residual USB activity on some boards. Switch back to RTT when PMU
+consistency matters.
 :::
 
 :::caution[SWO output is truncated]
-Use RTT or USB CDC. SWO is fundamentally lossy.
+Expected. Use RTT or USB CDC for the measurement.
 :::
+
+## What next
+
+[Memory placement](../memory/) for where the model and its arena live, and
+the PSRAM handshake that needs RTT; [PMU counters](../pmu-counters/) for
+what the transport is carrying.
