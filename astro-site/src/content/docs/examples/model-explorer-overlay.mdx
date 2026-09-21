@@ -1,0 +1,90 @@
+---
+title: "Per-layer cost on the model graph"
+description: "Load the overlays hpx writes into Google's Model Explorer to see cycles, cache misses or vector instructions coloured onto the model's own graph."
+---
+
+## Goal
+
+Look at a hot layer in context. You will learn which files to load, how
+the colours map to values, and how to switch between counters to tell a
+compute-bound layer from a memory-bound one.
+
+## Hardware and wiring
+
+Any supported board for the profile run; none for the viewing step, which
+is a browser on the host.
+
+## Software prerequisites
+
+hpx, a completed profile with `output.model_explorer` left at its default
+of `true`, and [Model Explorer](https://github.com/google-ai-edge/model-explorer)
+(`pip install ai-edge-model-explorer`, then `model-explorer`), or its
+hosted build.
+
+## Config file
+
+Any profile config; [`examples/quickstart/hpx_full_sweep.yml`](https://github.com/AmbiqAI/helia-profiler/blob/main/examples/quickstart/hpx_full_sweep.yml)
+sets `output.model_explorer: true` explicitly and captures the counters
+that make the overlays interesting. The quickstart
+[`hpx_rt.yml`](https://github.com/AmbiqAI/helia-profiler/blob/main/examples/quickstart/hpx_rt.yml)
+writes overlays for its default counters as well.
+
+## Run
+
+```bash
+cd examples/quickstart
+hpx profile --config hpx_full_sweep.yml
+ls results/results_full_sweep/model_explorer/
+model-explorer kws_model.tflite
+```
+
+In Model Explorer, open the model, choose **Add overlay** and pick
+`results/results_full_sweep/model_explorer/me_overlay_ARM_PMU_CPU_CYCLES.json`.
+
+## Expected output
+
+Not yet captured: the shipped bundles were produced with
+`model_explorer: false`. A run with overlays enabled writes one file per
+captured counter:
+
+```
+model_explorer/me_overlay_ARM_PMU_CPU_CYCLES.json
+model_explorer/me_overlay_ARM_PMU_INST_RETIRED.json
+model_explorer/me_overlay_ARM_PMU_STALL_FRONTEND.json
+model_explorer/me_overlay_ARM_PMU_STALL_BACKEND.json
+```
+
+Each is Model Explorer's node-data format keyed by graph id:
+
+```json
+{"main": {"name": "ARM_PMU_CPU_CYCLES", "results": {"0": {"value": 337348.0}, "1": {"value": 216205.0}}, "gradient": [{"stop": 0, "bgColor": "#22c55e"}, {"stop": 0.5, "bgColor": "#eab308"}, {"stop": 1, "bgColor": "#ef4444"}]}}
+```
+
+## How to read it
+
+- Green is the minimum value in that overlay, yellow the midpoint, red the
+  maximum. The scale is relative to the one file, so a colour says nothing
+  about absolute cost and nothing across two overlays or two runs.
+- Switch overlays on the same graph: a layer red on cycles and red on
+  `ARM_PMU_L1D_CACHE_MISS_RD` is waiting on memory and is a placement
+  question ([Memory placement](../../guide/memory/)); red on cycles and
+  green on cache misses is compute-bound and a kernel or engine question.
+- Node matching: heliaRT and TFLM overlays match by the runtime's
+  sequential operator index; heliaAOT overlays use the model's original
+  operator index, which the compiler preserves even when it skips
+  operators ([Model Explorer overlays](../../guide/model-explorer/)).
+- `jq '.main.results' me_overlay_ARM_PMU_CPU_CYCLES.json` reads the values
+  without the viewer; the same numbers with more context are in
+  `profile_results.csv`.
+
+## Variations
+
+- `--no-model-explorer` or `output.model_explorer: false` skips the export.
+- Compare two runs visually by opening each overlay in its own tab; for a
+  numeric comparison use `hpx compare` ([Compare engines](../engine-comparison/)).
+
+## Validated on
+
+Not yet validated. No shipped bundle contains a `model_explorer/`
+directory; the file layout and JSON shape above are quoted from
+`report/model_explorer.py` at the source tree this site was built from.
