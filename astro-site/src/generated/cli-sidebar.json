@@ -1,0 +1,67 @@
+[
+  {
+    "label": "Command line",
+    "items": [
+      {
+        "label": "Overview",
+        "slug": "reference/cli"
+      },
+      {
+        "label": "hpx analyze",
+        "slug": "reference/cli/analyze"
+      },
+      {
+        "label": "hpx boards",
+        "slug": "reference/cli/boards"
+      },
+      {
+        "label": "hpx cache",
+        "slug": "reference/cli/cache"
+      },
+      {
+        "label": "hpx compare",
+        "slug": "reference/cli/compare"
+      },
+      {
+        "label": "hpx doctor",
+        "slug": "reference/cli/doctor"
+      },
+      {
+        "label": "hpx engines",
+        "slug": "reference/cli/engines"
+      },
+      {
+        "label": "hpx ports",
+        "slug": "reference/cli/ports"
+      },
+      {
+        "label": "hpx power-on",
+        "slug": "reference/cli/power-on"
+      },
+      {
+        "label": "hpx probes",
+        "slug": "reference/cli/probes"
+      },
+      {
+        "label": "hpx profile",
+        "slug": "reference/cli/profile"
+      },
+      {
+        "label": "hpx target",
+        "slug": "reference/cli/target"
+      },
+      {
+        "label": "hpx validate",
+        "slug": "reference/cli/validate"
+      }
+    ]
+  },
+  {
+    "label": "Configuration",
+    "slug": "reference/configuration"
+  },
+  {
+    "label": "Issue codes",
+    "slug": "reference/issue-codes"
+  }
+]
