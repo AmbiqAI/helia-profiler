@@ -1,179 +1,102 @@
 # heliaPROFILER Agent Guide
 
-This file is for AI agents and automated contributors working in
-`helia-profiler`. It captures the architectural choices and repo workflows that
-should stay stable unless there is a deliberate design change.
+For AI agents and automated contributors. `hpx` profiles LiteRT (`.tflite`)
+and ExecuTorch (`.pte`) models on Ambiq Apollo boards: it builds temporary NSX
+firmware, flashes it, captures per-layer PMU counters and optional power, and
+writes a result bundle. It is a profiler, not a build system, SDK exporter, or
+application framework. Design rationale and module layout live in
+`docs/architecture/`; this file holds only what you cannot derive from the code.
 
-## Purpose
-
-`helia-profiler` (`hpx`) is a cross-platform CLI tool that profiles LiteRT
-(TFLite) flatbuffer models and ExecuTorch (`.pte`) programs on Ambiq Apollo
-hardware. It captures per-layer PMU counter breakdowns and optional power
-measurements.
-
-It is **not** a build system, SDK exporter, or application framework. It is a
-profiler.
-
-## Architectural Rules
-
-### One Engine Per Run
-
-The user explicitly selects one inference engine (`tflm`, `helia-rt`,
-`helia-aot`, `executorch`) per invocation. Do not add multi-engine
-orchestration.
-
-### Explicit Over Auto-Magic
-
-Prefer clear user-specified configuration over brittle auto-detection. If
-something needs to be known (arena size, memory placement), the user provides
-it or the firmware reports it at runtime with a clear error.
-
-### Immutable Config
-
-The `ProfileConfig` is resolved once at startup and frozen. No field should be
-mutated during execution. Do not add mutable global state.
-
-### Engine Isolation
-
-Each engine adapter runs in its own subprocess or module boundary. If an
-engine tool fails, the error propagates naturally. Do not monkey-patch
-`sys.exit` or swallow exceptions from engine tools.
-
-### NSX as Build Backend
-
-Firmware is built using the NSX pipeline (configure → build → flash). Prefer
-the `neuralspotx` Python API when available. Fall back to `subprocess.run()`
-calling the `nsx` CLI. Never use `os.system()` or `shell=True`.
-
-### heliaRT NSX Wrapper
-
-The `HeliaRTAdapter` generates a temporary NSX module wrapper (nsx-module.yaml
-+ CMakeLists.txt) so that heliaRT prebuilt static libraries appear as
-`nsx::helia_rt` to the firmware build. The pinned version lives in
-`engines/helia_rt/artifacts.py` — bump `HELIART_VERSION` when adopting a new release.
-This shim is retired once heliaRT ships a native `nsx-module.yaml`.
-
-### No Export Mode
-
-`hpx` does not generate exportable examples, static libraries, or AmbiqSuite
-projects. It generates temporary firmware, profiles, and reports results.
-
-### Cross-Platform First
-
-- `pathlib.Path` for all file paths
-- `subprocess.run()` with argument lists
-- `pyserial` for serial communication
-- No POSIX-only assumptions
-
-### HPX CLI Before Raw Debug Tools
-
-Run HPX through the project environment, preferably from any directory as:
+## Commands
 
 ```bash
-uv --directory <repo-root> run hpx ...
+uv sync --locked --all-groups --extra aot --extra analysis
+uv run ruff check . && uv run ruff format --check .
+uv run ty check src/helia_profiler tests
+uv run pytest -q                      # unit suite; hardware/compile_hw markers deselected
+uv run --group docs zensical build    # docs site (zensical, not mkdocs, is what Pages runs)
+pre-commit run --all-files            # identical to the CI pre-commit job
+uv --directory <repo-root> run hpx ...   # run the CLI from anywhere
 ```
 
-For probe and target diagnostics, prefer HPX's non-interactive helpers before
-reaching for raw SEGGER Commander sessions:
+Regenerate after changing the source they derive from; CI fails on drift:
 
-+ `hpx probes list [--board <board>] [--json]`
-+ `hpx probes match --board <board> [--jlink-serial <serial>]`
-+ `hpx ports list [--all] [--json]`
-+ `hpx target reset --board <board> [--jlink-serial <serial>] [--kind debug|swpoi]`
+```bash
+uv run python tools/gen_config_reference.py         # ProfileConfig → docs/reference/configuration.md
+uv run python tools/gen_issue_code_reference.py     # issue registry → docs/reference/issue-codes.md
+uv run python tools/gen_wire_protocol_reference.py  # wire registry → docs/reference/wire-protocol.md
+HPX_UPDATE_SNAPSHOTS=1 uv run pytest tests/contracts/test_firmware_render_snapshots.py tests/contracts/test_report_golden.py
+```
 
-Avoid raw `JLinkExe` in agent workflows unless HPX lacks the needed operation.
-If raw `JLinkExe` is unavoidable, use a non-interactive script that ends with
-`exit`, set a timeout, and prefer adding a wrapper in `target/probe/jlink.py` afterward.
+Software-only capture tests need the device guard installed before HPX is
+imported: `uv run python tools/software_only.py pytest <test> -q`. A pytest
+marker alone does not guard anything.
 
-## Module Responsibilities
+## Architectural rules
 
-| Module | Responsibility |
-| --- | --- |
-| `api.py` | `profile()` — public programmatic entry point, returns `ProfileResult` |
-| `cli/` | Typer command package (`app.py` + one module per command); delegates to `api.profile()` and the console layer |
-| `config.py` | `ProfileConfig` dataclass, YAML + CLI merge |
-| `compatibility.py` | Typed HPX compatibility baseline (`data/compatibility-baseline-v1.json`) — qualified NSX project/module/engine refs and override classification |
-| `results/` | Typed result models, workflow artifacts, and bundle manifests |
-| `evaluation/` | Model analysis, verified comparison, validity, and regression profiles |
-| `profiler.py` | Pipeline composition and logging setup |
-| `pipeline.py` | `PipelineContext`, `Stage` protocol, `PipelineRunner` |
-| `engines/` | One adapter per inference engine; `EngineAdapter` protocol and `EngineArtifacts` in `base.py` (`NsxModuleRef` lives in `results/models.py`) |
-| `firmware/` | NSX app generation from Jinja templates |
-| `capture/` | Capture orchestration, PMU parser → `PmuResult`, target readiness, power terminal records (transports themselves live in `transport/`) |
-| `power/` | Power measurement drivers, `PowerResult` in `base.py` |
-| `report/` | CSV, JSON, run summary, result manifest, Model Explorer overlays |
-| `console/` | All Rich rendering — progress, tables, results, comparisons. The library never prints; the CLI does |
-| `stages/` | One module per pipeline stage; `profiler.build_default_pipeline()` owns the order |
-| `platform/` | SoC families, board registry, capabilities, and custom overlays |
-| `transport/rtt.py` | RTT capture lifecycle; direct control-block access and low-level test patch points live in `rtt_control.py` |
-| `target/probe/jlink.py` | SEGGER J-Link helpers (discovery, reset, SWO commands) |
-| `nsx.py` | NSX build-system subprocess wrapper |
-| `doctor.py` | Host toolchain/version checks (`hpx doctor`) — never raises, informational only |
-| `redact.py` | Deterministic redaction of paths, URL credentials/tokens, secret assignments, and device serials for diagnostics output |
-| `support_bundle.py` | `hpx doctor --bundle` field-diagnostics collector and deterministic archive writer/verifier |
-| `errors.py` | Typed error hierarchy with `hint` field |
-| `session.py` | Immutable, branchable `Session` API for notebooks and scripts (backs `docs/reference/api/session.md`) |
-| `validation/` | `hpx validate` hardware-in-the-loop harness — case matrix, runner, report, and portable bundle |
-| `dependencies.py` | Locked-dependency preparation (`prepare_locked_dependencies`) for reproducible firmware builds |
+- **One engine per run.** The user selects `tflm`, `helia-rt`, `helia-aot`, or
+  `executorch` explicitly. No multi-engine orchestration, no auto-detection.
+- **Explicit over auto-magic.** Arena size, memory placement, and the like
+  come from the user or from firmware at runtime with a clear error.
+- **`ProfileConfig` is resolved once and frozen.** No mutable global state.
+- **Engine isolation.** Each adapter runs in its own subprocess or module
+  boundary; engine failures propagate. Never monkey-patch `sys.exit` or
+  swallow exceptions from engine tools.
+- **NSX is the build backend** (configure → build → flash). Prefer the
+  `neuralspotx` Python API, fall back to `subprocess.run([...])` on the `nsx`
+  CLI. Never `os.system()` or `shell=True`.
+- **Data between stages is frozen dataclasses from `results/`**, never bare
+  dicts. The one exception is `LayerResult.counters` (PMU names are dynamic).
+- **Cross-platform first:** `pathlib.Path`, argument-list subprocesses,
+  `pyserial`, no POSIX-only assumptions.
+- **`cli/` stays thin:** parse args, call `api`/`Session`, hand results to
+  `console/`. The library never prints; only the console layer does.
+- The heliaRT NSX wrapper (`engines/helia_rt/`) is a shim until heliaRT ships
+  a native `nsx-module.yaml`; bump `HELIART_VERSION` in `artifacts.py` to
+  adopt a release.
 
-### Data Contract
+## Hardware and probes
 
-All structured data between pipeline stages uses frozen dataclasses from
-the `results/` package, never bare `dict[str, Any]`. The main exception is
-`LayerResult.counters: dict[str, float]` — PMU counter names are dynamic.
+Use HPX's non-interactive helpers before raw SEGGER tooling: `hpx probes
+list|match`, `hpx ports list`, `hpx target reset`. If raw `JLinkExe` is
+unavoidable, script it non-interactively with a timeout and an `exit`, then
+add the operation to `target/probe/jlink.py`. The bench nightly and its
+runner contract are described in `maintainers/hardware-ci.md`.
 
-## Working Rules
+## Code and commit style
 
-- Prefer focused modules. Extract when a file accumulates multiple concerns.
-- Keep the `cli/` modules thin — they parse args, call `api`/`Session`, and
-  hand results to `console/` for rendering. No profiling logic in commands.
-- Use `subprocess.run()` with argument lists for all external tool calls.
-- Use dataclasses (frozen when possible) for internal models.
-- Tests should be fast, local, and mock external tools.
-- Use Conventional Commits for all commit messages.
+- Conventional Commits.
+- Tests are fast, local, and mock external tools.
+- Comments state **what** in one or two lines. When the why is an external
+  fact, link it: `# WORKAROUND helia-aot#349: their module checks ARM_NN_*`.
+  No third-party version numbers, bench numbers, or review history in code or
+  docstrings; those belong in `docs/architecture/compatibility-baseline.md`,
+  the issue, or git history. `rg WORKAROUND` is the cleanup pass.
+- Every `TODO(...)`/`FIXME(...)`/`HACK(...)` needs an issue or name reference
+  (pre-commit enforces it).
 
-### Comments
+## Gotchas
 
-- A comment or docstring states **what** the code does, in one or two lines.
-  When the **why** rests on an external fact, link the issue instead of
-  explaining it: `# WORKAROUND helia-aot#349: their module checks ARM_NN_*`.
-- Never put third-party version numbers, "X requires/refuses Y", bench
-  numbers, or review history in code. Those live in
-  `docs/architecture/compatibility-baseline.md`, the issue, or git history.
-- Tag workarounds for upstream defects with `WORKAROUND <repo>#<n>` so the
-  cleanup pass is `rg WORKAROUND`. Docstrings describe the contract, not the
-  history. This applies to tests.
-
-## Dependency Security Floors
-
-Dependabot alerts on `uv.lock`, and alerts often land on transitive packages
-HPX never names directly. Hold the fix in `[tool.uv] constraint-dependencies`
-in `pyproject.toml` — one entry per advisory, set to the first patched release,
-commented with the advisory and the path that reaches it — then re-run
-`uv lock`. Constraints only shape this repo's resolution; they do not leak into
-downstream consumers' resolves, so a real runtime floor still belongs in
-`[project] dependencies`.
-
-`tests/test_security_advisories.py` asserts `uv.lock` honours every declared
-floor — across every per-marker resolution fork, not just the first entry for a
-name — and fails on floors that no longer apply, so stale entries get dropped
-rather than accumulating. Dropping a floor is a two-place edit: remove the
-constraint and its assertion in `test_security_floors_are_declared`.
-
-`uv lock` strips the `# x-release-please-version` marker from the
-`helia-profiler` entry in `uv.lock`. Restore it before committing — the
-`package` CI job requires exactly one marker.
-
-## Compatibility Baseline Pins
-
-NSX resolves a module-level registry revision ahead of an app's
-project-level override — including the *packaged* registry's module
-defaults. A baseline pin therefore must reach the generated
-`module_registry.modules` entry, not just the project entry
-(`_render_module_registry` handles this for every app module owned by a
-pinned project). `prepare_locked_dependencies` independently verifies the
-lock's resolved commits against the baseline and raises `VersionError` on
-drift, so a resolver disagreement fails loudly instead of shipping
-unqualified sources under a QUALIFIED claim. When adding a baseline
-project, assert the pin in the *lock/manifest module entry* in tests —
-never encode the currently-observed registry shape as a golden.
+- `uv lock` strips the `# x-release-please-version` marker from the
+  `helia-profiler` entry in `uv.lock`. Restore it before committing; the
+  `package` CI job requires exactly one.
+- Dependabot floors go in `[tool.uv] constraint-dependencies` in
+  `pyproject.toml`, one per advisory at the first patched release, then
+  `uv lock`. `tests/test_security_advisories.py` checks every floor is honoured
+  and fails on floors that no longer apply, so dropping one is a two-place
+  edit (constraint + its assertion). A real runtime floor still belongs in
+  `[project] dependencies`.
+- Compatibility baseline pins must reach the generated
+  `module_registry.modules` entry, not just the project entry: NSX resolves a
+  module-level registry revision ahead of the project override.
+  `prepare_locked_dependencies` verifies resolved commits against the baseline
+  and raises `VersionError` on drift. When adding a baseline project, assert
+  the pin in the lock/manifest module entry in tests; never golden the
+  observed registry shape.
+- A firmware template that starts using a new variable or vendor symbol must
+  also reach both compile gates: Tier 1 (`tests/contracts/test_render_compile.py`
+  + `tests/fixtures/compile_stubs/`) and Tier 2
+  (`tests/contracts/test_render_compile_hw.py`, bench only). Tier 1 passing
+  does not imply Tier 2 renders.
+- `docs/` is published in full; `exclude_docs` in `mkdocs.yml` is ignored by
+  zensical. Maintainer-only material goes in `maintainers/`.
