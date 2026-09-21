@@ -63,7 +63,7 @@
     "path": [],
     "name": "hpx",
     "kind": "group",
-    "usage": "hpx COMMAND [ARGS]...",
+    "usage": "hpx [OPTIONS] COMMAND [ARGS]...",
     "short_help": "Profile LiteRT and ExecuTorch models on Ambiq silicon.",
     "help": "Profile LiteRT and ExecuTorch models on Ambiq silicon.",
     "epilog": null,

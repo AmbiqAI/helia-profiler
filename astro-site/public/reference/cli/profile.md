@@ -69,7 +69,7 @@ Defined in `src/helia_profiler/cli/app.py` line 93.
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
 | `--pmu-counters` | `Optional[list[str]]` |  | PMU counter selection per compute unit. Repeatable. Format: GROUP:SELECT where GROUP is a supported group for the target SoC (for example cpu/mve/memory on Cortex-M55) and SELECT is 'default', 'all', or comma-separated counter names. Examples: --pmu-counters cpu:default --pmu-counters mve:all, --pmu-counters mve:ARM_PMU_MVE_INST_RETIRED,ARM_PMU_MVE_STALL Repeatable. |
-| `--per-layer` | `Optional[bool]` |  | Per-layer breakdown (default) |
+| `--per-layer, --no-per-layer` | `Optional[bool]` |  | Per-layer breakdown (default) |
 | `--iterations` | `Optional[int]` |  | Inference iterations (default: 100) |
 | `--warmup` | `Optional[int]` |  | Warmup iterations (default: 5) |
 | `--aggregation` | `mean \| median \| trimmed` |  | How per-layer counters are aggregated across iterations (default: median). 'median' rejects corrupted iterations; 'trimmed' drops extremes then means; 'mean' is the raw average. |

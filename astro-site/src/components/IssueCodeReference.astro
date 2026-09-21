@@ -65,7 +65,7 @@ const sections = [
       summary: `${section.rows.length} codes`,
     })),
     ...issues.families.map((family) => ({
-      id: family.pattern,
+      id: anchorId(family.pattern),
       name: family.pattern,
       kind: 'enum',
       summary: `${family.codes.length} codes`,
