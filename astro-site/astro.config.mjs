@@ -105,15 +105,12 @@ export default defineConfig({
                 {
                   label: 'Read results',
                   items: [
-                    { label: 'Output & Results', slug: 'guide/output' },
-                    {
-                      label: 'Analysis & Run Comparison',
-                      slug: 'guide/analysis-comparison',
-                    },
-                    {
-                      label: 'Model Explorer Overlays',
-                      slug: 'guide/model-explorer',
-                    },
+                    { label: 'Output files', slug: 'guide/output' },
+                    { label: 'Latency and per-layer', slug: 'guide/latency' },
+                    { label: 'Analysis and comparison', slug: 'guide/analysis-comparison' },
+                    { label: 'Model Explorer overlays', slug: 'guide/model-explorer' },
+                    { label: 'Parsing outputs', slug: 'guide/parsing-outputs' },
+                    { label: 'Troubleshooting', slug: 'guide/troubleshooting' },
                   ],
                 },
                 {
