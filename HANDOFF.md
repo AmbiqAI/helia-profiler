@@ -36,27 +36,51 @@ comments on #320.
   keep verifying. Their `run_metadata.json` carries the runner's paths and
   the probe serial; the owner has not yet ruled on that.
 
-## State (2026-09-21, close)
+## State (2026-09-21, hand-off)
 
-Every sub-PR is merged into `docs-migration` (#333 to #362): skeleton, the
-generated references, the content port, Getting started, Set up a run,
-Measure, Read results, Concepts, Examples, the host-only power pages,
-Reference polish, the helia-ui alpha.19 pin and the cutover. `main` is
-merged in (4f2afae). PR #332 carries the branch to `main` as one squash and
-is marked ready; merging it deploys the Astro site (the owner's call).
+Every sub-PR is merged into `docs-migration` (#333 to #365). Home was
+rebuilt twice today on the owner's direction: PR #364 replaced the ported
+landing with a documentation overview (owner-approved mockup), PR #365 put
+a health check, a profile and a compare on both entry-point cards (CLI and
+the `Session` API) and the icon tiles and chips on the support cards.
+#337 is closed as superseded. `main` is merged in (4f2afae). PR #332
+carries the branch to `main` as one squash, CI is green at e1181b0d, and
+merging it deploys the Astro site. The owner merges; it needs an admin
+squash because `main` requires a review.
 
-Open, owner decisions:
-- Home was rebuilt on branch `335-home-rebuild` as a documentation overview
-  (owner-approved mockup, 2026-09-21): version line, intro, quickstart
-  tabs, CLI and Python cards, supports cards, five-stage block diagram,
-  eight measurement rows, four section links. It supersedes #337, which
-  closes once the rebuild merges.
+To serve locally: `cd astro-site && npm ci && npm run dev -- --port 4321`,
+then http://localhost:4321/helia-profiler/. Home is `astro-site/src/content/
+docs/index.mdx`; the registry counts on it are typed as text and held to
+`src/data/catalog.json` and `src/data/schema.json` by `scripts/check-output.mjs`.
+
+Open for the owner, none blocking the merge:
+- Home wording: the boards card names the Atomiq110 FPGA carrier because
+  the registry count includes it; the apollo330mP EVB sits under the
+  "Apollo3, Apollo4 and Apollo5" sentence though the registry tags it AP5.
 - The shipped bundles' `run_metadata.json` (runner paths, probe serial),
   kept unmodified so the manifests verify; see PR #354.
-- Two issue drafts in the session scratchpad: bench captures for the
-  not-yet-validated example pages and the remaining #345 pages; exporting
-  `load_run_summary` and the `RunSummary` sections for the API reference.
-- Post-deploy verification on #322 after #332 lands.
+- Two issues to file once approved (drafts below). Post-deploy
+  verification on #322 after #332 lands: version in the shell, search,
+  redirects, 404, `llms.txt`, `llms-full.txt`, JSON endpoints.
+
+Issue draft A, "Examples: capture the power bundles the bench-dependent
+example pages need" (child of #320, #345): one `apollo510_evb` session with
+a Joulescope JS220 or JS320 running `examples/quickstart/hpx_aot_power.yml`
+(and the same with `helia-rt`), `hpx_full_sweep.yml` (cpu, memory, mve,
+model_explorer, detailed), and an INA228 run if a carrier is on the bench;
+ship each bundle unmodified under `examples/results/<date>/<case>/` with a
+run record so `load_result_manifest(verify=True)` passes; update the four
+"not yet validated" pages and write the three remaining #345 pages from
+them. Acceptance: manifests verify, every number traces to a bundle,
+`examples-template.test.mjs` and the chain green, index table updated.
+
+Issue draft B, "Export the run-summary loader and section models"
+(child of #320): add `load_run_summary`, `RunSummary`, `MemorySection`,
+`BinarySection`, `LatencySection`, `PowerSection` to `helia_profiler.__all__`
+with stability badges, add a `results.run_summary` group to
+`astro-site/src/data/api-groups.json`, regenerate, and link Parsing outputs
+and Re-analyse saved results to the pages. Acceptance: the import works and
+the export test covers it, the generated pages exist, `check:reference` green.
 
 ## Decisions
 
