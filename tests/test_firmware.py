@@ -2439,3 +2439,69 @@ class TestResolveProjectOverrides:
         user = {"nsx-npu": SimpleNamespace(path=None, ref="my-branch", version=None)}
         overrides = _resolve_project_overrides(self._specs(), user, self._baseline())
         assert overrides["nsx-ambiq-sdk"] == ("ref", "my-branch")
+
+
+class TestNpuClockKnob:
+    """target.clock.npu selects the Ethos-U perf mode rendered by _npu_init.j2."""
+
+    def _ctx(self, tmp_path: Path, fake_dist: Path, clock: dict):
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                # plain helia-rt: the ethos_u backend needs a source build; the NPU
+                # symbol is still resolved and exported to the template vars.
+                "engine": {"type": "helia-rt", "config": {"dist_path": str(fake_dist)}},
+                "target": {"board": "atomiq110_fpga_turbo", "clock": clock},
+                "work_dir": str(tmp_path / "work"),
+            },
+        )
+        work_dir = tmp_path / "work"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        return PipelineContext(config=config, work_dir=work_dir)
+
+    def test_default_is_high_performance(self, tmp_path: Path, fake_dist: Path):
+        ctx = self._ctx(tmp_path, fake_dist, {})
+        ResolvePlatformStage().run(ctx)
+        platform = ctx.run_metadata.platform
+        assert platform.npu_clock_name == "hp" and platform.npu_perf_mode == "NSX_NPU_PERF_HIGH_PERFORMANCE"
+        assert platform.cpu_clock_name == "lp" and platform.cpu_clock_mhz == 25
+
+    def test_ulp_reaches_the_render_and_metadata(self, tmp_path: Path, fake_dist: Path):
+        ctx = self._ctx(tmp_path, fake_dist, {"cpu": "hp", "npu": "ulp"})
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        platform = ctx.run_metadata.platform
+        assert platform.npu_clock_name == "ulp" and platform.npu_clock_mhz == 10
+        assert platform.npu_perf_mode == "NSX_NPU_PERF_ULTRA_LOW_POWER"
+        assert platform.cpu_clock_name == "hp" and platform.cpu_perf_tier == "NSX_PERF_HIGH"
+        from helia_profiler.firmware.context import FirmwareRenderContext
+
+        template_vars = FirmwareRenderContext.from_pipeline_context(ctx).to_template_vars()
+        assert template_vars["npu_perf_symbol"] == "NSX_NPU_PERF_ULTRA_LOW_POWER"
+        app_dir = generate_app(ctx)
+        main = (app_dir / "src" / "main.cc").read_text()
+        assert "sys_cfg.perf_mode = NSX_PERF_HIGH;" in main
+        assert "SystemCoreClock = 50U * 1000000U" in main
+
+    def test_unknown_npu_speed_is_a_config_error(self, tmp_path: Path, fake_dist: Path):
+        from helia_profiler.errors import ConfigError
+
+        ctx = self._ctx(tmp_path, fake_dist, {"npu": "turbo"})
+        with pytest.raises(ConfigError, match="npu clock 'turbo'"):
+            ResolvePlatformStage().run(ctx)
+
+    def test_npu_clock_on_board_without_npu_domain_is_a_config_error(self, tmp_path: Path, fake_dist: Path):
+        from helia_profiler.errors import ConfigError
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
+        config = load_config(None, {"model": {"path": str(model)},
+                                    "engine": {"type": "helia-rt", "config": {"dist_path": str(fake_dist)}},
+                                    "target": {"board": "apollo510_evb", "clock": {"npu": "hp"}},
+                                    "work_dir": str(tmp_path / "work")})
+        (tmp_path / "work").mkdir(exist_ok=True)
+        with pytest.raises(ConfigError, match="no npu clock domain"):
+            ResolvePlatformStage().run(PipelineContext(config=config, work_dir=tmp_path / "work"))

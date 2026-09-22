@@ -81,6 +81,10 @@ class ClockSelection:
     """
 
     cpu: str | None = None
+    #: NPU (Ethos-U) clock mode on SoCs that declare an ``npu`` clock domain
+    #: (``ulp`` / ``hp``). ``None`` selects the domain default; naming a speed
+    #: on a SoC without an npu domain is a ConfigError.
+    npu: str | None = None
 
 
 PSRAM_CLOCK_HZ_VALUES = (

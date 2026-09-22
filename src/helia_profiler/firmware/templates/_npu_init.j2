@@ -1,16 +1,17 @@
 {# Shared Ethos-U NPU initialization — included by main.cc.j2 and
    main_aot.cc.j2 inside engine_model_setup, before any engine work. #}
     // --- Ethos-U NPU init (before any engine work) --------------------------
-    // skip_perf_mode=false is hardware-validated on the atomiq110 NPU
-    // bitstream: HP mode programs fine even though the FPGA core clock is
-    // fixed. tolerate_power_ack accepts a failed NPU power-domain handshake
+    // perf_mode comes from target.clock.npu (SoC npu clock domain; hp is the
+    // default). skip_perf_mode=false is hardware-validated on the atomiq110
+    // NPU bitstream: the mode programs fine even where the FPGA clock tree
+    // does not follow it. tolerate_power_ack accepts a failed NPU power-domain handshake
     // on FPGA targets, whose always-on NPU does not model the power-status
     // acknowledgement. A hard failure here almost always means the loaded
     // bitstream's generation does not match the SDK payload the firmware
     // was built against (no working Ethos-U at the expected base address).
     {
         nsx_npu_config_t npu_cfg = {
-            .perf_mode          = NSX_NPU_PERF_HIGH_PERFORMANCE,
+            .perf_mode          = {{ npu_perf_symbol | default("NSX_NPU_PERF_HIGH_PERFORMANCE") }},
             .skip_perf_mode     = false,
             .tolerate_power_ack = {{ "true" if npu_tolerate_power_ack | default(false) else "false" }},
         };

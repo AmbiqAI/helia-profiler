@@ -92,6 +92,7 @@ def test_family_membership_and_order_are_the_documented_sets():
         "board",
         "soc",
         "cpu_clock",
+        "npu_clock",
         "toolchain",
         "compiler_version",
         "system_clock_hz",

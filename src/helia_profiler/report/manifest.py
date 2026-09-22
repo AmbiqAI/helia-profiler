@@ -204,6 +204,7 @@ def _comparability(ctx: PipelineContext) -> dict[str, Any]:
         ComparisonDimension.BOARD: platform.board if platform is not None else None,
         ComparisonDimension.SOC: platform.soc if platform is not None else None,
         ComparisonDimension.CPU_CLOCK: platform.cpu_clock_name if platform is not None else None,
+        ComparisonDimension.NPU_CLOCK: platform.npu_clock_name if platform is not None else None,
         ComparisonDimension.TOOLCHAIN: nested_get(config, "target", "toolchain"),
         ComparisonDimension.COMPILER_VERSION: (
             toolchain.compiler_version if toolchain is not None else None

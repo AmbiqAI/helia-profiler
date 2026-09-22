@@ -122,6 +122,18 @@ class PerfTier(Enum):
     HIGH = "NSX_PERF_HIGH"
 
 
+class NpuPerfMode(Enum):
+    """NSX NPU performance mode — maps directly to ``nsx_npu_perf_mode_e``.
+
+    The Ethos-U clock on Ambiq NPU parts has two operating points (the HAL's
+    ``AM_HAL_PWRCTRL_NPU_MODE_ULTRA_LOW_POWER`` / ``_HIGH_PERFORMANCE``),
+    selected independently of the CPU tier.
+    """
+
+    ULP = "NSX_NPU_PERF_ULTRA_LOW_POWER"
+    HP = "NSX_NPU_PERF_HIGH_PERFORMANCE"
+
+
 @dataclass(frozen=True)
 class ClockSpeed:
     """A single named operating point within a clock domain.
@@ -132,7 +144,7 @@ class ClockSpeed:
 
     name: str
     mhz: int
-    perf_tier: PerfTier | None = None
+    perf_tier: PerfTier | NpuPerfMode | None = None
 
 
 @dataclass(frozen=True)
@@ -773,14 +785,31 @@ _register_soc(
         clocks=(
             ClockDomain(
                 "cpu",
-                # The FPGA "turbo" bitstream runs the core at a single fixed
-                # clock (NSX_SEGGER_CPUFREQ=25000000 in
-                # cmake/socs/facts/atomiq110.cmake) -- there is no faster
-                # "hp" tier to expose on this realization, unlike the
-                # silicon AP5 parts. Declaring a real second speed here
-                # would be fabricated, not measured.
-                (ClockSpeed("lp", 25, PerfTier.LOW),),
+                # MCU performance modes are a PWRCTRL->MCUPERFREQ write (HAL
+                # LP = 250 MHz, HP = 500 MHz nominal). The FPGA "turbo"
+                # bitstream runs at 1/10 of nominal (NSX_SEGGER_CPUFREQ=
+                # 25000000 in cmake/socs/facts/atomiq110.cmake for the boot
+                # default LP). The MHz here set SystemCoreClock in the
+                # firmware. Measured on the drop 9.1 NPU bitstream via the
+                # J-Link SWO core-clock readout: lp 25.05 MHz, hp 50.1 MHz.
+                (
+                    ClockSpeed("lp", 25, PerfTier.LOW),
+                    ClockSpeed("hp", 50, PerfTier.HIGH),
+                ),
                 default="lp",
+            ),
+            ClockDomain(
+                "npu",
+                # Ethos-U85 clock modes (PWRCTRL->NPUPERFREQ): ULP = 100 MHz,
+                # HP = 500 MHz nominal, 1/10 on the FPGA bitstream (measured on
+                # drop 9.1: a compute-bound conv keeps NPU_ACTIVE constant while
+                # its wall time scales 5.0x between the modes). hp is the
+                # historical default the profiler always requested.
+                (
+                    ClockSpeed("ulp", 10, NpuPerfMode.ULP),
+                    ClockSpeed("hp", 50, NpuPerfMode.HP),
+                ),
+                default="hp",
             ),
         ),
         # The SoC facts expose PART_atomiq110 through
