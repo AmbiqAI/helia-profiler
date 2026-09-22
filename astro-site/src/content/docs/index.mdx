@@ -16,6 +16,8 @@ import CardContent from '@ambiqai/helia-ui/astro/CardContent';
 import CardActions from '@ambiqai/helia-ui/astro/CardActions';
 import LinkCard from '@ambiqai/helia-ui/astro/LinkCard';
 import IconRow from '@ambiqai/helia-ui/astro/IconRow';
+import IconTile from '@ambiqai/helia-ui/astro/IconTile';
+import Chip from '@ambiqai/helia-ui/astro/Chip';
 import BlockDiagram from '@ambiqai/helia-ui/astro/BlockDiagram';
 import Block from '@ambiqai/helia-ui/astro/Block';
 import DocsVersion from '../../components/DocsVersion.astro';
@@ -81,13 +83,14 @@ hpx compare results/a results/b   # two bundles, one delta
   <Card>
     <CardHeader>Command line</CardHeader>
     <CardContent>
-      A clean CLI with live progress, a validity footer and strict
-      configuration with did-you-mean suggestions. Merge `hpx.yml` with flags
-      for reproducible runs.
-
+      Live progress, a validity footer, and strict configuration with
+      did-you-mean suggestions. A health check, a profile and a comparison
+      are one command each.
 
 ```bash
-hpx profile --config hpx.yml --engine helia-aot --toolchain atfe
+hpx doctor                          # toolchain, probes, dependencies
+hpx profile model.tflite --power    # build, flash, capture, report
+hpx compare results/base results/new
 ```
 
     </CardContent>
@@ -98,17 +101,17 @@ hpx profile --config hpx.yml --engine helia-aot --toolchain atfe
   <Card>
     <CardHeader>Python API</CardHeader>
     <CardContent>
-      The same configuration model as a typed API. Call `profile()` from
-      notebooks, CI and agents and get a typed result back, or reload any
-      bundle from disk.
-
+      A `Session` holds the same configuration as `hpx.yml`, and every
+      `with_*` call returns a new one, so a notebook, a CI job or an agent
+      can branch a run and keep the original.
 
 ```python
-from pathlib import Path
-from helia_profiler import profile
-from helia_profiler.config import load_config
+import helia_profiler as hpx
 
-result = profile(load_config(Path("hpx.yml"), {}))
+session = hpx.Session.from_yaml("hpx.yml")
+session.doctor()                     # toolchain, probes, dependencies
+result = session.profile("model.tflite")
+delta = session.compare("results/base", "results/new")
 ```
 
     </CardContent>
@@ -122,40 +125,52 @@ result = profile(load_config(Path("hpx.yml"), {}))
 
 <CardGrid columns={4} equalize>
   <Card>
-    <CardHeader>4 engines</CardHeader>
+    <CardHeader>
+      <IconTile slot="eyebrow" name="table-cells-large" variant="outlined" />
+      4 engines
+    </CardHeader>
     <CardContent>
       heliaRT, heliaAOT, a stock LiteRT for Microcontrollers baseline and
       ExecuTorch, on one harness.
 
-      `helia-rt` `helia-aot` `tflm` `executorch`
+      <Chip>helia-rt</Chip> <Chip>helia-aot</Chip> <Chip>tflm</Chip> <Chip>executorch</Chip>
     </CardContent>
   </Card>
   <Card>
-    <CardHeader>3 toolchains</CardHeader>
+    <CardHeader>
+      <IconTile slot="eyebrow" name="screwdriver-wrench" variant="outlined" />
+      3 toolchains
+    </CardHeader>
     <CardContent>
       GNU Arm Embedded, Arm Compiler 6 and the Arm Toolchain for Embedded
       (preview in hpx), selectable per run.
 
-      `gcc` `armclang` `atfe`
+      <Chip>gcc</Chip> <Chip>armclang</Chip> <Chip>atfe</Chip>
     </CardContent>
   </Card>
   <Card>
-    <CardHeader>13 boards</CardHeader>
+    <CardHeader>
+      <IconTile slot="eyebrow" name="microchip" variant="outlined" />
+      13 boards
+    </CardHeader>
     <CardContent>
       Apollo3, Apollo4 and Apollo5 family EVBs and an Atomiq110 FPGA
       carrier, 2 of them on the stable channel, plus custom SoC definitions
       based on a known part.
 
-      `hpx boards`
+      <Chip>hpx boards</Chip>
     </CardContent>
   </Card>
   <Card>
-    <CardHeader>Measured power</CardHeader>
+    <CardHeader>
+      <IconTile slot="eyebrow" name="bolt" variant="outlined" />
+      Measured power
+    </CardHeader>
     <CardContent>
       Gated windows on a Joulescope or an on-board INA228, with health checks
       on the window itself.
 
-      `joulescope` `ina228`
+      <Chip>joulescope</Chip> <Chip>ina228</Chip>
     </CardContent>
   </Card>
 </CardGrid>
