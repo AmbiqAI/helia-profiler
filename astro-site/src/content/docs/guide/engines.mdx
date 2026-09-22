@@ -79,8 +79,9 @@ not from a guess.
 ### heliaAOT
 
 [heliaAOT](https://github.com/AmbiqAI/helia-aot) compiles a `.tflite`
-model into C source: no interpreter, no flatbuffer parsing, no per-operator
-dispatch at runtime.
+model into C source, with execution and memory planning performed at build
+time. Inference runs the generated code without a model interpreter or
+runtime flatbuffer parsing.
 
 ```yaml title="hpx.yml"
 engine:

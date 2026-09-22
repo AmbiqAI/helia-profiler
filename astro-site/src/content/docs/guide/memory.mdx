@@ -10,8 +10,7 @@ import Block from '@ambiqai/helia-ui/astro/Block';
 
 Decide where the two big objects of a run live: the tensor arena
 (activations and scratch) and the model weights (the flatbuffer, the AOT
-constant blobs or the PTE program). Placement often changes cycle counts
-more than the model does. This page covers the tiers, the automatic
+constant blobs or the PTE program). Placement can affect cycle counts and power. This page covers the tiers, the automatic
 policy, the explicit controls, the tuning loop and the engine differences.
 
 ## Prerequisites
@@ -137,21 +136,19 @@ hpx profile model.tflite --arena-location tcm --weights-location mram --output-d
 hpx compare results/place_tcm_tcm results/place_tcm_mram
 ```
 
-Read the result as a ratio ("weights in MRAM cost about this much more on
-this model") rather than as absolute counts; the ratio transfers between
-benches, the counts do not. The TCM-versus-MRAM gap is the cost of running
-weights from flash. For power experiments, weights in TCM may let the SoC
-power-gate MRAM during inference; compare the captured traces.
+Report both the absolute measurements and the change, with the model,
+clock, compiler and placement recorded. Neither counts nor ratios are
+guaranteed to transfer to a different configuration. Memory placement alone
+does not establish which regions were power-gated; use a configured power
+capture to measure the effect.
 
 ### 5. Tighten the arena
 
-`arena_size` is a request. Unset, the interpreter engines and heliaAOT use
-`DEFAULT_ARENA_SIZE_BYTES`, 256 KiB (`config/__init__.py`); ExecuTorch
-takes the sidecar's `planned_arena_size` when present. After a representative run, set it a little
-above the reported `allocated_arena` (the existing guidance in this
-repository ranges from 1.15x to 1.5x depending on input variation), run
-again, and confirm `allocated_arena` did not move and no region is over
-capacity.
+`arena_size` is a request. The interpreter default is 256 KiB; ExecuTorch
+can use the sidecar's `planned_arena_size`. AOT plans its own arenas unless
+external-arena mode is enabled. For an interpreter, use the reported
+`allocated_arena` as a starting point, retain headroom for alignment and
+model/runtime changes, then run again to check allocation and region capacity.
 
 ### 6. PSRAM
 

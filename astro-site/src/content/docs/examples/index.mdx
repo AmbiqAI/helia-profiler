@@ -11,7 +11,7 @@ hardware and wiring, software prerequisites, config file, run, expected
 output, how to read it, variations, validated on. The config is a file in
 the repository. The output is either a captured run with its board, nsx
 module versions, date and source commit named, or the page says "not yet
-captured". Nothing on these pages is illustrative.
+captured". Read that status before treating an example as measurement evidence.
 
 <CardGrid>
   <LinkCard href="basic-profiling/" title="First results" eyebrow="Start here" meta="Profile a model, every counter per layer, the TFLM baseline">
@@ -19,7 +19,7 @@ captured". Nothing on these pages is illustrative.
     upstream baseline the Ambiq engines are measured against.
   </LinkCard>
   <LinkCard href="engine-comparison/" title="Comparisons" eyebrow="hpx compare" meta="Engines and toolchains on one model">
-    The same model through three engines and two toolchains, with the real
+    Separate captures of the same model across engines or toolchains, with
     comparison reports and the rules that withhold a delta.
   </LinkCard>
   <LinkCard href="power-profiling/" title="Power" eyebrow="Joulescope" meta="Energy per inference beside the profile">
@@ -41,7 +41,7 @@ captured". Nothing on these pages is illustrative.
 | Example | Engine | Toolchain | Board | Measurement | Validated on |
 |---|---|---|---|---|---|
 | [Profile a model](basic-profiling/) | heliaRT | GNU Arm | apollo510_evb (also 330mP, 3P, 4 Lite Blue) | cycles, default counters | nightly 2026-09-16, `0714893` |
-| [Every counter, every layer](per-layer/) | heliaAOT | GNU Arm | apollo510_evb | cpu, memory, mve groups | not yet validated |
+| [Capture per-layer counters](per-layer/) | heliaAOT | GNU Arm | apollo510_evb | cpu, memory, mve groups | not yet validated |
 | [Vanilla TFLM baseline](tflm-baseline/) | TFLM (CMSIS-NN) | GNU Arm | apollo510_evb | cycles, default counters | nightly 2026-09-16, `0714893` |
 | [Compare engines](engine-comparison/) | heliaRT, heliaAOT, TFLM (ExecuTorch as a variation) | GNU Arm | apollo510_evb | cycles, binary size | nightly 2026-09-16, `0714893`; compare run on host 2026-09-21 |
 | [Compare toolchains](toolchain-comparison/) | heliaRT, heliaAOT | GNU Arm, ATfE (armclang not yet) | apollo510_evb | cycles | nightly 2026-09-16, `0714893` |

@@ -12,8 +12,11 @@ applies typed comparability rules before it shows a delta.
 
 ## Prerequisites
 
-The `analysis` extra for `hpx analyze` (`pip install 'helia-profiler[analysis]'`),
-and two result bundles in separate directories for `hpx compare`.
+- To inspect a model without hardware, install model-analysis support:
+  `pip install 'helia-profiler[analysis]'`. If you installed with uv, use
+  `uv tool install --force 'helia-profiler[analysis]'` in the same tool environment.
+- To compare measurements, keep two completed result bundles in separate
+  directories. Model-analysis dependencies are not required for comparison.
 
 ## Which tool
 

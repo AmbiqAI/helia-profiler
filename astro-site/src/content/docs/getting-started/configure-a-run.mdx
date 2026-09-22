@@ -53,8 +53,10 @@ hpx profile --config hpx.yml --toolchain armclang
 hpx profile --config hpx.yml --power --power-duration 10
 ```
 
-Every key in the file has a flag and every flag has a key; the generated
-[command reference](../../reference/cli/profile/) lists them side by side.
+Common settings have CLI flags; engine-specific options and nested settings
+may require YAML. Use the [command reference](../../reference/cli/profile/)
+for available flags and the [configuration reference](../../reference/configuration/)
+for all file keys.
 Unknown keys are an error, not a silent no-op: every configuration model
 sets `extra="forbid"`.
 
@@ -64,7 +66,7 @@ sets `extra="forbid"`.
 model:
   path: examples/quickstart/kws_model.tflite
   arena_size: 131072            # bytes; set from allocated_arena in summary.json
-  arena_location: tcm           # tcm | sram | mram | psram, or omit for auto
+  arena_location: tcm           # writable memory supported by your target; omit for auto
   weights_location: mram
 
 engine:
@@ -123,7 +125,7 @@ covers the rules it applies.
 The same `results/` directory as First profile, now produced by
 `hpx profile --config hpx.yml` with no other flags, and a file you can commit
 next to the model. `run_metadata.json` in the bundle records the resolved
-configuration, so a bundle always says which file produced it.
+configuration, so you can inspect the effective settings, including CLI overrides.
 
 ## What next
 

@@ -21,16 +21,16 @@ introduces the file and the blocks a first profile touches.
 ### 1. How the layers merge
 
 1. The YAML file named by `--config` is loaded, if given.
-2. Command-line flags override the matching keys. Every key has a flag;
-   the model path can also be the positional argument of `hpx profile`.
+2. Command-line flags override matching keys; settings without a CLI flag
+   remain in YAML. The model path can also be the positional argument of `hpx profile`.
 3. Defaults fill any key still unset.
 4. The result is frozen into an immutable `ProfileConfig`. Every stage
    reads the same object; nothing mutates it afterwards.
 
-Unknown keys anywhere in the tree are rejected at load time with a
-did-you-mean suggestion from the real field names; every model sets
-`extra="forbid"`. Every configuration error is a `ConfigError` carrying a
-`hint`.
+Unknown fields in typed configuration blocks are rejected with a
+did-you-mean suggestion. Engine-specific options under `engine.config` are
+passed to the selected adapter; consult [Engines](../engines/) for its
+supported keys.
 
 ### 2. A worked file
 
@@ -52,7 +52,7 @@ target:
 profiling:
   pmu_counters:
     cpu: all
-    memory: all               # AP5 boards only; an AP3 or AP4 board rejects memory and mve
+    memory: all               # requires a target with the memory profiling domain
     mve: all
   per_layer: true
   iterations: 5
@@ -73,7 +73,7 @@ output:
 ```
 
 ```bash
-hpx profile --config hpx.yml --board apollo510b_evb --iterations 50 --engine helia-aot --output-dir ./my_results
+hpx profile --config hpx.yml --board apollo510b_evb --iterations 50 --output-dir ./my_results
 ```
 
 | Block | Page |

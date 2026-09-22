@@ -1,3 +1,63 @@
+# Current checkpoint — DRAFT / NOT READY TO MERGE
+
+PR #332 remains a draft. The current website changes are a preservation
+checkpoint, not approval to merge or publish. Refs #320, #322, #365.
+
+The Home has been revised for product comprehension, engine/memory comparisons,
+plain-language benefits, a single quickstart, responsive spacing and neutral
+light/dark surfaces. Main documentation corrections distinguish clean timing
+from layer totals, explain actual configuration controls, and clarify benchmark
+size metrics. Generated reference sources and captured result bundles remain
+unchanged. The previous handoff below is historical where it conflicts with
+this checkpoint.
+
+## Shared UI reconstruction requirement
+
+The checked-in package/lock still point to `@ambiqai/helia-ui` alpha.19.
+The reviewed local preview instead used unpublished shared UI commit
+`c6194ba3f5f46d1d1cdc48567b3c09ef7033f2f2`, packed as a tarball with SHA-256
+`d135b11b317c469c66a2213acd11d5e7dec16c493d17967e6324ecc89342d034`.
+A clean `npm ci` therefore does **not** reproduce the reviewed appearance or
+new component options. Do not treat the existing dependency pin as final.
+
+CORE owns the shared changes and preserved a self-contained Git bundle through
+`44d424b7348793fd54460b55f0318f7c2630a34e`, including the exact preview commit.
+To reconstruct: obtain that recovery bundle from the maintainer, clone it,
+check out the exact preview commit, run `npm pack`, and install the resulting
+package in `astro-site` with `npm install --no-save --package-lock=false`.
+No machine-specific dependency or unreleased version is committed here.
+An authorized shared publication and a reproducible package/lock update remain
+required before merge. This checkpoint does not authorize that publication.
+
+## Review and checks
+
+Independent Home content and usability reviews were completed; demonstrated
+findings were fixed and affected content was rechecked. Owner inspection covered
+1218, 764 and 390px in both themes, including menu focus and the workflow,
+quickstart and automation sequence. The main-docs pass was bounded navigation
+and content correction, not exhaustive verification of every technical claim.
+
+Local build, output/discoverability, links, search, redirects, and 38 script
+checks passed with the local shared package. The final Home has one H1 and
+retains the skip-link target. Existing power examples still lack qualified
+captured power bundles; no new hardware validation was performed.
+
+The checkpoint commit uses GitHub's supported `[skip ci]` marker because both
+CI and documentation workflows trigger on draft pull requests. No fresh remote
+CI success is claimed. Required checks must run on the final reproducible head
+before merge; the marker does not suppress unrelated GitHub review services.
+
+## Resume
+
+1. Obtain Adam's final visual/content feedback; no user acceptance is recorded.
+2. Resolve shared UI publication/dependency reconstruction and update the lock.
+3. Recheck the exact resulting source and run required local/remote checks once
+   authorized. Keep PR #332 draft until it is actually ready.
+4. Obtain Adam's explicit merge approval. Merging deploys the documentation;
+   post-deploy checks from the historical handoff remain required.
+
+---
+
 # HANDOFF: heliaPROFILER docs migration (Astro + helia-ui)
 
 Goal: replace the MkDocs/Zensical site with Astro + Starlight on helia-ui,

@@ -12,15 +12,15 @@ arena.
 
 ## Prerequisites
 
-A model exported for a microcontroller: an int8 LiteRT `.tflite` for the
-interpreter and ahead-of-time engines, or an ExecuTorch `.pte` exported for
+A model exported for a microcontroller: a LiteRT `.tflite` supported by the
+chosen interpreter or ahead-of-time compiler, or an ExecuTorch `.pte` exported for
 Cortex-M. [Engines](../engines/) explains which engine reads which.
 
 ## Which format
 
 | Format | Engines that read it | Notes |
 |---|---|---|
-| `.tflite` (LiteRT flatbuffer) | `tflm`, `helia-rt`, `helia-aot` | The interpreter engines load the flatbuffer at runtime; `helia-aot` compiles it to C at build time. Quantised int8 models are the target. |
+| `.tflite` (LiteRT flatbuffer) | `tflm`, `helia-rt`, `helia-aot` | The interpreter engines load the flatbuffer at runtime; `helia-aot` compiles it to C at build time. Operator and precision support depend on the engine, backend and target. |
 | `.pte` (ExecuTorch program) | `executorch` | Exported with `helia-torch` or the ExecuTorch Cortex-M flow. A `<model>.pte.json` sidecar next to it fills in the runner sizes; see [Engines](../engines/#executorch). |
 
 The engine, not the file extension, decides how the model is used: the same
@@ -62,9 +62,9 @@ what the runtime used. The loop:
    python -c "import json; print(json.load(open('results/summary.json'))['memory']['allocated_arena'])"
    ```
 
-3. Set `arena_size` to a little above it. The existing guidance in this
-   repository uses 1.15x to 1.5x depending on how much the inputs vary; the
-   headroom is for input variation, not the original guess.
+3. Set `arena_size` above the observed allocation, leaving headroom for
+   alignment and changes to the model or runtime. This is an interpreter
+   sizing loop; AOT uses its compiler memory plan.
 4. Run again and confirm `allocated_arena` did not move and the Memory
    table shows no region over capacity.
 

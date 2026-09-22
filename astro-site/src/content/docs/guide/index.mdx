@@ -6,68 +6,26 @@ description: "Task pages in four groups: set up a run, measure, read results, an
 import CardGrid from '@ambiqai/helia-ui/astro/CardGrid';
 import LinkCard from '@ambiqai/helia-ui/astro/LinkCard';
 import Icon from '@ambiqai/helia-ui/astro/Icon';
-import BlockDiagram from '@ambiqai/helia-ui/astro/BlockDiagram';
-import Block from '@ambiqai/helia-ui/astro/Block';
 
-The User guide is organised by what you are doing. Each page opens with the
-table that makes its choice, then the mechanics, then what to read next. If
+The User guide is organised by what you are doing. Start with a task below, then follow its prerequisites and examples. If
 you have not run a profile yet, [Getting started](../getting-started/) is
 the shorter path.
 
 ## The blocks of a run configuration
 
-Every `hpx.yml` and every `hpx profile` command sets the same eight blocks.
-The diagram shows them as the configuration model nests them; each block
-links to the page that explains its choices, and the generated
-[configuration reference](../reference/configuration/) lists every key.
+Use these configuration blocks to find the guide for your next change.
+The generated [configuration reference](../reference/configuration/) lists
+all keys and defaults.
 
-<BlockDiagram
-  title="A run configuration"
-  caption="Eight top-level blocks. Target, power and build hold the nested blocks shown inside them."
-  flow="grid"
-  columns={4}
->
-  <Block label="model" sublabel="path, arena, placement" href="models/" tone="accent" />
-  <Block label="engine" sublabel="runtime and backend" href="engines/" tone="accent" />
-  <Block label="target" sublabel="board and capture" href="boards/" tone="accent" flow="row">
-    <Block label="board" href="boards/" emphasis="filled" />
-    <Block label="toolchain" href="toolchains/" emphasis="filled" />
-    <Block label="transport" href="transports/" emphasis="filled" />
-    <Block label="clock" href="boards/#2-cpu-clock" emphasis="filled" />
-    <Block label="psram" href="memory/#6-psram" emphasis="filled" />
-    <Block label="heartbeat" emphasis="filled" />
-  </Block>
-  <Block label="profiling" sublabel="counters, iterations" href="pmu-counters/" tone="accent" />
-  <Block label="power" sublabel="capture" href="power/" tone="accent" flow="row">
-    <Block label="driver" emphasis="filled" />
-    <Block label="ina228" href="power/" emphasis="filled" />
-  </Block>
-  <Block label="output" sublabel="files and overlays" href="output/" tone="accent" />
-  <Block label="timeouts" sublabel="stage limits" />
-  <Block label="build" sublabel="modules, offline" flow="row">
-    <Block label="nsx_modules" emphasis="filled" />
-  </Block>
-</BlockDiagram>
-
-The same structure as a list, for readers of the Markdown rendition:
-
-- model: path, arena, placement
-- engine: runtime and backend
-- target: board and capture
-  - board
-  - toolchain
-  - transport
-  - clock
-  - psram
-  - heartbeat
-- profiling: counters, iterations
-- power: capture
-  - driver
-  - ina228
-- output: files and overlays
-- timeouts: stage limits
-- build: modules, offline
-  - nsx_modules
+| Block | Choose or inspect |
+|---|---|
+| `model` | [Model format and arena size](models/), [memory placement](memory/) |
+| `engine` | [Runtime or ahead-of-time compiler](engines/) |
+| `target` | [Board and clock](boards/), [toolchain](toolchains/), [transport](transports/) |
+| `profiling` | [Counters and sampling](pmu-counters/) |
+| `power` | [Instrument, wiring and measurement window](power/) |
+| `output` | [Result files](output/) and [model overlays](model-explorer/) |
+| `timeouts`, `build` | [Stage limits and dependency resolution](configuration/) |
 
 ## Set up a run
 
@@ -134,7 +92,10 @@ The same structure as a list, for readers of the Markdown rendition:
     <Icon name="folder-open" slot="icon" />
     Every file a run writes, its schema and its units.
   </LinkCard>
-  <LinkCard href="analysis-comparison/" title="Analysis and comparison">
+  <LinkCard href="latency/" title="Inference and layer timing">
+    Read clean inference timing and instrumented layer costs with the right units and scope.
+  </LinkCard>
+  <LinkCard href="analysis-comparison/" title="Compare results">
     <Icon name="scale-balanced" slot="icon" />
     Re-analyse a bundle, compare two runs, and the rules that make a
     comparison fair.

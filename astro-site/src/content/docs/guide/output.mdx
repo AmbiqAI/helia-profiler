@@ -90,13 +90,15 @@ above, is 6). Top level:
 | `model_size` | bytes | the model file |
 | `num_tensors`, `input_size`, `output_size` | count, bytes, bytes | graph tensors and the I/O buffers |
 
-`binary` (from `BinarySection`, read from the profile binary's ELF section
-headers; the power-only binary is not measured):
+`binary` (from `BinarySection`, using the profile ELF's size-tool totals
+and section headers for reserved-memory reconciliation; the power-only
+binary is not measured):
 
 | Field | Unit | What it measures |
 |---|---|---|
-| `text`, `data`, `bss` | bytes | code, initialised data, zero-initialised state the program uses |
-| `reserved` | bytes | linker-reserved NOBITS regions never written at run time (Apollo5 linker scripts fill the remaining DTCM as heap); omitted when zero |
+| `text` | bytes | size-tool code plus read-only data; not just the ELF section named `.text` |
+| `data`, `bss` | bytes | initialised writable data and zero-initialised state, respectively |
+| `reserved` | bytes | linker-reserved NOBITS capacity separated from statically allocated state (Apollo5 linker scripts fill the remaining DTCM as heap); omitted when zero |
 | `total` | bytes | the size tool's inclusive sum; `text + data + bss + reserved` reconciles to it |
 
 `latency` (from `LatencySection`; the boundary of each number is in its

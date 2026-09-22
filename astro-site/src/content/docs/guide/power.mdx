@@ -34,12 +34,12 @@ and one of:
 |---|---|---|
 | What it is | A bench instrument in series with the supply, watching a GPIO gate | A monitor chip on the target rail, read by the firmware over I2C |
 | Streaming samples | yes | no; hardware accumulators |
-| Whole-window energy | yes, integrated on the instrument | yes, integrated on the chip |
+| Whole-window energy | yes, HPX accumulates instrument statistics over the selected gate | yes, integrated on the chip |
 | Current distribution (median, p95, p99) | yes | no |
 | Host wiring | series supply plus one to three GPIO wires | none; target I2C |
 | Powers and resets the target rail | yes (relay, power-cycle recovery) | no |
 | Adds to the measured current | no | yes: the IOM that talks to the chip stays powered inside the measurement |
-| Pick it when | You want a sample stream, a current distribution, or a number to publish | You want cheap aggregate energy on a bench without a Joulescope, or relative A/B numbers |
+| Pick it when | You need external current statistics and GPIO-gated energy | You need on-target aggregate energy without a Joulescope |
 
 `power.driver` names the chip or instrument the firmware and host talk to.
 Both `joulescope` and `ina228` are registered drivers

@@ -114,10 +114,16 @@ from helia_profiler.results.run_summary import load_run_summary
 
 a = load_run_summary(Path("results/place_tcm_tcm/summary.json"))
 b = load_run_summary(Path("results/place_tcm_mram/summary.json"))
-print(f"{b.latency.device_clean_infer_avg_cycles / a.latency.device_clean_infer_avg_cycles:.3f}x clean-window cycles")
+baseline = a.latency.device_clean_infer_avg_cycles if a.latency else None
+candidate = b.latency.device_clean_infer_avg_cycles if b.latency else None
+if baseline is None or baseline <= 0 or candidate is None:
+    raise ValueError("Both runs need valid clean-window timing")
+print(f"{candidate / baseline:.3f}x clean-window cycles")
 ```
 
-For anything beyond a ratio, use `hpx compare`, which applies the
+This snippet only demonstrates arithmetic after you have checked run validity
+and matching measurement conditions. For a supported comparison, including
+a ratio, use `hpx compare`, which applies the
 comparability rules on [Analysis and comparison](../analysis-comparison/);
 a hand-rolled comparison that ignores them will compare a `busy_loop`
 window against an inference without noticing.
