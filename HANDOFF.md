@@ -46,7 +46,11 @@ merged in (4f2afae). PR #332 carries the branch to `main` as one squash and
 is marked ready; merging it deploys the Astro site (the owner's call).
 
 Open, owner decisions:
-- #337 Home copy sign-off (PR open against docs-migration).
+- Home was rebuilt on branch `335-home-rebuild` as a documentation overview
+  (owner-approved mockup, 2026-09-21): version line, intro, quickstart
+  tabs, CLI and Python cards, supports cards, five-stage block diagram,
+  eight measurement rows, four section links. It supersedes #337, which
+  closes once the rebuild merges.
 - The shipped bundles' `run_metadata.json` (runner paths, probe serial),
   kept unmodified so the manifests verify; see PR #354.
 - Two issue drafts in the session scratchpad: bench captures for the
@@ -57,6 +61,10 @@ Open, owner decisions:
 ## Decisions
 
 - Flowcharts became decision tables or block diagrams; no mermaid remains.
+- No commit hashes or commits-since-tag counts anywhere on the site; the
+  version line shows the released version only and `check-output.mjs`
+  enforces it. Registry counts on Home are typed as text (the Markdown
+  rendition drops JSX expressions) and held to `src/data/catalog.json`.
 - `summary.total_cycles` is the instrumented per-layer sum; pages publish
   `latency.device_clean_infer_avg_cycles`.
 - The JS110 column of the Joulescope table carries no figures: no product

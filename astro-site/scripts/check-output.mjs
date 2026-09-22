@@ -87,13 +87,75 @@ check(
   !Number.isNaN(Date.parse(buildInfo.buildTime ?? "")),
   `build-info.json buildTime is unusable: ${buildInfo.buildTime}`,
 );
+/* Home shows the released version and nothing about the build that produced
+ * the page: a commit hash or a commits-since-tag count is provenance for the
+ * deploy guard, not for a reader. */
+const home = read(dist, "index.html");
+const versionLine =
+  /<p class="[^"]*\bdocs-version\b[^"]*"[^>]*>([\s\S]*?)<\/p>/.exec(home)?.[1] ?? "";
+check(versionLine !== "", "Home has no version line.");
 check(
-  read(dist, "index.html").includes(buildInfo.display),
-  `Home does not show the build version "${buildInfo.display}".`,
+  versionLine.includes(`v${buildInfo.version}`),
+  `Home does not show the version v${buildInfo.version}.`,
 );
 check(
-  read(dist, "index.html").includes(buildInfo.shortCommit),
-  `Home does not show the source commit ${buildInfo.shortCommit}.`,
+  !versionLine.includes(buildInfo.shortCommit),
+  `Home shows the source commit ${buildInfo.shortCommit}; the site carries the version only.`,
+);
+
+/* Home names hardware, so it is held to the registry rather than to whatever
+ * was typed into the page. src/data/catalog.json is read out of
+ * src/helia_profiler by scripts/build-catalog.mjs; an engine added there is a
+ * failing build until Home names it, and the two figures on the page are the
+ * registry's counts. The figures are typed into the page as text rather than
+ * imported, because the Markdown rendition drops a JSX expression and the
+ * rendition is the copy an agent reads; this check is what keeps the typed
+ * figure honest. Read against the artifact, like everything else here.
+ *
+ * The tree assertion below cannot fire in CI, where prepare:docs regenerates
+ * the catalog from the same HEAD just before the build; a stale committed
+ * catalog is caught by check-committed-artifacts.mjs. It stays for a local
+ * dist/ built from another checkout. */
+const catalog = JSON.parse(read(site, "src/data/catalog.json"));
+const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+check(
+  catalog.generatedFrom?.sourceTree ===
+    execFileSync("git", ["rev-parse", `HEAD:${catalog.generatedFrom?.sourcePath}`], {
+      cwd: path.resolve(site, ".."),
+      encoding: "utf8",
+    }).trim(),
+  `src/data/catalog.json was generated from tree ${catalog.generatedFrom?.sourceTree}, ` +
+    `which is not the committed ${catalog.generatedFrom?.sourcePath}. Run npm run catalog:build.`,
+);
+const missingEngines = catalog.engines
+  .map((entry) => entry.id)
+  .filter((id) => !new RegExp(`<code[^>]*>${escape(id)}</code>`).test(home));
+check(
+  missingEngines.length === 0,
+  `Home does not name ${missingEngines.length} engine(s) the registry carries: ${missingEngines.join(", ")}.`,
+);
+/* The Toolchain enum carries one alias pair, gcc and arm-none-eabi-gcc, which
+ * vocab.py documents as the same GNU Arm toolchain; the page counts toolchains,
+ * not spellings. */
+const toolchainValues = JSON.parse(read(site, "src/data/schema.json")).$defs?.Toolchain?.enum;
+if (!Array.isArray(toolchainValues)) {
+  throw new Error("src/data/schema.json carries no $defs.Toolchain enum to count toolchains from.");
+}
+const toolchains = toolchainValues.filter((value) => value !== "gcc").length;
+const stableBoards = catalog.boards.filter((board) => board.channel === "stable").length;
+for (const [label, expected] of [
+  ["boards", catalog.counts.boards],
+  ["engines", catalog.counts.engines],
+  ["toolchains", toolchains],
+]) {
+  check(
+    new RegExp(`>${expected} ${label}<`).test(home),
+    `Home shows no figure of ${expected} ${label}, which is what the registry counts.`,
+  );
+}
+check(
+  home.includes(`${stableBoards} of them on the stable channel`),
+  `Home does not say ${stableBoards} boards are on the stable channel, which is what the registry counts.`,
 );
 
 /* Section shape: five in the top navigation, a scoped sidebar on four of
