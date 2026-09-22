@@ -129,7 +129,7 @@ check(
 );
 const missingEngines = catalog.engines
   .map((entry) => entry.id)
-  .filter((id) => !new RegExp(`<code[^>]*>${escape(id)}</code>`).test(home));
+  .filter((id) => !new RegExp(`helia-chip[^"]*"[^>]*>${escape(id)}<`).test(home));
 check(
   missingEngines.length === 0,
   `Home does not name ${missingEngines.length} engine(s) the registry carries: ${missingEngines.join(", ")}.`,
