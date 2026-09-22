@@ -1,18 +1,21 @@
 ---
 /**
- * The version and source commit this site was built from.
+ * The released version this site documents, with the places it ships from.
  *
  * Local rather than shared: helia-ui's Starlight shell has no version slot, so
  * until that lands upstream each product carries its own. The build-info import
  * is what ties the string on the page to the artifact the deploy guard reads.
+ * Only the version is shown; build provenance stays in build-info.json.
  */
 import Badge from '@ambiqai/helia-ui/astro/Badge';
 import buildInfo from '../data/build-info.json';
 ---
 
 <p class="docs-version">
-  <Badge tone="info" size="md">{buildInfo.display}</Badge>
-  <a href={buildInfo.sourceUrl}>Source commit {buildInfo.shortCommit}</a>
+  <Badge tone="neutral" size="md" dot>v{buildInfo.version}</Badge>
+  <a href="https://pypi.org/project/helia-profiler/">PyPI</a>
+  <a href="https://github.com/AmbiqAI/helia-profiler">GitHub</a>
+  <a href="https://github.com/AmbiqAI/helia-profiler/blob/main/CHANGELOG.md">Changelog</a>
 </p>
 
 <style>
@@ -20,6 +23,7 @@ import buildInfo from '../data/build-info.json';
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.9rem;
+    margin-top: 0;
   }
 </style>

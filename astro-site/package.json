@@ -9,7 +9,8 @@
     "npm": ">=11"
   },
   "scripts": {
-    "prepare:docs": "node scripts/build-info.mjs && npm run reference:dump && npm run reference:build && npm run cli-reference:build",
+    "prepare:docs": "node scripts/build-info.mjs && npm run catalog:build && npm run reference:dump && npm run reference:build && npm run cli-reference:build",
+    "catalog:build": "node scripts/build-catalog.mjs",
     "reference:dump": "node scripts/dump-python.mjs",
     "reference:build": "node scripts/build-reference.mjs",
     "cli-reference:build": "node scripts/build-cli-reference.mjs",

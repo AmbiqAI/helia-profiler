@@ -1,0 +1,104 @@
+{
+  "generatedFrom": {
+    "sourceTree": "872d67ad4e9083b1eacd7d6d3859148437b96b59",
+    "sourcePath": "src/helia_profiler"
+  },
+  "counts": {
+    "boards": 13,
+    "engines": 4
+  },
+  "boards": [
+    {
+      "id": "apollo3p_evb",
+      "soc": "apollo3p",
+      "channel": "stable",
+      "isFpga": false
+    },
+    {
+      "id": "apollo3p_evb_cygnus",
+      "soc": "apollo3p",
+      "channel": "preview",
+      "isFpga": false
+    },
+    {
+      "id": "apollo4p_evb",
+      "soc": "apollo4p",
+      "channel": "preview",
+      "isFpga": false
+    },
+    {
+      "id": "apollo4l_evb",
+      "soc": "apollo4l",
+      "channel": "preview",
+      "isFpga": false
+    },
+    {
+      "id": "apollo4l_blue_evb",
+      "soc": "apollo4l",
+      "channel": "preview",
+      "isFpga": false
+    },
+    {
+      "id": "apollo4p_blue_kbr_evb",
+      "soc": "apollo4p",
+      "channel": "preview",
+      "isFpga": false
+    },
+    {
+      "id": "apollo4p_blue_kxr_evb",
+      "soc": "apollo4p",
+      "channel": "preview",
+      "isFpga": false
+    },
+    {
+      "id": "apollo510_evb",
+      "soc": "apollo510",
+      "channel": "stable",
+      "isFpga": false
+    },
+    {
+      "id": "apollo510b_evb",
+      "soc": "apollo510b",
+      "channel": "preview",
+      "isFpga": false
+    },
+    {
+      "id": "apollo5b_evb",
+      "soc": "apollo5b",
+      "channel": "preview",
+      "isFpga": false
+    },
+    {
+      "id": "apollo330mP_evb",
+      "soc": "apollo330P",
+      "channel": "preview",
+      "isFpga": false
+    },
+    {
+      "id": "apollo510dL_evb",
+      "soc": "apollo510L",
+      "channel": "preview",
+      "isFpga": false
+    },
+    {
+      "id": "atomiq110_fpga_turbo",
+      "soc": "atomiq110",
+      "channel": "preview",
+      "isFpga": true
+    }
+  ],
+  "engines": [
+    {
+      "id": "tflm"
+    },
+    {
+      "id": "helia-rt"
+    },
+    {
+      "id": "helia-aot"
+    },
+    {
+      "id": "executorch"
+    }
+  ]
+}

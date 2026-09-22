@@ -1,71 +1,231 @@
 ---
 title: heliaPROFILER
-description: Profile LiteRT and ExecuTorch models on Ambiq Apollo hardware.
+description: Profile LiteRT and ExecuTorch models on Ambiq Apollo hardware and get per-layer cycles, PMU counters and measured power in one result bundle.
 tableOfContents: false
 prev: false
 next: false
 ---
 
+import SplitPanel from '@ambiqai/helia-ui/astro/SplitPanel';
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import Button from '@ambiqai/helia-ui/astro/Button';
 import CardGrid from '@ambiqai/helia-ui/astro/CardGrid';
+import Card from '@ambiqai/helia-ui/astro/Card';
+import CardHeader from '@ambiqai/helia-ui/astro/CardHeader';
+import CardContent from '@ambiqai/helia-ui/astro/CardContent';
+import CardActions from '@ambiqai/helia-ui/astro/CardActions';
 import LinkCard from '@ambiqai/helia-ui/astro/LinkCard';
+import IconRow from '@ambiqai/helia-ui/astro/IconRow';
+import BlockDiagram from '@ambiqai/helia-ui/astro/BlockDiagram';
+import Block from '@ambiqai/helia-ui/astro/Block';
 import DocsVersion from '../../components/DocsVersion.astro';
-
-Build, flash, measure and compare models on Ambiq Apollo hardware from one
-command. heliaPROFILER runs a model through heliaRT, heliaAOT, a stock TFLM
-baseline or the Cortex-M ExecuTorch runtime, and returns a result bundle you
-can read, compare and archive.
 
 <DocsVersion />
 
-## Where to start
+**heliaPROFILER (hpx)** shows ML and firmware engineers exactly how a model
+performs on Ambiq silicon. One command builds firmware around the model,
+flashes an Apollo EVB, captures per-layer cycles, hardware counters and
+measured power, and writes a result bundle you can read, script, compare and
+archive.
+
+<SplitPanel tone="muted" ratio="2:3" titleAs="h2">
+  <Fragment slot="title">Profile a model in minutes</Fragment>
+
+  <Fragment slot="body">Install hpx, check the bench with `hpx doctor`, and profile a model on the default board. The run ends with a validity verdict and a results directory.</Fragment>
+
+  <Fragment slot="actions">
+    <Button href="/helia-profiler/getting-started/">Get started</Button>
+    <Button variant="secondary" href="/helia-profiler/getting-started/install/">Install</Button>
+  </Fragment>
+
+  <Tabs slot="code">
+    <TabItem label="uv">
+
+```bash
+uv tool install helia-profiler
+hpx doctor                        # toolchain, probes, dependencies
+hpx profile model.tflite          # heliaRT on apollo510_evb over RTT
+hpx profile model.tflite --power  # with a Joulescope power capture
+hpx compare results/a results/b   # two bundles, one delta
+```
+
+    </TabItem>
+    <TabItem label="pip">
+
+```bash
+pip install helia-profiler
+hpx doctor                        # toolchain, probes, dependencies
+hpx profile model.tflite          # heliaRT on apollo510_evb over RTT
+hpx profile model.tflite --power  # with a Joulescope power capture
+hpx compare results/a results/b   # two bundles, one delta
+```
+
+    </TabItem>
+    <TabItem label="Nix">
+
+```bash
+git clone https://github.com/AmbiqAI/helia-profiler.git && cd helia-profiler
+nix develop
+hpx doctor                        # toolchain, probes, dependencies
+hpx profile model.tflite          # heliaRT on apollo510_evb over RTT
+hpx compare results/a results/b   # two bundles, one delta
+```
+
+    </TabItem>
+  </Tabs>
+</SplitPanel>
+
+## Two ways to drive it
 
 <CardGrid columns={2}>
-  <LinkCard
-    title="Getting started"
-    titleAs="h3"
-    eyebrow="First run"
-    href="/helia-profiler/getting-started/"
-  >
-    Install the toolchain, check your hardware and profile a first model.
-  </LinkCard>
-  <LinkCard
-    title="User guide"
-    titleAs="h3"
-    eyebrow="Configure and measure"
-    href="/helia-profiler/guide/"
-  >
-    Engines, boards, toolchains, capture transports, memory placement, PMU
-    counters and power measurement.
-  </LinkCard>
-  <LinkCard
-    title="Examples"
-    titleAs="h3"
-    eyebrow="Worked runs"
-    href="/helia-profiler/examples/"
-  >
-    Complete runs with configuration, captured output and how to read the
-    numbers.
-  </LinkCard>
-  <LinkCard
-    title="Reference"
-    titleAs="h3"
-    eyebrow="Contracts"
-    href="/helia-profiler/reference/"
-  >
-    The `hpx` command line, the configuration schema, issue codes and the
-    Python API.
-  </LinkCard>
+  <Card>
+    <CardHeader>Command line</CardHeader>
+    <CardContent>
+      A clean CLI with live progress, a validity footer and strict
+      configuration with did-you-mean suggestions. Merge `hpx.yml` with flags
+      for reproducible runs.
+
+
+```bash
+hpx profile --config hpx.yml --engine helia-aot --toolchain atfe
+```
+
+    </CardContent>
+    <CardActions>
+      <Button variant="ghost" size="sm" href="/helia-profiler/reference/cli/">Command reference</Button>
+    </CardActions>
+  </Card>
+  <Card>
+    <CardHeader>Python API</CardHeader>
+    <CardContent>
+      The same configuration model as a typed API. Call `profile()` from
+      notebooks, CI and agents and get a typed result back, or reload any
+      bundle from disk.
+
+
+```python
+from pathlib import Path
+from helia_profiler import profile
+from helia_profiler.config import load_config
+
+result = profile(load_config(Path("hpx.yml"), {}))
+```
+
+    </CardContent>
+    <CardActions>
+      <Button variant="ghost" size="sm" href="/helia-profiler/reference/api/">Python API</Button>
+    </CardActions>
+  </Card>
 </CardGrid>
 
-## What a run produces
+## What it supports
 
-A successful run writes a portable result bundle: a machine-readable summary,
-per-layer data, provenance for the firmware and toolchain that produced it, any
-validity issues the run detected, and a manifest with artifact sizes and
-SHA-256 digests. Two bundles can be compared when their measurement conditions
-match.
+<CardGrid columns={4} equalize>
+  <Card>
+    <CardHeader>4 engines</CardHeader>
+    <CardContent>
+      heliaRT, heliaAOT, a stock LiteRT for Microcontrollers baseline and
+      ExecuTorch, on one harness.
 
-## Status
+      `helia-rt` `helia-aot` `tflm` `executorch`
+    </CardContent>
+  </Card>
+  <Card>
+    <CardHeader>3 toolchains</CardHeader>
+    <CardContent>
+      GNU Arm Embedded, Arm Compiler 6 and the Arm Toolchain for Embedded
+      (preview in hpx), selectable per run.
 
-heliaPROFILER is pre-1.0. Breaking changes can land on minor versions until
-v1.0, so pin an exact version for anything long-lived.
+      `gcc` `armclang` `atfe`
+    </CardContent>
+  </Card>
+  <Card>
+    <CardHeader>13 boards</CardHeader>
+    <CardContent>
+      Apollo3, Apollo4 and Apollo5 family EVBs and an Atomiq110 FPGA
+      carrier, 2 of them on the stable channel, plus custom SoC definitions
+      based on a known part.
+
+      `hpx boards`
+    </CardContent>
+  </Card>
+  <Card>
+    <CardHeader>Measured power</CardHeader>
+    <CardContent>
+      Gated windows on a Joulescope or an on-board INA228, with health checks
+      on the window itself.
+
+      `joulescope` `ina228`
+    </CardContent>
+  </Card>
+</CardGrid>
+
+## How a run works
+
+<BlockDiagram flow="row" density="compact" ariaLabel="The five stages of a run">
+  <Block label="Resolve" sublabel="engine, board, counters" />
+  <Block label="Build" sublabel="firmware around the model" />
+  <Block label="Flash" sublabel="J-Link, then reset" />
+  <Block label="Capture" sublabel="three windows" tone="muted" flow="column">
+    <Block label="clean window" />
+    <Block label="per-layer passes" />
+    <Block label="power window" />
+  </Block>
+  <Block label="Report" sublabel="bundle and manifest" />
+</BlockDiagram>
+
+Resolve reads the engine, toolchain, board and counters from `hpx.yml` or
+flags and refuses early with a hint. Build generates an NSX app around the
+model with your memory placement and runtime overrides. Capture
+runs a clean window for the cycle count, instrumented passes for the per-layer
+rows, and a power window when a meter is attached. Report writes
+`summary.json`, the per-layer CSV, run metadata, Model Explorer overlays and a
+SHA-256 manifest. Already have two bundles? `hpx compare` runs on the host
+with no hardware attached, and `hpx analyze model.tflite` inspects a model
+before you build anything.
+
+## Start measuring
+
+<CardGrid columns={2}>
+  <IconRow title="Per-layer cycles and PMU counters" icon="chart-simple" variant="outlined" href="/helia-profiler/guide/pmu-counters/">
+    Every operator bracketed by hardware counter reads: cycles, instructions, stalls, cache and MVE events.
+  </IconRow>
+  <IconRow title="Measure power and energy per inference" icon="bolt" variant="outlined" href="/helia-profiler/guide/power/">
+    Wire a Joulescope or INA228, gate the window on a GPIO, and read average power and energy with the window verified.
+  </IconRow>
+  <IconRow title="Compare engines and toolchains" icon="table-cells-large" variant="outlined" href="/helia-profiler/examples/engine-comparison/">
+    Run the same model through heliaRT, heliaAOT, TFLM and ExecuTorch, or GCC against ATFE, on identical firmware.
+  </IconRow>
+  <IconRow title="Place memory and override the runtime" icon="memory" variant="outlined" href="/helia-profiler/guide/memory/">
+    Put the arena, weights and code in TCM, SRAM, MRAM or PSRAM per run, and pass engine-specific settings through.
+  </IconRow>
+  <IconRow title="Compare two runs fairly" icon="scale-balanced" variant="outlined" href="/helia-profiler/guide/analysis-comparison/">
+    hpx compare withholds a delta when the measurement conditions differ, so a number you quote is a real change.
+  </IconRow>
+  <IconRow title="See hot layers on the model graph" icon="diagram-project" variant="outlined" href="/helia-profiler/guide/model-explorer/">
+    One Model Explorer overlay per counter, so a hot operator is a colour on the graph rather than a row in a CSV.
+  </IconRow>
+  <IconRow title="Read and reanalyse results" icon="file-lines" variant="outlined" href="/helia-profiler/guide/output/">
+    Stable JSON and CSV schemas, issue codes for anything that degrades a run, and host-only reanalysis of any bundle.
+  </IconRow>
+  <IconRow title="Validate the bench" icon="circle-check" variant="outlined" href="/helia-profiler/getting-started/validate-your-setup/">
+    hpx validate runs canonical models end to end across engines, toolchains and transports and proves the setup works.
+  </IconRow>
+</CardGrid>
+
+## Where to go next
+
+<CardGrid columns={4} density="compact">
+  <LinkCard title="Examples" titleAs="h3" href="/helia-profiler/examples/" density="compact">
+    Real captured bundles with the config that produced them.
+  </LinkCard>
+  <LinkCard title="Reference" titleAs="h3" href="/helia-profiler/reference/" density="compact">
+    Every command, configuration key, issue code and API symbol.
+  </LinkCard>
+  <LinkCard title="Troubleshooting" titleAs="h3" href="/helia-profiler/guide/troubleshooting/" density="compact">
+    Issue codes, failure tables and the support bundle.
+  </LinkCard>
+  <LinkCard title="Report an issue" titleAs="h3" href="https://github.com/AmbiqAI/helia-profiler/issues" density="compact">
+    Bugs and requests on GitHub.
+  </LinkCard>
+</CardGrid>
