@@ -137,7 +137,10 @@ check(
 /* The Toolchain enum carries one alias pair, gcc and arm-none-eabi-gcc, which
  * vocab.py documents as the same GNU Arm toolchain; the page counts toolchains,
  * not spellings. */
-const toolchainValues = JSON.parse(read(site, "src/data/schema.json")).$defs.Toolchain.enum;
+const toolchainValues = JSON.parse(read(site, "src/data/schema.json")).$defs?.Toolchain?.enum;
+if (!Array.isArray(toolchainValues)) {
+  throw new Error("src/data/schema.json carries no $defs.Toolchain enum to count toolchains from.");
+}
 const toolchains = toolchainValues.filter((value) => value !== "gcc").length;
 const stableBoards = catalog.boards.filter((board) => board.channel === "stable").length;
 for (const [label, expected] of [
