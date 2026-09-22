@@ -894,3 +894,13 @@ def test_effective_window_target_applies_the_power_floor_only_when_auto_sized(
     )
 
     assert config.effective_window_target_ms == expected_ms
+
+
+def test_clock_selection_npu_parses():
+    from helia_profiler.config import load_config
+
+    cfg = load_config(None, {"model": {"path": "m.tflite"}, "target": {"board": "atomiq110_fpga_turbo",
+                                                                        "clock": {"cpu": "hp", "npu": "ulp"}}})
+    assert cfg.target.clock.cpu == "hp" and cfg.target.clock.npu == "ulp"
+    cfg2 = load_config(None, {"model": {"path": "m.tflite"}, "target": {"board": "atomiq110_fpga_turbo"}})
+    assert cfg2.target.clock.npu is None

@@ -76,6 +76,34 @@ class ResolvePlatformStage:
             cpu_speed.perf_tier.value,
         )
 
+        # --- Optional NPU clock domain ------------------------------------
+        npu_domain = soc.clock_domain("npu")
+        npu_speed = None
+        if npu_domain is not None:
+            npu_name = selection.npu or npu_domain.default
+            npu_speed = npu_domain.speed(npu_name)
+            if npu_speed is None:
+                raise ConfigError(
+                    f"Board '{board_name}' does not support npu clock '{npu_name}'.",
+                    hint=(f"Supported npu speeds for {soc.name}: {', '.join(npu_domain.speed_names)}."),
+                )
+            if npu_speed.perf_tier is None:
+                raise PlatformError(
+                    f"npu clock '{npu_name}' on {soc.name} has no NSX perf mode.",
+                    hint="This is likely a bug in the platform registry.",
+                )
+            log.info(
+                "Clock: npu=%s (%d MHz, %s)",
+                npu_speed.name,
+                npu_speed.mhz,
+                npu_speed.perf_tier.value,
+            )
+        elif selection.npu is not None:
+            raise ConfigError(
+                f"Board '{board_name}' has no npu clock domain; target.clock.npu is not applicable.",
+                hint="Remove target.clock.npu / --npu-clock for this board.",
+            )
+
         if soc.pmu_tier is PmuTier.DWT_ONLY:
             log.warning(
                 "%s has DWT-only profiling (no Armv8-M PMU). "
@@ -95,6 +123,9 @@ class ResolvePlatformStage:
             cpu_clock_name=cpu_speed.name,
             cpu_clock_mhz=cpu_speed.mhz,
             cpu_perf_tier=cpu_speed.perf_tier.value,
+            npu_clock_name=npu_speed.name if npu_speed else "",
+            npu_clock_mhz=npu_speed.mhz if npu_speed else 0,
+            npu_perf_mode=npu_speed.perf_tier.value if npu_speed else "",
             link_family=str(link_family_for_toolchain(ctx.config.target.toolchain.value)),
         )
 

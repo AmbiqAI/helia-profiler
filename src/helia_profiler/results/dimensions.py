@@ -67,6 +67,7 @@ class ComparisonDimension(StrEnum):
     BOARD = "board"
     SOC = "soc"
     CPU_CLOCK = "cpu_clock"
+    NPU_CLOCK = "npu_clock"
     TOOLCHAIN = "toolchain"
     COMPILER_VERSION = "compiler_version"
     SYSTEM_CLOCK_HZ = "system_clock_hz"
@@ -244,6 +245,13 @@ _DIMENSION_SPECS: tuple[DimensionSpec, ...] = (
         ArtifactSource.RUN_METADATA,
         ("platform", "cpu_clock_name"),
         label="CPU clock",
+    ),
+    DimensionSpec(
+        ComparisonDimension.NPU_CLOCK,
+        DimensionEffect.INFORMATIVE,
+        ArtifactSource.RUN_METADATA,
+        ("platform", "npu_clock_name"),
+        label="NPU clock",
     ),
     DimensionSpec(
         ComparisonDimension.TOOLCHAIN,

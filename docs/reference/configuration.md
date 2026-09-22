@@ -72,6 +72,7 @@ silently.
 | Key | Type | Default | Notes |
 |---|---|---|---|
 | `cpu` | str \| null | `null` |  |
+| `npu` | str \| null | `null` |  |
 
 ## `target.psram`
 

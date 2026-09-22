@@ -221,6 +221,9 @@ class PlatformInfo:
     cpu_clock_name: str = ""  # selected CPU speed name (e.g. "hp")
     cpu_clock_mhz: int = 0  # selected CPU frequency
     cpu_perf_tier: str = ""  # NSX perf_mode symbol (e.g. "NSX_PERF_HIGH")
+    npu_clock_name: str = ""  # selected NPU speed name ("ulp"/"hp"); "" when the SoC has no npu domain
+    npu_clock_mhz: int = 0  # selected NPU frequency
+    npu_perf_mode: str = ""  # nsx_npu_perf_mode_e symbol (e.g. "NSX_NPU_PERF_HIGH_PERFORMANCE")
     #: Which linker family built the firmware -- "gnu" (gcc, ATfE: *.ld) or
     #: "armlink" (armclang: scatter). Measured memory used/free are only
     #: comparable WITHIN a family (GNU counts the floating stack inside the

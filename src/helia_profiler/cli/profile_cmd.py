@@ -111,7 +111,8 @@ _OVERRIDE_SPECS: tuple[_OverrideSpec, ...] = (
     _OverrideSpec("transport", ("target", "transport")),
     _OverrideSpec("usb_port", ("target", "usb_port")),
     _OverrideSpec("rtt_buffer_size_up", ("target", "rtt_buffer_size_up")),
-    _OverrideSpec("cpu_clock", ("target", "clock"), coerce=lambda v: {"cpu": v}),
+    _OverrideSpec("cpu_clock", ("target", "clock", "cpu")),
+    _OverrideSpec("npu_clock", ("target", "clock", "npu")),
     _OverrideSpec("frozen", ("frozen",), default=False, apply="truthy", const=True),
     _OverrideSpec("offline", ("build", "offline"), default=False, apply="truthy", const=True),
     _OverrideSpec(

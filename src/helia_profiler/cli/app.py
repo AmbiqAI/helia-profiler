@@ -239,6 +239,18 @@ def profile_command(
             rich_help_panel=G_TARGET,
         ),
     ] = None,
+    npu_clock: Annotated[
+        Optional[str],
+        typer.Option(
+            "--npu-clock",
+            metavar="MODE",
+            help=(
+                "NPU clock mode for boards with an Ethos-U clock domain "
+                "('ulp'/'hp'). Default: the board's npu default (hp)."
+            ),
+            rich_help_panel=G_TARGET,
+        ),
+    ] = None,
     frozen: Annotated[
         bool,
         typer.Option(

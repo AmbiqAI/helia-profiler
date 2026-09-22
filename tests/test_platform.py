@@ -191,11 +191,16 @@ def test_atomiq110_hardware_facts_not_copied_from_apollo510():
     copy-paste-from-AP510 bug class caught during apollo330P bring-up.
     """
     soc = get_soc_for_board("atomiq110_fpga_turbo")
-    # FPGA "turbo" bitstream: single fixed 25 MHz clock, no faster "hp" tier.
-    assert soc.cpu_clock.speed_names == ("lp",)
+    # FPGA "turbo" bitstream: boot-default LP core clock is 25 MHz; hp is
+    # exposed for clock characterization (rate to be confirmed per bitstream).
+    assert soc.cpu_clock.speed_names == ("lp", "hp")
     lp_speed = soc.cpu_clock.speed("lp")
     assert lp_speed is not None
     assert lp_speed.mhz == 25
+    npu_domain = soc.clock_domain("npu")
+    assert npu_domain is not None and npu_domain.speed_names == ("ulp", "hp")
+    assert npu_domain.default == "hp"
+    assert npu_domain.speed("ulp").perf_tier.value == "NSX_NPU_PERF_ULTRA_LOW_POWER"
     # Real FPGA memory map: 496 KB DTCM/TCM, 256 KB ITCM, 3072 KB SSRAM,
     # 4096 KB MRAM, and no PSRAM/MSPI populated on this board.
     assert soc.memory.dtcm_kb == 496

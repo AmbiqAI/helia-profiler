@@ -237,6 +237,8 @@ class EngineContext:
     executorch_io_region: str
     has_ethos_u: bool = False
     npu_tolerate_power_ack: bool = False
+    #: nsx_npu_perf_mode_e symbol programmed by _npu_init.j2 (target.clock.npu).
+    npu_perf_symbol: str = "NSX_NPU_PERF_HIGH_PERFORMANCE"
 
 
 @dataclass(frozen=True)
@@ -431,6 +433,7 @@ class FirmwareRenderContext:
                 executorch_io_region=io_region,
                 has_ethos_u=artifacts.resolved_backend == "ethos_u",
                 npu_tolerate_power_ack=board.is_fpga,
+                npu_perf_symbol=clock.npu_perf_mode or "NSX_NPU_PERF_HIGH_PERFORMANCE",
             ),
         )
 
@@ -554,6 +557,7 @@ class FirmwareRenderContext:
             "executorch_io_region": self.engine.executorch_io_region,
             "has_ethos_u": self.engine.has_ethos_u,
             "npu_tolerate_power_ack": self.engine.npu_tolerate_power_ack,
+            "npu_perf_symbol": self.engine.npu_perf_symbol,
         }
 
 
