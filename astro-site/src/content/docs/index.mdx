@@ -7,8 +7,7 @@ next: false
 ---
 
 import SplitPanel from '@ambiqai/helia-ui/astro/SplitPanel';
-import CodeTabs from '@ambiqai/helia-ui/astro/CodeTabs';
-import CodeBlock from '@ambiqai/helia-ui/astro/CodeBlock';
+import { Tabs, TabItem } from '@astrojs/starlight/components';
 import Button from '@ambiqai/helia-ui/astro/Button';
 import CardGrid from '@ambiqai/helia-ui/astro/CardGrid';
 import Card from '@ambiqai/helia-ui/astro/Card';
@@ -39,39 +38,41 @@ archive.
     <Button variant="secondary" href="/helia-profiler/getting-started/install/">Install</Button>
   </Fragment>
 
-  <CodeTabs
-    slot="code"
-    ariaLabel="Install and first commands"
-    tabs={[
-      {
-        label: 'uv',
-        language: 'bash',
-        code: `uv tool install helia-profiler
+  <Tabs slot="code">
+    <TabItem label="uv">
+
+```bash
+uv tool install helia-profiler
 hpx doctor                        # toolchain, probes, dependencies
 hpx profile model.tflite          # heliaRT on apollo510_evb over RTT
 hpx profile model.tflite --power  # with a Joulescope power capture
-hpx compare results/a results/b   # two bundles, one delta`,
-      },
-      {
-        label: 'pip',
-        language: 'bash',
-        code: `pip install helia-profiler
+hpx compare results/a results/b   # two bundles, one delta
+```
+
+    </TabItem>
+    <TabItem label="pip">
+
+```bash
+pip install helia-profiler
 hpx doctor                        # toolchain, probes, dependencies
 hpx profile model.tflite          # heliaRT on apollo510_evb over RTT
 hpx profile model.tflite --power  # with a Joulescope power capture
-hpx compare results/a results/b   # two bundles, one delta`,
-      },
-      {
-        label: 'Nix',
-        language: 'bash',
-        code: `git clone https://github.com/AmbiqAI/helia-profiler.git && cd helia-profiler
+hpx compare results/a results/b   # two bundles, one delta
+```
+
+    </TabItem>
+    <TabItem label="Nix">
+
+```bash
+git clone https://github.com/AmbiqAI/helia-profiler.git && cd helia-profiler
 nix develop
 hpx doctor                        # toolchain, probes, dependencies
 hpx profile model.tflite          # heliaRT on apollo510_evb over RTT
-hpx compare results/a results/b   # two bundles, one delta`,
-      },
-    ]}
-  />
+hpx compare results/a results/b   # two bundles, one delta
+```
+
+    </TabItem>
+  </Tabs>
 </SplitPanel>
 
 ## Two ways to drive it
@@ -84,7 +85,11 @@ hpx compare results/a results/b   # two bundles, one delta`,
       configuration with did-you-mean suggestions. Merge `hpx.yml` with flags
       for reproducible runs.
 
-      <CodeBlock language="bash" code="hpx profile --config hpx.yml --engine helia-aot --toolchain atfe" />
+
+```bash
+hpx profile --config hpx.yml --engine helia-aot --toolchain atfe
+```
+
     </CardContent>
     <CardActions>
       <Button variant="ghost" size="sm" href="/helia-profiler/reference/cli/">Command reference</Button>
@@ -97,14 +102,15 @@ hpx compare results/a results/b   # two bundles, one delta`,
       notebooks, CI and agents and get a typed result back, or reload any
       bundle from disk.
 
-      <CodeBlock
-        language="python"
-        code={`from pathlib import Path
+
+```python
+from pathlib import Path
 from helia_profiler import profile
 from helia_profiler.config import load_config
 
-result = profile(load_config(Path("hpx.yml"), {}))`}
-      />
+result = profile(load_config(Path("hpx.yml"), {}))
+```
+
     </CardContent>
     <CardActions>
       <Button variant="ghost" size="sm" href="/helia-profiler/reference/api/">Python API</Button>
@@ -127,8 +133,8 @@ result = profile(load_config(Path("hpx.yml"), {}))`}
   <Card>
     <CardHeader>3 toolchains</CardHeader>
     <CardContent>
-      GNU Arm Embedded, Arm Compiler 6 and the Arm Toolchain for Embedded,
-      selectable per run.
+      GNU Arm Embedded, Arm Compiler 6 and the Arm Toolchain for Embedded
+      (preview in hpx), selectable per run.
 
       `gcc` `armclang` `atfe`
     </CardContent>
@@ -136,7 +142,8 @@ result = profile(load_config(Path("hpx.yml"), {}))`}
   <Card>
     <CardHeader>13 boards</CardHeader>
     <CardContent>
-      Apollo3, Apollo4 and Apollo5 family EVBs, plus custom SoC definitions
+      Apollo3, Apollo4 and Apollo5 family EVBs and an Atomiq110 FPGA
+      carrier, 2 of them on the stable channel, plus custom SoC definitions
       based on a known part.
 
       `hpx boards`
@@ -155,7 +162,7 @@ result = profile(load_config(Path("hpx.yml"), {}))`}
 
 ## How a run works
 
-<BlockDiagram flow="row" columns={5} density="compact" ariaLabel="The five stages of a run">
+<BlockDiagram flow="row" density="compact" ariaLabel="The five stages of a run">
   <Block label="Resolve" sublabel="engine, board, counters" />
   <Block label="Build" sublabel="firmware around the model" />
   <Block label="Flash" sublabel="J-Link, then reset" />
@@ -168,13 +175,14 @@ result = profile(load_config(Path("hpx.yml"), {}))`}
 </BlockDiagram>
 
 Resolve reads the engine, toolchain, board and counters from `hpx.yml` or
-flags and refuses early with a hint. Build generates temporary NSX firmware
-around the model with your memory placement and runtime overrides. Capture
+flags and refuses early with a hint. Build generates an NSX app around the
+model with your memory placement and runtime overrides. Capture
 runs a clean window for the cycle count, instrumented passes for the per-layer
 rows, and a power window when a meter is attached. Report writes
 `summary.json`, the per-layer CSV, run metadata, Model Explorer overlays and a
-SHA-256 manifest. Already have a bundle? `hpx analyze` and `hpx compare` run
-on the host with no hardware attached.
+SHA-256 manifest. Already have two bundles? `hpx compare` runs on the host
+with no hardware attached, and `hpx analyze model.tflite` inspects a model
+before you build anything.
 
 ## Start measuring
 
