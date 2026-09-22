@@ -45,7 +45,7 @@ archive.
 
 ```bash
 uv tool install helia-profiler
-hpx doctor                        # toolchain, probes, dependencies
+hpx doctor                        # toolchain, J-Link, dependencies
 hpx profile model.tflite          # heliaRT on apollo510_evb over RTT
 hpx profile model.tflite --power  # with a Joulescope power capture
 hpx compare results/a results/b   # two bundles, one delta
@@ -56,7 +56,7 @@ hpx compare results/a results/b   # two bundles, one delta
 
 ```bash
 pip install helia-profiler
-hpx doctor                        # toolchain, probes, dependencies
+hpx doctor                        # toolchain, J-Link, dependencies
 hpx profile model.tflite          # heliaRT on apollo510_evb over RTT
 hpx profile model.tflite --power  # with a Joulescope power capture
 hpx compare results/a results/b   # two bundles, one delta
@@ -68,7 +68,7 @@ hpx compare results/a results/b   # two bundles, one delta
 ```bash
 git clone https://github.com/AmbiqAI/helia-profiler.git && cd helia-profiler
 nix develop
-hpx doctor                        # toolchain, probes, dependencies
+hpx doctor                        # toolchain, J-Link, dependencies
 hpx profile model.tflite          # heliaRT on apollo510_evb over RTT
 hpx compare results/a results/b   # two bundles, one delta
 ```
@@ -88,7 +88,7 @@ hpx compare results/a results/b   # two bundles, one delta
       are one command each.
 
 ```bash
-hpx doctor                          # toolchain, probes, dependencies
+hpx doctor                          # toolchain, J-Link, dependencies
 hpx profile model.tflite --power    # build, flash, capture, report
 hpx compare results/base results/new
 ```
@@ -109,7 +109,7 @@ hpx compare results/base results/new
 import helia_profiler as hpx
 
 session = hpx.Session.from_yaml("hpx.yml")
-session.doctor()                     # toolchain, probes, dependencies
+session.doctor()                     # toolchain, J-Link, dependencies
 result = session.profile("model.tflite")
 delta = session.compare("results/base", "results/new")
 ```
@@ -133,7 +133,7 @@ delta = session.compare("results/base", "results/new")
       heliaRT, heliaAOT, a stock LiteRT for Microcontrollers baseline and
       ExecuTorch, on one harness.
 
-      <Chip>helia-rt</Chip> <Chip>helia-aot</Chip> <Chip>tflm</Chip> <Chip>executorch</Chip>
+      <Chip tone="static">helia-rt</Chip> <Chip tone="static">helia-aot</Chip> <Chip tone="static">tflm</Chip> <Chip tone="static">executorch</Chip>
     </CardContent>
   </Card>
   <Card>
@@ -145,7 +145,7 @@ delta = session.compare("results/base", "results/new")
       GNU Arm Embedded, Arm Compiler 6 and the Arm Toolchain for Embedded
       (preview in hpx), selectable per run.
 
-      <Chip>gcc</Chip> <Chip>armclang</Chip> <Chip>atfe</Chip>
+      <Chip tone="static">gcc</Chip> <Chip tone="static">armclang</Chip> <Chip tone="static">atfe</Chip>
     </CardContent>
   </Card>
   <Card>
@@ -158,7 +158,7 @@ delta = session.compare("results/base", "results/new")
       carrier, 2 of them on the stable channel, plus custom SoC definitions
       based on a known part.
 
-      <Chip>hpx boards</Chip>
+      `hpx boards`
     </CardContent>
   </Card>
   <Card>
@@ -170,7 +170,7 @@ delta = session.compare("results/base", "results/new")
       Gated windows on a Joulescope or an on-board INA228, with health checks
       on the window itself.
 
-      <Chip>joulescope</Chip> <Chip>ina228</Chip>
+      <Chip tone="static">joulescope</Chip> <Chip tone="static">ina228</Chip>
     </CardContent>
   </Card>
 </CardGrid>
