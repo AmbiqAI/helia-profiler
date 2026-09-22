@@ -209,6 +209,29 @@ jobs:
             fi
           } >> "${GITHUB_STEP_SUMMARY}"
 
+      # Held until release, ttl, or manual unlock.
+      - name: Take the board lock
+        id: lock
+        run: |
+          if [[ -z "${BENCH_BOARD:-}" ]]; then
+            echo "::error::runner does not export BENCH_BOARD; check the runner contract" >&2
+            exit 2
+          fi
+          if ! command -v bench-agent > /dev/null; then
+            echo "::error::runner has no bench-agent on PATH; check the runner contract" >&2
+            exit 2
+          fi
+          # Untagged: the runner's orphan cleanup skips it.
+          if ! held="$(env -u RUNNER_TRACKING_ID bench-agent lock "${BENCH_BOARD}" \
+              --holder ci \
+              --reason "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+              --timeout 1800 \
+              --ttl 21600 2>&1)"; then
+            echo "::error::${held}" >&2
+            exit 1
+          fi
+          echo "${held}"
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -460,6 +483,18 @@ jobs:
             args+=(--power-serials "${HPX_VALIDATION_POWER_SERIALS}")
           fi
           uv run hpx validate "${args[@]}"
+
+      # Free the board before the hardware-free steps.
+      - name: Release the board lock
+        if: always() && steps.lock.outcome == 'success'
+        run: |
+          if ! freed="$(bench-agent unlock "${BENCH_BOARD}" 2>&1)"; then
+            if [[ "${freed}" != *"is free"* ]]; then
+              echo "::error::${freed}" >&2
+              exit 1
+            fi
+          fi
+          echo "${freed}"
 
       # #187 Tier 2: the validate run above leaves warm dependency
       # workspaces — compile the rendered-firmware matrix with the real

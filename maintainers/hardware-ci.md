@@ -220,6 +220,7 @@ Every runner exports the board it owns and the probe serials it may open:
 | `HPX_BOARD` | the one board this runner owns |
 | `HPX_JLINK_SERIAL` | that board's J-Link serial |
 | `HPX_JOULESCOPE_SERIAL` | serial of a Joulescope dedicated to the board; unset if none |
+| `BENCH_BOARD` | the board's id on its host, what `bench-agent lock` takes |
 
 The first step of every job checks that `HPX_BOARD` matches the matrix board
 and derives `--jlink-serials`, `--power-boards` and `--power-serials` from those
@@ -379,6 +380,7 @@ The runner must already provide:
 - ATfE plus `ATFE_ROOT` when selected toolchains include `atfe`
 - Git LFS support for model fixtures
 - `jq` on `PATH` for the provenance steps
+- `bench-agent` on `PATH` and `BENCH_BOARD` for the board lock
 - optional Joulescope access and wiring when `power` is `on` or `both`
 
 ATfE runs require `ATFE_ROOT` to point at the Arm Toolchain for Embedded install
@@ -393,6 +395,27 @@ Two runs that select the same board queue behind each other on that board's
 concurrency group; runs for different boards proceed independently. Baseline
 comparison, threshold enforcement, and dashboards should consume
 `validation_manifest.json` rather than infer paths from the artifact layout.
+
+## Board lock
+
+Right after the contract checks, the job takes the board's lock with
+`bench-agent lock "$BENCH_BOARD" --holder ci --reason <run URL>`, and a
+`Release the board lock` step frees it once `hpx validate` ends. The lock
+serialises the board between people and CI: `bench who` on a laptop shows
+`ci` as the holder with the run URL as the reason while a job runs.
+
+When a person holds the board, the `Take the board lock` step waits up to
+30 minutes, then fails the job with `<board> held by <name>`. Release the
+board and re-run the job. The lock's ttl (6 hours) outlives the job's
+`timeout-minutes`, so a job the runner killed frees its board on its own.
+
+To release a stuck CI lock by hand, on the host that owns the board:
+
+```bash
+sudo bench-agent unlock <board-id> --force
+```
+
+`bench-agent status` on the host lists every board with its holder.
 
 ## Real-toolchain compile gate (#187 Tier 2)
 
