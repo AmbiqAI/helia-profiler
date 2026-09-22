@@ -1,13 +1,12 @@
 ---
 title: "First profile"
-description: "One command, one model, one board: run hpx profile on the bundled keyword-spotting model, then read the four files it writes and the three numbers that matter."
+description: "One command, one model, one board: run hpx profile on the bundled keyword-spotting model, then read its result bundle, clean inference timing, layer costs and memory use."
 ---
 
 ## Purpose
 
 Run one profile end to end and read the result. By the end you have a
-`results/` directory from your own board and know which three numbers to
-look at first.
+`results/` directory from your own board and know how to read clean timing, layer costs and memory use.
 
 ## Prerequisites
 
@@ -72,7 +71,9 @@ other file with its digest so a bundle can be checked for completeness
 later. The schema of every file is on
 [Output files](../../guide/output/).
 
-### 3. Read the three numbers
+<span id="3-read-the-three-numbers"></span>
+
+### 3. Read timing, layer costs and memory use
 
 Open `summary.json`. The block below is illustrative: the field names and
 shape are the summary schema, the values are placeholders until this page
@@ -85,6 +86,11 @@ carries a captured run. Replace them with what your board printed.
   "engine": "helia-rt",
   "layers": 13,
   "total_cycles": 0,
+  "latency": {
+    "device_clean_infer_count": 10,
+    "device_clean_infer_avg_cycles": 0,
+    "device_clean_infer_avg_us": 0
+  },
   "overflow_detected": false,
   "top_layers": [
     {"op": "CONV_2D", "cycles": 0, "pct": 0.0},
@@ -99,13 +105,18 @@ carries a captured run. Replace them with what your board printed.
 `top_layers` carries `op`, `cycles` and `pct` (the share of `total_cycles`),
 written by `report/summary.py`.
 
-- `total_cycles` is the cost of one inference, averaged over the measured
-  iterations. It is the headline.
+- `latency.device_clean_infer_avg_cycles` and
+  `latency.device_clean_infer_avg_us` are the average cost of one inference
+  in the separate clean window, in cycles and microseconds. Use these for
+  whole-model timing when the capture reports them. `total_cycles` sums
+  the instrumented layer statistics (medians by default); it is a different
+  measurement. [Inference and layer timing](../../guide/latency/) explains
+  the boundaries.
 - `top_layers` names the operators that dominate. Optimisation effort goes
   there first.
 - `memory.allocated_arena` is how much of the tensor arena the runtime used.
-  If it is far below `arena_size`, the arena can shrink; the next page shows
-  where to set it. On the first run leave `arena_size` at the engine default
+  Use it to choose a smaller arena reservation, then recapture to check
+  allocation still succeeds; the next page shows where to set it. On the first run leave `arena_size` at the engine default
   and let this number tell you the size.
 
 Before you quote any of them, look at `validity` and `issues`. A result is
@@ -125,7 +136,7 @@ the digests. The same data is rendered as a
 
 ## Expected output
 
-A `results/` directory with the four files above and, when the run was
+A `results/` directory with the five files above and, when the run was
 clean, `"validity": "valid"` and `"overflow_detected": false` in
 `summary.json`.
 
@@ -142,8 +153,9 @@ installed. On Linux, replug after installing so the udev rules apply.
 :::
 
 :::caution[The build cannot download heliaRT]
-Point `engine.config.dist_path` at a local distribution in a config file, or
-unblock GitHub release access. See [Engines](../../guide/engines/).
+Check access to the source repositories named in the build error. The default
+heliaRT path resolves source modules through neuralSPOT-X; custom local sources
+and distributions are described in [Engines](../../guide/engines/).
 :::
 
 :::caution[Capture times out]

@@ -25,8 +25,9 @@ the GNU Arm toolchain, CMake and Ninja, SEGGER J-Link software
 
 ## Config file
 
-Three checked-in configs share the model, board, toolchain and counter set
-and differ only in the `engine` block and the output directory:
+Start from these three checked-in configurations. They share the model,
+board and toolchain; align their counter selections before a controlled
+comparison:
 
 | Engine | Config |
 |---|---|
@@ -94,16 +95,15 @@ The three single-engine runs, from their `summary.json`:
 
 ## How to read it
 
-- The cycles are close because all three engines run the same CMSIS-NN
-  kernels for this model; the engine decides dispatch, not arithmetic.
-  A model with operators heliaRT fuses or heliaAOT specialises will show a
-  larger gap.
-- `binary.text` is where the engines differ: heliaAOT links only the
-  operators the model uses, so `.text` is 45.7% smaller than heliaRT and
-  `.data` shrinks because the model is compiled rather than embedded as a
-  flatbuffer; `.bss` grows because the compiled model's activation and
-  constant areas are static allocations. TFLM's `.text` carries the full
-  upstream interpreter.
+- Clean cycles are close for this captured model and configuration. These
+  are comparisons of complete engine stacks; they do not isolate dispatch
+  overhead or predict the difference on another model.
+- `binary.text` is the GNU size tool's code plus read-only-data total for
+  the complete profiling image, not the literal ELF `.text` section or
+  model-only code. It is 45.7% smaller for this AOT image than this heliaRT
+  image. `binary.total` includes RAM categories and is not deployment flash
+  usage. The console labels above are preserved from the captured output;
+  [Output files](../../guide/output/) defines the metrics.
 - `hpx compare` omits per-layer deltas when the operation sequences differ
   (heliaAOT reports the model's original operator indices, the
   interpreters report the runtime's), and it lists `engine`,
@@ -126,9 +126,10 @@ The three single-engine runs, from their `summary.json`:
 - A different model: keep the three configs and change `model.path` and
   `model.arena_size` in each; `hpx analyze model.tflite --engine helia-aot --compare`
   shows operator coverage before you build.
-- Placement: `model.arena_location` and `model.weights_location` change
-  the numbers more than the engine does for memory-bound models; keep them
-  identical across the three runs ([Memory placement](../../guide/memory/)).
+- Placement: control the arena and constant locations across the runs,
+  using each engine's placement model. Confirm actual placement in the
+  result rather than assuming identical flags produce identical layouts
+  ([Memory placement](../../guide/memory/)).
 
 ## Validated on
 

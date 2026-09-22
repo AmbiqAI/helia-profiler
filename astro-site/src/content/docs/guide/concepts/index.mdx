@@ -3,8 +3,8 @@ title: "Concepts"
 description: "How heliaPROFILER is built: the packages inside hpx, what each one owns, the frozen configuration and the mutable pipeline context that flow through them, and the typed error hierarchy."
 ---
 
-import BlockDiagram from '@ambiqai/helia-ui/astro/BlockDiagram';
-import Block from '@ambiqai/helia-ui/astro/Block';
+import CardGrid from '@ambiqai/helia-ui/astro/CardGrid';
+import LinkCard from '@ambiqai/helia-ui/astro/LinkCard';
 
 ## Purpose
 
@@ -14,106 +14,30 @@ and points at the module behind every block, so a change can be placed
 before it is written. Users who only run `hpx profile` need the
 [User guide](../../guide/), not this.
 
-## Diagram
+<span id="diagram"></span>
 
-<BlockDiagram
-  title="The hpx package"
-  caption="Every package under src/helia_profiler, grouped by what it owns. Leaves are modules or subpackages; the diagram omits the vendored code, the packaged data files, the console renderers and the CLI command modules."
-  flow="grid"
-  columns={4}
->
-  <Block label="Entry points" sublabel="cli, api, session" tone="accent" flow="column">
-    <Block label="cli" sublabel="Typer commands" emphasis="filled" />
-    <Block label="api" sublabel="profile()" emphasis="filled" />
-    <Block label="session" sublabel="notebooks" emphasis="filled" />
-  </Block>
-  <Block label="Configuration" tone="accent" flow="column">
-    <Block label="config" sublabel="ProfileConfig, frozen" emphasis="filled" />
-    <Block label="vocab" sublabel="shared enums" emphasis="filled" />
-    <Block label="placement" sublabel="policy" emphasis="filled" />
-  </Block>
-  <Block label="Pipeline" tone="accent" flow="column">
-    <Block label="pipeline" sublabel="Stage, context, runner" emphasis="filled" />
-    <Block label="profiler" sublabel="default stage list" emphasis="filled" />
-    <Block label="stages" sublabel="one module each" emphasis="filled" />
-  </Block>
-  <Block label="Engines" tone="accent" flow="column">
-    <Block label="base" sublabel="adapter protocol" emphasis="filled" />
-    <Block label="tflm" emphasis="filled" />
-    <Block label="helia_rt" emphasis="filled" />
-    <Block label="helia_aot" emphasis="filled" />
-    <Block label="executorch" emphasis="filled" />
-  </Block>
-  <Block label="Firmware" tone="accent" flow="column">
-    <Block label="templates" sublabel="Jinja2" emphasis="filled" />
-    <Block label="project" sublabel="NSX files" emphasis="filled" />
-    <Block label="build" sublabel="nsx configure, build" emphasis="filled" />
-    <Block label="fingerprint" emphasis="filled" />
-  </Block>
-  <Block label="Dependencies" tone="accent" flow="column">
-    <Block label="compatibility" sublabel="baseline" emphasis="filled" />
-    <Block label="dependencies" sublabel="workspaces, locks" emphasis="filled" />
-    <Block label="nsx" sublabel="subprocess" emphasis="filled" />
-    <Block label="sync" emphasis="filled" />
-  </Block>
-  <Block label="Platform" tone="accent" flow="column">
-    <Block label="soc" emphasis="filled" />
-    <Block label="board" emphasis="filled" />
-    <Block label="counters" sublabel="PMU registry" emphasis="filled" />
-    <Block label="memory_map" emphasis="filled" />
-    <Block label="custom" sublabel="overlays" emphasis="filled" />
-  </Block>
-  <Block label="Target" tone="accent" flow="column">
-    <Block label="lifecycle" sublabel="reset policy" emphasis="filled" />
-    <Block label="probe" sublabel="J-Link" emphasis="filled" />
-  </Block>
-  <Block label="Transport" tone="accent" flow="column">
-    <Block label="rtt" emphasis="filled" />
-    <Block label="usb_cdc" emphasis="filled" />
-    <Block label="uart" emphasis="filled" />
-    <Block label="swo" emphasis="filled" />
-    <Block label="protocol" sublabel="line loop" emphasis="filled" />
-  </Block>
-  <Block label="Capture" tone="accent" flow="column">
-    <Block label="parser" sublabel="stream to PmuResult" emphasis="filled" />
-    <Block label="readiness" emphasis="filled" />
-    <Block label="power_terminal" emphasis="filled" />
-  </Block>
-  <Block label="Power" tone="accent" flow="column">
-    <Block label="joulescope" emphasis="filled" />
-    <Block label="ina228_driver" emphasis="filled" />
-    <Block label="ondevice_driver" emphasis="filled" />
-    <Block label="sync" sublabel="gate contract" emphasis="filled" />
-  </Block>
-  <Block label="Results" tone="accent" flow="column">
-    <Block label="results" sublabel="typed models" emphasis="filled" />
-    <Block label="report" sublabel="writers" emphasis="filled" />
-    <Block label="evaluation" sublabel="validity, compare" emphasis="filled" />
-    <Block label="modelcost" sublabel="MACs, attribution" emphasis="filled" />
-  </Block>
-  <Block label="Host and wire" tone="accent" flow="column">
-    <Block label="hostenv" sublabel="doctor, toolchains" emphasis="filled" />
-    <Block label="diagnostics" sublabel="support bundle" emphasis="filled" />
-    <Block label="validation" sublabel="hpx validate" emphasis="filled" />
-    <Block label="wire" sublabel="protocol spec" emphasis="filled" />
-  </Block>
-</BlockDiagram>
+## Choose the subsystem you need
 
-The same structure as a list, for readers of the Markdown rendition:
-
-- Entry points: `cli` (Typer commands), `api` (`profile()`), `session` (notebooks)
-- Configuration: `config` (`ProfileConfig`, frozen), `vocab` (shared enums), `placement` (policy)
-- Pipeline: `pipeline` (`Stage`, `PipelineContext`, `PipelineRunner`), `profiler` (default stage list), `stages` (one module each)
-- Engines: `base` (adapter protocol), `tflm`, `helia_rt`, `helia_aot`, `executorch`
-- Firmware: `templates` (Jinja2), `project` (NSX files), `build` (nsx configure, build), `fingerprint`
-- Dependencies: `compatibility` (baseline), `dependencies` (workspaces, locks), `nsx` (subprocess), `sync`
-- Platform: `soc`, `board`, `counters` (PMU registry), `memory_map`, `custom` (overlays)
-- Target: `lifecycle` (reset policy), `probe` (J-Link)
-- Transport: `rtt`, `usb_cdc`, `uart`, `swo`, `protocol` (line loop)
-- Capture: `parser` (stream to `PmuResult`), `readiness`, `power_terminal`
-- Power: `joulescope`, `ina228_driver`, `ondevice_driver`, `sync` (gate contract)
-- Results: `results` (typed models), `report` (writers), `evaluation` (validity, compare), `modelcost` (MACs, attribution)
-- Host and wire: `hostenv` (doctor, toolchains), `diagnostics` (support bundle), `validation` (`hpx validate`), `wire` (protocol spec)
+<CardGrid>
+  <LinkCard href="pipeline/" title="Pipeline and state">
+    Stage order, immutable configuration and the results each stage produces.
+  </LinkCard>
+  <LinkCard href="engine-adapters/" title="Engine adapters">
+    How one selected engine turns a model into firmware artifacts.
+  </LinkCard>
+  <LinkCard href="firmware/" title="Firmware generation">
+    Templates, NSX modules and the build that runs on the target.
+  </LinkCard>
+  <LinkCard href="capture/" title="Data capture">
+    Target readiness, transports and parsing the measurement stream.
+  </LinkCard>
+  <LinkCard href="field-diagnostics/" title="Field diagnostics">
+    Collect and inspect a redacted support bundle for a failing environment.
+  </LinkCard>
+  <LinkCard href="adding-an-engine/" title="Add an engine">
+    The adapter, configuration, firmware and validation touch points.
+  </LinkCard>
+</CardGrid>
 
 ## The blocks
 
@@ -139,7 +63,7 @@ fields earlier stages set, through narrowing accessors that raise
 
 ### Errors are typed
 
-Every failure is a subclass of `HpxError` carrying an optional `hint` that
+HPX uses subclasses of `HpxError` with an optional `hint` that
 the CLI prints under the message. The subclass says which package failed:
 
 | Error | Raised by | Meaning |

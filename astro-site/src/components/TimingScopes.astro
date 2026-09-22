@@ -1,0 +1,32 @@
+---
+/** Illustrates separate whole-model and instrumented-layer measurements. */
+---
+
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 480 164"
+  width="100%"
+  height="164"
+  preserveAspectRatio="xMinYMid meet"
+  role="img"
+  aria-labelledby="timing-scopes-title timing-scopes-description"
+  font-family="var(--helia-font-sans)"
+  font-size="18"
+>
+  <title id="timing-scopes-title">Whole-model timing and per-layer breakdown</title>
+  <desc id="timing-scopes-description">Whole-model timing measures one complete inference. A separate instrumented pass records individual layer costs.</desc>
+  <text x="0" y="19" fill="var(--helia-ink-secondary)">Whole-model timing</text>
+  <rect x="1" y="30" width="478" height="40" rx="6" fill="var(--helia-ink-primary)" />
+  <text x="240" y="56" text-anchor="middle" fill="var(--sl-color-text-invert)">One complete inference</text>
+  <text x="0" y="104" fill="var(--helia-ink-secondary)">Per-layer breakdown</text>
+  {[0, 1, 2, 3].map((index) => (
+    <g>
+      <rect x={index * 123 + 1} y="116" width="109" height="40" rx="6"
+        fill={index % 2 ? 'var(--helia-surface-card-muted)' : 'var(--helia-surface-card)'}
+        stroke="var(--helia-surface-border)" />
+      <text x={index * 123 + 55} y="142" text-anchor="middle" fill="var(--helia-ink-primary)">
+        {index < 3 ? `Layer ${index + 1}` : '…'}
+      </text>
+    </g>
+  ))}
+</svg>

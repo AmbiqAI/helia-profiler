@@ -91,9 +91,12 @@ check(
  * the page: a commit hash or a commits-since-tag count is provenance for the
  * deploy guard, not for a reader. */
 const home = read(dist, "index.html");
+check((home.match(/<h1(?:\s|>)/g) ?? []).length === 1, "Home must have one primary heading.");
+check(home.includes('id="_top"'), "Home must retain the skip-link target.");
+const homeHero = /<section class="[^"]*\bhelia-hero\b[^"]*"[^>]*>([\s\S]*?)<\/section>/.exec(home)?.[1] ?? "";
 const versionLine =
-  /<p class="[^"]*\bdocs-version\b[^"]*"[^>]*>([\s\S]*?)<\/p>/.exec(home)?.[1] ?? "";
-check(versionLine !== "", "Home has no version line.");
+  /<span class="[^"]*\bhelia-hero__badge\b[^"]*"[^>]*>([\s\S]*?)<\/span>/.exec(homeHero)?.[1] ?? "";
+check(versionLine !== "", "Home hero has no version badge.");
 check(
   versionLine.includes(`v${buildInfo.version}`),
   `Home does not show the version v${buildInfo.version}.`,
@@ -127,9 +130,15 @@ check(
   `src/data/catalog.json was generated from tree ${catalog.generatedFrom?.sourceTree}, ` +
     `which is not the committed ${catalog.generatedFrom?.sourcePath}. Run npm run catalog:build.`,
 );
+const engineNames = {
+  "helia-aot": "heliaAOT",
+  "helia-rt": "heliaRT",
+  tflm: "LiteRT for Microcontrollers",
+  executorch: "ExecuTorch",
+};
 const missingEngines = catalog.engines
   .map((entry) => entry.id)
-  .filter((id) => !new RegExp(`helia-chip[^"]*"[^>]*>${escape(id)}<`).test(home));
+  .filter((id) => !engineNames[id] || !home.includes(engineNames[id]));
 check(
   missingEngines.length === 0,
   `Home does not name ${missingEngines.length} engine(s) the registry carries: ${missingEngines.join(", ")}.`,
@@ -154,7 +163,7 @@ for (const [label, expected] of [
   );
 }
 check(
-  home.includes(`${stableBoards} of them on the stable channel`),
+  home.includes(`${stableBoards} stable boards`),
   `Home does not say ${stableBoards} boards are on the stable channel, which is what the registry counts.`,
 );
 

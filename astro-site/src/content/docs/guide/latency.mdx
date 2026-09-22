@@ -1,12 +1,12 @@
 ---
-title: "Latency and per-layer"
+title: "Inference and layer timing"
 description: "What the three timing numbers in a bundle measure (the clean window, the profiled passes and the host capture), how per-layer rows relate to the total, and which configuration keys shaped each one."
 ---
 
 ## Purpose
 
 Read the timing numbers correctly. A bundle carries three kinds of time
-and one kind of cycle count, each with a different boundary; quoting the
+and cycle counts with different boundaries; quoting the
 wrong one is the most common way a benchmark becomes wrong.
 
 ## Prerequisites
@@ -17,7 +17,7 @@ A result bundle and [Output files](../output/) for the field names.
 
 | I want | Read | Boundary | Shaped by |
 |---|---|---|---|
-| The cost of one inference | `latency.device_clean_infer_avg_cycles` (cycles), `latency.device_clean_infer_avg_us` (microseconds) | the clean window: warm, back to back, no per-layer instrumentation; aggregated over `device_clean_infer_count` inferences | `profiling.iterations`, `warmup`, `window_mode`, `window_target_ms`, `aggregation`; the clock tier `target.clock.cpu` |
+| The cost of one inference | `latency.device_clean_infer_avg_cycles` (cycles), `latency.device_clean_infer_avg_us` (microseconds) | the clean window: warm, back to back, no per-layer instrumentation; aggregated over `device_clean_infer_count` inferences | `profiling.iterations`, `warmup`, `window_mode`, `window_target_ms`; the clock tier `target.clock.cpu` |
 | Where the cycles go | `profile_results.csv` rows, `summary.top_layers` | the instrumented passes: each layer bracketed by counter reads, aggregated over the measured iterations by `profiling.aggregation` | `profiling.pmu_counters`, `per_layer`, `iterations`, `warmup` |
 | How long the profiled passes took on the device | `latency.device_profiled_infer_avg_us`, `_total_us`, `_count` | the instrumented passes, on the device clock | as above |
 | How long the whole capture took | `latency.capture_duration_s`, `hpx_start_latency_s`, `protocol_duration_s`, `boot_phases_s` | host-side: boot, handshake, transport, everything; never an inference number | `target.transport`, `timeouts` |
@@ -73,8 +73,8 @@ you convert or transfer a figure, say which tier.
 
 ## Expected output
 
-A number you can label: "N cycles per inference, clean window, median of
-M iterations, board B at tier T", with the per-layer table explaining it.
+A number you can label: "N cycles per inference, clean window, average over
+M completed inferences, board B at tier T", with the per-layer table explaining it.
 
 ## What next
 
