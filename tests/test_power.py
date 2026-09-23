@@ -152,32 +152,43 @@ class TestPowerDiagnostics:
         from helia_profiler.power.diagnostics import GateFailureKind, classify_gate_failure
 
         failure = classify_gate_failure(
-            saw_gate_rise=True, duration_s=9.7, planned_window_s=4.992, gate_high_s=8.5
+            saw_gate_rise=True,
+            duration_s=9.7,
+            planned_window_s=4.992,
+            gate_high_s=8.5,
+            longest_window_s=5.75,
         )
 
         assert failure.kind is GateFailureKind.NO_GATE_FALL
-        assert "stayed high for 8.50s, past the planned 4.99s window" in failure.hint
-        assert "9.7s capture bound" in failure.hint
+        assert "stayed high for 8.50s, past the 5.75s the planned 4.99s window" in failure.hint
+        assert "9.70s capture bound" in failure.hint
         assert "hang" in failure.hint
         assert "Increase power.duration_s" not in failure.hint
 
     @pytest.mark.parametrize(
-        ("bound", "planned", "high", "expected"),
+        ("bound", "planned", "longest", "high", "expected"),
         [
             # A direct caller whose bound is shorter than the window.
-            (0.3, 10.0, 0.25, "high for only 0.25s of the planned 10.00s window"),
+            (0.3, 10.0, None, 0.25, "high for only 0.25s of the planned 10.00s window"),
             # A free-running target whose boot and warm-up used most of a bound
             # that is longer than the window.
-            (10.23, 0.2, 0.13, "high for only 0.13s of the planned 0.20s window"),
+            (10.23, 0.2, 0.23, 0.13, "rose 10.10s into the 10.23s capture bound"),
+            # Past the plan but inside the band the gate check accepts: a late
+            # healthy window, not a hang.
+            (3.15, 1.0, 1.15, 1.08, "high for only 1.08s of the planned 1.00s window"),
         ],
     )
     def test_no_gate_fall_hint_asks_for_more_time_when_the_bound_cut_the_window_short(
-        self, bound, planned, high, expected
+        self, bound, planned, longest, high, expected
     ):
         from helia_profiler.power.diagnostics import classify_gate_failure
 
         failure = classify_gate_failure(
-            saw_gate_rise=True, duration_s=bound, planned_window_s=planned, gate_high_s=high
+            saw_gate_rise=True,
+            duration_s=bound,
+            planned_window_s=planned,
+            gate_high_s=high,
+            longest_window_s=longest,
         )
 
         assert expected in failure.hint
@@ -194,7 +205,7 @@ class TestPowerDiagnostics:
             saw_gate_rise=True, duration_s=7.0, planned_window_s=planned, gate_high_s=high
         )
 
-        assert "7.0s capture bound" in failure.hint
+        assert "7.00s capture bound" in failure.hint
         assert "Increase power.duration_s" in failure.hint
         assert "not the window length" in failure.hint
 
@@ -1203,6 +1214,7 @@ class TestMissedGateWarningNamesTheFix:
         empty_frames=False,
         gpi_level: int = 0,
         gpi_rises_after_s: float | None = None,
+        clean_infer_count: int = 5,
         clean_infer_avg_us: int = 1000,
         duration_s: float = 0.3,
     ):
@@ -1228,7 +1240,7 @@ class TestMissedGateWarningNamesTheFix:
             io_voltage=1.8,
             sync_input_index=0,
             stats_rate_hz=1000,
-            clean_infer_count=5,
+            clean_infer_count=clean_infer_count,
             clean_infer_avg_us=clean_infer_avg_us,
             poll_interval_s=0.005,
             on_started=lambda _wait: fake.emit_packets(10),
@@ -1252,7 +1264,7 @@ class TestMissedGateWarningNamesTheFix:
         ("avg_us", "expected", "absent"),
         [
             # 5 x 1 ms planned: a gate high for the whole 0.3 s bound overran it.
-            (1000, "past the planned 0.01s window", "Increase power.duration_s"),
+            (1000, "the planned 0.01s window may run", "Increase power.duration_s"),
             # 5 x 100 ms planned: the 0.3 s bound ended inside the window.
             (100_000, "of the planned 0.50s window", "hang"),
         ],
@@ -1291,6 +1303,28 @@ class TestMissedGateWarningNamesTheFix:
         assert result.metadata.gate_failure.kind == "no_gate_fall"
         assert "of the planned 0.40s window" in result.metadata.gate_failure.hint
         assert "hang" not in result.metadata.gate_failure.hint
+
+    def test_missed_fall_inside_the_accepted_band_is_not_called_a_hang(self, monkeypatch, caplog):
+        """2 x 400 ms planned is accepted up to 1.0 s (half an inference of
+        slack); rising 0.3 s into a 1.2 s bound leaves it high about 0.9 s."""
+        with caplog.at_level(logging.WARNING, logger="hpx"):
+            result = self._run_capture(
+                monkeypatch,
+                lockstep=True,
+                wired=True,
+                gpi_rises_after_s=0.3,
+                clean_infer_count=2,
+                clean_infer_avg_us=400_000,
+                duration_s=1.2,
+            )
+
+        warnings = "\n".join(
+            record.getMessage() for record in caplog.records if record.levelno >= logging.WARNING
+        )
+        for text in (result.metadata.gate_failure.hint, warnings):
+            assert "of the planned 0.80s window" in text
+            assert "Increase power.duration_s" in text
+            assert "hang" not in text
 
     @pytest.mark.parametrize("empty_frames", [False, True, "silent"])
     def test_the_degraded_artifact_still_carries_the_time_base_diagnostics(
@@ -2845,7 +2879,12 @@ class TestCapturePowerWrapper:
 
     @staticmethod
     def _shared_ctx_with_planned_window(
-        tmp_path: Path, *, count: int = 233, avg_us: int = 21_425, **power
+        tmp_path: Path,
+        *,
+        count: int = 233,
+        avg_us: int = 21_425,
+        profiling: dict[str, object] | None = None,
+        **power,
     ):
         from helia_profiler.config import load_config
         from helia_profiler.pipeline import PipelineContext
@@ -2858,7 +2897,7 @@ class TestCapturePowerWrapper:
             {
                 "model": {"path": str(model)},
                 "engine": {"type": "helia-rt"},
-                "profiling": {"warmup": 5},
+                "profiling": {"warmup": 5, **(profiling or {})},
                 "power": {"enabled": True, "driver": "joulescope", "firmware": "shared", **power},
             },
         )
@@ -2930,28 +2969,58 @@ class TestCapturePowerWrapper:
         assert called["lockstep"] is False
         assert bound - self._longest_accepted_s(called, 233, 21_425) >= _BOOT_SETTLE_S
         assert result.metadata.capture_safety_bound_s == bound
-        raised = [r for r in caplog.records if "leaves too little room" in r.getMessage()]
+        raised = [r for r in caplog.records if "Raising the capture bound" in r.getMessage()]
         assert [r.levelno for r in raised] == [logging.WARNING]
-        assert "Capture bound 5.0s" in raised[0].getMessage()
-        assert "after boot and warm-up without lock-step" in raised[0].getMessage()
+        assert "from 5.00s" in raised[0].getMessage()
+        assert "plus boot and warm-up before it without lock-step" in raised[0].getMessage()
 
+    @pytest.mark.parametrize(("warmup", "warm_reps"), [(5, 5), (1, 3)])
     def test_free_running_wait_holds_warmup_before_a_slow_window(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, warmup, warm_reps
     ):
-        """Without lock-step the warm reps run inside the wait, before the gate."""
+        """Without lock-step the warm reps run inside the wait, before the gate;
+        the firmware never warms fewer than 3."""
         from helia_profiler.capture import capture_power
         from helia_profiler.stages.capture_power import _BOOT_SETTLE_S
 
-        ctx = self._shared_ctx_with_planned_window(tmp_path, count=10, avg_us=3_000_000)
+        ctx = self._shared_ctx_with_planned_window(
+            tmp_path, count=10, avg_us=3_000_000, profiling={"warmup": warmup}
+        )
         called = self._recording_gated_driver(monkeypatch)
 
         capture_power(ctx, duration_override_s=5.0)
 
         bound = called["duration_s"]
         assert isinstance(bound, float)
-        warmup_s = 5 * 3.0  # profiling.warmup=5 inferences of 3 s
         longest = self._longest_accepted_s(called, 10, 3_000_000)
-        assert bound - (_BOOT_SETTLE_S + warmup_s + longest) >= 1.0
+        assert bound - (_BOOT_SETTLE_S + warm_reps * 3.0 + longest) >= 1.0
+
+    def test_busy_loop_warmup_is_not_charged_a_whole_spin_per_rep(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ):
+        """A busy_loop unit is the whole spin, not an inference."""
+        from helia_profiler.capture import capture_power
+        from helia_profiler.power.diagnostics import FALL_WAIT_HEADROOM_S
+        from helia_profiler.stages.capture_power import _BOOT_SETTLE_S
+
+        ctx = self._shared_ctx_with_planned_window(
+            tmp_path, count=1, avg_us=5_000_000, profiling={"clean_window_probe": "busy_loop"}
+        )
+        called = self._recording_gated_driver(monkeypatch)
+
+        with caplog.at_level(logging.INFO, logger="hpx"):
+            capture_power(ctx, duration_override_s=1.0)
+
+        bound = called["duration_s"]
+        assert isinstance(bound, float)
+        # Charging warm reps would add whole 5 s spins; allow less than one.
+        extra_s = bound - self._longest_accepted_s(called, 1, 5_000_000)
+        assert extra_s < _BOOT_SETTLE_S + FALL_WAIT_HEADROOM_S + 5.0
+        raised = [
+            r.getMessage() for r in caplog.records if "Raising the capture bound" in r.getMessage()
+        ]
+        assert len(raised) == 1
+        assert "plus boot before it without lock-step" in raised[0]
 
     def test_default_cap_inside_a_long_window_is_raised_quietly(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
@@ -2970,7 +3039,7 @@ class TestCapturePowerWrapper:
         bound = called["duration_s"]
         assert isinstance(bound, float)
         assert bound - self._longest_accepted_s(called, 2000, 20_000) >= 1.0
-        raised = [r for r in caplog.records if "leaves too little room" in r.getMessage()]
+        raised = [r for r in caplog.records if "Raising the capture bound" in r.getMessage()]
         assert [r.levelno for r in raised] == [logging.INFO]
 
     @pytest.mark.parametrize("reports_bound", [True, False])
@@ -2998,7 +3067,7 @@ class TestCapturePowerWrapper:
             capture_power(ctx, duration_override_s=30.0)
 
         assert called["duration_s"] == 30.0
-        assert "leaves too little room" not in caplog.text
+        assert "Raising the capture bound" not in caplog.text
 
 
 class TestPowerFirmwareSelection:

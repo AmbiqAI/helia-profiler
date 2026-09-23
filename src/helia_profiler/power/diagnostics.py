@@ -864,6 +864,7 @@ def classify_gate_failure(
     lockstep_wiring_available: bool = False,
     planned_window_s: float | None = None,
     gate_high_s: float | None = None,
+    longest_window_s: float | None = None,
 ) -> GateFailure:
     """Classify why a gated capture produced no complete high window.
 
@@ -902,25 +903,27 @@ def classify_gate_failure(
             ),
         )
     planned = planned_window_s is not None and planned_window_s > 0
-    if planned and gate_high_s is not None and gate_high_s > planned_window_s:
+    longest = longest_window_s if longest_window_s else planned_window_s
+    if planned and gate_high_s is not None and longest is not None and gate_high_s > longest:
         hint = (
-            f"The gate stayed high for {gate_high_s:.2f}s, past the planned "
-            f"{planned_window_s:.2f}s window, until the {duration_s:.1f}s capture "
-            "bound ended. Check for a firmware hang or a window far longer than "
-            "planned; power.duration_s bounds the capture, and the profiling "
-            "window settings set the window length."
+            f"The gate stayed high for {gate_high_s:.2f}s, past the {longest:.2f}s "
+            f"the planned {planned_window_s:.2f}s window may run, until the "
+            f"{duration_s:.2f}s capture bound ended. Check for a firmware hang or a "
+            "window far longer than planned; power.duration_s bounds the capture, "
+            "and the profiling window settings set the window length."
         )
     elif planned and gate_high_s is not None:
         hint = (
-            f"The gate was high for only {gate_high_s:.2f}s of the planned "
-            f"{planned_window_s:.2f}s window when the {duration_s:.1f}s capture "
-            "bound ended. Increase power.duration_s (it bounds the capture, not "
-            "the window length)."
+            f"The gate rose {max(0.0, duration_s - gate_high_s):.2f}s into the "
+            f"{duration_s:.2f}s capture bound and was high for only "
+            f"{gate_high_s:.2f}s of the planned {planned_window_s:.2f}s window. "
+            "Increase power.duration_s (it bounds the capture, not the window "
+            "length)."
         )
     else:
         hint = (
             "The firmware entered the measured window but did not close it within "
-            f"the {duration_s:.1f}s capture bound. Increase power.duration_s (it "
+            f"the {duration_s:.2f}s capture bound. Increase power.duration_s (it "
             "bounds the capture, not the window length) or check for firmware "
             "hangs inside the clean window."
         )

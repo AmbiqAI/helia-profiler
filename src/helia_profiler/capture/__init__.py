@@ -372,8 +372,8 @@ def capture_power(
             if clean_count and clean_avg_us
             else None
         )
-        # Warm reps are inferences only for a counted probe; a busy_loop
-        # unit is the whole spin, so its warm-up cost is unknown here.
+        # Warm reps are inferences only for a counted probe; a busy_loop unit
+        # is the whole spin, so its per-inference cost is not in the plan.
         warmup_s = (
             max(CLEAN_WINDOW_WARMUP_REPS, ctx.config.profiling.warmup) * clean_avg_us / 1e6
             if clean_avg_us and probe_runs_inferences(probe)
@@ -386,16 +386,21 @@ def capture_power(
             pre_window_s=warmup_s,
         )
         if fall_wait_s > duration:
+            if sync.lockstep:
+                before_window = ""
+            elif warmup_s:
+                before_window = ", plus boot and warm-up before it without lock-step"
+            else:
+                before_window = ", plus boot before it without lock-step"
             log.log(
                 logging.WARNING if ctx.config.power.duration_s is not None else logging.INFO,
-                "Capture bound %.1fs leaves too little room for a gated window accepted "
-                "up to %.2fs%s; waiting up to %.1fs for the gate to fall. "
-                "power.duration_s bounds the capture; the profiling window settings "
-                "set the window length.",
+                "Raising the capture bound from %.2fs to %.2fs to hold a gated window "
+                "accepted up to %.2fs%s. power.duration_s bounds the capture; the "
+                "profiling window settings set the window length.",
                 duration,
-                longest_window_s,
-                "" if sync.lockstep else " after boot and warm-up without lock-step",
                 fall_wait_s,
+                longest_window_s,
+                before_window,
             )
         prepare_error: list[BaseException] = []
         try:
