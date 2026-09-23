@@ -74,6 +74,7 @@ def _degraded_observation_result(
     gating_diagnostics: dict[str, Any] | None = None,
     lockstep: bool | None = None,
     lockstep_wiring_available: bool = False,
+    planned_window_s: float | None = None,
 ) -> PowerResult:
     failure = classify_gate_failure(
         saw_gate_rise=saw_gate_rise,
@@ -81,6 +82,7 @@ def _degraded_observation_result(
         duration_s=duration_s,
         lockstep=lockstep,
         lockstep_wiring_available=lockstep_wiring_available,
+        planned_window_s=planned_window_s,
     )
     whole_summary = _whole_summary_from_stats(packets)
     return PowerResult(
@@ -149,7 +151,7 @@ def capture_gated(
     spike-robust current/power distribution for reporting.
 
     Only one clean window is supported. After its falling edge and a
-    ``guard_s`` settle, capture stops; ``duration_s`` is a safety upper bound.
+    ``guard_s`` settle, capture stops; ``duration_s`` bounds the wait for it.
     """
     del kwargs
 
@@ -631,12 +633,18 @@ def capture_gated(
                 gating_diagnostics.setdefault(
                     "fullrate_xcheck_unavailable_reason", "no_integrable_gate_samples"
                 )
+            planned_window_s = (
+                clean_infer_count * clean_infer_avg_us / 1_000_000
+                if clean_infer_count and clean_infer_avg_us
+                else None
+            )
             failure = classify_gate_failure(
                 saw_gate_rise=saw_any_gate_rise,
                 saw_gate_fall=saw_any_gate_fall,
                 duration_s=duration_s,
                 lockstep=lockstep,
                 lockstep_wiring_available=lockstep_wiring_available,
+                planned_window_s=planned_window_s,
             )
             if not packets:
                 raise PowerError(failure.message, hint=failure.hint)
@@ -658,6 +666,7 @@ def capture_gated(
                 gating_diagnostics=gating_diagnostics,
                 lockstep=lockstep,
                 lockstep_wiring_available=lockstep_wiring_available,
+                planned_window_s=planned_window_s,
             )
             # The hint is logged, not just stored in metadata: on the degraded
             # path there is no PowerError to carry it, so the terminal warning

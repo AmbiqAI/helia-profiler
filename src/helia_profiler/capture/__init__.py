@@ -25,6 +25,7 @@ from ..errors import CaptureError, PowerError
 from ..power.diagnostics import (
     SyncHandshakeMetadata,
     count_noun,
+    gate_fall_wait_s,
     gate_relative_tolerance_for,
 )
 from ..transport import (
@@ -356,6 +357,25 @@ def capture_power(
         # after on_started returns). One try/finally so any exception still
         # releases sync.
         sync = _make_sync_controller(ctx, driver)
+        relative_tolerance = gate_relative_tolerance_for(ctx.config.profiling.clean_window_probe)
+        planned_window_s = (
+            clean_count * clean_avg_us / 1_000_000 if clean_count and clean_avg_us else None
+        )
+        fall_wait_s = gate_fall_wait_s(
+            duration,
+            planned_window_s=planned_window_s,
+            relative_tolerance=relative_tolerance,
+            lockstep=sync.lockstep,
+        )
+        if fall_wait_s > duration:
+            log.warning(
+                "Capture bound %.1fs cannot contain the planned %.2fs gated window; "
+                "waiting up to %.1fs for the gate to fall. power.duration_s bounds "
+                "the capture; profiling.window_target_ms sets the window.",
+                duration,
+                planned_window_s,
+                fall_wait_s,
+            )
         prepare_error: list[BaseException] = []
         try:
             sync.arm()
@@ -418,7 +438,7 @@ def capture_power(
                     raise
 
             result = driver.capture_gated(
-                duration_s=duration,
+                duration_s=fall_wait_s,
                 io_voltage=ctx.config.power.io_voltage,
                 sync_input_index=ctx.config.power.sync_input_index,
                 state_input_index=ctx.config.power.state_input_index,
@@ -426,9 +446,7 @@ def capture_power(
                 clean_infer_count=clean_count,
                 clean_infer_avg_us=clean_avg_us,
                 minimum_gate_s=DEFAULT_POWER_MIN_WINDOW_MS / 1000.0,
-                gate_relative_tolerance=gate_relative_tolerance_for(
-                    ctx.config.profiling.clean_window_probe
-                ),
+                gate_relative_tolerance=relative_tolerance,
                 work_noun=count_noun(ctx.config.profiling.clean_window_probe, clean_count or 0),
                 on_started=_release,
                 # The dedicated JS320 GPI stream provides the authoritative

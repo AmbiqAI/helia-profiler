@@ -257,6 +257,40 @@ DRIFT_PLAUSIBLE_RATIO_DEVIATION = 0.15
 #: field carries the number either way.
 DRIFT_NOTE_MIN_RATIO_DEVIATION = 0.05
 
+#: Reset, secondary bootloader and firmware init before the clean window can
+#: start.
+BOOT_SETTLE_S = 8.0
+
+#: Gated-wait allowance beyond the longest plausible window: setup between GO
+#: and the gate rise, gate-edge detection and the post-fall guard.
+FALL_WAIT_HEADROOM_S = 2.0
+
+
+def gate_fall_wait_s(
+    configured_s: float,
+    *,
+    planned_window_s: float | None,
+    relative_tolerance: float,
+    lockstep: bool,
+) -> float:
+    """How long a gated capture waits for the gate to fall.
+
+    ``configured_s`` (``power.duration_s`` or its default/estimate) is raised
+    when it cannot contain the planned window at the longest length the gate
+    check or cross-boot drift still accepts. Without lock-step the wait starts
+    at reset rather than GO, so boot precedes the window. An unknown planned
+    window keeps ``configured_s``.
+    """
+    if planned_window_s is None or planned_window_s <= 0:
+        return configured_s
+    longest_window_s = planned_window_s * (
+        1.0 + max(relative_tolerance, DRIFT_PLAUSIBLE_RATIO_DEVIATION)
+    )
+    minimum_s = longest_window_s + FALL_WAIT_HEADROOM_S
+    if not lockstep:
+        minimum_s += BOOT_SETTLE_S
+    return max(configured_s, minimum_s)
+
 
 def external_observer_slack_s(
     stats_rate_hz: int | None,
@@ -809,6 +843,7 @@ def classify_gate_failure(
     duration_s: float,
     lockstep: bool | None = None,
     lockstep_wiring_available: bool = False,
+    planned_window_s: float | None = None,
 ) -> GateFailure:
     """Classify why a gated capture produced no complete high window.
 
@@ -846,21 +881,34 @@ def classify_gate_failure(
                 "check Joulescope callback timing before trusting power data."
             ),
         )
+    if planned_window_s is not None and planned_window_s > 0:
+        hint = (
+            "The firmware entered the measured window but did not close it within "
+            f"the {duration_s:.1f}s capture bound, which already covers the planned "
+            f"{planned_window_s:.2f}s window. Check for a firmware hang inside the "
+            "clean window. power.duration_s only raises the capture bound; "
+            "profiling.window_target_ms sets the window length."
+        )
+    else:
+        hint = (
+            "The firmware entered the measured window but did not close it within "
+            f"the {duration_s:.1f}s capture bound. Increase power.duration_s (it "
+            "bounds the capture, not the window length) or check for firmware "
+            "hangs inside the clean window."
+        )
     return GateFailure(
         kind=GateFailureKind.NO_GATE_FALL,
         message="GPIO gate rose but did not fall during Joulescope gated capture",
-        hint=(
-            "The firmware entered the measured window but did not close it before "
-            f"the {duration_s:.1f}s safety bound. Increase power.duration_s or "
-            "check for firmware hangs inside the clean window."
-        ),
+        hint=hint,
     )
 
 
 __all__ = [
+    "BOOT_SETTLE_S",
     "DRIFT_NOTE_MIN_RATIO_DEVIATION",
     "DRIFT_PLAUSIBLE_RATIO_DEVIATION",
     "EXTERNAL_WINDOW_CLOCK_TOLERANCE",
+    "FALL_WAIT_HEADROOM_S",
     "FROZEN_WINDOW_CLOCK_HINT",
     "GATE_EDGE_POLL_INTERVAL_S",
     "INTERNAL_WINDOW_CLOCK_TOLERANCE",
@@ -889,5 +937,6 @@ __all__ = [
     "classify_gate_failure",
     "external_observer_slack_s",
     "firmware_window_clock_is_frozen",
+    "gate_fall_wait_s",
     "gated_window_reference_s",
 ]

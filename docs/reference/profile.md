@@ -88,7 +88,7 @@ and synchronization is frozen.
 | `--power` | flag | off | Enable power capture. See [Power](../guide/power.md). |
 | `--power-driver` | `joulescope` | `joulescope` | Auto-detect a JS110, JS220, or JS320. On-device measurement values are reserved but not implemented. |
 | `--power-mode` | `external` | `external` | External GPIO-gated measurement. Internal mode is reserved but not implemented. |
-| `--power-duration` | int | 30 | Capture window length in seconds. |
+| `--power-duration` | int | auto | Upper bound on the power capture in seconds. A gated capture raises it to fit the planned window; `profiling.window_target_ms` sets the window length. |
 | `--power-firmware` | `dedicated` \| `shared` | `dedicated` | Binary flashed during power capture. `dedicated` uses a transport-free image to avoid transport current contamination; `shared` reuses the transport binary. See [Power](../guide/power.md#dedicated-power-firmware). |
 | `--power-reset-strategy` | `auto` \| `power_cycle` \| `none` \| `debug_reset` \| `swpoi_reset` \| `debug_reset+swpoi_reset` | `auto` | Override reset behavior for board bring-up or controlled experiments. |
 | `--sync-gpio` | int | board default (per-board; see [Boards](../guide/boards.md) and [Power](../guide/power.md#wiring-reference)) | GPIO pin the firmware toggles around inference. Most built-in EVBs register a board-specific pin; `10` is only the fallback for boards without a registered override. |

@@ -507,8 +507,12 @@ profiling:
 `power.duration_s` (default `None`) is the *host-side safety bound* for the
 whole capture, separate from the firmware-side window. Left unset,
 heliaPROFILER auto-tunes it from PMU-phase timing (boot settle + estimated
-firmware runtime + margin); an explicit value always wins and disables that
-auto-tuning.
+firmware runtime + margin); an explicit value disables that auto-tuning.
+Changing it does not change the measured window, which
+`profiling.window_target_ms` sets. When the planned window is known, a gated
+capture never waits less than that window at its longest accepted length plus
+headroom (and boot time without lock-step), and logs a warning when it raises
+the bound.
 
 ## Reset strategies
 
@@ -1159,8 +1163,10 @@ the JS320 bench.
 
 ??? failure "GPIO gate rose but did not fall (`no_gate_fall`)"
     The firmware entered the measured window but did not close it before the
-    safety bound. Increase `power.duration_s`, or check for a firmware hang
-    inside the clean window. This one is *not* a lock-step problem — the gate
+    safety bound. When the hint reports a planned window, the bound already
+    covered it, so check for a firmware hang inside the clean window.
+    Otherwise increase `power.duration_s`, which bounds the capture but does
+    not change the window length. This one is *not* a lock-step problem — the gate
     was observed rising, so the poller was armed in time.
 
 ??? failure "Wrong `io_voltage` or wrong input index"
