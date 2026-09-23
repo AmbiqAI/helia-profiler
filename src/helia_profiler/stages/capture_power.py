@@ -19,7 +19,12 @@ from ..config import DEFAULT_POWER_DURATION_S, WindowMode
 from ..errors import PowerError
 from ..pipeline import PipelineContext
 from ..power.base import PowerDriver
-from ..power.diagnostics import BOOT_SETTLE_S, count_noun, probe_runs_inferences
+from ..power.diagnostics import (
+    BOOT_SETTLE_S,
+    CLEAN_WINDOW_WARMUP_REPS,
+    count_noun,
+    probe_runs_inferences,
+)
 from ..power.metadata import classify_observation
 from ..target.lifecycle import CapturePhase, prepare_target_for_phase
 
@@ -29,11 +34,7 @@ _BOOT_SETTLE_S = BOOT_SETTLE_S
 _SAFETY_MARGIN_S = 6.0  # extra headroom beyond estimated runtime
 
 
-#: Auto window mode warms the clean pass with 3 uninstrumented reps before
-#: timing (_main_base.cc.j2), independent of profiling.warmup; every
-#: fixed-mode measuring arm floors its warmup at the same 3 (#164, #170), so
-#: the estimate below floors too.
-_AUTO_WINDOW_WARMUP_REPS = 3
+_AUTO_WINDOW_WARMUP_REPS = CLEAN_WINDOW_WARMUP_REPS
 
 
 def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
@@ -169,9 +170,10 @@ class CapturePowerStage:
 
         # Tighten the capture window from PMU timing only when the user left
         # duration unset: an explicit power.duration_s is an operator override
-        # and must win -- the PMU-phase estimate can be wrong about the
-        # power-phase boot, and a silently-shrunk bound blocks overrides
-        # during diagnosis.  duration_s is None when not explicitly set.
+        # and wins over the estimate -- the PMU-phase estimate can be wrong
+        # about the power-phase boot, and a silently-shrunk bound blocks
+        # overrides during diagnosis.  duration_s is None when not explicitly
+        # set.  A gated capture still raises either to fit the planned window.
         estimated = _estimate_capture_duration(ctx)
         user_overrode_duration = ctx.config.power.duration_s is not None
         configured = (

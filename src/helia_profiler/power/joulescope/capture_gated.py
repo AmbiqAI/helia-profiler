@@ -75,6 +75,7 @@ def _degraded_observation_result(
     lockstep: bool | None = None,
     lockstep_wiring_available: bool = False,
     planned_window_s: float | None = None,
+    gate_high_s: float | None = None,
 ) -> PowerResult:
     failure = classify_gate_failure(
         saw_gate_rise=saw_gate_rise,
@@ -83,6 +84,7 @@ def _degraded_observation_result(
         lockstep=lockstep,
         lockstep_wiring_available=lockstep_wiring_available,
         planned_window_s=planned_window_s,
+        gate_high_s=gate_high_s,
     )
     whole_summary = _whole_summary_from_stats(packets)
     return PowerResult(
@@ -409,6 +411,7 @@ def capture_gated(
             time.sleep(poll_interval_s)
 
     capture_start = time.monotonic()
+    wait_ended_at: float | None = None
     try:
         try:
             driver.publish(f"{device_path}/{cycle_topic}", on_value)
@@ -461,6 +464,7 @@ def capture_gated(
                 except Exception:
                     log.warning("on_started hook failed", exc_info=True)
             stop.wait(timeout=duration_s)
+            wait_ended_at = time.monotonic()
         finally:
             stop.set()
             try:
@@ -638,6 +642,11 @@ def capture_gated(
                 if clean_infer_count and clean_infer_avg_us
                 else None
             )
+            gate_high_s = (
+                wait_ended_at - first_high_at
+                if wait_ended_at is not None and first_high_at is not None
+                else None
+            )
             failure = classify_gate_failure(
                 saw_gate_rise=saw_any_gate_rise,
                 saw_gate_fall=saw_any_gate_fall,
@@ -645,6 +654,7 @@ def capture_gated(
                 lockstep=lockstep,
                 lockstep_wiring_available=lockstep_wiring_available,
                 planned_window_s=planned_window_s,
+                gate_high_s=gate_high_s,
             )
             if not packets:
                 raise PowerError(failure.message, hint=failure.hint)
@@ -667,6 +677,7 @@ def capture_gated(
                 lockstep=lockstep,
                 lockstep_wiring_available=lockstep_wiring_available,
                 planned_window_s=planned_window_s,
+                gate_high_s=gate_high_s,
             )
             # The hint is logged, not just stored in metadata: on the degraded
             # path there is no PowerError to carry it, so the terminal warning

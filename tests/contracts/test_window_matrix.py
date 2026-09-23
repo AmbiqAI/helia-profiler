@@ -10,7 +10,7 @@ the test.  Each cell asks what a real run depends on:
 * the gate check must ACCEPT a perfect run;
 * the capture deadline must outlast the window, or the poller misses the
   falling edge -- both the estimate and the bound the capture actually waits
-  on after a short explicit bound or the default cap.
+  on when the configured bound is short of, or equal to, the window.
 
 The firmware-side length is derived from the config and the templates' own
 rules -- deliberately NOT from `predicted_window_ms`, the thing under test.
@@ -24,11 +24,7 @@ from pathlib import Path
 
 import pytest
 
-from helia_profiler.config import (
-    DEFAULT_POWER_DURATION_S,
-    DEFAULT_POWER_WINDOW_TARGET_MS,
-    load_config,
-)
+from helia_profiler.config import DEFAULT_POWER_WINDOW_TARGET_MS, load_config
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.platform import get_soc_for_board
 from helia_profiler.power.diagnostics import (
@@ -337,21 +333,20 @@ def _bound_the_capture_waits_on(ctx, monkeypatch, *, configured_s: float, lockst
 
 
 @pytest.mark.parametrize("lockstep", [True, False], ids=["lockstep", "free-running"])
-@pytest.mark.parametrize(
-    "configured_s", [1.0, float(DEFAULT_POWER_DURATION_S)], ids=["short-explicit", "default-cap"]
-)
+@pytest.mark.parametrize("configured", ["short", "at-window"])
 @pytest.mark.parametrize(
     ("probe", "firmware", "window_mode", "target_ms", "power_mode"),
     [c for c in CELLS if c.values[4] == "external"],
 )
 def test_the_gated_capture_waits_past_the_longest_accepted_window(
-    cell, monkeypatch, probe, firmware, window_mode, target_ms, power_mode, configured_s, lockstep
+    cell, monkeypatch, probe, firmware, window_mode, target_ms, power_mode, configured, lockstep
 ):
     """The estimate above is not what the capture waits on (#302).
 
-    An explicit ``power.duration_s`` and the default cap both reach
-    ``capture_gated`` unchanged unless the capture raises them, so the wait
-    itself must still hold the longest window the gate check accepts.
+    An explicit ``power.duration_s`` or the default cap reaches
+    ``capture_gated`` unchanged unless the capture raises it, so a bound short
+    of the window, or exactly at it, must still become a wait that holds the
+    longest window the gate check accepts.
     """
     ctx, config, plan = cell(probe, firmware, window_mode, target_ms, power_mode)
     if firmware == "dedicated":
@@ -360,7 +355,10 @@ def test_the_gated_capture_waits_past_the_longest_accepted_window(
     longest_accepted_s = window_s * (1.0 + gate_relative_tolerance_for(probe))
 
     waited_s = _bound_the_capture_waits_on(
-        ctx, monkeypatch, configured_s=configured_s, lockstep=lockstep
+        ctx,
+        monkeypatch,
+        configured_s=1.0 if configured == "short" else window_s,
+        lockstep=lockstep,
     )
 
     assert waited_s > longest_accepted_s, (

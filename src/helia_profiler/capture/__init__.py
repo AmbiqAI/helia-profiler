@@ -23,10 +23,13 @@ from ..config import DEFAULT_POWER_DURATION_S
 from ..vocab import Transport
 from ..errors import CaptureError, PowerError
 from ..power.diagnostics import (
+    CLEAN_WINDOW_WARMUP_REPS,
     SyncHandshakeMetadata,
     count_noun,
     gate_fall_wait_s,
     gate_relative_tolerance_for,
+    longest_accepted_window_s,
+    probe_runs_inferences,
 )
 from ..transport import (
     HPX_END,
@@ -357,23 +360,41 @@ def capture_power(
         # after on_started returns). One try/finally so any exception still
         # releases sync.
         sync = _make_sync_controller(ctx, driver)
-        relative_tolerance = gate_relative_tolerance_for(ctx.config.profiling.clean_window_probe)
-        planned_window_s = (
-            clean_count * clean_avg_us / 1_000_000 if clean_count and clean_avg_us else None
+        probe = ctx.config.profiling.clean_window_probe
+        relative_tolerance = gate_relative_tolerance_for(probe)
+        longest_window_s = (
+            longest_accepted_window_s(
+                clean_infer_count=clean_count,
+                clean_infer_avg_us=clean_avg_us,
+                stats_rate_hz=ctx.config.power.stats_rate_hz,
+                relative_tolerance=relative_tolerance,
+            )
+            if clean_count and clean_avg_us
+            else None
+        )
+        # Warm reps are inferences only for a counted probe; a busy_loop
+        # unit is the whole spin, so its warm-up cost is unknown here.
+        warmup_s = (
+            max(CLEAN_WINDOW_WARMUP_REPS, ctx.config.profiling.warmup) * clean_avg_us / 1e6
+            if clean_avg_us and probe_runs_inferences(probe)
+            else 0.0
         )
         fall_wait_s = gate_fall_wait_s(
             duration,
-            planned_window_s=planned_window_s,
-            relative_tolerance=relative_tolerance,
+            longest_window_s=longest_window_s,
             lockstep=sync.lockstep,
+            pre_window_s=warmup_s,
         )
         if fall_wait_s > duration:
-            log.warning(
-                "Capture bound %.1fs cannot contain the planned %.2fs gated window; "
-                "waiting up to %.1fs for the gate to fall. power.duration_s bounds "
-                "the capture; profiling.window_target_ms sets the window.",
+            log.log(
+                logging.WARNING if ctx.config.power.duration_s is not None else logging.INFO,
+                "Capture bound %.1fs leaves too little room for a gated window accepted "
+                "up to %.2fs%s; waiting up to %.1fs for the gate to fall. "
+                "power.duration_s bounds the capture; the profiling window settings "
+                "set the window length.",
                 duration,
-                planned_window_s,
+                longest_window_s,
+                "" if sync.lockstep else " after boot and warm-up without lock-step",
                 fall_wait_s,
             )
         prepare_error: list[BaseException] = []
@@ -467,6 +488,8 @@ def capture_power(
                 raise prepare_error[0]
             if result.metadata.sync is None and sync_metadata_holder:
                 result.metadata.sync = sync_metadata_holder[-1]
+            if result.metadata.capture_safety_bound_s is None:
+                result.metadata.capture_safety_bound_s = fall_wait_s
             if result.metadata.power_plan is None:
                 result.metadata.power_plan = {
                     "inference_count": plan.inference_count,

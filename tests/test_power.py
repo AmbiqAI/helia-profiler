@@ -11,6 +11,7 @@ from tests.pipeline_context_helpers import (
 )
 
 import logging
+import time
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
@@ -147,22 +148,51 @@ class TestPowerDiagnostics:
         assert failure.kind is GateFailureKind.NO_GATE_FALL
         assert "did not fall" in failure.message
 
-    def test_no_gate_fall_hint_with_a_planned_window_points_at_a_hang(self):
+    def test_no_gate_fall_hint_points_at_a_hang_when_the_gate_outlasted_the_plan(self):
         from helia_profiler.power.diagnostics import GateFailureKind, classify_gate_failure
 
-        failure = classify_gate_failure(saw_gate_rise=True, duration_s=9.7, planned_window_s=4.992)
+        failure = classify_gate_failure(
+            saw_gate_rise=True, duration_s=9.7, planned_window_s=4.992, gate_high_s=8.5
+        )
 
         assert failure.kind is GateFailureKind.NO_GATE_FALL
+        assert "stayed high for 8.50s, past the planned 4.99s window" in failure.hint
         assert "9.7s capture bound" in failure.hint
-        assert "4.99s window" in failure.hint
         assert "hang" in failure.hint
-        assert "profiling.window_target_ms sets the window length" in failure.hint
         assert "Increase power.duration_s" not in failure.hint
 
-    def test_no_gate_fall_hint_without_a_planned_window_separates_bound_from_window(self):
+    @pytest.mark.parametrize(
+        ("bound", "planned", "high", "expected"),
+        [
+            # A direct caller whose bound is shorter than the window.
+            (0.3, 10.0, 0.25, "high for only 0.25s of the planned 10.00s window"),
+            # A free-running target whose boot and warm-up used most of a bound
+            # that is longer than the window.
+            (10.23, 0.2, 0.13, "high for only 0.13s of the planned 0.20s window"),
+        ],
+    )
+    def test_no_gate_fall_hint_asks_for_more_time_when_the_bound_cut_the_window_short(
+        self, bound, planned, high, expected
+    ):
         from helia_profiler.power.diagnostics import classify_gate_failure
 
-        failure = classify_gate_failure(saw_gate_rise=True, duration_s=7.0)
+        failure = classify_gate_failure(
+            saw_gate_rise=True, duration_s=bound, planned_window_s=planned, gate_high_s=high
+        )
+
+        assert expected in failure.hint
+        assert "Increase power.duration_s" in failure.hint
+        assert "hang" not in failure.hint
+
+    @pytest.mark.parametrize(("planned", "high"), [(None, None), (None, 3.0), (4.992, None)])
+    def test_no_gate_fall_hint_without_both_timings_separates_bound_from_window(
+        self, planned, high
+    ):
+        from helia_profiler.power.diagnostics import classify_gate_failure
+
+        failure = classify_gate_failure(
+            saw_gate_rise=True, duration_s=7.0, planned_window_s=planned, gate_high_s=high
+        )
 
         assert "7.0s capture bound" in failure.hint
         assert "Increase power.duration_s" in failure.hint
@@ -1165,7 +1195,16 @@ class TestMissedGateWarningNamesTheFix:
                 )
 
     def _run_capture(
-        self, monkeypatch, *, lockstep: bool, wired: bool, empty_frames=False, gpi_level: int = 0
+        self,
+        monkeypatch,
+        *,
+        lockstep: bool,
+        wired: bool,
+        empty_frames=False,
+        gpi_level: int = 0,
+        gpi_rises_after_s: float | None = None,
+        clean_infer_avg_us: int = 1000,
+        duration_s: float = 0.3,
     ):
         from helia_profiler.power.joulescope import capture_gated as module
         from helia_profiler.power.joulescope.driver import JoulescopeDriver
@@ -1173,17 +1212,24 @@ class TestMissedGateWarningNamesTheFix:
         fake = self._FakeJoulescopeDriver(empty_frames=empty_frames)
         monkeypatch.setattr(module, "_open_device", lambda _serial: (fake, "u/js320/test", "js320"))
         # GPI never goes high by default: the gate was missed entirely.
-        monkeypatch.setattr(module, "_read_gpi_snapshot", lambda _d, _p: gpi_level)
+        created = time.monotonic()
+
+        def read_gpi(_driver, _path) -> int:
+            if gpi_rises_after_s is not None:
+                return int(time.monotonic() - created >= gpi_rises_after_s)
+            return gpi_level
+
+        monkeypatch.setattr(module, "_read_gpi_snapshot", read_gpi)
         monkeypatch.setattr(module, "_close_device", lambda *_a, **_k: None)
 
         return module.capture_gated(
             JoulescopeDriver(),
-            duration_s=0.3,
+            duration_s=duration_s,
             io_voltage=1.8,
             sync_input_index=0,
             stats_rate_hz=1000,
             clean_infer_count=5,
-            clean_infer_avg_us=1000,
+            clean_infer_avg_us=clean_infer_avg_us,
             poll_interval_s=0.005,
             on_started=lambda _wait: fake.emit_packets(10),
             lockstep=lockstep,
@@ -1202,22 +1248,49 @@ class TestMissedGateWarningNamesTheFix:
         assert "No GPIO gate rising edge detected" in warnings
         assert "power.lockstep: true" in warnings
 
-    def test_missed_fall_warning_says_the_bound_covered_the_planned_window(
-        self, monkeypatch, caplog
+    @pytest.mark.parametrize(
+        ("avg_us", "expected", "absent"),
+        [
+            # 5 x 1 ms planned: a gate high for the whole 0.3 s bound overran it.
+            (1000, "past the planned 0.01s window", "Increase power.duration_s"),
+            # 5 x 100 ms planned: the 0.3 s bound ended inside the window.
+            (100_000, "of the planned 0.50s window", "hang"),
+        ],
+    )
+    def test_missed_fall_warning_reads_the_gate_against_the_planned_window(
+        self, monkeypatch, caplog, avg_us, expected, absent
     ):
-        """#302: a gate that rose and never fell within a bound that already
-        covered the planned window points at a hang, not at power.duration_s."""
+        """#302: a gate that rose and never fell is a hang only if it stayed
+        high past the planned window; otherwise the bound was too short."""
         with caplog.at_level(logging.WARNING, logger="hpx"):
-            result = self._run_capture(monkeypatch, lockstep=True, wired=True, gpi_level=1)
+            result = self._run_capture(
+                monkeypatch, lockstep=True, wired=True, gpi_level=1, clean_infer_avg_us=avg_us
+            )
 
         assert result.metadata.gate_failure.kind == "no_gate_fall"
-        assert "already covers the planned" in result.metadata.gate_failure.hint
+        assert expected in result.metadata.gate_failure.hint
         warnings = "\n".join(
             record.getMessage() for record in caplog.records if record.levelno >= logging.WARNING
         )
-        assert "0.3s capture bound, which already covers the planned" in warnings
-        assert "profiling.window_target_ms sets the window length" in warnings
-        assert "Increase power.duration_s" not in warnings
+        assert expected in warnings
+        assert absent not in warnings
+
+    def test_missed_fall_hint_times_the_gate_from_its_rise(self, monkeypatch, caplog):
+        """A gate that rose late in the wait was cut short, not hung: 5 x 80 ms
+        planned, rising 0.4 s into a 0.6 s bound, leaves it high about 0.2 s."""
+        with caplog.at_level(logging.WARNING, logger="hpx"):
+            result = self._run_capture(
+                monkeypatch,
+                lockstep=True,
+                wired=True,
+                gpi_rises_after_s=0.4,
+                clean_infer_avg_us=80_000,
+                duration_s=0.6,
+            )
+
+        assert result.metadata.gate_failure.kind == "no_gate_fall"
+        assert "of the planned 0.40s window" in result.metadata.gate_failure.hint
+        assert "hang" not in result.metadata.gate_failure.hint
 
     @pytest.mark.parametrize("empty_frames", [False, True, "silent"])
     def test_the_degraded_artifact_still_carries_the_time_base_diagnostics(
@@ -2403,83 +2476,82 @@ class TestGateFallWait:
     """The gated wait must contain the planned window, whatever bound was
     configured (#302)."""
 
-    PLANNED_S = 233 * 21_425 / 1e6
+    @pytest.mark.parametrize(
+        ("count", "avg_us", "tolerance"),
+        [
+            (233, 21_425, "counted"),
+            (2, 12_000_000, "counted"),  # half an inference outweighs the ratio
+            (1, 20_000_000, "predicted"),  # one busy_loop spin
+        ],
+    )
+    def test_the_longest_window_holds_every_gate_the_check_accepts(self, count, avg_us, tolerance):
+        from helia_profiler.power.diagnostics import (
+            COUNTED_WINDOW_TOLERANCE,
+            DRIFT_PLAUSIBLE_RATIO_DEVIATION,
+            PREDICTED_WINDOW_TOLERANCE,
+            assess_gate_duration,
+            longest_accepted_window_s,
+        )
 
-    @staticmethod
-    def _longest_healthy_window_s(planned_s: float, tolerance: float) -> float:
-        from helia_profiler.power.diagnostics import DRIFT_PLAUSIBLE_RATIO_DEVIATION
+        relative = (
+            COUNTED_WINDOW_TOLERANCE if tolerance == "counted" else PREDICTED_WINDOW_TOLERANCE
+        )
+        check = assess_gate_duration(
+            measured_s=0.0,
+            clean_infer_count=count,
+            clean_infer_avg_us=avg_us,
+            stats_rate_hz=1000,
+            relative_tolerance=relative,
+        )
 
-        return planned_s * (1.0 + max(tolerance, DRIFT_PLAUSIBLE_RATIO_DEVIATION))
+        longest = longest_accepted_window_s(
+            clean_infer_count=count,
+            clean_infer_avg_us=avg_us,
+            stats_rate_hz=1000,
+            relative_tolerance=relative,
+        )
+
+        assert longest >= check.expected_s + check.tolerance_s
+        assert longest >= check.expected_s * (1.0 + DRIFT_PLAUSIBLE_RATIO_DEVIATION)
 
     @pytest.mark.parametrize("lockstep", [True, False])
-    @pytest.mark.parametrize(("configured", "planned"), [(5.0, PLANNED_S), (30.0, 40.0)])
-    def test_a_bound_at_or_inside_the_window_is_raised_past_it(self, configured, planned, lockstep):
-        from helia_profiler.power.diagnostics import COUNTED_WINDOW_TOLERANCE, gate_fall_wait_s
+    @pytest.mark.parametrize(("configured", "longest"), [(5.0, 5.75), (30.0, 46.0)])
+    def test_a_bound_at_or_inside_the_window_is_raised_past_it(self, configured, longest, lockstep):
+        from helia_profiler.power.diagnostics import gate_fall_wait_s
 
-        bound = gate_fall_wait_s(
-            configured,
-            planned_window_s=planned,
-            relative_tolerance=COUNTED_WINDOW_TOLERANCE,
-            lockstep=lockstep,
-        )
+        bound = gate_fall_wait_s(configured, longest_window_s=longest, lockstep=lockstep)
 
-        longest = self._longest_healthy_window_s(planned, COUNTED_WINDOW_TOLERANCE)
         assert bound - longest >= 1.0
 
-    def test_a_predicted_window_gets_its_wider_tolerance(self):
-        from helia_profiler.power.diagnostics import PREDICTED_WINDOW_TOLERANCE, gate_fall_wait_s
-
-        bound = gate_fall_wait_s(
-            1.0,
-            planned_window_s=20.0,
-            relative_tolerance=PREDICTED_WINDOW_TOLERANCE,
-            lockstep=True,
-        )
-
-        assert bound - 20.0 * (1.0 + PREDICTED_WINDOW_TOLERANCE) >= 1.0
-
-    def test_without_lockstep_the_wait_also_covers_boot(self):
+    def test_without_lockstep_the_wait_also_covers_boot_and_warmup(self):
         """Without lock-step the wait starts at reset, not at GO."""
-        from helia_profiler.power.diagnostics import COUNTED_WINDOW_TOLERANCE, gate_fall_wait_s
+        from helia_profiler.power.diagnostics import gate_fall_wait_s
         from helia_profiler.stages.capture_power import _BOOT_SETTLE_S
 
         def bound(lockstep: bool) -> float:
-            return gate_fall_wait_s(
-                1.0,
-                planned_window_s=self.PLANNED_S,
-                relative_tolerance=COUNTED_WINDOW_TOLERANCE,
-                lockstep=lockstep,
-            )
+            return gate_fall_wait_s(1.0, longest_window_s=5.75, lockstep=lockstep, pre_window_s=9.0)
 
-        assert bound(False) - bound(True) >= _BOOT_SETTLE_S - 1e-9
+        assert bound(False) - bound(True) >= _BOOT_SETTLE_S + 9.0 - 1e-9
+
+    def test_warmup_is_not_charged_under_lockstep(self):
+        """READY follows warm-up, so a lock-step wait starts after it."""
+        from helia_profiler.power.diagnostics import gate_fall_wait_s
+
+        with_warmup = gate_fall_wait_s(1.0, longest_window_s=5.75, lockstep=True, pre_window_s=9.0)
+
+        assert with_warmup == gate_fall_wait_s(1.0, longest_window_s=5.75, lockstep=True)
 
     @pytest.mark.parametrize("lockstep", [True, False])
     def test_a_bound_that_already_fits_is_kept_exactly(self, lockstep):
-        from helia_profiler.power.diagnostics import COUNTED_WINDOW_TOLERANCE, gate_fall_wait_s
+        from helia_profiler.power.diagnostics import gate_fall_wait_s
 
-        assert (
-            gate_fall_wait_s(
-                30.0,
-                planned_window_s=self.PLANNED_S,
-                relative_tolerance=COUNTED_WINDOW_TOLERANCE,
-                lockstep=lockstep,
-            )
-            == 30.0
-        )
+        assert gate_fall_wait_s(30.0, longest_window_s=5.75, lockstep=lockstep) == 30.0
 
-    @pytest.mark.parametrize("planned", [None, 0.0])
-    def test_an_unknown_window_keeps_the_configured_bound(self, planned):
-        from helia_profiler.power.diagnostics import COUNTED_WINDOW_TOLERANCE, gate_fall_wait_s
+    @pytest.mark.parametrize("longest", [None, 0.0])
+    def test_an_unknown_window_keeps_the_configured_bound(self, longest):
+        from helia_profiler.power.diagnostics import gate_fall_wait_s
 
-        assert (
-            gate_fall_wait_s(
-                5.0,
-                planned_window_s=planned,
-                relative_tolerance=COUNTED_WINDOW_TOLERANCE,
-                lockstep=False,
-            )
-            == 5.0
-        )
+        assert gate_fall_wait_s(5.0, longest_window_s=longest, lockstep=False) == 5.0
 
 
 class TestCapturePowerWrapper:
@@ -2772,7 +2844,9 @@ class TestCapturePowerWrapper:
         assert calls == ["check", "make_sync", "arm", "capture_gated", "prepare", "release"]
 
     @staticmethod
-    def _shared_ctx_with_planned_window(tmp_path: Path):
+    def _shared_ctx_with_planned_window(
+        tmp_path: Path, *, count: int = 233, avg_us: int = 21_425, **power
+    ):
         from helia_profiler.config import load_config
         from helia_profiler.pipeline import PipelineContext
         from helia_profiler.results import FirmwareMeta, PmuResult
@@ -2784,21 +2858,24 @@ class TestCapturePowerWrapper:
             {
                 "model": {"path": str(model)},
                 "engine": {"type": "helia-rt"},
-                "power": {"enabled": True, "driver": "joulescope", "firmware": "shared"},
+                "profiling": {"warmup": 5},
+                "power": {"enabled": True, "driver": "joulescope", "firmware": "shared", **power},
             },
         )
         ctx = PipelineContext(config=config, work_dir=tmp_path)
         set_profile_result(
             ctx,
             PmuResult(
-                meta=FirmwareMeta(clean_infer_count=233, clean_infer_avg_us=21_425), layers=[]
+                meta=FirmwareMeta(clean_infer_count=count, clean_infer_avg_us=avg_us), layers=[]
             ),
         )
         ctx.publish_power_plan(PowerRunPlan(firmware_mode="shared"))
         return ctx
 
     @staticmethod
-    def _recording_gated_driver(monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
+    def _recording_gated_driver(
+        monkeypatch: pytest.MonkeyPatch, *, reports_bound: bool = False
+    ) -> dict[str, object]:
         called: dict[str, object] = {}
 
         class FakeDriver:
@@ -2812,12 +2889,26 @@ class TestCapturePowerWrapper:
                 return PowerResult(
                     summary=PowerSummary(0.01, 0.02, 0.03, 0.04, 0.05, 6),
                     metadata=PowerMetadata(
-                        measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW
+                        measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW,
+                        capture_safety_bound_s=kwargs["duration_s"] if reports_bound else None,
                     ),
                 )
 
         monkeypatch.setattr("helia_profiler.power.get_driver", lambda *a, **k: FakeDriver())
         return called
+
+    @staticmethod
+    def _longest_accepted_s(called: dict[str, object], count: int, avg_us: int) -> float:
+        from helia_profiler.power.diagnostics import longest_accepted_window_s
+
+        tolerance = called["gate_relative_tolerance"]
+        assert isinstance(tolerance, float)
+        return longest_accepted_window_s(
+            clean_infer_count=count,
+            clean_infer_avg_us=avg_us,
+            stats_rate_hz=1000,
+            relative_tolerance=tolerance,
+        )
 
     def test_explicit_bound_inside_the_planned_window_is_raised(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
@@ -2826,62 +2917,88 @@ class TestCapturePowerWrapper:
         from helia_profiler.capture import capture_power
         from helia_profiler.stages.capture_power import _BOOT_SETTLE_S
 
-        ctx = self._shared_ctx_with_planned_window(tmp_path)
+        ctx = self._shared_ctx_with_planned_window(tmp_path, duration_s=5)
         called = self._recording_gated_driver(monkeypatch)
-        planned_s = 233 * 21_425 / 1e6
 
-        with caplog.at_level(logging.WARNING, logger="hpx"):
-            capture_power(ctx, duration_override_s=5.0)
+        with caplog.at_level(logging.INFO, logger="hpx"):
+            result = capture_power(ctx, duration_override_s=5.0)
 
         bound = called["duration_s"]
         assert isinstance(bound, float)
         # This driver offers no sync controller, so the target free-runs from
         # reset and the wait must also hold the boot the estimate allows for.
         assert called["lockstep"] is False
-        tolerance = called["gate_relative_tolerance"]
-        assert isinstance(tolerance, float)
-        longest_s = planned_s * (1.0 + tolerance)
-        assert bound - longest_s >= _BOOT_SETTLE_S
-        assert "Capture bound 5.0s cannot contain the planned 4.99s gated window" in caplog.text
+        assert bound - self._longest_accepted_s(called, 233, 21_425) >= _BOOT_SETTLE_S
+        assert result.metadata.capture_safety_bound_s == bound
+        raised = [r for r in caplog.records if "leaves too little room" in r.getMessage()]
+        assert [r.levelno for r in raised] == [logging.WARNING]
+        assert "Capture bound 5.0s" in raised[0].getMessage()
+        assert "after boot and warm-up without lock-step" in raised[0].getMessage()
 
-    def test_default_cap_inside_a_long_window_is_raised(
+    def test_free_running_wait_holds_warmup_before_a_slow_window(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """Without lock-step the warm reps run inside the wait, before the gate."""
+        from helia_profiler.capture import capture_power
+        from helia_profiler.stages.capture_power import _BOOT_SETTLE_S
+
+        ctx = self._shared_ctx_with_planned_window(tmp_path, count=10, avg_us=3_000_000)
+        called = self._recording_gated_driver(monkeypatch)
+
+        capture_power(ctx, duration_override_s=5.0)
+
+        bound = called["duration_s"]
+        assert isinstance(bound, float)
+        warmup_s = 5 * 3.0  # profiling.warmup=5 inferences of 3 s
+        longest = self._longest_accepted_s(called, 10, 3_000_000)
+        assert bound - (_BOOT_SETTLE_S + warmup_s + longest) >= 1.0
+
+    def test_default_cap_inside_a_long_window_is_raised_quietly(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
     ):
         """With duration unset, the stage passes the 30 s default whenever its
         estimate exceeds it, which a 40 s planned window does."""
         from helia_profiler.capture import capture_power
         from helia_profiler.config import DEFAULT_POWER_DURATION_S
-        from helia_profiler.results import FirmwareMeta, PmuResult
 
-        ctx = self._shared_ctx_with_planned_window(tmp_path)
-        set_profile_result(
-            ctx,
-            PmuResult(
-                meta=FirmwareMeta(clean_infer_count=2000, clean_infer_avg_us=20_000), layers=[]
-            ),
-        )
+        ctx = self._shared_ctx_with_planned_window(tmp_path, count=2000, avg_us=20_000)
         called = self._recording_gated_driver(monkeypatch)
 
-        capture_power(ctx, duration_override_s=float(DEFAULT_POWER_DURATION_S))
+        with caplog.at_level(logging.INFO, logger="hpx"):
+            capture_power(ctx, duration_override_s=float(DEFAULT_POWER_DURATION_S))
 
         bound = called["duration_s"]
-        tolerance = called["gate_relative_tolerance"]
-        assert isinstance(bound, float) and isinstance(tolerance, float)
-        assert bound - 40.0 * (1.0 + tolerance) >= 1.0
+        assert isinstance(bound, float)
+        assert bound - self._longest_accepted_s(called, 2000, 20_000) >= 1.0
+        raised = [r for r in caplog.records if "leaves too little room" in r.getMessage()]
+        assert [r.levelno for r in raised] == [logging.INFO]
+
+    @pytest.mark.parametrize("reports_bound", [True, False])
+    def test_result_records_the_bound_the_capture_waited_on(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, reports_bound
+    ):
+        from helia_profiler.capture import capture_power
+
+        ctx = self._shared_ctx_with_planned_window(tmp_path)
+        called = self._recording_gated_driver(monkeypatch, reports_bound=reports_bound)
+
+        result = capture_power(ctx, duration_override_s=5.0)
+
+        assert result.metadata.capture_safety_bound_s == called["duration_s"]
 
     def test_explicit_bound_that_fits_the_window_passes_unchanged(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
     ):
         from helia_profiler.capture import capture_power
 
-        ctx = self._shared_ctx_with_planned_window(tmp_path)
+        ctx = self._shared_ctx_with_planned_window(tmp_path, duration_s=30)
         called = self._recording_gated_driver(monkeypatch)
 
-        with caplog.at_level(logging.WARNING, logger="hpx"):
+        with caplog.at_level(logging.INFO, logger="hpx"):
             capture_power(ctx, duration_override_s=30.0)
 
         assert called["duration_s"] == 30.0
-        assert "cannot contain" not in caplog.text
+        assert "leaves too little room" not in caplog.text
 
 
 class TestPowerFirmwareSelection:
