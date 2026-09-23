@@ -1164,11 +1164,11 @@ the JS320 bench.
 
 ??? failure "GPIO gate rose but did not fall (`no_gate_fall`)"
     The firmware entered the measured window but did not close it before the
-    safety bound. If the hint says the gate stayed high past the planned
-    window, check for a firmware hang inside the clean window. If it was high
-    for only part of the planned window, or the window is unknown, increase
-    `power.duration_s`, which bounds the capture but does not change the
-    window length. This one is *not* a lock-step problem — the gate
+    safety bound. If the hint says the gate stayed high past the longest
+    length the planned window may run, check for a firmware hang inside the
+    clean window. If the gate rose too late to finish a window of accepted
+    length, or the window is unknown, increase `power.duration_s`, which
+    bounds the capture but does not change the window length. This one is *not* a lock-step problem — the gate
     was observed rising, so the poller was armed in time.
 
 ??? failure "Wrong `io_voltage` or wrong input index"

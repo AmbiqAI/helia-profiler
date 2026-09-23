@@ -175,7 +175,9 @@ class TestPowerDiagnostics:
             (10.23, 0.2, 0.23, 0.13, "rose 10.10s into the 10.23s capture bound"),
             # Past the plan but inside the band the gate check accepts: a late
             # healthy window, not a hang.
-            (3.15, 1.0, 1.15, 1.08, "high for only 1.08s of the planned 1.00s window"),
+            (3.15, 1.0, 1.15, 1.08, "past the planned 1.00s window but inside the 1.15s"),
+            # The gate rose while GO was being released, before the wait began.
+            (3.0, 5.0, 5.75, 3.2, "rose 0.00s into the 3.00s capture bound"),
         ],
     )
     def test_no_gate_fall_hint_asks_for_more_time_when_the_bound_cut_the_window_short(
@@ -1217,6 +1219,7 @@ class TestMissedGateWarningNamesTheFix:
         clean_infer_count: int = 5,
         clean_infer_avg_us: int = 1000,
         duration_s: float = 0.3,
+        gate_relative_tolerance: float = 0.10,
     ):
         from helia_profiler.power.joulescope import capture_gated as module
         from helia_profiler.power.joulescope.driver import JoulescopeDriver
@@ -1240,6 +1243,7 @@ class TestMissedGateWarningNamesTheFix:
             io_voltage=1.8,
             sync_input_index=0,
             stats_rate_hz=1000,
+            gate_relative_tolerance=gate_relative_tolerance,
             clean_infer_count=clean_infer_count,
             clean_infer_avg_us=clean_infer_avg_us,
             poll_interval_s=0.005,
@@ -1322,9 +1326,33 @@ class TestMissedGateWarningNamesTheFix:
             record.getMessage() for record in caplog.records if record.levelno >= logging.WARNING
         )
         for text in (result.metadata.gate_failure.hint, warnings):
-            assert "of the planned 0.80s window" in text
+            assert "planned 0.80s window" in text
             assert "Increase power.duration_s" in text
             assert "hang" not in text
+
+    @pytest.mark.parametrize("tolerance", [0.10, 0.25])
+    def test_missed_fall_threshold_uses_the_probe_tolerance(self, monkeypatch, tolerance):
+        """A busy_loop window is accepted over a wider band than a counted one."""
+        from helia_profiler.power.joulescope import capture_gated as module
+
+        seen: list[float] = []
+        real = module.longest_accepted_window_s
+
+        def spy(**kwargs):
+            seen.append(kwargs["relative_tolerance"])
+            return real(**kwargs)
+
+        monkeypatch.setattr(module, "longest_accepted_window_s", spy)
+
+        self._run_capture(
+            monkeypatch,
+            lockstep=True,
+            wired=True,
+            gpi_level=1,
+            gate_relative_tolerance=tolerance,
+        )
+
+        assert seen == [tolerance]
 
     @pytest.mark.parametrize("empty_frames", [False, True, "silent"])
     def test_the_degraded_artifact_still_carries_the_time_base_diagnostics(
@@ -3021,6 +3049,41 @@ class TestCapturePowerWrapper:
         ]
         assert len(raised) == 1
         assert "plus boot before it without lock-step" in raised[0]
+
+    def test_lockstep_raise_log_charges_no_boot(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ):
+        """Under lock-step the wait starts at GO, after boot and warm-up."""
+        from helia_profiler.capture import capture_power
+
+        class Sync:
+            lockstep = True
+
+            def arm(self):
+                pass
+
+            def release(self):
+                pass
+
+            def release_go(self):
+                pass
+
+            def signal_go(self):
+                pass
+
+        ctx = self._shared_ctx_with_planned_window(tmp_path, duration_s=5)
+        called = self._recording_gated_driver(monkeypatch)
+        monkeypatch.setattr("helia_profiler.capture._make_sync_controller", lambda *_a: Sync())
+
+        with caplog.at_level(logging.INFO, logger="hpx"):
+            capture_power(ctx, duration_override_s=5.0)
+
+        assert called["lockstep"] is True
+        raised = [
+            r.getMessage() for r in caplog.records if "Raising the capture bound" in r.getMessage()
+        ]
+        assert len(raised) == 1
+        assert "boot" not in raised[0]
 
     def test_default_cap_inside_a_long_window_is_raised_quietly(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture

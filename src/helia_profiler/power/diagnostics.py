@@ -913,12 +913,17 @@ def classify_gate_failure(
             "and the profiling window settings set the window length."
         )
     elif planned and gate_high_s is not None:
+        if gate_high_s > planned_window_s and longest is not None:
+            high = (
+                f"high for {gate_high_s:.2f}s, past the planned "
+                f"{planned_window_s:.2f}s window but inside the {longest:.2f}s it may run"
+            )
+        else:
+            high = f"high for only {gate_high_s:.2f}s of the planned {planned_window_s:.2f}s window"
         hint = (
             f"The gate rose {max(0.0, duration_s - gate_high_s):.2f}s into the "
-            f"{duration_s:.2f}s capture bound and was high for only "
-            f"{gate_high_s:.2f}s of the planned {planned_window_s:.2f}s window. "
-            "Increase power.duration_s (it bounds the capture, not the window "
-            "length)."
+            f"{duration_s:.2f}s capture bound and was {high}. Increase "
+            "power.duration_s (it bounds the capture, not the window length)."
         )
     else:
         hint = (
