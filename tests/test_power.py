@@ -1277,7 +1277,8 @@ class TestMissedGateWarningNamesTheFix:
         self, monkeypatch, caplog, avg_us, expected, absent
     ):
         """#302: a gate that rose and never fell is a hang only if it stayed
-        high past the planned window; otherwise the bound was too short."""
+        high past the longest window the gate check accepts; otherwise the
+        bound was too short."""
         with caplog.at_level(logging.WARNING, logger="hpx"):
             result = self._run_capture(
                 monkeypatch, lockstep=True, wired=True, gpi_level=1, clean_infer_avg_us=avg_us
@@ -1330,10 +1331,13 @@ class TestMissedGateWarningNamesTheFix:
             assert "Increase power.duration_s" in text
             assert "hang" not in text
 
-    @pytest.mark.parametrize("tolerance", [0.10, 0.25])
-    def test_missed_fall_threshold_uses_the_probe_tolerance(self, monkeypatch, tolerance):
+    @pytest.mark.parametrize("probe", ["infer", "busy_loop"])
+    def test_missed_fall_threshold_uses_the_probe_tolerance(self, monkeypatch, probe):
         """A busy_loop window is accepted over a wider band than a counted one."""
+        from helia_profiler.power.diagnostics import gate_relative_tolerance_for
         from helia_profiler.power.joulescope import capture_gated as module
+
+        tolerance = gate_relative_tolerance_for(probe)
 
         seen: list[float] = []
         real = module.longest_accepted_window_s
