@@ -1,0 +1,189 @@
+---
+title: "ExecuTorch NS kernels"
+description: "What the ns CMSIS-NN provider buys over arm on a Cortex-M55, measured operator by operator on an Apollo510 EVB, with the models, the verification and the reproduction recipe."
+---
+
+## Purpose
+
+Show, with a measured table and its reproduction recipe, what Ambiq's
+`cortex_m_ns::` Tier-1 operators change compared with the portable ATen
+fallbacks the `arm` provider leaves in place. [Engines](../engines/#ns-tier-1-kernels)
+covers how to turn the kernels on; this page is the evidence.
+
+## Prerequisites
+
+The ExecuTorch engine set up as on [Engines](../engines/#executorch), the
+two PTE pairs under `examples/models/tier1/`, and the configurations under
+`configs/executorch/`.
+
+## Background
+
+ExecuTorch PTEs exported for Cortex-M can be lowered against two CMSIS-NN
+providers. The `arm` provider uses upstream arm-cmsis-nn and leaves
+operators outside the stock `cortex_m::` set as portable ATen fallbacks:
+float kernels wrapped in a dequantise and requantise island. The `ns`
+provider adds Ambiq's out-of-tree `cortex_m_ns::` Tier-1 operators (sub,
+hardswish, mean, relu, relu6, hardtanh, clamp, leaky_relu) backed by
+ns-cmsis-nn, so those operators stay int8 end to end.
+
+:::note[Measurement provenance]
+Captured 2026-08-19 on an Apollo510 EVB (Cortex-M55, the board's `lp`
+clock tier, RTT transport), 25 iterations and 5 warm-up runs, median
+aggregation, CPU, MVE and memory PMU presets. Every run reported
+`validity: valid`. Runtime: nsx-executorch `main` at `4a257def` (the PR #2 merge that added
+the out-of-tree `cortex_m_ns::` operators),
+ExecuTorch submodule `3a97429` (v1.3.0), arm-cmsis-nn `6d21a6f`,
+ns-cmsis-nn v7.29.2 `6317264`. The numbers come from one bench and one
+runtime pin; the ratios are the transferable result, the absolute cycle
+counts are not.
+:::
+
+## Steps
+
+### 1. The models
+
+Each pair is two deterministic random-weight int8 exports of the same
+PyTorch module, produced by `tools/export/executorch_tier1/export_tier1.py`
+through `nsx_cortex_m.export(kernel_provider=...)`.
+
+`tier1` is a channels_last convolution trunk (16 x 32 x 32 activations):
+conv, hardswish, conv, leaky_relu, sub, relu. The arm PTE runs
+`aten::leaky_relu.out`, `aten::sub.out` and `aten::clamp.out` (the relu) as
+float portable kernels inside a dequantise and quantise island, and
+decomposes hardswish into `cortex_m::minimum` plus `cortex_m::quantized_mul`.
+The ns PTE runs `cortex_m_ns::quantized_hardswish`, `quantized_leaky_relu`,
+`quantized_sub` and `quantized_relu` with no portable operators.
+
+`tier1mean` is a contiguous-layout micro model: `mean(dim=(2,3), keepdim)`.
+The arm PTE runs a float portable `aten::mean.out`; the ns PTE runs
+`cortex_m_ns::quantized_mean`. Mean is kept out of the convolution trunk on
+purpose; see the caveats.
+
+Configurations: `configs/executorch/tier1_{arm,ns}.yaml` and
+`tier1mean_{arm,ns}.yaml`; the `ns` runs set `engine.config.ns_ops: true`.
+The `tier1_{arm,ns}_atfe.yaml` variants build the same PTEs with ATfE
+(`ATFE_ROOT` required), so a GCC-versus-ATfE comparison is one more pair of
+runs plus `hpx compare results/tier1_arm results/tier1_arm_atfe`.
+
+### 2. Verify the right kernels ran
+
+A successful build does not prove which kernels linked, so three
+independent checks:
+
+1. Link-time symbols: `tools/verify_executorch_kernels.py` runs
+   `arm-none-eabi-nm` over the firmware. An `arm` build shows the portable
+   registration table and named `torch::executor::native::` kernels and no
+   `arm_convolve_weight_sum` or `cortex_m_ns` symbols; an `ns` build shows
+   the ns-cmsis-nn weight-sum ABI (`arm_convolve_weight_sum`,
+   `arm_convolve_s8_get_weights_sum_size`) plus the
+   `cortex_m_ns::native::quantized_*_out` kernels.
+2. Load-time fail-fast: a PTE containing `cortex_m_ns::` operators fails
+   `Method::load()` with "operator missing" on any build without
+   `NSX_EXECUTORCH_ENABLE_NS_OPS=ON`, so every `ns` run that loads is itself
+   proof of registration. The `arm` runs only load because
+   `NSX_EXECUTORCH_PORTABLE_SELECT_OPS_LIST` registered exactly the PTE's
+   ATen fallbacks.
+3. Per-instruction PMU signature: the captured instruction streams match
+   the operator counts in `examples/models/tier1/tier1_manifest.json`
+   exactly (12 arm and 8 ns instructions for `tier1`; 5 and 3 for
+   `tier1mean`).
+
+### 3. Results: `tier1`
+
+| # | arm operator | arm cycles | ns operator | ns cycles |
+|---|---|---:|---|---:|
+| 0 | `cortex_m::quantize` | 92,689 | `cortex_m::quantize` | 92,831 |
+| 1 | `cortex_m::quantized_conv2d` | 1,005,563 | `cortex_m::quantized_conv2d` | 1,001,585 |
+| 2 | `cortex_m::minimum` (hardswish) | 8,443 | `cortex_m_ns::quantized_hardswish` | 153,135 |
+| 3 | `cortex_m::quantized_mul` (hardswish) | 137,958 | `cortex_m::quantized_conv2d` | 1,000,661 |
+| 4 | `cortex_m::dequantize` | 51,605 | `cortex_m_ns::quantized_leaky_relu` | 144,761 |
+| 5 | `cortex_m::quantized_conv2d` | 1,004,539 | `cortex_m_ns::quantized_sub` | 222,067 |
+| 6 | `cortex_m::dequantize` | 52,057 | `cortex_m_ns::quantized_relu` | 95,050 |
+| 7 | `aten::leaky_relu` (portable, float) | 43,743 | `cortex_m::dequantize` | 52,226 |
+| 8 | `aten::sub` (portable, float) | 560,030 | | |
+| 9 | `cortex_m::quantize` | 86,982 | | |
+| 10 | `aten::clamp` = relu (portable) | 413,279 | | |
+| 11 | `cortex_m::dequantize` | 52,519 | | |
+
+| Metric | arm | ns | Delta |
+|---|---:|---:|---:|
+| Clean end-to-end cycles | 3,507,826 | 2,761,860 | -21.3% |
+| Tier-1 operator region | 1,156,091 | 461,878 | -60.0% (2.5x) |
+| Planned arena | 196,608 B | 98,304 B | -50% (no float intermediates) |
+
+The arm region is dequantise, leaky_relu, sub, quantise and clamp: the
+float island the portable fallbacks force. The ns region is leaky_relu, sub
+and relu. The convolutions are within 0.5% across providers, which places
+the delta in the Tier-1 operators rather than the convolution path.
+
+### 4. Results: `tier1mean`
+
+| # | arm operator | arm cycles | ns operator | ns cycles |
+|---|---|---:|---|---:|
+| 0 | `cortex_m::quantize` | 87,874 | `cortex_m::quantize` | 92,963 |
+| 1 | `cortex_m::dequantize` | 53,439 | `cortex_m_ns::quantized_mean` | 4,234 |
+| 2 | `aten::mean` (portable, float) | 741,211 | `cortex_m::dequantize` | 740 |
+| 3 | `cortex_m::quantize` | 866 | | |
+| 4 | `cortex_m::dequantize` | 776 | | |
+
+| Metric | arm | ns | Delta |
+|---|---:|---:|---:|
+| Clean end-to-end cycles | 883,076 | 97,848 | -88.9% (9.0x) |
+| `mean` operator alone | 741,211 | 4,234 | -99.4% (175x) |
+
+The ns kernel is MVE-vectorised (`arm_mean_reduce_spatial_mve_s8`) and
+works on int8 in place; the portable path dequantises 16K values to float,
+reduces scalar by scalar and requantises.
+
+### 5. Reproduce
+
+`$NSX_EXECUTORCH` is the qualified `nsx-executorch` checkout.
+
+```bash
+# 1. Export both PTEs (deterministic, seed 20260819)
+PYTHONPATH="$NSX_EXECUTORCH/external/executorch/src:$NSX_EXECUTORCH/aot" \
+  python tools/export/executorch_tier1/export_tier1.py --output-dir examples/models/tier1
+
+# 2. Profile each side
+hpx profile --config configs/executorch/tier1_arm.yaml
+hpx profile --config configs/executorch/tier1_ns.yaml
+
+# 3. Verify the linked kernels match the declared provider
+python tools/verify_executorch_kernels.py --provider arm --expect-portable <arm ELF>
+python tools/verify_executorch_kernels.py --provider ns  --ns-ops         <ns ELF>
+
+# 4. Per-instruction cross-PTE comparison
+python tools/export/executorch_tier1/compare_tier1.py \
+  --manifest examples/models/tier1/tier1_manifest.json \
+  --model tier1 --baseline results/tier1_arm --candidate results/tier1_ns
+```
+
+Add `--jlink-serial <serial>` to step 2 with more than one probe attached.
+
+## Caveats
+
+- Mean and channels_last: the ns qualifier rejects channels_last input for
+  `mean`, and the portable `aten::mean.out` fails `Method::execute()` with
+  `InvalidArgument` (error 18) on channels_last data, so a channels_last
+  graph that keeps `mean` portable runs on neither provider. Keep `mean` on
+  contiguous tensors or lower it to `cortex_m_ns::quantized_mean`.
+- Cross-PTE comparison: `hpx compare` requires the same model SHA, so it
+  will not compare an arm run against an ns run;
+  `tools/export/executorch_tier1/compare_tier1.py` matches operators
+  through the export manifest instead.
+- Portable-operator reporting: nsx-executorch's
+  `ExportResult.portable_fallback_ops` under-reports (it misses the
+  `aten::relu.out` and `aten::leaky_relu.out` spellings); derive the list
+  from the serialised PTE operator list.
+
+## Expected output
+
+Two bundles per model whose per-instruction rows match the manifest counts,
+and a comparison that reproduces the ratios above within the variance of
+your bench.
+
+## What next
+
+[Engines](../engines/#executorch) for the provider configuration;
+[Analysis and comparison](../analysis-comparison/) for what `hpx compare`
+will and will not compare.

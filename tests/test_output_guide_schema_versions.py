@@ -14,7 +14,15 @@ from helia_profiler.report.contracts import (
     RUN_SUMMARY_SCHEMA_VERSION,
 )
 
-DOCS_PATH = Path(__file__).resolve().parents[1] / "docs" / "guide" / "output.md"
+DOCS_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "astro-site"
+    / "src"
+    / "content"
+    / "docs"
+    / "guide"
+    / "output.mdx"
+)
 
 #: Every schema the guide's artifact table advertises, with its live version.
 ADVERTISED = (

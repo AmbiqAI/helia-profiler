@@ -1,0 +1,220 @@
+name: Documentation site
+
+# The Astro site is built and validated here on every pull request, and the
+# deploy job publishes the tested artifact to GitHub Pages on a release, a
+# docs-only push to main, or a manual dispatch, behind the ordering guard.
+
+on:
+  # Deliberately unfiltered. Reference pages are generated from the package, so
+  # a change under src/helia_profiler/** can change the site even when nothing
+  # under astro-site/ moved.
+  pull_request:
+  push:
+    branches:
+      - main
+    paths:
+      - 'astro-site/**'
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Branch, tag or commit to build the documentation from.
+        type: string
+        default: main
+  workflow_call:
+    inputs:
+      source_ref:
+        description: Branch, tag or commit to build the documentation from.
+        type: string
+        default: ''
+      release_publish:
+        description: Set by publish.yml when the build is for a new release.
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build and validate the documentation artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    outputs:
+      source_commit: ${{ steps.source.outputs.commit }}
+
+    steps:
+      # The ref is always explicit. A called workflow otherwise checks out the
+      # caller's commit, which on a release is the merge of the release pull
+      # request rather than the tag the package was built from.
+      - name: Checkout documentation source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref || github.sha }}
+          # build-info.json reports the distance from the last release tag.
+          fetch-depth: 0
+
+      - name: Record source checkout
+        id: source
+        run: echo "commit=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: astro-site/package-lock.json
+
+      # check:links is a Python script, and the Python API reference is
+      # extracted with griffe. griffe reads the source instead of importing
+      # it, so this job needs neither the package's runtime dependencies nor
+      # a board, and it runs with no secrets.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # Pinned: the griffe dump is not a versioned format, so an unpinned
+      # griffe would change the reference tree with no signal.
+      - name: Install griffe
+        run: |
+          python -m pip install --disable-pip-version-check 'griffe==1.7.3'
+          griffe --version
+
+      # The CLI, configuration and issue-code extractors import the package to
+      # ask click and pydantic what the contract is, so unlike griffe they need
+      # its runtime dependencies. They run under `uv run --isolated --no-dev`,
+      # which resolves the lock rather than this job's environment, so the
+      # typer, click and pydantic versions recorded in the artifacts are the
+      # package's pins. No board and no secrets: nothing invokes a command
+      # callback.
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      # The drift gate lives here and not in ci.yml because it is a question
+      # about the documentation artifact, not about the package: it compares
+      # the committed reference JSON with what the source produces, and the
+      # answer is only actionable together with the regenerated site in the
+      # same job. It has to be this job specifically. The pull_request trigger
+      # above is deliberately unfiltered, so a change under src/helia_profiler
+      # reaches it; the push trigger is filtered to astro-site/** and would let
+      # a CLI change land with a stale reference.
+      #
+      # The comparison is semantic, per command and per field, never byte
+      # equality or rendered --help: key order, $defs ordering and a pydantic
+      # upgrade that reshuffles the document without changing the contract all
+      # stay green, and a real change is reported as the command path plus the
+      # option that moved.
+      - name: Check the reference for drift
+        run: uv run --isolated --no-dev python tools/docs/check_reference.py --check
+
+      - name: Install locked site dependencies
+        working-directory: astro-site
+        run: npm ci
+
+      # prebuild regenerates it too; doing it here puts the griffe version and
+      # the symbol counts in the log before anything can fail downstream.
+      - name: Regenerate the Python reference
+        working-directory: astro-site
+        run: npm run prepare:docs
+
+      - name: Build the documentation artifact
+        working-directory: astro-site
+        env:
+          DOCS_SOURCE_REF: ${{ inputs.source_ref || github.head_ref || github.ref_name }}
+        run: npm run build
+
+      - name: Validate the artifact
+        working-directory: astro-site
+        env:
+          DOCS_REQUIRE_NO_DEFERRED: '1'
+        run: |
+          npm run check
+          npm run check:links
+          npm run check:output
+          npm run check:search
+          npm run check:redirects
+          npm run check:reference
+          npm run check:guard
+
+      - name: Show build provenance
+        run: cat astro-site/dist/build-info.json
+
+      - name: Upload the tested site
+        uses: actions/upload-artifact@v4
+        with:
+          name: heliaprofiler-docs-site
+          path: astro-site/dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  deploy:
+    name: Deploy the documentation artifact
+    needs: build
+    # A pull request never reaches this job: it admits the release call, a
+    # docs-only push to main, and a manual dispatch from main (the github-pages
+    # environment deploys from main only), and nothing else.
+    if: >-
+      github.repository == 'AmbiqAI/helia-profiler' &&
+      (inputs.release_publish ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout the deploy guard
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build.outputs.source_commit }}
+          sparse-checkout: astro-site/scripts
+
+      - name: Download the tested site
+        uses: actions/download-artifact@v4
+        with:
+          name: heliaprofiler-docs-site
+          path: tested-site
+
+      # Ordering is decided from the live artifact, not from the trigger: a
+      # re-run of an old release must not overwrite newer documentation. A
+      # refusal is a skip, so this step stays green either way.
+      - name: Decide whether this build may replace the live site
+        id: guard
+        env:
+          DOCS_LIVE_BUILD_INFO_URL: https://ambiqai.github.io/helia-profiler/build-info.json
+          DOCS_BUILD_INFO: tested-site/build-info.json
+        run: node astro-site/scripts/deploy-guard.mjs
+
+      - name: Configure Pages
+        if: steps.guard.outputs.publish == 'true'
+        uses: actions/configure-pages@v4
+
+      - name: Upload the Pages artifact
+        if: steps.guard.outputs.publish == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: tested-site
+
+      - name: Deploy to Pages
+        id: deployment
+        if: steps.guard.outputs.publish == 'true'
+        uses: actions/deploy-pages@v4

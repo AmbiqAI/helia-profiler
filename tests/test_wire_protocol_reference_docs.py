@@ -1,4 +1,4 @@
-"""Guards docs/reference/wire-protocol.md against drifting from the registry
+"""Guards astro-site/src/content/docs/reference/wire-protocol.mdx against drifting from the registry
 it is generated from.
 
 Run ``uv run python tools/gen_wire_protocol_reference.py`` and commit the
@@ -13,7 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 GENERATOR_PATH = ROOT / "tools" / "gen_wire_protocol_reference.py"
-DOCS_PATH = ROOT / "docs" / "reference" / "wire-protocol.md"
+DOCS_PATH = ROOT / "astro-site" / "src" / "content" / "docs" / "reference" / "wire-protocol.mdx"
 
 
 def _load_generator():
@@ -27,7 +27,7 @@ def _load_generator():
 
 def test_wire_protocol_reference_matches_generator():
     generator = _load_generator()
-    expected = generator.render()
+    expected = generator.render_mdx()
 
     assert DOCS_PATH.is_file(), (
         f"{DOCS_PATH} is missing. Generate it with: "
@@ -39,7 +39,7 @@ def test_wire_protocol_reference_matches_generator():
     actual = actual.replace("\r\n", "\n")
 
     assert actual == expected, (
-        "docs/reference/wire-protocol.md is stale relative to the wire "
+        "astro-site/src/content/docs/reference/wire-protocol.mdx is stale relative to the wire "
         "registry. Regenerate it with: "
         "uv run python tools/gen_wire_protocol_reference.py"
     )
@@ -47,7 +47,7 @@ def test_wire_protocol_reference_matches_generator():
 
 def test_generator_render_is_deterministic():
     generator = _load_generator()
-    assert generator.render() == generator.render()
+    assert generator.render_mdx() == generator.render_mdx()
 
 
 def test_every_declared_token_reaches_the_page():

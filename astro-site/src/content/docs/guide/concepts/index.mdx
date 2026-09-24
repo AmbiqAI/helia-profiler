@@ -1,0 +1,111 @@
+---
+title: "Concepts"
+description: "How heliaPROFILER is built: the packages inside hpx, what each one owns, the frozen configuration and the mutable pipeline context that flow through them, and the typed error hierarchy."
+---
+
+import CardGrid from '@ambiqai/helia-ui/astro/CardGrid';
+import LinkCard from '@ambiqai/helia-ui/astro/LinkCard';
+
+## Purpose
+
+This section is for contributors and for agents that change hpx rather
+than run it. It names the packages, says what each one owns and hands on,
+and points at the module behind every block, so a change can be placed
+before it is written. Users who only run `hpx profile` need the
+[User guide](../../guide/), not this.
+
+<span id="diagram"></span>
+
+## Choose the subsystem you need
+
+<CardGrid>
+  <LinkCard href="pipeline/" title="Pipeline and state">
+    Stage order, immutable configuration and the results each stage produces.
+  </LinkCard>
+  <LinkCard href="engine-adapters/" title="Engine adapters">
+    How one selected engine turns a model into firmware artifacts.
+  </LinkCard>
+  <LinkCard href="firmware/" title="Firmware generation">
+    Templates, NSX modules and the build that runs on the target.
+  </LinkCard>
+  <LinkCard href="capture/" title="Data capture">
+    Target readiness, transports and parsing the measurement stream.
+  </LinkCard>
+  <LinkCard href="field-diagnostics/" title="Field diagnostics">
+    Collect and inspect a redacted support bundle for a failing environment.
+  </LinkCard>
+  <LinkCard href="adding-an-engine/" title="Add an engine">
+    The adapter, configuration, firmware and validation touch points.
+  </LinkCard>
+</CardGrid>
+
+## The blocks
+
+hpx is a profiler, not a build system, an SDK exporter or an application
+framework. It generates a disposable firmware app for one model and one
+engine, builds it with NSX, flashes it, captures what the firmware prints,
+and writes a result bundle. Four rules shape every package:
+
+| Rule | What it means in code | Where it is enforced |
+|---|---|---|
+| Immutable configuration | `ProfileConfig` is resolved once from the CLI and YAML, then frozen; every stage reads the same object and none mutates it | `config/__init__.py` (frozen pydantic models with `extra="forbid"`) |
+| One engine per run | the engine is explicit; comparing engines means two runs and `hpx compare` | `engines/__init__.py` (`get_adapter` takes one `EngineType`) |
+| Typed stage boundaries | stages exchange dataclasses from `results/`, never dicts; the one dynamic field is `LayerResult.counters` because counter names come from the SoC | `results/models.py`, `results/artifacts.py` |
+| Subprocess isolation | GCC, CMake, J-Link and the heliaAOT compiler run through `subprocess.run()` with argument lists, never a shell | `deps/nsx.py`, `target/probe/jlink.py`, `engines/helia_aot/compile.py` |
+
+### Two objects flow through everything
+
+`ProfileConfig` is the read-only input. `PipelineContext` is the mutable
+state bag the stages fill: each stage sets the fields it owns and reads the
+fields earlier stages set, through narrowing accessors that raise
+`PipelineError` naming the producing stage when it has not run. The
+[Pipeline](pipeline/) page lists both.
+
+### Errors are typed
+
+HPX uses subclasses of `HpxError` with an optional `hint` that
+the CLI prints under the message. The subclass says which package failed:
+
+| Error | Raised by | Meaning |
+|---|---|---|
+| `PipelineError` | `pipeline.py` | a stage product was read before its stage ran |
+| `ConfigError` | `config/` | bad YAML, unknown key, missing field |
+| `PlatformError` | `platform/` | unknown board or SoC |
+| `EngineError` | `engines/` | adapter failure |
+| `FirmwareError` | `firmware/` | template rendering failure |
+| `BuildError` | `deps/`, `firmware/build.py` | NSX configure or build failure; `NetworkError` and `DependencyError` (`VersionError`, `LockError`) narrow it |
+| `CaptureError` | `capture/`, `transport/`, `target/probe/` | transport, protocol or firmware-reported failure; `DeterministicCaptureError` narrows it for refusals a retry cannot change, such as a missing image or an unknown load address on the flash path |
+| `PowerError` | `power/` | driver failure |
+| `ReportError` | `report/` | output failure; `ValidationBundleError` narrows it for `hpx validate` bundles |
+
+The list is `src/helia_profiler/errors.py`; the CLI maps every `HpxError`
+to a non-zero exit and the codes in the run's `issues` are a separate
+vocabulary, documented on the [issue codes](../../reference/issue-codes/)
+page.
+
+## Where the code lives
+
+| Block | Path under `src/helia_profiler/` |
+|---|---|
+| Entry points | `cli/`, `api.py`, `session.py` |
+| Configuration | `config/`, `vocab.py`, `placement.py` |
+| Pipeline | `pipeline.py`, `profiler.py`, `stages/` |
+| Engines | `engines/` |
+| Firmware | `firmware/` |
+| Dependencies | `deps/` |
+| Platform | `platform/` |
+| Target | `target/` |
+| Transport | `transport/` |
+| Capture | `capture/` |
+| Power | `power/` |
+| Results | `results/`, `report/`, `evaluation/`, `modelcost/` |
+| Host and wire | `hostenv/`, `diagnostics/`, `validation/`, `wire/` |
+
+## What next
+
+- [Pipeline](pipeline/): the eighteen stages in order, what each sets and when it is skipped.
+- [Engine adapters](engine-adapters/): how one `EngineType` becomes an adapter, its artifacts and a firmware template.
+- [Firmware generation](firmware/): the template skeleton, the NSX project files and the build.
+- [Data capture](capture/): target lifecycle, transports, the wire stream and the parser.
+- [Field diagnostics](field-diagnostics/): what `hpx doctor --bundle` collects, redacts and archives.
+- [Adding an engine](adding-an-engine/): the touch points a fifth engine has to cover.

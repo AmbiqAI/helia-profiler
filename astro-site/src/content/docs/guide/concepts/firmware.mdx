@@ -1,0 +1,208 @@
+---
+title: "Firmware generation"
+description: "How hpx renders a disposable NSX application for one model and one engine: the typed render context, the template skeleton and its engine children, the project files, the generated headers, the NSX build, and the identity recorded for the image."
+---
+
+import BlockDiagram from '@ambiqai/helia-ui/astro/BlockDiagram';
+import Block from '@ambiqai/helia-ui/astro/Block';
+
+## Purpose
+
+Explain what `GenerateFirmwareStage` and `BuildFirmwareStage` write into
+the work directory and why the templates are shaped as one skeleton with
+engine children, so a firmware change lands in the one block that owns it.
+
+## Diagram
+
+<BlockDiagram
+  title="Firmware generation"
+  caption="The inputs, templates and outputs of one firmware render and build. The dedicated power binary reuses the same blocks with a power_only render; the diagram omits the vendored SEGGER sources."
+  flow="grid"
+  columns={3}
+>
+  <Block label="Render context" sublabel="firmware/context.py" tone="accent" flow="column">
+    <Block label="config values" emphasis="filled" />
+    <Block label="engine artifacts" emphasis="filled" />
+    <Block label="PMU passes" emphasis="filled" />
+    <Block label="platform features" emphasis="filled" />
+    <Block label="power window" emphasis="filled" />
+  </Block>
+  <Block label="Templates" sublabel="firmware/templates" tone="accent" flow="column">
+    <Block label="skeleton" sublabel="_main_base.cc.j2" emphasis="filled" flow="column">
+      <Block label="main.cc.j2" sublabel="tflm, helia-rt" />
+      <Block label="main_aot.cc.j2" />
+      <Block label="main_executorch.cc.j2" />
+    </Block>
+    <Block label="partials" sublabel="_*.j2" emphasis="filled" />
+    <Block label="PMU harness" sublabel="hpx_pmu_profiler" emphasis="filled" />
+  </Block>
+  <Block label="Project files" sublabel="firmware/project.py" tone="accent" flow="column">
+    <Block label="CMakeLists.txt" emphasis="filled" />
+    <Block label="nsx.yml" emphasis="filled" />
+    <Block label="modules.cmake" emphasis="filled" />
+  </Block>
+  <Block label="Generated sources" tone="accent" flow="column">
+    <Block label="model header" emphasis="filled" />
+    <Block label="blob headers" emphasis="filled" />
+    <Block label="local modules" emphasis="filled" />
+  </Block>
+  <Block label="Build" sublabel="firmware/build.py" tone="accent" flow="column">
+    <Block label="nsx configure" emphasis="filled" />
+    <Block label="nsx build" emphasis="filled" />
+    <Block label="compiler launcher" emphasis="filled" />
+  </Block>
+  <Block label="Identity" tone="accent" flow="column">
+    <Block label="build image" emphasis="filled" />
+    <Block label="code fingerprint" emphasis="filled" />
+    <Block label="clean workload" emphasis="filled" />
+  </Block>
+</BlockDiagram>
+
+The same structure as a list, for readers of the Markdown rendition:
+
+- Render context (`firmware/context.py`): config values, engine artifacts, PMU passes, platform features, power window
+- Templates (`firmware/templates`): skeleton `_main_base.cc.j2` (children `main.cc.j2` for tflm and helia-rt, `main_aot.cc.j2`, `main_executorch.cc.j2`), partials `_*.j2`, PMU harness `hpx_pmu_profiler`
+- Project files (`firmware/project.py`): `CMakeLists.txt`, `nsx.yml`, `modules.cmake`
+- Generated sources: model header, blob headers, local modules
+- Build (`firmware/build.py`): nsx configure, nsx build, compiler launcher
+- Identity: build image, code fingerprint, clean workload
+
+## The blocks
+
+### Render context
+
+`FirmwareRenderContext` in `firmware/context.py` is the typed object every
+template reads. It joins the config values (board, SoC, arena size,
+iterations, warmup), the engine's artifact fields (`engine_header`,
+`cmake_vars`, the AOT operator manifest and arena regions, the ExecuTorch
+buffer sizes), the PMU passes planned from the requested groups and the
+SoC's counter capacity (`PmuPassContext`), the platform's feature flags
+(DSP, MVE, FPU, NPU), the transport (`TransportContext`), the memory plan
+(`MemoryContext`) and the power window and monitor settings
+(`PowerWindowContext`, `PowerMonitorContext`, `SyncContext`).
+`resolve_window_timer()` picks the timer the clean window runs on for the
+SoC.
+
+### Templates
+
+Every engine's `main.cc` is a child of `_main_base.cc.j2`. The skeleton
+owns everything engine-agnostic: boot, the transport preamble, GPIO sync,
+the clean window, the PMU pass loop, the power terminal and teardown. A
+child overrides named `engine_*` blocks and can never remove base text.
+Twelve blocks are required (the base renders nothing for them, so a
+missing one ships firmware with that engine's code absent):
+`engine_file_header`, `engine_includes`, `engine_globals`,
+`engine_heartbeat_arm`, `engine_invoke`, `engine_iteration_setup`,
+`engine_pass_init`, `engine_print_csv`, `engine_profiler_off`,
+`engine_reset_inputs`, `engine_reset_inputs_warm`, `engine_start_metadata`.
+The optional seams (`engine_model_storage`, `engine_model_setup`,
+`engine_clean_window`, `engine_window_prologue`, `engine_window_restore`,
+`engine_profiler_on`, `engine_psram_metadata`, `engine_profiled_summary`,
+`engine_io_metadata`, `engine_early_globals`, `engine_pre_start`,
+`engine_pass_preamble`, `engine_pmu_storage_sram_resident` and the
+pass-arming pair) have working defaults; the inventory is pinned by
+`tests/contracts/test_template_blocks.py`.
+
+Inheritance fails silently by nature: a child block whose name matches
+nothing in the base is ignored and the default renders. Because the render
+environment runs with `trim_blocks` and `lstrip_blocks` off, the whitespace
+shape of an override is part of the contract too; an override anchored to
+a `//` comment that does not lead with a newline is commented out of the
+firmware. `tests/contracts/test_template_blocks.py` pins the base's block
+inventory, each child's override set, the required set and the whitespace
+shape, and `tests/contracts/test_firmware_render_snapshots.py` renders
+every engine on every SoC it supports and diffs the output against a
+committed snapshot.
+
+The partials (`_hpx_printf.j2`, `_dwt_init.j2`, `_gpio_sync.j2`,
+`_power_terminal.j2`, `_psram_metadata.j2`, `_ina228_power.j2`,
+`_npu_init.j2` and the rest) are `{% include %}`d by the skeleton so
+transport setup, timer init and the power hooks are written once.
+`hpx_pmu_profiler.cc.j2` and its header are the per-layer capture harness
+the interpreter engines register with the runtime; heliaAOT brackets each
+generated operator call directly.
+
+### Project files and generated sources
+
+`render_project_files()` in `firmware/project.py` writes `CMakeLists.txt`,
+`nsx.yml` and `cmake/nsx/modules.cmake`. The module list is the board's
+NSX starter profile taken verbatim, minus the helpers hpx does not consume,
+plus `nsx-pmu-armv8m` when the SoC uses that PMU backend and the profile
+omits it, plus the engine's `extra_modules`; hpx keeps no SDK-tier table of
+its own, and module revisions come from the compatibility baseline
+(`data/compatibility-baseline-v1.json`). `firmware/headers.py` embeds the
+model bytes as a C array (interpreter and ExecuTorch paths) and any
+constant blob; `firmware/op_resolver.py` plans which operator kernels the
+interpreter engines register; `firmware/segger.py` vendors the SEGGER RTT
+sources when the transport is RTT; local engine modules are copied under
+`modules/`. The work directory after a render:
+
+```
+work_dir/
+  CMakeLists.txt
+  nsx.yml
+  cmake/nsx/modules.cmake
+  src/main.cc                the engine's child template, rendered
+  src/main_power.cc          the dedicated power binary, when power.firmware is dedicated
+  src/model_data.h           interpreter and ExecuTorch paths
+  src/hpx_pmu_profiler.cc    interpreter paths
+  src/hpx_pmu_profiler.h
+  src/rtt/                   RTT transport only
+  modules/<name>/            local engine modules, for example the heliaAOT model module
+```
+
+Registry-resolved modules are not copied; NSX fetches them at configure
+time into the dependency workspace, and `deps/dependencies.py` reuses the
+workspace across runs when its fingerprint matches.
+
+### Build
+
+`firmware/build.py` runs `nsx configure` and `nsx build` on the generated
+app through `deps/nsx.py` (the only NSX subprocess wrapper), with the
+toolchain mapped by `nsx_toolchain()` and, when `sccache` or `ccache` is
+present and supports the toolchain, the compiler launcher resolved by
+`firmware/launcher.py`. `BuildFirmwareStage` then measures the binary:
+section sizes through the toolchain's size probe
+(`hostenv/toolchain_probe.py`), the linked memory regions and symbols
+(`hostenv/elf_inventory.py`, `hostenv/memory_measurement.py`) and their
+reconciliation against the plan, which `VerifyPlacementStage` checks.
+
+### Identity
+
+Three records make a build comparable later. `firmware/image.py` records
+the image's identity and its architecture flags from the compile database
+(`run_metadata.build_images`). `firmware/fingerprint.py` hashes the
+rendered source with comments and whitespace normalised, which is the
+`firmware_code_fingerprint` that gates power comparisons on
+[Analysis and comparison](../../analysis-comparison/). `firmware/workload.py`
+names what the measured clean window ran (`clean_workload` in the
+summary).
+
+### What the firmware does at run time
+
+1. Initialise the SoC: clocks, cache, the selected transport, the window timer.
+2. Print `--- HPX_START ---` and the `HPX_<KEY>=<value>` metadata lines.
+3. Run the clean window: warm inferences back to back with the gate high and no per-layer reads, reporting the clean timing fields.
+4. For each PMU pass: configure the counters, print `--- HPX_PRESET <name> ---`, run the warmup iterations, then for each iteration print `--- HPX_ITER <n> ---`, the CSV header and one row per layer.
+5. Print `--- HPX_END ---` and sleep.
+
+The host side of that stream is on [Data capture](../capture/).
+
+## Where the code lives
+
+| Block | Path under `src/helia_profiler/` |
+|---|---|
+| render context | `firmware/context.py` |
+| templates | `firmware/templates/`, `firmware/render.py`, template selection in `firmware/__init__.py` (`generate_app()`, `render_power_source()`) |
+| project files | `firmware/project.py` |
+| generated sources | `firmware/headers.py`, `firmware/op_resolver.py`, `firmware/segger.py` |
+| build | `firmware/build.py`, `firmware/launcher.py`, `deps/nsx.py` |
+| identity | `firmware/image.py`, `firmware/fingerprint.py`, `firmware/workload.py` |
+| stages | `stages/generate_firmware.py`, `stages/build_firmware.py`, `stages/verify_placement.py`, `stages/build_power_firmware.py` |
+| contract tests | `tests/contracts/test_template_blocks.py`, `tests/contracts/test_firmware_render_snapshots.py` |
+
+## What next
+
+[Data capture](../capture/) for what the host does with the stream;
+[Engine adapters](../engine-adapters/) for where the artifact fields come
+from; [Memory placement](../../memory/) for the plan the linker has to honour.

@@ -1,0 +1,268 @@
+---
+title: "Output files"
+description: "Every file a run writes, its schema identity and version, and a field table per artifact with type, unit and the measurement boundary each number describes."
+---
+
+## Purpose
+
+Know what each file in a result bundle is, which numbers it holds, and what
+each number measures. The bundle is designed for progressive disclosure: a
+summary and a per-layer table by default, deeper projections on request,
+and a manifest that lets a consumer verify the whole set.
+
+## Prerequisites
+
+A `results/` directory from [First profile](../../getting-started/first-profile/).
+
+## Which file
+
+| File | Schema | Role | When present |
+|---|---|---|---|
+| `result_manifest.json` | `hpx.result-manifest` v1 (`results/manifest.py`) | the bundle envelope: identity, validity, issues, provenance, comparability, and every artifact's path, media type, size and SHA-256 | always; written last |
+| `summary.json` | `hpx.run-summary` v6 (`results/run_summary.py`) | headline metrics and health signals; read this first | always |
+| `profile_results.csv` or `.json` | `hpx.profile-results` v1 for the JSON form (`report/contracts.py`); the CSV carries the semantic name without a published schema | one row per layer, one column per counter | always; one of the two per `output.format` |
+| `run_metadata.json` | `hpx.run-metadata` v1 (`report/contracts.py`) | the resolved configuration, platform, model, toolchain, build images | always |
+| `nsx.lock` | neuralSPOT-X lock file | the exact module lock the firmware was built from | always |
+| `aot_operator_manifest.json` | engine extension | the operators the AOT compiler emitted with tensor placement | `helia-aot` runs |
+| `aot_memory_layers.csv` | engine extension | the same placement data flattened for a spreadsheet | `helia-aot` runs |
+| `model_explorer/me_overlay_<COUNTER>.json` | Model Explorer overlay format | one overlay per counter | unless `output.model_explorer: false` |
+| `detailed/memory.json`, `detailed/profile_<group>.csv`, `detailed/profile_<preset>.csv`, `detailed/power_summary.csv` | projections and diagnostics | counters merged per compute-unit group and per PMU preset, memory breakdown, per-window power | `output.detailed: true` |
+
+The manifest's artifact entries carry `role` (`core`, `projection`,
+`extension`, `export`, `diagnostic`), `name`, `producer`, `optional`, and
+`schema` plus `schema_version` only where a published schema exists. A
+complete `profile` bundle requires the core artifacts `summary.json`,
+`run_metadata.json` and the selected primary result, plus `nsx.lock`
+when the run's dependency provenance recorded one.
+`load_result_manifest(path, verify=True)` rejects missing, modified or
+path-escaping artifacts; `verify` defaults to `False`, so a loader that
+omits it reads the manifest without checking the files. The packaged JSON Schemas are under
+`helia_profiler/data/` (`result_manifest.schema.v1.json`,
+`run_summary.schema.v1.json`, `run_metadata.schema.v1.json`,
+`profile_results.schema.v1.json`); they fix the stable root fields and stay
+open to additive extension, and the typed models in
+`helia_profiler.results` are the authoritative shape.
+
+## Steps
+
+### 1. `summary.json`
+
+Written by `report/summary.py` from the `RunSummary` model. The file opens
+with its identity; abridged here, the full file also carries `binary`,
+`latency`, `memory`, `compatibility`, `dependencies`, `top_layers` and the
+nested memory and analysis tables described below:
+
+```json
+{
+  "schema": "hpx.run-summary",
+  "schema_version": 6,
+  "engine": "helia-rt",
+  "layers": 13,
+  "total_cycles": 2060239.0,
+  "overflow_detected": false,
+  "validity": "valid",
+  "issues": []
+}
+```
+
+(the engine, layer and cycle values are from the shipped bundle
+`examples/results/hardware-validation-2026-09-16/apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto/`,
+which was written at schema version 5; the version this tree writes, shown
+above, is 6). Top level:
+
+| Field | Type | Unit | What it measures |
+|---|---|---|---|
+| `schema`, `schema_version` | string, int | none | `hpx.run-summary`, currently 6 |
+| `engine` | string | none | the engine that ran |
+| `layers` | int | count | operators in the profiled graph |
+| `total_cycles` | number | CPU cycles | the sum of the per-layer instrumented cycle counts (`report/summary.py`), so it includes the per-layer counter reads; the clean window is `latency.device_clean_infer_avg_cycles` |
+| `overflow_detected` | bool | none | any counter saturated its 32-bit accumulator in any pass |
+| `top_layers[]` | `op`, `cycles`, `pct` | cycles, percent of `total_cycles` | the heaviest layers |
+| `validity` | `valid`, `degraded`, `invalid` | none | the run's verdict from the same evaluation the manifest records |
+| `issues[]` | code, severity, message, context | none | the structured reasons; every code is on the [issue codes](../../reference/issue-codes/) page |
+
+`memory` (from `MemorySection`):
+
+| Field | Unit | What it measures |
+|---|---|---|
+| `arena_size` | bytes | the arena requested (`model.arena_size` or the engine default) |
+| `allocated_arena` | bytes | what the runtime used of it; the number to size the next run from |
+| `model_size` | bytes | the model file |
+| `num_tensors`, `input_size`, `output_size` | count, bytes, bytes | graph tensors and the I/O buffers |
+
+`binary` (from `BinarySection`, using the profile ELF's size-tool totals
+and section headers for reserved-memory reconciliation; the power-only
+binary is not measured):
+
+| Field | Unit | What it measures |
+|---|---|---|
+| `text` | bytes | size-tool code plus read-only data; not just the ELF section named `.text` |
+| `data`, `bss` | bytes | initialised writable data and zero-initialised state, respectively |
+| `reserved` | bytes | linker-reserved NOBITS capacity separated from statically allocated state (Apollo5 linker scripts fill the remaining DTCM as heap); omitted when zero |
+| `total` | bytes | the size tool's inclusive sum; `text + data + bss + reserved` reconciles to it |
+
+`latency` (from `LatencySection`; the boundary of each number is in its
+name):
+
+| Field | Unit | Boundary |
+|---|---|---|
+| `capture_duration_s`, `hpx_start_latency_s`, `protocol_duration_s`, `boot_phases_s` | seconds | host-side timing of the whole capture, not of inference |
+| `device_profiled_infer_count`, `device_profiled_infer_total_us`, `device_profiled_infer_avg_us` | count, microseconds | the instrumented per-layer passes, on the device's clock |
+| `device_clean_infer_count`, `device_clean_infer_total_cycles`, `device_clean_infer_avg_cycles`, `device_clean_infer_avg_us` | count, cycles, microseconds | the clean window: warm, back to back, no per-layer instrumentation |
+| `device_clean_stalled_iters`, `device_clean_partial_iters`, `device_clean_ref_cycles`, `device_clean_dwt_rate_cyc`, `device_clean_dwt_rate_us`, `device_clean_attach_wait_us` | counts, cycles, microseconds | the clean-window clock checks described on [Verifying a capture](../power-verify/) |
+| `clean_workload` | string | identifies what the clean window ran (for AOT, `aot_raw_zero_refill_included_v1` means input restoration is inside the timing) |
+
+`cache`: the aggregated memory-group counters (`ARM_PMU_L1D_CACHE`,
+`ARM_PMU_L1D_CACHE_RD`, `ARM_PMU_L1D_CACHE_REFILL`,
+`ARM_PMU_L1D_CACHE_MISS_RD`, `ARM_PMU_DTCM_ACCESS`, `ARM_PMU_MEM_ACCESS`
+among others; `report/memory.py` holds the list) as event counts over the profiled passes, plus `l1d_hit_rate_pct` derived
+as on [PMU counters](../pmu-counters/#5-read-the-results).
+
+`power` (from `PowerSection`, present only when power was captured):
+
+| Field | Unit | Boundary |
+|---|---|---|
+| `measurement_scope` | `gpio_gated_clean_window`, `on_device_gated_inference`, `free_form_capture`, `whole_capture_window` | what the numbers below were integrated over ([Windows](../power-windows/)) |
+| `avg_current_a`, `median_current_a`, `p95_current_a`, `p99_current_a`, `peak_current_a` | amperes | inside the scope; percentiles exist for the Joulescope only |
+| `avg_power_w`, `median_power_w` | watts | inside the scope |
+| `energy_j`, `energy_per_inference_j`, `inferences_per_joule` | joules, joules, 1/joule | the scope's integrated energy and its division by the counted inferences |
+| `capture_duration_s`, `capture_window_s`, `gated_window_expected_duration_s`, `gated_window_duration_ratio` | seconds, seconds, seconds, ratio | the measured window against the expectation ([Verifying a capture](../power-verify/)) |
+| `gated_window_count`, `gated_window_duration_suspect`, `gated_window_reference_drift`, `per_inference_metrics_omitted`, `short_gate_pulses_ignored` | count, bool, string, string, count | health signals |
+| `power_firmware`, `observation_mode`, `integrity`, `gate_failure`, `gating_method`, `sync`, `sync_timing_s`, `terminal`, `on_device_summary`, `window_clock_ceiling`, `gate_duration_integrity`, `firmware_code_fingerprint`, `clean_workload`, `power_plan`, `target_lifecycle` | mixed | how the capture was produced; `firmware_code_fingerprint` and `clean_workload` are comparability inputs |
+| `active_window_estimated_*` | seconds, joules | an estimate for the active portion, labelled by `active_window_estimate_method` |
+
+`memory_plan` and `memory_regions` answer two different questions and are
+kept apart on purpose:
+
+- `memory_plan` is the decision record computed before any compiler ran:
+  per region, `capacity`, `used` (the sum of what hpx placed) and the named
+  `consumers`. It carries no `free` or `overflow`, because only a
+  measurement can answer those.
+- `memory_regions` is the measured truth from the linked ELF, classified
+  into the per-SoC windows: `link_family`, `linker_profile`, and per region
+  `window`, `app_window`, `used`, `reserved`, `free`, `load_image`,
+  `window_provenance`, `app_provenance`, plus `unattributed` for sections
+  outside every window. `used` includes the live stack on GNU links;
+  `free` is `app_window.length - used`; GNU's fill-to-end heap sits inside
+  the app window (in both `reserved` and `free`), armlink's fixed heap and
+  stack sit outside it, so `used` and `free` compare only within a link
+  family. The block is absent whenever it cannot be true: a custom SoC, a
+  non-default `linker_profile`, a failed tool probe or a partial section
+  inventory.
+- `memory_reconciliation`, when the symbol table is readable, holds the two
+  against each other: per consumer `planned_size`, `status` (`matched` with
+  `measured_size` and `delta`, `missing`, or `unmatchable` when no sized
+  symbol can exist) and `matched_symbols`; per region plan `used` against
+  measured `used`.
+
+The schema version history matters for comparisons: v2 split `reserved`
+out of `bss`; v3 removed `free` and `overflow` from `memory_plan`; v4
+re-sourced the gate-duration verdict (`power.gate_duration_integrity`
+with `gated_window_reference_drift`); v5 preferred the driver's packet
+duration for gated power; v6 added `clean_workload`. `hpx compare` reports
+a version difference as informative and reads artifacts through
+`load_run_summary`, whose `PowerSection.gate_duration_unarbitrated_failure`
+property applies the v4 arbitration.
+
+Four more top-level sections appear when the run produced them and are
+owned by other pages: `compatibility` and `dependencies` (the qualified
+baseline and the lock provenance, [Toolchains](../toolchains/)), `psram`
+([Memory placement](../memory/#6-psram)) and `model_analysis`
+(`cycles_per_mac` and `cycles_per_op` from `hpx analyze`,
+[Analysis and comparison](../analysis-comparison/)).
+
+### 2. `profile_results.csv`
+
+One row per layer, written from the merged per-layer table:
+
+| Column | Unit | Meaning |
+|---|---|---|
+| `id` | index | the firmware's execution position: the sequential layer index for the interpreter engines, the post-compilation position for AOT (which skips operators such as `VAR_HANDLE` without renumbering) |
+| `source_index` | index | AOT only: the original TFLite operator index; `macs`, `ops` and `cycles_per_mac` join on it, never on position |
+| `op` | string | operator type; `DEPTHWISE_CONV_2D:1` on AOT carries the original index |
+| `<COUNTER>` columns | event counts | each requested counter, aggregated across iterations by `profiling.aggregation` |
+| `cycles` | cycles | the dedicated cycle counter |
+| `overflow` | bool | any counter of this layer saturated; its values are a lower bound |
+| `macs`, `ops`, `cycles_per_mac` | count, count, cycles per MAC | present when the model could be analysed (the `analysis` extra) |
+
+The JSON form (`output.format: json`) carries the same rows under `layers`
+with `metadata`, `summary`, `presets`, `overflow_detected` and `power` at
+the root, per `profile_results.schema.v1.json`.
+
+### 3. `run_metadata.json`
+
+The provenance of the run, from `report/contracts.py`:
+
+| Field | Meaning |
+|---|---|
+| `hpx_version`, `run_id`, `timestamp` | the tool and the run |
+| `config` | the fully resolved configuration after the merge ([Configuration](../configuration/)) |
+| `platform` | `board`, `soc`, `core`, `link_family` (`gnu` for GCC and ATfE, `armlink` for armclang), the resolved clock tier |
+| `model` | `name`, `size` in bytes, `sha256` |
+| `toolchain` | `compiler`, `compiler_version`, `cmake_version` as found on the host |
+| `engine` | type and the measured runtime version where one resolves (heliaRT, heliaAOT) |
+| `build_images[]` | one entry per built target (`profile`, and `power` on a power run): `target_name`, `binary_name`, `sha256` of the image, `size_bytes`, `architecture_flags` counted from the configured build tree's `compile_commands.json`, `translation_units` |
+| `firmware` | `arena_size`, `allocated_arena`, `model_size` as the firmware reported them |
+| dependency provenance | the typed registry hash, baseline identity and fingerprint, workspace fingerprint, lock mode and update state, requested refs and tags, peeled commits, content hashes and explicit overrides |
+
+`architecture_flags` counts instruction-set flags such as
+`-mcpu=cortex-m55` against `-mcpu=cortex-m55+nomve` across the configured
+tree; it is an inventory of the configured units, not proof each was linked,
+and precompiled libraries contribute nothing. `hpx compare` shows it as an
+informative dimension.
+
+### 4. AOT artifacts
+
+`aot_operator_manifest.json` records the operators the AOT compiler emitted
+after graph transforms, each with inputs, outputs and local tensors
+(weights, weight sums, per-operator scratch). When the installed
+`helia-aot` exposes placement, tensor entries add `memory` (`dtcm`, `sram`,
+`mram`, `psram`), `source_memory`, `staged`, `arena_role` (`scratch`,
+`persistent`, `constant`), `arena_region_id`, `offset` and
+`allocation_size`, all in bytes where they are sizes.
+`aot_memory_layers.csv` is the same data as one row per tensor with
+`layer_idx`, `layer_id`, `op_type`, `op_name`, `tensor_role`, `tensor_id`,
+`tensor_name`, `tensor_kind`, `memory`, `source_memory`, `staged`,
+`arena_role`, `arena_region_id`, `offset`, `size`, `shape`.
+
+### 5. `detailed/`
+
+With `output.detailed: true`: `memory.json` (binary sections, the arena
+block, `per_layer_memory` with each layer's memory-group counters,
+`cache_totals`, and `memory_symbols`: the top 32 sized symbols per region),
+`profile_<group>.csv` merged per compute-unit group and, when the run
+needed more than one PMU pass, `profile_<preset>.csv` per preset (presets
+are named `<group>_<index>`, for example `cpu_0`), and `power_summary.csv` with one row per gated window plus a
+`whole_capture_window` reference row.
+
+### 6. The terminal summary
+
+Every run prints the arena, model and binary sizes, the layer count, total
+cycles, the top layers with percentages, the cache totals and the
+validity footer: `VALID`, `DEGRADED` with one `code: message` line per
+warning, or `INVALID` with the errors first. An invalid run still exits 0
+and writes its bundle unless `output.fail_on_invalid` (`--fail-on-invalid`)
+is set, in which case it exits 3.
+
+## Expected output
+
+A bundle whose manifest verifies, whose summary says `valid`, and whose
+per-layer table has one row per operator and one column per counter you
+asked for. [Parsing outputs](../parsing-outputs/) reads all of it from
+Python and `jq`.
+
+## Controlling output
+
+| Key | Flag | Effect |
+|---|---|---|
+| `output.dir` | `--output-dir` | the bundle directory (`results` by default; a second run into it overwrites in place) |
+| `output.format` | `--output-format csv` or `json` | the primary per-layer artifact |
+| `output.model_explorer` | `--no-model-explorer` | skip the overlays |
+| `output.detailed` | `--detailed` | write `detailed/` |
+| `output.fail_on_invalid` | `--fail-on-invalid` | exit 3 on an invalid run |
+
+## What next
+
+[Parsing outputs](../parsing-outputs/) for scripts against these files,
+[Analysis and comparison](../analysis-comparison/) for two bundles side
+by side, [Model Explorer overlays](../model-explorer/) for the graph view.

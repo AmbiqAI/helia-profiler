@@ -1,0 +1,145 @@
+---
+title: "Power measurement"
+description: "How hpx measures current, voltage and energy around a clean inference window with a Joulescope or an on-board INA228, what each instrument gives you, and the pages that cover wiring, windows and verification."
+---
+
+import CardGrid from '@ambiqai/helia-ui/astro/CardGrid';
+import LinkCard from '@ambiqai/helia-ui/astro/LinkCard';
+import Icon from '@ambiqai/helia-ui/astro/Icon';
+import BlockDiagram from '@ambiqai/helia-ui/astro/BlockDiagram';
+import Block from '@ambiqai/helia-ui/astro/Block';
+
+## Purpose
+
+Measure the energy an inference costs, not just its cycles. hpx captures
+current, voltage and energy around a GPIO-gated clean window: the firmware
+runs a dedicated, uninstrumented inference loop and drives a sync GPIO high
+for exactly that window, while an instrument integrates charge and energy
+and the host reads the result. Two instruments are supported, and this
+page is the map of the five pages that cover them.
+
+## Prerequisites
+
+A working PMU profile of the model ([First profile](../../getting-started/first-profile/)),
+and one of:
+
+- a Joulescope JS110, JS220 or JS320 in series with the board's supply, with
+  at least one GPIO wire from the board to the instrument; or
+- a TI INA228 current monitor on the board's own I2C bus, for whole-window
+  energy without a bench instrument.
+
+## Which instrument
+
+| | Joulescope (`power.driver: joulescope`, `mode: external`) | INA228 (`power.driver: ina228`, `mode: internal`) |
+|---|---|---|
+| What it is | A bench instrument in series with the supply, watching a GPIO gate | A monitor chip on the target rail, read by the firmware over I2C |
+| Streaming samples | yes | no; hardware accumulators |
+| Whole-window energy | yes, HPX accumulates instrument statistics over the selected gate | yes, integrated on the chip |
+| Current distribution (median, p95, p99) | yes | no |
+| Host wiring | series supply plus one to three GPIO wires | none; target I2C |
+| Powers and resets the target rail | yes (relay, power-cycle recovery) | no |
+| Adds to the measured current | no | yes: the IOM that talks to the chip stays powered inside the measurement |
+| Pick it when | You need external current statistics and GPIO-gated energy | You need on-target aggregate energy without a Joulescope |
+
+`power.driver` names the chip or instrument the firmware and host talk to.
+Both `joulescope` and `ina228` are registered drivers
+(`src/helia_profiler/power/__init__.py`); `ondevice` is also registered as
+the generic on-device base but has no firmware producer, so a run that
+selects it raises `PowerError`. Use `ina228` for an on-target measurement.
+Runs made with different instruments carry different `measurement_scope`
+values (`gpio_gated_clean_window` for the Joulescope,
+`on_device_gated_inference` for the INA228), and `hpx compare` omits power
+deltas between them.
+
+## How a power run works
+
+<BlockDiagram
+  title="A power run"
+  caption="The dedicated power binary runs a clean window; the instrument integrates it; the host verifies the window before it publishes a number."
+  flow="row"
+>
+  <Block label="Power firmware" sublabel="no transport" tone="accent" flow="column">
+    <Block label="Warm-up" emphasis="filled" />
+    <Block label="READY, GO" sublabel="lock-step" emphasis="filled" />
+    <Block label="Clean window" sublabel="gate high" emphasis="filled" />
+  </Block>
+  <Block label="Instrument" tone="accent" flow="column">
+    <Block label="Joulescope" sublabel="gate on INPUT0" emphasis="filled" />
+    <Block label="INA228" sublabel="I2C, accumulators" emphasis="filled" />
+  </Block>
+  <Block label="Host" tone="accent" flow="column">
+    <Block label="Window checks" sublabel="two clocks agree" emphasis="filled" />
+    <Block label="summary.json" sublabel="power block" emphasis="filled" />
+  </Block>
+</BlockDiagram>
+
+The same structure as a list, for readers of the Markdown rendition:
+
+- Power firmware: no transport
+  - Warm-up
+  - READY, GO: lock-step
+  - Clean window: gate high
+- Instrument
+  - Joulescope: gate on INPUT0
+  - INA228: I2C, accumulators
+- Host
+  - Window checks: two clocks agree
+  - summary.json: power block
+
+In order: hpx flashes a second, transport-free build of the firmware
+(`power.firmware: dedicated`, the default) that does model init, warm-up,
+the three-wire lock-step handshake and the gated clean window, then parks.
+With a Joulescope, the host watches the gate on `INPUT0`, sums the
+statistics packets that fall inside it, and divides the gated energy by
+the firmware-reported clean inference count. With an INA228, the firmware
+resets the chip's accumulators, runs a fixed number of inferences, reads
+energy and charge back, and reports them through the same terminal record.
+Either way the host cross-checks the firmware's own window clock against
+the instrument before it publishes per-inference numbers.
+
+## Steps
+
+<CardGrid>
+  <LinkCard href="../power-joulescope/" title="1. Joulescope setup and wiring">
+    <Icon name="plug" slot="icon" />
+    Series supply wiring, the per-board GPIO pins for gate, state and GO,
+    Vref on JS220 and JS320, `io_voltage`, and the lock-step handshake.
+  </LinkCard>
+  <LinkCard href="../power-ina228/" title="2. INA228 on the target">
+    <Icon name="microchip" slot="icon" />
+    Wiring a Power Monitor Click or an Adafruit breakout, choosing a shunt,
+    what the on-device summary contains, and its failure modes.
+  </LinkCard>
+  <LinkCard href="../power-windows/" title="3. Windows and the clean window">
+    <Icon name="stopwatch" slot="icon" />
+    The dedicated power firmware, window sizing and duration, reset
+    strategies, and the advanced power floors.
+  </LinkCard>
+  <LinkCard href="../power-verify/" title="4. Verifying a capture">
+    <Icon name="circle-check" slot="icon" />
+    The `power` block of `summary.json`, the health signals, the window
+    clock checks, bring-up diagnostics and troubleshooting.
+  </LinkCard>
+</CardGrid>
+
+Two topics other pages link to by their old anchors live on the Windows
+page: <span id="dedicated-power-firmware"></span>the
+[dedicated power firmware](../power-windows/#1-the-dedicated-power-firmware)
+and <span id="aot-input-preparation"></span>[AOT input preparation](../power-windows/#aot-input-preparation).
+
+The `power` block's every key, type and default is on the generated
+[configuration reference](../../reference/configuration/); the pages above
+explain what the keys do.
+
+## Expected output
+
+`summary.json` gains a `power` block with `measurement_scope`, average and
+peak current, average power, the current percentiles (Joulescope), energy
+per inference, inferences per joule, and the health signals the
+verification page lists; the terminal prints a compact power table. The
+[power examples](../../examples/) show captured runs.
+
+## What next
+
+Start with [Joulescope setup and wiring](../power-joulescope/) if you have
+the instrument, or [INA228 on the target](../power-ina228/) if you do not.

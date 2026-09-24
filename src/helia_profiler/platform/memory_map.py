@@ -412,7 +412,7 @@ def linked_memory_map(
     ``linker_profile`` is the third axis of the real layout: these tables
     characterize NSX's DEFAULT profile ONLY (sbl-based on Apollo parts,
     nbl-based on atomiq110). ``itcm`` is a
-    documented engine knob (``docs/guide/engines.md``) forwarded straight
+    documented engine knob (the ``guide/engines`` page) forwarded straight
     to CMake, and its scripts declare DIFFERENT regions — on apollo330P,
     AP510-sized ones (the upstream NSX bug in PR #176's report) — so any
     profile other than ``default`` returns empty: the honest "unavailable"

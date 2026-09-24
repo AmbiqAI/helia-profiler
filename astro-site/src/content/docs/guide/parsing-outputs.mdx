@@ -1,0 +1,143 @@
+---
+title: "Parsing outputs"
+description: "Read a result bundle from Python and from the shell: verify the manifest, load the typed summary, pull the per-layer table into a table library, and query the JSON with jq."
+---
+
+## Purpose
+
+Script against a bundle without guessing its shape. hpx ships typed
+loaders for the JSON artifacts and a JSON Schema for each, so a parser can
+be written once against the contract and checked against it in CI.
+
+## Prerequisites
+
+A result bundle ([First profile](../../getting-started/first-profile/))
+and hpx installed in the Python environment that will read it. The
+snippets below were written against the packaged schemas and typed models
+in `helia_profiler.results` at the source tree this site was built from;
+no captured bundle ships with the documentation yet, so they read the
+schema, not a remembered file. The [Examples](../../examples/) section
+will carry a captured bundle to run them against.
+
+## Steps
+
+### 1. Verify the bundle first
+
+```python
+from pathlib import Path
+from helia_profiler.results.manifest import load_result_manifest
+
+bundle = Path("results")
+manifest = load_result_manifest(bundle / "result_manifest.json", verify=True)
+print(manifest.run_id, manifest.validity, [issue.code for issue in manifest.issues])
+for artifact in manifest.artifacts:
+    print(artifact.role, artifact.name, artifact.path)
+```
+
+`verify=True` rejects a missing, modified or path-escaping artifact, so a
+script never reads half a bundle. `validity` is the verdict; read it before
+any metric.
+
+### 2. Load the summary through the typed model
+
+```python
+from helia_profiler.results.run_summary import load_run_summary
+
+summary = load_run_summary(bundle / "summary.json")
+print(summary.engine, summary.layers, summary.total_cycles)
+print(summary.memory.allocated_arena, "of", summary.memory.arena_size, "bytes")
+if summary.power is not None:
+    print(summary.power.measurement_scope, summary.power.energy_per_inference_j, "J per inference")
+    if summary.power.gate_duration_unarbitrated_failure:
+        print("gate duration failed without arbitration; do not quote per-inference energy")
+```
+
+`load_run_summary` applies the schema-version arbitration for you (the v4
+gate-duration verdict in particular), which a raw `json.load` does not.
+Sections are dataclasses (`MemorySection`, `BinarySection`,
+`LatencySection`, `PowerSection`) with the fields listed on
+[Output files](../output/); unknown keys land in each section's `extras`.
+
+### 3. The per-layer table
+
+```python
+import csv
+
+with open(bundle / "profile_results.csv", newline="") as handle:
+    rows = list(csv.DictReader(handle))
+counter = "ARM_PMU_CPU_CYCLES"
+hottest = sorted(rows, key=lambda row: int(float(row["cycles"])), reverse=True)[:5]
+for row in hottest:
+    print(row["id"], row["op"], row["cycles"], row.get(counter), row["overflow"])
+```
+
+With `output.format: json` the same rows are `profile_results.json`'s
+`layers` list and the file validates against
+`profile_results.schema.v1.json`. Join AOT rows on `source_index`, never on
+position: heliaAOT skips operators without renumbering.
+
+### 4. Query with jq
+
+```bash
+jq '{engine, layers, total_cycles, validity, issues: [.issues[].code]}' results/summary.json
+jq '.top_layers[] | "\(.op)\t\(.cycles)\t\(.pct)%"' -r results/summary.json
+jq '.memory | {arena_size, allocated_arena}' results/summary.json
+jq 'select(.power != null) | .power | {measurement_scope, energy_per_inference_j, gated_window_duration_ratio}' results/summary.json
+jq '.artifacts[] | "\(.role)\t\(.name)\t\(.path)"' -r results/result_manifest.json
+jq '.platform, .toolchain, .build_images[].sha256' results/run_metadata.json
+```
+
+### 5. Validate against the packaged schemas
+
+`jsonschema` is not an hpx dependency; `pip install jsonschema` first.
+
+```python
+import json
+from importlib.resources import files
+
+import jsonschema
+
+schema = json.loads(files("helia_profiler.data").joinpath("run_summary.schema.v1.json").read_text())
+jsonschema.validate(json.loads((bundle / "summary.json").read_text()), schema)
+```
+
+The packaged schemas fix the root fields and stay open to additive
+extension; a parser that keys on the fields the schema requires keeps
+working across the additive versions listed on [Output files](../output/).
+
+### 6. Compare in code
+
+```python
+from pathlib import Path
+
+from helia_profiler.results.run_summary import load_run_summary
+
+a = load_run_summary(Path("results/place_tcm_tcm/summary.json"))
+b = load_run_summary(Path("results/place_tcm_mram/summary.json"))
+baseline = a.latency.device_clean_infer_avg_cycles if a.latency else None
+candidate = b.latency.device_clean_infer_avg_cycles if b.latency else None
+if baseline is None or baseline <= 0 or candidate is None:
+    raise ValueError("Both runs need valid clean-window timing")
+print(f"{candidate / baseline:.3f}x clean-window cycles")
+```
+
+This snippet only demonstrates arithmetic after you have checked run validity
+and matching measurement conditions. For a supported comparison, including
+a ratio, use `hpx compare`, which applies the
+comparability rules on [Analysis and comparison](../analysis-comparison/);
+a hand-rolled comparison that ignores them will compare a `busy_loop`
+window against an inference without noticing.
+
+## Expected output
+
+A script that refuses a broken bundle, reads the verdict before the
+numbers, and validates against the shipped schema. The
+[Python API reference](../../reference/api/) documents
+`load_result_manifest`; `load_run_summary` and the section dataclasses are
+in `helia_profiler.results.run_summary`.
+
+## What next
+
+[Analysis and comparison](../analysis-comparison/) for the rules a
+comparison must honour; the [Python API](../../reference/api/) for the
+`Session` and `profile()` entry points when you drive runs from Python too.

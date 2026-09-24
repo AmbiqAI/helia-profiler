@@ -1,0 +1,217 @@
+---
+title: "Adding an engine"
+description: "The touch points a fifth inference engine has to cover in hpx: the artifact type, the adapter, the registry entry, the firmware template as a child of the skeleton, template selection, the contract tests, adapter tests and the user guide page."
+---
+
+import BlockDiagram from '@ambiqai/helia-ui/astro/BlockDiagram';
+import Block from '@ambiqai/helia-ui/astro/Block';
+
+## Purpose
+
+Walk a contributor from an NSX module for a runtime to
+`hpx profile --engine your-engine` building, flashing and profiling
+firmware with it. Every step names the file it touches and the test that
+holds it to the contract.
+
+## Diagram
+
+<BlockDiagram
+  title="Touch points for a new engine"
+  caption="The eight places a new engine changes, grouped by whether they are code, firmware or verification. The pipeline, capture and report packages are untouched."
+  flow="grid"
+  columns={3}
+>
+  <Block label="Python" tone="accent" flow="column">
+    <Block label="artifact type" sublabel="engines/base.py" emphasis="filled" />
+    <Block label="adapter" sublabel="engines/your_engine.py" emphasis="filled" />
+    <Block label="registry entry" sublabel="engines/__init__.py" emphasis="filled" />
+  </Block>
+  <Block label="Firmware" tone="accent" flow="column">
+    <Block label="template child" sublabel="main_your_engine.cc.j2" emphasis="filled" />
+    <Block label="template selection" sublabel="firmware/__init__.py" emphasis="filled" />
+  </Block>
+  <Block label="Verification" tone="accent" flow="column">
+    <Block label="contract tests" sublabel="three pinned inventories" emphasis="filled" />
+    <Block label="adapter tests" emphasis="filled" />
+    <Block label="user guide page" emphasis="filled" />
+  </Block>
+</BlockDiagram>
+
+The same structure as a list, for readers of the Markdown rendition:
+
+- Python: artifact type (`engines/base.py`), adapter (`engines/your_engine.py`), registry entry (`engines/__init__.py`)
+- Firmware: template child (`main_your_engine.cc.j2`), template selection (`firmware/__init__.py`)
+- Verification: contract tests (three pinned inventories), adapter tests, user guide page
+
+## The blocks
+
+### Before you start
+
+You need an NSX module or source tree for the runtime, a way to run
+inference that can be instrumented per layer, and the
+[Engine adapters](../engine-adapters/) page. Per-layer invocation is the
+hard requirement: PMU counters are read between layers, so a runtime that
+only exposes whole-model inference needs per-layer hooks added, or is
+profiled at whole-model granularity with that limitation documented.
+
+### 1. Artifact type
+
+Add an `EngineArtifacts` subclass in `src/helia_profiler/engines/base.py`.
+The base carries only what every engine produces; everything engine-specific
+goes on the subclass, required (no default) wherever the adapter always sets
+it, so consumers read it without a fallback:
+
+```python
+@dataclass(frozen=True, kw_only=True)
+class YourEngineArtifacts(EngineArtifacts):
+    """YourEngine adapter outputs."""
+
+    engine_type: EngineType = EngineType.YOUR_ENGINE
+    your_engine_blob_name: str
+    your_engine_scratch_size: int
+    your_engine_manifest: list[dict[str, Any]] | None = None
+
+    _PINNED_ENGINE_TYPE: ClassVar[EngineType | None] = EngineType.YOUR_ENGINE
+```
+
+`_PINNED_ENGINE_TYPE` makes construction with any other `engine_type` a
+`ValueError`. If the engine resolves a backend, version, variant or
+toolchain tag, override the matching `resolved_*` property: those four are
+how `deps/dependencies.py` puts engine identity into the workspace
+fingerprint, and a value not surfaced there does not invalidate a cached
+workspace when it changes. Then add the pairing to
+`ARTIFACT_TYPE_FOR_ENGINE` in `tests/contracts/test_engine_artifact_types.py`;
+that map is asserted complete over `EngineType`.
+
+### 2. Adapter
+
+Create `src/helia_profiler/engines/your_engine.py` implementing the
+`EngineAdapter` protocol: `name`, `engine_type`, `prepare(config, work_dir)`,
+and the placement hooks (`default_auto_placement()` returning `None` to
+accept the shared policy, `apply_arena_placement_override()` as the
+identity unless the engine emits arena regions). `prepare()` validates
+`config.engine.*`, creates any local NSX module under `work_dir`, and
+returns the artifact type fully populated:
+
+```python
+def prepare(self, config: ProfileConfig, work_dir: Path) -> YourEngineArtifacts:
+    extra_modules = [
+        NsxModuleRef(
+            name="your-engine-module",
+            path=Path(),
+            local=False,
+            project="your-engine-project",
+        ),
+    ]
+    return YourEngineArtifacts(
+        engine_type=EngineType.YOUR_ENGINE,
+        extra_modules=extra_modules,
+        cmake_vars={"NSX_YOUR_ENGINE_OPTION": "value"},
+        engine_header="your_engine/api.h",
+        your_engine_blob_name="blob.bin",
+        your_engine_scratch_size=32 * 1024,
+    )
+```
+
+Three rules: return only the modules the engine adds (the board's starter
+profile supplies the base set); state `engine_header` (TFLM's if the
+firmware runs TFLM's interpreter, as heliaRT does); and be idempotent, so
+two calls with the same inputs produce the same output.
+
+### 3. Registry entry
+
+In `engines/__init__.py`, add the `EngineType` member, a deferred factory
+function that imports the adapter module, and the factory's entry in
+`_ADAPTER_FACTORIES`. `get_adapter()` needs no change, and tests can
+substitute a stub with `register_engine_adapter()`.
+
+### 4. Template child
+
+If the engine runs through the interpreter path, `main.cc.j2` already
+serves it. Otherwise write `firmware/templates/main_your_engine.cc.j2`
+opening with `{% extends "_main_base.cc.j2" %}`; never a standalone main.
+The skeleton owns boot, the transport preamble, GPIO sync, the clean
+window, the PMU pass loop and teardown, and a standalone template drifts
+from it and loses features silently. Read the base's prelude first: the
+render environment has `trim_blocks` and `lstrip_blocks` off, so the
+whitespace shape of every override is part of the contract.
+
+Override the twelve required blocks (`engine_file_header`,
+`engine_includes`, `engine_globals`, `engine_heartbeat_arm`,
+`engine_invoke`, `engine_iteration_setup`, `engine_pass_init`,
+`engine_print_csv`, `engine_profiler_off`, `engine_reset_inputs`,
+`engine_reset_inputs_warm`, `engine_start_metadata`). Override an
+optional seam only where its default is wrong for the engine.
+`engine_pmu_storage_sram_resident` is a value seam that renders `true`
+(per-layer storage in shared SSRAM, the default) or `false` (storage in
+TCM); any other value is a render error. `engine_clean_window` deserves
+the most thought: its default brackets `engine_invoke()` with the window
+clock, which is right whenever the invoke is the inference (heliaRT, TFLM).
+ExecuTorch overrides it because its profiled call reloads the model and
+reports an execute-only cycle count, and heliaAOT enables input
+restoration inside the window. Whoever overrides it owns everything nested
+in it (`engine_window_prologue`, `engine_window_restore`,
+`engine_profiler_on`); overriding those separately as well is rejected by
+the block test.
+
+### 5. Template selection
+
+Selection is an inline conditional in `firmware/__init__.py`, in both
+`generate_app()` and `render_power_source()`: `main_aot.cc.j2` for
+`EngineType.HELIA_AOT`, `main_executorch.cc.j2` for `EngineType.EXECUTORCH`,
+`main.cc.j2` for everything else. Extend both for the engine's type.
+
+### 6. Contract tests
+
+- `tests/contracts/test_template_blocks.py`: add the file to `CHILDREN` and
+  the override set to `test_child_override_sets_are_the_documented_ones`.
+- `tests/contracts/test_firmware_render_snapshots.py`: add the engine to
+  `_ENGINES`, give `_render()` a branch that renders the template with the
+  variables production hands it (a missing branch raises rather than
+  rendering `main.cc.j2`), narrow `_ENGINE_SOCS` if it does not run on
+  every family, add it to `_MATRIX_ENGINES` only if it supports the
+  dedicated power binary, then regenerate with `HPX_UPDATE_SNAPSHOTS=1`
+  and review the JSON diff.
+- `tests/contracts/test_engine_artifact_types.py`: the map from step 1.
+
+### 7. Adapter tests
+
+Create `tests/test_your_engine.py` on the pattern of
+`tests/test_tflm_adapter.py`: `prepare()` returns the artifact type with
+the pinned `engine_type` and the expected module names, and creates any
+local module directory it promises.
+
+### 8. User guide page
+
+Add the engine to [Engines](../../engines/): what it is and when to use
+it, what it needs installed, its `engine.config` keys and its known
+limits. An engine without a page is not shippable.
+
+### Checklist
+
+- [ ] artifact subclass with `engine_type` pinned and any `resolved_*` override
+- [ ] adapter implementing `EngineAdapter`; `prepare()` returns the subclass fully populated
+- [ ] `ARTIFACT_TYPE_FOR_ENGINE` entry
+- [ ] `EngineType` member and factory registered
+- [ ] template child of the skeleton with the required blocks, or the interpreter path documented
+- [ ] template selection in both render functions
+- [ ] block, snapshot and adapter tests green
+- [ ] user guide page
+- [ ] one end-to-end run on hardware with a real model
+
+## Where the code lives
+
+| Block | Path |
+|---|---|
+| artifact type | `src/helia_profiler/engines/base.py` |
+| adapter | `src/helia_profiler/engines/your_engine.py` |
+| registry | `src/helia_profiler/engines/__init__.py` |
+| template child | `src/helia_profiler/firmware/templates/main_your_engine.cc.j2` |
+| template selection | `src/helia_profiler/firmware/__init__.py` |
+| contract tests | `tests/contracts/test_engine_artifact_types.py`, `tests/contracts/test_template_blocks.py`, `tests/contracts/test_firmware_render_snapshots.py` |
+| adapter tests | `tests/test_your_engine.py` |
+
+## What next
+
+[Firmware generation](../firmware/) for the skeleton the template extends;
+[Data capture](../capture/) for the stream the firmware has to print.

@@ -1055,7 +1055,7 @@ def test_write_summary_carries_the_power_firmware_fingerprint(tmp_path: Path):
 
 
 def test_window_clock_ceiling_metadata_keys_are_the_documented_set():
-    # docs/guide/power.md names these fields for users reading summary.json,
+    # the guide/power page names these fields for users reading summary.json,
     # and #115 put them in the summary's power block. Nothing else pins the
     # key set, so renaming or adding one in to_metadata() would leave the
     # guide describing a field that no longer exists while the whole suite

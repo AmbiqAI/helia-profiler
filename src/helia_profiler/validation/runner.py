@@ -420,26 +420,20 @@ def run_case(
 ) -> CaseResult:
     """Run one validation case end-to-end.
 
-    Parameters
-    ----------
-    case:
-        The case to execute.
-    repo_root:
-        Absolute path to the helia-profiler repo root (used to resolve
-        fixture paths).
-    output_root:
-        Directory under which each case's artifacts are written to
-        ``output_root/<case_id>/``.
-    timeout_s:
-        Wall-clock timeout for the ``hpx profile`` subprocess (ignored in
-        in-process mode — see module docstring).
-    verbose:
-        If true, stream the subprocess output live in addition to
-        capturing it.
-    in_process:
-        If True, call :func:`helia_profiler.cli.main` directly instead of
-        spawning ``hpx profile`` as a subprocess.  If ``None`` (default),
-        honor the ``HPX_VALIDATE_INPROCESS`` environment variable.
+    Args:
+        case: The case to execute.
+        repo_root: Absolute path to the helia-profiler repo root (used to
+            resolve fixture paths).
+        output_root: Directory under which each case's artifacts are written
+            to ``output_root/<case_id>/``.
+        timeout_s: Wall-clock timeout for the ``hpx profile`` subprocess
+            (ignored in in-process mode — see module docstring).
+        verbose: If true, stream the subprocess output live in addition to
+            capturing it.
+        in_process: If True, call :func:`helia_profiler.cli.main` directly
+            instead of spawning ``hpx profile`` as a subprocess.  If ``None``
+            (default), honor the ``HPX_VALIDATE_INPROCESS`` environment
+            variable.
     """
     case_dir = output_root / case.case_id
     case_dir.mkdir(parents=True, exist_ok=True)

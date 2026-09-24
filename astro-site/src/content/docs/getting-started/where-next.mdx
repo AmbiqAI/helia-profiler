@@ -1,0 +1,77 @@
+---
+title: "Next steps"
+description: "Pick the User guide page, the example or the reference that matches what you want to measure after your first profile."
+---
+
+import CardGrid from '@ambiqai/helia-ui/astro/CardGrid';
+import LinkCard from '@ambiqai/helia-ui/astro/LinkCard';
+
+## Purpose
+
+You have a result bundle and a configuration file. The rest of the site is
+organised by task, and this page maps the questions people ask after a
+first profile onto the page that answers each one.
+
+## Prerequisites
+
+[First profile](../first-profile/) and [Configure a run](../configure-a-run/)
+done.
+
+## Steps
+
+### By what you want to do
+
+| I want to | Go to |
+|---|---|
+| Understand every file hpx wrote and the units in each column | [Output files](../../guide/output/) |
+| Compare two runs and know when a comparison is not fair | [Analysis and comparison](../../guide/analysis-comparison/) |
+| See per-layer cost on the model graph | [Model Explorer overlays](../../guide/model-explorer/) |
+| Try another engine: heliaAOT, TFLM or ExecuTorch | [Engines](../../guide/engines/) |
+| Build with `armclang` or ATfE instead of GCC | [Toolchains](../../guide/toolchains/) |
+| Move the arena or the weights to a different memory | [Memory placement](../../guide/memory/) |
+| Capture more counters, or counters from the memory and MVE domains | [PMU counters](../../guide/pmu-counters/) |
+| Measure power with a Joulescope or an INA228 | [Power measurement](../../guide/power/) |
+| Capture over USB CDC or UART instead of RTT | [Capture transports](../../guide/transports/) |
+| Run hpx from Python instead of the shell | [Python API](../../reference/api/) |
+| Script a batch of runs or wire hpx into CI | [Batch runs from YAML](../../examples/batch-runs/) |
+| Understand a failed run or an issue code | [Issue codes](../../reference/issue-codes/) |
+
+### By section
+
+<CardGrid>
+  <LinkCard href="../../guide/" title="User guide">
+    Task pages in four groups: set up a run, measure, read results, and the
+    concepts behind the pipeline.
+  </LinkCard>
+  <LinkCard href="../../examples/" title="Examples">
+    Recipes for engines, toolchains, boards, power capture and workflows.
+    Each page identifies its configuration and validation status; some
+    show illustrative output rather than a captured result.
+  </LinkCard>
+  <LinkCard href="../../reference/" title="Reference">
+    The command line, every configuration key, the issue codes and the
+    Python API, all generated from the source, plus the compatibility
+    baseline and the firmware wire protocol.
+  </LinkCard>
+</CardGrid>
+
+### For agents
+
+Every page on this site has a Markdown rendition at its route plus
+`index.md`, the whole site is in `llms-full.txt`, and the generated
+reference ships as JSON: `reference/api/reference.json`,
+`reference/cli/cli.json`, `reference/configuration/schema.json` and
+`reference/issue-codes/issues.json`. Start from
+[`llms.txt`](../../llms.txt) for the index.
+
+## Expected output
+
+Nothing runs on this page. If none of the rows above matches your question,
+the troubleshooting section of [First profile](../first-profile/#troubleshooting-the-first-run) and the
+[issue codes](../../reference/issue-codes/) are the two places a failed run
+sends you.
+
+## What next
+
+Whichever row you picked. The section landing pages carry the same map in
+more detail.

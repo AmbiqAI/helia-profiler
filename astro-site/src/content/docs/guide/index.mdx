@@ -1,0 +1,117 @@
+---
+title: "User guide"
+description: "Task pages in four groups: set up a run, measure, read results, and the concepts behind the pipeline. Start from the block you want to change."
+---
+
+import CardGrid from '@ambiqai/helia-ui/astro/CardGrid';
+import LinkCard from '@ambiqai/helia-ui/astro/LinkCard';
+import Icon from '@ambiqai/helia-ui/astro/Icon';
+
+The User guide is organised by what you are doing. Start with a task below, then follow its prerequisites and examples. If
+you have not run a profile yet, [Getting started](../getting-started/) is
+the shorter path.
+
+## The blocks of a run configuration
+
+Use these configuration blocks to find the guide for your next change.
+The generated [configuration reference](../reference/configuration/) lists
+all keys and defaults.
+
+| Block | Choose or inspect |
+|---|---|
+| `model` | [Model format and arena size](models/), [memory placement](memory/) |
+| `engine` | [Runtime or ahead-of-time compiler](engines/) |
+| `target` | [Board and clock](boards/), [toolchain](toolchains/), [transport](transports/) |
+| `profiling` | [Counters and sampling](pmu-counters/) |
+| `power` | [Instrument, wiring and measurement window](power/) |
+| `output` | [Result files](output/) and [model overlays](model-explorer/) |
+| `timeouts`, `build` | [Stage limits and dependency resolution](configuration/) |
+
+## Set up a run
+
+<CardGrid>
+  <LinkCard href="engines/" title="Engines">
+    <Icon name="microchip" slot="icon" />
+    heliaRT, heliaAOT, TFLM and ExecuTorch: what each runs, what it costs,
+    and when to pick it.
+  </LinkCard>
+  <LinkCard href="models/" title="Models">
+    <Icon name="diagram-project" slot="icon" />
+    The model formats each engine accepts, the tensor arena, and how to size
+    it from a measurement.
+  </LinkCard>
+  <LinkCard href="boards/" title="Boards and targets">
+    <Icon name="memory" slot="icon" />
+    The board registry, what each SoC family can capture, the CPU clock and
+    custom boards.
+  </LinkCard>
+  <LinkCard href="toolchains/" title="Toolchains">
+    <Icon name="wrench" slot="icon" />
+    GCC, Arm Compiler 6 and the Arm Toolchain for Embedded: install, select,
+    compare.
+  </LinkCard>
+  <LinkCard href="transports/" title="Capture transports">
+    <Icon name="plug" slot="icon" />
+    RTT, USB CDC, UART and SWO: what each needs plugged in and what it can
+    lose.
+  </LinkCard>
+  <LinkCard href="memory/" title="Memory placement">
+    <Icon name="layer-group" slot="icon" />
+    Where the arena and the weights live, how automatic placement decides,
+    and how to tune it.
+  </LinkCard>
+  <LinkCard href="executorch-ns-kernels/" title="ExecuTorch NS kernels">
+    <Icon name="bolt" slot="icon" />
+    What the `ns` CMSIS-NN provider buys over `arm` on a Cortex-M55, measured
+    op by op.
+  </LinkCard>
+  <LinkCard href="configuration/" title="Configuration">
+    <Icon name="file-code" slot="icon" />
+    How the file and the command line merge, and the behaviour a schema table
+    cannot express.
+  </LinkCard>
+</CardGrid>
+
+## Measure
+
+<CardGrid>
+  <LinkCard href="pmu-counters/" title="PMU counters">
+    <Icon name="gauge" slot="icon" />
+    Counter groups per SoC, multi-pass capture and overflow detection.
+  </LinkCard>
+  <LinkCard href="power/" title="Power measurement">
+    <Icon name="bolt" slot="icon" />
+    Joulescope wiring, INA228, measurement windows and on-device summaries.
+  </LinkCard>
+</CardGrid>
+
+## Read results
+
+<CardGrid>
+  <LinkCard href="output/" title="Output files">
+    <Icon name="folder-open" slot="icon" />
+    Every file a run writes, its schema and its units.
+  </LinkCard>
+  <LinkCard href="latency/" title="Inference and layer timing">
+    Read clean inference timing and instrumented layer costs with the right units and scope.
+  </LinkCard>
+  <LinkCard href="analysis-comparison/" title="Compare results">
+    <Icon name="scale-balanced" slot="icon" />
+    Re-analyse a bundle, compare two runs, and the rules that make a
+    comparison fair.
+  </LinkCard>
+  <LinkCard href="model-explorer/" title="Model Explorer overlays">
+    <Icon name="eye" slot="icon" />
+    Per-layer cost on the model graph.
+  </LinkCard>
+</CardGrid>
+
+## Concepts
+
+<CardGrid>
+  <LinkCard href="concepts/" title="How hpx works">
+    <Icon name="sitemap" slot="icon" />
+    The pipeline, engine adapters, firmware generation, capture, field
+    diagnostics and how to add an engine, each with a block diagram.
+  </LinkCard>
+</CardGrid>

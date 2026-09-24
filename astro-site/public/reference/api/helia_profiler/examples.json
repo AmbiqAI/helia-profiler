@@ -1,0 +1,20 @@
+{
+  "$schema": "https://ambiqai.github.io/helia-ui/schema/reference-model-1.json",
+  "generatedFrom": {
+    "tool": "pyref",
+    "version": "1.7.3",
+    "sourceTree": "872d67ad4e9083b1eacd7d6d3859148437b96b59"
+  },
+  "language": "python",
+  "modules": [
+    {
+      "description": "Packaged model and config assets used by the examples, smoke tests and tutorials.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`\n\nGenerated from the `src/helia_profiler` tree `872d67ad4e9083b1eacd7d6d3859148437b96b59`.",
+      "name": "examples",
+      "path": "helia_profiler.examples",
+      "submodules": [],
+      "summary": "Packaged model and config assets used by the examples, smoke tests and tutorials.",
+      "symbols": []
+    }
+  ],
+  "name": "helia_profiler"
+}

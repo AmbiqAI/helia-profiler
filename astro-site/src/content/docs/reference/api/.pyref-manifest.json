@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "out": [
+    "helia_profiler/config/index.mdx",
+    "helia_profiler/config/power/index.mdx",
+    "helia_profiler/deps/index.mdx",
+    "helia_profiler/diagnostics/index.mdx",
+    "helia_profiler/errors/index.mdx",
+    "helia_profiler/evaluation/index.mdx",
+    "helia_profiler/examples/index.mdx",
+    "helia_profiler/index.mdx",
+    "helia_profiler/modelcost/index.mdx",
+    "helia_profiler/power/index.mdx",
+    "helia_profiler/power/metadata/index.mdx",
+    "helia_profiler/results/index.mdx",
+    "helia_profiler/results/manifest/index.mdx",
+    "helia_profiler/vocab/index.mdx"
+  ],
+  "public": [
+    "reference/api/helia_profiler.json",
+    "reference/api/helia_profiler/config.json",
+    "reference/api/helia_profiler/config/power.json",
+    "reference/api/helia_profiler/deps.json",
+    "reference/api/helia_profiler/diagnostics.json",
+    "reference/api/helia_profiler/errors.json",
+    "reference/api/helia_profiler/evaluation.json",
+    "reference/api/helia_profiler/examples.json",
+    "reference/api/helia_profiler/modelcost.json",
+    "reference/api/helia_profiler/power.json",
+    "reference/api/helia_profiler/power/metadata.json",
+    "reference/api/helia_profiler/results.json",
+    "reference/api/helia_profiler/results/manifest.json",
+    "reference/api/helia_profiler/vocab.json",
+    "reference/api/llms-full.txt",
+    "reference/api/llms.txt",
+    "reference/api/reference.json"
+  ]
+}

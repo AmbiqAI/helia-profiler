@@ -64,5 +64,10 @@ result-*
 # over-broad git add; removed in the follow-up PR)
 /tools/run_ap3_sweep.py
 
+# Review artifacts kept beside a branch, never committed
+/SCREENSHOTS/
+/SOURCES.md
+/ROUTES.md
+/STALE-CLAIMS.md
 # Claude Code worktrees live under the shared .claude dir
 .claude/worktrees/

@@ -1,0 +1,584 @@
+{
+  "schemaVersion": 1,
+  "kind": "pmu-catalog",
+  "generatedFrom": {
+    "sourceTree": "872d67ad4e9083b1eacd7d6d3859148437b96b59",
+    "helia_profiler": "0.1.6",
+    "typer": "0.26.8",
+    "click": "8.3.3",
+    "pydantic": "2.13.4"
+  },
+  "counts": {
+    "groups": 4,
+    "counters": 79,
+    "socs": 9
+  },
+  "groups": [
+    {
+      "group": "cpu",
+      "default": [
+        "ARM_PMU_CPU_CYCLES",
+        "ARM_PMU_INST_RETIRED",
+        "ARM_PMU_STALL_FRONTEND",
+        "ARM_PMU_STALL_BACKEND"
+      ],
+      "counters": [
+        {
+          "name": "ARM_PMU_BR_IMMED_RETIRED",
+          "eventId": 13,
+          "description": "Immediate branch architecturally executed"
+        },
+        {
+          "name": "ARM_PMU_BR_MIS_PRED_RETIRED",
+          "eventId": 34,
+          "description": "Mispredicted branch instruction architecturally executed"
+        },
+        {
+          "name": "ARM_PMU_BR_RETIRED",
+          "eventId": 33,
+          "description": "Branch instruction architecturally executed"
+        },
+        {
+          "name": "ARM_PMU_BR_RETURN_RETIRED",
+          "eventId": 14,
+          "description": "Function return instruction architecturally executed and the condition code check pass"
+        },
+        {
+          "name": "ARM_PMU_CPU_CYCLES",
+          "eventId": 17,
+          "description": "Cycle"
+        },
+        {
+          "name": "ARM_PMU_EXC_RETURN",
+          "eventId": 10,
+          "description": "Exception return instruction architecturally executed and the condition code check pass"
+        },
+        {
+          "name": "ARM_PMU_EXC_TAKEN",
+          "eventId": 9,
+          "description": "Exception entry"
+        },
+        {
+          "name": "ARM_PMU_INST_RETIRED",
+          "eventId": 8,
+          "description": "Instruction architecturally executed"
+        },
+        {
+          "name": "ARM_PMU_L1I_CACHE_REFILL",
+          "eventId": 1,
+          "description": "L1 I-Cache refill"
+        },
+        {
+          "name": "ARM_PMU_LD_RETIRED",
+          "eventId": 6,
+          "description": "Memory-reading instruction architecturally executed and condition code check pass"
+        },
+        {
+          "name": "ARM_PMU_LE_CANCEL",
+          "eventId": 264,
+          "description": "Loop end instruction not taken"
+        },
+        {
+          "name": "ARM_PMU_LE_RETIRED",
+          "eventId": 256,
+          "description": "Loop end instruction executed"
+        },
+        {
+          "name": "ARM_PMU_PC_WRITE_RETIRED",
+          "eventId": 12,
+          "description": "Software change to the Program Counter (PC). Instruction is architecturally executed and condition code check pass"
+        },
+        {
+          "name": "ARM_PMU_SE_CALL_NS",
+          "eventId": 277,
+          "description": "Call to non-secure function, resulting in Security state change"
+        },
+        {
+          "name": "ARM_PMU_SE_CALL_S",
+          "eventId": 276,
+          "description": "Call to secure function, resulting in Security state change"
+        },
+        {
+          "name": "ARM_PMU_STALL",
+          "eventId": 60,
+          "description": "Stall cycle for instruction or operation not sent for execution"
+        },
+        {
+          "name": "ARM_PMU_STALL_BACKEND",
+          "eventId": 36,
+          "description": "No operation issued because of the backend"
+        },
+        {
+          "name": "ARM_PMU_STALL_FRONTEND",
+          "eventId": 35,
+          "description": "No operation issued because of the frontend"
+        },
+        {
+          "name": "ARM_PMU_ST_RETIRED",
+          "eventId": 7,
+          "description": "Memory-writing instruction architecturally executed and condition code check pass"
+        },
+        {
+          "name": "ARM_PMU_SW_INCR",
+          "eventId": 0,
+          "description": "Software update to the PMU_SWINC register, architecturally executed and condition code check pass"
+        },
+        {
+          "name": "ARM_PMU_UNALIGNED_LDST_RETIRED",
+          "eventId": 15,
+          "description": "Unaligned memory memory-reading or memory-writing instruction architecturally executed and condition code check pass"
+        }
+      ]
+    },
+    {
+      "group": "ethos_npu",
+      "default": [
+        "ETHOSU_PMU_CYCLE",
+        "ETHOSU_PMU_NPU_ACTIVE",
+        "ETHOSU_PMU_MAC_ACTIVE",
+        "ETHOSU_PMU_SRAM_RD_DATA_BEAT_RECEIVED"
+      ],
+      "counters": [
+        {
+          "name": "ETHOSU_PMU_CYCLE",
+          "eventId": 0,
+          "description": "Total NPU cycles while the command stream runs"
+        },
+        {
+          "name": "ETHOSU_PMU_EXT_RD_DATA_BEAT_RECEIVED",
+          "eventId": 0,
+          "description": "External (flash/MRAM) read data beats"
+        },
+        {
+          "name": "ETHOSU_PMU_EXT_WR_DATA_BEAT_WRITTEN",
+          "eventId": 0,
+          "description": "External (flash/MRAM) write data beats"
+        },
+        {
+          "name": "ETHOSU_PMU_MAC_ACTIVE",
+          "eventId": 0,
+          "description": "Cycles the MAC engine is active"
+        },
+        {
+          "name": "ETHOSU_PMU_NPU_ACTIVE",
+          "eventId": 0,
+          "description": "Cycles the NPU is active (not idle/stalled)"
+        },
+        {
+          "name": "ETHOSU_PMU_NPU_IDLE",
+          "eventId": 0,
+          "description": "Cycles the NPU is idle"
+        },
+        {
+          "name": "ETHOSU_PMU_SRAM_RD_DATA_BEAT_RECEIVED",
+          "eventId": 0,
+          "description": "SRAM interface read data beats"
+        },
+        {
+          "name": "ETHOSU_PMU_SRAM_WR_DATA_BEAT_WRITTEN",
+          "eventId": 0,
+          "description": "SRAM interface write data beats"
+        },
+        {
+          "name": "ETHOSU_PMU_WD_ACTIVE",
+          "eventId": 0,
+          "description": "Cycles the weight decoder is active"
+        }
+      ]
+    },
+    {
+      "group": "memory",
+      "default": [
+        "ARM_PMU_MEM_ACCESS",
+        "ARM_PMU_L1D_CACHE_REFILL",
+        "ARM_PMU_BUS_ACCESS",
+        "ARM_PMU_BUS_CYCLES"
+      ],
+      "counters": [
+        {
+          "name": "ARM_PMU_BUS_ACCESS",
+          "eventId": 25,
+          "description": "Bus access"
+        },
+        {
+          "name": "ARM_PMU_BUS_CYCLES",
+          "eventId": 29,
+          "description": "Bus cycles"
+        },
+        {
+          "name": "ARM_PMU_DTCM_ACCESS",
+          "eventId": 16392,
+          "description": "Data TCM access"
+        },
+        {
+          "name": "ARM_PMU_ITCM_ACCESS",
+          "eventId": 16391,
+          "description": "Instruction TCM access"
+        },
+        {
+          "name": "ARM_PMU_L1D_CACHE",
+          "eventId": 4,
+          "description": "L1 D-Cache access"
+        },
+        {
+          "name": "ARM_PMU_L1D_CACHE_ALLOCATE",
+          "eventId": 31,
+          "description": "Level 1 data cache allocation without refill"
+        },
+        {
+          "name": "ARM_PMU_L1D_CACHE_MISS_RD",
+          "eventId": 57,
+          "description": "Level 1 data cache read miss"
+        },
+        {
+          "name": "ARM_PMU_L1D_CACHE_RD",
+          "eventId": 64,
+          "description": "Level 1 data cache read"
+        },
+        {
+          "name": "ARM_PMU_L1D_CACHE_REFILL",
+          "eventId": 3,
+          "description": "L1 D-Cache refill"
+        },
+        {
+          "name": "ARM_PMU_L1D_CACHE_WB",
+          "eventId": 21,
+          "description": "Level 1 data cache write-back"
+        },
+        {
+          "name": "ARM_PMU_L1I_CACHE",
+          "eventId": 20,
+          "description": "Level 1 instruction cache access"
+        },
+        {
+          "name": "ARM_PMU_LL_CACHE_MISS_RD",
+          "eventId": 55,
+          "description": "Last level data cache read miss"
+        },
+        {
+          "name": "ARM_PMU_LL_CACHE_RD",
+          "eventId": 54,
+          "description": "Last level data cache read"
+        },
+        {
+          "name": "ARM_PMU_MEMORY_ERROR",
+          "eventId": 26,
+          "description": "Local memory error"
+        },
+        {
+          "name": "ARM_PMU_MEM_ACCESS",
+          "eventId": 19,
+          "description": "Data memory access"
+        }
+      ]
+    },
+    {
+      "group": "mve",
+      "default": [
+        "ARM_PMU_MVE_INST_RETIRED",
+        "ARM_PMU_MVE_INT_MAC_RETIRED",
+        "ARM_PMU_MVE_LDST_RETIRED",
+        "ARM_PMU_MVE_STALL"
+      ],
+      "counters": [
+        {
+          "name": "ARM_PMU_MVE_FP_HP_RETIRED",
+          "eventId": 520,
+          "description": "MVE half-precision floating-point instruction architecturally executed"
+        },
+        {
+          "name": "ARM_PMU_MVE_FP_MAC_RETIRED",
+          "eventId": 532,
+          "description": "MVE floating-point multiply or multiply-accumulate instruction architecturally executed"
+        },
+        {
+          "name": "ARM_PMU_MVE_FP_RETIRED",
+          "eventId": 516,
+          "description": "MVE floating-point instruction architecturally executed"
+        },
+        {
+          "name": "ARM_PMU_MVE_FP_SP_RETIRED",
+          "eventId": 524,
+          "description": "MVE single-precision floating-point instruction architecturally executed"
+        },
+        {
+          "name": "ARM_PMU_MVE_INST_RETIRED",
+          "eventId": 512,
+          "description": "MVE instruction architecturally executed"
+        },
+        {
+          "name": "ARM_PMU_MVE_INT_MAC_RETIRED",
+          "eventId": 552,
+          "description": "MVE multiply or multiply-accumulate instruction architecturally executed"
+        },
+        {
+          "name": "ARM_PMU_MVE_INT_RETIRED",
+          "eventId": 548,
+          "description": "MVE integer instruction architecturally executed"
+        },
+        {
+          "name": "ARM_PMU_MVE_LDST_CONTIG_RETIRED",
+          "eventId": 580,
+          "description": "MVE contiguous load or store instruction architecturally executed"
+        },
+        {
+          "name": "ARM_PMU_MVE_LDST_MULTI_RETIRED",
+          "eventId": 604,
+          "description": "MVE memory instruction targeting multiple registers architecturally executed"
+        },
+        {
+          "name": "ARM_PMU_MVE_LDST_NONCONTIG_RETIRED",
+          "eventId": 592,
+          "description": "MVE non-contiguous load or store instruction architecturally executed"
+        },
+        {
+          "name": "ARM_PMU_MVE_LDST_RETIRED",
+          "eventId": 568,
+          "description": "MVE load or store instruction architecturally executed"
+        },
+        {
+          "name": "ARM_PMU_MVE_LDST_UNALIGNED_NONCONTIG_RETIRED",
+          "eventId": 664,
+          "description": "MVE unaligned noncontiguous load or store instruction architecturally executed"
+        },
+        {
+          "name": "ARM_PMU_MVE_LDST_UNALIGNED_RETIRED",
+          "eventId": 652,
+          "description": "MVE unaligned memory load or store instruction architecturally executed"
+        },
+        {
+          "name": "ARM_PMU_MVE_LD_CONTIG_RETIRED",
+          "eventId": 584,
+          "description": "MVE contiguous load instruction architecturally executed"
+        },
+        {
+          "name": "ARM_PMU_MVE_LD_MULTI_RETIRED",
+          "eventId": 608,
+          "description": "MVE memory load instruction targeting multiple registers architecturally executed"
+        },
+        {
+          "name": "ARM_PMU_MVE_LD_NONCONTIG_RETIRED",
+          "eventId": 596,
+          "description": "MVE non-contiguous load instruction architecturally executed"
+        },
+        {
+          "name": "ARM_PMU_MVE_LD_RETIRED",
+          "eventId": 572,
+          "description": "MVE load instruction architecturally executed"
+        },
+        {
+          "name": "ARM_PMU_MVE_LD_UNALIGNED_RETIRED",
+          "eventId": 656,
+          "description": "MVE unaligned load instruction architecturally executed"
+        },
+        {
+          "name": "ARM_PMU_MVE_PRED",
+          "eventId": 696,
+          "description": "Cycles where one or more predicated beats architecturally executed"
+        },
+        {
+          "name": "ARM_PMU_MVE_STALL",
+          "eventId": 716,
+          "description": "Stall cycles caused by an MVE instruction"
+        },
+        {
+          "name": "ARM_PMU_MVE_STALL_BREAK",
+          "eventId": 723,
+          "description": "Stall cycles caused by an MVE chain break"
+        },
+        {
+          "name": "ARM_PMU_MVE_STALL_DEPENDENCY",
+          "eventId": 724,
+          "description": "Stall cycles caused by MVE register dependency"
+        },
+        {
+          "name": "ARM_PMU_MVE_STALL_RESOURCE",
+          "eventId": 717,
+          "description": "Stall cycles caused by an MVE instruction because of resource conflicts"
+        },
+        {
+          "name": "ARM_PMU_MVE_STALL_RESOURCE_FP",
+          "eventId": 719,
+          "description": "Stall cycles caused by an MVE instruction because of floating-point resource conflicts"
+        },
+        {
+          "name": "ARM_PMU_MVE_STALL_RESOURCE_INT",
+          "eventId": 720,
+          "description": "Stall cycles caused by an MVE instruction because of integer resource conflicts"
+        },
+        {
+          "name": "ARM_PMU_MVE_STALL_RESOURCE_MEM",
+          "eventId": 718,
+          "description": "Stall cycles caused by an MVE instruction because of memory resource conflicts"
+        },
+        {
+          "name": "ARM_PMU_MVE_ST_CONTIG_RETIRED",
+          "eventId": 588,
+          "description": "MVE contiguous store instruction architecturally executed"
+        },
+        {
+          "name": "ARM_PMU_MVE_ST_MULTI_RETIRED",
+          "eventId": 612,
+          "description": "MVE memory store instruction targeting multiple registers architecturally executed"
+        },
+        {
+          "name": "ARM_PMU_MVE_ST_NONCONTIG_RETIRED",
+          "eventId": 600,
+          "description": "MVE non-contiguous store instruction architecturally executed"
+        },
+        {
+          "name": "ARM_PMU_MVE_ST_RETIRED",
+          "eventId": 576,
+          "description": "MVE store instruction architecturally executed"
+        },
+        {
+          "name": "ARM_PMU_MVE_ST_UNALIGNED_RETIRED",
+          "eventId": 660,
+          "description": "MVE unaligned store instruction architecturally executed"
+        },
+        {
+          "name": "ARM_PMU_MVE_VREDUCE_FP_RETIRED",
+          "eventId": 676,
+          "description": "MVE floating-point vector reduction instruction architecturally executed"
+        },
+        {
+          "name": "ARM_PMU_MVE_VREDUCE_INT_RETIRED",
+          "eventId": 680,
+          "description": "MVE integer vector reduction instruction architecturally executed"
+        },
+        {
+          "name": "ARM_PMU_MVE_VREDUCE_RETIRED",
+          "eventId": 672,
+          "description": "MVE vector reduction instruction architecturally executed"
+        }
+      ]
+    }
+  ],
+  "socs": [
+    {
+      "soc": "apollo3p",
+      "family": "ap3",
+      "domains": [
+        "cpu"
+      ],
+      "groups": [
+        "cpu"
+      ],
+      "pmuMaxOps": 2048
+    },
+    {
+      "soc": "apollo4p",
+      "family": "ap4",
+      "domains": [
+        "cpu"
+      ],
+      "groups": [
+        "cpu"
+      ],
+      "pmuMaxOps": 2048
+    },
+    {
+      "soc": "apollo4l",
+      "family": "ap4",
+      "domains": [
+        "cpu"
+      ],
+      "groups": [
+        "cpu"
+      ],
+      "pmuMaxOps": 2048
+    },
+    {
+      "soc": "apollo510",
+      "family": "ap5",
+      "domains": [
+        "cpu",
+        "memory",
+        "mve"
+      ],
+      "groups": [
+        "cpu",
+        "memory",
+        "mve"
+      ],
+      "pmuMaxOps": 4096
+    },
+    {
+      "soc": "apollo510b",
+      "family": "ap5",
+      "domains": [
+        "cpu",
+        "memory",
+        "mve"
+      ],
+      "groups": [
+        "cpu",
+        "memory",
+        "mve"
+      ],
+      "pmuMaxOps": 4096
+    },
+    {
+      "soc": "apollo5b",
+      "family": "ap5",
+      "domains": [
+        "cpu",
+        "memory",
+        "mve"
+      ],
+      "groups": [
+        "cpu",
+        "memory",
+        "mve"
+      ],
+      "pmuMaxOps": 4096
+    },
+    {
+      "soc": "apollo330P",
+      "family": "ap5",
+      "domains": [
+        "cpu",
+        "memory",
+        "mve"
+      ],
+      "groups": [
+        "cpu",
+        "memory",
+        "mve"
+      ],
+      "pmuMaxOps": 512
+    },
+    {
+      "soc": "apollo510L",
+      "family": "ap5",
+      "domains": [
+        "cpu",
+        "memory",
+        "mve"
+      ],
+      "groups": [
+        "cpu",
+        "memory",
+        "mve"
+      ],
+      "pmuMaxOps": 512
+    },
+    {
+      "soc": "atomiq110",
+      "family": "ap5",
+      "domains": [
+        "cpu",
+        "memory",
+        "mve",
+        "ethos_npu"
+      ],
+      "groups": [
+        "cpu",
+        "ethos_npu",
+        "memory",
+        "mve"
+      ],
+      "pmuMaxOps": 4096
+    }
+  ]
+}

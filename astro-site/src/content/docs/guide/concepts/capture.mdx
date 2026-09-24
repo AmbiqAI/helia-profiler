@@ -1,0 +1,176 @@
+---
+title: "Data capture"
+description: "How the host gets numbers off the board: the target lifecycle before each capture phase, the four transport backends, the line-oriented wire stream, the parser that turns it into a PmuResult, and the power capture that runs beside it."
+---
+
+import BlockDiagram from '@ambiqai/helia-ui/astro/BlockDiagram';
+import Block from '@ambiqai/helia-ui/astro/Block';
+
+## Purpose
+
+Explain the path from a firmware `printf` to a typed result, and the reset
+and readiness steps that run before it, so a capture failure can be placed
+at the lifecycle, the transport, the stream or the parser.
+
+## Diagram
+
+<BlockDiagram
+  title="The capture subsystem"
+  caption="What runs inside CapturePmuStage and CapturePowerStage. The lifecycle and transport blocks are shared by both phases; the parser is profile-only and the power block is skipped unless power.enabled is true."
+  flow="grid"
+  columns={3}
+>
+  <Block label="Target lifecycle" tone="accent" flow="column">
+    <Block label="ensure powered" emphasis="filled" />
+    <Block label="reset strategy" emphasis="filled" />
+    <Block label="readiness poll" emphasis="filled" />
+  </Block>
+  <Block label="Transport" sublabel="one per run" tone="accent" flow="column">
+    <Block label="rtt" sublabel="default" emphasis="filled" />
+    <Block label="usb_cdc" emphasis="filled" />
+    <Block label="uart" emphasis="filled" />
+    <Block label="swo" emphasis="filled" />
+  </Block>
+  <Block label="Wire stream" tone="accent" flow="column">
+    <Block label="sentinels" emphasis="filled" />
+    <Block label="metadata lines" emphasis="filled" />
+    <Block label="heartbeats" emphasis="filled" />
+    <Block label="CSV rows" emphasis="filled" />
+  </Block>
+  <Block label="Parser" tone="accent" flow="column">
+    <Block label="extract metadata" emphasis="filled" />
+    <Block label="group presets" emphasis="filled" />
+    <Block label="aggregate iterations" emphasis="filled" />
+    <Block label="merge presets" emphasis="filled" />
+  </Block>
+  <Block label="Power capture" sublabel="when enabled" tone="accent" emphasis="dashed" flow="column">
+    <Block label="driver" sublabel="joulescope, ina228, ondevice" emphasis="filled" />
+    <Block label="sync controller" emphasis="filled" />
+    <Block label="gated window" emphasis="filled" />
+    <Block label="terminal record" emphasis="filled" />
+  </Block>
+  <Block label="Results" tone="accent" flow="column">
+    <Block label="PmuResult" emphasis="filled" />
+    <Block label="PowerResult" emphasis="filled" />
+  </Block>
+</BlockDiagram>
+
+The same structure as a list, for readers of the Markdown rendition:
+
+- Target lifecycle: ensure powered, reset strategy, readiness poll
+- Transport (one per run): rtt (default), usb_cdc, uart, swo
+- Wire stream: sentinels, metadata lines, heartbeats, CSV rows
+- Parser: extract metadata, group presets, aggregate iterations, merge presets
+- Power capture (when enabled): driver (joulescope, ina228, ondevice), sync controller, gated window, terminal record
+- Results: `PmuResult`, `PowerResult`
+
+## The blocks
+
+### Target lifecycle
+
+Before either capture phase, `prepare_target_for_phase()` in
+`target/lifecycle.py` applies a `TargetLifecyclePlan`: it may power-cycle
+the board through the power driver, then applies a `ResetStrategy` through
+the `ResetController` the probe stage installed, and returns the actions
+it took so the run metadata records them. `EnsureBoardPoweredStage` ran
+earlier so the rail is up before the probe is touched; `capture/readiness.py`
+supplies the `poll_until()` loop the transports use to wait for the
+firmware to announce itself after a reset.
+
+### Transport backends
+
+`transport/__init__.py` holds a registry keyed by the `Transport` enum;
+`resolve_transport()` returns the backend and `register_transport()` lets
+tests swap one in. Every backend implements the `CaptureTransport` protocol
+in `transport/base.py`: `prepare(ctx, args)`, `start(ctx)`, `collect(ctx)`
+returning the captured lines, and `close()`. The shared line-collection
+loop is `transport/protocol.py`: it reads until the end sentinel or a
+timeout, and any `HPX_HEARTBEAT` line resets the inactivity deadline
+(`HEARTBEAT_TIMEOUT_S`), with the `clean_window_begin` heartbeat extending
+it to cover the announced window. Which transport to choose, and what each
+needs on the bench, is on [Capture transports](../../transports/).
+
+### The wire stream
+
+The firmware prints one line-oriented text stream, declared once in
+`src/helia_profiler/wire/` for both the templates and the host. The
+elements a reader meets:
+
+| Line form | Meaning |
+|---|---|
+| `--- HPX_START ---` | start of profiling output; everything before it is ignored |
+| `HPX_<KEY>=<value>` | metadata (`HPX_VERSION`, `HPX_ENGINE`, `HPX_MODEL_SIZE`, `HPX_ARENA_SIZE`, `HPX_ALLOCATED_ARENA`, `HPX_NUM_PRESETS`, `HPX_PRESETS`, the clean-window fields) |
+| `HPX_HEARTBEAT ...` | progress marker; resets the inactivity timeout, never parsed as data |
+| `--- HPX_PRESET <name> ---` | start of one counter pass |
+| `--- HPX_ITER <n> ---` | start of iteration n; the next line is the CSV header |
+| `"Layer","Op",<counters>,"overflow"` | header naming this pass's counter columns |
+| `<idx>,<op>,<c1>,...,<overflow>` | one layer row |
+| `--- HPX_END ---` | all profiling complete |
+
+The full vocabulary, including the fault and warning catalogues and the
+power binary's terminal record, is the [wire protocol](../../../reference/wire-protocol/)
+reference, marked internal because it is a contract between hpx's own
+firmware and host, not a user surface.
+
+### The parser
+
+`parse_firmware_output(lines, aggregation)` in `capture/parser.py` runs
+four steps: metadata lines become a `FirmwareMeta`; lines are grouped by
+preset marker; each iteration's CSV rows are parsed and, per layer,
+reduced across iterations by `profiling.aggregation` (`median` by default,
+`mean` or `trimmed`) after structurally invalid samples (uint32 wrap,
+frozen-zero readouts) are rejected; and the per-preset `PresetResult`s are
+merged into one `PmuResult` with every counter column on each
+`LayerResult`, plus per-compute-unit groups keyed by the `<group>_<index>`
+pass naming. Layers are matched by explicit id with the same operator name
+required across iterations and presets; a missing, duplicate or
+conflicting identity raises `CaptureError` rather than publishing a
+position-shifted aggregate. A single-preset stream with no preset markers
+is still accepted.
+
+Multiple presets exist because a SoC exposes a fixed number of PMU
+counters; `platform/counters.py` plans the passes from the requested
+groups and the SoC's capability record, and the firmware runs them in
+sequence in one boot.
+
+### Power capture
+
+When `power.enabled` is true, `capture_power()` in `capture/__init__.py`
+resolves the `PowerDriver` (`power/joulescope/`, `power/ina228_driver.py`
+or `power/ondevice_driver.py`), builds the sync controller that owns the
+READY, GO and GATE handshake (`power/sync.py`, `power/joulescope/sync.py`),
+runs the lifecycle plan, and calls the driver's `capture_gated()` for the
+GPIO-gated window or `capture()` for a free-form one. The result is a
+`PowerResult` with the accepted window, the energy integration and the
+gating diagnostics; `CollectPowerTerminalStage` then reads the one status
+record the power firmware prints after the gate closes
+(`capture/power_terminal.py`). The measurement scopes and their health
+signals are on [Power measurement](../../power/) and
+[Verifying a capture](../../power-verify/).
+
+### Failure handling
+
+| Scenario | Behaviour |
+|---|---|
+| no output at all | the overall timeout expires and `CaptureError` names the transport |
+| firmware stalls mid-run | no line for `HEARTBEAT_TIMEOUT_S` raises `CaptureError` with the last line seen |
+| silent clean window | the `clean_window_begin` heartbeat carries the estimated duration and extends the deadline |
+| firmware reports a fault | the `HPX_ERROR` line maps to a `CaptureError` carrying the catalogue's hint |
+| identity mismatch across iterations | `CaptureError`; nothing partial is published |
+
+## Where the code lives
+
+| Block | Path under `src/helia_profiler/` |
+|---|---|
+| target lifecycle | `target/lifecycle.py`, `target/probe/`, `stages/ensure_powered.py`, `capture/readiness.py` |
+| transports | `transport/{rtt,usb_cdc,uart,swo}.py`, `transport/base.py`, `transport/protocol.py`, `transport/timing.py` |
+| wire stream | `wire/` |
+| parser | `capture/parser.py`, `results/models.py` |
+| power capture | `capture/__init__.py` (`capture_power`), `power/`, `capture/power_terminal.py` |
+| stages | `stages/capture_pmu.py`, `stages/capture_power.py`, `stages/collect_power_terminal.py` |
+
+## What next
+
+[Firmware generation](../firmware/) for the side of the stream the
+templates print; [Pipeline](../pipeline/) for where the capture stages sit;
+[PMU counters](../../pmu-counters/) for what the columns mean.

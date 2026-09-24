@@ -5,7 +5,7 @@ and ExecuTorch (`.pte`) models on Ambiq Apollo boards: it builds temporary NSX
 firmware, flashes it, captures per-layer PMU counters and optional power, and
 writes a result bundle. It is a profiler, not a build system, SDK exporter, or
 application framework. Design rationale and module layout live in
-`docs/architecture/`; this file holds only what you cannot derive from the code.
+the Concepts section of the docs site (`astro-site/src/content/docs/guide/concepts/`); this file holds only what you cannot derive from the code.
 
 ## Commands
 
@@ -14,7 +14,6 @@ uv sync --locked --all-groups --extra aot --extra analysis
 uv run ruff check . && uv run ruff format --check .
 uv run ty check src/helia_profiler tests
 uv run pytest -q                      # unit suite; hardware/compile_hw markers deselected
-uv run --group docs zensical build    # docs site (zensical, not mkdocs, is what Pages runs)
 pre-commit run --all-files            # identical to the CI pre-commit job
 uv --directory <repo-root> run hpx ...   # run the CLI from anywhere
 ```
@@ -22,9 +21,8 @@ uv --directory <repo-root> run hpx ...   # run the CLI from anywhere
 Regenerate after changing the source they derive from; CI fails on drift:
 
 ```bash
-uv run python tools/gen_config_reference.py         # ProfileConfig → docs/reference/configuration.md
-uv run python tools/gen_issue_code_reference.py     # issue registry → docs/reference/issue-codes.md
-uv run python tools/gen_wire_protocol_reference.py  # wire registry → docs/reference/wire-protocol.md
+uv run python tools/docs/check_reference.py --check   # committed reference JSON vs the package
+uv run python tools/gen_wire_protocol_reference.py  # wire registry → the Reference wire-protocol page
 HPX_UPDATE_SNAPSHOTS=1 uv run pytest tests/contracts/test_firmware_render_snapshots.py tests/contracts/test_report_golden.py
 ```
 
@@ -72,7 +70,7 @@ runner contract are described in `maintainers/hardware-ci.md`.
   external fact, link it: `# WORKAROUND helia-aot#349: their module checks
   ARM_NN_*`. No third-party version numbers, bench numbers, or review history
   in code or docstrings; those belong in
-  `docs/architecture/compatibility-baseline.md`, the issue, or git history.
+  `astro-site/src/content/docs/reference/compatibility-baseline.mdx`, the issue, or git history.
   `rg WORKAROUND` is the cleanup pass.
 - Every `TODO(...)`/`FIXME(...)`/`HACK(...)` needs an issue or name reference
   (pre-commit enforces it).
@@ -100,5 +98,5 @@ runner contract are described in `maintainers/hardware-ci.md`.
   + `tests/fixtures/compile_stubs/`) and Tier 2
   (`tests/contracts/test_render_compile_hw.py`, bench only). Tier 1 passing
   does not imply Tier 2 renders.
-- `docs/` is published in full; `exclude_docs` in `mkdocs.yml` is ignored by
-  zensical. Maintainer-only material goes in `maintainers/`.
+- A page under `astro-site/src/content/docs/` is a published page; maintainer
+  material lives in `maintainers/`.

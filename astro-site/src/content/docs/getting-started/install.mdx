@@ -1,0 +1,310 @@
+---
+title: "Install"
+description: "Put hpx, the Arm GNU toolchain, CMake, Ninja and the SEGGER J-Link software on Linux, macOS or Windows, then confirm it with hpx doctor."
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+## Purpose
+
+Get `hpx` and the tools it drives onto your machine. When this page is done,
+`hpx doctor` reports every required row as found. Nothing here needs a board
+attached.
+
+## Prerequisites
+
+Python 3.11 or newer on the host (`requires-python` in `pyproject.toml`), a
+package manager (`uv` or `pip`), and either an internet connection for the
+downloads below or the Nix flake, which pins everything. Windows users need
+long-path support before the first build; the command is in step 1.
+
+## Steps
+
+### 1. Install hpx
+
+<Tabs>
+<TabItem label="uv">
+
+```bash
+uv tool install helia-profiler
+```
+
+`uv tool install` keeps `hpx` in its own environment, so the example model
+shipped inside the package is not importable from your shell; use a source
+checkout's `examples/quickstart/kws_model.tflite` or your own model on the
+First profile page.
+
+</TabItem>
+<TabItem label="pip">
+
+```bash
+pip install helia-profiler
+```
+
+Installing into an active Python environment also makes the bundled
+example model available:
+
+```bash
+python -c "from helia_profiler.examples import tiny_cnn; print(tiny_cnn())"
+```
+
+</TabItem>
+<TabItem label="Nix">
+
+The repository flake carries every tool on this page, including a pinned
+J-Link package downloaded from SEGGER under its terms. Install
+[Determinate Nix](https://determinate.systems/install/) with the installer
+on that page, then:
+
+```bash
+git clone https://github.com/AmbiqAI/helia-profiler.git && cd helia-profiler
+nix develop
+hpx doctor
+```
+
+The flake supports x86-64 Linux, ARM64 Linux and Apple Silicon macOS. It
+does not run natively on Windows; use WSL2 (J-Link USB access then needs
+`usbipd-win`) or the uv and pip paths. Skip steps 2 to 4 and continue with
+[Linux USB permissions](#5-linux-usb-permissions) if you are on Linux.
+
+</TabItem>
+</Tabs>
+
+On Windows, enable long paths before the first build. Some NSX module
+checkouts exceed the 260-character `MAX_PATH` limit; git needs its setting so
+checkouts can create the files, and the OS policy so Python can traverse and
+clean them:
+
+```powershell
+git config --global core.longpaths true
+
+# In an elevated (Administrator) PowerShell; new processes pick it up
+# immediately, no reboot needed:
+Set-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem `
+    -Name LongPathsEnabled -Value 1
+```
+
+:::caution[Pre-1.0]
+heliaPROFILER is pre-1.0 and breaking changes may land on minor versions.
+Pin the version you tested for anything long-lived, for example
+`pip install helia-profiler==0.1.6`.
+:::
+
+Optional extras:
+
+```bash
+pip install 'helia-profiler[aot]'        # heliaAOT compiler support
+pip install 'helia-profiler[analysis]'   # model compute and parameter analysis, no hardware
+```
+
+The `aot` extra installs `helia-aot`, which declares
+`requires-python >=3.11,<3.13`, so it needs Python 3.11 or 3.12 until that
+cap is lifted. Power capture support (`pyjoulescope_driver`) is a core
+dependency and needs no extra.
+
+### 2. Arm GNU toolchain
+
+`arm-none-eabi-gcc` is the default cross-compiler. `armclang` and ATfE are
+alternatives; see [Toolchains](../../guide/toolchains/).
+
+<Tabs>
+<TabItem label="Linux">
+
+```bash
+sudo apt install gcc-arm-none-eabi
+```
+
+For a newer compiler than your distribution packages, download the
+[Arm GNU Toolchain](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads)
+tarball and put its `bin/` directory on `PATH`:
+
+```bash
+export PATH="$HOME/arm-gnu-toolchain-14.3.rel1/bin:$PATH"
+```
+
+</TabItem>
+<TabItem label="macOS">
+
+Install the macOS package from the
+[Arm GNU Toolchain Downloads](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads)
+page (default location `/Applications/ArmGNUToolchain/`) and add it to
+`PATH`:
+
+```bash
+export PATH="/Applications/ArmGNUToolchain/14.3.rel1/arm-none-eabi/bin:$PATH"
+```
+
+</TabItem>
+<TabItem label="Windows">
+
+Run the Windows installer from the same downloads page and tick
+**Add path to environment variable** during setup. Verify in a new terminal:
+
+```powershell
+arm-none-eabi-gcc --version
+```
+
+If the command is not found but the toolchain is installed, add its `bin`
+directory to `PATH` (installer default
+`C:\Program Files (x86)\Arm GNU Toolchain arm-none-eabi\<version>\bin`):
+
+```powershell
+$env:PATH = "C:\path\to\arm-toolchain\bin;$env:PATH"
+```
+
+</TabItem>
+</Tabs>
+
+### 3. CMake and Ninja
+
+<Tabs>
+<TabItem label="Linux">
+
+```bash
+sudo apt install cmake ninja-build
+```
+
+</TabItem>
+<TabItem label="macOS">
+
+```bash
+brew install cmake ninja
+```
+
+</TabItem>
+<TabItem label="Windows">
+
+```powershell
+winget install Kitware.CMake Ninja-build.Ninja
+```
+
+`pip install cmake ninja` works if you prefer not to use winget.
+
+</TabItem>
+</Tabs>
+
+### 4. SEGGER J-Link software
+
+hpx drives the probe through SEGGER Commander (`JLinkExe` on Linux and
+macOS, `JLink.exe` on Windows) for flashing, and through `pylink-square`,
+installed with hpx, for RTT and SWO capture. Discovery checks `JLINK_PATH`
+first, then both executable names on `PATH`, then the common SEGGER install
+locations; set `JLINK_PATH` to the full executable path for a non-standard
+install.
+
+<Tabs>
+<TabItem label="Linux">
+
+Install the `.deb` or `.tgz` from
+[segger.com/downloads/jlink](https://www.segger.com/downloads/jlink/). The
+SEGGER installer sets up the udev rules for non-root access to the probe;
+replug the probe afterwards if `hpx probes list` does not see it.
+
+</TabItem>
+<TabItem label="macOS">
+
+Run the `.pkg` installer from
+[segger.com/downloads/jlink](https://www.segger.com/downloads/jlink/).
+
+</TabItem>
+<TabItem label="Windows">
+
+Run the `.exe` installer from
+[segger.com/downloads/jlink](https://www.segger.com/downloads/jlink/).
+Drivers install automatically. The software lands in a versioned directory
+(`C:\Program Files\SEGGER\JLink_V<version>`) and hpx finds it there without
+a `PATH` entry.
+
+</TabItem>
+</Tabs>
+
+hpx bundles a pinned copy of the permissively licensed SEGGER RTT target
+sources, so no separate RTT checkout is needed. To test another RTT
+release, hpx resolves overrides in this order: `target.segger_rtt_path` in
+configuration, then the `SEGGER_RTT_PATH` environment variable, then the
+bundled sources. An override directory must contain `RTT/SEGGER_RTT.c` and
+`Config/SEGGER_RTT_Conf.h`.
+
+### 5. Linux USB permissions
+
+Installing tools does not grant access to attached hardware. J-Link and
+Joulescope are raw USB devices; `uart` and `usb_cdc` transports also need
+the serial device (`/dev/ttyACM0`, `/dev/ttyUSB0`). Run hpx as your normal
+user after granting access.
+
+On a desktop Linux host, from a source checkout:
+
+```bash
+nix run .#install-udev-rules -- --dry-run
+nix run .#install-udev-rules
+```
+
+Without Nix, run `bash nix/scripts/install-udev-rules.sh`. The installer
+writes `70-segger-jlink.rules` and `70-joulescope.rules` under
+`/etc/udev/rules.d/`, reloads the rules and refreshes USB devices; unplug
+and reconnect the instruments afterwards. The rules grant the active local
+desktop session access through `uaccess`, not every user.
+
+On NixOS, declare the rules in the system configuration instead:
+
+```nix
+services.udev.packages = [
+  (pkgs.writeTextDir "lib/udev/rules.d/70-hpx.rules" ''
+    SUBSYSTEM=="usb", ATTR{idVendor}=="1366", MODE="0660", TAG+="uaccess", ENV{ID_MM_DEVICE_IGNORE}="1"
+    SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTRS{idVendor}=="16d0", ATTRS{idProduct}=="0e88|0e87|10ba|10b9|135a", MODE="0660", TAG+="uaccess"
+  '')
+];
+```
+
+Use `services.udev.packages`, not `services.udev.extraRules`, which NixOS
+writes after the active-session access handler.
+
+For SSH sessions and CI runners, which have no local desktop session, give a
+dedicated group access:
+
+```bash
+sudo groupadd -f hpx
+sudo usermod -aG hpx "$USER"
+sudo tee /etc/udev/rules.d/70-hpx-group.rules >/dev/null <<'RULES'
+SUBSYSTEM=="usb", ATTR{idVendor}=="1366", GROUP="hpx", MODE="0660", ENV{ID_MM_DEVICE_IGNORE}="1"
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTRS{idVendor}=="16d0", ATTRS{idProduct}=="0e88|0e87|10ba|10b9|135a", GROUP="hpx", MODE="0660"
+RULES
+sudo udevadm control --reload-rules
+sudo udevadm trigger --subsystem-match=usb
+```
+
+For serial ports, check the device's owning group with `ls -l /dev/ttyACM0`
+and add yourself to it (`dialout` on Ubuntu and Debian); the raw-USB rules
+do not cover `/dev/tty*`.
+
+## Expected output
+
+`hpx doctor` prints one row per tool. Captured on macOS 26.6 on 2026-09-21
+with the tools installed as above:
+
+```text
+Toolchain Check
+╭────┬───────────────────────────────────────┬─────────────────────────────────────────────────────╮
+│    │ Tool                                  │ Path                                                │
+├────┼───────────────────────────────────────┼─────────────────────────────────────────────────────┤
+│ ✓  │ CMake (>= 3.24)                       │ /opt/homebrew/bin/cmake                             │
+│ ✓  │ Ninja build system                    │ /opt/homebrew/bin/ninja                             │
+│ ✓  │ SEGGER J-Link commander               │ /usr/local/bin/JLinkExe                             │
+│ ✓  │ neuralspotx Python package            │ installed                                           │
+│ ✓  │ ARM GCC toolchain                     │ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-e… │
+│ ✓  │ pylink Python package (RTT transport) │ installed                                           │
+╰────┴───────────────────────────────────────┴─────────────────────────────────────────────────────╯
+
+  All required tools found.
+```
+
+A dash in the first column marks an optional tool that was not found
+(heliaAOT, `armclang`); those rows only matter if you use that engine or
+toolchain. `hpx doctor` checks presence, not versions: the minimum versions
+are on [Hardware prerequisites](../hardware-prerequisites/).
+
+## What next
+
+[Hardware prerequisites](../hardware-prerequisites/) lists what to plug in.
+If the board is already on the bench, go straight to
+[Validate your setup](../validate-your-setup/).

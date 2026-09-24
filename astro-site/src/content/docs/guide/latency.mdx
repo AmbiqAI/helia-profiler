@@ -1,0 +1,82 @@
+---
+title: "Inference and layer timing"
+description: "What the three timing numbers in a bundle measure (the clean window, the profiled passes and the host capture), how per-layer rows relate to the total, and which configuration keys shaped each one."
+---
+
+## Purpose
+
+Read the timing numbers correctly. A bundle carries three kinds of time
+and cycle counts with different boundaries; quoting the
+wrong one is the most common way a benchmark becomes wrong.
+
+## Prerequisites
+
+A result bundle and [Output files](../output/) for the field names.
+
+## Which number
+
+| I want | Read | Boundary | Shaped by |
+|---|---|---|---|
+| The cost of one inference | `latency.device_clean_infer_avg_cycles` (cycles), `latency.device_clean_infer_avg_us` (microseconds) | the clean window: warm, back to back, no per-layer instrumentation; aggregated over `device_clean_infer_count` inferences | `profiling.iterations`, `warmup`, `window_mode`, `window_target_ms`; the clock tier `target.clock.cpu` |
+| Where the cycles go | `profile_results.csv` rows, `summary.top_layers` | the instrumented passes: each layer bracketed by counter reads, aggregated over the measured iterations by `profiling.aggregation` | `profiling.pmu_counters`, `per_layer`, `iterations`, `warmup` |
+| How long the profiled passes took on the device | `latency.device_profiled_infer_avg_us`, `_total_us`, `_count` | the instrumented passes, on the device clock | as above |
+| How long the whole capture took | `latency.capture_duration_s`, `hpx_start_latency_s`, `protocol_duration_s`, `boot_phases_s` | host-side: boot, handshake, transport, everything; never an inference number | `target.transport`, `timeouts` |
+| Energy per inference | `power.energy_per_inference_j` | the power scope's window ([Windows](../power-windows/)) | `power.*` |
+
+## Steps
+
+### 1. Quote the clean window
+
+`device_clean_infer_avg_cycles` and `device_clean_infer_avg_us` describe
+the same window: the firmware's clean loop with the gate high and no
+per-layer reads. That is the number to publish. `summary.total_cycles` is
+a different quantity: the sum of the instrumented per-layer rows, which
+includes a counter read around every operator and changes when
+`profiling.pmu_counters` changes. The terminal prints both, as `Total
+cycles` and `Clean E2E cycles` with the percentage difference against the
+per-layer sum; that gap is the instrumentation overhead (plus input
+restoration on heliaAOT, where the label says `includes input refill`).
+
+### 2. Use per-layer rows to explain, not to total
+
+Each `profile_results.csv` row is one operator over `iterations`
+instrumented inferences, aggregated by `median` (default), `mean` or
+`trimmed` after structurally invalid samples are rejected. `top_layers`
+in the summary is the same data ranked, with `pct` against
+`total_cycles`. Sort by `cycles`, then look at the same rows' cache and
+MVE columns to see why a layer is hot; the
+[derived metrics](../pmu-counters/#5-read-the-results) are the ratios to
+compute.
+
+### 3. Convert cycles to time honestly
+
+Cycles transfer between clock tiers far better than microseconds do, but
+not perfectly: memory latency is fixed in time, so a faster core waits
+more cycles on MRAM or PSRAM ([Boards and targets](../boards/#2-cpu-clock)).
+The clock tier the run used is in `run_metadata.json` (`platform`). When
+you convert or transfer a figure, say which tier.
+
+### 4. Watch the boundaries a comparison crosses
+
+- `iterations` and `aggregation` change the per-layer statistics but not
+  the clean window's meaning; `window_mode`, `window_target_ms` and
+  `window_min`/`window_max` change how many inferences the clean window
+  ran.
+- On the Cortex-M4F families the clean window's cycle counter can stall
+  if the debugger detaches; `latency.device_clean_stalled_iters` and
+  `partial_iters` say so, and the codes on
+  [Verifying a capture](../power-verify/#3-check-the-window-clocks) explain
+  the checks.
+- `clean_workload` names what the clean window ran (AOT input restoration
+  is inside it from schema v6); a comparison across different workloads is
+  not a latency comparison.
+
+## Expected output
+
+A number you can label: "N cycles per inference, clean window, average over
+M completed inferences, board B at tier T", with the per-layer table explaining it.
+
+## What next
+
+[Analysis and comparison](../analysis-comparison/) to hold two of those
+numbers against each other with the rules that keep the comparison fair.

@@ -1,0 +1,102 @@
+---
+title: "Model Explorer overlays"
+description: "See per-layer cost on the model graph: one overlay per counter, loaded into Model Explorer beside the model, with the node matching rules for each engine."
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+## Purpose
+
+Look at where the cycles go on the graph rather than in a table. hpx
+writes one overlay JSON per captured counter that
+[Model Explorer](https://github.com/google-ai-edge/model-explorer) renders
+as a colour over each operator node.
+
+## Prerequisites
+
+A result bundle with `model_explorer/` in it (the default; `output.model_explorer`
+is `true`), the `.tflite` model that produced it, and Model Explorer in a
+browser.
+
+## Which overlay
+
+| File | Value on each node |
+|---|---|
+| `model_explorer/me_overlay_<COUNTER>.json` | that counter's per-layer aggregate, one file per counter captured, for example `me_overlay_ARM_PMU_CPU_CYCLES.json`, `me_overlay_ARM_PMU_INST_RETIRED.json`, `me_overlay_ARM_PMU_MVE_INST_RETIRED.json` |
+
+Each overlay maps graph node ids to that counter's raw per-layer value and
+carries a three-stop gradient (`GRADIENT_COST` in
+`report/model_explorer.py`): Model Explorer interpolates it across the
+range of values in the file, green at the minimum, yellow at the midpoint
+and red at the maximum. The colour is relative to the range in that one
+overlay, so a node's colour says nothing about absolute cost and cannot be
+compared between two overlays or two runs.
+
+The file is Model Explorer's node-data format: a top-level key per graph id
+(`main` for a single-subgraph model) holding a `name` shown in the overlay
+selector (the counter name), a `results` map from node key to
+`{"value": <number>}`, and the `gradient` list. It is plain JSON, so
+`jq '.main.results'` reads the per-node values when the graph view is not
+needed; [Parsing outputs](../parsing-outputs/)
+covers the CSV and summary that carry the same numbers with more context.
+
+## Steps
+
+1. Open [Model Explorer](https://google-ai-edge.github.io/model-explorer/).
+2. Load the `.tflite` model the run profiled (the same file; the overlay
+   matches nodes by operator index).
+3. Choose **Add Overlay** and pick one of the `me_overlay_*.json` files.
+4. Read the colours: red is the highest value of that counter, green the
+   lowest. Switch overlays to compare, for instance cycles against
+   `ARM_PMU_L1D_CACHE_MISS_RD` to see whether a hot layer is memory-bound.
+5. Check the picture against the table: the reddest node of the cycles
+   overlay is the first row of `summary.top_layers`, and its `pct` says how
+   much of the instrumented total it holds. A hot node that is green on the
+   cache-miss overlay is compute-bound; one that is red on both is waiting
+   on memory, and [Memory placement](../memory/) is the page to open.
+
+A layer that ran in several PMU passes has one value per counter, taken
+from the pass that captured that counter, so every overlay covers every
+operator the firmware instrumented; a counter the SoC could not capture
+has no overlay file rather than a file of zeros.
+
+Node matching depends on the engine. heliaRT and TFLM overlays match by the
+sequential operator index (0, 1, 2, ...). heliaAOT overlays use the original
+TFLite operator index preserved through compilation (the `3` in
+`CONV_2D:3`), because the compiler skips operators such as `VAR_HANDLE`
+without renumbering; see the `source_index` column on
+[Output files](../output/#2-profile_resultscsv).
+
+## Disabling
+
+<Tabs>
+<TabItem label="Command line">
+
+```bash
+hpx profile model.tflite --no-model-explorer
+```
+
+</TabItem>
+<TabItem label="YAML">
+
+```yaml
+output:
+  model_explorer: false
+```
+
+</TabItem>
+</Tabs>
+
+The `model_explorer/` directory is then absent and the manifest lists no
+overlay export; nothing else in the bundle changes.
+
+## Expected output
+
+A graph whose hottest operators match `top_layers` in `summary.json` for
+the cycles overlay, and whose colour pattern shifts by counter.
+
+## What next
+
+[PMU counters](../pmu-counters/) for what each counter measures;
+[Memory placement](../memory/) when the cache-miss overlay points at
+weights or activations in a slow tier.

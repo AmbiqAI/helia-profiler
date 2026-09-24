@@ -1,0 +1,2513 @@
+{
+  "schemaVersion": 1,
+  "kind": "config-schema",
+  "generatedFrom": {
+    "sourceTree": "872d67ad4e9083b1eacd7d6d3859148437b96b59",
+    "helia_profiler": "0.1.6",
+    "typer": "0.26.8",
+    "click": "8.3.3",
+    "pydantic": "2.13.4"
+  },
+  "counts": {
+    "classes": 15,
+    "declaredFields": 106,
+    "schemaProperties": 106,
+    "enums": 4,
+    "unreachableFromRoot": [
+      "MonitorBoardPreset"
+    ]
+  },
+  "x-hpx": {
+    "root": "ProfileConfig",
+    "sections": {
+      "": "ProfileConfig",
+      "model": "ModelConfig",
+      "engine": "EngineConfig",
+      "target": "TargetConfig",
+      "target.clock": "ClockSelection",
+      "target.psram": "PsramConfig",
+      "target.heartbeat": "HeartbeatConfig",
+      "profiling": "ProfilingConfig",
+      "power": "PowerConfig",
+      "power.ina228": "Ina228Config",
+      "output": "OutputConfig",
+      "timeouts": "TimeoutsConfig",
+      "build": "BuildConfig",
+      "build.nsx_modules": "NsxModuleOverride"
+    },
+    "fieldIndex": {
+      "BuildConfig": [
+        {
+          "name": "channel",
+          "pythonType": "str | None",
+          "required": false,
+          "default": null,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "nsx_modules",
+          "pythonType": "dict[str, NsxModuleOverride]",
+          "required": false,
+          "default": {},
+          "defaultFromFactory": true
+        },
+        {
+          "name": "compiler_launcher",
+          "pythonType": "str",
+          "required": false,
+          "default": "auto",
+          "defaultFromFactory": false
+        },
+        {
+          "name": "update_dependencies",
+          "pythonType": "bool",
+          "required": false,
+          "default": false,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "offline",
+          "pythonType": "bool",
+          "required": false,
+          "default": false,
+          "defaultFromFactory": false
+        }
+      ],
+      "ClockSelection": [
+        {
+          "name": "cpu",
+          "pythonType": "str | None",
+          "required": false,
+          "default": null,
+          "defaultFromFactory": false
+        }
+      ],
+      "EngineConfig": [
+        {
+          "name": "type",
+          "pythonType": "EngineType",
+          "required": false,
+          "default": "helia-rt",
+          "defaultFromFactory": false
+        },
+        {
+          "name": "backend",
+          "pythonType": "str | None",
+          "required": false,
+          "default": null,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "config",
+          "pythonType": "dict[str, Any]",
+          "required": false,
+          "default": {},
+          "defaultFromFactory": true
+        },
+        {
+          "name": "config_path",
+          "pythonType": "Path | None",
+          "required": false,
+          "default": null,
+          "defaultFromFactory": false
+        }
+      ],
+      "HeartbeatConfig": [
+        {
+          "name": "enabled",
+          "pythonType": "bool",
+          "required": false,
+          "default": true,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "every_n_ops",
+          "pythonType": "int",
+          "required": false,
+          "default": 8,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "every_ms",
+          "pythonType": "int",
+          "required": false,
+          "default": 2000,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "host_timeout_s",
+          "pythonType": "int",
+          "required": false,
+          "default": 30,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "overall_timeout_s",
+          "pythonType": "int | None",
+          "required": false,
+          "default": null,
+          "defaultFromFactory": false
+        }
+      ],
+      "Ina228Config": [
+        {
+          "name": "board",
+          "pythonType": "str | None",
+          "required": false,
+          "default": null,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "shunt_ohms",
+          "pythonType": "float | None",
+          "required": false,
+          "default": null,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "max_current_a",
+          "pythonType": "float",
+          "required": false,
+          "default": 0.5,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "i2c_iom",
+          "pythonType": "int",
+          "required": false,
+          "default": 1,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "i2c_address",
+          "pythonType": "int | None",
+          "required": false,
+          "default": null,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "i2c_speed_hz",
+          "pythonType": "int",
+          "required": false,
+          "default": 400000,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "conversion_time_us",
+          "pythonType": "int",
+          "required": false,
+          "default": 540,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "averaging_count",
+          "pythonType": "int",
+          "required": false,
+          "default": 16,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "calibration_id",
+          "pythonType": "str | None",
+          "required": false,
+          "default": null,
+          "defaultFromFactory": false
+        }
+      ],
+      "ModelConfig": [
+        {
+          "name": "path",
+          "pythonType": "Path",
+          "required": true,
+          "default": null,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "arena_size",
+          "pythonType": "int | None",
+          "required": false,
+          "default": null,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "arena_location",
+          "pythonType": "Placement | str | None",
+          "required": false,
+          "default": null,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "weights_location",
+          "pythonType": "Placement | str | None",
+          "required": false,
+          "default": null,
+          "defaultFromFactory": false
+        }
+      ],
+      "MonitorBoardPreset": [
+        {
+          "name": "label",
+          "pythonType": "str",
+          "required": true,
+          "default": null,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "i2c_address",
+          "pythonType": "int | None",
+          "required": false,
+          "default": null,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "shunt_ohms",
+          "pythonType": "float | None",
+          "required": false,
+          "default": null,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "missing_shunt_hint",
+          "pythonType": "str | None",
+          "required": false,
+          "default": null,
+          "defaultFromFactory": false
+        }
+      ],
+      "NsxModuleOverride": [
+        {
+          "name": "path",
+          "pythonType": "Path | None",
+          "required": false,
+          "default": null,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "ref",
+          "pythonType": "str | None",
+          "required": false,
+          "default": null,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "version",
+          "pythonType": "str | None",
+          "required": false,
+          "default": null,
+          "defaultFromFactory": false
+        }
+      ],
+      "OutputConfig": [
+        {
+          "name": "format",
+          "pythonType": "OutputFormat",
+          "required": false,
+          "default": "csv",
+          "defaultFromFactory": false
+        },
+        {
+          "name": "dir",
+          "pythonType": "Path",
+          "required": false,
+          "default": "results",
+          "defaultFromFactory": false
+        },
+        {
+          "name": "model_explorer",
+          "pythonType": "bool",
+          "required": false,
+          "default": true,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "detailed",
+          "pythonType": "bool",
+          "required": false,
+          "default": false,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "fail_on_invalid",
+          "pythonType": "bool",
+          "required": false,
+          "default": false,
+          "defaultFromFactory": false
+        }
+      ],
+      "PowerConfig": [
+        {
+          "name": "enabled",
+          "pythonType": "bool",
+          "required": false,
+          "default": false,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "driver",
+          "pythonType": "str",
+          "required": false,
+          "default": "joulescope",
+          "defaultFromFactory": false
+        },
+        {
+          "name": "firmware",
+          "pythonType": "PowerFirmware",
+          "required": false,
+          "default": "dedicated",
+          "defaultFromFactory": false
+        },
+        {
+          "name": "mode",
+          "pythonType": "PowerMode",
+          "required": false,
+          "default": "external",
+          "defaultFromFactory": false
+        },
+        {
+          "name": "duration_s",
+          "pythonType": "int | None",
+          "required": false,
+          "default": null,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "io_voltage",
+          "pythonType": "float",
+          "required": false,
+          "default": 1.8,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "sync_gpio_pin",
+          "pythonType": "int",
+          "required": false,
+          "default": 10,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "sync_input_index",
+          "pythonType": "int",
+          "required": false,
+          "default": 0,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "lockstep",
+          "pythonType": "bool | None",
+          "required": false,
+          "default": null,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "state_gpio_pin",
+          "pythonType": "int",
+          "required": false,
+          "default": 0,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "go_gpio_pin",
+          "pythonType": "int",
+          "required": false,
+          "default": 0,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "state_input_index",
+          "pythonType": "int",
+          "required": false,
+          "default": 1,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "go_output_index",
+          "pythonType": "int",
+          "required": false,
+          "default": 0,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "stats_rate_hz",
+          "pythonType": "int",
+          "required": false,
+          "default": 1000,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "reset_strategy",
+          "pythonType": "ResetStrategy",
+          "required": false,
+          "default": "auto",
+          "defaultFromFactory": false
+        },
+        {
+          "name": "serial",
+          "pythonType": "str | None",
+          "required": false,
+          "default": null,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "ina228",
+          "pythonType": "Ina228Config | None",
+          "required": false,
+          "default": null,
+          "defaultFromFactory": false
+        }
+      ],
+      "ProfileConfig": [
+        {
+          "name": "model",
+          "pythonType": "ModelConfig",
+          "required": true,
+          "default": null,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "engine",
+          "pythonType": "EngineConfig",
+          "required": false,
+          "default": "EngineConfig(type=<EngineType.HELIA_RT: 'helia-rt'>, backend=None, config={}, config_path=None)",
+          "defaultFromFactory": true
+        },
+        {
+          "name": "target",
+          "pythonType": "TargetConfig",
+          "required": false,
+          "default": "TargetConfig(board='apollo510_evb', toolchain=<Toolchain.ARM_NONE_EABI_GCC: 'arm-none-eabi-gcc'>, jlink_serial=None, transport=<Transport.RTT: 'rtt'>, usb_port=None, segger_rtt_path=None, rtt_buffer_size_up=None, clock=ClockSelection(cpu=None), psram=PsramConfig(clock_hz=48000000), heartbeat=HeartbeatConfig(enabled=True, every_n_ops=8, every_ms=2000, host_timeout_s=30, overall_timeout_s=None), custom_socs=None, custom_boards=None, ensure_board_powered=False)",
+          "defaultFromFactory": true
+        },
+        {
+          "name": "profiling",
+          "pythonType": "ProfilingConfig",
+          "required": false,
+          "default": "ProfilingConfig(pmu_counters={'cpu': 'default'}, per_layer=True, iterations=100, warmup=5, window_mode=<WindowMode.AUTO: 'auto'>, window_target_ms=1000, window_min=10, window_max=500000, clean_window_probe=<CleanWindowProbe.INFER: 'infer'>, clean_window_trace=False, force_shared_sram=False, aggregation=<Aggregation.MEDIAN: 'median'>, extreme_mode=False)",
+          "defaultFromFactory": true
+        },
+        {
+          "name": "power",
+          "pythonType": "PowerConfig",
+          "required": false,
+          "default": "PowerConfig(enabled=False, driver='joulescope', firmware=<PowerFirmware.DEDICATED: 'dedicated'>, mode=<PowerMode.EXTERNAL: 'external'>, duration_s=None, io_voltage=1.8, sync_gpio_pin=10, sync_input_index=0, lockstep=None, state_gpio_pin=0, go_gpio_pin=0, state_input_index=1, go_output_index=0, stats_rate_hz=1000, reset_strategy=<ResetStrategy.AUTO: 'auto'>, serial=None, ina228=None)",
+          "defaultFromFactory": true
+        },
+        {
+          "name": "output",
+          "pythonType": "OutputConfig",
+          "required": false,
+          "default": "OutputConfig(format=<OutputFormat.CSV: 'csv'>, dir=PosixPath('results'), model_explorer=True, detailed=False, fail_on_invalid=False)",
+          "defaultFromFactory": true
+        },
+        {
+          "name": "timeouts",
+          "pythonType": "TimeoutsConfig",
+          "required": false,
+          "default": "TimeoutsConfig(configure_s=120, build_s=300, flash_s=120, toolchain_probe_s=5, binary_probe_s=10, download_api_s=30, download_asset_s=300)",
+          "defaultFromFactory": true
+        },
+        {
+          "name": "build",
+          "pythonType": "BuildConfig",
+          "required": false,
+          "default": "BuildConfig(channel=None, nsx_modules={}, compiler_launcher='auto', update_dependencies=False, offline=False)",
+          "defaultFromFactory": true
+        },
+        {
+          "name": "platform_registry",
+          "pythonType": "PlatformRegistry",
+          "required": false,
+          "default": "PlatformRegistry(socs=mappingproxy({'apollo3p': SocDef(name='apollo3p', family=<SocFamily.AP3: 'ap3'>, core=<CoreArch.CORTEX_M4: 'cortex-m4'>, pmu_tier=<PmuTier.DWT_ONLY: 'dwt'>, has_mve=False, memory=MemoryLayout(mram_kb=2000, sram_kb=700, dtcm_kb=64, itcm_kb=0, psram_kb=0, nvm_kb=0), clocks=(ClockDomain(name='cpu', speeds=(ClockSpeed(name='lp', mhz=48, perf_tier=<PerfTier.LOW: 'NSX_PERF_LOW'>), ClockSpeed(name='hp', mhz=96, perf_tier=<PerfTier.HIGH: 'NSX_PERF_HIGH'>)), default='lp'),), c_define='AM_PART_APOLLO3P', cmsis_header='apollo3p.h', rtt_scan_ranges=((268435456, 1048576),), jlink_device='AMA3B2KK-KBR', pmu_max_ops=2048, swo_trace_clock_mhz=48, has_usb=False, ssram_full_power_enum='AM_HAL_PWRCTRL_SRAM_3M', has_radio_subsystem=False, npu=None, app_flash_load_addr=None, memory_bases_like=None, origin=<SocOrigin.BUILTIN: 'builtin'>, registered_name='apollo3p'), 'apollo4p': SocDef(name='apollo4p', family=<SocFamily.AP4: 'ap4'>, core=<CoreArch.CORTEX_M4: 'cortex-m4'>, pmu_tier=<PmuTier.DWT_ONLY: 'dwt'>, has_mve=False, memory=MemoryLayout(mram_kb=2000, sram_kb=1024, dtcm_kb=384, itcm_kb=0, psram_kb=0, nvm_kb=0), clocks=(ClockDomain(name='cpu', speeds=(ClockSpeed(name='lp', mhz=96, perf_tier=<PerfTier.LOW: 'NSX_PERF_LOW'>), ClockSpeed(name='hp', mhz=192, perf_tier=<PerfTier.HIGH: 'NSX_PERF_HIGH'>)), default='lp'),), c_define='AM_PART_APOLLO4P', cmsis_header='apollo4p.h', rtt_scan_ranges=((268435456, 1048576),), jlink_device='AMAP42KP-KBR', pmu_max_ops=2048, swo_trace_clock_mhz=None, has_usb=True, ssram_full_power_enum='AM_HAL_PWRCTRL_SRAM_3M', has_radio_subsystem=False, npu=None, app_flash_load_addr=None, memory_bases_like=None, origin=<SocOrigin.BUILTIN: 'builtin'>, registered_name='apollo4p'), 'apollo4l': SocDef(name='apollo4l', family=<SocFamily.AP4: 'ap4'>, core=<CoreArch.CORTEX_M4: 'cortex-m4'>, pmu_tier=<PmuTier.DWT_ONLY: 'dwt'>, has_mve=False, memory=MemoryLayout(mram_kb=2000, sram_kb=1024, dtcm_kb=384, itcm_kb=0, psram_kb=0, nvm_kb=0), clocks=(ClockDomain(name='cpu', speeds=(ClockSpeed(name='lp', mhz=96, perf_tier=<PerfTier.LOW: 'NSX_PERF_LOW'>), ClockSpeed(name='hp', mhz=192, perf_tier=<PerfTier.HIGH: 'NSX_PERF_HIGH'>)), default='lp'),), c_define='AM_PART_APOLLO4L', cmsis_header='apollo4l.h', rtt_scan_ranges=((268435456, 1048576),), jlink_device='AMAP42KL-KBR', pmu_max_ops=2048, swo_trace_clock_mhz=None, has_usb=True, ssram_full_power_enum='AM_HAL_PWRCTRL_SRAM_3M', has_radio_subsystem=False, npu=None, app_flash_load_addr=None, memory_bases_like=None, origin=<SocOrigin.BUILTIN: 'builtin'>, registered_name='apollo4l'), 'apollo510': SocDef(name='apollo510', family=<SocFamily.AP5: 'ap5'>, core=<CoreArch.CORTEX_M55: 'cortex-m55'>, pmu_tier=<PmuTier.ARMV8M_PMU: 'pmu'>, has_mve=True, memory=MemoryLayout(mram_kb=4096, sram_kb=3072, dtcm_kb=512, itcm_kb=256, psram_kb=65536, nvm_kb=8192), clocks=(ClockDomain(name='cpu', speeds=(ClockSpeed(name='lp', mhz=96, perf_tier=<PerfTier.LOW: 'NSX_PERF_LOW'>), ClockSpeed(name='hp', mhz=250, perf_tier=<PerfTier.HIGH: 'NSX_PERF_HIGH'>)), default='lp'),), c_define='AM_PART_APOLLO510', cmsis_header='apollo510.h', rtt_scan_ranges=((536870912, 524288),), jlink_device='AP510NFA-CBR', pmu_max_ops=4096, swo_trace_clock_mhz=None, has_usb=True, ssram_full_power_enum='AM_HAL_PWRCTRL_SRAM_3M', has_radio_subsystem=False, npu=None, app_flash_load_addr=None, memory_bases_like=None, origin=<SocOrigin.BUILTIN: 'builtin'>, registered_name='apollo510'), 'apollo510b': SocDef(name='apollo510b', family=<SocFamily.AP5: 'ap5'>, core=<CoreArch.CORTEX_M55: 'cortex-m55'>, pmu_tier=<PmuTier.ARMV8M_PMU: 'pmu'>, has_mve=True, memory=MemoryLayout(mram_kb=4096, sram_kb=3072, dtcm_kb=512, itcm_kb=256, psram_kb=65536, nvm_kb=0), clocks=(ClockDomain(name='cpu', speeds=(ClockSpeed(name='lp', mhz=96, perf_tier=<PerfTier.LOW: 'NSX_PERF_LOW'>), ClockSpeed(name='hp', mhz=250, perf_tier=<PerfTier.HIGH: 'NSX_PERF_HIGH'>)), default='lp'),), c_define='AM_PART_APOLLO510B', cmsis_header='apollo510.h', rtt_scan_ranges=((536870912, 524288),), jlink_device='AP510BFA-CBR', pmu_max_ops=4096, swo_trace_clock_mhz=None, has_usb=True, ssram_full_power_enum='AM_HAL_PWRCTRL_SRAM_3M', has_radio_subsystem=False, npu=None, app_flash_load_addr=None, memory_bases_like=None, origin=<SocOrigin.BUILTIN: 'builtin'>, registered_name='apollo510b'), 'apollo5b': SocDef(name='apollo5b', family=<SocFamily.AP5: 'ap5'>, core=<CoreArch.CORTEX_M55: 'cortex-m55'>, pmu_tier=<PmuTier.ARMV8M_PMU: 'pmu'>, has_mve=True, memory=MemoryLayout(mram_kb=4096, sram_kb=3072, dtcm_kb=512, itcm_kb=256, psram_kb=32768, nvm_kb=0), clocks=(ClockDomain(name='cpu', speeds=(ClockSpeed(name='lp', mhz=96, perf_tier=<PerfTier.LOW: 'NSX_PERF_LOW'>), ClockSpeed(name='hp', mhz=250, perf_tier=<PerfTier.HIGH: 'NSX_PERF_HIGH'>)), default='lp'),), c_define='AM_PART_APOLLO5B', cmsis_header='apollo510.h', rtt_scan_ranges=((536870912, 524288),), jlink_device='AP510NFA-CBR', pmu_max_ops=4096, swo_trace_clock_mhz=None, has_usb=True, ssram_full_power_enum='AM_HAL_PWRCTRL_SRAM_3M', has_radio_subsystem=False, npu=None, app_flash_load_addr=None, memory_bases_like=None, origin=<SocOrigin.BUILTIN: 'builtin'>, registered_name='apollo5b'), 'apollo330P': SocDef(name='apollo330P', family=<SocFamily.AP5: 'ap5'>, core=<CoreArch.CORTEX_M55: 'cortex-m55'>, pmu_tier=<PmuTier.ARMV8M_PMU: 'pmu'>, has_mve=True, memory=MemoryLayout(mram_kb=1984, sram_kb=1792, dtcm_kb=240, itcm_kb=0, psram_kb=32768, nvm_kb=0), clocks=(ClockDomain(name='cpu', speeds=(ClockSpeed(name='lp', mhz=96, perf_tier=<PerfTier.LOW: 'NSX_PERF_LOW'>), ClockSpeed(name='hp', mhz=250, perf_tier=<PerfTier.HIGH: 'NSX_PERF_HIGH'>)), default='lp'),), c_define='AM_PART_APOLLO330P', cmsis_header='apollo330P.h', rtt_scan_ranges=((536870912, 245760),), jlink_device='Apollo330P_510L', pmu_max_ops=512, swo_trace_clock_mhz=48, has_usb=True, ssram_full_power_enum='AM_HAL_PWRCTRL_SRAM_1P75M', has_radio_subsystem=True, npu=None, app_flash_load_addr=None, memory_bases_like=None, origin=<SocOrigin.BUILTIN: 'builtin'>, registered_name='apollo330P'), 'apollo510L': SocDef(name='apollo510L', family=<SocFamily.AP5: 'ap5'>, core=<CoreArch.CORTEX_M55: 'cortex-m55'>, pmu_tier=<PmuTier.ARMV8M_PMU: 'pmu'>, has_mve=True, memory=MemoryLayout(mram_kb=1984, sram_kb=1792, dtcm_kb=240, itcm_kb=0, psram_kb=32768, nvm_kb=0), clocks=(ClockDomain(name='cpu', speeds=(ClockSpeed(name='lp', mhz=96, perf_tier=<PerfTier.LOW: 'NSX_PERF_LOW'>), ClockSpeed(name='hp', mhz=250, perf_tier=<PerfTier.HIGH: 'NSX_PERF_HIGH'>)), default='lp'),), c_define='AM_PART_APOLLO510L', cmsis_header='apollo510L.h', rtt_scan_ranges=((536870912, 245760),), jlink_device='AP510L', pmu_max_ops=512, swo_trace_clock_mhz=48, has_usb=True, ssram_full_power_enum='AM_HAL_PWRCTRL_SRAM_1P75M', has_radio_subsystem=True, npu=None, app_flash_load_addr=None, memory_bases_like=None, origin=<SocOrigin.BUILTIN: 'builtin'>, registered_name='apollo510L'), 'atomiq110': SocDef(name='atomiq110', family=<SocFamily.AP5: 'ap5'>, core=<CoreArch.CORTEX_M55: 'cortex-m55'>, pmu_tier=<PmuTier.ARMV8M_PMU: 'pmu'>, has_mve=True, memory=MemoryLayout(mram_kb=4096, sram_kb=3072, dtcm_kb=496, itcm_kb=256, psram_kb=0, nvm_kb=0), clocks=(ClockDomain(name='cpu', speeds=(ClockSpeed(name='lp', mhz=25, perf_tier=<PerfTier.LOW: 'NSX_PERF_LOW'>),), default='lp'),), c_define='PART_atomiq110', cmsis_header='atomiq110.h', rtt_scan_ranges=((536870912, 507904),), jlink_device='Atomiq110', pmu_max_ops=4096, swo_trace_clock_mhz=None, has_usb=False, ssram_full_power_enum='AM_HAL_PWRCTRL_SRAM_3M', has_radio_subsystem=False, npu='ethos-u85-256', app_flash_load_addr=None, memory_bases_like=None, origin=<SocOrigin.BUILTIN: 'builtin'>, registered_name='atomiq110')}), boards=mappingproxy({'apollo3p_evb': BoardDef(name='apollo3p_evb', soc='apollo3p', channel='stable', psram_kb=8192, default_sync_gpio_pin=26, default_state_gpio_pin=24, default_go_gpio_pin=25, starter_profile_board=None, is_fpga=False, description='', ble_reset_gpio_pin=None), 'apollo3p_evb_cygnus': BoardDef(name='apollo3p_evb_cygnus', soc='apollo3p', channel='preview', psram_kb=8192, default_sync_gpio_pin=26, default_state_gpio_pin=24, default_go_gpio_pin=25, starter_profile_board=None, is_fpga=False, description='', ble_reset_gpio_pin=None), 'apollo4p_evb': BoardDef(name='apollo4p_evb', soc='apollo4p', channel='preview', psram_kb=32768, default_sync_gpio_pin=22, default_state_gpio_pin=23, default_go_gpio_pin=24, starter_profile_board=None, is_fpga=False, description='', ble_reset_gpio_pin=None), 'apollo4l_evb': BoardDef(name='apollo4l_evb', soc='apollo4l', channel='preview', psram_kb=32768, default_sync_gpio_pin=61, default_state_gpio_pin=23, default_go_gpio_pin=24, starter_profile_board=None, is_fpga=False, description='', ble_reset_gpio_pin=None), 'apollo4l_blue_evb': BoardDef(name='apollo4l_blue_evb', soc='apollo4l', channel='preview', psram_kb=32768, default_sync_gpio_pin=61, default_state_gpio_pin=23, default_go_gpio_pin=24, starter_profile_board=None, is_fpga=False, description='', ble_reset_gpio_pin=55), 'apollo4p_blue_kbr_evb': BoardDef(name='apollo4p_blue_kbr_evb', soc='apollo4p', channel='preview', psram_kb=32768, default_sync_gpio_pin=22, default_state_gpio_pin=23, default_go_gpio_pin=24, starter_profile_board=None, is_fpga=False, description='', ble_reset_gpio_pin=42), 'apollo4p_blue_kxr_evb': BoardDef(name='apollo4p_blue_kxr_evb', soc='apollo4p', channel='preview', psram_kb=32768, default_sync_gpio_pin=22, default_state_gpio_pin=23, default_go_gpio_pin=24, starter_profile_board=None, is_fpga=False, description='', ble_reset_gpio_pin=55), 'apollo510_evb': BoardDef(name='apollo510_evb', soc='apollo510', channel='stable', psram_kb=None, default_sync_gpio_pin=29, default_state_gpio_pin=36, default_go_gpio_pin=14, starter_profile_board=None, is_fpga=False, description='', ble_reset_gpio_pin=None), 'apollo510b_evb': BoardDef(name='apollo510b_evb', soc='apollo510b', channel='preview', psram_kb=None, default_sync_gpio_pin=29, default_state_gpio_pin=36, default_go_gpio_pin=14, starter_profile_board=None, is_fpga=False, description='', ble_reset_gpio_pin=None), 'apollo5b_evb': BoardDef(name='apollo5b_evb', soc='apollo5b', channel='preview', psram_kb=None, default_sync_gpio_pin=10, default_state_gpio_pin=0, default_go_gpio_pin=0, starter_profile_board=None, is_fpga=False, description='', ble_reset_gpio_pin=None), 'apollo330mP_evb': BoardDef(name='apollo330mP_evb', soc='apollo330P', channel='preview', psram_kb=None, default_sync_gpio_pin=10, default_state_gpio_pin=0, default_go_gpio_pin=0, starter_profile_board=None, is_fpga=False, description='Apollo330 — Cortex-M55 (AP5 family)', ble_reset_gpio_pin=None), 'apollo510dL_evb': BoardDef(name='apollo510dL_evb', soc='apollo510L', channel='preview', psram_kb=0, default_sync_gpio_pin=10, default_state_gpio_pin=0, default_go_gpio_pin=0, starter_profile_board=None, is_fpga=False, description='Apollo510 Lite — Cortex-M55 (AP5 family)', ble_reset_gpio_pin=None), 'atomiq110_fpga_turbo': BoardDef(name='atomiq110_fpga_turbo', soc='atomiq110', channel='preview', psram_kb=None, default_sync_gpio_pin=10, default_state_gpio_pin=0, default_go_gpio_pin=0, starter_profile_board=None, is_fpga=True, description='Atomiq110 FPGA turbo — Cortex-M55 + Ethos-U85 NPU (fixed 25 MHz, FPGA-only)', ble_reset_gpio_pin=None)}))",
+          "defaultFromFactory": true
+        },
+        {
+          "name": "compatibility_baseline",
+          "pythonType": "CompatibilityBaseline",
+          "required": false,
+          "default": "CompatibilityBaseline(schema='hpx.compatibility-baseline', schema_version=1, baseline_id='hpx-neuralspotx-0.8.1-2026-09', neuralspotx_package='neuralspotx', neuralspotx_version='0.8.1', neuralspotx_sha256='7aac6f1b2e89ebf41dfe087c7588e0db11d65e8a11cac2cda03f6d7c510a9094', projects=(CompatibilityProject(name='neuralspotx', url='https://github.com/AmbiqAI/neuralspotx.git', ref='2dbe12a2799fd8c3df85f1a103b0adca340c901f'), CompatibilityProject(name='nsx-ambiq-sdk', url='https://github.com/AmbiqAI/nsx-ambiq-sdk.git', ref='aefce2ca858795e783c76726ebe7d14d9d4bde7c'), CompatibilityProject(name='nsx-ethos-u-driver', url='https://github.com/AmbiqAI/nsx-ethos-u-driver.git', ref='f0f99bb124b22486ef55694c76567008680cb5a8'), CompatibilityProject(name='nsx-pmu-armv8m', url='https://github.com/AmbiqAI/nsx-pmu-armv8m.git', ref='5725c065a0c3603132f1064ee2684d1fa8587c88'), CompatibilityProject(name='nsx-tflite-micro', url='https://github.com/AmbiqAI/nsx-tflite-micro.git', ref='7afcf2b4170e039caf4c49f91e2c45d5869be333'), CompatibilityProject(name='arm-cmsis-nn', url='https://github.com/AmbiqAI/arm-cmsis-nn.git', ref='6d21a6f821fb72541173a6c4d05d83329fa74f7c'), CompatibilityProject(name='ns-cmsis-nn', url='https://github.com/AmbiqAI/ns-cmsis-nn.git', ref='aaeb145a67c3decd9869f96474e36e7dbdc2030c'), CompatibilityProject(name='nsx-executorch', url='https://github.com/AmbiqAI/nsx-executorch.git', ref='5514ac1ea8439b3fe615d180bf68c75a9dabb48e'), CompatibilityProject(name='helia-rt', url='https://github.com/AmbiqAI/helia-rt.git', ref='edb3a25fc96c8e9b634dabdb9cd31cb22aa43440'), CompatibilityProject(name='nsx-sensors', url='https://github.com/AmbiqAI/nsx-sensors.git', ref='c219a2bc98c62f96819fae20ab6c8911fcea3e25')), modules=(CompatibilityModule(name='nsx-ambiq-bsp', project='nsx-ambiq-sdk', ref='aefce2ca858795e783c76726ebe7d14d9d4bde7c'), CompatibilityModule(name='nsx-npu', project='nsx-ambiq-sdk', ref='aefce2ca858795e783c76726ebe7d14d9d4bde7c'), CompatibilityModule(name='nsx-pmu-armv8m', project='nsx-pmu-armv8m', ref='5725c065a0c3603132f1064ee2684d1fa8587c88'), CompatibilityModule(name='nsx-tflite-micro', project='nsx-tflite-micro', ref='7afcf2b4170e039caf4c49f91e2c45d5869be333'), CompatibilityModule(name='arm-cmsis-nn', project='arm-cmsis-nn', ref='6d21a6f821fb72541173a6c4d05d83329fa74f7c'), CompatibilityModule(name='nsx-cmsis-nn', project='ns-cmsis-nn', ref='aaeb145a67c3decd9869f96474e36e7dbdc2030c'), CompatibilityModule(name='nsx-executorch', project='nsx-executorch', ref='5514ac1ea8439b3fe615d180bf68c75a9dabb48e'), CompatibilityModule(name='nsx-helia-rt', project='helia-rt', ref='edb3a25fc96c8e9b634dabdb9cd31cb22aa43440'), CompatibilityModule(name='nsx-sensors', project='nsx-sensors', ref='c219a2bc98c62f96819fae20ab6c8911fcea3e25')), engines=(CompatibilityEngine(name='helia-rt', version='1.20.0', ref='edb3a25fc96c8e9b634dabdb9cd31cb22aa43440', min_version=None, max_version_exclusive=None, governed_by_modules=False), CompatibilityEngine(name='helia-aot', version=None, ref=None, min_version='0.20.0', max_version_exclusive='0.21.0', governed_by_modules=False), CompatibilityEngine(name='tflm', version=None, ref=None, min_version=None, max_version_exclusive=None, governed_by_modules=True), CompatibilityEngine(name='executorch', version='0.1.0', ref='5514ac1ea8439b3fe615d180bf68c75a9dabb48e', min_version=None, max_version_exclusive=None, governed_by_modules=False)))",
+          "defaultFromFactory": true
+        },
+        {
+          "name": "compatibility",
+          "pythonType": "CompatibilityResolution | None",
+          "required": false,
+          "default": null,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "frozen",
+          "pythonType": "bool",
+          "required": false,
+          "default": false,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "work_dir",
+          "pythonType": "Path | None",
+          "required": false,
+          "default": null,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "clean",
+          "pythonType": "bool",
+          "required": false,
+          "default": false,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "verbose",
+          "pythonType": "int",
+          "required": false,
+          "default": 0,
+          "defaultFromFactory": false
+        }
+      ],
+      "ProfilingConfig": [
+        {
+          "name": "pmu_counters",
+          "pythonType": "dict[str, str | list[str]]",
+          "required": false,
+          "default": {
+            "cpu": "default"
+          },
+          "defaultFromFactory": true
+        },
+        {
+          "name": "per_layer",
+          "pythonType": "bool",
+          "required": false,
+          "default": true,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "iterations",
+          "pythonType": "int",
+          "required": false,
+          "default": 100,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "warmup",
+          "pythonType": "int",
+          "required": false,
+          "default": 5,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "window_mode",
+          "pythonType": "WindowMode",
+          "required": false,
+          "default": "auto",
+          "defaultFromFactory": false
+        },
+        {
+          "name": "window_target_ms",
+          "pythonType": "int",
+          "required": false,
+          "default": 1000,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "window_min",
+          "pythonType": "int",
+          "required": false,
+          "default": 10,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "window_max",
+          "pythonType": "int",
+          "required": false,
+          "default": 500000,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "clean_window_probe",
+          "pythonType": "CleanWindowProbe",
+          "required": false,
+          "default": "infer",
+          "defaultFromFactory": false
+        },
+        {
+          "name": "clean_window_trace",
+          "pythonType": "bool",
+          "required": false,
+          "default": false,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "force_shared_sram",
+          "pythonType": "bool",
+          "required": false,
+          "default": false,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "aggregation",
+          "pythonType": "Aggregation",
+          "required": false,
+          "default": "median",
+          "defaultFromFactory": false
+        },
+        {
+          "name": "extreme_mode",
+          "pythonType": "bool",
+          "required": false,
+          "default": false,
+          "defaultFromFactory": false
+        }
+      ],
+      "PsramConfig": [
+        {
+          "name": "clock_hz",
+          "pythonType": "int",
+          "required": false,
+          "default": 48000000,
+          "defaultFromFactory": false
+        }
+      ],
+      "TargetConfig": [
+        {
+          "name": "board",
+          "pythonType": "str",
+          "required": false,
+          "default": "apollo510_evb",
+          "defaultFromFactory": false
+        },
+        {
+          "name": "toolchain",
+          "pythonType": "Toolchain",
+          "required": false,
+          "default": "arm-none-eabi-gcc",
+          "defaultFromFactory": false
+        },
+        {
+          "name": "jlink_serial",
+          "pythonType": "str | None",
+          "required": false,
+          "default": null,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "transport",
+          "pythonType": "Transport",
+          "required": false,
+          "default": "rtt",
+          "defaultFromFactory": false
+        },
+        {
+          "name": "usb_port",
+          "pythonType": "str | None",
+          "required": false,
+          "default": null,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "segger_rtt_path",
+          "pythonType": "Path | None",
+          "required": false,
+          "default": null,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "rtt_buffer_size_up",
+          "pythonType": "int | None",
+          "required": false,
+          "default": null,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "clock",
+          "pythonType": "ClockSelection",
+          "required": false,
+          "default": "ClockSelection(cpu=None)",
+          "defaultFromFactory": true
+        },
+        {
+          "name": "psram",
+          "pythonType": "PsramConfig",
+          "required": false,
+          "default": "PsramConfig(clock_hz=48000000)",
+          "defaultFromFactory": true
+        },
+        {
+          "name": "heartbeat",
+          "pythonType": "HeartbeatConfig",
+          "required": false,
+          "default": "HeartbeatConfig(enabled=True, every_n_ops=8, every_ms=2000, host_timeout_s=30, overall_timeout_s=None)",
+          "defaultFromFactory": true
+        },
+        {
+          "name": "custom_socs",
+          "pythonType": "dict[str, Any] | None",
+          "required": false,
+          "default": null,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "custom_boards",
+          "pythonType": "dict[str, Any] | None",
+          "required": false,
+          "default": null,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "ensure_board_powered",
+          "pythonType": "bool",
+          "required": false,
+          "default": false,
+          "defaultFromFactory": false
+        }
+      ],
+      "TimeoutsConfig": [
+        {
+          "name": "configure_s",
+          "pythonType": "int",
+          "required": false,
+          "default": 120,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "build_s",
+          "pythonType": "int",
+          "required": false,
+          "default": 300,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "flash_s",
+          "pythonType": "int",
+          "required": false,
+          "default": 120,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "toolchain_probe_s",
+          "pythonType": "int",
+          "required": false,
+          "default": 5,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "binary_probe_s",
+          "pythonType": "int",
+          "required": false,
+          "default": 10,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "download_api_s",
+          "pythonType": "int",
+          "required": false,
+          "default": 30,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "download_asset_s",
+          "pythonType": "int",
+          "required": false,
+          "default": 300,
+          "defaultFromFactory": false
+        }
+      ]
+    },
+    "coverage": {
+      "BuildConfig": {
+        "declared": 5,
+        "inSchema": 5,
+        "reachableFromRoot": true
+      },
+      "ClockSelection": {
+        "declared": 1,
+        "inSchema": 1,
+        "reachableFromRoot": true
+      },
+      "EngineConfig": {
+        "declared": 4,
+        "inSchema": 4,
+        "reachableFromRoot": true
+      },
+      "HeartbeatConfig": {
+        "declared": 5,
+        "inSchema": 5,
+        "reachableFromRoot": true
+      },
+      "Ina228Config": {
+        "declared": 9,
+        "inSchema": 9,
+        "reachableFromRoot": true
+      },
+      "ModelConfig": {
+        "declared": 4,
+        "inSchema": 4,
+        "reachableFromRoot": true
+      },
+      "MonitorBoardPreset": {
+        "declared": 4,
+        "inSchema": 4,
+        "reachableFromRoot": false
+      },
+      "NsxModuleOverride": {
+        "declared": 3,
+        "inSchema": 3,
+        "reachableFromRoot": true
+      },
+      "OutputConfig": {
+        "declared": 5,
+        "inSchema": 5,
+        "reachableFromRoot": true
+      },
+      "PowerConfig": {
+        "declared": 17,
+        "inSchema": 17,
+        "reachableFromRoot": true
+      },
+      "ProfileConfig": {
+        "declared": 15,
+        "inSchema": 15,
+        "reachableFromRoot": true
+      },
+      "ProfilingConfig": {
+        "declared": 13,
+        "inSchema": 13,
+        "reachableFromRoot": true
+      },
+      "PsramConfig": {
+        "declared": 1,
+        "inSchema": 1,
+        "reachableFromRoot": true
+      },
+      "TargetConfig": {
+        "declared": 13,
+        "inSchema": 13,
+        "reachableFromRoot": true
+      },
+      "TimeoutsConfig": {
+        "declared": 7,
+        "inSchema": 7,
+        "reachableFromRoot": true
+      }
+    },
+    "enums": {
+      "CleanWindowProbe": [
+        "infer",
+        "busy_loop"
+      ],
+      "OutputFormat": [
+        "csv",
+        "json",
+        "model-explorer"
+      ],
+      "PowerFirmware": [
+        "dedicated",
+        "shared"
+      ],
+      "WindowMode": [
+        "fixed",
+        "auto"
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/ProfileConfig",
+  "$defs": {
+    "Aggregation": {
+      "description": "Per-iteration aggregation estimator for per-layer counters.\n\n``MEDIAN`` is the default because it rejects the occasional corrupted\niteration (e.g. an Apollo4 DWT->CYCCNT uint32 wrap or a frozen-zero read\nwhile the host probe is still settling) that a plain ``MEAN`` would smear\nacross the whole layer.  ``TRIMMED`` drops the high/low extremes, then\nmeans.",
+      "enum": [
+        "mean",
+        "median",
+        "trimmed"
+      ],
+      "title": "Aggregation",
+      "type": "string"
+    },
+    "BoardDef": {
+      "description": "Definition of an evaluation board.",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "soc": {
+          "title": "Soc",
+          "type": "string"
+        },
+        "channel": {
+          "title": "Channel",
+          "type": "string"
+        },
+        "psram_kb": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Psram Kb"
+        },
+        "default_sync_gpio_pin": {
+          "default": 10,
+          "title": "Default Sync Gpio Pin",
+          "type": "integer"
+        },
+        "default_state_gpio_pin": {
+          "default": 0,
+          "title": "Default State Gpio Pin",
+          "type": "integer"
+        },
+        "default_go_gpio_pin": {
+          "default": 0,
+          "title": "Default Go Gpio Pin",
+          "type": "integer"
+        },
+        "starter_profile_board": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Starter Profile Board"
+        },
+        "is_fpga": {
+          "default": false,
+          "title": "Is Fpga",
+          "type": "boolean"
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "ble_reset_gpio_pin": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ble Reset Gpio Pin"
+        }
+      },
+      "required": [
+        "name",
+        "soc",
+        "channel"
+      ],
+      "title": "BoardDef",
+      "type": "object"
+    },
+    "BuildConfig": {
+      "additionalProperties": false,
+      "description": "NSX build-system overrides.\n\nControls how the generated firmware's NSX manifest resolves modules.\nDefault behaviour keeps the selected board's default NSX channel, and\ngenerated manifests pin the qualified compatibility baseline's full commit\nSHAs for the ``neuralspotx`` and ``nsx-ambiq-sdk`` projects unless the\nuser overrides those modules.\n\nAdvanced users can pin individual modules to a version, point them at\na local checkout, or select a custom git ref — useful for SoC/board\nbring-up before changes land in the stable channel.\n\n``compiler_launcher`` selects a CMake compiler launcher (e.g. ``sccache``\nor ``ccache``) that wraps every compile to cache object output and speed\nup repeated builds.  ``\"auto\"`` (the default) uses ``sccache`` then\n``ccache`` if either is on ``PATH`` and otherwise does nothing — so the\nmere presence of the binary is the opt-in.  ``\"none\"`` disables it; an\nexplicit tool name or path requires that the launcher be found.\n\nOrdinary profiles reuse a structurally compatible ``nsx.lock`` byte for\nbyte and always materialize with frozen sync. ``update_dependencies`` is\nthe only mode that intentionally advances refs. ``offline`` additionally\nrequires the exact lock and all locked module trees to already exist.",
+      "properties": {
+        "channel": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Channel"
+        },
+        "nsx_modules": {
+          "additionalProperties": {
+            "$ref": "#/$defs/NsxModuleOverride"
+          },
+          "title": "Nsx Modules",
+          "type": "object"
+        },
+        "compiler_launcher": {
+          "default": "auto",
+          "title": "Compiler Launcher",
+          "type": "string"
+        },
+        "update_dependencies": {
+          "default": false,
+          "title": "Update Dependencies",
+          "type": "boolean"
+        },
+        "offline": {
+          "default": false,
+          "title": "Offline",
+          "type": "boolean"
+        }
+      },
+      "title": "BuildConfig",
+      "type": "object"
+    },
+    "CleanWindowProbe": {
+      "description": "What runs inside the clean GPIO-gated window.\n\n``INFER`` runs the model.  ``BUSY_LOOP`` is an opt-in bench probe that\nkeeps the gate high around a calibrated CPU spin for roughly\n``window_target_ms`` so bring-up can distinguish wrong gate semantics\nfrom inference behaviour.",
+      "enum": [
+        "infer",
+        "busy_loop"
+      ],
+      "title": "CleanWindowProbe",
+      "type": "string"
+    },
+    "ClockDomain": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "speeds": {
+          "items": {
+            "$ref": "#/$defs/ClockSpeed"
+          },
+          "title": "Speeds",
+          "type": "array"
+        },
+        "default": {
+          "type": "string",
+          "title": "Default"
+        }
+      },
+      "required": [
+        "name",
+        "speeds",
+        "default"
+      ],
+      "title": "ClockDomain",
+      "type": "object"
+    },
+    "ClockSelection": {
+      "additionalProperties": false,
+      "description": "Per-domain clock speed selection for the generated firmware.\n\nEach field names a speed within the SoC's matching clock domain using\nAmbiq datasheet terminology (e.g. ``cpu=\"hp\"``).  ``None`` selects that\ndomain's default speed.  Values are validated against the resolved SoC in\nstage 1, so unknown names raise a clear ConfigError rather than failing\nsilently.",
+      "properties": {
+        "cpu": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cpu"
+        }
+      },
+      "title": "ClockSelection",
+      "type": "object"
+    },
+    "ClockSpeed": {
+      "description": "A single named operating point within a clock domain.\n\n``name`` uses Ambiq datasheet terminology (``ulp`` / ``lp`` / ``hp``).\n``perf_tier`` is the NSX firmware control value applied for CPU domains.",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "mhz": {
+          "title": "Mhz",
+          "type": "integer"
+        },
+        "perf_tier": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PerfTier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "name",
+        "mhz"
+      ],
+      "title": "ClockSpeed",
+      "type": "object"
+    },
+    "CompatibilityBaseline": {
+      "description": "Validated, immutable baseline loaded from HPX package data.",
+      "properties": {
+        "schema": {
+          "title": "Schema",
+          "type": "string"
+        },
+        "schema_version": {
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "baseline_id": {
+          "title": "Baseline Id",
+          "type": "string"
+        },
+        "neuralspotx_package": {
+          "title": "Neuralspotx Package",
+          "type": "string"
+        },
+        "neuralspotx_version": {
+          "title": "Neuralspotx Version",
+          "type": "string"
+        },
+        "neuralspotx_sha256": {
+          "title": "Neuralspotx Sha256",
+          "type": "string"
+        },
+        "projects": {
+          "items": {
+            "$ref": "#/$defs/CompatibilityProject"
+          },
+          "title": "Projects",
+          "type": "array"
+        },
+        "modules": {
+          "items": {
+            "$ref": "#/$defs/CompatibilityModule"
+          },
+          "title": "Modules",
+          "type": "array"
+        },
+        "engines": {
+          "items": {
+            "$ref": "#/$defs/CompatibilityEngine"
+          },
+          "title": "Engines",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema",
+        "schema_version",
+        "baseline_id",
+        "neuralspotx_package",
+        "neuralspotx_version",
+        "neuralspotx_sha256",
+        "projects",
+        "modules",
+        "engines"
+      ],
+      "title": "CompatibilityBaseline",
+      "type": "object"
+    },
+    "CompatibilityEngine": {
+      "description": "Engine version policy and default source reference.\n\nExactly one of ``version``, ``min_version``, or ``governed_by_modules``\nmust be set: a pinned engine release, a semver floor/ceiling policy, or a\nmarker that the engine's qualification is fully carried by its NSX\nmodule refs (e.g. stock TFLM, pinned via ``nsx-tflite-micro`` /\n``arm-cmsis-nn``).",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Version"
+        },
+        "ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ref"
+        },
+        "min_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min Version"
+        },
+        "max_version_exclusive": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Version Exclusive"
+        },
+        "governed_by_modules": {
+          "default": false,
+          "title": "Governed By Modules",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "CompatibilityEngine",
+      "type": "object"
+    },
+    "CompatibilityModule": {
+      "description": "One module-to-project reference qualified by HPX.",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "project": {
+          "title": "Project",
+          "type": "string"
+        },
+        "ref": {
+          "title": "Ref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "project",
+        "ref"
+      ],
+      "title": "CompatibilityModule",
+      "type": "object"
+    },
+    "CompatibilityProject": {
+      "description": "One immutable NSX project reference in a compatibility baseline.",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        },
+        "ref": {
+          "title": "Ref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "url",
+        "ref"
+      ],
+      "title": "CompatibilityProject",
+      "type": "object"
+    },
+    "CompatibilityResolution": {
+      "description": "Resolved baseline plus explicit override classification.",
+      "properties": {
+        "baseline": {
+          "$ref": "#/$defs/CompatibilityBaseline"
+        },
+        "qualification": {
+          "$ref": "#/$defs/QualificationState"
+        },
+        "module_overrides": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Module Overrides",
+          "type": "array"
+        },
+        "engine_overrides": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Engine Overrides",
+          "type": "array"
+        }
+      },
+      "required": [
+        "baseline",
+        "qualification"
+      ],
+      "title": "CompatibilityResolution",
+      "type": "object"
+    },
+    "CoreArch": {
+      "enum": [
+        "cortex-m4",
+        "cortex-m55"
+      ],
+      "title": "CoreArch",
+      "type": "string"
+    },
+    "EngineConfig": {
+      "additionalProperties": false,
+      "description": "Inference engine selection and passthrough config.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/EngineType",
+          "default": "helia-rt"
+        },
+        "backend": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Backend"
+        },
+        "config": {
+          "additionalProperties": true,
+          "title": "Config",
+          "type": "object"
+        },
+        "config_path": {
+          "anyOf": [
+            {
+              "format": "path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Config Path"
+        }
+      },
+      "title": "EngineConfig",
+      "type": "object"
+    },
+    "EngineType": {
+      "description": "Supported inference engine identifiers.\n\n``StrEnum`` so values are interchangeable with raw strings — Jinja\ntemplates and YAML configs can compare against the canonical hyphen\nform (``\"helia-aot\"``) without manually unwrapping ``.value``.",
+      "enum": [
+        "tflm",
+        "helia-rt",
+        "helia-aot",
+        "executorch"
+      ],
+      "title": "EngineType",
+      "type": "string"
+    },
+    "HeartbeatConfig": {
+      "additionalProperties": false,
+      "description": "Liveness / progress-reporting settings.\n\nThe firmware emits ``HPX_HEARTBEAT`` lines at configurable intervals so\nthe host can (a) detect a hung run without using a large wall-clock\ntimeout, and (b) show the user live progress.\n\nAttributes:\n    enabled: Master switch.  When ``False``, no heartbeats are emitted or\n        expected and the host falls back to the legacy line-gap timeout.\n    every_n_ops: Emit a heartbeat after this many profiled ops.  ``0``\n        disables this trigger.  Lower values add more PMU/inter-op\n        overhead but give finer-grained progress.\n    every_ms: Emit a heartbeat when at least this many wall-clock\n        milliseconds have elapsed since the last heartbeat.  ``0``\n        disables this trigger.  Useful for engines with a single large\n        invocation (e.g. AOT command streams) where ``every_n_ops`` does\n        not fire.\n    host_timeout_s: Maximum time the host will wait without receiving\n        *any* line from the firmware before declaring the run hung.\n    overall_timeout_s: Hard ceiling on total capture time, in seconds.\n        ``None`` means unbounded (rely on heartbeats).  Set to a positive\n        int for a safety net in CI or unattended runs.",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "every_n_ops": {
+          "default": 8,
+          "title": "Every N Ops",
+          "type": "integer"
+        },
+        "every_ms": {
+          "default": 2000,
+          "title": "Every Ms",
+          "type": "integer"
+        },
+        "host_timeout_s": {
+          "default": 30,
+          "title": "Host Timeout S",
+          "type": "integer"
+        },
+        "overall_timeout_s": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Overall Timeout S"
+        }
+      },
+      "title": "HeartbeatConfig",
+      "type": "object"
+    },
+    "Ina228Config": {
+      "additionalProperties": false,
+      "description": "On-target INA228 power monitor wiring and calibration (I2C).\n\nThe INA228 sits in series with the target rail and integrates energy and\ncharge in hardware; firmware reads the accumulators over I2C around the\nfixed-N inference window.\n\n``board`` selects a known carrier's electrical facts (address strapping,\nonboard shunt) from :data:`INA228_BOARD_PRESETS`; explicit values always\nwin over the preset. ``shunt_ohms`` has no bare default on purpose: a\nwrong shunt calibration produces plausible-looking but wrong energy, so\nthe value must come either from the user's wiring or from a board that\nphysically carries its shunt.",
+      "properties": {
+        "board": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Board"
+        },
+        "shunt_ohms": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Shunt Ohms"
+        },
+        "max_current_a": {
+          "default": 0.5,
+          "title": "Max Current A",
+          "type": "number"
+        },
+        "i2c_iom": {
+          "default": 1,
+          "title": "I2C Iom",
+          "type": "integer"
+        },
+        "i2c_address": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "I2C Address"
+        },
+        "i2c_speed_hz": {
+          "default": 400000,
+          "title": "I2C Speed Hz",
+          "type": "integer"
+        },
+        "conversion_time_us": {
+          "default": 540,
+          "title": "Conversion Time Us",
+          "type": "integer"
+        },
+        "averaging_count": {
+          "default": 16,
+          "title": "Averaging Count",
+          "type": "integer"
+        },
+        "calibration_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Calibration Id"
+        }
+      },
+      "title": "Ina228Config",
+      "type": "object"
+    },
+    "MemoryLayout": {
+      "description": "Memory sizes in KB.  0 means not present on this SoC.",
+      "properties": {
+        "mram_kb": {
+          "default": 0,
+          "title": "Mram Kb",
+          "type": "integer"
+        },
+        "sram_kb": {
+          "default": 0,
+          "title": "Sram Kb",
+          "type": "integer"
+        },
+        "dtcm_kb": {
+          "default": 0,
+          "title": "Dtcm Kb",
+          "type": "integer"
+        },
+        "itcm_kb": {
+          "default": 0,
+          "title": "Itcm Kb",
+          "type": "integer"
+        },
+        "psram_kb": {
+          "default": 0,
+          "title": "Psram Kb",
+          "type": "integer"
+        },
+        "nvm_kb": {
+          "default": 0,
+          "title": "Nvm Kb",
+          "type": "integer"
+        }
+      },
+      "title": "MemoryLayout",
+      "type": "object"
+    },
+    "ModelConfig": {
+      "additionalProperties": false,
+      "description": "Model file and arena sizing.\n\n``arena_location`` and ``weights_location`` are the preferred placement\ncontrols for runtime engines such as heliaRT: the arena is the mutable\ntensor arena, while weights are the model flatbuffer/constant data.\n\n    When a split field is omitted, the engine and memory planner choose the\n    fastest region that fits. ``helia-aot`` translates these coarse controls\n    into tensor rules; explicit ``engine.config.aot_args.memory.tensors`` rules\n    remain available for per-kind and per-tensor placement.",
+      "properties": {
+        "path": {
+          "format": "path",
+          "title": "Path",
+          "type": "string"
+        },
+        "arena_size": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Arena Size"
+        },
+        "arena_location": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Placement"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Arena Location"
+        },
+        "weights_location": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Placement"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Weights Location"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "title": "ModelConfig",
+      "type": "object"
+    },
+    "MonitorBoardPreset": {
+      "additionalProperties": false,
+      "description": "Known breakout/Click board carrying an on-target power monitor chip.\n\nA preset is pure data: the electrical facts a specific board fixes\n(address strapping, an onboard shunt when the board has one) plus the\nboard-specific hint to show when a required fact is missing. Explicit\n``power.ina228.*`` values always win over the preset. Adding support for\na new breakout of an already-supported chip is one registry entry here —\nno new driver, no new firmware.",
+      "properties": {
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "i2c_address": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "I2C Address"
+        },
+        "shunt_ohms": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Shunt Ohms"
+        },
+        "missing_shunt_hint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Missing Shunt Hint"
+        }
+      },
+      "required": [
+        "label"
+      ],
+      "title": "MonitorBoardPreset",
+      "type": "object"
+    },
+    "NsxModuleOverride": {
+      "additionalProperties": false,
+      "description": "Override resolution for a single NSX module.\n\nExactly one mode must be set:\n* *path* — use a local directory as the module source (``local: true``).\n* *ref* — resolve the module's project at a specific git ref/tag.\n* *version* — pin the module to an exact version constraint.\n\nOnly applies to modules NSX resolves itself (e.g. ``nsx-core``,\n``nsx-ambiq-bsp``). Engine-provided modules (``nsx-helia-rt``,\n``nsx-cmsis-nn``) are configured through ``engine.config``\n(``dist_path``/``source_path``/``source``/``cmsis_nn_path``/``cmsis_nn_ref``) instead —\nan entry here targeting one of those names is ignored with a warning.",
+      "properties": {
+        "path": {
+          "anyOf": [
+            {
+              "format": "path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        },
+        "ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ref"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Version"
+        }
+      },
+      "title": "NsxModuleOverride",
+      "type": "object"
+    },
+    "OutputConfig": {
+      "additionalProperties": false,
+      "description": "Report output settings.",
+      "properties": {
+        "format": {
+          "$ref": "#/$defs/OutputFormat",
+          "default": "csv"
+        },
+        "dir": {
+          "default": "results",
+          "format": "path",
+          "title": "Dir",
+          "type": "string"
+        },
+        "model_explorer": {
+          "default": true,
+          "title": "Model Explorer",
+          "type": "boolean"
+        },
+        "detailed": {
+          "default": false,
+          "title": "Detailed",
+          "type": "boolean"
+        },
+        "fail_on_invalid": {
+          "default": false,
+          "title": "Fail On Invalid",
+          "type": "boolean"
+        }
+      },
+      "title": "OutputConfig",
+      "type": "object"
+    },
+    "OutputFormat": {
+      "description": "Top-level report format emitted by the report stage.",
+      "enum": [
+        "csv",
+        "json",
+        "model-explorer"
+      ],
+      "title": "OutputFormat",
+      "type": "string"
+    },
+    "PerfTier": {
+      "description": "NSX CPU performance tier — maps directly to ``nsx_perf_mode_e``.",
+      "enum": [
+        "NSX_PERF_LOW",
+        "NSX_PERF_MEDIUM",
+        "NSX_PERF_HIGH"
+      ],
+      "title": "PerfTier",
+      "type": "string"
+    },
+    "Placement": {
+      "description": "Logical placement region for arenas / weights / model data.\n\nThe four logical regions abstract over the SoC physical layout —\ne.g. ``Placement.TCM`` covers DTCM on AP5 and is unavailable on AP3.\nEngine adapters that emit physical names (heliaAOT's ``DTCM``,\n``ITCM``, …) normalise to this enum at the adapter boundary.",
+      "enum": [
+        "tcm",
+        "sram",
+        "mram",
+        "psram"
+      ],
+      "title": "Placement",
+      "type": "string"
+    },
+    "PlatformRegistry": {
+      "description": "Resolved platform registry used for one config/run.",
+      "properties": {
+        "socs": {
+          "additionalProperties": {
+            "$ref": "#/$defs/SocDef"
+          },
+          "title": "Socs",
+          "type": "object"
+        },
+        "boards": {
+          "additionalProperties": {
+            "$ref": "#/$defs/BoardDef"
+          },
+          "title": "Boards",
+          "type": "object"
+        }
+      },
+      "required": [
+        "socs",
+        "boards"
+      ],
+      "title": "PlatformRegistry",
+      "type": "object"
+    },
+    "PmuTier": {
+      "enum": [
+        "dwt",
+        "pmu"
+      ],
+      "title": "PmuTier",
+      "type": "string"
+    },
+    "PowerConfig": {
+      "additionalProperties": false,
+      "description": "Power measurement settings.",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "driver": {
+          "default": "joulescope",
+          "title": "Driver",
+          "type": "string"
+        },
+        "firmware": {
+          "$ref": "#/$defs/PowerFirmware",
+          "default": "dedicated"
+        },
+        "mode": {
+          "$ref": "#/$defs/PowerMode",
+          "default": "external"
+        },
+        "duration_s": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration S"
+        },
+        "io_voltage": {
+          "default": 1.8,
+          "title": "Io Voltage",
+          "type": "number"
+        },
+        "sync_gpio_pin": {
+          "default": 10,
+          "title": "Sync Gpio Pin",
+          "type": "integer"
+        },
+        "sync_input_index": {
+          "default": 0,
+          "title": "Sync Input Index",
+          "type": "integer"
+        },
+        "lockstep": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lockstep"
+        },
+        "state_gpio_pin": {
+          "default": 0,
+          "title": "State Gpio Pin",
+          "type": "integer"
+        },
+        "go_gpio_pin": {
+          "default": 0,
+          "title": "Go Gpio Pin",
+          "type": "integer"
+        },
+        "state_input_index": {
+          "default": 1,
+          "title": "State Input Index",
+          "type": "integer"
+        },
+        "go_output_index": {
+          "default": 0,
+          "title": "Go Output Index",
+          "type": "integer"
+        },
+        "stats_rate_hz": {
+          "default": 1000,
+          "title": "Stats Rate Hz",
+          "type": "integer"
+        },
+        "reset_strategy": {
+          "$ref": "#/$defs/ResetStrategy",
+          "default": "auto"
+        },
+        "serial": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Serial"
+        },
+        "ina228": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Ina228Config"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "PowerConfig",
+      "type": "object"
+    },
+    "PowerFirmware": {
+      "description": "Which binary is on the target during power capture.\n\n``DEDICATED`` flashes the transport-free ``hpx_profiler_power`` image\n(see ``firmware/__init__.py`` WP2) before capture, avoiding SWO/UART/\nRTT/USB current contamination in the GPIO-gated Joulescope window, so\n``DEDICATED`` is the default.  ``SHARED`` reuses the already-flashed\ntransport binary for power capture (useful when no J-Link is free to\nreflash, or for bring-up comparisons against the contaminated\nbaseline).",
+      "enum": [
+        "dedicated",
+        "shared"
+      ],
+      "title": "PowerFirmware",
+      "type": "string"
+    },
+    "PowerMode": {
+      "description": "Power measurement mode.",
+      "enum": [
+        "external",
+        "internal"
+      ],
+      "title": "PowerMode",
+      "type": "string"
+    },
+    "ProfileConfig": {
+      "additionalProperties": false,
+      "description": "Top-level immutable configuration for a profiling run.",
+      "properties": {
+        "model": {
+          "$ref": "#/$defs/ModelConfig"
+        },
+        "engine": {
+          "$ref": "#/$defs/EngineConfig"
+        },
+        "target": {
+          "$ref": "#/$defs/TargetConfig"
+        },
+        "profiling": {
+          "$ref": "#/$defs/ProfilingConfig"
+        },
+        "power": {
+          "$ref": "#/$defs/PowerConfig"
+        },
+        "output": {
+          "$ref": "#/$defs/OutputConfig"
+        },
+        "timeouts": {
+          "$ref": "#/$defs/TimeoutsConfig"
+        },
+        "build": {
+          "$ref": "#/$defs/BuildConfig"
+        },
+        "platform_registry": {
+          "$ref": "#/$defs/PlatformRegistry"
+        },
+        "compatibility_baseline": {
+          "$ref": "#/$defs/CompatibilityBaseline"
+        },
+        "compatibility": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CompatibilityResolution"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "frozen": {
+          "default": false,
+          "title": "Frozen",
+          "type": "boolean"
+        },
+        "work_dir": {
+          "anyOf": [
+            {
+              "format": "path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Work Dir"
+        },
+        "clean": {
+          "default": false,
+          "title": "Clean",
+          "type": "boolean"
+        },
+        "verbose": {
+          "default": 0,
+          "title": "Verbose",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "model"
+      ],
+      "title": "ProfileConfig",
+      "type": "object"
+    },
+    "ProfilingConfig": {
+      "additionalProperties": false,
+      "description": "PMU capture settings.\n\nCounter selection is specified via *pmu_counters* — a mapping of\ncompute-unit group (``cpu``, ``mve``, ``memory``, ``ethos_npu``) to a\nselection:\n\n* ``\"default\"`` — curated set of the most useful counters.\n* ``\"all\"``     — every counter in the group (multi-pass).\n* ``[\"NAME\", …]`` — explicit counter names.\n\nThe ``ethos_npu`` group samples the Ethos-U NPU's own PMU (NPU cycles,\nMAC activity, SRAM/external bus beats) and requires an NPU-equipped board\nplus ``engine.backend: ethos_u`` (engine.type helia-rt or helia-aot).",
+      "properties": {
+        "pmu_counters": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          },
+          "title": "Pmu Counters",
+          "type": "object"
+        },
+        "per_layer": {
+          "default": true,
+          "title": "Per Layer",
+          "type": "boolean"
+        },
+        "iterations": {
+          "default": 100,
+          "title": "Iterations",
+          "type": "integer"
+        },
+        "warmup": {
+          "default": 5,
+          "title": "Warmup",
+          "type": "integer"
+        },
+        "window_mode": {
+          "$ref": "#/$defs/WindowMode",
+          "default": "auto"
+        },
+        "window_target_ms": {
+          "default": 1000,
+          "title": "Window Target Ms",
+          "type": "integer"
+        },
+        "window_min": {
+          "default": 10,
+          "title": "Window Min",
+          "type": "integer"
+        },
+        "window_max": {
+          "default": 500000,
+          "title": "Window Max",
+          "type": "integer"
+        },
+        "clean_window_probe": {
+          "$ref": "#/$defs/CleanWindowProbe",
+          "default": "infer"
+        },
+        "clean_window_trace": {
+          "default": false,
+          "title": "Clean Window Trace",
+          "type": "boolean"
+        },
+        "force_shared_sram": {
+          "default": false,
+          "title": "Force Shared Sram",
+          "type": "boolean"
+        },
+        "aggregation": {
+          "$ref": "#/$defs/Aggregation",
+          "default": "median"
+        },
+        "extreme_mode": {
+          "default": false,
+          "title": "Extreme Mode",
+          "type": "boolean"
+        }
+      },
+      "title": "ProfilingConfig",
+      "type": "object"
+    },
+    "PsramConfig": {
+      "additionalProperties": false,
+      "description": "External PSRAM interface selection.\n\nThe selected clock is passed to ``nsx-psram`` when a run places weights or\narenas in PSRAM. Board-specific support is enforced by the NSX module.",
+      "properties": {
+        "clock_hz": {
+          "default": 48000000,
+          "title": "Clock Hz",
+          "type": "integer"
+        }
+      },
+      "title": "PsramConfig",
+      "type": "object"
+    },
+    "QualificationState": {
+      "description": "Compatibility state of a resolved profiling configuration.",
+      "enum": [
+        "qualified",
+        "qualified-with-engine-override",
+        "development-overrides"
+      ],
+      "title": "QualificationState",
+      "type": "string"
+    },
+    "ResetStrategy": {
+      "description": "User-selectable reset policy for target lifecycle preparation.",
+      "enum": [
+        "auto",
+        "power_cycle",
+        "none",
+        "debug_reset",
+        "swpoi_reset",
+        "debug_reset+swpoi_reset"
+      ],
+      "title": "ResetStrategy",
+      "type": "string"
+    },
+    "SocDef": {
+      "description": "Definition of an Ambiq SoC relevant to profiling.",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "family": {
+          "$ref": "#/$defs/SocFamily"
+        },
+        "core": {
+          "$ref": "#/$defs/CoreArch"
+        },
+        "pmu_tier": {
+          "$ref": "#/$defs/PmuTier"
+        },
+        "has_mve": {
+          "title": "Has Mve",
+          "type": "boolean"
+        },
+        "memory": {
+          "$ref": "#/$defs/MemoryLayout"
+        },
+        "clocks": {
+          "items": {
+            "$ref": "#/$defs/ClockDomain"
+          },
+          "title": "Clocks",
+          "type": "array"
+        },
+        "c_define": {
+          "title": "C Define",
+          "type": "string"
+        },
+        "cmsis_header": {
+          "title": "Cmsis Header",
+          "type": "string"
+        },
+        "rtt_scan_ranges": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Rtt Scan Ranges",
+          "type": "array"
+        },
+        "jlink_device": {
+          "default": "",
+          "title": "Jlink Device",
+          "type": "string"
+        },
+        "pmu_max_ops": {
+          "default": 2048,
+          "title": "Pmu Max Ops",
+          "type": "integer"
+        },
+        "swo_trace_clock_mhz": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Swo Trace Clock Mhz"
+        },
+        "has_usb": {
+          "default": true,
+          "title": "Has Usb",
+          "type": "boolean"
+        },
+        "ssram_full_power_enum": {
+          "default": "AM_HAL_PWRCTRL_SRAM_3M",
+          "title": "Ssram Full Power Enum",
+          "type": "string"
+        },
+        "has_radio_subsystem": {
+          "default": false,
+          "title": "Has Radio Subsystem",
+          "type": "boolean"
+        },
+        "npu": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Npu"
+        },
+        "app_flash_load_addr": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "App Flash Load Addr"
+        },
+        "memory_bases_like": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Memory Bases Like"
+        },
+        "origin": {
+          "$ref": "#/$defs/SocOrigin",
+          "default": "custom"
+        },
+        "registered_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Registered Name"
+        }
+      },
+      "required": [
+        "name",
+        "family",
+        "core",
+        "pmu_tier",
+        "has_mve",
+        "memory",
+        "clocks",
+        "c_define",
+        "cmsis_header",
+        "rtt_scan_ranges"
+      ],
+      "title": "SocDef",
+      "type": "object"
+    },
+    "SocFamily": {
+      "enum": [
+        "ap3",
+        "ap4",
+        "ap5"
+      ],
+      "title": "SocFamily",
+      "type": "string"
+    },
+    "SocOrigin": {
+      "description": "Where a :class:`SocDef`'s platform facts came from.\n\nThis is not decoration: some policy in\n:mod:`~helia_profiler.platform.capabilities` is only sound for parts this\nrepo has actually characterised.  The app-image flash address is the live\ncase -- its per-SoC and per-family tables were checked part by part against\nNSX's ``cmake/socs/facts/*.cmake``, and neither table can speak for a SoC\nthat was never in them.\n\n``CUSTOM`` is the default precisely so that a ``SocDef`` arriving from\nanywhere other than this module's registry -- ``target.custom_socs``, a\ntest fixture, a caller of the public API -- is treated as uncharacterised\nunless something deliberately says otherwise.  ``_register_soc`` is that\nsomething, and is the only place ``BUILTIN`` is set.\n\nProvenance is a *field* rather than an ``is _SOCS[name]`` identity check\nbecause a built-in SoC does not always survive as the registered object:\n:func:`~helia_profiler.platform.registry.get_soc_for_board` returns a\n``dataclasses.replace`` copy whenever the board overrides ``psram_kb`` (7\nof the built-in boards do).  An identity check silently reclassifies those\ncopies as unknown parts; ``replace`` carries this field through untouched.\n\nCarrying through untouched is exactly why this field is not the whole\ntest on its own: ``replace`` also carries it onto a copy whose ``name``\nwas changed to another part's.  Read provenance through\n:attr:`SocDef.is_builtin`, never through this field alone.",
+      "enum": [
+        "builtin",
+        "custom"
+      ],
+      "title": "SocOrigin",
+      "type": "string"
+    },
+    "TargetConfig": {
+      "additionalProperties": false,
+      "description": "Hardware target.",
+      "properties": {
+        "board": {
+          "default": "apollo510_evb",
+          "title": "Board",
+          "type": "string"
+        },
+        "toolchain": {
+          "$ref": "#/$defs/Toolchain",
+          "default": "arm-none-eabi-gcc"
+        },
+        "jlink_serial": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Jlink Serial"
+        },
+        "transport": {
+          "$ref": "#/$defs/Transport",
+          "default": "rtt"
+        },
+        "usb_port": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Usb Port"
+        },
+        "segger_rtt_path": {
+          "anyOf": [
+            {
+              "format": "path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Segger Rtt Path"
+        },
+        "rtt_buffer_size_up": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rtt Buffer Size Up"
+        },
+        "clock": {
+          "$ref": "#/$defs/ClockSelection"
+        },
+        "psram": {
+          "$ref": "#/$defs/PsramConfig"
+        },
+        "heartbeat": {
+          "$ref": "#/$defs/HeartbeatConfig"
+        },
+        "custom_socs": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Custom Socs"
+        },
+        "custom_boards": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Custom Boards"
+        },
+        "ensure_board_powered": {
+          "default": false,
+          "title": "Ensure Board Powered",
+          "type": "boolean"
+        }
+      },
+      "title": "TargetConfig",
+      "type": "object"
+    },
+    "TimeoutsConfig": {
+      "additionalProperties": false,
+      "description": "Subprocess and network timeouts (seconds).\n\nEvery subprocess and long-lived HTTP call in heliaPROFILER reads its\ntimeout from this struct instead of hard-coding it.  Override any value\nin YAML under ``timeouts:`` to adapt to slow CI machines, laggy J-Link\nprobes, or poor network conditions.\n\nCapture-time timeouts (heartbeat / overall) live on ``HeartbeatConfig``\nbecause they are tied to the on-device progress protocol.",
+      "properties": {
+        "configure_s": {
+          "default": 120,
+          "title": "Configure S",
+          "type": "integer"
+        },
+        "build_s": {
+          "default": 300,
+          "title": "Build S",
+          "type": "integer"
+        },
+        "flash_s": {
+          "default": 120,
+          "title": "Flash S",
+          "type": "integer"
+        },
+        "toolchain_probe_s": {
+          "default": 5,
+          "title": "Toolchain Probe S",
+          "type": "integer"
+        },
+        "binary_probe_s": {
+          "default": 10,
+          "title": "Binary Probe S",
+          "type": "integer"
+        },
+        "download_api_s": {
+          "default": 30,
+          "title": "Download Api S",
+          "type": "integer"
+        },
+        "download_asset_s": {
+          "default": 300,
+          "title": "Download Asset S",
+          "type": "integer"
+        }
+      },
+      "title": "TimeoutsConfig",
+      "type": "object"
+    },
+    "Toolchain": {
+      "description": "Supported cross-compiler toolchains for the profiler firmware.\n\n``GCC`` and ``ARM_NONE_EABI_GCC`` are aliases — both resolve to the\nGNU Arm Embedded toolchain.  ``ARMCLANG`` is Arm Compiler 6 (Keil),\n``ATFE`` is the Arm Toolchain for Embedded (LLVM).",
+      "enum": [
+        "arm-none-eabi-gcc",
+        "gcc",
+        "armclang",
+        "atfe"
+      ],
+      "title": "Toolchain",
+      "type": "string"
+    },
+    "Transport": {
+      "description": "Host↔target transport for capture and heartbeat traffic.",
+      "enum": [
+        "rtt",
+        "usb_cdc",
+        "swo",
+        "uart"
+      ],
+      "title": "Transport",
+      "type": "string"
+    },
+    "WindowMode": {
+      "description": "Clean / GPIO-gated end-to-end window sizing.\n\n``FIXED`` reuses ``iterations`` for the clean pass (historical\nbehaviour).  ``AUTO`` (default) lets the firmware size the gated window\nat runtime from the measured clean-inference time so short models run\nmore iterations and big models run fewer — filling a consistent ~1 s\nwall-clock window for ordinary profiling.  External power capture raises\nthis to a longer minimum window so host-side GPIO polling and Joulescope\npacket alignment have several seconds to settle.",
+      "enum": [
+        "fixed",
+        "auto"
+      ],
+      "title": "WindowMode",
+      "type": "string"
+    }
+  }
+}

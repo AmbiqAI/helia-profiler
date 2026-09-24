@@ -608,15 +608,22 @@ def test_no_assert_narrowing_of_context_fields_survives_in_src():
 
 
 def test_docs_accessor_table_matches_the_code():
-    """docs/architecture/pipeline.md hand-duplicates the accessor table.
+    """The Concepts pipeline page hand-duplicates the accessor table.
     Parse the table and hold it to NARROWING_ACCESSORS so a mutated
     producer cannot leave the docs silently divergent."""
-    doc = (Path(__file__).resolve().parents[1] / "docs" / "architecture" / "pipeline.md").read_text(
-        encoding="utf-8"
-    )
+    doc = (
+        Path(__file__).resolve().parents[1]
+        / "astro-site"
+        / "src"
+        / "content"
+        / "docs"
+        / "guide"
+        / "concepts"
+        / "pipeline.mdx"
+    ).read_text(encoding="utf-8")
     rows = re.findall(r"^\| `(\w+)` \| `(\w+)` \| `(\w+)` \|$", doc, flags=re.MULTILINE)
     assert set(rows) == set(NARROWING_ACCESSORS), (
-        "the accessor table in docs/architecture/pipeline.md no longer "
+        "the accessor table in guide/concepts/pipeline.mdx no longer "
         "matches pipeline.py's accessors — update both together"
     )
 

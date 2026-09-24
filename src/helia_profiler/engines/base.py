@@ -49,29 +49,21 @@ class ArenaRegion:
     own size, alignment, and target memory.  The firmware template binds
     each region individually via ``bind_arena()``.
 
-    Attributes
-    ----------
-    region_id:
-        Stable AOT region index — also the enum value passed to
-        ``bind_arena()`` from firmware.
-    name:
-        Human-readable region name (used in firmware logs / report tables).
-    enum_name:
-        C symbol name of the corresponding region enum value.
-    size:
-        Byte size of the backing buffer.
-    alignment:
-        Required alignment of the backing buffer.
-    role:
-        Region role — drives firmware-level placement overrides.
-    memory:
-        Original physical memory name from the AOT planner (e.g.
-        ``"dtcm"``, ``"itcm"``, ``"sram"``).  Used in symbol names and
-        diagnostics; placement decisions should consult :attr:`placement`
-        instead.
-    placement:
-        Logical placement region — the single vocabulary used by the
-        firmware Jinja templates and the rest of the pipeline.
+    Attributes:
+        region_id: Stable AOT region index — also the enum value passed to
+            ``bind_arena()`` from firmware.
+        name: Human-readable region name (used in firmware logs / report
+            tables).
+        enum_name: C symbol name of the corresponding region enum value.
+        size: Byte size of the backing buffer.
+        alignment: Required alignment of the backing buffer.
+        role: Region role — drives firmware-level placement overrides.
+        memory: Original physical memory name from the AOT planner (e.g.
+            ``"dtcm"``, ``"itcm"``, ``"sram"``).  Used in symbol names and
+            diagnostics; placement decisions should consult :attr:`placement`
+            instead.
+        placement: Logical placement region — the single vocabulary used by
+            the firmware Jinja templates and the rest of the pipeline.
     """
 
     region_id: int
