@@ -67,7 +67,16 @@ def load_golden(model_path: Path, data_path: Path) -> GoldenData:
             data, expected = (array.tobytes(order="C") for array in arrays)
         if not data or len(data) > 1048576 or not expected or len(expected) > 256:
             raise ValueError("validation_data supports up to 1 MiB input and 256 output bytes")
-    except (OSError, ValueError, KeyError, IndexError, TypeError, struct.error, BadZipFile) as exc:
+    except (
+        OSError,
+        ValueError,
+        KeyError,
+        IndexError,
+        TypeError,
+        EOFError,
+        struct.error,
+        BadZipFile,
+    ) as exc:
         raise ConfigError(f"Invalid validation_data: {exc}") from exc
     return GoldenData(
         data, expected, hashlib.sha256(model_bytes).hexdigest(), hashlib.sha256(data).hexdigest()

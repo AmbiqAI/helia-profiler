@@ -198,13 +198,15 @@ def test_validation_record_must_belong_to_one_complete_capture(pair, case):
         check_golden_output(text, golden)
 
 
-@pytest.mark.parametrize("broken", ["flatbuffer", "zip"])
+@pytest.mark.parametrize("broken", ["flatbuffer", "zip", "empty"])
 def test_corrupted_containers_report_config_error(pair, broken):
     model, data = pair
     if broken == "flatbuffer":
         model.write_bytes(b"\xff\xff\xff\x7fTFL3")
-    else:
+    elif broken == "zip":
         data.write_bytes(b"PK\x03\x04truncated")
+    else:
+        data.write_bytes(b"")
     with pytest.raises(ConfigError, match="Invalid validation_data"):
         load_golden(model, data)
 
