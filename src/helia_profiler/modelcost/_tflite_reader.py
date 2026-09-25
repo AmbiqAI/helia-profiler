@@ -32,8 +32,8 @@ float precisions a model works in, #246). Real model analysis belongs in
 from __future__ import annotations
 
 import struct
-from typing import Any
 from dataclasses import dataclass
+from typing import Any
 
 # Extracted from ai_edge_litert's generated schema (#229 D7); flatbuffers
 # schema-evolution rules freeze them, and tests/test_softmax_preflight.py
@@ -113,7 +113,11 @@ class _Table:
         return _Table(self.buf, self._indirect(pos))
 
     def vector(self, slot: int) -> tuple[int, int]:
-        """(element-0 position, length); (0, 0) when absent."""
+        """(element-0 position, length); (0, 0) when absent.
+
+        Every vector this reader reads holds 4-byte elements (offsets, int32
+        indices, float32 scales), and the bound check assumes so.
+        """
         pos = self._field_pos(slot)
         if pos is None:
             return 0, 0

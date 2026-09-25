@@ -733,11 +733,15 @@ class TestReaderRejectsOffsetsOutsideTheBuffer:
         with pytest.raises(struct.error, match="runs past the buffer"):
             r._Table(bytes(buf), 8).string(4)
 
-    @pytest.mark.parametrize(("claimed", "fits"), [(2, True), (3, False)])
-    def test_a_vector_must_fit_its_claimed_length(self, claimed, fits):
+    # Two elements need bytes 32-39: a 39-byte buffer is one byte short, so a
+    # check that is lenient by a single byte is caught too.
+    @pytest.mark.parametrize(
+        ("size", "claimed", "fits"), [(40, 2, True), (39, 2, False), (40, 3, False)]
+    )
+    def test_a_vector_must_fit_its_claimed_length(self, size, claimed, fits):
         from helia_profiler.modelcost import _tflite_reader as r
 
-        buf = bytearray(40)
+        buf = bytearray(size)
         struct.pack_into("<i", buf, 8, 8 - 20)
         struct.pack_into("<HHH", buf, 20, 6, 8, 4)
         struct.pack_into("<I", buf, 12, 16)  # vector at 12 + 16 = 28
