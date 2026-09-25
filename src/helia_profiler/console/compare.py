@@ -143,7 +143,7 @@ def _build_compare_layer_table(layer_rows: list[LayerDiffRow], *, top_layers: in
             op_cell = f"{op_cell} [yellow]OVF[/yellow]"
 
         row_values = [
-            str(row.id or ""),
+            str(row.id) if row.id is not None else "",
             op_cell,
             _format_compact_number(row.baseline_cycles),
             _format_compact_number(row.candidate_cycles),
@@ -186,7 +186,7 @@ def _build_compare_placement_table(
         if not row.op_match:
             op = f"{row.baseline_op or '<missing>'} -> {row.candidate_op or '<missing>'}"
         table.add_row(
-            str(row.id or ""),
+            str(row.id) if row.id is not None else "",
             escape(op),
             escape(str(row.baseline_memory or "")),
             f"[yellow]{escape(str(row.candidate_memory or ''))}[/yellow]",
