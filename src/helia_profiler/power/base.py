@@ -148,7 +148,9 @@ class PowerDriver(Protocol):
         This is only meaningful for external host instruments that can sample
         current/voltage while also observing a sync input (for example,
         Joulescope JS110/JS220/JS320). Drivers without host-side GPIO visibility
-        should raise :class:`PowerError`.
+        should raise :class:`PowerError`. An optional ``on_started`` hook runs
+        once the driver is watching the sync input; if it raises, the capture
+        ends and the exception propagates unchanged.
         """
         ...
 

@@ -266,8 +266,8 @@ BOOT_SETTLE_S = 8.0
 #: #170).
 CLEAN_WINDOW_WARMUP_REPS = 3
 
-#: Gated-wait allowance beyond the longest plausible window: setup between GO
-#: and the gate rise, gate-edge detection and the post-fall guard.
+#: Allowance beyond the longest plausible window, and beyond boot and warm-up for
+#: READY: setup after GO, gate-edge detection and the post-fall guard.
 FALL_WAIT_HEADROOM_S = 2.0
 
 
@@ -309,6 +309,11 @@ def gate_fall_wait_s(
     if not lockstep:
         minimum_s += BOOT_SETTLE_S + pre_window_s
     return max(configured_s, minimum_s)
+
+
+def lockstep_ready_wait_s(configured_s: float, *, pre_window_s: float = 0.0) -> float:
+    """READY follows boot and ``pre_window_s`` of warm-up: wait that plus headroom."""
+    return max(configured_s, BOOT_SETTLE_S + pre_window_s + FALL_WAIT_HEADROOM_S)
 
 
 def external_observer_slack_s(
@@ -860,6 +865,7 @@ def classify_gate_failure(
     planned_window_s: float | None = None,
     gate_high_s: float | None = None,
     longest_window_s: float | None = None,
+    rise_due_s: float | None = None,
 ) -> GateFailure:
     """Classify why a gated capture produced no complete high window.
 
@@ -868,8 +874,25 @@ def classify_gate_failure(
     at all (see :attr:`PowerConfig.lockstep_wiring_available`, the single
     source of that predicate). Together they select which ``no_gate_rise``
     hint applies. ``lockstep=None`` means the caller does not know, which
-    keeps the wiring-only hint.
+    keeps the wiring-only hint. A bound shorter than ``rise_due_s`` (the gate's
+    due time from the start of the wait) explains a missing rise first.
     """
+    if not saw_gate_rise and rise_due_s is not None and duration_s < rise_due_s:
+        go = (
+            " or set power.lockstep: true so the wait starts at GO"
+            if lockstep_wiring_available
+            else ""
+        )
+        return GateFailure(
+            kind=GateFailureKind.NO_GATE_RISE,
+            message="No GPIO gate rising edge detected: the capture bound likely ended before the window was due",
+            hint=(
+                f"The {duration_s:.2f}s capture bound is shorter than the {rise_due_s:.2f}s "
+                "allowed after reset without lock-step, so the window had most likely not "
+                f"opened. Increase power.duration_s{go}; if the gate is still missed, check "
+                "GO/state/gate wiring."
+            ),
+        )
     if not saw_gate_rise:
         lockstep_is_the_suspect = lockstep is False and lockstep_wiring_available
         return GateFailure(
@@ -971,5 +994,6 @@ __all__ = [
     "firmware_window_clock_is_frozen",
     "gate_fall_wait_s",
     "gated_window_reference_s",
+    "lockstep_ready_wait_s",
     "longest_accepted_window_s",
 ]

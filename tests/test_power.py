@@ -187,7 +187,9 @@ def _install_fake_capture_clock(monkeypatch: pytest.MonkeyPatch) -> _FakeCapture
     return clock
 
 
-def _mark_power_firmware_deployed(ctx, tmp_path: Path) -> None:
+def _mark_power_firmware_deployed(
+    ctx, tmp_path: Path, *, reference_inference_us: int | None = None
+) -> None:
     binary = tmp_path / "hpx_profiler_power"
     binary.touch()
     artifact = FirmwareArtifact(
@@ -201,6 +203,7 @@ def _mark_power_firmware_deployed(ctx, tmp_path: Path) -> None:
         PowerRunPlan(
             firmware_mode="dedicated",
             inference_count=5,
+            reference_inference_us=reference_inference_us,
             count_source="configured",
         )
     )
@@ -1416,7 +1419,7 @@ class TestMissedGateWarningNamesTheFix:
         self,
         monkeypatch,
         *,
-        lockstep: bool,
+        lockstep: bool | None,
         wired: bool,
         empty_frames=False,
         gpi_level: int = 0,
@@ -1425,13 +1428,18 @@ class TestMissedGateWarningNamesTheFix:
         clean_infer_avg_us: int = 1000,
         duration_s: float = 0.3,
         gate_relative_tolerance: float = 0.10,
+        on_started: Callable[..., None] | None = None,
+        pre_window_s: float = 0.0,
+        boot_settle_s: float | None = None,
     ):
         from helia_profiler.power.joulescope import capture_gated as module
         from helia_profiler.power.joulescope.driver import JoulescopeDriver
 
         fake = self._FakeJoulescopeDriver(empty_frames=empty_frames)
         monkeypatch.setattr(module, "_open_device", lambda _serial: (fake, "u/js320/test", "js320"))
-        clock = _install_fake_capture_clock(monkeypatch)
+        if boot_settle_s is not None:
+            monkeypatch.setattr(module, "BOOT_SETTLE_S", boot_settle_s)
+        clock = self.clock = _install_fake_capture_clock(monkeypatch)
 
         # GPI never goes high by default: the gate was missed entirely. A
         # scheduled rise is exact on the fake clock.
@@ -1453,14 +1461,16 @@ class TestMissedGateWarningNamesTheFix:
             clean_infer_count=clean_infer_count,
             clean_infer_avg_us=clean_infer_avg_us,
             poll_interval_s=0.005,
-            on_started=lambda _wait: fake.emit_packets(10),
+            on_started=on_started or (lambda _wait: fake.emit_packets(10)),
             lockstep=lockstep,
             lockstep_wiring_available=wired,
+            pre_window_s=pre_window_s,
         )
 
     def test_warning_names_power_lockstep_when_it_is_the_suspect(self, monkeypatch, caplog):
+        # The window was due inside the bound, so the bound is not the cause.
         with caplog.at_level(logging.WARNING, logger="hpx"):
-            result = self._run_capture(monkeypatch, lockstep=False, wired=True)
+            result = self._run_capture(monkeypatch, lockstep=False, wired=True, boot_settle_s=0.0)
 
         assert result.metadata.integrity == "degraded"
         assert result.metadata.gate_failure.kind == "no_gate_rise"
@@ -1469,6 +1479,58 @@ class TestMissedGateWarningNamesTheFix:
         )
         assert "No GPIO gate rising edge detected" in warnings
         assert "power.lockstep: true" in warnings
+        assert "ran with power.lockstep disabled" in warnings
+        assert "before the window was due" not in warnings
+
+    @pytest.mark.parametrize(
+        ("wired", "pre_window_s", "due"), [(True, 0.0, "8.00"), (False, 1.5, "9.50")]
+    )
+    def test_bound_that_ends_before_the_window_is_due_is_named(
+        self, monkeypatch, caplog, wired, pre_window_s, due
+    ):
+        with caplog.at_level(logging.WARNING, logger="hpx"):
+            result = self._run_capture(
+                monkeypatch, lockstep=False, wired=wired, pre_window_s=pre_window_s
+            )
+
+        failure = result.metadata.gate_failure
+        assert failure.kind == "no_gate_rise"
+        assert "likely ended before the window was due" in failure.message
+        assert failure.hint.startswith("The 0.30s capture bound is shorter than")
+        assert f"the {due}s allowed after reset" in failure.hint
+        assert ("power.lockstep: true" in failure.hint) is wired
+        # The bound comes first; wiring stays the fallback, not the lead.
+        assert failure.hint.index("power.duration_s") < failure.hint.index("wiring")
+
+    def test_bound_exhausted_with_no_packets_raises_the_same_reason(self, monkeypatch):
+        with pytest.raises(PowerError, match="likely ended before the window was due"):
+            self._run_capture(monkeypatch, lockstep=False, wired=True, on_started=lambda _w: None)
+
+    def test_unknown_lockstep_is_not_blamed_on_the_bound(self, monkeypatch):
+        result = self._run_capture(monkeypatch, lockstep=None, wired=True)
+
+        assert "before the window was due" not in result.metadata.gate_failure.message
+
+    def test_bound_is_not_blamed_when_lockstep_starts_the_wait_at_go(self, monkeypatch):
+        result = self._run_capture(monkeypatch, lockstep=True, wired=True)
+
+        assert "before the window was due" not in result.metadata.gate_failure.message
+        assert "wiring" in result.metadata.gate_failure.hint
+
+    @pytest.mark.parametrize(
+        "error", [PowerError("READY never came"), RuntimeError("J-Link reset failed")]
+    )
+    def test_failed_start_hook_ends_the_capture_with_its_own_error(self, monkeypatch, error):
+        def hook(_wait) -> None:
+            raise error
+
+        with pytest.raises(type(error)) as excinfo:
+            self._run_capture(
+                monkeypatch, lockstep=True, wired=True, duration_s=5.0, on_started=hook
+            )
+
+        assert excinfo.value is error
+        assert self.clock.elapsed_s < 2.0
 
     @pytest.mark.parametrize(
         ("avg_us", "expected", "absent"),
@@ -2969,6 +3031,8 @@ class TestCapturePowerWrapper:
             # the runtime truth the classifier needs.
             "lockstep": False,
             "lockstep_wiring_available": True,
+            # No per-inference time, so no counted warm-up before the window.
+            "pre_window_s": 0.0,
         }
 
     def test_capture_power_waits_for_lockstep_ready_before_go(
@@ -3064,7 +3128,9 @@ class TestCapturePowerWrapper:
             "arm",
             "capture_gated",
             "prepare:joulescope",
-            "wait_ready:7.0",
+            # READY follows boot and warm-up, so the 7 s capture bound is
+            # raised to boot (8 s) plus headroom (2 s); no warm-up is known.
+            "wait_ready:10.0",
             "go",
             "release",
         ]
@@ -3145,9 +3211,8 @@ class TestCapturePowerWrapper:
                 return FakeSync()
 
             def capture_gated(self, **kwargs):
-                # Mirrors JoulescopeDriver.capture_gated: the prepare/handshake
-                # now runs inside on_started, whose exceptions the driver
-                # swallows (logs) — the capture wrapper re-raises them after.
+                # A driver that swallows the hook's error and returns: the
+                # capture wrapper still raises it afterwards.
                 calls.append("capture_gated")
                 try:
                     kwargs["on_started"]()
@@ -4820,3 +4885,185 @@ class TestGateArbitrationComposition:
                 observer=None,
                 terminal_unhealthy=False,
             )
+
+
+class TestLockstepReadyBoundAndHookPrecedence:
+    """The READY wait covers boot and warm-up; a failed hook's error wins (#302)."""
+
+    def _run(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        *,
+        duration_s: float = 7.0,
+        clean_infer_avg_us: int | None = None,
+        ready: bool = True,
+        prepare_error: BaseException | None = None,
+        driver_error: Exception | None = None,
+        propagate_hook_error: bool = False,
+    ) -> list[str]:
+        from helia_profiler.capture import capture_power
+        from helia_profiler.config import load_config
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.power.sync import DeviceState
+        from helia_profiler.results import FirmwareMeta, PmuResult
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+                "power": {
+                    "enabled": True,
+                    "driver": "joulescope",
+                    "lockstep": True,
+                    "state_gpio_pin": 23,
+                    "go_gpio_pin": 24,
+                },
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        set_profile_result(ctx, PmuResult(meta=FirmwareMeta(clean_infer_count=11), layers=[]))
+        _mark_power_firmware_deployed(ctx, tmp_path, reference_inference_us=clean_infer_avg_us)
+        calls: list[str] = []
+
+        class FakeSync:
+            lockstep = True
+
+            def arm(self):
+                calls.append("arm")
+
+            def wait_ready(self, *, timeout_s: float):
+                calls.append(f"wait_ready:{timeout_s}")
+                return ready
+
+            def signal_go(self):
+                calls.append("go")
+
+            def release_go(self):
+                calls.append("release_go")
+
+            def read_state(self):
+                return DeviceState.UNKNOWN
+
+            def release(self):
+                calls.append("release")
+
+        class FakeDriver:
+            supports_gated_capture = True
+
+            def check_available(self):
+                calls.append("check")
+
+            def make_sync_controller(self, wiring):
+                return FakeSync()
+
+            def capture_gated(self, **kwargs):
+                try:
+                    kwargs["on_started"]()
+                except Exception:
+                    if propagate_hook_error:
+                        raise
+                if driver_error is not None:
+                    raise driver_error
+                return PowerResult(summary=PowerSummary(0.01, 0.02, 0.03, 0.04, 0.05, 6))
+
+        monkeypatch.setattr("helia_profiler.power.get_driver", lambda *a, **k: FakeDriver())
+
+        def prepare_target(driver, name):
+            if prepare_error is not None:
+                raise prepare_error
+
+            class Plan:
+                def to_metadata(self):
+                    return {"reset_action": "debug_reset"}
+
+            return Plan()
+
+        self.result = capture_power(
+            ctx, duration_override_s=duration_s, prepare_target=prepare_target
+        )
+        return calls
+
+    def test_ready_bound_covers_boot_and_counted_warm_up(self, tmp_path, monkeypatch):
+        # 500 ms inferences x 5 warm-up reps: 8 s boot + 2.5 s + 2 s headroom.
+        calls = self._run(tmp_path, monkeypatch, clean_infer_avg_us=500_000)
+
+        assert "wait_ready:12.5" in calls
+        # The metadata records the time actually waited, not the bound.
+        sync = self.result.metadata.sync
+        assert sync is not None and sync.ready_wait_s is not None
+        assert sync.ready_wait_s < 1.0
+
+    def test_ready_bound_keeps_a_longer_configured_bound(self, tmp_path, monkeypatch):
+        calls = self._run(tmp_path, monkeypatch, duration_s=30.0)
+
+        assert "wait_ready:30.0" in calls
+
+    def test_ready_timeout_names_the_bound_it_waited_on(self, tmp_path, monkeypatch):
+        with pytest.raises(PowerError, match="READY") as excinfo:
+            self._run(tmp_path, monkeypatch, ready=False)
+
+        assert "of a 10.00s READY bound" in (excinfo.value.hint or "")
+
+    @pytest.mark.parametrize(
+        "driver_error", [PowerError("No GPIO gate rising edge detected"), ValueError("bad frame")]
+    )
+    def test_failed_reset_outranks_the_capture_error(self, tmp_path, monkeypatch, driver_error):
+        cause = OSError("probe vanished")
+        try:
+            raise RuntimeError("J-Link reset failed") from cause
+        except RuntimeError as exc:
+            reset = exc
+
+        with pytest.raises(RuntimeError) as excinfo:
+            self._run(tmp_path, monkeypatch, prepare_error=reset, driver_error=driver_error)
+
+        assert excinfo.value is reset
+        assert excinfo.value.__cause__ is cause
+
+    def test_replacing_capture_error_is_hidden_behind_the_reset_error(self, tmp_path, monkeypatch):
+        reset = RuntimeError("J-Link reset failed")
+
+        with pytest.raises(RuntimeError) as excinfo:
+            self._run(
+                tmp_path,
+                monkeypatch,
+                prepare_error=reset,
+                driver_error=PowerError("No GPIO gate rising edge detected"),
+            )
+
+        assert excinfo.value is reset
+        assert excinfo.value.__suppress_context__ is True
+
+    def test_passed_through_reset_error_keeps_its_own_context(self, tmp_path, monkeypatch):
+        try:
+            try:
+                raise OSError("probe vanished")
+            except OSError:
+                raise RuntimeError("J-Link reset failed")
+        except RuntimeError as exc:
+            reset = exc
+
+        with pytest.raises(RuntimeError) as excinfo:
+            self._run(tmp_path, monkeypatch, prepare_error=reset, propagate_hook_error=True)
+
+        assert excinfo.value is reset
+        assert isinstance(excinfo.value.__context__, OSError)
+        assert excinfo.value.__suppress_context__ is False
+
+
+def test_bound_equal_to_the_due_time_is_not_called_exhausted():
+    from helia_profiler.power.diagnostics import classify_gate_failure
+
+    failure = classify_gate_failure(
+        saw_gate_rise=False,
+        duration_s=8.0,
+        lockstep=False,
+        lockstep_wiring_available=True,
+        rise_due_s=8.0,
+    )
+
+    assert "before the window was due" not in failure.message

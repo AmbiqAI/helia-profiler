@@ -514,7 +514,11 @@ for a fixed window on shared firmware). When the planned window is known, a
 gated capture never waits less than that window at its longest accepted length
 plus headroom. Without lock-step it also allows for boot and, for a counted
 inference window, the warm-up inferences. It logs when it raises the bound, as
-a warning if you set `power.duration_s`.
+a warning if you set `power.duration_s`. With lock-step, the wait for the
+target's READY after reset is never shorter than the same boot allowance plus
+counted warm-up and headroom, so a short `power.duration_s` alone does not cut
+the handshake short. If the reset, READY or GO step fails, the capture stops at
+once and reports that failure rather than waiting out the bound.
 
 ## Reset strategies
 
@@ -1160,7 +1164,13 @@ the JS320 bench.
     debug USB power, or coin cell during the capture window.
 
 ??? failure "No GPIO gate rising edge detected (`no_gate_rise`)"
-    **Check `power.lockstep` before you check the wiring.** If lock-step is
+    **If the message says the capture bound likely ended before the window was
+    due**, the bound is the first suspect: without lock-step the wait starts at
+    reset, and it was shorter than the allowance for boot and warm-up. Increase
+    `power.duration_s`, or enable lock-step so the wait starts at GO; check the
+    wiring if the gate is still missed.
+
+    **Otherwise, check `power.lockstep` before you check the wiring.** If lock-step is
     disabled while `state_gpio_pin`/`go_gpio_pin` *are* configured, that is
     the likeliest cause and heliaPROFILER now says so in the warning and in
     the run's `gate_failure` metadata: with lock-step off the firmware never
