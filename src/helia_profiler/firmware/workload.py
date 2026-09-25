@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from ..pipeline import PipelineContext
 
 AOT_CLEAN_WORKLOAD = "aot_raw_zero_refill_included_v1"
+GOLDEN_CLEAN_WORKLOAD = "golden_int8_refill_included_v1"
 
 
 def measured_clean_workload(ctx: PipelineContext, *, power: bool = False) -> str | None:
@@ -18,7 +19,7 @@ def measured_clean_workload(ctx: PipelineContext, *, power: bool = False) -> str
     Like the firmware fingerprint, this identifies rendered source, not binary
     attestation. Never infer old artifact semantics from the installed version.
     """
-    if ctx.firmware_dir is None or ctx.config.engine.type.value != "helia-aot":
+    if ctx.firmware_dir is None:
         return None
     filename = "main.cc"
     if power:
@@ -31,6 +32,11 @@ def measured_clean_workload(ctx: PipelineContext, *, power: bool = False) -> str
     try:
         source = (ctx.firmware_dir / "src" / filename).read_text(encoding="utf-8")
     except (OSError, ValueError):
+        return None
+    golden_declaration = f'#define HPX_CLEAN_WORKLOAD "{GOLDEN_CLEAN_WORKLOAD}"'
+    if not power and golden_declaration in source.splitlines():
+        return GOLDEN_CLEAN_WORKLOAD
+    if ctx.config.engine.type.value != "helia-aot":
         return None
     declaration = f'#define HPX_CLEAN_WORKLOAD "{AOT_CLEAN_WORKLOAD}"'
     return AOT_CLEAN_WORKLOAD if declaration in source.splitlines() else None

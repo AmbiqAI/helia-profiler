@@ -106,9 +106,24 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
             hint="Ensure the firmware is running. Try resetting the board.",
         )
 
+    if ctx.config.model.validation_data is not None:
+        from ..validation.golden import check_golden_output, load_golden
+
+        raw = "\n".join(lines)
+        ctx.config.output.dir.mkdir(parents=True, exist_ok=True)
+        (ctx.config.output.dir / "validation-capture.txt").write_text(raw + "\n", encoding="utf-8")
+
     # A firmware-reported error is more specific than any "no layer data"
     # fallback message below, so surface it first with the best hint we can.
     _raise_on_firmware_error(lines, power_enabled=bool(ctx.config.power.enabled))
+
+    if ctx.config.model.validation_data is not None:
+        try:
+            check_golden_output(
+                raw, load_golden(ctx.config.model.path, ctx.config.model.validation_data)
+            )
+        except ValueError as exc:
+            raise CaptureError(f"Numerical validation failed: {exc}") from exc
 
     # Pre-parse validation: check for protocol sentinels.  Scan the whole
     # capture, not just the head: the SWO transport emits a variable-length
@@ -525,6 +540,8 @@ def capture_power(
 # completeness is pinned by tests/contracts/test_wire_protocol.py, so a new
 # code without a hint fails that test.
 _ERROR_HINTS: dict[FirmwareErrorCode, str] = {
+    FirmwareErrorCode.VALIDATION_SHAPE_MISMATCH: "Check model and validation_data identities.",
+    FirmwareErrorCode.VALIDATION_INVOKE_FAILED: "The validation inference failed; inspect the selected kernels.",
     FirmwareErrorCode.SCHEMA_MISMATCH: (
         "The model's schema version does not match what the firmware was "
         "built for.  Re-export the model with a matching TFLite version."

@@ -59,6 +59,11 @@ HPX_HEARTBEAT_PREFIX = "HPX_HEARTBEAT"
 #: envelope parser logs anything with this prefix that arrives ahead of the
 #: start marker, which is how monitor diagnostics stay outside the contract.
 HPX_POWER_PREFIX = "HPX_POWER_"
+HPX_GOLDEN_OUTPUT_PREFIX = "HPX_GOLDEN_OUTPUT"
+HPX_GOLDEN_OUTPUT_PATTERN = (
+    r"HPX_GOLDEN_OUTPUT model_sha256=([0-9a-f]{64}) "
+    r"input_sha256=([0-9a-f]{64}) output_hex=([0-9a-f]+)"
+)
 HPX_ERROR_PREFIX = "HPX_ERROR="
 HPX_WARN_PREFIX = "HPX_WARN="
 
@@ -207,6 +212,8 @@ class FirmwareErrorCode(StrEnum):
     code carries a host hint — see :attr:`WireSpec.has_host_hint`.
     """
 
+    VALIDATION_SHAPE_MISMATCH = "validation_shape_mismatch"
+    VALIDATION_INVOKE_FAILED = "validation_invoke_failed"
     SCHEMA_MISMATCH = "schema_mismatch"
     UNSUPPORTED_OP = "unsupported_op"
     MISSING_OPS = "missing_ops"
@@ -479,3 +486,5 @@ GATE_ATTACH_WAIT = (
 )
 GATE_POWER_ONLY = "power_only"
 GATE_POWER_INA228 = "power_only and power_monitor == ina228"
+
+GATE_GOLDEN_VALIDATION = "golden validation data"

@@ -66,6 +66,16 @@ class PreflightStage:
     def run(self, ctx: PipelineContext) -> None:
         cfg = ctx.config
         _check_model(cfg.model.path, cfg.engine.type)
+        if cfg.model.validation_data is not None:
+            if cfg.engine.type not in {EngineType.TFLM, EngineType.HELIA_AOT}:
+                raise ConfigError("validation_data supports only TFLM and heliaAOT")
+            if cfg.power.enabled or cfg.power.monitor_selected:
+                raise ConfigError("validation_data is limited to non-power profiles")
+            if cfg.profiling.clean_window_probe is not CleanWindowProbe.INFER:
+                raise ConfigError("validation_data requires the inference window probe")
+            from ..validation.golden import load_golden
+
+            load_golden(cfg.model.path, cfg.model.validation_data)
         _check_softmax_scaling(cfg.model.path, cfg.engine.type)
         _check_arena_size(cfg.model.arena_size)
         _check_rtt_buffer_size(cfg.target.rtt_buffer_size_up)

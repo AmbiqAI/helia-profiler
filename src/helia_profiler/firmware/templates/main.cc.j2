@@ -1,4 +1,5 @@
 {% extends "_main_base.cc.j2" %}
+{% set restore_clean_inputs = (golden | default(none)) is not none and not busy_loop_probe %}
 {#- main.cc — heliaPROFILER firmware entry point for the TFLM / heliaRT
    engine (engine_header is the engine's interpreter umbrella header).
 
@@ -12,7 +13,9 @@
    line with no newlines of its own. #}
 
 {% block engine_file_header %}
-/**
+{% if golden | default(none) %}#define HPX_CLEAN_WORKLOAD "golden_int8_refill_included_v1"
+
+{% endif %}/**
  * @file main.cc
  * @brief heliaPROFILER firmware — auto-generated, do not edit.
  *
@@ -421,11 +424,11 @@ static tflite::MicroMutableOpResolver<kMaxOps> &get_resolver() {
 
 {% block engine_profiler_off %}        g_profiler.SetEnabled(false);{% endblock %}
 
-{% block engine_reset_inputs_warm %}            memset(input->data.raw, 0, input->bytes);{% endblock %}
+{% block engine_reset_inputs_warm %}            {% if golden | default(none) %}memcpy(input->data.raw, hpx_validation_input, sizeof(hpx_validation_input));{% else %}memset(input->data.raw, 0, input->bytes);{% endif %}{% endblock %}
 
-{% block engine_reset_inputs %}        memset(input->data.raw, 0, input->bytes);{% endblock %}
+{% block engine_reset_inputs %}        {% if golden | default(none) %}memcpy(input->data.raw, hpx_validation_input, sizeof(hpx_validation_input));{% else %}memset(input->data.raw, 0, input->bytes);{% endif %}{% endblock %}
 
-{% block engine_invoke %}interpreter.Invoke();{% endblock %}
+{% block engine_invoke %}{% if golden | default(none) %}if (interpreter.Invoke() != kTfLiteOk) { hpx_printf("HPX_ERROR=validation_invoke_failed\n"); hpx_park(); }{% else %}interpreter.Invoke();{% endif %}{% endblock %}
 
 {% block engine_profiler_on %}
         g_profiler.SetEnabled(true);{% endblock %}
@@ -494,3 +497,20 @@ static tflite::MicroMutableOpResolver<kMaxOps> &get_resolver() {
     hpx_npu_set_enabled(false);
 {% endif %}
 {{ super() }}{% endblock %}
+
+{% block engine_validate_output %}    if (interpreter.inputs_size() != 1 || interpreter.outputs_size() != 1 ||
+        input->bytes != sizeof(hpx_validation_input) || output->bytes != {{ golden.expected_bytes | length }}) {
+        hpx_printf("HPX_ERROR=validation_shape_mismatch\n");
+        hpx_park();
+    }
+    memcpy(input->data.raw, hpx_validation_input, sizeof(hpx_validation_input));
+    if (interpreter.Invoke() != kTfLiteOk) {
+        hpx_printf("HPX_ERROR=validation_invoke_failed\n");
+        hpx_park();
+    }
+    hpx_printf("HPX_GOLDEN_OUTPUT model_sha256={{ golden.model_sha256 }} input_sha256={{ golden.input_sha256 }} output_hex=");
+    for (unsigned int i = 0; i < {{ golden.expected_bytes | length }}; ++i) {
+        hpx_printf("%02x", (unsigned int)(unsigned char)output->data.raw[i]);
+    }
+    hpx_printf("\n");
+{% endblock %}

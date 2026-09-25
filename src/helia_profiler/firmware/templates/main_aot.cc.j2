@@ -32,7 +32,8 @@
 
 {% block engine_includes %}
 {% if not busy_loop_probe %}
-#define HPX_CLEAN_WORKLOAD "aot_raw_zero_refill_included_v1"
+{% if golden | default(none) %}#define HPX_CLEAN_WORKLOAD "golden_int8_refill_included_v1"
+{% else %}#define HPX_CLEAN_WORKLOAD "aot_raw_zero_refill_included_v1"{% endif %}
 {% endif %}
 // heliaAOT model API
 #include "{{ aot_prefix }}_model.h"
@@ -494,17 +495,17 @@ static {{ aot_prefix }}_model_context_t {{ aot_prefix }}_model_ctx = {
    newline of their own: the base reuses each at several sites by calling it
    back through self, which supplies the surrounding newlines, so the first
    line has to glue to the block tag rather than start on the next one. #}
-{% block engine_reset_inputs_warm %}            for (int i = 0; i < {{ aot_prefix }}_num_inputs; i++) {
+{% block engine_reset_inputs_warm %}{% if golden | default(none) %}            memcpy({{ aot_prefix }}_model_ctx.inputs[0].data, hpx_validation_input, sizeof(hpx_validation_input));{% else %}            for (int i = 0; i < {{ aot_prefix }}_num_inputs; i++) {
                 memset({{ aot_prefix }}_model_ctx.inputs[i].data, 0,
                        {{ aot_prefix }}_model_ctx.inputs[i].size);
-            }{% endblock %}
+            }{% endif %}{% endblock %}
 
-{% block engine_reset_inputs %}        for (int i = 0; i < {{ aot_prefix }}_num_inputs; i++) {
+{% block engine_reset_inputs %}{% if golden | default(none) %}        memcpy({{ aot_prefix }}_model_ctx.inputs[0].data, hpx_validation_input, sizeof(hpx_validation_input));{% else %}        for (int i = 0; i < {{ aot_prefix }}_num_inputs; i++) {
             memset({{ aot_prefix }}_model_ctx.inputs[i].data, 0,
                    {{ aot_prefix }}_model_ctx.inputs[i].size);
-        }{% endblock %}
+        }{% endif %}{% endblock %}
 
-{% block engine_invoke %}{{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);{% endblock %}
+{% block engine_invoke %}{% if golden | default(none) %}if ({{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx) != 0) { hpx_printf("HPX_ERROR=validation_invoke_failed\n"); hpx_park(); }{% else %}{{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);{% endif %}{% endblock %}
 
 {% block engine_window_prologue %}
         // model_operator_cb() is a no-op during this window (guarded by
@@ -595,3 +596,21 @@ static {{ aot_prefix }}_model_context_t {{ aot_prefix }}_model_ctx = {
     hpx_npu_set_enabled(false);
 {% endif %}
 {{ super() }}{% endblock %}
+
+{% block engine_validate_output %}    if ({{ aot_prefix }}_num_inputs != 1 || {{ aot_prefix }}_num_outputs != 1 ||
+        {{ aot_prefix }}_model_ctx.inputs[0].size != sizeof(hpx_validation_input) ||
+        {{ aot_prefix }}_model_ctx.outputs[0].size != {{ golden.expected_bytes | length }}) {
+        hpx_printf("HPX_ERROR=validation_shape_mismatch\n");
+        hpx_park();
+    }
+    memcpy({{ aot_prefix }}_model_ctx.inputs[0].data, hpx_validation_input, sizeof(hpx_validation_input));
+    if ({{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx) != 0) {
+        hpx_printf("HPX_ERROR=validation_invoke_failed\n");
+        hpx_park();
+    }
+    hpx_printf("HPX_GOLDEN_OUTPUT model_sha256={{ golden.model_sha256 }} input_sha256={{ golden.input_sha256 }} output_hex=");
+    for (unsigned int i = 0; i < {{ golden.expected_bytes | length }}; ++i) {
+        hpx_printf("%02x", (unsigned int)((unsigned char *){{ aot_prefix }}_model_ctx.outputs[0].data)[i]);
+    }
+    hpx_printf("\n");
+{% endblock %}

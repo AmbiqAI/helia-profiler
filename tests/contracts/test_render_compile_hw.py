@@ -78,9 +78,29 @@ class _HwCase:
     probe: str = "infer"
     #: engines whose build also compiles the standalone profiler TU
     extra_profiler_tu: bool = False
+    golden: bool = False
 
 
 _MATRIX: tuple[_HwCase, ...] = (
+    _HwCase(
+        "510-tflm-golden",
+        "apollo510_evb-arm-none-eabi-gcc-tflm",
+        "apollo510_evb",
+        "apollo510",
+        "tflm",
+        "hpx_profiler",
+        extra_profiler_tu=True,
+        golden=True,
+    ),
+    _HwCase(
+        "510-aot-golden",
+        "apollo510_evb-arm-none-eabi-gcc-helia-aot",
+        "apollo510_evb",
+        "apollo510",
+        "helia-aot",
+        "hpx_profiler",
+        golden=True,
+    ),
     _HwCase(
         "510-rt-profile",
         "apollo510_evb-arm-none-eabi-gcc-helia-rt",
@@ -376,13 +396,17 @@ def _compile_command(
 def _prepare_case(case: _HwCase, workspace: _Workspace, tmp_path: Path) -> tuple[Path, list[Path]]:
     scratch = tmp_path / case.case_id
     scratch.mkdir()
-    overrides = {}
+    overrides: dict[str, object] = {}
     if case.engine == "helia-aot":
         # The workspace's generated model module carries its real prefix;
         # render against it so the include resolves to the real header.
         prefix = _aot_prefix_in(workspace.app_dir)
         if prefix is not None:
             overrides = {"aot_prefix": prefix}
+    if case.golden:
+        from helia_profiler.validation.golden import GoldenData
+
+        overrides["golden"] = GoldenData(b"\x01", b"\x02", "a" * 64, "b" * 64)
     text = _render(
         case.soc,
         "rtt",
@@ -404,6 +428,7 @@ def _prepare_case(case: _HwCase, workspace: _Workspace, tmp_path: Path) -> tuple
             cmsis_device_header=kwargs["cmsis_device_header"],
             profiling_backends=list(kwargs["profiling_backends"]),
             has_armv8m_pmu=kwargs["has_armv8m_pmu"],
+            has_ethos_u=kwargs.get("has_ethos_u", False),
             pmu_max_ops=kwargs["pmu_max_ops"],
         )
     )
@@ -564,6 +589,8 @@ def test_matrix_covers_every_engine_family():
         "510-rt-power",
         "510-rt-power-busy",
         "510-tflm-profile",
+        "510-tflm-golden",
+        "510-aot-golden",
         "510-tflm-power",
         "510-aot-profile",
         "510-aot-profile-busy",
