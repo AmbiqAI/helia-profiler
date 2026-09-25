@@ -27,6 +27,7 @@ from ..power.diagnostics import (
     SyncHandshakeMetadata,
     count_noun,
     gate_fall_wait_s,
+    lockstep_ready_wait_s,
     gate_relative_tolerance_for,
     longest_accepted_window_s,
     probe_runs_inferences,
@@ -385,6 +386,7 @@ def capture_power(
             lockstep=sync.lockstep,
             pre_window_s=warmup_s,
         )
+        ready_wait_s = lockstep_ready_wait_s(duration, pre_window_s=warmup_s)
         if fall_wait_s > duration:
             if sync.lockstep:
                 before_window = ""
@@ -426,11 +428,11 @@ def capture_power(
                         capture_phase["name"] = "waiting_ready"
                         ready_started = time.monotonic()
                         ready = (
-                            wait_gpi_state(ctx.config.power.state_input_index, True, duration)
+                            wait_gpi_state(ctx.config.power.state_input_index, True, ready_wait_s)
                             if wait_gpi_state is not None
-                            else sync.wait_ready(timeout_s=duration)
+                            else sync.wait_ready(timeout_s=ready_wait_s)
                         )
-                        ready_wait_s = round(time.monotonic() - ready_started, 6)
+                        ready_waited_s = round(time.monotonic() - ready_started, 6)
                         if not ready:
                             state = sync.read_state()
                             raise PowerError(
@@ -439,13 +441,14 @@ def capture_power(
                                     "Check the state/go GPIO wiring, reset strategy, and "
                                     "that the firmware is parked in the power sync wait "
                                     f"state. Last observed state: {state.value}; waited "
-                                    f"{ready_wait_s:.3f}s."
+                                    f"{ready_waited_s:.3f}s of a {ready_wait_s:.2f}s READY "
+                                    "bound."
                                 ),
                             )
                         sync_metadata_holder.append(
                             SyncHandshakeMetadata(
                                 lockstep=True,
-                                ready_wait_s=ready_wait_s,
+                                ready_wait_s=ready_waited_s,
                                 ready_observed=True,
                             )
                         )
@@ -488,6 +491,7 @@ def capture_power(
                 # null controller even when the config resolved lock-step on.
                 lockstep=sync.lockstep,
                 lockstep_wiring_available=ctx.config.power.lockstep_wiring_available,
+                pre_window_s=warmup_s,
             )
             if prepare_error:
                 raise prepare_error[0]
@@ -504,7 +508,9 @@ def capture_power(
                 }
             return _attach_lifecycle_metadata(result)
         except PowerError:
-            if prepare_error and isinstance(prepare_error[0], PowerError):
+            # A failed reset/READY/GO step outranks whatever the capture made
+            # of the run it never started, whatever the failure's type.
+            if prepare_error:
                 raise prepare_error[0] from None
             raise
         finally:

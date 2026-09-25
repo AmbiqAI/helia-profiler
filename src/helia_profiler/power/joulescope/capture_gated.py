@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any
 from ...errors import PowerError
 from ..base import PowerResult
 from ..diagnostics import (
+    BOOT_SETTLE_S,
     GATE_EDGE_POLL_INTERVAL_S,
     GateTransitionTiming,
     classify_gate_failure,
@@ -78,6 +79,7 @@ def _degraded_observation_result(
     planned_window_s: float | None = None,
     gate_high_s: float | None = None,
     longest_window_s: float | None = None,
+    rise_due_s: float | None = None,
 ) -> PowerResult:
     failure = classify_gate_failure(
         saw_gate_rise=saw_gate_rise,
@@ -88,6 +90,7 @@ def _degraded_observation_result(
         planned_window_s=planned_window_s,
         gate_high_s=gate_high_s,
         longest_window_s=longest_window_s,
+        rise_due_s=rise_due_s,
     )
     whole_summary = _whole_summary_from_stats(packets)
     return PowerResult(
@@ -142,6 +145,7 @@ def capture_gated(
     phase_getter: Callable[[], str] | None = None,
     lockstep: bool | None = None,
     lockstep_wiring_available: bool = False,
+    pre_window_s: float = 0.0,
     **kwargs: Any,
 ) -> PowerResult:
     """Capture GPIO-gated power using on-device-integrated host stats.
@@ -157,6 +161,9 @@ def capture_gated(
 
     Only one clean window is supported. After its falling edge and a
     ``guard_s`` settle, capture stops; ``duration_s`` bounds the wait for it.
+    An exception from ``on_started`` ends the capture at once and propagates
+    unchanged. ``pre_window_s`` is the warm-up the target runs between boot
+    and the window when lock-step is off.
     """
     del kwargs
 
@@ -415,6 +422,7 @@ def capture_gated(
 
     capture_start = time.monotonic()
     wait_ended_at: float | None = None
+    hook_error: Exception | None = None
     try:
         try:
             driver.publish(f"{device_path}/{cycle_topic}", on_value)
@@ -464,8 +472,9 @@ def capture_gated(
                 try:
                     on_started(_wait_gpi_state)
                     go_release_at = time.monotonic()
-                except Exception:
-                    log.warning("on_started hook failed", exc_info=True)
+                except Exception as exc:
+                    hook_error = exc
+                    raise
             stop.wait(timeout=duration_s)
             wait_ended_at = time.monotonic()
         finally:
@@ -660,6 +669,9 @@ def capture_gated(
                 if wait_ended_at is not None and first_high_at is not None
                 else None
             )
+            # Without lock-step the wait starts at reset, so the window opens
+            # only after boot and warm-up.
+            rise_due_s = BOOT_SETTLE_S + pre_window_s if lockstep is False else None
             failure = classify_gate_failure(
                 saw_gate_rise=saw_any_gate_rise,
                 saw_gate_fall=saw_any_gate_fall,
@@ -669,6 +681,7 @@ def capture_gated(
                 planned_window_s=planned_window_s,
                 gate_high_s=gate_high_s,
                 longest_window_s=longest_window_s,
+                rise_due_s=rise_due_s,
             )
             if not packets:
                 raise PowerError(failure.message, hint=failure.hint)
@@ -693,6 +706,7 @@ def capture_gated(
                 planned_window_s=planned_window_s,
                 gate_high_s=gate_high_s,
                 longest_window_s=longest_window_s,
+                rise_due_s=rise_due_s,
             )
             # The hint is logged, not just stored in metadata: on the degraded
             # path there is no PowerError to carry it, so the terminal warning
@@ -903,6 +917,10 @@ def capture_gated(
     except PowerError:
         raise
     except Exception as exc:
+        # The start hook's failure is the caller's error to report, not a
+        # capture failure.
+        if exc is hook_error:
+            raise
         raise PowerError(
             f"Joulescope gated capture failed: {exc}",
             hint="Check USB connection, sync wiring, and that no other software is using the device.",
