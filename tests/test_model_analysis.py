@@ -116,12 +116,14 @@ class TestFullyConnected:
 
 
 class TestTransposeConv:
-    def test_mirror_of_conv2d(self):
+    def test_sized_by_input_not_output(self):
+        # input [1,8,8,16] stride 2 -> output [1,16,16,32]
+        # 8*8 input pixels * 3*3*16*32 = 294_912
         macs = _transpose_conv_macs(
-            weight_shape=[16, 3, 3, 3],
-            output_shape=[1, 8, 8, 16],
+            input_shape=[1, 8, 8, 16],
+            weight_shape=[32, 3, 3, 16],
         )
-        assert macs == 27_648
+        assert macs == 294_912
 
 
 class TestElementwise:
