@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -250,3 +251,59 @@ def test_resolve_cdc_port_does_not_fall_back_to_foreign_hpx(monkeypatch):
 
     with pytest.raises(CaptureError, match="No application USB CDC device appeared"):
         usb_reader.resolve_cdc_port(marker=expected, pre_existing=set(), timeout_s=0)
+
+
+class _ChunkedSerial:
+    """Serial fake returning one queued chunk per read."""
+
+    def __init__(self, chunks: list[bytes]):
+        self.chunks = list(chunks)
+        self.is_open = True
+        self.dtr = False
+        self.timeout = None
+
+    @property
+    def in_waiting(self) -> int:
+        return len(self.chunks[0]) if self.chunks else 0
+
+    def reset_input_buffer(self) -> None:
+        pass
+
+    def readline(self) -> bytes:
+        return self.read(0)
+
+    def read(self, count: int) -> bytes:
+        return self.chunks.pop(0) if self.chunks else b""
+
+    def close(self) -> None:
+        self.is_open = False
+
+
+def _capture_usb(monkeypatch, chunks: list[bytes], **kwargs) -> list[str]:
+    port = _ChunkedSerial(chunks)
+    monkeypatch.setattr(usb_reader, "_snapshot_cdc_ports", lambda: set())
+    monkeypatch.setattr(usb_reader.time, "sleep", lambda *_: None)
+    monkeypatch.setattr(usb_reader.serial, "Serial", lambda **_: port)
+    reset = MagicMock()
+    lines = usb_reader.capture_usb_output(
+        jlink_device="dev", usb_port="/dev/ttyACM9", reset_controller=reset, **kwargs
+    )
+    assert not port.is_open
+    return lines
+
+
+def test_usb_capture_joins_partial_reads(monkeypatch):
+    chunks = [b"--- HPX_START ---\n", b"0,CONV", b"_2D,5\n", b"--- HPX_END ---\n"]
+    lines = _capture_usb(monkeypatch, chunks, timeout_s=5)
+    assert lines == ["--- HPX_START ---", "0,CONV_2D,5", "--- HPX_END ---"]
+
+
+def test_usb_capture_honours_heartbeat_timeout(monkeypatch):
+    import time
+
+    started = time.monotonic()
+    lines = _capture_usb(
+        monkeypatch, [b"--- HPX_START ---\n"], timeout_s=None, heartbeat_timeout_s=0.1
+    )
+    assert lines == ["--- HPX_START ---"]
+    assert time.monotonic() - started < 5

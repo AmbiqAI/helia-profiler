@@ -1506,3 +1506,58 @@ def test_psram_upload_gated_on_engine_capability(
     capture_pmu(ctx)
 
     assert captured["psram_host_upload"] is expect_upload
+
+
+def test_capture_swo_retries_share_one_deadline(monkeypatch):
+    class _FakeJLinkHandle:
+        def open(self, serial_no=None):
+            return None
+
+        def disable_dialog_boxes(self):
+            return None
+
+        def set_tif(self, tif):
+            return None
+
+        def connect(self, device, speed):
+            return None
+
+        def halted(self):
+            return False
+
+        def swo_enable(self, cpu_speed, swo_speed, port_mask):
+            return None
+
+        def swo_stop(self):
+            return None
+
+        def close(self):
+            return None
+
+    fake_pylink = types.SimpleNamespace(
+        JLink=_FakeJLinkHandle,
+        JLinkInterfaces=types.SimpleNamespace(SWD=1),
+        errors=types.SimpleNamespace(JLinkException=Exception),
+    )
+    clock = {"now": 1000.0}
+    budgets: list[float | None] = []
+
+    def fake_collect_lines(*args, overall_timeout_s=None, **kwargs):
+        budgets.append(overall_timeout_s)
+        clock["now"] += 40.0
+        return ["no start sentinel"]
+
+    monkeypatch.setitem(sys.modules, "pylink", fake_pylink)
+    monkeypatch.setattr("helia_profiler.target.probe.jlink.reset_target", lambda **kwargs: None)
+    monkeypatch.setattr("helia_profiler.transport.swo.time.sleep", lambda _: None)
+    monkeypatch.setattr("helia_profiler.transport.swo.time.monotonic", lambda: clock["now"])
+    monkeypatch.setattr("helia_profiler.transport.swo.collect_lines", fake_collect_lines)
+
+    lines = capture_swo_output(
+        jlink_serial="1160002204",
+        jlink_device="AP510NFA-CBR",
+        timeout_s=60.0,
+    )
+
+    assert budgets == [60.0, 20.0]
+    assert lines == ["no start sentinel"]

@@ -234,7 +234,8 @@ per-layer counters are combined across those iterations:
 | `trimmed` | Drops the high/low extremes, then averages the rest |
 
 All three methods first reject **structurally-invalid samples** — a
-uint32-wrap (finish < start) or a frozen-zero row — before aggregating, and
+uint32-wrap (finish < start) or a frozen-zero row (every counter 0 in a pass
+that includes `ARM_PMU_CPU_CYCLES`) — before aggregating, and
 log how many were rejected. A counter with no surviving samples is omitted
 from the aggregate, not replaced with rejected values; raw iterations remain
 available for diagnostics. Consistently all-zero layers are retained because

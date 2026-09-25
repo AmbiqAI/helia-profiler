@@ -35,6 +35,7 @@ from ..power.diagnostics import (
 from ..transport import (
     HPX_END,
     HPX_START,
+    LINE_TIMEOUT_S,
     CaptureArgs,
     resolve_transport,
 )
@@ -63,7 +64,7 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
 
     jlink_serial = ctx.resolved_jlink_serial or ctx.config.target.jlink_serial
     hb = ctx.config.target.heartbeat
-    heartbeat_timeout_s = hb.host_timeout_s if hb.enabled else 300
+    heartbeat_timeout_s = hb.host_timeout_s if hb.enabled else LINE_TIMEOUT_S
     overall_timeout_s = hb.overall_timeout_s
 
     if ctx.soc is None or not ctx.soc.jlink_device:
@@ -124,27 +125,16 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
                 "transport connection failed before data arrived."
             ),
         )
-    saw_end = any(l.strip() == HPX_END for l in lines[-10:])
-    if not saw_end:
-        log.warning(
-            "HPX_END sentinel not found in captured data (%d lines) — capture "
-            "was truncated before the firmware finished. %s",
-            len(lines),
-            _truncation_hint(str(transport)),
+    if not any(l.strip() == HPX_END for l in lines):
+        raise CaptureError(
+            f"Capture ended before HPX_END ({len(lines)} lines).",
+            hint=_truncation_hint(str(transport)),
         )
 
     result = parse_firmware_output(lines, aggregation=ctx.config.profiling.aggregation)
     if not result.layers:
-        # We saw HPX_START (checked above) but parsed zero layers.  Either the
-        # CSV stream was lost in transit (lossy transport / undersized buffer)
-        # or the run was cut short before any iteration completed.
-        detail = (
-            "the stream was truncated before any CSV data arrived"
-            if not saw_end
-            else "the firmware emitted HPX_END but no parseable CSV rows"
-        )
         raise CaptureError(
-            f"No layer data parsed from firmware output ({len(lines)} lines, {detail}).",
+            f"No layer data parsed from firmware output ({len(lines)} lines).",
             hint=_truncation_hint(str(transport)),
         )
 
