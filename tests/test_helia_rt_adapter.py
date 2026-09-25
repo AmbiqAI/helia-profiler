@@ -216,7 +216,7 @@ class TestHeliaRTAdapter:
         assert not (tmp_path / "modules" / "helia-rt").exists()
         assert not (tmp_path / "modules" / "nsx-helia-rt").exists()
 
-    @pytest.mark.parametrize("variant", ["debug", "release-with-logs", "release"])
+    @pytest.mark.parametrize("variant", ["debug", "release-with-logs"])
     def test_registry_passes_variant_to_cmake(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, variant: str
     ):
@@ -228,6 +228,14 @@ class TestHeliaRTAdapter:
 
         assert artifacts.cmake_vars["HELIA_RT_VARIANT"] == variant
         assert artifacts.heliart_variant == variant
+
+    def test_release_variant_is_rejected(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.delenv("HELIART_DIST_PATH", raising=False)
+        monkeypatch.delenv("HELIART_SOURCE_PATH", raising=False)
+        config = _make_config(tmp_path, {"config": {"variant": "release"}})
+
+        with pytest.raises(EngineError, match="strips per-op profiling"):
+            HeliaRTAdapter().prepare(config, tmp_path)
 
     def test_registry_warns_on_core_override(
         self,

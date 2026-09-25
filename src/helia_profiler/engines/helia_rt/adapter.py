@@ -121,6 +121,12 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
                 f"Invalid heliaRT variant '{variant}'",
                 hint=f"Valid variants: {', '.join(valid_variants)}",
             )
+        if variant == "release":
+            # TF_LITE_STRIP_ERROR_STRINGS compiles out ScopedMicroProfiler.
+            raise EngineError(
+                "heliaRT variant 'release' strips per-op profiling",
+                hint="Use variant 'release-with-logs' (default) or 'debug'.",
+            )
 
         toolchain_tag = _toolchain_tag(config.target.toolchain)
 

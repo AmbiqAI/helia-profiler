@@ -257,7 +257,7 @@ selects the kernels.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `variant` | string | `release-with-logs` | `debug`, `release-with-logs`, or `release` |
+| `variant` | string | `release-with-logs` | `debug` or `release-with-logs`. `release` is rejected: it compiles out the per-op profiler hooks |
 | `resolver_ops` | string | `auto` | Resolver strategy: `auto` registers builtins observed in the model; `all` keeps the broad fixed allowlist |
 | `source_path` | string | *(registry module)* | Local heliaRT source checkout |
 | `dist_path` | string | *(registry module)* | Explicit local prebuilt distribution |
