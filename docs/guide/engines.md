@@ -249,13 +249,15 @@ resolve to heliaRT `>= v1.16.0`.
 | `atfe` | `libhelia-rt-{core}-atfe-{variant}.a` |
 
 This table applies only to the explicit prebuilt-distribution mode. The default
-registry and local-source modes compile heliaRT with the selected toolchain.
+registry and local-source modes compile heliaRT with the selected toolchain and
+`variant`; they ignore `core_override` (with a warning), since the SoC family
+selects the kernels.
 
 ### heliaRT engine config
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `variant` | string | `release-with-logs` | `debug`, `release-with-logs`, or `release` |
+| `variant` | string | `release-with-logs` | `debug` or `release-with-logs`. `release` is rejected: it compiles out the per-op profiler hooks |
 | `resolver_ops` | string | `auto` | Resolver strategy: `auto` registers builtins observed in the model; `all` keeps the broad fixed allowlist |
 | `source_path` | string | *(registry module)* | Local heliaRT source checkout |
 | `dist_path` | string | *(registry module)* | Explicit local prebuilt distribution |
