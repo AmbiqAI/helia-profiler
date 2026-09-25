@@ -172,7 +172,9 @@
 {% block engine_model_storage %}{% endblock %}
 
 {% include "_hpx_printf.j2" %}
-{% block engine_globals %}{% endblock %}
+{% block engine_globals %}{% endblock %}{% if golden | default(none) %}
+static const unsigned char hpx_validation_input[] = { {{ golden.input_literals }} };
+{% endif %}
 
 int main(void) {
     nsx_system_config_t sys_cfg = {};
@@ -371,7 +373,9 @@ int main(void) {
     // every engine that uses the default window.  When power sync is disabled,
     // hpx_sync_window_begin/end compile to no-ops.
     {
-{% block engine_profiler_off %}{% endblock %}
+{% block engine_profiler_off %}{% endblock %}{% if golden | default(none) %}
+{% block engine_validate_output %}{% endblock %}
+{% endif %}
 {% if clean_window_needs_probe_attach | default(false) and transport == "rtt" and not power_only | default(false) and not use_stimer_window -%}
 {% include "_clean_window_attach_wait.j2" %}
 {%- endif -%}

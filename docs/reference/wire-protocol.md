@@ -132,6 +132,7 @@ Token-then-payload lines. The space after the token defeats the key/value regex,
 
 | Token | Scope | Condition | Consumer | Criticality | Notes |
 | --- | --- | --- | --- | --- | --- |
+| `HPX_GOLDEN_OUTPUT` | helia-aot, tflm | `golden validation data` | `transport_control` | `protocol` | Actual INT8 output from the configured validation input, outside timed windows. Value: `model_sha256=<hex> input_sha256=<hex> output_hex=<hex>`. |
 | `HPX_CONST_BLOB_LOADED` | helia-aot | `not allocate_arenas and arena_regions with blob_filename` | `unconsumed` | `diagnostic` | One constant sidecar blob was copied into its bound arena. Value: `region=<id> size=<bytes>`. Space-separated, so the generic key/value regex never matches it: this line reaches no host consumer at all. |
 
 ## Heartbeat phases
@@ -155,6 +156,8 @@ Token-then-payload lines. The space after the token defeats the key/value regex,
 
 | Token | Scope | Condition | Consumer | Criticality | Notes |
 | --- | --- | --- | --- | --- | --- |
+| `HPX_ERROR=validation_shape_mismatch` | helia-aot, tflm | `golden validation data` | `transport_control` | `protocol` | Runtime tensor sizes differ from the validation vector. Host hint: yes. |
+| `HPX_ERROR=validation_invoke_failed` | helia-aot, tflm | `golden validation data` | `transport_control` | `protocol` | The validation inference failed. Host hint: yes. |
 | `HPX_ERROR=schema_mismatch` | helia-rt, tflm | `always` | `transport_control` | `protocol` | The model's TFLite schema version is not the one firmware was built for. Value: `schema_mismatch:<found>_vs_<expected>`. Host hint: yes. |
 | `HPX_ERROR=unsupported_op` | helia-rt, tflm | `always` | `transport_control` | `protocol` | An operator in the model is not registered in the resolver. Value: `kind=custom\|builtin [builtin=<n>] name=<s> index=<n>`. Host hint: yes. |
 | `HPX_ERROR=missing_ops` | helia-rt, tflm | `always` | `transport_control` | `protocol` | Summary count of unregistered operators after the preflight walk. Value: `count=<n> hint=rebuild_with_op_registration`. Host hint: yes. |

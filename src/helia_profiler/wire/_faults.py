@@ -17,6 +17,7 @@ from ._model import (
     GATE_STIMER_WINDOW,
     TFLM_ENGINES,
     FirmwareErrorCode,
+    GATE_GOLDEN_VALIDATION,
     FirmwareWarnCode,
     WireConsumer,
     WireCriticality,
@@ -28,6 +29,26 @@ from ._model import (
 )
 
 ERROR_SPECS: tuple[WireSpec, ...] = (
+    _spec(
+        error_token(FirmwareErrorCode.VALIDATION_SHAPE_MISMATCH),
+        WireKind.ERROR,
+        "Runtime tensor sizes differ from the validation vector.",
+        WireConsumer.TRANSPORT_CONTROL,
+        WireCriticality.PROTOCOL,
+        engines=frozenset({EngineType.TFLM, EngineType.HELIA_AOT}),
+        condition=GATE_GOLDEN_VALIDATION,
+        has_host_hint=True,
+    ),
+    _spec(
+        error_token(FirmwareErrorCode.VALIDATION_INVOKE_FAILED),
+        WireKind.ERROR,
+        "The validation inference failed.",
+        WireConsumer.TRANSPORT_CONTROL,
+        WireCriticality.PROTOCOL,
+        engines=frozenset({EngineType.TFLM, EngineType.HELIA_AOT}),
+        condition=GATE_GOLDEN_VALIDATION,
+        has_host_hint=True,
+    ),
     _spec(
         error_token(FirmwareErrorCode.SCHEMA_MISMATCH),
         WireKind.ERROR,

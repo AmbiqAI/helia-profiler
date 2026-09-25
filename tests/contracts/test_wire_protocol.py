@@ -580,6 +580,18 @@ def _matrix() -> list[_Render]:
             overrides={**_INA228_VARS, "ina228_required": False},
         ),
     ]
+    from helia_profiler.validation.golden import GoldenData
+
+    for engine in ("tflm", "helia-aot"):
+        renders.append(
+            _Render(
+                f"ap510|rtt|{engine}|golden",
+                "apollo510",
+                "rtt",
+                engine,
+                overrides={"golden": GoldenData(b"\x01", b"\x02", "a" * 64, "b" * 64)},
+            )
+        )
     return renders
 
 
@@ -634,6 +646,7 @@ def _attach_wait(v: dict) -> bool:
 #: ``WIRE_CONDITIONS`` — a condition invented in ``wire.py`` without a
 #: predicate here cannot slip through unchecked.
 _PREDICATES = {
+    "golden validation data": lambda v: v.get("golden") is not None,
     "not power_only": lambda v: not _power(v),
     "not power_only and transport != usb_cdc": (
         lambda v: not _power(v) and v["transport"] != "usb_cdc"
@@ -967,6 +980,8 @@ def test_no_macro_name_ever_reaches_a_string():
 
 def test_error_code_catalogue():
     assert {code.value for code in FirmwareErrorCode} == {
+        "validation_shape_mismatch",
+        "validation_invoke_failed",
         "schema_mismatch",
         "unsupported_op",
         "missing_ops",

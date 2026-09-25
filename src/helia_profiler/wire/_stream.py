@@ -16,6 +16,8 @@ from ._model import (
     GATE_ATTACH_WAIT,
     GATE_BUSY_LOOP_PROBE,
     GATE_CLEAN_WINDOW_TRACE,
+    GATE_GOLDEN_VALIDATION,
+    HPX_GOLDEN_OUTPUT_PREFIX,
     GATE_HAS_ETHOS_U,
     NPU_ENGINES,
     GATE_NOT_POWER_ONLY,
@@ -154,6 +156,16 @@ HANDSHAKE_SPECS: tuple[WireSpec, ...] = (
 
 
 START_HEADER_SPECS: tuple[WireSpec, ...] = (
+    _spec(
+        HPX_GOLDEN_OUTPUT_PREFIX,
+        WireKind.RECORD,
+        "Actual INT8 output from the configured validation input, outside timed windows.",
+        WireConsumer.TRANSPORT_CONTROL,
+        WireCriticality.PROTOCOL,
+        engines=frozenset({EngineType.TFLM, EngineType.HELIA_AOT}),
+        condition=GATE_GOLDEN_VALIDATION,
+        value_shape="model_sha256=<hex> input_sha256=<hex> output_hex=<hex>",
+    ),
     _spec(
         WireKey.VERSION.wire,
         WireKind.KEY_VALUE,

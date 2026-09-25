@@ -19,6 +19,7 @@ from ..platform.counters import (
 from ..target.lifecycle import resolve_power_lockstep
 from ..transport.usb_identity import USB_MARKER_PRODUCT, usb_marker_serial
 from .op_resolver import build_resolver_plan
+from ..validation.golden import GoldenData, load_golden
 
 if TYPE_CHECKING:
     from ..config import ProfileConfig
@@ -247,6 +248,7 @@ class FirmwareRenderContext:
     power_window: PowerWindowContext
     power_monitor: PowerMonitorContext
     engine: EngineContext
+    golden: GoldenData | None = None
 
     @classmethod
     def from_pipeline_context(
@@ -342,6 +344,11 @@ class FirmwareRenderContext:
         transport = config.target.transport
         printf_linkage = "static " if engine_type is EngineType.HELIA_AOT else ""
         return cls(
+            golden=(
+                load_golden(config.model.path, config.model.validation_data)
+                if config.model.validation_data is not None
+                else None
+            ),
             sync=SyncContext(
                 power_sync_enabled=power_sync_enabled,
                 sync_gpio_pin=config.power.sync_gpio_pin,
@@ -459,6 +466,7 @@ class FirmwareRenderContext:
         """
         return {
             "power_only": power_only,
+            "golden": self.golden,
             **resolve_window_timer(
                 clean_window_probe=self.power_window.clean_window_probe,
                 power_only=power_only,
