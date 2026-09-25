@@ -222,6 +222,7 @@ def test_missing_analysis_dependency_has_actionable_error(pair, monkeypatch):
     monkeypatch.setattr(builtins, "__import__", missing)
     with pytest.raises(ConfigError, match="analysis extra") as caught:
         load_golden(*pair)
+    assert caught.value.hint is not None
     assert "helia-profiler[analysis]" in caught.value.hint
 
 
