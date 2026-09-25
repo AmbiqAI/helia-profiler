@@ -38,6 +38,7 @@ from ..transport import (
     CaptureArgs,
     resolve_transport,
 )
+from ..power.sync import DeviceState
 from ..transport.usb_identity import usb_marker_serial
 from ..wire import HPX_ERROR_PREFIX, FirmwareErrorCode
 
@@ -434,15 +435,20 @@ def capture_power(
                         )
                         ready_waited_s = round(time.monotonic() - ready_started, 6)
                         if not ready:
+                            # A separate, later read than the wait's.
                             state = sync.read_state()
+                            observed = (
+                                "READY is high now, so it came late or did not hold"
+                                if state is DeviceState.READY
+                                else f"State after the wait: {state.value}"
+                            )
                             raise PowerError(
                                 "Target did not signal READY before gated power capture",
                                 hint=(
                                     "Check the state/go GPIO wiring, reset strategy, and "
                                     "that the firmware is parked in the power sync wait "
-                                    f"state. Last observed state: {state.value}; waited "
-                                    f"{ready_waited_s:.3f}s of a {ready_wait_s:.2f}s READY "
-                                    "bound."
+                                    f"state. {observed}; waited {ready_waited_s:.3f}s of a "
+                                    f"{ready_wait_s:.2f}s READY bound."
                                 ),
                             )
                         sync_metadata_holder.append(

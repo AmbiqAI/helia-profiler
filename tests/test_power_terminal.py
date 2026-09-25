@@ -215,6 +215,23 @@ def _measured_lines(duration_us: str, **overrides: str) -> list[str]:
     )
 
 
+def test_frozen_window_clock_names_the_clock() -> None:
+    from helia_profiler.power.diagnostics import FROZEN_WINDOW_CLOCK_HINT
+
+    # A stopped STIMER zeroes all three nested durations.
+    lines = _measured_lines("0", HPX_POWER_ELAPSED_US="0", HPX_POWER_GATE_ELAPSED_US="0")
+
+    with pytest.raises(PowerError, match="window clock never advanced") as excinfo:
+        parse_power_terminal_envelope(lines)
+
+    assert excinfo.value.hint == FROZEN_WINDOW_CLOCK_HINT
+
+
+def test_zero_duration_on_a_live_clock_keeps_its_message() -> None:
+    with pytest.raises(PowerError, match="duration must be positive"):
+        parse_power_terminal_envelope(_measured_lines("0", HPX_POWER_GATE_ELAPSED_US="0"))
+
+
 class TestWindowBrackets:
     """Gate, accumulation and whole window nest; nothing else is enforced (#299)."""
 

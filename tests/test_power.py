@@ -4901,6 +4901,7 @@ class TestLockstepReadyBoundAndHookPrecedence:
         prepare_error: BaseException | None = None,
         driver_error: Exception | None = None,
         propagate_hook_error: bool = False,
+        state_after_wait: str = "unknown",
     ) -> list[str]:
         from helia_profiler.capture import capture_power
         from helia_profiler.config import load_config
@@ -4946,7 +4947,7 @@ class TestLockstepReadyBoundAndHookPrecedence:
                 calls.append("release_go")
 
             def read_state(self):
-                return DeviceState.UNKNOWN
+                return DeviceState(state_after_wait)
 
             def release(self):
                 calls.append("release")
@@ -5007,6 +5008,15 @@ class TestLockstepReadyBoundAndHookPrecedence:
             self._run(tmp_path, monkeypatch, ready=False)
 
         assert "of a 10.00s READY bound" in (excinfo.value.hint or "")
+
+    def test_ready_timeout_hint_agrees_with_a_late_ready(self, tmp_path, monkeypatch):
+        # READY read high after the wait gave up on it.
+        with pytest.raises(PowerError, match="did not signal READY") as excinfo:
+            self._run(tmp_path, monkeypatch, ready=False, state_after_wait="ready")
+
+        hint = excinfo.value.hint or ""
+        assert "state: ready" not in hint
+        assert "came late or did not hold" in hint
 
     @pytest.mark.parametrize(
         "driver_error", [PowerError("No GPIO gate rising edge detected"), ValueError("bad frame")]

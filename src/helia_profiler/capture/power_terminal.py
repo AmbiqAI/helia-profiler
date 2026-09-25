@@ -13,6 +13,7 @@ from ..results import (
     PowerTerminalRecord,
 )
 from ..errors import PowerError
+from ..power.diagnostics import FROZEN_WINDOW_CLOCK_HINT, firmware_window_clock_is_frozen
 from ..wire import (
     HPX_POWER_PREFIX,
     POWER_TERMINAL_END_SENTINEL,
@@ -187,6 +188,13 @@ def parse_power_terminal_envelope(lines: Iterable[str]) -> PowerTerminalEnvelope
         measured_count = measurement_fields[PowerTerminalKey.MEASUREMENT_COUNT]
         measured_duration_us = measurement_fields[PowerTerminalKey.MEASUREMENT_DURATION_US]
         if measured_count > 0 and measured_duration_us == 0:
+            if firmware_window_clock_is_frozen(
+                elapsed_us=terminal.elapsed_us, completed_count=terminal.completed_count
+            ):
+                raise PowerError(
+                    "Power firmware window clock never advanced.",
+                    hint=FROZEN_WINDOW_CLOCK_HINT,
+                )
             raise PowerError("Power measurement duration must be positive for completed work.")
         if measured_count != terminal.completed_count:
             raise PowerError("Power measurement count does not match terminal completion count.")
