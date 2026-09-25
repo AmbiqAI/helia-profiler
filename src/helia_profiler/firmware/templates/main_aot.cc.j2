@@ -74,6 +74,7 @@ struct HpxLayerRecord {
 
 {% if has_armv8m_pmu %}
 static nsx_pmu_config_t g_pmu_cfg;
+{% include "_pmu_read.j2" %}
 {% else %}
 static uint32_t g_op_start_cyccnt = 0;
 {% endif %}
@@ -98,6 +99,7 @@ NSX_MEM_SRAM_BSS static HpxLayerRecord g_layers[kMaxLayers];
 static HpxLayerRecord g_layers[kMaxLayers];
 {% endif %}
 static int g_num_layers = 0;
+static bool g_layer_capacity_exceeded = false;
 static int g_num_counters = 0;
 static bool g_profiler_enabled = false;
 static const char* g_counter_names[kMaxEvents] = {};
@@ -188,6 +190,7 @@ static void profiler_init_custom(const uint32_t[], int) {
 
 static void profiler_clear(void) {
     g_num_layers = 0;
+    g_layer_capacity_exceeded = false;
 }
 
 static void profiler_print_csv(void) {
@@ -249,22 +252,16 @@ static void model_operator_cb(
 {% endif %}
     } else if (state == {{ aot_prefix }}_op_state_run_finished) {
         // Read PMU counters after each operator completes
-        if (g_num_layers >= kMaxLayers) return;
+        if (g_num_layers >= kMaxLayers) {
+            g_layer_capacity_exceeded = true;
+            return;
+        }
         int idx = g_num_layers++;
 {% if has_armv8m_pmu %}
-        uint32_t saved_cyccnt = DWT->CYCCNT;
-        nsx_pmu_get_counters(&g_pmu_cfg);
-        DWT->CYCCNT = saved_cyccnt;
+        g_layers[idx].overflow = hpx_pmu_read_layer(&g_pmu_cfg, g_num_counters);
         for (int i = 0; i < g_num_counters; i++) {
             g_layers[idx].counters[i] = g_pmu_cfg.counter[i].counterValue;
         }
-#if (__CORTEX_M >= 55U)
-        uint32_t ovs = ARM_PMU_Get_CNTR_OVS();
-        g_layers[idx].overflow = (ovs != 0);
-        if (ovs) ARM_PMU_Set_CNTR_OVS(ovs);
-#else
-        g_layers[idx].overflow = false;
-#endif
     {% else %}
         g_layers[idx].counters[0] = DWT->CYCCNT - g_op_start_cyccnt;
         g_layers[idx].overflow = false;
@@ -581,7 +578,12 @@ static {{ aot_prefix }}_model_context_t {{ aot_prefix }}_model_ctx = {
         g_hb_ops_since = 0;
 {%- endblock %}
 
-{% block engine_print_csv %}{% if pass.group == "ethos_npu" %}
+{% block engine_print_csv %}        if (g_layer_capacity_exceeded) {
+            hpx_printf("HPX_ERROR=operator_count_exceeds_capacity capacity=%d\n",
+                       kMaxLayers);
+            hpx_park();
+        }
+{% if pass.group == "ethos_npu" %}
         hpx_npu_print_csv();
 {% else %}
         profiler_print_csv();

@@ -1,0 +1,21 @@
+{#- Per-operator Armv8-M PMU read, shared by every engine that records layers.
+
+    nsx_pmu_get_counters() ends with nsx_pmu_reset_counters(), which writes
+    PMOVSCLR, so the overflow status must be sampled before the read. NSX
+    builds each 32-bit event from a 16-bit counter (index 2i) chained into a
+    16-bit CHAIN counter (index 2i+1): the low half overflowing is the normal
+    carry, and only the CHAIN half overflowing truncates the logical count. -#}
+// Reads counters; true if a count wrapped.
+static inline bool hpx_pmu_read_layer(nsx_pmu_config_t *cfg, int num_counters) {
+#if (__CORTEX_M >= 55U)
+    const uint32_t ovs = ARM_PMU_Get_CNTR_OVS();
+#else
+    const uint32_t ovs = 0U;
+#endif
+    const uint32_t saved_cyccnt = DWT->CYCCNT;
+    const uint32_t status = nsx_pmu_get_counters(cfg);
+    DWT->CYCCNT = saved_cyccnt;
+    uint32_t chain_mask = 0U;
+    for (int i = 0; i < num_counters; ++i) chain_mask |= 1UL << (2 * i + 1);
+    return (ovs & chain_mask) != 0U || status != NSX_STATUS_SUCCESS;
+}
