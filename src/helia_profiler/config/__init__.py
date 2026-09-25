@@ -201,10 +201,10 @@ class ModelConfig:
     """
 
     path: Path
-    validation_data: Path | None = None  # single INT8 input/output NPZ
     arena_size: int | None = None  # bytes; None = let engine/firmware report
     arena_location: Placement | str | None = None
     weights_location: Placement | str | None = None
+    validation_data: Path | None = None  # single INT8 input/output NPZ
 
     @field_validator("arena_location", "weights_location", mode="before")
     @classmethod

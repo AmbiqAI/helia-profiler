@@ -6,9 +6,16 @@ from dataclasses import dataclass
 import hashlib
 from pathlib import Path
 import re
+import struct
+from zipfile import BadZipFile
 
 from ..errors import ConfigError
-from ..wire._model import HPX_GOLDEN_OUTPUT_PREFIX, HPX_GOLDEN_OUTPUT_PATTERN
+from ..wire._model import (
+    HPX_GOLDEN_OUTPUT_PREFIX,
+    HPX_GOLDEN_OUTPUT_PATTERN,
+    HPX_START_SENTINEL,
+    HPX_END_SENTINEL,
+)
 
 
 @dataclass(frozen=True)
@@ -25,11 +32,19 @@ class GoldenData:
 
 def load_golden(model_path: Path, data_path: Path) -> GoldenData:
     """Load one fixed-shape INT8 pair and verify it against the flatbuffer."""
-    import numpy as np
-    from ai_edge_litert import schema_py_generated as schema
+    try:
+        import numpy as np
+        from ai_edge_litert import schema_py_generated as schema
+    except ImportError as exc:
+        raise ConfigError(
+            "validation_data requires the analysis extra",
+            hint="Install helia-profiler[analysis] in the profiling environment.",
+        ) from exc
 
     try:
         model_bytes = model_path.read_bytes()
+        if not schema.Model.ModelBufferHasIdentifier(model_bytes, 0):
+            raise ValueError("model is not a TFLite flatbuffer")
         model = schema.Model.GetRootAsModel(model_bytes, 0)
         if model.SubgraphsLength() != 1:
             raise ValueError("validation_data requires one subgraph")
@@ -52,7 +67,7 @@ def load_golden(model_path: Path, data_path: Path) -> GoldenData:
             data, expected = (array.tobytes(order="C") for array in arrays)
         if not data or len(data) > 1048576 or not expected or len(expected) > 256:
             raise ValueError("validation_data supports up to 1 MiB input and 256 output bytes")
-    except (OSError, ValueError, KeyError, IndexError, TypeError) as exc:
+    except (OSError, ValueError, KeyError, IndexError, TypeError, struct.error, BadZipFile) as exc:
         raise ConfigError(f"Invalid validation_data: {exc}") from exc
     return GoldenData(
         data, expected, hashlib.sha256(model_bytes).hexdigest(), hashlib.sha256(data).hexdigest()
@@ -61,11 +76,17 @@ def load_golden(model_path: Path, data_path: Path) -> GoldenData:
 
 def check_golden_output(text: str, golden: GoldenData) -> bytes:
     """Require one complete matching output record; absent or stale data fails."""
-    records = [
-        line.strip()
-        for line in text.splitlines()
-        if line.strip().startswith(HPX_GOLDEN_OUTPUT_PREFIX)
+    lines = [line.strip() for line in text.splitlines()]
+    starts = [i for i, line in enumerate(lines) if line == HPX_START_SENTINEL]
+    ends = [i for i, line in enumerate(lines) if line == HPX_END_SENTINEL]
+    if len(starts) != 1 or len(ends) != 1 or starts[0] >= ends[0]:
+        raise ValueError("Numerical validation requires one complete capture frame")
+    record_indices = [
+        i for i, line in enumerate(lines) if line.startswith(HPX_GOLDEN_OUTPUT_PREFIX)
     ]
+    if any(not starts[0] < i < ends[0] for i in record_indices):
+        raise ValueError("Numerical output record lies outside the capture frame")
+    records = [lines[i] for i in record_indices]
     if len(records) != 1:
         raise ValueError(f"Expected one HPX_GOLDEN_OUTPUT record, found {len(records)}")
     match = re.fullmatch(HPX_GOLDEN_OUTPUT_PATTERN, records[0])

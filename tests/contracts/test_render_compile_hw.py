@@ -588,6 +588,8 @@ def test_matrix_covers_every_engine_family():
         "510-rt-power",
         "510-rt-power-busy",
         "510-tflm-profile",
+        "510-tflm-golden",
+        "510-aot-golden",
         "510-tflm-power",
         "510-aot-profile",
         "510-aot-profile-busy",

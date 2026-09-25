@@ -1,5 +1,7 @@
 # Fixed INT8 input validation
 
+This option requires the `analysis` extra (`helia-profiler[analysis]`).
+
 Set `model.validation_data` to an NPZ file containing only `input_0` and
 `output_0`, both INT8 arrays matching the concrete input/output tensor shapes
 in the original TFLite model. The optional path supports one input and one
@@ -10,7 +12,8 @@ concrete tensor shape; firmware also checks the allocated byte sizes.
 Firmware embeds only the input. Before clean timing, it performs an inference
 and emits the actual output, model hash and input hash. The capture stage saves
 `validation-capture.txt` and requires exact output equality. Missing, repeated,
-malformed or mismatched records fail capture. The expected output is never
+malformed, out-of-frame or mismatched records fail capture. Exactly one complete
+START/END capture frame is required. The expected output is never
 embedded in firmware. One matching vector does not establish dataset accuracy.
 
 For these runs both engines restore the fixed bytes inside every clean timing

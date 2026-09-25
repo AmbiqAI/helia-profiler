@@ -112,16 +112,18 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
         raw = "\n".join(lines)
         ctx.config.output.dir.mkdir(parents=True, exist_ok=True)
         (ctx.config.output.dir / "validation-capture.txt").write_text(raw + "\n", encoding="utf-8")
+
+    # A firmware-reported error is more specific than any "no layer data"
+    # fallback message below, so surface it first with the best hint we can.
+    _raise_on_firmware_error(lines, power_enabled=bool(ctx.config.power.enabled))
+
+    if ctx.config.model.validation_data is not None:
         try:
             check_golden_output(
                 raw, load_golden(ctx.config.model.path, ctx.config.model.validation_data)
             )
         except ValueError as exc:
             raise CaptureError(f"Numerical validation failed: {exc}") from exc
-
-    # A firmware-reported error is more specific than any "no layer data"
-    # fallback message below, so surface it first with the best hint we can.
-    _raise_on_firmware_error(lines, power_enabled=bool(ctx.config.power.enabled))
 
     # Pre-parse validation: check for protocol sentinels.  Scan the whole
     # capture, not just the head: the SWO transport emits a variable-length

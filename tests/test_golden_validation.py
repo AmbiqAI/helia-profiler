@@ -47,17 +47,21 @@ def _record(golden):
     )
 
 
+def _frame(record):
+    return "--- HPX_START ---\n" + record + "\n--- HPX_END ---"
+
+
 def test_checker_rejects_corrupted_expectation_and_identity(pair):
     golden = load_golden(*pair)
     assert golden.input_bytes == b"\x80\x00\x7f"
-    assert check_golden_output(_record(golden), golden) == b"\x17\xd7"
+    assert check_golden_output(_frame(_record(golden)), golden) == b"\x17\xd7"
     bad = replace(golden, expected_bytes=b"\x16\xd7")
     with pytest.raises(ValueError, match="differs"):
-        check_golden_output(_record(golden), bad)
+        check_golden_output(_frame(_record(golden)), bad)
     with pytest.raises(ValueError, match="identity"):
-        check_golden_output(_record(golden), replace(golden, model_sha256="0" * 64))
+        check_golden_output(_frame(_record(golden)), replace(golden, model_sha256="0" * 64))
     with pytest.raises(ValueError, match="identity"):
-        check_golden_output(_record(golden), replace(golden, input_sha256="0" * 64))
+        check_golden_output(_frame(_record(golden)), replace(golden, input_sha256="0" * 64))
 
 
 @pytest.mark.parametrize("mutation", ["missing", "duplicate", "truncated", "odd", "wrong"])
@@ -72,7 +76,7 @@ def test_checker_rejects_incomplete_or_wrong_output(pair, mutation):
         "wrong": line[:-2] + "00",
     }[mutation]
     with pytest.raises(ValueError):
-        check_golden_output(text, golden)
+        check_golden_output(_frame(text), golden)
 
 
 @pytest.mark.parametrize("kind", ["dtype", "shape", "extra", "pickle"])
@@ -178,3 +182,86 @@ def test_capture_checks_actual_lines_and_retains_failure(pair, monkeypatch):
     with pytest.raises(CaptureError, match="Numerical validation failed"):
         capture_pmu(ctx)
     assert bad_record in (config.output.dir / "validation-capture.txt").read_text()
+
+
+@pytest.mark.parametrize("case", ["before", "after", "missing_end", "two_frames"])
+def test_validation_record_must_belong_to_one_complete_capture(pair, case):
+    golden = load_golden(*pair)
+    line = _record(golden)
+    text = {
+        "before": line + "\n" + _frame(""),
+        "after": _frame("") + "\n" + line,
+        "missing_end": "--- HPX_START ---\n" + line,
+        "two_frames": _frame(line) + "\n" + _frame(""),
+    }[case]
+    with pytest.raises(ValueError, match="capture frame"):
+        check_golden_output(text, golden)
+
+
+@pytest.mark.parametrize("broken", ["flatbuffer", "zip"])
+def test_corrupted_containers_report_config_error(pair, broken):
+    model, data = pair
+    if broken == "flatbuffer":
+        model.write_bytes(b"\xff\xff\xff\x7fTFL3")
+    else:
+        data.write_bytes(b"PK\x03\x04truncated")
+    with pytest.raises(ConfigError, match="Invalid validation_data"):
+        load_golden(model, data)
+
+
+def test_missing_analysis_dependency_has_actionable_error(pair, monkeypatch):
+    import builtins
+
+    real_import = builtins.__import__
+
+    def missing(name, *args, **kwargs):
+        if name == "ai_edge_litert":
+            raise ModuleNotFoundError(name)
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", missing)
+    with pytest.raises(ConfigError, match="analysis extra") as caught:
+        load_golden(*pair)
+    assert "helia-profiler[analysis]" in caught.value.hint
+
+
+def test_capture_keeps_firmware_failure_diagnosis(pair, monkeypatch):
+    from helia_profiler.capture import capture_pmu
+
+    model, data = pair
+    config = load_config(
+        None,
+        {
+            "model": {"path": str(model), "validation_data": str(data)},
+            "engine": {"type": "tflm"},
+            "output": {"dir": str(data.parent / "errors")},
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=data.parent)
+    ResolvePlatformStage().run(ctx)
+
+    class FakeTransport:
+        def prepare(self, *args):
+            pass
+
+        def start(self, *args):
+            pass
+
+        def collect(self, *args):
+            return ["--- HPX_START ---", "HPX_ERROR=validation_invoke_failed"]
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr("helia_profiler.capture.resolve_transport", lambda _: FakeTransport())
+    with pytest.raises(CaptureError, match="validation_invoke_failed"):
+        capture_pmu(ctx)
+    assert "validation_invoke_failed" in (config.output.dir / "validation-capture.txt").read_text()
+
+
+def test_model_config_keeps_existing_positional_arena_argument(tmp_path):
+    from helia_profiler.config import ModelConfig
+
+    config = ModelConfig(tmp_path / "model.tflite", 4096)
+    assert config.arena_size == 4096
+    assert config.validation_data is None
