@@ -485,6 +485,54 @@ def test_capture_pmu_no_clock_warning_when_device_clock_matches(
     assert not any("Device reports CPU clock" in r.message for r in caplog.records)
 
 
+@pytest.mark.parametrize(
+    ("measured_hz", "warns"),
+    [(96_000_000, True), (249_900_000, False)],
+)
+def test_capture_pmu_checks_measured_clock(
+    tmp_path: Path, monkeypatch, caplog, measured_hz: int, warns: bool
+):
+    import logging
+
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"\x00")
+    config = load_config(
+        None,
+        {
+            "model": {"path": str(model)},
+            "engine": {"type": "helia-rt"},
+            "target": {"transport": "swo", "clock": {"cpu": "hp"}},
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ResolvePlatformStage().run(ctx)
+    build_dir = tmp_path / "build"
+    set_profile_firmware(ctx, build_dir=build_dir)
+    build_dir.mkdir()
+    ctx.resolved_jlink_serial = "1160002204"
+
+    def fake_capture_swo_output(**kwargs):
+        # SystemCoreClock echoes the host's 250 MHz; only the probe can differ.
+        return [
+            "--- HPX_START ---",
+            "HPX_SYSTEM_CLOCK_HZ=250000000",
+            f"HPX_MEASURED_CLOCK_HZ={measured_hz}",
+            "--- HPX_PRESET basic_cpu ---",
+            "--- HPX_ITER 0 ---",
+            "Layer,Op,ARM_PMU_CPU_CYCLES",
+            "0,CONV_2D,1",
+            "--- HPX_END ---",
+        ]
+
+    monkeypatch.setattr("helia_profiler.transport.swo.capture_swo_output", fake_capture_swo_output)
+
+    with caplog.at_level(logging.WARNING, logger="hpx"):
+        result = capture_pmu(ctx)
+
+    assert result.meta.measured_clock_hz == measured_hz
+    assert any("Measured CPU clock" in r.message for r in caplog.records) is warns
+
+
 def test_capture_pmu_passes_resolved_jlink_device_to_usb(tmp_path: Path, monkeypatch):
     model = tmp_path / "model.tflite"
     model.write_bytes(b"\x00")

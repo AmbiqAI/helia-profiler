@@ -24,6 +24,7 @@ from ._model import (
     GATE_PSRAM_METADATA,
     GATE_PSRAM_WEIGHTS_UPLOAD,
     GATE_RTT_FLUSH,
+    GATE_STIMER_WINDOW,
     GATE_TRANSPORT_HAS_READY_PREAMBLE,
     GATE_WEIGHTS_IN_PSRAM,
     HPX_END_SENTINEL,
@@ -256,10 +257,27 @@ START_HEADER_SPECS: tuple[WireSpec, ...] = (
         WireCriticality.METRIC,
         key=WireKey.SYSTEM_CLOCK_HZ,
         value_shape="Hz",
-        note="Checked against the platform registry (>5% divergence warns) "
-        "and used by the clean-window clock-rate validity check: it is the "
-        "expected-rate term of PROFILE_CLEAN_WINDOW_CLOCK_RATE_LOW, with "
-        "HPX_CLEAN_DWT_RATE_CYC and HPX_CLEAN_DWT_RATE_US.",
+        note="Written from the host's clock choice, so it echoes the "
+        "registry on every non-burst build; HPX_MEASURED_CLOCK_HZ is the "
+        "independent check. Used by the clean-window clock-rate validity "
+        "check: it is the expected-rate term of "
+        "PROFILE_CLEAN_WINDOW_CLOCK_RATE_LOW, with HPX_CLEAN_DWT_RATE_CYC "
+        "and HPX_CLEAN_DWT_RATE_US.",
+    ),
+    _spec(
+        WireKey.MEASURED_CLOCK_HZ.wire,
+        WireKind.KEY_VALUE,
+        "Core clock measured as DWT cycles over a STIMER interval.",
+        WireConsumer.FIRMWARE_META,
+        WireCriticality.METRIC,
+        key=WireKey.MEASURED_CLOCK_HZ,
+        condition=GATE_STIMER_WINDOW,
+        runtime_gate="if (hpx_stimer_init() != 0U)",
+        value_shape="Hz",
+        note="STIMER runs from its own 32.768 kHz crystal, so this catches "
+        "a perf mode that did not take. Checked against the platform "
+        "registry (>5% divergence warns). Absent when the crystal fails to "
+        "settle; the clean window then reports HPX_ERROR=stimer_dead.",
     ),
     _spec(
         WireKey.BURST_AVAIL.wire,
