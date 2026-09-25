@@ -135,6 +135,37 @@ def test_package_dependency_matches_qualified_baseline() -> None:
     assert neuralspotx_package["version"] == baseline.neuralspotx_version
 
 
+def test_aot_extra_and_lock_match_the_qualified_helia_aot_range() -> None:
+    from helia_profiler.engines.helia_aot import compile as aot_compile
+
+    repo_root = Path(__file__).resolve().parent.parent
+    aot = load_compatibility_baseline().engine("helia-aot")
+    assert aot.min_version is not None and aot.max_version_exclusive is not None
+    specifier = f">={aot.min_version},<{aot.max_version_exclusive}"
+    # The constants are the policy when no baseline is resolved.
+    assert (aot_compile.HELIAAOT_MIN_VERSION, aot_compile.HELIAAOT_MAX_VERSION_EXCLUSIVE) == (
+        aot.min_version,
+        aot.max_version_exclusive,
+    )
+
+    with (repo_root / "pyproject.toml").open("rb") as stream:
+        extra = tomllib.load(stream)["project"]["optional-dependencies"]["aot"]
+    assert f"helia-aot{specifier}" in extra
+
+    with (repo_root / "uv.lock").open("rb") as stream:
+        packages = tomllib.load(stream)["package"]
+    project_package = next(package for package in packages if package["name"] == "helia-profiler")
+    locked = next(
+        dependency
+        for dependency in project_package["metadata"]["requires-dist"]
+        if dependency["name"] == "helia-aot"
+    )
+    assert locked["specifier"] == specifier
+    version = next(package for package in packages if package["name"] == "helia-aot")["version"]
+    assert aot_compile._parse_semver(aot.min_version) <= aot_compile._parse_semver(version)
+    assert aot_compile._parse_semver(version) < aot_compile._parse_semver(aot.max_version_exclusive)
+
+
 def test_provenance_fingerprint_is_serializable_and_stable(tmp_path: Path) -> None:
     config = _config(tmp_path)
     assert config.compatibility is not None
@@ -469,8 +500,12 @@ def test_helia_aot_version_check_uses_baseline_policy(
         return "0.21.9"
 
     monkeypatch.setattr("importlib.metadata.version", _fake_version_too_old)
-    with pytest.raises(EngineError, match=r"below the minimum supported version \(v0\.22\.0\)"):
+    with pytest.raises(
+        EngineError, match=r"below the minimum supported version \(v0\.22\.0\)"
+    ) as excinfo:
         aot_compile._check_helia_aot_version(config)
+    # The upgrade command stays inside the qualified range.
+    assert "'helia-aot>=0.22.0,<0.23.0'" in (excinfo.value.hint or "")
 
     def _fake_version_too_new(name: str) -> str:
         return "0.23.0"

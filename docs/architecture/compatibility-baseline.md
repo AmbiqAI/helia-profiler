@@ -74,8 +74,19 @@ on the NSX route. And several float operators now dispatch to native kernels
 that raise that module's floor: float `SQRT`/`RSQRT` need v7.33.0,
 `GATHER`/`GATHER_ND`/`REDUCE_MAX`/`REDUCE_MIN` v7.34.0, and
 `ARG_MAX`/`ARG_MIN` v7.35.0. Against the v7.32.0 core such a model stops at
-compile time on the generated module's own `#error`; integer models, and
-float models without those operators, are unaffected.
+compile time on the generated module's own `#error`. That includes a float
+`SQRT`, which 0.20.0 converted through its own code; integer models, and float
+models without those operators, are unaffected. Until the core moves, such a
+model runs with `engine.config.cmsis_nn_ref: v7.35.0`, which the run reports
+as `development-overrides`.
+
+**Verified (host only).** With helia-aot 0.22.0 installed, the int8 KWS model
+converts through the heliaAOT engine's own stages for Apollo510, the rendered
+`main_aot.cc` is byte-identical to the 0.20.0 render, and the generated module
+and rendered firmware compile (Arm GNU 15.2, `-Werror -fsyntax-only`) against
+the v7.32.0 core; the same module against v7.31.0 stops on its floor. For the
+fp32 and fp16 KWS models HPX enables every float kernel the generated module
+requires. No build, flash or hardware run is recorded for this revision yet.
 
 The previous revision is recorded below. heliaRT 1.19.0 and heliaAOT 0.19.0
 (issue #246) are the releases that add FP16

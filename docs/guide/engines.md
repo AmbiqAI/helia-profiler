@@ -100,7 +100,7 @@ owns provider materialization and uses its standard `NSX_CACHE_DIR` cache;
 the runtime's idempotent bridge prevents duplicate targets. The `ns` provider
 uses PR #1's private compatibility layer for the fork's `weight_sum_ctx` ABI
 and resolves `nsx-cmsis-nn` at the baseline's qualified ref like the helia
-engines (v7.31.0, verified on Apollo510).
+engines.
 Set `engine.config.cmsis_nn_path` or `engine.config.cmsis_nn_ref` to override
 the selected provider while preserving the same ordered module contract. These
 overrides, including the `CMSIS_NN_PATH` environment variable, replace a
@@ -277,11 +277,10 @@ registry and local-source modes compile heliaRT with the selected toolchain.
   successful run, set it to roughly `1.5x` the reported `allocated_arena` in
   `summary.json`.
 - Source builds (the registry default and `source_path`) declare
-  `nsx-cmsis-nn` at the baseline's qualified ref (v7.31.0), always enable its
-  fp32 kernels (heliaRT 1.19.0 refuses to configure without them), and enable
-  the fp16 kernels only when the model carries FLOAT16 tensors — computed or
-  dequantized weights — on a Cortex-M55. There is no field to turn them off;
-  1.19.0 prebuilt `dist_path` archives already contain them.
+  `nsx-cmsis-nn` at the baseline's qualified ref (v7.32.0), enable its fp32
+  kernels when the model computes in float, and enable the fp16 kernels
+  additionally when it carries FLOAT16 tensors — computed or dequantized
+  weights — on a Cortex-M55. An integer-only model links neither.
 
 ## heliaAOT
 
@@ -407,7 +406,11 @@ The pipeline:
 module-wide minimum). Its fp32 kernels are enabled when the model computes in
 float, and the fp16 kernels additionally when it carries FLOAT16 tensors on a
 Cortex-M55, exactly as for heliaRT source builds (see the heliaRT runtime
-notes).
+notes). A float `SQRT`, `RSQRT`, `GATHER`, `GATHER_ND`, `REDUCE_MAX`,
+`REDUCE_MIN`, `ARG_MAX` or `ARG_MIN` needs a newer core (v7.33.0 to v7.35.0)
+and stops at compile time against this one; set
+`engine.config.cmsis_nn_ref: v7.35.0` for such a model, which marks the run
+`development-overrides`.
 
 ## Choosing an engine
 
