@@ -956,8 +956,9 @@ three nested intervals, read from the one clock in order:
   edges. This is what the instrument and the plan also time, so the
   window-clock checks compare against it.
 - `power.on_device_summary.duration_us` (INA228 builds): from the accumulator
-  reset to the accumulator reads. Energy and charge integrate over this
-  interval, so internal mode divides by it for average power and current.
+  reset to just before the accumulator reads, which latch energy and charge a
+  few I2C transactions later. Internal mode divides by it for average power
+  and current.
 - `power.terminal.elapsed_us`: the whole window, including the engine's
   prologue and the INA228's own arm and read. It bounds the other two and
   feeds the host wall-time ceiling.

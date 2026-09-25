@@ -347,10 +347,9 @@ WINDOW_CLOCK_CEILING_SLACK_S = 0.25
 
 #: Shared user-facing explanation for a frozen firmware window clock.
 #:
-#: Two causes produce this identical signature, and the hint must name both --
-#: ``SocCapabilities.power_window_timer`` now resolves to ``stimer`` for EVERY
-#: registered SoC, so on current firmware the debug domain is no longer even
-#: the likelier of the two.
+#: Only the dedicated power binary's terminal record reaches it, and that
+#: binary refuses to render any window timer but STIMER, so the crystal is the
+#: one cause left to name.
 FROZEN_WINDOW_CLOCK_HINT = (
     "The firmware completed its measured work but timed the window with a clock "
     "that never advanced. Power binaries time the window with STIMER, so its "

@@ -356,6 +356,22 @@ class TestWindowClockValidity:
 
             assert IssueCode.POWER_WINDOW_CLOCK_FROZEN not in codes
 
+    def test_sub_tick_gate_keeps_the_host_ceiling(self, tmp_path: Path):
+        """The ceiling is internal mode's backstop when the gate cannot be
+        judged, so a zero gate must not suppress it."""
+        ctx = _context(tmp_path, mode="internal")
+        self._bench_run(
+            ctx,
+            elapsed_us=int(self.BENCH_ELAPSED_US * 6027 / 866.6),
+            gate_elapsed_us=0,
+            internal=True,
+            host_envelope_s=10.0,
+        )
+
+        codes = {issue.code for issue in evaluate_run(ctx).issues}
+
+        assert IssueCode.POWER_WINDOW_CLOCK_EXCEEDS_HOST_TIME in codes
+
     def test_frozen_window_clock_message_is_probe_aware(self, tmp_path: Path):
         """#172: the ninth 'completed inferences' site — a busy-loop
         run completes busy-loop passes, and this is exactly the diagnostic a
