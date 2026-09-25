@@ -21,7 +21,7 @@ Each backend in `transport/` implements the same line-collection contract:
 read bytes from the wire, split into lines, and return `list[str]` when the
 `--- HPX_END ---` sentinel arrives or a timeout expires. Every backend honours
 `target.heartbeat.overall_timeout_s` and `target.heartbeat.host_timeout_s`
-(300 s when heartbeats are off). The default is RTT
+(300 s when heartbeats are off); SWO retries share one overall deadline. The default is RTT
 (`transport/rtt.py`), which drains a ring buffer in target RAM over SWD —
 lossless and requiring no extra cabling. SWO (`transport/swo.py`) is lossy
 and kept for diagnostics only; the parser and protocol are identical across
@@ -101,8 +101,10 @@ def parse_firmware_output(
    reads 0: zero cycles is the witness of a debug-domain freeze. Passes
    without a cycle counter (MVE, memory) keep their all-zero rows.
 5. **Build PresetResult** — one per counter preset
-6. **Check completeness** — a session without `--- HPX_END ---`, or whose
-   passes differ from `HPX_PRESETS` / `HPX_NUM_PRESETS`, raises `CaptureError`.
+6. **Check completeness** — a session without `--- HPX_END ---`, whose
+   passes differ from `HPX_PRESETS` / `HPX_NUM_PRESETS`, that repeats a pass,
+   or whose pass holds fewer `HPX_ITER` blocks than `HPX_ITERATIONS`, raises
+   `CaptureError`.
 
 ### Result structure
 
@@ -154,7 +156,7 @@ otherwise mix complete and partial passes.
 | No output at all | Overall timeout expires → `CaptureError` |
 | Firmware hang mid-run | No line (heartbeat, CSV, or sentinel) for 30s → `CaptureError` |
 | Silent clean window | `HPX_HEARTBEAT phase=clean_window_begin` announce extends the deadline to cover the estimated window |
-| Truncated stream | Missing `--- HPX_END ---` or an announced pass → `CaptureError` with a transport hint |
+| Truncated stream | Missing `--- HPX_END ---`, an announced pass, or an iteration → `CaptureError` with a transport hint |
 | Invalid CSV | Skips malformed rows, warns, continues |
 
 ## Power capture

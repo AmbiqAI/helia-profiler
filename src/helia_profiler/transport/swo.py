@@ -59,6 +59,13 @@ _SWO_POLL_INTERVAL_S = 0.001
 _HPX_START_SENTINEL = HPX_START_SENTINEL
 
 
+def _remaining(deadline: float | None) -> float | None:
+    """Budget left for this attempt."""
+    if deadline is None:
+        return None
+    return max(deadline - time.monotonic(), 0.0)
+
+
 def capture_swo_output(
     *,
     build_dir=None,  # unused — kept for interface parity
@@ -89,6 +96,7 @@ def capture_swo_output(
         timing.finalize(timing_out)
 
     controller = reset_controller or JLinkResetController()
+    deadline = None if timeout_s is None else time.monotonic() + timeout_s
 
     for attempt in range(1, _MAX_CAPTURE_ATTEMPTS + 1):
         # --- Step 1: reset the target BEFORE connecting pylink ---
@@ -120,7 +128,7 @@ def capture_swo_output(
             lines = collect_lines(
                 lambda: bytes(jlink.swo_read_stimulus(0, 4096)),
                 transport_name="SWO",
-                overall_timeout_s=timeout_s,
+                overall_timeout_s=_remaining(deadline),
                 heartbeat_timeout_s=heartbeat_timeout_s,
                 poll_interval_s=_SWO_POLL_INTERVAL_S,
                 on_line=on_line,
@@ -131,7 +139,8 @@ def capture_swo_output(
             # recoverable startup race, so retry with a fresh reset rather than
             # returning a partial capture that fails downstream validation.
             have_start = any(_HPX_START_SENTINEL in l for l in lines)
-            if (lines and have_start) or attempt == _MAX_CAPTURE_ATTEMPTS:
+            out_of_time = deadline is not None and time.monotonic() >= deadline
+            if (lines and have_start) or attempt == _MAX_CAPTURE_ATTEMPTS or out_of_time:
                 finalize_timing()
                 return lines
             if lines and not have_start:

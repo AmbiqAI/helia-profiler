@@ -146,6 +146,11 @@ def parse_firmware_output(
             if current_preset is not None:
                 current_preset.flush_iteration()
             preset_name = m.group(1)
+            if preset_name in presets:
+                raise CaptureError(
+                    f"PMU pass {preset_name} appeared twice.",
+                    hint=_TRUNCATED_HINT,
+                )
             current_preset = _PresetData()
             presets[preset_name] = current_preset
             continue
@@ -217,6 +222,7 @@ def parse_firmware_output(
         presets=preset_names,
     )
     _check_presets(firmware_meta, list(presets))
+    _check_iterations(presets, meta_kv.get(WireKey.ITERATIONS))
 
     typed_presets: dict[str, PresetResult] = {}
     for name, pd in presets.items():
@@ -296,6 +302,19 @@ def _check_presets(meta: FirmwareMeta, parsed: list[str]) -> None:
             f"Captured {len(parsed)} PMU passes; firmware announced {meta.num_presets}.",
             hint=_TRUNCATED_HINT,
         )
+
+
+def _check_iterations(presets: dict[str, _PresetData], announced: Any) -> None:
+    """Reject a pass with missing or empty iterations."""
+    for name, pd in presets.items():
+        complete = [it for it in pd.iterations if it]
+        if not complete:
+            raise CaptureError(f"PMU pass {name} has no layer data.", hint=_TRUNCATED_HINT)
+        if isinstance(announced, int) and len(complete) != announced:
+            raise CaptureError(
+                f"PMU pass {name} has {len(complete)} of {announced} iterations.",
+                hint=_TRUNCATED_HINT,
+            )
 
 
 class _PresetData:

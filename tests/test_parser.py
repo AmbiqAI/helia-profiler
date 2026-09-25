@@ -596,7 +596,7 @@ def test_identity_failure_bounds_large_differences_and_labels():
 
 
 def _two_pass_session() -> list[str]:
-    meta = {"num_presets": "2", "presets": "cpu_0,memory_0"}
+    meta = {"num_presets": "2", "presets": "cpu_0,memory_0", "iterations": "2"}
     cpu = _make_preset_block(
         "cpu_0", ["Layer", "Op", "ARM_PMU_CPU_CYCLES"], [["0", "CONV_2D", "100"]], iterations=2
     )
@@ -643,6 +643,43 @@ def test_announced_pass_count_mismatch_is_rejected():
     lines = [line.replace("HPX_NUM_PRESETS=2", "HPX_NUM_PRESETS=3") for line in _two_pass_session()]
     with pytest.raises(CaptureError, match="3"):
         parse_firmware_output(lines)
+
+
+def _memory_pass_bounds(lines: list[str]) -> tuple[int, int]:
+    start = lines.index("--- HPX_PRESET memory_0 ---")
+    return start, lines.index("--- HPX_END ---")
+
+
+def test_pass_with_dropped_iteration_is_rejected():
+    import pytest
+    from helia_profiler.errors import CaptureError
+
+    lines = _two_pass_session()
+    start, end = _memory_pass_bounds(lines)
+    last_iter = _last_index(lines, "--- HPX_ITER 1 ---")
+    assert start < last_iter < end
+    with pytest.raises(CaptureError, match="memory_0 has 1 of 2"):
+        parse_firmware_output(lines[:last_iter] + lines[end:])
+
+
+def test_announced_pass_without_data_is_rejected():
+    import pytest
+    from helia_profiler.errors import CaptureError
+
+    lines = _two_pass_session()
+    start, end = _memory_pass_bounds(lines)
+    with pytest.raises(CaptureError, match="memory_0 has no layer data"):
+        parse_firmware_output(lines[: start + 1] + lines[end:])
+
+
+def test_repeated_pass_is_rejected():
+    import pytest
+    from helia_profiler.errors import CaptureError
+
+    lines = _two_pass_session()
+    start, end = _memory_pass_bounds(lines)
+    with pytest.raises(CaptureError, match="appeared twice"):
+        parse_firmware_output(lines[:end] + lines[start:end] + lines[end:])
 
 
 def test_stream_cut_after_final_iter_marker_is_rejected():
