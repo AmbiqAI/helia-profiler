@@ -11,7 +11,6 @@ from tests.pipeline_context_helpers import (
 )
 
 import logging
-import time
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
@@ -38,6 +37,154 @@ from helia_profiler.power.base import (
 
 #: time64 tick rate (2**30 ticks per second), mirrors ``pyjoulescope_driver.time64.SECOND``.
 _SECOND = 1 << 30
+
+
+class _WaitElapsed(BaseException):
+    """Ends the synchronously driven poller when the capture's wait runs out.
+
+    A BaseException so the poller's own ``except Exception`` cannot swallow it.
+    """
+
+
+class _FakeClockMisuse(BaseException):
+    """A path the fake capture clock cannot model; fails the test loudly.
+
+    A BaseException so neither the poller nor the start-hook handling in
+    ``capture_gated`` can swallow it.
+    """
+
+
+class _FakeCaptureClock:
+    """Deterministic time for ``capture_gated``: integer microseconds, no real waits.
+
+    ``capture_gated`` samples GPI on a thread with real sleeps and times the
+    gate with ``time.monotonic``, so a test that classifies a gate duration
+    would otherwise measure it. Here the poller runs synchronously inside the
+    capture's ``stop.wait`` on this clock, and a GPI schedule written against
+    ``elapsed_s`` fixes every edge exactly.
+    """
+
+    #: Clock readings allowed per capture before the harness calls it a runaway
+    #: loop; the poller reads the clock on every pass, sleep or not.
+    MAX_READS = 200_000
+
+    def __init__(self) -> None:
+        # Every reading in these tests stays within [512, 1024) s, where
+        # doubles are evenly spaced, so the difference of two readings is
+        # exact. Keep the start and the test durations inside that range.
+        self.now_us = 1_000_000_000
+        self.start_us = self.now_us
+        self.reads = 0
+        self._deadline_us: int | None = None
+        self._poller: Callable[[], None] | None = None
+        clock = self
+
+        class _Event:
+            def __init__(self) -> None:
+                self._set = False
+
+            def set(self) -> None:
+                self._set = True
+
+            def is_set(self) -> bool:
+                return self._set
+
+            def wait(self, timeout: float | None = None) -> bool:
+                if self._set:
+                    return True
+                if timeout is None:
+                    raise _FakeClockMisuse("an unbounded wait cannot run on the fake clock")
+                deadline = clock.now_us + round(timeout * 1e6)
+                poller, clock._poller = clock._poller, None
+                if poller is not None:
+                    clock._deadline_us = deadline
+                    try:
+                        poller()
+                    except _WaitElapsed:
+                        pass
+                    finally:
+                        clock._deadline_us = None
+                if not self._set:
+                    clock.now_us = max(clock.now_us, deadline)
+                return self._set
+
+        class _Thread:
+            def __init__(self, target: Callable[[], None], daemon: bool = False) -> None:
+                self._target = target
+
+            def start(self) -> None:
+                clock._poller = self._target
+
+            def join(self, timeout: float | None = None) -> None:
+                pass
+
+        import threading as real_threading
+        import types
+
+        class _Condition(real_threading.Condition):
+            # READY qualification waits for poller samples, but the poller only
+            # runs inside the capture's stop.wait here. Fail rather than block
+            # for real time and report the wrong answer.
+            def wait_for(self, predicate, timeout=None):
+                raise _FakeClockMisuse("READY qualification is not modelled by the fake clock")
+
+            def wait(self, timeout=None):
+                raise _FakeClockMisuse("a condition wait is not modelled by the fake clock")
+
+        self.time = types.SimpleNamespace(
+            monotonic=self.monotonic,
+            monotonic_ns=self.monotonic_ns,
+            time=lambda: 1.7e9 + self.now_us / 1e6,
+            sleep=self.sleep,
+        )
+        self.threading = types.SimpleNamespace(Event=_Event, Thread=_Thread, Condition=_Condition)
+
+    def monotonic(self) -> float:
+        return self.now_us / 1e6
+
+    @property
+    def elapsed_s(self) -> float:
+        return (self.now_us - self.start_us) / 1e6
+
+    def monotonic_ns(self) -> int:
+        # The poller stamps every pass through here, so a pass that never
+        # sleeps is caught however the test scripts GPI.
+        self.reads += 1
+        if self.reads > self.MAX_READS:
+            raise _FakeClockMisuse("the poller read GPI without advancing the clock")
+        return self.now_us * 1_000
+
+    def sleep(self, seconds: float) -> None:
+        if round(seconds * 1e6) <= 0:
+            raise _FakeClockMisuse("a non-positive sleep would never advance the clock")
+        self.reads = 0
+        target = self.now_us + round(seconds * 1e6)
+        if self._deadline_us is not None and target >= self._deadline_us:
+            self.now_us = self._deadline_us
+            raise _WaitElapsed
+        self.now_us = target
+
+
+def _install_fake_capture_clock(monkeypatch: pytest.MonkeyPatch) -> _FakeCaptureClock:
+    """Run ``capture_gated`` on a fake clock with a minimal ``time64``.
+
+    The ``pyjoulescope_driver`` stand-in exposes only ``time64.SECOND``, the
+    one attribute this path reads, so these tests also run under the
+    software-only guard, which blocks the real driver import.
+    """
+    import sys
+    import types
+
+    from helia_profiler.power.joulescope import capture_gated as module
+
+    clock = _FakeCaptureClock()
+    time64 = types.SimpleNamespace(SECOND=_SECOND)
+    driver_pkg = types.SimpleNamespace(time64=time64)
+    monkeypatch.setitem(sys.modules, "pyjoulescope_driver", driver_pkg)
+    monkeypatch.setitem(sys.modules, "pyjoulescope_driver.time64", time64)
+    monkeypatch.setattr(module, "time", clock.time)
+    monkeypatch.setattr(module, "threading", clock.threading)
+    return clock
 
 
 def _mark_power_firmware_deployed(ctx, tmp_path: Path) -> None:
@@ -1056,6 +1203,7 @@ class TestStreamedGateSelection:
         from helia_profiler.power.joulescope.driver import JoulescopeDriver
 
         fake = self._FakeStreamingDriver(fullrate_case=fullrate_case)
+        clock = _install_fake_capture_clock(monkeypatch)
         monkeypatch.setenv("HPX_POWER_FULLRATE_XCHECK", "1")
         monkeypatch.setattr(module, "_open_device", lambda _serial: (fake, "u/js320/test", "js320"))
         monkeypatch.setattr(module, "_close_device", lambda *_a, **_k: None)
@@ -1065,13 +1213,14 @@ class TestStreamedGateSelection:
 
         monkeypatch.setattr(module, "_map_poll_samples_to_packet_time", unexpected_mapping)
 
-        # Snapshot poller sees one plain rise/fall so the capture completes;
-        # its edge timing is deliberately NOT what the assertion checks.
+        # Snapshot poller sees one plain rise/fall so the capture completes:
+        # ten 1 ms polls high clear the 8 ms minimum gate on the fake clock.
+        # Its edge timing is deliberately NOT what the assertion checks.
         calls = {"n": 0}
 
         def _scripted_gpi(_driver, _path):
             calls["n"] += 1
-            return 1 if 3 <= calls["n"] <= 8 else 0
+            return 1 if 3 <= calls["n"] <= 12 else 0
 
         monkeypatch.setattr(module, "_read_gpi_snapshot", _scripted_gpi)
 
@@ -1089,6 +1238,8 @@ class TestStreamedGateSelection:
             on_started=_on_started,
         )
 
+        # The snapshot gate completed, so the capture stopped before its 1 s bound.
+        assert clock.elapsed_s < 1.0
         ms = _SECOND // 1000
         assert result.metadata.gating_method == "gpi_stream+host_stats_integral"
         assert len(result.gated_windows) == 1
@@ -1133,6 +1284,60 @@ class TestStreamedGateSelection:
         (recorded,) = diagnostics["windows"]
         assert recorded["rise_tick"] == pytest.approx(19 * ms, abs=ms // 100)
         assert recorded["fall_tick"] == pytest.approx(29 * ms, abs=ms // 100)
+
+
+class TestFakeCaptureClockRefusesWhatItCannotModel:
+    """The fake clock fails loudly instead of silently mis-timing a capture."""
+
+    def test_ready_qualification_is_refused(self, monkeypatch):
+        from helia_profiler.power.joulescope import capture_gated as module
+
+        _install_fake_capture_clock(monkeypatch)
+
+        with pytest.raises(_FakeClockMisuse, match="READY qualification"):
+            module.threading.Condition().wait_for(lambda: True, timeout=1.0)
+
+    def test_unbounded_wait_is_refused(self, monkeypatch):
+        from helia_profiler.power.joulescope import capture_gated as module
+
+        _install_fake_capture_clock(monkeypatch)
+
+        with pytest.raises(_FakeClockMisuse, match="unbounded wait"):
+            module.threading.Event().wait()
+
+    def test_a_poller_that_does_not_advance_time_is_stopped(self, monkeypatch):
+        from helia_profiler.power.joulescope import capture_gated as module
+
+        clock = _install_fake_capture_clock(monkeypatch)
+
+        with pytest.raises(_FakeClockMisuse, match="non-positive sleep"):
+            clock.sleep(0.0)
+        with pytest.raises(_FakeClockMisuse, match="a condition wait"):
+            module.threading.Condition().wait(timeout=1.0)
+        with pytest.raises(_FakeClockMisuse, match="without advancing the clock"):
+            for _ in range(clock.MAX_READS + 1):
+                module.time.monotonic_ns()
+
+    def test_ready_qualification_fails_the_capture_loudly(self, monkeypatch):
+        """End to end: capture_gated's hook handling must not swallow it."""
+        from helia_profiler.power.joulescope import capture_gated as module
+        from helia_profiler.power.joulescope.driver import JoulescopeDriver
+
+        fake = TestMissedGateWarningNamesTheFix._FakeJoulescopeDriver()
+        monkeypatch.setattr(module, "_open_device", lambda _serial: (fake, "u/js320/test", "js320"))
+        monkeypatch.setattr(module, "_close_device", lambda *_a, **_k: None)
+        monkeypatch.setattr(module, "_read_gpi_snapshot", lambda _driver, _path: 0)
+        _install_fake_capture_clock(monkeypatch)
+
+        with pytest.raises(_FakeClockMisuse, match="READY qualification"):
+            module.capture_gated(
+                JoulescopeDriver(),
+                duration_s=1.0,
+                io_voltage=1.8,
+                sync_input_index=0,
+                poll_interval_s=0.005,
+                on_started=lambda wait: wait(1, True, 0.5),
+            )
 
 
 class TestMissedGateWarningNamesTheFix:
@@ -1226,12 +1431,13 @@ class TestMissedGateWarningNamesTheFix:
 
         fake = self._FakeJoulescopeDriver(empty_frames=empty_frames)
         monkeypatch.setattr(module, "_open_device", lambda _serial: (fake, "u/js320/test", "js320"))
-        # GPI never goes high by default: the gate was missed entirely.
-        created = time.monotonic()
+        clock = _install_fake_capture_clock(monkeypatch)
 
+        # GPI never goes high by default: the gate was missed entirely. A
+        # scheduled rise is exact on the fake clock.
         def read_gpi(_driver, _path) -> int:
             if gpi_rises_after_s is not None:
-                return int(time.monotonic() - created >= gpi_rises_after_s)
+                return int(clock.elapsed_s >= gpi_rises_after_s)
             return gpi_level
 
         monkeypatch.setattr(module, "_read_gpi_snapshot", read_gpi)
@@ -1330,6 +1536,57 @@ class TestMissedGateWarningNamesTheFix:
             assert "planned 0.80s window" in text
             assert "Increase power.duration_s" in text
             assert "hang" not in text
+
+    @pytest.mark.parametrize(
+        ("rise_s", "is_hang"),
+        [(0.2, False), (0.195, True)],
+        ids=["exactly-the-accepted-window", "one-poll-past-it"],
+    )
+    def test_missed_fall_band_edge_is_exact(self, monkeypatch, rise_s, is_hang):
+        """2 x 400 ms planned is accepted up to exactly 1.0 s. On the fake
+        clock a gate rising at 0.2 s into a 1.2 s bound is high for exactly
+        that long, and one 5 ms poll earlier it is past it."""
+        from helia_profiler.power.diagnostics import longest_accepted_window_s
+
+        assert (
+            longest_accepted_window_s(
+                clean_infer_count=2,
+                clean_infer_avg_us=400_000,
+                stats_rate_hz=1000,
+                relative_tolerance=0.10,
+            )
+            == 1.0
+        )
+
+        result = self._run_capture(
+            monkeypatch,
+            lockstep=True,
+            wired=True,
+            gpi_rises_after_s=rise_s,
+            clean_infer_count=2,
+            clean_infer_avg_us=400_000,
+            duration_s=1.2,
+        )
+
+        hint = result.metadata.gate_failure.hint
+        assert result.metadata.gate_failure.kind == "no_gate_fall"
+        assert ("hang" in hint) is is_hang
+        assert ("Increase power.duration_s" in hint) is not is_hang
+
+    def test_missed_fall_reports_the_exact_time_high(self, monkeypatch):
+        result = self._run_capture(
+            monkeypatch,
+            lockstep=True,
+            wired=True,
+            gpi_rises_after_s=0.45,
+            clean_infer_count=2,
+            clean_infer_avg_us=400_000,
+            duration_s=1.2,
+        )
+
+        assert "was high for only 0.75s of the planned 0.80s window" in (
+            result.metadata.gate_failure.hint
+        )
 
     @pytest.mark.parametrize("probe", ["infer", "busy_loop"])
     def test_missed_fall_threshold_uses_the_probe_tolerance(self, monkeypatch, probe):
