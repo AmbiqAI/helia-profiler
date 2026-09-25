@@ -46,6 +46,14 @@ class _WaitElapsed(BaseException):
     """
 
 
+class _FakeClockMisuse(BaseException):
+    """A path the fake capture clock cannot model; fails the test loudly.
+
+    A BaseException so neither the poller nor the start-hook handling in
+    ``capture_gated`` can swallow it.
+    """
+
+
 class _FakeCaptureClock:
     """Deterministic time for ``capture_gated``: integer microseconds, no real waits.
 
@@ -56,9 +64,16 @@ class _FakeCaptureClock:
     ``elapsed_s`` fixes every edge exactly.
     """
 
+    #: GPI reads allowed per capture before the harness calls it a runaway loop.
+    MAX_READS = 100_000
+
     def __init__(self) -> None:
+        # Every reading in these tests stays within [512, 1024) s, where
+        # doubles are evenly spaced, so the difference of two readings is
+        # exact. Keep the start and the test durations inside that range.
         self.now_us = 1_000_000_000
         self.start_us = self.now_us
+        self.reads = 0
         self._deadline_us: int | None = None
         self._poller: Callable[[], None] | None = None
         clock = self
@@ -76,7 +91,9 @@ class _FakeCaptureClock:
             def wait(self, timeout: float | None = None) -> bool:
                 if self._set:
                     return True
-                deadline = clock.now_us + round((timeout or 0.0) * 1e6)
+                if timeout is None:
+                    raise _FakeClockMisuse("an unbounded wait cannot run on the fake clock")
+                deadline = clock.now_us + round(timeout * 1e6)
                 poller, clock._poller = clock._poller, None
                 if poller is not None:
                     clock._deadline_us = deadline
@@ -103,15 +120,20 @@ class _FakeCaptureClock:
         import threading as real_threading
         import types
 
+        class _Condition(real_threading.Condition):
+            # READY qualification waits for poller samples, but the poller only
+            # runs inside the capture's stop.wait here. Fail rather than block
+            # for real time and report the wrong answer.
+            def wait_for(self, predicate, timeout=None):
+                raise _FakeClockMisuse("READY qualification is not modelled by the fake clock")
+
         self.time = types.SimpleNamespace(
             monotonic=self.monotonic,
             monotonic_ns=lambda: self.now_us * 1_000,
             time=lambda: 1.7e9 + self.now_us / 1e6,
             sleep=self.sleep,
         )
-        self.threading = types.SimpleNamespace(
-            Event=_Event, Thread=_Thread, Condition=real_threading.Condition
-        )
+        self.threading = types.SimpleNamespace(Event=_Event, Thread=_Thread, Condition=_Condition)
 
     def monotonic(self) -> float:
         return self.now_us / 1e6
@@ -120,7 +142,15 @@ class _FakeCaptureClock:
     def elapsed_s(self) -> float:
         return (self.now_us - self.start_us) / 1e6
 
+    def read(self) -> None:
+        """Count one GPI read; a poller that never sleeps would spin forever."""
+        self.reads += 1
+        if self.reads > self.MAX_READS:
+            raise _FakeClockMisuse("the poller read GPI without advancing the clock")
+
     def sleep(self, seconds: float) -> None:
+        if round(seconds * 1e6) <= 0:
+            raise _FakeClockMisuse("a non-positive sleep would never advance the clock")
         target = self.now_us + round(seconds * 1e6)
         if self._deadline_us is not None and target >= self._deadline_us:
             self.now_us = self._deadline_us
@@ -131,9 +161,9 @@ class _FakeCaptureClock:
 def _install_fake_capture_clock(monkeypatch: pytest.MonkeyPatch) -> _FakeCaptureClock:
     """Run ``capture_gated`` on a fake clock with a minimal ``time64``.
 
-    The ``pyjoulescope_driver`` stand-in exposes only what ``capture_gated``
-    reads from ``time64``, so these tests also run under the software-only
-    guard, which blocks the real driver import.
+    The ``pyjoulescope_driver`` stand-in exposes only ``time64.SECOND``, the
+    one attribute this path reads, so these tests also run under the
+    software-only guard, which blocks the real driver import.
     """
     import sys
     import types
@@ -141,7 +171,7 @@ def _install_fake_capture_clock(monkeypatch: pytest.MonkeyPatch) -> _FakeCapture
     from helia_profiler.power.joulescope import capture_gated as module
 
     clock = _FakeCaptureClock()
-    time64 = types.SimpleNamespace(SECOND=_SECOND, now=lambda: clock.now_us * _SECOND // 1_000_000)
+    time64 = types.SimpleNamespace(SECOND=_SECOND)
     driver_pkg = types.SimpleNamespace(time64=time64)
     monkeypatch.setitem(sys.modules, "pyjoulescope_driver", driver_pkg)
     monkeypatch.setitem(sys.modules, "pyjoulescope_driver.time64", time64)
@@ -1166,7 +1196,7 @@ class TestStreamedGateSelection:
         from helia_profiler.power.joulescope.driver import JoulescopeDriver
 
         fake = self._FakeStreamingDriver(fullrate_case=fullrate_case)
-        _install_fake_capture_clock(monkeypatch)
+        clock = _install_fake_capture_clock(monkeypatch)
         monkeypatch.setenv("HPX_POWER_FULLRATE_XCHECK", "1")
         monkeypatch.setattr(module, "_open_device", lambda _serial: (fake, "u/js320/test", "js320"))
         monkeypatch.setattr(module, "_close_device", lambda *_a, **_k: None)
@@ -1182,6 +1212,7 @@ class TestStreamedGateSelection:
         calls = {"n": 0}
 
         def _scripted_gpi(_driver, _path):
+            clock.read()
             calls["n"] += 1
             return 1 if 3 <= calls["n"] <= 12 else 0
 
@@ -1201,6 +1232,8 @@ class TestStreamedGateSelection:
             on_started=_on_started,
         )
 
+        # The snapshot gate completed, so the capture stopped before its 1 s bound.
+        assert clock.elapsed_s < 1.0
         ms = _SECOND // 1000
         assert result.metadata.gating_method == "gpi_stream+host_stats_integral"
         assert len(result.gated_windows) == 1
@@ -1245,6 +1278,35 @@ class TestStreamedGateSelection:
         (recorded,) = diagnostics["windows"]
         assert recorded["rise_tick"] == pytest.approx(19 * ms, abs=ms // 100)
         assert recorded["fall_tick"] == pytest.approx(29 * ms, abs=ms // 100)
+
+
+class TestFakeCaptureClockRefusesWhatItCannotModel:
+    """The fake clock fails loudly instead of silently mis-timing a capture."""
+
+    def test_ready_qualification_is_refused(self, monkeypatch):
+        from helia_profiler.power.joulescope import capture_gated as module
+
+        _install_fake_capture_clock(monkeypatch)
+
+        with pytest.raises(_FakeClockMisuse, match="READY qualification"):
+            module.threading.Condition().wait_for(lambda: True, timeout=1.0)
+
+    def test_unbounded_wait_is_refused(self, monkeypatch):
+        from helia_profiler.power.joulescope import capture_gated as module
+
+        _install_fake_capture_clock(monkeypatch)
+
+        with pytest.raises(_FakeClockMisuse, match="unbounded wait"):
+            module.threading.Event().wait()
+
+    def test_a_poller_that_does_not_advance_time_is_stopped(self, monkeypatch):
+        clock = _install_fake_capture_clock(monkeypatch)
+
+        with pytest.raises(_FakeClockMisuse, match="non-positive sleep"):
+            clock.sleep(0.0)
+        with pytest.raises(_FakeClockMisuse, match="without advancing the clock"):
+            for _ in range(clock.MAX_READS + 1):
+                clock.read()
 
 
 class TestMissedGateWarningNamesTheFix:
@@ -1343,6 +1405,7 @@ class TestMissedGateWarningNamesTheFix:
         # GPI never goes high by default: the gate was missed entirely. A
         # scheduled rise is exact on the fake clock.
         def read_gpi(_driver, _path) -> int:
+            clock.read()
             if gpi_rises_after_s is not None:
                 return int(clock.elapsed_s >= gpi_rises_after_s)
             return gpi_level
