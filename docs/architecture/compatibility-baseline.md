@@ -67,12 +67,15 @@ heliaRT 1.21.0 (`fe025f2b…56f`), heliaAOT `[0.22.0, 0.23.0)` and
 `ns-cmsis-nn v7.35.0` (`cad3c8fa…1a6`) then move together (#380); every other
 ref above is unchanged. heliaRT 1.21.0 pins that exact core for its own
 builds, and its NSX module differs from 1.20.0 only in its version, so
-neuralSPOT-X 0.8.1 is unchanged. v7.33.0 to v7.35.0 add float kernels (square
-root and reciprocal square root, nearest-neighbour resize, gather, reduce
-minimum and maximum, arg minimum and maximum) without changing a public kernel
-signature. heliaAOT 0.22.0 lowers those float operators to the new kernels and
-raises a module's floor to match (up to v7.35.0 for `ARG_MAX`/`ARG_MIN`), so
-the qualified core now builds every float operator it emits. Its module-wide
+neuralSPOT-X 0.8.1 is unchanged. v7.33.0 to v7.35.0 add float kernels without
+changing a public kernel signature. heliaRT 1.21.0's float kernels call them
+(square root and reciprocal square root, fill, pack, unpack, split, gather,
+arg minimum and maximum), so a float heliaRT 1.21.0 build needs at least
+v7.35.0 and an `engine.config.cmsis_nn_ref` below it fails to compile.
+heliaAOT 0.22.0 lowers float square root and reciprocal square root, gather,
+reduce minimum and maximum, and arg minimum and maximum to them and raises a
+module's floor to match (up to v7.35.0 for `ARG_MAX`/`ARG_MIN`), so the
+qualified core builds every float operator it emits. Its module-wide
 floor stays v7.32.0; a float module requires the core's
 `ns_cmsis_nn_float_support()` query at configure time; and the interfaces HPX
 drives (the converter and its arguments, the codegen context, and the
