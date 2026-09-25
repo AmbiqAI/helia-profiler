@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -239,8 +238,7 @@ def test_fully_connected_4d_example():
     assert _fully_connected_macs([1, 4, 4, 8], [10, 128], has_bias=True) == 1 * 128 * 10
 
 
-@pytest.mark.parametrize("adj_x", [False, True], ids=["plain", "adj-x"])
-def test_batch_matmul_counts_shared_dim(tmp_path: Path, adj_x: bool):
+def _batch_matmul_model(tmp_path: Path, adj_x: bool) -> tuple[Path, int]:
     rng = np.random.default_rng(2)
     batch, rows, inner, cols = 2, 3, 4, 5
     lhs_shape = (batch, inner, rows) if adj_x else (batch, rows, inner)
@@ -268,31 +266,23 @@ def test_batch_matmul_counts_shared_dim(tmp_path: Path, adj_x: bool):
                     expected[b, r, c] += left[b, r, k] * rhs[b, k, c]
                     multiplies += 1
     np.testing.assert_allclose(_run_litert(path, [lhs, rhs]), expected, rtol=1e-4, atol=1e-4)
+    return path, multiplies
 
+
+_ADJ_X = pytest.mark.parametrize("adj_x", [False, True], ids=["plain", "adj-x"])
+
+
+@_ADJ_X
+def test_batch_matmul_counts_shared_dim(tmp_path: Path, adj_x: bool):
+    path, multiplies = _batch_matmul_model(tmp_path, adj_x)
     assert _analyzed_macs(path) == multiplies
 
 
 @_needs_aot
-def test_air_batch_matmul_counts_shared_dim():
-    from helia_aot.air.enums import AirOpType
-
-    shapes = {"lhs": [2, 3, 4], "rhs": [2, 4, 5], "out": [2, 3, 5]}
-    air_model = SimpleNamespace(
-        operators=[
-            SimpleNamespace(
-                id="0",
-                op_type=AirOpType.BATCH_MATMUL,
-                input_ids=["lhs", "rhs"],
-                output_ids=["out"],
-                named_tensors={},
-                options=SimpleNamespace(adj_x=False, adj_y=False),
-            )
-        ],
-        get_tensor=lambda tid: SimpleNamespace(shape=shapes[tid]),
-    )
-    analysis = analyze_air_model(air_model)
-    assert analysis is not None
-    assert analysis.total_macs == 2 * 3 * 5 * 4
+@_ADJ_X
+def test_air_batch_matmul_counts_shared_dim(tmp_path: Path, adj_x: bool):
+    path, multiplies = _batch_matmul_model(tmp_path, adj_x)
+    assert _air_macs(path) == multiplies
 
 
 def test_helpers_reject_malformed_shapes():
