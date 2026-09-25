@@ -32,6 +32,7 @@ float precisions a model works in, #246). Real model analysis belongs in
 from __future__ import annotations
 
 import struct
+from typing import Any
 from dataclasses import dataclass
 
 # Extracted from ai_edge_litert's generated schema (#229 D7); flatbuffers
@@ -66,7 +67,7 @@ _QUANT_SCALE = 8
 _SOFTMAX_BETA = 4
 
 
-def _read(fmt: str, buf: bytes, pos: int):
+def _read(fmt: str, buf: bytes, pos: int) -> Any:
     """The value at ``pos``, raising ``struct.error`` when it lies outside ``buf``.
 
     ``struct.unpack_from`` reads a negative offset from the END of the buffer,
@@ -118,6 +119,8 @@ class _Table:
             return 0, 0
         vec = self._indirect(pos)
         length = _read("<I", self.buf, vec)
+        if vec + 4 + 4 * length > len(self.buf):
+            raise struct.error(f"vector of {length} elements at {vec} runs past the buffer")
         return vec + 4, length
 
     def table_vector(self, slot: int) -> list["_Table"]:

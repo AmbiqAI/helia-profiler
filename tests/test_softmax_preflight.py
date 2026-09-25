@@ -18,9 +18,8 @@ which installs the analysis extra for exactly this purpose.
 from __future__ import annotations
 
 import math
-from pathlib import Path
-
 import struct
+from pathlib import Path
 
 import pytest
 
@@ -684,7 +683,7 @@ def test_reader_constants_re_derive_from_the_installed_litert():
 
 
 class TestReaderRejectsOffsetsOutsideTheBuffer:
-    """A malformed buffer raises; it never reads a wrong value (#239).
+    """An offset or length outside the buffer raises instead of being read (#239).
 
     ``struct.unpack_from`` accepts a negative offset and reads from the end of
     the buffer, and a slice past the end simply truncates, so both used to
@@ -721,17 +720,35 @@ class TestReaderRejectsOffsetsOutsideTheBuffer:
         with pytest.raises(struct.error):
             read(r, self._table_with_soffset(20))
 
-    def test_a_string_running_past_the_buffer_raises(self):
+    @pytest.mark.parametrize("claimed", [50, 9])  # 8 bytes left after the length
+    def test_a_string_running_past_the_buffer_raises(self, claimed):
         from helia_profiler.modelcost import _tflite_reader as r
 
         buf = bytearray(40)
         struct.pack_into("<i", buf, 8, 8 - 20)  # table at 8, vtable at 20
         struct.pack_into("<HHH", buf, 20, 6, 8, 4)  # size 6, field slot 4 at +4
         struct.pack_into("<I", buf, 12, 16)  # string at 12 + 16 = 28
-        struct.pack_into("<I", buf, 28, 50)  # 50 bytes claimed, 8 left
+        struct.pack_into("<I", buf, 28, claimed)
 
         with pytest.raises(struct.error, match="runs past the buffer"):
             r._Table(bytes(buf), 8).string(4)
+
+    @pytest.mark.parametrize(("claimed", "fits"), [(2, True), (3, False)])
+    def test_a_vector_must_fit_its_claimed_length(self, claimed, fits):
+        from helia_profiler.modelcost import _tflite_reader as r
+
+        buf = bytearray(40)
+        struct.pack_into("<i", buf, 8, 8 - 20)
+        struct.pack_into("<HHH", buf, 20, 6, 8, 4)
+        struct.pack_into("<I", buf, 12, 16)  # vector at 12 + 16 = 28
+        struct.pack_into("<I", buf, 28, claimed)  # 8 bytes (2 elements) left
+        table = r._Table(bytes(buf), 8)
+
+        if fits:
+            assert table.vector(4) == (32, 2)
+        else:
+            with pytest.raises(struct.error, match="runs past the buffer"):
+                table.vector(4)
 
     def test_a_string_that_fits_is_read_whole(self):
         from helia_profiler.modelcost import _tflite_reader as r
