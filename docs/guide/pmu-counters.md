@@ -318,9 +318,10 @@ Apollo5 boards keep releasing it after reset.
 
 Each SoC reserves a fixed amount of firmware memory for per-op PMU records
 (`pmu_max_ops`), sized for that board's memory budget — for example 512 on
-memory-constrained Apollo330P versus 4096 on Apollo510. Models with more
-operators than the reservation allow will not fit; this is a static,
-per-SoC limit rather than a config knob.
+memory-constrained Apollo330P versus 4096 on Apollo510. A model that runs
+more operators than that fails the capture with
+`HPX_ERROR=operator_count_exceeds_capacity` on every engine; this is a
+static, per-SoC limit rather than a config knob.
 
 ## Troubleshooting
 
