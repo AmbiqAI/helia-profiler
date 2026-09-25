@@ -42,8 +42,8 @@ log = logging.getLogger("hpx")
 # custom-op kernel against that real driver instead of its host stub.
 # Mirrors the hardware-validated NSX npu-tflm app wiring.
 _ETHOSU_CMAKE_FLAG = "NSX_HELIA_RT_ENABLE_ETHOSU"
-# heliaRT's NSX wrapper declares the flag from helia-rt-v1.18.0; older trees
-# have Ethos-U only in the root build and silently ignore it.
+# Older heliaRT trees have Ethos-U only in the root build: their NSX wrapper
+# does not declare the flag and silently ignores it.
 _ETHOSU_NSX_OPTION = re.compile(rf"^[ \t]*option\s*\(\s*{_ETHOSU_CMAKE_FLAG}\b", re.MULTILINE)
 
 
@@ -63,17 +63,19 @@ def _require_ethos_u_source_support(source_path: Path) -> None:
     """Refuse an Ethos-U build from a source tree whose NSX wrapper lacks the flag."""
     try:
         nsx_cmake = (source_path / "nsx" / "CMakeLists.txt").read_text(errors="replace")
-    except OSError:
-        nsx_cmake = ""
-    if _ETHOSU_NSX_OPTION.search(nsx_cmake):
-        return
+    except OSError as exc:
+        problem = f"its nsx/CMakeLists.txt could not be read ({exc.strerror or exc})"
+    else:
+        if _ETHOSU_NSX_OPTION.search(nsx_cmake):
+            return
+        problem = f"its nsx/CMakeLists.txt does not declare {_ETHOSU_CMAKE_FLAG}"
     raise EngineError(
         f"heliaRT source at {source_path} (version {_detect_version(source_path) or 'unknown'}) "
-        f"cannot build backend 'ethos_u': its nsx/CMakeLists.txt does not declare "
-        f"{_ETHOSU_CMAKE_FLAG}.",
+        f"cannot build backend 'ethos_u': {problem}.",
         hint=(
-            "Use a heliaRT source tree at helia-rt-v1.18.0 or later, or remove "
-            "engine.config.source_path to build the pinned release."
+            "Use a heliaRT source tree at helia-rt-v1.18.0 or later, or build the "
+            "pinned release by removing engine.config.source_path and unsetting "
+            "HELIART_SOURCE_PATH."
         ),
     )
 
