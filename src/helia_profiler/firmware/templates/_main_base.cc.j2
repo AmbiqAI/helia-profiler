@@ -337,10 +337,11 @@ int main(void) {
     }
 {# The endif below closes the `if not power_only` opened further up: a block cannot close a conditional its parent opened, so it stays in the base. #}{% block engine_heartbeat_arm %}{% endblock %}{% endif %}
 {% block engine_model_setup %}{% endblock %}
-    // Ground-truth CPU clock as actually configured on-device.  The host uses
-    // this to verify its registry assumption (used for SWO baud + cycle->time
-    // math) matches reality instead of trusting a hardcoded frequency.
+    // Assumed clock; the STIMER probe measures it.
     hpx_printf("HPX_SYSTEM_CLOCK_HZ=%lu\n", (unsigned long)SystemCoreClock);
+{% if use_stimer_window and not power_only | default(false) %}
+{% include "_core_clock_probe.j2" %}
+{% endif %}
 {% if apollo3_burst %}
     hpx_printf("HPX_BURST_AVAIL=%d\n", hpx_burst_avail);
     hpx_printf("HPX_BURST_ENGAGED=%d\n", hpx_burst_engaged);

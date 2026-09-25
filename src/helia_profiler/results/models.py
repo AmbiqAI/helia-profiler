@@ -104,9 +104,10 @@ class FirmwareMeta:
     num_inputs: int | None = None
     num_outputs: int | None = None
     num_presets: int | None = None
-    #: Actual CPU clock (Hz) reported by the firmware's ``SystemCoreClock``.
-    #: Ground truth for verifying the host's registry clock assumption.
+    #: Firmware's ``SystemCoreClock`` (Hz), set from the host's clock choice.
     system_clock_hz: int | None = None
+    #: Core clock (Hz) measured on-device against STIMER.
+    measured_clock_hz: int | None = None
     profiled_infer_count: int | None = None
     profiled_infer_total_us: int | None = None
     profiled_infer_avg_us: int | None = None

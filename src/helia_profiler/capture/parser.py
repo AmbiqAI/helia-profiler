@@ -186,6 +186,7 @@ def parse_firmware_output(
         num_outputs=meta_kv.get(WireKey.NUM_OUTPUTS),
         num_presets=meta_kv.get(WireKey.NUM_PRESETS),
         system_clock_hz=meta_kv.get(WireKey.SYSTEM_CLOCK_HZ),
+        measured_clock_hz=meta_kv.get(WireKey.MEASURED_CLOCK_HZ),
         profiled_infer_count=meta_kv.get(WireKey.PROFILED_INFER_COUNT),
         profiled_infer_total_us=meta_kv.get(WireKey.PROFILED_INFER_TOTAL_US),
         profiled_infer_avg_us=meta_kv.get(WireKey.PROFILED_INFER_AVG_US),

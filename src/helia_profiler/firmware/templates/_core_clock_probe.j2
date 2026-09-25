@@ -1,0 +1,17 @@
+{# Measure the core clock against STIMER. #}
+    if (hpx_stimer_init() != 0U) {
+        const uint32_t clock_probe_ticks = 1638U;  // ~50 ms of STIMER
+        // Start on a tick edge.
+        const uint32_t clock_probe_s0 = hpx_stimer_ticks();
+        uint32_t clock_probe_s1 = clock_probe_s0;
+        while (clock_probe_s1 == clock_probe_s0) {
+            clock_probe_s1 = hpx_stimer_ticks();
+        }
+        const uint32_t clock_probe_c0 = DWT->CYCCNT;
+        while ((uint32_t)(hpx_stimer_ticks() - clock_probe_s1) < clock_probe_ticks) {
+        }
+        const uint32_t clock_probe_cyc = (uint32_t)(DWT->CYCCNT - clock_probe_c0);
+        const uint64_t clock_probe_hz =
+            ((uint64_t)clock_probe_cyc * (uint64_t)HPX_STIMER_HZ) / (uint64_t)clock_probe_ticks;
+        hpx_printf("HPX_MEASURED_CLOCK_HZ=%lu\n", (unsigned long)clock_probe_hz);
+    }

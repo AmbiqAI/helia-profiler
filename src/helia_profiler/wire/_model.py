@@ -249,6 +249,7 @@ class WireKey(StrEnum):
     POWER_SYNC = "power_sync"
     SYNC_GPIO = "sync_gpio"
     SYSTEM_CLOCK_HZ = "system_clock_hz"
+    MEASURED_CLOCK_HZ = "measured_clock_hz"
     BURST_AVAIL = "burst_avail"
     BURST_ENGAGED = "burst_engaged"
 

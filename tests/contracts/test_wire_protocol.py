@@ -756,6 +756,10 @@ _UNFLIPPABLE_PAIRS: dict[tuple[str, str], str] = {
         "Same template as tflm, which carries the trace renders on both the "
         "DWT and STIMER window bodies."
     ),
+    ("use_stimer_window and not power_only", "executorch"): (
+        "ExecuTorch is Apollo5 only, where the clean window is always "
+        "STIMER, and it has no power binary; the gate is never false for it."
+    ),
 }
 
 

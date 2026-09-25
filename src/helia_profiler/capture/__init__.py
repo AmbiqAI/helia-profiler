@@ -148,9 +148,6 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
             hint=_truncation_hint(str(transport)),
         )
 
-    # Cross-check the device's actual clock against the registry value the host
-    # assumed.  This catches registry drift or an NSX perf-mode that silently
-    # failed to apply — both of which corrupt SWO baud and cycle->time math.
     _verify_device_clock(ctx, result)
 
     if timing_raw:
@@ -684,33 +681,39 @@ def _truncation_hint(transport: str) -> str:
 
 
 def _verify_device_clock(ctx: PipelineContext, result: PmuResult) -> None:
-    """Warn if the device's actual clock disagrees with the registry value.
+    """Warn if the device's clock disagrees with the registry value.
 
     The host derives SWO baud and every cycle->time conversion from the
     ``target.clock.cpu`` selection resolved against the platform registry.
-    The firmware reports its real ``SystemCoreClock`` so we can detect when
-    that assumption is wrong — e.g. a stale registry entry or an NSX perf-mode
-    that did not take effect on this SoC.  A mismatch does not abort the run
-    (the cycle counts themselves are still valid), but it makes every derived
-    time value suspect, so surface it loudly.
+    Two device readings can contradict it: ``HPX_SYSTEM_CLOCK_HZ`` (the
+    firmware's ``SystemCoreClock``, which only differs when Apollo3 burst
+    fails to engage) and ``HPX_MEASURED_CLOCK_HZ`` (DWT cycles over a STIMER
+    interval, which catches a perf mode that silently did not apply).  A
+    mismatch does not abort the run (the cycle counts themselves are still
+    valid), but it makes every derived time value suspect.
     """
     platform = ctx.run_metadata.platform
     if platform is None:
         return
-    device_hz = result.meta.system_clock_hz
     registry_mhz = platform.cpu_clock_mhz
-    if not device_hz or registry_mhz <= 0:
+    if registry_mhz <= 0:
         return
-
     registry_hz = registry_mhz * 1_000_000
-    # HFRC trim tolerance is a few percent; 5% comfortably clears real trim
-    # variation while still catching integer-ratio mistakes (48 vs 96 MHz).
-    if abs(device_hz - registry_hz) > 0.05 * registry_hz:
+    readings = (
+        ("Device reports", result.meta.system_clock_hz),
+        ("Measured", result.meta.measured_clock_hz),
+    )
+    for label, device_hz in readings:
+        # 5% clears HFRC trim, catches perf-mode misses.
+        if not device_hz or abs(device_hz - registry_hz) <= 0.05 * registry_hz:
+            continue
         log.warning(
-            "Device reports CPU clock %.3f MHz but the platform registry "
+            "%s CPU clock %.3f MHz but the platform registry "
             "assumed %d MHz (cpu=%s) for %s. SWO baud and all cycle->time "
-            "values use the registry value and will be wrong. Fix the clock "
-            "for %s in the platform registry or the target.clock.cpu setting.",
+            "values use the registry value and will be wrong. Check that "
+            "the perf mode took effect, or fix the clock for %s in the "
+            "platform registry or the target.clock.cpu setting.",
+            label,
             device_hz / 1_000_000,
             registry_mhz,
             platform.cpu_clock_name or "?",
