@@ -19,7 +19,9 @@ graph LR
 
 Each backend in `transport/` implements the same line-collection contract:
 read bytes from the wire, split into lines, and return `list[str]` when the
-`--- HPX_END ---` sentinel arrives or a timeout expires. The default is RTT
+`--- HPX_END ---` sentinel arrives or a timeout expires. Every backend honours
+`target.heartbeat.overall_timeout_s` and `target.heartbeat.host_timeout_s`
+(300 s when heartbeats are off). The default is RTT
 (`transport/rtt.py`), which drains a ring buffer in target RAM over SWD —
 lossless and requiring no extra cabling. SWO (`transport/swo.py`) is lossy
 and kept for diagnostics only; the parser and protocol are identical across
@@ -94,8 +96,13 @@ def parse_firmware_output(
    iterations using *aggregation*: `"median"` (the default,
    `DEFAULT_AGGREGATION` in the `config` package, exposed as
    `profiling.aggregation`), `"mean"`, or `"trimmed"`. Structurally-invalid
-   samples (uint32-wrap, frozen-zero readouts) are rejected first.
+   samples (uint32-wrap, frozen-zero readouts) are rejected first. A row is
+   frozen only when its pass includes `ARM_PMU_CPU_CYCLES` and every counter
+   reads 0: zero cycles is the witness of a debug-domain freeze. Passes
+   without a cycle counter (MVE, memory) keep their all-zero rows.
 5. **Build PresetResult** — one per counter preset
+6. **Check completeness** — a session without `--- HPX_END ---`, or whose
+   passes differ from `HPX_PRESETS` / `HPX_NUM_PRESETS`, raises `CaptureError`.
 
 ### Result structure
 
@@ -136,6 +143,9 @@ Layers are matched by explicit layer ID, with the same operator label required
 across iterations and presets; row order may differ. Missing, duplicate, or
 conflicting identities raise `CaptureError`, including when the first iteration
 is truncated. The parser does not publish partial or position-shifted aggregates.
+A truncated capture fails the run rather than surfacing as a validity issue:
+the missing samples cannot be recovered, and the per-layer tables would
+otherwise mix complete and partial passes.
 
 ## Timeouts and error handling
 
@@ -144,7 +154,7 @@ is truncated. The parser does not publish partial or position-shifted aggregates
 | No output at all | Overall timeout expires → `CaptureError` |
 | Firmware hang mid-run | No line (heartbeat, CSV, or sentinel) for 30s → `CaptureError` |
 | Silent clean window | `HPX_HEARTBEAT phase=clean_window_begin` announce extends the deadline to cover the estimated window |
-| Firmware crash | Detects missing `--- HPX_END ---` → reports last seen line |
+| Truncated stream | Missing `--- HPX_END ---` or an announced pass → `CaptureError` with a transport hint |
 | Invalid CSV | Skips malformed rows, warns, continues |
 
 ## Power capture

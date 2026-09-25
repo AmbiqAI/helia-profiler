@@ -593,3 +593,102 @@ def test_identity_failure_bounds_large_differences_and_labels():
     assert message.count("(+97 more)") == 3
     assert "expected 'CONV" in message
     assert "got 'ADD" in message
+
+
+def _two_pass_session() -> list[str]:
+    meta = {"num_presets": "2", "presets": "cpu_0,memory_0"}
+    cpu = _make_preset_block(
+        "cpu_0", ["Layer", "Op", "ARM_PMU_CPU_CYCLES"], [["0", "CONV_2D", "100"]], iterations=2
+    )
+    memory = _make_preset_block(
+        "memory_0", ["Layer", "Op", "ARM_PMU_MEM_ACCESS"], [["0", "CONV_2D", "40"]], iterations=2
+    )
+    return _wrap_session(meta, [cpu, memory])
+
+
+def _last_index(lines: list[str], line: str) -> int:
+    return len(lines) - 1 - lines[::-1].index(line)
+
+
+def test_complete_two_pass_session_parses():
+    result = parse_firmware_output(_two_pass_session())
+    assert list(result.presets) == ["cpu_0", "memory_0"]
+    assert result.layers[0].counters == {"ARM_PMU_CPU_CYCLES": 100, "ARM_PMU_MEM_ACCESS": 40}
+
+
+def test_stream_cut_at_pass_boundary_is_rejected():
+    import pytest
+    from helia_profiler.errors import CaptureError
+
+    lines = _two_pass_session()
+    cut = lines.index("--- HPX_PRESET memory_0 ---")
+    with pytest.raises(CaptureError, match="HPX_END"):
+        parse_firmware_output(lines[:cut])
+
+
+def test_announced_pass_missing_is_rejected():
+    import pytest
+    from helia_profiler.errors import CaptureError
+
+    lines = _two_pass_session()
+    cut = lines.index("--- HPX_PRESET memory_0 ---")
+    with pytest.raises(CaptureError, match="memory_0"):
+        parse_firmware_output(lines[:cut] + ["--- HPX_END ---"])
+
+
+def test_announced_pass_count_mismatch_is_rejected():
+    import pytest
+    from helia_profiler.errors import CaptureError
+
+    lines = [line.replace("HPX_NUM_PRESETS=2", "HPX_NUM_PRESETS=3") for line in _two_pass_session()]
+    with pytest.raises(CaptureError, match="3"):
+        parse_firmware_output(lines)
+
+
+def test_stream_cut_after_final_iter_marker_is_rejected():
+    import pytest
+    from helia_profiler.errors import CaptureError
+
+    lines = _two_pass_session()
+    cut = _last_index(lines, "--- HPX_ITER 1 ---")
+    with pytest.raises(CaptureError):
+        parse_firmware_output(lines[: cut + 1])
+
+
+def test_stream_without_end_is_rejected():
+    import pytest
+    from helia_profiler.errors import CaptureError
+
+    lines = _single_layer_iters(["100", "101"])
+    assert lines[-1] == "--- HPX_END ---"
+    with pytest.raises(CaptureError, match="HPX_END"):
+        parse_firmware_output(lines[:-1])
+
+
+def test_sparse_pass_all_zero_samples_are_kept():
+    """A pass without a cycle counter has no freeze witness.
+
+    MVE/memory passes read 0 on scalar layers; dropping those rows
+    whenever one iteration is non-zero biases the median upward.
+    """
+    lines = ["--- HPX_START ---", "HPX_PRESETS=mve_0", "--- HPX_PRESET mve_0 ---"]
+    for i, (inst, mac) in enumerate([("0", "0")] * 4 + [("7", "2")]):
+        lines.append(f"--- HPX_ITER {i} ---")
+        lines.append("Layer,Op,ARM_PMU_MVE_INST_RETIRED,ARM_PMU_MVE_INT_MAC_RETIRED")
+        lines.append(f"0,ADD,{inst},{mac}")
+    lines.append("--- HPX_END ---")
+    layer = parse_firmware_output(lines).layers[0]
+    assert layer.counters == {"ARM_PMU_MVE_INST_RETIRED": 0, "ARM_PMU_MVE_INT_MAC_RETIRED": 0}
+
+
+def test_settling_zero_cycles_on_first_iteration_filtered():
+    """Apollo4 debug-domain settling reads 0 cycles on iteration 0."""
+    lines = ["--- HPX_START ---", "HPX_PRESETS=cpu_0", "--- HPX_PRESET cpu_0 ---"]
+    for i, (conv, add) in enumerate([("0", "0"), ("900", "50"), ("910", "52")]):
+        lines.append(f"--- HPX_ITER {i} ---")
+        lines.append("Layer,Op,ARM_PMU_CPU_CYCLES")
+        lines.append(f"0,CONV_2D,{conv}")
+        lines.append(f"1,ADD,{add}")
+    lines.append("--- HPX_END ---")
+    layers = parse_firmware_output(lines).layers
+    assert [layer.cycles for layer in layers] == [905, 51]

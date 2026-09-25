@@ -35,7 +35,7 @@ from ..target.probe.jlink import (
     resume_if_halted,
 )
 from .timing import SBL_SETTLE_S, CaptureTimingTracker
-from .protocol import DEFAULT_TIMEOUT_S, collect_lines
+from .protocol import DEFAULT_TIMEOUT_S, HEARTBEAT_TIMEOUT_S, collect_lines
 from ..wire import HPX_END_SENTINEL, HPX_START_SENTINEL
 
 log = logging.getLogger("hpx")
@@ -64,7 +64,8 @@ def capture_swo_output(
     build_dir=None,  # unused — kept for interface parity
     jlink_serial: str | None = None,
     jlink_device: str,
-    timeout_s: float = DEFAULT_TIMEOUT_S,
+    timeout_s: float | None = DEFAULT_TIMEOUT_S,
+    heartbeat_timeout_s: float = HEARTBEAT_TIMEOUT_S,
     cpu_freq: int = 96_000_000,
     swo_freq: int = 1_000_000,
     timing_out: dict[str, float] | None = None,
@@ -120,6 +121,7 @@ def capture_swo_output(
                 lambda: bytes(jlink.swo_read_stimulus(0, 4096)),
                 transport_name="SWO",
                 overall_timeout_s=timeout_s,
+                heartbeat_timeout_s=heartbeat_timeout_s,
                 poll_interval_s=_SWO_POLL_INTERVAL_S,
                 on_line=on_line,
             )
@@ -212,6 +214,8 @@ class SwoTransport(BaseCaptureTransport):
             build_dir=args.build_dir,
             jlink_serial=args.jlink_serial,
             jlink_device=args.jlink_device,
+            timeout_s=args.overall_timeout_s,
+            heartbeat_timeout_s=args.heartbeat_timeout_s,
             cpu_freq=cpu_freq_hz,
             timing_out=args.timing_raw,
             reset_controller=args.reset_controller,
