@@ -87,6 +87,7 @@ def fake_source_tree(tmp_path: Path) -> Path:
     (src / "nsx").mkdir()
     (src / "nsx" / "CMakeLists.txt").write_text(
         "# source-build heliaRT nsx CMakeLists (test stub)\n"
+        'option(NSX_HELIA_RT_ENABLE_ETHOSU "Ethos-U custom op" OFF)\n'
         "add_library(nsx_helia_rt INTERFACE)\n"
         "add_library(nsx::helia_rt ALIAS nsx_helia_rt)\n"
     )

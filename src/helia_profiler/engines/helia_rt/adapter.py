@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from pathlib import Path
 
 from ...config import ProfileConfig
@@ -41,6 +42,9 @@ log = logging.getLogger("hpx")
 # custom-op kernel against that real driver instead of its host stub.
 # Mirrors the hardware-validated NSX npu-tflm app wiring.
 _ETHOSU_CMAKE_FLAG = "NSX_HELIA_RT_ENABLE_ETHOSU"
+# heliaRT's NSX wrapper declares the flag from helia-rt-v1.18.0; older trees
+# have Ethos-U only in the root build and silently ignore it.
+_ETHOSU_NSX_OPTION = re.compile(rf"^[ \t]*option\s*\(\s*{_ETHOSU_CMAKE_FLAG}\b", re.MULTILINE)
 
 
 def _add_ethos_u_artifacts(extra_modules: list[NsxModuleRef], cmake_vars: dict[str, str]) -> None:
@@ -53,6 +57,25 @@ def _add_ethos_u_artifacts(extra_modules: list[NsxModuleRef], cmake_vars: dict[s
         )
     )
     cmake_vars[_ETHOSU_CMAKE_FLAG] = "ON"
+
+
+def _require_ethos_u_source_support(source_path: Path) -> None:
+    """Refuse an Ethos-U build from a source tree whose NSX wrapper lacks the flag."""
+    try:
+        nsx_cmake = (source_path / "nsx" / "CMakeLists.txt").read_text(errors="replace")
+    except OSError:
+        nsx_cmake = ""
+    if _ETHOSU_NSX_OPTION.search(nsx_cmake):
+        return
+    raise EngineError(
+        f"heliaRT source at {source_path} (version {_detect_version(source_path) or 'unknown'}) "
+        f"cannot build backend 'ethos_u': its nsx/CMakeLists.txt does not declare "
+        f"{_ETHOSU_CMAKE_FLAG}.",
+        hint=(
+            "Use a heliaRT source tree at helia-rt-v1.18.0 or later, or remove "
+            "engine.config.source_path to build the pinned release."
+        ),
+    )
 
 
 class HeliaRTAdapter(SingleArenaPlacementMixin):
@@ -161,6 +184,8 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
             resolved_version = _detect_version(source_path)
             _check_version_compatibility(source_path, resolved_version)
             version = resolved_version or HELIART_VERSION
+            if ethos_u:
+                _require_ethos_u_source_support(source_path)
 
             if core_override:
                 log.warning(
