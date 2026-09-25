@@ -64,8 +64,9 @@ class _FakeCaptureClock:
     ``elapsed_s`` fixes every edge exactly.
     """
 
-    #: GPI reads allowed per capture before the harness calls it a runaway loop.
-    MAX_READS = 100_000
+    #: Clock readings allowed per capture before the harness calls it a runaway
+    #: loop; the poller reads the clock on every pass, sleep or not.
+    MAX_READS = 200_000
 
     def __init__(self) -> None:
         # Every reading in these tests stays within [512, 1024) s, where
@@ -127,9 +128,12 @@ class _FakeCaptureClock:
             def wait_for(self, predicate, timeout=None):
                 raise _FakeClockMisuse("READY qualification is not modelled by the fake clock")
 
+            def wait(self, timeout=None):
+                raise _FakeClockMisuse("a condition wait is not modelled by the fake clock")
+
         self.time = types.SimpleNamespace(
             monotonic=self.monotonic,
-            monotonic_ns=lambda: self.now_us * 1_000,
+            monotonic_ns=self.monotonic_ns,
             time=lambda: 1.7e9 + self.now_us / 1e6,
             sleep=self.sleep,
         )
@@ -142,15 +146,18 @@ class _FakeCaptureClock:
     def elapsed_s(self) -> float:
         return (self.now_us - self.start_us) / 1e6
 
-    def read(self) -> None:
-        """Count one GPI read; a poller that never sleeps would spin forever."""
+    def monotonic_ns(self) -> int:
+        # The poller stamps every pass through here, so a pass that never
+        # sleeps is caught however the test scripts GPI.
         self.reads += 1
         if self.reads > self.MAX_READS:
             raise _FakeClockMisuse("the poller read GPI without advancing the clock")
+        return self.now_us * 1_000
 
     def sleep(self, seconds: float) -> None:
         if round(seconds * 1e6) <= 0:
             raise _FakeClockMisuse("a non-positive sleep would never advance the clock")
+        self.reads = 0
         target = self.now_us + round(seconds * 1e6)
         if self._deadline_us is not None and target >= self._deadline_us:
             self.now_us = self._deadline_us
@@ -1212,7 +1219,6 @@ class TestStreamedGateSelection:
         calls = {"n": 0}
 
         def _scripted_gpi(_driver, _path):
-            clock.read()
             calls["n"] += 1
             return 1 if 3 <= calls["n"] <= 12 else 0
 
@@ -1300,13 +1306,38 @@ class TestFakeCaptureClockRefusesWhatItCannotModel:
             module.threading.Event().wait()
 
     def test_a_poller_that_does_not_advance_time_is_stopped(self, monkeypatch):
+        from helia_profiler.power.joulescope import capture_gated as module
+
         clock = _install_fake_capture_clock(monkeypatch)
 
         with pytest.raises(_FakeClockMisuse, match="non-positive sleep"):
             clock.sleep(0.0)
+        with pytest.raises(_FakeClockMisuse, match="a condition wait"):
+            module.threading.Condition().wait(timeout=1.0)
         with pytest.raises(_FakeClockMisuse, match="without advancing the clock"):
             for _ in range(clock.MAX_READS + 1):
-                clock.read()
+                module.time.monotonic_ns()
+
+    def test_ready_qualification_fails_the_capture_loudly(self, monkeypatch):
+        """End to end: capture_gated's hook handling must not swallow it."""
+        from helia_profiler.power.joulescope import capture_gated as module
+        from helia_profiler.power.joulescope.driver import JoulescopeDriver
+
+        fake = TestMissedGateWarningNamesTheFix._FakeJoulescopeDriver()
+        monkeypatch.setattr(module, "_open_device", lambda _serial: (fake, "u/js320/test", "js320"))
+        monkeypatch.setattr(module, "_close_device", lambda *_a, **_k: None)
+        monkeypatch.setattr(module, "_read_gpi_snapshot", lambda _driver, _path: 0)
+        _install_fake_capture_clock(monkeypatch)
+
+        with pytest.raises(_FakeClockMisuse, match="READY qualification"):
+            module.capture_gated(
+                JoulescopeDriver(),
+                duration_s=1.0,
+                io_voltage=1.8,
+                sync_input_index=0,
+                poll_interval_s=0.005,
+                on_started=lambda wait: wait(1, True, 0.5),
+            )
 
 
 class TestMissedGateWarningNamesTheFix:
@@ -1405,7 +1436,6 @@ class TestMissedGateWarningNamesTheFix:
         # GPI never goes high by default: the gate was missed entirely. A
         # scheduled rise is exact on the fake clock.
         def read_gpi(_driver, _path) -> int:
-            clock.read()
             if gpi_rises_after_s is not None:
                 return int(clock.elapsed_s >= gpi_rises_after_s)
             return gpi_level
