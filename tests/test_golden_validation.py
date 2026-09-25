@@ -108,14 +108,17 @@ def test_loader_rejects_invalid_vectors(pair, kind):
 
 
 @pytest.mark.parametrize(
-    "extra",
+    "extra, reason",
     [
-        {"engine": {"type": "helia-rt"}},
-        {"power": {"enabled": True}},
-        {"profiling": {"clean_window_probe": "busy_loop"}},
+        ({"engine": {"type": "helia-rt"}}, "validation_data supports only TFLM and heliaAOT"),
+        ({"power": {"enabled": True}}, "validation_data is limited to non-power profiles"),
+        (
+            {"profiling": {"clean_window_probe": "busy_loop"}},
+            "validation_data requires the inference window probe",
+        ),
     ],
 )
-def test_preflight_rejects_unsupported_validation_before_host_tools(tmp_path, extra):
+def test_preflight_rejects_unsupported_validation_before_host_tools(tmp_path, extra, reason):
     model, data = tmp_path / "model.tflite", tmp_path / "golden.npz"
     model.write_bytes(b"\x00\x00\x00\x00TFL3")
     settings = {
@@ -124,7 +127,7 @@ def test_preflight_rejects_unsupported_validation_before_host_tools(tmp_path, ex
         **extra,
     }
     ctx = PipelineContext(config=load_config(None, settings), work_dir=data.parent)
-    with pytest.raises(ConfigError, match="validation_data"):
+    with pytest.raises(ConfigError, match=reason):
         PreflightStage().run(ctx)
 
 
