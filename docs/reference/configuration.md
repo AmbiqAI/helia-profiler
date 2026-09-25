@@ -261,8 +261,13 @@ Exactly one mode must be set:
 * *version* — pin the module to an exact version constraint.
 
 Only applies to modules NSX resolves itself (e.g. ``nsx-core``,
-``nsx-ambiq-bsp``). Engine-provided modules (``nsx-helia-rt``,
-``nsx-cmsis-nn``) are configured through ``engine.config``
+``nsx-ambiq-bsp``). A *path* override may also name a registry project
+that no board module belongs to (a transitive dependency such as
+``nsx-ethos-u-driver`` pulled in by ``nsx-npu``); it is then emitted as
+``module_registry.projects.<name>.local_path`` in the generated
+``nsx.yml`` so the closure resolver takes that local tree. Engine-provided
+modules (``nsx-helia-rt``, ``nsx-cmsis-nn``) are configured through
+``engine.config``
 (``dist_path``/``source_path``/``source``/``cmsis_nn_path``/``cmsis_nn_ref``) instead —
 an entry here targeting one of those names is ignored with a warning.
 
