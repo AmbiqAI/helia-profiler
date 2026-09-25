@@ -237,10 +237,11 @@ class PowerConfig:
     driver: str = DEFAULT_POWER_DRIVER
     firmware: PowerFirmware = DEFAULT_POWER_FIRMWARE
     mode: PowerMode = DEFAULT_POWER_MODE
-    # ``None`` means "not explicitly set": consumers use
-    # DEFAULT_POWER_DURATION_S and may auto-tune the bound from PMU-phase
-    # timing.  An explicit value (YAML or --power-duration, even if equal to
-    # the default) always wins and disables auto-tuning.
+    # Upper bound on the power capture, not the window length. ``None``
+    # means "not explicitly set": consumers use DEFAULT_POWER_DURATION_S and
+    # may auto-tune the bound from PMU-phase timing.  An explicit value (YAML
+    # or --power-duration, even if equal to the default) disables
+    # auto-tuning; a gated capture still raises it to fit the planned window.
     duration_s: int | None = None
     io_voltage: float = DEFAULT_IO_VOLTAGE
     sync_gpio_pin: int = DEFAULT_SYNC_GPIO_PIN  # GPIO for external sync

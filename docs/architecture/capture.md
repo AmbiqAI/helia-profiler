@@ -153,7 +153,7 @@ When `power.enabled` is true, the power stage runs after PMU capture:
 
 1. **Reset target** — power-cycle via Joulescope
 2. **Start capture** — begin current/voltage sampling
-3. **Wait for duration** — `power.duration_s` seconds
+3. **Wait for the gate to fall** — bounded by `power.duration_s`, raised to fit the planned window
 4. **Stop and compute** — average current, peak current, energy
 
 The power result is independent of PMU data — they capture different aspects

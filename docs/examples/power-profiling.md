@@ -48,8 +48,7 @@ hpx profile --config hpx_power.yml
 ```
 
 The profiler runs the normal PMU passes, then power-cycles the EVB and
-captures current/voltage for `duration_s` seconds during a clean,
-uninstrumented inference window.
+captures current/voltage during a clean, uninstrumented inference window.
 
 ## What you get
 

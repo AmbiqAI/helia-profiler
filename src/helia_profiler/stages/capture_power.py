@@ -19,21 +19,22 @@ from ..config import DEFAULT_POWER_DURATION_S, WindowMode
 from ..errors import PowerError
 from ..pipeline import PipelineContext
 from ..power.base import PowerDriver
-from ..power.diagnostics import count_noun, probe_runs_inferences
+from ..power.diagnostics import (
+    BOOT_SETTLE_S,
+    CLEAN_WINDOW_WARMUP_REPS,
+    count_noun,
+    probe_runs_inferences,
+)
 from ..power.metadata import classify_observation
 from ..target.lifecycle import CapturePhase, prepare_target_for_phase
 
 log = logging.getLogger("hpx")
 
-_BOOT_SETTLE_S = 8.0  # reset/SBL/firmware init allowance
+_BOOT_SETTLE_S = BOOT_SETTLE_S
 _SAFETY_MARGIN_S = 6.0  # extra headroom beyond estimated runtime
 
 
-#: Auto window mode warms the clean pass with 3 uninstrumented reps before
-#: timing (_main_base.cc.j2), independent of profiling.warmup; every
-#: fixed-mode measuring arm floors its warmup at the same 3 (#164, #170), so
-#: the estimate below floors too.
-_AUTO_WINDOW_WARMUP_REPS = 3
+_AUTO_WINDOW_WARMUP_REPS = CLEAN_WINDOW_WARMUP_REPS
 
 
 def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
@@ -169,9 +170,10 @@ class CapturePowerStage:
 
         # Tighten the capture window from PMU timing only when the user left
         # duration unset: an explicit power.duration_s is an operator override
-        # and must win -- the PMU-phase estimate can be wrong about the
-        # power-phase boot, and a silently-shrunk bound blocks overrides
-        # during diagnosis.  duration_s is None when not explicitly set.
+        # and wins over the estimate -- the PMU-phase estimate can be wrong
+        # about the power-phase boot, and a silently-shrunk bound blocks
+        # overrides during diagnosis.  duration_s is None when not explicitly
+        # set.  A gated capture still raises either to fit the planned window.
         estimated = _estimate_capture_duration(ctx)
         user_overrode_duration = ctx.config.power.duration_s is not None
         configured = (
@@ -217,21 +219,23 @@ class CapturePowerStage:
             ) from exc
 
         # Mode/integrity/edges derive from capture metadata in one place so
-        # this log and publish_power_observation cannot disagree; the deadline
-        # stays this stage's own budget.
-        obs_mode, obs_integrity, rise, fall, _ = classify_observation(power_result.metadata)
+        # this log and publish_power_observation cannot disagree. A gated
+        # capture reports the bound it waited on, which exceeds this stage's
+        # budget when the planned window needs more.
+        obs_mode, obs_integrity, rise, fall, bound_s = classify_observation(power_result.metadata)
+        deadline_s = bound_s if bound_s is not None else capture_duration
         observation = PowerObservation(
             mode=obs_mode,
             result=power_result,
             gate_rise_observed=rise,
             gate_fall_observed=fall,
-            deadline_s=capture_duration,
+            deadline_s=deadline_s,
             integrity=obs_integrity,
         )
         ctx.publish_power_observation(observation)
         log.info(
-            "Captured power data (%.1fs, driver=%s, mode=%s)",
-            capture_duration,
+            "Captured power data (bound %.1fs, driver=%s, mode=%s)",
+            deadline_s,
             driver_name,
             mode,
         )

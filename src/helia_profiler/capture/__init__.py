@@ -23,9 +23,13 @@ from ..config import DEFAULT_POWER_DURATION_S
 from ..vocab import Transport
 from ..errors import CaptureError, PowerError
 from ..power.diagnostics import (
+    CLEAN_WINDOW_WARMUP_REPS,
     SyncHandshakeMetadata,
     count_noun,
+    gate_fall_wait_s,
     gate_relative_tolerance_for,
+    longest_accepted_window_s,
+    probe_runs_inferences,
 )
 from ..transport import (
     HPX_END,
@@ -356,6 +360,48 @@ def capture_power(
         # after on_started returns). One try/finally so any exception still
         # releases sync.
         sync = _make_sync_controller(ctx, driver)
+        probe = ctx.config.profiling.clean_window_probe
+        relative_tolerance = gate_relative_tolerance_for(probe)
+        longest_window_s = (
+            longest_accepted_window_s(
+                clean_infer_count=clean_count,
+                clean_infer_avg_us=clean_avg_us,
+                stats_rate_hz=ctx.config.power.stats_rate_hz,
+                relative_tolerance=relative_tolerance,
+            )
+            if clean_count and clean_avg_us
+            else None
+        )
+        # Warm reps are inferences only for a counted probe; a busy_loop unit
+        # is the whole spin, so its per-inference cost is not in the plan.
+        warmup_s = (
+            max(CLEAN_WINDOW_WARMUP_REPS, ctx.config.profiling.warmup) * clean_avg_us / 1e6
+            if clean_avg_us and probe_runs_inferences(probe)
+            else 0.0
+        )
+        fall_wait_s = gate_fall_wait_s(
+            duration,
+            longest_window_s=longest_window_s,
+            lockstep=sync.lockstep,
+            pre_window_s=warmup_s,
+        )
+        if fall_wait_s > duration:
+            if sync.lockstep:
+                before_window = ""
+            elif warmup_s:
+                before_window = ", plus boot and warm-up before it without lock-step"
+            else:
+                before_window = ", plus boot before it without lock-step"
+            log.log(
+                logging.WARNING if ctx.config.power.duration_s is not None else logging.INFO,
+                "Raising the capture bound from %.2fs to %.2fs to hold a gated window "
+                "accepted up to %.2fs%s. power.duration_s bounds the capture; the "
+                "profiling window settings set the window length.",
+                duration,
+                fall_wait_s,
+                longest_window_s,
+                before_window,
+            )
         prepare_error: list[BaseException] = []
         try:
             sync.arm()
@@ -418,7 +464,7 @@ def capture_power(
                     raise
 
             result = driver.capture_gated(
-                duration_s=duration,
+                duration_s=fall_wait_s,
                 io_voltage=ctx.config.power.io_voltage,
                 sync_input_index=ctx.config.power.sync_input_index,
                 state_input_index=ctx.config.power.state_input_index,
@@ -426,9 +472,7 @@ def capture_power(
                 clean_infer_count=clean_count,
                 clean_infer_avg_us=clean_avg_us,
                 minimum_gate_s=DEFAULT_POWER_MIN_WINDOW_MS / 1000.0,
-                gate_relative_tolerance=gate_relative_tolerance_for(
-                    ctx.config.profiling.clean_window_probe
-                ),
+                gate_relative_tolerance=relative_tolerance,
                 work_noun=count_noun(ctx.config.profiling.clean_window_probe, clean_count or 0),
                 on_started=_release,
                 # The dedicated JS320 GPI stream provides the authoritative
@@ -449,6 +493,8 @@ def capture_power(
                 raise prepare_error[0]
             if result.metadata.sync is None and sync_metadata_holder:
                 result.metadata.sync = sync_metadata_holder[-1]
+            if result.metadata.capture_safety_bound_s is None:
+                result.metadata.capture_safety_bound_s = fall_wait_s
             if result.metadata.power_plan is None:
                 result.metadata.power_plan = {
                     "inference_count": plan.inference_count,

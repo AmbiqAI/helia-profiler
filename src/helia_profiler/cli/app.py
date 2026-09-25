@@ -381,7 +381,11 @@ def profile_command(
         Optional[int],
         typer.Option(
             "--power-duration",
-            help="Power capture seconds (default: auto-tuned from profile timing)",
+            help=(
+                "Upper bound on the power capture, in seconds; a gated capture "
+                "raises it to fit the planned window, and it does not set the "
+                "window length (default: auto-tuned from profile timing)"
+            ),
             rich_help_panel=G_POWER,
         ),
     ] = None,

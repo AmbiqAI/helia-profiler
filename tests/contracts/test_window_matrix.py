@@ -9,7 +9,8 @@ the test.  Each cell asks what a real run depends on:
   (`capture_gated` RAISES on a disagreement; internal mode divides energy by it);
 * the gate check must ACCEPT a perfect run;
 * the capture deadline must outlast the window, or the poller misses the
-  falling edge.
+  falling edge -- both the estimate and the bound the capture actually waits
+  on when the configured bound is short of, or equal to, the window.
 
 The firmware-side length is derived from the config and the templates' own
 rules -- deliberately NOT from `predicted_window_ms`, the thing under test.
@@ -31,7 +32,16 @@ from helia_profiler.power.diagnostics import (
     gate_relative_tolerance_for,
     probe_runs_inferences,
 )
-from helia_profiler.results import FirmwareMeta, LayerResult, PlatformInfo, PmuResult
+from helia_profiler.power.base import PowerResult, PowerSummary
+from helia_profiler.power.metadata import MeasurementScope, PowerMetadata
+from helia_profiler.results import (
+    DeploymentRecord,
+    FirmwareArtifact,
+    FirmwareMeta,
+    LayerResult,
+    PlatformInfo,
+    PmuResult,
+)
 from helia_profiler.stages.capture_power import _estimate_capture_duration
 from helia_profiler.stages.plan_power import plan_power_run
 
@@ -258,6 +268,101 @@ def test_the_capture_deadline_outlasts_the_window(
     assert estimated is not None, "the estimate must exist, or this checks nothing"
     assert estimated > window_s, (
         f"capture bound {estimated:.1f}s is inside a {window_s:.1f}s window"
+    )
+
+
+def _deploy_dedicated_firmware(ctx) -> None:
+    binary = ctx.work_dir / "hpx_profiler_power"
+    binary.touch()
+    artifact = FirmwareArtifact(
+        role="power",
+        target_name="hpx_profiler_power",
+        app_dir=ctx.work_dir,
+        build_dir=ctx.work_dir,
+        binary_path=binary,
+    )
+    ctx.publish_power_firmware(artifact)
+    ctx.publish_power_deployment(
+        DeploymentRecord(
+            firmware=artifact,
+            target_id=ctx.config.target.board,
+            deployed_at="2026-07-18T00:00:00+00:00",
+        )
+    )
+
+
+def _bound_the_capture_waits_on(ctx, monkeypatch, *, configured_s: float, lockstep: bool) -> float:
+    """Run the real capture wrapper against an inert gated driver."""
+    from helia_profiler.capture import capture_power
+
+    seen: dict[str, float] = {}
+
+    class Driver:
+        supports_gated_capture = True
+
+        def check_available(self):
+            pass
+
+        def capture_gated(self, **kwargs):
+            seen["duration_s"] = kwargs["duration_s"]
+            return PowerResult(
+                summary=PowerSummary(0.01, 0.02, 0.03, 0.04, 0.05, 6),
+                metadata=PowerMetadata(measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW),
+            )
+
+    class Sync:
+        def __init__(self) -> None:
+            self.lockstep = lockstep
+
+        def arm(self):
+            pass
+
+        def release(self):
+            pass
+
+        def release_go(self):
+            pass
+
+        def signal_go(self):
+            pass
+
+    monkeypatch.setattr("helia_profiler.power.get_driver", lambda *a, **k: Driver())
+    monkeypatch.setattr("helia_profiler.capture._make_sync_controller", lambda *_a: Sync())
+    capture_power(ctx, duration_override_s=configured_s)
+    return seen["duration_s"]
+
+
+@pytest.mark.parametrize("lockstep", [True, False], ids=["lockstep", "free-running"])
+@pytest.mark.parametrize("configured", ["short", "at-window"])
+@pytest.mark.parametrize(
+    ("probe", "firmware", "window_mode", "target_ms", "power_mode"),
+    [c for c in CELLS if c.values[4] == "external"],
+)
+def test_the_gated_capture_waits_past_the_longest_accepted_window(
+    cell, monkeypatch, probe, firmware, window_mode, target_ms, power_mode, configured, lockstep
+):
+    """The estimate above is not what the capture waits on (#302).
+
+    An explicit ``power.duration_s`` or the default cap reaches
+    ``capture_gated`` unchanged unless the capture raises it, so a bound short
+    of the window, or exactly at it, must still become a wait that holds the
+    longest window the gate check accepts.
+    """
+    ctx, config, plan = cell(probe, firmware, window_mode, target_ms, power_mode)
+    if firmware == "dedicated":
+        _deploy_dedicated_firmware(ctx)
+    window_s = _firmware_window_s(config, probe, firmware, window_mode, plan)
+    longest_accepted_s = window_s * (1.0 + gate_relative_tolerance_for(probe))
+
+    waited_s = _bound_the_capture_waits_on(
+        ctx,
+        monkeypatch,
+        configured_s=1.0 if configured == "short" else window_s,
+        lockstep=lockstep,
+    )
+
+    assert waited_s > longest_accepted_s, (
+        f"capture waits {waited_s:.1f}s for a window accepted up to {longest_accepted_s:.1f}s"
     )
 
 
