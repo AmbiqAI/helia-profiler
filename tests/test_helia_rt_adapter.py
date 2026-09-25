@@ -524,6 +524,7 @@ class TestEthosUBackend:
         assert f"version {version or 'unknown'}" in str(excinfo.value)
         assert "helia-rt-v1.18.0" in (excinfo.value.hint or "")
         assert "HELIART_SOURCE_PATH" in (excinfo.value.hint or "")
+        assert "engine.config.source_path" in (excinfo.value.hint or "")
         assert not (tmp_path / "modules" / "helia-rt" / "CMakeLists.txt").exists()
 
     @pytest.mark.parametrize(
@@ -577,7 +578,7 @@ class TestEthosUBackend:
             tmp_path, {"backend": "ethos_u", "config": {"source_path": str(fake_source_tree)}}
         )
 
-        with pytest.raises(EngineError, match="could not be read"):
+        with pytest.raises(EngineError, match=r"could not be read \(Permission denied\)"):
             HeliaRTAdapter().prepare(config, tmp_path)
 
     def test_default_backend_has_no_npu_artifacts(self, tmp_path: Path):
