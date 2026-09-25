@@ -1143,12 +1143,14 @@ class TestStreamedGateSelection:
                 },
             )
             # GPI stream at 1 kHz: a 12 ms coupling stretch (qualifying!),
-            # a 5 ms low gap, then the 10 ms real window, then low.
-            levels = [0] * 2 + [1] * 12 + [0] * 5 + [1] * 10 + [0] * 5
+            # a 5 ms low gap, then the 10 ms real window, then low. The
+            # driver packs uint1 samples 8 per byte, earliest in the LSB, so
+            # every edge here lands mid-byte.
+            levels = [0] * 2 + [1] * 12 + [0] * 5 + [1] * 10 + [0] * 3
             gpi_cb(
                 "u/js320/test/s/gpi/0/!data",
                 {
-                    "data": np.asarray(levels, dtype=np.uint8),
+                    "data": np.packbits(np.asarray(levels, dtype=np.uint8), bitorder="little"),
                     "sample_rate": 1000,
                     "decimate_factor": 1,
                     "sample_id": 0,

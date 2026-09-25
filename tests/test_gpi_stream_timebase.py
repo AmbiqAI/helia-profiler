@@ -1,8 +1,7 @@
 """The streamed-GPI time base is derived, so it has to be observable (#249).
 
 `_segment_streamed_gpi` places both gate edges with a per-sample spacing
-inferred from frame timestamps, because the JS320 reports its raw sample rate
-while delivering decimated samples. When a gate window disagrees with the
+inferred from frame timestamps. When a gate window disagrees with the
 firmware clock, that inference is the first suspect, so these tests pin
 what it saw.
 """
@@ -39,7 +38,7 @@ def test_a_steady_stream_reports_no_spread():
 
 
 def test_the_reported_rate_is_compared_against_what_the_frames_imply():
-    """The instrument's 8:1 decimation must be visible, not silently absorbed."""
+    """A rate the frame timestamps contradict must be visible."""
     tick = time64.SECOND / 250_000.0
     d = _streamed_gpi_timebase(_frames([tick] * 10, rate=2_000_000.0))
 
@@ -153,3 +152,59 @@ def test_excluded_frame_does_not_bridge_spacing_or_gate_edges(bad_rate):
     assert d["tick_per_sample_source"] == "reported_rate"
     assert d["dropped_or_empty_frames"] == 1
     assert _segment_streamed_gpi(frames) == [(18 * tick, 20 * tick)]
+
+
+def test_gpi_bytes_unpack_earliest_sample_first():
+    """The driver packs uint1 GPI samples 8 per byte, LSB first."""
+    from helia_profiler.power.joulescope.stats import _unpack_gpi_levels
+
+    # 0b11100000: a rise after the fifth sample; 0b00000111: a fall after the third.
+    levels = _unpack_gpi_levels([0x00, 0xE0, 0xFF, 0x07])
+
+    assert levels.tolist() == [0] * 8 + [0] * 5 + [1] * 3 + [1] * 8 + [1] * 3 + [0] * 5
+
+
+def test_unpacked_frames_imply_the_reported_rate():
+    """Packed bytes read as samples would imply one eighth of it."""
+    import numpy as np
+
+    from helia_profiler.power.joulescope.stats import _unpack_gpi_levels
+
+    rate = 1_000_000.0
+    samples_per_frame = 8 * 6396
+    tick = time64.SECOND / rate
+    frames = [
+        {
+            "utc": i * samples_per_frame * tick,
+            "rate": rate,
+            "data": _unpack_gpi_levels(np.zeros(samples_per_frame // 8, dtype=np.uint8)),
+        }
+        for i in range(4)
+    ]
+
+    d = _streamed_gpi_timebase(frames)
+
+    assert d["implied_rate_hz"] == pytest.approx(rate)
+    assert d["reported_over_implied_rate"] == pytest.approx(1.0)
+
+
+def test_a_single_packed_frame_keeps_mid_byte_edges():
+    """One frame has no spacing pair, so the reported rate places edges."""
+    import numpy as np
+
+    from helia_profiler.power.joulescope.stats import (
+        _segment_streamed_gpi,
+        _unpack_gpi_levels,
+    )
+
+    rate = 1_000_000.0
+    levels = np.zeros(4000, dtype=np.uint8)
+    levels[1003:3005] = 1
+    packed = np.packbits(levels, bitorder="little")
+    frames = [{"utc": 0, "rate": rate, "data": _unpack_gpi_levels(packed)}]
+
+    ((rise, fall),) = _segment_streamed_gpi(frames)
+
+    tick = time64.SECOND / rate
+    assert rise == pytest.approx(1003 * tick)
+    assert fall == pytest.approx(3005 * tick)

@@ -343,6 +343,17 @@ def _segment_gpi_windows(poll_samples: list[tuple[int, int]]) -> list[tuple[floa
     return windows
 
 
+def _unpack_gpi_levels(data: Any) -> Any:
+    """Expand a GPI stream frame into one level per sample.
+
+    The driver delivers GPI signals as uint1 packed 8 samples per byte,
+    earliest sample in the least significant bit.
+    """
+    import numpy as np
+
+    return np.unpackbits(np.asarray(data, dtype=np.uint8), bitorder="little")
+
+
 def _frame_spacings(frames: list[dict[str, Any]]) -> list[float]:
     """Measure adjacent valid-frame spacing without bridging excluded input."""
     import numpy as np
@@ -366,7 +377,7 @@ def _segment_streamed_gpi(
     """Segment gate-high windows from device-timestamped GPI stream frames.
 
     Each frame is ``{"utc": <time64 of first sample>, "rate": <samples/s>,
-    "data": <per-sample levels>}`` as captured from ``s/gpi/N/!data``.  The
+    "data": <per-sample levels>}`` unpacked from ``s/gpi/N/!data``.  The
     returned ``(rise, fall)`` pairs are in instrument time64 — the same clock
     as the stat-packet midpoints — so no host-time mapping is involved and the
     edges carry sample-period resolution instead of host poll cadence.
@@ -470,8 +481,7 @@ def _streamed_gpi_timebase(frames: list[dict[str, Any]]) -> dict[str, Any]:
             "tick_per_sample": median,
             "tick_per_sample_source": "median_frame_spacing",
             "implied_rate_hz": time64.SECOND / median if median else None,
-            # Ratio of the rate the instrument claims to the rate its own frame
-            # timestamps imply. The 8:1 decimation shows up here as ~8.
+            # Reported rate over the rate frame timestamps imply.
             "reported_over_implied_rate": (reported_rate * median / time64.SECOND)
             if median
             else None,

@@ -45,6 +45,7 @@ from .stats import (
     _segment_streamed_gpi,
     _streamed_gpi_timebase,
     _summary_to_dict,
+    _unpack_gpi_levels,
     _whole_summary_from_stats,
 )
 
@@ -247,9 +248,7 @@ def capture_gated(
 
     def _on_gpi_data(_topic: str, value: Any) -> None:
         try:
-            import numpy as np
-
-            data = np.asarray(value["data"])
+            data = _unpack_gpi_levels(value["data"])
             decimate = max(1, int(value.get("decimate_factor", 1) or 1))
             rate = float(value["sample_rate"]) / decimate
             sample_id = value.get("sample_id")
@@ -258,7 +257,7 @@ def capture_gated(
                     "utc": int(value["utc"]),
                     "rate": rate,
                     "sample_id": (int(sample_id) // decimate if sample_id is not None else None),
-                    "data": data.copy(),
+                    "data": data,
                 }
             )
         except Exception:  # never let a malformed frame kill the capture
