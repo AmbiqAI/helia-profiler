@@ -4900,6 +4900,7 @@ class TestLockstepReadyBoundAndHookPrecedence:
         ready: bool = True,
         prepare_error: BaseException | None = None,
         driver_error: Exception | None = None,
+        propagate_hook_error: bool = False,
     ) -> list[str]:
         from helia_profiler.capture import capture_power
         from helia_profiler.config import load_config
@@ -4963,7 +4964,8 @@ class TestLockstepReadyBoundAndHookPrecedence:
                 try:
                     kwargs["on_started"]()
                 except Exception:
-                    pass
+                    if propagate_hook_error:
+                        raise
                 if driver_error is not None:
                     raise driver_error
                 return PowerResult(summary=PowerSummary(0.01, 0.02, 0.03, 0.04, 0.05, 6))
@@ -5021,6 +5023,36 @@ class TestLockstepReadyBoundAndHookPrecedence:
 
         assert excinfo.value is reset
         assert excinfo.value.__cause__ is cause
+
+    def test_replacing_capture_error_is_hidden_behind_the_reset_error(self, tmp_path, monkeypatch):
+        reset = RuntimeError("J-Link reset failed")
+
+        with pytest.raises(RuntimeError) as excinfo:
+            self._run(
+                tmp_path,
+                monkeypatch,
+                prepare_error=reset,
+                driver_error=PowerError("No GPIO gate rising edge detected"),
+            )
+
+        assert excinfo.value is reset
+        assert excinfo.value.__suppress_context__ is True
+
+    def test_passed_through_reset_error_keeps_its_own_context(self, tmp_path, monkeypatch):
+        try:
+            try:
+                raise OSError("probe vanished")
+            except OSError:
+                raise RuntimeError("J-Link reset failed")
+        except RuntimeError as exc:
+            reset = exc
+
+        with pytest.raises(RuntimeError) as excinfo:
+            self._run(tmp_path, monkeypatch, prepare_error=reset, propagate_hook_error=True)
+
+        assert excinfo.value is reset
+        assert isinstance(excinfo.value.__context__, OSError)
+        assert excinfo.value.__suppress_context__ is False
 
 
 def test_bound_equal_to_the_due_time_is_not_called_exhausted():

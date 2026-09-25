@@ -407,8 +407,8 @@ def capture_power(
         prepare_error: list[BaseException] = []
         try:
             sync.arm()
-            # Filled inside the driver-thread callback; a one-slot holder so
-            # the typed object survives the thread boundary.
+            # Filled inside the driver's start callback; a one-slot holder so
+            # the typed object outlives it.
             sync_metadata_holder: list[SyncHandshakeMetadata] = []
             capture_phase = {"name": "poller_armed"}
 
@@ -507,10 +507,10 @@ def capture_power(
                     "count_source": plan.count_source,
                 }
             return _attach_lifecycle_metadata(result)
-        except Exception:
+        except Exception as exc:
             # A failed reset/READY/GO step outranks whatever the capture made
             # of the run it never started. Its own cause chain is kept.
-            if prepare_error:
+            if prepare_error and exc is not prepare_error[0]:
                 error = prepare_error[0]
                 error.__suppress_context__ = True
                 raise error
