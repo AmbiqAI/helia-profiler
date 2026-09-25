@@ -81,7 +81,7 @@ rule for non-root USB access.
 
 | Dependency | Version | Purpose |
 |---|---|---|
-| Python | `>= 3.11` | Runtime (the `aot` extra currently needs 3.11–3.12) |
+| Python | `>= 3.11` | Runtime |
 | `arm-none-eabi-gcc` | 13.x or 14.x | Default ARM cross-compiler |
 | CMake | `>= 3.24` | Build system |
 | Ninja | any | Build backend |
