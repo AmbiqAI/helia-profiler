@@ -682,6 +682,14 @@ def test_empty_iteration_block_is_rejected():
         parse_firmware_output(lines[:end] + ["--- HPX_ITER 2 ---"] + lines[end:])
 
 
+def test_legacy_single_pass_without_preset_marker_parses():
+    lines = ["--- HPX_START ---", "HPX_PRESETS=cpu_0", "HPX_NUM_PRESETS=1", "HPX_ITERATIONS=2"]
+    for i, cycles in enumerate(["100", "102"]):
+        lines += [f"--- HPX_ITER {i} ---", "Layer,Op,ARM_PMU_CPU_CYCLES", f"0,CONV_2D,{cycles}"]
+    lines.append("--- HPX_END ---")
+    assert parse_firmware_output(lines).layers[0].cycles == 101
+
+
 def test_repeated_pass_is_rejected():
     import pytest
     from helia_profiler.errors import CaptureError

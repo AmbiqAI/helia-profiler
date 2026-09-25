@@ -290,6 +290,8 @@ def parse_firmware_output(
 
 def _check_presets(meta: FirmwareMeta, parsed: list[str]) -> None:
     """Reject a capture missing any announced PMU pass."""
+    if parsed == ["_default"] and len(meta.presets) == 1:
+        parsed = list(meta.presets)
     if meta.presets and set(parsed) != set(meta.presets):
         missing = [name for name in meta.presets if name not in parsed]
         extra = [name for name in parsed if name not in meta.presets]
