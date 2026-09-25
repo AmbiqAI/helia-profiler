@@ -169,7 +169,7 @@ def test_wheel_contains_only_canonical_evaluation_modules(tmp_path: Path) -> Non
     assert probe.stdout.splitlines() == [
         "0.8.1",
         "aefce2ca858795e783c76726ebe7d14d9d4bde7c",
-        "67413548ee7be2adbd49d574e74c9381015f0fc984416c12b5111122295ecb1b",
+        "23f598bd4ae7924ae93d58e7f0e1c54eb443e328fc32574a2df6950cf77d78e6",
     ]
 
 

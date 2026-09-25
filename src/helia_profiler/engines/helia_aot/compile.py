@@ -39,8 +39,8 @@ log = logging.getLogger("hpx")
 # does that better. We just enforce a minimum-supported version at runtime
 # so a user with an older install gets a clear error instead of a confusing
 # build failure (e.g. missing ModuleType.nsx).
-HELIAAOT_MIN_VERSION = "0.20.0"
-HELIAAOT_MAX_VERSION_EXCLUSIVE = "0.21.0"
+HELIAAOT_MIN_VERSION = "0.22.0"
+HELIAAOT_MAX_VERSION_EXCLUSIVE = "0.23.0"
 
 _DEFAULT_PREFIX = "hpx"
 _DEFAULT_MODULE_NAME = "hpx_model"

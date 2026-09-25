@@ -122,7 +122,10 @@ HeliaAotArtifacts(
 ### Assumptions
 
 - The `helia-aot` pip package must be installed (`pip install helia-aot`)
-- The AOT compiler version must match the ns-cmsis-nn module version
+- The ns-cmsis-nn module must meet the generated module's floor: the
+  compatibility baseline pins a core at or above heliaAOT's module-wide
+  minimum, and a float operator can raise it (see
+  [Compatibility baseline](compatibility-baseline.md))
 - The model must use only ops supported by the AOT compiler
 - Uses a different `main.cc` template (`main_aot.cc.j2`) because AOT
   inference calls are direct function invocations, not interpreter runs

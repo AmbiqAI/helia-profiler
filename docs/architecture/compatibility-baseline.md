@@ -22,7 +22,7 @@ The current baseline is `hpx-neuralspotx-0.8.1-2026-09`:
 | `nsx-executorch` | `5514ac1e…b48e` |
 | `nsx-sensors` | `c219a2bc…3e25` (`v0.3.0`, peeled) |
 | heliaRT | `1.20.0`, commit `edb3a25f…440` (min supported `1.16.0` — from `HELIART_MIN_VERSION` in code, not a baseline-JSON field) |
-| heliaAOT | `min_version=0.20.0`, `max_version_exclusive=0.21.0` |
+| heliaAOT | `min_version=0.22.0`, `max_version_exclusive=0.23.0` |
 | tflm | governed entirely by the `nsx-tflite-micro` / `arm-cmsis-nn` module refs above |
 | executorch | `0.1.0`, module ref `5514ac1e…b48e` (a checkout's `version.txt` is verified against the baseline) |
 
@@ -62,6 +62,20 @@ is the LiteRT converter's standard FP16 model shape (helia-rt#255, closing
 hpx#251). heliaAOT 0.20.0 pins the same core and now rejects float on the six
 operators ns-cmsis-nn ships integer kernels for, naming the operator and dtype
 instead of failing at link time (helia-aot#396).
+
+heliaAOT then moves `[0.20.0, 0.21.0) → [0.22.0, 0.23.0)` (#380) on the same
+core; every other ref above is unchanged. 0.22.0 keeps the module-wide
+`ns-cmsis-nn` floor at v7.32.0, and the interfaces HPX drives (the converter
+and its arguments, the codegen context, and the generated model API that
+`main_aot.cc.j2` calls) are unchanged apart from additive fields. Two things
+differ for a consumer. A float module now requires the core's
+`ns_cmsis_nn_float_support()` query at configure time, which v7.32.0 provides
+on the NSX route. And several float operators now dispatch to native kernels
+that raise that module's floor: float `SQRT`/`RSQRT` need v7.33.0,
+`GATHER`/`GATHER_ND`/`REDUCE_MAX`/`REDUCE_MIN` v7.34.0, and
+`ARG_MAX`/`ARG_MIN` v7.35.0. Against the v7.32.0 core such a model stops at
+compile time on the generated module's own `#error`; integer models, and
+float models without those operators, are unaffected.
 
 The previous revision is recorded below. heliaRT 1.19.0 and heliaAOT 0.19.0
 (issue #246) are the releases that add FP16

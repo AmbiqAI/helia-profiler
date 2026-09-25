@@ -313,10 +313,9 @@ heliaAOT ships as a Python package (it runs at build-time), so version
 resolution is handled entirely by **pip** — there's no separate cache,
 download, or `dist_path` to manage.
 
-The profiler's `[aot]` extra requires `helia-aot>=0.19.0`, and the profiler
-also enforces a runtime
-**minimum supported version** (`HELIAAOT_MIN_VERSION`) so any compatible
-override still has to clear the floor.
+The profiler's `[aot]` extra requires `helia-aot>=0.22.0,<0.23.0`, and the
+profiler enforces the same qualified range at runtime from the compatibility
+baseline, so an installed version outside it is refused with a clear error.
 
 You get three modes:
 
@@ -404,10 +403,11 @@ The pipeline:
 | `aot_args` | dict | `{}` | Pass-through args to the AOT compiler |
 | `platform_name` | string | *(from board)* | Override the board → AOT platform mapping |
 
-`nsx-cmsis-nn` is declared at the baseline's qualified ref (v7.31.0, which
-heliaAOT 0.19.0 requires), its fp32 kernels are always enabled, and the fp16
-kernels when the model carries FLOAT16 tensors on a Cortex-M55 — exactly as
-for heliaRT source builds (see the heliaRT runtime notes).
+`nsx-cmsis-nn` is declared at the baseline's qualified ref (v7.32.0, heliaAOT's
+module-wide minimum). Its fp32 kernels are enabled when the model computes in
+float, and the fp16 kernels additionally when it carries FLOAT16 tensors on a
+Cortex-M55, exactly as for heliaRT source builds (see the heliaRT runtime
+notes).
 
 ## Choosing an engine
 

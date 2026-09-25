@@ -44,7 +44,7 @@ dependencies = [
 
 [project.optional-dependencies]
 aot = [
-    "helia-aot>=0.20.0,<0.21.0",
+    "helia-aot>=0.22.0,<0.23.0",
     "ai-edge-litert>=2.1.6,<2.3",
     "backports-strenum<1.3",
 ]
