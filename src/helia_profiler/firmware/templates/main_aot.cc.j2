@@ -597,8 +597,7 @@ static {{ aot_prefix }}_model_context_t {{ aot_prefix }}_model_ctx = {
 {% endif %}
 {{ super() }}{% endblock %}
 
-{% block engine_validate_output %}
-    if ({{ aot_prefix }}_num_inputs != 1 || {{ aot_prefix }}_num_outputs != 1 ||
+{% block engine_validate_output %}    if ({{ aot_prefix }}_num_inputs != 1 || {{ aot_prefix }}_num_outputs != 1 ||
         {{ aot_prefix }}_model_ctx.inputs[0].size != sizeof(hpx_validation_input) ||
         {{ aot_prefix }}_model_ctx.outputs[0].size != {{ golden.expected_bytes | length }}) {
         hpx_printf("HPX_ERROR=validation_shape_mismatch\n");

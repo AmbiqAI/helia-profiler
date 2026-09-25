@@ -12,10 +12,10 @@
    that terminates the last line), and a single-line block holds exactly one
    line with no newlines of its own. #}
 
-{% block engine_file_header %}{% if golden | default(none) %}
-#define HPX_CLEAN_WORKLOAD "golden_int8_refill_included_v1"
-{% endif %}
-/**
+{% block engine_file_header %}
+{% if golden | default(none) %}#define HPX_CLEAN_WORKLOAD "golden_int8_refill_included_v1"
+
+{% endif %}/**
  * @file main.cc
  * @brief heliaPROFILER firmware — auto-generated, do not edit.
  *
@@ -498,8 +498,7 @@ static tflite::MicroMutableOpResolver<kMaxOps> &get_resolver() {
 {% endif %}
 {{ super() }}{% endblock %}
 
-{% block engine_validate_output %}
-    if (interpreter.inputs_size() != 1 || interpreter.outputs_size() != 1 ||
+{% block engine_validate_output %}    if (interpreter.inputs_size() != 1 || interpreter.outputs_size() != 1 ||
         input->bytes != sizeof(hpx_validation_input) || output->bytes != {{ golden.expected_bytes | length }}) {
         hpx_printf("HPX_ERROR=validation_shape_mismatch\n");
         hpx_park();

@@ -104,6 +104,7 @@ def test_base_blocks_are_the_documented_set():
         "engine_reset_inputs",
         "engine_reset_inputs_warm",
         "engine_start_metadata",
+        "engine_validate_output",
         "engine_window_prologue",
         "engine_window_restore",
     }
@@ -112,7 +113,21 @@ def test_base_blocks_are_the_documented_set():
 def test_base_block_count_is_pinned():
     """Belt to the set assertion's braces: a rename that swaps one name for
     another keeps the count, but an accidental extra seam does not."""
-    assert len(_blocks(BASE)) == 27
+    assert len(_blocks(BASE)) == 28
+
+
+@pytest.mark.parametrize("golden", [None, True])
+def test_tflm_header_branches_preserve_line_boundary_and_workload(golden):
+    template = _jinja_env.get_template("main.cc.j2")
+    context = template.new_context({"golden": golden, "transport": "rtt"})
+    header = "".join(template.blocks["engine_file_header"](context))
+    assert header.startswith("\n")
+    definition = '#define HPX_CLEAN_WORKLOAD "golden_int8_refill_included_v1"'
+    if golden:
+        assert header.startswith("\n" + definition + "\n\n/**")
+    else:
+        assert header.startswith("\n/**")
+        assert "HPX_CLEAN_WORKLOAD" not in header
 
 
 #: Blocks every engine must supply: the base renders nothing (or nothing
@@ -150,6 +165,7 @@ def test_child_override_sets_are_the_documented_ones():
         "engine_pre_start",
         "engine_profiled_summary",
         "engine_profiler_on",
+        "engine_validate_output",
     }
     assert _blocks("main_aot.cc.j2") == REQUIRED_ENGINE_BLOCKS | {
         "engine_early_globals",
@@ -160,6 +176,7 @@ def test_child_override_sets_are_the_documented_ones():
         "engine_profiled_summary",
         "engine_profiler_on",
         "engine_psram_metadata",
+        "engine_validate_output",
         "engine_window_prologue",
         "engine_window_restore",
     }
@@ -304,6 +321,8 @@ GLUED_BLOCKS = {
     "engine_profiler_off",
     "engine_reset_inputs",
     "engine_reset_inputs_warm",
+    # The base surrounds this golden-only seam with newlines.
+    "engine_validate_output",
     "engine_window_restore",
 }
 
