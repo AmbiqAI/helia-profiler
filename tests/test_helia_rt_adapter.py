@@ -216,6 +216,34 @@ class TestHeliaRTAdapter:
         assert not (tmp_path / "modules" / "helia-rt").exists()
         assert not (tmp_path / "modules" / "nsx-helia-rt").exists()
 
+    @pytest.mark.parametrize("variant", ["debug", "release-with-logs", "release"])
+    def test_registry_passes_variant_to_cmake(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, variant: str
+    ):
+        monkeypatch.delenv("HELIART_DIST_PATH", raising=False)
+        monkeypatch.delenv("HELIART_SOURCE_PATH", raising=False)
+        config = _make_config(tmp_path, {"config": {"variant": variant}})
+
+        artifacts = HeliaRTAdapter().prepare(config, tmp_path)
+
+        assert artifacts.cmake_vars["HELIA_RT_VARIANT"] == variant
+        assert artifacts.heliart_variant == variant
+
+    def test_registry_warns_on_core_override(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ):
+        monkeypatch.delenv("HELIART_DIST_PATH", raising=False)
+        monkeypatch.delenv("HELIART_SOURCE_PATH", raising=False)
+        config = _make_config(tmp_path, {"config": {"core_override": "cm4"}})
+
+        with caplog.at_level("WARNING", logger="hpx"):
+            HeliaRTAdapter().prepare(config, tmp_path)
+
+        assert "ignores core_override=cm4" in caplog.text
+
     def test_registry_helia_rt_uses_explicit_cmsis_nn_checkout(
         self,
         tmp_path: Path,

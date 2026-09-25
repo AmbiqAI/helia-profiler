@@ -140,6 +140,13 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
         extra_modules: list[NsxModuleRef] = []
         cmake_vars: dict[str, str] = {}
 
+        if core_override and (source_path is not None or not use_local):
+            log.warning(
+                "heliaRT source build ignores core_override=%s "
+                "(SoC family drives kernel selection)",
+                core_override,
+            )
+
         if not use_local:
             version = HELIART_VERSION
             log.info(
@@ -164,6 +171,7 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
             )
             extra_modules.append(cmsis_nn_module_ref(config, work_dir))
             cmake_vars.update(cmsis_nn_cmake_vars(config))
+            cmake_vars["HELIA_RT_VARIANT"] = variant
             if ethos_u:
                 _add_ethos_u_artifacts(extra_modules, cmake_vars)
             return HeliaRtArtifacts(
@@ -188,13 +196,6 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
             version = resolved_version or HELIART_VERSION
             if ethos_u:
                 _require_ethos_u_source_support(source_path)
-
-            if core_override:
-                log.warning(
-                    "heliaRT source build ignores core_override=%s "
-                    "(SoC family drives kernel selection)",
-                    core_override,
-                )
 
             # A source build needs the core module and its kernel options;
             # a prebuilt archive has both baked in.

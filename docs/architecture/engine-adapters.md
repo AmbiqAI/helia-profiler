@@ -83,7 +83,7 @@ prebuilt distribution.
 - Explicit prebuilt archives must match the target core, toolchain, and
   requested variant.
 - The default registry and local-source modes build heliaRT with the selected
-  toolchain.
+  toolchain and variant (`HELIA_RT_VARIANT`), and ignore `core_override`.
 
 ## heliaAOT adapter
 

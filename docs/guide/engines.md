@@ -249,7 +249,9 @@ resolve to heliaRT `>= v1.16.0`.
 | `atfe` | `libhelia-rt-{core}-atfe-{variant}.a` |
 
 This table applies only to the explicit prebuilt-distribution mode. The default
-registry and local-source modes compile heliaRT with the selected toolchain.
+registry and local-source modes compile heliaRT with the selected toolchain and
+`variant`; they ignore `core_override` (with a warning), since the SoC family
+selects the kernels.
 
 ### heliaRT engine config
 
