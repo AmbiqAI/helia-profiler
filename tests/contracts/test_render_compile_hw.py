@@ -404,6 +404,7 @@ def _prepare_case(case: _HwCase, workspace: _Workspace, tmp_path: Path) -> tuple
             cmsis_device_header=kwargs["cmsis_device_header"],
             profiling_backends=list(kwargs["profiling_backends"]),
             has_armv8m_pmu=kwargs["has_armv8m_pmu"],
+            has_ethos_u=False,
             pmu_max_ops=kwargs["pmu_max_ops"],
         )
     )
