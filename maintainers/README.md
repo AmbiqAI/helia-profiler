@@ -8,6 +8,7 @@ out of `astro-site/` so it is not part of the published documentation site.
 | [`releasing.md`](releasing.md) | Release Please flow, version markers, and the trusted-publishing PyPI workflow. |
 | [`hardware-ci.md`](hardware-ci.md) | Running `hpx validate` on the self-hosted GitHub Actions runner and what it uploads. |
 | [`validation-bundle-compare.md`](validation-bundle-compare.md) | Internals of `hpx compare --validation`: manifest contract, case matching, eligibility, and outputs. |
+| [`capture-timeline.md`](capture-timeline.md) | The gated power capture timeline contract: steps, host wait bounds, published intervals, error precedence, hint claims, and constant provenance. The acceptance spec for bench validation. |
 | [`compile-gate.md`](compile-gate.md) | The #187 Tier 1 rendered-firmware compile gate: stub tree, maintenance rule, GNU-only scope, known-bug ledger. |
 
 Everything user-facing belongs on the site instead: a page under
