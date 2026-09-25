@@ -209,7 +209,10 @@ engine:
 ```
 
 `HELIART_SOURCE_PATH` is the environment-variable equivalent. The checkout
-must contain heliaRT's native NSX module.
+must contain heliaRT's native NSX module. With `engine.backend: ethos_u`, that
+module must also declare the `NSX_HELIA_RT_ENABLE_ETHOSU` option, which
+heliaRT carries from `helia-rt-v1.18.0`; HPX refuses an older checkout before
+building rather than silently building without the NPU kernel.
 
 #### 3. Explicit prebuilt or custom release
 

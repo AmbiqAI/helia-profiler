@@ -467,6 +467,120 @@ class TestEthosUBackend:
         with pytest.raises(EngineError, match="source build"):
             adapter.prepare(config, tmp_path)
 
+    # An older heliaRT tree has Ethos-U in its root build but no NSX wrapper
+    # option (added by heliaRT #191), so the flag would be silently ignored.
+    _NSX_117 = (
+        "# source-build heliaRT nsx CMakeLists (test stub)\n"
+        "add_library(nsx_helia_rt INTERFACE)\n"
+        "add_library(nsx::helia_rt ALIAS nsx_helia_rt)\n"
+    )
+
+    @staticmethod
+    def _source_with(tree: Path, nsx_cmake: str, version: str | None) -> Path:
+        (tree / "nsx" / "CMakeLists.txt").write_text(nsx_cmake)
+        header = tree / "tensorflow" / "lite" / "micro" / "helia_rt_version.h"
+        # A development tree may carry the header without a parsable version.
+        header.write_text(
+            "// development tree\n"
+            if version is None
+            else f'#define HELIA_RT_VERSION "v{version}"\n'
+        )
+        return tree
+
+    @pytest.mark.parametrize(
+        ("nsx_cmake", "version"),
+        [
+            (_NSX_117, "1.17.0"),
+            (_NSX_117 + '# option(NSX_HELIA_RT_ENABLE_ETHOSU "commented out" OFF)\n', "1.17.0"),
+            (_NSX_117 + 'option(HELIA_RT_ENABLE_ETHOSU "root option only" OFF)\n', "1.17.0"),
+            (_NSX_117 + 'option(NSX_HELIA_RT_ENABLE_ETHOSU_EXTRA "longer name" OFF)\n', "1.17.0"),
+            # The probe, not the tag, decides: a tree that claims a new
+            # version or none must still declare the option.
+            (_NSX_117, "1.20.0"),
+            (_NSX_117, None),
+        ],
+        ids=[
+            "no-option",
+            "commented-out",
+            "root-option-only",
+            "longer-name",
+            "new-tag-no-option",
+            "unknown-version-no-option",
+        ],
+    )
+    def test_source_without_the_nsx_option_is_refused(
+        self, tmp_path: Path, fake_source_tree: Path, nsx_cmake: str, version: str | None
+    ):
+        source = self._source_with(fake_source_tree, nsx_cmake, version)
+        config = _make_config(
+            tmp_path, {"backend": "ethos_u", "config": {"source_path": str(source)}}
+        )
+
+        with pytest.raises(
+            EngineError, match="does not declare NSX_HELIA_RT_ENABLE_ETHOSU"
+        ) as excinfo:
+            HeliaRTAdapter().prepare(config, tmp_path)
+
+        assert f"version {version or 'unknown'}" in str(excinfo.value)
+        assert "helia-rt-v1.18.0" in (excinfo.value.hint or "")
+        assert "HELIART_SOURCE_PATH" in (excinfo.value.hint or "")
+        assert "engine.config.source_path" in (excinfo.value.hint or "")
+        assert not (tmp_path / "modules" / "helia-rt" / "CMakeLists.txt").exists()
+
+    @pytest.mark.parametrize(
+        "version",
+        ["1.18.0", None, "1.17.0"],
+        ids=["tagged", "unknown-dev-tree", "old-tag-with-backported-option"],
+    )
+    def test_source_with_the_nsx_option_builds_the_npu_path(
+        self, tmp_path: Path, fake_source_tree: Path, version: str | None
+    ):
+        source = self._source_with(
+            fake_source_tree,
+            self._NSX_117 + '  option( NSX_HELIA_RT_ENABLE_ETHOSU "Ethos-U" OFF)\n',
+            version,
+        )
+        config = _make_config(
+            tmp_path, {"backend": "ethos_u", "config": {"source_path": str(source)}}
+        )
+
+        artifacts = HeliaRTAdapter().prepare(config, tmp_path)
+
+        assert artifacts.cmake_vars["NSX_HELIA_RT_ENABLE_ETHOSU"] == "ON"
+        assert "nsx-npu" in [m.name for m in artifacts.extra_modules]
+
+    def test_cpu_backend_still_builds_a_117_source(self, tmp_path: Path, fake_source_tree: Path):
+        source = self._source_with(fake_source_tree, self._NSX_117, "1.17.0")
+        config = _make_config(tmp_path, {"config": {"source_path": str(source)}})
+
+        artifacts = HeliaRTAdapter().prepare(config, tmp_path)
+
+        assert "NSX_HELIA_RT_ENABLE_ETHOSU" not in artifacts.cmake_vars
+
+    def test_registry_pin_carries_the_nsx_ethos_u_option(self):
+        from helia_profiler.engines.helia_rt.artifacts import HELIART_VERSION, _parse_semver
+
+        assert _parse_semver(HELIART_VERSION) >= (1, 18, 0)
+
+    def test_unreadable_nsx_wrapper_is_refused_with_its_reason(
+        self, tmp_path: Path, fake_source_tree: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        nsx = fake_source_tree / "nsx" / "CMakeLists.txt"
+        real_read_text = Path.read_text
+
+        def read_text(self: Path, *args, **kwargs) -> str:
+            if self == nsx:
+                raise PermissionError(13, "Permission denied")
+            return real_read_text(self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "read_text", read_text)
+        config = _make_config(
+            tmp_path, {"backend": "ethos_u", "config": {"source_path": str(fake_source_tree)}}
+        )
+
+        with pytest.raises(EngineError, match=r"could not be read \(Permission denied\)"):
+            HeliaRTAdapter().prepare(config, tmp_path)
+
     def test_default_backend_has_no_npu_artifacts(self, tmp_path: Path):
         config = _make_config(tmp_path)
         adapter = HeliaRTAdapter()
