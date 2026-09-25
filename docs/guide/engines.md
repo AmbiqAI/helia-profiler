@@ -277,7 +277,7 @@ registry and local-source modes compile heliaRT with the selected toolchain.
   successful run, set it to roughly `1.5x` the reported `allocated_arena` in
   `summary.json`.
 - Source builds (the registry default and `source_path`) declare
-  `nsx-cmsis-nn` at the baseline's qualified ref (v7.32.0), enable its fp32
+  `nsx-cmsis-nn` at the baseline's qualified ref (v7.35.0), enable its fp32
   kernels when the model computes in float, and enable the fp16 kernels
   additionally when it carries FLOAT16 tensors — computed or dequantized
   weights — on a Cortex-M55. An integer-only model links neither.
@@ -402,15 +402,11 @@ The pipeline:
 | `aot_args` | dict | `{}` | Pass-through args to the AOT compiler |
 | `platform_name` | string | *(from board)* | Override the board → AOT platform mapping |
 
-`nsx-cmsis-nn` is declared at the baseline's qualified ref (v7.32.0, heliaAOT's
-module-wide minimum). Its fp32 kernels are enabled when the model computes in
-float, and the fp16 kernels additionally when it carries FLOAT16 tensors on a
-Cortex-M55, exactly as for heliaRT source builds (see the heliaRT runtime
-notes). A float `SQRT`, `RSQRT`, `GATHER`, `GATHER_ND`, `REDUCE_MAX`,
-`REDUCE_MIN`, `ARG_MAX` or `ARG_MIN` needs a newer core (v7.33.0 to v7.35.0)
-and stops at compile time against this one; set
-`engine.config.cmsis_nn_ref: v7.35.0` for such a model, which marks the run
-`development-overrides`.
+`nsx-cmsis-nn` is declared at the baseline's qualified ref (v7.35.0, which
+covers every float operator heliaAOT 0.22.0 lowers to a native kernel). Its
+fp32 kernels are enabled when the model computes in float, and the fp16
+kernels additionally when it carries FLOAT16 tensors on a Cortex-M55, exactly
+as for heliaRT source builds (see the heliaRT runtime notes).
 
 ## Choosing an engine
 

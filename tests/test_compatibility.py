@@ -46,10 +46,10 @@ def test_default_baseline_has_exact_qualified_refs(tmp_path: Path) -> None:
     assert baseline.project("nsx-tflite-micro").ref == "7afcf2b4170e039caf4c49f91e2c45d5869be333"
     assert baseline.project("arm-cmsis-nn").ref == "6d21a6f821fb72541173a6c4d05d83329fa74f7c"
     assert baseline.module("arm-cmsis-nn").ref == "6d21a6f821fb72541173a6c4d05d83329fa74f7c"
-    assert baseline.project("ns-cmsis-nn").ref == "aaeb145a67c3decd9869f96474e36e7dbdc2030c"
+    assert baseline.project("ns-cmsis-nn").ref == "cad3c8fa0cc2f7b13d6ff750bfc9744af0d621a6"
     assert baseline.project("nsx-executorch").ref == "5514ac1ea8439b3fe615d180bf68c75a9dabb48e"
     assert baseline.engine("executorch").ref == "5514ac1ea8439b3fe615d180bf68c75a9dabb48e"
-    assert baseline.engine("helia-rt").ref == "edb3a25fc96c8e9b634dabdb9cd31cb22aa43440"
+    assert baseline.engine("helia-rt").ref == "fe025f2be66ac213cafbbf203a395a3d1e89156f"
     assert baseline.engine("helia-aot").min_version == "0.22.0"
     assert baseline.engine("helia-aot").max_version_exclusive == "0.23.0"
     assert len(baseline.fingerprint) == 64
@@ -69,9 +69,9 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "nsx-pmu-armv8m": "5725c065a0c3603132f1064ee2684d1fa8587c88",
         "nsx-tflite-micro": "7afcf2b4170e039caf4c49f91e2c45d5869be333",
         "arm-cmsis-nn": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",
-        "ns-cmsis-nn": "aaeb145a67c3decd9869f96474e36e7dbdc2030c",
+        "ns-cmsis-nn": "cad3c8fa0cc2f7b13d6ff750bfc9744af0d621a6",
         "nsx-executorch": "5514ac1ea8439b3fe615d180bf68c75a9dabb48e",
-        "helia-rt": "edb3a25fc96c8e9b634dabdb9cd31cb22aa43440",
+        "helia-rt": "fe025f2be66ac213cafbbf203a395a3d1e89156f",
         # nsx-sensors: INA228 driver pinned for the shunt-cal register
         # fixes and raw 40-bit accumulator reads power.driver: ina228
         # needs (issue #95).
@@ -83,12 +83,12 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "nsx-pmu-armv8m": "5725c065a0c3603132f1064ee2684d1fa8587c88",
         "nsx-tflite-micro": "7afcf2b4170e039caf4c49f91e2c45d5869be333",
         "arm-cmsis-nn": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",
-        "nsx-cmsis-nn": "aaeb145a67c3decd9869f96474e36e7dbdc2030c",
+        "nsx-cmsis-nn": "cad3c8fa0cc2f7b13d6ff750bfc9744af0d621a6",
         "nsx-executorch": "5514ac1ea8439b3fe615d180bf68c75a9dabb48e",
-        "nsx-helia-rt": "edb3a25fc96c8e9b634dabdb9cd31cb22aa43440",
+        "nsx-helia-rt": "fe025f2be66ac213cafbbf203a395a3d1e89156f",
         "nsx-sensors": "c219a2bc98c62f96819fae20ab6c8911fcea3e25",
     }
-    assert baseline.engine("helia-rt").version == "1.20.0"
+    assert baseline.engine("helia-rt").version == "1.21.0"
     assert baseline.engine("helia-aot").min_version == "0.22.0"
     assert baseline.engine("helia-aot").max_version_exclusive == "0.23.0"
     assert baseline.engine("tflm").governed_by_modules
@@ -164,6 +164,20 @@ def test_aot_extra_and_lock_match_the_qualified_helia_aot_range() -> None:
     version = next(package for package in packages if package["name"] == "helia-aot")["version"]
     assert aot_compile._parse_semver(aot.min_version) <= aot_compile._parse_semver(version)
     assert aot_compile._parse_semver(version) < aot_compile._parse_semver(aot.max_version_exclusive)
+
+
+def test_helia_rt_and_core_pins_agree_across_the_baseline() -> None:
+    # heliaRT, heliaAOT and the shared ns-cmsis-nn core are qualified as one
+    # set: every place the baseline names heliaRT or the core carries one ref.
+    from helia_profiler.engines.helia_rt.artifacts import HELIART_SOURCE_COMMIT, HELIART_VERSION
+
+    baseline = load_compatibility_baseline()
+    helia_rt = baseline.engine("helia-rt")
+    assert (helia_rt.version, helia_rt.ref) == (HELIART_VERSION, HELIART_SOURCE_COMMIT)
+    assert baseline.project("helia-rt").ref == HELIART_SOURCE_COMMIT
+    assert baseline.module("nsx-helia-rt").ref == HELIART_SOURCE_COMMIT
+    core = baseline.project("ns-cmsis-nn").ref
+    assert baseline.module("nsx-cmsis-nn").ref == core
 
 
 def test_provenance_fingerprint_is_serializable_and_stable(tmp_path: Path) -> None:

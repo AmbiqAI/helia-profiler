@@ -18,10 +18,10 @@ The current baseline is `hpx-neuralspotx-0.8.1-2026-09`:
 | `nsx-pmu-armv8m` | `5725c065…c88` |
 | `nsx-tflite-micro` | `7afcf2b4…333` |
 | `arm-cmsis-nn` | `6d21a6f8…f7c` |
-| `ns-cmsis-nn` | `aaeb145a…30c` (`v7.32.0`, hpx-declared — see below) |
+| `ns-cmsis-nn` | `cad3c8fa…1a6` (`v7.35.0`, hpx-declared — see below) |
 | `nsx-executorch` | `5514ac1e…b48e` |
 | `nsx-sensors` | `c219a2bc…3e25` (`v0.3.0`, peeled) |
-| heliaRT | `1.20.0`, commit `edb3a25f…440` (min supported `1.16.0` — from `HELIART_MIN_VERSION` in code, not a baseline-JSON field) |
+| heliaRT | `1.21.0`, commit `fe025f2b…56f` (min supported `1.16.0` — from `HELIART_MIN_VERSION` in code, not a baseline-JSON field) |
 | heliaAOT | `min_version=0.22.0`, `max_version_exclusive=0.23.0` |
 | tflm | governed entirely by the `nsx-tflite-micro` / `arm-cmsis-nn` module refs above |
 | executorch | `0.1.0`, module ref `5514ac1e…b48e` (a checkout's `version.txt` is verified against the baseline) |
@@ -41,7 +41,7 @@ upstream — which is why the baseline pins the SDK project and HPX re-points
 every sdk-owned app module to it. The remaining projects stay at 0.7.17's
 tags (nsx-pmu-armv8m `v0.2.0`, nsx-tflite-micro and arm-cmsis-nn `v0.1.0`,
 nsx-sensors `v0.3.0`, and still `ns-cmsis-nn v7.29.2` under the hpx-declared
-`v7.32.0`), each re-peeled to the commit already recorded. Two 0.8.x changes
+`v7.35.0`), each re-peeled to the commit already recorded. Two 0.8.x changes
 are worth knowing: the Python floor rose to 3.11 (HPX already requires it),
 and the packaged board and tooling modules changed content hash
 (neuralspotx#247), so an `nsx.lock` produced under 0.7.17 cannot be
@@ -63,30 +63,30 @@ hpx#251). heliaAOT 0.20.0 pins the same core and now rejects float on the six
 operators ns-cmsis-nn ships integer kernels for, naming the operator and dtype
 instead of failing at link time (helia-aot#396).
 
-heliaAOT then moves `[0.20.0, 0.21.0) → [0.22.0, 0.23.0)` (#380) on the same
-core; every other ref above is unchanged. 0.22.0 keeps the module-wide
-`ns-cmsis-nn` floor at v7.32.0, and the interfaces HPX drives (the converter
-and its arguments, the codegen context, and the generated model API that
-`main_aot.cc.j2` calls) are unchanged apart from additive fields. Two things
-differ for a consumer. A float module now requires the core's
-`ns_cmsis_nn_float_support()` query at configure time, which v7.32.0 provides
-on the NSX route. And several float operators now dispatch to native kernels
-that raise that module's floor: float `SQRT`/`RSQRT` need v7.33.0,
-`GATHER`/`GATHER_ND`/`REDUCE_MAX`/`REDUCE_MIN` v7.34.0, and
-`ARG_MAX`/`ARG_MIN` v7.35.0. Against the v7.32.0 core such a model stops at
-compile time on the generated module's own `#error`. That includes a float
-`SQRT`, which 0.20.0 converted through its own code; integer models, and float
-models without those operators, are unaffected. Until the core moves, such a
-model runs with `engine.config.cmsis_nn_ref: v7.35.0`, which the run reports
-as `development-overrides`.
+heliaRT 1.21.0 (`fe025f2b…56f`), heliaAOT `[0.22.0, 0.23.0)` and
+`ns-cmsis-nn v7.35.0` (`cad3c8fa…1a6`) then move together (#380); every other
+ref above is unchanged. heliaRT 1.21.0 pins that exact core for its own
+builds, and its NSX module differs from 1.20.0 only in its version, so
+neuralSPOT-X 0.8.1 is unchanged. v7.33.0 to v7.35.0 add float kernels (square
+root and reciprocal square root, nearest-neighbour resize, gather, reduce
+minimum and maximum, arg minimum and maximum) without changing a public kernel
+signature. heliaAOT 0.22.0 lowers those float operators to the new kernels and
+raises a module's floor to match (up to v7.35.0 for `ARG_MAX`/`ARG_MIN`), so
+the qualified core now builds every float operator it emits. Its module-wide
+floor stays v7.32.0; a float module requires the core's
+`ns_cmsis_nn_float_support()` query at configure time; and the interfaces HPX
+drives (the converter and its arguments, the codegen context, and the
+generated model API that `main_aot.cc.j2` calls) are unchanged apart from
+additive fields.
 
 **Verified (host only).** With helia-aot 0.22.0 installed, the int8 KWS model
 converts through the heliaAOT engine's own stages for Apollo510, the rendered
 `main_aot.cc` is byte-identical to the 0.20.0 render, and the generated module
 and rendered firmware compile (Arm GNU 15.2, `-Werror -fsyntax-only`) against
-the v7.32.0 core; the same module against v7.31.0 stops on its floor. For the
-fp32 and fp16 KWS models HPX enables every float kernel the generated module
-requires. No build, flash or hardware run is recorded for this revision yet.
+the v7.35.0 core. A float model using `SQRT` and `ARG_MAX` compiles against
+v7.35.0 and stops on its own `#error` floor against v7.32.0. For the fp32 and
+fp16 KWS models HPX enables every float kernel the generated module requires.
+No build, flash or hardware run is recorded for this revision yet.
 
 The previous revision is recorded below. heliaRT 1.19.0 and heliaAOT 0.19.0
 (issue #246) are the releases that add FP16
