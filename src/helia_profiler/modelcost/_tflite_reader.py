@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import struct
 from dataclasses import dataclass
+from typing import Any
 
 # Extracted from ai_edge_litert's generated schema (#229 D7); flatbuffers
 # schema-evolution rules freeze them, and tests/test_softmax_preflight.py
@@ -66,6 +67,18 @@ _QUANT_SCALE = 8
 _SOFTMAX_BETA = 4
 
 
+def _read(fmt: str, buf: bytes, pos: int) -> Any:
+    """The value at ``pos``, raising ``struct.error`` when it lies outside ``buf``.
+
+    ``struct.unpack_from`` reads a negative offset from the END of the buffer,
+    so an offset computed from hostile fields would otherwise return a wrong
+    value instead of failing.
+    """
+    if pos < 0 or pos + struct.calcsize(fmt) > len(buf):
+        raise struct.error(f"offset {pos} is outside the {len(buf)}-byte buffer")
+    return struct.unpack_from(fmt, buf, pos)[0]
+
+
 class _Table:
     """One flatbuffers table: field lookups against its vtable."""
 
@@ -77,21 +90,21 @@ class _Table:
 
     def _field_pos(self, slot: int) -> int | None:
         """Absolute position of a field's value, or None when absent."""
-        vtable = self.pos - struct.unpack_from("<i", self.buf, self.pos)[0]
-        vtable_size = struct.unpack_from("<H", self.buf, vtable)[0]
+        vtable = self.pos - _read("<i", self.buf, self.pos)
+        vtable_size = _read("<H", self.buf, vtable)
         if slot >= vtable_size:
             return None
-        offset = struct.unpack_from("<H", self.buf, vtable + slot)[0]
+        offset = _read("<H", self.buf, vtable + slot)
         return self.pos + offset if offset else None
 
     def scalar(self, slot: int, fmt: str, default):
         pos = self._field_pos(slot)
         if pos is None:
             return default
-        return struct.unpack_from(fmt, self.buf, pos)[0]
+        return _read(fmt, self.buf, pos)
 
     def _indirect(self, pos: int) -> int:
-        return pos + struct.unpack_from("<I", self.buf, pos)[0]
+        return pos + _read("<I", self.buf, pos)
 
     def table(self, slot: int) -> "_Table | None":
         pos = self._field_pos(slot)
@@ -100,12 +113,18 @@ class _Table:
         return _Table(self.buf, self._indirect(pos))
 
     def vector(self, slot: int) -> tuple[int, int]:
-        """(element-0 position, length); (0, 0) when absent."""
+        """(element-0 position, length); (0, 0) when absent.
+
+        Every vector this reader reads holds 4-byte elements (offsets, int32
+        indices, float32 scales), and the bound check assumes so.
+        """
         pos = self._field_pos(slot)
         if pos is None:
             return 0, 0
         vec = self._indirect(pos)
-        length = struct.unpack_from("<I", self.buf, vec)[0]
+        length = _read("<I", self.buf, vec)
+        if vec + 4 + 4 * length > len(self.buf):
+            raise struct.error(f"vector of {length} elements at {vec} runs past the buffer")
         return vec + 4, length
 
     def table_vector(self, slot: int) -> list["_Table"]:
@@ -117,7 +136,9 @@ class _Table:
         if pos is None:
             return None
         s = self._indirect(pos)
-        length = struct.unpack_from("<I", self.buf, s)[0]
+        length = _read("<I", self.buf, s)
+        if s + 4 + length > len(self.buf):
+            raise struct.error(f"string of {length} bytes at {s} runs past the buffer")
         return self.buf[s + 4 : s + 4 + length].decode("utf-8", "replace")
 
 
@@ -139,7 +160,7 @@ def read_float_compute_types(buf: bytes) -> set[int]:
     is float16 work on the target. Raises like
     :func:`read_quantized_softmax_ops` on a malformed buffer.
     """
-    model = _Table(buf, struct.unpack_from("<I", buf, 0)[0])
+    model = _Table(buf, _read("<I", buf, 0))
     opcodes = model.table_vector(_MODEL_OPERATOR_CODES)
     found: set[int] = set()
     for sg in model.table_vector(_MODEL_SUBGRAPHS):
@@ -152,7 +173,7 @@ def read_float_compute_types(buf: bytes) -> set[int]:
             }
             start, length = op.vector(_OPERATOR_INPUTS)
             for i in range(length):
-                index = struct.unpack_from("<i", op.buf, start + 4 * i)[0]
+                index = _read("<i", op.buf, start + 4 * i)
                 if index < 0:  # -1 marks an absent optional input
                     continue
                 tensor_type = tensors[index].scalar(_TENSOR_TYPE, "<b", 0)
@@ -184,7 +205,7 @@ def read_quantized_softmax_ops(buf: bytes) -> list[SoftmaxOp]:
     gate on the preflight's existing header check having already accepted the
     file as a TFLite flatbuffer.
     """
-    model = _Table(buf, struct.unpack_from("<I", buf, 0)[0])
+    model = _Table(buf, _read("<I", buf, 0))
     opcodes = model.table_vector(_MODEL_OPERATOR_CODES)
     found: list[SoftmaxOp] = []
 
@@ -198,7 +219,7 @@ def read_quantized_softmax_ops(buf: bytes) -> list[SoftmaxOp]:
             inputs_start, inputs_len = op.vector(_OPERATOR_INPUTS)
             if not inputs_len:
                 continue
-            tensor_index = struct.unpack_from("<i", op.buf, inputs_start)[0]
+            tensor_index = _read("<i", op.buf, inputs_start)
             if tensor_index < 0:
                 # TFLite uses -1 for an absent optional input; a bare Python
                 # index would silently read the LAST tensor instead.
@@ -213,7 +234,7 @@ def read_quantized_softmax_ops(buf: bytes) -> list[SoftmaxOp]:
             if quant is not None:
                 scale_start, scale_len = quant.vector(_QUANT_SCALE)
                 if scale_len:
-                    scale = struct.unpack_from("<f", quant.buf, scale_start)[0]
+                    scale = _read("<f", quant.buf, scale_start)
 
             beta = 0.0
             if op.scalar(_OPERATOR_OPTIONS_TYPE, "<B", 0) == BUILTIN_OPTIONS_SOFTMAX:
