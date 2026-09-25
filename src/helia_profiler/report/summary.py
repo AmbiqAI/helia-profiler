@@ -320,6 +320,14 @@ def _write_summary(
                         meta.clean_infer_avg_cycles,
                         meta.clean_infer_avg_us,
                     )
+        elif measurement_scope == "on_device_gated_inference":
+            count = window_inference_count(ctx)
+            suppressed = arbitration is not None and arbitration.suppress_per_inference
+            if probe_ran_inferences and not suppressed and count:
+                energy_per_infer = ps.energy_j / count
+                summary["power"]["energy_per_inference_j"] = round(energy_per_infer, 9)
+                if energy_per_infer > 0:
+                    summary["power"]["inferences_per_joule"] = round(1.0 / energy_per_infer, 6)
         elif (
             probe_ran_inferences
             and measurement_scope != "free_form_capture"

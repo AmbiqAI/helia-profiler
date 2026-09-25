@@ -727,8 +727,10 @@ real peak rather than to the shunt's rating.
 
 What you get in `summary.json` is an `on_device_summary` block — integrated
 energy (nJ), charge (nC), bus voltage, and the inference count — with
-`measurement_scope: on_device_gated_inference`. Divide energy by count for
-per-inference energy; average power is energy over the window duration.
+`measurement_scope: on_device_gated_inference`. HPX divides energy by that
+count and publishes `energy_per_inference_j` and `inferences_per_joule`, the
+same fields external mode writes, so `hpx compare` and validation read them.
+Average power is energy over the window duration.
 
 !!! warning "That duration comes from the firmware, not the instrument"
     Energy and charge are integrated in hardware over real time and are

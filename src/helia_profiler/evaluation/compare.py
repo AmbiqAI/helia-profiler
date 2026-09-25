@@ -515,12 +515,13 @@ def _compare_layers(base_run: RunArtifacts, cand_run: RunArtifacts) -> list[Laye
 
         counters: dict[str, CounterDiff] = {}
         # source_index is an identifier (#218), not a metric, and
-        # macs/ops/cycles_per_mac are DERIVED analysis enrichments (#218 D6)
+        # cycles_pct/macs/ops/cycles_per_mac are DERIVED (#218 D6)
         # — per-layer counter diffs carry measured counters only.
         excluded = {
             "id",
             "op",
             "cycles",
+            "cycles_pct",
             "overflow",
             "source_index",
             "macs",
