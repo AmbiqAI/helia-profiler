@@ -825,8 +825,8 @@ int main(void) {
 {% if power_only | default(false) %}
         uint32_t clean_stimer_gate_t1 = hpx_stimer_ticks();
 {% endif %}{% if power_only | default(false) and power_monitor | default(none) == "ina228" %}
-        // Closes the accumulation interval. The register reads that follow
-        // land within one accumulator conversion of it.
+        // Closes the accumulation interval. ENERGY and CHARGE latch during the
+        // register reads that follow, a few I2C transactions later.
         g_hpx_ina228_window_us = hpx_stimer_ticks_to_us(
             (uint64_t)(uint32_t)(hpx_stimer_ticks() - clean_stimer_acc_t0));
         // Read the integrated energy/charge (plus bus voltage and the

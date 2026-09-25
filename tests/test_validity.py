@@ -336,6 +336,26 @@ class TestWindowClockValidity:
         assert frozen[0].severity == "warning"
         assert evaluation.validity is ResultValidity.DEGRADED
 
+    def test_sub_tick_gate_is_not_a_frozen_clock(self, tmp_path: Path):
+        """The frozen check reads the whole window: a gate under one STIMER
+        tick reads 0 while the clock demonstrably advanced."""
+        for internal in (True, False):
+            ctx = (
+                _context(tmp_path / "internal", mode="internal")
+                if internal
+                else _context(tmp_path / "external")
+            )
+            self._bench_run(
+                ctx,
+                elapsed_us=self.BENCH_ELAPSED_US,
+                gate_elapsed_us=0,
+                internal=internal,
+            )
+
+            codes = {issue.code for issue in evaluate_run(ctx).issues}
+
+            assert IssueCode.POWER_WINDOW_CLOCK_FROZEN not in codes
+
     def test_frozen_window_clock_message_is_probe_aware(self, tmp_path: Path):
         """#172: the ninth 'completed inferences' site — a busy-loop
         run completes busy-loop passes, and this is exactly the diagnostic a

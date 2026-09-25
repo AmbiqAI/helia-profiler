@@ -287,6 +287,27 @@ def test_record_rejects_a_gate_longer_than_its_window() -> None:
         )
 
 
+def test_parser_and_record_read_the_version_from_the_wire_constant(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A hardcoded version would still pass every test pinned to today's value.
+    next_version = POWER_TERMINAL_VERSION + 1
+    monkeypatch.setattr(
+        "helia_profiler.capture.power_terminal.POWER_TERMINAL_VERSION", next_version
+    )
+    monkeypatch.setattr("helia_profiler.results.artifacts.POWER_TERMINAL_VERSION", next_version)
+
+    record = parse_power_terminal_envelope(
+        _lines(HPX_POWER_TERMINAL_VERSION=str(next_version))
+    ).terminal
+
+    assert record.version == next_version
+    with pytest.raises(PowerError, match="Unsupported power terminal version"):
+        parse_power_terminal_envelope(
+            _lines(HPX_POWER_TERMINAL_VERSION=str(POWER_TERMINAL_VERSION))
+        )
+
+
 def test_record_version_follows_the_wire_constant() -> None:
     with pytest.raises(ValueError, match="Unsupported power terminal version"):
         PowerTerminalRecord(

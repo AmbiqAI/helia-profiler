@@ -972,9 +972,8 @@ directly. Four issue codes come out of that:
   for average power and current, so the measurement of record is corrupt. In
   **external** mode it is only a warning that degrades the run — the
   instrument owns the power numbers and they are unaffected; only
-  `elapsed_us` is meaningless. Two causes produce it: a window timed with
-  `DWT->CYCCNT` on a Cortex-M4F part whose debug power domain is down, or a
-  STIMER-timed window whose 32.768 kHz XTAL is stopped or unpopulated.
+  `elapsed_us` is meaningless. Power binaries time their window with STIMER, so
+  the cause is its 32.768 kHz XTAL being stopped or unpopulated.
 - **`power.window_observer_mismatch`** — external mode: the firmware's
   gate disagrees with the host-timed gate beyond 1% (plus an absolute
   stats-packet/gate-poll quantization allowance). The two are

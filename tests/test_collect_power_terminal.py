@@ -414,8 +414,10 @@ class TestFirmwareWindowClockIntegrity:
         with pytest.raises(PowerError, match="zero elapsed time") as excinfo:
             self._run(ctx, record, monkeypatch, self._bench_measurement(1))
         hint = excinfo.value.hint or ""
-        assert "CDBGPWRUPREQ" in hint
-        assert "32.768 kHz" in hint  # the second cause must be named too
+        assert "32.768 kHz" in hint
+        assert "stimer_dead" in hint
+        # Power renders refuse a DWT-timed window, so it is no longer a cause.
+        assert "DWT" not in hint
 
     def test_zero_elapsed_only_warns_in_external_mode(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
@@ -432,6 +434,21 @@ class TestFirmwareWindowClockIntegrity:
         # The capture survives and is published.
         assert ctx.power_run is not None
         assert ctx.power_run.terminal is record
+
+    def test_sub_tick_gate_is_not_a_frozen_clock(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
+    ):
+        """A gate shorter than one STIMER tick reads 0 while the whole window
+        advanced, so the clock did run: the frozen check reads the window."""
+        for internal in (True, False):
+            ctx = self._bench_ctx(tmp_path / str(internal), internal=internal)
+            record = self._bench_record(gate_elapsed_us=0)
+            measurement = self._bench_measurement(self.BENCH_ELAPSED_US) if internal else None
+            caplog.clear()
+            with caplog.at_level("WARNING", logger="hpx"):
+                self._run(ctx, record, monkeypatch, measurement)
+            assert "zero elapsed time" not in caplog.text
+            assert ctx.power_run is not None and ctx.power_run.terminal is record
 
     def test_zero_elapsed_with_no_completed_work_is_not_this_failure(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

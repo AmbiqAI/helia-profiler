@@ -491,9 +491,11 @@ inputs are (no symbol table, partial listing, no measured view).
     On-device (`power.mode: internal`) power now divides energy and charge by
     the INA228 accumulation interval instead of the whole firmware window,
     which also covered the monitor's own arm and read (#299). This moves
-    `duration_s`, `avg_current_a`, `avg_power_w` and derived TOPS by well
-    under a millisecond's worth; energy, energy per inference and
-    TOPS-per-watt are unchanged. The firmware's side of the window-clock
+    `duration_s`, `avg_current_a`, `avg_power_w` and derived TOPS by the time
+    those I2C transactions take, estimated at about a millisecond at the
+    default 400 kHz bus and a few at 100 kHz: a small fraction of a percent
+    of a multi-second window. Energy, energy per inference and TOPS-per-watt
+    are unchanged. The firmware's side of the window-clock
     checks is now the gate bracket, `power.terminal.gate_elapsed_us`.
     Comparing v6 and v7 reports an `INFORMATIVE` schema difference.
 
