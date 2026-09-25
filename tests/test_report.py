@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from helia_profiler.wire import POWER_TERMINAL_VERSION
 from helia_profiler.config import CleanWindowProbe, load_config
 from helia_profiler.results import (
     OnDevicePowerSummary,
@@ -787,11 +788,12 @@ def _attach_power_terminal(
         deployment=existing.deployment if existing is not None else None,
         observation=existing.observation if existing is not None else None,
         terminal=PowerTerminalRecord(
-            version=1,
+            version=POWER_TERMINAL_VERSION,
             status="ok",
             requested_count=count,
             completed_count=count if completed_count is None else completed_count,
             elapsed_us=elapsed_us,
+            gate_elapsed_us=elapsed_us,
             final_phase="done",
             error_code=0,
             gate_asserted=True,
@@ -1242,11 +1244,12 @@ def test_summary_serializes_power_terminal_status(tmp_path: Path):
     ctx = PipelineContext(config=config, work_dir=tmp_path)
     set_profile_result(ctx, PmuResult(meta=FirmwareMeta(), layers=[]))
     terminal = PowerTerminalRecord(
-        version=1,
+        version=POWER_TERMINAL_VERSION,
         status="ok",
         requested_count=237,
         completed_count=237,
         elapsed_us=4_987_792,
+        gate_elapsed_us=4_987_792,
         final_phase="complete",
         error_code=0,
         gate_asserted=True,
@@ -1279,7 +1282,7 @@ def test_summary_serializes_power_terminal_status(tmp_path: Path):
     summary = json.loads(path.read_text())
 
     assert summary["power"]["terminal"] == {
-        "version": 1,
+        "version": POWER_TERMINAL_VERSION,
         "status": "ok",
         "requested_count": 237,
         "completed_count": 237,
@@ -1288,6 +1291,7 @@ def test_summary_serializes_power_terminal_status(tmp_path: Path):
         "error_code": 0,
         "gate_asserted": True,
         "gate_lowered": True,
+        "gate_elapsed_us": 4_987_792,
     }
     assert summary["power"]["on_device_summary"] == {
         "source": "ina228",

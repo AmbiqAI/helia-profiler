@@ -43,7 +43,7 @@ POWER_TERMINAL_START_SENTINEL = "--- HPX_POWER_TERMINAL_START ---"
 POWER_TERMINAL_END_SENTINEL = "--- HPX_POWER_TERMINAL_END ---"
 
 #: Version of the power terminal envelope (``HPX_POWER_TERMINAL_VERSION``).
-POWER_TERMINAL_VERSION = 1
+POWER_TERMINAL_VERSION = 2
 
 #: Liveness line the firmware prints before the start header — once on RTT, as
 #: a 40-line sync preamble on SWO/UART, never on USB CDC (which polls DTR).
@@ -328,12 +328,13 @@ class PowerTerminalKey(StrEnum):
     markers and never lower-cases anything.
     """
 
-    # Required envelope (9)
+    # Required envelope (10)
     TERMINAL_VERSION = "HPX_POWER_TERMINAL_VERSION"
     STATUS = "HPX_POWER_STATUS"
     REQUESTED_COUNT = "HPX_POWER_REQUESTED_COUNT"
     COMPLETED_COUNT = "HPX_POWER_COMPLETED_COUNT"
     ELAPSED_US = "HPX_POWER_ELAPSED_US"
+    GATE_ELAPSED_US = "HPX_POWER_GATE_ELAPSED_US"
     FINAL_PHASE = "HPX_POWER_FINAL_PHASE"
     ERROR_CODE = "HPX_POWER_ERROR_CODE"
     GATE_ASSERTED = "HPX_POWER_GATE_ASSERTED"

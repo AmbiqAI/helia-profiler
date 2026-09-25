@@ -394,17 +394,6 @@ int main(void) {
 {{ self.engine_reset_inputs_warm() }}
             {{ self.engine_invoke() }}
         }
-{%- if not use_stimer_window %}
-        // The DWT window body reads the stall floor (clean_low_cyc,
-        // HPX_CLEAN_REF_CYCLES) unconditionally.  A power render measures no
-        // warm reference, so the floor is zero and the low-floor comparison
-        // is inert (the frozen-counter tally, clean_stalled_iters, stays
-        // live) — consistent with the minimal power image.  No SoC routes a power
-        // window through DWT today (SocCapabilities.power_window_timer is
-        // stimer everywhere); this keeps the render compilable if one ever
-        // does (#170 review).
-        uint32_t clean_warm_min_cyc = 0U;
-{%- endif %}
         const int clean_iters_n = {{ clean_iters | default(1) }};
 {% elif window_mode | default("fixed") == "auto" %}
         // Adaptive clean-window sizing.  Warm caches / branch predictor / MRAM
@@ -724,6 +713,14 @@ int main(void) {
 {% endif %}
             }
         }
+        // Accumulation restarted at RSTACC, so this read opens the interval
+        // energy and charge integrate over. Every bracket below reads the one
+        // STIMER in order, which keeps gate <= accumulation <= whole window.
+        uint32_t clean_stimer_acc_t0 = hpx_stimer_ticks();
+{% endif %}{% if power_only | default(false) %}
+        // Gate bracket: read beside the GPIO edges, never between them, so no
+        // peripheral traffic enters the measured region.
+        uint32_t clean_stimer_gate_t0 = hpx_stimer_ticks();
 {% endif %}
         hpx_sync_window_begin();
 {% if busy_loop_probe %}
@@ -825,7 +822,13 @@ int main(void) {
         }
 {% endif %}
         hpx_sync_window_end();
-{% if power_only | default(false) and power_monitor | default(none) == "ina228" %}
+{% if power_only | default(false) %}
+        uint32_t clean_stimer_gate_t1 = hpx_stimer_ticks();
+{% endif %}{% if power_only | default(false) and power_monitor | default(none) == "ina228" %}
+        // Closes the accumulation interval. The register reads that follow
+        // land within one accumulator conversion of it.
+        g_hpx_ina228_window_us = hpx_stimer_ticks_to_us(
+            (uint64_t)(uint32_t)(hpx_stimer_ticks() - clean_stimer_acc_t0));
         // Read the integrated energy/charge (plus bus voltage and the
         // accumulator-overflow flags) now that the window is closed.
         if (g_hpx_ina228_active) {
@@ -848,6 +851,9 @@ int main(void) {
 {% if use_stimer_window %}
         uint64_t clean_stimer_total_us =
             hpx_stimer_ticks_to_us((uint64_t)(uint32_t)(hpx_stimer_ticks() - clean_stimer_t0));
+{% endif %}{% if power_only | default(false) %}
+        uint64_t clean_stimer_gate_us = hpx_stimer_ticks_to_us(
+            (uint64_t)(uint32_t)(clean_stimer_gate_t1 - clean_stimer_gate_t0));
 {% endif %}
 {% if not power_only | default(false) %}{% block engine_window_restore %}{% endblock %}{% if has_armv8m_pmu %}
         // Restore PMU/debug state for the instrumented per-layer passes below.

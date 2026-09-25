@@ -7,11 +7,13 @@ from pathlib import Path
 
 import pytest
 
+from helia_profiler.wire import POWER_TERMINAL_VERSION
 from helia_profiler.results import (
     DeploymentRecord,
     FirmwareArtifact,
     PowerObservation,
     PowerRunPlan,
+    PowerTerminalRecord,
 )
 from helia_profiler.capture.power_terminal import (
     collect_power_terminal_envelope_rtt,
@@ -33,11 +35,12 @@ from helia_profiler.capture.terminal_transport import (
 
 def _lines(**overrides: str) -> list[str]:
     fields = {
-        "HPX_POWER_TERMINAL_VERSION": "1",
+        "HPX_POWER_TERMINAL_VERSION": str(POWER_TERMINAL_VERSION),
         "HPX_POWER_STATUS": "ok",
         "HPX_POWER_REQUESTED_COUNT": "237",
         "HPX_POWER_COMPLETED_COUNT": "237",
         "HPX_POWER_ELAPSED_US": "5001234",
+        "HPX_POWER_GATE_ELAPSED_US": "5000000",
         "HPX_POWER_FINAL_PHASE": "complete",
         "HPX_POWER_ERROR_CODE": "0",
         "HPX_POWER_GATE_ASSERTED": "1",
@@ -56,11 +59,12 @@ def _lines(**overrides: str) -> list[str]:
 def test_parse_success_record() -> None:
     record = parse_power_terminal_envelope(_lines()).terminal
 
-    assert record.version == 1
+    assert record.version == POWER_TERMINAL_VERSION
     assert record.status == "ok"
     assert record.requested_count == 237
     assert record.completed_count == 237
     assert record.elapsed_us == 5001234
+    assert record.gate_elapsed_us == 5000000
     assert record.final_phase == "complete"
     assert record.error_code == 0
     assert record.gate_asserted is True
@@ -72,7 +76,7 @@ def test_public_power_types_validate_direct_construction() -> None:
 
     with pytest.raises(ValueError, match="Completed count exceeds"):
         PowerTerminalRecord(
-            version=1,
+            version=POWER_TERMINAL_VERSION,
             status="ok",
             requested_count=1,
             completed_count=2,
@@ -115,7 +119,7 @@ def test_parse_on_device_power_measurement_envelope() -> None:
             HPX_POWER_MEASUREMENT_SOURCE="ina228",
             HPX_POWER_MEASUREMENT_SCOPE="fixed_n_inference",
             HPX_POWER_ENERGY_NJ="90123456",
-            HPX_POWER_MEASUREMENT_DURATION_US="5001234",
+            HPX_POWER_MEASUREMENT_DURATION_US="5000800",
             HPX_POWER_MEASUREMENT_COUNT="237",
             HPX_POWER_MEASUREMENT_OVERFLOW="0",
             HPX_POWER_CHARGE_NC="50000000",
@@ -129,7 +133,7 @@ def test_parse_on_device_power_measurement_envelope() -> None:
     assert envelope.measurement.source == "ina228"
     assert envelope.measurement.scope == "fixed_n_inference"
     assert envelope.measurement.energy_nj == 90123456
-    assert envelope.measurement.duration_us == 5001234
+    assert envelope.measurement.duration_us == 5000800
     assert envelope.measurement.inference_count == 237
     assert envelope.measurement.overflow is False
     assert envelope.measurement.charge_nc == 50000000
@@ -169,7 +173,7 @@ def test_parse_rejects_partial_or_invalid_measurement(overrides: dict[str, str])
     ("lines", "message"),
     [
         (_lines()[:-2], "incomplete or missing"),
-        (_lines(HPX_POWER_TERMINAL_VERSION="2"), "Unsupported power terminal version"),
+        (_lines(HPX_POWER_TERMINAL_VERSION="1"), "Unsupported power terminal version"),
         (_lines(HPX_POWER_GATE_LOWERED="yes"), "Malformed power terminal boolean"),
         (_lines(HPX_POWER_ELAPSED_US="abc"), "Malformed power terminal field"),
         (_lines(HPX_POWER_COMPLETED_COUNT="238"), "exceeds requested count"),
@@ -197,6 +201,105 @@ def test_parse_rejects_partial_or_invalid_measurement(overrides: dict[str, str])
 def test_parse_rejects_invalid_records(lines: list[str], message: str) -> None:
     with pytest.raises(PowerError, match=message):
         parse_power_terminal_envelope(lines).terminal
+
+
+def _measured_lines(duration_us: str, **overrides: str) -> list[str]:
+    return _lines(
+        HPX_POWER_MEASUREMENT_SOURCE="ina228",
+        HPX_POWER_MEASUREMENT_SCOPE="fixed_n_inference",
+        HPX_POWER_ENERGY_NJ="90123456",
+        HPX_POWER_MEASUREMENT_DURATION_US=duration_us,
+        HPX_POWER_MEASUREMENT_COUNT="237",
+        HPX_POWER_MEASUREMENT_OVERFLOW="0",
+        **overrides,
+    )
+
+
+class TestWindowBrackets:
+    """Gate, accumulation and whole window nest; nothing else is enforced (#299)."""
+
+    def test_gate_key_is_required(self) -> None:
+        lines = [line for line in _lines() if not line.startswith("HPX_POWER_GATE_ELAPSED_US=")]
+        with pytest.raises(PowerError, match="missing fields: HPX_POWER_GATE_ELAPSED_US"):
+            parse_power_terminal_envelope(lines)
+
+    def test_gate_longer_than_the_window_is_rejected(self) -> None:
+        with pytest.raises(PowerError, match="gate elapsed time exceeds"):
+            parse_power_terminal_envelope(_lines(HPX_POWER_GATE_ELAPSED_US="5001235"))
+
+    def test_gate_equal_to_the_window_is_accepted(self) -> None:
+        record = parse_power_terminal_envelope(_lines(HPX_POWER_GATE_ELAPSED_US="5001234")).terminal
+        assert record.gate_elapsed_us == record.elapsed_us == 5001234
+
+    def test_negative_gate_is_rejected(self) -> None:
+        with pytest.raises(PowerError, match="gate elapsed time must be non-negative"):
+            parse_power_terminal_envelope(_lines(HPX_POWER_GATE_ELAPSED_US="-1"))
+
+    def test_failure_envelope_with_zero_intervals_parses(self) -> None:
+        record = parse_power_terminal_envelope(
+            _lines(
+                HPX_POWER_STATUS="error",
+                HPX_POWER_COMPLETED_COUNT="0",
+                HPX_POWER_ELAPSED_US="0",
+                HPX_POWER_GATE_ELAPSED_US="0",
+                HPX_POWER_FINAL_PHASE="stimer_dead",
+                HPX_POWER_ERROR_CODE="1",
+            )
+        ).terminal
+        assert record.elapsed_us == record.gate_elapsed_us == 0
+
+    def test_frozen_clock_reaches_the_record(self) -> None:
+        # Completed work in zero time is validity's to judge, not the parser's.
+        record = parse_power_terminal_envelope(
+            _lines(HPX_POWER_ELAPSED_US="0", HPX_POWER_GATE_ELAPSED_US="0")
+        ).terminal
+        assert record.completed_count == 237
+        assert record.elapsed_us == record.gate_elapsed_us == 0
+
+    @pytest.mark.parametrize("duration_us", ["5000000", "5000800", "5001234"])
+    def test_accumulation_between_gate_and_window_is_accepted(self, duration_us: str) -> None:
+        measurement = parse_power_terminal_envelope(_measured_lines(duration_us)).measurement
+        assert measurement is not None
+        assert measurement.duration_us == int(duration_us)
+
+    def test_accumulation_longer_than_the_window_is_rejected(self) -> None:
+        with pytest.raises(PowerError, match="duration exceeds terminal elapsed time"):
+            parse_power_terminal_envelope(_measured_lines("5001235"))
+
+    def test_accumulation_shorter_than_the_gate_is_rejected(self) -> None:
+        with pytest.raises(PowerError, match="shorter than the gate"):
+            parse_power_terminal_envelope(_measured_lines("4999999"))
+
+
+def test_record_rejects_a_gate_longer_than_its_window() -> None:
+    with pytest.raises(ValueError, match="gate elapsed time exceeds"):
+        PowerTerminalRecord(
+            version=POWER_TERMINAL_VERSION,
+            status="ok",
+            requested_count=1,
+            completed_count=1,
+            elapsed_us=100,
+            gate_elapsed_us=101,
+            final_phase="complete",
+            error_code=0,
+            gate_asserted=True,
+            gate_lowered=True,
+        )
+
+
+def test_record_version_follows_the_wire_constant() -> None:
+    with pytest.raises(ValueError, match="Unsupported power terminal version"):
+        PowerTerminalRecord(
+            version=POWER_TERMINAL_VERSION - 1,
+            status="ok",
+            requested_count=1,
+            completed_count=1,
+            elapsed_us=100,
+            final_phase="complete",
+            error_code=0,
+            gate_asserted=True,
+            gate_lowered=True,
+        )
 
 
 def test_parse_requires_elapsed_time_for_v1() -> None:

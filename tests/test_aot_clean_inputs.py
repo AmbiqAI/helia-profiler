@@ -32,8 +32,8 @@ def _loop(source: str) -> str:
     return source[start:end]
 
 
-@pytest.mark.parametrize("timer", ["dwt", "stimer"])
-@pytest.mark.parametrize("power", [False, True])
+# Power binaries time their window with STIMER only; the template refuses DWT.
+@pytest.mark.parametrize(("power", "timer"), [(False, "dwt"), (False, "stimer"), (True, "stimer")])
 def test_rendered_clean_loop_restores_every_input(tmp_path: Path, timer: str, power: bool):
     compiler = shutil.which("c++")
     if compiler is None:

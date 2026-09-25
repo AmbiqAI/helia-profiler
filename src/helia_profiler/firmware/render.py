@@ -3,14 +3,20 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any, cast
 
 import jinja2
+
+from ..wire import POWER_TERMINAL_VERSION
 
 _jinja_env = jinja2.Environment(
     loader=jinja2.PackageLoader("helia_profiler.firmware", "templates"),
     keep_trailing_newline=True,
     undefined=jinja2.StrictUndefined,
 )
+# The envelope version the host parser accepts, so the firmware cannot drift
+# from it. jinja2 types ``globals`` as its own builtin helpers only.
+cast("dict[str, Any]", _jinja_env.globals)["power_terminal_version"] = POWER_TERMINAL_VERSION
 
 
 def _write_text(path: Path, text: str) -> None:

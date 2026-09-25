@@ -16,19 +16,18 @@
 
    The tags below are kept INLINE so the infer render stays byte-identical: the
    production Jinja env has trim_blocks off, so a control tag on its own line
-   emits a blank line into the generated C (issue #119). #}
+   emits a blank line into the generated C (issue #119).
+
+   Power binaries time their window with STIMER only. A DWT sum would be
+   shorter than the gate rather than a bracket around it, and the gate and
+   accumulation brackets read STIMER, so any other timer is a render error. #}{% if not use_stimer_window %}{{ {}["power binaries must time their clean window with STIMER"] }}{% endif %}
 hpx_power_terminal_report(
     true,
 {% if busy_loop_probe %}    1U,
 {% else %}    (uint32_t)clean_iters_n,
 {% endif %}    clean_count,
-{% if use_stimer_window %}
     clean_stimer_total_us,
-{% else %}
-    (SystemCoreClock > 0U)
-        ? (clean_cycles * 1000000ULL) / (uint64_t)SystemCoreClock
-        : 0ULL,
-{% endif %}
+    clean_stimer_gate_us,
     "complete",
     0U,
     {{ power_sync_enabled | lower }},

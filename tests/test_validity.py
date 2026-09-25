@@ -31,7 +31,7 @@ from helia_profiler.results import ResultValidity
 from helia_profiler.results import FirmwareMeta, ModelInfo, PmuResult
 from helia_profiler.capture.parser import parse_firmware_output
 from helia_profiler.evaluation import evaluate_run
-from helia_profiler.wire import HPX_END_SENTINEL, HPX_START_SENTINEL
+from helia_profiler.wire import HPX_END_SENTINEL, HPX_START_SENTINEL, POWER_TERMINAL_VERSION
 from helia_profiler.results.issues import IssueCode
 
 
@@ -64,11 +64,12 @@ def _context(tmp_path: Path, *, mode: str = "external", probe: str = "infer") ->
         integrity=PowerIntegrity.VALID,
     )
     terminal = PowerTerminalRecord(
-        version=1,
+        version=POWER_TERMINAL_VERSION,
         status="ok",
         requested_count=10,
         completed_count=10,
         elapsed_us=1_000_000,
+        gate_elapsed_us=1_000_000,
         final_phase="done",
         error_code=0,
         gate_asserted=True,
@@ -150,11 +151,12 @@ def test_terminal_plan_and_on_device_mismatches_are_invalid(tmp_path: Path):
     ctx = _context(tmp_path)
     assert ctx.power_run is not None
     terminal = PowerTerminalRecord(
-        version=1,
+        version=POWER_TERMINAL_VERSION,
         status="ok",
         requested_count=9,
         completed_count=9,
         elapsed_us=1_000_000,
+        gate_elapsed_us=1_000_000,
         final_phase="done",
         error_code=0,
         gate_asserted=True,
@@ -215,6 +217,7 @@ class TestWindowClockValidity:
         ctx: PipelineContext,
         *,
         elapsed_us: int,
+        gate_elapsed_us: int | None = None,
         gate_s: float = BENCH_GATE_S,
         internal: bool = False,
         host_envelope_s: float | None = None,
@@ -235,6 +238,7 @@ class TestWindowClockValidity:
             requested_count=self.BENCH_COUNT,
             completed_count=self.BENCH_COUNT,
             elapsed_us=elapsed_us,
+            gate_elapsed_us=elapsed_us if gate_elapsed_us is None else gate_elapsed_us,
         )
         ctx.power_run = PowerRun(
             plan=PowerRunPlan(
@@ -382,6 +386,60 @@ class TestWindowClockValidity:
         # The old external warning code must not double up on the same defect.
         codes = [issue.code for issue in evaluation.issues]
         assert IssueCode.POWER_WINDOW_CLOCK_MISMATCH not in codes
+
+    # The whole window also covers the prologue and the monitor's arm and
+    # read; only the gate bracket times what the references time (#299).
+
+    def test_external_observer_judges_the_gate_not_the_whole_window(self, tmp_path: Path):
+        ctx = _context(tmp_path)
+        self._bench_run(
+            ctx,
+            elapsed_us=int(self.BENCH_ELAPSED_US * 1.2),
+            gate_elapsed_us=self.BENCH_ELAPSED_US,
+        )
+
+        codes = {issue.code for issue in evaluate_run(ctx).issues}
+
+        assert IssueCode.POWER_WINDOW_OBSERVER_MISMATCH not in codes
+
+    def test_external_short_gate_is_the_observer_error(self, tmp_path: Path):
+        ctx = _context(tmp_path)
+        self._bench_run(
+            ctx,
+            elapsed_us=self.BENCH_ELAPSED_US,
+            gate_elapsed_us=int(self.BENCH_ELAPSED_US * 0.8),
+        )
+
+        evaluation = evaluate_run(ctx)
+
+        assert evaluation.validity is ResultValidity.INVALID
+        mismatch = [
+            issue
+            for issue in evaluation.issues
+            if issue.code == IssueCode.POWER_WINDOW_OBSERVER_MISMATCH
+        ]
+        assert len(mismatch) == 1
+        assert mismatch[0].context["elapsed_us"] == int(self.BENCH_ELAPSED_US * 0.8)
+
+    def test_internal_plan_check_judges_the_gate_not_the_whole_window(self, tmp_path: Path):
+        planned = self.BENCH_COUNT * self.BENCH_REFERENCE_US
+        agrees = _context(tmp_path / "agrees", mode="internal")
+        self._bench_run(
+            agrees, elapsed_us=int(planned * 1.3), gate_elapsed_us=planned, internal=True
+        )
+        assert not any(
+            issue.code == IssueCode.POWER_WINDOW_CLOCK_MISMATCH
+            for issue in evaluate_run(agrees).issues
+        )
+
+        short = _context(tmp_path / "short", mode="internal")
+        self._bench_run(
+            short, elapsed_us=planned, gate_elapsed_us=int(planned * 0.7), internal=True
+        )
+        assert any(
+            issue.code == IssueCode.POWER_WINDOW_CLOCK_MISMATCH
+            for issue in evaluate_run(short).issues
+        )
 
     def test_degraded_capture_gains_no_window_clock_issue(self, tmp_path: Path):
         """A degraded capture has no gated window, only a whole-capture
@@ -543,6 +601,7 @@ class TestGateArbitration:
         ctx: PipelineContext,
         *,
         elapsed_us: int | None,
+        gate_elapsed_us: int | None = None,
         minimum_s: float = 1.0,
         gate_s: float = DRIFT_GATE_S,
         completed_count: int | None = None,
@@ -580,6 +639,7 @@ class TestGateArbitration:
                         self.DRIFT_COUNT if completed_count is None else completed_count
                     ),
                     elapsed_us=elapsed_us,
+                    gate_elapsed_us=elapsed_us if gate_elapsed_us is None else gate_elapsed_us,
                 )
                 if elapsed_us is not None
                 else None
@@ -1158,6 +1218,7 @@ class TestNoInferenceProbeWindowDuration:
             requested_count=1,
             completed_count=1,
             elapsed_us=elapsed_us,
+            gate_elapsed_us=elapsed_us,
         )
         ctx.power_run = PowerRun(
             plan=PowerRunPlan(

@@ -6,6 +6,7 @@ from tests.pipeline_context_helpers import set_power_result, set_profile_result
 
 from pathlib import Path
 
+from helia_profiler.wire import POWER_TERMINAL_VERSION
 from helia_profiler import (
     OnDevicePowerSummary,
     PowerObservation,
@@ -50,11 +51,12 @@ def test_profile_result_exposes_grouped_power_contract(tmp_path: Path, monkeypat
         integrity=PowerIntegrity.VALID,
     )
     terminal = PowerTerminalRecord(
-        version=1,
+        version=POWER_TERMINAL_VERSION,
         status="ok",
         requested_count=5,
         completed_count=5,
         elapsed_us=5000,
+        gate_elapsed_us=5000,
         final_phase="complete",
         error_code=0,
         gate_asserted=True,

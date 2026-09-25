@@ -8,6 +8,7 @@ from typing import Literal
 
 from ..power.base import PowerResult
 from ..power.metadata import ObservationMode, PowerIntegrity
+from ..wire import POWER_TERMINAL_VERSION
 from .models import BinarySections, PmuResult
 
 
@@ -88,9 +89,13 @@ class PowerTerminalRecord:
     error_code: int
     gate_asserted: bool
     gate_lowered: bool
+    #: STIMER interval around the GPIO gate alone. ``elapsed_us`` also covers
+    #: the window prologue and the on-device monitor's arm and read, so the
+    #: gate interval is the one to hold against an instrument's gate (#299).
+    gate_elapsed_us: int | None = None
 
     def __post_init__(self) -> None:
-        if self.version != 1:
+        if self.version != POWER_TERMINAL_VERSION:
             raise ValueError(f"Unsupported power terminal version: {self.version}.")
         if self.requested_count < 0 or self.completed_count < 0:
             raise ValueError("Power terminal counts must be non-negative.")
@@ -98,6 +103,14 @@ class PowerTerminalRecord:
             raise ValueError("Completed count exceeds requested count.")
         if self.elapsed_us is not None and self.elapsed_us < 0:
             raise ValueError("Power terminal elapsed time must be non-negative.")
+        if self.gate_elapsed_us is not None and self.gate_elapsed_us < 0:
+            raise ValueError("Power terminal gate elapsed time must be non-negative.")
+        if (
+            self.gate_elapsed_us is not None
+            and self.elapsed_us is not None
+            and self.gate_elapsed_us > self.elapsed_us
+        ):
+            raise ValueError("Power terminal gate elapsed time exceeds the window elapsed time.")
         if not self.final_phase:
             raise ValueError("Power terminal final phase must not be empty.")
         if self.status == "ok" and self.error_code != 0:

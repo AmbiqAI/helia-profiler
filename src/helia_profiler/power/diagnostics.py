@@ -447,6 +447,8 @@ def expected_terminal_requested_count(
 class WindowClockAgreement:
     """Agreement between the firmware's own window clock and a reference."""
 
+    #: The firmware's gate interval (``HPX_POWER_GATE_ELAPSED_US``): both
+    #: references time the gated loop alone.
     elapsed_us: int
     reference_s: float
     #: Which independent measurement ``reference_s`` came from, so a warning

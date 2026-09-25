@@ -7,6 +7,7 @@ static void hpx_power_terminal_report(
     uint32_t requested_count,
     uint32_t completed_count,
     uint64_t elapsed_us,
+    uint64_t gate_elapsed_us,
     const char *final_phase,
     uint32_t error_code,
     bool gate_asserted,
@@ -41,11 +42,12 @@ static void hpx_power_terminal_report(
         sizeof(record) - (unsigned)length,
         "HPX_POWER_INA228_DIAG=0x%03X CFG=0x%04X ADCCFG=0x%04X SHUNTCAL=%u\n"
         "--- HPX_POWER_TERMINAL_START ---\n"
-        "HPX_POWER_TERMINAL_VERSION=1\n"
+        "HPX_POWER_TERMINAL_VERSION={{ power_terminal_version }}\n"
         "HPX_POWER_STATUS=%s\n"
         "HPX_POWER_REQUESTED_COUNT=%lu\n"
         "HPX_POWER_COMPLETED_COUNT=%lu\n"
         "HPX_POWER_ELAPSED_US=%llu\n"
+        "HPX_POWER_GATE_ELAPSED_US=%llu\n"
         "HPX_POWER_FINAL_PHASE=%s\n"
         "HPX_POWER_ERROR_CODE=%lu\n"
         "HPX_POWER_GATE_ASSERTED=%d\n"
@@ -58,13 +60,15 @@ static void hpx_power_terminal_report(
         (unsigned long)requested_count,
         (unsigned long)completed_count,
         (unsigned long long)elapsed_us,
+        (unsigned long long)gate_elapsed_us,
         final_phase,
         (unsigned long)error_code,
         gate_asserted ? 1 : 0,
         gate_lowered ? 1 : 0);
     // Measurement keys are emitted only for a successful window with valid
-    // accumulator reads: the parser requires DURATION_US == ELAPSED_US and
-    // COUNT == COMPLETED_COUNT, so both reuse the terminal values verbatim.
+    // accumulator reads. DURATION_US is the accumulation interval, which the
+    // parser requires to lie between the gate and the whole window; COUNT
+    // reuses COMPLETED_COUNT verbatim because the parser requires equality.
     if (success && g_hpx_ina228_ok && length > 0 && (unsigned)length < sizeof(record)) {
         length += snprintf(
             record + length,
@@ -79,7 +83,7 @@ static void hpx_power_terminal_report(
             "HPX_POWER_BUS_VOLTAGE_UV=%lu\n"
             "HPX_POWER_CALIBRATION_ID={{ ina228_calibration_id }}\n",
             (unsigned long long)g_hpx_ina228_energy_nj,
-            (unsigned long long)elapsed_us,
+            (unsigned long long)g_hpx_ina228_window_us,
             (unsigned long)completed_count,
             g_hpx_ina228_overflow ? 1 : 0,
             (unsigned long long)g_hpx_ina228_charge_nc,
@@ -97,11 +101,12 @@ static void hpx_power_terminal_report(
         record,
         sizeof(record),
         "--- HPX_POWER_TERMINAL_START ---\n"
-        "HPX_POWER_TERMINAL_VERSION=1\n"
+        "HPX_POWER_TERMINAL_VERSION={{ power_terminal_version }}\n"
         "HPX_POWER_STATUS=%s\n"
         "HPX_POWER_REQUESTED_COUNT=%lu\n"
         "HPX_POWER_COMPLETED_COUNT=%lu\n"
         "HPX_POWER_ELAPSED_US=%llu\n"
+        "HPX_POWER_GATE_ELAPSED_US=%llu\n"
         "HPX_POWER_FINAL_PHASE=%s\n"
         "HPX_POWER_ERROR_CODE=%lu\n"
         "HPX_POWER_GATE_ASSERTED=%d\n"
@@ -111,6 +116,7 @@ static void hpx_power_terminal_report(
         (unsigned long)requested_count,
         (unsigned long)completed_count,
         (unsigned long long)elapsed_us,
+        (unsigned long long)gate_elapsed_us,
         final_phase,
         (unsigned long)error_code,
         gate_asserted ? 1 : 0,
@@ -178,6 +184,7 @@ static void hpx_power_terminal_fail(const char *phase, uint32_t error_code) {
 {% if busy_loop_probe %}        1U,
 {% else %}        (uint32_t){{ clean_iters | default(1) }},
 {% endif %}        0U,
+        0ULL,
         0ULL,
         phase,
         error_code,

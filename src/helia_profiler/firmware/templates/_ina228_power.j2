@@ -44,6 +44,9 @@ static bool     g_hpx_ina228_overflow = false;
 static uint64_t g_hpx_ina228_energy_nj = 0;
 static uint64_t g_hpx_ina228_charge_nc = 0;
 static uint32_t g_hpx_ina228_bus_voltage_uv = 0;
+// STIMER interval from the accumulator reset to the accumulator reads: the
+// interval energy and charge integrate over, and so their denominator.
+static uint64_t g_hpx_ina228_window_us = 0;
 // Raw DIAG_ALRT low bits at window end — emitted as a pre-envelope
 // diagnostic line so a bench capture shows WHICH health bit tripped.
 static uint16_t g_hpx_ina228_diag_bits = 0;

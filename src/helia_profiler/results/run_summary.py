@@ -47,7 +47,9 @@ RUN_SUMMARY_SCHEMA = "hpx.run-summary"
 #: avg_power_w and the TOPS figures shift; energy_j and TOPS-per-watt do
 #: not. A v4 and a v5 summary are not comparable on those fields.
 #: v6: #317 AOT clean timing and power include per-call input restoration.
-RUN_SUMMARY_SCHEMA_VERSION = 6
+#: v7: #299 on-device power divides by the INA228 accumulation interval, and
+#: the firmware side of the window-clock checks is the gate bracket.
+RUN_SUMMARY_SCHEMA_VERSION = 7
 
 __all__ = [
     "RUN_SUMMARY_SCHEMA",

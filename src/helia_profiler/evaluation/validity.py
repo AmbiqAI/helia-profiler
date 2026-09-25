@@ -110,7 +110,7 @@ def _build_gate_arbitration(ctx: PipelineContext) -> GateArbitration | None:
     )
     observer = (
         assess_gate_observer(
-            elapsed_us=terminal.elapsed_us,
+            elapsed_us=terminal.gate_elapsed_us,
             gated_result=result,
             stats_rate_hz=ctx.config.power.stats_rate_hz,
         )
@@ -434,7 +434,7 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                     )
             elif internal_mode:
                 agreement = assess_run_window_clock(
-                    elapsed_us=terminal.elapsed_us,
+                    elapsed_us=terminal.gate_elapsed_us,
                     internal_mode=True,
                     gated_result=observation.result if observation is not None else None,
                     # Same reference the collect stage uses, unconditionally:

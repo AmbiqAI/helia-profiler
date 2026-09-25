@@ -1155,6 +1155,7 @@ def test_power_terminal_key_sets():
         "HPX_POWER_REQUESTED_COUNT",
         "HPX_POWER_COMPLETED_COUNT",
         "HPX_POWER_ELAPSED_US",
+        "HPX_POWER_GATE_ELAPSED_US",
         "HPX_POWER_FINAL_PHASE",
         "HPX_POWER_ERROR_CODE",
         "HPX_POWER_GATE_ASSERTED",

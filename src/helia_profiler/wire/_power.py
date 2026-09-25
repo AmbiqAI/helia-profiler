@@ -19,7 +19,7 @@ _TERMINAL_FIELDS: tuple[tuple[PowerTerminalKey, bool | None, str, str], ...] = (
     (
         PowerTerminalKey.TERMINAL_VERSION,
         True,
-        "Envelope version; anything but 1 is refused.",
+        "Envelope version; anything but 2 is refused.",
         "int",
     ),
     (PowerTerminalKey.STATUS, True, "Whether the power run completed.", "ok | error"),
@@ -33,7 +33,13 @@ _TERMINAL_FIELDS: tuple[tuple[PowerTerminalKey, bool | None, str, str], ...] = (
     (
         PowerTerminalKey.ELAPSED_US,
         True,
-        "Device-measured duration of the gated window.",
+        "Device-measured duration of the whole clean window, monitor arm and read included.",
+        "microseconds",
+    ),
+    (
+        PowerTerminalKey.GATE_ELAPSED_US,
+        True,
+        "Device-measured duration of the GPIO gate; at most ELAPSED_US, 0 on error.",
         "microseconds",
     ),
     (
@@ -71,7 +77,7 @@ _TERMINAL_FIELDS: tuple[tuple[PowerTerminalKey, bool | None, str, str], ...] = (
     (
         PowerTerminalKey.MEASUREMENT_DURATION_US,
         False,
-        "Measurement duration; must equal ELAPSED_US.",
+        "Accumulation interval; between GATE_ELAPSED_US and ELAPSED_US.",
         "microseconds",
     ),
     (
