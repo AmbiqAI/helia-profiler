@@ -266,8 +266,8 @@ BOOT_SETTLE_S = 8.0
 #: #170).
 CLEAN_WINDOW_WARMUP_REPS = 3
 
-#: Gated-wait allowance beyond the longest plausible window: setup between GO
-#: and the gate rise, gate-edge detection and the post-fall guard.
+#: Allowance beyond the longest plausible window, and beyond boot and warm-up for
+#: READY: setup after GO, gate-edge detection and the post-fall guard.
 FALL_WAIT_HEADROOM_S = 2.0
 
 
@@ -885,11 +885,12 @@ def classify_gate_failure(
         )
         return GateFailure(
             kind=GateFailureKind.NO_GATE_RISE,
-            message="No GPIO gate rising edge detected: the capture bound ended before the window was due",
+            message="No GPIO gate rising edge detected: the capture bound likely ended before the window was due",
             hint=(
-                f"The {duration_s:.2f}s capture bound ended before the window was due about "
-                f"{rise_due_s:.2f}s after reset (boot and warm-up without lock-step). "
-                f"Increase power.duration_s{go}."
+                f"The {duration_s:.2f}s capture bound is shorter than the {rise_due_s:.2f}s "
+                "allowed after reset without lock-step, so the window had most likely not "
+                f"opened. Increase power.duration_s{go}; if the gate is still missed, check "
+                "GO/state/gate wiring."
             ),
         )
     if not saw_gate_rise:

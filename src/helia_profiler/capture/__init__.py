@@ -507,11 +507,13 @@ def capture_power(
                     "count_source": plan.count_source,
                 }
             return _attach_lifecycle_metadata(result)
-        except PowerError:
+        except Exception:
             # A failed reset/READY/GO step outranks whatever the capture made
-            # of the run it never started, whatever the failure's type.
+            # of the run it never started. Its own cause chain is kept.
             if prepare_error:
-                raise prepare_error[0] from None
+                error = prepare_error[0]
+                error.__suppress_context__ = True
+                raise error
             raise
         finally:
             sync.release()

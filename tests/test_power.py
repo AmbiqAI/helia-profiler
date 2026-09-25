@@ -1419,7 +1419,7 @@ class TestMissedGateWarningNamesTheFix:
         self,
         monkeypatch,
         *,
-        lockstep: bool,
+        lockstep: bool | None,
         wired: bool,
         empty_frames=False,
         gpi_level: int = 0,
@@ -1495,11 +1495,21 @@ class TestMissedGateWarningNamesTheFix:
 
         failure = result.metadata.gate_failure
         assert failure.kind == "no_gate_rise"
-        assert "before the window was due" in failure.message
-        assert f"due about {due}s after reset" in failure.hint
-        assert "0.30s capture bound" in failure.hint
+        assert "likely ended before the window was due" in failure.message
+        assert failure.hint.startswith("The 0.30s capture bound is shorter than")
+        assert f"the {due}s allowed after reset" in failure.hint
         assert ("power.lockstep: true" in failure.hint) is wired
-        assert "wiring" not in failure.hint
+        # The bound comes first; wiring stays the fallback, not the lead.
+        assert failure.hint.index("power.duration_s") < failure.hint.index("wiring")
+
+    def test_bound_exhausted_with_no_packets_raises_the_same_reason(self, monkeypatch):
+        with pytest.raises(PowerError, match="likely ended before the window was due"):
+            self._run_capture(monkeypatch, lockstep=False, wired=True, on_started=lambda _w: None)
+
+    def test_unknown_lockstep_is_not_blamed_on_the_bound(self, monkeypatch):
+        result = self._run_capture(monkeypatch, lockstep=None, wired=True)
+
+        assert "before the window was due" not in result.metadata.gate_failure.message
 
     def test_bound_is_not_blamed_when_lockstep_starts_the_wait_at_go(self, monkeypatch):
         result = self._run_capture(monkeypatch, lockstep=True, wired=True)
@@ -4889,7 +4899,7 @@ class TestLockstepReadyBoundAndHookPrecedence:
         clean_infer_avg_us: int | None = None,
         ready: bool = True,
         prepare_error: BaseException | None = None,
-        driver_error: PowerError | None = None,
+        driver_error: Exception | None = None,
     ) -> list[str]:
         from helia_profiler.capture import capture_power
         from helia_profiler.config import load_config
@@ -4970,7 +4980,9 @@ class TestLockstepReadyBoundAndHookPrecedence:
 
             return Plan()
 
-        capture_power(ctx, duration_override_s=duration_s, prepare_target=prepare_target)
+        self.result = capture_power(
+            ctx, duration_override_s=duration_s, prepare_target=prepare_target
+        )
         return calls
 
     def test_ready_bound_covers_boot_and_counted_warm_up(self, tmp_path, monkeypatch):
@@ -4978,6 +4990,10 @@ class TestLockstepReadyBoundAndHookPrecedence:
         calls = self._run(tmp_path, monkeypatch, clean_infer_avg_us=500_000)
 
         assert "wait_ready:12.5" in calls
+        # The metadata records the time actually waited, not the bound.
+        sync = self.result.metadata.sync
+        assert sync is not None and sync.ready_wait_s is not None
+        assert sync.ready_wait_s < 1.0
 
     def test_ready_bound_keeps_a_longer_configured_bound(self, tmp_path, monkeypatch):
         calls = self._run(tmp_path, monkeypatch, duration_s=30.0)
@@ -4990,15 +5006,32 @@ class TestLockstepReadyBoundAndHookPrecedence:
 
         assert "of a 10.00s READY bound" in (excinfo.value.hint or "")
 
-    def test_failed_reset_outranks_the_capture_error(self, tmp_path, monkeypatch):
-        reset = RuntimeError("J-Link reset failed")
+    @pytest.mark.parametrize(
+        "driver_error", [PowerError("No GPIO gate rising edge detected"), ValueError("bad frame")]
+    )
+    def test_failed_reset_outranks_the_capture_error(self, tmp_path, monkeypatch, driver_error):
+        cause = OSError("probe vanished")
+        try:
+            raise RuntimeError("J-Link reset failed") from cause
+        except RuntimeError as exc:
+            reset = exc
 
         with pytest.raises(RuntimeError) as excinfo:
-            self._run(
-                tmp_path,
-                monkeypatch,
-                prepare_error=reset,
-                driver_error=PowerError("No GPIO gate rising edge detected"),
-            )
+            self._run(tmp_path, monkeypatch, prepare_error=reset, driver_error=driver_error)
 
         assert excinfo.value is reset
+        assert excinfo.value.__cause__ is cause
+
+
+def test_bound_equal_to_the_due_time_is_not_called_exhausted():
+    from helia_profiler.power.diagnostics import classify_gate_failure
+
+    failure = classify_gate_failure(
+        saw_gate_rise=False,
+        duration_s=8.0,
+        lockstep=False,
+        lockstep_wiring_available=True,
+        rise_due_s=8.0,
+    )
+
+    assert "before the window was due" not in failure.message
