@@ -672,6 +672,16 @@ def test_announced_pass_without_data_is_rejected():
         parse_firmware_output(lines[: start + 1] + lines[end:])
 
 
+def test_empty_iteration_block_is_rejected():
+    import pytest
+    from helia_profiler.errors import CaptureError
+
+    lines = _two_pass_session()
+    end = lines.index("--- HPX_END ---")
+    with pytest.raises(CaptureError, match="memory_0 has no layer data"):
+        parse_firmware_output(lines[:end] + ["--- HPX_ITER 2 ---"] + lines[end:])
+
+
 def test_repeated_pass_is_rejected():
     import pytest
     from helia_profiler.errors import CaptureError

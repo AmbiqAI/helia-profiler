@@ -307,12 +307,11 @@ def _check_presets(meta: FirmwareMeta, parsed: list[str]) -> None:
 def _check_iterations(presets: dict[str, _PresetData], announced: Any) -> None:
     """Reject a pass with missing or empty iterations."""
     for name, pd in presets.items():
-        complete = [it for it in pd.iterations if it]
-        if not complete:
+        if not pd.iterations or not all(pd.iterations):
             raise CaptureError(f"PMU pass {name} has no layer data.", hint=_TRUNCATED_HINT)
-        if isinstance(announced, int) and len(complete) != announced:
+        if isinstance(announced, int) and len(pd.iterations) != announced:
             raise CaptureError(
-                f"PMU pass {name} has {len(complete)} of {announced} iterations.",
+                f"PMU pass {name} has {len(pd.iterations)} of {announced} iterations.",
                 hint=_TRUNCATED_HINT,
             )
 
