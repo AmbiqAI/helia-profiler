@@ -134,7 +134,7 @@ def _fake_source_refs(monkeypatch: pytest.MonkeyPatch):
                 "6d21a6f821fb72541173a6c4d05d83329fa74f7c"
                 if path.name.startswith("arm-cmsis-nn-")
                 else (
-                    "aaeb145a67c3decd9869f96474e36e7dbdc2030c"
+                    "cad3c8fa0cc2f7b13d6ff750bfc9744af0d621a6"
                     if path.name.startswith("ns-cmsis-nn-")
                     else "5514ac1ea8439b3fe615d180bf68c75a9dabb48e"
                 )

@@ -100,7 +100,7 @@ owns provider materialization and uses its standard `NSX_CACHE_DIR` cache;
 the runtime's idempotent bridge prevents duplicate targets. The `ns` provider
 uses PR #1's private compatibility layer for the fork's `weight_sum_ctx` ABI
 and resolves `nsx-cmsis-nn` at the baseline's qualified ref like the helia
-engines (v7.31.0, verified on Apollo510).
+engines.
 Set `engine.config.cmsis_nn_path` or `engine.config.cmsis_nn_ref` to override
 the selected provider while preserving the same ordered module contract. These
 overrides, including the `CMSIS_NN_PATH` environment variable, replace a
@@ -277,11 +277,10 @@ registry and local-source modes compile heliaRT with the selected toolchain.
   successful run, set it to roughly `1.5x` the reported `allocated_arena` in
   `summary.json`.
 - Source builds (the registry default and `source_path`) declare
-  `nsx-cmsis-nn` at the baseline's qualified ref (v7.31.0), always enable its
-  fp32 kernels (heliaRT 1.19.0 refuses to configure without them), and enable
-  the fp16 kernels only when the model carries FLOAT16 tensors — computed or
-  dequantized weights — on a Cortex-M55. There is no field to turn them off;
-  1.19.0 prebuilt `dist_path` archives already contain them.
+  `nsx-cmsis-nn` at the baseline's qualified ref (v7.35.0), enable its fp32
+  kernels when the model computes in float, and enable the fp16 kernels
+  additionally when it carries FLOAT16 tensors — computed or dequantized
+  weights — on a Cortex-M55. An integer-only model links neither.
 
 ## heliaAOT
 
@@ -313,10 +312,9 @@ heliaAOT ships as a Python package (it runs at build-time), so version
 resolution is handled entirely by **pip** — there's no separate cache,
 download, or `dist_path` to manage.
 
-The profiler's `[aot]` extra requires `helia-aot>=0.19.0`, and the profiler
-also enforces a runtime
-**minimum supported version** (`HELIAAOT_MIN_VERSION`) so any compatible
-override still has to clear the floor.
+The profiler's `[aot]` extra requires `helia-aot>=0.22.0,<0.23.0`, and the
+profiler enforces the same qualified range at runtime from the compatibility
+baseline, so an installed version outside it is refused with a clear error.
 
 You get three modes:
 
@@ -404,10 +402,11 @@ The pipeline:
 | `aot_args` | dict | `{}` | Pass-through args to the AOT compiler |
 | `platform_name` | string | *(from board)* | Override the board → AOT platform mapping |
 
-`nsx-cmsis-nn` is declared at the baseline's qualified ref (v7.31.0, which
-heliaAOT 0.19.0 requires), its fp32 kernels are always enabled, and the fp16
-kernels when the model carries FLOAT16 tensors on a Cortex-M55 — exactly as
-for heliaRT source builds (see the heliaRT runtime notes).
+`nsx-cmsis-nn` is declared at the baseline's qualified ref (v7.35.0, which
+covers every float operator heliaAOT 0.22.0 lowers to a native kernel). Its
+fp32 kernels are enabled when the model computes in float, and the fp16
+kernels additionally when it carries FLOAT16 tensors on a Cortex-M55, exactly
+as for heliaRT source builds (see the heliaRT runtime notes).
 
 ## Choosing an engine
 

@@ -27,20 +27,20 @@ from ...platform import SocDef, get_soc_for_board
 log = logging.getLogger("hpx")
 
 # heliaAOT ships as a Python package, so version resolution is handled
-# entirely by pip. heliaAOT is not on PyPI, so the [aot] extra in
-# helia-aot is published on PyPI. Users get three install modes:
+# entirely by pip; helia-aot is published on PyPI. Users get three install
+# modes:
 #
 #   1. Default       : pip install 'helia-profiler[aot]'
 #                      → installs the version pinned in pyproject.toml.
-#   2. Specific ver.  : pip install 'helia-aot>=<HELIAAOT_MIN_VERSION>'
+#   2. Specific ver.  : pip install 'helia-aot>=<MIN>,<<MAX_EXCLUSIVE>'
 #   3. Local checkout: pip install -e /path/to/helia-aot
 #
 # We don't manage downloads/caches like we do for heliaRT — pip already
-# does that better. We just enforce a minimum-supported version at runtime
-# so a user with an older install gets a clear error instead of a confusing
+# does that better. We just enforce the qualified version range at runtime so
+# a user with an unqualified install gets a clear error instead of a confusing
 # build failure (e.g. missing ModuleType.nsx).
-HELIAAOT_MIN_VERSION = "0.20.0"
-HELIAAOT_MAX_VERSION_EXCLUSIVE = "0.21.0"
+HELIAAOT_MIN_VERSION = "0.22.0"
+HELIAAOT_MAX_VERSION_EXCLUSIVE = "0.23.0"
 
 _DEFAULT_PREFIX = "hpx"
 _DEFAULT_MODULE_NAME = "hpx_model"
@@ -539,10 +539,11 @@ def _check_helia_aot_version(config: ProfileConfig | None = None) -> str:
         return installed
 
     if actual < minimum:
+        ceiling = "" if maximum is None else f",<{maximum_str}"
         raise EngineError(
             f"helia-aot v{installed} is below the minimum supported version (v{minimum_str}).",
             hint=(
-                f"Upgrade with: pip install -U 'helia-aot>={minimum_str}'\n"
+                f"Upgrade with: pip install -U 'helia-aot>={minimum_str}{ceiling}'\n"
                 "or pin a specific newer version / fork / local checkout."
             ),
         )
