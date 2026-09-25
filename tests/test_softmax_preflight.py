@@ -20,6 +20,8 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
+import struct
+
 import pytest
 
 from helia_profiler.engines import EngineType
@@ -679,3 +681,79 @@ def test_reader_constants_re_derive_from_the_installed_litert():
     assert len(expected_slots) == 14  # one row per frozen slot constant
     for constant, accessor in expected_slots:
         assert constant == slot(accessor), accessor.__qualname__
+
+
+class TestReaderRejectsOffsetsOutsideTheBuffer:
+    """A malformed buffer raises; it never reads a wrong value (#239).
+
+    ``struct.unpack_from`` accepts a negative offset and reads from the end of
+    the buffer, and a slice past the end simply truncates, so both used to
+    return plausible values instead of failing.
+    """
+
+    @staticmethod
+    def _table_with_soffset(soffset: int, size: int = 32) -> bytes:
+        buf = bytearray(size)
+        struct.pack_into("<I", buf, 0, 8)  # root table at 8
+        struct.pack_into("<i", buf, 8, soffset)
+        return bytes(buf)
+
+    def test_a_vtable_before_the_buffer_raises(self):
+        from helia_profiler.modelcost import _tflite_reader as r
+
+        table = r._Table(self._table_with_soffset(20), 8)  # vtable at -12
+
+        with pytest.raises(struct.error, match="outside the 32-byte buffer"):
+            table._field_pos(4)
+
+    @pytest.mark.parametrize(
+        "read",
+        [
+            pytest.param(lambda r, buf: r.read_quantized_softmax_ops(buf), id="softmax-scan"),
+            pytest.param(lambda r, buf: r.read_float_compute_types(buf), id="float-types"),
+        ],
+    )
+    def test_a_hostile_root_table_fails_the_scan_instead_of_passing_it(self, read):
+        from helia_profiler.modelcost import _tflite_reader as r
+
+        # vtable at -12 used to read the zeroed tail as an empty vtable, so
+        # every field looked absent and the scan found nothing to reject.
+        with pytest.raises(struct.error):
+            read(r, self._table_with_soffset(20))
+
+    def test_a_string_running_past_the_buffer_raises(self):
+        from helia_profiler.modelcost import _tflite_reader as r
+
+        buf = bytearray(40)
+        struct.pack_into("<i", buf, 8, 8 - 20)  # table at 8, vtable at 20
+        struct.pack_into("<HHH", buf, 20, 6, 8, 4)  # size 6, field slot 4 at +4
+        struct.pack_into("<I", buf, 12, 16)  # string at 12 + 16 = 28
+        struct.pack_into("<I", buf, 28, 50)  # 50 bytes claimed, 8 left
+
+        with pytest.raises(struct.error, match="runs past the buffer"):
+            r._Table(bytes(buf), 8).string(4)
+
+    def test_a_string_that_fits_is_read_whole(self):
+        from helia_profiler.modelcost import _tflite_reader as r
+
+        buf = bytearray(40)
+        struct.pack_into("<i", buf, 8, 8 - 20)
+        struct.pack_into("<HHH", buf, 20, 6, 8, 4)
+        struct.pack_into("<I", buf, 12, 16)
+        struct.pack_into("<I", buf, 28, 8)
+        buf[32:40] = b"conv_out"
+
+        assert r._Table(bytes(buf), 8).string(4) == "conv_out"
+
+    @pytest.mark.parametrize(("pos", "fmt"), [(-1, "<B"), (29, "<I"), (32, "<B")])
+    def test_reads_outside_the_buffer_raise(self, pos, fmt):
+        from helia_profiler.modelcost import _tflite_reader as r
+
+        with pytest.raises(struct.error):
+            r._read(fmt, bytes(32), pos)
+
+    @pytest.mark.parametrize(("pos", "fmt"), [(0, "<B"), (28, "<I"), (31, "<B")])
+    def test_reads_at_the_buffer_edges_succeed(self, pos, fmt):
+        from helia_profiler.modelcost import _tflite_reader as r
+
+        assert r._read(fmt, bytes(32), pos) == 0
