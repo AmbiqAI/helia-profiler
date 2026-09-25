@@ -3,10 +3,8 @@
 from dataclasses import replace
 import re
 
-import flatbuffers
 import numpy as np
 import pytest
-from ai_edge_litert import schema_py_generated as schema
 
 from helia_profiler.config import load_config
 from helia_profiler.errors import CaptureError, ConfigError
@@ -18,6 +16,8 @@ from tests.contracts.test_firmware_render_snapshots import _render
 
 @pytest.fixture
 def pair(tmp_path):
+    flatbuffers = pytest.importorskip("flatbuffers")
+    schema = pytest.importorskip("ai_edge_litert.schema_py_generated")
     graph = schema.SubGraphT()
     graph.tensors = []
     for name, shape in ((b"input", [1, 3]), (b"output", [1, 2])):
@@ -40,6 +40,11 @@ def pair(tmp_path):
     return model_path, data_path
 
 
+@pytest.fixture
+def golden():
+    return GoldenData(b"\x80\x00\x7f", b"\x17\xd7", "a" * 64, "b" * 64)
+
+
 def _record(golden):
     return (
         f"HPX_GOLDEN_OUTPUT model_sha256={golden.model_sha256} "
@@ -51,9 +56,13 @@ def _frame(record):
     return "--- HPX_START ---\n" + record + "\n--- HPX_END ---"
 
 
-def test_checker_rejects_corrupted_expectation_and_identity(pair):
+def test_loader_reads_fixed_int8_pair(pair):
     golden = load_golden(*pair)
     assert golden.input_bytes == b"\x80\x00\x7f"
+    assert golden.expected_bytes == b"\x17\xd7"
+
+
+def test_checker_rejects_corrupted_expectation_and_identity(golden):
     assert check_golden_output(_frame(_record(golden)), golden) == b"\x17\xd7"
     bad = replace(golden, expected_bytes=b"\x16\xd7")
     with pytest.raises(ValueError, match="differs"):
@@ -65,8 +74,7 @@ def test_checker_rejects_corrupted_expectation_and_identity(pair):
 
 
 @pytest.mark.parametrize("mutation", ["missing", "duplicate", "truncated", "odd", "wrong"])
-def test_checker_rejects_incomplete_or_wrong_output(pair, mutation):
-    golden = load_golden(*pair)
+def test_checker_rejects_incomplete_or_wrong_output(golden, mutation):
     line = _record(golden)
     text = {
         "missing": "",
@@ -107,8 +115,9 @@ def test_loader_rejects_invalid_vectors(pair, kind):
         {"profiling": {"clean_window_probe": "busy_loop"}},
     ],
 )
-def test_preflight_rejects_unsupported_validation_before_host_tools(pair, extra):
-    model, data = pair
+def test_preflight_rejects_unsupported_validation_before_host_tools(tmp_path, extra):
+    model, data = tmp_path / "model.tflite", tmp_path / "golden.npz"
+    model.write_bytes(b"\x00\x00\x00\x00TFL3")
     settings = {
         "model": {"path": str(model), "validation_data": str(data)},
         "engine": {"type": "tflm"},
@@ -132,8 +141,7 @@ def _assert_matched_restore(code):
 
 
 @pytest.mark.parametrize("engine", ["tflm", "helia-aot"])
-def test_rendered_restore_bracket_and_negative_sensitivity(engine):
-    golden = GoldenData(b"\x80\x00\x7f", b"\x17\xd7", "a" * 64, "b" * 64)
+def test_rendered_restore_bracket_and_negative_sensitivity(engine, golden):
     code = _render("apollo510", "rtt", engine, overrides={"golden": golden})
     _assert_matched_restore(code)
     begin = code.index("uint32_t clean_stimer_t0 = hpx_stimer_ticks();")
@@ -185,8 +193,7 @@ def test_capture_checks_actual_lines_and_retains_failure(pair, monkeypatch):
 
 
 @pytest.mark.parametrize("case", ["before", "after", "missing_end", "two_frames"])
-def test_validation_record_must_belong_to_one_complete_capture(pair, case):
-    golden = load_golden(*pair)
+def test_validation_record_must_belong_to_one_complete_capture(golden, case):
     line = _record(golden)
     text = {
         "before": line + "\n" + _frame(""),
@@ -211,7 +218,7 @@ def test_corrupted_containers_report_config_error(pair, broken):
         load_golden(model, data)
 
 
-def test_missing_analysis_dependency_has_actionable_error(pair, monkeypatch):
+def test_missing_analysis_dependency_has_actionable_error(tmp_path, monkeypatch):
     import builtins
 
     real_import = builtins.__import__
@@ -223,15 +230,16 @@ def test_missing_analysis_dependency_has_actionable_error(pair, monkeypatch):
 
     monkeypatch.setattr(builtins, "__import__", missing)
     with pytest.raises(ConfigError, match="analysis extra") as caught:
-        load_golden(*pair)
+        load_golden(tmp_path / "model.tflite", tmp_path / "golden.npz")
     assert caught.value.hint is not None
     assert "helia-profiler[analysis]" in caught.value.hint
 
 
-def test_capture_keeps_firmware_failure_diagnosis(pair, monkeypatch):
+def test_capture_keeps_firmware_failure_diagnosis(tmp_path, monkeypatch):
     from helia_profiler.capture import capture_pmu
 
-    model, data = pair
+    model, data = tmp_path / "model.tflite", tmp_path / "golden.npz"
+    model.write_bytes(b"\x00\x00\x00\x00TFL3")
     config = load_config(
         None,
         {

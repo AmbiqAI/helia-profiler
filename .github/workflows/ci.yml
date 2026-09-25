@@ -126,19 +126,19 @@ jobs:
         # guards them needs the real compiler installed.
         run: uv sync --locked --group test --extra analysis --extra aot
 
-      - name: Fail loudly if litert or helia-aot is absent
+      - name: Fail loudly if analysis or aot dependencies are absent
         # Without this the job goes green with every litert and helia-aot
         # test skipped -- the exact disconnected-oracle failure it exists to
         # prevent.
         run: |
           uv run --group test --extra analysis --extra aot python \
-            -c "import ai_edge_litert.schema_py_generated; import helia_aot"
+            -c "import flatbuffers; import ai_edge_litert.schema_py_generated; import helia_aot"
 
       - name: Run the litert- and helia-aot-dependent tests
         run: |
           uv run --group test --extra analysis --extra aot pytest \
             tests/test_softmax_preflight.py tests/test_model_analysis.py \
-            tests/test_example_models.py -q
+            tests/test_example_models.py tests/test_golden_validation.py -q
 
   # ---------------------------------------------------------------
   # pre-commit — runs the exact hook config contributors run locally, so
