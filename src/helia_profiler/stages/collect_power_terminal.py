@@ -153,9 +153,8 @@ class CollectPowerTerminalStage:
         )
         if frozen_window_clock and internal_mode:
             # The firmware says it ran N inferences in zero time, and in
-            # internal mode that number IS the denominator: the parser requires
-            # MEASUREMENT_DURATION_US == ELAPSED_US, so average power and
-            # current are wrong by the same factor. The measurement of record
+            # internal mode the denominator is read from that same clock, so
+            # average power and current are wrong by the same factor. The measurement of record
             # is corrupt, which is terminal here for the same reason the
             # all-zero INA228 reading above is.
             raise PowerError(
@@ -303,9 +302,11 @@ class CollectPowerTerminalStage:
         # Cross-check of the firmware's window clock against an independent
         # measurement. This stage only LOGS; evaluation.validity holds the
         # verdict (external arm ERROR, internal arm warning -- #142/#181).
-        # Same helper, same inputs, so the two cannot diverge.
+        # Same helper, same inputs, so the two cannot diverge. Both references
+        # time the gated loop alone, so the firmware side is the gate bracket,
+        # not the whole window around the monitor's arm and read (#299).
         agreement = assess_run_window_clock(
-            elapsed_us=terminal.elapsed_us,
+            elapsed_us=terminal.gate_elapsed_us,
             internal_mode=internal_mode,
             gated_result=(
                 ctx.power_run.observation.result if ctx.power_run.observation is not None else None
@@ -314,8 +315,8 @@ class CollectPowerTerminalStage:
             # describes a busy_loop window in the probe's own units (#112),
             # so the product is the right reference there too. Withholding it
             # would leave internal mode with no duration check (#125), and
-            # elapsed_us is its power denominator. External mode's reference
-            # is the instrument's own gate.
+            # its power denominator comes from the same clock. External mode's
+            # reference is the instrument's own gate.
             planned_inference_count=plan.inference_count,
             planned_inference_us=plan.reference_inference_us,
             stats_rate_hz=ctx.config.power.stats_rate_hz,
@@ -365,10 +366,11 @@ class CollectPowerTerminalStage:
                         ceiling.ratio,
                     )
         log.info(
-            "Power terminal: status=%s count=%d elapsed_us=%s phase=%s",
+            "Power terminal: status=%s count=%d elapsed_us=%s gate_elapsed_us=%s phase=%s",
             terminal.status,
             terminal.completed_count,
             terminal.elapsed_us,
+            terminal.gate_elapsed_us,
             terminal.final_phase,
         )
         ctx.report_progress(

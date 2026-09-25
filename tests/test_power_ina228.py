@@ -24,6 +24,7 @@ from helia_profiler.errors import FirmwareError, PowerError
 from helia_profiler.firmware.context import PowerMonitorContext
 from helia_profiler.power import get_driver, list_drivers
 from helia_profiler.results.issues import IssueCode
+from helia_profiler.wire import POWER_TERMINAL_VERSION
 
 
 class TestIna228Config:
@@ -399,11 +400,12 @@ class TestPowerMonitorContext:
 def _success_record() -> str:
     return (
         "--- HPX_POWER_TERMINAL_START ---\n"
-        "HPX_POWER_TERMINAL_VERSION=1\n"
+        f"HPX_POWER_TERMINAL_VERSION={POWER_TERMINAL_VERSION}\n"
         "HPX_POWER_STATUS=ok\n"
         "HPX_POWER_REQUESTED_COUNT=2000\n"
         "HPX_POWER_COMPLETED_COUNT=2000\n"
         "HPX_POWER_ELAPSED_US=512345\n"
+        "HPX_POWER_GATE_ELAPSED_US=511000\n"
         "HPX_POWER_FINAL_PHASE=complete\n"
         "HPX_POWER_ERROR_CODE=0\n"
         "HPX_POWER_GATE_ASSERTED=0\n"
@@ -411,7 +413,7 @@ def _success_record() -> str:
         "HPX_POWER_MEASUREMENT_SOURCE=ina228\n"
         "HPX_POWER_MEASUREMENT_SCOPE=fixed_n_inference\n"
         "HPX_POWER_ENERGY_NJ=4200000\n"
-        "HPX_POWER_MEASUREMENT_DURATION_US=512345\n"
+        "HPX_POWER_MEASUREMENT_DURATION_US=511800\n"
         "HPX_POWER_MEASUREMENT_COUNT=2000\n"
         "HPX_POWER_MEASUREMENT_OVERFLOW=0\n"
         "HPX_POWER_CHARGE_NC=3500000\n"
@@ -433,7 +435,8 @@ class TestIna228EnvelopeWireFormat:
         assert measurement.energy_nj == 4_200_000
         assert measurement.charge_nc == 3_500_000
         assert measurement.bus_voltage_uv == 1_800_000
-        assert measurement.duration_us == 512_345
+        assert measurement.duration_us == 511_800
+        assert envelope.terminal.gate_elapsed_us == 511_000
         assert measurement.inference_count == 2000
         assert measurement.overflow is False
         assert measurement.calibration_id == "ina228:r2000000uohm:i500ma:adc0"
@@ -442,11 +445,12 @@ class TestIna228EnvelopeWireFormat:
         """The ina228_init/arm/read fail paths emit no measurement keys."""
         record = (
             "--- HPX_POWER_TERMINAL_START ---\n"
-            "HPX_POWER_TERMINAL_VERSION=1\n"
+            f"HPX_POWER_TERMINAL_VERSION={POWER_TERMINAL_VERSION}\n"
             "HPX_POWER_STATUS=error\n"
             "HPX_POWER_REQUESTED_COUNT=2000\n"
             "HPX_POWER_COMPLETED_COUNT=0\n"
             "HPX_POWER_ELAPSED_US=0\n"
+            "HPX_POWER_GATE_ELAPSED_US=0\n"
             "HPX_POWER_FINAL_PHASE=ina228_init\n"
             "HPX_POWER_ERROR_CODE=2\n"
             "HPX_POWER_GATE_ASSERTED=0\n"

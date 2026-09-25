@@ -77,11 +77,10 @@ def _render_tflm(
     clean_window_probe: str = "infer",
     clean_iters: int = 3,
     power_only: bool = False,
-    # Only read for power_only renders (SocCapabilities.power_window_timer);
-    # these smoke tests leave clean_window_timer at its "dwt" template default,
-    # so the matching power-binary default keeps them on the DWT paths unless a
-    # case opts into STIMER explicitly.
-    power_window_timer: str = "dwt",
+    # Only read for power_only renders (SocCapabilities.power_window_timer).
+    # Power binaries always time their window with STIMER, and the template
+    # refuses anything else, so this is not a knob for the DWT paths.
+    power_window_timer: str = "stimer",
     has_ethos_u: bool = False,
     pmu_passes: list[dict[str, object]] | None = None,
     psram_clock_hz: int = 48_000_000,
@@ -158,7 +157,7 @@ def _render_aot(
     clean_iters: int = 3,
     power_only: bool = False,
     # See _render_tflm.
-    power_window_timer: str = "dwt",
+    power_window_timer: str = "stimer",
     has_ethos_u: bool = False,
     pmu_passes: list[dict[str, object]] | None = None,
     psram_clock_hz: int = 48_000_000,
@@ -712,16 +711,13 @@ class TestMainAotCcRender:
             )
             assert "const int clean_iters_n = 2247;" in out
             # Power renders take the first template arm and measure NOTHING
-            # pre-window (#170) — no adaptive sizing, no DWT warm bracket;
-            # the DWT window's stall floor is declared zeroed so the render
-            # stays compilable, with the low-floor comparison inert. The
-            # positive assertion matters (#171): without it, deleting the
-            # zeroed declaration would go undetected while the render
-            # becomes uncompilable C (clean_warm_min_cyc consumed by the
-            # window body, declared nowhere).
+            # pre-window (#170) — no adaptive sizing, no DWT warm bracket,
+            # and no DWT window whose stall floor would need declaring: power
+            # binaries time their window with STIMER only.
             assert "target_cyc" not in out
             assert "uint32_t wt0 = DWT->CYCCNT;" not in out
-            assert "uint32_t clean_warm_min_cyc = 0U;" in out
+            assert "clean_warm_min_cyc" not in out
+            assert "uint32_t clean_stimer_t0 = hpx_stimer_ticks();" in out
 
     def test_busy_loop_terminal_count_agrees_in_all_three_places(self):
         """The busy-loop work count must be 1 in the plan, the terminal

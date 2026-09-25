@@ -8,6 +8,7 @@ from typing import Literal
 
 import pytest
 
+from helia_profiler.wire import POWER_TERMINAL_VERSION
 from helia_profiler.results import (
     DeploymentRecord,
     FirmwareArtifact,
@@ -138,7 +139,7 @@ def _make_ctx(
 
 def _record(**overrides) -> PowerTerminalRecord:
     values = {
-        "version": 1,
+        "version": POWER_TERMINAL_VERSION,
         "status": "ok",
         "requested_count": 5,
         "completed_count": 5,
@@ -147,6 +148,9 @@ def _record(**overrides) -> PowerTerminalRecord:
         "error_code": 0,
         "gate_asserted": True,
         "gate_lowered": True,
+        # A skewed window clock inflates every bracket it times alike, so the
+        # gate follows the window unless a test separates them.
+        "gate_elapsed_us": overrides.get("elapsed_us", 5000),
         **overrides,
     }
     return PowerTerminalRecord(**values)
@@ -394,14 +398,14 @@ class TestFirmwareWindowClockIntegrity:
         CollectPowerTerminalStage().run(ctx)
 
     def _bench_measurement(self, elapsed_us: int) -> OnDevicePowerSummary:
-        # Internal mode requires a measurement payload; the parser already
-        # enforces duration_us == elapsed_us, so mirror that here.
+        # Internal mode requires a measurement payload; its accumulation
+        # interval nests inside the window, so the window is a valid stand-in.
         return _measurement(duration_us=elapsed_us, inference_count=self.BENCH_COUNT)
 
     def test_zero_elapsed_is_terminal_in_internal_mode(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
-        """Internal mode requires MEASUREMENT_DURATION_US == ELAPSED_US, so a
+        """Internal mode reads its denominator from the same clock, so a
         zero window makes average power and current wrong by the same factor.
         The measurement of record is corrupt -- terminal, for the same reason
         the all-zero INA228 reading is."""
@@ -410,8 +414,10 @@ class TestFirmwareWindowClockIntegrity:
         with pytest.raises(PowerError, match="zero elapsed time") as excinfo:
             self._run(ctx, record, monkeypatch, self._bench_measurement(1))
         hint = excinfo.value.hint or ""
-        assert "CDBGPWRUPREQ" in hint
-        assert "32.768 kHz" in hint  # the second cause must be named too
+        assert "32.768 kHz" in hint
+        assert "stimer_dead" in hint
+        # Power renders refuse a DWT-timed window, so it is no longer a cause.
+        assert "DWT" not in hint
 
     def test_zero_elapsed_only_warns_in_external_mode(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
@@ -428,6 +434,21 @@ class TestFirmwareWindowClockIntegrity:
         # The capture survives and is published.
         assert ctx.power_run is not None
         assert ctx.power_run.terminal is record
+
+    def test_sub_tick_gate_is_not_a_frozen_clock(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
+    ):
+        """A gate shorter than one STIMER tick reads 0 while the whole window
+        advanced, so the clock did run: the frozen check reads the window."""
+        for internal in (True, False):
+            ctx = self._bench_ctx(tmp_path / str(internal), internal=internal)
+            record = self._bench_record(gate_elapsed_us=0)
+            measurement = self._bench_measurement(self.BENCH_ELAPSED_US) if internal else None
+            caplog.clear()
+            with caplog.at_level("WARNING", logger="hpx"):
+                self._run(ctx, record, monkeypatch, measurement)
+            assert "zero elapsed time" not in caplog.text
+            assert ctx.power_run is not None and ctx.power_run.terminal is record
 
     def test_zero_elapsed_with_no_completed_work_is_not_this_failure(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -648,6 +669,105 @@ class TestFirmwareWindowClockIntegrity:
             )
         assert "window clock" not in caplog.text
 
+    # The whole window also covers the prologue and the monitor's arm and
+    # read; only the gate bracket times what both references time (#299).
+    # The separations below are exaggerated so that choosing the wrong
+    # bracket crosses a tolerance.
+
+    def test_external_observer_times_the_gate_not_the_whole_window(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
+    ):
+        ctx = self._bench_ctx(tmp_path)
+        record = self._bench_record(
+            elapsed_us=int(self.BENCH_ELAPSED_US * 1.2),
+            gate_elapsed_us=self.BENCH_ELAPSED_US,
+        )
+        with caplog.at_level("WARNING", logger="hpx"):
+            self._run(ctx, record, monkeypatch)
+        assert "window clock" not in caplog.text
+
+    def test_external_short_gate_warns_although_the_window_agrees(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
+    ):
+        ctx = self._bench_ctx(tmp_path)
+        record = self._bench_record(gate_elapsed_us=int(self.BENCH_ELAPSED_US * 0.8))
+        with caplog.at_level("WARNING", logger="hpx"):
+            self._run(ctx, record, monkeypatch)
+        assert "window clock and the reference disagree" in caplog.text
+        assert "gated_windows" in caplog.text
+
+    def test_internal_observer_times_the_gate_not_the_whole_window(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
+    ):
+        ctx = self._bench_ctx(tmp_path, internal=True)
+        planned = self.BENCH_COUNT * self.BENCH_REFERENCE_US
+        elapsed = int(planned * 1.3)
+        with caplog.at_level("WARNING", logger="hpx"):
+            self._run(
+                ctx,
+                self._bench_record(elapsed_us=elapsed, gate_elapsed_us=planned),
+                monkeypatch,
+                self._bench_measurement(planned),
+            )
+        assert "window clock" not in caplog.text
+
+    def test_internal_short_gate_warns_although_the_window_agrees(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
+    ):
+        ctx = self._bench_ctx(tmp_path, internal=True)
+        planned = self.BENCH_COUNT * self.BENCH_REFERENCE_US
+        gate = int(planned * 0.7)
+        with caplog.at_level("WARNING", logger="hpx"):
+            self._run(
+                ctx,
+                self._bench_record(elapsed_us=planned, gate_elapsed_us=gate),
+                monkeypatch,
+                self._bench_measurement(gate),
+            )
+        assert "window clock and the reference disagree" in caplog.text
+        assert "planned_window" in caplog.text
+
+    def test_ceiling_bounds_the_whole_window(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
+    ):
+        ctx = self._bench_ctx(tmp_path, internal=True, host_envelope_s=10.0)
+        elapsed = self.BENCH_ELAPSED_US + 7_000_000
+        with caplog.at_level("WARNING", logger="hpx"):
+            self._run(
+                ctx,
+                self._bench_record(elapsed_us=elapsed, gate_elapsed_us=self.BENCH_ELAPSED_US),
+                monkeypatch,
+                self._bench_measurement(self.BENCH_ELAPSED_US),
+            )
+        assert "cannot outlast the interval that contains it" in caplog.text
+        assert ctx.power_result is not None
+        ceiling = ctx.power_result.metadata.window_clock_ceiling
+        assert ceiling is not None and ceiling.elapsed_us == elapsed
+
+    def test_internal_power_divides_by_the_accumulation_interval(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        ctx = self._bench_ctx(tmp_path, internal=True)
+        gate = self.BENCH_ELAPSED_US
+        accumulation = gate + 400
+        measurement = _measurement(
+            energy_nj=50_000_000,
+            charge_nc=25_000_000,
+            duration_us=accumulation,
+            inference_count=self.BENCH_COUNT,
+        )
+        self._run(
+            ctx,
+            self._bench_record(elapsed_us=gate + 900, gate_elapsed_us=gate),
+            monkeypatch,
+            measurement,
+        )
+        assert ctx.power_result is not None
+        summary = ctx.power_result.summary
+        assert summary.duration_s == pytest.approx(accumulation / 1e6, abs=0)
+        assert summary.avg_power_w == pytest.approx(0.05 / (accumulation / 1e6), rel=1e-12)
+        assert summary.avg_current_a == pytest.approx(0.025 / (accumulation / 1e6), rel=1e-12)
+
 
 class TestBusyLoopProbeCompletesARun:
     """The busy_loop diagnostic runs ONE spin window, not N inferences.
@@ -847,11 +967,12 @@ class TestStimerDeadAttribution:
         terminal = parse_power_terminal_envelope(
             [
                 "--- HPX_POWER_TERMINAL_START ---",
-                "HPX_POWER_TERMINAL_VERSION=1",
+                f"HPX_POWER_TERMINAL_VERSION={POWER_TERMINAL_VERSION}",
                 "HPX_POWER_STATUS=error",
                 "HPX_POWER_REQUESTED_COUNT=233",
                 "HPX_POWER_COMPLETED_COUNT=233",
                 "HPX_POWER_ELAPSED_US=0",
+                "HPX_POWER_GATE_ELAPSED_US=0",
                 "HPX_POWER_FINAL_PHASE=stimer_dead",
                 "HPX_POWER_ERROR_CODE=1",  # 0 ticks + the wire bias
                 "HPX_POWER_GATE_ASSERTED=0",

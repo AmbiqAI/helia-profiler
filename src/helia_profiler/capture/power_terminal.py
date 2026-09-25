@@ -100,6 +100,7 @@ def parse_power_terminal_envelope(lines: Iterable[str]) -> PowerTerminalEnvelope
     requested_count = _parse_int(fields, PowerTerminalKey.REQUESTED_COUNT)
     completed_count = _parse_int(fields, PowerTerminalKey.COMPLETED_COUNT)
     error_code = _parse_int(fields, PowerTerminalKey.ERROR_CODE)
+    gate_elapsed_us = _parse_int(fields, PowerTerminalKey.GATE_ELAPSED_US)
     elapsed_raw = fields[PowerTerminalKey.ELAPSED_US]
     try:
         elapsed_us = int(elapsed_raw, 10)
@@ -111,6 +112,12 @@ def parse_power_terminal_envelope(lines: Iterable[str]) -> PowerTerminalEnvelope
         raise PowerError("Power terminal count and error fields must be non-negative.")
     if elapsed_us is not None and elapsed_us < 0:
         raise PowerError("Power terminal elapsed time must be non-negative.")
+    if gate_elapsed_us < 0:
+        raise PowerError("Power terminal gate elapsed time must be non-negative.")
+    # Upper bound only: a failure envelope reports 0 for both, and a frozen
+    # window clock must reach validity as 0 rather than be refused here.
+    if elapsed_us is not None and gate_elapsed_us > elapsed_us:
+        raise PowerError("Power terminal gate elapsed time exceeds the window elapsed time.")
     if completed_count > requested_count:
         raise PowerError("Power terminal completed count exceeds requested count.")
     if status == "ok" and error_code != 0:
@@ -127,6 +134,7 @@ def parse_power_terminal_envelope(lines: Iterable[str]) -> PowerTerminalEnvelope
         requested_count=requested_count,
         completed_count=completed_count,
         elapsed_us=elapsed_us,
+        gate_elapsed_us=gate_elapsed_us,
         final_phase=final_phase,
         error_code=error_code,
         gate_asserted=_parse_bool(fields, PowerTerminalKey.GATE_ASSERTED),
@@ -182,8 +190,12 @@ def parse_power_terminal_envelope(lines: Iterable[str]) -> PowerTerminalEnvelope
             raise PowerError("Power measurement duration must be positive for completed work.")
         if measured_count != terminal.completed_count:
             raise PowerError("Power measurement count does not match terminal completion count.")
-        if terminal.elapsed_us is not None and measured_duration_us != terminal.elapsed_us:
-            raise PowerError("Power measurement duration does not match terminal elapsed time.")
+        # The accumulation interval nests between the gate and the whole
+        # window, all three read from one STIMER in order.
+        if terminal.elapsed_us is not None and measured_duration_us > terminal.elapsed_us:
+            raise PowerError("Power measurement duration exceeds terminal elapsed time.")
+        if measured_duration_us < gate_elapsed_us:
+            raise PowerError("Power measurement duration is shorter than the gate it contains.")
         measurement = OnDevicePowerSummary(
             source=measurement_source,
             scope="fixed_n_inference",

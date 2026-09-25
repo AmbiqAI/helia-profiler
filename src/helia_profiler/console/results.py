@@ -622,6 +622,11 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
                     "Firmware elapsed",
                     f"{terminal.elapsed_us / 1_000_000:.6f} s",
                 )
+            if terminal.gate_elapsed_us is not None:
+                power_table.add_row(
+                    "Firmware gate",
+                    f"{terminal.gate_elapsed_us / 1_000_000:.6f} s",
+                )
         if ctx.power_run is not None and ctx.power_run.on_device_summary is not None:
             device_power = ctx.power_run.on_device_summary
             power_table.add_row("On-device source", device_power.source)

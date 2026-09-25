@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from helia_profiler.wire import POWER_TERMINAL_VERSION
 from helia_profiler.config import CleanWindowProbe, load_config
 from helia_profiler.results import (
     OnDevicePowerSummary,
@@ -787,11 +788,12 @@ def _attach_power_terminal(
         deployment=existing.deployment if existing is not None else None,
         observation=existing.observation if existing is not None else None,
         terminal=PowerTerminalRecord(
-            version=1,
+            version=POWER_TERMINAL_VERSION,
             status="ok",
             requested_count=count,
             completed_count=count if completed_count is None else completed_count,
             elapsed_us=elapsed_us,
+            gate_elapsed_us=elapsed_us,
             final_phase="done",
             error_code=0,
             gate_asserted=True,
@@ -1231,6 +1233,53 @@ def test_degraded_free_form_capture_suppresses_derived_efficiency(tmp_path: Path
     }
 
 
+def test_console_labels_the_window_and_gate_intervals(tmp_path: Path):
+    from rich.console import Console
+
+    from helia_profiler.console import HpxConsole
+    from helia_profiler.console.results import print_results
+
+    config = load_config(
+        None,
+        {
+            "model": {"path": "test.tflite"},
+            "engine": {"type": "helia-rt"},
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    set_profile_result(ctx, PmuResult(meta=FirmwareMeta(), layers=[]))
+    ctx.power_run = PowerRun(
+        plan=PowerRunPlan(firmware_mode="dedicated", inference_count=237),
+        terminal=PowerTerminalRecord(
+            version=POWER_TERMINAL_VERSION,
+            status="ok",
+            requested_count=237,
+            completed_count=237,
+            elapsed_us=4_990_000,
+            gate_elapsed_us=4_987_792,
+            final_phase="complete",
+            error_code=0,
+            gate_asserted=True,
+            gate_lowered=True,
+        ),
+    )
+    set_power_result(
+        ctx,
+        PowerResult(
+            summary=PowerSummary(0.01, 0.018, 0.02, 0.09, 5.0, 5000),
+            metadata=PowerMetadata(measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW),
+        ),
+    )
+    console = HpxConsole(verbosity=0)
+    console._console = Console(record=True, width=200)
+
+    print_results(console, ctx)
+
+    lines = console._console.export_text().splitlines()
+    assert any("Firmware elapsed" in line and "4.990000 s" in line for line in lines)
+    assert any("Firmware gate" in line and "4.987792 s" in line for line in lines)
+
+
 def test_summary_serializes_power_terminal_status(tmp_path: Path):
     config = load_config(
         None,
@@ -1242,11 +1291,12 @@ def test_summary_serializes_power_terminal_status(tmp_path: Path):
     ctx = PipelineContext(config=config, work_dir=tmp_path)
     set_profile_result(ctx, PmuResult(meta=FirmwareMeta(), layers=[]))
     terminal = PowerTerminalRecord(
-        version=1,
+        version=POWER_TERMINAL_VERSION,
         status="ok",
         requested_count=237,
         completed_count=237,
         elapsed_us=4_987_792,
+        gate_elapsed_us=4_987_792,
         final_phase="complete",
         error_code=0,
         gate_asserted=True,
@@ -1279,7 +1329,7 @@ def test_summary_serializes_power_terminal_status(tmp_path: Path):
     summary = json.loads(path.read_text())
 
     assert summary["power"]["terminal"] == {
-        "version": 1,
+        "version": POWER_TERMINAL_VERSION,
         "status": "ok",
         "requested_count": 237,
         "completed_count": 237,
@@ -1288,6 +1338,7 @@ def test_summary_serializes_power_terminal_status(tmp_path: Path):
         "error_code": 0,
         "gate_asserted": True,
         "gate_lowered": True,
+        "gate_elapsed_us": 4_987_792,
     }
     assert summary["power"]["on_device_summary"] == {
         "source": "ina228",

@@ -457,7 +457,7 @@ either way the run completes and writes its artifact.
 
 External captures verify the window in two layers before reporting
 energy-per-inference. The **authoritative** check compares the firmware's own
-STIMER-timed window (`power.terminal.elapsed_us`) against the instrument-timed
+STIMER-timed gate (`power.terminal.gate_elapsed_us`) against the instrument-timed
 gate: two independent clocks watching the same physical window in the same
 boot, so they must agree within 1% (plus a small absolute allowance for
 stats-packet and gate-poll quantization, which dominates on short windows) —
@@ -949,22 +949,34 @@ on your board, model, and clock configuration.)
   clean-window timing itself looks corrupted (an inference reporting zero
   time). Per-inference metrics are suppressed when it is set.
 
-The dedicated power firmware also times its own measured window and reports it
-as `power.terminal.elapsed_us`. Because nothing else on the host depends on
-that clock, it is the one number that can be wrong while every other check
-passes, so it is cross-checked directly. Four issue codes come out of that:
+The dedicated power firmware also times its own window with STIMER and reports
+three nested intervals, read from the one clock in order:
+
+- `power.terminal.gate_elapsed_us`: the GPIO gate alone, read beside the two
+  edges. This is what the instrument and the plan also time, so the
+  window-clock checks compare against it.
+- `power.on_device_summary.duration_us` (INA228 builds): from the accumulator
+  reset to just before the accumulator reads, which latch energy and charge a
+  few I2C transactions later. Internal mode divides by it for average power
+  and current.
+- `power.terminal.elapsed_us`: the whole window, including the engine's
+  prologue and the INA228's own arm and read. It bounds the other two and
+  feeds the host wall-time ceiling.
+
+Because nothing else on the host depends on that clock, it is the one number
+that can be wrong while every other check passes, so it is cross-checked
+directly. Four issue codes come out of that:
 
 - **`power.window_clock_frozen`** — the firmware completed its inferences but
   reported zero elapsed time, so its window clock never advanced. In
-  **internal** mode this fails the run: that duration is the denominator for
-  average power and current, so the measurement of record is corrupt. In
+  **internal** mode this fails the run: the same clock times the denominator
+  for average power and current, so the measurement of record is corrupt. In
   **external** mode it is only a warning that degrades the run — the
   instrument owns the power numbers and they are unaffected; only
-  `elapsed_us` is meaningless. Two causes produce it: a window timed with
-  `DWT->CYCCNT` on a Cortex-M4F part whose debug power domain is down, or a
-  STIMER-timed window whose 32.768 kHz XTAL is stopped or unpopulated.
+  `elapsed_us` is meaningless. Power binaries time their window with STIMER, so
+  the cause is its 32.768 kHz XTAL being stopped or unpopulated.
 - **`power.window_observer_mismatch`** — external mode: the firmware's
-  window disagrees with the host-timed gate beyond 1% (plus an absolute
+  gate disagrees with the host-timed gate beyond 1% (plus an absolute
   stats-packet/gate-poll quantization allowance). The two are
   independent clocks timing the same physical window in the same boot, so
   drift cannot explain a miss — the gate did not bracket what the firmware
@@ -974,7 +986,7 @@ passes, so it is cross-checked directly. Four issue codes come out of that:
   computes cycle, latency, memory and per-layer deltas against such a run and
   omits only the power rows, because the gate the firmware disagreed with
   bounds none of those figures.
-- **`power.window_clock_mismatch`** — internal mode: the firmware's window
+- **`power.window_clock_mismatch`** — internal mode: the firmware's gate
   disagrees with `inference_count × reference_inference_us` (25% tolerance —
   loose because that reference comes from a different binary, in a different
   boot and thermal state). A warning.
@@ -987,7 +999,7 @@ The envelope comparison behind that last warning is written to
 `power.window_clock_ceiling` in `summary.json` on every internal-mode run that
 produces a summary at all — not only when the warning fires — so you can see the margin on a healthy run
 as well as a breached one. Its five fields are `elapsed_us` and `elapsed_s`
-(the firmware's reported window), `host_envelope_s` (the host-timed interval
+(the firmware's whole window), `host_envelope_s` (the host-timed interval
 from starting the power binary to collecting its record), `slack_s`, and
 `ratio` (`elapsed_s / host_envelope_s`). The warning fires when `elapsed_s`
 exceeds `host_envelope_s + slack_s`, so `slack_s` is part of the bound rather
@@ -1189,13 +1201,13 @@ the JS320 bench.
     **Check the firmware's own clock first.** Both symptoms above are about
     the *host-observed* gate, but a firmware timing fault can look similar and
     has a completely different fix. The distinguishing symptom is
-    `power.terminal.elapsed_us` disagreeing with the gate: compare it against
+    `power.terminal.gate_elapsed_us` disagreeing with the gate: compare it against
     `power.capture_duration_s` in `summary.json` (they should agree to well
-    under 1%). If `elapsed_us` is `0`, or several times the gate, the wiring
+    under 1%). If `gate_elapsed_us` is `0`, or several times the gate, the wiring
     is fine and the firmware timed its window with a clock it could not read —
     see `power.window_clock_frozen` and `power.window_observer_mismatch`
     above. The remedy is a firmware rebuild, not a rewire. If instead
-    `elapsed_us` *agrees* with the gate and only the est×count ratio is off,
+    `gate_elapsed_us` *agrees* with the gate and only the est×count ratio is off,
     that is cold-start clock drift, reported as
     `gated_window_reference_drift` — nothing is wrong.
 

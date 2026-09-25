@@ -94,7 +94,7 @@ consumers can evolve parsers without coupling every file to the bundle schema:
 
 | Artifact | Schema | Packaged JSON Schema |
 | --- | --- | --- |
-| `summary.json` | `hpx.run-summary` v6 | `run_summary.schema.v1.json` (root fields; the authoritative shape is the typed model `helia_profiler.results.run_summary.RunSummary`) |
+| `summary.json` | `hpx.run-summary` v7 | `run_summary.schema.v1.json` (root fields; the authoritative shape is the typed model `helia_profiler.results.run_summary.RunSummary`) |
 | `run_metadata.json` | `hpx.run-metadata` v1 | `run_metadata.schema.v1.json` |
 | `profile_results.json` | `hpx.profile-results` v1 | `profile_results.schema.v1.json` |
 
@@ -109,7 +109,7 @@ The top-level summary — start here for a quick overview.
 ```json
 {
   "schema": "hpx.run-summary",
-  "schema_version": 6,
+  "schema_version": 7,
   "engine": "helia-rt",
   "layers": 13,
   "total_cycles": 2016376,
@@ -486,6 +486,18 @@ inputs are (no symbol table, partial listing, no measured view).
     summaries remain readable. A schema difference is informative; the
     workload identity separately blocks power deltas against missing or
     different workloads. Profiled and per-layer comparisons remain available.
+
+!!! note "Schema v7"
+    On-device (`power.mode: internal`) power now divides energy and charge by
+    the INA228 accumulation interval instead of the whole firmware window,
+    which also covered the monitor's own arm and read (#299). This moves
+    `duration_s`, `avg_current_a`, `avg_power_w` and derived TOPS by the time
+    those I2C transactions take, estimated at about a millisecond at the
+    default 400 kHz bus and a few at 100 kHz: a small fraction of a percent
+    of a multi-second window. Energy, energy per inference and TOPS-per-watt
+    are unchanged. The firmware's side of the window-clock
+    checks is now the gate bracket, `power.terminal.gate_elapsed_us`.
+    Comparing v6 and v7 reports an `INFORMATIVE` schema difference.
 
 ## Terminal summary
 
