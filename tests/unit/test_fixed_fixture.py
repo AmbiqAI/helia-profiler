@@ -14,6 +14,9 @@ from helia_profiler.config import (
     ProfilingConfig,
 )
 from helia_profiler.engines import EngineType
+from helia_profiler.pipeline import PipelineContext
+from helia_profiler.results.dependencies import ContentDigest, DependencyWorkspace
+from helia_profiler.vocab import Toolchain
 from helia_profiler.fixture import (
     FixtureFile,
     Int8Tensor,
@@ -43,7 +46,7 @@ def fixture(tmp_path):
         ),
         engine=EngineConfig(type=EngineType.TFLM, backend="cmsis_nn"),
         target=TargetConfig(
-            board="apollo510_evb", toolchain="atfe", clock=ClockSelection(cpu="lp")
+            board="apollo510_evb", toolchain=Toolchain.ATFE, clock=ClockSelection(cpu="lp")
         ),
         profiling=ProfilingConfig(iterations=100, warmup=5),
         work_dir=tmp_path / "build",
@@ -143,7 +146,9 @@ def test_host_only_stage_selection_and_source_receipt(tmp_path, monkeypatch):
         "generate_fixed_fixture",
     ]
     r = build_fixed_fixture(c, f, runtime=rt)
-    assert r.built and r.binary.read() == b"elf"
+    assert r.built
+    assert r.binary is not None
+    assert r.binary.read() == b"elf"
     assert calls[-1][-1] == "build_firmware"
     with pytest.raises(Exception, match="different fixture"):
         build_fixed_fixture(replace(c, model=replace(c.model, arena_size=131072)), f, runtime=rt)
@@ -160,7 +165,18 @@ def test_render_uses_full_input_and_exact_sink_extents(tmp_path, monkeypatch):
         "helia_profiler.stages.generate_firmware.GenerateFirmwareStage.run", lambda self, ctx: None
     )
     monkeypatch.setattr("helia_profiler.deps.dependencies.workspace_mutex", lambda _: nullcontext())
-    ctx = SimpleNamespace(config=c, resolved_firmware_dir=app, resolved_workspace=None)
+    workspace = DependencyWorkspace(
+        schema_version=1,
+        fingerprint="fixture-render-test",
+        baseline_id="fixture-render-test",
+        baseline_fingerprint="fixture-render-test",
+        registry_hash=ContentDigest(algorithm="sha256", value="0" * 64),
+        inputs={},
+        root=tmp_path,
+    )
+    ctx = PipelineContext(
+        config=c, work_dir=tmp_path, firmware_dir=app, dependency_workspace=workspace
+    )
     _GenerateFixtureStage(f).run(ctx)
     source = (app / "src/main.cc").read_text()
     assert "deployment_output[480]" in source and "input->bytes != 3360" in source
