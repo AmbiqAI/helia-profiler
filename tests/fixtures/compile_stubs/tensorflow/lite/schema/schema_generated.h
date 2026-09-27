@@ -58,6 +58,8 @@ struct Tensor {
 };
 
 struct SubGraph {
+    const HpxStubVector<int32_t> *inputs() const { return nullptr; }
+    const HpxStubVector<int32_t> *outputs() const { return nullptr; }
     const HpxStubVector<const Tensor *> *tensors() const { return nullptr; }
 };
 
