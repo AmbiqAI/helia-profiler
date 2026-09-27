@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-static volatile uint32_t deployment_memory[8];
+volatile uint32_t deployment_memory[8];
 
 static inline void hpx_fixture_memory_init(uint32_t capacity_bytes) {
     deployment_memory[0] = UINT32_C(0x4d454d31);

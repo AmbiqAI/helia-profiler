@@ -193,3 +193,11 @@ def test_runtime_rejects_path_escape(tmp_path):
     for path in ("../outside.h", "/etc/passwd", "x;message(test)"):
         with pytest.raises(ValueError):
             rt._path(path)
+
+
+def test_memory_terminal_has_external_symbol_linkage():
+    from helia_profiler.firmware.render import _jinja_env
+
+    source = _jinja_env.get_template("fixed_fixture_memory.h.j2").render()
+    assert "volatile uint32_t deployment_memory[8];" in source
+    assert "static volatile uint32_t deployment_memory" not in source
