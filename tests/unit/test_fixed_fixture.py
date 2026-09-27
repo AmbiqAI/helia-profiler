@@ -15,7 +15,9 @@ from helia_profiler.config import (
 )
 from helia_profiler.engines import EngineType
 from helia_profiler.pipeline import PipelineContext
-from helia_profiler.results.dependencies import ContentDigest, DependencyWorkspace
+from helia_profiler.modelcost.fixture_analysis import FixtureModelAnalysis
+from helia_profiler.modelcost.model_analysis import ModelAnalysis, LayerOps
+from helia_profiler.firmware.op_resolver import build_fixture_resolver_plan
 from helia_profiler.vocab import Toolchain
 from helia_profiler.fixture import (
     FixtureFile,
@@ -23,7 +25,10 @@ from helia_profiler.fixture import (
     FixedFixture,
     PreparedUpstreamRuntime,
     build_fixed_fixture,
-    _GenerateFixtureStage,
+    FixtureMethod,
+    FixtureTimingScope,
+    FixtureRenderSpec,
+    _BindFixtureStage,
 )
 
 
@@ -52,6 +57,20 @@ def fixture(tmp_path):
         work_dir=tmp_path / "build",
     )
     return c, f
+
+
+METHOD = FixtureMethod(FixtureTimingScope.RESTORE_AND_INVOKE)
+
+
+def analyzed(f, ops=("CONV_2D", "RESHAPE")):
+    analysis = ModelAnalysis([LayerOps(i, op) for i, op in enumerate(ops)], 0, 0, 0)
+    return FixtureModelAnalysis(
+        f.input_tensor, f.output_tensor, analysis, build_fixture_resolver_plan(analysis)
+    )
+
+
+def mock_analysis(monkeypatch, f):
+    monkeypatch.setattr("helia_profiler.fixture.analyze_fixture_model", lambda _: analyzed(f))
 
 
 def runtime(tmp_path):
@@ -89,16 +108,20 @@ def test_hash_or_unsupported_config_stops_before_pipeline(tmp_path, monkeypatch)
     monkeypatch.setattr("helia_profiler.fixture.PipelineRunner", forbidden)
     with pytest.raises(Exception, match="upstream"):
         build_fixed_fixture(
-            replace(c, engine=EngineConfig(type=EngineType.HELIA_RT)), f, runtime=rt
+            replace(c, engine=EngineConfig(type=EngineType.HELIA_RT)), f, method=METHOD, runtime=rt
         )
     f.input.path.write_bytes(bytes(3359))
     with pytest.raises(ValueError, match="hash mismatch"):
-        build_fixed_fixture(c, f, runtime=rt)
+        build_fixed_fixture(c, f, method=METHOD, runtime=rt)
 
 
-def test_host_only_stage_selection_and_source_receipt(tmp_path, monkeypatch):
+@pytest.mark.parametrize("engine", [EngineType.TFLM, EngineType.HELIA_AOT])
+def test_host_only_stage_selection_and_source_receipt(tmp_path, monkeypatch, engine):
     c, f = fixture(tmp_path)
     rt = runtime(tmp_path)
+    mock_analysis(monkeypatch, f)
+    c = replace(c, engine=EngineConfig(type=engine, backend="cmsis_nn"))
+    selected_runtime = rt if engine is EngineType.TFLM else None
     calls = []
 
     class Runner:
@@ -134,56 +157,117 @@ def test_host_only_stage_selection_and_source_receipt(tmp_path, monkeypatch):
             )
 
     monkeypatch.setattr("helia_profiler.fixture.PipelineRunner", Runner)
-    r = build_fixed_fixture(c, f, runtime=rt, compile=False)
+    r = build_fixed_fixture(c, f, method=METHOD, runtime=selected_runtime, compile=False)
     assert not r.built and r.binary is None and len(r.generated_sources) == 4
     assert calls[-1] == [
         "bind_fixed_fixture",
         "resolve_platform",
         "prepare_engine",
-        "prepare_upstream_runtime",
-        "analyze_model",
+        *(["prepare_upstream_runtime"] if engine is EngineType.TFLM else []),
+        "bind_fixture_render",
         "plan_memory",
-        "generate_fixed_fixture",
+        "generate_firmware",
     ]
-    r = build_fixed_fixture(c, f, runtime=rt)
+    r = build_fixed_fixture(c, f, method=METHOD, runtime=selected_runtime)
     assert r.built
     assert r.binary is not None
     assert r.binary.read() == b"elf"
     assert calls[-1][-1] == "build_firmware"
     with pytest.raises(Exception, match="different fixture"):
-        build_fixed_fixture(replace(c, model=replace(c.model, arena_size=131072)), f, runtime=rt)
+        build_fixed_fixture(
+            replace(c, model=replace(c.model, arena_size=131072)),
+            f,
+            method=METHOD,
+            runtime=selected_runtime,
+        )
+
+    assert r.engine is engine
+    assert (r.runtime_manifest is not None) == (engine is EngineType.TFLM)
+    for altered_config, altered_method in (
+        (c, FixtureMethod(FixtureTimingScope.INVOKE_ONLY)),
+        (replace(c, profiling=ProfilingConfig(iterations=7, warmup=2)), METHOD),
+        (replace(c, model=replace(c.model, weights_location="sram")), METHOD),
+    ):
+        with pytest.raises(Exception, match="different fixture|MRAM"):
+            build_fixed_fixture(altered_config, f, method=altered_method, runtime=selected_runtime)
+    if engine is EngineType.HELIA_AOT:
+        with pytest.raises(Exception, match="cannot consume"):
+            build_fixed_fixture(c, f, method=METHOD, runtime=rt)
 
 
-def test_render_uses_full_input_and_exact_sink_extents(tmp_path, monkeypatch):
-    from contextlib import nullcontext
+@pytest.mark.parametrize("scope", list(FixtureTimingScope))
+@pytest.mark.parametrize("kind", ["tcn", "kws"])
+def test_render_derives_extents_ops_counts_and_scope(tmp_path, kind, scope):
+    from helia_profiler.firmware.fixture import fixture_template_vars
+    from helia_profiler.firmware.render import _jinja_env
 
     c, f = fixture(tmp_path)
-    rt = runtime(tmp_path)
-    app = tmp_path / "app"
-    (app / "src").mkdir(parents=True)
+    if kind == "kws":
+        inp = bytes(490)
+        out = bytes(12)
+        f.input.path.write_bytes(inp)
+        f.expected.path.write_bytes(out)
+        f = replace(
+            f,
+            input=FixtureFile(f.input.path, sha256(inp).hexdigest()),
+            expected=FixtureFile(f.expected.path, sha256(out).hexdigest()),
+            input_tensor=Int8Tensor((1, 49, 10, 1), 0.125, -4, 0),
+            output_tensor=Int8Tensor((1, 12), 0.0625, -128, 4),
+        )
+    c = replace(c, profiling=ProfilingConfig(iterations=17, warmup=3))
+    model = analyzed(f, ("FULLY_CONNECTED", "SOFTMAX") if kind == "kws" else ("CONV_2D", "RESHAPE"))
+    ctx = PipelineContext(config=c, work_dir=tmp_path)
+    _BindFixtureStage(FixtureRenderSpec(f, FixtureMethod(scope), model)).run(ctx)
+    values = fixture_template_vars(ctx, [])
+    assert values["input_tensor"] == f.input_tensor
+    assert values["output_tensor"] == f.output_tensor
+    assert values["fixture_iterations"] == 17
+    assert values["fixture_warmups"] == 3
+    assert values["fixture_timing_scope"] == scope.value
+    assert len(str(values["input_values"]).split(",")) == f.input_tensor.size
+    source = _jinja_env.get_template("fixed_fixture.cc.j2").render(**values)
+    assert f"deployment_output[{f.output_tensor.size}]" in source
+    assert f"input->bytes != {f.input_tensor.size}" in source
+    for registration in model.resolver.registrations:
+        assert registration.removeprefix("r.").removesuffix(";") in source
+    assert ("AddFullyConnected()" in source) == (kind == "kws")
+    assert ("AddConv2D()" in source) == (kind == "tcn")
+    assert "RecordingMicroInterpreter" not in source
+    assert "deployment_timing[1] = 17;" in source
+    assert "deployment_timing[2] = 3;" in source
+    measured_loop = source.index("for (unsigned i = 0; i < 17;")
+    timer_start = source.index("const uint32_t t0 = hpx_stimer_ticks();")
+    restore = source.index("std::memcpy(input_data", measured_loop)
+    invocation = source.index("invocation_status |= invoke();", measured_loop)
+    if scope is FixtureTimingScope.INVOKE_ONLY:
+        assert measured_loop < restore < timer_start < invocation
+        assert "ticks += hpx_stimer_ticks() - t0;" in source
+    else:
+        assert timer_start < measured_loop < restore < invocation
+        assert "ticks = hpx_stimer_ticks() - t0;" in source
+
+
+def test_declaration_mismatch_stops_before_pipeline(tmp_path, monkeypatch):
+    c, f = fixture(tmp_path)
+    model = analyzed(f)
+    monkeypatch.setattr("helia_profiler.fixture.analyze_fixture_model", lambda _: model)
+    wrong = replace(f, input_tensor=replace(f.input_tensor, scale=0.5))
+    with pytest.raises(Exception, match="declarations differ"):
+        build_fixed_fixture(c, wrong, method=METHOD, runtime=runtime(tmp_path))
+
+
+def test_invalid_model_stops_before_pipeline(tmp_path, monkeypatch):
+    c, f = fixture(tmp_path)
     monkeypatch.setattr(
-        "helia_profiler.stages.generate_firmware.GenerateFirmwareStage.run", lambda self, ctx: None
+        "helia_profiler.fixture.PipelineRunner", lambda *_: pytest.fail("pipeline reached")
     )
-    monkeypatch.setattr("helia_profiler.deps.dependencies.workspace_mutex", lambda _: nullcontext())
-    workspace = DependencyWorkspace(
-        schema_version=1,
-        fingerprint="fixture-render-test",
-        baseline_id="fixture-render-test",
-        baseline_fingerprint="fixture-render-test",
-        registry_hash=ContentDigest(algorithm="sha256", value="0" * 64),
-        inputs={},
-        root=tmp_path,
-    )
-    ctx = PipelineContext(
-        config=c, work_dir=tmp_path, firmware_dir=app, dependency_workspace=workspace
-    )
-    _GenerateFixtureStage(f).run(ctx)
-    source = (app / "src/main.cc").read_text()
-    assert "deployment_output[480]" in source and "input->bytes != 3360" in source
-    assert "output->dims->data[2] != 2" in source
-    assert source.count("std::memcpy(input->data.int8, fixed_input, sizeof(fixed_input))") == 2
-    assert source.index("const uint32_t ticks =") < source.index("hpx_fixture_memory_snapshot(5")
-    assert "MicroMutableOpResolver<6>" in source and "RecordingMicroInterpreter" not in source
+    with pytest.raises(ValueError, match="fixture model|analysis extra"):
+        build_fixed_fixture(c, f, method=METHOD, runtime=runtime(tmp_path))
+
+
+def test_method_requires_explicit_scope():
+    with pytest.raises(ValueError, match="Explicit"):
+        FixtureMethod("invoke_only")  # ty: ignore[invalid-argument-type]
 
 
 def test_runtime_rejects_header_tamper_and_provider_substitution(tmp_path):
@@ -207,8 +291,18 @@ def test_runtime_rejects_header_tamper_and_provider_substitution(tmp_path):
 def test_runtime_rejects_path_escape(tmp_path):
     rt = runtime(tmp_path)
     for path in ("../outside.h", "/etc/passwd", "x;message(test)"):
+        data = json.loads(rt.manifest.read())
+        data["headers"] = {path: "0" * 64}
+        rt.manifest.path.write_text(json.dumps(data))
+        candidate = replace(
+            rt,
+            manifest=FixtureFile(
+                rt.manifest.path, sha256(rt.manifest.path.read_bytes()).hexdigest()
+            ),
+        )
         with pytest.raises(ValueError):
-            rt._path(path)
+            candidate.verify()
+        rt = runtime(tmp_path)
 
 
 def test_memory_terminal_has_external_symbol_linkage():
@@ -217,3 +311,27 @@ def test_memory_terminal_has_external_symbol_linkage():
     source = _jinja_env.get_template("fixed_fixture_memory.h.j2").render()
     assert "volatile uint32_t deployment_memory[8];" in source
     assert "static volatile uint32_t deployment_memory" not in source
+
+
+def test_aot_render_uses_compiled_model_without_interpreter(tmp_path):
+    from helia_profiler.firmware.fixture import fixture_template_vars
+    from helia_profiler.firmware.render import _jinja_env
+
+    c, f = fixture(tmp_path)
+    c = replace(c, engine=EngineConfig(type=EngineType.HELIA_AOT))
+    ctx = PipelineContext(config=c, work_dir=tmp_path)
+    _BindFixtureStage(FixtureRenderSpec(f, METHOD, analyzed(f))).run(ctx)
+    source = _jinja_env.get_template("fixed_fixture.cc.j2").render(
+        **fixture_template_vars(ctx, []),
+        aot_prefix="compiled_tcn",
+        allocate_arenas=True,
+        arena_regions=[],
+    )
+    assert "compiled_tcn_model_init(&model_ctx)" in source
+    assert "compiled_tcn_model_run(&model_ctx)" in source
+    assert "model_ctx.inputs[0].size != 3360" in source
+    assert "model_ctx.outputs[0].size != 480" in source
+    assert "deployment_output[480]" in source
+    assert "MicroInterpreter" not in source
+    assert "MicroMutableOpResolver" not in source
+    assert "model_data.h" not in source

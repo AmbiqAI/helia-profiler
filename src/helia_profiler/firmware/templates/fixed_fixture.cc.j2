@@ -8,26 +8,60 @@
 #include "nsx_core.h"
 #include "am_hal_pwrctrl.h"
 #include "fixed_fixture_clock.h"
+{% if fixture_aot %}
+#include "{{ aot_prefix }}_model.h"
+#include "{{ aot_prefix }}_common.h"
+{% if not allocate_arenas %}{% for region in arena_regions %}{% if region.blob_filename %}
+#include "hpx_const_blob_{{ region.region_id }}.h"
+{% endif %}{% endfor %}{% endif %}
+{% else %}
 #include "fixed_fixture_memory.h"
 #include "model_data.h"
 #include "tensorflow/lite/micro/micro_interpreter.h"
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/schema/schema_generated.h"
+{% endif %}
 
 static const uint8_t fixed_input[] = { {{ input_values }} };
-alignas(16) static uint8_t arena[{{ arena_size }}] __attribute__((section(".sram_bss")));
+{% if not fixture_aot %}
+alignas(16) static uint8_t arena[{{ fixture_arena_size }}] __attribute__((section(".sram_bss")));
+{% endif %}
 volatile int32_t deployment_status = -1;
 volatile uint8_t deployment_output[{{ output_tensor.size }}];
 volatile uint32_t deployment_checksum;
-volatile uint32_t deployment_timing[6];
+volatile uint32_t deployment_timing[7];
 
 static int infer_fixture() {
+{% if fixture_aot %}
+    {{ aot_prefix }}_model_context_t model_ctx = {};
+{% if not allocate_arenas %}
+{% for region in arena_regions %}
+{% if region.blob_filename and region.placement == 'mram' %}
+    static_assert(sizeof(hpx_const_blob_{{ region.region_id }}) == {{ region.size }}, "Constant arena extent mismatch");
+    void *region_{{ region.region_id }} = const_cast<uint8_t *>(hpx_const_blob_{{ region.region_id }});
+{% else %}
+    alignas({{ region.alignment }}) static uint8_t region_{{ region.region_id }}[{{ region.size }}] __attribute__((section(".sram_bss")));
+{% if region.blob_filename %}
+    static_assert(sizeof(hpx_const_blob_{{ region.region_id }}) <= sizeof(region_{{ region.region_id }}), "Constant arena overflow");
+    std::memcpy(region_{{ region.region_id }}, hpx_const_blob_{{ region.region_id }}, sizeof(hpx_const_blob_{{ region.region_id }}));
+{% endif %}
+{% endif %}
+    if ({{ aot_prefix }}_bind_arena(({{ aot_prefix }}_arena_region_t){{ region.region_id }}, region_{{ region.region_id }}, {{ region.size }}) != 0) return -5;
+{% endfor %}
+{% endif %}
+    if ({{ aot_prefix }}_model_init(&model_ctx) != 0) return -5;
+    if ({{ aot_prefix }}_num_inputs != 1 || {{ aot_prefix }}_num_outputs != 1 ||
+        model_ctx.inputs[0].size != {{ input_tensor.size }} || model_ctx.outputs[0].size != {{ output_tensor.size }} ||
+        !model_ctx.inputs[0].data || !model_ctx.outputs[0].data) return -6;
+    auto *input_data = model_ctx.inputs[0].data;
+    auto *output_data = reinterpret_cast<const uint8_t *>(model_ctx.outputs[0].data);
+    auto invoke = [&]() { return {{ aot_prefix }}_model_run(&model_ctx); };
+{% else %}
     hpx_fixture_memory_init(sizeof(arena));
-    tflite::MicroMutableOpResolver<6> resolver;
-    if (resolver.AddReshape() != kTfLiteOk ||
-        resolver.AddDepthwiseConv2D() != kTfLiteOk ||
-        resolver.AddConv2D() != kTfLiteOk || resolver.AddMean() != kTfLiteOk ||
-        resolver.AddMul() != kTfLiteOk || resolver.AddAdd() != kTfLiteOk) return -3;
+    tflite::MicroMutableOpResolver<{{ fixture_resolver.max_ops }}> resolver;
+{% for registration in fixture_registrations %}
+    if (resolver.{{ registration }} != kTfLiteOk) return -3;
+{% endfor %}
     const auto *model = tflite::GetModel(model_data);
     if (model->version() != TFLITE_SCHEMA_VERSION || model->subgraphs()->size() != 1) return -4;
     const auto *graph = model->subgraphs()->Get(0);
@@ -46,32 +80,52 @@ static int infer_fixture() {
     if ({{ name }}->dims->data[{{ loop.index0 }}] != {{ dim }}) return -6;
 {% endfor %}
 {% endfor %}
+    auto *input_data = input->data.int8;
+    auto *output_data = reinterpret_cast<const uint8_t *>(output->data.int8);
+    auto invoke = [&]() { return interpreter.Invoke(); };
     hpx_fixture_memory_snapshot(3, interpreter.arena_used_bytes());
+{% endif %}
     if (!hpx_stimer_init()) return -8;
-    for (unsigned i = 0; i < 5; ++i) {
-        std::memcpy(input->data.int8, fixed_input, sizeof(fixed_input));
-        if (interpreter.Invoke() != kTfLiteOk) return -7;
+    for (unsigned i = 0; i < {{ fixture_warmups }}; ++i) {
+        std::memcpy(input_data, fixed_input, sizeof(fixed_input));
+        if (invoke() != 0) return -7;
     }
+{% if not fixture_aot %}
     hpx_fixture_memory_snapshot(4, interpreter.arena_used_bytes());
+{% endif %}
     int32_t invocation_status = 0;
+    uint32_t ticks = 0;
+{% if fixture_timing_scope == 'restore_and_invoke' %}
     const uint32_t t0 = hpx_stimer_ticks();
-    for (unsigned i = 0; i < 100; ++i) {
-        std::memcpy(input->data.int8, fixed_input, sizeof(fixed_input));
-        invocation_status |= interpreter.Invoke();
+{% endif %}
+    for (unsigned i = 0; i < {{ fixture_iterations }}; ++i) {
+        std::memcpy(input_data, fixed_input, sizeof(fixed_input));
+{% if fixture_timing_scope == 'invoke_only' %}
+        const uint32_t t0 = hpx_stimer_ticks();
+{% endif %}
+        invocation_status |= invoke();
+{% if fixture_timing_scope == 'invoke_only' %}
+        ticks += hpx_stimer_ticks() - t0;
+{% endif %}
     }
-    const uint32_t ticks = hpx_stimer_ticks() - t0;
+{% if fixture_timing_scope == 'restore_and_invoke' %}
+    ticks = hpx_stimer_ticks() - t0;
+{% endif %}
     if (invocation_status != 0) return -7;
     if (!ticks || ticks >= 60U*HPX_STIMER_HZ) return -9;
+{% if not fixture_aot %}
     hpx_fixture_memory_snapshot(5, interpreter.arena_used_bytes());
     hpx_fixture_memory_finish();
+{% endif %}
     deployment_timing[0] = ticks;
-    deployment_timing[1] = 100;
-    deployment_timing[2] = 5;
+    deployment_timing[1] = {{ fixture_iterations }};
+    deployment_timing[2] = {{ fixture_warmups }};
     deployment_timing[3] = HPX_STIMER_HZ;
     deployment_timing[4] = g_hpx_stimer_last_ticks;
     deployment_timing[5] = SystemCoreClock;
+    deployment_timing[6] = {{ 1 if fixture_timing_scope == "invoke_only" else 2 }};
     for (unsigned i = 0; i < sizeof(deployment_output); ++i) {
-        deployment_output[i] = static_cast<uint8_t>(output->data.int8[i]);
+        deployment_output[i] = output_data[i];
     }
     return 0;
 }

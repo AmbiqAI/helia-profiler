@@ -1,31 +1,56 @@
-# Fixed-input fixture integration
+# Fixed-input fixture measurements
 
-`helia_profiler.fixture.build_fixed_fixture(config, fixture, runtime=runtime)`
-uses the existing host-only NSX pipeline. It does not power, probe, flash or
-capture. The initial slice accepts one INT8 TCN input `(1, 240, 14)` and output
-`(1, 240, 2)`, SRAM arena, MRAM model, LP Apollo510 EVB and ATfE. It preserves
-five warmups and one 100-call batch, restoring the entire input before each call.
+`helia_profiler.fixture.build_fixed_fixture(config, fixture, method=method,
+runtime=runtime, compile=True)` composes the existing platform, engine,
+memory-plan, firmware-generation and NSX build stages. It never probes or
+flashes. `compile=False` prepares and renders without linking.
 
-The caller supplies frozen `FixedFixture` and `PreparedUpstreamRuntime` records.
-Model/input/expected bytes, runtime archive and manifest are SHA256 pinned.
-The manifest lists include directories and every vendored header digest plus
-provider URLs/revisions and the archive ABI. These source identities are
-**manifest-declared**, not independently authenticated by matching the hashes.
-Qualification must retain and audit the corresponding source/build record.
-The build receipt pins the archive manifest, NSX lock, link map, ELF, flat image
-and generated source. It checks the selected local archive and rejects competing
-runtime modules. No default adapter behavior changes.
+Supply SHA256-pinned `FixtureFile` records for model/input/reference and
+`FixedFixture` tensor declarations. Model analysis verifies dimensions, indices,
+INT8 type and per-tensor quantization, then derives the used operator resolver.
+The supported capability is one static, stateless INT8 input and output on
+Apollo510 EVB LP, ATfE, SRAM arena and MRAM weights. Unsupported graphs fail
+before engine preparation. Advisory batch wildcards are accepted only when
+the stored shape has batch one; firmware never resizes or rewrites the model.
+No model names or fixed shapes select execution.
 
-`compile=False` renders only. An explicit preserved work directory is bound to
-fixture, configuration and runtime identities; mismatched reuse fails. This is
-a prepared-runtime integration, not a source runtime builder or general recipe.
+`FixtureMethod(FixtureTimingScope.RESTORE_AND_INVOKE)` measures a batch including
+full input restoration. `INVOKE_ONLY` restores each input outside each measured
+invocation and sums the timer intervals; timer quantization applies per call.
+Both use `config.profiling.warmup` and `iterations`. The build identity binds
+fixture, configuration, provider and timing scope. Reusing a work directory with
+different intent fails. Historical measurements retain their original methods.
 
-`helia_profiler.firmware.fixture_memory.decode_memory_snapshots` validates the
-versioned 32-byte terminal. Three values are current normal allocator use after
-I/O access, warmups and the timed batch. They are not allocator peaks, temporary
-high-water marks or minimum viable capacity. The firmware captures them outside
-the timed interval. Full output is 480 bytes; timing is six words. The caller
-still owns numerical acceptance against the pinned full expected output.
+TFLM requires explicit `PreparedUpstreamRuntime`: a pinned archive, header root
+and manifest. Strict typed ingress validates provider URLs/revisions, archive
+ABI, include directories and all header hashes. Copies recheck hashes and path
+containment. Provider source identities remain manifest-declared; retain the
+corresponding audited source/build record. AOT accepts no upstream override and
+uses the ordinary AOT adapter and its generated module. Ordinary profiler
+configuration and provider defaults are unchanged.
 
-Stack/heap peaks are unavailable. Energy is not captured by this API. One batch
-is integration smoke evidence, not a variance or performance qualification study.
+`FixtureBuild` pins generated sources, ELF, flat image, dependency lock and map;
+its runtime manifest is absent for AOT. A prepared result is not a successful
+build or a numerical validation result.
+
+`helia_profiler.fixture_capture.capture_fixture(request, guard=guard)` captures
+raw evidence using existing profiler flash/probe APIs. `FixtureCaptureRequest`
+binds ELF/image pins, device/serial (`AP510NFA-CBR` for the supported board), output extent, load address, evidence
+directory, settle interval, timing scope and optional TFLM arena capacity.
+The caller's `FixtureCaptureGuard.check(require_free=..., remaining_s=...)`
+must enforce exclusive ownership and its bounded deadline. Image extents,
+symbols, full readback, exact poison writes and stable halted terminal reads are
+checked. Each attempt preserves started, identity, binary terminal and final
+receipt artifacts; existing attempt directories are never overwritten.
+
+Transport success establishes completion, checksum and supported clock/timer
+metadata; it does **not** establish numerical acceptance. The caller binds the
+request to its build receipt, compares every output byte under its policy and
+checks observed iteration/warmup counts against the requested method. The
+seven-word timing terminal includes firmware-reported scope, which must match
+the request. Failed attempts retain available raw bytes.
+
+The optional versioned 32-byte memory terminal reports normal TFLM allocator
+use after I/O access, warmups and measured calls, outside the timed interval.
+AOT planned regions are not allocator observations. Neither value is a transient
+peak or minimum capacity. Stack/heap peaks and energy are unavailable here.
