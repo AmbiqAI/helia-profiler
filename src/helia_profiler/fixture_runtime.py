@@ -1,4 +1,4 @@
-"""Verified prepared-runtime records and host-only NSX staging."""
+"""Hash-verified prepared-runtime declarations and host-only NSX staging."""
 
 from __future__ import annotations
 
@@ -65,6 +65,8 @@ class RuntimeProvider:
 
 @dataclass(frozen=True)
 class RuntimeABI:
+    """Manifest-declared ABI; archive members are not independently inspected."""
+
     toolchain: str
     cpu: str
     float_abi: str
@@ -107,7 +109,9 @@ class PreparedUpstreamRuntime:
     manifest: FixtureFile
 
     def verify(self) -> VerifiedPreparedRuntime:
-        self.archive.read()
+        archive = self.archive.read()
+        if len(archive) <= 8 or not archive.startswith(b"!<arch>\n"):
+            raise ValueError("Prepared runtime requires a nonempty regular archive")
         data = _object(
             json.loads(self.manifest.read(), object_pairs_hook=_unique_object),
             {"schema_version", "archive_sha256", "providers", "abi", "headers", "include_dirs"},

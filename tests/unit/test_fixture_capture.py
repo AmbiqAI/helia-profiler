@@ -12,6 +12,7 @@ import pytest
 from helia_profiler import fixture_capture as capture
 from helia_profiler.fixture import FixtureTimingScope
 from helia_profiler.fixture_image import inspect_elf
+from helia_profiler.fixture_target import supported_fixture_target
 from helia_profiler.fixture_runtime import FixtureFile
 
 
@@ -50,6 +51,9 @@ class Guard:
     def __init__(self):
         self.calls = []
 
+    def verify_target(self, *, target, jlink_serial):
+        assert target == supported_fixture_target() and jlink_serial == "123"
+
     def check(self, *, require_free, remaining_s):
         self.calls.append((require_free, remaining_s))
 
@@ -62,11 +66,12 @@ def rig(tmp_path, monkeypatch):
         image,
         0x410000,
         3,
-        "Cortex-M55",
+        "AP510NFA-CBR",
         "123",
         tmp_path / "evidence",
         0.01,
         FixtureTimingScope.INVOKE_ONLY,
+        supported_fixture_target(),
     )
     memory = {0x410000: image.read(), 0xE000ED00: struct.pack("<I", 0xD22 << 4)}
     writes = []
@@ -153,7 +158,7 @@ def test_failure_preserves_receipt_and_no_retry(rig, fault):
 def test_guard_denial_stops_before_probe(rig, monkeypatch):
     request, _, _, _, flashes, _ = rig
 
-    class Denied:
+    class Denied(Guard):
         def check(self, **kwargs):
             raise PermissionError("denied by caller")
 
@@ -293,3 +298,50 @@ def test_partial_snapshot_preserves_received_evidence(rig, monkeypatch, pass_num
     else:
         assert not timing_path.exists()
     assert json.loads((request.evidence_dir / "receipt.json").read_text())["state"] == "failure"
+
+
+def test_consistent_relocated_image_rejected_before_device(rig, monkeypatch):
+    request, memory, terminal, writes, flashes, guard = rig
+    raw = bytearray(request.elf.read())
+    struct.pack_into("<I", raw, 24, 0x420001)
+    struct.pack_into("<II", raw, 60, 0x420000, 0x420000)
+    request.elf.path.write_bytes(raw)
+    moved = replace(
+        request, elf=FixtureFile(request.elf.path, sha256(raw).hexdigest()), load_address=0x420000
+    )
+    memory[0x420000] = request.image.read()
+    result = capture.capture_fixture(moved, guard=guard)
+    assert result.state == "failure"
+    assert result.error is not None and "boot origin" in result.error
+    assert not guard.calls and not flashes and not writes
+
+
+def test_unsupported_device_rejected_before_device(rig):
+    request, memory, terminal, writes, flashes, guard = rig
+    with pytest.raises(ValueError, match="target"):
+        capture.capture_fixture(replace(request, device="AP510BFA-CBR"), guard=guard)
+    assert not guard.calls and not flashes and not writes
+
+
+def test_missing_physical_target_verification_stops_before_device(rig, monkeypatch):
+    request, memory, terminal, writes, flashes, guard = rig
+
+    class UnverifiedGuard(Guard):
+        def verify_target(self, *, target, jlink_serial):
+            raise ValueError("No independent physical board/serial verification")
+
+    monkeypatch.setattr(
+        capture, "list_connected_probes", lambda: pytest.fail("probe enumeration reached")
+    )
+    result = capture.capture_fixture(request, guard=UnverifiedGuard())
+    assert result.state == "failure"
+    assert result.error is not None and "physical board" in result.error
+    assert not flashes and not writes
+
+
+def test_inconsistent_typed_target_stops_before_device(rig):
+    request, memory, terminal, writes, flashes, guard = rig
+    bad = replace(request.target, board="apollo510b_evb")
+    with pytest.raises(ValueError, match="target"):
+        capture.capture_fixture(replace(request, target=bad), guard=guard)
+    assert not guard.calls and not flashes and not writes

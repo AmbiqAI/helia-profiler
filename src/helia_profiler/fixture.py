@@ -12,6 +12,8 @@ from .engines import EngineType
 from .errors import ConfigError
 from .pipeline import PipelineContext, PipelineRunner, Stage, serialize_config
 from .placement import Placement
+from .fixture_target import FixtureTarget, supported_fixture_target
+from .results.models import ToolchainInfo
 
 
 from enum import StrEnum
@@ -82,9 +84,12 @@ class FixtureBuild:
     link_map: FixtureFile | None
     timing_scope: FixtureTimingScope
     engine: EngineType
-    build_identity: str
+    build_identity: str | None
     iterations: int
     warmups: int
+    intent_identity: str
+    target: FixtureTarget
+    toolchain: ToolchainInfo | None
     provider_provenance: str = (
         "manifest-declared; independently audit the pinned build/source record"
     )
@@ -96,6 +101,8 @@ def _validate(config: ProfileConfig, fixture: FixedFixture) -> None:
         raise ConfigError("Profile model differs from the pinned fixture")
     if config.engine.type not in (EngineType.TFLM, EngineType.HELIA_AOT):
         raise ConfigError("Fixture supports upstream TFLM or helia-AOT only")
+    if config.target.custom_socs or config.target.custom_boards:
+        raise ConfigError("Fixed fixture does not support custom target declarations")
     if config.target.board != "apollo510_evb" or config.target.clock.cpu != "lp":
         raise ConfigError("Fixed fixture supports Apollo510 EVB LP clock only")
     if (
@@ -243,6 +250,26 @@ def build_fixed_fixture(
             or "helia-rt" in map_text
         ):
             raise ConfigError("Link map does not prove the explicit upstream provider")
+    intent_identity = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
+    toolchain = ctx.run_metadata.toolchain if compile else None
+    if compile and (toolchain is None or not toolchain.compiler_version):
+        raise ConfigError("Compiled fixture requires recorded toolchain provenance")
+    artifact_identity = None
+    if binary is not None:
+        artifact_identity = hashlib.sha256(
+            json.dumps(
+                {
+                    "intent": intent_identity,
+                    "elf": binary.sha256,
+                    "image": flat_binary.sha256 if flat_binary else None,
+                    "lock": dependency_lock.sha256 if dependency_lock else None,
+                    "map": link_map.sha256 if link_map else None,
+                    "sources": [(source.path.name, source.sha256) for source in sources],
+                    "toolchain": asdict(toolchain) if toolchain else None,
+                },
+                sort_keys=True,
+            ).encode()
+        ).hexdigest()
     return FixtureBuild(
         fixture.identity,
         app,
@@ -256,9 +283,12 @@ def build_fixed_fixture(
         link_map,
         method.timing_scope,
         config.engine.type,
-        hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest(),
+        artifact_identity,
         config.profiling.iterations,
         config.profiling.warmup,
+        intent_identity,
+        supported_fixture_target(),
+        toolchain,
         "manifest-declared; independently audit the pinned build/source record"
         if runtime
         else "normal AOT engine artifacts and resolved dependency lock",

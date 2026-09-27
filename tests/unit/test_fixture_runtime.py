@@ -18,7 +18,7 @@ from helia_profiler.fixture_runtime import (
 
 def runtime(tmp_path, mutate=None):
     archive = tmp_path / "runtime.a"
-    archive.write_bytes(b"archive")
+    archive.write_bytes(b"!<arch>\nfixture-member")
     header = tmp_path / "header.h"
     header.write_bytes(b"header")
     data = {
@@ -116,3 +116,20 @@ def test_duplicate_manifest_keys_rejected(tmp_path):
     )
     with pytest.raises(ValueError, match="Duplicate"):
         source.verify()
+
+
+def test_non_archive_rejected_even_with_matching_manifest_hash(tmp_path):
+    candidate = runtime(tmp_path)
+    candidate.archive.path.write_bytes(b"not-an-archive")
+    data = json.loads(candidate.manifest.path.read_text())
+    data["archive_sha256"] = sha256(candidate.archive.path.read_bytes()).hexdigest()
+    candidate.manifest.path.write_text(json.dumps(data))
+    candidate = PreparedUpstreamRuntime(
+        FixtureFile(candidate.archive.path, data["archive_sha256"]),
+        candidate.header_root,
+        FixtureFile(
+            candidate.manifest.path, sha256(candidate.manifest.path.read_bytes()).hexdigest()
+        ),
+    )
+    with pytest.raises(ValueError, match="archive"):
+        candidate.verify()

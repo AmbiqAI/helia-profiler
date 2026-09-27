@@ -3,7 +3,7 @@
 from __future__ import annotations
 from pathlib import Path
 from ..engines import EngineType
-from ..engines.base import ArenaRegion
+from ..engines.base import ArenaRegion, HeliaAotArtifacts
 from ..errors import ConfigError
 from ..pipeline import PipelineContext
 from ..placement import ArenaRole
@@ -15,6 +15,11 @@ def fixture_template_vars(ctx: PipelineContext, regions: list[ArenaRegion]) -> d
     if spec is None:
         raise ConfigError("Fixture render specification missing")
     spec.fixture.verify()
+    if (
+        isinstance(ctx.engine_artifacts, HeliaAotArtifacts)
+        and not ctx.engine_artifacts.aot_allocate_arenas
+    ):
+        raise ConfigError("External AOT arenas are not qualified for fixed fixtures")
     if any(r.placement not in ("sram", "mram") for r in regions):
         raise ConfigError("Fixture supports SRAM/MRAM AOT regions only")
     if any(

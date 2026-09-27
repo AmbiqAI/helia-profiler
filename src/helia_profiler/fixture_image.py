@@ -76,6 +76,12 @@ class Image:
 
 
 def inspect_elf(data: bytes, binary: bytes, load_address: int, sizes: dict[str, int]) -> Image:
+    from .fixture_target import supported_fixture_target
+
+    require(
+        load_address == supported_fixture_target().load_address,
+        "unsupported application boot origin",
+    )
     require(52 <= len(data) <= MAX_ELF, "ELF size")
     require(data[:7] == b"\x7fELF\x01\x01\x01", "requires ELF32 little endian version 1")
     fields = struct.unpack_from("<HHIIIIIHHHHHH", data, 16)

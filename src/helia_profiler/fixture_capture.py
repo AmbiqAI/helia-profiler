@@ -12,6 +12,7 @@ from typing import Protocol
 
 from .fixture import FixtureTimingScope
 from .fixture_runtime import FixtureFile
+from .fixture_target import FixtureTarget
 from .fixture_image import MAX_ELF, MAX_IMAGE, DTCM, digest, require, inspect_elf
 from .target.probe.flash import flash_binary
 from .target.probe.jlink import attached_session, reset_target, list_connected_probes
@@ -21,6 +22,14 @@ class FixtureCaptureGuard(Protocol):
     """Caller-owned authorization and remaining-window checks."""
 
     def check(self, *, require_free: bool, remaining_s: float) -> None: ...
+
+    def verify_target(self, *, target: FixtureTarget, jlink_serial: str) -> None:
+        """Require caller-verified physical board/serial identity and exclusive ownership.
+
+        Core CPUID and probe enumeration cannot establish the physical board.
+        Reject if the caller has no current independent board/serial evidence.
+        """
+        ...
 
 
 @dataclass(frozen=True)
@@ -34,6 +43,7 @@ class FixtureCaptureRequest:
     evidence_dir: Path
     settle_seconds: float
     timing_scope: FixtureTimingScope
+    target: FixtureTarget
     arena_capacity: int | None = None
 
 
@@ -119,6 +129,9 @@ def capture_fixture(
         "Invalid arena capacity",
     )
     require(isinstance(request.timing_scope, FixtureTimingScope), "Explicit timing scope required")
+    require(isinstance(request.target, FixtureTarget), "Explicit typed fixture target required")
+    request.target.verify()
+    require(request.device == request.target.device, "Device differs from fixture target")
     directory = request.evidence_dir
     directory.mkdir(parents=True, exist_ok=False)
     _atomic_json(directory / "started.json", {"state": "started", "request": asdict(request)})
@@ -182,6 +195,7 @@ def capture_fixture(
         )
         # Flash the verified private copy so source mutation cannot select another image.
         flash_image = pin("image.bin", image.binary)
+        guard.verify_target(target=request.target, jlink_serial=request.jlink_serial)
         guard.check(require_free=True, remaining_s=360)
         require(
             sum(str(p.serial) == request.jlink_serial for p in list_connected_probes()) == 1,

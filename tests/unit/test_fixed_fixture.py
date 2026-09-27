@@ -15,6 +15,7 @@ from helia_profiler.config import (
 )
 from helia_profiler.engines import EngineType
 from helia_profiler.pipeline import PipelineContext
+from helia_profiler.results.models import ToolchainInfo, RunMetadata
 from helia_profiler.fixture_analysis import FixtureModelAnalysis
 from helia_profiler.modelcost.model_analysis import ModelAnalysis, LayerOps
 from helia_profiler.firmware.op_resolver import build_fixture_resolver_plan
@@ -79,7 +80,7 @@ def runtime(tmp_path):
         p.write_bytes(data)
         return FixtureFile(p, sha256(data).hexdigest())
 
-    a = pin("runtime.a", b"archive")
+    a = pin("runtime.a", b"!<arch>\nfixture-member")
     h = pin("header.h", b"header")
     data = {
         "schema_version": 1,
@@ -123,6 +124,9 @@ def test_host_only_stage_selection_and_source_receipt(tmp_path, monkeypatch, eng
     c = replace(c, engine=EngineConfig(type=engine, backend="cmsis_nn"))
     selected_runtime = rt if engine is EngineType.TFLM else None
     calls = []
+    elf_bytes = b"elf"
+    compiler_version = "qualified-compiler"
+    lock_suffix = ""
 
     class Runner:
         def __init__(self, stages):
@@ -141,7 +145,7 @@ def test_host_only_stage_selection_and_source_receipt(tmp_path, monkeypatch, eng
             ):
                 (app / "src" / name).write_text(name)
             binary = app / "hpx_profiler"
-            binary.write_bytes(b"elf")
+            binary.write_bytes(elf_bytes)
             binary.with_suffix(".bin").write_bytes(b"bin")
             binary.with_suffix(".map").write_text("hpx-upstream-runtime/runtime.a(member.o)")
             module = app / "modules/hpx-upstream-runtime"
@@ -150,8 +154,12 @@ def test_host_only_stage_selection_and_source_receipt(tmp_path, monkeypatch, eng
             (module / "provider-manifest.json").write_bytes(rt.manifest.read())
             (app / "nsx.lock").write_text(
                 "targets:\n  apollo510_evb:\n    modules:\n      hpx-upstream-runtime: {}\n"
+                + lock_suffix
             )
             return SimpleNamespace(
+                run_metadata=RunMetadata(
+                    toolchain=ToolchainInfo(compiler="atfe", compiler_version=compiler_version)
+                ),
                 resolved_firmware_dir=app,
                 profile_run=SimpleNamespace(firmware=SimpleNamespace(binary_path=binary)),
             )
@@ -159,6 +167,7 @@ def test_host_only_stage_selection_and_source_receipt(tmp_path, monkeypatch, eng
     monkeypatch.setattr("helia_profiler.fixture.PipelineRunner", Runner)
     r = build_fixed_fixture(c, f, method=METHOD, runtime=selected_runtime, compile=False)
     assert not r.built and r.binary is None and len(r.generated_sources) == 4
+    assert r.build_identity is None
     assert calls[-1] == [
         "bind_fixed_fixture",
         "resolve_platform",
@@ -173,6 +182,24 @@ def test_host_only_stage_selection_and_source_receipt(tmp_path, monkeypatch, eng
     assert r.binary is not None
     assert r.binary.read() == b"elf"
     assert calls[-1][-1] == "build_firmware"
+    assert r.build_identity is not None and r.build_identity != r.intent_identity
+    original_identity = r.build_identity
+    elf_bytes = b"different-elf"
+    changed = build_fixed_fixture(c, f, method=METHOD, runtime=selected_runtime)
+    assert changed.intent_identity == r.intent_identity
+    assert changed.build_identity != original_identity
+    elf_bytes = b"elf"
+    compiler_version = "different-compiler"
+    changed = build_fixed_fixture(c, f, method=METHOD, runtime=selected_runtime)
+    assert changed.intent_identity == r.intent_identity
+    assert changed.build_identity != original_identity
+    compiler_version = "qualified-compiler"
+    lock_suffix = "# different resolved dependency graph\n"
+    changed = build_fixed_fixture(c, f, method=METHOD, runtime=selected_runtime)
+    assert changed.intent_identity == r.intent_identity
+    assert changed.build_identity != original_identity
+    assert r.target.board == "apollo510_evb"
+
     with pytest.raises(Exception, match="different fixture"):
         build_fixed_fixture(
             replace(c, model=replace(c.model, arena_size=131072)),
@@ -335,3 +362,24 @@ def test_aot_render_uses_compiled_model_without_interpreter(tmp_path):
     assert "MicroInterpreter" not in source
     assert "MicroMutableOpResolver" not in source
     assert "model_data.h" not in source
+
+
+def test_external_aot_arena_mode_rejected(tmp_path):
+    from helia_profiler.engines.base import HeliaAotArtifacts
+    from helia_profiler.firmware.fixture import fixture_template_vars
+
+    c, f = fixture(tmp_path)
+    ctx = PipelineContext(
+        config=replace(c, engine=EngineConfig(type=EngineType.HELIA_AOT)), work_dir=tmp_path
+    )
+    _BindFixtureStage(FixtureRenderSpec(f, METHOD, analyzed(f))).run(ctx)
+    ctx.engine_artifacts = HeliaAotArtifacts(
+        engine_header="model.h",
+        aot_prefix="model",
+        aot_module_name="model",
+        aot_cmake_target="model",
+        helia_aot_version="test",
+        aot_allocate_arenas=False,
+    )
+    with pytest.raises(Exception, match="External AOT arenas"):
+        fixture_template_vars(ctx, [])

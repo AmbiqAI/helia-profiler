@@ -17,16 +17,22 @@ No model names or fixed shapes select execution.
 `FixtureMethod(FixtureTimingScope.RESTORE_AND_INVOKE)` measures a batch including
 full input restoration. `INVOKE_ONLY` restores each input outside each measured
 invocation and sums the timer intervals; timer quantization applies per call.
-Both use `config.profiling.warmup` and `iterations`. The build identity binds
-fixture, configuration, provider and timing scope. Reusing a work directory with
+Both use `config.profiling.warmup` and `iterations`. The intent identity binds
+fixture, configuration, provider and timing scope. A compiled build identity
+also binds ELF/image, dependency lock, link map, generated source hashes and
+recorded toolchain provenance. Render-only results have no build identity. Reusing a work directory with
 different intent fails. Historical measurements retain their original methods.
 
 TFLM requires explicit `PreparedUpstreamRuntime`: a pinned archive, header root
-and manifest. Strict typed ingress validates provider URLs/revisions, archive
-ABI, include directories and all header hashes. Copies recheck hashes and path
+and manifest. Strict typed ingress validates provider URL/revision declarations, declared ABI,
+include directories and all header hashes. Archive hashing and regular-archive
+magic rejection do not verify member format, ARM attributes or ABI compatibility.
+The caller must independently audit the provider archive build/source/ABI record
+before supplying it; manifest fields are assertions, not independent ABI evidence. Copies recheck hashes and path
 containment. Provider source identities remain manifest-declared; retain the
 corresponding audited source/build record. AOT accepts no upstream override and
-uses the ordinary AOT adapter and its generated module. Ordinary profiler
+uses the ordinary AOT adapter and its internally allocated generated module.
+External-arena fixture mode is rejected until separately qualified. Ordinary profiler
 configuration and provider defaults are unchanged.
 
 `FixtureBuild` pins generated sources, ELF, flat image, dependency lock and map;
@@ -37,8 +43,17 @@ build or a numerical validation result.
 raw evidence using existing profiler flash/probe APIs. `FixtureCaptureRequest`
 binds ELF/image pins, device/serial (`AP510NFA-CBR` for the supported board), output extent, load address, evidence
 directory, settle interval, timing scope and optional TFLM arena capacity.
+Pass `target=build.target`: the typed canonical board/device/load-origin record.
+Other devices, target declarations, custom target overlays and relocated
+application origins are rejected before device operations.
 The caller's `FixtureCaptureGuard.check(require_free=..., remaining_s=...)`
-must enforce exclusive ownership and its bounded deadline. Image extents,
+must enforce exclusive ownership and its bounded deadline. The mandatory
+`guard.verify_target(target=..., jlink_serial=...)` must reject unless the caller
+has current independent physical board-to-serial verification and ownership.
+The profiler verifies supported declarations and probe enumeration; CPUID only
+establishes core type, not physical board identity. A no-op verifier does not
+satisfy this caller contract. Reset boots the canonical application origin;
+alternate image origins and boot-selection modes are not supported. Image extents,
 symbols, full readback, exact poison writes and stable halted terminal reads are
 checked. Each attempt preserves started, identity, binary terminal and final
 receipt artifacts; existing attempt directories are never overwritten.
