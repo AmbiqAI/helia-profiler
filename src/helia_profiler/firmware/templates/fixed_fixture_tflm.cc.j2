@@ -1,0 +1,103 @@
+#include <cstdint>
+#include <cstring>
+#if defined(__ARM_FEATURE_MVE)
+#include <arm_mve.h>
+#endif
+#include "apollo510.h"
+#include "nsx_system.h"
+#include "nsx_core.h"
+#include "am_hal_pwrctrl.h"
+#include "fixed_fixture_clock.h"
+#include "fixed_fixture_memory.h"
+#include "model_data.h"
+#include "tensorflow/lite/micro/micro_interpreter.h"
+#include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
+#include "tensorflow/lite/schema/schema_generated.h"
+
+static const uint8_t fixed_input[] = { {{ input_values }} };
+alignas(16) static uint8_t arena[{{ arena_size }}] __attribute__((section(".sram_bss")));
+volatile int32_t deployment_status = -1;
+volatile uint8_t deployment_output[{{ output_tensor.size }}];
+volatile uint32_t deployment_checksum;
+volatile uint32_t deployment_timing[6];
+
+static int infer_fixture() {
+    hpx_fixture_memory_init(sizeof(arena));
+    tflite::MicroMutableOpResolver<6> resolver;
+    if (resolver.AddReshape() != kTfLiteOk ||
+        resolver.AddDepthwiseConv2D() != kTfLiteOk ||
+        resolver.AddConv2D() != kTfLiteOk || resolver.AddMean() != kTfLiteOk ||
+        resolver.AddMul() != kTfLiteOk || resolver.AddAdd() != kTfLiteOk) return -3;
+    const auto *model = tflite::GetModel(model_data);
+    if (model->version() != TFLITE_SCHEMA_VERSION || model->subgraphs()->size() != 1) return -4;
+    const auto *graph = model->subgraphs()->Get(0);
+    if (graph->inputs()->size() != 1 || graph->outputs()->size() != 1) return -6;
+    tflite::MicroInterpreter interpreter(model, resolver, arena, sizeof(arena));
+    if (interpreter.AllocateTensors() != kTfLiteOk) return -5;
+    auto *input = interpreter.input(0);
+    auto *output = interpreter.output(0);
+{% for name, tensor in [('input', input_tensor), ('output', output_tensor)] %}
+    if (graph->{{ 'inputs' if name == 'input' else 'outputs' }}()->Get(0) != {{ tensor.tensor_index }} ||
+        !{{ name }} || {{ name }}->type != kTfLiteInt8 || {{ name }}->bytes != {{ tensor.size }} ||
+        {{ name }}->dims->size != {{ tensor.shape | length }} ||
+        {{ name }}->params.scale != {{ tensor.scale.hex() }}f ||
+        {{ name }}->params.zero_point != {{ tensor.zero_point }}) return -6;
+{% for dim in tensor.shape %}
+    if ({{ name }}->dims->data[{{ loop.index0 }}] != {{ dim }}) return -6;
+{% endfor %}
+{% endfor %}
+    hpx_fixture_memory_snapshot(3, interpreter.arena_used_bytes());
+    if (!hpx_stimer_init()) return -8;
+    for (unsigned i = 0; i < 5; ++i) {
+        std::memcpy(input->data.int8, fixed_input, sizeof(fixed_input));
+        if (interpreter.Invoke() != kTfLiteOk) return -7;
+    }
+    hpx_fixture_memory_snapshot(4, interpreter.arena_used_bytes());
+    int32_t invocation_status = 0;
+    const uint32_t t0 = hpx_stimer_ticks();
+    for (unsigned i = 0; i < 100; ++i) {
+        std::memcpy(input->data.int8, fixed_input, sizeof(fixed_input));
+        invocation_status |= interpreter.Invoke();
+    }
+    const uint32_t ticks = hpx_stimer_ticks() - t0;
+    if (invocation_status != 0) return -7;
+    if (!ticks || ticks >= 60U*HPX_STIMER_HZ) return -9;
+    hpx_fixture_memory_snapshot(5, interpreter.arena_used_bytes());
+    hpx_fixture_memory_finish();
+    deployment_timing[0] = ticks;
+    deployment_timing[1] = 100;
+    deployment_timing[2] = 5;
+    deployment_timing[3] = HPX_STIMER_HZ;
+    deployment_timing[4] = g_hpx_stimer_last_ticks;
+    deployment_timing[5] = SystemCoreClock;
+    for (unsigned i = 0; i < sizeof(deployment_output); ++i) {
+        deployment_output[i] = static_cast<uint8_t>(output->data.int8[i]);
+    }
+    return 0;
+}
+
+int main() {
+    nsx_system_config_t config = {};
+    config.perf_mode = NSX_PERF_LOW;
+    config.enable_cache = true;
+    config.enable_sram = true;
+    config.debug.transport = NSX_DEBUG_NONE;
+    config.skip_bsp_init = false;
+    config.spot_mgr_profile = true;
+    int32_t status = nsx_system_init(&config);
+    if (status == 0) {
+        SystemCoreClock = 96000000U;
+        am_hal_pwrctrl_sram_memcfg_t sram = {};
+        sram.eSRAMCfg = AM_HAL_PWRCTRL_SRAM_3M;
+        sram.eActiveWithMCU = AM_HAL_PWRCTRL_SRAM_3M;
+        sram.eActiveWithGFX = AM_HAL_PWRCTRL_SRAM_NONE;
+        sram.eActiveWithDISP = AM_HAL_PWRCTRL_SRAM_NONE;
+        sram.eSRAMRetain = AM_HAL_PWRCTRL_SRAM_3M;
+        status = am_hal_pwrctrl_sram_config(&sram) == 0 ? infer_fixture() : -2;
+        uint32_t checksum = 0;
+        for (unsigned i = 0; i < sizeof(deployment_output); ++i) checksum = checksum*31U + deployment_output[i];
+        deployment_checksum = checksum;
+    }
+    deployment_status = status;
+    for (;;) __WFI();
+}

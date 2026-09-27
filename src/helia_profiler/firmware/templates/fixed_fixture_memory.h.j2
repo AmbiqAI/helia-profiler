@@ -1,0 +1,33 @@
+#pragma once
+
+#include <stdint.h>
+
+static volatile uint32_t deployment_memory[8];
+
+static inline void hpx_fixture_memory_init(uint32_t capacity_bytes) {
+    deployment_memory[0] = UINT32_C(0x4d454d31);
+    deployment_memory[1] = UINT32_C(1);
+    deployment_memory[2] = capacity_bytes;
+    deployment_memory[3] = UINT32_C(0);
+    deployment_memory[4] = UINT32_C(0);
+    deployment_memory[5] = UINT32_C(0);
+    deployment_memory[6] = UINT32_C(0);
+    deployment_memory[7] = UINT32_C(0);
+}
+
+static inline void hpx_fixture_memory_snapshot(uint32_t word_index, uint32_t used_bytes) {
+    if (word_index == UINT32_C(3) || word_index == UINT32_C(4) ||
+        word_index == UINT32_C(5)) {
+        deployment_memory[word_index] = used_bytes;
+    }
+}
+
+static inline void hpx_fixture_memory_finish(void) {
+    uint32_t checksum = UINT32_C(0);
+    for (uint32_t index = UINT32_C(0); index < UINT32_C(6); ++index) {
+        checksum = checksum * UINT32_C(31) + deployment_memory[index];
+    }
+    deployment_memory[6] = UINT32_C(1);
+    checksum = checksum * UINT32_C(31) + deployment_memory[6];
+    deployment_memory[7] = checksum;
+}
