@@ -16,7 +16,7 @@ from .placement import Placement
 
 from enum import StrEnum
 from .fixture_runtime import FixtureFile, PreparedUpstreamRuntime, _PreparedRuntimeStage
-from .modelcost.fixture_analysis import Int8Tensor, FixtureModelAnalysis, analyze_fixture_model
+from .fixture_analysis import Int8Tensor, FixtureModelAnalysis, analyze_fixture_model
 
 
 class FixtureTimingScope(StrEnum):

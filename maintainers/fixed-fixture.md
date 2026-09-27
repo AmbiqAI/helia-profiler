@@ -54,3 +54,15 @@ The optional versioned 32-byte memory terminal reports normal TFLM allocator
 use after I/O access, warmups and measured calls, outside the timed interval.
 AOT planned regions are not allocator observations. Neither value is a transient
 peak or minimum capacity. Stack/heap peaks and energy are unavailable here.
+
+The pre-link plan includes fixture output, status, checksum, timing, timer state,
+and the TFLM memory terminal in the default data region, plus the fixed input in
+MRAM. Tensor extents come from validated model metadata. The normal arena and
+boot-stack reservations remain; inactive PMU and transport buffers are excluded.
+These are source-level reservations, not whole-ELF totals: optimization may
+remove timer state, while linker alignment and other runtime objects are resolved
+by the linked-image memory report.
+
+The existing host compile gate includes representative TCN/KWS fixtures for both
+engines and timing scopes. The existing real-toolchain gate includes both engines
+and models, using its normal qualified dependency-workspace requirements.

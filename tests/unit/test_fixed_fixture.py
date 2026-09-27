@@ -15,7 +15,7 @@ from helia_profiler.config import (
 )
 from helia_profiler.engines import EngineType
 from helia_profiler.pipeline import PipelineContext
-from helia_profiler.modelcost.fixture_analysis import FixtureModelAnalysis
+from helia_profiler.fixture_analysis import FixtureModelAnalysis
 from helia_profiler.modelcost.model_analysis import ModelAnalysis, LayerOps
 from helia_profiler.firmware.op_resolver import build_fixture_resolver_plan
 from helia_profiler.vocab import Toolchain

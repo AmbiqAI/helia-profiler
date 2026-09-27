@@ -7,9 +7,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ..firmware.op_resolver import ResolverPlan, build_fixture_resolver_plan
-from . import model_analysis
-from .model_analysis import ModelAnalysis
+from .firmware.op_resolver import ResolverPlan, build_fixture_resolver_plan
+from .modelcost import model_analysis
+from .modelcost.model_analysis import ModelAnalysis
 
 
 @dataclass(frozen=True)

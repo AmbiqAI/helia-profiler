@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from helia_profiler.modelcost.fixture_analysis import analyze_fixture_model
+from helia_profiler.fixture_analysis import analyze_fixture_model
 
 s = pytest.importorskip("ai_edge_litert.schema_py_generated")
 flatbuffers = pytest.importorskip("flatbuffers")

@@ -13,11 +13,19 @@ typedef enum {
 } TfLiteStatus;
 
 typedef union {
+    int8_t *int8;
     char *raw;
     void *data;
 } TfLitePtrUnion;
 
+enum TfLiteType { kTfLiteInt8 = 9 };
+struct TfLiteIntArray { int size; int data[4]; };
+struct TfLiteQuantizationParams { float scale; int32_t zero_point; };
+
 typedef struct {
+    TfLiteType type;
+    TfLiteIntArray *dims;
+    TfLiteQuantizationParams params;
     size_t bytes;
     TfLitePtrUnion data;
 } TfLiteTensor;
