@@ -114,3 +114,11 @@ free-running/degraded captures cannot become per-inference energy. Poll-based
 edges require bounded uncertainty. Energy covers the stated powered domain with
 no idle subtraction. Missing captures have null values and `not_captured`, not zero.
 This normalization layer does not add a gated firmware mode or acquire an instrument.
+
+Build receipts also expose `planned_memory` from the existing memory-plan stage,
+with `planned_memory_reason` when unavailable. This is a compiler/configuration
+plan, not a linked measurement or allocator observation. If AOT has no complete
+producer plan, the capacities-only fallback is not exported as an arena plan.
+Unknown runtime or source mappings invalidate the whole AOT plan rather than
+silently dropping allocations. Staged constant source and destination remain
+separate physical consumers; neither is added to enclosing section totals.

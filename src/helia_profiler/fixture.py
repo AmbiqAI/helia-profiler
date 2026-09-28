@@ -13,7 +13,7 @@ from .errors import ConfigError
 from .pipeline import PipelineContext, PipelineRunner, Stage, serialize_config
 from .placement import Placement
 from .fixture_target import FixtureTarget, supported_fixture_target
-from .results.models import ToolchainInfo
+from .results.models import ToolchainInfo, MemoryPlan
 
 
 from enum import StrEnum
@@ -93,6 +93,8 @@ class FixtureBuild:
     provider_provenance: str = (
         "manifest-declared; independently audit the pinned build/source record"
     )
+    planned_memory: MemoryPlan | None = None
+    planned_memory_reason: str | None = "not_recorded"
 
 
 def _validate(config: ProfileConfig, fixture: FixedFixture) -> None:
@@ -270,6 +272,11 @@ def build_fixed_fixture(
                 sort_keys=True,
             ).encode()
         ).hexdigest()
+    planned_memory = ctx.memory_plan
+    if config.engine.type is EngineType.HELIA_AOT and (
+        ctx.engine_artifacts is None or ctx.engine_artifacts.memory_plan is None
+    ):
+        planned_memory = None
     return FixtureBuild(
         fixture.identity,
         app,
@@ -292,4 +299,8 @@ def build_fixed_fixture(
         "manifest-declared; independently audit the pinned build/source record"
         if runtime
         else "normal AOT engine artifacts and resolved dependency lock",
+        planned_memory=planned_memory,
+        planned_memory_reason=None
+        if planned_memory is not None
+        else "producer_plan_unavailable_or_unsupported_mapping",
     )
