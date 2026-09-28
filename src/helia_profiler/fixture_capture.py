@@ -32,8 +32,28 @@ class FixtureCaptureGuard(Protocol):
         ...
 
 
+_STATUS_POISON = struct.unpack("<i", bytes([0xA5]) * 4)[0]
+_STATUS_RUNNING = -1
+_FIRST_POLL_S = 1.0
+_POLL_INTERVAL_S = 0.25
+_MEMORY_MAGIC = (0x4D454D31, 1)
+# Terminal status codes returned by fixed_fixture.cc.j2.
+_FAILED_STAGES = {
+    -2: "SRAM power configuration",
+    -3: "operator resolver registration",
+    -4: "model schema check",
+    -5: "arena allocation or model init",
+    -6: "input/output tensor contract",
+    -7: "inference invoke",
+    -8: "STIMER start",
+    -9: "timing bound",
+}
+
+
 @dataclass(frozen=True)
 class FixtureCaptureRequest:
+    """One bounded capture; ``settle_seconds`` is the maximum wait for completion."""
+
     elf: FixtureFile
     image: FixtureFile
     load_address: int
@@ -99,6 +119,27 @@ def _memory(data: bytes, capacity: int) -> FixtureMemory:
     )
     require(all(0 < used <= capacity for used in words[3:6]), "Invalid allocator-use snapshot")
     return FixtureMemory(capacity, *words[3:6])
+
+
+def _running_stage(status: int, memory: bytes | None) -> str:
+    """Name the stage an unfinished fixture reached from its live sinks."""
+    if status == _STATUS_POISON:
+        return "firmware not started (status sink still poisoned)"
+    if status != _STATUS_RUNNING:
+        return f"unrecognised status {status}"
+    if memory is None or len(memory) != 32:
+        return "running (no intermediate stage reported)"
+    words = struct.unpack("<8I", memory)
+    if words[:2] != _MEMORY_MAGIC or not words[3]:
+        return "running before tensor allocation"
+    if not words[4]:
+        return "running warmups"
+    return "running the timed loop"
+
+
+def _failed_stage(status: int) -> str:
+    stage = _FAILED_STAGES.get(status, "system initialisation or unknown stage")
+    return f"Firmware failed at {stage} (status {status})"
 
 
 def capture_fixture(
@@ -248,10 +289,52 @@ def capture_fixture(
                 require(
                     read(session, sink.address, sink.size) == poison, "Poison readback mismatch"
                 )
+        sinks = {sink.name: sink for sink in image.sinks}
+
+        def await_completion(session, started: float) -> None:
+            """Poll the running target's status sink until it leaves both sentinels."""
+            polls = 0
+            while True:
+                polls += 1
+                raw = read(session, sinks["deployment_status"].address, 4)
+                live = struct.unpack("<i", raw)[0]
+                elapsed = time.monotonic() - started
+                completed = live not in (_STATUS_POISON, _STATUS_RUNNING)
+                if completed or elapsed >= request.settle_seconds:
+                    break
+                time.sleep(min(_POLL_INTERVAL_S, request.settle_seconds - elapsed))
+            live_memory = None
+            if not completed and "deployment_memory" in sinks:
+                live_memory = read(session, sinks["deployment_memory"].address, 32)
+            pin(
+                "completion.json",
+                (
+                    json.dumps(
+                        {
+                            "completed": completed,
+                            "status": live,
+                            "polls": polls,
+                            "elapsed_s": elapsed,
+                            "max_wait_s": request.settle_seconds,
+                        },
+                        sort_keys=True,
+                    )
+                    + "\n"
+                ).encode(),
+            )
+            require(
+                completed,
+                f"Firmware did not complete within {request.settle_seconds} s: "
+                + _running_stage(live, live_memory),
+            )
+
         guard.check(require_free=True, remaining_s=request.settle_seconds + 120)
         reset_target(device=request.device, jlink_serial=request.jlink_serial)
-        time.sleep(request.settle_seconds)
+        started = time.monotonic()
+        # Stay detached while the secure bootloader runs after reset.
+        time.sleep(min(_FIRST_POLL_S, request.settle_seconds))
         with attach() as session:
+            await_completion(session, started)
             halt(session)
             verify(session)
             values = snapshot(session, suffix="")
@@ -261,6 +344,7 @@ def capture_fixture(
             require(session.halted(), "Target resumed during snapshot")
         status = struct.unpack("<i", values["deployment_status"])[0]
         crc = struct.unpack("<I", values["deployment_checksum"])[0]
+        require(status == 0, _failed_stage(status))
         timing_words = struct.unpack("<7I", values["deployment_timing"])
         observed_scope = {
             1: FixtureTimingScope.INVOKE_ONLY,
@@ -274,7 +358,6 @@ def capture_fixture(
             observed_scope is request.timing_scope,
             "Timing scope differs from verified firmware terminal",
         )
-        require(status == 0, "Firmware completion status is nonzero")
         computed = 0
         for byte in values["deployment_output"]:
             computed = (computed * 31 + byte) & 0xFFFFFFFF

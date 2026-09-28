@@ -345,3 +345,96 @@ def test_inconsistent_typed_target_stops_before_device(rig):
     with pytest.raises(ValueError, match="target"):
         capture.capture_fixture(replace(request, target=bad), guard=guard)
     assert not guard.calls and not flashes and not writes
+
+
+_RUNNING = {
+    0x20000000: struct.pack("<i", -1),
+    0x20000004: bytes(3),
+    0x20000008: bytes(4),
+    0x2000000C: bytes(28),
+}
+
+
+def test_mid_loop_read_waits_for_completion(rig, monkeypatch):
+    """Sinks read while the timed loop still runs must not end the capture."""
+    request, memory, terminal, _, _, guard = rig
+    status_reads = 0
+    original_attach = capture.attached_session
+
+    @contextmanager
+    def attach(**kwargs):
+        with original_attach(**kwargs) as session:
+            original_read = session.memory_read8
+
+            def read(address, count):
+                nonlocal status_reads
+                if address == 0x20000000 and memory[address] == _RUNNING[address]:
+                    status_reads += 1
+                    if status_reads > 3:
+                        memory.update(terminal)
+                return original_read(address, count)
+
+            monkeypatch.setattr(session, "memory_read8", read)
+            yield session
+
+    monkeypatch.setattr(capture, "attached_session", attach)
+    monkeypatch.setattr(capture, "reset_target", lambda **kwargs: memory.update(_RUNNING))
+    result = capture.capture_fixture(replace(request, settle_seconds=5), guard=guard)
+    assert result.state == "success", result.error
+    assert result.timing is not None and result.timing.iterations == 10
+    completion = json.loads((request.evidence_dir / "completion.json").read_text())
+    assert completion["status"] == 0 and completion["polls"] == 4
+
+
+def test_completion_timeout_names_running_stage(rig, monkeypatch):
+    request, memory, terminal, _, _, guard = rig
+    monkeypatch.setattr(
+        capture, "reset_target", lambda **kwargs: memory.update({0x20000000: struct.pack("<i", -1)})
+    )
+    result = capture.capture_fixture(request, guard=guard)
+    assert result.state == "failure"
+    assert result.error is not None
+    assert "did not complete within 0.01 s" in result.error and "running" in result.error
+    completion = json.loads((request.evidence_dir / "completion.json").read_text())
+    assert completion["status"] == -1 and completion["completed"] is False
+
+
+def test_completion_timeout_names_unstarted_firmware(rig, monkeypatch):
+    request, memory, terminal, _, _, guard = rig
+    monkeypatch.setattr(capture, "reset_target", lambda **kwargs: None)
+    result = capture.capture_fixture(request, guard=guard)
+    assert result.state == "failure"
+    assert result.error is not None and "not started" in result.error
+
+
+def test_nonzero_status_names_failing_stage(rig):
+    request, memory, terminal, _, _, guard = rig
+    terminal[0x20000000] = struct.pack("<i", -7)
+    result = capture.capture_fixture(request, guard=guard)
+    assert result.state == "failure"
+    assert result.error is not None and "invoke" in result.error and "-7" in result.error
+
+
+def _live_memory(*words):
+    return struct.pack("<8I", *words, *([0] * (8 - len(words))))
+
+
+@pytest.mark.parametrize(
+    "status,memory,stage",
+    [
+        (capture._STATUS_POISON, None, "not started"),
+        (-1, None, "no intermediate stage"),
+        (-1, _live_memory(), "before tensor allocation"),
+        (-1, _live_memory(0x4D454D31, 1, 1024), "before tensor allocation"),
+        (-1, _live_memory(0x4D454D31, 1, 1024, 100), "running warmups"),
+        (-1, _live_memory(0x4D454D31, 1, 1024, 100, 100), "timed loop"),
+        (7, None, "unrecognised status 7"),
+    ],
+)
+def test_running_stage_names_progress(status, memory, stage):
+    assert stage in capture._running_stage(status, memory)
+
+
+def test_failed_stage_names_unmapped_status():
+    assert capture._failed_stage(-9) == "Firmware failed at timing bound (status -9)"
+    assert "unknown stage" in capture._failed_stage(-42)

@@ -42,7 +42,8 @@ build or a numerical validation result.
 `helia_profiler.fixture_capture.capture_fixture(request, guard=guard)` captures
 raw evidence using existing profiler flash/probe APIs. `FixtureCaptureRequest`
 binds ELF/image pins, device/serial (`AP510NFA-CBR` for the supported board), output extent, load address, evidence
-directory, settle interval, timing scope and optional TFLM arena capacity.
+directory, maximum completion wait (`settle_seconds`), timing scope and optional
+TFLM arena capacity.
 Pass `target=build.target`: the typed canonical board/device/load-origin record.
 Other devices, target declarations, custom target overlays and relocated
 application origins are rejected before device operations.
@@ -55,8 +56,14 @@ establishes core type, not physical board identity. A no-op verifier does not
 satisfy this caller contract. Reset boots the canonical application origin;
 alternate image origins and boot-selection modes are not supported. Image extents,
 symbols, full readback, exact poison writes and stable halted terminal reads are
-checked. Each attempt preserves started, identity, binary terminal and final
-receipt artifacts; existing attempt directories are never overwritten.
+checked. After reset the host stays detached for up to one second, then reads
+the running target's status sink without halting it until the status leaves its
+poison and running sentinels or `settle_seconds` elapses. A timeout names the
+stage reached (not started, before tensor allocation, warmups, timed loop; the
+intermediate stages need the TFLM memory sink) and a nonzero status names the
+failing firmware stage. Each attempt preserves started, identity, completion,
+binary terminal and final receipt artifacts; existing attempt directories are
+never overwritten.
 
 Transport success establishes completion, checksum and supported clock/timer
 metadata; it does **not** establish numerical acceptance. The caller binds the
