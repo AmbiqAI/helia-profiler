@@ -438,3 +438,13 @@ def test_running_stage_names_progress(status, memory, stage):
 def test_failed_stage_names_unmapped_status():
     assert capture._failed_stage(-9) == "Firmware failed at timing bound (status -9)"
     assert "unknown stage" in capture._failed_stage(-42)
+
+
+def test_early_firmware_failure_names_stage_before_timing(rig):
+    """A failing fixture returns before writing timing; the stage must still be named."""
+    request, memory, terminal, _, _, guard = rig
+    terminal[0x20000000] = struct.pack("<i", -5)
+    terminal[0x2000000C] = bytes(28)
+    result = capture.capture_fixture(request, guard=guard)
+    assert result.state == "failure"
+    assert result.error == "Firmware failed at arena allocation or model init (status -5)"
