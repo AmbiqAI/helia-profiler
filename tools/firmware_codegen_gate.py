@@ -10,7 +10,8 @@ records section sizes and per-function disassembly digests.
 Run ``record`` once in each checkout with the same ``--scratch`` directory so
 embedded paths are identical. ``compare`` fails on any profiler or power
 difference and on any fixture disassembly difference; fixture section-size
-differences are reported for the change description.
+differences are reported for the change description. Debug sections are ignored:
+they embed the compile directory, which differs between checkouts.
 """
 
 from __future__ import annotations
@@ -125,7 +126,7 @@ def compare(base_path: Path, head_path: Path) -> int:
         deltas = {
             s: h["sections"].get(s, 0) - b["sections"].get(s, 0)
             for s in set(b["sections"]) | set(h["sections"])
-            if h["sections"].get(s, 0) != b["sections"].get(s, 0)
+            if not s.startswith(".debug") and h["sections"].get(s, 0) != b["sections"].get(s, 0)
         }
         if b["kind"] == "fixture":
             if changed:
