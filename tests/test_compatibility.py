@@ -49,7 +49,7 @@ def test_default_baseline_has_exact_qualified_refs(tmp_path: Path) -> None:
     assert baseline.project("ns-cmsis-nn").ref == "8d34472eaf494589515d1463b8a427564ee83947"
     assert baseline.project("nsx-executorch").ref == "5514ac1ea8439b3fe615d180bf68c75a9dabb48e"
     assert baseline.engine("executorch").ref == "5514ac1ea8439b3fe615d180bf68c75a9dabb48e"
-    assert baseline.engine("helia-rt").ref == "fe025f2be66ac213cafbbf203a395a3d1e89156f"
+    assert baseline.engine("helia-rt").ref == "ce03af575c5369605fea447f8a0b9c2808ea3a11"
     assert baseline.engine("helia-aot").min_version == "0.23.0"
     assert baseline.engine("helia-aot").max_version_exclusive == "0.24.0"
     assert len(baseline.fingerprint) == 64
@@ -71,7 +71,7 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "arm-cmsis-nn": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",
         "ns-cmsis-nn": "8d34472eaf494589515d1463b8a427564ee83947",
         "nsx-executorch": "5514ac1ea8439b3fe615d180bf68c75a9dabb48e",
-        "helia-rt": "fe025f2be66ac213cafbbf203a395a3d1e89156f",
+        "helia-rt": "ce03af575c5369605fea447f8a0b9c2808ea3a11",
         # nsx-sensors: INA228 driver pinned for the shunt-cal register
         # fixes and raw 40-bit accumulator reads power.driver: ina228
         # needs (issue #95).
@@ -85,10 +85,10 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "arm-cmsis-nn": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",
         "nsx-cmsis-nn": "8d34472eaf494589515d1463b8a427564ee83947",
         "nsx-executorch": "5514ac1ea8439b3fe615d180bf68c75a9dabb48e",
-        "nsx-helia-rt": "fe025f2be66ac213cafbbf203a395a3d1e89156f",
+        "nsx-helia-rt": "ce03af575c5369605fea447f8a0b9c2808ea3a11",
         "nsx-sensors": "c219a2bc98c62f96819fae20ab6c8911fcea3e25",
     }
-    assert baseline.engine("helia-rt").version == "1.21.0"
+    assert baseline.engine("helia-rt").version == "1.21.2"
     assert baseline.engine("helia-aot").min_version == "0.23.0"
     assert baseline.engine("helia-aot").max_version_exclusive == "0.24.0"
     assert baseline.engine("tflm").governed_by_modules
