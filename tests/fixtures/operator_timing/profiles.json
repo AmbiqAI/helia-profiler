@@ -20,6 +20,9 @@
    },
    "profiling": {
     "clean_window_probe": "infer"
+   },
+   "engine": {
+    "backend": "cmsis_nn"
    }
   },
   "overflow_detected": false,
@@ -125,6 +128,9 @@
    },
    "profiling": {
     "clean_window_probe": "infer"
+   },
+   "engine": {
+    "backend": null
    }
   },
   "overflow_detected": false,
@@ -230,6 +236,9 @@
    },
    "profiling": {
     "clean_window_probe": "infer"
+   },
+   "engine": {
+    "backend": null
    }
   },
   "overflow_detected": false,
@@ -317,6 +326,9 @@
    },
    "profiling": {
     "clean_window_probe": "busy_loop"
+   },
+   "engine": {
+    "backend": null
    }
   },
   "overflow_detected": false,

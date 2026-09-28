@@ -134,10 +134,12 @@ separate physical consumers; neither is added to enclosing section totals.
 per-layer cycles from a separate `hpx profile` run of the same model to a fixture
 build. The fixture image has no per-operator hooks, so these are approximate
 shares from a PMU-instrumented sibling image, never the fixture's latency. The
-record is null with a reason unless the model hash, engine, compiler version,
-board, LP 96 MHz clock and SRAM/MRAM placement match, no counter overflowed, the
-clean window ran inferences, and the per-layer sum agrees with the clean-window
-cycles within 1 % (2 % below 2 ms). A TFLM fixture's prepared upstream runtime is
+record is null with a reason unless the fixture is the one the build was made
+from and the model hash, engine, TFLM `cmsis_nn` backend, compiler version, board,
+LP 96 MHz clock and SRAM/MRAM placement match, every layer has finite cycles, no
+counter overflowed, the clean window ran inferences, and the per-layer sum agrees
+with the clean-window cycles within 1 % (2 % below 2 ms). A TFLM fixture's prepared upstream runtime is
 not selectable by `hpx profile`; `allow_runtime_difference=True` accepts the
-baseline stack and labels the record. The fixture build does not record the
-engine version, so the record carries the profile's for the consumer to compare.
+baseline stack and labels the record. The fixture build records no engine
+version or AOT code-generation options, so neither is compared; the record
+carries the profile's engine version.

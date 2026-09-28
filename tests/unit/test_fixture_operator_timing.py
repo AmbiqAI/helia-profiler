@@ -67,10 +67,13 @@ def fixture_for(sha: str, tmp_path) -> FixedFixture:
     )
 
 
-def build_for(engine: EngineType, tmp_path, *, prepared_runtime: bool = False) -> FixtureBuild:
+def build_for(
+    engine: EngineType, fixture: FixedFixture, *, prepared_runtime: bool = False
+) -> FixtureBuild:
+    tmp_path = fixture.model.path.parent
     file = FixtureFile(tmp_path / "f", "0" * 64)
     return FixtureBuild(
-        "fixture",
+        fixture.identity,
         tmp_path,
         file,
         (),
@@ -92,9 +95,10 @@ def build_for(engine: EngineType, tmp_path, *, prepared_runtime: bool = False) -
 
 
 def test_real_aot_capture_binds_within_one_percent(tmp_path):
+    fixture = fixture_for(KWS_SHA, tmp_path)
     result = bind_operator_timing(
-        build_for(EngineType.HELIA_AOT, tmp_path),
-        fixture_for(KWS_SHA, tmp_path),
+        build_for(EngineType.HELIA_AOT, fixture),
+        fixture,
         profile("kws_aot"),
     )
     assert result.accepted and result.reason is None
@@ -108,8 +112,8 @@ def test_real_aot_capture_binds_within_one_percent(tmp_path):
 
 
 def test_tflm_prepared_runtime_needs_explicit_label(tmp_path):
-    build = build_for(EngineType.TFLM, tmp_path, prepared_runtime=True)
     fixture, run = fixture_for(KWS_SHA, tmp_path), profile("kws_tflm")
+    build = build_for(EngineType.TFLM, fixture, prepared_runtime=True)
     refused = bind_operator_timing(build, fixture, run)
     assert refused.operators is None and refused.reason == "runtime_stack_mismatch"
     labelled = bind_operator_timing(build, fixture, run, allow_runtime_difference=True)
@@ -125,9 +129,8 @@ def test_short_inference_uses_two_percent(tmp_path):
         engine={"type": "helia-aot", "version": "0.23.0"},
         config={**raw["config"], "model": {"arena_location": "sram", "weights_location": "mram"}},
     )
-    result = bind_operator_timing(
-        build_for(EngineType.HELIA_AOT, tmp_path), fixture_for(raw["model_sha256"], tmp_path), run
-    )
+    fixture = fixture_for(raw["model_sha256"], tmp_path)
+    result = bind_operator_timing(build_for(EngineType.HELIA_AOT, fixture), fixture, run)
     assert result.accepted, result.reason
     assert result.agreement_pct is not None and 1.0 < result.agreement_pct < 2.0
     assert result.tolerance_pct == 2.0
@@ -136,9 +139,10 @@ def test_short_inference_uses_two_percent(tmp_path):
 def test_long_inference_outside_one_percent_is_refused(tmp_path):
     raw = PROFILES["kws_aot"]
     layers = [dict(layer, cycles=layer["cycles"] * 1.012) for layer in raw["layers"]]
+    fixture = fixture_for(KWS_SHA, tmp_path)
     result = bind_operator_timing(
-        build_for(EngineType.HELIA_AOT, tmp_path),
-        fixture_for(KWS_SHA, tmp_path),
+        build_for(EngineType.HELIA_AOT, fixture),
+        fixture,
         profile("kws_aot", layers=layers),
     )
     assert result.operators is None
@@ -154,9 +158,8 @@ def test_busy_loop_clean_window_is_refused(tmp_path):
         toolchain={"compiler": "atfe", "compiler_version": "clang version 22.1.0"},
         config={**raw["config"], "model": {"arena_location": "sram", "weights_location": "mram"}},
     )
-    result = bind_operator_timing(
-        build_for(EngineType.HELIA_AOT, tmp_path), fixture_for(raw["model_sha256"], tmp_path), run
-    )
+    fixture = fixture_for(raw["model_sha256"], tmp_path)
+    result = bind_operator_timing(build_for(EngineType.HELIA_AOT, fixture), fixture, run)
     assert result.operators is None and result.reason == "clean_window_not_inference"
 
 
@@ -167,11 +170,19 @@ def test_busy_loop_clean_window_is_refused(tmp_path):
         ({"model_sha256": ""}, "profile_model_identity_unrecorded"),
         ({"engine": {"type": "tflm", "version": None}}, "engine_mismatch"),
         ({"toolchain": {"compiler": "gcc", "compiler_version": "15.2.1"}}, "compiler_mismatch"),
+        (
+            {"toolchain": {"compiler": "atfe", "compiler_version": "clang version 21.1.0"}},
+            "compiler_mismatch",
+        ),
         ({"board": "apollo510b_evb"}, "board_mismatch"),
         ({"cpu_clock_name": "hp"}, "clock_mismatch"),
         ({"system_clock_hz": 192_000_000}, "clock_mismatch"),
         (
             {"config": {"model": {"arena_location": "tcm", "weights_location": "mram"}}},
+            "placement_mismatch",
+        ),
+        (
+            {"config": {"model": {"arena_location": "sram", "weights_location": "tcm"}}},
             "placement_mismatch",
         ),
         ({"overflow_detected": True}, "counter_overflow"),
@@ -182,9 +193,10 @@ def test_busy_loop_clean_window_is_refused(tmp_path):
 def test_identity_or_counter_mismatch_is_null_with_reason(tmp_path, override, reason):
     if "config" in override:
         override["config"]["profiling"] = {"clean_window_probe": "infer"}
+    fixture = fixture_for(KWS_SHA, tmp_path)
     result = bind_operator_timing(
-        build_for(EngineType.HELIA_AOT, tmp_path),
-        fixture_for(KWS_SHA, tmp_path),
+        build_for(EngineType.HELIA_AOT, fixture),
+        fixture,
         profile("kws_aot", **override),
     )
     assert result.operators is None and not result.accepted
@@ -194,15 +206,45 @@ def test_identity_or_counter_mismatch_is_null_with_reason(tmp_path, override, re
 def test_layer_overflow_is_refused(tmp_path):
     layers = [dict(layer) for layer in PROFILES["kws_aot"]["layers"]]
     layers[3]["overflow"] = True
+    fixture = fixture_for(KWS_SHA, tmp_path)
     result = bind_operator_timing(
-        build_for(EngineType.HELIA_AOT, tmp_path),
-        fixture_for(KWS_SHA, tmp_path),
+        build_for(EngineType.HELIA_AOT, fixture),
+        fixture,
         profile("kws_aot", layers=layers),
     )
     assert result.reason == "counter_overflow"
 
 
 def test_fixture_toolchain_unrecorded_is_refused(tmp_path):
-    build = replace(build_for(EngineType.HELIA_AOT, tmp_path), toolchain=None)
-    result = bind_operator_timing(build, fixture_for(KWS_SHA, tmp_path), profile("kws_aot"))
+    fixture = fixture_for(KWS_SHA, tmp_path)
+    build = replace(build_for(EngineType.HELIA_AOT, fixture), toolchain=None)
+    result = bind_operator_timing(build, fixture, profile("kws_aot"))
     assert result.reason == "toolchain_unrecorded"
+
+
+def test_fixture_other_than_the_build_is_refused(tmp_path):
+    fixture = fixture_for(KWS_SHA, tmp_path)
+    other = replace(fixture, output_tensor=Int8Tensor((1, 12), 0.00390625, -127, 1))
+    result = bind_operator_timing(
+        build_for(EngineType.HELIA_AOT, other), fixture, profile("kws_aot")
+    )
+    assert result.reason == "fixture_mismatch" and result.operators is None
+
+
+def test_tflm_backend_other_than_cmsis_nn_is_refused(tmp_path):
+    fixture = fixture_for(KWS_SHA, tmp_path)
+    raw = PROFILES["kws_tflm"]
+    run = profile("kws_tflm", config={**raw["config"], "engine": {"backend": "reference"}})
+    build = build_for(EngineType.TFLM, fixture, prepared_runtime=True)
+    result = bind_operator_timing(build, fixture, run, allow_runtime_difference=True)
+    assert result.reason == "backend_mismatch" and result.operators is None
+
+
+def test_non_finite_layer_cycles_are_refused(tmp_path):
+    layers = [dict(layer) for layer in PROFILES["kws_aot"]["layers"]]
+    layers[2]["cycles"] = float("nan")
+    fixture = fixture_for(KWS_SHA, tmp_path)
+    result = bind_operator_timing(
+        build_for(EngineType.HELIA_AOT, fixture), fixture, profile("kws_aot", layers=layers)
+    )
+    assert result.reason == "layer_cycles_unavailable" and result.operators is None

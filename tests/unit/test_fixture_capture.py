@@ -4,6 +4,8 @@ from contextlib import contextmanager
 from dataclasses import replace
 from hashlib import sha256
 import json
+from pathlib import Path
+import re
 import struct
 from types import SimpleNamespace
 
@@ -11,7 +13,7 @@ import pytest
 
 from helia_profiler import fixture_capture as capture
 from helia_profiler.fixture import FixtureTimingScope
-from helia_profiler.fixture_image import inspect_elf
+from helia_profiler.fixture_image import Sink, inspect_elf
 from helia_profiler.fixture_target import supported_fixture_target
 from helia_profiler.fixture_runtime import FixtureFile
 
@@ -448,3 +450,86 @@ def test_early_firmware_failure_names_stage_before_timing(rig):
     result = capture.capture_fixture(request, guard=guard)
     assert result.state == "failure"
     assert result.error == "Firmware failed at arena allocation or model init (status -5)"
+
+
+def test_target_is_not_halted_until_status_is_terminal(rig, monkeypatch):
+    request, memory, terminal, _, _, guard = rig
+    events: list[tuple] = []
+    after_reset = False
+    running_reads = 0
+    original_attach = capture.attached_session
+
+    @contextmanager
+    def attach(**kwargs):
+        with original_attach(**kwargs) as session:
+            original_read, original_halt = session.memory_read8, session.halt
+
+            def read(address, count):
+                nonlocal running_reads
+                if after_reset and address == 0x20000000:
+                    if struct.unpack("<i", memory[address][:4])[0] == -1:
+                        running_reads += 1
+                        if running_reads >= 3:
+                            memory.update(terminal)
+                    events.append(("read_status", struct.unpack("<i", memory[address][:4])[0]))
+                return original_read(address, count)
+
+            def halt():
+                if after_reset:
+                    events.append(("halt",))
+                return original_halt()
+
+            monkeypatch.setattr(session, "memory_read8", read)
+            monkeypatch.setattr(session, "halt", halt)
+            yield session
+
+    def reset(**kwargs):
+        nonlocal after_reset
+        after_reset = True
+        memory.update(_RUNNING)
+
+    sleeps: list[float] = []
+    monkeypatch.setattr(capture.time, "sleep", sleeps.append)
+    monkeypatch.setattr(capture, "attached_session", attach)
+    monkeypatch.setattr(capture, "reset_target", reset)
+    result = capture.capture_fixture(replace(request, settle_seconds=5), guard=guard)
+    assert result.state == "success", result.error
+    first_halt = events.index(("halt",))
+    assert first_halt >= 1
+    assert all(kind == "read_status" for kind, *_ in events[:first_halt])
+    assert events[first_halt - 1] == ("read_status", 0)
+    assert sleeps[0] == capture._FIRST_POLL_S
+    assert all(0 < s <= capture._POLL_INTERVAL_S for s in sleeps[1:])
+
+
+def test_memory_sink_names_stage_on_timeout(rig, monkeypatch):
+    request, memory, terminal, _, _, guard = rig
+    real_inspect = capture.inspect_elf
+
+    def inspect(elf, image, load_address, sizes):
+        sizes = dict(sizes)
+        assert sizes.pop("deployment_memory") == 32
+        found = real_inspect(elf, image, load_address, sizes)
+        return replace(found, sinks=found.sinks + (Sink("deployment_memory", 0x20000030, 32),))
+
+    live = struct.pack("<8I", 0x4D454D31, 1, 1024, 100, 0, 0, 0, 0)
+    monkeypatch.setattr(capture, "inspect_elf", inspect)
+    monkeypatch.setattr(
+        capture,
+        "reset_target",
+        lambda **kwargs: memory.update({0x20000000: struct.pack("<i", -1), 0x20000030: live}),
+    )
+    result = capture.capture_fixture(replace(request, arena_capacity=1024), guard=guard)
+    completion = json.loads((request.evidence_dir / "completion.json").read_text())
+    assert result.state == "failure"
+    assert result.error is not None and result.error.endswith("running warmups")
+    assert completion["completed"] is False and completion["status"] == -1
+
+
+def test_failed_stage_codes_are_returned_by_the_fixture_template():
+    template = (
+        Path(capture.__file__).parent / "firmware" / "templates" / "fixed_fixture.cc.j2"
+    ).read_text()
+    returned = {int(code) for code in re.findall(r"return (-\d+);", template)}
+    returned |= {int(code) for code in re.findall(r"\? infer_fixture\(\) : (-\d+)", template)}
+    assert returned == set(capture._FAILED_STAGES)

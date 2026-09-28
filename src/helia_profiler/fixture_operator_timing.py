@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 
+from .engines import EngineType
 from .fixture import FixedFixture, FixtureBuild
 from .results.models import ProfileResult
 
@@ -11,6 +13,7 @@ from .results.models import ProfileResult
 FIXTURE_CPU_HZ = 96_000_000
 FIXTURE_CLOCK = "lp"
 FIXTURE_PLACEMENT = {"arena_location": "sram", "weights_location": "mram"}
+FIXTURE_TFLM_BACKEND = "cmsis_nn"
 #: Layer-sum agreement with the uninstrumented clean window, in percent of clean.
 AGREEMENT_PCT = 1.0
 SHORT_AGREEMENT_PCT = 2.0
@@ -19,7 +22,7 @@ SHORT_INFERENCE_S = 0.002
 
 @dataclass(frozen=True)
 class OperatorTiming:
-    """Median per-operator cycles from the instrumented profile image."""
+    """Aggregated per-operator cycles from the instrumented profile image."""
 
     index: int | str
     op: str
@@ -35,8 +38,9 @@ class FixtureOperatorTiming:
     ``operators`` is set only when every identity check and the agreement rule
     pass. Cycles come from a separate PMU-instrumented image; they are
     approximate shares of the fixture's work, not its measured latency.
-    ``engine_version`` is the profile run's engine version; the fixture build
-    does not record one, so the consumer compares it.
+    ``engine_version`` is the profile run's engine version. The fixture build
+    records no engine version or AOT code-generation options, so neither is
+    compared here.
     """
 
     build_identity: str | None
@@ -62,12 +66,17 @@ def _identity_reason(
     snapshot = meta.config_snapshot or {}
     model = snapshot.get("model") or {}
     probe = (snapshot.get("profiling") or {}).get("clean_window_probe")
+    if build.fixture_identity != fixture.identity:
+        return "fixture_mismatch"
     if meta.model is None or not meta.model.sha256:
         return "profile_model_identity_unrecorded"
     if meta.model.sha256 != fixture.model.sha256:
         return "model_mismatch"
     if meta.engine is None or meta.engine.type != build.engine.value:
         return "engine_mismatch"
+    backend = (snapshot.get("engine") or {}).get("backend")
+    if build.engine is EngineType.TFLM and backend != FIXTURE_TFLM_BACKEND:
+        return "backend_mismatch"
     if build.toolchain is None or meta.toolchain is None:
         return "toolchain_unrecorded"
     if (meta.toolchain.compiler, meta.toolchain.compiler_version) != (
@@ -131,7 +140,7 @@ def bind_operator_timing(
         return result("counter_overflow")
     cycles: list[float] = []
     for layer in layers:
-        if layer.cycles is None or layer.cycles < 0:
+        if layer.cycles is None or not math.isfinite(layer.cycles) or layer.cycles < 0:
             return result("layer_cycles_unavailable")
         cycles.append(float(layer.cycles))
     clean = profile.pmu.meta.clean_infer_avg_cycles

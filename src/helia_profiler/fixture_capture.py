@@ -111,10 +111,7 @@ def _memory(data: bytes, capacity: int) -> FixtureMemory:
     for word in words[:7]:
         check = (check * 31 + word) & 0xFFFFFFFF
     require(
-        words[:2] == (0x4D454D31, 1)
-        and words[2] == capacity
-        and words[6] == 1
-        and words[7] == check,
+        words[:2] == _MEMORY_MAGIC and words[2] == capacity and words[6] == 1 and words[7] == check,
         "Invalid versioned memory terminal",
     )
     require(all(0 < used <= capacity for used in words[3:6]), "Invalid allocator-use snapshot")
