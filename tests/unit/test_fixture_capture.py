@@ -629,12 +629,15 @@ def test_short_prediction_falls_back_to_polling(rig, monkeypatch):
             monkeypatch.setattr(session, "memory_read8", read)
             yield session
 
+    sleeps: list[float] = []
+    monkeypatch.setattr(capture.time, "sleep", sleeps.append)
     monkeypatch.setattr(capture, "attached_session", attach)
     monkeypatch.setattr(capture, "reset_target", lambda **kwargs: memory.update(_RUNNING))
     result = capture.capture_fixture(
         replace(request, settle_seconds=5, expected_duration_s=0.1), guard=guard
     )
     assert result.state == "success", result.error
+    assert sleeps[0] == capture._FIRST_POLL_S
     completion = json.loads((request.evidence_dir / "completion.json").read_text())
     assert completion["complete_on_first_poll"] is False and completion["polls"] == 3
 

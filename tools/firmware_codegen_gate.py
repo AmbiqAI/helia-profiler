@@ -55,7 +55,10 @@ def _sections(size_tool: str, obj: Path) -> dict[str, int]:
 
 def _functions(objdump: str, obj: Path) -> dict[str, str]:
     out = subprocess.run(
-        [objdump, "-d", "--no-show-raw-insn", str(obj)], capture_output=True, text=True, check=True
+        [objdump, "-d", "-r", "--no-show-raw-insn", str(obj)],
+        capture_output=True,
+        text=True,
+        check=True,
     )
     functions: dict[str, list[str]] = {}
     current = None
@@ -73,9 +76,13 @@ def _functions(objdump: str, obj: Path) -> dict[str, str]:
 
 
 def record(out: Path, scratch: Path) -> None:
+    marker = scratch / ".hpx-codegen-gate"
     if scratch.exists():
+        if any(scratch.iterdir()) and not marker.exists():
+            raise SystemExit(f"refusing to clear {scratch}: not a codegen-gate scratch directory")
         shutil.rmtree(scratch)
     scratch.mkdir(parents=True)
+    marker.touch()
     results, skipped = {}, {}
     for case in hw._MATRIX:
         workspace = hw._resolve_workspace(case)
