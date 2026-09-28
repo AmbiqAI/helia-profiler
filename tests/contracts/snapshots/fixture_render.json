@@ -1,0 +1,38 @@
+{
+  "kws|helia-aot|invoke_only": {
+    "fixed_fixture.cc": "533ae8a07057485d8dc27a09ffa98b5a0a4a81e340ab211bf224d7452f20cc9b",
+    "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382"
+  },
+  "kws|helia-aot|restore_and_invoke": {
+    "fixed_fixture.cc": "0e958348e177d4cdb524b17170652db041f956f039632661e0b3a2b7735ca428",
+    "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382"
+  },
+  "kws|tflm|invoke_only": {
+    "fixed_fixture.cc": "bd99235af74a594a6dcfe4948f7a5f72651e83104407ab7947f1b5c413af2fd1",
+    "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382",
+    "fixed_fixture_memory.h": "baf938dba9148e9f25fd8245952b2f4fadcddf92a1ba33a133c26ac1477b1526"
+  },
+  "kws|tflm|restore_and_invoke": {
+    "fixed_fixture.cc": "5ae111c61b575c198b6296e9023b529f73f915ffbe1073f56400bc51fd198e4b",
+    "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382",
+    "fixed_fixture_memory.h": "baf938dba9148e9f25fd8245952b2f4fadcddf92a1ba33a133c26ac1477b1526"
+  },
+  "tcn|helia-aot|invoke_only": {
+    "fixed_fixture.cc": "2426e24dd52b2de9087b7206a9462125056b960275cd9ecb80272170dfd5f045",
+    "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382"
+  },
+  "tcn|helia-aot|restore_and_invoke": {
+    "fixed_fixture.cc": "8832fa08cd7acfe35592d80ab26ba4b6bab702d044303b662aaf4a1e7c406b1c",
+    "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382"
+  },
+  "tcn|tflm|invoke_only": {
+    "fixed_fixture.cc": "3e6d389568a6effbe06000ada156a1bdb91584932e497ab590e8860542b749e4",
+    "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382",
+    "fixed_fixture_memory.h": "baf938dba9148e9f25fd8245952b2f4fadcddf92a1ba33a133c26ac1477b1526"
+  },
+  "tcn|tflm|restore_and_invoke": {
+    "fixed_fixture.cc": "4eecd375dcf5ff124c73477216dfe02b4d7fe7507415ae1506905054daaf52e9",
+    "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382",
+    "fixed_fixture_memory.h": "baf938dba9148e9f25fd8245952b2f4fadcddf92a1ba33a133c26ac1477b1526"
+  }
+}
