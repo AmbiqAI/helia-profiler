@@ -15,7 +15,12 @@ from .fixture_runtime import FixtureFile
 from .fixture_target import FixtureTarget
 from .fixture_image import MAX_ELF, MAX_IMAGE, DTCM, digest, require, inspect_elf
 from .target.probe.flash import flash_binary
-from .target.probe.jlink import attached_session, reset_target, list_connected_probes
+from .target.probe.jlink import (
+    attached_session,
+    list_connected_probes,
+    reset_target,
+    resume_if_halted,
+)
 
 
 class FixtureCaptureGuard(Protocol):
@@ -288,7 +293,7 @@ def capture_fixture(
                 )
         sinks = {sink.name: sink for sink in image.sinks}
 
-        def await_completion(session, started: float) -> None:
+        def await_completion(session, started: float, resumed: bool) -> None:
             """Poll the running target's status sink until it leaves both sentinels."""
             polls = 0
             while True:
@@ -313,6 +318,7 @@ def capture_fixture(
                             "polls": polls,
                             "elapsed_s": elapsed,
                             "max_wait_s": request.settle_seconds,
+                            "resumed_after_attach": resumed,
                         },
                         sort_keys=True,
                     )
@@ -331,7 +337,8 @@ def capture_fixture(
         # Stay detached while the secure bootloader runs after reset.
         time.sleep(min(_FIRST_POLL_S, request.settle_seconds))
         with attach() as session:
-            await_completion(session, started)
+            guard.check(require_free=False, remaining_s=10)
+            await_completion(session, started, resume_if_halted(session))
             halt(session)
             verify(session)
             values = snapshot(session, suffix="")

@@ -78,12 +78,17 @@ def rig(tmp_path, monkeypatch):
     memory = {0x410000: image.read(), 0xE000ED00: struct.pack("<I", 0xD22 << 4)}
     writes = []
 
+    core = {"halted": False}
+
     class Session:
         def halt(self):
-            pass
+            core["halted"] = True
 
         def halted(self):
-            return True
+            return core["halted"]
+
+        def restart(self):
+            core["halted"] = False
 
         def memory_read8(self, address, count):
             return memory[address][:count]
@@ -106,7 +111,12 @@ def rig(tmp_path, monkeypatch):
     flashes = []
     monkeypatch.setattr(capture, "attached_session", attach)
     monkeypatch.setattr(capture, "flash_binary", lambda **kwargs: flashes.append(kwargs))
-    monkeypatch.setattr(capture, "reset_target", lambda **kwargs: memory.update(terminal))
+
+    def reset(**kwargs):
+        memory.update(terminal)
+        core["halted"] = False
+
+    monkeypatch.setattr(capture, "reset_target", reset)
     monkeypatch.setattr(capture, "list_connected_probes", lambda: [SimpleNamespace(serial="123")])
     monkeypatch.setattr(capture.time, "sleep", lambda _: None)
     return request, memory, terminal, writes, flashes, Guard()
@@ -130,6 +140,8 @@ def test_capture_raw_success(rig):
     assert flashes[0]["binary_path"] == request.evidence_dir / "image.bin"
     identity = json.loads((request.evidence_dir / "identity.json").read_text())
     assert identity["elf_sha256"] == request.elf.sha256
+    completion = json.loads((request.evidence_dir / "completion.json").read_text())
+    assert completion["resumed_after_attach"] is False
     assert len(identity["sinks"]) == 4
     assert any(not free for free, _ in guard.calls)
 
@@ -533,3 +545,37 @@ def test_failed_stage_codes_are_returned_by_the_fixture_template():
     returned = {int(code) for code in re.findall(r"return (-\d+);", template)}
     returned |= {int(code) for code in re.findall(r"\? infer_fixture\(\) : (-\d+)", template)}
     assert returned == set(capture._FAILED_STAGES)
+
+
+def test_attach_that_halts_the_core_is_resumed_before_polling(rig, monkeypatch):
+    """A debug connect that leaves the core halted must not stall the fixture."""
+    request, memory, terminal, _, _, guard = rig
+    after_reset = False
+    original_attach = capture.attached_session
+
+    @contextmanager
+    def attach(**kwargs):
+        with original_attach(**kwargs) as session:
+            if after_reset:
+                session.halt()
+                original_read = session.memory_read8
+
+                def read(address, count):
+                    if address == 0x20000000 and not session.halted():
+                        memory.update(terminal)
+                    return original_read(address, count)
+
+                monkeypatch.setattr(session, "memory_read8", read)
+            yield session
+
+    def reset(**kwargs):
+        nonlocal after_reset
+        after_reset = True
+        memory.update(_RUNNING)
+
+    monkeypatch.setattr(capture, "attached_session", attach)
+    monkeypatch.setattr(capture, "reset_target", reset)
+    result = capture.capture_fixture(replace(request, settle_seconds=0.5), guard=guard)
+    assert result.state == "success", result.error
+    completion = json.loads((request.evidence_dir / "completion.json").read_text())
+    assert completion["resumed_after_attach"] is True
