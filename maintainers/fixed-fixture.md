@@ -56,14 +56,18 @@ establishes core type, not physical board identity. A no-op verifier does not
 satisfy this caller contract. Reset boots the canonical application origin;
 alternate image origins and boot-selection modes are not supported. Image extents,
 symbols, full readback, exact poison writes and stable halted terminal reads are
-checked. After reset the host stays detached for up to one second, attaches,
+checked. After reset the host stays detached for one second, or for
+`expected_duration_s` × 1.25 when the caller predicts the run (both bounded by
+`settle_seconds`), so a correct prediction leaves the timed loop probe-free. It then attaches,
 resumes the core if the attach left it halted (recorded as
 `resumed_after_attach`), then reads the running target's status sink without
 halting it until the status leaves its
 poison and running sentinels or `settle_seconds` elapses. A timeout names the
 stage reached (not started, before tensor allocation, warmups, timed loop; the
 intermediate stages need the TFLM memory sink) and a nonzero status names the
-failing firmware stage. Each attempt preserves started, identity, completion,
+failing firmware stage from the shared `fixture_stage.FixtureStage`
+vocabulary that also renders the firmware return codes. `completion.json` records
+the detached time and whether the first poll already saw completion. Each attempt preserves started, identity, completion,
 binary terminal and final receipt artifacts; existing attempt directories are
 never overwritten.
 

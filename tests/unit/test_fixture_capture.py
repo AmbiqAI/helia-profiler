@@ -581,3 +581,69 @@ def test_attach_that_halts_the_core_is_resumed_before_polling(rig, monkeypatch):
     assert result.state == "success", result.error
     completion = json.loads((request.evidence_dir / "completion.json").read_text())
     assert completion["resumed_after_attach"] is True
+
+
+def test_predicted_run_stays_detached_and_completes_on_first_poll(rig, monkeypatch):
+    request, memory, terminal, _, _, guard = rig
+    sleeps: list[float] = []
+    monkeypatch.setattr(capture.time, "sleep", sleeps.append)
+    result = capture.capture_fixture(
+        replace(request, settle_seconds=10, expected_duration_s=2.0), guard=guard
+    )
+    assert result.state == "success", result.error
+    assert sleeps[0] == 2.0 * capture._EXPECTED_MARGIN
+    completion = json.loads((request.evidence_dir / "completion.json").read_text())
+    assert completion["detached_s"] == 2.5 and completion["complete_on_first_poll"] is True
+    assert completion["polls"] == 1
+
+
+def test_predicted_detach_is_bounded_by_settle_seconds(rig, monkeypatch):
+    request, memory, terminal, _, _, guard = rig
+    sleeps: list[float] = []
+    monkeypatch.setattr(capture.time, "sleep", sleeps.append)
+    result = capture.capture_fixture(
+        replace(request, settle_seconds=5, expected_duration_s=4.5), guard=guard
+    )
+    assert result.state == "success", result.error
+    assert sleeps[0] == 5
+
+
+def test_short_prediction_falls_back_to_polling(rig, monkeypatch):
+    request, memory, terminal, _, _, guard = rig
+    status_reads = 0
+    original_attach = capture.attached_session
+
+    @contextmanager
+    def attach(**kwargs):
+        with original_attach(**kwargs) as session:
+            original_read = session.memory_read8
+
+            def read(address, count):
+                nonlocal status_reads
+                if address == 0x20000000 and memory[address] == _RUNNING[address]:
+                    status_reads += 1
+                    if status_reads > 2:
+                        memory.update(terminal)
+                return original_read(address, count)
+
+            monkeypatch.setattr(session, "memory_read8", read)
+            yield session
+
+    monkeypatch.setattr(capture, "attached_session", attach)
+    monkeypatch.setattr(capture, "reset_target", lambda **kwargs: memory.update(_RUNNING))
+    result = capture.capture_fixture(
+        replace(request, settle_seconds=5, expected_duration_s=0.1), guard=guard
+    )
+    assert result.state == "success", result.error
+    completion = json.loads((request.evidence_dir / "completion.json").read_text())
+    assert completion["complete_on_first_poll"] is False and completion["polls"] == 3
+
+
+@pytest.mark.parametrize("expected", [0, -1.0, float("nan"), 11.0, "2"])
+def test_invalid_prediction_is_rejected_before_device(rig, expected):
+    request, memory, terminal, writes, flashes, guard = rig
+    with pytest.raises(ValueError, match="expected duration"):
+        capture.capture_fixture(
+            replace(request, settle_seconds=10, expected_duration_s=expected), guard=guard
+        )
+    assert not guard.calls and not flashes and not writes

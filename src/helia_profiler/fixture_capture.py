@@ -42,6 +42,7 @@ _STATUS_POISON = struct.unpack("<i", bytes([0xA5]) * 4)[0]
 _STATUS_RUNNING = -1
 _FIRST_POLL_S = 1.0
 _POLL_INTERVAL_S = 0.25
+_EXPECTED_MARGIN = 1.25
 _MEMORY_MAGIC = (0x4D454D31, 1)
 _FAILED_STAGES = {int(stage): stage.description for stage in FixtureStage}
 
@@ -61,6 +62,9 @@ class FixtureCaptureRequest:
     timing_scope: FixtureTimingScope
     target: FixtureTarget
     arena_capacity: int | None = None
+    #: Caller-predicted firmware run time after reset; the host stays detached until
+    #: ``expected_duration_s * 1.25`` (bounded by ``settle_seconds``) before polling.
+    expected_duration_s: float | None = None
 
 
 @dataclass(frozen=True)
@@ -161,6 +165,13 @@ def capture_fixture(
         or type(request.arena_capacity) is int
         and 0 < request.arena_capacity <= 3 * 1024 * 1024,
         "Invalid arena capacity",
+    )
+    require(
+        request.expected_duration_s is None
+        or type(request.expected_duration_s) in (int, float)
+        and math.isfinite(request.expected_duration_s)
+        and 0 < request.expected_duration_s <= request.settle_seconds,
+        "Invalid expected duration",
     )
     require(isinstance(request.timing_scope, FixtureTimingScope), "Explicit timing scope required")
     require(isinstance(request.target, FixtureTarget), "Explicit typed fixture target required")
@@ -284,7 +295,7 @@ def capture_fixture(
                 )
         sinks = {sink.name: sink for sink in image.sinks}
 
-        def await_completion(session, started: float, resumed: bool) -> None:
+        def await_completion(session, started: float, resumed: bool, detached: float) -> None:
             """Poll the running target's status sink until it leaves both sentinels."""
             polls = 0
             while True:
@@ -310,6 +321,8 @@ def capture_fixture(
                             "elapsed_s": elapsed,
                             "max_wait_s": request.settle_seconds,
                             "resumed_after_attach": resumed,
+                            "detached_s": detached,
+                            "complete_on_first_poll": completed and polls == 1,
                         },
                         sort_keys=True,
                     )
@@ -325,11 +338,15 @@ def capture_fixture(
         guard.check(require_free=True, remaining_s=request.settle_seconds + 120)
         reset_target(device=request.device, jlink_serial=request.jlink_serial)
         started = time.monotonic()
-        # Stay detached while the secure bootloader runs after reset.
-        time.sleep(min(_FIRST_POLL_S, request.settle_seconds))
+        # Stay detached through the secure bootloader and, when predicted, the whole run.
+        detached = min(
+            max(_FIRST_POLL_S, (request.expected_duration_s or 0.0) * _EXPECTED_MARGIN),
+            request.settle_seconds,
+        )
+        time.sleep(detached)
         with attach() as session:
             guard.check(require_free=False, remaining_s=10)
-            await_completion(session, started, resume_if_halted(session))
+            await_completion(session, started, resume_if_halted(session), detached)
             halt(session)
             verify(session)
             values = snapshot(session, suffix="")
