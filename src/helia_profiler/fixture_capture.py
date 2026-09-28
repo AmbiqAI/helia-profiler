@@ -11,6 +11,7 @@ from dataclasses import asdict
 from typing import Protocol
 
 from .fixture import FixtureTimingScope
+from .fixture_stage import FixtureStage
 from .fixture_runtime import FixtureFile
 from .fixture_target import FixtureTarget
 from .fixture_image import MAX_ELF, MAX_IMAGE, DTCM, digest, require, inspect_elf
@@ -42,17 +43,7 @@ _STATUS_RUNNING = -1
 _FIRST_POLL_S = 1.0
 _POLL_INTERVAL_S = 0.25
 _MEMORY_MAGIC = (0x4D454D31, 1)
-# Terminal status codes returned by fixed_fixture.cc.j2.
-_FAILED_STAGES = {
-    -2: "SRAM power configuration",
-    -3: "operator resolver registration",
-    -4: "model schema check",
-    -5: "arena allocation or model init",
-    -6: "input/output tensor contract",
-    -7: "inference invoke",
-    -8: "STIMER start",
-    -9: "timing bound",
-}
+_FAILED_STAGES = {int(stage): stage.description for stage in FixtureStage}
 
 
 @dataclass(frozen=True)

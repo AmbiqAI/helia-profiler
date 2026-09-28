@@ -4,7 +4,6 @@ from contextlib import contextmanager
 from dataclasses import replace
 from hashlib import sha256
 import json
-from pathlib import Path
 import re
 import struct
 from types import SimpleNamespace
@@ -13,6 +12,7 @@ import pytest
 
 from helia_profiler import fixture_capture as capture
 from helia_profiler.fixture import FixtureTimingScope
+from helia_profiler.fixture_stage import FixtureStage
 from helia_profiler.fixture_image import Sink, inspect_elf
 from helia_profiler.fixture_target import supported_fixture_target
 from helia_profiler.fixture_runtime import FixtureFile
@@ -538,13 +538,15 @@ def test_memory_sink_names_stage_on_timeout(rig, monkeypatch):
     assert completion["completed"] is False and completion["status"] == -1
 
 
-def test_failed_stage_codes_are_returned_by_the_fixture_template():
-    template = (
-        Path(capture.__file__).parent / "firmware" / "templates" / "fixed_fixture.cc.j2"
-    ).read_text()
-    returned = {int(code) for code in re.findall(r"return (-\d+);", template)}
-    returned |= {int(code) for code in re.findall(r"\? infer_fixture\(\) : (-\d+)", template)}
-    assert returned == set(capture._FAILED_STAGES)
+@pytest.mark.parametrize("engine", ["tflm", "helia-aot"])
+def test_rendered_fixture_returns_only_named_stages(engine):
+    from tests.contracts.fixture_compile_cases import render_fixture
+
+    text, _ = render_fixture("kws", engine)
+    returned = {int(code) for code in re.findall(r"return (-\d+);", text)}
+    returned |= {int(code) for code in re.findall(r"\? infer_fixture\(\) : (-\d+)", text)}
+    assert returned and returned <= set(capture._FAILED_STAGES)
+    assert set(capture._FAILED_STAGES) == {int(stage) for stage in FixtureStage}
 
 
 def test_attach_that_halts_the_core_is_resumed_before_polling(rig, monkeypatch):

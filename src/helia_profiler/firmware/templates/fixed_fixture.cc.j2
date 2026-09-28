@@ -6,14 +6,12 @@
 #include "apollo510.h"
 #include "nsx_system.h"
 #include "nsx_core.h"
+#include "nsx_mem.h"
 #include "am_hal_pwrctrl.h"
 #include "fixed_fixture_clock.h"
 {% if fixture_aot %}
 #include "{{ aot_prefix }}_model.h"
 #include "{{ aot_prefix }}_common.h"
-{% if not allocate_arenas %}{% for region in arena_regions %}{% if region.blob_filename %}
-#include "hpx_const_blob_{{ region.region_id }}.h"
-{% endif %}{% endfor %}{% endif %}
 {% else %}
 #include "fixed_fixture_memory.h"
 #include "model_data.h"
@@ -24,7 +22,7 @@
 
 static const uint8_t fixed_input[] = { {{ input_values }} };
 {% if not fixture_aot %}
-alignas(16) static uint8_t arena[{{ fixture_arena_size }}] __attribute__((section(".sram_bss")));
+NSX_MEM_SRAM_BSS alignas(16) static uint8_t arena[{{ fixture_arena_size }}];
 {% endif %}
 volatile int32_t deployment_status = -1;
 volatile uint8_t deployment_output[{{ output_tensor.size }}];
@@ -34,25 +32,10 @@ volatile uint32_t deployment_timing[7];
 static int infer_fixture() {
 {% if fixture_aot %}
     {{ aot_prefix }}_model_context_t model_ctx = {};
-{% if not allocate_arenas %}
-{% for region in arena_regions %}
-{% if region.blob_filename and region.placement == 'mram' %}
-    static_assert(sizeof(hpx_const_blob_{{ region.region_id }}) == {{ region.size }}, "Constant arena extent mismatch");
-    void *region_{{ region.region_id }} = const_cast<uint8_t *>(hpx_const_blob_{{ region.region_id }});
-{% else %}
-    alignas({{ region.alignment }}) static uint8_t region_{{ region.region_id }}[{{ region.size }}] __attribute__((section(".sram_bss")));
-{% if region.blob_filename %}
-    static_assert(sizeof(hpx_const_blob_{{ region.region_id }}) <= sizeof(region_{{ region.region_id }}), "Constant arena overflow");
-    std::memcpy(region_{{ region.region_id }}, hpx_const_blob_{{ region.region_id }}, sizeof(hpx_const_blob_{{ region.region_id }}));
-{% endif %}
-{% endif %}
-    if ({{ aot_prefix }}_bind_arena(({{ aot_prefix }}_arena_region_t){{ region.region_id }}, region_{{ region.region_id }}, {{ region.size }}) != 0) return -5;
-{% endfor %}
-{% endif %}
-    if ({{ aot_prefix }}_model_init(&model_ctx) != 0) return -5;
+    if ({{ aot_prefix }}_model_init(&model_ctx) != 0) return {{ fixture_status.arena }};
     if ({{ aot_prefix }}_num_inputs != 1 || {{ aot_prefix }}_num_outputs != 1 ||
         model_ctx.inputs[0].size != {{ input_tensor.size }} || model_ctx.outputs[0].size != {{ output_tensor.size }} ||
-        !model_ctx.inputs[0].data || !model_ctx.outputs[0].data) return -6;
+        !model_ctx.inputs[0].data || !model_ctx.outputs[0].data) return {{ fixture_status.io_contract }};
     auto *input_data = model_ctx.inputs[0].data;
     auto *output_data = reinterpret_cast<const uint8_t *>(model_ctx.outputs[0].data);
     auto invoke = [&]() { return {{ aot_prefix }}_model_run(&model_ctx); };
@@ -60,14 +43,14 @@ static int infer_fixture() {
     hpx_fixture_memory_init(sizeof(arena));
     tflite::MicroMutableOpResolver<{{ fixture_resolver.max_ops }}> resolver;
 {% for registration in fixture_registrations %}
-    if (resolver.{{ registration }} != kTfLiteOk) return -3;
+    if (resolver.{{ registration }} != kTfLiteOk) return {{ fixture_status.resolver }};
 {% endfor %}
     const auto *model = tflite::GetModel(model_data);
-    if (model->version() != TFLITE_SCHEMA_VERSION || model->subgraphs()->size() != 1) return -4;
+    if (model->version() != TFLITE_SCHEMA_VERSION || model->subgraphs()->size() != 1) return {{ fixture_status.model_schema }};
     const auto *graph = model->subgraphs()->Get(0);
-    if (graph->inputs()->size() != 1 || graph->outputs()->size() != 1) return -6;
+    if (graph->inputs()->size() != 1 || graph->outputs()->size() != 1) return {{ fixture_status.io_contract }};
     tflite::MicroInterpreter interpreter(model, resolver, arena, sizeof(arena));
-    if (interpreter.AllocateTensors() != kTfLiteOk) return -5;
+    if (interpreter.AllocateTensors() != kTfLiteOk) return {{ fixture_status.arena }};
     auto *input = interpreter.input(0);
     auto *output = interpreter.output(0);
 {% for name, tensor in [('input', input_tensor), ('output', output_tensor)] %}
@@ -75,9 +58,9 @@ static int infer_fixture() {
         !{{ name }} || {{ name }}->type != kTfLiteInt8 || {{ name }}->bytes != {{ tensor.size }} ||
         {{ name }}->dims->size != {{ tensor.shape | length }} ||
         {{ name }}->params.scale != {{ tensor.scale.hex() }}f ||
-        {{ name }}->params.zero_point != {{ tensor.zero_point }}) return -6;
+        {{ name }}->params.zero_point != {{ tensor.zero_point }}) return {{ fixture_status.io_contract }};
 {% for dim in tensor.shape %}
-    if ({{ name }}->dims->data[{{ loop.index0 }}] != {{ dim }}) return -6;
+    if ({{ name }}->dims->data[{{ loop.index0 }}] != {{ dim }}) return {{ fixture_status.io_contract }};
 {% endfor %}
 {% endfor %}
     auto *input_data = input->data.int8;
@@ -85,10 +68,10 @@ static int infer_fixture() {
     auto invoke = [&]() { return interpreter.Invoke(); };
     hpx_fixture_memory_snapshot(3, interpreter.arena_used_bytes());
 {% endif %}
-    if (!hpx_stimer_init()) return -8;
+    if (!hpx_stimer_init()) return {{ fixture_status.stimer }};
     for (unsigned i = 0; i < {{ fixture_warmups }}; ++i) {
         std::memcpy(input_data, fixed_input, sizeof(fixed_input));
-        if (invoke() != 0) return -7;
+        if (invoke() != 0) return {{ fixture_status.invoke }};
     }
 {% if not fixture_aot %}
     hpx_fixture_memory_snapshot(4, interpreter.arena_used_bytes());
@@ -111,8 +94,8 @@ static int infer_fixture() {
 {% if fixture_timing_scope == 'restore_and_invoke' %}
     ticks = hpx_stimer_ticks() - t0;
 {% endif %}
-    if (invocation_status != 0) return -7;
-    if (!ticks || ticks >= 60U*HPX_STIMER_HZ) return -9;
+    if (invocation_status != 0) return {{ fixture_status.invoke }};
+    if (!ticks || ticks >= 60U*HPX_STIMER_HZ) return {{ fixture_status.timing_bound }};
 {% if not fixture_aot %}
     hpx_fixture_memory_snapshot(5, interpreter.arena_used_bytes());
     hpx_fixture_memory_finish();
@@ -131,14 +114,8 @@ static int infer_fixture() {
 }
 
 int main() {
-    nsx_system_config_t config = {};
-    config.perf_mode = NSX_PERF_LOW;
-    config.enable_cache = true;
-    config.enable_sram = true;
-    config.debug.transport = NSX_DEBUG_NONE;
-    config.skip_bsp_init = false;
-    config.spot_mgr_profile = true;
-    int32_t status = nsx_system_init(&config);
+{% with power_only=true, perf_mode_symbol="NSX_PERF_LOW", perf_mode_mhz=96 %}{% include "_system_config.j2" %}{% endwith %}
+    int32_t status = nsx_system_init(&sys_cfg);
     if (status == 0) {
         SystemCoreClock = 96000000U;
         am_hal_pwrctrl_sram_memcfg_t sram = {};
@@ -147,7 +124,7 @@ int main() {
         sram.eActiveWithGFX = AM_HAL_PWRCTRL_SRAM_NONE;
         sram.eActiveWithDISP = AM_HAL_PWRCTRL_SRAM_NONE;
         sram.eSRAMRetain = AM_HAL_PWRCTRL_SRAM_3M;
-        status = am_hal_pwrctrl_sram_config(&sram) == 0 ? infer_fixture() : -2;
+        status = am_hal_pwrctrl_sram_config(&sram) == 0 ? infer_fixture() : {{ fixture_status.sram_config }};
         uint32_t checksum = 0;
         for (unsigned i = 0; i < sizeof(deployment_output); ++i) checksum = checksum*31U + deployment_output[i];
         deployment_checksum = checksum;
