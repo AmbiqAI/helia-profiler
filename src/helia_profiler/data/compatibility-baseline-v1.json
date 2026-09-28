@@ -34,7 +34,7 @@
     },
     "ns-cmsis-nn": {
       "url": "https://github.com/AmbiqAI/ns-cmsis-nn.git",
-      "ref": "cad3c8fa0cc2f7b13d6ff750bfc9744af0d621a6"
+      "ref": "8d34472eaf494589515d1463b8a427564ee83947"
     },
     "nsx-executorch": {
       "url": "https://github.com/AmbiqAI/nsx-executorch.git",
@@ -72,7 +72,7 @@
     },
     "nsx-cmsis-nn": {
       "project": "ns-cmsis-nn",
-      "ref": "cad3c8fa0cc2f7b13d6ff750bfc9744af0d621a6"
+      "ref": "8d34472eaf494589515d1463b8a427564ee83947"
     },
     "nsx-executorch": {
       "project": "nsx-executorch",
@@ -93,8 +93,8 @@
       "ref": "fe025f2be66ac213cafbbf203a395a3d1e89156f"
     },
     "helia-aot": {
-      "min_version": "0.22.0",
-      "max_version_exclusive": "0.23.0"
+      "min_version": "0.23.0",
+      "max_version_exclusive": "0.24.0"
     },
     "tflm": {
       "governed_by_modules": true

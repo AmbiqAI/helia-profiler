@@ -18,11 +18,11 @@ The current baseline is `hpx-neuralspotx-0.8.1-2026-09`:
 | `nsx-pmu-armv8m` | `5725c065…c88` |
 | `nsx-tflite-micro` | `7afcf2b4…333` |
 | `arm-cmsis-nn` | `6d21a6f8…f7c` |
-| `ns-cmsis-nn` | `cad3c8fa…1a6` (`v7.35.0`, hpx-declared — see below) |
+| `ns-cmsis-nn` | `8d34472e…947` (`v7.36.0`, hpx-declared — see below) |
 | `nsx-executorch` | `5514ac1e…b48e` |
 | `nsx-sensors` | `c219a2bc…3e25` (`v0.3.0`, peeled) |
 | heliaRT | `1.21.0`, commit `fe025f2b…56f` (min supported `1.16.0` — from `HELIART_MIN_VERSION` in code, not a baseline-JSON field) |
-| heliaAOT | `min_version=0.22.0`, `max_version_exclusive=0.23.0` |
+| heliaAOT | `min_version=0.23.0`, `max_version_exclusive=0.24.0` |
 | tflm | governed entirely by the `nsx-tflite-micro` / `arm-cmsis-nn` module refs above |
 | executorch | `0.1.0`, module ref `5514ac1e…b48e` (a checkout's `version.txt` is verified against the baseline) |
 
@@ -90,6 +90,15 @@ the v7.35.0 core. A float model using `SQRT` and `ARG_MAX` compiles against
 v7.35.0 and stops on its own `#error` floor against v7.32.0. For the fp32 and
 fp16 KWS models HPX enables every float kernel the generated module requires.
 No build, flash or hardware run is recorded for this revision yet.
+
+heliaAOT `[0.23.0, 0.24.0)` and `ns-cmsis-nn v7.36.0` (`8d34472e…947`) then
+move together (#393); every other ref above is unchanged. heliaAOT 0.23.0
+keeps the converter, codegen context and generated model API HPX drives,
+adding fields only. Its dilated one-dimensional depthwise route raises a
+module's floor to v7.36.0, so that release is the qualified core; v7.36.0
+adds kernels without changing a public kernel signature. heliaRT 1.21.2
+pins the same core; heliaRT 1.21.0 source builds against it are not yet
+verified.
 
 The previous revision is recorded below. heliaRT 1.19.0 and heliaAOT 0.19.0
 (issue #246) are the releases that add FP16
