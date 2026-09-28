@@ -77,5 +77,5 @@ def render_fixture(
             **values, aot_prefix=aot_prefix, allocate_arenas=True, arena_regions=[]
         )
         write_fixture_headers(directory, ctx)
-        headers = {p.name: p.read_text() for p in directory.glob("*.h")}
+        headers = {p.name: p.read_text(encoding="utf-8") for p in directory.glob("*.h")}
     return text, headers

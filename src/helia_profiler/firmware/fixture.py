@@ -5,6 +5,7 @@ from pathlib import Path
 from ..engines import EngineType
 from ..engines.base import ArenaRegion, HeliaAotArtifacts
 from ..errors import ConfigError
+from ..fixture_stage import FixtureStage
 from ..pipeline import PipelineContext
 from ..placement import ArenaRole
 from .render import _jinja_env, _write_text
@@ -28,6 +29,7 @@ def fixture_template_vars(ctx: PipelineContext, regions: list[ArenaRegion]) -> d
     ):
         raise ConfigError("Writable AOT region cannot use MRAM fixture placement")
     return {
+        "fixture_status": {stage.name.lower(): int(stage) for stage in FixtureStage},
         "input_tensor": spec.model.input_tensor,
         "output_tensor": spec.model.output_tensor,
         "input_values": ",".join(str(b) for b in spec.fixture.input.read()),

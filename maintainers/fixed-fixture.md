@@ -42,7 +42,8 @@ build or a numerical validation result.
 `helia_profiler.fixture_capture.capture_fixture(request, guard=guard)` captures
 raw evidence using existing profiler flash/probe APIs. `FixtureCaptureRequest`
 binds ELF/image pins, device/serial (`AP510NFA-CBR` for the supported board), output extent, load address, evidence
-directory, settle interval, timing scope and optional TFLM arena capacity.
+directory, maximum completion wait (`settle_seconds`), timing scope and optional
+TFLM arena capacity.
 Pass `target=build.target`: the typed canonical board/device/load-origin record.
 Other devices, target declarations, custom target overlays and relocated
 application origins are rejected before device operations.
@@ -55,8 +56,20 @@ establishes core type, not physical board identity. A no-op verifier does not
 satisfy this caller contract. Reset boots the canonical application origin;
 alternate image origins and boot-selection modes are not supported. Image extents,
 symbols, full readback, exact poison writes and stable halted terminal reads are
-checked. Each attempt preserves started, identity, binary terminal and final
-receipt artifacts; existing attempt directories are never overwritten.
+checked. After reset the host stays detached for one second, or for
+`expected_duration_s` × 1.25 when the caller predicts the run (both bounded by
+`settle_seconds`), so a correct prediction leaves the timed loop probe-free. It then attaches,
+resumes the core if the attach left it halted (recorded as
+`resumed_after_attach`), then reads the running target's status sink without
+halting it until the status leaves its
+poison and running sentinels or `settle_seconds` elapses. A timeout names the
+stage reached (not started, before tensor allocation, warmups, timed loop; the
+intermediate stages need the TFLM memory sink) and a nonzero status names the
+failing firmware stage from the shared `fixture_stage.FixtureStage`
+vocabulary that also renders the firmware return codes. `completion.json` records
+the detached time and whether the first poll already saw completion. Each attempt preserves started, identity, completion,
+binary terminal and final receipt artifacts; existing attempt directories are
+never overwritten.
 
 Transport success establishes completion, checksum and supported clock/timer
 metadata; it does **not** establish numerical acceptance. The caller binds the
@@ -122,3 +135,17 @@ producer plan, the capacities-only fallback is not exported as an arena plan.
 Unknown runtime or source mappings invalidate the whole AOT plan rather than
 silently dropping allocations. Staged constant source and destination remain
 separate physical consumers; neither is added to enclosing section totals.
+
+`fixture_operator_timing.bind_operator_timing(build, fixture, profile)` attributes
+per-layer cycles from a separate `hpx profile` run of the same model to a fixture
+build. The fixture image has no per-operator hooks, so these are approximate
+shares from a PMU-instrumented sibling image, never the fixture's latency. The
+record is null with a reason unless the fixture is the one the build was made
+from and the model hash, engine, TFLM `cmsis_nn` backend, compiler version, board,
+LP 96 MHz clock and SRAM/MRAM placement match, every layer has finite cycles, no
+counter overflowed, the clean window ran inferences, and the per-layer sum agrees
+with the clean-window cycles within 1 % (2 % below 2 ms). A TFLM fixture's prepared upstream runtime is
+not selectable by `hpx profile`; `allow_runtime_difference=True` accepts the
+baseline stack and labels the record. The fixture build records no engine
+version or AOT code-generation options, so neither is compared; the record
+carries the profile's engine version.

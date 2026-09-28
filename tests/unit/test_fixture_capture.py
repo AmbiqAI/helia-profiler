@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from dataclasses import replace
 from hashlib import sha256
 import json
+import re
 import struct
 from types import SimpleNamespace
 
@@ -11,7 +12,8 @@ import pytest
 
 from helia_profiler import fixture_capture as capture
 from helia_profiler.fixture import FixtureTimingScope
-from helia_profiler.fixture_image import inspect_elf
+from helia_profiler.fixture_stage import FixtureStage
+from helia_profiler.fixture_image import Sink, inspect_elf
 from helia_profiler.fixture_target import supported_fixture_target
 from helia_profiler.fixture_runtime import FixtureFile
 
@@ -76,12 +78,17 @@ def rig(tmp_path, monkeypatch):
     memory = {0x410000: image.read(), 0xE000ED00: struct.pack("<I", 0xD22 << 4)}
     writes = []
 
+    core = {"halted": False}
+
     class Session:
         def halt(self):
-            pass
+            core["halted"] = True
 
         def halted(self):
-            return True
+            return core["halted"]
+
+        def restart(self):
+            core["halted"] = False
 
         def memory_read8(self, address, count):
             return memory[address][:count]
@@ -104,7 +111,12 @@ def rig(tmp_path, monkeypatch):
     flashes = []
     monkeypatch.setattr(capture, "attached_session", attach)
     monkeypatch.setattr(capture, "flash_binary", lambda **kwargs: flashes.append(kwargs))
-    monkeypatch.setattr(capture, "reset_target", lambda **kwargs: memory.update(terminal))
+
+    def reset(**kwargs):
+        memory.update(terminal)
+        core["halted"] = False
+
+    monkeypatch.setattr(capture, "reset_target", reset)
     monkeypatch.setattr(capture, "list_connected_probes", lambda: [SimpleNamespace(serial="123")])
     monkeypatch.setattr(capture.time, "sleep", lambda _: None)
     return request, memory, terminal, writes, flashes, Guard()
@@ -128,6 +140,8 @@ def test_capture_raw_success(rig):
     assert flashes[0]["binary_path"] == request.evidence_dir / "image.bin"
     identity = json.loads((request.evidence_dir / "identity.json").read_text())
     assert identity["elf_sha256"] == request.elf.sha256
+    completion = json.loads((request.evidence_dir / "completion.json").read_text())
+    assert completion["resumed_after_attach"] is False
     assert len(identity["sinks"]) == 4
     assert any(not free for free, _ in guard.calls)
 
@@ -344,4 +358,295 @@ def test_inconsistent_typed_target_stops_before_device(rig):
     bad = replace(request.target, board="apollo510b_evb")
     with pytest.raises(ValueError, match="target"):
         capture.capture_fixture(replace(request, target=bad), guard=guard)
+    assert not guard.calls and not flashes and not writes
+
+
+_RUNNING = {
+    0x20000000: struct.pack("<i", -1),
+    0x20000004: bytes(3),
+    0x20000008: bytes(4),
+    0x2000000C: bytes(28),
+}
+
+
+def test_mid_loop_read_waits_for_completion(rig, monkeypatch):
+    """Sinks read while the timed loop still runs must not end the capture."""
+    request, memory, terminal, _, _, guard = rig
+    status_reads = 0
+    original_attach = capture.attached_session
+
+    @contextmanager
+    def attach(**kwargs):
+        with original_attach(**kwargs) as session:
+            original_read = session.memory_read8
+
+            def read(address, count):
+                nonlocal status_reads
+                if address == 0x20000000 and memory[address] == _RUNNING[address]:
+                    status_reads += 1
+                    if status_reads > 3:
+                        memory.update(terminal)
+                return original_read(address, count)
+
+            monkeypatch.setattr(session, "memory_read8", read)
+            yield session
+
+    monkeypatch.setattr(capture, "attached_session", attach)
+    monkeypatch.setattr(capture, "reset_target", lambda **kwargs: memory.update(_RUNNING))
+    result = capture.capture_fixture(replace(request, settle_seconds=5), guard=guard)
+    assert result.state == "success", result.error
+    assert result.timing is not None and result.timing.iterations == 10
+    completion = json.loads((request.evidence_dir / "completion.json").read_text())
+    assert completion["status"] == 0 and completion["polls"] == 4
+
+
+def test_completion_timeout_names_running_stage(rig, monkeypatch):
+    request, memory, terminal, _, _, guard = rig
+    monkeypatch.setattr(
+        capture, "reset_target", lambda **kwargs: memory.update({0x20000000: struct.pack("<i", -1)})
+    )
+    result = capture.capture_fixture(request, guard=guard)
+    assert result.state == "failure"
+    assert result.error is not None
+    assert "did not complete within 0.01 s" in result.error and "running" in result.error
+    completion = json.loads((request.evidence_dir / "completion.json").read_text())
+    assert completion["status"] == -1 and completion["completed"] is False
+
+
+def test_completion_timeout_names_unstarted_firmware(rig, monkeypatch):
+    request, memory, terminal, _, _, guard = rig
+    monkeypatch.setattr(capture, "reset_target", lambda **kwargs: None)
+    result = capture.capture_fixture(request, guard=guard)
+    assert result.state == "failure"
+    assert result.error is not None and "not started" in result.error
+
+
+def test_nonzero_status_names_failing_stage(rig):
+    request, memory, terminal, _, _, guard = rig
+    terminal[0x20000000] = struct.pack("<i", -7)
+    result = capture.capture_fixture(request, guard=guard)
+    assert result.state == "failure"
+    assert result.error is not None and "invoke" in result.error and "-7" in result.error
+
+
+def _live_memory(*words):
+    return struct.pack("<8I", *words, *([0] * (8 - len(words))))
+
+
+@pytest.mark.parametrize(
+    "status,memory,stage",
+    [
+        (capture._STATUS_POISON, None, "not started"),
+        (-1, None, "no intermediate stage"),
+        (-1, _live_memory(), "before tensor allocation"),
+        (-1, _live_memory(0x4D454D31, 1, 1024), "before tensor allocation"),
+        (-1, _live_memory(0x4D454D31, 1, 1024, 100), "running warmups"),
+        (-1, _live_memory(0x4D454D31, 1, 1024, 100, 100), "timed loop"),
+        (7, None, "unrecognised status 7"),
+    ],
+)
+def test_running_stage_names_progress(status, memory, stage):
+    assert stage in capture._running_stage(status, memory)
+
+
+def test_failed_stage_names_unmapped_status():
+    assert capture._failed_stage(-9) == "Firmware failed at timing bound (status -9)"
+    assert "unknown stage" in capture._failed_stage(-42)
+
+
+def test_early_firmware_failure_names_stage_before_timing(rig):
+    """A failing fixture returns before writing timing; the stage must still be named."""
+    request, memory, terminal, _, _, guard = rig
+    terminal[0x20000000] = struct.pack("<i", -5)
+    terminal[0x2000000C] = bytes(28)
+    result = capture.capture_fixture(request, guard=guard)
+    assert result.state == "failure"
+    assert result.error == "Firmware failed at arena allocation or model init (status -5)"
+
+
+def test_target_is_not_halted_until_status_is_terminal(rig, monkeypatch):
+    request, memory, terminal, _, _, guard = rig
+    events: list[tuple] = []
+    after_reset = False
+    running_reads = 0
+    original_attach = capture.attached_session
+
+    @contextmanager
+    def attach(**kwargs):
+        with original_attach(**kwargs) as session:
+            original_read, original_halt = session.memory_read8, session.halt
+
+            def read(address, count):
+                nonlocal running_reads
+                if after_reset and address == 0x20000000:
+                    if struct.unpack("<i", memory[address][:4])[0] == -1:
+                        running_reads += 1
+                        if running_reads >= 3:
+                            memory.update(terminal)
+                    events.append(("read_status", struct.unpack("<i", memory[address][:4])[0]))
+                return original_read(address, count)
+
+            def halt():
+                if after_reset:
+                    events.append(("halt",))
+                return original_halt()
+
+            monkeypatch.setattr(session, "memory_read8", read)
+            monkeypatch.setattr(session, "halt", halt)
+            yield session
+
+    def reset(**kwargs):
+        nonlocal after_reset
+        after_reset = True
+        memory.update(_RUNNING)
+
+    sleeps: list[float] = []
+    monkeypatch.setattr(capture.time, "sleep", sleeps.append)
+    monkeypatch.setattr(capture, "attached_session", attach)
+    monkeypatch.setattr(capture, "reset_target", reset)
+    result = capture.capture_fixture(replace(request, settle_seconds=5), guard=guard)
+    assert result.state == "success", result.error
+    first_halt = events.index(("halt",))
+    assert first_halt >= 1
+    assert all(kind == "read_status" for kind, *_ in events[:first_halt])
+    assert events[first_halt - 1] == ("read_status", 0)
+    assert sleeps[0] == capture._FIRST_POLL_S
+    assert all(0 < s <= capture._POLL_INTERVAL_S for s in sleeps[1:])
+
+
+def test_memory_sink_names_stage_on_timeout(rig, monkeypatch):
+    request, memory, terminal, _, _, guard = rig
+    real_inspect = capture.inspect_elf
+
+    def inspect(elf, image, load_address, sizes):
+        sizes = dict(sizes)
+        assert sizes.pop("deployment_memory") == 32
+        found = real_inspect(elf, image, load_address, sizes)
+        return replace(found, sinks=found.sinks + (Sink("deployment_memory", 0x20000030, 32),))
+
+    live = struct.pack("<8I", 0x4D454D31, 1, 1024, 100, 0, 0, 0, 0)
+    monkeypatch.setattr(capture, "inspect_elf", inspect)
+    monkeypatch.setattr(
+        capture,
+        "reset_target",
+        lambda **kwargs: memory.update({0x20000000: struct.pack("<i", -1), 0x20000030: live}),
+    )
+    result = capture.capture_fixture(replace(request, arena_capacity=1024), guard=guard)
+    completion = json.loads((request.evidence_dir / "completion.json").read_text())
+    assert result.state == "failure"
+    assert result.error is not None and result.error.endswith("running warmups")
+    assert completion["completed"] is False and completion["status"] == -1
+
+
+@pytest.mark.parametrize("engine", ["tflm", "helia-aot"])
+def test_rendered_fixture_returns_only_named_stages(engine):
+    from tests.contracts.fixture_compile_cases import render_fixture
+
+    text, _ = render_fixture("kws", engine)
+    returned = {int(code) for code in re.findall(r"return (-\d+);", text)}
+    returned |= {int(code) for code in re.findall(r"\? infer_fixture\(\) : (-\d+)", text)}
+    assert returned and returned <= set(capture._FAILED_STAGES)
+    assert set(capture._FAILED_STAGES) == {int(stage) for stage in FixtureStage}
+
+
+def test_attach_that_halts_the_core_is_resumed_before_polling(rig, monkeypatch):
+    """A debug connect that leaves the core halted must not stall the fixture."""
+    request, memory, terminal, _, _, guard = rig
+    after_reset = False
+    original_attach = capture.attached_session
+
+    @contextmanager
+    def attach(**kwargs):
+        with original_attach(**kwargs) as session:
+            if after_reset:
+                session.halt()
+                original_read = session.memory_read8
+
+                def read(address, count):
+                    if address == 0x20000000 and not session.halted():
+                        memory.update(terminal)
+                    return original_read(address, count)
+
+                monkeypatch.setattr(session, "memory_read8", read)
+            yield session
+
+    def reset(**kwargs):
+        nonlocal after_reset
+        after_reset = True
+        memory.update(_RUNNING)
+
+    monkeypatch.setattr(capture, "attached_session", attach)
+    monkeypatch.setattr(capture, "reset_target", reset)
+    result = capture.capture_fixture(replace(request, settle_seconds=0.5), guard=guard)
+    assert result.state == "success", result.error
+    completion = json.loads((request.evidence_dir / "completion.json").read_text())
+    assert completion["resumed_after_attach"] is True
+
+
+def test_predicted_run_stays_detached_and_completes_on_first_poll(rig, monkeypatch):
+    request, memory, terminal, _, _, guard = rig
+    sleeps: list[float] = []
+    monkeypatch.setattr(capture.time, "sleep", sleeps.append)
+    result = capture.capture_fixture(
+        replace(request, settle_seconds=10, expected_duration_s=2.0), guard=guard
+    )
+    assert result.state == "success", result.error
+    assert sleeps[0] == 2.0 * capture._EXPECTED_MARGIN
+    completion = json.loads((request.evidence_dir / "completion.json").read_text())
+    assert completion["detached_s"] == 2.5 and completion["complete_on_first_poll"] is True
+    assert completion["polls"] == 1
+
+
+def test_predicted_detach_is_bounded_by_settle_seconds(rig, monkeypatch):
+    request, memory, terminal, _, _, guard = rig
+    sleeps: list[float] = []
+    monkeypatch.setattr(capture.time, "sleep", sleeps.append)
+    result = capture.capture_fixture(
+        replace(request, settle_seconds=5, expected_duration_s=4.5), guard=guard
+    )
+    assert result.state == "success", result.error
+    assert sleeps[0] == 5
+
+
+def test_short_prediction_falls_back_to_polling(rig, monkeypatch):
+    request, memory, terminal, _, _, guard = rig
+    status_reads = 0
+    original_attach = capture.attached_session
+
+    @contextmanager
+    def attach(**kwargs):
+        with original_attach(**kwargs) as session:
+            original_read = session.memory_read8
+
+            def read(address, count):
+                nonlocal status_reads
+                if address == 0x20000000 and memory[address] == _RUNNING[address]:
+                    status_reads += 1
+                    if status_reads > 2:
+                        memory.update(terminal)
+                return original_read(address, count)
+
+            monkeypatch.setattr(session, "memory_read8", read)
+            yield session
+
+    sleeps: list[float] = []
+    monkeypatch.setattr(capture.time, "sleep", sleeps.append)
+    monkeypatch.setattr(capture, "attached_session", attach)
+    monkeypatch.setattr(capture, "reset_target", lambda **kwargs: memory.update(_RUNNING))
+    result = capture.capture_fixture(
+        replace(request, settle_seconds=5, expected_duration_s=0.1), guard=guard
+    )
+    assert result.state == "success", result.error
+    assert sleeps[0] == capture._FIRST_POLL_S
+    completion = json.loads((request.evidence_dir / "completion.json").read_text())
+    assert completion["complete_on_first_poll"] is False and completion["polls"] == 3
+
+
+@pytest.mark.parametrize("expected", [0, -1.0, float("nan"), 11.0, "2"])
+def test_invalid_prediction_is_rejected_before_device(rig, expected):
+    request, memory, terminal, writes, flashes, guard = rig
+    with pytest.raises(ValueError, match="expected duration"):
+        capture.capture_fixture(
+            replace(request, settle_seconds=10, expected_duration_s=expected), guard=guard
+        )
     assert not guard.calls and not flashes and not writes
