@@ -474,11 +474,13 @@ _socs_by_header = _build_socs_by_header()
 def _prepare_case_dir(case: _CompileCase, base: Path) -> Path:
     case_dir = base / re.sub(r"[^A-Za-z0-9_.-]+", "_", case.case_id)
     case_dir.mkdir(parents=True, exist_ok=True)
-    (case_dir / "main.cc").write_text(case.text)
+    (case_dir / "main.cc").write_text(case.text, encoding="utf-8")
     for name, text in case.headers.items():
-        (case_dir / name).write_text(text)
+        (case_dir / name).write_text(text, encoding="utf-8")
     if '#include "hpx_pmu_profiler.h"' in case.text or not case.is_main_tu:
-        (case_dir / "hpx_pmu_profiler.h").write_text(_render_pmu_profiler_header(case.vars))
+        (case_dir / "hpx_pmu_profiler.h").write_text(
+            _render_pmu_profiler_header(case.vars), encoding="utf-8"
+        )
     if '#include "model_data.h"' in case.text:
         (case_dir / "model_data.h").write_text(_MODEL_DATA_STUB)
     if '#include "fake_model.h"' in case.text:
@@ -495,7 +497,8 @@ def _prepare_case_dir(case: _CompileCase, base: Path) -> Path:
     (case_dir / "hpx_prelude.h").write_text(
         "#pragma once\n"
         f"{linkage}void hpx_printf(const char *fmt, ...) "
-        "__attribute__((format(printf, 1, 2), unused));\n"
+        "__attribute__((format(printf, 1, 2), unused));\n",
+        encoding="utf-8",
     )
     return case_dir
 

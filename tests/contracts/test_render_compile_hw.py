@@ -404,7 +404,7 @@ def _prepare_case(case: _HwCase, workspace: _Workspace, tmp_path: Path) -> tuple
             case.fixture_kind, case.engine, aot_prefix=overrides.get("aot_prefix", "fake")
         )
         for name, content in headers.items():
-            (scratch / name).write_text(content)
+            (scratch / name).write_text(content, encoding="utf-8")
     else:
         text = _render(
             case.soc,
@@ -418,7 +418,7 @@ def _prepare_case(case: _HwCase, workspace: _Workspace, tmp_path: Path) -> tuple
     # -fsyntax-only trivially (#225).
     assert "int main(" in text, f"[{case.case_id}] render has no 'int main(' — vacuous TU"
     main_tu = scratch / ("main_power.cc" if case.power_only else "main.cc")
-    main_tu.write_text(text)
+    main_tu.write_text(text, encoding="utf-8")
     tus = [main_tu]
 
     kwargs = _common_kwargs(case.soc, "rtt")
@@ -429,7 +429,8 @@ def _prepare_case(case: _HwCase, workspace: _Workspace, tmp_path: Path) -> tuple
             has_armv8m_pmu=kwargs["has_armv8m_pmu"],
             has_ethos_u=kwargs.get("has_ethos_u", False),
             pmu_max_ops=kwargs["pmu_max_ops"],
-        )
+        ),
+        encoding="utf-8",
     )
     if case.extra_profiler_tu:
         profiler_text = _jinja_env.get_template("hpx_pmu_profiler.cc.j2").render(
@@ -438,7 +439,7 @@ def _prepare_case(case: _HwCase, workspace: _Workspace, tmp_path: Path) -> tuple
         )
         assert "HpxPmuProfiler::" in profiler_text, f"[{case.case_id}] vacuous profiler TU"
         profiler_tu = scratch / "hpx_pmu_profiler.cc"
-        profiler_tu.write_text(profiler_text)
+        profiler_tu.write_text(profiler_text, encoding="utf-8")
         tus.append(profiler_tu)
     # Generated inputs production writes next to the sources, not templates:
     # carry them from the workspace so includes resolve (read-only copy).
@@ -834,13 +835,15 @@ def test_fixture_real_toolchain_preparation_renders_current_sources(tmp_path, ca
     workspace = _Workspace(app, app / "build", Path("/compiler"), "")
     scratch, tus = _prepare_case(case, workspace, tmp_path)
     assert tus == [scratch / "main.cc"]
-    text = tus[0].read_text()
+    text = tus[0].read_text(encoding="utf-8")
     size = 480 if case.fixture_kind == "tcn" else 12
     assert f"deployment_output[{size}]" in text
-    assert "hpx_stimer_init" in (scratch / "fixed_fixture_clock.h").read_text()
+    assert "hpx_stimer_init" in (scratch / "fixed_fixture_clock.h").read_text(encoding="utf-8")
     if case.engine == "helia-aot":
         assert '#include "warm_model.h"' in text
         assert not (scratch / "fixed_fixture_memory.h").exists()
     else:
-        assert "deployment_memory[8]" in (scratch / "fixed_fixture_memory.h").read_text()
-        assert (scratch / "model_data.h").read_text() == "// model data\n"
+        assert "deployment_memory[8]" in (scratch / "fixed_fixture_memory.h").read_text(
+            encoding="utf-8"
+        )
+        assert (scratch / "model_data.h").read_text(encoding="utf-8") == "// model data\n"
