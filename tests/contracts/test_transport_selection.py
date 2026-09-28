@@ -104,6 +104,18 @@ def test_usb_reader_receives_marker_and_keep_attached(reader_recorder, pmu_ctx_f
     assert "keep_attached" in kwargs
 
 
+@pytest.mark.parametrize("transport", ALL_TRANSPORTS)
+def test_reader_receives_configured_timeouts(transport, reader_recorder, pmu_ctx_factory):
+    heartbeat = {"host_timeout_s": 45, "overall_timeout_s": 900}
+    ctx = pmu_ctx_factory(
+        board="apollo510_evb", transport=transport, extra={"target": {"heartbeat": heartbeat}}
+    )
+    capture_pmu(ctx)
+    kwargs = reader_recorder[transport]
+    assert kwargs["timeout_s"] == 900
+    assert kwargs["heartbeat_timeout_s"] == 45
+
+
 @pytest.mark.parametrize("family,board", sorted(BOARD_FOR_FAMILY.items()))
 @pytest.mark.parametrize("transport", ["uart", "usb_cdc"])
 def test_keep_attached_tracks_soc_debug_domain(
