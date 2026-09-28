@@ -116,6 +116,13 @@ from .test_firmware_render_snapshots import (  # noqa: E402
 )
 from .test_wire_protocol import _MATRIX as _CENSUS_MATRIX  # noqa: E402
 
+from .fixture_compile_cases import (  # noqa: E402
+    FIXTURE_ENGINES,
+    FIXTURE_KINDS,
+    FIXTURE_SCOPES,
+    render_fixture,
+)
+
 _STUB_DIR = Path(__file__).parent.parent / "fixtures" / "compile_stubs"
 
 
@@ -126,6 +133,7 @@ class _CompileCase:
     vars: dict
     is_main_tu: bool = True
     aliases: list[str] = field(default_factory=list)
+    headers: dict[str, str] = field(default_factory=dict)
 
 
 def _render_pmu_profiler_header(vars: dict) -> str:
@@ -324,6 +332,18 @@ def _build_cases() -> list[_CompileCase]:
             )
         )
 
+    for kind in FIXTURE_KINDS:
+        for engine in FIXTURE_ENGINES:
+            for scope in FIXTURE_SCOPES:
+                text, headers = render_fixture(kind, engine, scope)
+                cases.append(
+                    _CompileCase(
+                        case_id=f"fixture:{kind}|{engine}|{scope}",
+                        text=text,
+                        vars=_common_kwargs("apollo510", "rtt"),
+                        headers=headers,
+                    )
+                )
     return cases
 
 
@@ -455,6 +475,8 @@ def _prepare_case_dir(case: _CompileCase, base: Path) -> Path:
     case_dir = base / re.sub(r"[^A-Za-z0-9_.-]+", "_", case.case_id)
     case_dir.mkdir(parents=True, exist_ok=True)
     (case_dir / "main.cc").write_text(case.text)
+    for name, text in case.headers.items():
+        (case_dir / name).write_text(text)
     if '#include "hpx_pmu_profiler.h"' in case.text or not case.is_main_tu:
         (case_dir / "hpx_pmu_profiler.h").write_text(_render_pmu_profiler_header(case.vars))
     if '#include "model_data.h"' in case.text:
@@ -623,3 +645,32 @@ def test_gate_fails_on_an_unused_local_variable(tmp_path):
     assert result.returncode != 0, "gate passed a TU with an unused local variable"
     assert "hpx_orphaned_by_injection" in result.stderr
     assert "-Wunused-variable" in result.stderr or "unused" in result.stderr
+
+
+@pytest.mark.parametrize("engine", FIXTURE_ENGINES)
+def test_fixture_gate_rejects_missing_output_storage(tmp_path, engine):
+    """The same compiler rejects a fixture-only undeclared output buffer."""
+    text, headers = render_fixture("tcn", engine)
+    case = _CompileCase(
+        "fixture-regression", text, _common_kwargs("apollo510", "rtt"), headers=headers
+    )
+    declaration = "volatile uint8_t deployment_output[480];"
+    assert declaration in case.text
+    case.text = text.replace(declaration, "", 1)
+    directory = _prepare_case_dir(case, tmp_path)
+    broken = _compile(directory, _part_define(case.vars))
+    assert broken.returncode != 0
+    assert "deployment_output" in broken.stderr and "not declared" in broken.stderr
+    case.text = text
+    directory = _prepare_case_dir(case, tmp_path)
+    restored = _compile(directory, _part_define(case.vars))
+    assert restored.returncode == 0, restored.stderr
+
+
+def test_compile_matrix_covers_fixture_render_arms():
+    assert {case.case_id for case in _build_cases() if case.case_id.startswith("fixture:")} == {
+        f"fixture:{kind}|{engine}|{scope}"
+        for kind in ("tcn", "kws")
+        for engine in ("tflm", "helia-aot")
+        for scope in ("restore_and_invoke", "invoke_only")
+    }

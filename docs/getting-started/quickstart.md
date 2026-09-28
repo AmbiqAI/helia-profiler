@@ -84,7 +84,8 @@ output:
     `psram` independently, or omit both for `auto` (greedy fastest-fit).
     See [Memory Placement](../guide/memory.md).
 3.  heliaRT library variant. `release-with-logs` keeps SWO printf available
-    for debugging; `release` is leaner.
+    for debugging; `debug` keeps asserts. `release` is rejected because it
+    compiles out per-op profiling.
 4.  Toolchain. See [Toolchains](../guide/toolchains.md) for `armclang` and
     `atfe` setup.
 5.  Capture transport. See [Transports](../guide/transports.md).

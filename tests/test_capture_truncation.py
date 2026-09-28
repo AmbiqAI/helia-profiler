@@ -25,8 +25,7 @@ def test_truncation_hint_handles_missing_mapping(monkeypatch):
     assert "selected transport" in _truncation_hint("uart")
 
 
-@pytest.mark.parametrize("include_end", [False, True])
-def test_uart_without_layers_reports_capture_error(tmp_path, monkeypatch, caplog, include_end):
+def _uart_ctx(tmp_path, monkeypatch, lines):
     model = tmp_path / "model.tflite"
     model.write_bytes(b"\x00")
     config = load_config(
@@ -39,17 +38,42 @@ def test_uart_without_layers_reports_capture_error(tmp_path, monkeypatch, caplog
     )
     ctx = PipelineContext(config=config, work_dir=tmp_path)
     ResolvePlatformStage().run(ctx)
-    lines = ["--- HPX_START ---"]
-    if include_end:
-        lines.append("--- HPX_END ---")
     monkeypatch.setattr("helia_profiler.transport.uart.capture_uart_output", lambda **kwargs: lines)
+    return ctx
 
-    with pytest.raises(CaptureError, match="No layer data") as exc:
+
+@pytest.mark.parametrize(
+    ("lines", "message"),
+    [
+        (["--- HPX_START ---"], "ended before HPX_END"),
+        (["--- HPX_START ---", "--- HPX_END ---"], "No layer data"),
+    ],
+)
+def test_uart_without_layers_reports_capture_error(tmp_path, monkeypatch, lines, message):
+    ctx = _uart_ctx(tmp_path, monkeypatch, lines)
+
+    with pytest.raises(CaptureError, match=message) as exc:
         capture_pmu(ctx)
 
     assert exc.value.hint is not None
     assert "UART" in exc.value.hint
     assert "--transport rtt" in exc.value.hint
-    if not include_end:
-        assert "HPX_END sentinel not found" in caplog.text
-        assert "UART capture truncated" in caplog.text
+
+
+def test_truncated_capture_with_layers_fails(tmp_path, monkeypatch):
+    lines = [
+        "--- HPX_START ---",
+        "HPX_NUM_PRESETS=2",
+        "HPX_PRESETS=cpu_0,memory_0",
+        "--- HPX_PRESET cpu_0 ---",
+        "--- HPX_ITER 0 ---",
+        "Layer,Op,ARM_PMU_CPU_CYCLES",
+        "0,CONV_2D,100",
+    ]
+    ctx = _uart_ctx(tmp_path, monkeypatch, lines)
+
+    with pytest.raises(CaptureError, match="ended before HPX_END") as exc:
+        capture_pmu(ctx)
+
+    assert exc.value.hint is not None
+    assert "UART capture truncated" in exc.value.hint

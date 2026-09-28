@@ -35,15 +35,16 @@ from .usb_identity import USB_MARKER_PREFIX
 from .timing import READINESS_POLL_INTERVAL_S, USB_REENUM_FLOOR_S, CaptureTimingTracker
 from .protocol import (
     DEFAULT_TIMEOUT_S,
+    HEARTBEAT_TIMEOUT_S,
     HPX_END,
     HPX_START,
-    LINE_TIMEOUT_S,
-    window_budget_s,
+    collect_lines,
 )
 
 log = logging.getLogger("hpx")
 
 _ENUM_TIMEOUT_S = 15
+_READ_CHUNK = 4096
 BAUD = 115200  # CDC ignores baud, but pyserial requires a value
 _CDC_PATTERNS = ["/dev/tty.usbmodem*", "/dev/ttyACM*"]
 _JLINK_MARKERS = ("segger", "j-link")
@@ -248,7 +249,8 @@ def capture_usb_output(
     build_dir: None = None,  # unused — kept for interface parity with SWO
     jlink_serial: str | None = None,
     jlink_device: str,
-    timeout_s: float = DEFAULT_TIMEOUT_S,
+    timeout_s: float | None = DEFAULT_TIMEOUT_S,
+    heartbeat_timeout_s: float = HEARTBEAT_TIMEOUT_S,
     usb_port: str | None = None,
     usb_marker: str | None = None,
     keep_attached: bool = False,
@@ -267,20 +269,18 @@ def capture_usb_output(
     power domain (Apollo4) — see
     :func:`~helia_profiler.capture.readiness.attached_reset_session`.
 
+    *timeout_s* is the absolute capture ceiling (``None`` = unbounded) and
+    *heartbeat_timeout_s* the max gap between received lines.
+
     Returns:
         List of captured text lines.
     """
     timing = CaptureTimingTracker(start_marker=HPX_START, end_marker=HPX_END)
-
-    def finalize_timing() -> None:
-        timing.finalize(timing_out)
-
     pre_existing = _snapshot_cdc_ports()
     log.info("Pre-existing CDC ports: %s", sorted(pre_existing) or "(none)")
 
     # --- Step 1: reset the target ---
     ser: serial.Serial | None = None
-    lines: list[str] = []
     # On SoCs that gate the DWT cycle counter behind the debug power domain
     # (Apollo4), a debugger must stay attached for the whole capture or every
     # per-layer cycle reads back 0.  Hold the pylink session open across reset,
@@ -310,63 +310,25 @@ def capture_usb_output(
             port = resolve_cdc_port(marker=usb_marker, pre_existing=pre_existing)
 
         log.info("Opening USB CDC port: %s", port)
-        ser = serial.Serial(
+        ser = opened = serial.Serial(
             port=port,
             baudrate=BAUD,
-            timeout=LINE_TIMEOUT_S,
+            timeout=0,
             dsrdtr=True,  # assert DTR so nsx_usb_connected() returns true
         )
-        ser.dtr = True
-        ser.reset_input_buffer()
+        opened.dtr = True
+        opened.reset_input_buffer()
 
-        deadline = time.monotonic() + timeout_s
+        def read_fn() -> bytes:
+            return opened.read(opened.in_waiting or _READ_CHUNK)
 
-        while time.monotonic() < deadline:
-            ser.timeout = min(deadline - time.monotonic(), LINE_TIMEOUT_S)
-            raw = ser.readline()
-
-            if not raw:
-                # Timeout on readline — no data for LINE_TIMEOUT_S
-                if lines and any(HPX_START in l for l in lines[:20]):
-                    log.warning(
-                        "No USB data for %ds after receiving %d lines — HPX_END may have been lost",
-                        LINE_TIMEOUT_S,
-                        len(lines),
-                    )
-                    break
-                continue
-
-            try:
-                line = raw.decode("utf-8", errors="replace").strip()
-            except Exception:
-                continue
-            if not line:
-                continue
-
-            line_ts = time.monotonic()
-            lines.append(line)
-            log.debug("USB: %s", line)
-            timing.observe_line(line, line_ts)
-
-            # Clean (power) window announce: widen the capture deadline to cover
-            # the firmware's estimate of the upcoming silent window so a long
-            # but healthy blackout is not cut short.
-            budget = window_budget_s(line)
-            if budget is not None:
-                window_deadline = line_ts + budget
-                if window_deadline > deadline:
-                    deadline = window_deadline
-                    log.info(
-                        "USB: clean window announced (~%.0fs budget) — "
-                        "holding deadline through the silent measurement window",
-                        budget,
-                    )
-
-            if line == HPX_END:
-                log.info("Captured %d lines (HPX_END received)", len(lines))
-                finalize_timing()
-                return lines
-
+        lines = collect_lines(
+            read_fn,
+            transport_name="USB CDC",
+            overall_timeout_s=timeout_s,
+            heartbeat_timeout_s=heartbeat_timeout_s,
+            on_line=timing.observe_line,
+        )
     except CaptureError:
         raise
     except serial.SerialException as exc:
@@ -384,12 +346,7 @@ def capture_usb_output(
             ser.close()
         reset_stack.close()
 
-    log.warning(
-        "USB CDC capture timed out after %.0fs (%d lines captured)",
-        timeout_s,
-        len(lines),
-    )
-    finalize_timing()
+    timing.finalize(timing_out)
     return lines
 
 
@@ -415,6 +372,8 @@ class UsbCdcTransport(BaseCaptureTransport):
             jlink_device=args.jlink_device,
             usb_port=ctx.config.target.usb_port,
             usb_marker=usb_marker_serial(args.jlink_serial),
+            timeout_s=args.overall_timeout_s,
+            heartbeat_timeout_s=args.heartbeat_timeout_s,
             keep_attached=args.keep_debugger_attached,
             timing_out=args.timing_raw,
             reset_controller=args.reset_controller,

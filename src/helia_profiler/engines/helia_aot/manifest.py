@@ -378,7 +378,8 @@ def _extract_memory_plan_from_render_plan(
         for arena in getattr(render_plan, arena_list_name, ()):
             runtime_key = _aot_memory_region_key(getattr(arena, "memory", None))
             if runtime_key is None:
-                continue
+                log.warning("AOT memory plan unavailable: unsupported runtime memory mapping")
+                return None
 
             size = int(getattr(arena, "size", 0))
             if size <= 0:
@@ -388,6 +389,9 @@ def _extract_memory_plan_from_render_plan(
             region_id = int(getattr(arena, "region_id", len(buckets)))
             kind = ConsumerKind.WEIGHTS if role == ArenaRole.CONSTANT.value else ConsumerKind.ARENA
             source_key_early = _aot_memory_region_key(getattr(arena, "source_memory", None))
+            if getattr(arena, "source_memory", None) is not None and source_key_early is None:
+                log.warning("AOT memory plan unavailable: unsupported source memory mapping")
+                return None
             staged = source_key_early is not None and source_key_early != runtime_key
             buckets.setdefault(runtime_key, []).append(
                 MemoryConsumer(
