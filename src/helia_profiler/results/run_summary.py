@@ -49,7 +49,9 @@ RUN_SUMMARY_SCHEMA = "hpx.run-summary"
 #: v6: #317 AOT clean timing and power include per-call input restoration.
 #: v7: #299 on-device power divides by the INA228 accumulation interval, and
 #: the firmware side of the window-clock checks is the gate bracket.
-RUN_SUMMARY_SCHEMA_VERSION = 7
+#: v8: #386 on-device gated inference publishes per-inference energy and
+#: inferences-per-joule alongside the existing gated totals.
+RUN_SUMMARY_SCHEMA_VERSION = 8
 
 __all__ = [
     "RUN_SUMMARY_SCHEMA",

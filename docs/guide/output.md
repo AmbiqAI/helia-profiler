@@ -94,7 +94,7 @@ consumers can evolve parsers without coupling every file to the bundle schema:
 
 | Artifact | Schema | Packaged JSON Schema |
 | --- | --- | --- |
-| `summary.json` | `hpx.run-summary` v7 | `run_summary.schema.v1.json` (root fields; the authoritative shape is the typed model `helia_profiler.results.run_summary.RunSummary`) |
+| `summary.json` | `hpx.run-summary` v8 | `run_summary.schema.v1.json` (root fields; the authoritative shape is the typed model `helia_profiler.results.run_summary.RunSummary`) |
 | `run_metadata.json` | `hpx.run-metadata` v1 | `run_metadata.schema.v1.json` |
 | `profile_results.json` | `hpx.profile-results` v1 | `profile_results.schema.v1.json` |
 
@@ -109,7 +109,7 @@ The top-level summary — start here for a quick overview.
 ```json
 {
   "schema": "hpx.run-summary",
-  "schema_version": 7,
+  "schema_version": 8,
   "engine": "helia-rt",
   "layers": 13,
   "total_cycles": 2016376,
@@ -486,6 +486,14 @@ inputs are (no symbol table, partial listing, no measured view).
     summaries remain readable. A schema difference is informative; the
     workload identity separately blocks power deltas against missing or
     different workloads. Profiled and per-layer comparisons remain available.
+
+!!! note "Schema v8"
+    On-device gated-inference summaries now publish
+    `power.energy_per_inference_j` and `power.inferences_per_joule` when the
+    probe ran inferences and the existing arbitration does not suppress the
+    per-inference figures (#386). Older summaries remain readable, but a schema
+    difference is informative because these fields were previously absent for
+    the same scope.
 
 !!! note "Schema v7"
     On-device (`power.mode: internal`) power now divides energy and charge by
