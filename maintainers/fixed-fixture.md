@@ -129,3 +129,15 @@ producer plan, the capacities-only fallback is not exported as an arena plan.
 Unknown runtime or source mappings invalidate the whole AOT plan rather than
 silently dropping allocations. Staged constant source and destination remain
 separate physical consumers; neither is added to enclosing section totals.
+
+`fixture_operator_timing.bind_operator_timing(build, fixture, profile)` attributes
+per-layer cycles from a separate `hpx profile` run of the same model to a fixture
+build. The fixture image has no per-operator hooks, so these are approximate
+shares from a PMU-instrumented sibling image, never the fixture's latency. The
+record is null with a reason unless the model hash, engine, compiler version,
+board, LP 96 MHz clock and SRAM/MRAM placement match, no counter overflowed, the
+clean window ran inferences, and the per-layer sum agrees with the clean-window
+cycles within 1 % (2 % below 2 ms). A TFLM fixture's prepared upstream runtime is
+not selectable by `hpx profile`; `allow_runtime_difference=True` accepts the
+baseline stack and labels the record. The fixture build does not record the
+engine version, so the record carries the profile's for the consumer to compare.
