@@ -25,7 +25,7 @@ Regenerate after changing the source they derive from; CI fails on drift:
 uv run python tools/gen_config_reference.py         # ProfileConfig → docs/reference/configuration.md
 uv run python tools/gen_issue_code_reference.py     # issue registry → docs/reference/issue-codes.md
 uv run python tools/gen_wire_protocol_reference.py  # wire registry → docs/reference/wire-protocol.md
-HPX_UPDATE_SNAPSHOTS=1 uv run pytest tests/contracts/test_firmware_render_snapshots.py tests/contracts/test_report_golden.py
+HPX_UPDATE_SNAPSHOTS=1 uv run pytest tests/contracts/test_firmware_render_snapshots.py tests/contracts/test_fixture_render_snapshots.py tests/contracts/test_report_golden.py
 ```
 
 Software-only capture tests need the device guard installed before HPX is

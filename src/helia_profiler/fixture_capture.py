@@ -62,8 +62,8 @@ class FixtureCaptureRequest:
     timing_scope: FixtureTimingScope
     target: FixtureTarget
     arena_capacity: int | None = None
-    #: Caller-predicted firmware run time after reset; the host stays detached until
-    #: ``expected_duration_s * 1.25`` (bounded by ``settle_seconds``) before polling.
+    #: Caller-predicted firmware run time after reset; the host stays detached for
+    #: ``max(1 s, expected_duration_s * 1.25)``, bounded by ``settle_seconds``, before polling.
     expected_duration_s: float | None = None
 
 
