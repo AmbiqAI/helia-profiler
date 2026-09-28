@@ -81,3 +81,44 @@ by the linked-image memory report.
 The existing host compile gate includes representative TCN/KWS fixtures for both
 engines and timing scopes. The existing real-toolchain gate includes both engines
 and models, using its normal qualified dependency-workspace requirements.
+
+## Measurement records
+
+`fixture_metrics.inspect_fixture_footprint` reads pinned ELF/image/map artifacts
+through the existing host tool probes. It performs no build or device operation.
+ELF file length, flat image length and PT_LOAD bytes are separate: debug metadata
+and layout gaps make them different. Linked RAM includes stack reservation;
+non-stack RAM includes arenas, terminals and any RAM-resident code. Heap
+reservation is separate. Do not add these component rows to their parent totals.
+Partial, unattributed or straddling section inventories yield null with a reason.
+
+ATfE LLD `.text` input contributions give retained text bytes including literal
+pools, not instruction-only bytes. Nested symbol rows and overlapping aliases are
+not added twice. The pinned map and actual symbol inventory support attribution;
+selected `arm_`/`helia_` text symbols show linked membership, not execution or an
+exhaustive kernel count. Pure model-weight, runtime and kernel totals remain null
+when no exhaustive partition is available. Stack/heap peaks are not instrumented.
+
+`fixture_observation.summarize_fixture_measurements` binds the footprint map,
+ELF/image and successful raw capture identity to the compiled build receipt. It
+checks the captured iteration/warmup counts and timing scope. It reports current
+allocator snapshots by phase, never a transient peak or tested minimum. Numerical
+acceptance remains with the consumer. Both stale and wrong maps are rejected.
+
+Optional `FixtureEnergyWindow` is an internal producer-verified association of an
+existing `PowerResult` with the exact compiled image and completed firmware count.
+Construct it only after image/terminal validation through the existing gated
+capture protocol and independent electrical setup/ownership checks. The summary
+accepts one complete valid GPIO window and a matching finite firmware interval;
+free-running/degraded captures cannot become per-inference energy. Poll-based
+edges require bounded uncertainty. Energy covers the stated powered domain with
+no idle subtraction. Missing captures have null values and `not_captured`, not zero.
+This normalization layer does not add a gated firmware mode or acquire an instrument.
+
+Build receipts also expose `planned_memory` from the existing memory-plan stage,
+with `planned_memory_reason` when unavailable. This is a compiler/configuration
+plan, not a linked measurement or allocator observation. If AOT has no complete
+producer plan, the capacities-only fallback is not exported as an arena plan.
+Unknown runtime or source mappings invalidate the whole AOT plan rather than
+silently dropping allocations. Staged constant source and destination remain
+separate physical consumers; neither is added to enclosing section totals.

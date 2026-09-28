@@ -15,7 +15,7 @@ from helia_profiler.config import (
 )
 from helia_profiler.engines import EngineType
 from helia_profiler.pipeline import PipelineContext
-from helia_profiler.results.models import ToolchainInfo, RunMetadata
+from helia_profiler.results.models import ToolchainInfo, RunMetadata, MemoryPlan
 from helia_profiler.fixture_analysis import FixtureModelAnalysis
 from helia_profiler.modelcost.model_analysis import ModelAnalysis, LayerOps
 from helia_profiler.firmware.op_resolver import build_fixture_resolver_plan
@@ -117,7 +117,10 @@ def test_hash_or_unsupported_config_stops_before_pipeline(tmp_path, monkeypatch)
 
 
 @pytest.mark.parametrize("engine", [EngineType.TFLM, EngineType.HELIA_AOT])
-def test_host_only_stage_selection_and_source_receipt(tmp_path, monkeypatch, engine):
+@pytest.mark.parametrize("aot_plan_available", [False, True])
+def test_host_only_stage_selection_and_source_receipt(
+    tmp_path, monkeypatch, engine, aot_plan_available
+):
     c, f = fixture(tmp_path)
     rt = runtime(tmp_path)
     mock_analysis(monkeypatch, f)
@@ -157,6 +160,12 @@ def test_host_only_stage_selection_and_source_receipt(tmp_path, monkeypatch, eng
                 + lock_suffix
             )
             return SimpleNamespace(
+                memory_plan=MemoryPlan(engine=engine),
+                engine_artifacts=(
+                    SimpleNamespace(memory_plan=MemoryPlan(engine=engine))
+                    if aot_plan_available
+                    else None
+                ),
                 run_metadata=RunMetadata(
                     toolchain=ToolchainInfo(compiler="atfe", compiler_version=compiler_version)
                 ),
@@ -168,6 +177,10 @@ def test_host_only_stage_selection_and_source_receipt(tmp_path, monkeypatch, eng
     r = build_fixed_fixture(c, f, method=METHOD, runtime=selected_runtime, compile=False)
     assert not r.built and r.binary is None and len(r.generated_sources) == 4
     assert r.build_identity is None
+    assert (r.planned_memory is None) == (engine is EngineType.HELIA_AOT and not aot_plan_available)
+    assert (r.planned_memory_reason is not None) == (
+        engine is EngineType.HELIA_AOT and not aot_plan_available
+    )
     assert calls[-1] == [
         "bind_fixed_fixture",
         "resolve_platform",
