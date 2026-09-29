@@ -501,3 +501,30 @@ def test_heliart_accepts_float16_models_that_tflm_refuses(tmp_path):
     )
     with pytest.raises(ConfigError, match="float16"):
         _check_typed_fixture(fixture, model, EngineType.TFLM)
+
+
+@pytest.mark.parametrize("sep", ["/", "\\"])
+def test_linked_inputs_keep_a_windows_drive_letter(sep):
+    """ATfE maps on Windows name inputs as ``C:\\...``; the drive colon is not a delimiter."""
+    from pathlib import PurePath
+
+    from helia_profiler.fixture import _linked_components
+
+    root = sep.join(["C:", "Users", "r", "helia-rt-bench", "modules", "tflite-micro", "app"])
+    own = sep.join([root, "modules", "hpx-heliart-runtime", "runtime.a(m.cc.obj):(.text)"])
+    main = sep.join([root, "build", "CMakeFiles", "hpx_profiler.dir", "src", "main.cc.obj:(.text)"])
+    names = _linked_components(f"{own}\n{main}\n", PurePath(root))
+    assert names == {
+        "modules",
+        "hpx-heliart-runtime",
+        "runtime",
+        "build",
+        "CMakeFiles",
+        "hpx-profiler.dir",
+        "src",
+        "main.cc",
+    }
+    nested = sep.join(
+        [root, "modules", "hpx-heliart-runtime", "cmsis-nn-x", "modules", "u", "l.a(x.o):"]
+    )
+    assert "cmsis-nn-x" in _linked_components(nested, PurePath(root))

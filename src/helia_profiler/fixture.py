@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 import hashlib
 import json
-from pathlib import Path
+from pathlib import Path, PurePath
 import re
 
 from .config import ProfileConfig
@@ -127,10 +127,10 @@ PREPARED_RUNTIME_ENGINES = {
 _RUNTIME_PROVIDER = re.compile(r"helia-rt|tflite-micro|cmsis-nn")
 _PREPARED_MODULES = frozenset(name for name, _, _ in PREPARED_RUNTIME_MODULES.values())
 #: Archives and objects a link map lists as inputs, e.g. ``.../libx.a(y.o):`` or ``.../y.o:``.
-_MAP_INPUT = re.compile(r"([^\s():]+)\.(?:a|o|obj)(?=[(:])")
+_MAP_INPUT = re.compile(r"((?:[A-Za-z]:)?[^\s():]+)\.(?:a|o|obj)(?=[(:])")
 
 
-def _linked_components(map_text: str, app: Path) -> set[str]:
+def _linked_components(map_text: str, app: PurePath) -> set[str]:
     """Path components naming each linked input, not the directories above the app.
 
     Inputs under ``app`` and relative inputs contribute every component; other
