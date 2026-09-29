@@ -3,12 +3,12 @@
   "generatedFrom": {
     "tool": "pyref",
     "version": "1.7.3",
-    "sourceTree": "81f0b1419e1bba14c3416aeffef31acf543f617c"
+    "sourceTree": "81ac29b5c609a5638d0b19d3a4dcbd68ea962d5b"
   },
   "language": "python",
   "modules": [
     {
-      "description": "The on-disk index of a run directory: the artifacts it holds, the issues raised against it, and whether its numbers may be used.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `81f0b1419e1bba14c3416aeffef31acf543f617c`.",
+      "description": "The on-disk index of a run directory: the artifacts it holds, the issues raised against it, and whether its numbers may be used.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `81ac29b5c609a5638d0b19d3a4dcbd68ea962d5b`.",
       "name": "manifest",
       "path": "helia_profiler.results.manifest",
       "submodules": [],
