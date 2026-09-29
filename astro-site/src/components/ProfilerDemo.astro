@@ -1,11 +1,11 @@
 <hpx-demo class="demo">
   <div class="demo__bar">
     <div class="demo__tabs" role="tablist" aria-label="Profiling workflow">
-      {['Check', 'Probes', 'LiteRT', 'AOT', 'Compare', 'Power'].map((name, index) => <button type="button" role="tab" id={`hpx-tab-${index}`} aria-controls={`hpx-panel-${index}`} aria-selected={index === 0 ? 'true' : 'false'} tabindex={index === 0 ? 0 : -1}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="currentColor" /><circle class="progress-ring" cx="12" cy="12" r="9" pathLength="100" /></svg>{name}</button>)}
+      {['Check', 'Probes', 'LiteRT', 'AOT', 'Compare'].map((name, index) => <button type="button" role="tab" id={`hpx-tab-${index}`} aria-controls={`hpx-panel-${index}`} aria-selected={index === 0 ? 'true' : 'false'} tabindex={index === 0 ? 0 : -1}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="currentColor" /><circle class="progress-ring" cx="12" cy="12" r="9" pathLength="100" /></svg>{name}</button>)}
     </div>
 
   </div>
-  {['doctor', 'probes', 'litert', 'aot', 'compare', 'power'].map((name, index) => <div class="demo__screen" id={`hpx-panel-${index}`} role="tabpanel" aria-labelledby={`hpx-tab-${index}`} tabindex="0" hidden={index !== 0}><slot name={name} /></div>)}
+  {['doctor', 'probes', 'litert', 'aot', 'compare'].map((name, index) => <div class="demo__screen" id={`hpx-panel-${index}`} role="tabpanel" aria-labelledby={`hpx-tab-${index}`} tabindex="0" hidden={index !== 0}><slot name={name} /></div>)}
   <div class="demo__caption">Abbreviated CLI excerpts · measured profiling example</div>
 </hpx-demo>
 <script>
@@ -44,7 +44,7 @@ class HpxDemo extends HTMLElement {
     });
     const characterMs = 34;
     const resultLineMs = 240;
-    const readingMs = [2600, 2600, 5000, 5000, 7000, 5500];
+    const readingMs = [2600, 2600, 5000, 5000, 7000];
     const typingTimes = lines.map((group, i) => group.slice(0, commandCounts[i]).reduce((total, line) => total + line.dataset.text!.length * characterMs, 0));
     const durationFor = (i: number) => typingTimes[i] + (lines[i].length - commandCounts[i]) * resultLineMs + readingMs[i];
     const render = () => {

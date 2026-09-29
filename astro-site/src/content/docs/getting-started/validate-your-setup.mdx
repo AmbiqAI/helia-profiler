@@ -86,10 +86,12 @@ and does not depend on attached hardware):
     "kind": "command"
   },
   {
-    "text": " Board                    SoC            Core           Backends             Domains             Channel"
+    "text": " Board                    SoC            Core           Backends             Domains             Channel",
+    "kind": "muted"
   },
   {
-    "text": " apollo3p_evb             apollo3p       cortex-m4      dwt                  cpu                 stable"
+    "text": " apollo3p_evb             apollo3p       cortex-m4      dwt                  cpu                 stable",
+    "kind": "success"
   },
   {
     "text": " apollo3p_evb_cygnus      apollo3p       cortex-m4      dwt                  cpu                 preview"
@@ -110,7 +112,8 @@ and does not depend on attached hardware):
     "text": " apollo4p_blue_kxr_evb    apollo4p       cortex-m4      dwt                  cpu                 preview"
   },
   {
-    "text": " apollo510_evb            apollo510      cortex-m55     dwt, armv8m-pmu      cpu, memory, mve    stable"
+    "text": " apollo510_evb            apollo510      cortex-m55     dwt, armv8m-pmu      cpu, memory, mve    stable",
+    "kind": "success"
   },
   {
     "text": " apollo510b_evb           apollo510b     cortex-m55     dwt, armv8m-pmu      cpu, memory, mve    preview"
@@ -128,11 +131,12 @@ and does not depend on attached hardware):
     "text": " atomiq110_fpga_turbo     atomiq110      cortex-m55     dwt, armv8m-pmu      cpu, memory, mve,   preview"
   },
   {
-    "text": "                                                                             ethos_npu"
+    "text": "                                                                             ethos_npu",
+    "kind": "muted"
   }
 ]} />
 
-Find your EVB in the first column; that string is the `--board` value for
+Stable board rows are highlighted in green. Find your EVB in the first column; that string is the `--board` value for
 every other command. `Backends` and `Domains` say which counters the board
 can capture: a Cortex-M4 board has DWT cycle counting only, a Cortex-M55
 board adds the Armv8-M PMU with memory and MVE counters. `Channel` records
@@ -142,7 +146,7 @@ board registry, so it is always current for the hpx you installed;
 
 ### 3. `hpx probes list`: the J-Link probe
 
-With no probe attached (captured on the same host, same day):
+Illustrative output with two connected J-Link probes. Serial numbers are fictional; your product strings will vary.
 
 <AsciiTerminal animated copy="commands" lines={[
   {
@@ -150,18 +154,24 @@ With no probe attached (captured on the same host, same day):
     "kind": "command"
   },
   {
-    "text": "No J-Link probes detected."
+    "text": "serial     product                    connection",
+    "kind": "muted"
+  },
+  {
+    "text": "---------  -------------------------  ----------",
+    "kind": "muted"
+  },
+  {
+    "text": "801000001  J-Link-OB-Apollo4-CortexM  USB",
+    "kind": "success"
+  },
+  {
+    "text": "801000002  J-Link                     USB",
+    "kind": "success"
   }
 ]} />
 
-With an EVB on its debug USB port, one line per probe (captured earlier on
-an Apollo4 EVB bench; your serial and product string will differ):
-
-```text
-serial      product                    connection
-----------  -------------------------  ----------
-801000001  J-Link-OB-Apollo4-CortexM  USB
-```
+If no probe is connected, hpx prints `No J-Link probes detected.`
 
 Nothing listed with a board plugged in means the wrong USB connector, a
 missing SEGGER install, or on Linux the udev rules not yet applied; replug
@@ -181,8 +191,7 @@ and suggests `--jlink-serial`.
 Only the `usb_cdc` and `uart` transports use a serial port. Skip this step
 when using the default `rtt` transport:
 
-Captured on macOS 26.6, 2026-09-21, no board attached; on Windows the
-devices read `COM3` and similar:
+Illustrative macOS output with a J-Link virtual COM port and an HPX USB CDC device. Device paths and serial numbers are fictional. Windows uses names such as `COM3`; Linux uses names such as `/dev/ttyACM0`.
 
 <AsciiTerminal animated copy="commands" lines={[
   {
@@ -190,16 +199,24 @@ devices read `COM3` and similar:
     "kind": "command"
   },
   {
-    "text": "device                           kind    serial_number  description  product"
+    "text": "device                 kind         serial_number  description  product",
+    "kind": "muted"
   },
   {
-    "text": "-------------------------------  ------  -------------  -----------  -------"
+    "text": "---------------------  -----------  -------------  -----------  -------",
+    "kind": "muted"
   },
   {
-    "text": "/dev/cu.debug-console            serial                 n/a"
+    "text": "/dev/cu.usbmodem001    jlink-vcom   801000001      J-Link VCOM  J-Link",
+    "kind": "success"
   },
   {
-    "text": "/dev/cu.Bluetooth-Incoming-Port  serial                 n/a"
+    "text": "/dev/cu.usbmodem002    hpx-usb-cdc  HPX-DEMO-002   HPX USB CDC  HPX",
+    "kind": "success"
+  },
+  {
+    "text": "/dev/cu.debug-console  serial                      n/a",
+    "kind": "muted"
   }
 ]} />
 
@@ -275,7 +292,8 @@ validity, issues and measurement scope before using its numbers.
 
 ## What next
 
-[First profile](../first-profile/) runs your own model through the same
-chain and shows you how to read what it writes. If validation failed, the
-troubleshooting section of [First profile](../first-profile/#troubleshooting-the-first-run) maps each failure to
-its cause.
+With validation complete, [profile your model](../first-profile/) and learn
+to read its timing, layer costs and memory use.
+
+If a check failed, [troubleshoot your setup](../first-profile/#troubleshooting-the-first-run)
+before continuing.

@@ -69,9 +69,9 @@ import buildInfo from '../../data/build-info.json';
 <div>
 <span class="eyebrow">Measure · Inspect · Compare</span>
 <h2>From setup to a side-by-side comparison.</h2>
-<p>Check your tools, find a debug probe and profile the heartKIT AFIB arrhythmia classifier. Compare LiteRT with heliaAOT, then explore power capture as a separate next step.</p>
+<p>Check your tools, find a debug probe and profile the heartKIT AFIB arrhythmia classifier. Compare LiteRT with heliaAOT to see the difference in latency and model memory.</p>
 <a href="/helia-profiler/getting-started/first-profile/">Run your first profile →</a>
-<p class="demo-help">Setup output shows an illustrative connected probe. Commands are illustrative excerpts, not a runnable recipe: afib.yml and afib-power.yml stand for your own configuration files. The tables show measured profiling results. Select a step to explore; click the active step to pause or resume.</p>
+<p class="demo-help">Setup output shows an illustrative connected probe. Commands are illustrative excerpts, not a runnable recipe: afib.yml stands for your own configuration file. The tables show measured profiling results. Select a step to explore; click the active step to pause or resume.</p>
 
 <div class="profiling-info">
 <button class="profiling-info-trigger" type="button" popovertarget="profiling-method"><span aria-hidden="true">ⓘ</span> About this example</button>
@@ -155,20 +155,6 @@ $ hpx compare results/litert-afib results/aot-afib
 <div class="profile-result">
 <p>Profiling example · heartKIT AFIB</p>
 <table><thead><tr><th>Measurement</th><th>LiteRT</th><th>heliaAOT</th><th>Change</th></tr></thead><tbody><tr><th>Latency</th><td>38.69 ms</td><td>12.14 ms</td><td>3.2x faster</td></tr><tr><th>Cycles</th><td>3,714,336</td><td>1,164,960</td><td>-69%</td></tr><tr><th>Activation RAM</th><td>28.3 KB</td><td>14.7 KB</td><td>-48%</td></tr><tr><th>Model storage</th><td>61.4 KB</td><td>25.7 KB</td><td>-58%</td></tr><tr><th>Total model memory</th><td>89.7 KB</td><td>40.4 KB</td><td>-55%</td></tr></tbody></table>
-</div>
-</div>
-<div slot="power">
-
-```text
-$ hpx profile --config afib-power.yml \
-  --engine helia-aot --power
-```
-
-<div class="profile-result">
-<p>Next: include energy in your comparison.</p>
-<p>Configure a supported Joulescope or INA228 monitor in afib-power.yml, then capture power alongside inference timing.</p>
-<p>Power was not measured in this profiling example.</p>
-<a href="/helia-profiler/guide/power/">Set up power capture →</a>
 </div>
 </div>
 </ProfilerDemo>
