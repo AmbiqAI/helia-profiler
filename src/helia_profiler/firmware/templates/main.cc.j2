@@ -481,7 +481,12 @@ static tflite::MicroMutableOpResolver<kMaxOps> &get_resolver() {
         g_profiler.SetIterationContext({{ loop.index0 }}, iter);
 {%- endblock %}
 
-{% block engine_print_csv %}{% if pass.group == "ethos_npu" %}
+{% block engine_print_csv %}        if (g_profiler.capacity_exceeded()) {
+            hpx_printf("HPX_ERROR=operator_count_exceeds_capacity capacity=%d\n",
+                       HpxPmuProfiler::kMaxLayers);
+            hpx_park();
+        }
+{% if pass.group == "ethos_npu" %}
         hpx_npu_print_csv();
 {% else %}
         g_profiler.PrintCsv();

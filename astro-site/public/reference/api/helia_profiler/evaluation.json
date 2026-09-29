@@ -3,12 +3,12 @@
   "generatedFrom": {
     "tool": "pyref",
     "version": "1.7.3",
-    "sourceTree": "86e1a1bc566380a5ff68c8e53854bb120e635215"
+    "sourceTree": "923b435f2270602d7706369421a5a0e36ebce28e"
   },
   "language": "python",
   "modules": [
     {
-      "description": "Comparing two runs and judging one: the comparability rules that decide whether a comparison is meaningful, and the metric policies that turn numbers into a verdict.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `86e1a1bc566380a5ff68c8e53854bb120e635215`.",
+      "description": "Comparing two runs and judging one: the comparability rules that decide whether a comparison is meaningful, and the metric policies that turn numbers into a verdict.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `923b435f2270602d7706369421a5a0e36ebce28e`.",
       "name": "evaluation",
       "path": "helia_profiler.evaluation",
       "submodules": [],

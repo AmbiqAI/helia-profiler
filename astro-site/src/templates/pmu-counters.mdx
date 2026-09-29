@@ -140,8 +140,9 @@ dedicated power binary never has a debugger, which is why it times its
 window with STIMER on those families (`SocCapabilities.power_window_timer`).
 
 Each SoC also reserves a fixed number of per-operator PMU records
-(`SocDef.pmu_max_ops`); a model with more operators than the reservation
-does not fit, and the limit is per SoC rather than a configuration key.
+(`SocDef.pmu_max_ops`). A model that runs more operators than that fails
+the capture with `HPX_ERROR=operator_count_exceeds_capacity` on every
+engine; the limit is per SoC rather than a configuration key.
 
 ## Expected output
 
@@ -153,7 +154,7 @@ close to the per-layer sum.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `overflow_detected: true` | a counter saturated its 32-bit accumulator on a very long or hot layer | fewer iterations, or fewer or narrower counters for that layer |
+| `overflow_detected: true` | a counter wrapped its 32-bit accumulator on a very long or hot layer, or that layer's PMU read failed | fewer iterations, or fewer or narrower counters for that layer |
 | selections silently ignored | a DWT-only SoC | expected; `hpx profile --verbose` shows the warning |
 | per-layer cycles read 0 on Apollo4 | the probe was released early over `uart` or `usb_cdc` | check for a custom reset or lifecycle override |
 | `all` takes a long time | many independent build, flash and capture passes | narrow the selection |

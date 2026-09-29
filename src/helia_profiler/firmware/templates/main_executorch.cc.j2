@@ -77,6 +77,7 @@ struct LayerRecord {
 };
 
 static nsx_pmu_config_t g_pmu_cfg = {};
+{% include "_pmu_read.j2" %}
 // POD (no vtable), so a NOLOAD/zero-init section is safe -- see the AOT
 // template's g_layers comment.  The base powers the AP5 shared SSRAM domain
 // for it via pmu_profiler_sram_resident (true for every non-power render, and
@@ -85,7 +86,6 @@ NSX_MEM_SRAM_BSS static LayerRecord g_layers[kMaxLayers];
 static const char *g_counter_names[kMaxCounters] = {};
 static int g_num_layers = 0;
 static int g_num_counters = 0;
-static uint32_t g_logical_overflow_mask = 0U;
 static bool g_profile_enabled = false;
 static bool g_layer_capacity_exceeded = false;
 
@@ -117,16 +117,10 @@ static bool profiler_init(
     nsx_pmu_reset_config(&g_pmu_cfg);
     g_pmu_cfg.api = &nsx_pmu_V1_0_0;
     g_num_counters = count > kMaxCounters ? kMaxCounters : count;
-    g_logical_overflow_mask = 0U;
     for (int i = 0; i < g_num_counters; ++i) {
         nsx_pmu_event_create(
             &g_pmu_cfg.events[i], event_ids[i], NSX_PMU_EVENT_COUNTER_SIZE_32);
         g_counter_names[i] = names[i];
-        // NSX implements each 32-bit event as a 16-bit event counter followed
-        // by a 16-bit CHAIN counter. Overflow of the low half is the expected
-        // carry; only overflow of the high half means the logical value was
-        // truncated.
-        g_logical_overflow_mask |= 1UL << (2 * i + 1);
     }
     const uint32_t status = nsx_pmu_init(&g_pmu_cfg);
     hpx_printf("HPX_PMU_INIT_STATUS=%lu\n", (unsigned long)status);
@@ -172,20 +166,8 @@ static uint32_t begin_operator(
 
 static void end_operator(void *, uint32_t handle) {
     if (!g_profile_enabled || handle >= (uint32_t)g_num_layers) return;
-#if (__CORTEX_M >= 55U)
-    // Snapshot before nsx_pmu_get_counters(), which resets counters and clears
-    // PMOVSSET as part of its read/re-arm sequence.
-    const uint32_t overflow_status = ARM_PMU_Get_CNTR_OVS();
-#else
-    const uint32_t overflow_status = 0U;
-#endif
-    const uint32_t saved_cyccnt = DWT->CYCCNT;
-    const uint32_t status = nsx_pmu_get_counters(&g_pmu_cfg);
-    DWT->CYCCNT = saved_cyccnt;
     LayerRecord &record = g_layers[handle];
-    record.overflow =
-        (overflow_status & g_logical_overflow_mask) != 0U ||
-        status != NSX_STATUS_SUCCESS;
+    record.overflow = hpx_pmu_read_layer(&g_pmu_cfg, g_num_counters);
     for (int i = 0; i < g_num_counters; ++i) {
         record.counters[i] = g_pmu_cfg.counter[i].counterValue;
     }
