@@ -138,11 +138,11 @@ def _build(tmp_path: Path, *, armv8m: bool, max_ops: int) -> Path:
         profiling_backends=["armv8m_pmu"] if armv8m else ["dwt"],
         has_armv8m_pmu=armv8m,
     )
-    (tmp_path / "hpx_pmu_profiler.h").write_text(header)
-    (tmp_path / "hpx_pmu_profiler.cc").write_text(source)
-    (tmp_path / "hpx_sim_device.h").write_text(_SIM_DEVICE_H)
-    (tmp_path / "nsx_pmu_utils.h").write_text(_SIM_PMU_H)
-    (tmp_path / "driver.cc").write_text(_DRIVER_CC)
+    (tmp_path / "hpx_pmu_profiler.h").write_text(header, encoding="utf-8")
+    (tmp_path / "hpx_pmu_profiler.cc").write_text(source, encoding="utf-8")
+    (tmp_path / "hpx_sim_device.h").write_text(_SIM_DEVICE_H, encoding="utf-8")
+    (tmp_path / "nsx_pmu_utils.h").write_text(_SIM_PMU_H, encoding="utf-8")
+    (tmp_path / "driver.cc").write_text(_DRIVER_CC, encoding="utf-8")
     exe = tmp_path / "sim"
     assert _GXX is not None
     subprocess.run(
@@ -303,9 +303,9 @@ def _build_aot(tmp_path: Path, *, soc: str, max_ops: int) -> Path:
         .replace("{print_block}", print_block)
         .replace("{preset}", "NSX_PMU_PRESET_ML_DEFAULT" if armv8m else "0")
     )
-    (tmp_path / "hpx_sim_device.h").write_text(_SIM_DEVICE_H)
-    (tmp_path / "nsx_pmu_utils.h").write_text(_SIM_PMU_H)
-    (tmp_path / "aot_driver.cc").write_text(source)
+    (tmp_path / "hpx_sim_device.h").write_text(_SIM_DEVICE_H, encoding="utf-8")
+    (tmp_path / "nsx_pmu_utils.h").write_text(_SIM_PMU_H, encoding="utf-8")
+    (tmp_path / "aot_driver.cc").write_text(source, encoding="utf-8")
     exe = tmp_path / "aot_sim"
     assert _GXX is not None
     subprocess.run(
