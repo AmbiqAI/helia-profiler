@@ -80,6 +80,8 @@ def _identity_reason(
     backend = (snapshot.get("engine") or {}).get("backend")
     if build.engine is EngineType.TFLM and backend != FIXTURE_TFLM_BACKEND:
         return "backend_mismatch"
+    if build.engine is EngineType.HELIA_RT and backend not in (None, "helia"):
+        return "backend_mismatch"
     if build.toolchain is None or meta.toolchain is None:
         return "toolchain_unrecorded"
     if (meta.toolchain.compiler, meta.toolchain.compiler_version) != (
@@ -112,8 +114,8 @@ def bind_operator_timing(
 ) -> FixtureOperatorTiming:
     """Attribute a profile run's per-layer cycles to ``build`` when they describe it.
 
-    A TFLM fixture links a prepared upstream runtime that ``hpx profile``
-    cannot select, so its per-layer data describe a different runtime stack;
+    TFLM and heliaRT fixtures link a prepared runtime archive that ``hpx profile``
+    does not use, so its per-layer data describe a different runtime build;
     ``allow_runtime_difference`` accepts that and labels the record.
     """
     engine = profile.metadata.engine

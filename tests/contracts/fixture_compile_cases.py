@@ -31,7 +31,7 @@ from helia_profiler.firmware.fixture import fixture_template_vars, write_fixture
 from helia_profiler.firmware.render import _jinja_env
 
 FIXTURE_KINDS = ("tcn", "kws", "typed")
-FIXTURE_ENGINES = ("tflm", "helia-aot")
+FIXTURE_ENGINES = ("tflm", "helia-rt", "helia-aot")
 FIXTURE_SCOPES = ("restore_and_invoke", "invoke_only")
 
 

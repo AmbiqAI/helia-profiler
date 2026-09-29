@@ -79,6 +79,29 @@ class RuntimeHeader:
     sha256: str
 
 
+#: Runtime stacks a prepared archive may provide, with their source repositories.
+#: ``upstream`` is manifest schema 1; ``helia-rt`` is schema 2.
+_STACK_PROVIDERS = {
+    "upstream": (
+        ("tflite-micro", "https://github.com/tensorflow/tflite-micro"),
+        ("cmsis-nn", "https://github.com/ARM-software/CMSIS-NN"),
+    ),
+    "helia-rt": (
+        ("helia-rt", "https://github.com/AmbiqAI/helia-rt"),
+        ("ns-cmsis-nn", "https://github.com/AmbiqAI/ns-cmsis-nn"),
+    ),
+}
+#: Kernel directory each schema-2 stack declares.
+_STACK_KERNEL_DIR = {"helia-rt": "helia"}
+#: Consumer defines of schema 1, which the manifest does not declare.
+_UPSTREAM_DEFINES = (
+    "TF_LITE_STATIC_MEMORY",
+    "CMSIS_NN",
+    "ARM_NN_ENABLE_F16=0",
+    "ARM_NN_ENABLE_F32=0",
+)
+
+
 @dataclass(frozen=True)
 class RuntimeManifest:
     schema_version: int
@@ -87,6 +110,10 @@ class RuntimeManifest:
     abi: RuntimeABI
     headers: tuple[RuntimeHeader, ...]
     include_dirs: tuple[str, ...]
+    stack: str = "upstream"
+    #: Preprocessor definitions every translation unit using the headers needs.
+    consumer_defines: tuple[str, ...] = _UPSTREAM_DEFINES
+    kernel_dir: str | None = None
 
 
 @dataclass(frozen=True)
@@ -102,7 +129,12 @@ class VerifiedPreparedRuntime:
 
 @dataclass(frozen=True)
 class PreparedUpstreamRuntime:
-    """Explicit prebuilt provider with a pinned, vendored header closure."""
+    """Explicit prebuilt provider with a pinned, vendored header closure.
+
+    Manifest schema 1 declares the upstream TFLM + CMSIS-NN stack; schema 2
+    declares its ``stack`` (``helia-rt``) and the consumer defines and kernel
+    directory it was built with.
+    """
 
     archive: FixtureFile
     header_root: Path
@@ -112,21 +144,21 @@ class PreparedUpstreamRuntime:
         archive = self.archive.read()
         if len(archive) <= 8 or not archive.startswith(b"!<arch>\n"):
             raise ValueError("Prepared runtime requires a nonempty regular archive")
-        data = _object(
-            json.loads(self.manifest.read(), object_pairs_hook=_unique_object),
-            {"schema_version", "archive_sha256", "providers", "abi", "headers", "include_dirs"},
-            "manifest",
-        )
-        if type(data["schema_version"]) is not int or data["schema_version"] != 1:
+        raw = json.loads(self.manifest.read(), object_pairs_hook=_unique_object)
+        schema = raw.get("schema_version") if isinstance(raw, dict) else None
+        if type(schema) is not int or schema not in (1, 2):
             raise ValueError("Unsupported runtime manifest schema version")
+        fields = {"schema_version", "archive_sha256", "providers", "abi", "headers", "include_dirs"}
+        data = _object(raw, fields | ({"stack", "build"} if schema == 2 else set()), "manifest")
+        stack = data["stack"] if schema == 2 else "upstream"
+        if schema == 2 and stack not in _STACK_KERNEL_DIR:
+            raise ValueError("Unsupported prepared runtime stack")
         if _digest(data["archive_sha256"]) != self.archive.sha256:
             raise ValueError("Runtime manifest/archive identity mismatch")
-        providers = _object(data["providers"], {"tflite-micro", "cmsis-nn"}, "providers")
+        declared = _STACK_PROVIDERS[stack]
+        providers = _object(data["providers"], {name for name, _ in declared}, "providers")
         sources = []
-        for name, url in (
-            ("tflite-micro", "https://github.com/tensorflow/tflite-micro"),
-            ("cmsis-nn", "https://github.com/ARM-software/CMSIS-NN"),
-        ):
+        for name, url in declared:
             provider = _object(providers[name], {"url", "revision"}, "provider")
             revision = provider["revision"]
             if (
@@ -134,8 +166,25 @@ class PreparedUpstreamRuntime:
                 or not isinstance(revision, str)
                 or not re.fullmatch(r"[0-9a-f]{40}", revision)
             ):
-                raise ValueError("Invalid upstream provider source identity")
+                raise ValueError("Invalid runtime provider source identity")
             sources.append(RuntimeProvider(name, url, revision))
+        defines, kernel_dir = _UPSTREAM_DEFINES, None
+        if schema == 2:
+            build = _object(data["build"], {"consumer_defines", "kernel_dir"}, "build")
+            defines, kernel_dir = build["consumer_defines"], build["kernel_dir"]
+            if (
+                not isinstance(defines, list)
+                or not all(
+                    isinstance(d, str) and re.fullmatch(r"[A-Z_][A-Z0-9_]*(=[A-Za-z0-9_]+)?", d)
+                    for d in defines
+                )
+                or len({d.split("=")[0] for d in defines}) != len(defines)
+                or "TF_LITE_STATIC_MEMORY" not in defines
+            ):
+                raise ValueError("Invalid runtime consumer defines")
+            if kernel_dir != _STACK_KERNEL_DIR[stack]:
+                raise ValueError("Unexpected runtime kernel directory")
+            defines = tuple(defines)
         abi = _object(data["abi"], {"toolchain", "cpu", "float_abi", "short_enums"}, "ABI")
         if (
             abi
@@ -168,21 +217,34 @@ class PreparedUpstreamRuntime:
             root,
             self.manifest,
             RuntimeManifest(
-                1,
+                schema,
                 self.archive.sha256,
                 tuple(sources),
                 RuntimeABI(**abi),
                 tuple(pinned),
                 tuple(includes),
+                stack,
+                defines,
+                kernel_dir,
             ),
         )
 
 
-class _PreparedRuntimeStage:
-    name = "prepare_upstream_runtime"
+#: NSX module, CMake target and alias each prepared stack is staged as.
+PREPARED_RUNTIME_MODULES = {
+    "upstream": ("hpx-upstream-runtime", "hpx_upstream_runtime", "nsx::tflite_micro"),
+    "helia-rt": ("hpx-heliart-runtime", "hpx_heliart_runtime", "nsx::helia_rt"),
+}
 
+
+class _PreparedRuntimeStage:
     def __init__(self, runtime: VerifiedPreparedRuntime):
         self.runtime = runtime
+        self.name = (
+            "prepare_upstream_runtime"
+            if runtime.record.stack == "upstream"
+            else "prepare_heliart_runtime"
+        )
 
     def should_skip(self, ctx: PipelineContext) -> bool:
         return False
@@ -191,7 +253,12 @@ class _PreparedRuntimeStage:
         from .results import NsxModuleRef
 
         data = self.runtime.record
-        module = ctx.work_dir / "prepared-upstream-runtime" / self.runtime.manifest.sha256
+        module_name, library, alias = PREPARED_RUNTIME_MODULES[data.stack]
+        module = (
+            ctx.work_dir
+            / ("prepared-" + module_name.removeprefix("hpx-"))
+            / self.runtime.manifest.sha256
+        )
         module.mkdir(parents=True, exist_ok=True)
         (module / "runtime.a").write_bytes(self.runtime.archive.read())
         for header in data.headers:
@@ -201,25 +268,25 @@ class _PreparedRuntimeStage:
             target.write_bytes(FixtureFile(self.runtime.header_path(name), digest).read())
         (module / "provider-manifest.json").write_bytes(self.runtime.manifest.read())
         (module / "nsx-module.yaml").write_text(
-            "schema_version: 1\nmodule:\n  name: hpx-upstream-runtime\n  type: runtime\n  version: '0.1.0'\n"
+            f"schema_version: 1\nmodule:\n  name: {module_name}\n  type: runtime\n  version: '0.1.0'\n"
             "support:\n  ambiqsuite: true\n  zephyr: false\n"
-            "build:\n  cmake:\n    targets: [nsx::tflite_micro]\n"
+            f"build:\n  cmake:\n    targets: [{alias}]\n"
             "depends:\n  required: [nsx-core, nsx-soc-hal]\n"
         )
         includes = "\n".join(
             '  "${CMAKE_CURRENT_LIST_DIR}/include/' + name + '"' for name in data.include_dirs
         )
         (module / "CMakeLists.txt").write_text(
-            "add_library(hpx_upstream_runtime STATIC IMPORTED GLOBAL)\n"
-            'set_target_properties(hpx_upstream_runtime PROPERTIES IMPORTED_LOCATION "${CMAKE_CURRENT_LIST_DIR}/runtime.a")\n'
-            "target_include_directories(hpx_upstream_runtime INTERFACE\n" + includes + "\n)\n"
-            "target_compile_definitions(hpx_upstream_runtime INTERFACE TF_LITE_STATIC_MEMORY CMSIS_NN ARM_NN_ENABLE_F16=0 ARM_NN_ENABLE_F32=0)\n"
-            "add_library(nsx::tflite_micro ALIAS hpx_upstream_runtime)\n"
+            f"add_library({library} STATIC IMPORTED GLOBAL)\n"
+            f'set_target_properties({library} PROPERTIES IMPORTED_LOCATION "${{CMAKE_CURRENT_LIST_DIR}}/runtime.a")\n'
+            f"target_include_directories({library} INTERFACE\n" + includes + "\n)\n"
+            f"target_compile_definitions({library} INTERFACE {' '.join(data.consumer_defines)})\n"
+            f"add_library({alias} ALIAS {library})\n"
         )
         if ctx.engine_artifacts is None:
             raise ConfigError("Engine preparation did not produce artifacts")
         ctx.engine_artifacts = replace(
             ctx.engine_artifacts,
-            extra_modules=[NsxModuleRef(name="hpx-upstream-runtime", path=module, local=True)],
+            extra_modules=[NsxModuleRef(name=module_name, path=module, local=True)],
             cmake_vars={},
         )

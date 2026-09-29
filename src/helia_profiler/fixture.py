@@ -18,7 +18,12 @@ from .results.models import ToolchainInfo, MemoryPlan
 
 
 from enum import StrEnum
-from .fixture_runtime import FixtureFile, PreparedUpstreamRuntime, _PreparedRuntimeStage
+from .fixture_runtime import (
+    PREPARED_RUNTIME_MODULES,
+    FixtureFile,
+    PreparedUpstreamRuntime,
+    _PreparedRuntimeStage,
+)
 from .fixture_analysis import (
     FixtureModelAnalysis,
     FixtureTensor,
@@ -104,7 +109,23 @@ FIXTURE_CAPABILITIES: dict[EngineType, dict[str, FixtureCapability]] = {
         "float16": FixtureCapability.SUPPORTED,
         "float32": FixtureCapability.SUPPORTED,
     },
+    EngineType.HELIA_RT: {
+        "int8": FixtureCapability.SUPPORTED,
+        "int16": FixtureCapability.SUPPORTED,
+        "float16": FixtureCapability.SUPPORTED,
+        "float32": FixtureCapability.SUPPORTED,
+    },
 }
+#: Engines that link a prepared runtime archive: (manifest stack, required backend).
+PREPARED_RUNTIME_ENGINES = {
+    EngineType.TFLM: ("upstream", "cmsis_nn"),
+    EngineType.HELIA_RT: ("helia-rt", "helia"),
+}
+#: Runtime provider modules a prepared-runtime build must not also resolve.
+_OTHER_RUNTIME_MODULES = frozenset(
+    {"nsx-tflite-micro", "arm-cmsis-nn", "nsx-helia-rt", "nsx-cmsis-nn"}
+    | {name for name, _, _ in PREPARED_RUNTIME_MODULES.values()}
+)
 #: Largest total output a fixture may expose for full readback.
 FIXTURE_READBACK_BUDGET = 128 * 1024
 _FIXTURE_ROLES = {"signal", "aux"}
@@ -229,8 +250,8 @@ def _validate(config: ProfileConfig, fixture: FixedFixture | TypedFixture) -> No
     fixture.verify()
     if config.model.path.resolve() != fixture.model.path.resolve():
         raise ConfigError("Profile model differs from the pinned fixture")
-    if config.engine.type not in (EngineType.TFLM, EngineType.HELIA_AOT):
-        raise ConfigError("Fixture supports upstream TFLM or helia-AOT only")
+    if config.engine.type not in FIXTURE_CAPABILITIES:
+        raise ConfigError("Fixture supports upstream TFLM, heliaRT or helia-AOT only")
     if config.target.custom_socs or config.target.custom_boards:
         raise ConfigError("Fixed fixture does not support custom target declarations")
     if config.target.board != "apollo510_evb" or config.target.clock.cpu != "lp":
@@ -290,10 +311,13 @@ def build_fixed_fixture(
         ):
             raise ConfigError("Fixture tensor declarations differ from analyzed model")
         capabilities = (("int8", FIXTURE_CAPABILITIES[config.engine.type]["int8"]),)
-    if config.engine.type is EngineType.TFLM:
-        if runtime is None or config.engine.backend != "cmsis_nn":
-            raise ConfigError("Explicit upstream prepared runtime and cmsis_nn backend required")
+    if config.engine.type in PREPARED_RUNTIME_ENGINES:
+        stack, backend = PREPARED_RUNTIME_ENGINES[config.engine.type]
+        if runtime is None or config.engine.backend != backend:
+            raise ConfigError(f"Explicit {stack} prepared runtime and {backend} backend required")
         verified_runtime = runtime.verify()
+        if verified_runtime.record.stack != stack:
+            raise ConfigError(f"Prepared runtime stack is not {stack}")
     else:
         if runtime is not None:
             raise ConfigError("AOT cannot consume an upstream runtime override")
@@ -373,27 +397,30 @@ def build_fixed_fixture(
         flat_binary = pin(binary.path.with_suffix(".bin"))
         link_map = pin(binary.path.with_suffix(".map"))
         dependency_lock = pin(app / "nsx.lock")
-    if binary is not None and runtime is not None:
+    if binary is not None and runtime is not None and verified_runtime is not None:
         import yaml
 
-        module = app / "modules" / "hpx-upstream-runtime"
+        stack = verified_runtime.record.stack
+        name = PREPARED_RUNTIME_MODULES[stack][0]
+        others = _OTHER_RUNTIME_MODULES - {name}
+        module = app / "modules" / name
         FixtureFile(module / "runtime.a", runtime.archive.sha256).read()
         FixtureFile(module / "provider-manifest.json", runtime.manifest.sha256).read()
         dependency_lock = pin(app / "nsx.lock")
         modules = yaml.safe_load(dependency_lock.read())["targets"][config.target.board]["modules"]
-        if "hpx-upstream-runtime" not in modules or any(
-            "helia-rt" in name or name in {"nsx-tflite-micro", "arm-cmsis-nn"} for name in modules
+        if name not in modules or any(
+            m in others or (stack == "upstream" and "helia-rt" in m) for m in modules
         ):
             raise ConfigError("Unexpected runtime provider in resolved dependency lock")
         flat_binary = pin(binary.path.with_suffix(".bin"))
         link_map = pin(binary.path.with_suffix(".map"))
         map_text = link_map.read().decode()
         if (
-            "hpx-upstream-runtime/runtime.a(" not in map_text
-            or "helia_rt" in map_text
-            or "helia-rt" in map_text
+            f"{name}/runtime.a(" not in map_text
+            or any(f"{m}/" in map_text for m in others)
+            or (stack == "upstream" and ("helia_rt" in map_text or "helia-rt" in map_text))
         ):
-            raise ConfigError("Link map does not prove the explicit upstream provider")
+            raise ConfigError(f"Link map does not prove the explicit {stack} provider")
     intent_identity = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
     toolchain = ctx.run_metadata.toolchain if compile else None
     if compile and (toolchain is None or not toolchain.compiler_version):

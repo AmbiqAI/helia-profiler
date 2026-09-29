@@ -490,7 +490,7 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
             "fixture_timing": 7 * 4,
             "fixture_timer_state": 4,
         }
-        if engine_type is EngineType.TFLM:
+        if engine_type is not EngineType.HELIA_AOT:
             sizes["fixture_memory"] = 8 * 4
         artifacts = ctx.engine_artifacts
         if fixture.observe_aot_arenas and isinstance(artifacts, HeliaAotArtifacts):

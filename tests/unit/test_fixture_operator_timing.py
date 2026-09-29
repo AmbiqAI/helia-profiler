@@ -284,3 +284,29 @@ def test_typed_fixture_binds_only_to_its_own_build(tmp_path):
     assert refused.operators is None and refused.reason == "fixture_mismatch"
     legacy = fixture_for(KWS_SHA, tmp_path)
     assert bind_operator_timing(build, legacy, profile("kws_aot")).reason == "fixture_mismatch"
+
+
+@pytest.mark.parametrize(
+    "backend,reason",
+    [
+        (None, None),
+        ("helia", None),
+        ("ethos_u", "backend_mismatch"),
+        ("cmsis_nn", "backend_mismatch"),
+    ],
+)
+def test_heliart_fixture_binds_only_to_a_helia_backend_profile(tmp_path, backend, reason):
+    fixture = fixture_for(KWS_SHA, tmp_path)
+    raw = PROFILES["kws_aot"]
+    run = profile(
+        "kws_aot",
+        engine={"type": "helia-rt", "version": "1.21.2"},
+        config={**raw["config"], "engine": {"backend": backend}},
+    )
+    build = build_for(EngineType.HELIA_RT, fixture, prepared_runtime=True)
+    assert bind_operator_timing(build, fixture, run).reason == (reason or "runtime_stack_mismatch")
+    labelled = bind_operator_timing(build, fixture, run, allow_runtime_difference=True)
+    assert labelled.reason == reason
+    if reason is None:
+        assert labelled.accepted
+        assert labelled.runtime_stack == "profile_baseline_differs_from_fixture_runtime"

@@ -603,6 +603,9 @@ def test_matrix_covers_every_engine_family():
         "510-helia-aot-fixture-kws",
         "510-tflm-fixture-typed",
         "510-helia-aot-fixture-typed",
+        "510-helia-rt-fixture-tcn",
+        "510-helia-rt-fixture-kws",
+        "510-helia-rt-fixture-typed",
     }, "the Tier-2 leg set changed — deliberate? update this pin with the reason"
 
 

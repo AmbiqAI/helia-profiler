@@ -109,7 +109,10 @@ def test_hash_or_unsupported_config_stops_before_pipeline(tmp_path, monkeypatch)
     monkeypatch.setattr("helia_profiler.fixture.PipelineRunner", forbidden)
     with pytest.raises(Exception, match="upstream"):
         build_fixed_fixture(
-            replace(c, engine=EngineConfig(type=EngineType.HELIA_RT)), f, method=METHOD, runtime=rt
+            replace(c, engine=EngineConfig(type=EngineType.EXECUTORCH)),
+            f,
+            method=METHOD,
+            runtime=rt,
         )
     f.input.path.write_bytes(bytes(3359))
     with pytest.raises(ValueError, match="hash mismatch"):
