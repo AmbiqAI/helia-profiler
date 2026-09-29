@@ -128,6 +128,9 @@ _RUNTIME_PROVIDER = re.compile(r"helia-rt|tflite-micro|cmsis-nn")
 _PREPARED_MODULES = frozenset(name for name, _, _ in PREPARED_RUNTIME_MODULES.values())
 #: Archives and objects a link map lists as inputs, e.g. ``.../libx.a(y.o):`` or ``.../y.o:``.
 _MAP_INPUT = re.compile(r"((?:[A-Za-z]:)?[^\s():]+)\.(?:a|o|obj)(?=[(:])")
+#: An LLD map input line: address, load address, size and alignment columns, then the
+#: input path, which may contain spaces.
+_LLD_INPUT = re.compile(r"\s*(?:[0-9A-Fa-f]+\s+){4}((?:[A-Za-z]:)?[^():]+?)\.(?:a|o|obj)(?=[(:])")
 
 
 def _linked_components(map_text: str, app: PurePath) -> set[str]:
@@ -138,18 +141,44 @@ def _linked_components(map_text: str, app: PurePath) -> set[str]:
     their first ``modules`` or ``_nsx`` directory, or else their parent directory
     and file stem. Underscores are read as hyphens, the NSX build-directory spelling.
     """
-    root = str(app).rstrip("/\\")
+    # Windows maps may spell separators either way, whatever the app path uses.
+    root = str(app).replace("\\", "/").rstrip("/")
     names = set()
-    for path in _MAP_INPUT.findall(map_text):
-        if path.startswith(root + "/") or path.startswith(root + "\\"):
-            parts = re.split(r"[/\\]", path[len(root) + 1 :])
-        else:
-            parts = re.split(r"[/\\]", path)
-            if path.startswith(("/", "\\")) or re.match(r"[A-Za-z]:", path):
-                marks = [i for i, part in enumerate(parts) if part in ("modules", "_nsx")]
-                parts = parts[marks[0] + 1 :] if marks else parts[-2:]
-        names.update(part.replace("_", "-") for part in parts if part)
+    for line in map_text.splitlines():
+        lld = _LLD_INPUT.match(line)
+        for found in [lld.group(1)] if lld else _MAP_INPUT.findall(line):
+            names.update(_input_components(found.replace("\\", "/"), root))
     return names
+
+
+def _input_components(path: str, root: str) -> set[str]:
+    """Components of one ``/``-separated input path, per :func:`_linked_components`."""
+    prefix = path[: len(root) + 1]
+    # A drive-letter root is a Windows path, whose case does not matter.
+    windows = re.match(r"[A-Za-z]:", root) is not None
+    if prefix == root + "/" or (windows and prefix.lower() == (root + "/").lower()):
+        parts = path[len(root) + 1 :].split("/")
+    else:
+        parts = path.split("/")
+        if path.startswith("/") or re.match(r"[A-Za-z]:", path):
+            marks = [i for i, part in enumerate(parts) if part in ("modules", "_nsx")]
+            parts = parts[marks[0] + 1 :] if marks else parts[-2:]
+    return {part.replace("_", "-") for part in parts if part}
+
+
+def _prove_link_map(map_text: str, app: PurePath, stack: str) -> None:
+    """Refuse a link map that lacks the stack's archive or names another runtime provider."""
+    name = PREPARED_RUNTIME_MODULES[stack][0]
+    others = _PREPARED_MODULES - {name}
+    if (
+        f"{name}/runtime.a(" not in map_text.replace("\\", "/")
+        or any(
+            part in others or _RUNTIME_PROVIDER.search(part)
+            for part in _linked_components(map_text, app)
+        )
+        or (stack == "upstream" and ("helia_rt" in map_text or "helia-rt" in map_text))
+    ):
+        raise ConfigError(f"Link map does not prove the explicit {stack} provider")
 
 
 #: Largest total output a fixture may expose for full readback.
@@ -438,16 +467,7 @@ def build_fixed_fixture(
             raise ConfigError("Unexpected runtime provider in resolved dependency lock")
         flat_binary = pin(binary.path.with_suffix(".bin"))
         link_map = pin(binary.path.with_suffix(".map"))
-        map_text = link_map.read().decode()
-        if (
-            f"{name}/runtime.a(" not in map_text
-            or any(
-                part in others or _RUNTIME_PROVIDER.search(part)
-                for part in _linked_components(map_text, app)
-            )
-            or (stack == "upstream" and ("helia_rt" in map_text or "helia-rt" in map_text))
-        ):
-            raise ConfigError(f"Link map does not prove the explicit {stack} provider")
+        _prove_link_map(link_map.read().decode(), app, stack)
     intent_identity = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
     toolchain = ctx.run_metadata.toolchain if compile else None
     if compile and (toolchain is None or not toolchain.compiler_version):

@@ -505,16 +505,16 @@ def test_heliart_accepts_float16_models_that_tflm_refuses(tmp_path):
 
 @pytest.mark.parametrize("sep", ["/", "\\"])
 def test_linked_inputs_keep_a_windows_drive_letter(sep):
-    """ATfE maps on Windows name inputs as ``C:\\...``; the drive colon is not a delimiter."""
-    from pathlib import PurePath
+    """ATfE maps on Windows name inputs as ``C:\\...`` with either separator."""
+    from pathlib import PureWindowsPath
 
     from helia_profiler.fixture import _linked_components
 
     root = sep.join(["C:", "Users", "r", "helia-rt-bench", "modules", "tflite-micro", "app"])
+    app = PureWindowsPath(root)
     own = sep.join([root, "modules", "hpx-heliart-runtime", "runtime.a(m.cc.obj):(.text)"])
     main = sep.join([root, "build", "CMakeFiles", "hpx_profiler.dir", "src", "main.cc.obj:(.text)"])
-    names = _linked_components(f"{own}\n{main}\n", PurePath(root))
-    assert names == {
+    assert _linked_components(f"{own}\n{main}\n", app) == {
         "modules",
         "hpx-heliart-runtime",
         "runtime",
@@ -527,4 +527,83 @@ def test_linked_inputs_keep_a_windows_drive_letter(sep):
     nested = sep.join(
         [root, "modules", "hpx-heliart-runtime", "cmsis-nn-x", "modules", "u", "l.a(x.o):"]
     )
-    assert "cmsis-nn-x" in _linked_components(nested, PurePath(root))
+    assert "cmsis-nn-x" in _linked_components(nested, app)
+
+
+_APPS = {
+    "posix": ("/home/First Last/helia-rt bench/modules/tflite-micro/app", "/"),
+    "windows": ("C:\\Users\\First Last\\helia-rt-bench\\modules\\tflite-micro\\app", "\\"),
+}
+_TOOLCHAIN = {
+    "posix": "/opt/ATfE 22/lib/clang-runtimes/arm-none-eabi/armv8.1m.main_hard_fp/lib/libc.a",
+    "windows": "C:\\Program Files\\ATfE\\lib\\clang-runtimes\\arm-none-eabi\\lib\\libc.a",
+}
+
+
+def _lld(path: str, member: str = "x.c.obj") -> str:
+    return f"  41101e   41101e       42     2         {path}({member}):(.text)"
+
+
+@pytest.mark.parametrize("stack", ["helia-rt", "upstream"])
+@pytest.mark.parametrize("style", ["native", "forward", "mixed"])
+@pytest.mark.parametrize("host", ["posix", "windows", "windows-lower-drive"])
+@pytest.mark.parametrize(
+    "case,refused",
+    [
+        ("clean", False),
+        ("nsx-provider", True),
+        ("nested-provider", True),
+        ("vendored-provider", True),
+        ("other-stack-archive", True),
+        ("missing-own-archive", True),
+    ],
+)
+def test_link_map_proof_on_posix_and_windows_paths(stack, style, host, case, refused):
+    """Every map-scan case under POSIX and Windows paths, spaces and either separator."""
+    from pathlib import PurePosixPath, PureWindowsPath
+
+    from helia_profiler.fixture import PREPARED_RUNTIME_MODULES, _prove_link_map
+
+    base = host.replace("-lower-drive", "")
+    root, native = _APPS[base]
+    if stack == "upstream":
+        # The upstream proof also refuses any "helia-rt" text; keep the tree neutral there.
+        root = root.replace("helia-rt", "neutral")
+    app = (PureWindowsPath if base == "windows" else PurePosixPath)(root)
+    if host == "windows-lower-drive":
+        # The map spells the drive in the other case from the app path.
+        root = "c" + root[1:]
+    own = PREPARED_RUNTIME_MODULES[stack][0]
+    other = next(n for s, (n, _, _) in PREPARED_RUNTIME_MODULES.items() if s != stack)
+
+    def under_app(*parts: str) -> str:
+        if style == "native":
+            return native.join([root, *parts])
+        if style == "forward":
+            return "/".join([root.replace("\\", "/"), *parts])
+        return root + "/" + "\\".join(parts)
+
+    lines = [
+        _lld(under_app("modules", own, "runtime.a"), "micro_interpreter.cc.obj"),
+        _lld("_nsx/nsx_core/libnsx_runtime.a", "runtime.c.obj"),
+        f"  41101e   41101e       42     2         {under_app('build', 'CMakeFiles', 'hpx_profiler.dir', 'src', 'main.cc.obj')}:(.text)",
+        _lld(_TOOLCHAIN[base]),
+    ]
+    extra = {
+        "nsx-provider": _lld(under_app("build", "_nsx", "helia_rt", "libhelia_rt.a")),
+        "nested-provider": _lld(
+            under_app("modules", own, "cmsis-nn-embedded", "modules", "utils", "lib.a")
+        ),
+        "vendored-provider": _lld(under_app("modules", "nsx-tflite-micro", "libtflm.a")),
+        "other-stack-archive": _lld(under_app("modules", other, "runtime.a")),
+    }
+    if case == "missing-own-archive":
+        lines = lines[1:]
+    elif case in extra:
+        lines.append(extra[case])
+    text = "\n".join(lines) + "\n"
+    if refused:
+        with pytest.raises(ConfigError, match=f"explicit {stack} provider"):
+            _prove_link_map(text, app, stack)
+    else:
+        _prove_link_map(text, app, stack)
