@@ -83,13 +83,11 @@ if (!customElements.get('hpx-hero-carousel')) customElements.define('hpx-hero-ca
 .hero-controls button:focus-visible{outline:2px solid #9bea55;outline-offset:2px;border-radius:3px;}
 .hero-controls svg{width:20px;height:20px;display:block;}
 .ring{fill:none;stroke:currentColor;stroke-width:1.5;stroke-dasharray:100;stroke-dashoffset:100;transform:rotate(-90deg);transform-origin:center;}
-.profile-visual :global(.active .hero-diagram > *){animation:reveal .55s ease-out both;}
-.profile-visual :global(.active .hero-diagram > :nth-child(2)){animation-delay:.15s;}
-.profile-visual :global(.active .hero-diagram > :nth-child(3)){animation-delay:.3s;}
+.profile-visual :global(.active .counter-diagram),.profile-visual :global(.active .compare-diagram){animation:fade-in .45s ease-out both;}
 .profile-visual :global(.active .layer-row i){animation:grow .9s ease-out both;}
 .profile-visual :global(.active .energy-diagram path){animation:trace 2.2s ease-out both;}
 .profile-visual[data-paused] :global(*){animation:none!important;}
-@keyframes reveal{from{opacity:.2;transform:translateY(5px)}to{opacity:1;transform:none}}
+@keyframes fade-in{from{opacity:0}to{opacity:1}}
 @keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 @keyframes trace{from{stroke-dashoffset:100}to{stroke-dashoffset:0}}
 @media(max-width:380px){.hero-controls{grid-template-columns:repeat(2,1fr);}}

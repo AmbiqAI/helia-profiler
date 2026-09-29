@@ -61,3 +61,5 @@ Measured-example update: local landing build and semantic exports pass; all eigh
 ExecuTorch promotion removed from Home at owner request, including engine pill and setup copy/count. Guide retains documentation with explicit experimental status. Home search smoke term changed to heliaRT.
 
 Final PR polish completed: replace the landing timing schematic with an owner-supplied latency highlight and a three-step explanation of baseline timing, operator ranking and targeted comparisons. Expand counter/power cards with actionable interpretation. User authorized updating PR332. Final build, zero Astro diagnostics, eight browser tests, 38 guards, references, semantic exports, links, search and redirects pass. Revised card screenshot inspected. Publishing docs-migration to PR332 with refreshed scope and validation; keep draft pending final owner review and remote CI.
+
+Hero motion polish: removed the shared upward entrance and stagger. Layers use only growing bars, Energy only the tracing waveform; MVE/NPU and Compare diagrams fade in without translation. Pause and reduced-motion overrides retained.
