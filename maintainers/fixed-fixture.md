@@ -106,7 +106,8 @@ and `float32`. Integer tensors need `PerTensorQuantization` or
 `PerAxisQuantization`; float tensors carry none.
 `analyze_typed_fixture_model` reads the same declarations from the flatbuffer,
 and the build refuses any difference in name, index, order, dtype, shape or
-quantization. A `FixedFixture` keeps its single-INT8 rules and renders exactly as
+quantization. Every IO tensor needs at least one dimension; scalar (rank-0) IO is
+refused. A `FixedFixture` keeps its single-INT8 rules and renders exactly as
 before.
 
 `FIXTURE_CAPABILITIES` is the producer's declaration per engine and IO dtype:
@@ -117,7 +118,8 @@ before.
 
 The upstream TFLM runtime also refuses any model with a FLOAT16 tensor, including
 weights behind DEQUANTIZE. `FixtureBuild.capabilities` records the status of
-every IO dtype the build uses.
+every IO dtype the build uses. A device pass so far covers one input and one
+output, so a typed fixture with more tensors reports `supported`, not `qualified`.
 
 Firmware restores every input before each warmup and measured call. It checks
 each tensor's byte extent, and on TFLM also its type, shape and per-tensor
@@ -136,7 +138,8 @@ after model initialization, then scans it after the timed loop, outside the
 timed interval. `FixtureBuild.aot_arena_scan` lists `(region id, size)`. Pass
 the sizes as `arena_scan_sizes`; `FixtureCaptureResult.arena_scan` then gives
 `(touched bytes, high water)` per arena. Both are lower bounds, since a kernel may
-write the paint value itself. Persistent and constant arenas are not painted.
+write the paint value itself. Persistent and constant arenas are not painted. Painting touches every scratch byte just before the warmups, so configure at
+least one warmup when timing matters.
 The option joins the intent identity only when enabled, so existing identities
 are unchanged.
 

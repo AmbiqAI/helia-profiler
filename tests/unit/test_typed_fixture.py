@@ -191,9 +191,14 @@ def test_capability_table_covers_every_fixture_engine_and_dtype():
 @pytest.mark.parametrize("engine", [EngineType.TFLM, EngineType.HELIA_AOT])
 def test_check_returns_capabilities_of_the_dtypes_used(tmp_path, engine):
     f = typed(tmp_path)
+    # int8 is qualified per engine, but only for one input and one output.
     assert _check_typed_fixture(f, analysis_of(f), engine) == (
         ("float32", FixtureCapability.SUPPORTED),
         ("int16", FixtureCapability.SUPPORTED),
+        ("int8", FixtureCapability.SUPPORTED),
+    )
+    single = typed(tmp_path / "single", inputs=(replace(LABEL, index=0),), outputs=(LABEL,))
+    assert _check_typed_fixture(single, analysis_of(single), engine) == (
         ("int8", FixtureCapability.QUALIFIED),
     )
 
@@ -324,7 +329,7 @@ def test_typed_build_reports_outputs_capabilities_and_scan(tmp_path, monkeypatch
     assert r.fixture_identity == f.identity
     assert r.outputs == tuple(io.data for io in f.outputs)
     assert r.expected == f.outputs[0].data
-    assert dict(r.capabilities)["int8"] is FixtureCapability.QUALIFIED
+    assert dict(r.capabilities)["int8"] is FixtureCapability.SUPPORTED
     assert r.aot_arena_scan == (((0, 4096),) if observe else ())
     assert calls[-1].spec.observe_aot_arenas is observe
 

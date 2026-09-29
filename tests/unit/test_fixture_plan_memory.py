@@ -129,3 +129,27 @@ def test_fixture_consumers_have_actual_regions_and_no_inactive_profiler_buffers(
         assert {c.name: c.size for c in sram.consumers} == {"tensor_arena": 65536}
     again = _add_hpx_owned_consumers(plan, ctx)
     assert again == plan
+
+
+@pytest.mark.parametrize("observe", [False, True])
+def test_observed_aot_scratch_arenas_reserve_their_scan_sink(tmp_path, observe):
+    from helia_profiler.engines.base import ArenaRegion
+    from helia_profiler.placement import ArenaRole, Placement
+
+    ctx = context(tmp_path, EngineType.HELIA_AOT, 12)
+    assert ctx.fixture is not None and isinstance(ctx.engine_artifacts, HeliaAotArtifacts)
+    ctx.fixture = replace(ctx.fixture, observe_aot_arenas=observe)
+    ctx.engine_artifacts = replace(
+        ctx.engine_artifacts,
+        aot_arena_regions=[
+            ArenaRegion(0, "s0", "S0", 256, 16, ArenaRole.SCRATCH, "sram", Placement.SRAM),
+            ArenaRegion(1, "p", "P", 64, 16, ArenaRole.PERSISTENT, "sram", Placement.SRAM),
+            ArenaRegion(2, "s1", "S1", 128, 16, ArenaRole.SCRATCH, "sram", Placement.SRAM),
+        ],
+    )
+    PlanMemoryStage().run(ctx)
+    assert ctx.memory_plan is not None
+    dtcm = ctx.memory_plan.region("DTCM")
+    assert dtcm is not None
+    sizes = {c.name: c.size for c in dtcm.consumers}
+    assert sizes.get("fixture_arena_scan") == (16 if observe else None)

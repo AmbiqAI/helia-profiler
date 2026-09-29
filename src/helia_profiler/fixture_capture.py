@@ -152,10 +152,10 @@ def capture_fixture(
     request: FixtureCaptureRequest, *, guard: FixtureCaptureGuard
 ) -> FixtureCaptureResult:
     """Capture one bounded raw terminal snapshot and persist every attempted operation."""
+    require(isinstance(request.extra_output_sizes, tuple), "Invalid output extent")
     output_sizes = (request.output_size, *request.extra_output_sizes)
     require(
-        isinstance(request.extra_output_sizes, tuple)
-        and all(type(size) is int and size > 0 for size in output_sizes)
+        all(type(size) is int and size > 0 for size in output_sizes)
         and sum(output_sizes) <= DTCM[1] - DTCM[0],
         "Invalid output extent",
     )
@@ -287,7 +287,12 @@ def capture_fixture(
                 value = bytes(session.memory_read8(sink.address, sink.size))
                 ref = pin(sink.name + suffix + ".bin", value)
                 if sink.name in output_names and not suffix:
-                    outputs = outputs + (ref,)
+                    outputs = tuple(
+                        sorted(
+                            (*outputs, ref),
+                            key=lambda r: output_names.index(r.path.stem),
+                        )
+                    )
                     if sink.name == "deployment_output":
                         output = ref
                 require(len(value) == sink.size, "Short target read")
@@ -423,7 +428,6 @@ def capture_fixture(
                 ),
                 "Invalid arena scan terminal",
             )
-        outputs = tuple(sorted(outputs, key=lambda ref: output_names.index(ref.path.stem)))
         result = FixtureCaptureResult(
             "success",
             request.timing_scope,

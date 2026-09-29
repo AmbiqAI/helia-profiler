@@ -170,8 +170,16 @@ def _check_typed_fixture(
     if engine is EngineType.TFLM and model.has_float16:
         raise ConfigError("The upstream TFLM runtime has no float16 support")
     table = FIXTURE_CAPABILITIES[engine]
+    single_io = len(model.inputs) == len(model.outputs) == 1
+
+    def status(dtype: str) -> FixtureCapability:
+        # Device passes so far cover one input and one output only.
+        if table[dtype] is FixtureCapability.QUALIFIED and not single_io:
+            return FixtureCapability.SUPPORTED
+        return table[dtype]
+
     capabilities = tuple(
-        sorted({(t.dtype, table[t.dtype]) for t in (*model.inputs, *model.outputs)})
+        sorted({(t.dtype, status(t.dtype)) for t in (*model.inputs, *model.outputs)})
     )
     unsupported = [
         dtype for dtype, status in capabilities if status is FixtureCapability.UNSUPPORTED

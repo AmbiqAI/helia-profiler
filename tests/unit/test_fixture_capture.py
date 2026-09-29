@@ -6,6 +6,7 @@ from hashlib import sha256
 import json
 import re
 import struct
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -753,6 +754,7 @@ def test_declared_sinks_must_match_the_image(typed_rig, change):
     [
         ({"extra_output_sizes": (0,)}, "output extent"),
         ({"extra_output_sizes": [5]}, "output extent"),
+        ({"extra_output_sizes": 5}, "output extent"),
         ({"extra_output_sizes": (0x7C000,)}, "output extent"),
         ({"arena_scan_sizes": (0,)}, "arena scan extents"),
         ({"arena_scan_sizes": [64]}, "arena scan extents"),
@@ -792,3 +794,40 @@ def test_undeclared_typed_sink_is_refused(tmp_path, extra):
     del sizes[extra]
     with pytest.raises(ValueError, match=f"undeclared fixture sink {extra}"):
         inspect_elf(elf.read(), image.read(), 0x410000, sizes)
+
+
+def _eleven_output_rig(rig, tmp_path, *, checksum_ok):
+    request, memory, terminal, writes, flashes, guard = rig
+    extra = {f"deployment_output_{k}": 1 for k in range(1, 12)}
+    sinks = {**_SINKS, **extra}
+    (tmp_path / "eleven").mkdir()
+    elf, _, _ = image_files(tmp_path / "eleven", sinks)
+    address, addresses = 0x20000000, {}
+    for name, size in sinks.items():
+        addresses[name] = address
+        address += (size + 3) // 4 * 4
+    values = {f"deployment_output_{k}": bytes([k]) for k in range(1, 12)}
+    for name, value in values.items():
+        terminal[addresses[name]] = value
+    model_order = bytes([1, 2, 3]) + b"".join(
+        values[f"deployment_output_{k}"] for k in range(1, 12)
+    )
+    terminal[addresses["deployment_checksum"]] = struct.pack(
+        "<I", _checksum(model_order) if checksum_ok else 0
+    )
+    return replace(request, elf=elf, extra_output_sizes=(1,) * 11), guard
+
+
+@pytest.mark.parametrize("checksum_ok", [True, False])
+def test_outputs_are_returned_in_model_order_past_ten(rig, tmp_path, checksum_ok):
+    request, guard = _eleven_output_rig(rig, tmp_path, checksum_ok=checksum_ok)
+    result = capture.capture_fixture(request, guard=guard)
+    assert result.state == ("success" if checksum_ok else "failure"), result.error
+    assert [ref.path.name for ref in result.outputs] == ["deployment_output.bin"] + [
+        f"deployment_output_{k}.bin" for k in range(1, 12)
+    ]
+    assert [ref.read() for ref in result.outputs[1:]] == [bytes([k]) for k in range(1, 12)]
+    receipt = json.loads((request.evidence_dir / "receipt.json").read_text())
+    assert [Path(o["path"]).name for o in receipt["outputs"]] == [
+        ref.path.name for ref in result.outputs
+    ]
