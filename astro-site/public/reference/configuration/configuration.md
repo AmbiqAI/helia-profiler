@@ -414,4 +414,4 @@ Not reachable from `ProfileConfig`; surfaced through a lookup table.
 | `fixed` |
 | `auto` |
 
-Generated from the `src/helia_profiler` tree `71998218bf34fc2da2de49b191a8bcc5b96e7077` with pydantic 2.13.4.
+Generated from the `src/helia_profiler` tree `81f0b1419e1bba14c3416aeffef31acf543f617c` with pydantic 2.13.4.
