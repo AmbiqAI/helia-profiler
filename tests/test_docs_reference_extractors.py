@@ -187,3 +187,15 @@ def teardown_module(module) -> None:  # noqa: ARG001 - pytest hook signature
         sys.modules.pop(name, None)
     if str(TOOLS_DOCS) in sys.path:
         sys.path.remove(str(TOOLS_DOCS))
+
+
+@pytest.mark.parametrize("missing", [True, False])
+def test_invalid_artifacts_report_before_fresh_payload_access(tmp_path, capsys, missing):
+    import json
+
+    if not missing:
+        for stem in ("cli", "schema", "issues", "pmu-catalog"):
+            (tmp_path / f"{stem}.json").write_text(json.dumps({}), encoding="utf-8")
+    assert check_reference.main(["--check", "--data-dir", str(tmp_path)]) == 1
+    captured = capsys.readouterr()
+    assert "missing committed artifact" in captured.err if missing else "sourceTree" in captured.err

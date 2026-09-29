@@ -67,3 +67,5 @@ Hero motion polish: removed the shared upward entrance and stagger. Layers use o
 Removed the standalone profiling note below the hero at owner request. Method and memory definitions remain in the example disclosure.
 
 Example methodology now opens from a compact info button next to the workflow introduction using a native auto popover, with Escape/outside-click dismissal and a close button. Condensed content retains model, setup, method and memory definitions.
+
+CI repair: rebased onto origin/main fab4cddd, retaining reviewed docs and upstream fixture cap fix. Regenerate committed references against rebased source. Historical summary test now checks captured bundle fields and separately requires the live schema declaration. Existing early return already fixes the fresh-payload review finding; regression coverage added. Fix metadata path and use HTTPS shared dependency.

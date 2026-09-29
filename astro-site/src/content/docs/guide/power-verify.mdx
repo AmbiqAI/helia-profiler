@@ -73,7 +73,7 @@ ExecuTorch) and only when the window is inference-bracketed.
 ### 3. Check the window clocks
 
 The dedicated power firmware times its own window and reports it as
-`power.terminal.elapsed_us`. Nothing else on the host depends on that
+`power.terminal.gate_elapsed_us`. Nothing else on the host depends on that
 clock, so it is the one number that can be wrong while every other check
 passes; hpx cross-checks it and four codes come out:
 
@@ -145,7 +145,7 @@ A run whose `power` block has `gated_window_count: 1`, a ratio near 1.0,
 | `no_gate_rise` | lock-step disabled while state and GO pins are configured: the firmware opens and closes its window before the poller is armed; the run comes back `integrity: degraded (no_gate_rise)` and looks like a dead wire | set `power.lockstep: true` or remove an explicit `false`; only then check the gate wire, `sync_gpio_pin` and `sync_input_index` |
 | `no_gate_fall` | the firmware entered the window but did not close it before the safety bound; not a lock-step problem, the gate was seen rising | raise `power.duration_s` or look for a hang inside the clean window |
 | gate always low or always high | wrong `io_voltage`, floating Vref on JS220 or JS320, or the wrong `INPUTn` | match `io_voltage` and Vref to the board's I/O rail; check the index keys against the physical wiring |
-| `ready_observed: false` or ratio far from 1.0 | handshake or gate timing; or a firmware clock fault that only looks similar | compare `power.terminal.elapsed_us` with `power.capture_duration_s`: agreement to well under 1% means the wiring is fine and only the reference is off (drift); `0` or several times the gate means the firmware timed with a clock it could not read, a rebuild not a rewire |
+| `ready_observed: false` or ratio far from 1.0 | handshake or gate timing; or a firmware clock fault that only looks similar | compare `power.terminal.gate_elapsed_us` with `power.capture_duration_s`: agreement to well under 1% means the wiring is fine and only the reference is off (drift); `0` or several times the gate means the firmware timed with a clock it could not read, a rebuild not a rewire |
 | gated average not above whole-capture average | gate or timing; or a genuinely light model | compare the `whole_capture_window` row in `detailed/power_summary.csv` |
 | `driver: ondevice` raises `PowerError` | the generic on-device driver has no firmware producer | use `power.driver: ina228` with a wired INA228, or `joulescope` |
 | TOPS per watt missing | the model cannot be analysed for MACs (ExecuTorch), or the window is not inference-bracketed | expected |

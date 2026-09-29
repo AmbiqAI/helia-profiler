@@ -120,14 +120,13 @@ four steps: metadata lines become a `FirmwareMeta`; lines are grouped by
 preset marker; each iteration's CSV rows are parsed and, per layer,
 reduced across iterations by `profiling.aggregation` (`median` by default,
 `mean` or `trimmed`) after structurally invalid samples (uint32 wrap,
-frozen-zero readouts) are rejected; and the per-preset `PresetResult`s are
+all-zero rows in a pass containing `ARM_PMU_CPU_CYCLES`) are rejected; and the per-preset `PresetResult`s are
 merged into one `PmuResult` with every counter column on each
 `LayerResult`, plus per-compute-unit groups keyed by the `<group>_<index>`
 pass naming. Layers are matched by explicit id with the same operator name
 required across iterations and presets; a missing, duplicate or
 conflicting identity raises `CaptureError` rather than publishing a
-position-shifted aggregate. A single-preset stream with no preset markers
-is still accepted.
+position-shifted aggregate. A missing end sentinel, missing or repeated announced pass, or missing iteration raises `CaptureError`. Truncated captures fail the run instead of publishing partial aggregates.
 
 Multiple presets exist because a SoC exposes a fixed number of PMU
 counters; `platform/counters.py` plans the passes from the requested
@@ -175,3 +174,5 @@ signals are on [Power measurement](../../power/) and
 [Firmware generation](../firmware/) for the side of the stream the
 templates print; [Pipeline](../pipeline/) for where the capture stages sit;
 [PMU counters](../../pmu-counters/) for what the columns mean.
+
+Capture backends respect `target.heartbeat.overall_timeout_s` and `target.heartbeat.host_timeout_s`. SWO retries share one overall deadline. Only complete lines refresh progress deadlines. Passes without a cycle counter retain all-zero rows.

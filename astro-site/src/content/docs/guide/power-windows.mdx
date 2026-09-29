@@ -83,7 +83,7 @@ many it ran. `fixed` runs exactly `profiling.iterations` inferences.
 | `profiling.window_mode` | `auto` | `auto` sizes by wall time; `fixed` runs `iterations` |
 | `profiling.window_target_ms` | `1000` | target wall time; raised to at least 5000 ms when `power.enabled` and `window_mode: auto`, because GPIO polling and packet alignment need longer to settle |
 | `profiling.window_min`, `window_max` | `10`, `500000` | clamp on the auto-sized inference count |
-| `power.duration_s` | unset | the host-side safety bound for the whole capture; unset auto-tunes from the PMU-phase timing, an explicit value wins |
+| `power.duration_s` | unset | the host-side safety bound for the whole capture; unset auto-tunes from the PMU-phase timing, an explicit value disables auto-tuning, but gated captures raise the bound to cover the planned window and required boot/warm-up allowance |
 
 Gates shorter than 1 s are discarded as glitches during window extraction,
 so a `fixed` target at or below about 1000 ms usually yields no qualifying
@@ -109,7 +109,7 @@ External captures verify the window in two layers before reporting energy
 per inference.
 
 The authoritative check compares the firmware's own STIMER-timed window
-(`power.terminal.elapsed_us`) against the instrument-timed gate. Two
+(`power.terminal.gate_elapsed_us`) against the instrument-timed gate. Two
 independent clocks watched the same physical window in the same boot, so
 they must agree within 1% plus a small absolute allowance for packet and
 poll quantisation; disagreement is `power.window_observer_mismatch`, an

@@ -129,7 +129,7 @@ The `power` block of `summary.json` gains `on_device_summary` under
 | `duration_us` | microseconds | INA228 accumulation interval timed by firmware |
 
 Energy divided by count is energy per inference; average power is energy
-over `elapsed_us`.
+over the INA228 accumulation interval, `power.on_device_summary.duration_us`. The whole firmware window is `power.terminal.elapsed_us`; the GPIO gate interval is `power.terminal.gate_elapsed_us`.
 
 :::caution[The duration comes from the firmware, not the instrument]
 Energy and charge are integrated in hardware over real time and are

@@ -160,11 +160,6 @@ class PowerDriver(Protocol):
         Only meaningful for external instruments that sit on the power rail
         (e.g. Joulescope).  Drivers that cannot power-cycle should raise
         :class:`PowerError`.
-
-        Args:
-            off_time_s: How long to keep power off (seconds).
-            settle_time_s: How long to wait after restoring power for the
-                target to boot.
         """
         ...
 

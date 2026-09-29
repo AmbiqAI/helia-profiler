@@ -42,17 +42,19 @@ def test_the_artifact_table_advertises_the_live_schema_versions():
         )
 
 
-def test_the_worked_summary_example_carries_the_live_version():
+def test_the_worked_summary_example_preserves_the_captured_bundle():
     text = DOCS_PATH.read_text(encoding="utf-8")
-    # The example pairs the schema name with its version two lines apart; pin
-    # the pair rather than a bare `"schema_version": N`, which also appears in
-    # the run-metadata and profile-results examples.
-    block = re.search(
-        rf'"schema": "{re.escape(RUN_SUMMARY_SCHEMA)}",\s*\n\s*"schema_version": (\d+),',
-        text,
+    example = re.search(r"```json\n(.*?)\n```", text, flags=re.DOTALL)
+    assert example is not None
+    excerpt = json.loads(example.group(1))
+    bundle = (
+        DOCS_PATH.parents[5]
+        / "examples/results/hardware-validation-2026-09-16"
+        / "apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto/summary.json"
     )
-    assert block is not None, f"{DOCS_PATH.name} has no worked {RUN_SUMMARY_SCHEMA} example"
-    assert int(block.group(1)) == RUN_SUMMARY_SCHEMA_VERSION
+    captured = json.loads(bundle.read_text(encoding="utf-8"))
+    assert excerpt == {key: captured[key] for key in excerpt}
+    assert f"New runs use schema version {RUN_SUMMARY_SCHEMA_VERSION}" in text
 
 
 def test_packaged_summary_schema_matches_the_emitted_version():
