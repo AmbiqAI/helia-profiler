@@ -3,12 +3,12 @@
   "generatedFrom": {
     "tool": "pyref",
     "version": "1.7.3",
-    "sourceTree": "81f0b1419e1bba14c3416aeffef31acf543f617c"
+    "sourceTree": "9aff61ba5c10268a6a0f1be06aeec77b7a311e16"
   },
   "language": "python",
   "modules": [
     {
-      "description": "What a power capture produces: the measured result, the observations behind it, and the on-device summary the firmware reports.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`, `experimental`\n\nGenerated from the `src/helia_profiler` tree `81f0b1419e1bba14c3416aeffef31acf543f617c`.",
+      "description": "What a power capture produces: the measured result, the observations behind it, and the on-device summary the firmware reports.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`, `experimental`\n\nGenerated from the `src/helia_profiler` tree `9aff61ba5c10268a6a0f1be06aeec77b7a311e16`.",
       "name": "power",
       "path": "helia_profiler.power",
       "submodules": [],

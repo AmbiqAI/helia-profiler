@@ -6,7 +6,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`
 
-Generated from the `src/helia_profiler` tree `81f0b1419e1bba14c3416aeffef31acf543f617c`.
+Generated from the `src/helia_profiler` tree `9aff61ba5c10268a6a0f1be06aeec77b7a311e16`.
 
 ## helia_profiler.ClockSelection
 
