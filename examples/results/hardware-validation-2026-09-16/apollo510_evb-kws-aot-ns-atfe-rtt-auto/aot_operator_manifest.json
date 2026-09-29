@@ -1,0 +1,1802 @@
+[
+  {
+    "idx": 0,
+    "id": 0,
+    "op_type": "CONV_2D",
+    "name": "conv_2d_0",
+    "inputs": [
+      {
+        "name": "tensor_0",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 490,
+        "size": 490,
+        "ndim": 4,
+        "buffer_index": 1,
+        "shape": [
+          1,
+          49,
+          10,
+          1
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 0,
+        "allocation_size": 490,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "outputs": [
+      {
+        "name": "tensor_22",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "size": 8000,
+        "ndim": 4,
+        "buffer_index": 23,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 496,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "local_tensors": [
+      {
+        "name": "tensor_17",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "constant",
+        "nbytes": 2560,
+        "size": 2560,
+        "ndim": 4,
+        "buffer_index": 18,
+        "shape": [
+          64,
+          10,
+          4,
+          1
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 0,
+        "allocation_size": 2560,
+        "arena_region_id": 1,
+        "staged": true
+      },
+      {
+        "name": "tensor_conv_2d_0_scratch",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 192,
+        "size": 192,
+        "ndim": 1,
+        "shape": [
+          192
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 8496,
+        "allocation_size": 192,
+        "arena_region_id": 0,
+        "staged": false
+      },
+      {
+        "name": "tensor_conv_2d_0_weight_sum",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "size": 64,
+        "ndim": 1,
+        "shape": [
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 2560,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": true
+      },
+      {
+        "name": "tensor_conv_2d_0_multiplier",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "size": 64,
+        "ndim": 1,
+        "shape": [
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 2816,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": true
+      },
+      {
+        "name": "tensor_conv_2d_0_shift",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "size": 64,
+        "ndim": 1,
+        "shape": [
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 3072,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": true
+      }
+    ]
+  },
+  {
+    "idx": 1,
+    "id": 1,
+    "op_type": "DEPTHWISE_CONV_2D",
+    "name": "depthwise_conv_2d_1",
+    "inputs": [
+      {
+        "name": "tensor_22",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "size": 8000,
+        "ndim": 4,
+        "buffer_index": 23,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 496,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "outputs": [
+      {
+        "name": "tensor_23",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "size": 8000,
+        "ndim": 4,
+        "buffer_index": 24,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 8496,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "local_tensors": [
+      {
+        "name": "tensor_5",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "constant",
+        "nbytes": 576,
+        "size": 576,
+        "ndim": 4,
+        "buffer_index": 6,
+        "shape": [
+          1,
+          3,
+          3,
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 3328,
+        "allocation_size": 576,
+        "arena_region_id": 1,
+        "staged": true
+      },
+      {
+        "name": "tensor_depthwise_conv_2d_1_scratch",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 4464,
+        "size": 4464,
+        "ndim": 1,
+        "shape": [
+          4464
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 16496,
+        "allocation_size": 4464,
+        "arena_region_id": 0,
+        "staged": false
+      },
+      {
+        "name": "tensor_depthwise_conv_2d_1_weight_sum",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "size": 64,
+        "ndim": 1,
+        "shape": [
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 3904,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": true
+      },
+      {
+        "name": "tensor_depthwise_conv_2d_1_multiplier",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "size": 64,
+        "ndim": 1,
+        "shape": [
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 4160,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": true
+      },
+      {
+        "name": "tensor_depthwise_conv_2d_1_shift",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "size": 64,
+        "ndim": 1,
+        "shape": [
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 4416,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": true
+      }
+    ]
+  },
+  {
+    "idx": 2,
+    "id": 2,
+    "op_type": "CONV_2D",
+    "name": "conv_2d_2",
+    "inputs": [
+      {
+        "name": "tensor_23",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "size": 8000,
+        "ndim": 4,
+        "buffer_index": 24,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 8496,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "outputs": [
+      {
+        "name": "tensor_24",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "size": 8000,
+        "ndim": 4,
+        "buffer_index": 25,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 0,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "local_tensors": [
+      {
+        "name": "tensor_18",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "constant",
+        "nbytes": 4096,
+        "size": 4096,
+        "ndim": 4,
+        "buffer_index": 19,
+        "shape": [
+          64,
+          1,
+          1,
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 4672,
+        "allocation_size": 4096,
+        "arena_region_id": 1,
+        "staged": true
+      },
+      {
+        "name": "tensor_conv_2d_2_weight_sum",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "size": 64,
+        "ndim": 1,
+        "shape": [
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 8768,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": true
+      },
+      {
+        "name": "tensor_conv_2d_2_multiplier",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "size": 64,
+        "ndim": 1,
+        "shape": [
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 9024,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": true
+      },
+      {
+        "name": "tensor_conv_2d_2_shift",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "size": 64,
+        "ndim": 1,
+        "shape": [
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 9280,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": true
+      }
+    ]
+  },
+  {
+    "idx": 3,
+    "id": 3,
+    "op_type": "DEPTHWISE_CONV_2D",
+    "name": "depthwise_conv_2d_3",
+    "inputs": [
+      {
+        "name": "tensor_24",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "size": 8000,
+        "ndim": 4,
+        "buffer_index": 25,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 0,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "outputs": [
+      {
+        "name": "tensor_25",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "size": 8000,
+        "ndim": 4,
+        "buffer_index": 26,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 8000,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "local_tensors": [
+      {
+        "name": "tensor_8",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "constant",
+        "nbytes": 576,
+        "size": 576,
+        "ndim": 4,
+        "buffer_index": 9,
+        "shape": [
+          1,
+          3,
+          3,
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 9536,
+        "allocation_size": 576,
+        "arena_region_id": 1,
+        "staged": true
+      },
+      {
+        "name": "tensor_depthwise_conv_2d_3_scratch",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 4464,
+        "size": 4464,
+        "ndim": 1,
+        "shape": [
+          4464
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 16000,
+        "allocation_size": 4464,
+        "arena_region_id": 0,
+        "staged": false
+      },
+      {
+        "name": "tensor_depthwise_conv_2d_3_weight_sum",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "size": 64,
+        "ndim": 1,
+        "shape": [
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 10112,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": true
+      },
+      {
+        "name": "tensor_depthwise_conv_2d_3_multiplier",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "size": 64,
+        "ndim": 1,
+        "shape": [
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 10368,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": true
+      },
+      {
+        "name": "tensor_depthwise_conv_2d_3_shift",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "size": 64,
+        "ndim": 1,
+        "shape": [
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 10624,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": true
+      }
+    ]
+  },
+  {
+    "idx": 4,
+    "id": 4,
+    "op_type": "CONV_2D",
+    "name": "conv_2d_4",
+    "inputs": [
+      {
+        "name": "tensor_25",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "size": 8000,
+        "ndim": 4,
+        "buffer_index": 26,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 8000,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "outputs": [
+      {
+        "name": "tensor_26",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "size": 8000,
+        "ndim": 4,
+        "buffer_index": 27,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 0,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "local_tensors": [
+      {
+        "name": "tensor_19",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "constant",
+        "nbytes": 4096,
+        "size": 4096,
+        "ndim": 4,
+        "buffer_index": 20,
+        "shape": [
+          64,
+          1,
+          1,
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 10880,
+        "allocation_size": 4096,
+        "arena_region_id": 1,
+        "staged": true
+      },
+      {
+        "name": "tensor_conv_2d_4_weight_sum",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "size": 64,
+        "ndim": 1,
+        "shape": [
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 14976,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": true
+      },
+      {
+        "name": "tensor_conv_2d_4_multiplier",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "size": 64,
+        "ndim": 1,
+        "shape": [
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 15232,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": true
+      },
+      {
+        "name": "tensor_conv_2d_4_shift",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "size": 64,
+        "ndim": 1,
+        "shape": [
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 15488,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": true
+      }
+    ]
+  },
+  {
+    "idx": 5,
+    "id": 5,
+    "op_type": "DEPTHWISE_CONV_2D",
+    "name": "depthwise_conv_2d_5",
+    "inputs": [
+      {
+        "name": "tensor_26",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "size": 8000,
+        "ndim": 4,
+        "buffer_index": 27,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 0,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "outputs": [
+      {
+        "name": "tensor_27",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "size": 8000,
+        "ndim": 4,
+        "buffer_index": 28,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 8000,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "local_tensors": [
+      {
+        "name": "tensor_11",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "constant",
+        "nbytes": 576,
+        "size": 576,
+        "ndim": 4,
+        "buffer_index": 12,
+        "shape": [
+          1,
+          3,
+          3,
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 15744,
+        "allocation_size": 576,
+        "arena_region_id": 1,
+        "staged": true
+      },
+      {
+        "name": "tensor_depthwise_conv_2d_5_scratch",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 4464,
+        "size": 4464,
+        "ndim": 1,
+        "shape": [
+          4464
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 16000,
+        "allocation_size": 4464,
+        "arena_region_id": 0,
+        "staged": false
+      },
+      {
+        "name": "tensor_depthwise_conv_2d_5_weight_sum",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "size": 64,
+        "ndim": 1,
+        "shape": [
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 16320,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": true
+      },
+      {
+        "name": "tensor_depthwise_conv_2d_5_multiplier",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "size": 64,
+        "ndim": 1,
+        "shape": [
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 16576,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": true
+      },
+      {
+        "name": "tensor_depthwise_conv_2d_5_shift",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "size": 64,
+        "ndim": 1,
+        "shape": [
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 16832,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": true
+      }
+    ]
+  },
+  {
+    "idx": 6,
+    "id": 6,
+    "op_type": "CONV_2D",
+    "name": "conv_2d_6",
+    "inputs": [
+      {
+        "name": "tensor_27",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "size": 8000,
+        "ndim": 4,
+        "buffer_index": 28,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 8000,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "outputs": [
+      {
+        "name": "tensor_28",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "size": 8000,
+        "ndim": 4,
+        "buffer_index": 29,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 0,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "local_tensors": [
+      {
+        "name": "tensor_20",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "constant",
+        "nbytes": 4096,
+        "size": 4096,
+        "ndim": 4,
+        "buffer_index": 21,
+        "shape": [
+          64,
+          1,
+          1,
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 17088,
+        "allocation_size": 4096,
+        "arena_region_id": 1,
+        "staged": true
+      },
+      {
+        "name": "tensor_conv_2d_6_weight_sum",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "size": 64,
+        "ndim": 1,
+        "shape": [
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 21184,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": true
+      },
+      {
+        "name": "tensor_conv_2d_6_multiplier",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "size": 64,
+        "ndim": 1,
+        "shape": [
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 21440,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": true
+      },
+      {
+        "name": "tensor_conv_2d_6_shift",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "size": 64,
+        "ndim": 1,
+        "shape": [
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 21696,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": true
+      }
+    ]
+  },
+  {
+    "idx": 7,
+    "id": 7,
+    "op_type": "DEPTHWISE_CONV_2D",
+    "name": "depthwise_conv_2d_7",
+    "inputs": [
+      {
+        "name": "tensor_28",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "size": 8000,
+        "ndim": 4,
+        "buffer_index": 29,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 0,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "outputs": [
+      {
+        "name": "tensor_29",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "size": 8000,
+        "ndim": 4,
+        "buffer_index": 30,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 8000,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "local_tensors": [
+      {
+        "name": "tensor_14",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "constant",
+        "nbytes": 576,
+        "size": 576,
+        "ndim": 4,
+        "buffer_index": 15,
+        "shape": [
+          1,
+          3,
+          3,
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 21952,
+        "allocation_size": 576,
+        "arena_region_id": 1,
+        "staged": true
+      },
+      {
+        "name": "tensor_depthwise_conv_2d_7_scratch",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 4464,
+        "size": 4464,
+        "ndim": 1,
+        "shape": [
+          4464
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 16000,
+        "allocation_size": 4464,
+        "arena_region_id": 0,
+        "staged": false
+      },
+      {
+        "name": "tensor_depthwise_conv_2d_7_weight_sum",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "size": 64,
+        "ndim": 1,
+        "shape": [
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 22528,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": true
+      },
+      {
+        "name": "tensor_depthwise_conv_2d_7_multiplier",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "size": 64,
+        "ndim": 1,
+        "shape": [
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 22784,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": true
+      },
+      {
+        "name": "tensor_depthwise_conv_2d_7_shift",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "size": 64,
+        "ndim": 1,
+        "shape": [
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 23040,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": true
+      }
+    ]
+  },
+  {
+    "idx": 8,
+    "id": 8,
+    "op_type": "CONV_2D",
+    "name": "conv_2d_8",
+    "inputs": [
+      {
+        "name": "tensor_29",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "size": 8000,
+        "ndim": 4,
+        "buffer_index": 30,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 8000,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "outputs": [
+      {
+        "name": "tensor_30",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "size": 8000,
+        "ndim": 4,
+        "buffer_index": 31,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 0,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "local_tensors": [
+      {
+        "name": "tensor_21",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "constant",
+        "nbytes": 4096,
+        "size": 4096,
+        "ndim": 4,
+        "buffer_index": 22,
+        "shape": [
+          64,
+          1,
+          1,
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 23296,
+        "allocation_size": 4096,
+        "arena_region_id": 1,
+        "staged": true
+      },
+      {
+        "name": "tensor_conv_2d_8_weight_sum",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "size": 64,
+        "ndim": 1,
+        "shape": [
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 27392,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": true
+      },
+      {
+        "name": "tensor_conv_2d_8_multiplier",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "size": 64,
+        "ndim": 1,
+        "shape": [
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 27648,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": true
+      },
+      {
+        "name": "tensor_conv_2d_8_shift",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "size": 64,
+        "ndim": 1,
+        "shape": [
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 27904,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": true
+      }
+    ]
+  },
+  {
+    "idx": 9,
+    "id": 9,
+    "op_type": "AVERAGE_POOL_2D",
+    "name": "average_pool_2d_9",
+    "inputs": [
+      {
+        "name": "tensor_30",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "size": 8000,
+        "ndim": 4,
+        "buffer_index": 31,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 0,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "outputs": [
+      {
+        "name": "tensor_31",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 64,
+        "size": 64,
+        "ndim": 4,
+        "buffer_index": 32,
+        "shape": [
+          1,
+          1,
+          1,
+          64
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 8000,
+        "allocation_size": 64,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ]
+  },
+  {
+    "idx": 10,
+    "id": 10,
+    "op_type": "RESHAPE",
+    "name": "reshape_10",
+    "inputs": [
+      {
+        "name": "tensor_31",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 64,
+        "size": 64,
+        "ndim": 4,
+        "buffer_index": 32,
+        "shape": [
+          1,
+          1,
+          1,
+          64
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 8000,
+        "allocation_size": 64,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "outputs": [
+      {
+        "name": "tensor_32",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 64,
+        "size": 64,
+        "ndim": 2,
+        "buffer_index": 33,
+        "shape": [
+          1,
+          64
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 8000,
+        "allocation_size": 64,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ]
+  },
+  {
+    "idx": 11,
+    "id": 11,
+    "op_type": "FULLY_CONNECTED",
+    "name": "fully_connected_11",
+    "inputs": [
+      {
+        "name": "tensor_32",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 64,
+        "size": 64,
+        "ndim": 2,
+        "buffer_index": 33,
+        "shape": [
+          1,
+          64
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 8000,
+        "allocation_size": 64,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "outputs": [
+      {
+        "name": "tensor_33",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 12,
+        "size": 12,
+        "ndim": 2,
+        "buffer_index": 34,
+        "shape": [
+          1,
+          12
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 0,
+        "allocation_size": 12,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "local_tensors": [
+      {
+        "name": "tensor_16",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "constant",
+        "nbytes": 768,
+        "size": 768,
+        "ndim": 2,
+        "buffer_index": 17,
+        "shape": [
+          12,
+          64
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 28160,
+        "allocation_size": 768,
+        "arena_region_id": 1,
+        "staged": true
+      },
+      {
+        "name": "tensor_fully_connected_11_weight_sum",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 48,
+        "size": 12,
+        "ndim": 1,
+        "shape": [
+          12
+        ],
+        "is_constant": true,
+        "is_persistent": false,
+        "is_scratch": false,
+        "memory": "dtcm",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 28928,
+        "allocation_size": 48,
+        "arena_region_id": 1,
+        "staged": true
+      }
+    ]
+  },
+  {
+    "idx": 12,
+    "id": 12,
+    "op_type": "SOFTMAX",
+    "name": "softmax_12",
+    "inputs": [
+      {
+        "name": "tensor_33",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 12,
+        "size": 12,
+        "ndim": 2,
+        "buffer_index": 34,
+        "shape": [
+          1,
+          12
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 0,
+        "allocation_size": 12,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "outputs": [
+      {
+        "name": "tensor_34",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 12,
+        "size": 12,
+        "ndim": 2,
+        "buffer_index": 35,
+        "shape": [
+          1,
+          12
+        ],
+        "is_constant": false,
+        "is_persistent": false,
+        "is_scratch": true,
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 16,
+        "allocation_size": 12,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ]
+  }
+]

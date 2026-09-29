@@ -206,10 +206,6 @@ def collect_lines(
 
         if data:
             buf += data
-            last_data_ts = time.monotonic()
-            hb_deadline = last_data_ts + heartbeat_timeout_s
-            if window_deadline is not None and window_deadline > hb_deadline:
-                hb_deadline = window_deadline
 
             # Extract complete newline-delimited lines from the buffer
             while b"\n" in buf:
@@ -243,6 +239,11 @@ def collect_lines(
                     if not line:
                         continue
                 line_ts = time.monotonic()
+                # Only whole lines prove liveness.
+                last_data_ts = line_ts
+                hb_deadline = line_ts + heartbeat_timeout_s
+                if window_deadline is not None and window_deadline > hb_deadline:
+                    hb_deadline = window_deadline
 
                 lines.append(line)
                 if on_line is not None:
@@ -276,27 +277,27 @@ def collect_lines(
                 if line == HPX_END:
                     log.info("Captured %d lines (HPX_END received)", len(lines))
                     return lines
-        else:
-            if time.monotonic() > hb_deadline:
-                # Report the REAL silence, not the configured timeout: with a
-                # held window budget the two differ by up to the whole budget
-                # (#170), and "no data for 30s" after a 3-minute wait sent
-                # readers down the wrong path.
-                silent_s = time.monotonic() - last_data_ts
-                if seen_start:
-                    log.warning(
-                        "%s: no data for %.0fs after HPX_START (%d lines) — "
-                        "firmware may be hung or HPX_END was lost",
-                        transport_name,
-                        silent_s,
-                        len(lines),
-                    )
-                else:
-                    log.warning(
-                        "%s: no data for %.0fs — firmware may not be running "
-                        "(check reset / transport / heartbeat config)",
-                        transport_name,
-                        silent_s,
-                    )
-                return lines
+        if time.monotonic() > hb_deadline:
+            # Report the REAL silence, not the configured timeout: with a
+            # held window budget the two differ by up to the whole budget
+            # (#170), and "no data for 30s" after a 3-minute wait sent
+            # readers down the wrong path.
+            silent_s = time.monotonic() - last_data_ts
+            if seen_start:
+                log.warning(
+                    "%s: no complete line for %.0fs after HPX_START (%d lines) — "
+                    "firmware may be hung or HPX_END was lost",
+                    transport_name,
+                    silent_s,
+                    len(lines),
+                )
+            else:
+                log.warning(
+                    "%s: no complete line for %.0fs — firmware may not be running "
+                    "(check reset / transport / heartbeat config)",
+                    transport_name,
+                    silent_s,
+                )
+            return lines
+        if not data:
             time.sleep(poll_interval_s)

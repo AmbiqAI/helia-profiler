@@ -14,7 +14,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Literal, Protocol, TypeVar, runtime_checkable
+from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeVar, runtime_checkable
 
 from neuralspotx.file_lock import file_mutex
 
@@ -49,6 +49,9 @@ from .results import (
 )
 from .hostenv.toolchain_probe import SymbolEntry
 from .target.probe.base import Probe, ResetController
+
+if TYPE_CHECKING:
+    from .fixture import FixtureRenderSpec
 
 log = logging.getLogger("hpx")
 
@@ -111,6 +114,7 @@ class PipelineContext:
     engine_artifacts: EngineArtifacts | None = None
 
     # Firmware generation (stage: generate_firmware)
+    fixture: FixtureRenderSpec | None = None
     firmware_dir: Path | None = None
     dependency_workspace: DependencyWorkspace | None = None
     dependency_lock_path: Path | None = None

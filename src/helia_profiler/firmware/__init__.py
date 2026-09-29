@@ -332,6 +332,12 @@ def generate_app(ctx: PipelineContext) -> Path:
     src_dir = app_dir / "src"
     src_dir.mkdir(parents=True, exist_ok=True)
 
+    if ctx.fixture is not None:
+        from .fixture import fixture_template_vars, write_fixture_headers
+
+        template_vars.update(fixture_template_vars(ctx, aot_arena_regions))
+        write_fixture_headers(src_dir, ctx)
+
     if transport == Transport.RTT:
         _copy_segger_rtt(src_dir, config.target.segger_rtt_path)
 
@@ -406,7 +412,9 @@ def generate_app(ctx: PipelineContext) -> Path:
 
         _write_text(
             src_dir / "main.cc",
-            _jinja_env.get_template("main_aot.cc.j2").render(**template_vars),
+            _jinja_env.get_template(
+                "fixed_fixture.cc.j2" if ctx.fixture else "main_aot.cc.j2"
+            ).render(**template_vars),
         )
         if power_binary_enabled:
             # Same template, power_only=True: no transport init, no per-layer
@@ -425,7 +433,7 @@ def generate_app(ctx: PipelineContext) -> Path:
 
         _write_text(
             src_dir / "main.cc",
-            _jinja_env.get_template("main.cc.j2").render(
+            _jinja_env.get_template("fixed_fixture.cc.j2" if ctx.fixture else "main.cc.j2").render(
                 **template_vars,
             ),
         )

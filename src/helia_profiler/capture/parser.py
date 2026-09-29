@@ -66,6 +66,10 @@ _STRING_COLS = frozenset({"Layer", "Op", "tag", "name", "overflow"})
 # subtraction wrapped (the Apollo4 DWT->CYCCNT settling artifact).
 _UINT32_WRAP_THRESHOLD = 1 << 31
 
+_CYCLES_COL = "ARM_PMU_CPU_CYCLES"
+
+_TRUNCATED_HINT = "Check transport integrity and capture timeouts, then retry."
+
 
 def parse_firmware_output(
     lines: list[str], aggregation: Aggregation = Aggregation.MEDIAN
@@ -83,6 +87,7 @@ def parse_firmware_output(
     presets: dict[str, _PresetData] = {}
     current_preset: _PresetData | None = None
     in_session = False
+    saw_end = False
 
     for line in lines:
         line = line.strip()
@@ -96,6 +101,7 @@ def parse_firmware_output(
         if line == HPX_END_SENTINEL:
             if current_preset is not None:
                 current_preset.flush_iteration()
+            saw_end = True
             break
 
         if not in_session:
@@ -140,6 +146,11 @@ def parse_firmware_output(
             if current_preset is not None:
                 current_preset.flush_iteration()
             preset_name = m.group(1)
+            if preset_name in presets:
+                raise CaptureError(
+                    f"PMU pass {preset_name} appeared twice.",
+                    hint=_TRUNCATED_HINT,
+                )
             current_preset = _PresetData()
             presets[preset_name] = current_preset
             continue
@@ -155,6 +166,12 @@ def parse_firmware_output(
 
         if current_preset is not None and current_preset.in_iteration:
             current_preset.feed_line(line)
+
+    if in_session and not saw_end:
+        raise CaptureError(
+            "Firmware output ended before HPX_END.",
+            hint=_TRUNCATED_HINT,
+        )
 
     preset_names_str = meta_kv.get(WireKey.PRESETS, "")
     preset_names = (
@@ -204,6 +221,8 @@ def parse_firmware_output(
         psram=psram,
         presets=preset_names,
     )
+    _check_presets(firmware_meta, list(presets))
+    _check_iterations(presets, meta_kv.get(WireKey.ITERATIONS))
 
     typed_presets: dict[str, PresetResult] = {}
     for name, pd in presets.items():
@@ -267,6 +286,36 @@ def parse_firmware_output(
         overflow_detected=overflow_detected,
         groups=groups,
     )
+
+
+def _check_presets(meta: FirmwareMeta, parsed: list[str]) -> None:
+    """Reject a capture missing any announced PMU pass."""
+    if parsed == ["_default"] and len(meta.presets) == 1:
+        parsed = list(meta.presets)
+    if meta.presets and set(parsed) != set(meta.presets):
+        missing = [name for name in meta.presets if name not in parsed]
+        extra = [name for name in parsed if name not in meta.presets]
+        raise CaptureError(
+            f"PMU passes differ from HPX_PRESETS: missing {missing}, unexpected {extra}.",
+            hint=_TRUNCATED_HINT,
+        )
+    if isinstance(meta.num_presets, int) and meta.num_presets != len(parsed):
+        raise CaptureError(
+            f"Captured {len(parsed)} PMU passes; firmware announced {meta.num_presets}.",
+            hint=_TRUNCATED_HINT,
+        )
+
+
+def _check_iterations(presets: dict[str, _PresetData], announced: Any) -> None:
+    """Reject a pass with missing or empty iterations."""
+    for name, pd in presets.items():
+        if not pd.iterations or not all(pd.iterations):
+            raise CaptureError(f"PMU pass {name} has no layer data.", hint=_TRUNCATED_HINT)
+        if isinstance(announced, int) and len(pd.iterations) != announced:
+            raise CaptureError(
+                f"PMU pass {name} has {len(pd.iterations)} of {announced} iterations.",
+                hint=_TRUNCATED_HINT,
+            )
 
 
 class _PresetData:
@@ -475,7 +524,8 @@ def _average_iterations(
         # frozen (a genuinely-zero layer) so a counter is never silently
         # emptied.
         frozen_iters = {it_idx for it_idx, row in rows if _row_is_frozen(row, numeric_cols)}
-        if len(frozen_iters) >= len(rows):
+        # Zero cycles witness a debug-domain freeze.
+        if _CYCLES_COL not in numeric_cols or len(frozen_iters) >= len(rows):
             frozen_iters = set()
         total_frozen += len(frozen_iters)
 
@@ -497,7 +547,7 @@ def _average_iterations(
             if clean:
                 counters[col] = _aggregate(clean, aggregation)
 
-        cycles = counters.get("ARM_PMU_CPU_CYCLES")
+        cycles = counters.get(_CYCLES_COL)
 
         overflow_count = sum(1 for _, row in rows if row.get("overflow", 0) not in (0, "0", False))
 
@@ -544,7 +594,7 @@ def _raw_iterations_to_typed(
                     id=row.get("Layer", 0),
                     op=row.get("Op", row.get("tag", "unknown")),
                     counters=counters,
-                    cycles=counters.get("ARM_PMU_CPU_CYCLES"),
+                    cycles=counters.get(_CYCLES_COL),
                     overflow=row.get("overflow", 0) not in (0, "0", False),
                 )
             )
@@ -583,7 +633,7 @@ def _merge_presets(
             id=layer_id,
             op=op,
             counters=merged_counters[layer_id],
-            cycles=merged_counters[layer_id].get("ARM_PMU_CPU_CYCLES"),
+            cycles=merged_counters[layer_id].get(_CYCLES_COL),
             overflow=merged_overflow[layer_id],
         )
         for layer_id, op in (identities or {}).items()

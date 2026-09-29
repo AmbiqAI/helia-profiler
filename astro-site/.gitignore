@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.astro/
+.cache/
+src/data/build-info.json
+public/build-info.json
+.generated/

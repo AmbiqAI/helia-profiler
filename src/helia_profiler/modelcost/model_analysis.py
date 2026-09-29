@@ -274,37 +274,49 @@ def _fully_connected_macs(
 
     Weight shape: [N_out, N_in]
     MACs = N_in * N_out * batch
+
+    TFLite folds every input dim into the batch, so a 4-D input feeds
+    ``batch = elements(input) / N_in`` rows, whatever ``keep_num_dims`` says.
     """
-    if len(weight_shape) != 2:
+    if len(weight_shape) != 2 or weight_shape[1] <= 0:
         return 0
     n_out, n_in = weight_shape
-    batch = 1
-    for d in input_shape[:-1]:
-        batch *= d
+    batch = math.prod(input_shape) // n_in if input_shape else 1
     return batch * n_in * n_out
 
 
 def _transpose_conv_macs(
+    input_shape: list[int],
     weight_shape: list[int],
-    output_shape: list[int],
 ) -> int:
     """Compute MACs for TRANSPOSE_CONV.
 
+    Input shape:  [N, H_in, W_in, C_in]      (the data tensor, not output_shape)
     Weight shape: [C_out, K_h, K_w, C_in]
-    Output shape: [N, H_out, W_out, C_out]
-    Same MAC count as forward conv.
+    Each input pixel scatters a K_h x K_w x C_out patch, so
+    MACs = N * H_in * W_in * K_h * K_w * C_in * C_out.
+    Sizing by the output instead overcounts by stride_h * stride_w.
     """
-    if len(weight_shape) != 4 or len(output_shape) < 3:
+    if len(weight_shape) != 4 or len(input_shape) < 2:
         return 0
     c_out, k_h, k_w, c_in = weight_shape
-    n = output_shape[0]
-    if len(output_shape) == 4:
-        h_out = output_shape[1]
-        w_out = output_shape[2]
-    else:
-        h_out = output_shape[1]
-        w_out = 1
-    return n * k_h * k_w * c_in * c_out * h_out * w_out
+    return math.prod(input_shape[:-1]) * k_h * k_w * c_in * c_out
+
+
+def _batch_matmul_macs(
+    lhs_shape: list[int],
+    output_shape: list[int],
+    adj_x: bool,
+) -> int:
+    """Compute MACs for BATCH_MATMUL.
+
+    Each output element is a dot product over the shared dim K:
+    MACs = elements(output) * K, K = lhs[-1] (lhs[-2] when adj_x).
+    """
+    if len(lhs_shape) < 2 or not output_shape:
+        return 0
+    k = lhs_shape[-2] if adj_x else lhs_shape[-1]
+    return math.prod(output_shape) * k
 
 
 def _elementwise_ops(output_shape: list[int]) -> int:
@@ -527,14 +539,20 @@ def analyze_model(model_path: str | Path) -> ModelAnalysis | None:
             }
             # TRANSPOSE_CONV inputs: [output_shape, weights, input]
             weight_idx = 1
-            macs = _transpose_conv_macs(
-                in_shapes[weight_idx] if len(in_shapes) > weight_idx else [],
-                out_shapes[0] if out_shapes else [],
-            )
+            macs = _transpose_conv_macs(in_shapes[2], in_shapes[weight_idx])
             ops = 2 * macs
             total_params += _count_tensor_elements(sg, op.Inputs(weight_idx))
             if op.InputsLength() >= 4 and op.Inputs(3) >= 0:
                 total_params += _count_tensor_elements(sg, op.Inputs(3))
+
+        elif builtin == bo.BATCH_MATMUL and len(in_shapes) >= 2:
+            bmm_opts = _schema.BatchMatMulOptions()
+            bmm_opts.Init(op.BuiltinOptions().Bytes, op.BuiltinOptions().Pos)
+            params = {"adj_x": bmm_opts.AdjX(), "adj_y": bmm_opts.AdjY()}
+            macs = _batch_matmul_macs(
+                in_shapes[0], out_shapes[0] if out_shapes else [], bmm_opts.AdjX()
+            )
+            ops = 2 * macs
 
         elif builtin in (bo.AVERAGE_POOL_2D, bo.MAX_POOL_2D):
             pool_opts = _schema.Pool2DOptions()
@@ -690,8 +708,14 @@ def analyze_air_model(air_model: Any) -> ModelAnalysis | None:
             )
             ops = 2 * macs
 
-        elif ot == _AirOpType.TRANSPOSE_CONV and weight_shape and out_shapes:
-            macs = _transpose_conv_macs(weight_shape, out_shapes[0])
+        elif ot == _AirOpType.TRANSPOSE_CONV and weight_shape and in_shapes:
+            macs = _transpose_conv_macs(in_shapes[0], weight_shape)
+            ops = 2 * macs
+
+        elif ot == _AirOpType.BATCH_MATMUL and in_shapes and out_shapes:
+            adj_x = bool(getattr(op.options, "adj_x", False))
+            params = {"adj_x": adj_x, "adj_y": bool(getattr(op.options, "adj_y", False))}
+            macs = _batch_matmul_macs(in_shapes[0], out_shapes[0], adj_x)
             ops = 2 * macs
 
         elif ot in (_AirOpType.AVERAGE_POOL_2D, _AirOpType.MAX_POOL_2D):

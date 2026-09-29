@@ -6,9 +6,9 @@ way to prove a bench works before trusting any numbers off it.
 
 **User-facing documentation lives in the docs site — not here:**
 
-- [`hpx validate` reference](../../docs/reference/validate.md) — every flag,
+- [`hpx validate` reference](https://ambiqai.github.io/helia-profiler/reference/cli/validate/) — every flag,
   the preset suites, custom model registries, and the manifest contract.
-- [Validating a Board Setup](../../docs/guides/validating-a-board-setup.md) —
+- [Validating a Board Setup](https://ambiqai.github.io/helia-profiler/getting-started/validate-your-setup/) —
   the bring-up walkthrough.
 - [`maintainers/hardware-ci.md`](../../maintainers/hardware-ci.md) — running
   the same suite under the self-hosted GitHub Actions runner.

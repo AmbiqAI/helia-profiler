@@ -38,9 +38,9 @@ from typing import TYPE_CHECKING
 from ..config import DEFAULT_ARENA_SIZE_BYTES
 from ..errors import PlatformError
 from ..engines import EngineType, get_adapter
-from ..engines.base import ExecutorchArtifacts
+from ..engines.base import ExecutorchArtifacts, HeliaAotArtifacts
 from ..pipeline import PipelineContext
-from ..placement import MemoryRegion, Placement, resolve_fastest_fit_placement
+from ..placement import ArenaRole, MemoryRegion, Placement, resolve_fastest_fit_placement
 from ..config import Transport
 from ..platform import MemoryLayout, PmuTier, SocDef, SocFamily
 from ..results import ConsumerKind, MemoryConsumer, MemoryPlan, MemoryRegionUsage
@@ -477,7 +477,42 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
 
     additions: list[tuple[MemoryRegion, MemoryConsumer]] = []
 
-    record_size = PMU_RECORD_SIZE_BYTES.get(engine_type)
+    fixture = ctx.fixture
+    if fixture is not None:
+        # The fixed-input wrapper exposes terminals instead of allocating
+        # the ordinary PMU/transport objects. Its unannotated RAM statics
+        # follow the target's default data region, not the tensor arena.
+        static_region = _default_bss_region(family)
+        sizes = {
+            "fixture_output": fixture.model.output_bytes,
+            "fixture_status": 4,
+            "fixture_checksum": 4,
+            "fixture_timing": 7 * 4,
+            "fixture_timer_state": 4,
+        }
+        if engine_type is not EngineType.HELIA_AOT:
+            sizes["fixture_memory"] = 8 * 4
+        artifacts = ctx.engine_artifacts
+        if fixture.observe_aot_arenas and isinstance(artifacts, HeliaAotArtifacts):
+            scanned = [r for r in artifacts.aot_arena_regions if r.role is ArenaRole.SCRATCH]
+            if scanned:
+                sizes["fixture_arena_scan"] = 8 * len(scanned)
+        additions.extend(
+            (static_region, MemoryConsumer(name=name, size=size, kind=ConsumerKind.OTHER))
+            for name, size in sizes.items()
+        )
+        additions.append(
+            (
+                MemoryRegion.MRAM,
+                MemoryConsumer(
+                    name="fixture_input",
+                    size=fixture.model.input_bytes,
+                    kind=ConsumerKind.OTHER,
+                ),
+            )
+        )
+
+    record_size = PMU_RECORD_SIZE_BYTES.get(engine_type) if fixture is None else None
     if record_size is not None:
         records_bytes = int(soc.pmu_max_ops) * record_size
         if engine_type in (EngineType.TFLM, EngineType.HELIA_RT):
@@ -507,7 +542,7 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
     # the power binary excludes them). NB the plan describes the PROFILE
     # binary — same scope as pmu_layer_records above.
     artifacts = ctx.engine_artifacts
-    if artifacts is not None and artifacts.resolved_backend == "ethos_u":
+    if fixture is None and artifacts is not None and artifacts.resolved_backend == "ethos_u":
         additions.append(
             (
                 _nsx_mem_sram_bss_region(soc),
@@ -520,7 +555,7 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
         )
 
     transport = ctx.config.target.transport
-    if transport == Transport.RTT:
+    if fixture is None and transport == Transport.RTT:
         from ..firmware import rtt_buffer_size_up
 
         up = rtt_buffer_size_up(
@@ -538,7 +573,7 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
                 ),
             )
         )
-    elif transport == Transport.USB_CDC:
+    elif fixture is None and transport == Transport.USB_CDC:
         additions.append(
             (
                 _usb_region(family),
