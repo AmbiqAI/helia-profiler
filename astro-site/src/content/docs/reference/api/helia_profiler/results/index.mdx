@@ -16,7 +16,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`
 
-Generated from the `src/helia_profiler` tree `bed5e1fd96ee420ed80b2c0d9d7c362796568425`.
+Generated from the `src/helia_profiler` tree `86e1a1bc566380a5ff68c8e53854bb120e635215`.
 
 [Machine-readable model](/helia-profiler/reference/api/helia_profiler/results.json)
 
@@ -210,7 +210,7 @@ Generated from the `src/helia_profiler` tree `bed5e1fd96ee420ed80b2c0d9d7c362796
   name={"FirmwareMeta"}
   kind={"class"}
   language={"python"}
-  signature={"FirmwareMeta(\n    model_size: int | None = None,\n    arena_size: int | None = None,\n    allocated_arena: int | None = None,\n    input_size: int | None = None,\n    output_size: int | None = None,\n    num_tensors: int | None = None,\n    num_inputs: int | None = None,\n    num_outputs: int | None = None,\n    num_presets: int | None = None,\n    system_clock_hz: int | None = None,\n    measured_clock_hz: int | None = None,\n    profiled_infer_count: int | None = None,\n    profiled_infer_total_us: int | None = None,\n    profiled_infer_avg_us: int | None = None,\n    clean_infer_count: int | None = None,\n    clean_infer_total_cycles: int | None = None,\n    clean_infer_avg_cycles: int | None = None,\n    clean_infer_avg_us: int | None = None,\n    clean_stalled_iters: int | None = None,\n    clean_partial_iters: int | None = None,\n    clean_ref_cycles: int | None = None,\n    clean_dwt_rate_cyc: int | None = None,\n    clean_dwt_rate_us: int | None = None,\n    clean_attach_wait_us: int | None = None,\n    psram: PsramInfo | None = None,\n    presets: tuple[str, ...] = (),\n) -> None"}
+  signature={"FirmwareMeta(\n    model_size: int | None = None,\n    arena_size: int | None = None,\n    allocated_arena: int | None = None,\n    input_size: int | None = None,\n    output_size: int | None = None,\n    num_tensors: int | None = None,\n    num_inputs: int | None = None,\n    num_outputs: int | None = None,\n    num_presets: int | None = None,\n    system_clock_hz: int | None = None,\n    profiled_infer_count: int | None = None,\n    profiled_infer_total_us: int | None = None,\n    profiled_infer_avg_us: int | None = None,\n    clean_infer_count: int | None = None,\n    clean_infer_total_cycles: int | None = None,\n    clean_infer_avg_cycles: int | None = None,\n    clean_infer_avg_us: int | None = None,\n    clean_stalled_iters: int | None = None,\n    clean_partial_iters: int | None = None,\n    clean_ref_cycles: int | None = None,\n    clean_dwt_rate_cyc: int | None = None,\n    clean_dwt_rate_us: int | None = None,\n    clean_attach_wait_us: int | None = None,\n    psram: PsramInfo | None = None,\n    presets: tuple[str, ...] = (),\n    measured_clock_hz: int | None = None,\n) -> None"}
   level={2}
   summary={"Metadata reported by the profiler firmware at startup."}
   source={{"path":"src/helia_profiler/results/models.py","line":90,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L90"}}
@@ -366,27 +366,13 @@ Generated from the `src/helia_profiler` tree `bed5e1fd96ee420ed80b2c0d9d7c362796
   </RefSymbol>
 
   <RefSymbol
-    id={"helia_profiler.FirmwareMeta.measured_clock_hz"}
-    name={"measured_clock_hz"}
-    kind={"attribute"}
-    language={"python"}
-    signature={"measured_clock_hz: int | None = None"}
-    level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":110,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L110"}}
-  >
-
-
-
-  </RefSymbol>
-
-  <RefSymbol
     id={"helia_profiler.FirmwareMeta.profiled_infer_count"}
     name={"profiled_infer_count"}
     kind={"attribute"}
     language={"python"}
     signature={"profiled_infer_count: int | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":111,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L111"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":109,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L109"}}
   >
 
 
@@ -400,7 +386,7 @@ Generated from the `src/helia_profiler` tree `bed5e1fd96ee420ed80b2c0d9d7c362796
     language={"python"}
     signature={"profiled_infer_total_us: int | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":112,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L112"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":110,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L110"}}
   >
 
 
@@ -414,7 +400,7 @@ Generated from the `src/helia_profiler` tree `bed5e1fd96ee420ed80b2c0d9d7c362796
     language={"python"}
     signature={"profiled_infer_avg_us: int | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":113,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L113"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":111,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L111"}}
   >
 
 
@@ -428,7 +414,7 @@ Generated from the `src/helia_profiler` tree `bed5e1fd96ee420ed80b2c0d9d7c362796
     language={"python"}
     signature={"clean_infer_count: int | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":117,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L117"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":115,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L115"}}
   >
 
 
@@ -442,7 +428,7 @@ Generated from the `src/helia_profiler` tree `bed5e1fd96ee420ed80b2c0d9d7c362796
     language={"python"}
     signature={"clean_infer_total_cycles: int | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":118,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L118"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":116,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L116"}}
   >
 
 
@@ -456,7 +442,7 @@ Generated from the `src/helia_profiler` tree `bed5e1fd96ee420ed80b2c0d9d7c362796
     language={"python"}
     signature={"clean_infer_avg_cycles: int | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":119,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L119"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":117,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L117"}}
   >
 
 
@@ -470,7 +456,7 @@ Generated from the `src/helia_profiler` tree `bed5e1fd96ee420ed80b2c0d9d7c362796
     language={"python"}
     signature={"clean_infer_avg_us: int | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":120,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L120"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":118,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L118"}}
   >
 
 
@@ -484,7 +470,7 @@ Generated from the `src/helia_profiler` tree `bed5e1fd96ee420ed80b2c0d9d7c362796
     language={"python"}
     signature={"clean_stalled_iters: int | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":125,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L125"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":123,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L123"}}
   >
 
 
@@ -498,7 +484,7 @@ Generated from the `src/helia_profiler` tree `bed5e1fd96ee420ed80b2c0d9d7c362796
     language={"python"}
     signature={"clean_partial_iters: int | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":130,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L130"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":128,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L128"}}
   >
 
 
@@ -512,7 +498,7 @@ Generated from the `src/helia_profiler` tree `bed5e1fd96ee420ed80b2c0d9d7c362796
     language={"python"}
     signature={"clean_ref_cycles: int | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":140,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L140"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":138,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L138"}}
   >
 
 
@@ -526,7 +512,7 @@ Generated from the `src/helia_profiler` tree `bed5e1fd96ee420ed80b2c0d9d7c362796
     language={"python"}
     signature={"clean_dwt_rate_cyc: int | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":146,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L146"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":144,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L144"}}
   >
 
 
@@ -540,7 +526,7 @@ Generated from the `src/helia_profiler` tree `bed5e1fd96ee420ed80b2c0d9d7c362796
     language={"python"}
     signature={"clean_dwt_rate_us: int | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":147,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L147"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":145,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L145"}}
   >
 
 
@@ -554,7 +540,7 @@ Generated from the `src/helia_profiler` tree `bed5e1fd96ee420ed80b2c0d9d7c362796
     language={"python"}
     signature={"clean_attach_wait_us: int | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":152,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L152"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":150,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L150"}}
   >
 
 
@@ -568,7 +554,7 @@ Generated from the `src/helia_profiler` tree `bed5e1fd96ee420ed80b2c0d9d7c362796
     language={"python"}
     signature={"psram: PsramInfo | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":153,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L153"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":151,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L151"}}
   >
 
 
@@ -581,6 +567,20 @@ Generated from the `src/helia_profiler` tree `bed5e1fd96ee420ed80b2c0d9d7c362796
     kind={"attribute"}
     language={"python"}
     signature={"presets: tuple[str, ...] = ()"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/models.py","line":152,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L152"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FirmwareMeta.measured_clock_hz"}
+    name={"measured_clock_hz"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"measured_clock_hz: int | None = None"}
     level={3}
     source={{"path":"src/helia_profiler/results/models.py","line":154,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L154"}}
   >

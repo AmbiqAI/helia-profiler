@@ -6,7 +6,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`
 
-Generated from the `src/helia_profiler` tree `bed5e1fd96ee420ed80b2c0d9d7c362796568425`.
+Generated from the `src/helia_profiler` tree `86e1a1bc566380a5ff68c8e53854bb120e635215`.
 
 ## helia_profiler.LayerResult
 
@@ -173,7 +173,6 @@ FirmwareMeta(
     num_outputs: int | None = None,
     num_presets: int | None = None,
     system_clock_hz: int | None = None,
-    measured_clock_hz: int | None = None,
     profiled_infer_count: int | None = None,
     profiled_infer_total_us: int | None = None,
     profiled_infer_avg_us: int | None = None,
@@ -189,6 +188,7 @@ FirmwareMeta(
     clean_attach_wait_us: int | None = None,
     psram: PsramInfo | None = None,
     presets: tuple[str, ...] = (),
+    measured_clock_hz: int | None = None,
 ) -> None
 ```
 
@@ -303,16 +303,6 @@ system_clock_hz: int | None = None
 
 Source: `src/helia_profiler/results/models.py:108`
 
-### helia_profiler.FirmwareMeta.measured_clock_hz
-
-`attribute` · `python`
-
-```python
-measured_clock_hz: int | None = None
-```
-
-Source: `src/helia_profiler/results/models.py:110`
-
 ### helia_profiler.FirmwareMeta.profiled_infer_count
 
 `attribute` · `python`
@@ -321,7 +311,7 @@ Source: `src/helia_profiler/results/models.py:110`
 profiled_infer_count: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:111`
+Source: `src/helia_profiler/results/models.py:109`
 
 ### helia_profiler.FirmwareMeta.profiled_infer_total_us
 
@@ -331,7 +321,7 @@ Source: `src/helia_profiler/results/models.py:111`
 profiled_infer_total_us: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:112`
+Source: `src/helia_profiler/results/models.py:110`
 
 ### helia_profiler.FirmwareMeta.profiled_infer_avg_us
 
@@ -341,7 +331,7 @@ Source: `src/helia_profiler/results/models.py:112`
 profiled_infer_avg_us: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:113`
+Source: `src/helia_profiler/results/models.py:111`
 
 ### helia_profiler.FirmwareMeta.clean_infer_count
 
@@ -351,7 +341,7 @@ Source: `src/helia_profiler/results/models.py:113`
 clean_infer_count: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:117`
+Source: `src/helia_profiler/results/models.py:115`
 
 ### helia_profiler.FirmwareMeta.clean_infer_total_cycles
 
@@ -361,7 +351,7 @@ Source: `src/helia_profiler/results/models.py:117`
 clean_infer_total_cycles: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:118`
+Source: `src/helia_profiler/results/models.py:116`
 
 ### helia_profiler.FirmwareMeta.clean_infer_avg_cycles
 
@@ -371,7 +361,7 @@ Source: `src/helia_profiler/results/models.py:118`
 clean_infer_avg_cycles: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:119`
+Source: `src/helia_profiler/results/models.py:117`
 
 ### helia_profiler.FirmwareMeta.clean_infer_avg_us
 
@@ -381,7 +371,7 @@ Source: `src/helia_profiler/results/models.py:119`
 clean_infer_avg_us: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:120`
+Source: `src/helia_profiler/results/models.py:118`
 
 ### helia_profiler.FirmwareMeta.clean_stalled_iters
 
@@ -391,7 +381,7 @@ Source: `src/helia_profiler/results/models.py:120`
 clean_stalled_iters: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:125`
+Source: `src/helia_profiler/results/models.py:123`
 
 ### helia_profiler.FirmwareMeta.clean_partial_iters
 
@@ -401,7 +391,7 @@ Source: `src/helia_profiler/results/models.py:125`
 clean_partial_iters: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:130`
+Source: `src/helia_profiler/results/models.py:128`
 
 ### helia_profiler.FirmwareMeta.clean_ref_cycles
 
@@ -411,7 +401,7 @@ Source: `src/helia_profiler/results/models.py:130`
 clean_ref_cycles: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:140`
+Source: `src/helia_profiler/results/models.py:138`
 
 ### helia_profiler.FirmwareMeta.clean_dwt_rate_cyc
 
@@ -421,7 +411,7 @@ Source: `src/helia_profiler/results/models.py:140`
 clean_dwt_rate_cyc: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:146`
+Source: `src/helia_profiler/results/models.py:144`
 
 ### helia_profiler.FirmwareMeta.clean_dwt_rate_us
 
@@ -431,7 +421,7 @@ Source: `src/helia_profiler/results/models.py:146`
 clean_dwt_rate_us: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:147`
+Source: `src/helia_profiler/results/models.py:145`
 
 ### helia_profiler.FirmwareMeta.clean_attach_wait_us
 
@@ -441,7 +431,7 @@ Source: `src/helia_profiler/results/models.py:147`
 clean_attach_wait_us: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:152`
+Source: `src/helia_profiler/results/models.py:150`
 
 ### helia_profiler.FirmwareMeta.psram
 
@@ -451,7 +441,7 @@ Source: `src/helia_profiler/results/models.py:152`
 psram: PsramInfo | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:153`
+Source: `src/helia_profiler/results/models.py:151`
 
 ### helia_profiler.FirmwareMeta.presets
 
@@ -459,6 +449,16 @@ Source: `src/helia_profiler/results/models.py:153`
 
 ```python
 presets: tuple[str, ...] = ()
+```
+
+Source: `src/helia_profiler/results/models.py:152`
+
+### helia_profiler.FirmwareMeta.measured_clock_hz
+
+`attribute` · `python`
+
+```python
+measured_clock_hz: int | None = None
 ```
 
 Source: `src/helia_profiler/results/models.py:154`
