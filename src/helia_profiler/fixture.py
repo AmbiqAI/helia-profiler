@@ -14,6 +14,7 @@ from .engines.base import HeliaAotArtifacts
 from .errors import ConfigError
 from .pipeline import PipelineContext, PipelineRunner, Stage, serialize_config
 from .placement import ArenaRole, Placement
+from .fixture_image import MAX_IMAGE, MRAM, bounded
 from .fixture_target import FixtureTarget, supported_fixture_target
 from .results.models import ToolchainInfo, MemoryPlan
 
@@ -468,6 +469,14 @@ def build_fixed_fixture(
         flat_binary = pin(binary.path.with_suffix(".bin"))
         link_map = pin(binary.path.with_suffix(".map"))
         _prove_link_map(link_map.read().decode(), app, stack)
+    if flat_binary is not None:
+        size = flat_binary.path.stat().st_size
+        if not 0 < size <= MAX_IMAGE or not bounded(
+            supported_fixture_target().load_address, size, MRAM
+        ):
+            raise ConfigError(
+                f"Flat image is {size} B; fixture capture accepts at most {MAX_IMAGE} B in MRAM"
+            )
     intent_identity = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
     toolchain = ctx.run_metadata.toolchain if compile else None
     if compile and (toolchain is None or not toolchain.compiler_version):

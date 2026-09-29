@@ -5,7 +5,9 @@ from hashlib import sha256
 import re
 import struct
 
-MAX_IMAGE = 1024 * 1024
+#: Largest flat image a fixture capture flashes and reads back in full, well inside the
+#: MRAM application region below; each capture pays for flashing and verifying every byte.
+MAX_IMAGE = 2 * 1024 * 1024
 MAX_ELF = 32 * MAX_IMAGE
 MRAM = (0x00410000, 0x00800000)
 DTCM = (0x20000000, 0x2007C000)

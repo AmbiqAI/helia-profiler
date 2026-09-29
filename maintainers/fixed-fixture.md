@@ -61,7 +61,12 @@ External-arena fixture mode is rejected until separately qualified. Ordinary pro
 configuration and provider defaults are unchanged.
 
 `FixtureBuild` pins generated sources, ELF, flat image, dependency lock and map;
-its runtime manifest is absent for AOT. A prepared result is not a successful
+its runtime manifest is absent for AOT. A compiled build refuses a flat image over
+`fixture_image.MAX_IMAGE` (2 MiB) or outside the MRAM application region, the same
+limits capture applies, so no plan can pin an image capture would refuse. The cap is
+a policy bound well inside MRAM: every capture flashes the whole image and reads it
+all back to verify it, which costs roughly 11–12 s per MB per capture on the
+Apollo510 EVB. A prepared result is not a successful
 build or a numerical validation result.
 
 `helia_profiler.fixture_capture.capture_fixture(request, guard=guard)` captures
