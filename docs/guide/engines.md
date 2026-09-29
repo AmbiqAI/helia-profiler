@@ -279,7 +279,7 @@ selects the kernels.
   successful run, set it to roughly `1.5x` the reported `allocated_arena` in
   `summary.json`.
 - Source builds (the registry default and `source_path`) declare
-  `nsx-cmsis-nn` at the baseline's qualified ref (v7.36.0), enable its fp32
+  `nsx-cmsis-nn` at the baseline's qualified ref (v7.36.1), enable its fp32
   kernels when the model computes in float, and enable the fp16 kernels
   additionally when it carries FLOAT16 tensors — computed or dequantized
   weights — on a Cortex-M55. An integer-only model links neither.
@@ -404,7 +404,7 @@ The pipeline:
 | `aot_args` | dict | `{}` | Pass-through args to the AOT compiler |
 | `platform_name` | string | *(from board)* | Override the board → AOT platform mapping |
 
-`nsx-cmsis-nn` is declared at the baseline's qualified ref (v7.36.0, which
+`nsx-cmsis-nn` is declared at the baseline's qualified ref (v7.36.1, which
 covers every float operator heliaAOT 0.23.0 lowers to a native kernel and its
 dilated one-dimensional depthwise route). Its
 fp32 kernels are enabled when the model computes in float, and the fp16
