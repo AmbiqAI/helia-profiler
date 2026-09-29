@@ -31,9 +31,11 @@ and
 
 ## Run
 
+Run from the repository root, passing the model path explicitly:
+
 ```bash
-hpx profile --config examples/quickstart/hpx_rt.yml --toolchain gcc  --output-dir results/rt_gcc
-hpx profile --config examples/quickstart/hpx_rt.yml --toolchain atfe --output-dir results/rt_atfe
+hpx profile examples/quickstart/kws_model.tflite --config examples/quickstart/hpx_rt.yml --toolchain gcc  --output-dir results/rt_gcc
+hpx profile examples/quickstart/kws_model.tflite --config examples/quickstart/hpx_rt.yml --toolchain atfe --output-dir results/rt_atfe
 hpx compare results/rt_gcc results/rt_atfe --output-dir results/rt_gcc-vs-atfe
 ```
 
@@ -78,8 +80,9 @@ Clean-window cycles per inference from the four bundles:
 - The toolchain dimension is informative, not blocking: `hpx compare`
   shows every delta and tells you the compiler changed. Per-layer deltas
   stay because the operation sequence is identical.
-- Both engines gain the same 5.5% from ATfE on this model, which says the
-  gain is in the shared CMSIS-NN kernels rather than in engine code.
+- Both engines gain 5.5% from ATfE in these captured runs. The shared
+  kernels are a useful place to investigate, but these totals alone do not
+  isolate the source of the improvement.
 - To see where the gain lands, sort `layer_diff.csv` in the compare output
   directory, or line the two per-layer files up:
 

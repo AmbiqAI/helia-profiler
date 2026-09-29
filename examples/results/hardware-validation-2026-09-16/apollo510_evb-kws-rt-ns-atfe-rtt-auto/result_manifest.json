@@ -31,8 +31,8 @@
       "role": "core",
       "schema": "hpx.run-metadata",
       "schema_version": 1,
-      "sha256": "f5cbe2722e40133839fd47e1b82e46c73be14d376712b1a22ba97203117f63a6",
-      "size_bytes": 43881
+      "sha256": "36a4e7213d29a98255b15b2a8294c55609e1b4a72088ac36c8648a9a9622a975",
+      "size_bytes": 43897
     },
     {
       "media_type": "application/yaml",

@@ -1,6 +1,6 @@
 # Captured result bundles
 
-Unmodified result bundles from the nightly hardware validation workflow,
+Sanitized result bundles from the nightly hardware validation workflow,
 kept so the documentation examples can show real output with its
 provenance and so `hpx compare` and the result loaders have something to
 run against without a board.
@@ -15,3 +15,6 @@ Each case directory holds the four core artifacts the manifest lists
 wrote them. The run's logs and the resolved `config.yml` are not kept;
 the resolved configuration is recorded in `run_metadata.json`.
 `load_result_manifest(path, verify=True)` passes on every bundle.
+
+Probe serial numbers are redacted for publication. Artifact digests and sizes
+in each manifest are refreshed; measurements and captured schema versions are unchanged.

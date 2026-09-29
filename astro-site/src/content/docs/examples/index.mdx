@@ -58,7 +58,7 @@ Search by model, engine, board or measurement, or narrow the list by task and se
 (from the bundle's `nsx.lock`), date and source commit. Nine bundles from
 the nightly hardware validation run of 2026-09-16 ship under
 [`examples/results/hardware-validation-2026-09-16/`](https://github.com/AmbiqAI/helia-profiler/tree/main/examples/results/hardware-validation-2026-09-16),
-unmodified, so `load_result_manifest(..., verify=True)` passes on each.
+published with probe serials redacted and manifest digests refreshed, so `load_result_manifest(..., verify=True)` passes on each.
 A page whose recipe has no such record says "not yet validated", and a
 compile-only run is never called profiled. Host-only steps (loaders,
 `hpx compare`, `Session.resolve()`) record the date and hpx version they

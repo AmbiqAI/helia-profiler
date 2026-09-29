@@ -41,12 +41,12 @@ comparing per-layer columns, or expect them to differ.
 
 ## Run
 
-From the repository root (the model paths in the configs are relative):
+From the repository root, pass the model path explicitly to override each config’s relative path:
 
 ```bash
-hpx profile --config examples/quickstart/hpx_rt.yml
-hpx profile --config examples/quickstart/hpx_aot.yml
-hpx profile --config examples/quickstart/hpx_tflm_baseline.yml
+hpx profile examples/quickstart/kws_model.tflite --config examples/quickstart/hpx_rt.yml
+hpx profile examples/quickstart/kws_model.tflite --config examples/quickstart/hpx_aot.yml
+hpx profile examples/quickstart/kws_model.tflite --config examples/quickstart/hpx_tflm_baseline.yml
 hpx compare results/results_rt results/results_aot --output-dir results/rt-vs-aot
 hpx compare results/results_rt results/results_tflm_baseline
 ```

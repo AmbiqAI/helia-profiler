@@ -20,7 +20,7 @@
     "target": {
       "board": "apollo4l_blue_evb",
       "toolchain": "arm-none-eabi-gcc",
-      "jlink_serial": "1160001560",
+      "jlink_serial": "<redacted-serial:89825122>",
       "transport": "rtt",
       "usb_port": null,
       "segger_rtt_path": null,
