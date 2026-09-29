@@ -6,6 +6,7 @@
     options:
       members:
         - tiny_cnn
+        - ambiq_vela_ini
 
 Create a session, retain typed results, and render them as Rich tables when
 working in a terminal, IPython, or notebook:

@@ -31,6 +31,10 @@ PMU (`ethos_npu` group) per layer.
 vela --accelerator-config ethos-u85-256 model_INT8.tflite
 ```
 
+  For a start-to-finish walkthrough of installing Vela and compiling with
+  Ambiq's system configuration, see
+  [Compile with Vela and Profile on the NPU](vela-compile-and-profile.md).
+
 `hpx` cross-checks model and config: `engine.backend: ethos_u` without a
 Vela model is always rejected. The reverse check (a Vela model on a CPU
 backend) needs the `analysis` extra listed above; without it the mismatch

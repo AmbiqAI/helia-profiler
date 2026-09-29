@@ -108,6 +108,7 @@ helia_profiler = [
     "data/*.json",
     "data/models/*.json",
     "data/models/*.tflite",
+    "data/vela/*.ini",
     "vendor/segger_rtt/**/*",
 ]
 

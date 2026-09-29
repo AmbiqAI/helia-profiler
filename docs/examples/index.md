@@ -86,4 +86,13 @@ Every recipe follows the same shape:
 
     [:octicons-arrow-right-24: Read](atomiq110-npu-profiling.md)
 
+-   :material-chip:{ .lg .middle } __Compile with Vela and Profile on the NPU__
+
+    ---
+
+    Install Vela, compile an INT8 model with Ambiq's system configuration,
+    and profile it on the Ethos-U85 — no Ethos-U experience assumed.
+
+    [:octicons-arrow-right-24: Read](vela-compile-and-profile.md)
+
 </div>
