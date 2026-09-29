@@ -6,7 +6,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`, `experimental`
 
-Generated from the `src/helia_profiler` tree `872d67ad4e9083b1eacd7d6d3859148437b96b59`.
+Generated from the `src/helia_profiler` tree `8356cf6991de8ad13e526650e3176120c11ec266`.
 
 ## helia_profiler.PowerMode
 
@@ -63,7 +63,7 @@ Host instrument observation, independent of firmware terminal status.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/results/artifacts.py:66`
+Source: `src/helia_profiler/results/artifacts.py:67`
 
 ### helia_profiler.PowerObservation.mode
 
@@ -73,7 +73,7 @@ Source: `src/helia_profiler/results/artifacts.py:66`
 mode: ObservationMode
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:70`
+Source: `src/helia_profiler/results/artifacts.py:71`
 
 ### helia_profiler.PowerObservation.result
 
@@ -83,7 +83,7 @@ Source: `src/helia_profiler/results/artifacts.py:70`
 result: PowerResult
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:71`
+Source: `src/helia_profiler/results/artifacts.py:72`
 
 ### helia_profiler.PowerObservation.gate_rise_observed
 
@@ -93,7 +93,7 @@ Source: `src/helia_profiler/results/artifacts.py:71`
 gate_rise_observed: bool
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:72`
+Source: `src/helia_profiler/results/artifacts.py:73`
 
 ### helia_profiler.PowerObservation.gate_fall_observed
 
@@ -103,7 +103,7 @@ Source: `src/helia_profiler/results/artifacts.py:72`
 gate_fall_observed: bool
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:73`
+Source: `src/helia_profiler/results/artifacts.py:74`
 
 ### helia_profiler.PowerObservation.deadline_s
 
@@ -113,7 +113,7 @@ Source: `src/helia_profiler/results/artifacts.py:73`
 deadline_s: float
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:74`
+Source: `src/helia_profiler/results/artifacts.py:75`
 
 ### helia_profiler.PowerObservation.integrity
 
@@ -123,7 +123,7 @@ Source: `src/helia_profiler/results/artifacts.py:74`
 integrity: PowerIntegrity
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:75`
+Source: `src/helia_profiler/results/artifacts.py:76`
 
 ## helia_profiler.PowerResult
 
@@ -217,6 +217,7 @@ PowerTerminalRecord(
     error_code: int,
     gate_asserted: bool,
     gate_lowered: bool,
+    gate_elapsed_us: int | None = None,
 ) -> None
 ```
 
@@ -226,7 +227,7 @@ Versioned firmware status emitted only after the power gate is low.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/results/artifacts.py:78`
+Source: `src/helia_profiler/results/artifacts.py:79`
 
 ### helia_profiler.PowerTerminalRecord.version
 
@@ -236,7 +237,7 @@ Source: `src/helia_profiler/results/artifacts.py:78`
 version: int
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:82`
+Source: `src/helia_profiler/results/artifacts.py:83`
 
 ### helia_profiler.PowerTerminalRecord.status
 
@@ -246,7 +247,7 @@ Source: `src/helia_profiler/results/artifacts.py:82`
 status: Literal['ok', 'error']
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:83`
+Source: `src/helia_profiler/results/artifacts.py:84`
 
 ### helia_profiler.PowerTerminalRecord.requested_count
 
@@ -256,7 +257,7 @@ Source: `src/helia_profiler/results/artifacts.py:83`
 requested_count: int
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:84`
+Source: `src/helia_profiler/results/artifacts.py:85`
 
 ### helia_profiler.PowerTerminalRecord.completed_count
 
@@ -266,7 +267,7 @@ Source: `src/helia_profiler/results/artifacts.py:84`
 completed_count: int
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:85`
+Source: `src/helia_profiler/results/artifacts.py:86`
 
 ### helia_profiler.PowerTerminalRecord.elapsed_us
 
@@ -276,7 +277,7 @@ Source: `src/helia_profiler/results/artifacts.py:85`
 elapsed_us: int | None
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:86`
+Source: `src/helia_profiler/results/artifacts.py:87`
 
 ### helia_profiler.PowerTerminalRecord.final_phase
 
@@ -286,7 +287,7 @@ Source: `src/helia_profiler/results/artifacts.py:86`
 final_phase: str
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:87`
+Source: `src/helia_profiler/results/artifacts.py:88`
 
 ### helia_profiler.PowerTerminalRecord.error_code
 
@@ -296,7 +297,7 @@ Source: `src/helia_profiler/results/artifacts.py:87`
 error_code: int
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:88`
+Source: `src/helia_profiler/results/artifacts.py:89`
 
 ### helia_profiler.PowerTerminalRecord.gate_asserted
 
@@ -306,7 +307,7 @@ Source: `src/helia_profiler/results/artifacts.py:88`
 gate_asserted: bool
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:89`
+Source: `src/helia_profiler/results/artifacts.py:90`
 
 ### helia_profiler.PowerTerminalRecord.gate_lowered
 
@@ -316,7 +317,17 @@ Source: `src/helia_profiler/results/artifacts.py:89`
 gate_lowered: bool
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:90`
+Source: `src/helia_profiler/results/artifacts.py:91`
+
+### helia_profiler.PowerTerminalRecord.gate_elapsed_us
+
+`attribute` · `python`
+
+```python
+gate_elapsed_us: int | None = None
+```
+
+Source: `src/helia_profiler/results/artifacts.py:95`
 
 ## helia_profiler.OnDevicePowerSummary
 
@@ -342,7 +353,7 @@ Integer-unit aggregate reported by a firmware-side power monitor.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/results/artifacts.py:109`
+Source: `src/helia_profiler/results/artifacts.py:122`
 
 ### helia_profiler.OnDevicePowerSummary.source
 
@@ -352,7 +363,7 @@ Source: `src/helia_profiler/results/artifacts.py:109`
 source: str
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:113`
+Source: `src/helia_profiler/results/artifacts.py:126`
 
 ### helia_profiler.OnDevicePowerSummary.scope
 
@@ -362,7 +373,7 @@ Source: `src/helia_profiler/results/artifacts.py:113`
 scope: Literal['fixed_n_inference']
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:114`
+Source: `src/helia_profiler/results/artifacts.py:127`
 
 ### helia_profiler.OnDevicePowerSummary.energy_nj
 
@@ -372,7 +383,7 @@ Source: `src/helia_profiler/results/artifacts.py:114`
 energy_nj: int
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:115`
+Source: `src/helia_profiler/results/artifacts.py:128`
 
 ### helia_profiler.OnDevicePowerSummary.duration_us
 
@@ -382,7 +393,7 @@ Source: `src/helia_profiler/results/artifacts.py:115`
 duration_us: int
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:116`
+Source: `src/helia_profiler/results/artifacts.py:129`
 
 ### helia_profiler.OnDevicePowerSummary.inference_count
 
@@ -392,7 +403,7 @@ Source: `src/helia_profiler/results/artifacts.py:116`
 inference_count: int
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:117`
+Source: `src/helia_profiler/results/artifacts.py:130`
 
 ### helia_profiler.OnDevicePowerSummary.overflow
 
@@ -402,7 +413,7 @@ Source: `src/helia_profiler/results/artifacts.py:117`
 overflow: bool
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:118`
+Source: `src/helia_profiler/results/artifacts.py:131`
 
 ### helia_profiler.OnDevicePowerSummary.charge_nc
 
@@ -412,7 +423,7 @@ Source: `src/helia_profiler/results/artifacts.py:118`
 charge_nc: int | None = None
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:119`
+Source: `src/helia_profiler/results/artifacts.py:132`
 
 ### helia_profiler.OnDevicePowerSummary.bus_voltage_uv
 
@@ -422,7 +433,7 @@ Source: `src/helia_profiler/results/artifacts.py:119`
 bus_voltage_uv: int | None = None
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:120`
+Source: `src/helia_profiler/results/artifacts.py:133`
 
 ### helia_profiler.OnDevicePowerSummary.calibration_id
 
@@ -432,4 +443,4 @@ Source: `src/helia_profiler/results/artifacts.py:120`
 calibration_id: str | None = None
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:121`
+Source: `src/helia_profiler/results/artifacts.py:134`

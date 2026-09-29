@@ -81,7 +81,7 @@ Defined in `src/helia_profiler/cli/app.py` line 88.
 | `--power` | `bool` | false | Enable power capture |
 | `--power-driver` | `joulescope \| ondevice` |  | Power driver (default: joulescope = auto-detect JS110/JS220/JS320) |
 | `--power-mode` | `external \| internal` |  | Power mode (default: external) |
-| `--power-duration` | `Optional[int]` |  | Power capture seconds (default: auto-tuned from profile timing) |
+| `--power-duration` | `Optional[int]` |  | Upper bound on the power capture, in seconds; a gated capture raises it to fit the planned window, and it does not set the window length (default: auto-tuned from profile timing) |
 | `--power-firmware` | `dedicated \| shared` |  | Which binary is on target during power capture (default: dedicated). 'dedicated' flashes the transport-free hpx_profiler_power image to avoid SWO/UART/RTT/USB current contamination (measured on AP510 EVBs); 'shared' reuses the already-flashed transport binary. |
 | `--power-reset-strategy` | `auto \| power_cycle \| none \| debug_reset \| swpoi_reset \| debug_reset+swpoi_reset` |  | Reset strategy before power capture (default: auto). Use explicit values only for board bring-up or controlled experiments. |
 | `--sync-gpio` | `Optional[int]` |  | GPIO pin for external power sync (default: per-board; 10 only for boards without a registered override) |
@@ -114,4 +114,4 @@ Quick start:
   hpx profile my_model.tflite --engine helia-rt --power -vv
 ```
 
-Generated from the `src/helia_profiler` tree `872d67ad4e9083b1eacd7d6d3859148437b96b59` with typer 0.26.8 and click 8.3.3.
+Generated from the `src/helia_profiler` tree `8356cf6991de8ad13e526650e3176120c11ec266` with typer 0.26.8 and click 8.3.3.

@@ -127,7 +127,7 @@ The `power` block of `summary.json` gains `on_device_summary` under
 | `charge_nc` | nanocoulombs | charge integrated over the window; signed, clamped at zero |
 | `bus_voltage_uv` | microvolts | the rail as the chip saw it; independent of the shunt |
 | `inference_count` | count | inferences the firmware ran inside the window |
-| `elapsed_us` | microseconds | the window as the firmware timed it |
+| `duration_us` | microseconds | INA228 accumulation interval timed by firmware |
 
 Energy divided by count is energy per inference; average power is energy
 over `elapsed_us`.

@@ -97,9 +97,7 @@ pip install 'helia-profiler[aot]'        # heliaAOT compiler support
 pip install 'helia-profiler[analysis]'   # model compute and parameter analysis, no hardware
 ```
 
-The `aot` extra installs `helia-aot`, which declares
-`requires-python >=3.11,<3.13`, so it needs Python 3.11 or 3.12 until that
-cap is lifted. Power capture support (`pyjoulescope_driver`) is a core
+The `aot` extra installs the qualified `helia-aot>=0.23.0,<0.24.0` range. Power capture support (`pyjoulescope_driver`) is a core
 dependency and needs no extra.
 
 ### 2. Arm GNU toolchain

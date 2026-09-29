@@ -48,4 +48,4 @@ Defined in `src/helia_profiler/cli/inspect_app.py` line 169.
 | `--jlink-serial` | `Optional[str]` |  | Optional requested serial to validate against the selected board |
 | `--json` | `bool` | false | Emit machine-readable JSON |
 
-Generated from the `src/helia_profiler` tree `872d67ad4e9083b1eacd7d6d3859148437b96b59` with typer 0.26.8 and click 8.3.3.
+Generated from the `src/helia_profiler` tree `8356cf6991de8ad13e526650e3176120c11ec266` with typer 0.26.8 and click 8.3.3.

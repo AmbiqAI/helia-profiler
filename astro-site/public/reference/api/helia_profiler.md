@@ -6,7 +6,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`
 
-Generated from the `src/helia_profiler` tree `872d67ad4e9083b1eacd7d6d3859148437b96b59`.
+Generated from the `src/helia_profiler` tree `8356cf6991de8ad13e526650e3176120c11ec266`.
 
 **Re-exports**
 
@@ -146,7 +146,7 @@ User-meaningful progress within a pipeline stage.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/pipeline.py:56`
+Source: `src/helia_profiler/pipeline.py:59`
 
 ### helia_profiler.ProgressUpdate.message
 
@@ -156,7 +156,7 @@ Source: `src/helia_profiler/pipeline.py:56`
 message: str
 ```
 
-Source: `src/helia_profiler/pipeline.py:60`
+Source: `src/helia_profiler/pipeline.py:63`
 
 ### helia_profiler.ProgressUpdate.kind
 
@@ -166,7 +166,7 @@ Source: `src/helia_profiler/pipeline.py:60`
 kind: Literal['status', 'checkpoint'] = 'status'
 ```
 
-Source: `src/helia_profiler/pipeline.py:61`
+Source: `src/helia_profiler/pipeline.py:64`
 
 ### helia_profiler.ProgressUpdate.completed
 
@@ -176,7 +176,7 @@ Source: `src/helia_profiler/pipeline.py:61`
 completed: int | None = None
 ```
 
-Source: `src/helia_profiler/pipeline.py:62`
+Source: `src/helia_profiler/pipeline.py:65`
 
 ### helia_profiler.ProgressUpdate.total
 
@@ -186,7 +186,7 @@ Source: `src/helia_profiler/pipeline.py:62`
 total: int | None = None
 ```
 
-Source: `src/helia_profiler/pipeline.py:63`
+Source: `src/helia_profiler/pipeline.py:66`
 
 ### helia_profiler.ProgressUpdate.unit
 
@@ -196,7 +196,7 @@ Source: `src/helia_profiler/pipeline.py:63`
 unit: str | None = None
 ```
 
-Source: `src/helia_profiler/pipeline.py:64`
+Source: `src/helia_profiler/pipeline.py:67`
 
 ### helia_profiler.ProgressUpdate.eta_s
 
@@ -206,7 +206,7 @@ Source: `src/helia_profiler/pipeline.py:64`
 eta_s: float | None = None
 ```
 
-Source: `src/helia_profiler/pipeline.py:65`
+Source: `src/helia_profiler/pipeline.py:68`
 
 ### helia_profiler.ProgressUpdate.min_verbosity
 
@@ -216,7 +216,7 @@ Source: `src/helia_profiler/pipeline.py:65`
 min_verbosity: int = 0
 ```
 
-Source: `src/helia_profiler/pipeline.py:66`
+Source: `src/helia_profiler/pipeline.py:69`
 
 ## helia_profiler.Session
 

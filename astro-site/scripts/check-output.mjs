@@ -120,7 +120,6 @@ check(
  * catalog is caught by check-committed-artifacts.mjs. It stays for a local
  * dist/ built from another checkout. */
 const catalog = JSON.parse(read(site, "src/data/catalog.json"));
-const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 check(
   catalog.generatedFrom?.sourceTree ===
     execFileSync("git", ["rev-parse", `HEAD:${catalog.generatedFrom?.sourcePath}`], {

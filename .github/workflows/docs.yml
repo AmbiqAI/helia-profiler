@@ -14,6 +14,7 @@ on:
       - main
     paths:
       - 'astro-site/**'
+      - '.github/workflows/docs.yml'
   workflow_dispatch:
     inputs:
       source_ref:
@@ -111,6 +112,9 @@ jobs:
       # upgrade that reshuffles the document without changing the contract all
       # stay green, and a real change is reported as the command path plus the
       # option that moved.
+      - name: Use HTTPS for public Git dependencies
+        run: git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
+
       - name: Check the reference for drift
         run: uv run --isolated --no-dev python tools/docs/check_reference.py --check
 

@@ -3,7 +3,7 @@
   "kind": "cli",
   "program": "hpx",
   "generatedFrom": {
-    "sourceTree": "872d67ad4e9083b1eacd7d6d3859148437b96b59",
+    "sourceTree": "8356cf6991de8ad13e526650e3176120c11ec266",
     "helia_profiler": "0.1.6",
     "typer": "0.26.8",
     "click": "8.3.3",
@@ -118,7 +118,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 532
+          "line": 536
         },
         "arguments": [
           {
@@ -340,7 +340,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 674
+          "line": 678
         },
         "arguments": [],
         "options": [],
@@ -361,7 +361,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 688
+              "line": 692
             },
             "arguments": [],
             "options": [],
@@ -382,7 +382,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 681
+              "line": 685
             },
             "arguments": [],
             "options": [],
@@ -404,7 +404,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 607
+          "line": 611
         },
         "arguments": [
           {
@@ -2213,7 +2213,7 @@
             "python_type": "Optional[int]",
             "default": null,
             "required": false,
-            "help": "Power capture seconds (default: auto-tuned from profile timing)",
+            "help": "Upper bound on the power capture, in seconds; a gated capture raises it to fit the planned window, and it does not set the window length (default: auto-tuned from profile timing)",
             "panel": "power measurement",
             "is_flag": false,
             "multiple": false,
