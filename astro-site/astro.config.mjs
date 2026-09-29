@@ -154,6 +154,7 @@ export default defineConfig({
               href: `${basePath}reference/`,
               sidebar: [
                 { label: 'Overview', slug: 'reference' },
+                { label: 'Engine configuration', slug: 'reference/engine-configuration' },
                 apiSidebar,
                 ...cliSidebar,
                 {

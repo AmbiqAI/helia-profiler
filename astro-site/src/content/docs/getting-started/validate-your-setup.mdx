@@ -3,10 +3,12 @@ title: "Validate your setup"
 description: "Five commands that prove the host, the probe and the board agree before you spend a build on them: doctor, boards, probes, ports and validate."
 ---
 
+import AsciiTerminal from '@ambiqai/helia-ui/astro/AsciiTerminal';
+
 Prove the chain works before you trust a number from it. Each command below
 checks one link: the host tools, the board registry, the probe, the serial
 ports, and finally a real build-flash-capture round trip on a known model.
-Run them in order; each one is cheap until the last.
+Run them in order. The terminal examples play once as you reach them, then keep the output visible. Use Replay to watch again or copy the command to run it yourself.
 
 ## Prerequisites
 
@@ -19,27 +21,53 @@ also needs network access for neuralSPOT-X to fetch its modules.
 
 ### 1. `hpx doctor`: the host tools
 
-```bash
-hpx doctor
-```
-
 Captured on macOS 26.6, 2026-09-21:
 
-```text
-Toolchain Check
-╭────┬───────────────────────────────────────┬─────────────────────────────────────────────────────╮
-│    │ Tool                                  │ Path                                                │
-├────┼───────────────────────────────────────┼─────────────────────────────────────────────────────┤
-│ ✓  │ CMake (>= 3.24)                       │ /opt/homebrew/bin/cmake                             │
-│ ✓  │ Ninja build system                    │ /opt/homebrew/bin/ninja                             │
-│ ✓  │ SEGGER J-Link commander               │ /usr/local/bin/JLinkExe                             │
-│ ✓  │ neuralspotx Python package            │ installed                                           │
-│ ✓  │ ARM GCC toolchain                     │ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-e… │
-│ ✓  │ pylink Python package (RTT transport) │ installed                                           │
-╰────┴───────────────────────────────────────┴─────────────────────────────────────────────────────╯
-
-  All required tools found.
-```
+<AsciiTerminal animated copy="commands" lines={[
+  {
+    "text": "hpx doctor",
+    "kind": "command"
+  },
+  {
+    "text": "Toolchain Check"
+  },
+  {
+    "text": "╭────┬───────────────────────────────────────┬─────────────────────────────────────────────────────╮"
+  },
+  {
+    "text": "│    │ Tool                                  │ Path                                                │"
+  },
+  {
+    "text": "├────┼───────────────────────────────────────┼─────────────────────────────────────────────────────┤"
+  },
+  {
+    "text": "│ ✓  │ CMake (>= 3.24)                       │ /opt/homebrew/bin/cmake                             │"
+  },
+  {
+    "text": "│ ✓  │ Ninja build system                    │ /opt/homebrew/bin/ninja                             │"
+  },
+  {
+    "text": "│ ✓  │ SEGGER J-Link commander               │ /usr/local/bin/JLinkExe                             │"
+  },
+  {
+    "text": "│ ✓  │ neuralspotx Python package            │ installed                                           │"
+  },
+  {
+    "text": "│ ✓  │ ARM GCC toolchain                     │ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-e… │"
+  },
+  {
+    "text": "│ ✓  │ pylink Python package (RTT transport) │ installed                                           │"
+  },
+  {
+    "text": "╰────┴───────────────────────────────────────┴─────────────────────────────────────────────────────╯"
+  },
+  {
+    "text": ""
+  },
+  {
+    "text": "  All required tools found."
+  }
+]} />
 
 Every required row must show a check mark. A dash marks an optional tool
 (heliaAOT, `armclang`) and is not a failure. If a required row is missing,
@@ -49,30 +77,60 @@ find them too.
 
 ### 2. `hpx boards`: the board registry
 
-```bash
-hpx boards
-```
-
 Captured on macOS 26.6, 2026-09-21 (the table is printed from the registry
 and does not depend on attached hardware):
 
-```text
- Board                    SoC            Core           Backends             Domains             Channel
- apollo3p_evb             apollo3p       cortex-m4      dwt                  cpu                 stable
- apollo3p_evb_cygnus      apollo3p       cortex-m4      dwt                  cpu                 preview
- apollo4p_evb             apollo4p       cortex-m4      dwt                  cpu                 preview
- apollo4l_evb             apollo4l       cortex-m4      dwt                  cpu                 preview
- apollo4l_blue_evb        apollo4l       cortex-m4      dwt                  cpu                 preview
- apollo4p_blue_kbr_evb    apollo4p       cortex-m4      dwt                  cpu                 preview
- apollo4p_blue_kxr_evb    apollo4p       cortex-m4      dwt                  cpu                 preview
- apollo510_evb            apollo510      cortex-m55     dwt, armv8m-pmu      cpu, memory, mve    stable
- apollo510b_evb           apollo510b     cortex-m55     dwt, armv8m-pmu      cpu, memory, mve    preview
- apollo5b_evb             apollo5b       cortex-m55     dwt, armv8m-pmu      cpu, memory, mve    preview
- apollo330mP_evb          apollo330P     cortex-m55     dwt, armv8m-pmu      cpu, memory, mve    preview
- apollo510dL_evb          apollo510L     cortex-m55     dwt, armv8m-pmu      cpu, memory, mve    preview
- atomiq110_fpga_turbo     atomiq110      cortex-m55     dwt, armv8m-pmu      cpu, memory, mve,   preview
-                                                                             ethos_npu
-```
+<AsciiTerminal animated copy="commands" lines={[
+  {
+    "text": "hpx boards",
+    "kind": "command"
+  },
+  {
+    "text": " Board                    SoC            Core           Backends             Domains             Channel"
+  },
+  {
+    "text": " apollo3p_evb             apollo3p       cortex-m4      dwt                  cpu                 stable"
+  },
+  {
+    "text": " apollo3p_evb_cygnus      apollo3p       cortex-m4      dwt                  cpu                 preview"
+  },
+  {
+    "text": " apollo4p_evb             apollo4p       cortex-m4      dwt                  cpu                 preview"
+  },
+  {
+    "text": " apollo4l_evb             apollo4l       cortex-m4      dwt                  cpu                 preview"
+  },
+  {
+    "text": " apollo4l_blue_evb        apollo4l       cortex-m4      dwt                  cpu                 preview"
+  },
+  {
+    "text": " apollo4p_blue_kbr_evb    apollo4p       cortex-m4      dwt                  cpu                 preview"
+  },
+  {
+    "text": " apollo4p_blue_kxr_evb    apollo4p       cortex-m4      dwt                  cpu                 preview"
+  },
+  {
+    "text": " apollo510_evb            apollo510      cortex-m55     dwt, armv8m-pmu      cpu, memory, mve    stable"
+  },
+  {
+    "text": " apollo510b_evb           apollo510b     cortex-m55     dwt, armv8m-pmu      cpu, memory, mve    preview"
+  },
+  {
+    "text": " apollo5b_evb             apollo5b       cortex-m55     dwt, armv8m-pmu      cpu, memory, mve    preview"
+  },
+  {
+    "text": " apollo330mP_evb          apollo330P     cortex-m55     dwt, armv8m-pmu      cpu, memory, mve    preview"
+  },
+  {
+    "text": " apollo510dL_evb          apollo510L     cortex-m55     dwt, armv8m-pmu      cpu, memory, mve    preview"
+  },
+  {
+    "text": " atomiq110_fpga_turbo     atomiq110      cortex-m55     dwt, armv8m-pmu      cpu, memory, mve,   preview"
+  },
+  {
+    "text": "                                                                             ethos_npu"
+  }
+]} />
 
 Find your EVB in the first column; that string is the `--board` value for
 every other command. `Backends` and `Domains` say which counters the board
@@ -84,15 +142,17 @@ board registry, so it is always current for the hpx you installed;
 
 ### 3. `hpx probes list`: the J-Link probe
 
-```bash
-hpx probes list
-```
-
 With no probe attached (captured on the same host, same day):
 
-```text
-No J-Link probes detected.
-```
+<AsciiTerminal animated copy="commands" lines={[
+  {
+    "text": "hpx probes list",
+    "kind": "command"
+  },
+  {
+    "text": "No J-Link probes detected."
+  }
+]} />
 
 With an EVB on its debug USB port, one line per probe (captured earlier on
 an Apollo4 EVB bench; your serial and product string will differ):
@@ -121,19 +181,27 @@ and suggests `--jlink-serial`.
 Only the `usb_cdc` and `uart` transports use a serial port. Skip this step
 when using the default `rtt` transport:
 
-```bash
-hpx ports list --all
-```
-
 Captured on macOS 26.6, 2026-09-21, no board attached; on Windows the
 devices read `COM3` and similar:
 
-```text
-device                           kind    serial_number  description  product
--------------------------------  ------  -------------  -----------  -------
-/dev/cu.debug-console            serial                 n/a
-/dev/cu.Bluetooth-Incoming-Port  serial                 n/a
-```
+<AsciiTerminal animated copy="commands" lines={[
+  {
+    "text": "hpx ports list --all",
+    "kind": "command"
+  },
+  {
+    "text": "device                           kind    serial_number  description  product"
+  },
+  {
+    "text": "-------------------------------  ------  -------------  -----------  -------"
+  },
+  {
+    "text": "/dev/cu.debug-console            serial                 n/a"
+  },
+  {
+    "text": "/dev/cu.Bluetooth-Incoming-Port  serial                 n/a"
+  }
+]} />
 
 Without `--all` the list is filtered to ports that look like a board. On
 Linux, a port you can see but cannot open needs the group change from
@@ -145,20 +213,32 @@ Linux, a port you can see but cannot open needs the group change from
 and reports pass or fail per case. `--list` shows what a suite would run
 without touching hardware:
 
-```bash
-hpx validate --suite smoke --list
-```
-
 Captured on macOS 26.6, 2026-09-21:
 
-```text
-Registered models: ad, ic, kws, vww
-Registered boards: apollo330mP_evb, apollo3p_evb, apollo4l_blue_evb, apollo4p_blue_kxr_evb, apollo510_evb, apollo510dL_evb
-
-1 case(s) would run:
-
-  apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto    helia-rt/ns   arm-none-eabi-gcc   rtt   auto
-```
+<AsciiTerminal animated copy="commands" lines={[
+  {
+    "text": "hpx validate --suite smoke --list",
+    "kind": "command"
+  },
+  {
+    "text": "Registered models: ad, ic, kws, vww"
+  },
+  {
+    "text": "Registered boards: apollo330mP_evb, apollo3p_evb, apollo4l_blue_evb, apollo4p_blue_kxr_evb, apollo510_evb, apollo510dL_evb"
+  },
+  {
+    "text": ""
+  },
+  {
+    "text": "1 case(s) would run:"
+  },
+  {
+    "text": ""
+  },
+  {
+    "text": "  apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto    helia-rt/ns   arm-none-eabi-gcc   rtt   auto"
+  }
+]} />
 
 The smoke suite is one case: the keyword-spotting model on heliaRT with
 GCC, RTT and automatic memory placement. Drop `--list` to run it:

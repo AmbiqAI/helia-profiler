@@ -8,33 +8,25 @@ knows, a J-Link path to it, and a host with the tools from
 [Install](../install/). Power measurement needs one more instrument and comes
 later; you do not need it for your first profile.
 
-## Prerequisites
+## Host setup
 
-The tools from [Install](../install/). Nothing on this page runs a command.
+Complete [Install](../install/) on your Linux, macOS or Windows host. You need Python 3.11 or newer, an Arm toolchain, CMake 3.24 or newer, Ninja and the SEGGER J-Link software. Python dependency wheels must be available for your host and Python version.
 
-## Steps
+**neuralSPOT-X and the Python RTT transport are installed with hpx.** You do not need a separate SDK checkout for a standard profile. Run `hpx doctor` to check that the host tools can be found.
 
-### What you need
+## Board and debug connection
 
-| Item | Requirement | Where this comes from |
-|---|---|---|
-| Host OS | Linux, macOS or Windows | `ci.yml` runs the unit tests on all three; the Nix flake covers x86-64 Linux, ARM64 Linux and Apple Silicon macOS |
-| Python | 3.11 or newer; dependency wheels must be available for your host and Python version | `pyproject.toml` and [heliaAOT 0.23.0 package metadata](https://pypi.org/project/helia-aot/0.23.0/) both declare `>=3.11` |
-| Arm GNU toolchain | `arm-none-eabi-gcc`, any recent release; hpx checks presence, not version (`hostenv/doctor.py` passes `required=None` for the compiler) | The doctor output on Install was captured with 15.2.rel1 |
-| CMake | 3.24 or newer | `hpx doctor` row label `CMake (>= 3.24)` |
-| Ninja | any | `hpx doctor` row |
-| SEGGER J-Link software | J-Link Commander for flashing, `pylink-square` for RTT; no version floor is enforced | `hostenv` discovery order; Install step 4 |
-| neuralSPOT-X | `neuralspotx==0.8.1`, installed with hpx | `pyproject.toml` dependency pin |
-| Board | An Ambiq Apollo EVB from `hpx boards` | `src/helia_profiler/platform/board.py` registry; the channel column is `BoardDef.channel` |
-| Probe | The EVB's on-board J-Link, over its debug USB port | `hpx probes list` enumerates J-Link probes; `probes match` picks one per board |
-| Cable | Debug USB for J-Link; target USB for `usb_cdc`. UART uses the board's virtual COM port or a suitable serial adapter | [Capture transports](../../guide/transports/) |
-| Power instrument (optional) | Joulescope JS110, JS220 or JS320, or an INA228 breakout wired to the board | [Power measurement](../../guide/power/); the Joulescope driver `pyjoulescope_driver` ships with hpx |
+| Your setup | What to connect |
+|---|---|
+| Supported EVB with on-board J-Link | The EVB and a data-capable USB cable connected to its debug USB port. |
+| Board using an external probe | A SEGGER J-Link connected to the board's SWD header, plus the board's power connection. The board must have an hpx board definition. |
+| Serial capture instead of RTT | The connection required by your selected transport: target USB for `usb_cdc`, or the virtual COM port / serial adapter for `uart`. |
 
-Board names, cores and the stable or preview channel of each board are on
-[Boards and targets](../../guide/boards/). Use `hpx boards` to check the
-registry in your installed version.
+The default RTT transport uses the same J-Link connection for flashing and capture. Start there unless your setup calls for serial capture. See [Capture transports](../../guide/transports/) for the wiring and configuration choices.
 
-### Which board
+Board names and support channels are listed in [Boards and targets](../../guide/boards/). Run `hpx boards` for the registry in your installed version. A custom board needs integration before it can be profiled; connecting a probe alone does not add board support.
+
+### Select your board
 
 Connect the board's on-board J-Link, or an external J-Link attached to its
 SWD header. hpx uses that connection for flashing and the default `rtt` capture. Boards with more than one USB connector label the debug port on the
@@ -46,14 +38,14 @@ using the exact name from `hpx boards`. A board on the `preview` channel
 works with the same commands; the channel records how much hardware
 validation backs it, not whether hpx will drive it.
 
-### Which probe
+### Select your probe
 
 hpx uses SEGGER J-Link, either the on-board probe or an external J-Link
 plugged into the EVB's SWD header. With one probe attached nothing needs
 configuring. With several, `hpx probes match --board <name>` shows which
 serial hpx will pick, and `--jlink-serial` pins it.
 
-### Power measurement, for later
+## Optional power measurement
 
 Cycle counts need no instrument. Power needs one of:
 
@@ -63,14 +55,7 @@ Cycle counts need no instrument. Power needs one of:
 - An INA228 current monitor on the board's I2C, read by the firmware itself,
   which needs no host instrument during capture.
 
-Both are optional for everything in this section. Leave them for
-[Where next](../where-next/).
-
-## Expected output
-
-There is no command on this page. When the board is on the bench and the
-debug USB cable is in, the next page's `hpx probes list` prints one line per
-probe; when it is not, it prints `No J-Link probes detected.`
+Start with timing measurements, then follow [Power measurement](../../guide/power/) when you are ready to add energy capture.
 
 ## What next
 

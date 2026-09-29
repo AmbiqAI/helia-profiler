@@ -3,6 +3,8 @@ title: "Install"
 description: "Put hpx, the Arm GNU toolchain, CMake, Ninja and the SEGGER J-Link software on Linux, macOS or Windows, then confirm it with hpx doctor."
 ---
 
+import AsciiTerminal from '@ambiqai/helia-ui/astro/AsciiTerminal';
+
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
 Get `hpx` and the tools it drives onto your machine. When this page is done,
@@ -110,7 +112,7 @@ dependency and needs no extra.
 `arm-none-eabi-gcc` is the default cross-compiler. `armclang` and ATfE are
 alternatives; see [Toolchains](../../guide/toolchains/).
 
-<Tabs>
+<Tabs syncKey="hpx-host-os">
 <TabItem label="Linux">
 
 ```bash
@@ -160,7 +162,7 @@ $env:PATH = "C:\path\to\arm-toolchain\bin;$env:PATH"
 
 ### 3. CMake and Ninja
 
-<Tabs>
+<Tabs syncKey="hpx-host-os">
 <TabItem label="Linux">
 
 ```bash
@@ -195,7 +197,7 @@ first, then both executable names on `PATH`, then the common SEGGER install
 locations; set `JLINK_PATH` to the full executable path for a non-standard
 install.
 
-<Tabs>
+<Tabs syncKey="hpx-host-os">
 <TabItem label="Linux">
 
 Install the `.deb` or `.tgz` from
@@ -285,21 +287,51 @@ do not cover `/dev/tty*`.
 `hpx doctor` prints one row per tool. Captured on macOS 26.6 on 2026-09-21
 with the tools installed as above:
 
-```text
-Toolchain Check
-╭────┬───────────────────────────────────────┬─────────────────────────────────────────────────────╮
-│    │ Tool                                  │ Path                                                │
-├────┼───────────────────────────────────────┼─────────────────────────────────────────────────────┤
-│ ✓  │ CMake (>= 3.24)                       │ /opt/homebrew/bin/cmake                             │
-│ ✓  │ Ninja build system                    │ /opt/homebrew/bin/ninja                             │
-│ ✓  │ SEGGER J-Link commander               │ /usr/local/bin/JLinkExe                             │
-│ ✓  │ neuralspotx Python package            │ installed                                           │
-│ ✓  │ ARM GCC toolchain                     │ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-e… │
-│ ✓  │ pylink Python package (RTT transport) │ installed                                           │
-╰────┴───────────────────────────────────────┴─────────────────────────────────────────────────────╯
-
-  All required tools found.
-```
+<AsciiTerminal animated copy="commands" title="Check host tools" lines={[
+  {
+    "text": "hpx doctor",
+    "kind": "command"
+  },
+  {
+    "text": "Toolchain Check"
+  },
+  {
+    "text": "╭────┬───────────────────────────────────────┬─────────────────────────────────────────────────────╮"
+  },
+  {
+    "text": "│    │ Tool                                  │ Path                                                │"
+  },
+  {
+    "text": "├────┼───────────────────────────────────────┼─────────────────────────────────────────────────────┤"
+  },
+  {
+    "text": "│ ✓  │ CMake (>= 3.24)                       │ /opt/homebrew/bin/cmake                             │"
+  },
+  {
+    "text": "│ ✓  │ Ninja build system                    │ /opt/homebrew/bin/ninja                             │"
+  },
+  {
+    "text": "│ ✓  │ SEGGER J-Link commander               │ /usr/local/bin/JLinkExe                             │"
+  },
+  {
+    "text": "│ ✓  │ neuralspotx Python package            │ installed                                           │"
+  },
+  {
+    "text": "│ ✓  │ ARM GCC toolchain                     │ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-e… │"
+  },
+  {
+    "text": "│ ✓  │ pylink Python package (RTT transport) │ installed                                           │"
+  },
+  {
+    "text": "╰────┴───────────────────────────────────────┴─────────────────────────────────────────────────────╯"
+  },
+  {
+    "text": ""
+  },
+  {
+    "text": "  All required tools found."
+  }
+]} />
 
 A dash in the first column marks an optional tool that was not found
 (heliaAOT, `armclang`); those rows only matter if you use that engine or

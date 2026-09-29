@@ -70,3 +70,26 @@ test('site search finds the measurement guide', async ({ page }) => {
   await page.keyboard.press('Escape');
   await expect(dialog).not.toBeVisible();
 });
+
+test('host OS tabs stay synchronized without changing installer choice', async ({ page }) => {
+  await page.goto('getting-started/install/');
+  await page.getByRole('tab', { name: 'macOS', exact: true }).first().click();
+  await expect(page.locator('[data-sync-key="hpx-host-os"] [role="tab"][aria-selected="true"]')).toHaveText(['macOS', 'macOS', 'macOS']);
+  await expect(page.getByRole('tab', { name: 'uv', exact: true })).toHaveAttribute('aria-selected', 'true');
+});
+
+test('setup terminal retains output, replays, and copies only its command', async ({ page, context }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('getting-started/validate-your-setup/');
+  const terminal = page.locator('helia-ascii-terminal').first();
+  await terminal.scrollIntoViewIfNeeded();
+  await expect(terminal.locator('[data-line-text]').last()).toHaveText('  All required tools found.');
+  await expect(terminal).not.toHaveAttribute('data-playing', 'true');
+  await terminal.getByRole('button', { name: 'Copy commands', exact: true }).click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('hpx doctor');
+  await terminal.locator('[data-replay-button]').click();
+  await expect(terminal).toHaveAttribute('data-playing', 'true');
+  await expect(terminal).not.toHaveAttribute('data-playing', 'true', { timeout: 10000 });
+  await expect(terminal.locator('[data-line-text]').last()).toHaveText('  All required tools found.');
+});
