@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+from collections.abc import Sequence
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 
@@ -20,7 +21,11 @@ from helia_profiler.evaluation import (
     MetricPolicy,
 )
 from helia_profiler.errors import ReportError
+from helia_profiler.report.csv_writer import _write_csv
 from helia_profiler.results import (
+    FirmwareMeta,
+    LayerResult,
+    PmuResult,
     ResultArtifact,
     ResultManifest,
     ResultValidity,
@@ -34,7 +39,7 @@ def _write_run(
     toolchain: str,
     total_cycles: float,
     avg_us: int,
-    layer_cycles: list[float],
+    layer_cycles: Sequence[float],
     power: dict[str, float | str] | None = None,
     memory_regions: dict | None = None,
     link_family: str | None = None,
@@ -96,22 +101,16 @@ def _write_run(
             }
         )
     )
-    with open(path / "profile_results.csv", "w", newline="") as f:
-        writer = csv.DictWriter(
-            f,
-            fieldnames=["id", "op", "ARM_PMU_CPU_CYCLES", "cycles", "overflow"],
+    layers = [
+        LayerResult(
+            id=idx,
+            op="CONV_2D" if idx == 0 else "SOFTMAX",
+            counters={"ARM_PMU_CPU_CYCLES": cycles},
+            cycles=cycles,
         )
-        writer.writeheader()
-        for idx, cycles in enumerate(layer_cycles):
-            writer.writerow(
-                {
-                    "id": idx,
-                    "op": "CONV_2D" if idx == 0 else "SOFTMAX",
-                    "ARM_PMU_CPU_CYCLES": cycles,
-                    "cycles": cycles,
-                    "overflow": False,
-                }
-            )
+        for idx, cycles in enumerate(layer_cycles)
+    ]
+    _write_csv(PmuResult(meta=FirmwareMeta(), layers=layers), path)
 
 
 def _write_aot_memory_layers(
@@ -475,6 +474,56 @@ def test_compare_layer_rows_type_dynamic_pmu_counters_as_counter_diffs(tmp_path:
     assert counter.delta == -200
     assert row.baseline_memory is None
     assert row.memory_changed is None
+
+
+def test_cycles_pct_not_diffed(tmp_path: Path):
+    """The writer derives cycles_pct; a percent change of it is noise."""
+    for name, cycles in (("baseline", [800, 200]), ("candidate", [600, 150])):
+        _write_run(
+            tmp_path / name,
+            toolchain="arm-none-eabi-gcc",
+            total_cycles=sum(cycles),
+            avg_us=10,
+            layer_cycles=cycles,
+        )
+    header = (tmp_path / "baseline" / "profile_results.csv").read_text().splitlines()[0]
+    assert "cycles_pct" in header.split(",")
+
+    result = compare_runs(tmp_path / "baseline", tmp_path / "candidate")
+
+    assert all("cycles_pct" not in row.counters for row in result.layer_rows)
+    paths = write_compare_artifacts(result, tmp_path / "diff")
+    layer_csv = next(p for p in paths if p.name == "layer_diff.csv")
+    assert "cycles_pct" not in layer_csv.read_text()
+
+
+def test_console_shows_layer_zero(tmp_path: Path):
+    from rich.console import Console
+
+    from helia_profiler.console import HpxConsole
+    from helia_profiler.console.compare import print_compare
+
+    for name, cycles in (("baseline", [800, 200]), ("candidate", [600, 150])):
+        _write_run(
+            tmp_path / name,
+            toolchain="arm-none-eabi-gcc",
+            total_cycles=sum(cycles),
+            avg_us=10,
+            layer_cycles=cycles,
+        )
+    _write_aot_memory_layers(tmp_path / "baseline", "DTCM")
+    _write_aot_memory_layers(tmp_path / "candidate", "SRAM")
+    result = compare_runs(tmp_path / "baseline", tmp_path / "candidate")
+    console = HpxConsole(verbosity=0)
+    recorder = Console(record=True, highlight=False, width=200)
+    console._console = recorder
+
+    print_compare(console, result)
+
+    rows = [line.split() for line in recorder.export_text().splitlines()]
+    conv_rows = [row for row in rows if "CONV_2D" in row]
+    assert len(conv_rows) == 2
+    assert all(row[0] == "0" for row in conv_rows)
 
 
 def test_write_compare_artifacts(tmp_path: Path):

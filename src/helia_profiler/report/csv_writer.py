@@ -56,6 +56,11 @@ def _layer_to_flat_dict(
     return row
 
 
+def _union_fieldnames(rows: list[dict[str, Any]]) -> list[str]:
+    # Any layer may lack a rejected counter.
+    return list(dict.fromkeys(key for row in rows for key in row))
+
+
 def _write_csv(
     pmu: PmuResult,
     output_dir: Path,
@@ -77,9 +82,9 @@ def _write_csv(
         )
         for layer in layers
     ]
-    fieldnames = list(rows[0].keys())
-    # Ensure enriched columns appear even if first row lacks them
-    if any("source_index" in row for row in rows) and "source_index" not in fieldnames:
+    fieldnames = _union_fieldnames(rows)
+    if "source_index" in fieldnames and "source_index" not in rows[0]:
+        fieldnames.remove("source_index")
         fieldnames.insert(2, "source_index")
     if analysis is not None:
         for col in ("macs", "ops", "cycles_per_mac"):
@@ -107,7 +112,7 @@ def _write_preset_csv(
 
     total_cycles = sum(layer.cycles or 0 for layer in layers)
     rows = [_layer_to_flat_dict(layer, total_cycles=total_cycles) for layer in layers]
-    fieldnames = list(rows[0].keys())
+    fieldnames = _union_fieldnames(rows)
 
     with open(out_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)

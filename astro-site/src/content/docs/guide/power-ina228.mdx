@@ -128,7 +128,9 @@ The `power` block of `summary.json` gains `on_device_summary` under
 | `inference_count` | count | inferences the firmware ran inside the window |
 | `duration_us` | microseconds | INA228 accumulation interval timed by firmware |
 
-Energy divided by count is energy per inference; average power is energy
+HPX divides energy by count and publishes `power.energy_per_inference_j`
+and `power.inferences_per_joule`, the same fields external mode writes, so
+`hpx compare` and validation read them. Average power is energy
 over the INA228 accumulation interval, `power.on_device_summary.duration_us`. The whole firmware window is `power.terminal.elapsed_us`; the GPIO gate interval is `power.terminal.gate_elapsed_us`.
 
 :::caution[The duration comes from the firmware, not the instrument]
