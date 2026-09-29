@@ -47,6 +47,13 @@ fixed upstream defines. It replaces the registry `nsx-helia-rt` and
 lock and link map name that archive, and no other module whose name carries
 `helia-rt`, `tflite-micro` or `cmsis-nn`. The engine provenance records the
 prepared archive's heliaRT revision as its version and `prepared` as its variant.
+The link-map check reads every directory of each linked archive or object below
+the firmware app directory, and a toolchain library from its first module
+directory down, so the names of directories above the app do not count.
+The fixture resolver registers only the model's own operators. Ordinary heliaRT
+profile firmware also registers QUANTIZE and DEQUANTIZE, because heliaRT can
+need them while preparing a model. A heliaRT fixture that needs them fails with a
+nonzero status before the timed loop instead of producing a wrong result.
 Each engine accepts only its own stack. The rendered firmware is the TFLM
 fixture: heliaRT keeps the TFLM API. AOT accepts no runtime override and
 uses the ordinary AOT adapter and its internally allocated generated module.

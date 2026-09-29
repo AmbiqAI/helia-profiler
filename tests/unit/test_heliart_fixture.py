@@ -357,7 +357,11 @@ def test_heliart_build_links_and_proves_the_prepared_archive(tmp_path, monkeypat
         ([*GOOD_LOCK, "helia-rt-source"], GOOD_MAP, "dependency lock"),
         ([*GOOD_LOCK, "arm-cmsis-nn"], GOOD_MAP, "dependency lock"),
         (GOOD_LOCK, [*GOOD_MAP, "/w/modules/helia-rt-source/libhelia.a(x.o)"], "helia-rt provider"),
-        (GOOD_LOCK, [*GOOD_MAP, "/w/app/modules/arm-cmsis-nn/Source/x.o"], "helia-rt provider"),
+        (
+            GOOD_LOCK,
+            [*GOOD_MAP, "/w/app/modules/arm-cmsis-nn/Source/x.c.obj:(.text)"],
+            "helia-rt provider",
+        ),
     ],
 )
 def test_heliart_build_refuses_any_other_runtime_provider(
@@ -372,6 +376,47 @@ def test_heliart_build_refuses_any_other_runtime_provider(
     )
     with pytest.raises(ConfigError, match=match):
         build_fixed_fixture(_config(tmp_path, f), f, method=METHOD, runtime=rt)
+
+
+@pytest.mark.parametrize(
+    "extra,refused",
+    [
+        (None, False),
+        ("build/_nsx/helia_rt/libhelia_rt.a(kernel.cc.obj):(.text)", True),
+        (
+            "modules/hpx-heliart-runtime/cmsis-nn-embedded/modules/utils/lib.a(x.o):(.text)",
+            True,
+        ),
+    ],
+)
+def test_heliart_proof_reads_inputs_below_the_app_not_above_it(
+    tmp_path, monkeypatch, extra, refused
+):
+    """Directories above the app never count; every directory below it does."""
+    f, analysis = _fixture(tmp_path)
+    rt = runtime(tmp_path / "rt")
+    # A provider-named build tree must pass; refusals use a neutral tree so the
+    # extra input alone decides them.
+    work = tmp_path / ("plain" if refused else "helia-rt-bench/modules/tflite-micro")
+    root = work / "app"
+    lines = [
+        f"{root}/modules/hpx-heliart-runtime/runtime.a(micro_interpreter.cc.obj):(.text)",
+        "_nsx/nsx_core/libnsx_runtime.a(runtime.c.obj):(.text)",
+        f"{root}/build/CMakeFiles/hpx_profiler.dir/src/main.cc.obj:(.text)",
+        "/opt/ATfE/lib/clang-runtimes/arm-none-eabi/armv8.1m.main_hard_fp/lib/libc.a(x.o):(.text)",
+    ]
+    if extra:
+        lines.append(f"{root}/{extra}")
+    monkeypatch.setattr("helia_profiler.fixture.analyze_fixture_model", lambda _: analysis)
+    monkeypatch.setattr(
+        "helia_profiler.fixture.PipelineRunner",
+        _runner(work, rt, [], lock_modules=GOOD_LOCK, map_lines=lines),
+    )
+    if refused:
+        with pytest.raises(ConfigError, match="helia-rt provider"):
+            build_fixed_fixture(_config(tmp_path, f), f, method=METHOD, runtime=rt)
+    else:
+        assert build_fixed_fixture(_config(tmp_path, f), f, method=METHOD, runtime=rt).built
 
 
 @pytest.mark.parametrize(

@@ -126,7 +126,32 @@ PREPARED_RUNTIME_ENGINES = {
 #: any module whose name carries one of these, and the other prepared stacks.
 _RUNTIME_PROVIDER = re.compile(r"helia-rt|tflite-micro|cmsis-nn")
 _PREPARED_MODULES = frozenset(name for name, _, _ in PREPARED_RUNTIME_MODULES.values())
-_MAP_MODULE = re.compile(r"(?<=[/\\])[A-Za-z0-9_.+-]+(?=[/\\])")
+#: Archives and objects a link map lists as inputs, e.g. ``.../libx.a(y.o):`` or ``.../y.o:``.
+_MAP_INPUT = re.compile(r"([^\s():]+)\.(?:a|o|obj)(?=[(:])")
+
+
+def _linked_components(map_text: str, app: Path) -> set[str]:
+    """Path components naming each linked input, not the directories above the app.
+
+    Inputs under ``app`` and relative inputs contribute every component; other
+    absolute inputs (the toolchain's libraries) contribute the components after
+    their first ``modules`` or ``_nsx`` directory, or else their parent directory
+    and file stem. Underscores are read as hyphens, the NSX build-directory spelling.
+    """
+    root = str(app).rstrip("/\\")
+    names = set()
+    for path in _MAP_INPUT.findall(map_text):
+        if path.startswith(root + "/") or path.startswith(root + "\\"):
+            parts = re.split(r"[/\\]", path[len(root) + 1 :])
+        else:
+            parts = re.split(r"[/\\]", path)
+            if path.startswith(("/", "\\")) or re.match(r"[A-Za-z]:", path):
+                marks = [i for i, part in enumerate(parts) if part in ("modules", "_nsx")]
+                parts = parts[marks[0] + 1 :] if marks else parts[-2:]
+        names.update(part.replace("_", "-") for part in parts if part)
+    return names
+
+
 #: Largest total output a fixture may expose for full readback.
 FIXTURE_READBACK_BUDGET = 128 * 1024
 _FIXTURE_ROLES = {"signal", "aux"}
@@ -417,8 +442,8 @@ def build_fixed_fixture(
         if (
             f"{name}/runtime.a(" not in map_text
             or any(
-                segment in others or _RUNTIME_PROVIDER.search(segment)
-                for segment in _MAP_MODULE.findall(map_text)
+                part in others or _RUNTIME_PROVIDER.search(part)
+                for part in _linked_components(map_text, app)
             )
             or (stack == "upstream" and ("helia_rt" in map_text or "helia-rt" in map_text))
         ):
