@@ -150,7 +150,7 @@ ERROR_SPECS: tuple[WireSpec, ...] = (
         "The model has more operators than the per-layer record array holds.",
         WireConsumer.TRANSPORT_CONTROL,
         WireCriticality.PROTOCOL,
-        engines=ET_ENGINES,
+        engines=TFLM_ENGINES | AOT_ENGINES | ET_ENGINES,
         condition=GATE_NOT_POWER_ONLY,
         value_shape="capacity=<n>",
         runtime_gate="the capacity was actually exceeded during the pass",

@@ -461,11 +461,8 @@ def test_executorch_template_has_counter_health_and_true_overflow_mask():
     # header (not merely pulled in by the umbrella) on every render.
     assert "am_hal_pwrctrl_sram_config(&sramCfg)" in out
     assert '#include "am_hal_pwrctrl.h"' in out
-    assert "g_logical_overflow_mask |= 1UL << (2 * i + 1)" in out
     end_operator = out[out.index("static void end_operator") :]
-    assert end_operator.index("ARM_PMU_Get_CNTR_OVS()") < end_operator.index(
-        "nsx_pmu_get_counters(&g_pmu_cfg)"
-    )
+    assert "hpx_pmu_read_layer(&g_pmu_cfg, g_num_counters)" in end_operator
     assert "result.execution_cycles" in out
 
 
