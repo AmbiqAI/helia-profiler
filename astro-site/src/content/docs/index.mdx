@@ -16,7 +16,6 @@ import ProfilerDemo from '../../components/ProfilerDemo.astro';
 import ProfilerLanding from '../../components/ProfilerLanding.astro';
 import Landing from '@ambiqai/helia-ui/astro/Landing';
 import Icon from '@ambiqai/helia-ui/astro/Icon';
-import TimingScopes from '../../components/TimingScopes.astro';
 import buildInfo from '../../data/build-info.json';
 
 <Landing>
@@ -177,9 +176,9 @@ $ hpx profile --config afib-power.yml \
 <h2>Understand the cost of inference.</h2>
 <p>Measure the model as a whole, then investigate the operations and hardware activity behind the result.</p>
 <div class="feature-strip feature-mosaic">
-<article><Icon class="feature-icon" name="stopwatch" /><h3>Time the whole inference</h3><p>Measure a clean inference window separately from instrumented layer timings, so profiling overhead is visible.</p><figure class="timing-visual"><TimingScopes /><figcaption>Separate passes for whole-model timing and layer detail.</figcaption></figure><a href="/helia-profiler/guide/latency/">Understand timing →</a></article>
-<article><Icon class="feature-icon" name="microchip" /><h3>Investigate costly layers</h3><p>Use hardware counters on supported boards to investigate stalls and memory accesses.</p><a href="/helia-profiler/guide/pmu-counters/">Explore counters →</a></article>
-<article><Icon class="feature-icon" name="bolt" /><h3>Include power and energy</h3><p>Use a supported Joulescope or INA228 to measure power on the monitored supply and energy per inference.</p><a href="/helia-profiler/guide/power/">Set up power capture →</a></article>
+<article><Icon class="feature-icon" name="stopwatch" /><h3>Measure the model. Locate the cost.</h3><p>Start with latency from a clean inference window, then inspect a separate instrumented pass to find the operators worth optimizing.</p><div class="timing-result"><span>heartKIT AFIB · heliaAOT</span><strong>12.14 <small>ms</small></strong><span>Median latency · Apollo510 @ 96 MHz</span></div><ol class="timing-workflow"><li><strong>Establish the baseline</strong><span>Measure the complete inference without per-layer counter reads. Keep the model, clock and measurement settings with the result.</span></li><li><strong>Rank the expensive operators</strong><span>Inspect cycles and each layer’s share of the instrumented total. Start with the layers that account for the most work.</span></li><li><strong>Test a targeted improvement</strong><span>Try another engine or memory placement, then compare the saved runs to see whether whole-model latency improved.</span></li></ol><a href="/helia-profiler/guide/latency/">Understand timing and measurement boundaries →</a></article>
+<article><Icon class="feature-icon" name="microchip" /><h3>Investigate costly layers</h3><p>Look beyond cycle counts. On supported targets, inspect memory accesses, processor stalls and MVE activity alongside each operator.</p><p class="feature-detail">Use the counters to investigate whether memory placement or kernel execution deserves a closer look. Available counters depend on the target.</p><a href="/helia-profiler/guide/pmu-counters/">Explore counters →</a></article>
+<article><Icon class="feature-icon" name="bolt" /><h3>Include power and energy</h3><p>Capture the monitored supply with a supported Joulescope or INA228. Read power during the measurement window and energy per inference.</p><p class="feature-detail">Save the capture with the run, inspect its validity and compare energy alongside latency. Requires a configured power monitor.</p><a href="/helia-profiler/guide/power/">Set up power capture →</a></article>
 </div>
 </section>
 
