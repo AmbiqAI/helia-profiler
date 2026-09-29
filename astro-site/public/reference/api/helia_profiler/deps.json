@@ -3,12 +3,12 @@
   "generatedFrom": {
     "tool": "pyref",
     "version": "1.7.3",
-    "sourceTree": "81f0b1419e1bba14c3416aeffef31acf543f617c"
+    "sourceTree": "24b1dfcb49ea82d6c9d83554d2088d49c3fd327b"
   },
   "language": "python",
   "modules": [
     {
-      "description": "What this build of heliaPROFILER is qualified against: the board, engine and toolchain matrix, and the locked dependency revisions a run was produced with.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`, `experimental`\n\nGenerated from the `src/helia_profiler` tree `81f0b1419e1bba14c3416aeffef31acf543f617c`.",
+      "description": "What this build of heliaPROFILER is qualified against: the board, engine and toolchain matrix, and the locked dependency revisions a run was produced with.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`, `experimental`\n\nGenerated from the `src/helia_profiler` tree `24b1dfcb49ea82d6c9d83554d2088d49c3fd327b`.",
       "name": "deps",
       "path": "helia_profiler.deps",
       "submodules": [],
