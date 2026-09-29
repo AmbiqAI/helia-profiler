@@ -695,7 +695,7 @@ def _verify_device_clock(ctx: PipelineContext, result: PmuResult) -> None:
     )
     for label, device_hz in readings:
         # 5% clears HFRC trim, catches perf-mode misses.
-        if not device_hz or abs(device_hz - registry_hz) <= 0.05 * registry_hz:
+        if device_hz is None or abs(device_hz - registry_hz) <= 0.05 * registry_hz:
             continue
         log.warning(
             "%s CPU clock %.3f MHz but the platform registry "

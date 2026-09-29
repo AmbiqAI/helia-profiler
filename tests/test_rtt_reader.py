@@ -487,7 +487,7 @@ def test_capture_pmu_no_clock_warning_when_device_clock_matches(
 
 @pytest.mark.parametrize(
     ("measured_hz", "warns"),
-    [(96_000_000, True), (249_900_000, False)],
+    [(96_000_000, True), (249_900_000, False), (0, True)],
 )
 def test_capture_pmu_checks_measured_clock(
     tmp_path: Path, monkeypatch, caplog, measured_hz: int, warns: bool

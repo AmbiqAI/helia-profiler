@@ -1400,3 +1400,9 @@ def test_no_bare_wire_literal_survives_in_src():
         "bare HPX wire literals found in src/ — import them from "
         "helia_profiler.wire:\n" + "\n".join(offenders)
     )
+
+
+def test_system_clock_is_described_as_assumed():
+    spec = WIRE_REGISTRY[WireKey.SYSTEM_CLOCK_HZ.wire]
+    assert "Ground-truth" not in spec.description
+    assert "host" in spec.description

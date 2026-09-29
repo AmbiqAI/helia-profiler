@@ -252,7 +252,7 @@ START_HEADER_SPECS: tuple[WireSpec, ...] = (
     _spec(
         WireKey.SYSTEM_CLOCK_HZ.wire,
         WireKind.KEY_VALUE,
-        "Ground-truth SystemCoreClock as configured on the device.",
+        "SystemCoreClock as set from the host's clock choice.",
         WireConsumer.FIRMWARE_META,
         WireCriticality.METRIC,
         key=WireKey.SYSTEM_CLOCK_HZ,
