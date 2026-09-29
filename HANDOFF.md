@@ -19,7 +19,7 @@ Preview: http://127.0.0.1:8764/helia-profiler/ . Do not control existing user ta
 .github/workflows/docs.yml validates the artifact on PRs and deploys relevant main pushes, release calls and manual dispatch. Release docs wait for package publishing; ordering guard prevents an older artifact replacing newer docs. HTTPS Git rewrite makes the public shared dependency installable without SSH credentials. User has not approved merging this migration in this session.
 
 ## Remaining
-Run final committed reference drift checks and review the final local diff; obtain owner visual/content acceptance. Push/refresh draft PR with an accurate description when approved; final remote checks and explicit merge approval precede cutover. Verify public build-info, search, redirects, 404 and machine-readable reference after deployment. Then start heliaEDGE with its own approved issue.
+Final committed reference drift checks, CLI source checks and the full site validation chain passed. Astro reports zero errors, warnings or hints. Local commits d550a26e and c5326af1 are not pushed. Obtain owner visual/content acceptance. Push/refresh draft PR with an accurate description when approved; final remote checks and explicit merge approval precede cutover. Verify public build-info, search, redirects, 404 and machine-readable reference after deployment. Then start heliaEDGE with its own approved issue.
 
 ## Constraints and gotchas
 - Preserve actual hardware evidence boundaries. Power example pages without captured bundles stay labelled unvalidated.
