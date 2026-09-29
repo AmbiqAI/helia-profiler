@@ -10,6 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+import pytest
+
 from helia_profiler.engines.helia_aot.manifest import (
     _AOT_MEMORY_TO_PLACEMENT,
     _extract_arena_regions,
@@ -193,3 +195,14 @@ class TestExtractMemoryPlanFromRenderPlan:
         assert mram is not None
         assert mram.used == 28_976
         assert result.model_weight_bytes == 28_976
+
+
+@pytest.mark.parametrize("runtime,source", [("HBM", None), ("SRAM", "HBM")])
+def test_unknown_mapping_invalidates_whole_aot_plan(runtime, source):
+    plan = _FakeRenderPlan(
+        scratch_arenas=[_FakeArena(0, "SRAM", 1024, 16, "scratch")],
+        persistent_arenas=[],
+        constant_arenas=[_FakeArena(1, runtime, 128, 16, "constant", source)],
+    )
+    memory_plan = _FakeAotPlan(arena_usages={}, tensor_allocs={})
+    assert _extract_memory_plan(_FakeCodegenCtxWithMemoryAndRenderPlan(memory_plan, plan)) is None

@@ -138,7 +138,8 @@ jobs:
         run: |
           uv run --group test --extra analysis --extra aot pytest \
             tests/test_softmax_preflight.py tests/test_model_analysis.py \
-            tests/test_example_models.py -q
+            tests/test_example_models.py tests/unit/test_fixture_analysis.py \
+            tests/unit/test_typed_fixture_analysis.py -q
 
   # ---------------------------------------------------------------
   # pre-commit — runs the exact hook config contributors run locally, so

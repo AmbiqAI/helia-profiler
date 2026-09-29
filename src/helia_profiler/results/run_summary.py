@@ -49,7 +49,10 @@ RUN_SUMMARY_SCHEMA = "hpx.run-summary"
 #: v6: #317 AOT clean timing and power include per-call input restoration.
 #: v7: #299 on-device power divides by the INA228 accumulation interval, and
 #: the firmware side of the window-clock checks is the gate bracket.
-RUN_SUMMARY_SCHEMA_VERSION = 7
+#: v8: model_analysis MACs fixed for TRANSPOSE_CONV, non-flat
+#: FULLY_CONNECTED and BATCH_MATMUL; total_macs, total_ops, TOPS and
+#: cycles_per_mac move for models with those ops.
+RUN_SUMMARY_SCHEMA_VERSION = 8
 
 __all__ = [
     "RUN_SUMMARY_SCHEMA",

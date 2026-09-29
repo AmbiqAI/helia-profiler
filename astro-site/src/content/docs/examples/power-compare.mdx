@@ -1,0 +1,114 @@
+---
+title: "Compare two power runs"
+description: "Hold two power captures against each other with hpx compare: the dimensions that must match for an energy delta to be shown, the issue code each mismatch reports, and how to record a baseline that stays comparable."
+---
+
+## Goal
+
+Get an energy delta you can trust, or a clear statement of why hpx will
+not give you one. You will learn which parts of a power setup are
+comparability dimensions, what a mismatch looks like in the report, and
+how to keep a baseline comparable across weeks.
+
+## Hardware and wiring
+
+None for the comparison itself; the two bundles come from
+[Power capture with a Joulescope](../power-profiling/) runs made with the
+same instrument, wiring and board.
+
+## Software prerequisites
+
+hpx (`pip install helia-profiler`); two completed bundles with a `power`
+block, in separate directories.
+
+## Config file
+
+None for `hpx compare`. For a CI gate, a comparison profile that names
+the energy metric; save it beside the bundles:
+
+```json title="power-regression.json"
+{
+  "schema": "hpx.comparison-profile",
+  "schema_version": 1,
+  "name": "kws-energy",
+  "required_dimensions": ["board", "cpu_clock"],
+  "metrics": {
+    "power.energy_per_inference_j": {"direction": "smaller", "unit": "J", "max_regression_pct": 5.0, "missing": "fail"}
+  }
+}
+```
+
+## Run
+
+```bash
+hpx compare results/baseline results/candidate --output-dir results/power-diff
+hpx compare results/baseline results/candidate --profile power-regression.json
+```
+
+## Expected output
+
+Not yet captured: no pair of power bundles ships with the documentation.
+The report has the same shape as the one on
+[Compare engines](../engine-comparison/#expected-output): a header with
+the totals, a Warnings box, the Config table and the Run table. For a
+comparable pair the Run table carries a `power.energy_per_inference_j`
+row and a `power.duration_s` row; for an incomparable pair the Warnings
+box names the code that withheld them and the power rows are absent.
+
+## How to read it
+
+`hpx compare` withholds every power delta when any of these differs
+between the two runs, and reports the code from the
+[issue codes](../../reference/issue-codes/) page:
+
+| What differs | Code | Why it blocks |
+|---|---|---|
+| `measurement_scope` | `metric.power_power_scope_mismatch` | a gated window and a free-form capture integrate different things |
+| `power.mode` (`external`, `internal`) | `metric.power_power_mode_mismatch` | an instrument in series and the chip's own accumulators measure different rails |
+| `power.firmware` (`dedicated`, `shared`) | `metric.power_power_firmware_mismatch` | shared firmware carries the transport's draw |
+| the on-target monitor's presence | `metric.power_power_monitor_mismatch` | an on-target monitor's IOM stays powered on the measured rail, a real current adder |
+| lock-step on or off | `metric.power_power_lockstep_mismatch` | the gate is timed differently |
+| the clean-window probe (`infer`, `busy_loop`) | `metric.power_power_clean_window_probe_mismatch` | a spin is not an inference |
+| the clean workload (`clean_workload`) | `metric.power_power_clean_workload_mismatch` | heliaAOT's window includes input restoration, the interpreters' does not |
+| the firmware code fingerprint, same SoC, board and power firmware only | `metric.power_power_firmware_fingerprint_mismatch` | different rendered firmware ran inside the window |
+| either run's `integrity` is not `valid` | `metric.power_integrity_invalid` | a capture whose own checks failed is not a measurement |
+
+The dimension names already start with `power_`, which is why the emitted
+codes double the prefix. A run recorded before a dimension existed carries
+no value for it and is skipped rather than failed, so an old baseline does
+not become incomparable when hpx learns a rule. The one exception is the
+clean workload: an unknown value on either side counts as a mismatch, so a
+baseline that predates that field must be re-recorded; the pages that
+describe a default change (lock-step, a summary schema version) say the
+same ([Analysis and comparison](../../guide/analysis-comparison/)).
+
+The profile above names no power dimension on purpose: `required_dimensions`
+is matched against the report's Config rows, which carry no power entries,
+so a power name there fails every comparison. A power mismatch is caught
+anyway, because it withholds `power.energy_per_inference_j` from the Run
+table and `"missing": "fail"` then fails the verdict.
+
+The `power.duration_s` row reads each summary's `capture_duration_s`, the
+duration of the selected scope, so it compares window against window and
+never host timing. `board`, `cpu_clock`, `toolchain` and `engine` are
+informative dimensions: shown, not blocking, so an engine comparison of
+energy is allowed and labelled.
+
+## Variations
+
+- From Python, `hpx.Session().compare(baseline_dir, candidate_dir, profile="power-regression.json")`
+  returns the same `CompareResult`.
+- To compare energy across two boards, keep everything in the table equal
+  and read the `board` and `cpu_clock` rows of the Config table as the
+  explanation of the delta, not as noise.
+- A baseline that stays comparable: same config file, same instrument
+  serial (`power.serial`), same `power.firmware: dedicated`, lock-step left
+  at its default, and the bundle kept whole so `verify=True` still passes.
+
+## Validated on
+
+Not yet validated. No captured power bundle ships with the documentation.
+The codes in the table are quoted from `results/issues.py` and the rules
+from `evaluation/comparability.py` at the source tree this site was built
+from; the `hpx compare` report shape is the one captured on
+[Compare engines](../engine-comparison/) for two profile bundles.

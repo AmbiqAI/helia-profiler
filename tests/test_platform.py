@@ -598,7 +598,7 @@ def test_a_declared_address_beats_the_based_on_part():
     """The whole point of the field: a novel part derived from a known one.
 
     ``based_on: apollo510`` plus a different bootloader reservation is exactly
-    the bring-up path ``docs/guide/boards.md`` documents.
+    the bring-up path ``the guide/boards page`` documents.
     """
     soc = _custom_soc(
         "apollo510_custom",
@@ -741,7 +741,7 @@ def test_a_renamed_builtin_copy_does_not_inherit_the_name_it_was_given():
     """The other half of the ``is_builtin`` rule, and the tighter half.
 
     ``dataclasses.replace`` of a built-in is the obvious way to build a custom
-    ``SocDef`` programmatically -- no guide points at it (``docs/guide/boards.md``
+    ``SocDef`` programmatically -- no guide points at it (``the guide/boards page``
     shows a fresh ``SocDef(...)`` constructor, which defaults to ``CUSTOM``), but
     it is the shape a caller invents -- and ``origin`` survives it by design,
     which is exactly what the sibling test above requires.  The cost is that a

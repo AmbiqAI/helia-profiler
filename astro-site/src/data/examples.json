@@ -1,0 +1,223 @@
+[
+  {
+    "id": "basic-profiling",
+    "name": "Profile a model",
+    "kind": "namespace",
+    "module": "Examples",
+    "group": "Profile",
+    "href": "/helia-profiler/examples/basic-profiling/",
+    "summary": "Capture timing and layer counters with heliaRT on Apollo510 EVB. Includes a historical hardware bundle.",
+    "facets": {
+      "workflow": [
+        "Profile"
+      ],
+      "setup": [
+        "Board"
+      ]
+    }
+  },
+  {
+    "id": "per-layer",
+    "name": "Capture per-layer counters",
+    "kind": "namespace",
+    "module": "Examples",
+    "group": "Profile",
+    "href": "/helia-profiler/examples/per-layer/",
+    "summary": "Capture CPU, memory and MVE counters with heliaAOT on Apollo510 EVB. Recipe not yet hardware-validated.",
+    "facets": {
+      "workflow": [
+        "Profile"
+      ],
+      "setup": [
+        "Board"
+      ]
+    }
+  },
+  {
+    "id": "tflm-baseline",
+    "name": "Vanilla TFLM baseline",
+    "kind": "namespace",
+    "module": "Examples",
+    "group": "Profile",
+    "href": "/helia-profiler/examples/tflm-baseline/",
+    "summary": "Profile the keyword-spotting model with LiteRT for Microcontrollers and CMSIS-NN. Includes a captured baseline.",
+    "facets": {
+      "workflow": [
+        "Profile"
+      ],
+      "setup": [
+        "Board"
+      ]
+    }
+  },
+  {
+    "id": "engine-comparison",
+    "name": "Compare engines",
+    "kind": "namespace",
+    "module": "Examples",
+    "group": "Compare",
+    "href": "/helia-profiler/examples/engine-comparison/",
+    "summary": "Compare heliaRT, heliaAOT and LiteRT on one model and board. Includes captured bundles and a host comparison.",
+    "facets": {
+      "workflow": [
+        "Compare"
+      ],
+      "setup": [
+        "Board"
+      ]
+    }
+  },
+  {
+    "id": "toolchain-comparison",
+    "name": "Compare toolchains",
+    "kind": "namespace",
+    "module": "Examples",
+    "group": "Compare",
+    "href": "/helia-profiler/examples/toolchain-comparison/",
+    "summary": "Compare GNU Arm and ATfE builds using recorded runs. Arm Compiler 6 remains unvalidated in this recipe.",
+    "facets": {
+      "workflow": [
+        "Compare"
+      ],
+      "setup": [
+        "Board"
+      ]
+    }
+  },
+  {
+    "id": "power-profiling",
+    "name": "Power capture with a Joulescope",
+    "kind": "namespace",
+    "module": "Examples",
+    "group": "Power",
+    "href": "/helia-profiler/examples/power-profiling/",
+    "summary": "Add Joulescope power capture to a heliaAOT run. Configuration provided; no captured power bundle.",
+    "facets": {
+      "workflow": [
+        "Power"
+      ],
+      "setup": [
+        "Board"
+      ]
+    }
+  },
+  {
+    "id": "atomiq110-npu-profiling",
+    "name": "Atomiq110 NPU profiling",
+    "kind": "namespace",
+    "module": "Examples",
+    "group": "NPU",
+    "href": "/helia-profiler/examples/atomiq110-npu-profiling/",
+    "summary": "Profile Ethos-U85 on the experimental Atomiq110 FPGA with heliaRT or heliaAOT. Recipe not yet validated.",
+    "facets": {
+      "workflow": [
+        "NPU"
+      ],
+      "setup": [
+        "FPGA"
+      ]
+    }
+  },
+  {
+    "id": "interactive-python",
+    "name": "Interactive Python session",
+    "kind": "namespace",
+    "module": "Examples",
+    "group": "Automate",
+    "href": "/helia-profiler/examples/interactive-python/",
+    "summary": "Explore Session configuration, profiling and comparison from Python. Host steps checked; hardware steps unvalidated.",
+    "facets": {
+      "workflow": [
+        "Automate"
+      ],
+      "setup": [
+        "Host and board"
+      ]
+    }
+  },
+  {
+    "id": "batch-runs",
+    "name": "Batch runs from YAML",
+    "kind": "namespace",
+    "module": "Examples",
+    "group": "Automate",
+    "href": "/helia-profiler/examples/batch-runs/",
+    "summary": "Run a model matrix with hpx validate. Includes a historical nightly run across four boards.",
+    "facets": {
+      "workflow": [
+        "Automate"
+      ],
+      "setup": [
+        "Board"
+      ]
+    }
+  },
+  {
+    "id": "reanalyse-results",
+    "name": "Re-analyse saved results",
+    "kind": "namespace",
+    "module": "Examples",
+    "group": "Analyze",
+    "href": "/helia-profiler/examples/reanalyse-results/",
+    "summary": "Verify, load and compare the supplied result bundles without a board. Host steps checked on those bundles.",
+    "facets": {
+      "workflow": [
+        "Analyze"
+      ],
+      "setup": [
+        "Saved results"
+      ]
+    }
+  },
+  {
+    "id": "model-explorer-overlay",
+    "name": "Per-layer cost on the model graph",
+    "kind": "namespace",
+    "module": "Examples",
+    "group": "Analyze",
+    "href": "/helia-profiler/examples/model-explorer-overlay/",
+    "summary": "View per-layer counters on a model graph. Output format documented; no captured overlay bundle.",
+    "facets": {
+      "workflow": [
+        "Analyze"
+      ],
+      "setup": [
+        "Saved results"
+      ]
+    }
+  },
+  {
+    "id": "power-read-summary",
+    "name": "Read a power summary",
+    "kind": "namespace",
+    "module": "Examples",
+    "group": "Power",
+    "href": "/helia-profiler/examples/power-read-summary/",
+    "summary": "Read energy, measurement scope and capture health from a saved power summary. No captured power bundle.",
+    "facets": {
+      "workflow": [
+        "Power"
+      ],
+      "setup": [
+        "Saved results"
+      ]
+    }
+  },
+  {
+    "id": "power-compare",
+    "name": "Compare two power runs",
+    "kind": "namespace",
+    "module": "Examples",
+    "group": "Power",
+    "href": "/helia-profiler/examples/power-compare/",
+    "summary": "Check power comparability before interpreting energy deltas. No captured power bundle.",
+    "facets": {
+      "workflow": [
+        "Power"
+      ],
+      "setup": [
+        "Saved results"
+      ]
+    }
+  }
+]

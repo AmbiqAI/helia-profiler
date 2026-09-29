@@ -1,0 +1,299 @@
+---
+title: "Validate your setup"
+description: "Five commands that prove the host, the probe and the board agree before you spend a build on them: doctor, boards, probes, ports and validate."
+---
+
+import AsciiTerminal from '@ambiqai/helia-ui/astro/AsciiTerminal';
+
+Prove the chain works before you trust a number from it. Each command below
+checks one link: the host tools, the board registry, the probe, the serial
+ports, and finally a real build-flash-capture round trip on a known model.
+Run them in order. The terminal examples play once as you reach them, then keep the output visible. Use Replay to watch again or copy the command to run it yourself.
+
+## Prerequisites
+
+[Install](../install/) complete and the board from
+[Hardware prerequisites](../hardware-prerequisites/) on the bench with its
+debug USB cable connected. The last step builds firmware, so the first run
+also needs network access for neuralSPOT-X to fetch its modules.
+
+## Steps
+
+### 1. `hpx doctor`: the host tools
+
+Captured on macOS 26.6, 2026-09-21:
+
+<AsciiTerminal animated copy="commands" lines={[
+  {
+    "text": "hpx doctor",
+    "kind": "command"
+  },
+  {
+    "text": "Toolchain Check"
+  },
+  {
+    "text": "╭────┬───────────────────────────────────────┬─────────────────────────────────────────────────────╮"
+  },
+  {
+    "text": "│    │ Tool                                  │ Path                                                │"
+  },
+  {
+    "text": "├────┼───────────────────────────────────────┼─────────────────────────────────────────────────────┤"
+  },
+  {
+    "text": "│ ✓  │ CMake (>= 3.24)                       │ /opt/homebrew/bin/cmake                             │"
+  },
+  {
+    "text": "│ ✓  │ Ninja build system                    │ /opt/homebrew/bin/ninja                             │"
+  },
+  {
+    "text": "│ ✓  │ SEGGER J-Link commander               │ /usr/local/bin/JLinkExe                             │"
+  },
+  {
+    "text": "│ ✓  │ neuralspotx Python package            │ installed                                           │"
+  },
+  {
+    "text": "│ ✓  │ ARM GCC toolchain                     │ /Applications/ArmGNUToolchain/15.2.rel1/arm-none-e… │"
+  },
+  {
+    "text": "│ ✓  │ pylink Python package (RTT transport) │ installed                                           │"
+  },
+  {
+    "text": "╰────┴───────────────────────────────────────┴─────────────────────────────────────────────────────╯"
+  },
+  {
+    "text": ""
+  },
+  {
+    "text": "  All required tools found."
+  }
+]} />
+
+Every required row must show a check mark. A dash marks an optional tool
+(heliaAOT, `armclang`) and is not a failure. If a required row is missing,
+the fix is on [Install](../install/); `hpx doctor` finds tools by the same
+rules hpx uses at build time, so a green table here means the build will
+find them too.
+
+### 2. `hpx boards`: the board registry
+
+Captured on macOS 26.6, 2026-09-21 (the table is printed from the registry
+and does not depend on attached hardware):
+
+<AsciiTerminal animated copy="commands" lines={[
+  {
+    "text": "hpx boards",
+    "kind": "command"
+  },
+  {
+    "text": " Board                    SoC            Core           Backends             Domains             Channel",
+    "kind": "muted"
+  },
+  {
+    "text": " apollo3p_evb             apollo3p       cortex-m4      dwt                  cpu                 stable",
+    "kind": "success"
+  },
+  {
+    "text": " apollo3p_evb_cygnus      apollo3p       cortex-m4      dwt                  cpu                 preview"
+  },
+  {
+    "text": " apollo4p_evb             apollo4p       cortex-m4      dwt                  cpu                 preview"
+  },
+  {
+    "text": " apollo4l_evb             apollo4l       cortex-m4      dwt                  cpu                 preview"
+  },
+  {
+    "text": " apollo4l_blue_evb        apollo4l       cortex-m4      dwt                  cpu                 preview"
+  },
+  {
+    "text": " apollo4p_blue_kbr_evb    apollo4p       cortex-m4      dwt                  cpu                 preview"
+  },
+  {
+    "text": " apollo4p_blue_kxr_evb    apollo4p       cortex-m4      dwt                  cpu                 preview"
+  },
+  {
+    "text": " apollo510_evb            apollo510      cortex-m55     dwt, armv8m-pmu      cpu, memory, mve    stable",
+    "kind": "success"
+  },
+  {
+    "text": " apollo510b_evb           apollo510b     cortex-m55     dwt, armv8m-pmu      cpu, memory, mve    preview"
+  },
+  {
+    "text": " apollo5b_evb             apollo5b       cortex-m55     dwt, armv8m-pmu      cpu, memory, mve    preview"
+  },
+  {
+    "text": " apollo330mP_evb          apollo330P     cortex-m55     dwt, armv8m-pmu      cpu, memory, mve    preview"
+  },
+  {
+    "text": " apollo510dL_evb          apollo510L     cortex-m55     dwt, armv8m-pmu      cpu, memory, mve    preview"
+  },
+  {
+    "text": " atomiq110_fpga_turbo     atomiq110      cortex-m55     dwt, armv8m-pmu      cpu, memory, mve,   preview"
+  },
+  {
+    "text": "                                                                             ethos_npu",
+    "kind": "muted"
+  }
+]} />
+
+Stable board rows are highlighted in green. Find your EVB in the first column; that string is the `--board` value for
+every other command. `Backends` and `Domains` say which counters the board
+can capture: a Cortex-M4 board has DWT cycle counting only, a Cortex-M55
+board adds the Armv8-M PMU with memory and MVE counters. `Channel` records
+how much hardware validation backs the board. The table is printed from the
+board registry, so it is always current for the hpx you installed;
+[Boards and platforms](../../guide/boards/) explains each column.
+
+### 3. `hpx probes list`: the J-Link probe
+
+Illustrative output with two connected J-Link probes. Serial numbers are fictional; your product strings will vary.
+
+<AsciiTerminal animated copy="commands" lines={[
+  {
+    "text": "hpx probes list",
+    "kind": "command"
+  },
+  {
+    "text": "serial     product                    connection",
+    "kind": "muted"
+  },
+  {
+    "text": "---------  -------------------------  ----------",
+    "kind": "muted"
+  },
+  {
+    "text": "801000001  J-Link-OB-Apollo4-CortexM  USB",
+    "kind": "success"
+  },
+  {
+    "text": "801000002  J-Link                     USB",
+    "kind": "success"
+  }
+]} />
+
+If no probe is connected, hpx prints `No J-Link probes detected.`
+
+Nothing listed with a board plugged in means the wrong USB connector, a
+missing SEGGER install, or on Linux the udev rules not yet applied; replug
+after installing. With more than one probe attached, ask which one hpx
+would pick for your board:
+
+```bash
+hpx probes match --board apollo510_evb
+```
+
+It applies the same selection policy as `hpx profile` and `hpx validate`,
+so a wrong pick shows up here instead of mid-run. With no probe it says so
+and suggests `--jlink-serial`.
+
+### 4. `hpx ports list`: serial ports
+
+Only the `usb_cdc` and `uart` transports use a serial port. Skip this step
+when using the default `rtt` transport:
+
+Illustrative macOS output with a J-Link virtual COM port and an HPX USB CDC device. Device paths and serial numbers are fictional. Windows uses names such as `COM3`; Linux uses names such as `/dev/ttyACM0`.
+
+<AsciiTerminal animated copy="commands" lines={[
+  {
+    "text": "hpx ports list --all",
+    "kind": "command"
+  },
+  {
+    "text": "device                 kind         serial_number  description  product",
+    "kind": "muted"
+  },
+  {
+    "text": "---------------------  -----------  -------------  -----------  -------",
+    "kind": "muted"
+  },
+  {
+    "text": "/dev/cu.usbmodem001    jlink-vcom   801000001      J-Link VCOM  J-Link",
+    "kind": "success"
+  },
+  {
+    "text": "/dev/cu.usbmodem002    hpx-usb-cdc  HPX-DEMO-002   HPX USB CDC  HPX",
+    "kind": "success"
+  },
+  {
+    "text": "/dev/cu.debug-console  serial                      n/a",
+    "kind": "muted"
+  }
+]} />
+
+Without `--all` the list is filtered to ports that look like a board. On
+Linux, a port you can see but cannot open needs the group change from
+[Install](../install/#5-linux-usb-permissions).
+
+### 5. `hpx validate`: one real round trip
+
+`hpx validate` builds, flashes and profiles the MLPerf Tiny reference models
+and reports pass or fail per case. `--list` shows what a suite would run
+without touching hardware:
+
+Captured on macOS 26.6, 2026-09-21:
+
+<AsciiTerminal animated copy="commands" lines={[
+  {
+    "text": "hpx validate --suite smoke --list",
+    "kind": "command"
+  },
+  {
+    "text": "Registered models: ad, ic, kws, vww"
+  },
+  {
+    "text": "Registered boards: apollo330mP_evb, apollo3p_evb, apollo4l_blue_evb, apollo4p_blue_kxr_evb, apollo510_evb, apollo510dL_evb"
+  },
+  {
+    "text": ""
+  },
+  {
+    "text": "1 case(s) would run:"
+  },
+  {
+    "text": ""
+  },
+  {
+    "text": "  apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto    helia-rt/ns   arm-none-eabi-gcc   rtt   auto"
+  }
+]} />
+
+The smoke suite is one case: the keyword-spotting model on heliaRT with
+GCC, RTT and automatic memory placement. Drop `--list` to run it:
+
+```bash
+hpx validate --suite smoke
+```
+
+Each case writes its own artifact directory under `results/validation/`
+plus `validation_report.md` (one row per case with status, duration, layer
+count and cycles) and `validation_report.json` with paths to every case's
+`summary.json` and `run_metadata.json`. A `fail` row carries its error in
+the Notes column; read that case's `run_metadata.json` before re-running.
+
+Once smoke passes, widen the sweep along any axis, always with `--list`
+first:
+
+```bash
+hpx validate --models kws,ic --boards apollo510_evb --toolchains gcc,atfe --memories auto,tcm --list
+hpx validate --suite models-rt --list
+hpx validate --suite smoke --repeat 3
+```
+
+`--repeat` runs each case several times to help detect intermittent failures
+before using the setup in CI. With several boards on one host, map each to its
+probe: `--jlink-serials apollo510_evb=801000001,apollo3p_evb=801000002`.
+
+## Expected output
+
+A doctor table with every required tool found, your board in the registry,
+your probe listed, any serial port your transport needs, and
+`pass: 1` in `validation_report.md`. This confirms a working build, flash and capture path. Read each later run's
+validity, issues and measurement scope before using its numbers.
+
+## What next
+
+With validation complete, [profile your model](../first-profile/) and learn
+to read its timing, layer costs and memory use.
+
+If a check failed, [troubleshoot your setup](../first-profile/#troubleshooting-the-first-run)
+before continuing.

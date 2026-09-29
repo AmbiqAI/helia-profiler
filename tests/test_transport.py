@@ -111,6 +111,27 @@ def test_hang_detected_when_no_heartbeat():
     assert "--- HPX_END ---" not in lines
 
 
+def test_partial_bytes_do_not_keep_capture_alive():
+    """Bytes that never finish a line are not liveness."""
+    import time as _t
+
+    sent = {"n": 0}
+
+    def read() -> bytes:
+        sent["n"] += 1
+        if sent["n"] == 1:
+            return b"--- HPX_START ---\n"
+        if sent["n"] > 3_000:
+            raise AssertionError("heartbeat timeout never fired")
+        _t.sleep(0.001)
+        return b"x"
+
+    t0 = _t.monotonic()
+    lines = collect_lines(read, transport_name="TEST", heartbeat_timeout_s=0.2)
+    assert _t.monotonic() - t0 < 2.0
+    assert lines == ["--- HPX_START ---"]
+
+
 def test_collect_lines_invokes_on_line_callback():
     seen: list[str] = []
 
@@ -253,9 +274,9 @@ def test_hang_warning_reports_real_silence_not_configured_timeout(caplog, monkey
     # The 1s est at 1.0 safety + 1s margin holds a ~2s floor past the 0.2s
     # timeout.
     assert waited > 1.0
-    hang = [r for r in caplog.records if "no data for" in r.getMessage()]
+    hang = [r for r in caplog.records if "no complete line for" in r.getMessage()]
     assert hang, "expected the hang warning"
-    silence_match = re.search(r"no data for (\d+)s", hang[-1].getMessage())
+    silence_match = re.search(r"no complete line for (\d+)s", hang[-1].getMessage())
     assert silence_match is not None
     reported = float(silence_match.group(1))
     # Reports the real ~2s silence, not the configured 0.2s.

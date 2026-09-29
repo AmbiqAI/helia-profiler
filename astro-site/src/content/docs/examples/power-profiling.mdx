@@ -1,0 +1,114 @@
+---
+title: "Power capture with a Joulescope"
+description: "Add a Joulescope to the bench and capture energy per inference alongside the profile: the config, the run, and the summary fields to read, with the measurement pages that explain each step."
+---
+
+## Goal
+
+Capture current, charge and energy for the clean inference window of a
+profile run. You will learn what the config adds, what the run does after
+the profile pass, and which health signals decide whether the energy
+number can be quoted.
+
+## Hardware and wiring
+
+An Apollo510 EVB, a J-Link, and a Joulescope JS110, JS220 or JS320 in
+series with the board's supply, with its GPIO input on the board's sync
+pin and, on the JS220 and JS320, its Vref pin wired. The wiring, the pin
+table and the instrument differences are on
+[Joulescope](../../guide/power-joulescope/); read it before plugging
+anything in.
+
+## Software prerequisites
+
+hpx with the `aot` extra (`pyjoulescope_driver` ships with hpx), the
+toolchain and J-Link software, and on Linux the Joulescope udev rule.
+`hpx power-on` is the smoke test that the instrument is seen.
+
+## Config file
+
+[`examples/quickstart/hpx_aot_power.yml`](https://github.com/AmbiqAI/helia-profiler/blob/main/examples/quickstart/hpx_aot_power.yml):
+
+```yaml
+model:
+  path: kws_model.tflite
+  arena_size: 131072
+engine:
+  type: helia-aot
+  config:
+    prefix: hpx
+    module_name: hpx_model
+target:
+  board: apollo510_evb
+  toolchain: arm-none-eabi-gcc
+profiling:
+  pmu_counters:
+    cpu: default
+  per_layer: true
+  iterations: 3
+  warmup: 1
+power:
+  enabled: true
+  driver: joulescope
+  mode: external
+  duration_s: 20
+  io_voltage: 1.8
+  sync_gpio_pin: 29
+output:
+  format: csv
+  dir: ./results/results_aot_power
+```
+
+`power.enabled` turns the five power stages on; `driver`, `mode`,
+`duration_s`, `io_voltage` and `sync_gpio_pin` are explained on
+[Power measurement](../../guide/power/) and the generated
+[configuration reference](../../reference/configuration/).
+
+## Run
+
+```bash
+cd examples/quickstart
+hpx power-on --driver joulescope
+hpx profile --config hpx_aot_power.yml
+```
+
+The run profiles as usual, then builds and flashes a dedicated power
+binary, arms the Joulescope, resets the board and captures the gated
+clean window.
+
+## Expected output
+
+Not yet captured on this bench. A completed run adds a `power` block to
+`summary.json` with `measurement_scope`, `energy_per_inference_j`,
+`capture_duration_s`, the gated-window statistics and the health signals;
+the fields are listed on [Output files](../../guide/output/) and the
+terminal panel is described on [Verifying a capture](../../guide/power-verify/).
+
+## How to read it
+
+- `measurement_scope` must read `gpio_gated_clean_window` for the energy
+  per inference to mean one inference; the other scopes are explained on
+  [Windows and lock-step](../../guide/power-windows/).
+- The `power.window_*` and `gated_window_duration_suspect` codes in
+  `issues` are the health checks; a `degraded` verdict with one of them
+  means the number is a caveat, not a measurement.
+- Compare two power runs only through `hpx compare`, which withholds the
+  power deltas when the scope, mode, firmware, probe or clean workload
+  differ ([Analysis and comparison](../../guide/analysis-comparison/)).
+
+## Variations
+
+- Reading the block the run wrote: [Read a power summary](../power-read-summary/);
+  holding two captures against each other: [Compare two power runs](../power-compare/).
+- heliaRT instead of heliaAOT: copy the `power` block into `hpx_rt.yml`.
+- INA228 on the board instead of a Joulescope: `power.driver: ina228`, a
+  different measurement scope, on [INA228](../../guide/power-ina228/).
+- Longer captures for tighter statistics: raise `duration_s`; the fixed
+  inference count is derived from the profile pass's clean timing.
+
+## Validated on
+
+Not yet validated. The nightly hardware validation runs with `power: off`,
+and no captured power bundle is shipped with the documentation. The
+configuration above is the checked-in quickstart file; the bench facts on
+the linked measurement pages are cited there.

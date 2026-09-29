@@ -1,0 +1,174 @@
+{
+  "package": "helia_profiler",
+  "importFrom": "helia_profiler",
+  "groups": [
+    {
+      "path": "helia_profiler",
+      "summary": "The entry points of the heliaPROFILER Python API: one call, one session, and the progress stream they report through.",
+      "members": [
+        "__version__",
+        "profile",
+        "Session",
+        "ProgressUpdate"
+      ]
+    },
+    {
+      "path": "helia_profiler.config",
+      "summary": "The run description: what to profile, on what, how, and what to write out. Every field of a YAML config file lands in one of these.",
+      "members": [
+        "ProfileConfig",
+        "ModelConfig",
+        "EngineConfig",
+        "TargetConfig",
+        "ProfilingConfig",
+        "OutputConfig",
+        "BuildConfig",
+        "HeartbeatConfig",
+        "TimeoutsConfig",
+        "ClockSelection",
+        "OutputFormat"
+      ]
+    },
+    {
+      "path": "helia_profiler.config.power",
+      "summary": "Power capture settings: which instrument measures the rail, how it is wired to the board, and which window of the run is integrated.",
+      "members": [
+        "PowerConfig"
+      ]
+    },
+    {
+      "path": "helia_profiler.vocab",
+      "summary": "The fixed vocabularies a configuration selects from: engines, toolchains, capture transports, memory placements and reset strategies.",
+      "members": [
+        "EngineType",
+        "Toolchain",
+        "Transport",
+        "Placement",
+        "ResetStrategy"
+      ]
+    },
+    {
+      "path": "helia_profiler.deps",
+      "summary": "What this build of heliaPROFILER is qualified against: the board, engine and toolchain matrix, and the locked dependency revisions a run was produced with.",
+      "members": [
+        "CompatibilityBaseline",
+        "CompatibilityResolution",
+        "QualificationState",
+        "load_compatibility_baseline",
+        "DependencyLockProvenance",
+        "read_dependency_lock_provenance"
+      ]
+    },
+    {
+      "path": "helia_profiler.results",
+      "summary": "What a profiling run produces: the run result, its per-layer and PMU detail, and the firmware and run metadata that say how it was measured.",
+      "members": [
+        "ProfileResult",
+        "PmuResult",
+        "PresetResult",
+        "LayerResult",
+        "FirmwareMeta",
+        "RunMetadata"
+      ]
+    },
+    {
+      "path": "helia_profiler.results.manifest",
+      "summary": "The on-disk index of a run directory: the artifacts it holds, the issues raised against it, and whether its numbers may be used.",
+      "members": [
+        "ResultManifest",
+        "ResultArtifact",
+        "ResultIssue",
+        "ResultValidity",
+        "RunStatus",
+        "load_result_manifest"
+      ]
+    },
+    {
+      "path": "helia_profiler.power",
+      "summary": "What a power capture produces: the measured result, the observations behind it, and the on-device summary the firmware reports.",
+      "members": [
+        "PowerMode",
+        "PowerResult",
+        "PowerObservation",
+        "PowerTerminalRecord",
+        "OnDevicePowerSummary"
+      ]
+    },
+    {
+      "path": "helia_profiler.power.metadata",
+      "summary": "The provenance of a power number: how it was observed, what the measurement boundary included, and whether the capture holds together.",
+      "members": [
+        "PowerMetadata",
+        "MeasurementScope",
+        "ObservationMode",
+        "PowerIntegrity"
+      ]
+    },
+    {
+      "path": "helia_profiler.evaluation",
+      "summary": "Comparing two runs and judging one: the comparability rules that decide whether a comparison is meaningful, and the metric policies that turn numbers into a verdict.",
+      "members": [
+        "CompareResult",
+        "assess_comparability",
+        "ComparabilityAssessment",
+        "ComparabilityIssue",
+        "ComparabilitySeverity",
+        "ComparisonProfile",
+        "evaluate_comparison_profile",
+        "ComparisonVerdict",
+        "MetricPolicy",
+        "MetricDirection",
+        "MetricVerdict",
+        "MissingMetricPolicy",
+        "VerdictStatus",
+        "evaluate_run",
+        "RunEvaluation"
+      ]
+    },
+    {
+      "path": "helia_profiler.modelcost",
+      "summary": "The static cost model of a network, read from the model file before anything is built or run.",
+      "members": [
+        "ModelAnalysis"
+      ]
+    },
+    {
+      "path": "helia_profiler.diagnostics",
+      "summary": "Collecting a redacted support bundle from a run directory, and reading one back.",
+      "members": [
+        "SupportBundleOptions",
+        "collect_support_bundle",
+        "write_support_bundle",
+        "verify_support_bundle",
+        "SupportBundleManifest",
+        "SupportBundleSection"
+      ]
+    },
+    {
+      "path": "helia_profiler.errors",
+      "summary": "The exception hierarchy every heliaPROFILER failure is raised through, rooted at HpxError.",
+      "members": [
+        "HpxError",
+        "ConfigError",
+        "PlatformError",
+        "EngineError",
+        "FirmwareError",
+        "BuildError",
+        "DependencyError",
+        "VersionError",
+        "LockError",
+        "NetworkError",
+        "CaptureError",
+        "DeterministicCaptureError",
+        "PowerError",
+        "ReportError"
+      ]
+    },
+    {
+      "path": "helia_profiler.examples",
+      "kind": "module",
+      "summary": "Packaged model and config assets used by the examples, smoke tests and tutorials.",
+      "members": []
+    }
+  ]
+}

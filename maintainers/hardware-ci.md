@@ -436,3 +436,9 @@ wiped or mispointed `HPX_CACHE_DIR`) into a failure.
 
 The gate is read-only on the workspace cache (`-fsyntax-only`, scratch in
 pytest tmp dirs) and adds ~20 s for a full matrix.
+
+For template refactors that must not change generated code,
+`tools/firmware_codegen_gate.py` compiles the same matrix to objects and
+compares allocated sections and per-function disassembly between two
+checkouts: `record` in each checkout with the same `--scratch`, then
+`compare BASE.json HEAD.json`.
