@@ -65,6 +65,10 @@ class FixtureCaptureRequest:
     #: Caller-predicted firmware run time after reset; the host stays detached for
     #: ``max(1 s, expected_duration_s * 1.25)``, bounded by ``settle_seconds``, before polling.
     expected_duration_s: float | None = None
+    #: Sizes of outputs after the first, in model order (typed fixtures).
+    extra_output_sizes: tuple[int, ...] = ()
+    #: Byte size of each heliaAOT scratch arena the build scans, in ``FixtureBuild.aot_arena_scan`` order.
+    arena_scan_sizes: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -97,6 +101,11 @@ class FixtureCaptureResult:
     memory: FixtureMemory | None = None
     artifacts: tuple[FixtureFile, ...] = ()
     error: str | None = None
+    #: Every output in model order; ``output`` is the first.
+    outputs: tuple[FixtureFile, ...] = ()
+    #: Per scanned scratch arena: (bytes no longer holding the paint, highest such offset + 1).
+    #: Both are lower bounds: a kernel may write the paint value itself.
+    arena_scan: tuple[tuple[int, int], ...] = ()
 
 
 def _atomic_json(path: Path, value: object) -> None:
@@ -143,10 +152,22 @@ def capture_fixture(
     request: FixtureCaptureRequest, *, guard: FixtureCaptureGuard
 ) -> FixtureCaptureResult:
     """Capture one bounded raw terminal snapshot and persist every attempted operation."""
+    require(isinstance(request.extra_output_sizes, tuple), "Invalid output extent")
+    output_sizes = (request.output_size, *request.extra_output_sizes)
     require(
-        type(request.output_size) is int and 0 < request.output_size <= DTCM[1] - DTCM[0],
+        all(type(size) is int and size > 0 for size in output_sizes)
+        and sum(output_sizes) <= DTCM[1] - DTCM[0],
         "Invalid output extent",
     )
+    require(
+        isinstance(request.arena_scan_sizes, tuple)
+        and len(request.arena_scan_sizes) <= 64
+        and all(type(size) is int and size > 0 for size in request.arena_scan_sizes),
+        "Invalid arena scan extents",
+    )
+    output_names = ["deployment_output"] + [
+        f"deployment_output_{k}" for k in range(1, len(output_sizes))
+    ]
     require(
         type(request.settle_seconds) in (int, float)
         and math.isfinite(request.settle_seconds)
@@ -182,6 +203,7 @@ def capture_fixture(
     _atomic_json(directory / "started.json", {"state": "started", "request": asdict(request)})
     artifacts: list[FixtureFile] = []
     output = None
+    outputs: tuple[FixtureFile, ...] = ()
     status = crc = None
     timing = memory = None
 
@@ -214,12 +236,14 @@ def capture_fixture(
         require(0 < request.image.path.stat().st_size <= MAX_IMAGE, "Image size")
         sizes = {
             "deployment_status": 4,
-            "deployment_output": request.output_size,
+            **dict(zip(output_names, output_sizes)),
             "deployment_checksum": 4,
             "deployment_timing": 28,
         }
         if request.arena_capacity is not None:
             sizes["deployment_memory"] = 32
+        if request.arena_scan_sizes:
+            sizes["deployment_arena_scan"] = 8 * len(request.arena_scan_sizes)
         image = inspect_elf(request.elf.read(), request.image.read(), request.load_address, sizes)
         pin(
             "identity.json",
@@ -256,14 +280,21 @@ def capture_fixture(
                 )
 
         def snapshot(session, *, suffix: str) -> dict[str, bytes]:
-            nonlocal output
+            nonlocal output, outputs
             values = {}
             for sink in image.sinks:
                 guard.check(require_free=False, remaining_s=10)
                 value = bytes(session.memory_read8(sink.address, sink.size))
                 ref = pin(sink.name + suffix + ".bin", value)
-                if sink.name == "deployment_output" and not suffix:
-                    output = ref
+                if sink.name in output_names and not suffix:
+                    outputs = tuple(
+                        sorted(
+                            (*outputs, ref),
+                            key=lambda r: output_names.index(r.path.stem),
+                        )
+                    )
+                    if sink.name == "deployment_output":
+                        output = ref
                 require(len(value) == sink.size, "Short target read")
                 values[sink.name] = value
             return values
@@ -371,7 +402,7 @@ def capture_fixture(
             "Timing scope differs from verified firmware terminal",
         )
         computed = 0
-        for byte in values["deployment_output"]:
+        for byte in b"".join(values[name] for name in output_names):
             computed = (computed * 31 + byte) & 0xFFFFFFFF
         require(crc == computed, "Output checksum mismatch")
         require(
@@ -384,8 +415,30 @@ def capture_fixture(
         )
         if request.arena_capacity is not None:
             memory = _memory(values["deployment_memory"], request.arena_capacity)
+        arena_scan = ()
+        if request.arena_scan_sizes:
+            words = struct.unpack(
+                f"<{2 * len(request.arena_scan_sizes)}I", values["deployment_arena_scan"]
+            )
+            arena_scan = tuple(zip(words[0::2], words[1::2]))
+            require(
+                all(
+                    touched <= high <= size
+                    for (touched, high), size in zip(arena_scan, request.arena_scan_sizes)
+                ),
+                "Invalid arena scan terminal",
+            )
         result = FixtureCaptureResult(
-            "success", request.timing_scope, output, status, crc, timing, memory, tuple(artifacts)
+            "success",
+            request.timing_scope,
+            output,
+            status,
+            crc,
+            timing,
+            memory,
+            tuple(artifacts),
+            outputs=outputs,
+            arena_scan=arena_scan,
         )
     except Exception as exc:
         result = FixtureCaptureResult(
@@ -398,6 +451,7 @@ def capture_fixture(
             memory,
             tuple(artifacts),
             str(exc),
+            outputs=outputs,
         )
     _atomic_json(directory / "receipt.json", asdict(result))
     return result

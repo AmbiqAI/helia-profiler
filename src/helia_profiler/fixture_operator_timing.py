@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import math
 
 from .engines import EngineType
-from .fixture import FixedFixture, FixtureBuild
+from .fixture import FixedFixture, FixtureBuild, TypedFixture
 from .results.models import ProfileResult
 
 #: Clock and placement every fixed fixture is built for (see ``fixture._validate``).
@@ -60,7 +60,10 @@ class FixtureOperatorTiming:
 
 
 def _identity_reason(
-    build: FixtureBuild, fixture: FixedFixture, profile: ProfileResult, allow_runtime: bool
+    build: FixtureBuild,
+    fixture: FixedFixture | TypedFixture,
+    profile: ProfileResult,
+    allow_runtime: bool,
 ) -> str | None:
     meta = profile.metadata
     snapshot = meta.config_snapshot or {}
@@ -102,7 +105,7 @@ def _identity_reason(
 
 def bind_operator_timing(
     build: FixtureBuild,
-    fixture: FixedFixture,
+    fixture: FixedFixture | TypedFixture,
     profile: ProfileResult,
     *,
     allow_runtime_difference: bool = False,

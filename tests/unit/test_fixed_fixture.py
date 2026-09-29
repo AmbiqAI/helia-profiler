@@ -259,12 +259,23 @@ def test_render_derives_extents_ops_counts_and_scope(tmp_path, kind, scope):
     ctx = PipelineContext(config=c, work_dir=tmp_path)
     _BindFixtureStage(FixtureRenderSpec(f, FixtureMethod(scope), model)).run(ctx)
     values = fixture_template_vars(ctx, [])
-    assert values["input_tensor"] == f.input_tensor
-    assert values["output_tensor"] == f.output_tensor
+    inputs, outputs = values["fixture_inputs"], values["fixture_outputs"]
+    assert isinstance(inputs, list) and isinstance(outputs, list)
+    (fixture_input,) = inputs
+    (fixture_output,) = outputs
+    assert (fixture_input["tensor_index"], fixture_input["size"], fixture_input["shape"]) == (
+        f.input_tensor.tensor_index,
+        f.input_tensor.size,
+        f.input_tensor.shape,
+    )
+    assert (fixture_output["tensor_index"], fixture_output["size"]) == (
+        f.output_tensor.tensor_index,
+        f.output_tensor.size,
+    )
     assert values["fixture_iterations"] == 17
     assert values["fixture_warmups"] == 3
     assert values["fixture_timing_scope"] == scope.value
-    assert len(str(values["input_values"]).split(",")) == f.input_tensor.size
+    assert len(str(fixture_input["initializer"]).split(",")) == f.input_tensor.size
     source = _jinja_env.get_template("fixed_fixture.cc.j2").render(**values)
     assert f"deployment_output[{f.output_tensor.size}]" in source
     assert f"input->bytes != {f.input_tensor.size}" in source

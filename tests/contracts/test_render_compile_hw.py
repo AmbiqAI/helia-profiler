@@ -601,6 +601,8 @@ def test_matrix_covers_every_engine_family():
         "510-helia-aot-fixture-tcn",
         "510-tflm-fixture-kws",
         "510-helia-aot-fixture-kws",
+        "510-tflm-fixture-typed",
+        "510-helia-aot-fixture-typed",
     }, "the Tier-2 leg set changed — deliberate? update this pin with the reason"
 
 
@@ -836,7 +838,7 @@ def test_fixture_real_toolchain_preparation_renders_current_sources(tmp_path, ca
     scratch, tus = _prepare_case(case, workspace, tmp_path)
     assert tus == [scratch / "main.cc"]
     text = tus[0].read_text(encoding="utf-8")
-    size = 480 if case.fixture_kind == "tcn" else 12
+    size = {"tcn": 480, "kws": 12, "typed": 4}[case.fixture_kind]
     assert f"deployment_output[{size}]" in text
     assert "hpx_stimer_init" in (scratch / "fixed_fixture_clock.h").read_text(encoding="utf-8")
     if case.engine == "helia-aot":

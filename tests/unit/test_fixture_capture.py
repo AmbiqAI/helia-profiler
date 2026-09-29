@@ -6,6 +6,7 @@ from hashlib import sha256
 import json
 import re
 import struct
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -18,28 +19,40 @@ from helia_profiler.fixture_target import supported_fixture_target
 from helia_profiler.fixture_runtime import FixtureFile
 
 
-def image_files(tmp_path):
-    names = ["deployment_status", "deployment_output", "deployment_checksum", "deployment_timing"]
-    sizes = [4, 3, 4, 28]
-    addresses = [0x20000000, 0x20000004, 0x20000008, 0x2000000C]
+_SINKS = {
+    "deployment_status": 4,
+    "deployment_output": 3,
+    "deployment_checksum": 4,
+    "deployment_timing": 28,
+}
+
+
+def image_files(tmp_path, sinks=_SINKS, *, align=4):
+    names, sizes = list(sinks), list(sinks.values())
+    addresses = [0x20000000]
+    for size in sizes[:-1]:
+        addresses.append(addresses[-1] + (size + align - 1) // align * align)
+    extent = max(64, addresses[-1] + sizes[-1] - 0x20000000)
     strings = b"\0" + b"".join(n.encode() + b"\0" for n in names)
     symbols = b"\0" * 16
     for name, size, address in zip(names, sizes, addresses):
-        symbols += struct.pack("<IIIBBH", strings.index(name.encode()), address, size, 0x11, 0, 1)
+        symbols += struct.pack(
+            "<IIIBBH", strings.index(name.encode() + b"\0"), address, size, 0x11, 0, 1
+        )
     binary = b"\x01\x02\x03\x04"
-    data = bytearray(512)
+    data = bytearray(1024)
     data[:16] = b"\x7fELF\x01\x01\x01" + b"\0" * 9
     struct.pack_into(
         "<HHIIIIIHHHHHH", data, 16, 2, 40, 1, 0x410001, 52, 128, 0, 52, 32, 2, 40, 4, 2
     )
-    struct.pack_into("<8I", data, 52, 1, 400, 0x410000, 0x410000, 4, 4, 5, 1)
-    struct.pack_into("<8I", data, 84, 1, 0, 0x20000000, 0, 0, 64, 6, 1)
-    struct.pack_into("<10I", data, 168, 0, 8, 3, 0x20000000, 0, 64, 0, 0, 4, 0)
+    struct.pack_into("<8I", data, 52, 1, 640, 0x410000, 0x410000, 4, 4, 5, 1)
+    struct.pack_into("<8I", data, 84, 1, 0, 0x20000000, 0, 0, extent, 6, 1)
+    struct.pack_into("<10I", data, 168, 0, 8, 3, 0x20000000, 0, extent, 0, 0, 4, 0)
     struct.pack_into("<10I", data, 208, 0, 3, 0, 0, 288, len(strings), 0, 0, 1, 0)
-    struct.pack_into("<10I", data, 248, 0, 2, 0, 0, 408, len(symbols), 2, 0, 4, 16)
+    struct.pack_into("<10I", data, 248, 0, 2, 0, 0, 648, len(symbols), 2, 0, 4, 16)
     data[288 : 288 + len(strings)] = strings
-    data[400:404] = binary
-    data[408 : 408 + len(symbols)] = symbols
+    data[640:644] = binary
+    data[648 : 648 + len(symbols)] = symbols
 
     def pin(name, raw):
         path = tmp_path / name
@@ -650,3 +663,171 @@ def test_invalid_prediction_is_rejected_before_device(rig, expected):
             replace(request, settle_seconds=10, expected_duration_s=expected), guard=guard
         )
     assert not guard.calls and not flashes and not writes
+
+
+_TYPED_SINKS = {
+    **_SINKS,
+    "deployment_output_1": 5,
+    "deployment_output_2": 2,
+    "deployment_arena_scan": 16,
+}
+_TYPED_OUTPUTS = {
+    0x20000004: bytes([1, 2, 3]),
+    0x20000028: bytes([4, 5, 6, 7, 8]),
+    0x20000030: b"\x09\x0a",
+}
+
+
+def _checksum(data):
+    value = 0
+    for byte in data:
+        value = (value * 31 + byte) & 0xFFFFFFFF
+    return value
+
+
+@pytest.fixture
+def typed_rig(rig, tmp_path):
+    request, memory, terminal, writes, flashes, guard = rig
+    (tmp_path / "typed").mkdir()
+    elf, _, _ = image_files(tmp_path / "typed", _TYPED_SINKS)
+    request = replace(request, elf=elf, extra_output_sizes=(5, 2), arena_scan_sizes=(64, 32))
+    terminal.update(_TYPED_OUTPUTS)
+    terminal[0x20000008] = struct.pack("<I", _checksum(b"".join(_TYPED_OUTPUTS.values())))
+    terminal[0x20000034] = struct.pack("<4I", 10, 40, 0, 0)
+    return request, memory, terminal, writes, flashes, guard
+
+
+def test_typed_capture_reads_every_output_and_the_arena_scan(typed_rig):
+    request, memory, terminal, writes, flashes, guard = typed_rig
+    result = capture.capture_fixture(request, guard=guard)
+    assert result.state == "success", result.error
+    assert [ref.read() for ref in result.outputs] == list(_TYPED_OUTPUTS.values())
+    assert [ref.path.name for ref in result.outputs] == [
+        "deployment_output.bin",
+        "deployment_output_1.bin",
+        "deployment_output_2.bin",
+    ]
+    assert result.output == result.outputs[0]
+    assert result.arena_scan == ((10, 40), (0, 0))
+    identity = json.loads((request.evidence_dir / "identity.json").read_text())
+    assert len(identity["sinks"]) == 7
+    receipt = json.loads((request.evidence_dir / "receipt.json").read_text())
+    assert receipt["arena_scan"] == [[10, 40], [0, 0]] and len(receipt["outputs"]) == 3
+
+
+@pytest.mark.parametrize("covered", [1, 2])
+def test_typed_checksum_must_cover_every_output(typed_rig, covered):
+    request, memory, terminal, writes, flashes, guard = typed_rig
+    partial = b"".join(list(_TYPED_OUTPUTS.values())[:covered])
+    terminal[0x20000008] = struct.pack("<I", _checksum(partial))
+    result = capture.capture_fixture(request, guard=guard)
+    assert result.state == "failure" and "checksum" in (result.error or "")
+    assert len(result.outputs) == 3
+
+
+@pytest.mark.parametrize("words", [(41, 40, 0, 0), (0, 0, 1, 33), (0, 65, 0, 0)])
+def test_arena_scan_terminal_must_fit_its_arena(typed_rig, words):
+    request, memory, terminal, writes, flashes, guard = typed_rig
+    terminal[0x20000034] = struct.pack("<4I", *words)
+    result = capture.capture_fixture(request, guard=guard)
+    assert result.state == "failure" and "arena scan" in (result.error or "")
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"extra_output_sizes": (5, 2, 1)},
+        {"extra_output_sizes": (5, 3)},
+        {"arena_scan_sizes": ()},
+        {"arena_scan_sizes": (64,)},
+    ],
+)
+def test_declared_sinks_must_match_the_image(typed_rig, change):
+    request, memory, terminal, writes, flashes, guard = typed_rig
+    result = capture.capture_fixture(replace(request, **change), guard=guard)
+    assert result.state == "failure"
+    assert not flashes and not writes
+
+
+@pytest.mark.parametrize(
+    "change,match",
+    [
+        ({"extra_output_sizes": (0,)}, "output extent"),
+        ({"extra_output_sizes": [5]}, "output extent"),
+        ({"extra_output_sizes": 5}, "output extent"),
+        ({"extra_output_sizes": (0x7C000,)}, "output extent"),
+        ({"arena_scan_sizes": (0,)}, "arena scan extents"),
+        ({"arena_scan_sizes": [64]}, "arena scan extents"),
+        ({"arena_scan_sizes": (1,) * 65}, "arena scan extents"),
+    ],
+)
+def test_invalid_typed_extents_are_rejected_before_device(rig, change, match):
+    request, memory, terminal, writes, flashes, guard = rig
+    with pytest.raises(ValueError, match=match):
+        capture.capture_fixture(replace(request, **change), guard=guard)
+    assert not guard.calls and not flashes and not writes
+
+
+def test_output_sinks_may_be_byte_aligned_but_word_sinks_may_not(tmp_path):
+    sinks = {
+        "deployment_output": 3,
+        "deployment_output_1": 4,
+        "deployment_status": 4,
+        "deployment_checksum": 4,
+        "deployment_timing": 28,
+    }
+    elf, image, sizes = image_files(tmp_path, sinks, align=1)
+    with pytest.raises(ValueError, match="unaligned word sink"):
+        inspect_elf(elf.read(), image.read(), 0x410000, sizes)
+    (tmp_path / "bytes").mkdir()
+    only_bytes = {"deployment_status": 4, "deployment_output": 3, "deployment_output_1": 5}
+    elf, image, sizes = image_files(tmp_path / "bytes", only_bytes, align=1)
+    parsed = inspect_elf(elf.read(), image.read(), 0x410000, sizes)
+    assert {s.name: s.address for s in parsed.sinks}["deployment_output_1"] == 0x20000007
+
+
+@pytest.mark.parametrize(
+    "extra", ["deployment_output_1", "deployment_output_12", "deployment_arena_scan"]
+)
+def test_undeclared_typed_sink_is_refused(tmp_path, extra):
+    elf, image, sizes = image_files(tmp_path, {**_SINKS, extra: 8})
+    del sizes[extra]
+    with pytest.raises(ValueError, match=f"undeclared fixture sink {extra}"):
+        inspect_elf(elf.read(), image.read(), 0x410000, sizes)
+
+
+def _eleven_output_rig(rig, tmp_path, *, checksum_ok):
+    request, memory, terminal, writes, flashes, guard = rig
+    extra = {f"deployment_output_{k}": 1 for k in range(1, 12)}
+    sinks = {**_SINKS, **extra}
+    (tmp_path / "eleven").mkdir()
+    elf, _, _ = image_files(tmp_path / "eleven", sinks)
+    address, addresses = 0x20000000, {}
+    for name, size in sinks.items():
+        addresses[name] = address
+        address += (size + 3) // 4 * 4
+    values = {f"deployment_output_{k}": bytes([k]) for k in range(1, 12)}
+    for name, value in values.items():
+        terminal[addresses[name]] = value
+    model_order = bytes([1, 2, 3]) + b"".join(
+        values[f"deployment_output_{k}"] for k in range(1, 12)
+    )
+    terminal[addresses["deployment_checksum"]] = struct.pack(
+        "<I", _checksum(model_order) if checksum_ok else 0
+    )
+    return replace(request, elf=elf, extra_output_sizes=(1,) * 11), guard
+
+
+@pytest.mark.parametrize("checksum_ok", [True, False])
+def test_outputs_are_returned_in_model_order_past_ten(rig, tmp_path, checksum_ok):
+    request, guard = _eleven_output_rig(rig, tmp_path, checksum_ok=checksum_ok)
+    result = capture.capture_fixture(request, guard=guard)
+    assert result.state == ("success" if checksum_ok else "failure"), result.error
+    assert [ref.path.name for ref in result.outputs] == ["deployment_output.bin"] + [
+        f"deployment_output_{k}.bin" for k in range(1, 12)
+    ]
+    assert [ref.read() for ref in result.outputs[1:]] == [bytes([k]) for k in range(1, 12)]
+    receipt = json.loads((request.evidence_dir / "receipt.json").read_text())
+    assert [Path(o["path"]).name for o in receipt["outputs"]] == [
+        ref.path.name for ref in result.outputs
+    ]

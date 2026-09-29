@@ -95,6 +95,58 @@ The existing host compile gate includes representative TCN/KWS fixtures for both
 engines and timing scopes. The existing real-toolchain gate includes both engines
 and models, using its normal qualified dependency-workspace requirements.
 
+## Typed multi-tensor fixtures
+
+`TypedFixture(model, inputs, outputs)` covers every input and output of a
+static, stateless, single-subgraph model. Each `FixtureIO` pairs a
+`FixtureTensor(name, index, dtype, shape, quantization)` with the pinned bytes of
+that tensor: fixed input bytes, or the expected output. Inputs carry a role
+(`signal` or `aux`); outputs are `signal`. Dtypes are `int8`, `int16`, `float16`
+and `float32`. Integer tensors need `PerTensorQuantization` or
+`PerAxisQuantization`; float tensors carry none.
+`analyze_typed_fixture_model` reads the same declarations from the flatbuffer,
+and the build refuses any difference in name, index, order, dtype, shape or
+quantization. Every IO tensor must be named in the flatbuffer and have at least
+one dimension; unnamed or scalar (rank-0) IO is refused. An IO tensor with a
+single scale and zero point is read as per-tensor, even when its quantized axis
+has extent 1, so declare it with `PerTensorQuantization`. A `FixedFixture` keeps
+its single-INT8 rules and renders exactly as before.
+
+`FIXTURE_CAPABILITIES` is the producer's declaration per engine and IO dtype:
+
+- `qualified` means an exact device pass;
+- `supported` means it builds but has no device pass yet;
+- `unsupported` is refused.
+
+The upstream TFLM runtime also refuses any model with a FLOAT16 tensor, including
+weights behind DEQUANTIZE. `FixtureBuild.capabilities` records the status of
+every IO dtype the build uses. A device pass so far covers one input and one
+output with per-tensor quantization. A typed fixture with more tensors, or with
+per-axis IO quantization (checked on the host only), reports `supported`, not
+`qualified`.
+
+Firmware restores every input before each warmup and measured call. It checks
+each tensor's byte extent, and on TFLM also its type, shape and per-tensor
+quantization (per-axis parameters are verified on the host only). It then copies
+each output to its own DTCM sink, `deployment_output`, `deployment_output_1`, and
+so on. `deployment_checksum` covers all outputs in model order. Total output
+bytes may not exceed `FIXTURE_READBACK_BUDGET` (128 KiB), so every output of
+every capture is read back in full. The caller compares each
+`FixtureCaptureResult.outputs` file against `FixtureBuild.outputs`. For typed
+builds, pass `extra_output_sizes` (every output after the first) to
+`FixtureCaptureRequest`. Capture refuses an image whose typed sinks differ from
+the request.
+
+`observe_aot_arenas=True` (heliaAOT only) paints every scratch arena with `0xA5`
+after model initialization, then scans it after the timed loop, outside the
+timed interval. `FixtureBuild.aot_arena_scan` lists `(region id, size)`. Pass
+the sizes as `arena_scan_sizes`; `FixtureCaptureResult.arena_scan` then gives
+`(touched bytes, high water)` per arena. Both are lower bounds, since a kernel may
+write the paint value itself. Persistent and constant arenas are not painted.
+Painting touches every scratch byte just before the warmups, so configure at
+least one warmup when timing matters. The option joins the intent identity only
+when enabled, so existing identities are unchanged.
+
 ## Measurement records
 
 `fixture_metrics.inspect_fixture_footprint` reads pinned ELF/image/map artifacts
