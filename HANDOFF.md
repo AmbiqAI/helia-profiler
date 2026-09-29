@@ -73,3 +73,5 @@ CI repair: rebased onto origin/main fab4cddd, retaining reviewed docs and upstre
 CI repair verified remotely on 2e31c89d: both CI and Documentation site workflows passed; all three old review threads resolved. Fresh review pending and approval still required. Timing-result card now uses an even green outline on all sides per owner preference.
 
 Fresh review: sanitized probe serials in nine published bundles and refreshed manifest digests; regression tests verify redaction and integrity. Clarified Home config placeholders and made engine/toolchain recipes pass repository-relative model paths explicitly. Focused checks: 24 passed; site build passed. Approval remains required.
+
+Merge authorized once CI is green. Windows bundle-integrity tests exposed checkout line-ending conversion; .gitattributes now preserves exact captured bytes with -text for examples/results.
