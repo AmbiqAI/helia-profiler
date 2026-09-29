@@ -203,6 +203,15 @@ def test_check_returns_capabilities_of_the_dtypes_used(tmp_path, engine):
     )
 
 
+@pytest.mark.parametrize("engine", [EngineType.TFLM, EngineType.HELIA_AOT])
+def test_per_axis_io_is_not_qualified_even_for_one_input_and_output(tmp_path, engine):
+    per_axis = FixtureTensor("x", 0, "int8", (1, 2), PerAxisQuantization(1, (0.5, 0.25), (0, 1)))
+    f = typed(tmp_path, inputs=(per_axis,), outputs=(LABEL,))
+    assert _check_typed_fixture(f, analysis_of(f), engine) == (
+        ("int8", FixtureCapability.SUPPORTED),
+    )
+
+
 @pytest.mark.parametrize(
     "declared",
     [

@@ -23,6 +23,7 @@ from .fixture_analysis import (
     FixtureModelAnalysis,
     FixtureTensor,
     Int8Tensor,
+    PerAxisQuantization,
     TypedFixtureModelAnalysis,
     analyze_fixture_model,
     analyze_typed_fixture_model,
@@ -170,17 +171,19 @@ def _check_typed_fixture(
     if engine is EngineType.TFLM and model.has_float16:
         raise ConfigError("The upstream TFLM runtime has no float16 support")
     table = FIXTURE_CAPABILITIES[engine]
-    single_io = len(model.inputs) == len(model.outputs) == 1
+    tensors = (*model.inputs, *model.outputs)
+    # Device passes so far cover one input and one output with per-tensor
+    # quantization, which the firmware also checks on the device.
+    single_io = len(model.inputs) == len(model.outputs) == 1 and not any(
+        isinstance(t.quantization, PerAxisQuantization) for t in tensors
+    )
 
     def status(dtype: str) -> FixtureCapability:
-        # Device passes so far cover one input and one output only.
         if table[dtype] is FixtureCapability.QUALIFIED and not single_io:
             return FixtureCapability.SUPPORTED
         return table[dtype]
 
-    capabilities = tuple(
-        sorted({(t.dtype, status(t.dtype)) for t in (*model.inputs, *model.outputs)})
-    )
+    capabilities = tuple(sorted({(t.dtype, status(t.dtype)) for t in tensors}))
     unsupported = [
         dtype for dtype, status in capabilities if status is FixtureCapability.UNSUPPORTED
     ]
