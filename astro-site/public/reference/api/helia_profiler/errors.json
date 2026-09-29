@@ -3,12 +3,12 @@
   "generatedFrom": {
     "tool": "pyref",
     "version": "1.7.3",
-    "sourceTree": "81ac29b5c609a5638d0b19d3a4dcbd68ea962d5b"
+    "sourceTree": "bed5e1fd96ee420ed80b2c0d9d7c362796568425"
   },
   "language": "python",
   "modules": [
     {
-      "description": "The exception hierarchy every heliaPROFILER failure is raised through, rooted at HpxError.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`, `experimental`\n\nGenerated from the `src/helia_profiler` tree `81ac29b5c609a5638d0b19d3a4dcbd68ea962d5b`.",
+      "description": "The exception hierarchy every heliaPROFILER failure is raised through, rooted at HpxError.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`, `experimental`\n\nGenerated from the `src/helia_profiler` tree `bed5e1fd96ee420ed80b2c0d9d7c362796568425`.",
       "name": "errors",
       "path": "helia_profiler.errors",
       "submodules": [],
