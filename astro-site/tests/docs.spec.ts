@@ -93,3 +93,26 @@ test('setup terminal retains output, replays, and copies only its command', asyn
   await expect(terminal).not.toHaveAttribute('data-playing', 'true', { timeout: 10000 });
   await expect(terminal.locator('[data-line-text]').last()).toHaveText('  All required tools found.');
 });
+
+test('landing workflow has five steps and wraps from Compare to Check', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('./');
+  const demo = page.locator('hpx-demo');
+  await demo.scrollIntoViewIfNeeded();
+  const tabs = demo.getByRole('tab');
+  await expect(tabs).toHaveText(['Check', 'Probes', 'LiteRT', 'AOT', 'Compare']);
+  await expect(demo.locator('[role="tabpanel"]')).toHaveCount(5);
+  for (const tab of await tabs.all()) {
+    const panelId = await tab.getAttribute('aria-controls');
+    await expect(demo.locator(`[id="${panelId}"] code`)).toHaveCount(1);
+  }
+  await tabs.last().click();
+  await tabs.last().press('ArrowRight');
+  await expect(tabs.first()).toBeFocused();
+  await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
+  await tabs.first().press('ArrowLeft');
+  await expect(tabs.last()).toBeFocused();
+  await expect(tabs.last()).toHaveAttribute('aria-selected', 'true');
+  await tabs.last().evaluate((element) => element.blur());
+  await expect(tabs.first()).toHaveAttribute('aria-selected', 'true', { timeout: 20000 });
+});
