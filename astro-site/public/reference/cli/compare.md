@@ -40,4 +40,4 @@ Examples:
   hpx compare results/baseline-validation results/candidate-validation --validation --output-dir results/validation-compare
 ```
 
-Generated from the `src/helia_profiler` tree `923b435f2270602d7706369421a5a0e36ebce28e` with typer 0.26.8 and click 8.3.3.
+Generated from the `src/helia_profiler` tree `60638c8527d6f08bfb943eb72ca2ee32a639f673` with typer 0.26.8 and click 8.3.3.
