@@ -97,7 +97,7 @@ def test_fixture_statics_fit_at_boundary_and_overflow_one_byte_later(tmp_path, e
 
 
 @pytest.mark.parametrize("transport", ["swo", "rtt", "usb_cdc"])
-@pytest.mark.parametrize("engine", [EngineType.TFLM, EngineType.HELIA_AOT])
+@pytest.mark.parametrize("engine", [EngineType.TFLM, EngineType.HELIA_RT, EngineType.HELIA_AOT])
 def test_fixture_consumers_have_actual_regions_and_no_inactive_profiler_buffers(
     tmp_path, engine, transport
 ):
@@ -118,14 +118,38 @@ def test_fixture_consumers_have_actual_regions_and_no_inactive_profiler_buffers(
         "fixture_timing": 28,
         "fixture_timer_state": 4,
     }
-    if engine is EngineType.TFLM:
+    if engine is not EngineType.HELIA_AOT:
         expected["fixture_memory"] = 32
     assert sizes == expected
     assert {c.name: c.size for c in mram.consumers}["fixture_input"] == 490
     names = {c.name for region in plan.regions for c in region.consumers}
     assert not names & {"pmu_layer_records", "rtt_buffers", "usb_buffers"}
-    if engine is EngineType.TFLM:
+    if engine is not EngineType.HELIA_AOT:
         assert sram is not None
         assert {c.name: c.size for c in sram.consumers} == {"tensor_arena": 65536}
     again = _add_hpx_owned_consumers(plan, ctx)
     assert again == plan
+
+
+@pytest.mark.parametrize("observe", [False, True])
+def test_observed_aot_scratch_arenas_reserve_their_scan_sink(tmp_path, observe):
+    from helia_profiler.engines.base import ArenaRegion
+    from helia_profiler.placement import ArenaRole, Placement
+
+    ctx = context(tmp_path, EngineType.HELIA_AOT, 12)
+    assert ctx.fixture is not None and isinstance(ctx.engine_artifacts, HeliaAotArtifacts)
+    ctx.fixture = replace(ctx.fixture, observe_aot_arenas=observe)
+    ctx.engine_artifacts = replace(
+        ctx.engine_artifacts,
+        aot_arena_regions=[
+            ArenaRegion(0, "s0", "S0", 256, 16, ArenaRole.SCRATCH, "sram", Placement.SRAM),
+            ArenaRegion(1, "p", "P", 64, 16, ArenaRole.PERSISTENT, "sram", Placement.SRAM),
+            ArenaRegion(2, "s1", "S1", 128, 16, ArenaRole.SCRATCH, "sram", Placement.SRAM),
+        ],
+    )
+    PlanMemoryStage().run(ctx)
+    assert ctx.memory_plan is not None
+    dtcm = ctx.memory_plan.region("DTCM")
+    assert dtcm is not None
+    sizes = {c.name: c.size for c in dtcm.consumers}
+    assert sizes.get("fixture_arena_scan") == (16 if observe else None)

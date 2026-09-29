@@ -11,11 +11,17 @@ from dataclasses import asdict
 from typing import Protocol
 
 from .fixture import FixtureTimingScope
+from .fixture_stage import FixtureStage
 from .fixture_runtime import FixtureFile
 from .fixture_target import FixtureTarget
 from .fixture_image import MAX_ELF, MAX_IMAGE, DTCM, digest, require, inspect_elf
 from .target.probe.flash import flash_binary
-from .target.probe.jlink import attached_session, reset_target, list_connected_probes
+from .target.probe.jlink import (
+    attached_session,
+    list_connected_probes,
+    reset_target,
+    resume_if_halted,
+)
 
 
 class FixtureCaptureGuard(Protocol):
@@ -32,8 +38,19 @@ class FixtureCaptureGuard(Protocol):
         ...
 
 
+_STATUS_POISON = struct.unpack("<i", bytes([0xA5]) * 4)[0]
+_STATUS_RUNNING = -1
+_FIRST_POLL_S = 1.0
+_POLL_INTERVAL_S = 0.25
+_EXPECTED_MARGIN = 1.25
+_MEMORY_MAGIC = (0x4D454D31, 1)
+_FAILED_STAGES = {int(stage): stage.description for stage in FixtureStage}
+
+
 @dataclass(frozen=True)
 class FixtureCaptureRequest:
+    """One bounded capture; ``settle_seconds`` is the maximum wait for completion."""
+
     elf: FixtureFile
     image: FixtureFile
     load_address: int
@@ -45,6 +62,13 @@ class FixtureCaptureRequest:
     timing_scope: FixtureTimingScope
     target: FixtureTarget
     arena_capacity: int | None = None
+    #: Caller-predicted firmware run time after reset; the host stays detached for
+    #: ``max(1 s, expected_duration_s * 1.25)``, bounded by ``settle_seconds``, before polling.
+    expected_duration_s: float | None = None
+    #: Sizes of outputs after the first, in model order (typed fixtures).
+    extra_output_sizes: tuple[int, ...] = ()
+    #: Byte size of each heliaAOT scratch arena the build scans, in ``FixtureBuild.aot_arena_scan`` order.
+    arena_scan_sizes: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -77,6 +101,11 @@ class FixtureCaptureResult:
     memory: FixtureMemory | None = None
     artifacts: tuple[FixtureFile, ...] = ()
     error: str | None = None
+    #: Every output in model order; ``output`` is the first.
+    outputs: tuple[FixtureFile, ...] = ()
+    #: Per scanned scratch arena: (bytes no longer holding the paint, highest such offset + 1).
+    #: Both are lower bounds: a kernel may write the paint value itself.
+    arena_scan: tuple[tuple[int, int], ...] = ()
 
 
 def _atomic_json(path: Path, value: object) -> None:
@@ -91,24 +120,54 @@ def _memory(data: bytes, capacity: int) -> FixtureMemory:
     for word in words[:7]:
         check = (check * 31 + word) & 0xFFFFFFFF
     require(
-        words[:2] == (0x4D454D31, 1)
-        and words[2] == capacity
-        and words[6] == 1
-        and words[7] == check,
+        words[:2] == _MEMORY_MAGIC and words[2] == capacity and words[6] == 1 and words[7] == check,
         "Invalid versioned memory terminal",
     )
     require(all(0 < used <= capacity for used in words[3:6]), "Invalid allocator-use snapshot")
     return FixtureMemory(capacity, *words[3:6])
 
 
+def _running_stage(status: int, memory: bytes | None) -> str:
+    """Name the stage an unfinished fixture reached from its live sinks."""
+    if status == _STATUS_POISON:
+        return "firmware not started (status sink still poisoned)"
+    if status != _STATUS_RUNNING:
+        return f"unrecognised status {status}"
+    if memory is None or len(memory) != 32:
+        return "running (no intermediate stage reported)"
+    words = struct.unpack("<8I", memory)
+    if words[:2] != _MEMORY_MAGIC or not words[3]:
+        return "running before tensor allocation"
+    if not words[4]:
+        return "running warmups"
+    return "running the timed loop"
+
+
+def _failed_stage(status: int) -> str:
+    stage = _FAILED_STAGES.get(status, "system initialisation or unknown stage")
+    return f"Firmware failed at {stage} (status {status})"
+
+
 def capture_fixture(
     request: FixtureCaptureRequest, *, guard: FixtureCaptureGuard
 ) -> FixtureCaptureResult:
     """Capture one bounded raw terminal snapshot and persist every attempted operation."""
+    require(isinstance(request.extra_output_sizes, tuple), "Invalid output extent")
+    output_sizes = (request.output_size, *request.extra_output_sizes)
     require(
-        type(request.output_size) is int and 0 < request.output_size <= DTCM[1] - DTCM[0],
+        all(type(size) is int and size > 0 for size in output_sizes)
+        and sum(output_sizes) <= DTCM[1] - DTCM[0],
         "Invalid output extent",
     )
+    require(
+        isinstance(request.arena_scan_sizes, tuple)
+        and len(request.arena_scan_sizes) <= 64
+        and all(type(size) is int and size > 0 for size in request.arena_scan_sizes),
+        "Invalid arena scan extents",
+    )
+    output_names = ["deployment_output"] + [
+        f"deployment_output_{k}" for k in range(1, len(output_sizes))
+    ]
     require(
         type(request.settle_seconds) in (int, float)
         and math.isfinite(request.settle_seconds)
@@ -128,6 +187,13 @@ def capture_fixture(
         and 0 < request.arena_capacity <= 3 * 1024 * 1024,
         "Invalid arena capacity",
     )
+    require(
+        request.expected_duration_s is None
+        or type(request.expected_duration_s) in (int, float)
+        and math.isfinite(request.expected_duration_s)
+        and 0 < request.expected_duration_s <= request.settle_seconds,
+        "Invalid expected duration",
+    )
     require(isinstance(request.timing_scope, FixtureTimingScope), "Explicit timing scope required")
     require(isinstance(request.target, FixtureTarget), "Explicit typed fixture target required")
     request.target.verify()
@@ -137,6 +203,7 @@ def capture_fixture(
     _atomic_json(directory / "started.json", {"state": "started", "request": asdict(request)})
     artifacts: list[FixtureFile] = []
     output = None
+    outputs: tuple[FixtureFile, ...] = ()
     status = crc = None
     timing = memory = None
 
@@ -169,12 +236,14 @@ def capture_fixture(
         require(0 < request.image.path.stat().st_size <= MAX_IMAGE, "Image size")
         sizes = {
             "deployment_status": 4,
-            "deployment_output": request.output_size,
+            **dict(zip(output_names, output_sizes)),
             "deployment_checksum": 4,
             "deployment_timing": 28,
         }
         if request.arena_capacity is not None:
             sizes["deployment_memory"] = 32
+        if request.arena_scan_sizes:
+            sizes["deployment_arena_scan"] = 8 * len(request.arena_scan_sizes)
         image = inspect_elf(request.elf.read(), request.image.read(), request.load_address, sizes)
         pin(
             "identity.json",
@@ -211,14 +280,21 @@ def capture_fixture(
                 )
 
         def snapshot(session, *, suffix: str) -> dict[str, bytes]:
-            nonlocal output
+            nonlocal output, outputs
             values = {}
             for sink in image.sinks:
                 guard.check(require_free=False, remaining_s=10)
                 value = bytes(session.memory_read8(sink.address, sink.size))
                 ref = pin(sink.name + suffix + ".bin", value)
-                if sink.name == "deployment_output" and not suffix:
-                    output = ref
+                if sink.name in output_names and not suffix:
+                    outputs = tuple(
+                        sorted(
+                            (*outputs, ref),
+                            key=lambda r: output_names.index(r.path.stem),
+                        )
+                    )
+                    if sink.name == "deployment_output":
+                        output = ref
                 require(len(value) == sink.size, "Short target read")
                 values[sink.name] = value
             return values
@@ -248,10 +324,60 @@ def capture_fixture(
                 require(
                     read(session, sink.address, sink.size) == poison, "Poison readback mismatch"
                 )
+        sinks = {sink.name: sink for sink in image.sinks}
+
+        def await_completion(session, started: float, resumed: bool, detached: float) -> None:
+            """Poll the running target's status sink until it leaves both sentinels."""
+            polls = 0
+            while True:
+                polls += 1
+                raw = read(session, sinks["deployment_status"].address, 4)
+                live = struct.unpack("<i", raw)[0]
+                elapsed = time.monotonic() - started
+                completed = live not in (_STATUS_POISON, _STATUS_RUNNING)
+                if completed or elapsed >= request.settle_seconds:
+                    break
+                time.sleep(min(_POLL_INTERVAL_S, request.settle_seconds - elapsed))
+            live_memory = None
+            if not completed and "deployment_memory" in sinks:
+                live_memory = read(session, sinks["deployment_memory"].address, 32)
+            pin(
+                "completion.json",
+                (
+                    json.dumps(
+                        {
+                            "completed": completed,
+                            "status": live,
+                            "polls": polls,
+                            "elapsed_s": elapsed,
+                            "max_wait_s": request.settle_seconds,
+                            "resumed_after_attach": resumed,
+                            "detached_s": detached,
+                            "complete_on_first_poll": completed and polls == 1,
+                        },
+                        sort_keys=True,
+                    )
+                    + "\n"
+                ).encode(),
+            )
+            require(
+                completed,
+                f"Firmware did not complete within {request.settle_seconds} s: "
+                + _running_stage(live, live_memory),
+            )
+
         guard.check(require_free=True, remaining_s=request.settle_seconds + 120)
         reset_target(device=request.device, jlink_serial=request.jlink_serial)
-        time.sleep(request.settle_seconds)
+        started = time.monotonic()
+        # Stay detached through the secure bootloader and, when predicted, the whole run.
+        detached = min(
+            max(_FIRST_POLL_S, (request.expected_duration_s or 0.0) * _EXPECTED_MARGIN),
+            request.settle_seconds,
+        )
+        time.sleep(detached)
         with attach() as session:
+            guard.check(require_free=False, remaining_s=10)
+            await_completion(session, started, resume_if_halted(session), detached)
             halt(session)
             verify(session)
             values = snapshot(session, suffix="")
@@ -261,6 +387,7 @@ def capture_fixture(
             require(session.halted(), "Target resumed during snapshot")
         status = struct.unpack("<i", values["deployment_status"])[0]
         crc = struct.unpack("<I", values["deployment_checksum"])[0]
+        require(status == 0, _failed_stage(status))
         timing_words = struct.unpack("<7I", values["deployment_timing"])
         observed_scope = {
             1: FixtureTimingScope.INVOKE_ONLY,
@@ -274,9 +401,8 @@ def capture_fixture(
             observed_scope is request.timing_scope,
             "Timing scope differs from verified firmware terminal",
         )
-        require(status == 0, "Firmware completion status is nonzero")
         computed = 0
-        for byte in values["deployment_output"]:
+        for byte in b"".join(values[name] for name in output_names):
             computed = (computed * 31 + byte) & 0xFFFFFFFF
         require(crc == computed, "Output checksum mismatch")
         require(
@@ -289,8 +415,30 @@ def capture_fixture(
         )
         if request.arena_capacity is not None:
             memory = _memory(values["deployment_memory"], request.arena_capacity)
+        arena_scan = ()
+        if request.arena_scan_sizes:
+            words = struct.unpack(
+                f"<{2 * len(request.arena_scan_sizes)}I", values["deployment_arena_scan"]
+            )
+            arena_scan = tuple(zip(words[0::2], words[1::2]))
+            require(
+                all(
+                    touched <= high <= size
+                    for (touched, high), size in zip(arena_scan, request.arena_scan_sizes)
+                ),
+                "Invalid arena scan terminal",
+            )
         result = FixtureCaptureResult(
-            "success", request.timing_scope, output, status, crc, timing, memory, tuple(artifacts)
+            "success",
+            request.timing_scope,
+            output,
+            status,
+            crc,
+            timing,
+            memory,
+            tuple(artifacts),
+            outputs=outputs,
+            arena_scan=arena_scan,
         )
     except Exception as exc:
         result = FixtureCaptureResult(
@@ -303,6 +451,7 @@ def capture_fixture(
             memory,
             tuple(artifacts),
             str(exc),
+            outputs=outputs,
         )
     _atomic_json(directory / "receipt.json", asdict(result))
     return result

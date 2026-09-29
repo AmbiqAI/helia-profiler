@@ -1,0 +1,416 @@
+{
+ "kws_tflm": {
+  "model_sha256": "aeea436800704fce17b17292e4412630ad856e9d777c044c64ef748a880bd0ae",
+  "engine": {
+   "type": "tflm",
+   "version": null
+  },
+  "toolchain": {
+   "compiler": "atfe",
+   "compiler_version": "clang version 22.1.0"
+  },
+  "board": "apollo510_evb",
+  "cpu_clock_name": "lp",
+  "system_clock_hz": 96000000,
+  "clean_infer_avg_cycles": 1968960,
+  "config": {
+   "model": {
+    "arena_location": "sram",
+    "weights_location": "mram"
+   },
+   "profiling": {
+    "clean_window_probe": "infer"
+   },
+   "engine": {
+    "backend": "cmsis_nn"
+   }
+  },
+  "overflow_detected": false,
+  "layers": [
+   {
+    "id": 0,
+    "op": "CONV_2D",
+    "cycles": 315010.0,
+    "overflow": false
+   },
+   {
+    "id": 1,
+    "op": "DEPTHWISE_CONV_2D",
+    "cycles": 197360.5,
+    "overflow": false
+   },
+   {
+    "id": 2,
+    "op": "CONV_2D",
+    "cycles": 212250.0,
+    "overflow": false
+   },
+   {
+    "id": 3,
+    "op": "DEPTHWISE_CONV_2D",
+    "cycles": 197250.5,
+    "overflow": false
+   },
+   {
+    "id": 4,
+    "op": "CONV_2D",
+    "cycles": 212234.0,
+    "overflow": false
+   },
+   {
+    "id": 5,
+    "op": "DEPTHWISE_CONV_2D",
+    "cycles": 197295.5,
+    "overflow": false
+   },
+   {
+    "id": 6,
+    "op": "CONV_2D",
+    "cycles": 212479.0,
+    "overflow": false
+   },
+   {
+    "id": 7,
+    "op": "DEPTHWISE_CONV_2D",
+    "cycles": 197490.0,
+    "overflow": false
+   },
+   {
+    "id": 8,
+    "op": "CONV_2D",
+    "cycles": 219483.0,
+    "overflow": false
+   },
+   {
+    "id": 9,
+    "op": "AVERAGE_POOL_2D",
+    "cycles": 13464.0,
+    "overflow": false
+   },
+   {
+    "id": 10,
+    "op": "RESHAPE",
+    "cycles": 362.0,
+    "overflow": false
+   },
+   {
+    "id": 11,
+    "op": "FULLY_CONNECTED",
+    "cycles": 1698.0,
+    "overflow": false
+   },
+   {
+    "id": 12,
+    "op": "SOFTMAX",
+    "cycles": 1610.0,
+    "overflow": false
+   }
+  ]
+ },
+ "kws_aot": {
+  "model_sha256": "aeea436800704fce17b17292e4412630ad856e9d777c044c64ef748a880bd0ae",
+  "engine": {
+   "type": "helia-aot",
+   "version": "0.22.0"
+  },
+  "toolchain": {
+   "compiler": "atfe",
+   "compiler_version": "clang version 22.1.0"
+  },
+  "board": "apollo510_evb",
+  "cpu_clock_name": "lp",
+  "system_clock_hz": 96000000,
+  "clean_infer_avg_cycles": 1955904,
+  "config": {
+   "model": {
+    "arena_location": "sram",
+    "weights_location": "mram"
+   },
+   "profiling": {
+    "clean_window_probe": "infer"
+   },
+   "engine": {
+    "backend": null
+   }
+  },
+  "overflow_detected": false,
+  "layers": [
+   {
+    "id": 0,
+    "op": "CONV_2D:0",
+    "cycles": 296958.5,
+    "overflow": false
+   },
+   {
+    "id": 1,
+    "op": "DEPTHWISE_CONV_2D:1",
+    "cycles": 225987.0,
+    "overflow": false
+   },
+   {
+    "id": 2,
+    "op": "CONV_2D:2",
+    "cycles": 185536.0,
+    "overflow": false
+   },
+   {
+    "id": 3,
+    "op": "DEPTHWISE_CONV_2D:3",
+    "cycles": 225989.0,
+    "overflow": false
+   },
+   {
+    "id": 4,
+    "op": "CONV_2D:4",
+    "cycles": 185381.0,
+    "overflow": false
+   },
+   {
+    "id": 5,
+    "op": "DEPTHWISE_CONV_2D:5",
+    "cycles": 225990.5,
+    "overflow": false
+   },
+   {
+    "id": 6,
+    "op": "CONV_2D:6",
+    "cycles": 185384.0,
+    "overflow": false
+   },
+   {
+    "id": 7,
+    "op": "DEPTHWISE_CONV_2D:7",
+    "cycles": 225994.5,
+    "overflow": false
+   },
+   {
+    "id": 8,
+    "op": "CONV_2D:8",
+    "cycles": 185472.0,
+    "overflow": false
+   },
+   {
+    "id": 9,
+    "op": "AVERAGE_POOL_2D:9",
+    "cycles": 13142.0,
+    "overflow": false
+   },
+   {
+    "id": 10,
+    "op": "RESHAPE:10",
+    "cycles": 86.0,
+    "overflow": false
+   },
+   {
+    "id": 11,
+    "op": "FULLY_CONNECTED:11",
+    "cycles": 506.0,
+    "overflow": false
+   },
+   {
+    "id": 12,
+    "op": "SOFTMAX:12",
+    "cycles": 1354.0,
+    "overflow": false
+   }
+  ]
+ },
+ "ad_aot_short": {
+  "model_sha256": "87cf24194ef93d1d9b11a591d805526b98008e351655d29883c825c9c106ba24",
+  "engine": {
+   "type": "helia-aot",
+   "version": "0.23.0"
+  },
+  "toolchain": {
+   "compiler": "atfe",
+   "compiler_version": "clang version 22.1.0"
+  },
+  "board": "apollo510b_evb",
+  "cpu_clock_name": "lp",
+  "system_clock_hz": 96000000,
+  "clean_infer_avg_cycles": 172992,
+  "config": {
+   "model": {
+    "arena_location": null,
+    "weights_location": null
+   },
+   "profiling": {
+    "clean_window_probe": "infer"
+   },
+   "engine": {
+    "backend": null
+   }
+  },
+  "overflow_detected": false,
+  "layers": [
+   {
+    "id": 0,
+    "op": "FULLY_CONNECTED:0",
+    "cycles": 48553.0,
+    "overflow": false
+   },
+   {
+    "id": 1,
+    "op": "FULLY_CONNECTED:1",
+    "cycles": 11268.0,
+    "overflow": false
+   },
+   {
+    "id": 2,
+    "op": "FULLY_CONNECTED:2",
+    "cycles": 11309.0,
+    "overflow": false
+   },
+   {
+    "id": 3,
+    "op": "FULLY_CONNECTED:3",
+    "cycles": 11251.0,
+    "overflow": false
+   },
+   {
+    "id": 4,
+    "op": "FULLY_CONNECTED:4",
+    "cycles": 968.0,
+    "overflow": false
+   },
+   {
+    "id": 5,
+    "op": "FULLY_CONNECTED:5",
+    "cycles": 2793.0,
+    "overflow": false
+   },
+   {
+    "id": 6,
+    "op": "FULLY_CONNECTED:6",
+    "cycles": 11308.5,
+    "overflow": false
+   },
+   {
+    "id": 7,
+    "op": "FULLY_CONNECTED:7",
+    "cycles": 11378.0,
+    "overflow": false
+   },
+   {
+    "id": 8,
+    "op": "FULLY_CONNECTED:8",
+    "cycles": 11352.5,
+    "overflow": false
+   },
+   {
+    "id": 9,
+    "op": "FULLY_CONNECTED:9",
+    "cycles": 55845.5,
+    "overflow": false
+   }
+  ]
+ },
+ "kws_rt_busy_loop": {
+  "model_sha256": "935c513a5f4dbfe6458c16b0a791e916f5e89d6c9b02ffbefce49c06fbbdf038",
+  "engine": {
+   "type": "helia-rt",
+   "version": "1.21.0"
+  },
+  "toolchain": {
+   "compiler": "arm-none-eabi-gcc",
+   "compiler_version": "arm-none-eabi-gcc (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203"
+  },
+  "board": "apollo510_evb",
+  "cpu_clock_name": "lp",
+  "system_clock_hz": 96000000,
+  "clean_infer_avg_cycles": 480955008,
+  "config": {
+   "model": {
+    "arena_location": "tcm",
+    "weights_location": "tcm"
+   },
+   "profiling": {
+    "clean_window_probe": "busy_loop"
+   },
+   "engine": {
+    "backend": null
+   }
+  },
+  "overflow_detected": false,
+  "layers": [
+   {
+    "id": 0,
+    "op": "CONV_2D",
+    "cycles": 337720.5,
+    "overflow": false
+   },
+   {
+    "id": 1,
+    "op": "DEPTHWISE_CONV_2D",
+    "cycles": 216286.5,
+    "overflow": false
+   },
+   {
+    "id": 2,
+    "op": "CONV_2D",
+    "cycles": 209908.0,
+    "overflow": false
+   },
+   {
+    "id": 3,
+    "op": "DEPTHWISE_CONV_2D",
+    "cycles": 216195.0,
+    "overflow": false
+   },
+   {
+    "id": 4,
+    "op": "CONV_2D",
+    "cycles": 209902.0,
+    "overflow": false
+   },
+   {
+    "id": 5,
+    "op": "DEPTHWISE_CONV_2D",
+    "cycles": 216203.0,
+    "overflow": false
+   },
+   {
+    "id": 6,
+    "op": "CONV_2D",
+    "cycles": 209905.0,
+    "overflow": false
+   },
+   {
+    "id": 7,
+    "op": "DEPTHWISE_CONV_2D",
+    "cycles": 216207.0,
+    "overflow": false
+   },
+   {
+    "id": 8,
+    "op": "CONV_2D",
+    "cycles": 209863.5,
+    "overflow": false
+   },
+   {
+    "id": 9,
+    "op": "AVERAGE_POOL_2D",
+    "cycles": 14902.0,
+    "overflow": false
+   },
+   {
+    "id": 10,
+    "op": "RESHAPE",
+    "cycles": 325.0,
+    "overflow": false
+   },
+   {
+    "id": 11,
+    "op": "FULLY_CONNECTED",
+    "cycles": 992.0,
+    "overflow": false
+   },
+   {
+    "id": 12,
+    "op": "SOFTMAX",
+    "cycles": 2319.0,
+    "overflow": false
+   }
+  ]
+ }
+}

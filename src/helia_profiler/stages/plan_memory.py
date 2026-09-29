@@ -38,9 +38,9 @@ from typing import TYPE_CHECKING
 from ..config import DEFAULT_ARENA_SIZE_BYTES
 from ..errors import PlatformError
 from ..engines import EngineType, get_adapter
-from ..engines.base import ExecutorchArtifacts
+from ..engines.base import ExecutorchArtifacts, HeliaAotArtifacts
 from ..pipeline import PipelineContext
-from ..placement import MemoryRegion, Placement, resolve_fastest_fit_placement
+from ..placement import ArenaRole, MemoryRegion, Placement, resolve_fastest_fit_placement
 from ..config import Transport
 from ..platform import MemoryLayout, PmuTier, SocDef, SocFamily
 from ..results import ConsumerKind, MemoryConsumer, MemoryPlan, MemoryRegionUsage
@@ -484,14 +484,19 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
         # follow the target's default data region, not the tensor arena.
         static_region = _default_bss_region(family)
         sizes = {
-            "fixture_output": fixture.model.output_tensor.size,
+            "fixture_output": fixture.model.output_bytes,
             "fixture_status": 4,
             "fixture_checksum": 4,
             "fixture_timing": 7 * 4,
             "fixture_timer_state": 4,
         }
-        if engine_type is EngineType.TFLM:
+        if engine_type is not EngineType.HELIA_AOT:
             sizes["fixture_memory"] = 8 * 4
+        artifacts = ctx.engine_artifacts
+        if fixture.observe_aot_arenas and isinstance(artifacts, HeliaAotArtifacts):
+            scanned = [r for r in artifacts.aot_arena_regions if r.role is ArenaRole.SCRATCH]
+            if scanned:
+                sizes["fixture_arena_scan"] = 8 * len(scanned)
         additions.extend(
             (static_region, MemoryConsumer(name=name, size=size, kind=ConsumerKind.OTHER))
             for name, size in sizes.items()
@@ -501,7 +506,7 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
                 MemoryRegion.MRAM,
                 MemoryConsumer(
                     name="fixture_input",
-                    size=fixture.model.input_tensor.size,
+                    size=fixture.model.input_bytes,
                     kind=ConsumerKind.OTHER,
                 ),
             )

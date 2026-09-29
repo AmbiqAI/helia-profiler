@@ -1,0 +1,73 @@
+---
+title: "Engines"
+description: "Choose heliaAOT for compiled inference, heliaRT for an Ambiq-tuned interpreter, or a baseline engine to compare on your board."
+---
+
+Start with **heliaAOT** when your model is supported. It compiles your model into C, plans execution and memory at build time, and runs without an interpreter. Use hpx to measure the latency, memory and energy tradeoffs on your target.
+
+Prefer an interpreter? **heliaRT** brings Ambiq-tuned kernels to a familiar LiteRT workflow. It remains the default when you do not specify an engine.
+
+## Which engine
+
+| Engine | Use it for | Model |
+|---|---|---|
+| **heliaAOT** | Our recommended starting point for compiled inference and per-tensor memory placement. | `.tflite` |
+| **heliaRT** | Interpreter-based inference with Ambiq-tuned kernels. The hpx default. | `.tflite` |
+| **LiteRT / TFLM** | An upstream interpreter baseline to compare with the HELIA engines. | `.tflite` |
+| **ExecuTorch (experimental)** | Profiling an exported Cortex-M program from your PyTorch workflow. | `.pte` |
+
+Support depends on your model's operators and target. Compare saved runs to choose the engine that meets your requirements; gains vary by model and configuration.
+
+## heliaAOT
+
+Install the [AOT extra](../../getting-started/install/#1-install-hpx), then select `helia-aot` in your profiling command:
+
+```bash
+hpx profile --config hpx.yml --engine helia-aot --output-dir results/aot
+```
+
+Your configuration supplies the model and board. hpx invokes the compiler and builds the generated code into profiling firmware. If compilation reports an unsupported operator, check [heliaAOT operator support](https://ambiqai.github.io/helia-aot/) or try heliaRT for that model.
+
+Once the first run works, explore [per-tensor memory placement](../memory/#heliaaot-per-tensor-placement). Keep the model and measurement settings consistent while testing placement choices.
+
+## heliaRT
+
+Choose `helia-rt` to run a TFLite model with Ambiq's interpreter and kernel backends:
+
+```bash
+hpx profile --config hpx.yml --engine helia-rt --output-dir results/rt
+```
+
+hpx resolves the runtime and builds the required operators into the firmware. The first build needs network access to fetch pinned dependencies through neuralSPOT-X.
+
+## TFLM
+
+Use `tflm` for an upstream LiteRT baseline with reference or upstream CMSIS-NN kernels:
+
+```bash
+hpx profile --config hpx.yml --engine tflm --output-dir results/tflm
+```
+
+Select the kernel backend deliberately and record it with the result. The [engine comparison example](../../examples/engine-comparison/) walks through the setup.
+
+## ExecuTorch
+
+ExecuTorch support is experimental. Use `executorch` for an exported `.pte` program. A matching manifest from `helia-torch` supplies the program's memory and I/O defaults; otherwise configure them explicitly. See [ExecuTorch configuration](../../reference/engine-configuration/#executorch).
+
+Power capture is not supported by this engine. Keep `power.enabled: false` and compare timing and memory instead.
+
+## Compare your runs
+
+Run the same model with the same board and measurement settings, changing the engine. Then compare the result bundles:
+
+```bash
+hpx compare results/tflm results/aot
+```
+
+Read the configuration differences and comparability notes alongside the metrics. A different operation sequence can prevent a layer-by-layer comparison even when whole-model measurements remain useful. See [Comparing runs](../analysis-comparison/).
+
+## Go further
+
+- [Engine configuration](../../reference/engine-configuration/): adapter options, dependency overrides and source builds.
+- [Memory placement](../memory/): control where weights and working memory live.
+- [Toolchains](../toolchains/): choose the compiler used to build profiling firmware.

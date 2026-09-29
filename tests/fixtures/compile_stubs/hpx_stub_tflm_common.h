@@ -12,13 +12,18 @@ typedef enum {
     kTfLiteError = 1,
 } TfLiteStatus;
 
+typedef struct { uint16_t data; } TfLiteFloat16;
+
 typedef union {
     int8_t *int8;
+    int16_t *i16;
+    float *f;
+    TfLiteFloat16 *f16;
     char *raw;
     void *data;
 } TfLitePtrUnion;
 
-enum TfLiteType { kTfLiteInt8 = 9 };
+enum TfLiteType { kTfLiteFloat32 = 1, kTfLiteInt16 = 7, kTfLiteInt8 = 9, kTfLiteFloat16 = 10 };
 struct TfLiteIntArray { int size; int data[4]; };
 struct TfLiteQuantizationParams { float scale; int32_t zero_point; };
 

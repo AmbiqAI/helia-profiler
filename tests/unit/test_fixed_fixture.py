@@ -109,7 +109,10 @@ def test_hash_or_unsupported_config_stops_before_pipeline(tmp_path, monkeypatch)
     monkeypatch.setattr("helia_profiler.fixture.PipelineRunner", forbidden)
     with pytest.raises(Exception, match="upstream"):
         build_fixed_fixture(
-            replace(c, engine=EngineConfig(type=EngineType.HELIA_RT)), f, method=METHOD, runtime=rt
+            replace(c, engine=EngineConfig(type=EngineType.EXECUTORCH)),
+            f,
+            method=METHOD,
+            runtime=rt,
         )
     f.input.path.write_bytes(bytes(3359))
     with pytest.raises(ValueError, match="hash mismatch"):
@@ -259,12 +262,23 @@ def test_render_derives_extents_ops_counts_and_scope(tmp_path, kind, scope):
     ctx = PipelineContext(config=c, work_dir=tmp_path)
     _BindFixtureStage(FixtureRenderSpec(f, FixtureMethod(scope), model)).run(ctx)
     values = fixture_template_vars(ctx, [])
-    assert values["input_tensor"] == f.input_tensor
-    assert values["output_tensor"] == f.output_tensor
+    inputs, outputs = values["fixture_inputs"], values["fixture_outputs"]
+    assert isinstance(inputs, list) and isinstance(outputs, list)
+    (fixture_input,) = inputs
+    (fixture_output,) = outputs
+    assert (fixture_input["tensor_index"], fixture_input["size"], fixture_input["shape"]) == (
+        f.input_tensor.tensor_index,
+        f.input_tensor.size,
+        f.input_tensor.shape,
+    )
+    assert (fixture_output["tensor_index"], fixture_output["size"]) == (
+        f.output_tensor.tensor_index,
+        f.output_tensor.size,
+    )
     assert values["fixture_iterations"] == 17
     assert values["fixture_warmups"] == 3
     assert values["fixture_timing_scope"] == scope.value
-    assert len(str(values["input_values"]).split(",")) == f.input_tensor.size
+    assert len(str(fixture_input["initializer"]).split(",")) == f.input_tensor.size
     source = _jinja_env.get_template("fixed_fixture.cc.j2").render(**values)
     assert f"deployment_output[{f.output_tensor.size}]" in source
     assert f"input->bytes != {f.input_tensor.size}" in source
@@ -396,3 +410,44 @@ def test_external_aot_arena_mode_rejected(tmp_path):
     )
     with pytest.raises(Exception, match="External AOT arenas"):
         fixture_template_vars(ctx, [])
+
+
+@pytest.mark.parametrize(
+    "size,refused",
+    [(3 * 1024 * 1024 // 2, False), (2 * 1024 * 1024, False), (2 * 1024 * 1024 + 1, True)],
+)
+def test_build_refuses_a_flat_image_capture_cannot_flash(tmp_path, monkeypatch, size, refused):
+    from helia_profiler.errors import ConfigError
+
+    c, f = fixture(tmp_path)
+    mock_analysis(monkeypatch, f)
+    c = replace(c, engine=EngineConfig(type=EngineType.HELIA_AOT))
+
+    class Runner:
+        def __init__(self, stages):
+            pass
+
+        def run(self, config):
+            app = tmp_path / "app"
+            (app / "src").mkdir(parents=True, exist_ok=True)
+            (app / "src" / "main.cc").write_text("main")
+            binary = app / "hpx_profiler"
+            binary.write_bytes(b"elf")
+            binary.with_suffix(".bin").write_bytes(bytes(size))
+            binary.with_suffix(".map").write_text("map")
+            (app / "nsx.lock").write_text("lock")
+            return SimpleNamespace(
+                memory_plan=MemoryPlan(engine=config.engine.type),
+                engine_artifacts=None,
+                run_metadata=RunMetadata(toolchain=ToolchainInfo("atfe", "22.1.0")),
+                resolved_firmware_dir=app,
+                profile_run=SimpleNamespace(firmware=SimpleNamespace(binary_path=binary)),
+            )
+
+    monkeypatch.setattr("helia_profiler.fixture.PipelineRunner", Runner)
+    if refused:
+        with pytest.raises(ConfigError, match=f"Flat image is {size} B"):
+            build_fixed_fixture(c, f, method=METHOD)
+    else:
+        r = build_fixed_fixture(c, f, method=METHOD)
+        assert r.flat_binary is not None and r.flat_binary.path.stat().st_size == size

@@ -404,6 +404,8 @@ typedef struct {
 
 typedef int32_t fake_arena_region_t;
 
+extern const void * const fake_arena_buffers[4];
+
 static const int fake_num_inputs = 1;
 static const int fake_num_outputs = 1;
 
@@ -474,11 +476,13 @@ _socs_by_header = _build_socs_by_header()
 def _prepare_case_dir(case: _CompileCase, base: Path) -> Path:
     case_dir = base / re.sub(r"[^A-Za-z0-9_.-]+", "_", case.case_id)
     case_dir.mkdir(parents=True, exist_ok=True)
-    (case_dir / "main.cc").write_text(case.text)
+    (case_dir / "main.cc").write_text(case.text, encoding="utf-8")
     for name, text in case.headers.items():
-        (case_dir / name).write_text(text)
+        (case_dir / name).write_text(text, encoding="utf-8")
     if '#include "hpx_pmu_profiler.h"' in case.text or not case.is_main_tu:
-        (case_dir / "hpx_pmu_profiler.h").write_text(_render_pmu_profiler_header(case.vars))
+        (case_dir / "hpx_pmu_profiler.h").write_text(
+            _render_pmu_profiler_header(case.vars), encoding="utf-8"
+        )
     if '#include "model_data.h"' in case.text:
         (case_dir / "model_data.h").write_text(_MODEL_DATA_STUB)
     if '#include "fake_model.h"' in case.text:
@@ -495,7 +499,8 @@ def _prepare_case_dir(case: _CompileCase, base: Path) -> Path:
     (case_dir / "hpx_prelude.h").write_text(
         "#pragma once\n"
         f"{linkage}void hpx_printf(const char *fmt, ...) "
-        "__attribute__((format(printf, 1, 2), unused));\n"
+        "__attribute__((format(printf, 1, 2), unused));\n",
+        encoding="utf-8",
     )
     return case_dir
 
@@ -670,7 +675,7 @@ def test_fixture_gate_rejects_missing_output_storage(tmp_path, engine):
 def test_compile_matrix_covers_fixture_render_arms():
     assert {case.case_id for case in _build_cases() if case.case_id.startswith("fixture:")} == {
         f"fixture:{kind}|{engine}|{scope}"
-        for kind in ("tcn", "kws")
-        for engine in ("tflm", "helia-aot")
+        for kind in ("tcn", "kws", "typed")
+        for engine in ("tflm", "helia-rt", "helia-aot")
         for scope in ("restore_and_invoke", "invoke_only")
     }
