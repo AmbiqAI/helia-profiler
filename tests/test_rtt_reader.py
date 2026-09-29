@@ -1609,3 +1609,13 @@ def test_capture_swo_retries_share_one_deadline(monkeypatch):
 
     assert budgets == [60.0, 20.0]
     assert lines == ["no start sentinel"]
+
+
+def test_firmware_meta_keeps_positional_order():
+    from dataclasses import fields
+
+    from helia_profiler.results.models import FirmwareMeta
+
+    names = [f.name for f in fields(FirmwareMeta)]
+    assert names.index("profiled_infer_count") == names.index("system_clock_hz") + 1
+    assert names[-1] == "measured_clock_hz"

@@ -106,8 +106,6 @@ class FirmwareMeta:
     num_presets: int | None = None
     #: Firmware's ``SystemCoreClock`` (Hz), set from the host's clock choice.
     system_clock_hz: int | None = None
-    #: Core clock (Hz) measured on-device against STIMER.
-    measured_clock_hz: int | None = None
     profiled_infer_count: int | None = None
     profiled_infer_total_us: int | None = None
     profiled_infer_avg_us: int | None = None
@@ -152,6 +150,8 @@ class FirmwareMeta:
     clean_attach_wait_us: int | None = None
     psram: PsramInfo | None = None
     presets: tuple[str, ...] = ()
+    #: Core clock (Hz) measured on-device against STIMER.
+    measured_clock_hz: int | None = None
 
     @property
     def reported_model_bytes(self) -> int | None:
