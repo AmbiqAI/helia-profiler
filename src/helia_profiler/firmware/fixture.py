@@ -108,7 +108,7 @@ def fixture_template_vars(ctx: PipelineContext, regions: list[ArenaRegion]) -> d
 
 
 def write_fixture_headers(directory: Path, ctx: PipelineContext) -> None:
-    if ctx.config.engine.type is EngineType.TFLM:
+    if ctx.config.engine.type is not EngineType.HELIA_AOT:
         _write_text(
             directory / "fixed_fixture_memory.h",
             _jinja_env.get_template("fixed_fixture_memory.h.j2").render(),

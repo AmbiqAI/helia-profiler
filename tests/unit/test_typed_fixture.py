@@ -181,11 +181,14 @@ def test_identity_is_path_free_and_covers_every_declaration(tmp_path):
 
 
 def test_capability_table_covers_every_fixture_engine_and_dtype():
-    assert set(FIXTURE_CAPABILITIES) == {EngineType.TFLM, EngineType.HELIA_AOT}
+    assert set(FIXTURE_CAPABILITIES) == {EngineType.TFLM, EngineType.HELIA_RT, EngineType.HELIA_AOT}
     for table in FIXTURE_CAPABILITIES.values():
         assert set(table) == {"int8", "int16", "float16", "float32"}
-        assert table["int8"] is FixtureCapability.QUALIFIED
+    assert FIXTURE_CAPABILITIES[EngineType.TFLM]["int8"] is FixtureCapability.QUALIFIED
+    assert FIXTURE_CAPABILITIES[EngineType.HELIA_AOT]["int8"] is FixtureCapability.QUALIFIED
     assert FIXTURE_CAPABILITIES[EngineType.TFLM]["float16"] is FixtureCapability.UNSUPPORTED
+    # No heliaRT fixture has a device pass yet.
+    assert set(FIXTURE_CAPABILITIES[EngineType.HELIA_RT].values()) == {FixtureCapability.SUPPORTED}
 
 
 @pytest.mark.parametrize("engine", [EngineType.TFLM, EngineType.HELIA_AOT])

@@ -97,7 +97,7 @@ def test_fixture_statics_fit_at_boundary_and_overflow_one_byte_later(tmp_path, e
 
 
 @pytest.mark.parametrize("transport", ["swo", "rtt", "usb_cdc"])
-@pytest.mark.parametrize("engine", [EngineType.TFLM, EngineType.HELIA_AOT])
+@pytest.mark.parametrize("engine", [EngineType.TFLM, EngineType.HELIA_RT, EngineType.HELIA_AOT])
 def test_fixture_consumers_have_actual_regions_and_no_inactive_profiler_buffers(
     tmp_path, engine, transport
 ):
@@ -118,13 +118,13 @@ def test_fixture_consumers_have_actual_regions_and_no_inactive_profiler_buffers(
         "fixture_timing": 28,
         "fixture_timer_state": 4,
     }
-    if engine is EngineType.TFLM:
+    if engine is not EngineType.HELIA_AOT:
         expected["fixture_memory"] = 32
     assert sizes == expected
     assert {c.name: c.size for c in mram.consumers}["fixture_input"] == 490
     names = {c.name for region in plan.regions for c in region.consumers}
     assert not names & {"pmu_layer_records", "rtt_buffers", "usb_buffers"}
-    if engine is EngineType.TFLM:
+    if engine is not EngineType.HELIA_AOT:
         assert sram is not None
         assert {c.name: c.size for c in sram.consumers} == {"tensor_arena": 65536}
     again = _add_hpx_owned_consumers(plan, ctx)

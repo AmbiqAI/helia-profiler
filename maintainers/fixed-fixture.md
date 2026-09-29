@@ -30,7 +30,32 @@ magic rejection do not verify member format, ARM attributes or ABI compatibility
 The caller must independently audit the provider archive build/source/ABI record
 before supplying it; manifest fields are assertions, not independent ABI evidence. Copies recheck hashes and path
 containment. Provider source identities remain manifest-declared; retain the
-corresponding audited source/build record. AOT accepts no upstream override and
+corresponding audited source/build record.
+
+heliaRT (`engine.type: helia-rt`, backend `helia`) also links a
+`PreparedUpstreamRuntime`, whose manifest uses schema 2:
+
+- `stack: helia-rt`, with providers `helia-rt` and `ns-cmsis-nn` (AmbiqAI URLs, full revisions);
+- the same ABI record;
+- `build.kernel_dir: helia`;
+- `build.consumer_defines`, which must include `TF_LITE_STATIC_MEMORY`.
+
+The archive is staged as the local module `hpx-heliart-runtime` and aliased to
+`nsx::helia_rt`. Its declared defines apply to every consumer; schema 1 keeps the
+fixed upstream defines. It replaces the registry `nsx-helia-rt` and
+`nsx-cmsis-nn` modules. The compiled build must prove that the dependency
+lock and link map name that archive, and no other module whose name carries
+`helia-rt`, `tflite-micro` or `cmsis-nn`. The engine provenance records the
+prepared archive's heliaRT revision as its version and `prepared` as its variant.
+The link-map check reads every directory of each linked archive or object below
+the firmware app directory, and a toolchain library from its first module
+directory down, so the names of directories above the app do not count.
+The fixture resolver registers only the model's own operators. Ordinary heliaRT
+profile firmware also registers QUANTIZE and DEQUANTIZE, because heliaRT can
+need them while preparing a model. A heliaRT fixture that needs them fails with a
+nonzero status before the timed loop instead of producing a wrong result.
+Each engine accepts only its own stack. The rendered firmware is the TFLM
+fixture: heliaRT keeps the TFLM API. AOT accepts no runtime override and
 uses the ordinary AOT adapter and its internally allocated generated module.
 External-arena fixture mode is rejected until separately qualified. Ordinary profiler
 configuration and provider defaults are unchanged.
@@ -91,9 +116,10 @@ These are source-level reservations, not whole-ELF totals: optimization may
 remove timer state, while linker alignment and other runtime objects are resolved
 by the linked-image memory report.
 
-The existing host compile gate includes representative TCN/KWS fixtures for both
-engines and timing scopes. The existing real-toolchain gate includes both engines
-and models, using its normal qualified dependency-workspace requirements.
+The existing host compile gate includes representative TCN/KWS and typed fixtures
+for all three fixture engines and both timing scopes. The existing real-toolchain
+gate includes every engine and model, using its normal qualified
+dependency-workspace requirements.
 
 ## Typed multi-tensor fixtures
 
@@ -112,7 +138,8 @@ single scale and zero point is read as per-tensor, even when its quantized axis
 has extent 1, so declare it with `PerTensorQuantization`. A `FixedFixture` keeps
 its single-INT8 rules and renders exactly as before.
 
-`FIXTURE_CAPABILITIES` is the producer's declaration per engine and IO dtype:
+`FIXTURE_CAPABILITIES` is the producer's declaration per engine and IO dtype. No heliaRT
+entry is qualified until a device pass. The table uses these statuses:
 
 - `qualified` means an exact device pass;
 - `supported` means it builds but has no device pass yet;
@@ -193,11 +220,11 @@ per-layer cycles from a separate `hpx profile` run of the same model to a fixtur
 build. The fixture image has no per-operator hooks, so these are approximate
 shares from a PMU-instrumented sibling image, never the fixture's latency. The
 record is null with a reason unless the fixture is the one the build was made
-from and the model hash, engine, TFLM `cmsis_nn` backend, compiler version, board,
+from and the model hash, engine, TFLM `cmsis_nn` or heliaRT `helia` backend, compiler version, board,
 LP 96 MHz clock and SRAM/MRAM placement match, every layer has finite cycles, no
 counter overflowed, the clean window ran inferences, and the per-layer sum agrees
-with the clean-window cycles within 1 % (2 % below 2 ms). A TFLM fixture's prepared upstream runtime is
-not selectable by `hpx profile`; `allow_runtime_difference=True` accepts the
+with the clean-window cycles within 1 % (2 % below 2 ms). The prepared runtime of a TFLM or heliaRT
+fixture is not selectable by `hpx profile`; `allow_runtime_difference=True` accepts the
 baseline stack and labels the record. The fixture build records no engine
 version or AOT code-generation options, so neither is compared; the record
 carries the profile's engine version.
