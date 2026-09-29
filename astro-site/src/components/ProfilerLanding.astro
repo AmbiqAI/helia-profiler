@@ -53,7 +53,7 @@
 </style>
 
 <style>
-:global(.profiling-method){grid-column:1 / -1;font-size:.8rem;}
+
 </style>
 
 <style>
@@ -66,4 +66,17 @@
 .hpx-home :global(.timing-workflow li::before){content:counter(timing);grid-row:span 2;border:1px solid var(--sl-color-gray-5);border-radius:50%;width:24px;height:24px;text-align:center;font-size:12px;line-height:24px;}
 .hpx-home :global(.timing-workflow strong){font-size:15px;}
 .hpx-home :global(.timing-workflow span),.hpx-home :global(.feature-detail){font-size:14px;line-height:1.65;color:var(--sl-color-gray-2);}
+</style>
+
+<style>
+.hpx-home :global(.profiling-info){margin-top:12px;}
+.hpx-home :global(.profiling-info-trigger){anchor-name:--profiling-info;display:inline-flex;align-items:center;gap:6px;background:none;border:0;padding:4px 0;color:var(--sl-color-text);font:500 12px var(--sl-font);cursor:pointer;}
+.hpx-home :global(.profiling-info-trigger:focus-visible){outline:2px solid var(--sl-color-text-accent);outline-offset:4px;border-radius:3px;}
+.hpx-home :global(.profiling-popover){box-sizing:border-box;width:min(360px,calc(100vw - 32px));max-height: min(480px,calc(100dvh - 32px));overflow:auto;padding:18px;border:1px solid var(--sl-color-gray-5);border-radius:12px;background:var(--sl-color-bg);color:var(--sl-color-text);box-shadow:0 12px 36px #0002;font-size:13px;line-height:1.6;}
+.hpx-home :global(.profiling-popover p){max-width:none;margin:12px 0 0;}
+.hpx-home :global(.profiling-popover-heading){display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.hpx-home :global(.profiling-popover-heading button){background:none;color:inherit;border:0;font-size:22px;line-height:1;padding:4px;cursor:pointer;}
+@supports(top:anchor(bottom)){
+.hpx-home :global(.profiling-popover){position-anchor:--profiling-info;margin:8px 0;inset:auto;top:anchor(bottom);left:anchor(left);position-try-fallbacks:flip-block,flip-inline,flip-block flip-inline;}
+}
 </style>

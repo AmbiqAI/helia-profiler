@@ -72,6 +72,18 @@ import buildInfo from '../../data/build-info.json';
 <p>Check your tools, find a debug probe and profile the heartKIT AFIB arrhythmia classifier. Compare LiteRT with heliaAOT, then explore power capture as a separate next step.</p>
 <a href="/helia-profiler/getting-started/first-profile/">Run your first profile →</a>
 <p class="demo-help">Setup output shows an illustrative connected probe. Profile commands use afib.yml for the model and target settings. Abbreviated CLI excerpts are followed by the supplied profiling results. Select a step to explore; click the active step to pause or resume.</p>
+
+<div class="profiling-info">
+<button class="profiling-info-trigger" type="button" popovertarget="profiling-method"><span aria-hidden="true">ⓘ</span> About this example</button>
+<div id="profiling-method" class="profiling-popover" popover="auto" role="dialog" aria-labelledby="profiling-method-title">
+<div class="profiling-popover-heading"><strong id="profiling-method-title">About this profiling example</strong><button type="button" popovertarget="profiling-method" popovertargetaction="hide" aria-label="Close profiling details">×</button></div>
+<p><a href="https://github.com/AmbiqAI/heartkit/blob/main/docs/zoo/arr-2-eff-sm.md">heartKIT arr-2-eff-sm</a> (INT8). Apollo510 EVB, Cortex-M55 with Helium, 96 MHz low-power mode; no NPU. ATfE 22.1.0.</p>
+<p>LiteRT: Ambiq TFLM with Arm CMSIS-NN. heliaAOT 0.23: ns-cmsis-nn 7.36.</p>
+<p>Measured 2026-09-28: 5 warmups, 100 profiled iterations. Median latency from a clean window of 48 inferences.</p>
+<p>Total model memory = activation arena + model storage. Arena means LiteRT’s actual usage or AOT’s static arena; storage means the LiteRT flatbuffer or AOT’s packed constants.</p>
+</div>
+</div>
+
 </div>
 <ProfilerDemo>
 <div slot="doctor">
@@ -161,13 +173,7 @@ $ hpx profile --config afib-power.yml \
 </div>
 </ProfilerDemo>
 
-<details class="profiling-method">
-<summary>About this profiling example</summary>
 
-<p><a href="https://github.com/AmbiqAI/heartkit/blob/main/docs/zoo/arr-2-eff-sm.md">heartKIT AFIB arrhythmia classifier, arr-2-eff-sm</a>, INT8. Apollo510 EVB, Cortex-M55 with Helium, 96 MHz low-power mode, ATfE (clang) 22.1.0; no NPU. LiteRT uses the Ambiq TFLM build with Arm CMSIS-NN kernels. heliaAOT 0.23 uses ns-cmsis-nn 7.36.</p>
-<p>Measured 2026-09-28 with heliaPROFILER: 5 warmups and 100 profiled iterations. Latency is the median of an uninstrumented clean window of 48 inferences.</p>
-<p>Activation RAM is the tensor arena actually used by LiteRT or heliaAOT's compiled static arena. Model storage is the LiteRT flatbuffer (graph and weights) or heliaAOT's packed constants. Total model memory is their sum.</p>
-</details>
 </section>
 
 <section class="home-band home-band--muted">

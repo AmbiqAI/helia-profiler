@@ -65,3 +65,5 @@ Final PR polish completed: replace the landing timing schematic with an owner-su
 Hero motion polish: removed the shared upward entrance and stagger. Layers use only growing bars, Energy only the tracing waveform; MVE/NPU and Compare diagrams fade in without translation. Pause and reduced-motion overrides retained.
 
 Removed the standalone profiling note below the hero at owner request. Method and memory definitions remain in the example disclosure.
+
+Example methodology now opens from a compact info button next to the workflow introduction using a native auto popover, with Escape/outside-click dismissal and a close button. Condensed content retains model, setup, method and memory definitions.
