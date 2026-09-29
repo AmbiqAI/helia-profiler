@@ -6,7 +6,7 @@
 
   </div>
   {['doctor', 'probes', 'litert', 'aot', 'compare', 'power'].map((name, index) => <div class="demo__screen" id={`hpx-panel-${index}`} role="tabpanel" aria-labelledby={`hpx-tab-${index}`} tabindex="0" hidden={index !== 0}><slot name={name} /></div>)}
-  <div class="demo__caption">Abbreviated output · illustrative values, not hardware benchmarks</div>
+  <div class="demo__caption">Abbreviated CLI excerpts · measured profiling example</div>
 </hpx-demo>
 <script>
 class HpxDemo extends HTMLElement {
@@ -28,7 +28,7 @@ class HpxDemo extends HTMLElement {
         line.dataset.text = text || '\u00a0';
         if (/━/.test(text)) line.classList.add('rule');
         if (/Run summary|Power summary|Baseline|LiteRT →/.test(text)) line.classList.add('table-heading');
-        if (/^✓|2.4×|Saved →/.test(text.trim())) line.classList.add('positive');
+        if (/^✓|3.2x|Saved →/.test(text.trim())) line.classList.add('positive');
         if (/-58.3%|-60.0%|\+140.0%/.test(text)) line.classList.add('gain');
         line.textContent = text || '\u00a0';
         return line;
@@ -53,6 +53,7 @@ class HpxDemo extends HTMLElement {
         tab.tabIndex = i === active ? 0 : -1;
         tab.title = i === active ? (paused ? 'Resume animation' : 'Pause animation') : `Show ${tab.textContent}`;
         panels[i].hidden = i !== active;
+        panels[i].querySelector('.profile-result')?.classList.toggle('pending', !motion.matches && elapsed < typingTimes[i] + (lines[i].length - commandCounts[i]) * resultLineMs);
         let typedBefore = 0;
         lines[i].forEach((line, n) => {
           const text = line.dataset.text!;
@@ -126,4 +127,12 @@ svg{width:20px;height:20px;color:#588b2e;flex:none;}
 .demo__screen :global(.typing)::after{content:"▍";color:#588b2e;}
 .demo__caption{border-top:1px solid var(--sl-color-gray-5);padding:8px 18px;color:var(--sl-color-gray-2);font-size:11px;}
 @media(prefers-reduced-motion:reduce){.demo__screen :global(.demo-line){transition:none;}svg{display:none;}}
+</style>
+
+<style>
+.demo :global(.profile-result){padding:0 0 8px;font-size:.82rem;overflow-x:auto;}
+.demo :global(.profile-result p){margin:8px 0 12px;}
+.demo :global(.profile-result table){display:table;width:100%;font-size:.8rem;margin:0;border-collapse:collapse;}
+.demo :global(.profile-result th),.demo :global(.profile-result td){padding:7px 6px;text-align:left;white-space:nowrap;}
+.demo :global(.profile-result td:last-child){font-weight:600;}
 </style>

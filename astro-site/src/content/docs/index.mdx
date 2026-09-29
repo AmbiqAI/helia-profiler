@@ -47,9 +47,9 @@ import buildInfo from '../../data/build-info.json';
     </section>
     <section class="hero-slide" aria-hidden="true" inert>
       <p class="visual-label">03 / Compare the next run</p>
-      <div class="hero-diagram compare-diagram"><div class="compare-head"><span>LiteRT</span><span>heliaAOT</span></div><div class="compare-row"><span>Inference</span><b>12 ms → 5 ms</b></div><div class="compare-row"><span>Allocated arena</span><b>200 KiB → 80 KiB</b></div><div class="compare-row"><span>Energy / inference</span><b>24 µJ → 10 µJ</b></div><small>Illustrative keyword-spotting comparison</small></div>
-      <h2>Compare LiteRT with heliaAOT.</h2>
-      <p>This illustrative run is 2.4× faster with 60% less allocated arena. Profile your model to measure its tradeoffs.</p>
+      <div class="hero-diagram compare-diagram"><div class="compare-head"><span>LiteRT</span><span>heliaAOT</span></div><div class="compare-row"><span>Latency</span><b>38.69 ms → 12.14 ms</b></div><div class="compare-row"><span>Total model memory</span><b>89.7 KB → 40.4 KB</b></div><small>heartKIT AFIB · Apollo510 · CPU / Helium, no NPU</small></div>
+      <h2>3.2x faster, 55% less memory.</h2>
+      <p>heartKIT AFIB on Apollo510, LiteRT → heliaAOT.</p>
     </section>
     <section class="hero-slide" aria-hidden="true" inert>
       <p class="visual-label">04 / Measure power and energy</p>
@@ -59,6 +59,7 @@ import buildInfo from '../../data/build-info.json';
     </section>
   </ProfilerHero>
 </Hero>
+<p class="profiling-note">heartKIT arr-2-eff-sm (INT8), Apollo510 @ 96 MHz. Median latency; memory = activation arena + model storage. Measured with heliaPROFILER. Profiling example.</p>
 
 <nav class="engine-links" aria-label="Inference engines">
   <a href="/helia-profiler/guide/engines/#tflm" aria-label="LiteRT for Microcontrollers">LiteRT <ProfilerArrow /></a>
@@ -71,9 +72,9 @@ import buildInfo from '../../data/build-info.json';
 <div>
 <span class="eyebrow">Measure · Inspect · Compare</span>
 <h2>From setup to a side-by-side comparison.</h2>
-<p>Check your tools, find a debug probe and profile a keyword-spotting (KWS) model. Compare LiteRT with heliaAOT, then inspect the power results.</p>
+<p>Check your tools, find a debug probe and profile the heartKIT AFIB arrhythmia classifier. Compare LiteRT with heliaAOT, then explore power capture as a separate next step.</p>
 <a href="/helia-profiler/getting-started/first-profile/">Run your first profile →</a>
-<p class="demo-help">These abbreviated examples use kws.yml for the model, target and power settings. All values are illustrative. Select a step to explore; click the active step to pause or resume.</p>
+<p class="demo-help">Setup output shows an illustrative connected probe. Profile commands use afib.yml for the model and target settings. Abbreviated CLI excerpts are followed by the supplied profiling results. Select a step to explore; click the active step to pause or resume.</p>
 </div>
 <ProfilerDemo>
 <div slot="doctor">
@@ -81,12 +82,14 @@ import buildInfo from '../../data/build-info.json';
 ```text
 $ hpx doctor
 
-✓ Python environment
-✓ CMake and Ninja
-✓ Arm compiler
-✓ NSX build tools
-✓ SEGGER J-Link
-✓ Environment checks passed
+Toolchain Check
+  ✓ CMake (>= 3.24)
+  ✓ Ninja build system
+  ✓ SEGGER J-Link commander
+  ✓ neuralspotx Python package
+  ✓ ARM GCC toolchain
+
+  All required tools found.
 ```
 
 </div>
@@ -95,91 +98,79 @@ $ hpx doctor
 ```text
 $ hpx probes list
 
-  Probe           Serial       Connection
-  J-Link          123456789    USB
-
-✓ One probe found
-  Select the board in your run configuration.
+  serial      product                   connection
+  801000001   J-Link-OB-Apollo4-CortexM  USB
 ```
 
 </div>
 <div slot="litert">
 
 ```text
-$ hpx profile --config kws.yml --engine tflm \
-  --output-dir tflm-kws
+$ hpx profile --config afib.yml --engine tflm \
+  --output-dir results/litert-afib
 
-✓ Build · flash · capture complete
-
-  KWS / LiteRT                   Run summary
-  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  Avg inference                   12.00 ms
-  Allocated arena                  200 KiB
-  Energy / inference              24.00 µJ
-  Efficiency                 41,667 inf / J
-
-  Saved → tflm-kws
+  Engine    tflm
+  Board     apollo510_evb
 ```
 
+<div class="profile-result">
+<p>heartKIT arr-2-eff-sm · INT8 · LiteRT</p>
+<table><tbody><tr><th>Median latency</th><td>38.69 ms</td></tr><tr><th>Cycles</th><td>3,714,336</td></tr><tr><th>Activation RAM</th><td>28.3 KB</td></tr><tr><th>Model storage</th><td>61.4 KB</td></tr><tr><th>Total model memory</th><td>89.7 KB</td></tr></tbody></table>
+</div>
 </div>
 <div slot="aot">
 
 ```text
-$ hpx profile --config kws.yml --engine helia-aot \
-  --output-dir aot-kws
+$ hpx profile --config afib.yml --engine helia-aot \
+  --output-dir results/aot-afib
 
-✓ Compile · build · flash · capture complete
-
-  KWS / heliaAOT                 Run summary
-  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  Avg inference                    5.00 ms
-  Allocated arena                   80 KiB
-  Energy / inference              10.00 µJ
-  Efficiency                100,000 inf / J
-
-  Saved → aot-kws
+  Engine    helia-aot
+  Board     apollo510_evb
 ```
 
+<div class="profile-result">
+<p>heartKIT arr-2-eff-sm · INT8 · heliaAOT 0.23</p>
+<table><tbody><tr><th>Median latency</th><td>12.14 ms</td></tr><tr><th>Cycles</th><td>1,164,960</td></tr><tr><th>Activation RAM</th><td>14.7 KB</td></tr><tr><th>Model storage</th><td>25.7 KB</td></tr><tr><th>Total model memory</th><td>40.4 KB</td></tr></tbody></table>
+</div>
 </div>
 <div slot="compare">
 
 ```text
-$ hpx compare tflm-kws aot-kws
+$ hpx compare results/litert-afib results/aot-afib
 
-  KWS             LiteRT → heliaAOT
-  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  Metric          Baseline  Candidate    Change
-  Latency         12.00 ms    5.00 ms    -58.3%
-  Alloc. arena     200 KiB     80 KiB    -60.0%
-  Energy / inf.   24.00 µJ   10.00 µJ    -58.3%
-  Inf. / joule     41,667    100,000    +140.0%
-
-  2.4× faster · 60% less arena · 2.4× inf / J
-  Engine changed: tflm → helia-aot
-  Illustrative values · not a hardware benchmark
+  Config
+  Field    Baseline   Candidate   Status
+  Engine   tflm       helia-aot   diff
 ```
 
+<div class="profile-result">
+<p>Profiling example · heartKIT AFIB</p>
+<table><thead><tr><th>Measurement</th><th>LiteRT</th><th>heliaAOT</th><th>Change</th></tr></thead><tbody><tr><th>Latency</th><td>38.69 ms</td><td>12.14 ms</td><td>3.2x faster</td></tr><tr><th>Cycles</th><td>3,714,336</td><td>1,164,960</td><td>-69%</td></tr><tr><th>Activation RAM</th><td>28.3 KB</td><td>14.7 KB</td><td>-48%</td></tr><tr><th>Model storage</th><td>61.4 KB</td><td>25.7 KB</td><td>-58%</td></tr><tr><th>Total model memory</th><td>89.7 KB</td><td>40.4 KB</td><td>-55%</td></tr></tbody></table>
+</div>
 </div>
 <div slot="power">
 
 ```text
-$ hpx profile --config kws.yml --engine helia-aot \
-  --power
-
-✓ Configured monitor connected
-✓ Inference window captured
-
-  KWS / heliaAOT               Power summary
-  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  Avg power                        2.00 mW
-  Energy / inference              10.00 µJ
-  Efficiency                100,000 inf / J
-
-  Illustrative values · supported monitor required
+$ hpx profile --config afib-power.yml \
+  --engine helia-aot --power
 ```
 
+<div class="profile-result">
+<p>Next: include energy in your comparison.</p>
+<p>Configure a supported Joulescope or INA228 monitor in afib-power.yml, then capture power alongside inference timing.</p>
+<p>Power was not measured in this profiling example.</p>
+<a href="/helia-profiler/guide/power/">Set up power capture →</a>
+</div>
 </div>
 </ProfilerDemo>
+
+<details class="profiling-method">
+<summary>About this profiling example</summary>
+
+<p><a href="https://github.com/AmbiqAI/heartkit/blob/main/docs/zoo/arr-2-eff-sm.md">heartKIT AFIB arrhythmia classifier, arr-2-eff-sm</a>, INT8. Apollo510 EVB, Cortex-M55 with Helium, 96 MHz low-power mode, ATfE (clang) 22.1.0; no NPU. LiteRT uses the Ambiq TFLM build with Arm CMSIS-NN kernels. heliaAOT 0.23 uses ns-cmsis-nn 7.36.</p>
+<p>Measured 2026-09-28 with heliaPROFILER: 5 warmups and 100 profiled iterations. Latency is the median of an uninstrumented clean window of 48 inferences.</p>
+<p>Activation RAM is the tensor arena actually used by LiteRT or heliaAOT's compiled static arena. Model storage is the LiteRT flatbuffer (graph and weights) or heliaAOT's packed constants. Total model memory is their sum.</p>
+</details>
 </section>
 
 <section class="home-band home-band--muted">
