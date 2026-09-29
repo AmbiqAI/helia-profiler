@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass
 import hashlib
 import json
 from pathlib import Path
+import re
 
 from .config import ProfileConfig
 from .engines import EngineType
@@ -121,11 +122,11 @@ PREPARED_RUNTIME_ENGINES = {
     EngineType.TFLM: ("upstream", "cmsis_nn"),
     EngineType.HELIA_RT: ("helia-rt", "helia"),
 }
-#: Runtime provider modules a prepared-runtime build must not also resolve.
-_OTHER_RUNTIME_MODULES = frozenset(
-    {"nsx-tflite-micro", "arm-cmsis-nn", "nsx-helia-rt", "nsx-cmsis-nn"}
-    | {name for name, _, _ in PREPARED_RUNTIME_MODULES.values()}
-)
+#: Runtime providers a prepared-runtime build must not also resolve or link:
+#: any module whose name carries one of these, and the other prepared stacks.
+_RUNTIME_PROVIDER = re.compile(r"helia-rt|tflite-micro|cmsis-nn")
+_PREPARED_MODULES = frozenset(name for name, _, _ in PREPARED_RUNTIME_MODULES.values())
+_MAP_MODULE = re.compile(r"(?<=[/\\])[A-Za-z0-9_.+-]+(?=[/\\])")
 #: Largest total output a fixture may expose for full readback.
 FIXTURE_READBACK_BUDGET = 128 * 1024
 _FIXTURE_ROLES = {"signal", "aux"}
@@ -402,22 +403,23 @@ def build_fixed_fixture(
 
         stack = verified_runtime.record.stack
         name = PREPARED_RUNTIME_MODULES[stack][0]
-        others = _OTHER_RUNTIME_MODULES - {name}
+        others = _PREPARED_MODULES - {name}
         module = app / "modules" / name
         FixtureFile(module / "runtime.a", runtime.archive.sha256).read()
         FixtureFile(module / "provider-manifest.json", runtime.manifest.sha256).read()
         dependency_lock = pin(app / "nsx.lock")
         modules = yaml.safe_load(dependency_lock.read())["targets"][config.target.board]["modules"]
-        if name not in modules or any(
-            m in others or (stack == "upstream" and "helia-rt" in m) for m in modules
-        ):
+        if name not in modules or any(m in others or _RUNTIME_PROVIDER.search(m) for m in modules):
             raise ConfigError("Unexpected runtime provider in resolved dependency lock")
         flat_binary = pin(binary.path.with_suffix(".bin"))
         link_map = pin(binary.path.with_suffix(".map"))
         map_text = link_map.read().decode()
         if (
             f"{name}/runtime.a(" not in map_text
-            or any(f"{m}/" in map_text for m in others)
+            or any(
+                segment in others or _RUNTIME_PROVIDER.search(segment)
+                for segment in _MAP_MODULE.findall(map_text)
+            )
             or (stack == "upstream" and ("helia_rt" in map_text or "helia-rt" in map_text))
         ):
             raise ConfigError(f"Link map does not prove the explicit {stack} provider")

@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 import re
 
+from .engines.base import HeliaRtArtifacts
 from .errors import ConfigError
 from .pipeline import PipelineContext
 
@@ -151,7 +152,7 @@ class PreparedUpstreamRuntime:
         fields = {"schema_version", "archive_sha256", "providers", "abi", "headers", "include_dirs"}
         data = _object(raw, fields | ({"stack", "build"} if schema == 2 else set()), "manifest")
         stack = data["stack"] if schema == 2 else "upstream"
-        if schema == 2 and stack not in _STACK_KERNEL_DIR:
+        if schema == 2 and (not isinstance(stack, str) or stack not in _STACK_KERNEL_DIR):
             raise ValueError("Unsupported prepared runtime stack")
         if _digest(data["archive_sha256"]) != self.archive.sha256:
             raise ValueError("Runtime manifest/archive identity mismatch")
@@ -290,3 +291,14 @@ class _PreparedRuntimeStage:
             extra_modules=[NsxModuleRef(name=module_name, path=module, local=True)],
             cmake_vars={},
         )
+        artifacts = ctx.engine_artifacts
+        if data.stack == "helia-rt" and isinstance(artifacts, HeliaRtArtifacts):
+            # The adapter named its own release; record the archive actually linked.
+            revision = next(p.revision for p in data.providers if p.name == "helia-rt")
+            ctx.engine_artifacts = replace(
+                artifacts, heliart_version=f"prepared:{revision}", heliart_variant="prepared"
+            )
+            if ctx.run_metadata.engine is not None:
+                ctx.run_metadata.engine = replace(
+                    ctx.run_metadata.engine, version=f"prepared:{revision}"
+                )

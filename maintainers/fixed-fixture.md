@@ -44,7 +44,9 @@ The archive is staged as the local module `hpx-heliart-runtime` and aliased to
 `nsx::helia_rt`. Its declared defines apply to every consumer; schema 1 keeps the
 fixed upstream defines. It replaces the registry `nsx-helia-rt` and
 `nsx-cmsis-nn` modules. The compiled build must prove that the dependency
-lock and link map name that archive and no other runtime provider module.
+lock and link map name that archive, and no other module whose name carries
+`helia-rt`, `tflite-micro` or `cmsis-nn`. The engine provenance records the
+prepared archive's heliaRT revision as its version and `prepared` as its variant.
 Each engine accepts only its own stack. The rendered firmware is the TFLM
 fixture: heliaRT keeps the TFLM API. AOT accepts no runtime override and
 uses the ordinary AOT adapter and its internally allocated generated module.
@@ -107,9 +109,10 @@ These are source-level reservations, not whole-ELF totals: optimization may
 remove timer state, while linker alignment and other runtime objects are resolved
 by the linked-image memory report.
 
-The existing host compile gate includes representative TCN/KWS fixtures for both
-engines and timing scopes. The existing real-toolchain gate includes both engines
-and models, using its normal qualified dependency-workspace requirements.
+The existing host compile gate includes representative TCN/KWS and typed fixtures
+for all three fixture engines and both timing scopes. The existing real-toolchain
+gate includes every engine and model, using its normal qualified
+dependency-workspace requirements.
 
 ## Typed multi-tensor fixtures
 

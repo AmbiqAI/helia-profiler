@@ -33,7 +33,7 @@ from helia_profiler.fixture_runtime import _PreparedRuntimeStage
 from helia_profiler.modelcost.model_analysis import LayerOps, ModelAnalysis
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.results import NsxModuleRef
-from helia_profiler.results.models import MemoryPlan, RunMetadata, ToolchainInfo
+from helia_profiler.results.models import EngineInfo, MemoryPlan, RunMetadata, ToolchainInfo
 from helia_profiler.vocab import Toolchain
 
 METHOD = FixtureMethod(FixtureTimingScope.RESTORE_AND_INVOKE)
@@ -119,6 +119,7 @@ def test_schema_two_records_stack_defines_and_kernel_dir(tmp_path):
         ({"schema_version": 3}, "schema version"),
         ({"stack": "upstream"}, "stack"),
         ({"stack": "helia-aot"}, "stack"),
+        ({"stack": []}, "stack"),
         (
             {
                 "providers": {
@@ -199,6 +200,7 @@ def _stage(tmp_path, rt):
         heliart_variant="release",
         heliart_toolchain_tag="atfe",
     )
+    ctx.run_metadata.engine = EngineInfo(type="helia-rt", version="1.21.0", backend="helia")
     stage = _PreparedRuntimeStage(rt.verify())
     stage.run(ctx)
     return stage, ctx
@@ -224,6 +226,7 @@ def test_upstream_staging_is_unchanged(tmp_path):
         "depends:\n  required: [nsx-core, nsx-soc-hal]\n"
     )
     assert [m.name for m in ctx.engine_artifacts.extra_modules] == ["hpx-upstream-runtime"]
+    assert ctx.run_metadata.engine is not None and ctx.run_metadata.engine.version == "1.21.0"
 
 
 def test_heliart_staging_replaces_the_engine_modules_with_the_archive(tmp_path):
@@ -246,6 +249,11 @@ def test_heliart_staging_replaces_the_engine_modules_with_the_archive(tmp_path):
         ("hpx-heliart-runtime", True)
     ]
     assert ctx.engine_artifacts.cmake_vars == {}
+    assert isinstance(ctx.engine_artifacts, HeliaRtArtifacts)
+    assert ctx.engine_artifacts.heliart_version == "prepared:" + "c" * 40
+    assert ctx.engine_artifacts.heliart_variant == "prepared"
+    assert ctx.run_metadata.engine is not None
+    assert ctx.run_metadata.engine.version == "prepared:" + "c" * 40
 
 
 # --- fixture build ----------------------------------------------------------
@@ -346,6 +354,10 @@ def test_heliart_build_links_and_proves_the_prepared_archive(tmp_path, monkeypat
         (GOOD_LOCK, ["modules/nsx-helia-rt/libhelia-rt.a(x.o)"], "helia-rt provider"),
         (GOOD_LOCK, [*GOOD_MAP, "modules/nsx-cmsis-nn/libcmsis-nn.a(x.o)"], "helia-rt provider"),
         (GOOD_LOCK, [*GOOD_MAP, "modules/nsx-tflite-micro/lib.a(x.o)"], "helia-rt provider"),
+        ([*GOOD_LOCK, "helia-rt-source"], GOOD_MAP, "dependency lock"),
+        ([*GOOD_LOCK, "arm-cmsis-nn"], GOOD_MAP, "dependency lock"),
+        (GOOD_LOCK, [*GOOD_MAP, "/w/modules/helia-rt-source/libhelia.a(x.o)"], "helia-rt provider"),
+        (GOOD_LOCK, [*GOOD_MAP, "/w/app/modules/arm-cmsis-nn/Source/x.o"], "helia-rt provider"),
     ],
 )
 def test_heliart_build_refuses_any_other_runtime_provider(
