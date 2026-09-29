@@ -57,3 +57,5 @@ Completed locally: install OS tabs use native Starlight syncKey; shared AsciiTer
 Verified: build, zero Astro diagnostics, links across 122 HTML pages, 84 semantic/search routes, redirects, reference freshness and 38 script tests. Browser checks cover all 84 routes at 390px light and 1029px dark, search/filters/no-JS navigation, synchronized OS tabs and terminal copy/replay. Representative screenshots inspected. No hardware run or remote publication.
 
 Measured-example update: local landing build and semantic exports pass; all eight browser checks passed, Astro diagnostics clean. Inspected hero and comparison screenshots, adjusted footnote spacing and full-width result table. Public model link verified. Measurements were supplied by the owner, not remeasured in this task.
+
+ExecuTorch promotion removed from Home at owner request, including engine pill and setup copy/count. Guide retains documentation with explicit experimental status. Home search smoke term changed to heliaRT.

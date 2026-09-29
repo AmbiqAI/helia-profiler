@@ -24,7 +24,7 @@ const pagefind = path.join(dist, 'pagefind');
 
 /* Lower case and already its own stem, so what is in the vocabulary is what
  * a reader types. It appears on Home and nowhere else in the skeleton. */
-const TERM = 'executorch';
+const TERM = 'heliart';
 const HOME = '/';
 const MARKER = 'pagefind_dcd';
 

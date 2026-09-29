@@ -14,7 +14,7 @@ Prefer an interpreter? **heliaRT** brings Ambiq-tuned kernels to a familiar Lite
 | **heliaAOT** | Our recommended starting point for compiled inference and per-tensor memory placement. | `.tflite` |
 | **heliaRT** | Interpreter-based inference with Ambiq-tuned kernels. The hpx default. | `.tflite` |
 | **LiteRT / TFLM** | An upstream interpreter baseline to compare with the HELIA engines. | `.tflite` |
-| **ExecuTorch** | Profiling an exported Cortex-M program from your PyTorch workflow. | `.pte` |
+| **ExecuTorch (experimental)** | Profiling an exported Cortex-M program from your PyTorch workflow. | `.pte` |
 
 Support depends on your model's operators and target. Compare saved runs to choose the engine that meets your requirements; gains vary by model and configuration.
 
@@ -52,7 +52,7 @@ Select the kernel backend deliberately and record it with the result. The [engin
 
 ## ExecuTorch
 
-Use `executorch` for an exported `.pte` program. A matching manifest from `helia-torch` supplies the program's memory and I/O defaults; otherwise configure them explicitly. See [ExecuTorch configuration](../../reference/engine-configuration/#executorch).
+ExecuTorch support is experimental. Use `executorch` for an exported `.pte` program. A matching manifest from `helia-torch` supplies the program's memory and I/O defaults; otherwise configure them explicitly. See [ExecuTorch configuration](../../reference/engine-configuration/#executorch).
 
 Power capture is not supported by this engine. Keep `power.enabled: false` and compare timing and memory instead.
 
