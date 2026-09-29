@@ -17,6 +17,7 @@ ends with ``nsx_pmu_reset_counters()``, which writes PMOVSCLR.
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -214,3 +215,140 @@ def test_every_engine_reads_layers_through_the_shared_helper(template):
     assert '{% include "_pmu_read.j2" %}' in source
     assert "hpx_pmu_read_layer(" in source
     assert "ARM_PMU_Get_CNTR_OVS" not in source
+
+
+_AOT_DRIVER_HEAD = r"""
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include "hpx_sim_device.h"
+#include "nsx_pmu_utils.h"
+#define NSX_MEM_SRAM_BSS
+
+typedef enum {
+    {prefix}_op_state_run_started,
+    {prefix}_op_state_run_finished,
+} {prefix}_operator_state_t;
+
+HpxSimDwt hpx_sim_dwt;
+uint32_t hpx_sim_ovsset;
+uint32_t hpx_sim_count;
+const nsx_core_api_t nsx_pmu_V1_0_0 = {};
+
+void hpx_printf(const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    vprintf(fmt, ap);
+    va_end(ap);
+}
+
+static void hpx_park(void) {
+    printf("parked\n");
+    exit(0);
+}
+"""
+
+_AOT_DRIVER_MAIN = r"""
+static void print_iteration(void) {
+{print_block}
+}
+
+int main(int argc, char **argv) {
+    profiler_init_preset({preset});
+    g_profiler_enabled = true;
+    profiler_clear();
+    // Each arg is one op's cycle count.
+    for (int i = 1; i < argc; ++i) {
+        uint32_t cycles = (uint32_t)strtoul(argv[i], nullptr, 10);
+        model_operator_cb(i - 1, {prefix}_op_state_run_started, 0, nullptr);
+        hpx_sim_dwt.CYCCNT += cycles;
+        hpx_sim_count = cycles;
+        model_operator_cb(i - 1, {prefix}_op_state_run_finished, 0, nullptr);
+        hpx_sim_dwt.CYCCNT += 7U;
+    }
+    print_iteration();
+    return 0;
+}
+"""
+
+
+def _slice(text: str, start: str, end: str, *, keep_end: bool) -> str:
+    begin = text.index(start)
+    stop = text.index(end, begin)
+    return text[begin : stop + len(end) if keep_end else stop]
+
+
+def _build_aot(tmp_path: Path, *, soc: str, max_ops: int) -> Path:
+    """Compile the rendered AOT callback and CSV print on host."""
+    from .test_firmware_render_snapshots import _render
+
+    text = _render(soc, "rtt", "helia-aot", overrides={"pmu_max_ops": max_ops})
+    match = re.search(r"(\w+)_operator_state_t state", text)
+    assert match is not None
+    prefix = match.group(1)
+    region = _slice(
+        text,
+        "static constexpr int kMaxLayers",
+        "// AOT model context with profiling callback",
+        keep_end=False,
+    )
+    print_block = _slice(
+        text, "if (g_layer_capacity_exceeded)", "profiler_print_csv();", keep_end=True
+    )
+    armv8m = "hpx_pmu_read_layer(" in region
+    source = (
+        _AOT_DRIVER_HEAD.replace("{prefix}", prefix)
+        + region
+        + _AOT_DRIVER_MAIN.replace("{prefix}", prefix)
+        .replace("{print_block}", print_block)
+        .replace("{preset}", "NSX_PMU_PRESET_ML_DEFAULT" if armv8m else "0")
+    )
+    (tmp_path / "hpx_sim_device.h").write_text(_SIM_DEVICE_H)
+    (tmp_path / "nsx_pmu_utils.h").write_text(_SIM_PMU_H)
+    (tmp_path / "aot_driver.cc").write_text(source)
+    exe = tmp_path / "aot_sim"
+    assert _GXX is not None
+    subprocess.run(
+        [
+            _GXX,
+            "-std=gnu++17",
+            "-I",
+            str(tmp_path),
+            "-I",
+            str(_STUB_DIR),
+            str(tmp_path / "aot_driver.cc"),
+            "-o",
+            str(exe),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return exe
+
+
+@pytest.mark.parametrize("soc", ["apollo510", "apollo4p"], ids=["armv8m_pmu", "dwt"])
+def test_aot_ops_past_capacity_park_with_error(tmp_path, soc):
+    exe = _build_aot(tmp_path, soc=soc, max_ops=2)
+
+    out = subprocess.run(
+        [str(exe), "100", "200", "5000"], check=True, capture_output=True, text=True
+    ).stdout
+
+    assert out.splitlines() == [
+        "HPX_ERROR=operator_count_exceeds_capacity capacity=2",
+        "parked",
+    ]
+
+
+@pytest.mark.parametrize("soc", ["apollo510", "apollo4p"], ids=["armv8m_pmu", "dwt"])
+def test_aot_ops_within_capacity_print_every_layer(tmp_path, soc):
+    exe = _build_aot(tmp_path, soc=soc, max_ops=2)
+
+    out = subprocess.run(
+        [str(exe), "100", "200"], check=True, capture_output=True, text=True
+    ).stdout
+
+    rows = [line.split(",") for line in out.strip().splitlines()[1:]]
+    assert [row[2] for row in rows] == ["100", "200"]
+    assert "HPX_ERROR" not in out
