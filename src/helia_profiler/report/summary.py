@@ -17,6 +17,7 @@ from .memory import (
 from .power import _power_summary_to_dict
 from .contracts import RUN_SUMMARY_SCHEMA, RUN_SUMMARY_SCHEMA_VERSION
 from ..errors import ReportError
+from ..results.issues import Severity
 from ..results.run_summary import RunSummary
 from ..evaluation import evaluate_run
 from ..firmware import measured_power_fingerprint
@@ -28,6 +29,17 @@ if TYPE_CHECKING:
     from ..pipeline import PipelineContext
 
 log = logging.getLogger("hpx")
+
+
+def _power_errors(evaluation: RunEvaluation) -> list[str]:
+    # Validity rejects these; energy/N would too.
+    return sorted(
+        {
+            issue.code
+            for issue in evaluation.issues
+            if issue.severity == Severity.ERROR and issue.code.startswith("power.")
+        }
+    )
 
 
 def _write_summary(
@@ -212,6 +224,9 @@ def _write_summary(
         # collect_power_terminal and evaluation.validity ask (#125).
         probe_ran_inferences = probe_runs_inferences(ctx.config.profiling.clean_window_probe)
         arbitration = evaluation.gate_arbitration
+        power_errors = (
+            _power_errors(evaluation) if measurement_scope == "on_device_gated_inference" else []
+        )
         if not probe_ran_inferences:
             summary["power"]["per_inference_metrics_omitted"] = (
                 f"clean_window_probe={ctx.config.profiling.clean_window_probe} runs no inferences"
@@ -221,6 +236,10 @@ def _write_summary(
             # Written here, not beside the suppression, so the key lands in
             # its model-declared position.
             summary["power"]["per_inference_metrics_omitted"] = str(arbitration.suppression_reason)
+        elif power_errors:
+            summary["power"]["per_inference_metrics_omitted"] = "power errors: " + ", ".join(
+                power_errors
+            )
         if measurement_scope == "gpio_gated_clean_window":
             if ctx.power_result.gated_windows:
                 gw = ctx.power_result.gated_windows[0]
@@ -320,6 +339,14 @@ def _write_summary(
                         meta.clean_infer_avg_cycles,
                         meta.clean_infer_avg_us,
                     )
+        elif measurement_scope == "on_device_gated_inference":
+            count = window_inference_count(ctx)
+            suppressed = arbitration is not None and arbitration.suppress_per_inference
+            if probe_ran_inferences and not suppressed and not power_errors and count:
+                energy_per_infer = ps.energy_j / count
+                summary["power"]["energy_per_inference_j"] = round(energy_per_infer, 9)
+                if energy_per_infer > 0:
+                    summary["power"]["inferences_per_joule"] = round(1.0 / energy_per_infer, 6)
         elif (
             probe_ran_inferences
             and measurement_scope != "free_form_capture"

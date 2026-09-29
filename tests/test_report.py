@@ -5,6 +5,7 @@ from tests.pipeline_context_helpers import set_power_result, set_profile_result
 import csv
 import json
 from pathlib import Path
+from typing import Literal
 
 import pytest
 
@@ -203,6 +204,47 @@ def test_cache_rate_requires_the_same_layer_population():
         "ARM_PMU_L1D_CACHE_MISS_RD": 20,
     }
     assert _cache_totals([]) == {}
+
+
+@pytest.mark.parametrize(
+    "counters,expected",
+    [
+        # RD accesses with all-refill misses would read 83.3%.
+        (
+            {
+                "ARM_PMU_L1D_CACHE": 1000,
+                "ARM_PMU_L1D_CACHE_RD": 600,
+                "ARM_PMU_L1D_CACHE_REFILL": 100,
+            },
+            "90.0%",
+        ),
+        ({"ARM_PMU_L1D_CACHE_RD": 600}, None),
+    ],
+)
+def test_console_hit_rate_matches(tmp_path: Path, counters, expected):
+    from rich.console import Console
+
+    from helia_profiler.console import HpxConsole
+    from helia_profiler.console.results import print_results
+    from helia_profiler.report.memory import _cache_totals
+
+    config = load_config(None, {"model": {"path": "test.tflite"}, "engine": {"type": "helia-rt"}})
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    layers = [LayerResult(id=0, op="CONV_2D", counters=counters, cycles=1000.0)]
+    set_profile_result(ctx, PmuResult(meta=FirmwareMeta(), layers=layers))
+    console = HpxConsole(verbosity=0)
+    recorder = Console(record=True, highlight=False, width=200)
+    console._console = recorder
+
+    print_results(console, ctx)
+
+    hit_rows = [line for line in recorder.export_text().splitlines() if "L1D hit rate" in line]
+    if expected is None:
+        assert hit_rows == []
+        assert "l1d_hit_rate_pct" not in _cache_totals(layers)
+    else:
+        assert [row.split()[-1] for row in hit_rows] == [expected]
+        assert f"{_cache_totals(layers)['l1d_hit_rate_pct']:.1f}%" == expected
 
 
 def test_write_summary_surfaces_the_clean_window_self_check(tmp_path: Path):
@@ -1573,3 +1615,221 @@ def test_tops_suppressed_for_whole_capture(tmp_path: Path):
     )
     ma = _tops(ctx, tmp_path)
     assert "tops" not in ma and "tops_per_watt" not in ma
+
+
+def test_on_device_energy_published(tmp_path: Path):
+    """The monitor's bracket IS its N inferences, so energy/N is measured.
+
+    The on-device scope used to fall into the whole-capture estimate, which
+    scales power by profiled time and labels it not gated.
+    """
+    ctx = _tops_ctx(
+        tmp_path,
+        scope=MeasurementScope.ON_DEVICE_GATED_INFERENCE,
+        on_device_count=500,
+        duration_s=5.0,
+    )
+    assert ctx.pmu_result is not None
+    object.__setattr__(ctx.pmu_result.meta, "profiled_infer_count", 200)
+    object.__setattr__(ctx.pmu_result.meta, "profiled_infer_total_us", 18_000_000)
+
+    power = json.loads(_write_summary(ctx, tmp_path).read_text())["power"]
+
+    assert power["energy_per_inference_j"] == round(0.0016 / 500, 9)
+    assert power["inferences_per_joule"] == round(500 / 0.0016, 6)
+    assert not any(key.startswith("active_window_estimated") for key in power)
+
+
+def test_on_device_zero_count(tmp_path: Path):
+    ctx = _tops_ctx(
+        tmp_path,
+        scope=MeasurementScope.ON_DEVICE_GATED_INFERENCE,
+        on_device_count=0,
+        duration_s=5.0,
+    )
+
+    power = json.loads(_write_summary(ctx, tmp_path).read_text())["power"]
+
+    assert "energy_per_inference_j" not in power
+
+
+def _on_device_run(
+    tmp_path: Path,
+    *,
+    status: Literal["ok", "error"] = "ok",
+    completed: int = 500,
+    measured: int = 500,
+    overflow: bool = False,
+    probe: str = "infer",
+) -> PipelineContext:
+    from dataclasses import replace
+
+    from helia_profiler.config import PowerMode
+
+    ctx = _tops_ctx(
+        tmp_path,
+        scope=MeasurementScope.ON_DEVICE_GATED_INFERENCE,
+        on_device_count=measured,
+        duration_s=5.0,
+        probe=probe,
+    )
+    object.__setattr__(ctx.config.power, "mode", PowerMode.INTERNAL)
+    assert ctx.power_result is not None
+    set_power_result(
+        ctx,
+        PowerResult(
+            summary=ctx.power_result.summary,
+            metadata=PowerMetadata(
+                measurement_scope=MeasurementScope.ON_DEVICE_GATED_INFERENCE,
+                observation_mode=ObservationMode.ON_DEVICE,
+                integrity=PowerIntegrity.VALID,
+                inference_count=measured,
+            ),
+        ),
+    )
+    assert ctx.power_run is not None
+    ctx.power_run = replace(
+        ctx.power_run,
+        terminal=PowerTerminalRecord(
+            version=POWER_TERMINAL_VERSION,
+            status=status,
+            requested_count=500,
+            completed_count=completed,
+            elapsed_us=5_000_000,
+            gate_elapsed_us=5_000_000,
+            final_phase="done",
+            error_code=0 if status == "ok" else 3,
+            gate_asserted=True,
+            gate_lowered=True,
+        ),
+        on_device_summary=OnDevicePowerSummary(
+            source="ina228",
+            scope="fixed_n_inference",
+            energy_nj=1_600_000,
+            duration_us=5_000_000,
+            inference_count=measured,
+            overflow=overflow,
+        ),
+    )
+    return ctx
+
+
+def test_on_device_healthy_run_publishes(tmp_path: Path):
+    summary = json.loads(_write_summary(_on_device_run(tmp_path), tmp_path).read_text())
+
+    assert summary["validity"] == "valid"
+    assert summary["power"]["energy_per_inference_j"] == round(0.0016 / 500, 9)
+
+
+@pytest.mark.parametrize(
+    "fault,code",
+    [
+        ({"measured": 499}, IssueCode.POWER_ON_DEVICE_COUNT_MISMATCH),
+        ({"overflow": True}, IssueCode.POWER_ON_DEVICE_OVERFLOW),
+        ({"status": "error"}, IssueCode.POWER_TERMINAL_ERROR),
+        ({"completed": 499}, IssueCode.POWER_TERMINAL_INCOMPLETE),
+    ],
+)
+def test_on_device_power_error_suppresses(tmp_path: Path, fault, code):
+    summary = json.loads(_write_summary(_on_device_run(tmp_path, **fault), tmp_path).read_text())
+
+    assert code in [issue["code"] for issue in summary["issues"]]
+    assert "energy_per_inference_j" not in summary["power"]
+    assert "inferences_per_joule" not in summary["power"]
+    assert code in summary["power"]["per_inference_metrics_omitted"]
+
+
+def test_on_device_busy_loop_publishes_nothing(tmp_path: Path):
+    ctx = _on_device_run(tmp_path, probe="busy_loop")
+
+    power = json.loads(_write_summary(ctx, tmp_path).read_text())["power"]
+
+    assert "energy_per_inference_j" not in power
+    assert "busy_loop" in power["per_inference_metrics_omitted"]
+
+
+def _publish_bundle(ctx: PipelineContext, run_dir: Path) -> Path:
+    from helia_profiler.results import ModelInfo, RunMetadata
+
+    ctx.run_metadata = RunMetadata(
+        hpx_version="0.1.0",
+        run_id=run_dir.name,
+        timestamp="2026-09-08T00:00:00+00:00",
+        model=ModelInfo(name="kws.tflite", size_bytes=1, sha256="a" * 64),
+    )
+    object.__setattr__(ctx.config.output, "dir", run_dir)
+    object.__setattr__(ctx.config.output, "model_explorer", False)
+    lock = run_dir / "workspace" / "nsx.lock"
+    lock.parent.mkdir(parents=True)
+    lock.write_bytes(b"schema_version: 4\ntargets: {}\n")
+    ctx.dependency_lock_path = lock
+    write_report(ctx)
+    return run_dir
+
+
+def test_on_device_energy_compared(tmp_path: Path):
+    from helia_profiler.evaluation import compare_runs
+
+    bundles = []
+    for name, count in (("baseline", 500), ("candidate", 400)):
+        ctx = _tops_ctx(
+            tmp_path,
+            scope=MeasurementScope.ON_DEVICE_GATED_INFERENCE,
+            on_device_count=count,
+            duration_s=5.0,
+        )
+        bundles.append(_publish_bundle(ctx, tmp_path / name))
+
+    result = compare_runs(*bundles)
+
+    energy = next(m for m in result.metrics if m.name == "power.energy_per_inference_j")
+    assert energy.baseline == round(0.0016 / 500, 9)
+    assert energy.candidate == round(0.0016 / 400, 9)
+
+
+def test_missing_counter_still_publishes(tmp_path: Path):
+    """Every sample of layer 0's cycle counter wraps, so the parser drops it.
+
+    The CSV header must still carry the columns later layers have, or the
+    writer raises before summary.json and the manifest exist.
+    """
+    from helia_profiler.capture.parser import parse_firmware_output
+    from helia_profiler.wire import HPX_END_SENTINEL, HPX_START_SENTINEL
+
+    lines = [HPX_START_SENTINEL, "HPX_PRESETS=basic_cpu,memory"]
+    for preset, header, layer0, layer1 in (
+        (
+            "basic_cpu",
+            "Layer,Op,ARM_PMU_CPU_CYCLES,ARM_PMU_INST_RETIRED",
+            "0,CONV_2D,4294967000,10",
+            "1,SOFTMAX,500,20",
+        ),
+        ("memory", "Layer,Op,ARM_PMU_MEM_ACCESS", "0,CONV_2D,7", "1,SOFTMAX,8"),
+    ):
+        lines.append(f"--- HPX_PRESET {preset} ---")
+        for it in range(2):
+            lines.extend([f"--- HPX_ITER {it} ---", header, layer0, layer1])
+    lines.append(HPX_END_SENTINEL)
+    pmu = parse_firmware_output(lines)
+    assert "ARM_PMU_CPU_CYCLES" not in pmu.layers[0].counters
+
+    config = load_config(
+        None,
+        {
+            "model": {"path": "test.tflite"},
+            "engine": {"type": "helia-rt"},
+            "output": {"detailed": True},
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    set_profile_result(ctx, pmu)
+    _publish_bundle(ctx, tmp_path / "run")
+
+    with open(tmp_path / "run" / "profile_results.csv", newline="") as f:
+        rows = list(csv.DictReader(f))
+    assert rows[0]["ARM_PMU_CPU_CYCLES"] == ""
+    assert float(rows[1]["ARM_PMU_CPU_CYCLES"]) == 500
+    assert (tmp_path / "run" / "summary.json").is_file()
+    assert (tmp_path / "run" / "result_manifest.json").is_file()
+    with open(tmp_path / "run" / "detailed" / "profile_basic_cpu.csv", newline="") as f:
+        assert "ARM_PMU_CPU_CYCLES" in next(csv.reader(f))
