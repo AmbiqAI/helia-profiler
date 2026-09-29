@@ -5,6 +5,7 @@ from tests.pipeline_context_helpers import set_power_result, set_profile_result
 import csv
 import json
 from pathlib import Path
+from typing import Literal
 
 import pytest
 
@@ -1098,7 +1099,7 @@ def test_write_summary_carries_the_power_firmware_fingerprint(tmp_path: Path):
 
 
 def test_window_clock_ceiling_metadata_keys_are_the_documented_set():
-    # docs/guide/power.md names these fields for users reading summary.json,
+    # the guide/power page names these fields for users reading summary.json,
     # and #115 put them in the summary's power block. Nothing else pins the
     # key set, so renaming or adding one in to_metadata() would leave the
     # guide describing a field that no longer exists while the whole suite
@@ -1650,6 +1651,101 @@ def test_on_device_zero_count(tmp_path: Path):
     power = json.loads(_write_summary(ctx, tmp_path).read_text())["power"]
 
     assert "energy_per_inference_j" not in power
+
+
+def _on_device_run(
+    tmp_path: Path,
+    *,
+    status: Literal["ok", "error"] = "ok",
+    completed: int = 500,
+    measured: int = 500,
+    overflow: bool = False,
+    probe: str = "infer",
+) -> PipelineContext:
+    from dataclasses import replace
+
+    from helia_profiler.config import PowerMode
+
+    ctx = _tops_ctx(
+        tmp_path,
+        scope=MeasurementScope.ON_DEVICE_GATED_INFERENCE,
+        on_device_count=measured,
+        duration_s=5.0,
+        probe=probe,
+    )
+    object.__setattr__(ctx.config.power, "mode", PowerMode.INTERNAL)
+    assert ctx.power_result is not None
+    set_power_result(
+        ctx,
+        PowerResult(
+            summary=ctx.power_result.summary,
+            metadata=PowerMetadata(
+                measurement_scope=MeasurementScope.ON_DEVICE_GATED_INFERENCE,
+                observation_mode=ObservationMode.ON_DEVICE,
+                integrity=PowerIntegrity.VALID,
+                inference_count=measured,
+            ),
+        ),
+    )
+    assert ctx.power_run is not None
+    ctx.power_run = replace(
+        ctx.power_run,
+        terminal=PowerTerminalRecord(
+            version=POWER_TERMINAL_VERSION,
+            status=status,
+            requested_count=500,
+            completed_count=completed,
+            elapsed_us=5_000_000,
+            gate_elapsed_us=5_000_000,
+            final_phase="done",
+            error_code=0 if status == "ok" else 3,
+            gate_asserted=True,
+            gate_lowered=True,
+        ),
+        on_device_summary=OnDevicePowerSummary(
+            source="ina228",
+            scope="fixed_n_inference",
+            energy_nj=1_600_000,
+            duration_us=5_000_000,
+            inference_count=measured,
+            overflow=overflow,
+        ),
+    )
+    return ctx
+
+
+def test_on_device_healthy_run_publishes(tmp_path: Path):
+    summary = json.loads(_write_summary(_on_device_run(tmp_path), tmp_path).read_text())
+
+    assert summary["validity"] == "valid"
+    assert summary["power"]["energy_per_inference_j"] == round(0.0016 / 500, 9)
+
+
+@pytest.mark.parametrize(
+    "fault,code",
+    [
+        ({"measured": 499}, IssueCode.POWER_ON_DEVICE_COUNT_MISMATCH),
+        ({"overflow": True}, IssueCode.POWER_ON_DEVICE_OVERFLOW),
+        ({"status": "error"}, IssueCode.POWER_TERMINAL_ERROR),
+        ({"completed": 499}, IssueCode.POWER_TERMINAL_INCOMPLETE),
+    ],
+)
+def test_on_device_power_error_suppresses(tmp_path: Path, fault, code):
+    summary = json.loads(_write_summary(_on_device_run(tmp_path, **fault), tmp_path).read_text())
+
+    assert code in [issue["code"] for issue in summary["issues"]]
+    assert "energy_per_inference_j" not in summary["power"]
+    assert "inferences_per_joule" not in summary["power"]
+    assert code in summary["power"]["per_inference_metrics_omitted"]
+
+
+def test_on_device_busy_loop_publishes_nothing(tmp_path: Path):
+    ctx = _on_device_run(tmp_path, probe="busy_loop")
+
+    power = json.loads(_write_summary(ctx, tmp_path).read_text())["power"]
+
+    assert "energy_per_inference_j" not in power
+    assert "busy_loop" in power["per_inference_metrics_omitted"]
 
 
 def _publish_bundle(ctx: PipelineContext, run_dir: Path) -> Path:

@@ -270,4 +270,4 @@ Schema v7 uses the INA228 accumulation interval for internal-mode average power 
 
 Schema v8 corrects MAC counts for `TRANSPOSE_CONV`, non-flat `FULLY_CONNECTED`, and `BATCH_MATMUL`. Models using these operators can have changed total MACs, total operations, TOPS, and cycles per MAC.
 
-Schema v9 publishes `power.energy_per_inference_j` and `power.inferences_per_joule` for on-device gated-inference summaries when the probe ran inferences and the gate arbitration does not suppress per-inference figures. Earlier summaries lacked these fields for that scope, so comparing v8 and v9 reports an informative schema difference.
+Schema v9 publishes `power.energy_per_inference_j` and `power.inferences_per_joule` for on-device gated-inference summaries when the probe ran inferences and the run has no power error; `power.per_inference_metrics_omitted` names the errors otherwise. Earlier summaries lacked these fields for that scope, so comparing v8 and v9 reports an informative schema difference.
