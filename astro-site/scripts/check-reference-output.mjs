@@ -1,3 +1,4 @@
+import { hasSourceRef } from './source-link-ref.mjs';
 /*
  * Reads the built Python reference back and asserts what it promised.
  *
@@ -276,9 +277,9 @@ for (const page of pages) {
     !/blob\/[0-9a-f]{40}\//.test(html),
     `${page.route}: a source link names a commit sha rather than the build's ref.`,
   );
-  const links = [...html.matchAll(/blob\/([^/"]+)\//g)].map((match) => match[1]);
+  const links = [...html.matchAll(/blob\/[^"<>\s]+/g)].map((match) => match[0]);
   check(
-    links.every((ref) => ref === expectedRef),
+    links.every((link) => hasSourceRef(link, expectedRef)),
     `${page.route}: source links name ${[...new Set(links)].join(', ')}, expected ${expectedRef}.`,
   );
 

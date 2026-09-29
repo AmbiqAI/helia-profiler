@@ -14,3 +14,5 @@ Site builds passed after edits. Rendered cards and terminal examples inspected i
 
 ## Next
 Commit and open PR, pass documentation validation, then squash merge as authorized. Verify remote merge and distinguish it from public deployment. PR #332 previously merged as ad8b71a1 with all CI green. Preserve this worktree and the running local preview at port 8764.
+
+PR #400 opened. Eight browser tests pass. Docs CI exposed a source-link checker that truncated slash-containing branches; fixed matching against the full ref and source path, with regression tests.
