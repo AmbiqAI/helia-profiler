@@ -29,4 +29,4 @@ Defined in `src/helia_profiler/cli/inspect_app.py` line 198.
 | `--all` | `bool` | false | Show every host serial port, not just HPX-relevant USB/J-Link ports |
 | `--json` | `bool` | false | Emit machine-readable JSON |
 
-Generated from the `src/helia_profiler` tree `24b1dfcb49ea82d6c9d83554d2088d49c3fd327b` with typer 0.26.8 and click 8.3.3.
+Generated from the `src/helia_profiler` tree `81ac29b5c609a5638d0b19d3a4dcbd68ea962d5b` with typer 0.26.8 and click 8.3.3.

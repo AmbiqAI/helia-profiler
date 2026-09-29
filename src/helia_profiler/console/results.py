@@ -15,6 +15,7 @@ from rich.text import Text
 from .tables import _fmt_bytes, _progress_bar
 from ..firmware.workload import measured_clean_workload
 from ..power.metadata import PowerIntegrity
+from ..report.memory import _cache_totals
 from ..results.serde import to_float
 
 if TYPE_CHECKING:
@@ -565,13 +566,8 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
                 short = cname.replace("ARM_PMU_", "")
                 cache_table.add_row(short, f"{cache_totals[cname]:,.0f}")
 
-        l1d_acc = cache_totals.get("ARM_PMU_L1D_CACHE_RD", cache_totals.get("ARM_PMU_L1D_CACHE", 0))
-        l1d_miss = cache_totals.get(
-            "ARM_PMU_L1D_CACHE_MISS_RD",
-            cache_totals.get("ARM_PMU_L1D_CACHE_REFILL", 0),
-        )
-        if l1d_acc > 0:
-            hit_rate = (1 - l1d_miss / l1d_acc) * 100
+        hit_rate = _cache_totals(layers).get("l1d_hit_rate_pct")
+        if hit_rate is not None:
             style = "green" if hit_rate >= 95 else "yellow" if hit_rate >= 80 else "red"
             cache_table.add_row(
                 "[bold]L1D hit rate[/bold]",
