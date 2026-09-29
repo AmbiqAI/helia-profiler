@@ -1,0 +1,15 @@
+:root[data-theme='dark'] :is(.helia-card-mark--icon, .helia-icon-tile) {
+  --accent: #9bea55;
+}
+
+:root[data-theme='light'] :is(.helia-card-mark--icon, .helia-icon-tile) {
+  --accent: #477821;
+}
+
+:root[data-theme='dark'] helia-ascii-terminal.tone-adaptive {
+  --ascii-success: #9bea55;
+}
+
+:root[data-theme='light'] helia-ascii-terminal.tone-adaptive {
+  --ascii-success: #477821;
+}
