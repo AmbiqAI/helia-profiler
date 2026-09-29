@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from hashlib import sha256
+import re
 import struct
 
 MAX_IMAGE = 1024 * 1024
@@ -73,6 +74,11 @@ class Image:
 
     def sink(self, name):
         return next(s for s in self.sinks if s.name == name)
+
+
+_BYTE_SINK = re.compile(r"deployment_output(_[1-9][0-9]*)?")
+#: Sinks only typed fixtures emit; an image carrying one the caller did not declare is refused.
+_TYPED_SINK = re.compile(r"deployment_output_[1-9][0-9]*|deployment_arena_scan")
 
 
 def inspect_elf(data: bytes, binary: bytes, load_address: int, sizes: dict[str, int]) -> Image:
@@ -172,13 +178,14 @@ def inspect_elf(data: bytes, binary: bytes, load_address: int, sizes: dict[str, 
             n, value, length, sym_info, other, section = struct.unpack_from("<IIIBBH", data, pos)
             name = cstring(table, n)
             if name not in found:
+                require(not _TYPED_SINK.fullmatch(name), f"undeclared fixture sink {name}")
                 continue
             require(
                 0 < section < shnum and sym_info >> 4 == 1 and sym_info & 15 == 1,
                 "sink must be defined global object",
             )
             require(length == sizes[name] and bounded(value, length, DTCM), "sink size/DTCM range")
-            require(name == "deployment_output" or value % 4 == 0, "unaligned word sink")
+            require(_BYTE_SINK.fullmatch(name) or value % 4 == 0, "unaligned word sink")
             owner = sections[section]
             require(
                 owner[2] & 3 == 3 and bounded(value, length, (owner[3], owner[3] + owner[5])),

@@ -7,8 +7,14 @@ from pathlib import Path
 import pytest
 
 from helia_profiler.engines import EngineType
-from helia_profiler.fixture import FixedFixture, FixtureBuild, FixtureTimingScope
-from helia_profiler.fixture_analysis import Int8Tensor
+from helia_profiler.fixture import (
+    FixedFixture,
+    FixtureBuild,
+    FixtureIO,
+    FixtureTimingScope,
+    TypedFixture,
+)
+from helia_profiler.fixture_analysis import FixtureTensor, Int8Tensor, PerTensorQuantization
 from helia_profiler.fixture_operator_timing import bind_operator_timing
 from helia_profiler.fixture_runtime import FixtureFile
 from helia_profiler.fixture_target import supported_fixture_target
@@ -67,8 +73,26 @@ def fixture_for(sha: str, tmp_path) -> FixedFixture:
     )
 
 
+def typed_fixture_for(sha: str, tmp_path, *, output_name: str = "scores") -> TypedFixture:
+    return TypedFixture(
+        FixtureFile(tmp_path / "model", sha),
+        (
+            FixtureIO(
+                FixtureTensor("mfcc", 0, "int8", (1, 49, 10, 1), PerTensorQuantization(0.125, -4)),
+                FixtureFile(tmp_path / "input", sha),
+            ),
+        ),
+        (
+            FixtureIO(
+                FixtureTensor(output_name, 1, "int8", (1, 12), PerTensorQuantization(2**-8, -128)),
+                FixtureFile(tmp_path / "expected", sha),
+            ),
+        ),
+    )
+
+
 def build_for(
-    engine: EngineType, fixture: FixedFixture, *, prepared_runtime: bool = False
+    engine: EngineType, fixture: FixedFixture | TypedFixture, *, prepared_runtime: bool = False
 ) -> FixtureBuild:
     tmp_path = fixture.model.path.parent
     file = FixtureFile(tmp_path / "f", "0" * 64)
@@ -248,3 +272,15 @@ def test_non_finite_layer_cycles_are_refused(tmp_path):
         build_for(EngineType.HELIA_AOT, fixture), fixture, profile("kws_aot", layers=layers)
     )
     assert result.reason == "layer_cycles_unavailable" and result.operators is None
+
+
+def test_typed_fixture_binds_only_to_its_own_build(tmp_path):
+    fixture = typed_fixture_for(KWS_SHA, tmp_path)
+    build = build_for(EngineType.HELIA_AOT, fixture)
+    result = bind_operator_timing(build, fixture, profile("kws_aot"))
+    assert result.accepted and result.operators is not None and len(result.operators) == 13
+    renamed = typed_fixture_for(KWS_SHA, tmp_path, output_name="logits")
+    refused = bind_operator_timing(build, renamed, profile("kws_aot"))
+    assert refused.operators is None and refused.reason == "fixture_mismatch"
+    legacy = fixture_for(KWS_SHA, tmp_path)
+    assert bind_operator_timing(build, legacy, profile("kws_aot")).reason == "fixture_mismatch"

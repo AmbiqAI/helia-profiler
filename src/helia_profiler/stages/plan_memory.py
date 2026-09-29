@@ -484,7 +484,7 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
         # follow the target's default data region, not the tensor arena.
         static_region = _default_bss_region(family)
         sizes = {
-            "fixture_output": fixture.model.output_tensor.size,
+            "fixture_output": fixture.model.output_bytes,
             "fixture_status": 4,
             "fixture_checksum": 4,
             "fixture_timing": 7 * 4,
@@ -501,7 +501,7 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
                 MemoryRegion.MRAM,
                 MemoryConsumer(
                     name="fixture_input",
-                    size=fixture.model.input_tensor.size,
+                    size=fixture.model.input_bytes,
                     kind=ConsumerKind.OTHER,
                 ),
             )

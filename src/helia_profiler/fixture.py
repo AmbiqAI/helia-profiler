@@ -9,16 +9,24 @@ from pathlib import Path
 
 from .config import ProfileConfig
 from .engines import EngineType
+from .engines.base import HeliaAotArtifacts
 from .errors import ConfigError
 from .pipeline import PipelineContext, PipelineRunner, Stage, serialize_config
-from .placement import Placement
+from .placement import ArenaRole, Placement
 from .fixture_target import FixtureTarget, supported_fixture_target
 from .results.models import ToolchainInfo, MemoryPlan
 
 
 from enum import StrEnum
 from .fixture_runtime import FixtureFile, PreparedUpstreamRuntime, _PreparedRuntimeStage
-from .fixture_analysis import Int8Tensor, FixtureModelAnalysis, analyze_fixture_model
+from .fixture_analysis import (
+    FixtureModelAnalysis,
+    FixtureTensor,
+    Int8Tensor,
+    TypedFixtureModelAnalysis,
+    analyze_fixture_model,
+    analyze_typed_fixture_model,
+)
 
 
 class FixtureTimingScope(StrEnum):
@@ -39,9 +47,11 @@ class FixtureMethod:
 
 @dataclass(frozen=True)
 class FixtureRenderSpec:
-    fixture: FixedFixture
+    fixture: FixedFixture | TypedFixture
     method: FixtureMethod
-    model: FixtureModelAnalysis
+    model: FixtureModelAnalysis | TypedFixtureModelAnalysis
+    #: Paint heliaAOT scratch arenas and report touched bytes after the run.
+    observe_aot_arenas: bool = False
 
 
 @dataclass(frozen=True)
@@ -70,6 +80,107 @@ class FixedFixture:
         ).hexdigest()
 
 
+class FixtureCapability(StrEnum):
+    """Producer-declared status of one engine and IO dtype for fixed fixtures."""
+
+    QUALIFIED = "qualified"
+    SUPPORTED = "supported"
+    UNSUPPORTED = "unsupported"
+
+
+#: Fixture support per engine and IO dtype. ``qualified`` has an exact device
+#: pass; ``supported`` builds but has none yet; ``unsupported`` is refused.
+FIXTURE_CAPABILITIES: dict[EngineType, dict[str, FixtureCapability]] = {
+    EngineType.TFLM: {
+        "int8": FixtureCapability.QUALIFIED,
+        "int16": FixtureCapability.SUPPORTED,
+        "float32": FixtureCapability.SUPPORTED,
+        "float16": FixtureCapability.UNSUPPORTED,
+    },
+    EngineType.HELIA_AOT: {
+        "int8": FixtureCapability.QUALIFIED,
+        "int16": FixtureCapability.SUPPORTED,
+        "float16": FixtureCapability.SUPPORTED,
+        "float32": FixtureCapability.SUPPORTED,
+    },
+}
+#: Largest total output a fixture may expose for full readback.
+FIXTURE_READBACK_BUDGET = 128 * 1024
+_FIXTURE_ROLES = {"signal", "aux"}
+
+
+@dataclass(frozen=True)
+class FixtureIO:
+    """One model input with its fixed bytes, or one output with its expected bytes."""
+
+    tensor: FixtureTensor
+    data: FixtureFile
+    role: str = "signal"
+
+
+@dataclass(frozen=True)
+class TypedFixture:
+    """Fixed inputs and expected outputs for every IO tensor of a model."""
+
+    model: FixtureFile
+    inputs: tuple[FixtureIO, ...]
+    outputs: tuple[FixtureIO, ...]
+
+    def verify(self) -> None:
+        self.model.read()
+        if not self.inputs or not self.outputs:
+            raise ValueError("Typed fixture requires inputs and outputs")
+        if any(io.role not in _FIXTURE_ROLES for io in self.inputs) or any(
+            io.role != "signal" for io in self.outputs
+        ):
+            raise ValueError("Invalid fixture tensor role")
+        for io in (*self.inputs, *self.outputs):
+            if len(io.data.read()) != io.tensor.size_bytes:
+                raise ValueError(f"Fixture tensor {io.tensor.name} byte extent mismatch")
+
+    @property
+    def expected(self) -> FixtureFile:
+        return self.outputs[0].data
+
+    @property
+    def identity(self) -> str:
+        value = asdict(self)
+        value["model"].pop("path")
+        for io in (*value["inputs"], *value["outputs"]):
+            io["data"].pop("path")
+        return hashlib.sha256(
+            json.dumps(value, sort_keys=True, allow_nan=False).encode()
+        ).hexdigest()
+
+
+def _check_typed_fixture(
+    fixture: TypedFixture, model: TypedFixtureModelAnalysis, engine: EngineType
+) -> tuple[tuple[str, FixtureCapability], ...]:
+    """Match declared tensors to the model and return each IO dtype's capability."""
+    if (
+        tuple(io.tensor for io in fixture.inputs) != model.inputs
+        or tuple(io.tensor for io in fixture.outputs) != model.outputs
+    ):
+        raise ConfigError("Fixture tensor declarations differ from analyzed model")
+    if model.output_bytes > FIXTURE_READBACK_BUDGET:
+        raise ConfigError(
+            f"Fixture outputs total {model.output_bytes} B, above the "
+            f"{FIXTURE_READBACK_BUDGET} B readback budget"
+        )
+    if engine is EngineType.TFLM and model.has_float16:
+        raise ConfigError("The upstream TFLM runtime has no float16 support")
+    table = FIXTURE_CAPABILITIES[engine]
+    capabilities = tuple(
+        sorted({(t.dtype, table[t.dtype]) for t in (*model.inputs, *model.outputs)})
+    )
+    unsupported = [
+        dtype for dtype, status in capabilities if status is FixtureCapability.UNSUPPORTED
+    ]
+    if unsupported:
+        raise ConfigError(f"{engine.value} fixtures do not support {', '.join(unsupported)} IO")
+    return capabilities
+
+
 @dataclass(frozen=True)
 class FixtureBuild:
     fixture_identity: str
@@ -95,9 +206,15 @@ class FixtureBuild:
     )
     planned_memory: MemoryPlan | None = None
     planned_memory_reason: str | None = "not_recorded"
+    #: Expected bytes of every output, in model order (typed fixtures).
+    outputs: tuple[FixtureFile, ...] = ()
+    #: Producer capability of each IO dtype this build uses.
+    capabilities: tuple[tuple[str, FixtureCapability], ...] = ()
+    #: heliaAOT scratch arenas painted and scanned: (region id, size in bytes).
+    aot_arena_scan: tuple[tuple[int, int], ...] = ()
 
 
-def _validate(config: ProfileConfig, fixture: FixedFixture) -> None:
+def _validate(config: ProfileConfig, fixture: FixedFixture | TypedFixture) -> None:
     fixture.verify()
     if config.model.path.resolve() != fixture.model.path.resolve():
         raise ConfigError("Profile model differs from the pinned fixture")
@@ -139,19 +256,29 @@ class _BindFixtureStage:
 
 def build_fixed_fixture(
     config: ProfileConfig,
-    fixture: FixedFixture,
+    fixture: FixedFixture | TypedFixture,
     *,
     method: FixtureMethod,
     runtime: PreparedUpstreamRuntime | None = None,
     compile: bool = True,
+    observe_aot_arenas: bool = False,
 ) -> FixtureBuild:
     """Render or compile one fixed fixture through profiler's host-only stages."""
     if not isinstance(method, FixtureMethod):
         raise ConfigError("Explicit FixtureMethod required")
     _validate(config, fixture)
-    model = analyze_fixture_model(fixture.model.path)
-    if (fixture.input_tensor, fixture.output_tensor) != (model.input_tensor, model.output_tensor):
-        raise ConfigError("Fixture tensor declarations differ from analyzed model")
+    model: FixtureModelAnalysis | TypedFixtureModelAnalysis
+    if isinstance(fixture, TypedFixture):
+        model = analyze_typed_fixture_model(fixture.model.path)
+        capabilities = _check_typed_fixture(fixture, model, config.engine.type)
+    else:
+        model = analyze_fixture_model(fixture.model.path)
+        if (fixture.input_tensor, fixture.output_tensor) != (
+            model.input_tensor,
+            model.output_tensor,
+        ):
+            raise ConfigError("Fixture tensor declarations differ from analyzed model")
+        capabilities = (("int8", FIXTURE_CAPABILITIES[config.engine.type]["int8"]),)
     if config.engine.type is EngineType.TFLM:
         if runtime is None or config.engine.backend != "cmsis_nn":
             raise ConfigError("Explicit upstream prepared runtime and cmsis_nn backend required")
@@ -160,6 +287,8 @@ def build_fixed_fixture(
         if runtime is not None:
             raise ConfigError("AOT cannot consume an upstream runtime override")
         verified_runtime = None
+    if observe_aot_arenas and config.engine.type is not EngineType.HELIA_AOT:
+        raise ConfigError("Arena observation applies to heliaAOT fixtures only")
     if config.target.toolchain != "atfe":
         raise ConfigError("Prepared runtime requires its matching ATfE toolchain")
     if config.work_dir is None:
@@ -175,6 +304,8 @@ def build_fixed_fixture(
             json.dumps(serialize_config(config), sort_keys=True).encode()
         ).hexdigest(),
     }
+    if observe_aot_arenas:
+        identity["observe_aot_arenas"] = True
 
     # PipelineRunner holds its normal workspace lock; its first stage binds
     # this directory before any generated source can overwrite older intent.
@@ -206,7 +337,7 @@ def build_fixed_fixture(
     if verified_runtime is not None:
         stages.append(_PreparedRuntimeStage(verified_runtime))
     stages += [
-        _BindFixtureStage(FixtureRenderSpec(fixture, method, model)),
+        _BindFixtureStage(FixtureRenderSpec(fixture, method, model, observe_aot_arenas)),
         PlanMemoryStage(),
         GenerateFirmwareStage(),
     ]
@@ -303,4 +434,17 @@ def build_fixed_fixture(
         planned_memory_reason=None
         if planned_memory is not None
         else "producer_plan_unavailable_or_unsupported_mapping",
+        outputs=tuple(io.data for io in fixture.outputs)
+        if isinstance(fixture, TypedFixture)
+        else (fixture.expected,),
+        capabilities=capabilities,
+        aot_arena_scan=tuple(
+            (r.region_id, r.size)
+            for r in (
+                ctx.engine_artifacts.aot_arena_regions
+                if isinstance(ctx.engine_artifacts, HeliaAotArtifacts)
+                else ()
+            )
+            if observe_aot_arenas and r.role is ArenaRole.SCRATCH
+        ),
     )

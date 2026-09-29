@@ -19,26 +19,39 @@
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/schema/schema_generated.h"
 {% endif %}
-
-static const uint8_t fixed_input[] = { {{ input_values }} };
+{% for io in fixture_inputs %}
+static const uint8_t {{ io.buffer }}[] = { {{ io.initializer }} };
+{%- endfor %}
 {% if not fixture_aot %}
 NSX_MEM_SRAM_BSS alignas(16) static uint8_t arena[{{ fixture_arena_size }}];
 {% endif %}
 volatile int32_t deployment_status = -1;
-volatile uint8_t deployment_output[{{ output_tensor.size }}];
+{%- for io in fixture_outputs %}
+volatile uint8_t {{ io.sink }}[{{ io.size }}];
+{%- endfor %}
 volatile uint32_t deployment_checksum;
 volatile uint32_t deployment_timing[7];
+{%- if fixture_scan_arenas %}
+volatile uint32_t deployment_arena_scan[{{ 2 * (fixture_scan_arenas | length) }}];
+{%- endif %}
 
 static int infer_fixture() {
 {% if fixture_aot %}
     {{ aot_prefix }}_model_context_t model_ctx = {};
     if ({{ aot_prefix }}_model_init(&model_ctx) != 0) return {{ fixture_status.arena }};
-    if ({{ aot_prefix }}_num_inputs != 1 || {{ aot_prefix }}_num_outputs != 1 ||
-        model_ctx.inputs[0].size != {{ input_tensor.size }} || model_ctx.outputs[0].size != {{ output_tensor.size }} ||
-        !model_ctx.inputs[0].data || !model_ctx.outputs[0].data) return {{ fixture_status.io_contract }};
-    auto *input_data = model_ctx.inputs[0].data;
-    auto *output_data = reinterpret_cast<const uint8_t *>(model_ctx.outputs[0].data);
+    if ({{ aot_prefix }}_num_inputs != {{ fixture_inputs | length }} || {{ aot_prefix }}_num_outputs != {{ fixture_outputs | length }} ||
+        {% for io in fixture_inputs %}model_ctx.inputs[{{ io.position }}].size != {{ io.size }} || {% endfor %}{% for io in fixture_outputs %}model_ctx.outputs[{{ io.position }}].size != {{ io.size }} ||{% endfor %}
+        {% for io in fixture_inputs %}!model_ctx.inputs[{{ io.position }}].data || {% endfor %}{% for io in fixture_outputs %}!model_ctx.outputs[{{ io.position }}].data{{ " ||" if not loop.last }}{% endfor %}) return {{ fixture_status.io_contract }};
+{%- for io in fixture_inputs %}
+    auto *{{ io.pointer }} = model_ctx.inputs[{{ io.position }}].data;
+{%- endfor %}
+{%- for io in fixture_outputs %}
+    auto *{{ io.pointer }} = reinterpret_cast<const uint8_t *>(model_ctx.outputs[{{ io.position }}].data);
+{%- endfor %}
     auto invoke = [&]() { return {{ aot_prefix }}_model_run(&model_ctx); };
+{%- for arena in fixture_scan_arenas %}
+    std::memset(const_cast<void *>({{ aot_prefix }}_arena_buffers[{{ arena.region_id }}]), 0xA5, {{ arena.size }});
+{%- endfor %}
 {% else %}
     hpx_fixture_memory_init(sizeof(arena));
     tflite::MicroMutableOpResolver<{{ fixture_resolver.max_ops }}> resolver;
@@ -48,29 +61,36 @@ static int infer_fixture() {
     const auto *model = tflite::GetModel(model_data);
     if (model->version() != TFLITE_SCHEMA_VERSION || model->subgraphs()->size() != 1) return {{ fixture_status.model_schema }};
     const auto *graph = model->subgraphs()->Get(0);
-    if (graph->inputs()->size() != 1 || graph->outputs()->size() != 1) return {{ fixture_status.io_contract }};
+    if (graph->inputs()->size() != {{ fixture_inputs | length }} || graph->outputs()->size() != {{ fixture_outputs | length }}) return {{ fixture_status.io_contract }};
     tflite::MicroInterpreter interpreter(model, resolver, arena, sizeof(arena));
     if (interpreter.AllocateTensors() != kTfLiteOk) return {{ fixture_status.arena }};
-    auto *input = interpreter.input(0);
-    auto *output = interpreter.output(0);
-{% for name, tensor in [('input', input_tensor), ('output', output_tensor)] %}
-    if (graph->{{ 'inputs' if name == 'input' else 'outputs' }}()->Get(0) != {{ tensor.tensor_index }} ||
-        !{{ name }} || {{ name }}->type != kTfLiteInt8 || {{ name }}->bytes != {{ tensor.size }} ||
-        {{ name }}->dims->size != {{ tensor.shape | length }} ||
-        {{ name }}->params.scale != {{ tensor.scale.hex() }}f ||
-        {{ name }}->params.zero_point != {{ tensor.zero_point }}) return {{ fixture_status.io_contract }};
-{% for dim in tensor.shape %}
-    if ({{ name }}->dims->data[{{ loop.index0 }}] != {{ dim }}) return {{ fixture_status.io_contract }};
+{%- for kind, records in [('input', fixture_inputs), ('output', fixture_outputs)] %}{%- for io in records %}
+    auto *{{ io.tensor }} = interpreter.{{ kind }}({{ io.position }});
+{%- endfor %}{%- endfor %}
+{% for kind, records in [('input', fixture_inputs), ('output', fixture_outputs)] %}{% for io in records %}
+    if (graph->{{ kind }}s()->Get({{ io.position }}) != {{ io.tensor_index }} ||
+        !{{ io.tensor }} || {{ io.tensor }}->type != {{ io.tflite_type }} || {{ io.tensor }}->bytes != {{ io.size }} ||
+        {{ io.tensor }}->dims->size != {{ io.shape | length }}{% if io.scale_hex %} ||
+        {{ io.tensor }}->params.scale != {{ io.scale_hex }}f ||
+        {{ io.tensor }}->params.zero_point != {{ io.zero_point }}{% endif %}) return {{ fixture_status.io_contract }};
+{% for dim in io.shape %}
+    if ({{ io.tensor }}->dims->data[{{ loop.index0 }}] != {{ dim }}) return {{ fixture_status.io_contract }};
 {% endfor %}
-{% endfor %}
-    auto *input_data = input->data.int8;
-    auto *output_data = reinterpret_cast<const uint8_t *>(output->data.int8);
+{% endfor %}{% endfor %}
+{%- for io in fixture_inputs %}
+    auto *{{ io.pointer }} = {{ io.tensor }}->data.{{ io.member }};
+{%- endfor %}
+{%- for io in fixture_outputs %}
+    auto *{{ io.pointer }} = reinterpret_cast<const uint8_t *>({{ io.tensor }}->data.{{ io.member }});
+{%- endfor %}
     auto invoke = [&]() { return interpreter.Invoke(); };
     hpx_fixture_memory_snapshot(3, interpreter.arena_used_bytes());
 {% endif %}
     if (!hpx_stimer_init()) return {{ fixture_status.stimer }};
     for (unsigned i = 0; i < {{ fixture_warmups }}; ++i) {
-        std::memcpy(input_data, fixed_input, sizeof(fixed_input));
+{%- for io in fixture_inputs %}
+        std::memcpy({{ io.pointer }}, {{ io.buffer }}, sizeof({{ io.buffer }}));
+{%- endfor %}
         if (invoke() != 0) return {{ fixture_status.invoke }};
     }
 {% if not fixture_aot %}
@@ -82,7 +102,9 @@ static int infer_fixture() {
     const uint32_t t0 = hpx_stimer_ticks();
 {% endif %}
     for (unsigned i = 0; i < {{ fixture_iterations }}; ++i) {
-        std::memcpy(input_data, fixed_input, sizeof(fixed_input));
+{%- for io in fixture_inputs %}
+        std::memcpy({{ io.pointer }}, {{ io.buffer }}, sizeof({{ io.buffer }}));
+{%- endfor %}
 {% if fixture_timing_scope == 'invoke_only' %}
         const uint32_t t0 = hpx_stimer_ticks();
 {% endif %}
@@ -100,6 +122,20 @@ static int infer_fixture() {
     hpx_fixture_memory_snapshot(5, interpreter.arena_used_bytes());
     hpx_fixture_memory_finish();
 {% endif %}
+{%- for arena in fixture_scan_arenas %}
+    {
+        const auto *scan = static_cast<const uint8_t *>({{ aot_prefix }}_arena_buffers[{{ arena.region_id }}]);
+        uint32_t touched = 0, high_water = 0;
+        for (uint32_t i = 0; i < {{ arena.size }}U; ++i) {
+            if (scan[i] != 0xA5U) {
+                ++touched;
+                high_water = i + 1U;
+            }
+        }
+        deployment_arena_scan[{{ 2 * loop.index0 }}] = touched;
+        deployment_arena_scan[{{ 2 * loop.index0 + 1 }}] = high_water;
+    }
+{%- endfor %}
     deployment_timing[0] = ticks;
     deployment_timing[1] = {{ fixture_iterations }};
     deployment_timing[2] = {{ fixture_warmups }};
@@ -107,9 +143,11 @@ static int infer_fixture() {
     deployment_timing[4] = g_hpx_stimer_last_ticks;
     deployment_timing[5] = SystemCoreClock;
     deployment_timing[6] = {{ 1 if fixture_timing_scope == "invoke_only" else 2 }};
-    for (unsigned i = 0; i < sizeof(deployment_output); ++i) {
-        deployment_output[i] = output_data[i];
+{%- for io in fixture_outputs %}
+    for (unsigned i = 0; i < sizeof({{ io.sink }}); ++i) {
+        {{ io.sink }}[i] = {{ io.pointer }}[i];
     }
+{%- endfor %}
     return 0;
 }
 
@@ -126,7 +164,9 @@ int main() {
         sram.eSRAMRetain = AM_HAL_PWRCTRL_SRAM_3M;
         status = am_hal_pwrctrl_sram_config(&sram) == 0 ? infer_fixture() : {{ fixture_status.sram_config }};
         uint32_t checksum = 0;
-        for (unsigned i = 0; i < sizeof(deployment_output); ++i) checksum = checksum*31U + deployment_output[i];
+{%- for io in fixture_outputs %}
+        for (unsigned i = 0; i < sizeof({{ io.sink }}); ++i) checksum = checksum*31U + {{ io.sink }}[i];
+{%- endfor %}
         deployment_checksum = checksum;
     }
     deployment_status = status;

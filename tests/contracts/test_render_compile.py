@@ -404,6 +404,8 @@ typedef struct {
 
 typedef int32_t fake_arena_region_t;
 
+extern const void * const fake_arena_buffers[4];
+
 static const int fake_num_inputs = 1;
 static const int fake_num_outputs = 1;
 
@@ -673,7 +675,7 @@ def test_fixture_gate_rejects_missing_output_storage(tmp_path, engine):
 def test_compile_matrix_covers_fixture_render_arms():
     assert {case.case_id for case in _build_cases() if case.case_id.startswith("fixture:")} == {
         f"fixture:{kind}|{engine}|{scope}"
-        for kind in ("tcn", "kws")
+        for kind in ("tcn", "kws", "typed")
         for engine in ("tflm", "helia-aot")
         for scope in ("restore_and_invoke", "invoke_only")
     }
