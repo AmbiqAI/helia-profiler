@@ -410,3 +410,44 @@ def test_external_aot_arena_mode_rejected(tmp_path):
     )
     with pytest.raises(Exception, match="External AOT arenas"):
         fixture_template_vars(ctx, [])
+
+
+@pytest.mark.parametrize(
+    "size,refused",
+    [(3 * 1024 * 1024 // 2, False), (2 * 1024 * 1024, False), (2 * 1024 * 1024 + 1, True)],
+)
+def test_build_refuses_a_flat_image_capture_cannot_flash(tmp_path, monkeypatch, size, refused):
+    from helia_profiler.errors import ConfigError
+
+    c, f = fixture(tmp_path)
+    mock_analysis(monkeypatch, f)
+    c = replace(c, engine=EngineConfig(type=EngineType.HELIA_AOT))
+
+    class Runner:
+        def __init__(self, stages):
+            pass
+
+        def run(self, config):
+            app = tmp_path / "app"
+            (app / "src").mkdir(parents=True, exist_ok=True)
+            (app / "src" / "main.cc").write_text("main")
+            binary = app / "hpx_profiler"
+            binary.write_bytes(b"elf")
+            binary.with_suffix(".bin").write_bytes(bytes(size))
+            binary.with_suffix(".map").write_text("map")
+            (app / "nsx.lock").write_text("lock")
+            return SimpleNamespace(
+                memory_plan=MemoryPlan(engine=config.engine.type),
+                engine_artifacts=None,
+                run_metadata=RunMetadata(toolchain=ToolchainInfo("atfe", "22.1.0")),
+                resolved_firmware_dir=app,
+                profile_run=SimpleNamespace(firmware=SimpleNamespace(binary_path=binary)),
+            )
+
+    monkeypatch.setattr("helia_profiler.fixture.PipelineRunner", Runner)
+    if refused:
+        with pytest.raises(ConfigError, match=f"Flat image is {size} B"):
+            build_fixed_fixture(c, f, method=METHOD)
+    else:
+        r = build_fixed_fixture(c, f, method=METHOD)
+        assert r.flat_binary is not None and r.flat_binary.path.stat().st_size == size

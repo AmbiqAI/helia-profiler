@@ -27,7 +27,7 @@ _SINKS = {
 }
 
 
-def image_files(tmp_path, sinks=_SINKS, *, align=4):
+def image_files(tmp_path, sinks=_SINKS, *, align=4, binary=b"\x01\x02\x03\x04"):
     names, sizes = list(sinks), list(sinks.values())
     addresses = [0x20000000]
     for size in sizes[:-1]:
@@ -39,20 +39,19 @@ def image_files(tmp_path, sinks=_SINKS, *, align=4):
         symbols += struct.pack(
             "<IIIBBH", strings.index(name.encode() + b"\0"), address, size, 0x11, 0, 1
         )
-    binary = b"\x01\x02\x03\x04"
     data = bytearray(1024)
     data[:16] = b"\x7fELF\x01\x01\x01" + b"\0" * 9
     struct.pack_into(
         "<HHIIIIIHHHHHH", data, 16, 2, 40, 1, 0x410001, 52, 128, 0, 52, 32, 2, 40, 4, 2
     )
-    struct.pack_into("<8I", data, 52, 1, 640, 0x410000, 0x410000, 4, 4, 5, 1)
+    struct.pack_into("<8I", data, 52, 1, 1024, 0x410000, 0x410000, len(binary), len(binary), 5, 1)
     struct.pack_into("<8I", data, 84, 1, 0, 0x20000000, 0, 0, extent, 6, 1)
     struct.pack_into("<10I", data, 168, 0, 8, 3, 0x20000000, 0, extent, 0, 0, 4, 0)
     struct.pack_into("<10I", data, 208, 0, 3, 0, 0, 288, len(strings), 0, 0, 1, 0)
     struct.pack_into("<10I", data, 248, 0, 2, 0, 0, 648, len(symbols), 2, 0, 4, 16)
     data[288 : 288 + len(strings)] = strings
-    data[640:644] = binary
     data[648 : 648 + len(symbols)] = symbols
+    data += binary
 
     def pin(name, raw):
         path = tmp_path / name
@@ -104,7 +103,10 @@ def rig(tmp_path, monkeypatch):
             core["halted"] = False
 
         def memory_read8(self, address, count):
-            return memory[address][:count]
+            if address in memory:
+                return memory[address][:count]
+            base = next(b for b in memory if b <= address < b + len(memory[b]))
+            return memory[base][address - base : address - base + count]
 
         def memory_write8(self, address, values):
             writes.append((address, bytes(values)))
@@ -831,3 +833,42 @@ def test_outputs_are_returned_in_model_order_past_ten(rig, tmp_path, checksum_ok
     assert [Path(o["path"]).name for o in receipt["outputs"]] == [
         ref.path.name for ref in result.outputs
     ]
+
+
+_MIB = 1024 * 1024
+
+
+@pytest.mark.parametrize("size", [_MIB + 1, 3 * _MIB // 2, 2 * _MIB])
+def test_images_up_to_two_mib_are_flashed_verified_and_captured(rig, tmp_path, size):
+    request, memory, terminal, writes, flashes, guard = rig
+    binary = bytes((i * 7 + 1) & 0xFF for i in range(size))
+    (tmp_path / "large").mkdir()
+    elf, image, _ = image_files(tmp_path / "large", binary=binary)
+    memory[0x410000] = binary
+    result = capture.capture_fixture(replace(request, elf=elf, image=image), guard=guard)
+    assert result.state == "success", result.error
+    assert len(flashes) == 1
+    assert (request.evidence_dir / "image.bin").read_bytes() == binary
+
+
+def test_image_over_two_mib_is_refused_before_device(rig, tmp_path):
+    request, memory, terminal, writes, flashes, guard = rig
+    (tmp_path / "large").mkdir()
+    elf, image, _ = image_files(tmp_path / "large", binary=b"\x01" * (2 * _MIB + 4))
+    result = capture.capture_fixture(replace(request, elf=elf, image=image), guard=guard)
+    assert result.state == "failure" and result.error == "Image size"
+    assert not flashes and not writes and not guard.calls
+
+
+def test_elf_inspection_admits_two_mib_and_keeps_the_mram_bound(tmp_path):
+    from helia_profiler.fixture_image import MAX_IMAGE, MRAM, bounded
+
+    assert MAX_IMAGE == 2 * _MIB
+    assert MRAM == (0x00410000, 0x00800000)
+    assert bounded(0x00410000, 0x003F0000, MRAM) and not bounded(0x00410000, 0x003F0001, MRAM)
+    elf, image, sizes = image_files(tmp_path, binary=b"\x02" * (2 * _MIB))
+    assert len(inspect_elf(elf.read(), image.read(), 0x410000, sizes).binary) == 2 * _MIB
+    (tmp_path / "over").mkdir()
+    elf, image, sizes = image_files(tmp_path / "over", binary=b"\x02" * (2 * _MIB + 4))
+    with pytest.raises(ValueError, match="image outside bounded application MRAM"):
+        inspect_elf(elf.read(), image.read(), 0x410000, sizes)
