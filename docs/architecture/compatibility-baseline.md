@@ -18,11 +18,11 @@ The current baseline is `hpx-neuralspotx-0.8.1-2026-09`:
 | `nsx-pmu-armv8m` | `5725c065…c88` |
 | `nsx-tflite-micro` | `7afcf2b4…333` |
 | `arm-cmsis-nn` | `6d21a6f8…f7c` |
-| `ns-cmsis-nn` | `cad3c8fa…1a6` (`v7.35.0`, hpx-declared — see below) |
+| `ns-cmsis-nn` | `630a1c39…c6c` (`v7.36.1`, hpx-declared — see below) |
 | `nsx-executorch` | `5514ac1e…b48e` |
 | `nsx-sensors` | `c219a2bc…3e25` (`v0.3.0`, peeled) |
-| heliaRT | `1.21.0`, commit `fe025f2b…56f` (min supported `1.16.0` — from `HELIART_MIN_VERSION` in code, not a baseline-JSON field) |
-| heliaAOT | `min_version=0.22.0`, `max_version_exclusive=0.23.0` |
+| heliaRT | `1.21.2`, commit `ce03af57…a11` (min supported `1.16.0` — from `HELIART_MIN_VERSION` in code, not a baseline-JSON field) |
+| heliaAOT | `min_version=0.23.0`, `max_version_exclusive=0.24.0` |
 | tflm | governed entirely by the `nsx-tflite-micro` / `arm-cmsis-nn` module refs above |
 | executorch | `0.1.0`, module ref `5514ac1e…b48e` (a checkout's `version.txt` is verified against the baseline) |
 
@@ -90,6 +90,32 @@ the v7.35.0 core. A float model using `SQRT` and `ARG_MAX` compiles against
 v7.35.0 and stops on its own `#error` floor against v7.32.0. For the fp32 and
 fp16 KWS models HPX enables every float kernel the generated module requires.
 No build, flash or hardware run is recorded for this revision yet.
+
+heliaRT 1.21.2 (`ce03af57…a11`), heliaAOT `[0.23.0, 0.24.0)` and
+`ns-cmsis-nn v7.36.1` (`630a1c39…c6c`) then move together (#393); every
+other ref above is unchanged. heliaAOT 0.23.0 keeps the converter, codegen context and
+generated model API HPX drives, adding fields only. It raises its
+module-wide floor from v7.32.0 to v7.35.0, for integer models too, so an
+`engine.config.cmsis_nn_ref` below v7.35.0 no longer compiles; its dilated
+one-dimensional depthwise route raises a module's floor to v7.36.0. v7.36.0
+adds kernels and keeps every public kernel callable as before (it only
+adds `const` to `arm_sqrt_s8`'s lookup table). The core is v7.36.1, one
+patch above the v7.36.0 that heliaRT 1.21.2 and heliaAOT 0.23.0 were
+released against, because it fixes two Cortex-M55 vector defects that
+v7.35.0 already had: an over-read in `arm_depthwise_conv_fast_s16` for
+channel counts not a multiple of four, and missing saturation of the output
+offset in `arm_elementwise_mul_s8`. v7.36.1 otherwise adds vectorized s8
+depthwise, s8 add/mul and float MEAN paths and leaves the public kernel
+header unchanged. HPX's default heliaRT build compiles from source, so both
+engines compile against this core. ExecuTorch's `ns` backend uses the same core and is not
+separately verified here.
+
+**Verified (host only).** With helia-aot 0.23.0, int8 keyword-spotting,
+temporal-convolution (dilated), anomaly-detection, heart-rhythm,
+segmentation, visual-wake-word and image-classification models and fp32 and
+fp16 sleep-staging models convert and build for Apollo510 with ATfE. heliaRT
+1.21.2 builds from source against v7.36.1 for the int8 keyword-spotting
+model (Arm GNU and ATfE) and the fp32 and fp16 sleep-staging models (ATfE).
 
 The previous revision is recorded below. heliaRT 1.19.0 and heliaAOT 0.19.0
 (issue #246) are the releases that add FP16

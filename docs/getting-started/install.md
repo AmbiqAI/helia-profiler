@@ -146,7 +146,7 @@ pip install 'helia-profiler[aot]'        # heliaAOT compiler support
 pip install 'helia-profiler[analysis]'   # model compute/parameter analysis, no hardware needed
 ```
 
-The AOT extra installs `helia-aot>=0.22.0,<0.23.0` (the qualified range; see
+The AOT extra installs `helia-aot>=0.23.0,<0.24.0` (the qualified range; see
 [Compatibility baseline](../architecture/compatibility-baseline.md)) and a
 LiteRT-compatible analysis stack. The analysis extra installs the same
 constrained LiteRT stack plus flatbuffer inspection support.

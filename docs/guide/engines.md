@@ -279,7 +279,7 @@ selects the kernels.
   successful run, set it to roughly `1.5x` the reported `allocated_arena` in
   `summary.json`.
 - Source builds (the registry default and `source_path`) declare
-  `nsx-cmsis-nn` at the baseline's qualified ref (v7.35.0), enable its fp32
+  `nsx-cmsis-nn` at the baseline's qualified ref (v7.36.1), enable its fp32
   kernels when the model computes in float, and enable the fp16 kernels
   additionally when it carries FLOAT16 tensors — computed or dequantized
   weights — on a Cortex-M55. An integer-only model links neither.
@@ -314,7 +314,7 @@ heliaAOT ships as a Python package (it runs at build-time), so version
 resolution is handled entirely by **pip** — there's no separate cache,
 download, or `dist_path` to manage.
 
-The profiler's `[aot]` extra requires `helia-aot>=0.22.0,<0.23.0`, and the
+The profiler's `[aot]` extra requires `helia-aot>=0.23.0,<0.24.0`, and the
 profiler enforces the same qualified range at runtime from the compatibility
 baseline, so an installed version outside it is refused with a clear error.
 
@@ -404,8 +404,9 @@ The pipeline:
 | `aot_args` | dict | `{}` | Pass-through args to the AOT compiler |
 | `platform_name` | string | *(from board)* | Override the board → AOT platform mapping |
 
-`nsx-cmsis-nn` is declared at the baseline's qualified ref (v7.35.0, which
-covers every float operator heliaAOT 0.22.0 lowers to a native kernel). Its
+`nsx-cmsis-nn` is declared at the baseline's qualified ref (v7.36.1, which
+covers every float operator heliaAOT 0.23.0 lowers to a native kernel and its
+dilated one-dimensional depthwise route). Its
 fp32 kernels are enabled when the model computes in float, and the fp16
 kernels additionally when it carries FLOAT16 tensors on a Cortex-M55, exactly
 as for heliaRT source builds (see the heliaRT runtime notes).
