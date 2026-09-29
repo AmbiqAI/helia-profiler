@@ -7,7 +7,9 @@ repos:
     hooks:
       # Excludes vendored/generated content whose whitespace we don't own:
       # SEGGER's vendored RTT sources, an upstream NSX patch file, and
-      # captured tool output used as test fixtures. Scoped to these two
+      # captured tool output used as test fixtures, and the result
+      # bundles shipped for the documentation examples (their manifests hash
+      # every byte). Scoped to these two
       # whitespace-shaped hooks (and .editorconfig, which mirrors this) —
       # ruff/todo-needs-issue still see these paths, since none
       # of them contain first-party .py.
@@ -17,6 +19,7 @@ repos:
           (?x)^(
             nix/patches/.*|
             tests/fixtures/.*|
+            examples/results/hardware-validation-.*|
             src/helia_profiler/vendor/segger_rtt/.*
           )$
       - id: end-of-file-fixer
@@ -24,6 +27,7 @@ repos:
           (?x)^(
             nix/patches/.*|
             tests/fixtures/.*|
+            examples/results/hardware-validation-.*|
             src/helia_profiler/vendor/segger_rtt/.*
           )$
       - id: check-merge-conflict

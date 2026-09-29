@@ -1,0 +1,701 @@
+{
+  "schema": "hpx.run-summary",
+  "schema_version": 5,
+  "engine": "helia-rt",
+  "layers": 13,
+  "total_cycles": 10185111.0,
+  "overflow_detected": false,
+  "compatibility": {
+    "qualification": "qualified",
+    "baseline_fingerprint": "ec2f81db229825ea772a2594e50decd55acb7ff84fbe6536bc4af44c8107068b",
+    "baseline": {
+      "schema": "hpx.compatibility-baseline",
+      "schema_version": 1,
+      "baseline_id": "hpx-neuralspotx-0.8.1-2026-09",
+      "neuralspotx": {
+        "package": "neuralspotx",
+        "version": "0.8.1",
+        "sha256": "7aac6f1b2e89ebf41dfe087c7588e0db11d65e8a11cac2cda03f6d7c510a9094"
+      },
+      "projects": {
+        "neuralspotx": {
+          "url": "https://github.com/AmbiqAI/neuralspotx.git",
+          "ref": "2dbe12a2799fd8c3df85f1a103b0adca340c901f"
+        },
+        "nsx-ambiq-sdk": {
+          "url": "https://github.com/AmbiqAI/nsx-ambiq-sdk.git",
+          "ref": "a9f4ec25a162f6f3700623feb691423bb5a51132"
+        },
+        "nsx-pmu-armv8m": {
+          "url": "https://github.com/AmbiqAI/nsx-pmu-armv8m.git",
+          "ref": "5725c065a0c3603132f1064ee2684d1fa8587c88"
+        },
+        "nsx-tflite-micro": {
+          "url": "https://github.com/AmbiqAI/nsx-tflite-micro.git",
+          "ref": "7afcf2b4170e039caf4c49f91e2c45d5869be333"
+        },
+        "arm-cmsis-nn": {
+          "url": "https://github.com/AmbiqAI/arm-cmsis-nn.git",
+          "ref": "6d21a6f821fb72541173a6c4d05d83329fa74f7c"
+        },
+        "ns-cmsis-nn": {
+          "url": "https://github.com/AmbiqAI/ns-cmsis-nn.git",
+          "ref": "aaeb145a67c3decd9869f96474e36e7dbdc2030c"
+        },
+        "nsx-executorch": {
+          "url": "https://github.com/AmbiqAI/nsx-executorch.git",
+          "ref": "5514ac1ea8439b3fe615d180bf68c75a9dabb48e"
+        },
+        "helia-rt": {
+          "url": "https://github.com/AmbiqAI/helia-rt.git",
+          "ref": "edb3a25fc96c8e9b634dabdb9cd31cb22aa43440"
+        },
+        "nsx-sensors": {
+          "url": "https://github.com/AmbiqAI/nsx-sensors.git",
+          "ref": "c219a2bc98c62f96819fae20ab6c8911fcea3e25"
+        }
+      },
+      "modules": {
+        "nsx-ambiq-bsp": {
+          "project": "nsx-ambiq-sdk",
+          "ref": "a9f4ec25a162f6f3700623feb691423bb5a51132"
+        },
+        "nsx-pmu-armv8m": {
+          "project": "nsx-pmu-armv8m",
+          "ref": "5725c065a0c3603132f1064ee2684d1fa8587c88"
+        },
+        "nsx-tflite-micro": {
+          "project": "nsx-tflite-micro",
+          "ref": "7afcf2b4170e039caf4c49f91e2c45d5869be333"
+        },
+        "arm-cmsis-nn": {
+          "project": "arm-cmsis-nn",
+          "ref": "6d21a6f821fb72541173a6c4d05d83329fa74f7c"
+        },
+        "nsx-cmsis-nn": {
+          "project": "ns-cmsis-nn",
+          "ref": "aaeb145a67c3decd9869f96474e36e7dbdc2030c"
+        },
+        "nsx-executorch": {
+          "project": "nsx-executorch",
+          "ref": "5514ac1ea8439b3fe615d180bf68c75a9dabb48e"
+        },
+        "nsx-helia-rt": {
+          "project": "helia-rt",
+          "ref": "edb3a25fc96c8e9b634dabdb9cd31cb22aa43440"
+        },
+        "nsx-sensors": {
+          "project": "nsx-sensors",
+          "ref": "c219a2bc98c62f96819fae20ab6c8911fcea3e25"
+        }
+      },
+      "engines": {
+        "helia-rt": {
+          "version": "1.20.0",
+          "ref": "edb3a25fc96c8e9b634dabdb9cd31cb22aa43440"
+        },
+        "helia-aot": {
+          "min_version": "0.20.0",
+          "max_version_exclusive": "0.21.0"
+        },
+        "tflm": {
+          "governed_by_modules": true
+        },
+        "executorch": {
+          "version": "0.1.0",
+          "ref": "5514ac1ea8439b3fe615d180bf68c75a9dabb48e"
+        }
+      }
+    },
+    "module_overrides": [],
+    "engine_overrides": []
+  },
+  "dependencies": {
+    "workspace": {
+      "schema_version": 1,
+      "fingerprint": "c431de284788c122c24ffc5e6ad33d66b0b056f9609263b2b607d7e5e3eb78c9",
+      "baseline_id": "hpx-neuralspotx-0.8.1-2026-09",
+      "baseline_fingerprint": "ec2f81db229825ea772a2594e50decd55acb7ff84fbe6536bc4af44c8107068b",
+      "registry_hash": {
+        "algorithm": "sha256",
+        "value": "22f9bb7a8023bd01840a6aeea29b1c5a58b9310dcbd7c28710bcb4d25d9f8911"
+      },
+      "inputs": {
+        "baseline": {
+          "fingerprint": "ec2f81db229825ea772a2594e50decd55acb7ff84fbe6536bc4af44c8107068b",
+          "id": "hpx-neuralspotx-0.8.1-2026-09"
+        },
+        "board": {
+          "ble_reset_gpio_pin": null,
+          "channel": "stable",
+          "default_go_gpio_pin": 25,
+          "default_state_gpio_pin": 24,
+          "default_sync_gpio_pin": 26,
+          "description": "",
+          "name": "apollo3p_evb",
+          "psram_kb": 8192,
+          "soc": "apollo3p",
+          "starter_profile_board": null
+        },
+        "build": {
+          "channel": null,
+          "compiler_launcher": "auto",
+          "explicit_overrides": [],
+          "module_overrides": {}
+        },
+        "engine": {
+          "backend": null,
+          "cmake_vars": {
+            "NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM": "ON"
+          },
+          "config": {},
+          "config_path_hash": null,
+          "extra_modules": [
+            {
+              "local": false,
+              "name": "nsx-cmsis-nn",
+              "project": "ns-cmsis-nn",
+              "ref": "aaeb145a67c3decd9869f96474e36e7dbdc2030c",
+              "version": ""
+            },
+            {
+              "local": false,
+              "name": "nsx-helia-rt",
+              "project": "helia-rt",
+              "ref": "helia-rt-v1.20.0",
+              "version": "1.20.0"
+            }
+          ],
+          "resolved_backend": "helia",
+          "resolved_variant": "release-with-logs",
+          "resolved_version": "1.20.0",
+          "toolchain_tag": "gcc",
+          "type": "helia-rt"
+        },
+        "hpx_version": "0.1.6",
+        "registry_hash": {
+          "algorithm": "sha256",
+          "value": "22f9bb7a8023bd01840a6aeea29b1c5a58b9310dcbd7c28710bcb4d25d9f8911"
+        },
+        "soc": {
+          "app_flash_load_addr": null,
+          "c_define": "AM_PART_APOLLO3P",
+          "clocks": [
+            {
+              "default": "lp",
+              "name": "cpu",
+              "speeds": [
+                {
+                  "mhz": 48,
+                  "name": "lp",
+                  "perf_tier": "NSX_PERF_LOW"
+                },
+                {
+                  "mhz": 96,
+                  "name": "hp",
+                  "perf_tier": "NSX_PERF_HIGH"
+                }
+              ]
+            }
+          ],
+          "cmsis_header": "apollo3p.h",
+          "core": "cortex-m4",
+          "family": "ap3",
+          "has_mve": false,
+          "has_radio_subsystem": false,
+          "has_usb": false,
+          "jlink_device": "AMA3B2KK-KBR",
+          "memory": {
+            "dtcm_kb": 64,
+            "itcm_kb": 0,
+            "mram_kb": 2000,
+            "nvm_kb": 0,
+            "psram_kb": 8192,
+            "sram_kb": 700
+          },
+          "name": "apollo3p",
+          "origin": "builtin",
+          "pmu_max_ops": 2048,
+          "pmu_tier": "dwt",
+          "registered_name": "apollo3p",
+          "rtt_scan_ranges": [
+            [
+              268435456,
+              1048576
+            ]
+          ],
+          "ssram_full_power_enum": "AM_HAL_PWRCTRL_SRAM_3M",
+          "swo_trace_clock_mhz": 48
+        },
+        "target": {
+          "clock": {
+            "cpu": null
+          },
+          "psram": {
+            "clock_hz": 48000000
+          },
+          "segger_rtt_source_hash": null,
+          "toolchain": "arm-none-eabi-gcc",
+          "transport": "rtt"
+        }
+      }
+    },
+    "lock": {
+      "mode": "reused",
+      "update_requested": false,
+      "offline": false,
+      "frozen_sync": true,
+      "schema_version": 4,
+      "sha256": {
+        "algorithm": "sha256",
+        "value": "ef313c38b0c35c9ba21c82a2f01d14662eca954e7dbd28caffff59cf0d1c1aef"
+      },
+      "manifest_hash": {
+        "algorithm": "sha256",
+        "value": "fcfdb2ac7f5f04b661939697987308aaa1e141fa1cc55f809acd4cb88e2c28e0"
+      }
+    },
+    "modules": [
+      {
+        "name": "nsx-ambiq-bsp",
+        "project": "nsx-ambiq-sdk",
+        "kind": "git",
+        "requested_ref": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+        "requested_tag": null,
+        "peeled_commit": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+        "content_hash": {
+          "algorithm": "sha256",
+          "value": "4ca0d4e197abbb9a0165baebb6b7832d24b6fd23f1a47e424e9f5a01fbd459c6"
+        },
+        "url": "https://github.com/AmbiqAI/nsx-ambiq-sdk.git",
+        "vendored_at": "modules/nsx-ambiq-sdk"
+      },
+      {
+        "name": "nsx-ambiq-hal",
+        "project": "nsx-ambiq-sdk",
+        "kind": "git",
+        "requested_ref": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+        "requested_tag": null,
+        "peeled_commit": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+        "content_hash": {
+          "algorithm": "sha256",
+          "value": "4ca0d4e197abbb9a0165baebb6b7832d24b6fd23f1a47e424e9f5a01fbd459c6"
+        },
+        "url": "https://github.com/AmbiqAI/nsx-ambiq-sdk.git",
+        "vendored_at": "modules/nsx-ambiq-sdk"
+      },
+      {
+        "name": "nsx-ambiqsuite",
+        "project": "nsx-ambiq-sdk",
+        "kind": "git",
+        "requested_ref": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+        "requested_tag": null,
+        "peeled_commit": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+        "content_hash": {
+          "algorithm": "sha256",
+          "value": "4ca0d4e197abbb9a0165baebb6b7832d24b6fd23f1a47e424e9f5a01fbd459c6"
+        },
+        "url": "https://github.com/AmbiqAI/nsx-ambiq-sdk.git",
+        "vendored_at": "modules/nsx-ambiq-sdk"
+      },
+      {
+        "name": "nsx-board-apollo3p-evb",
+        "project": "neuralspotx",
+        "kind": "packaged",
+        "requested_ref": "packaged",
+        "requested_tag": null,
+        "peeled_commit": null,
+        "content_hash": {
+          "algorithm": "sha256",
+          "value": "92ddb55842d2be5ae7e1e435100a75d39cadcbf1457169cfe69b860f4f3c7866"
+        },
+        "url": null,
+        "vendored_at": "boards/apollo3p_evb"
+      },
+      {
+        "name": "nsx-cmsis-core",
+        "project": "nsx-ambiq-sdk",
+        "kind": "git",
+        "requested_ref": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+        "requested_tag": null,
+        "peeled_commit": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+        "content_hash": {
+          "algorithm": "sha256",
+          "value": "4ca0d4e197abbb9a0165baebb6b7832d24b6fd23f1a47e424e9f5a01fbd459c6"
+        },
+        "url": "https://github.com/AmbiqAI/nsx-ambiq-sdk.git",
+        "vendored_at": "modules/nsx-ambiq-sdk"
+      },
+      {
+        "name": "nsx-cmsis-nn",
+        "project": "ns-cmsis-nn",
+        "kind": "git",
+        "requested_ref": "aaeb145a67c3decd9869f96474e36e7dbdc2030c",
+        "requested_tag": null,
+        "peeled_commit": "aaeb145a67c3decd9869f96474e36e7dbdc2030c",
+        "content_hash": {
+          "algorithm": "sha256",
+          "value": "a02935baf255b4bd2c03cab27a58f289155d0972103413f274e23c687261ac10"
+        },
+        "url": "https://github.com/AmbiqAI/ns-cmsis-nn.git",
+        "vendored_at": "modules/ns-cmsis-nn"
+      },
+      {
+        "name": "nsx-cmsis-startup",
+        "project": "nsx-ambiq-sdk",
+        "kind": "git",
+        "requested_ref": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+        "requested_tag": null,
+        "peeled_commit": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+        "content_hash": {
+          "algorithm": "sha256",
+          "value": "4ca0d4e197abbb9a0165baebb6b7832d24b6fd23f1a47e424e9f5a01fbd459c6"
+        },
+        "url": "https://github.com/AmbiqAI/nsx-ambiq-sdk.git",
+        "vendored_at": "modules/nsx-ambiq-sdk"
+      },
+      {
+        "name": "nsx-core",
+        "project": "nsx-ambiq-sdk",
+        "kind": "git",
+        "requested_ref": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+        "requested_tag": null,
+        "peeled_commit": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+        "content_hash": {
+          "algorithm": "sha256",
+          "value": "4ca0d4e197abbb9a0165baebb6b7832d24b6fd23f1a47e424e9f5a01fbd459c6"
+        },
+        "url": "https://github.com/AmbiqAI/nsx-ambiq-sdk.git",
+        "vendored_at": "modules/nsx-ambiq-sdk"
+      },
+      {
+        "name": "nsx-helia-rt",
+        "project": "helia-rt",
+        "kind": "git",
+        "requested_ref": "helia-rt-v1.20.0",
+        "requested_tag": "helia-rt-v1.20.0",
+        "peeled_commit": "edb3a25fc96c8e9b634dabdb9cd31cb22aa43440",
+        "content_hash": {
+          "algorithm": "sha256",
+          "value": "521e6c4cee745bdac76e219ce75079eac36b15d4a56aa5f8809e1bb25e65b6b4"
+        },
+        "url": "https://github.com/AmbiqAI/helia-rt.git",
+        "vendored_at": "modules/helia-rt"
+      },
+      {
+        "name": "nsx-soc-hal",
+        "project": "nsx-ambiq-sdk",
+        "kind": "git",
+        "requested_ref": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+        "requested_tag": null,
+        "peeled_commit": "a9f4ec25a162f6f3700623feb691423bb5a51132",
+        "content_hash": {
+          "algorithm": "sha256",
+          "value": "4ca0d4e197abbb9a0165baebb6b7832d24b6fd23f1a47e424e9f5a01fbd459c6"
+        },
+        "url": "https://github.com/AmbiqAI/nsx-ambiq-sdk.git",
+        "vendored_at": "modules/nsx-ambiq-sdk"
+      },
+      {
+        "name": "nsx-tooling",
+        "project": "neuralspotx",
+        "kind": "packaged",
+        "requested_ref": "packaged",
+        "requested_tag": null,
+        "peeled_commit": null,
+        "content_hash": {
+          "algorithm": "sha256",
+          "value": "04de1c1329109e872fea5c65ce36e8ccec02fb2492eb5450a341b0c488d96528"
+        },
+        "url": null,
+        "vendored_at": "cmake/nsx"
+      }
+    ],
+    "overrides": [],
+    "qualification": "qualified"
+  },
+  "top_layers": [
+    {
+      "op": "CONV_2D",
+      "cycles": 1563449.0,
+      "pct": 15.4
+    },
+    {
+      "op": "CONV_2D",
+      "cycles": 1403258.0,
+      "pct": 13.8
+    },
+    {
+      "op": "CONV_2D",
+      "cycles": 1358853.0,
+      "pct": 13.3
+    },
+    {
+      "op": "CONV_2D",
+      "cycles": 1358781.0,
+      "pct": 13.3
+    },
+    {
+      "op": "CONV_2D",
+      "cycles": 1358540.0,
+      "pct": 13.3
+    }
+  ],
+  "memory": {
+    "arena_size": 32768,
+    "allocated_arena": 22948,
+    "model_size": 53744,
+    "num_tensors": 35,
+    "input_size": 490,
+    "output_size": 12
+  },
+  "memory_plan": {
+    "engine": "helia-rt",
+    "model_weight_bytes": 53744,
+    "regions": [
+      {
+        "region": "MRAM",
+        "capacity": 2048000,
+        "used": 53744,
+        "consumers": [
+          {
+            "name": "model_flatbuffer",
+            "size": 53744,
+            "kind": "weights"
+          }
+        ]
+      },
+      {
+        "region": "SRAM",
+        "capacity": 716800,
+        "used": 119024,
+        "consumers": [
+          {
+            "name": "tensor_arena",
+            "size": 32768,
+            "kind": "arena"
+          },
+          {
+            "name": "pmu_layer_records",
+            "size": 49208,
+            "kind": "other"
+          },
+          {
+            "name": "rtt_buffers",
+            "size": 32952,
+            "kind": "other"
+          },
+          {
+            "name": "boot_stack",
+            "size": 4096,
+            "kind": "stack"
+          }
+        ]
+      },
+      {
+        "region": "DTCM",
+        "capacity": 65536,
+        "used": 0,
+        "consumers": []
+      },
+      {
+        "region": "PSRAM",
+        "capacity": 8388608,
+        "used": 0,
+        "consumers": []
+      }
+    ]
+  },
+  "memory_regions": {
+    "link_family": "gnu",
+    "linker_profile": "default",
+    "regions": [
+      {
+        "region": "MRAM",
+        "window": {
+          "start": 49152,
+          "length": 2048000
+        },
+        "app_window": {
+          "start": 49152,
+          "length": 2048000
+        },
+        "used": 266544,
+        "reserved": 0,
+        "free": 1781456,
+        "load_image": 317992,
+        "window_provenance": "linker-app-origin",
+        "app_provenance": "linker-script"
+      },
+      {
+        "region": "DTCM",
+        "window": {
+          "start": 268435456,
+          "length": 65536
+        },
+        "app_window": {
+          "start": 268435456,
+          "length": 65536
+        },
+        "used": 0,
+        "reserved": 0,
+        "free": 65536,
+        "load_image": 0,
+        "window_provenance": "hardware-aperture",
+        "app_provenance": "linker-script"
+      },
+      {
+        "region": "SRAM",
+        "window": {
+          "start": 268500992,
+          "length": 720896
+        },
+        "app_window": {
+          "start": 268505088,
+          "length": 716800
+        },
+        "used": 119668,
+        "reserved": 4096,
+        "free": 597132,
+        "load_image": 0,
+        "window_provenance": "hardware-aperture",
+        "app_provenance": "linker-script"
+      }
+    ],
+    "unattributed": [],
+    "unattributed_load_bytes": 0
+  },
+  "memory_reconciliation": {
+    "consumers": [
+      {
+        "name": "model_flatbuffer",
+        "kind": "weights",
+        "region": "MRAM",
+        "planned_size": 53744,
+        "status": "matched",
+        "matched_symbols": [
+          "_ZL10model_data"
+        ],
+        "measured_size": 53744,
+        "measured_region": "MRAM",
+        "delta": 0
+      },
+      {
+        "name": "tensor_arena",
+        "kind": "arena",
+        "region": "SRAM",
+        "planned_size": 32768,
+        "status": "matched",
+        "matched_symbols": [
+          "_ZL15g_arena_storage"
+        ],
+        "measured_size": 32768,
+        "measured_region": "SRAM",
+        "delta": 0
+      },
+      {
+        "name": "pmu_layer_records",
+        "kind": "other",
+        "region": "SRAM",
+        "planned_size": 49208,
+        "status": "matched",
+        "matched_symbols": [
+          "_ZL10g_profiler"
+        ],
+        "measured_size": 49208,
+        "measured_region": "SRAM",
+        "delta": 0
+      },
+      {
+        "name": "rtt_buffers",
+        "kind": "other",
+        "region": "SRAM",
+        "planned_size": 32952,
+        "status": "matched",
+        "matched_symbols": [
+          "_acDownBuffer",
+          "_SEGGER_RTT",
+          "_acUpBuffer"
+        ],
+        "measured_size": 32952,
+        "measured_region": "SRAM",
+        "delta": 0
+      },
+      {
+        "name": "boot_stack",
+        "kind": "stack",
+        "region": "SRAM",
+        "planned_size": 4096,
+        "status": "matched",
+        "matched_symbols": [
+          "g_pui32Stack"
+        ],
+        "measured_size": 4096,
+        "measured_region": "SRAM",
+        "delta": 0
+      }
+    ],
+    "regions": [
+      {
+        "region": "MRAM",
+        "planned_used": 53744,
+        "measured_used": 266544,
+        "delta": 212800
+      },
+      {
+        "region": "SRAM",
+        "planned_used": 119024,
+        "measured_used": 119668,
+        "delta": 644
+      },
+      {
+        "region": "DTCM",
+        "planned_used": 0,
+        "measured_used": 0,
+        "delta": 0
+      }
+    ]
+  },
+  "binary": {
+    "text": 266544,
+    "data": 51448,
+    "bss": 72316,
+    "total": 390308
+  },
+  "model_analysis": {
+    "total_macs": 2656768,
+    "total_ops": 5321596,
+    "num_parameters": 22604,
+    "cycles_per_mac": 3.83,
+    "cycles_per_op": 1.91
+  },
+  "latency": {
+    "capture_duration_s": 6.400341,
+    "hpx_start_latency_s": 2.771417,
+    "protocol_duration_s": 3.626407,
+    "boot_phases_s": {
+      "reset": 1.940404,
+      "sbl_settle": 0.200135,
+      "attach": 0.403291,
+      "control_block_scan": 6e-06,
+      "api_probe": 0.051043,
+      "ready_handshake_api": 1e-05,
+      "line_collection_api": 3.628221
+    },
+    "device_profiled_infer_count": 3,
+    "device_profiled_infer_total_us": 637055,
+    "device_profiled_infer_avg_us": 212352,
+    "device_clean_infer_count": 10,
+    "device_clean_infer_total_cycles": 101861408,
+    "device_clean_infer_avg_cycles": 10186141,
+    "device_clean_infer_avg_us": 212211,
+    "device_clean_stalled_iters": 0,
+    "device_clean_partial_iters": 0,
+    "device_clean_ref_cycles": 10186042,
+    "device_clean_dwt_rate_cyc": 48080,
+    "device_clean_dwt_rate_us": 1000,
+    "device_clean_attach_wait_us": 632000
+  },
+  "validity": "valid",
+  "issues": []
+}

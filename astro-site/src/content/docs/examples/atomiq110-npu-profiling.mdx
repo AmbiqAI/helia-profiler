@@ -1,0 +1,125 @@
+---
+title: "Atomiq110 NPU profiling (experimental)"
+description: "Profile a Vela-compiled model on the Ethos-U85 NPU of the experimental Atomiq110 FPGA target, capturing the Arm PMU and the NPU's own counters per layer, with heliaRT or heliaAOT."
+---
+
+## Goal
+
+Run a model on the NPU and read both counter families. You will learn what
+a Vela-compiled model is, how hpx checks it against the target, what the
+`ethos_npu` counter group measures, and why an NPU run shows one fused
+layer.
+
+:::caution[Experimental FPGA target]
+HPX support for Atomiq110 and `atomiq110_fpga_turbo` is best-effort, is
+not release-blocking, and may change or be removed in any minor release.
+It is outside the compatibility guarantees for production-silicon targets.
+Clock rates, cycle counts, latency, power and energy measurements from this
+FPGA describe its current image only, not production Atomiq110 silicon.
+:::
+
+## Hardware and wiring
+
+An Atomiq110 FPGA board whose NPU bitstream matches the SDK generation
+`nsx-npu` expects (a mismatch fails NPU init at boot with
+`HPX_ERROR=npu_init_failed ... hint=bitstream_sdk_generation_mismatch`),
+and a J-Link. Transport is RTT.
+
+## Software prerequisites
+
+hpx with the `analysis` extra (`pip install 'helia-profiler[analysis]'`):
+preflight validates the model's Vela accelerator config against the
+target NPU, which needs `ai-edge-litert`. For the heliaAOT variant the
+`aot` extra, which includes it. Vela itself only if you compile your own
+model: `vela --accelerator-config ethos-u85-256 model_int8.tflite`
+produces the `_vela.tflite` file; a compiled KWS model is checked in.
+
+## Config file
+
+[`examples/quickstart/hpx_rt_npu_atomiq110.yml`](https://github.com/AmbiqAI/helia-profiler/blob/main/examples/quickstart/hpx_rt_npu_atomiq110.yml):
+
+```yaml
+model:
+  path: examples/quickstart/kws_model_vela.tflite
+  arena_size: 524288
+  arena_location: sram
+  weights_location: mram
+engine:
+  type: helia-rt
+  backend: ethos_u
+  config:
+    variant: release-with-logs
+target:
+  board: atomiq110_fpga_turbo
+  toolchain: arm-none-eabi-gcc
+  transport: rtt
+profiling:
+  pmu_counters:
+    cpu: default
+    ethos_npu: default
+  per_layer: true
+  iterations: 5
+  warmup: 2
+power:
+  enabled: false
+output:
+  format: csv
+  dir: ./results/atomiq110_npu
+```
+
+The heliaAOT variant,
+[`examples/quickstart/hpx_aot_npu_atomiq110.yml`](https://github.com/AmbiqAI/helia-profiler/blob/main/examples/quickstart/hpx_aot_npu_atomiq110.yml),
+differs only in `engine.type: helia-aot`: the compiler turns the Vela
+`ethos-u` op into a generated NPU kernel instead of dispatching it
+through the interpreter.
+
+## Run
+
+From the repository root (the model path is repository-relative):
+
+```bash
+hpx profile --config examples/quickstart/hpx_rt_npu_atomiq110.yml
+```
+
+A successful boot logs `HPX_NPU=ethos-u85 init=ok` before allocation.
+
+## Expected output
+
+Not yet captured. The per-layer file carries the `ARM_PMU_*` columns and,
+from the `ethos_npu` default preset, `ETHOSU_PMU_CYCLE`,
+`ETHOSU_PMU_NPU_ACTIVE`, `ETHOSU_PMU_MAC_ACTIVE` and
+`ETHOSU_PMU_SRAM_RD_DATA_BEAT_RECEIVED`, with the NPU columns non-zero
+on the `CUSTOM(ethos-u)` row and zero on CPU-resident rows.
+
+## How to read it
+
+- Vela fuses every supported subgraph into one `ethos-u` custom operator
+  that runs as a single command stream, so a fully offloaded model shows
+  one layer carrying all the NPU counters. There is no per-layer view
+  inside that dispatch at run time; Vela's `--verbose-performance` gives
+  static estimates for the interior.
+- `ETHOSU_PMU_NPU_ACTIVE / ETHOSU_PMU_CYCLE` is the NPU's utilisation
+  during the dispatch; `MAC_ACTIVE / NPU_ACTIVE` separates compute-bound
+  from memory-bound.
+- hpx cross-checks model and config: `engine.backend: ethos_u` without a
+  Vela model is rejected; a Vela model on a CPU backend is rejected when
+  the `analysis` extra is installed and otherwise fails at run time as an
+  unresolved custom operator.
+- With the NPU backend, automatic placement keeps NPU-visible buffers in
+  SRAM and MRAM; an explicit `tcm` placement is honoured.
+
+## Variations
+
+- `ethos_npu: all` samples the full NPU event catalogue over extra passes;
+  the [PMU counters](../../guide/pmu-counters/) page lists it.
+- Your own model: compile with Vela for `ethos-u85-256` and point
+  `model.path` at the output; the accelerator config is checked at
+  preflight.
+- heliaAOT: the second config above.
+
+## Validated on
+
+Not yet validated. No Atomiq110 case runs in the nightly hardware
+validation suite and no captured bundle from the FPGA is shipped. The
+support statements above are quoted from the checked-in configs and the
+engine sources; the maturity label is the one the source pages use.

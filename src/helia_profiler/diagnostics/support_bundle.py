@@ -3,7 +3,7 @@
 ``hpx doctor --bundle`` calls into this module to assemble a sanitized,
 offline-safe snapshot of the host environment for troubleshooting — never a
 model, firmware source, ELF/binary, or raw credential. See
-``docs/architecture/field-diagnostics.md`` for the full design rationale.
+the Concepts page ``guide/concepts/field-diagnostics`` for the full design rationale.
 
 Collection is best-effort per section: a missing workspace, an absent
 optional tool, or a config that fails to resolve degrades exactly that one

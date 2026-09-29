@@ -1,0 +1,116 @@
+---
+title: "Interactive Python session"
+description: "Drive hpx from a notebook or script with the immutable Session: load a checked-in config, branch it into heliaRT and heliaAOT experiments, resolve them without touching hardware, then profile and compare."
+---
+
+## Goal
+
+Use hpx as a library. You will learn how a `Session` is built from YAML
+or from method calls, why every `with_*` call returns a new session, how
+to inspect a resolved configuration before a build, and how to profile and
+compare from Python.
+
+## Hardware and wiring
+
+None for the discovery and resolve steps. An Apollo510 EVB on J-Link for
+the profile step.
+
+## Software prerequisites
+
+hpx in the notebook's kernel. From a source checkout:
+
+```bash
+uv sync --group notebook --extra analysis --extra aot
+```
+
+`analysis` enables `Session.analyze()` and `aot` the heliaAOT branch.
+Toolchains, CMake, Ninja and J-Link come from the kernel's `PATH`.
+
+## Config file
+
+[`examples/quickstart/hpx_rt.yml`](https://github.com/AmbiqAI/helia-profiler/blob/main/examples/quickstart/hpx_rt.yml),
+loaded with `Session.from_yaml`; the same keys can be given as method
+arguments instead.
+
+## Run
+
+```python
+import helia_profiler as hpx
+
+session = hpx.Session.from_yaml("examples/quickstart/hpx_rt.yml")
+config = session.resolve()
+print(config.target.board, config.engine.type, config.target.toolchain,
+      config.profiling.pmu_counters, config.model.arena_size)
+
+aot = session.with_engine("helia-aot").with_output(dir="results/aot")
+print(aot.resolve().engine.type, aot.resolve().output.dir)
+
+doctor = session.show(session.doctor())
+```
+
+Then, with a board attached:
+
+```python
+rt_result = session.with_output(dir="results/rt").profile()
+aot_result = aot.profile()
+comparison = session.compare(rt_result, aot_result, output_dir="results/rt-vs-aot")
+```
+
+## Expected output
+
+The first block, run on the host on 2026-09-21 with hpx 0.1.6 from the
+repository root:
+
+```
+apollo510_evb helia-rt arm-none-eabi-gcc {'cpu': 'default', 'memory': 'default'} 131072
+helia-aot results/aot
+```
+
+followed by the `hpx doctor` table that `show()` renders. The profile
+step prints the same stage progress and results panel as the CLI and
+returns a `ProfileResult`.
+
+## How to read it
+
+- `resolve()` returns the fully validated `ProfileConfig` the pipeline
+  would run: every default filled in, every key checked, no hardware
+  touched. Print it, or `session.save("experiment.yml")` to write the
+  intent back out as YAML.
+- A session is immutable, so `session` is unchanged after `with_engine`;
+  a base session can fan out into engine, placement, counter or power
+  branches that share everything else.
+- `show()` renders a Rich table and returns the typed value, so
+  `doctor.ok` and `doctor.checks` remain available for a script.
+- `ProfileResult` carries the merged layers, PMU presets and groups,
+  firmware metadata, memory placement, optional power data, run
+  provenance and `report_paths`; `compare()` accepts results or result
+  directories and returns the `CompareResult` the CLI prints.
+- `session.analyze()` runs the host-side model analysis for the configured
+  engine; `session.boards()`, `engines()`, `counters("cpu")`, `probes()`
+  and `ports()` are the discovery calls, each typed.
+
+## Variations
+
+- Without a file:
+  `hpx.Session().with_model(hpx.examples.tiny_cnn(), arena_size=65536).with_target(board="apollo510_evb", toolchain="gcc", transport="rtt")`
+  uses the packaged tiny CNN, a deterministic int8 model materialised
+  into the hpx cache, so no checkout is needed.
+- `with_profiling(iterations=100, warmup=5, pmu_counters={"cpu": "all"})`
+  and `with_power(enabled=True, driver="joulescope")` branch the other
+  sections.
+- `Session.load("experiment.yml")` restores a saved intent;
+  `with_overrides({...})` applies a mapping of dotted keys.
+- The walkthrough notebook
+  [`examples/notebooks/hpx_walkthrough.ipynb`](https://github.com/AmbiqAI/helia-profiler/blob/main/examples/notebooks/hpx_walkthrough.ipynb)
+  runs the packaged model through heliaRT and heliaAOT and then digs into
+  layer timing distributions, compute-unit lanes, hotspots, memory
+  regions, engine comparison and exports, with optional power capture.
+
+## Validated on
+
+Host-only steps validated: the resolve and branch block above was executed
+on 2026-09-21 with hpx 0.1.6 and produced the output shown. The profile
+and compare steps are not yet validated from Python; the same
+configuration run through the CLI is validated on
+[Profile a model](../basic-profiling/#validated-on). The walkthrough
+notebook is not yet validated on hardware.

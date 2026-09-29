@@ -1,0 +1,138 @@
+<hpx-demo class="demo">
+  <div class="demo__bar">
+    <div class="demo__tabs" role="tablist" aria-label="Profiling workflow">
+      {['Check', 'Probes', 'LiteRT', 'AOT', 'Compare', 'Power'].map((name, index) => <button type="button" role="tab" id={`hpx-tab-${index}`} aria-controls={`hpx-panel-${index}`} aria-selected={index === 0 ? 'true' : 'false'} tabindex={index === 0 ? 0 : -1}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="currentColor" /><circle class="progress-ring" cx="12" cy="12" r="9" pathLength="100" /></svg>{name}</button>)}
+    </div>
+
+  </div>
+  {['doctor', 'probes', 'litert', 'aot', 'compare', 'power'].map((name, index) => <div class="demo__screen" id={`hpx-panel-${index}`} role="tabpanel" aria-labelledby={`hpx-tab-${index}`} tabindex="0" hidden={index !== 0}><slot name={name} /></div>)}
+  <div class="demo__caption">Abbreviated CLI excerpts · measured profiling example</div>
+</hpx-demo>
+<script>
+class HpxDemo extends HTMLElement {
+  connectedCallback() {
+    if (this.dataset.ready) return;
+    this.dataset.ready = 'true';
+    const tabs = [...this.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+    const panels = [...this.querySelectorAll<HTMLElement>('[role="tabpanel"]')];
+
+    this.querySelectorAll('.expressive-code .copy').forEach(control => control.remove());
+    const motion = matchMedia('(prefers-reduced-motion: reduce)');
+    const lines = panels.map(panel => {
+      const code = panel.querySelector('code')!;
+      const source = [...code.querySelectorAll('.ec-line')];
+      const content = source.length ? source.map(line => line.textContent!.replace(/\n$/, '')) : code.textContent!.trimEnd().split('\n');
+      const result = content.map(text => {
+        const line = document.createElement('span');
+        line.className = 'demo-line';
+        line.dataset.text = text || '\u00a0';
+        if (/━/.test(text)) line.classList.add('rule');
+        if (/Run summary|Power summary|Baseline|LiteRT →/.test(text)) line.classList.add('table-heading');
+        if (/^✓|3.2x|Saved →/.test(text.trim())) line.classList.add('positive');
+        if (/-58.3%|-60.0%|\+140.0%/.test(text)) line.classList.add('gain');
+        line.textContent = text || '\u00a0';
+        return line;
+      });
+      code.replaceChildren(...result);
+      return result;
+    });
+    let active = 0, elapsed = 0, last = performance.now(), frame = 0;
+    let visible = false, paused = false;
+    const commandCounts = lines.map(group => {
+      const blank = group.findIndex(line => !line.dataset.text!.trim());
+      return blank < 0 ? 1 : blank;
+    });
+    const characterMs = 34;
+    const resultLineMs = 240;
+    const readingMs = [2600, 2600, 5000, 5000, 7000, 5500];
+    const typingTimes = lines.map((group, i) => group.slice(0, commandCounts[i]).reduce((total, line) => total + line.dataset.text!.length * characterMs, 0));
+    const durationFor = (i: number) => typingTimes[i] + (lines[i].length - commandCounts[i]) * resultLineMs + readingMs[i];
+    const render = () => {
+      tabs.forEach((tab, i) => {
+        tab.setAttribute('aria-selected', String(i === active));
+        tab.tabIndex = i === active ? 0 : -1;
+        tab.title = i === active ? (paused ? 'Resume animation' : 'Pause animation') : `Show ${tab.textContent}`;
+        panels[i].hidden = i !== active;
+        panels[i].querySelector('.profile-result')?.classList.toggle('pending', !motion.matches && elapsed < typingTimes[i] + (lines[i].length - commandCounts[i]) * resultLineMs);
+        let typedBefore = 0;
+        lines[i].forEach((line, n) => {
+          const text = line.dataset.text!;
+          if (n < commandCounts[i]) {
+            const count = motion.matches ? text.length : Math.max(0, Math.floor(elapsed / characterMs) - typedBefore);
+            line.textContent = text.slice(0, count) || '\u00a0';
+            line.classList.toggle('typing', !motion.matches && count > 0 && count < text.length);
+            typedBefore += text.length;
+          } else {
+            line.classList.toggle('pending', !motion.matches && elapsed < typingTimes[i] + (n - commandCounts[i]) * resultLineMs);
+          }
+        });
+        tab.querySelector<SVGCircleElement>('.progress-ring')!.style.strokeDashoffset = String(i === active ? 100 - elapsed / durationFor(i) * 100 : 100);
+      });
+      this.toggleAttribute('data-paused', paused);
+    };
+    const show = (i: number) => { active = i; elapsed = 0; last = performance.now(); render(); };
+    tabs.forEach((tab, i) => {
+      tab.addEventListener('click', () => {
+        if (i === active) { paused = !paused; last = performance.now(); render(); }
+        else show(i);
+      });
+      tab.addEventListener('keydown', event => {
+        let next = i;
+        if (event.key === 'ArrowRight') next = (i + 1) % tabs.length;
+        else if (event.key === 'ArrowLeft') next = (i + tabs.length - 1) % tabs.length;
+        else if (event.key === 'Home') next = 0;
+        else if (event.key === 'End') next = tabs.length - 1;
+        else return;
+        event.preventDefault(); show(next); tabs[next].focus();
+      });
+    });
+    const tick = (time: number) => {
+      if (visible && !paused && !motion.matches && !document.hidden) {
+        elapsed = Math.min(durationFor(active), elapsed + Math.min(time - last, 100));
+        if (elapsed >= durationFor(active) && !this.matches(':focus-within')) show((active + 1) % tabs.length);
+      }
+      last = time; render(); frame = requestAnimationFrame(tick);
+    };
+    const observer = new IntersectionObserver(entries => { visible = entries[0].isIntersecting; }, {threshold: .25});
+    observer.observe(this);
+    this.cleanup = () => { cancelAnimationFrame(frame); observer.disconnect(); };
+    render(); frame = requestAnimationFrame(tick);
+  }
+  cleanup?: () => void;
+  disconnectedCallback() { this.cleanup?.(); delete this.dataset.ready; }
+}
+if (!customElements.get('hpx-demo')) customElements.define('hpx-demo', HpxDemo);
+</script>
+<style>
+.demo{display:block;min-width:0;background:var(--sl-color-bg);color:var(--sl-color-text);border:1px solid var(--sl-color-gray-5);border-radius:12px;overflow:hidden;}
+.demo__bar{padding:10px 18px;border-bottom:1px solid var(--sl-color-gray-5);background:var(--sl-color-gray-6);}
+.demo__tabs{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin:0;}
+.demo__tabs button{display:inline-flex;align-items:center;gap:7px;height:36px;margin:0!important;padding:0 7px;border:1px solid transparent;border-radius:20px;background:transparent;color:var(--sl-color-gray-2);font:500 13px/1 var(--sl-font);cursor:pointer;}
+.demo__tabs button[aria-selected="true"]{color:var(--sl-color-text);border-color:var(--sl-color-gray-4);background:var(--sl-color-bg);}
+button:focus-visible{outline:2px solid #68a33b;outline-offset:3px;}
+svg{width:20px;height:20px;color:#588b2e;flex:none;}
+.progress-ring{fill:none;stroke:currentColor;stroke-width:1.8;stroke-dasharray:100;stroke-dashoffset:100;transform:rotate(-90deg);transform-origin:center;}
+.demo__screen{padding:14px 18px;overflow:auto;min-height:330px;margin:0;}
+[hidden]{display:none!important;}
+.demo__screen :global(.expressive-code .copy){display:none!important;}
+.demo__screen :global(pre){margin:0!important;padding:0!important;background:transparent!important;border:0!important;}
+.demo__screen :global(code){color:var(--sl-color-text);background:transparent!important;font:13px/1.7 var(--sl-font-mono);white-space:pre;}
+.demo__screen :global(.demo-line){display:block;transition:opacity .18s;}
+.demo__screen :global(.demo-line:first-child){color:var(--sl-color-text);font-weight:600;}
+.demo__screen :global(.rule){color:var(--sl-color-gray-4);}
+.demo__screen :global(.table-heading){font-weight:700;}
+.demo__screen :global(.positive),.demo__screen :global(.gain){color:#367515;font-weight:600;}
+:global([data-theme="dark"]) .demo__screen :global(.positive),:global([data-theme="dark"]) .demo__screen :global(.gain){color:#a1e569;}
+.demo__screen :global(.pending){opacity:0;}
+.demo__screen :global(.typing)::after{content:"▍";color:#588b2e;}
+.demo__caption{border-top:1px solid var(--sl-color-gray-5);padding:8px 18px;color:var(--sl-color-gray-2);font-size:11px;}
+@media(prefers-reduced-motion:reduce){.demo__screen :global(.demo-line){transition:none;}svg{display:none;}}
+</style>
+
+<style>
+.demo :global(.profile-result){padding:0 0 8px;font-size:.82rem;overflow-x:auto;}
+.demo :global(.profile-result p){margin:8px 0 12px;}
+.demo :global(.profile-result table){display:table;width:100%;font-size:.8rem;margin:0;border-collapse:collapse;}
+.demo :global(.profile-result th),.demo :global(.profile-result td){padding:7px 6px;text-align:left;white-space:nowrap;}
+.demo :global(.profile-result td:last-child){font-weight:600;}
+</style>

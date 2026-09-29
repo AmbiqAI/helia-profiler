@@ -504,50 +504,42 @@ def build_matrix(
 ) -> list[CaseSpec]:
     """Expand user filters into a concrete list of :class:`CaseSpec`.
 
-    Parameters
-    ----------
-    models:
-        Model IDs to include (default: all in :data:`MODELS`).
-    engines:
-        Engine identifiers to include (string slug or :class:`EngineType`;
-        default: all in :data:`ENGINES`).
-    executorch_backends:
-        ExecuTorch CMSIS-NN providers to include (``arm`` and/or ``ns``).
-        Defaults to both. Other engines use their fixed validation provider:
-        ARM CMSIS-NN for TFLM and ns-cmsis-nn for heliaRT/heliaAOT.
-    power:
-        One of ``"both"``, ``"on"``, ``"off"``.  ``"both"`` runs each
-        (model, engine) case twice — with and without Joulescope.
-    boards:
-        Board IDs (default: all in :data:`BOARDS`).
-    toolchains:
-        Toolchain identifiers to include (default: each board's validation toolchains).
-    transports:
-        Transport identifiers to include (default: each board's supported transports).
-    memories:
-        Model placement presets to include (default: each board's supported placements).
-    jlink_serials:
-        Optional mapping of board ID to J-Link serial number for multi-board labs.
-    power_boards:
-        Optional board IDs allowed to run powered cases. Selected boards not in
-        this list run unpowered even when ``power`` is ``"on"`` or ``"both"``.
-        When omitted, the power mode applies to every selected board.
-    power_serials:
-        Optional mapping of board ID to Joulescope serial number for powered
-        cases. This permits several instruments to remain connected.
-    power_gpio_pins:
-        Optional mapping of board ID to ``(gate, state, go)`` GPIO pins for
-        powered cases on boards without registered power-sync wiring.
+    Args:
+        models: Model IDs to include (default: all in :data:`MODELS`).
+        engines: Engine identifiers to include (string slug or
+            :class:`EngineType`; default: all in :data:`ENGINES`).
+        executorch_backends: ExecuTorch CMSIS-NN providers to include (``arm``
+            and/or ``ns``). Defaults to both. Other engines use their fixed
+            validation provider: ARM CMSIS-NN for TFLM and ns-cmsis-nn for
+            heliaRT/heliaAOT.
+        power: One of ``"both"``, ``"on"``, ``"off"``.  ``"both"`` runs each
+            (model, engine) case twice — with and without Joulescope.
+        boards: Board IDs (default: all in :data:`BOARDS`).
+        toolchains: Toolchain identifiers to include (default: each board's
+            validation toolchains).
+        transports: Transport identifiers to include (default: each board's
+            supported transports).
+        memories: Model placement presets to include (default: each board's
+            supported placements).
+        jlink_serials: Optional mapping of board ID to J-Link serial number
+            for multi-board labs.
+        power_boards: Optional board IDs allowed to run powered cases.
+            Selected boards not in this list run unpowered even when ``power``
+            is ``"on"`` or ``"both"``. When omitted, the power mode applies to
+            every selected board.
+        power_serials: Optional mapping of board ID to Joulescope serial
+            number for powered cases. This permits several instruments to
+            remain connected.
+        power_gpio_pins: Optional mapping of board ID to ``(gate, state, go)``
+            GPIO pins for powered cases on boards without registered
+            power-sync wiring.
 
-    Returns
-    -------
-    list[CaseSpec]
-        Ordered deterministically — by board → model category → engine → power → attempt.
+    Returns:
+        Ordered deterministically — by board → model category → engine →
+        power → attempt.
 
-    Raises
-    ------
-    ValueError
-        If any filter value is not a known registry key.
+    Raises:
+        ValueError: If any filter value is not a known registry key.
     """
     registry = model_registry or MODELS
     model_ids = models or list(registry.keys())

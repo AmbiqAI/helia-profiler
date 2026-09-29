@@ -1,0 +1,120 @@
+---
+title: "Vanilla TFLM baseline"
+description: "Profile the upstream TensorFlow Lite Micro port with its reference or CMSIS-NN kernels to get the number every Ambiq-optimised engine is measured against."
+---
+
+## Goal
+
+Produce the baseline that gives the heliaRT and heliaAOT numbers their
+meaning. You will learn what the `tflm` engine is and is not, how to pick
+its kernel backend, and how its binary compares.
+
+## Hardware and wiring
+
+An Apollo510 EVB on its J-Link USB port; no other connections.
+
+## Software prerequisites
+
+hpx, the GNU Arm toolchain, CMake, Ninja and J-Link software
+([Install](../../getting-started/install/)). No extra: the `tflm` engine
+resolves the `nsx-tflite-micro` module from the registry.
+
+## Config file
+
+[`examples/quickstart/hpx_tflm_baseline.yml`](https://github.com/AmbiqAI/helia-profiler/blob/main/examples/quickstart/hpx_tflm_baseline.yml):
+
+```yaml
+model:
+  path: examples/quickstart/kws_model.tflite
+  arena_size: 131072
+engine:
+  type: tflm
+  backend: cmsis_nn    # reference or cmsis_nn
+target:
+  board: apollo510_evb
+  toolchain: arm-none-eabi-gcc
+profiling:
+  pmu_counters:
+    cpu: default
+    memory: default
+  per_layer: true
+  iterations: 3
+  warmup: 1
+power:
+  enabled: false
+output:
+  format: csv
+  dir: ./results/results_tflm_baseline
+```
+
+`engine.backend: cmsis_nn` links upstream Arm CMSIS-NN; `reference`
+selects TFLM's portable C kernels. Neither enables Ambiq's HELIA kernels;
+that is the point of the baseline.
+
+## Run
+
+From the repository root (the model path is repository-relative):
+
+```bash
+hpx profile --config examples/quickstart/hpx_tflm_baseline.yml
+```
+
+## Expected output
+
+From the nightly case named under Validated on (the arena progress bar is omitted):
+
+```
+  Engine              tflm
+  Board               apollo510_evb
+  Layers              13
+  Total cycles        2,118,339
+  Clean E2E cycles    2,109,120  (-0.4% vs per-layer sum)
+  Arena      27,300 / 32,768 bytes  83%
+  Model      53,744 bytes
+  Binary Sections
+  Section          Size
+  text          507,932
+  data          154,796
+  bss            89,284
+  reserved      362,380
+  total       1,114,392
+  Validity: VALID
+```
+
+## How to read it
+
+- 2,109,120 clean cycles against heliaRT's 2,051,232 and heliaAOT's
+  2,044,512 on the same board, model and toolchain: for this model the
+  arithmetic runs in CMSIS-NN either way, so the engines separate by a few
+  percent. Models with operators that heliaRT fuses show a larger gap;
+  the baseline is what tells you how large.
+- `.text` is 507,932 bytes, 1.8 times heliaRT's 278,596, because the
+  upstream interpreter links its full operator set and resolver.
+- The per-layer table has the same columns as every other engine, so a
+  row-by-row comparison with `hpx compare` works
+  ([Compare engines](../engine-comparison/)).
+- The result describes the vanilla port; it is not an Ambiq-optimised
+  number and should not be quoted as one.
+
+## Variations
+
+- Reference kernels: copy the config, set `backend: reference`, keep
+  everything else, and compare the two TFLM runs to see what CMSIS-NN buys
+  on this core.
+- Another model: change `model.path` and `model.arena_size`; the arena
+  usage line tells you how much you needed.
+- Cortex-M4 boards (`apollo3p_evb`, `apollo4l_blue_evb`) run the same
+  engine with cycle counts only.
+
+## Validated on
+
+| | |
+|---|---|
+| Board | `apollo510_evb`, `lp` clock tier |
+| Run | nightly hardware validation [run 35078330526](https://github.com/AmbiqAI/helia-profiler/actions/runs/35078330526), 2026-09-16, hpx 0.1.6 at `0714893` |
+| Case | `apollo510_evb-kws-tflm-arm-arm-none-eabi-gcc-rtt-auto` (`arm` is the CMSIS-NN provider), verdict `valid` |
+| nsx modules | `nsx-tflite-micro` 7afcf2b, `arm-cmsis-nn` 6d21a6f, `nsx-ambiq-sdk` a9f4ec2, `nsx-pmu-armv8m` 5725c06 (bundle `nsx.lock`) |
+| Toolchain | arm-none-eabi-gcc 15.2.1, CMake 4.1.2 |
+| Differences from the config above | `arena_size: 32768`, `pmu_counters: {cpu: default}` in the nightly case |
+| `reference` backend | not yet validated: the nightly suite runs the CMSIS-NN backend only |
+| Bundle | [`examples/results/hardware-validation-2026-09-16/apollo510_evb-kws-tflm-arm-arm-none-eabi-gcc-rtt-auto/`](https://github.com/AmbiqAI/helia-profiler/tree/main/examples/results/hardware-validation-2026-09-16/apollo510_evb-kws-tflm-arm-arm-none-eabi-gcc-rtt-auto) |
