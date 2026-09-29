@@ -3,13 +3,12 @@ title: "INA228 on the target"
 description: "Measure whole-window energy with a TI INA228 on the board's own I2C bus: wiring a Power Monitor Click or an Adafruit breakout, choosing the shunt, the on-device summary, bring-up without a shunt, and the failure modes."
 ---
 
-## Purpose
-
 Measure aggregate energy without a bench instrument. A TI INA228
 current and power monitor wired into the target rail and onto the target's
 I2C bus integrates energy and charge in hardware while the firmware
 brackets a fixed number of inferences. The host does nothing inside the
-window, so nothing the host does can contaminate it.
+window. Account for the target-side measurement overhead and the rail
+being monitored when interpreting the result.
 
 ## Prerequisites
 
@@ -83,7 +82,8 @@ well inside range.
 Two pressures: a larger resistor gives more signal and shrinks the chip's
 input offset relative to it; a smaller one steals less of the supply. Pick
 the largest value whose worst-case drop still fits the high-resolution
-±40.96 mV range with headroom for peaks:
+±40.96 mV range with headroom for peaks. The selectable input ranges are
+defined in the [TI INA228 data sheet](https://www.ti.com/lit/ds/symlink/ina228.pdf):
 
 | Peak current | Largest shunt inside ±40.96 mV | Burden at that peak |
 |---|---|---|
@@ -92,17 +92,16 @@ the largest value whose worst-case drop still fits the high-resolution
 | 400 mA | 0.1024 Ω (use 0.10 Ω) | up to 41 mV |
 
 The limit is exact: hpx selects the high-resolution range only when
-`shunt_ohms x max_current_a <= 0.04096`, so a value at the boundary lands
-on the wide ±163.84 mV range and loses the 4x resolution. Round down to a
+`shunt_ohms x max_current_a <= 0.04096`, so a value above the boundary selects
+the wider ±163.84 mV range, with four times the voltage step size. Round down to a
 standard value. Setting `max_current_a` far above the real peak also costs
 resolution.
 
-For a target drawing about 20 mA with peaks under about 80 mA, 0.5 Ω is a
-good choice: 10 mV of burden at 20 mA, about 128k ADC counts of
-resolution, and offset error well under 0.05%. Dissipation is negligible
-at these currents, so any 0603 or 0805 part works; buy tolerance rather
-than rating, because the resistor's tolerance passes straight into the
-energy figure (a 1% part means 1% energy error).
+For illustration, 20 mA through 0.5 Ω produces a 10 mV drop; an 80 mA
+peak produces 40 mV. Check the target's minimum supply voltage, peak
+current, resistor tolerance, temperature coefficient and power rating
+before selecting a shunt. Shunt tolerance contributes directly to the
+current and energy calibration error.
 
 :::caution[The Adafruit board's 15 mΩ shunt is sized for amps]
 A low-power target develops tens of µV across 15 mΩ, while the INA228's
@@ -110,10 +109,10 @@ input offset is on the order of a µV (datasheet `V_OS`, per ADC range), so
 the offset alone is a percentage-level current error. The error is fixed
 in volts and shrinks in proportion to the shunt drop: 0.5 Ω at 20 mA gives
 10 mV of signal, 15 mΩ gives 300 µV, a 33x difference in how much a
-microvolt of offset matters. For relative work (A/B comparisons,
-regression tracking at a similar operating current) the stock board is
-fine, because a stable bias cancels in the delta. For absolute milliwatts
-on a sleepy target, wire your own resistor.
+microvolt of offset matters. A stable offset may cancel in an absolute current difference, but it can
+still bias relative changes and energy comparisons with different run
+durations. Check the signal-to-offset ratio and calibration for the
+measurements you intend to compare.
 :::
 
 ### 4. Read the on-device summary
@@ -148,8 +147,7 @@ The IOM that talks to the chip stays powered and clocked for the whole
 run, on the rail being measured, so it is counted in the reported energy;
 an external instrument has no equivalent cost, which is one reason the two
 do not agree out of the box. The adder is the idle IOM, not bus traffic,
-and it did not move between conversion-time settings on the bench that
-measured it. Measure it on your own board: run once with the
+and depends on your target configuration. Measure it on your own board: run once with the
 `power.ina228` block and once without, using an external instrument for
 both. The block's presence, not `power.driver`, decides whether the
 firmware brings up a monitor, so delete the block when the chip comes off
@@ -173,10 +171,9 @@ meaningless differential and the target loses its supply. Everything but
 the absolute current scale is exercised for real: I2C bring-up, the
 manufacturer and device id probes, ADC configuration, the accumulator reset
 and read bracketing, the terminal envelope and the host-side parse.
-`bus_voltage_uv` is fully trustworthy because it does not involve the
-shunt; seeing your rail voltage confirms chip, bus and read path in one
-number. Current, energy and charge are scaled by `R_parasitic / shunt_ohms`
-and read one to two orders of magnitude low; the `calibration_id` is what
+`bus_voltage_uv` does not depend on the declared shunt resistance; compare
+it with an independent rail-voltage reading. Current, energy and charge
+use the declared resistance and are not calibrated in this setup; the `calibration_id` is what
 stops those numbers being mistaken for a measurement later.
 
 Two readings to interpret: energy exactly zero with a non-zero bus voltage
@@ -225,4 +222,5 @@ today.
 
 [Windows and the clean window](../power-windows/) for the firmware side,
 [Verifying a capture](../power-verify/) for the health signals, and the
-[power examples](../../examples/) for a captured INA228 run.
+[power-summary example](../../examples/power-read-summary/) for the
+reading procedure and its validation status.

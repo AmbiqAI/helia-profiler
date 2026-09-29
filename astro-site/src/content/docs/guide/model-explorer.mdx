@@ -5,8 +5,6 @@ description: "See per-layer cost on the model graph: one overlay per counter, lo
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
-## Purpose
-
 Look at where the cycles go on the graph rather than in a table. hpx
 writes one overlay JSON per captured counter that
 [Model Explorer](https://github.com/google-ai-edge/model-explorer) renders
@@ -51,9 +49,10 @@ covers the CSV and summary that carry the same numbers with more context.
    `ARM_PMU_L1D_CACHE_MISS_RD` to see whether a hot layer is memory-bound.
 5. Check the picture against the table: the reddest node of the cycles
    overlay is the first row of `summary.top_layers`, and its `pct` says how
-   much of the instrumented total it holds. A hot node that is green on the
-   cache-miss overlay is compute-bound; one that is red on both is waiting
-   on memory, and [Memory placement](../memory/) is the page to open.
+   much of the instrumented total it holds. High cycle cost with many cache misses is a reason to investigate
+   [memory placement](../memory/). Low cache misses alone do not prove a
+   layer is compute-bound; compare stalls, instruction counts and the
+   other available counters before attributing the cost.
 
 A layer that ran in several PMU passes has one value per counter, taken
 from the pass that captured that counter, so every overlay covers every

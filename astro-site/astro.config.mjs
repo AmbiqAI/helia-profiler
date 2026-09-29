@@ -1,5 +1,6 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
+import react from '@astrojs/react';
 import starlight from '@astrojs/starlight';
 import { heliaStarlight } from '@ambiqai/helia-ui/starlight';
 import redirects from './src/data/redirects.json' with { type: 'json' };
@@ -25,6 +26,7 @@ export default defineConfig({
      `moved` covers routes this site published and later moved. */
   redirects: { ...redirects.redirects, ...(redirects.moved ?? {}) },
   integrations: [
+    react(),
     starlight({
       title: 'heliaPROFILER',
       description:

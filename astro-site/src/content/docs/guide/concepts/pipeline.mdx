@@ -6,8 +6,6 @@ description: "The eighteen stages hpx profile runs in order, grouped into prefli
 import BlockDiagram from '@ambiqai/helia-ui/astro/BlockDiagram';
 import Block from '@ambiqai/helia-ui/astro/Block';
 
-## Purpose
-
 Name the stage behind every line `hpx profile` prints, so a failure can be
 placed in the code and a change can be scoped to one stage. The pipeline is
 a flat ordered list; nothing runs in parallel and nothing runs twice.
@@ -52,7 +50,8 @@ a flat ordered list; nothing runs in parallel and nothing runs twice.
   </Block>
 </BlockDiagram>
 
-The same structure as a list, for readers of the Markdown rendition:
+<details>
+<summary>Text description of the diagram</summary>
 
 - Preflight (host and target): preflight, ensure powered, resolve platform, resolve probe
 - Prepare (engine and plan): prepare engine, analyze model, plan memory
@@ -60,6 +59,8 @@ The same structure as a list, for readers of the Markdown rendition:
 - Capture: capture PMU
 - Power (when enabled): plan power run, build power firmware, flash power, capture power, collect terminal
 - Report: generate report
+
+</details>
 
 ## The blocks
 

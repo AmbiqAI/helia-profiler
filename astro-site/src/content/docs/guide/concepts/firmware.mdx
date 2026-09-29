@@ -6,8 +6,6 @@ description: "How hpx renders a disposable NSX application for one model and one
 import BlockDiagram from '@ambiqai/helia-ui/astro/BlockDiagram';
 import Block from '@ambiqai/helia-ui/astro/Block';
 
-## Purpose
-
 Explain what `GenerateFirmwareStage` and `BuildFirmwareStage` write into
 the work directory and why the templates are shaped as one skeleton with
 engine children, so a firmware change lands in the one block that owns it.
@@ -58,7 +56,8 @@ engine children, so a firmware change lands in the one block that owns it.
   </Block>
 </BlockDiagram>
 
-The same structure as a list, for readers of the Markdown rendition:
+<details>
+<summary>Text description of the diagram</summary>
 
 - Render context (`firmware/context.py`): config values, engine artifacts, PMU passes, platform features, power window
 - Templates (`firmware/templates`): skeleton `_main_base.cc.j2` (children `main.cc.j2` for tflm and helia-rt, `main_aot.cc.j2`, `main_executorch.cc.j2`), partials `_*.j2`, PMU harness `hpx_pmu_profiler`
@@ -66,6 +65,8 @@ The same structure as a list, for readers of the Markdown rendition:
 - Generated sources: model header, blob headers, local modules
 - Build (`firmware/build.py`): nsx configure, nsx build, compiler launcher
 - Identity: build image, code fingerprint, clean workload
+
+</details>
 
 ## The blocks
 

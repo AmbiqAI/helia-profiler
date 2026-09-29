@@ -5,12 +5,10 @@ description: "GCC, Arm Compiler 6 and the Arm Toolchain for Embedded: which to p
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
-## Purpose
-
 Choose the cross-compiler that builds the firmware. hpx builds through
 neuralSPOT-X, which supports three Cortex-M toolchains; the choice changes
-build time, binary size and cycle counts, and every other axis of a run is
-independent of it.
+build time, binary size and cycle counts, so hold the model, engine and target settings fixed when comparing compilers.
+Supported combinations depend on the engine and board.
 
 ## Prerequisites
 
@@ -22,7 +20,7 @@ needs a licence; ATfE needs `ATFE_ROOT`.
 
 | `target.toolchain` | Compiler | Linker | Cost to set up | Pick it when |
 |---|---|---|---|---|
-| `arm-none-eabi-gcc` (default; `gcc` is the accepted alias) | GNU Arm Embedded | GNU `ld` | free, in every distribution | First setup, CI without a licence, cross-platform reproducibility. The default heliaRT registry module builds with it. |
+| `arm-none-eabi-gcc` (default; `gcc` is the accepted alias) | GNU Arm Embedded | GNU `ld` | free; install a supported host package | First setup, CI without a licence, cross-platform reproducibility. The default heliaRT registry module builds with it. |
 | `armclang` | Arm Compiler 6 | `armlink` | licence required | Cycle-count optimisation on Cortex-M55, or confirming a result replicates across compilers. Not covered by ExecuTorch validation. |
 | `atfe` | Arm Toolchain for Embedded (LLVM) | LLD | free download, `ATFE_ROOT` | An open LLVM toolchain; preview status in hpx. Builds the heliaRT registry flow and ExecuTorch end to end. |
 

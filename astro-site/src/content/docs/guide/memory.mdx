@@ -6,8 +6,6 @@ description: "Where the tensor arena and the model weights live, what each memor
 import BlockDiagram from '@ambiqai/helia-ui/astro/BlockDiagram';
 import Block from '@ambiqai/helia-ui/astro/Block';
 
-## Purpose
-
 Decide where the two big objects of a run live: the tensor arena
 (activations and scratch) and the model weights (the flatbuffer, the AOT
 constant blobs or the PTE program). Placement can affect cycle counts and power. This page covers the tiers, the automatic
@@ -54,7 +52,8 @@ the number to trust for your board.
   </Block>
 </BlockDiagram>
 
-The same structure as a list, for readers of the Markdown rendition:
+<details>
+<summary>Text description of the diagram</summary>
 
 - Consumers
   - Arena: activations, scratch
@@ -66,6 +65,8 @@ The same structure as a list, for readers of the Markdown rendition:
   - SRAM
   - MRAM
   - PSRAM: opt-in only
+
+</details>
 
 ## Steps
 

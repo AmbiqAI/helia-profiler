@@ -3,12 +3,10 @@ title: "Hardware prerequisites"
 description: "The board, probe, cable and optional power instrument a first profile needs, with the host and tool versions hpx expects, each traced to its source."
 ---
 
-## Purpose
-
 Know what to plug in before you run anything. A profile needs a board hpx
 knows, a J-Link path to it, and a host with the tools from
 [Install](../install/). Power measurement needs one more instrument and comes
-later; it is listed here so you can plan for it, not so you can skip it.
+later; you do not need it for your first profile.
 
 ## Prerequisites
 
@@ -21,7 +19,7 @@ The tools from [Install](../install/). Nothing on this page runs a command.
 | Item | Requirement | Where this comes from |
 |---|---|---|
 | Host OS | Linux, macOS or Windows | `ci.yml` runs the unit tests on all three; the Nix flake covers x86-64 Linux, ARM64 Linux and Apple Silicon macOS |
-| Python | 3.11 or newer; 3.11 or 3.12 for the `aot` extra | `pyproject.toml` `requires-python`; `helia-aot` declares `<3.13` |
+| Python | 3.11 or newer; dependency wheels must be available for your host and Python version | `pyproject.toml` and [heliaAOT 0.23.0 package metadata](https://pypi.org/project/helia-aot/0.23.0/) both declare `>=3.11` |
 | Arm GNU toolchain | `arm-none-eabi-gcc`, any recent release; hpx checks presence, not version (`hostenv/doctor.py` passes `required=None` for the compiler) | The doctor output on Install was captured with 15.2.rel1 |
 | CMake | 3.24 or newer | `hpx doctor` row label `CMake (>= 3.24)` |
 | Ninja | any | `hpx doctor` row |
@@ -29,21 +27,19 @@ The tools from [Install](../install/). Nothing on this page runs a command.
 | neuralSPOT-X | `neuralspotx==0.8.1`, installed with hpx | `pyproject.toml` dependency pin |
 | Board | An Ambiq Apollo EVB from `hpx boards` | `src/helia_profiler/platform/board.py` registry; the channel column is `BoardDef.channel` |
 | Probe | The EVB's on-board J-Link, over its debug USB port | `hpx probes list` enumerates J-Link probes; `probes match` picks one per board |
-| Cable | One USB cable to the debug port; a second only if you use the `usb_cdc` or `uart` transport | [Capture transports](../../guide/transports/) |
+| Cable | Debug USB for J-Link; target USB for `usb_cdc`. UART uses the board's virtual COM port or a suitable serial adapter | [Capture transports](../../guide/transports/) |
 | Power instrument (optional) | Joulescope JS110, JS220 or JS320, or an INA228 breakout wired to the board | [Power measurement](../../guide/power/); the Joulescope driver `pyjoulescope_driver` ships with hpx |
 
 Board names, cores and the stable or preview channel of each board are on
-[Boards and platforms](../../guide/boards/), which is generated from the same
-registry `hpx boards` prints. Do not copy them from here; that table is the
-source.
+[Boards and targets](../../guide/boards/). Use `hpx boards` to check the
+registry in your installed version.
 
 ### Which board
 
-Every Apollo EVB has an on-board J-Link on its debug USB connector. That is
-the port hpx flashes through and, with the default `rtt` transport, captures
-through. Boards with more than one USB connector label the debug port on the
+Connect the board's on-board J-Link, or an external J-Link attached to its
+SWD header. hpx uses that connection for flashing and the default `rtt` capture. Boards with more than one USB connector label the debug port on the
 silkscreen or the quick-start card; if `hpx probes list` prints nothing after
-you plug in, you have the other connector.
+you plug in, check the connector, cable, SEGGER installation and host USB permissions.
 
 The default board is `apollo510_evb`. Pass `--board <name>` for any other,
 using the exact name from `hpx boards`. A board on the `preview` channel

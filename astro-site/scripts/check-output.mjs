@@ -93,9 +93,9 @@ check(
 const home = read(dist, "index.html");
 check((home.match(/<h1(?:\s|>)/g) ?? []).length === 1, "Home must have one primary heading.");
 check(home.includes('id="_top"'), "Home must retain the skip-link target.");
-const homeHero = /<section class="[^"]*\bhelia-hero\b[^"]*"[^>]*>([\s\S]*?)<\/section>/.exec(home)?.[1] ?? "";
+const homeHero = /<section class="[^"]*\bhpx-hero\b[^"]*"[^>]*>([\s\S]*?)<\/section>/.exec(home)?.[1] ?? "";
 const versionLine =
-  /<span class="[^"]*\bhelia-hero__badge\b[^"]*"[^>]*>([\s\S]*?)<\/span>/.exec(homeHero)?.[1] ?? "";
+  /<span class="[^"]*\bhpx-release\b[^"]*"[^>]*>([\s\S]*?)<\/span>/.exec(homeHero)?.[1] ?? "";
 check(versionLine !== "", "Home hero has no version badge.");
 check(
   versionLine.includes(`v${buildInfo.version}`),

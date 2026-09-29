@@ -6,8 +6,6 @@ description: "How the host gets numbers off the board: the target lifecycle befo
 import BlockDiagram from '@ambiqai/helia-ui/astro/BlockDiagram';
 import Block from '@ambiqai/helia-ui/astro/Block';
 
-## Purpose
-
 Explain the path from a firmware `printf` to a typed result, and the reset
 and readiness steps that run before it, so a capture failure can be placed
 at the lifecycle, the transport, the stream or the parser.
@@ -55,7 +53,8 @@ at the lifecycle, the transport, the stream or the parser.
   </Block>
 </BlockDiagram>
 
-The same structure as a list, for readers of the Markdown rendition:
+<details>
+<summary>Text description of the diagram</summary>
 
 - Target lifecycle: ensure powered, reset strategy, readiness poll
 - Transport (one per run): rtt (default), usb_cdc, uart, swo
@@ -63,6 +62,8 @@ The same structure as a list, for readers of the Markdown rendition:
 - Parser: extract metadata, group presets, aggregate iterations, merge presets
 - Power capture (when enabled): driver (joulescope, ina228, ondevice), sync controller, gated window, terminal record
 - Results: `PmuResult`, `PowerResult`
+
+</details>
 
 ## The blocks
 

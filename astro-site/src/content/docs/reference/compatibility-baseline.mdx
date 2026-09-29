@@ -29,6 +29,72 @@ The current baseline is `hpx-neuralspotx-0.8.1-2026-09`:
 | tflm | governed entirely by the `nsx-tflite-micro` / `arm-cmsis-nn` module refs above |
 | executorch | `0.1.0`, module ref `5514ac1e…b48e` (a checkout's `version.txt` is verified against the baseline) |
 
+Every baseline project and module ref is immutable by policy: only a full
+40-character Git object ID is accepted. Newly promoted annotated tags are
+verified and peeled before being recorded. Each engine entry is typed: a pinned
+`version`/`ref`
+(heliaRT), a `min_version`/`max_version_exclusive` semver range (heliaAOT),
+or `governed_by_modules: true` when an engine has no version of its own and
+is fully qualified by its NSX module refs (stock TFLM).
+
+heliaRT's `version`/`ref` in the baseline mirror the canonical
+`HELIART_VERSION`/`HELIART_RELEASE_TAG` constants in
+`engines/helia_rt/artifacts.py` (see `AGENTS.md`) for reporting purposes
+only; a test asserts they never drift apart. Runtime resolution of the
+default heliaRT source continues to read those constants directly; the
+baseline does not drive ordinary heliaRT version/ref resolution.
+
+heliaAOT is different: it is a separately pip-installed package, so HPX
+cannot select its version; it can only validate the one already installed.
+`engines/helia_aot/compile._check_helia_aot_version()` reads the baseline's
+`min_version`/`max_version_exclusive` policy for `helia-aot` (falling back to
+local `HELIAAOT_MIN_VERSION`/`HELIAAOT_MAX_VERSION_EXCLUSIVE` constants only
+when no resolved baseline is available) and raises a clear `EngineError` if
+the installed package is outside that qualified range.
+
+## Qualification states
+
+Each resolved run reports one state:
+
+- `qualified`: baseline defaults are used.
+- `qualified-with-engine-override`: an explicit engine source/version
+  override is present (`engine.config.{dist_path,source_path,source}`,
+  `engine.config_path`, or one of the `HELIART_DIST_PATH` /
+  `HELIART_SOURCE_PATH` environment variables), but no baseline module is
+  replaced. Ordinary engine knobs (e.g. `engine.backend`,
+  `engine.config.variant`) do not affect qualification.
+- `development-overrides`: an NSX module is replaced, either through any
+  `build.nsx_modules` entry NSX itself resolves (whether or not the baseline
+  pins that module; entries naming an engine-owned module are ignored with a
+  warning and do not count) or through a CMSIS-NN provider selector
+  (`engine.config.cmsis_nn_path`, `engine.config.cmsis_nn_ref`, or the
+  `CMSIS_NN_PATH` environment variable). Overrides are classified by the
+  dependency they replace, not by the config key that carried them: the
+  selector is recorded under the provider module it replaces (`nsx-cmsis-nn`
+  for the helia engines and ExecuTorch's `ns` provider, `arm-cmsis-nn` for
+  ExecuTorch's `arm` provider), so the `cmsis_nn_ref` form and the
+  `build.nsx_modules` form of the same ref stamp identically. Empty selector
+  values are not overrides. The dependency provenance's `overrides` list uses
+  the same module-scoped record for the selector that took effect.
+
+Explicit local paths, branches, and SHAs remain supported. They are never
+silently replaced by the baseline; the state and override names are recorded
+in `run_metadata.json`, `summary.json`, `result_manifest.json`, and terminal
+output.
+
+The baseline exposes a canonical SHA-256 fingerprint. Ordinary profiles never
+refresh a structurally compatible lock: they reuse its exact bytes and run
+`nsx sync --frozen`. A missing or incompatible lock is resolved without the
+NSX update flag. Only `hpx profile --update-dependencies` (or
+`build.update_dependencies: true`) deliberately refreshes refs. The exact
+resulting `nsx.lock` and typed resolution provenance are copied into every
+completed result bundle.
+
+## Baseline history
+
+<details>
+<summary>Why earlier promotions changed these pins</summary>
+
 This revision moves neuralSPOT-X `0.7.17 → 0.8.1` for the Apollo4 Blue Lite
 board descriptor fix (AmbiqAI/neuralspotx#250, closing hpx#263): 0.7.17's
 `apollo4l_evb` and `apollo4l_blue_evb` descriptors cleared `NSX_SYSTEM_SOURCE`,
@@ -221,63 +287,4 @@ baselines recorded the annotated tag-object ids, which a resolved NSX lock
 can never match. All other project, module, and engine refs (SDK, PMU,
 heliaRT, nsx-sensors) are unchanged.
 
-Every baseline project and module ref is immutable by policy: only a full
-40-character Git object ID is accepted. Newly promoted annotated tags are
-verified and peeled before being recorded. Each engine entry is typed: a pinned
-`version`/`ref`
-(heliaRT), a `min_version`/`max_version_exclusive` semver range (heliaAOT),
-or `governed_by_modules: true` when an engine has no version of its own and
-is fully qualified by its NSX module refs (stock TFLM).
-
-heliaRT's `version`/`ref` in the baseline mirror the canonical
-`HELIART_VERSION`/`HELIART_RELEASE_TAG` constants in
-`engines/helia_rt/artifacts.py` (see `AGENTS.md`) for reporting purposes
-only; a test asserts they never drift apart. Runtime resolution of the
-default heliaRT source continues to read those constants directly; the
-baseline does not drive ordinary heliaRT version/ref resolution.
-
-heliaAOT is different: it is a separately pip-installed package, so HPX
-cannot select its version; it can only validate the one already installed.
-`engines/helia_aot/compile._check_helia_aot_version()` reads the baseline's
-`min_version`/`max_version_exclusive` policy for `helia-aot` (falling back to
-local `HELIAAOT_MIN_VERSION`/`HELIAAOT_MAX_VERSION_EXCLUSIVE` constants only
-when no resolved baseline is available) and raises a clear `EngineError` if
-the installed package is outside that qualified range.
-
-## Qualification states
-
-Each resolved run reports one state:
-
-- `qualified`: baseline defaults are used.
-- `qualified-with-engine-override`: an explicit engine source/version
-  override is present (`engine.config.{dist_path,source_path,source}`,
-  `engine.config_path`, or one of the `HELIART_DIST_PATH` /
-  `HELIART_SOURCE_PATH` environment variables), but no baseline module is
-  replaced. Ordinary engine knobs (e.g. `engine.backend`,
-  `engine.config.variant`) do not affect qualification.
-- `development-overrides`: an NSX module is replaced, either through any
-  `build.nsx_modules` entry NSX itself resolves (whether or not the baseline
-  pins that module; entries naming an engine-owned module are ignored with a
-  warning and do not count) or through a CMSIS-NN provider selector
-  (`engine.config.cmsis_nn_path`, `engine.config.cmsis_nn_ref`, or the
-  `CMSIS_NN_PATH` environment variable). Overrides are classified by the
-  dependency they replace, not by the config key that carried them: the
-  selector is recorded under the provider module it replaces (`nsx-cmsis-nn`
-  for the helia engines and ExecuTorch's `ns` provider, `arm-cmsis-nn` for
-  ExecuTorch's `arm` provider), so the `cmsis_nn_ref` form and the
-  `build.nsx_modules` form of the same ref stamp identically. Empty selector
-  values are not overrides. The dependency provenance's `overrides` list uses
-  the same module-scoped record for the selector that took effect.
-
-Explicit local paths, branches, and SHAs remain supported. They are never
-silently replaced by the baseline; the state and override names are recorded
-in `run_metadata.json`, `summary.json`, `result_manifest.json`, and terminal
-output.
-
-The baseline exposes a canonical SHA-256 fingerprint. Ordinary profiles never
-refresh a structurally compatible lock: they reuse its exact bytes and run
-`nsx sync --frozen`. A missing or incompatible lock is resolved without the
-NSX update flag. Only `hpx profile --update-dependencies` (or
-`build.update_dependencies: true`) deliberately refreshes refs. The exact
-resulting `nsx.lock` and typed resolution provenance are copied into every
-completed result bundle.
+</details>

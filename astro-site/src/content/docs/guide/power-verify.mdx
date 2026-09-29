@@ -3,8 +3,6 @@ title: "Verifying a capture"
 description: "The power block of summary.json, the health signals to check before trusting a number, the window clock issue codes, bring-up diagnostics and the troubleshooting table."
 ---
 
-## Purpose
-
 Decide whether a power number is a measurement. Every capture writes the
 numbers and the signals that say how they were obtained; this page lists
 those signals, the issue codes behind them, and what each failure looks
@@ -151,7 +149,7 @@ A run whose `power` block has `gated_window_count: 1`, a ratio near 1.0,
 | gated average not above whole-capture average | gate or timing; or a genuinely light model | compare the `whole_capture_window` row in `detailed/power_summary.csv` |
 | `driver: ondevice` raises `PowerError` | the generic on-device driver has no firmware producer | use `power.driver: ina228` with a wired INA228, or `joulescope` |
 | TOPS per watt missing | the model cannot be analysed for MACs (ExecuTorch), or the window is not inference-bracketed | expected |
-| power differs between transports | `power.firmware: shared` is set | use `dedicated`; all transports then agree within 0.3% on the bench that measured it |
+| power differs between transports | `power.firmware: shared` is set | use `dedicated` to remove the capture transport from the power firmware, then verify the window and monitored rail |
 
 ## What next
 

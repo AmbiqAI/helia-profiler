@@ -3,8 +3,6 @@ title: "Windows and the clean window"
 description: "The dedicated power firmware, how the clean window is sized and bounded, the two-clock check that verifies it, reset strategies, and the advanced power floors."
 ---
 
-## Purpose
-
 Understand the window a power number describes. hpx measures a clean
 window: a dedicated firmware build with no transport runs back-to-back
 inferences with the gate high, and the host accepts the result only when
@@ -52,8 +50,8 @@ into `src/main_power.cc`: no transport at all (`NSX_DEBUG_NONE`,
 lock-step, the gated clean window, then park. `hpx_profiler` (PMU capture)
 and `hpx_profiler_power` (power capture) build from one NSX and CMake
 project, and the power stage flashes the second binary right before
-arming the capture. On the Apollo510 EVB bench that measured it, all four
-transports then agree on current and energy within 0.3%.
+arming the capture. This removes the capture transport from the measured
+firmware; verify the resulting measurement on your target and wiring.
 
 `power.firmware` (default `dedicated`) controls this and
 `summary.json`'s `power.power_firmware` records which mode produced the

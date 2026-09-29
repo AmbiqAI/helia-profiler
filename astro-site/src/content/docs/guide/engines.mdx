@@ -3,8 +3,6 @@ title: "Engines"
 description: "heliaRT, heliaAOT, TFLM and ExecuTorch: what each engine runs, how hpx obtains it, what it costs, and when to pick it. One engine per run; compare by running twice."
 ---
 
-## Purpose
-
 Pick the runtime that executes the model. hpx exposes four engines, uses
 exactly one per run, and keeps the pipeline, the capture protocol and the
 report identical across them; only the firmware payload changes. Comparison
@@ -20,8 +18,8 @@ network access so neuralSPOT-X can fetch the pinned modules.
 
 | Engine | `engine.type` | Interpreter | Model format | Pick it when |
 |---|---|---|---|---|
-| heliaRT | `helia-rt` (default) | yes | `.tflite` | First profile, unsupported operators, prototyping a new model. Ambiq-tuned kernels through the HELIA backend. |
-| heliaAOT | `helia-aot` | no | `.tflite` | Smallest flash footprint and per-tensor memory placement; production deployment. Curated operator subset. |
+| heliaRT | `helia-rt` (default) | yes | `.tflite` | First profile and interpreter-based execution. Check operator support for your model. Ambiq-tuned kernels through the HELIA backend. |
+| heliaAOT | `helia-aot` | no | `.tflite` | Evaluate generated C without an interpreter and tune per-tensor memory placement. Check operator support and measure the footprint on your model. |
 | TFLM | `tflm` | yes | `.tflite` | An upstream interpreter baseline with reference or upstream CMSIS-NN kernels, for comparison against heliaRT. |
 | ExecuTorch | `executorch` | no | `.pte` | Cortex-M PTE programs with CMSIS-NN kernels; the `ns` provider adds Ambiq's Tier-1 operators. |
 
@@ -29,9 +27,9 @@ Each engine's own pipeline, backend and constraints are in its section
 below. What every engine shares: the model block, the target block, the
 counters and the output files.
 
-## Steps
+## Engine details
 
-Each step is one engine; read the one you chose.
+Choose the section for your engine. Each describes its dependencies, configuration and constraints.
 
 ### heliaRT
 

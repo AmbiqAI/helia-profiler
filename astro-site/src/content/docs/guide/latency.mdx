@@ -3,15 +3,20 @@ title: "Inference and layer timing"
 description: "What the three timing numbers in a bundle measure (the clean window, the profiled passes and the host capture), how per-layer rows relate to the total, and which configuration keys shaped each one."
 ---
 
-## Purpose
+import TimingScopes from '../../../components/TimingScopes.astro';
 
 Read the timing numbers correctly. A bundle carries three kinds of time
 and cycle counts with different boundaries; quoting the
-wrong one is the most common way a benchmark becomes wrong.
+wrong one can lead to a misleading comparison.
 
 ## Prerequisites
 
 A result bundle and [Output files](../output/) for the field names.
+
+<figure>
+<TimingScopes />
+<figcaption>Whole-model timing and per-layer detail come from separate measurement passes.</figcaption>
+</figure>
 
 ## Which number
 

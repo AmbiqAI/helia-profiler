@@ -147,6 +147,14 @@ jobs:
           npm run check:reference
           npm run check:guard
 
+      - name: Install browser for rendered checks
+        working-directory: astro-site
+        run: npx playwright install --with-deps chromium
+
+      - name: Check rendered docs and interactions
+        working-directory: astro-site
+        run: npm test
+
       - name: Show build provenance
         run: cat astro-site/dist/build-info.json
 

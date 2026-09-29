@@ -1,0 +1,97 @@
+<hpx-hero-carousel class="profile-visual" role="region" aria-label="Explore profiler capabilities" aria-roledescription="carousel">
+  <div class="hero-slides"><slot /></div>
+  <div class="hero-controls" role="group" aria-label="Choose a capability">
+    {['Layers', 'MVE / NPU', 'Compare', 'Energy'].map((name, i) => <div class="hero-control"><button data-dot type="button" aria-label={i === 0 ? 'Pause hero animation' : `Show ${name}`}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="currentColor"/><circle class="ring" cx="12" cy="12" r="9" pathLength="100" /></svg></button><button data-name type="button" aria-pressed={i === 0}>{name}</button></div>)}
+  </div>
+</hpx-hero-carousel>
+<script>
+class HpxHeroCarousel extends HTMLElement {
+  cleanup?: () => void;
+  connectedCallback() {
+    this.cleanup?.();
+    const slides = [...this.querySelectorAll<HTMLElement>('.hero-slide')];
+    const names = [...this.querySelectorAll<HTMLButtonElement>('[data-name]')];
+    const dots = [...this.querySelectorAll<HTMLButtonElement>('[data-dot]')];
+    const motion = matchMedia('(prefers-reduced-motion: reduce)');
+    let active = 0, elapsed = 0, last = performance.now(), frame = 0;
+    let paused = false, visible = false;
+    const render = () => {
+      this.toggleAttribute('data-paused', paused);
+      names.forEach((button, i) => {
+        button.setAttribute('aria-pressed', String(i === active));
+        dots[i].setAttribute('aria-label', i === active ? `${paused ? 'Resume' : 'Pause'} hero animation` : `Show ${button.textContent}`);
+        dots[i].tabIndex = i === active ? 0 : -1;
+        dots[i].dataset.active = String(i === active);
+        slides[i].classList.toggle('active', i === active);
+        slides[i].inert = i !== active;
+        slides[i].setAttribute('aria-hidden', String(i !== active));
+      });
+    };
+    const show = (i: number) => { active = i; elapsed = 0; last = performance.now(); render(); };
+    const removers: (() => void)[] = [];
+    names.forEach((name, i) => {
+      const select = () => show(i);
+      const toggle = () => { if (i !== active) show(i); else { paused = !paused; render(); } };
+      name.addEventListener('click', select); dots[i].addEventListener('click', toggle);
+      removers.push(() => { name.removeEventListener('click', select); dots[i].removeEventListener('click', toggle); });
+    });
+    const observer = new IntersectionObserver(entries => { visible = entries[0].isIntersecting; }, {threshold: .2});
+    observer.observe(this);
+    const tick = (time: number) => {
+      if (visible && !paused && !motion.matches && !document.hidden) {
+        elapsed = Math.min(7500, elapsed + Math.min(time - last, 100));
+        if (elapsed >= 7500 && !this.matches(':focus-within')) show((active + 1) % slides.length);
+      }
+      last = time;
+      dots.forEach((dot, i) => { dot.querySelector<SVGCircleElement>('.ring')!.style.strokeDashoffset = String(i === active ? 100 - elapsed / 75 : 100); });
+      frame = requestAnimationFrame(tick);
+    };
+    render(); frame = requestAnimationFrame(tick);
+    this.cleanup = () => { cancelAnimationFrame(frame); observer.disconnect(); removers.forEach(remove => remove()); };
+  }
+  disconnectedCallback() { this.cleanup?.(); }
+}
+if (!customElements.get('hpx-hero-carousel')) customElements.define('hpx-hero-carousel', HpxHeroCarousel);
+</script>
+<style>
+.profile-visual{display:block;background:linear-gradient(145deg,#1b2027,#15191f);border:1px solid #3b424d;border-radius:20px;padding:20px;color:#edf0f4;}
+.hero-slides{display:grid;}
+.profile-visual :global(.hero-slide){grid-area:1/1;margin:0;min-width:0;visibility:hidden;opacity:0;}
+.profile-visual :global(.hero-slide.active){visibility:visible;opacity:1;}
+.profile-visual :global(.visual-label){font:600 11px/1.5 var(--sl-font-mono);letter-spacing:.1em;text-transform:uppercase;color:#bac2cd;margin:0 0 12px;}
+.profile-visual :global(.hero-diagram){height:174px;display:flex;flex-direction:column;justify-content:center;gap:8px;font-size:12px;}
+.profile-visual :global(.hero-diagram > *){margin:0;}
+.profile-visual :global(.visual-block){padding:9px 10px;text-align:center;border:1px solid #444e5c;border-radius:8px;background:#242c36;}
+.profile-visual :global(.accent-block){border-color:#8bb75e;color:#9bea55;}
+.profile-visual :global(.energy-labels),.profile-visual :global(.compare-head){display:flex;gap:8px;justify-content:space-between;}
+.profile-visual :global(.layer-row){display:grid;grid-template-columns:110px 1fr;align-items:center;gap:10px;}
+.profile-visual :global(.layer-row i){display:block;width:var(--bar);height:12px;background:#98d864;border-radius:3px;transform-origin:left;}
+.profile-visual :global(.counter-grid){display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.profile-visual :global(.counter-grid span){border:1px solid #46515f;padding:9px 5px;text-align:center;border-radius:6px;}
+.profile-visual :global(.compare-head span){border:1px solid #444e5c;border-radius:6px;text-align:center;padding:10px;flex:1;}
+.profile-visual :global(.compare-row){display:flex;justify-content:space-between;border-bottom:1px solid #38414e;padding:5px 0;}
+.profile-visual :global(.compare-row b){font-weight:400;color:#9bea55;}
+.profile-visual :global(small){color:#aeb9c7;font-size:10px;text-align:center;}
+.profile-visual :global(.energy-diagram svg){width:100%;height:64px;overflow:visible;}
+.profile-visual :global(.energy-diagram path){fill:none;stroke:#9bea55;stroke-width:2;stroke-linejoin:round;stroke-dasharray:100;}
+.profile-visual :global(h2){font-size:22px;line-height:1.25;color:#edf0f4;margin:16px 0 8px;letter-spacing:-.025em;}
+.profile-visual :global(p){font-size:14px;line-height:1.6;color:#c3cbd5;margin:0;}
+.hero-controls{display:grid;grid-template-columns:repeat(4,auto);justify-content:space-between;gap:4px 8px;margin-top:16px;}
+.hero-control{display:flex;align-items:center;gap:2px;margin:0;}
+.hero-controls button{background:none;border:0;padding:5px 0;margin:0;color:#aeb9c7;font:12px var(--sl-font);cursor:pointer;}
+.hero-controls button[aria-pressed=true],.hero-controls [data-active=true]{color:#9bea55;}
+.hero-controls button:focus-visible{outline:2px solid #9bea55;outline-offset:2px;border-radius:3px;}
+.hero-controls svg{width:20px;height:20px;display:block;}
+.ring{fill:none;stroke:currentColor;stroke-width:1.5;stroke-dasharray:100;stroke-dashoffset:100;transform:rotate(-90deg);transform-origin:center;}
+.profile-visual :global(.active .hero-diagram > *){animation:reveal .55s ease-out both;}
+.profile-visual :global(.active .hero-diagram > :nth-child(2)){animation-delay:.15s;}
+.profile-visual :global(.active .hero-diagram > :nth-child(3)){animation-delay:.3s;}
+.profile-visual :global(.active .layer-row i){animation:grow .9s ease-out both;}
+.profile-visual :global(.active .energy-diagram path){animation:trace 2.2s ease-out both;}
+.profile-visual[data-paused] :global(*){animation:none!important;}
+@keyframes reveal{from{opacity:.2;transform:translateY(5px)}to{opacity:1;transform:none}}
+@keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes trace{from{stroke-dashoffset:100}to{stroke-dashoffset:0}}
+@media(max-width:380px){.hero-controls{grid-template-columns:repeat(2,1fr);}}
+@media(prefers-reduced-motion:reduce){.profile-visual :global(*){animation:none!important;}}
+</style>

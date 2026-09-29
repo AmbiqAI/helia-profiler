@@ -14,6 +14,7 @@
  * group is rendered as a namespace and a leaf as a function, with the usage
  * line highlighted as the shell it is (helia-ui#74).
  */
+import CodeBlock from '@ambiqai/helia-ui/astro/CodeBlock';
 import RefMembers from '@ambiqai/helia-ui/astro/RefMembers';
 import RefParams from '@ambiqai/helia-ui/astro/RefParams';
 import RefSection from '@ambiqai/helia-ui/astro/RefSection';
@@ -102,7 +103,7 @@ const subcommands = node.commands ?? [];
 
       {cmd.epilog && (
         <RefSection title="Examples">
-          <pre>{cmd.epilog}</pre>
+          <CodeBlock code={cmd.epilog} language="plaintext" label={`${commandLabel(cmd.path)} examples`} />
         </RefSection>
       )}
     </RefSymbol>

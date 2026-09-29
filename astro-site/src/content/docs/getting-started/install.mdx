@@ -5,8 +5,6 @@ description: "Put hpx, the Arm GNU toolchain, CMake, Ninja and the SEGGER J-Link
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
-## Purpose
-
 Get `hpx` and the tools it drives onto your machine. When this page is done,
 `hpx doctor` reports every required row as found. Nothing here needs a board
 attached.
@@ -90,7 +88,14 @@ Pin the version you tested for anything long-lived, for example
 `pip install helia-profiler==0.1.6`.
 :::
 
-Optional extras:
+Optional extras use the same installer as the base package. To add both
+compiler and model-analysis support to a uv tool environment:
+
+```bash
+uv tool install --force 'helia-profiler[aot,analysis]'
+```
+
+For an active Python environment:
 
 ```bash
 pip install 'helia-profiler[aot]'        # heliaAOT compiler support

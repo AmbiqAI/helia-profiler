@@ -166,6 +166,8 @@ The docs site lives in `astro-site/` (Astro and Starlight on `@ambiqai/helia-ui`
 `npm ci && npm run build` there builds it, `npm run dev` serves it, and the
 check chain in `.github/workflows/docs.yml` is what CI runs. It deploys to
 GitHub Pages on a release and on docs-only pushes to `main`.
+See [Documentation release checks](maintainers/documentation.md) for browser
+validation, manual publishing and post-deployment verification.
 
 Repository workflows use the committed `uv.lock` for reproducibility. PyPI
 installations continue to resolve the compatible dependency ranges published in

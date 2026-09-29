@@ -1,6 +1,6 @@
 ---
 title: heliaPROFILER
-description: Measure how your AI model runs on Ambiq hardware, find slow layers, and compare engine and memory choices.
+description: Profile AI models on Ambiq hardware. Measure inference latency, inspect layer costs, and compare memory use and energy across runs.
 tableOfContents: false
 helia:
   pageTitle: false
@@ -9,247 +9,224 @@ next: false
 ---
 
 import Hero from '@ambiqai/helia-ui/astro/Hero';
-import Mosaic from '@ambiqai/helia-ui/astro/Mosaic';
-import Band from '@ambiqai/helia-ui/astro/Band';
-import TimingScopes from '../../components/TimingScopes.astro';
-import AsciiTerminal from '@ambiqai/helia-ui/astro/AsciiTerminal';
-import LinkCard from '@ambiqai/helia-ui/astro/LinkCard';
-import CardActions from '@ambiqai/helia-ui/astro/CardActions';
 import Button from '@ambiqai/helia-ui/astro/Button';
-import CardGrid from '@ambiqai/helia-ui/astro/CardGrid';
-import Card from '@ambiqai/helia-ui/astro/Card';
-import CardHeader from '@ambiqai/helia-ui/astro/CardHeader';
-import CardContent from '@ambiqai/helia-ui/astro/CardContent';
+import ProfilerHero from '../../components/ProfilerHero.astro';
+import ProfilerArrow from '../../components/ProfilerArrow.astro';
+import ProfilerDemo from '../../components/ProfilerDemo.astro';
+import ProfilerLanding from '../../components/ProfilerLanding.astro';
 import Landing from '@ambiqai/helia-ui/astro/Landing';
+import Icon from '@ambiqai/helia-ui/astro/Icon';
+import TimingScopes from '../../components/TimingScopes.astro';
 import buildInfo from '../../data/build-info.json';
 
 <Landing>
+<ProfilerLanding>
+<Hero eyebrow="heliaPROFILER" variant="contrast" class="hpx-hero">
+  <Fragment>Find the bottleneck.<br /><em>Test the next idea.</em></Fragment>
 
-<Hero palette="neutral" align="center" variant="contrast" titleAs="h1" eyebrow="heliaPROFILER · AI performance on Ambiq hardware" badge={`v${buildInfo.version}`}>
-  <Fragment>From model to measured performance.</Fragment>
-
-  <Fragment slot="summary">Run LiteRT and ExecuTorch models on Ambiq hardware with the heliaPROFILER command-line tool (<code>hpx</code>). See how fast they run, find slow layers, and compare engine and memory choices.</Fragment>
+  <Fragment slot="summary">heliaPROFILER (hpx) is a command-line toolkit for profiling AI models on Ambiq hardware. Measure inference latency, find costly layers, and compare engine and memory choices using saved results.</Fragment>
 
   <Fragment slot="actions">
     <Button href="/helia-profiler/getting-started/">Get started</Button>
-    <Button variant="secondary" href="/helia-profiler/examples/">Explore examples</Button>
-  </Fragment>
-</Hero>
-
-
-## Find the layers that cost the most time
-
-See where your model spends its time, then choose what to improve.
-
-<Mosaic pattern="feature-start" density="comfortable">
-  <Card tone="filled" density="comfortable">
-    <CardHeader titleAs="h3" eyebrow="Timing and layers" href="/helia-profiler/guide/latency/">Find the layers slowing your model down</CardHeader>
-    <CardContent>
-      Find the layers worth optimizing.
-
-      <TimingScopes />
-
-      Time the whole model, then measure layers separately to find the
-      most expensive operations.
-    </CardContent>
-    <CardActions>
-      <Button href="/helia-profiler/examples/basic-profiling/">Find your bottleneck</Button>
-    </CardActions>
-  </Card>
-  <Card density="comfortable">
-    <CardHeader titleAs="h3" eyebrow="Hardware counters" href="/helia-profiler/guide/pmu-counters/">Understand why a layer is slow</CardHeader>
-    <CardContent>
-      On boards with performance counters, inspect processor stalls and
-      memory accesses to help explain slow layers.
-    </CardContent>
-  </Card>
-  <Card tone="filled" density="comfortable">
-    <CardHeader titleAs="h3" eyebrow="Memory placement" href="/helia-profiler/guide/memory/">Find the right memory placement</CardHeader>
-    <CardContent>
-      Try different locations for your model's working memory and weights.
-      Measure how each choice affects speed on your board.
-    </CardContent>
-  </Card>
-  <Card density="comfortable">
-    <CardHeader titleAs="h3" eyebrow="Power and energy" href="/helia-profiler/guide/power/">Measure power and energy</CardHeader>
-    <CardContent>
-      Measure power drawn from the supply you monitor while your model runs,
-      and energy per inference. Requires a Joulescope or INA228 power monitor.
-    </CardContent>
-  </Card>
-  <Card tone="filled" density="comfortable">
-    <CardHeader titleAs="h3" eyebrow="Engine and toolchain" href="/helia-profiler/examples/engine-comparison/">Compare engines and compilers</CardHeader>
-    <CardContent>
-      Run the same model with different engines or compilers. Compare the
-      results to choose the setup that works best for your device.
-    </CardContent>
-  </Card>
-  <Card density="comfortable">
-    <CardHeader titleAs="h3" eyebrow="Model analysis" href="/helia-profiler/guide/analysis-comparison/#1-analyse-a-model">Explore your model without a board</CardHeader>
-    <CardContent>
-      Inspect your LiteRT model's layers, parameter counts and tensor sizes
-      on your computer before running it on hardware.
-    </CardContent>
-  </Card>
-</Mosaic>
-
-<Band tone="muted" density="comfortable">
-  <h2 slot="header" id="saved-results">Save your results. Compare the next run.</h2>
-
-  <CardGrid columns={2} density="comfortable">
-    <Card tone="card" density="comfortable">
-      <CardHeader titleAs="h3">Save a complete run</CardHeader>
-      <CardContent>
-        Keep measurements and run settings together, ready to revisit or
-        share with your team.
-      </CardContent>
-      <CardActions>
-        <Button variant="secondary" href="/helia-profiler/guide/output/">Explore result files</Button>
-      </CardActions>
-    </Card>
-    <Card tone="card" density="comfortable">
-      <CardHeader titleAs="h3">See whether a change helped</CardHeader>
-      <CardContent>
-        Compare speed and memory use for the same model after changing its engine
-        or memory placement. heliaPROFILER flags results that cannot be compared fairly.
-      </CardContent>
-      <CardActions>
-        <Button variant="secondary" href="/helia-profiler/guide/analysis-comparison/">Compare two runs</Button>
-      </CardActions>
-    </Card>
-  </CardGrid>
-</Band>
-
-<span id="from-a-model-to-a-repeatable-experiment"></span>
-
-## From model to results in three steps
-
-Choose a model and board. heliaPROFILER builds the test firmware, loads it
-onto your board, and saves the measurements for you.
-
-<CardGrid columns={3} density="comfortable">
-  <LinkCard href="/helia-profiler/getting-started/configure-a-run/" title="1. Choose your setup" tone="filled">
-    Choose your model, board, engine and compiler. Save the settings so you
-    can repeat the experiment.
-  </LinkCard>
-  <LinkCard href="/helia-profiler/getting-started/validate-your-setup/" title="2. Run on your board" tone="filled">
-    Check the connection and required tools, then let heliaPROFILER build
-    and run the model.
-  </LinkCard>
-  <LinkCard href="/helia-profiler/guide/analysis-comparison/" title="3. Find what to improve" tone="filled">
-    Find the slow layers. Change an engine or memory setting, run again,
-    and compare with your saved results.
-  </LinkCard>
-</CardGrid>
-
-<Band tone="plain" density="comfortable">
-<Hero palette="neutral" variant="plain" size="section" titleAs="h2">
-  <Fragment>Profile your first model</Fragment>
-
-  <Fragment slot="summary">Connect an Apollo510 EVB and start with a LiteRT model. The <a href="/helia-profiler/getting-started/install/">installation guide</a> helps you set up the software and debug connection.</Fragment>
-
-  <Fragment slot="actions">
-    <Button href="/helia-profiler/getting-started/first-profile/">Follow the first-profile guide</Button>
+    <Button href="/helia-profiler/examples/" variant="secondary">Explore examples</Button>
+    <span class="hpx-release">v{buildInfo.version}</span>
   </Fragment>
 
-  <AsciiTerminal slot="media" title="Profile a model" frame="window" tone="dark" copy="commands" lines={[{"kind": "command", "text": "uv tool install helia-profiler"}, {"kind": "command", "text": "hpx doctor"}, {"kind": "command", "text": "hpx profile model.tflite \\\n  --board apollo510_evb \\\n  --engine helia-rt \\\n  --output-dir results/baseline"}]} />
+  <ProfilerHero slot="media">
+    <section class="hero-slide active">
+      <p class="visual-label">01 / Inference and layer timing</p>
+      <div class="hero-diagram layer-diagram"><div class="visual-block">One complete inference</div><div class="layer-row"><span>Convolution</span><i style="--bar:86%"></i></div><div class="layer-row"><span>Depthwise</span><i style="--bar:48%"></i></div><div class="layer-row"><span>Fully connected</span><i style="--bar:28%"></i></div><small>Illustrative layer costs</small></div>
+      <h2>Find where the time goes.</h2>
+      <p>Measure the full inference, then use per-layer timings to decide what to optimize.</p>
+    </section>
+    <section class="hero-slide" aria-hidden="true" inert>
+      <p class="visual-label">02 / CPU and NPU profiling</p>
+      <div class="hero-diagram counter-diagram"><div class="visual-block accent-block">Hardware performance counters</div><div class="counter-grid"><span>Arm MVE / Helium</span><span>Ethos-U NPU</span><span>Vector instructions</span><span>NPU counters</span></div><small>MVE on supported targets · NPU FPGA support experimental</small></div>
+      <h2>Inspect MVE and NPU execution.</h2>
+      <p>Examine vector activity and NPU counters. Ethos-U profiling on Atomiq110 FPGA is experimental.</p>
+    </section>
+    <section class="hero-slide" aria-hidden="true" inert>
+      <p class="visual-label">03 / Compare the next run</p>
+      <div class="hero-diagram compare-diagram"><div class="compare-head"><span>LiteRT</span><span>heliaAOT</span></div><div class="compare-row"><span>Inference</span><b>12 ms → 5 ms</b></div><div class="compare-row"><span>Allocated arena</span><b>200 KiB → 80 KiB</b></div><div class="compare-row"><span>Energy / inference</span><b>24 µJ → 10 µJ</b></div><small>Illustrative keyword-spotting comparison</small></div>
+      <h2>Compare LiteRT with heliaAOT.</h2>
+      <p>This illustrative run is 2.4× faster with 60% less allocated arena. Profile your model to measure its tradeoffs.</p>
+    </section>
+    <section class="hero-slide" aria-hidden="true" inert>
+      <p class="visual-label">04 / Measure power and energy</p>
+      <div class="hero-diagram energy-diagram"><div class="visual-block">Inference window</div><svg viewBox="0 0 300 70" role="img" aria-label="Illustrative power trace: idle, inference burst, idle, inference burst, idle"><path pathLength="100" d="M0 57 H35 L37 16 L39 38 L41 17 L43 36 L45 18 L47 42 L49 19 L51 40 L53 20 L55 38 L57 21 L59 36 L61 22 L63 42 L65 23 L67 40 L69 24 L71 38 L73 25 L75 36 L77 26 L79 42 L81 27 L83 40 L85 28 L87 38 L89 16 L91 36 L93 17 L95 42 L97 18 L99 40 L101 19 L103 38 L105 20 L107 36 L109 21 L111 42 L113 22 L115 40 L117 23 L121 57 H162 L164 16 L166 38 L168 17 L170 36 L172 18 L174 42 L176 19 L178 40 L180 20 L182 38 L184 21 L186 36 L188 22 L190 42 L192 23 L194 40 L196 24 L198 38 L200 25 L202 36 L204 26 L206 42 L208 27 L210 40 L212 28 L214 38 L216 16 L218 36 L220 17 L222 42 L224 18 L226 40 L228 19 L230 38 L232 20 L234 36 L236 21 L238 42 L240 22 L242 40 L244 23 L246 38 L248 24 L250 36 L252 25 L254 42 L256 26 L260 57 H300" /></svg><div class="energy-labels"><span>Power trace</span><span>Energy / inference</span></div><small>Illustrative trace, not measured data</small></div>
+      <h2>Measure energy per inference.</h2>
+      <p>Measure the monitored supply with a supported Joulescope or INA228, alongside inference timing.</p>
+    </section>
+  </ProfilerHero>
 </Hero>
-</Band>
 
-## Explore and automate your results
+<nav class="engine-links" aria-label="Inference engines">
+  <a href="/helia-profiler/guide/engines/#tflm" aria-label="LiteRT for Microcontrollers">LiteRT <ProfilerArrow /></a>
+  <a href="/helia-profiler/guide/engines/#heliart">heliaRT <ProfilerArrow /></a>
+  <a href="/helia-profiler/guide/engines/#heliaaot">heliaAOT <ProfilerArrow /></a>
+  <a href="/helia-profiler/guide/engines/#executorch">ExecuTorch <ProfilerArrow /></a>
+</nav>
 
-<CardGrid columns={3} density="comfortable">
-  <LinkCard href="/helia-profiler/reference/api/helia_profiler/#helia_profiler.Session" title="Work in Python" tone="filled">
-    Run experiments and analyze their results from Python scripts or notebooks.
-  </LinkCard>
-  <LinkCard href="/helia-profiler/guide/model-explorer/" title="Explore the model graph" tone="filled">
-    See each layer's measurements alongside the model graph in Model Explorer.
-  </LinkCard>
-  <LinkCard href="/helia-profiler/examples/batch-runs/" title="Automate repeated runs" tone="filled">
-    Save experiment settings in YAML and run them again as your workflow grows.
-  </LinkCard>
-</CardGrid>
+<section class="story" id="from-a-model-to-a-repeatable-experiment">
+<div>
+<span class="eyebrow">Measure · Inspect · Compare</span>
+<h2>From setup to a side-by-side comparison.</h2>
+<p>Check your tools, find a debug probe and profile a keyword-spotting (KWS) model. Compare LiteRT with heliaAOT, then inspect the power results.</p>
+<a href="/helia-profiler/getting-started/first-profile/">Run your first profile →</a>
+<p class="demo-help">These abbreviated examples use kws.yml for the model, target and power settings. All values are illustrative. Select a step to explore; click the active step to pause or resume.</p>
+</div>
+<ProfilerDemo>
+<div slot="doctor">
 
-## Profile with four inference engines
+```text
+$ hpx doctor
 
-Choose one of **4 engines** for each run. The engine guides explain which
-models, boards and measurements each supports.
+✓ Python environment
+✓ CMake and Ninja
+✓ Arm compiler
+✓ NSX build tools
+✓ SEGGER J-Link
+✓ Environment checks passed
+```
 
-<CardGrid columns={2} density="comfortable">
-  <Card tone="filled" density="comfortable">
-    <CardHeader titleAs="h3" eyebrow="Ahead-of-time compilation">heliaAOT</CardHeader>
-    <CardContent>
-      Measure LiteRT models compiled to C, and choose where their tensors
-      live in memory.
-    </CardContent>
-    <CardActions>
-      <Button href="/helia-profiler/guide/engines/#heliaaot">Profile with heliaAOT</Button>
-    </CardActions>
-  </Card>
-  <Card tone="filled" density="comfortable">
-    <CardHeader titleAs="h3" eyebrow="Interpreter-based inference">heliaRT</CardHeader>
-    <CardContent>
-      Measure LiteRT models running with Ambiq's interpreter and optimized
-      kernels for Apollo devices.
-    </CardContent>
-    <CardActions>
-      <Button href="/helia-profiler/getting-started/first-profile/">Start with heliaRT</Button>
-    </CardActions>
-  </Card>
-</CardGrid>
+</div>
+<div slot="probes">
 
-<CardGrid columns={2} density="comfortable">
-  <Card density="comfortable">
-    <CardHeader titleAs="h3" href="/helia-profiler/guide/engines/#tflm">LiteRT for Microcontrollers</CardHeader>
-    <CardContent>
-      Measure your model with the upstream TFLM interpreter as a comparison
-      point for other engines.
-    </CardContent>
-  </Card>
-  <Card density="comfortable">
-    <CardHeader titleAs="h3" href="/helia-profiler/guide/engines/#executorch">ExecuTorch</CardHeader>
-    <CardContent>
-      Measure PyTorch models exported as ExecuTorch programs for Cortex-M devices.
-    </CardContent>
-  </Card>
-</CardGrid>
+```text
+$ hpx probes list
 
-### Choose the hardware and toolchain for your run
+  Probe           Serial       Connection
+  J-Link          123456789    USB
 
-Start with Apollo510 EVB or Apollo3P EVB, the **2 stable boards** among
-**13 boards**. Other boards, including the Atomiq110 FPGA carrier, have
-preview support. Choose from **3 toolchains**: GNU Arm Embedded, Arm Compiler 6,
-or Arm Toolchain for Embedded (preview).
-See the [board guide](/helia-profiler/guide/boards/),
-[compiler setup](/helia-profiler/guide/toolchains/) and
-[tested combinations](/helia-profiler/reference/compatibility/)
-to choose a setup for your model.
+✓ One probe found
+  Select the board in your run configuration.
+```
 
-## Packages, source and release notes
+</div>
+<div slot="litert">
 
-<CardGrid columns={3} density="comfortable">
-  <LinkCard href="https://pypi.org/project/helia-profiler/" title="Install the Python package">
-    Install heliaPROFILER from PyPI.
-  </LinkCard>
-  <LinkCard href="https://github.com/AmbiqAI/helia-profiler" title="Explore the source">
-    Read the code, report an issue or follow development on GitHub.
-  </LinkCard>
-  <LinkCard href="https://github.com/AmbiqAI/helia-profiler/blob/main/CHANGELOG.md" title="Read the changelog">
-    Review changes before updating your profiling environment.
-  </LinkCard>
-</CardGrid>
+```text
+$ hpx profile --config kws.yml --engine tflm \
+  --output-dir tflm-kws
 
-<Band tone="muted" density="comfortable">
-<Hero palette="neutral" variant="plain" size="compact" titleAs="h2" align="center">
-  <Fragment>Find the bottleneck. Measure the improvement.</Fragment>
+✓ Build · flash · capture complete
 
-  <Fragment slot="summary">Run your model on Ambiq hardware. Try a different engine or memory placement, then measure whether it helped.</Fragment>
+  KWS / LiteRT                   Run summary
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Avg inference                   12.00 ms
+  Allocated arena                  200 KiB
+  Energy / inference              24.00 µJ
+  Efficiency                 41,667 inf / J
 
-  <Fragment slot="actions">
-    <Button href="/helia-profiler/getting-started/first-profile/">Profile your first model</Button>
-    <Button variant="secondary" href="/helia-profiler/examples/">Browse profiling examples</Button>
-  </Fragment>
-</Hero>
-</Band>
+  Saved → tflm-kws
+```
 
+</div>
+<div slot="aot">
+
+```text
+$ hpx profile --config kws.yml --engine helia-aot \
+  --output-dir aot-kws
+
+✓ Compile · build · flash · capture complete
+
+  KWS / heliaAOT                 Run summary
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Avg inference                    5.00 ms
+  Allocated arena                   80 KiB
+  Energy / inference              10.00 µJ
+  Efficiency                100,000 inf / J
+
+  Saved → aot-kws
+```
+
+</div>
+<div slot="compare">
+
+```text
+$ hpx compare tflm-kws aot-kws
+
+  KWS             LiteRT → heliaAOT
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Metric          Baseline  Candidate    Change
+  Latency         12.00 ms    5.00 ms    -58.3%
+  Alloc. arena     200 KiB     80 KiB    -60.0%
+  Energy / inf.   24.00 µJ   10.00 µJ    -58.3%
+  Inf. / joule     41,667    100,000    +140.0%
+
+  2.4× faster · 60% less arena · 2.4× inf / J
+  Engine changed: tflm → helia-aot
+  Illustrative values · not a hardware benchmark
+```
+
+</div>
+<div slot="power">
+
+```text
+$ hpx profile --config kws.yml --engine helia-aot \
+  --power
+
+✓ Configured monitor connected
+✓ Inference window captured
+
+  KWS / heliaAOT               Power summary
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Avg power                        2.00 mW
+  Energy / inference              10.00 µJ
+  Efficiency                100,000 inf / J
+
+  Illustrative values · supported monitor required
+```
+
+</div>
+</ProfilerDemo>
+</section>
+
+<section class="home-band home-band--muted">
+<span class="eyebrow">Find the bottleneck</span>
+<h2>Understand the cost of inference.</h2>
+<p>Measure the model as a whole, then investigate the operations and hardware activity behind the result.</p>
+<div class="feature-strip feature-mosaic">
+<article><Icon class="feature-icon" name="stopwatch" /><h3>Time the whole inference</h3><p>Measure a clean inference window separately from instrumented layer timings, so profiling overhead is visible.</p><figure class="timing-visual"><TimingScopes /><figcaption>Separate passes for whole-model timing and layer detail.</figcaption></figure><a href="/helia-profiler/guide/latency/">Understand timing →</a></article>
+<article><Icon class="feature-icon" name="microchip" /><h3>Investigate costly layers</h3><p>Use hardware counters on supported boards to investigate stalls and memory accesses.</p><a href="/helia-profiler/guide/pmu-counters/">Explore counters →</a></article>
+<article><Icon class="feature-icon" name="bolt" /><h3>Include power and energy</h3><p>Use a supported Joulescope or INA228 to measure power on the monitored supply and energy per inference.</p><a href="/helia-profiler/guide/power/">Set up power capture →</a></article>
+</div>
+</section>
+
+<section class="home-band" id="saved-results">
+<span class="eyebrow">Compare your options</span>
+<h2>Put your next idea to the test.</h2>
+<p>Compare timing, memory and energy alongside the settings that produced them. hpx flags incompatible measurements and leaves out per-layer differences when operation sequences do not match.</p>
+<div class="feature-rows">
+<article><h3>Evaluate engines and compilers</h3><p>Keep the model and target fixed, then measure the effect of an engine or compiler change.</p><a href="/helia-profiler/examples/engine-comparison/">Compare engines →</a></article>
+<article><h3>Explore memory placement</h3><p>Try supported placements for weights and working memory, then measure the effect on your target.</p><a href="/helia-profiler/guide/memory/">Plan memory →</a></article>
+<article><h3>Inspect the model graph</h3><p>View captured layer measurements on the model graph. Use host-side model analysis to inspect operations and tensor sizes before connecting a board.</p><a href="/helia-profiler/guide/model-explorer/">Explore the graph →</a></article>
+</div>
+</section>
+
+<section class="home-band home-band--muted automation-split">
+<div><span class="eyebrow">Build a repeatable workflow</span>
+<h2>Keep runs reproducible and results reusable.</h2>
+<p>Each result bundle keeps measurements, configuration and source information together. Revisit a run, share it with a colleague or analyze its CSV and JSON reports.</p>
+<a href="/helia-profiler/guide/output/">Browse result files →</a></div>
+<div class="feature-strip automation-cards">
+<article><h3>Repeat runs and check regressions</h3><p>Save settings in YAML and define regression limits for automated comparisons.</p><a href="/helia-profiler/guide/analysis-comparison/">Compare and check runs →</a></article>
+<article><h3>Work in scripts and notebooks</h3><p>Use the Python Session API to run profiles and analyze results with the same configuration model as the CLI.</p><a href="/helia-profiler/reference/api/helia_profiler/#helia_profiler.Session">Explore the Python API →</a></article>
+</div>
+</section>
+
+<section class="home-band setup">
+<span class="eyebrow">Get started</span>
+<h2>Choose a setup for your first run.</h2>
+<p><strong>4 engines</strong> · <strong>13 boards</strong> · <strong>3 toolchains</strong></p>
+<p>Profile with LiteRT, heliaRT, heliaAOT or ExecuTorch. Apollo510 EVB and Apollo3P EVB are the <strong>2 stable boards</strong> in the registry. Other targets are preview or experimental. Check the tested combinations for engine support and available measurements.</p>
+<div class="route-grid">
+<a href="/helia-profiler/getting-started/install/"><strong>Install hpx <span>→</span></strong><span>Install the CLI and required host tools.</span></a>
+<a href="/helia-profiler/reference/compatibility/"><strong>Choose your target <span>→</span></strong><span>Check tested board and engine combinations.</span></a>
+<a href="/helia-profiler/guide/toolchains/"><strong>Set up a compiler <span>→</span></strong><span>Configure the toolchain for your run.</span></a>
+<a href="/helia-profiler/examples/"><strong>Explore examples <span>→</span></strong><span>Follow a complete profiling example.</span></a>
+</div>
+<p class="source-links"><a href="https://github.com/AmbiqAI/helia-profiler">Source on GitHub →</a> · <a href="https://github.com/AmbiqAI/helia-profiler/blob/main/CHANGELOG.md">Release notes →</a></p>
+</section>
+</ProfilerLanding>
 </Landing>

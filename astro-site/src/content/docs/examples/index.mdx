@@ -3,15 +3,14 @@ title: "Examples"
 description: "Runnable recipes on one fixed template, from the first profile to batch runs and saved-result analysis, each stating what it was validated on and shipping its config and, where one exists, its captured bundle."
 ---
 
+import ReferenceBrowser from '@ambiqai/helia-ui/astro/ReferenceBrowser';
+import examples from '../../../data/examples.json';
 import CardGrid from '@ambiqai/helia-ui/astro/CardGrid';
 import LinkCard from '@ambiqai/helia-ui/astro/LinkCard';
 
-Every example is a complete recipe on the same nine headings: goal,
-hardware and wiring, software prerequisites, config file, run, expected
-output, how to read it, variations, validated on. The config is a file in
-the repository. The output is either a captured run with its board, nsx
-module versions, date and source commit named, or the page says "not yet
-captured". Read that status before treating an example as measurement evidence.
+Choose a recipe for the result you need. Each example includes its configuration,
+commands, expected output and validation status. Hardware recipes require the
+listed board and tools; saved-result recipes can run without a connected board.
 
 <CardGrid>
   <LinkCard href="basic-profiling/" title="First results" eyebrow="Start here" meta="Profile a model, every counter per layer, the TFLM baseline">
@@ -36,25 +35,24 @@ captured". Read that status before treating an example as measurement evidence.
   </LinkCard>
 </CardGrid>
 
-## Index
+## Find an example
 
-| Example | Engine | Toolchain | Board | Measurement | Validated on |
-|---|---|---|---|---|---|
-| [Profile a model](basic-profiling/) | heliaRT | GNU Arm | apollo510_evb (also 330mP, 3P, 4 Lite Blue) | cycles, default counters | nightly 2026-09-16, `0714893` |
-| [Capture per-layer counters](per-layer/) | heliaAOT | GNU Arm | apollo510_evb | cpu, memory, mve groups | not yet validated |
-| [Vanilla TFLM baseline](tflm-baseline/) | TFLM (CMSIS-NN) | GNU Arm | apollo510_evb | cycles, default counters | nightly 2026-09-16, `0714893` |
-| [Compare engines](engine-comparison/) | heliaRT, heliaAOT, TFLM (ExecuTorch as a variation) | GNU Arm | apollo510_evb | cycles, binary size | nightly 2026-09-16, `0714893`; compare run on host 2026-09-21 |
-| [Compare toolchains](toolchain-comparison/) | heliaRT, heliaAOT | GNU Arm, ATfE (armclang not yet) | apollo510_evb | cycles | nightly 2026-09-16, `0714893` |
-| [Power capture with a Joulescope](power-profiling/) | heliaAOT | GNU Arm | apollo510_evb | energy per inference | not yet validated |
-| [Atomiq110 NPU profiling](atomiq110-npu-profiling/) | heliaRT, heliaAOT | GNU Arm | atomiq110_fpga_turbo (experimental) | cpu and NPU counters | not yet validated |
-| [Interactive Python session](interactive-python/) | heliaRT, heliaAOT | GNU Arm | apollo510_evb | resolve, profile, compare | host steps 2026-09-21; profile not yet |
-| [Batch runs from YAML](batch-runs/) | all | GNU Arm, ATfE | four boards | suite manifest | nightly 2026-09-16, `0714893` |
-| [Re-analyse saved results](reanalyse-results/) | any | any | none | loaders, compare, regression | host 2026-09-21 on the shipped bundles |
-| [Per-layer cost on the model graph](model-explorer-overlay/) | any | any | none for viewing | overlays | not yet validated |
-| [Read a power summary](power-read-summary/) | any | any | none | the `power` block, health signals | not yet validated (no captured power bundle) |
-| [Compare two power runs](power-compare/) | any | any | none | power comparability rules | not yet validated (no captured power bundle) |
+Search by model, engine, board or measurement, or narrow the list by task and setup.
 
-## The evidence rule
+<ReferenceBrowser
+  rows={examples}
+  filters={[
+    { id: 'workflow', label: 'Task', values: ['Profile', 'Compare', 'Power', 'NPU', 'Automate', 'Analyze'] },
+    { id: 'setup', label: 'Setup', values: ['Board', 'FPGA', 'Host and board', 'Saved results'] },
+  ]}
+  label="Search examples"
+  nameLabel="Example"
+  itemsLabel="examples"
+  placeholder="Engine, board or measurement"
+  pageSize={15}
+/>
+
+## What the validation status means
 
 "Validated on" names a hardware run record: board, nsx module versions
 (from the bundle's `nsx.lock`), date and source commit. Nine bundles from

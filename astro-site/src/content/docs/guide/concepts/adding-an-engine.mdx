@@ -6,8 +6,6 @@ description: "The touch points a fifth inference engine has to cover in hpx: the
 import BlockDiagram from '@ambiqai/helia-ui/astro/BlockDiagram';
 import Block from '@ambiqai/helia-ui/astro/Block';
 
-## Purpose
-
 Walk a contributor from an NSX module for a runtime to
 `hpx profile --engine your-engine` building, flashing and profiling
 firmware with it. Every step names the file it touches and the test that
@@ -37,11 +35,14 @@ holds it to the contract.
   </Block>
 </BlockDiagram>
 
-The same structure as a list, for readers of the Markdown rendition:
+<details>
+<summary>Text description of the diagram</summary>
 
 - Python: artifact type (`engines/base.py`), adapter (`engines/your_engine.py`), registry entry (`engines/__init__.py`)
 - Firmware: template child (`main_your_engine.cc.j2`), template selection (`firmware/__init__.py`)
 - Verification: contract tests (three pinned inventories), adapter tests, user guide page
+
+</details>
 
 ## The blocks
 

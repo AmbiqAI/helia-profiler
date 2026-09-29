@@ -3,8 +3,6 @@ title: "Validate your setup"
 description: "Five commands that prove the host, the probe and the board agree before you spend a build on them: doctor, boards, probes, ports and validate."
 ---
 
-## Purpose
-
 Prove the chain works before you trust a number from it. Each command below
 checks one link: the host tools, the board registry, the probe, the serial
 ports, and finally a real build-flash-capture round trip on a known model.
@@ -120,8 +118,8 @@ and suggests `--jlink-serial`.
 
 ### 4. `hpx ports list`: serial ports
 
-Only the `usb_cdc` and `uart` transports use a serial port; the default
-`rtt` transport does not. Run it anyway to learn what your host exposes:
+Only the `usb_cdc` and `uart` transports use a serial port. Skip this step
+when using the default `rtt` transport:
 
 ```bash
 hpx ports list --all
@@ -184,14 +182,14 @@ hpx validate --suite models-rt --list
 hpx validate --suite smoke --repeat 3
 ```
 
-`--repeat` runs each case several times; a bench that fails one repeat is a
-bench that will fail in CI. With several boards on one host, map each to its
+`--repeat` runs each case several times to help detect intermittent failures
+before using the setup in CI. With several boards on one host, map each to its
 probe: `--jlink-serials apollo510_evb=801000001,apollo3p_evb=801000002`.
 
 ## Expected output
 
-Five green results: a doctor table with every required row found, your
-board in the registry, your probe listed, the serial ports you expect, and
+A doctor table with every required tool found, your board in the registry,
+your probe listed, any serial port your transport needs, and
 `pass: 1` in `validation_report.md`. This confirms a working build, flash and capture path. Read each later run's
 validity, issues and measurement scope before using its numbers.
 

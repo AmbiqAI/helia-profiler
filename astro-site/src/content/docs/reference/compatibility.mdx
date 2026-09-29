@@ -20,7 +20,7 @@ which is the nightly workflow.
 | Cell | Meaning | Source that can set it |
 |---|---|---|
 | hardware-validated | a case with this board, engine and toolchain passed in a recorded run of `.github/workflows/hardware-validation.yml` | the run's `validation_manifest.json` |
-| compile-only | firmware for this combination built in CI without a board | no CI job builds firmware without hardware at the source tree this site was built from, so no cell carries it |
+| compile-only | firmware for this combination built in CI without a board | a recorded compile result; the historical matrices below do not use this status |
 | experimental | the sources label the target best-effort and outside the compatibility guarantees | `guide/boards.mdx`, the board's config comments, `platform/board.py` (`is_fpga`) |
 | unknown | no record either way | the absence of a source |
 
@@ -32,6 +32,11 @@ Embedded toolchain; `armclang` is Arm Compiler 6; `atfe` is the Arm
 Toolchain for Embedded. The engines are the `EngineType` enum.
 
 ## Steps
+
+The matrices summarize a dated run, not a guarantee for every later version.
+An engine cell and a toolchain cell do not establish every possible pairing.
+Use the run record and [compatibility baseline](../compatibility-baseline/)
+to check the exact revisions and combinations you need.
 
 ### 1. Boards against engines
 
@@ -95,11 +100,11 @@ case was enumerated, and no other source states support either way.
 
 ## Expected output
 
-A cell you can act on: hardware-validated means the recipe on
-[Batch runs from YAML](../../examples/batch-runs/) reproduces it;
+A cell you can act on: hardware-validated means the cited run passed at its recorded revisions;
+[Batch runs from YAML](../../examples/batch-runs/) explains how to test your setup;
 experimental means the wording on [Boards and targets](../../guide/boards/)
-applies; unknown means nobody has recorded a result and a run of yours
-would be the first.
+applies; unknown means the records cited on this page do not establish the
+combination. It is not evidence of either support or failure.
 
 ## What next
 

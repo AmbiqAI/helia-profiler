@@ -6,8 +6,6 @@ description: "Series supply wiring, the per-board GPIO pins for the gate, state 
 import BlockDiagram from '@ambiqai/helia-ui/astro/BlockDiagram';
 import Block from '@ambiqai/helia-ui/astro/Block';
 
-## Purpose
-
 Wire a Joulescope so a capture is valid on the first try: the instrument
 in series with the board's supply, one to three GPIO wires for the
 handshake, and the two settings (`io_voltage`, Vref) that decide whether
@@ -61,7 +59,8 @@ connector pinout (which physical pin is `INPUT0`, `INPUT1`, `OUTPUT0` and
   <Block label="Host" sublabel="two USB links" />
 </BlockDiagram>
 
-The same structure as a list, for readers of the Markdown rendition:
+<details>
+<summary>Text description of the diagram</summary>
 
 - Supply: bench or adapter
 - Joulescope: IN to OUT
@@ -71,6 +70,8 @@ The same structure as a list, for readers of the Markdown rendition:
   - Vref: JS220, JS320
 - EVB: VBAT, GND, GPIO
 - Host: two USB links
+
+</details>
 
 1. Make the Joulescope the board's only supply: disconnect the target USB
    cable and any coin cell, and on an EVB whose debug USB connector also

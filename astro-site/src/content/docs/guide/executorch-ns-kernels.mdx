@@ -3,8 +3,6 @@ title: "ExecuTorch NS kernels"
 description: "What the ns CMSIS-NN provider buys over arm on a Cortex-M55, measured operator by operator on an Apollo510 EVB, with the models, the verification and the reproduction recipe."
 ---
 
-## Purpose
-
 Show, with a measured table and its reproduction recipe, what Ambiq's
 `cortex_m_ns::` Tier-1 operators change compared with the portable ATen
 fallbacks the `arm` provider leaves in place. [Engines](../engines/#ns-tier-1-kernels)
@@ -34,8 +32,9 @@ aggregation, CPU, MVE and memory PMU presets. Every run reported
 the out-of-tree `cortex_m_ns::` operators),
 ExecuTorch submodule `3a97429` (v1.3.0), arm-cmsis-nn `6d21a6f`,
 ns-cmsis-nn v7.29.2 `6317264`. The numbers come from one bench and one
-runtime pin; the ratios are the transferable result, the absolute cycle
-counts are not.
+runtime pin. Both ratios and absolute cycle counts depend on the model,
+configuration and software revisions; measure your own setup before
+applying them to a deployment.
 :::
 
 ## Steps
@@ -179,8 +178,8 @@ Add `--jlink-serial <serial>` to step 2 with more than one probe attached.
 ## Expected output
 
 Two bundles per model whose per-instruction rows match the manifest counts,
-and a comparison that reproduces the ratios above within the variance of
-your bench.
+and a comparison you can interpret alongside the recorded configuration.
+The historical ratios above are a reference point, not a guaranteed outcome.
 
 ## What next
 

@@ -6,8 +6,6 @@ description: "How one engine type becomes an adapter, a typed artifact bundle an
 import BlockDiagram from '@ambiqai/helia-ui/astro/BlockDiagram';
 import Block from '@ambiqai/helia-ui/astro/Block';
 
-## Purpose
-
 Show the seam that keeps the pipeline engine-agnostic. Everything an
 engine contributes to a run passes through one `prepare()` call and one
 typed artifact object; the rest of hpx reads those and never imports an
@@ -51,13 +49,16 @@ engine package.
   </Block>
 </BlockDiagram>
 
-The same structure as a list, for readers of the Markdown rendition:
+<details>
+<summary>Text description of the diagram</summary>
 
 - Registry (`engines/__init__.py`): `EngineType`, adapter factories, `get_adapter`
 - Adapters: `tflm`, `helia_rt`, `helia_aot`, `executorch`
 - Shared helpers: `cmsis_nn`, `ethos_u`
 - Artifacts (`engines/base.py`): `EngineArtifacts`, `TflmArtifacts`, `HeliaRtArtifacts`, `HeliaAotArtifacts`, `ExecutorchArtifacts`
 - Consumers: firmware render, memory planning, workspace fingerprint, model analysis
+
+</details>
 
 ## The blocks
 

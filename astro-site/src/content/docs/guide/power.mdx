@@ -9,14 +9,11 @@ import Icon from '@ambiqai/helia-ui/astro/Icon';
 import BlockDiagram from '@ambiqai/helia-ui/astro/BlockDiagram';
 import Block from '@ambiqai/helia-ui/astro/Block';
 
-## Purpose
-
 Measure the energy an inference costs, not just its cycles. hpx captures
 current, voltage and energy around a GPIO-gated clean window: the firmware
 runs a dedicated, uninstrumented inference loop and drives a sync GPIO high
 for exactly that window, while an instrument integrates charge and energy
-and the host reads the result. Two instruments are supported, and this
-page is the map of the five pages that cover them.
+and the host reads the result. Two instruments are supported, and the guides below cover setup, measurement windows and verification.
 
 ## Prerequisites
 
@@ -73,7 +70,8 @@ deltas between them.
   </Block>
 </BlockDiagram>
 
-The same structure as a list, for readers of the Markdown rendition:
+<details>
+<summary>Text description of the diagram</summary>
 
 - Power firmware: no transport
   - Warm-up
@@ -85,6 +83,8 @@ The same structure as a list, for readers of the Markdown rendition:
 - Host
   - Window checks: two clocks agree
   - summary.json: power block
+
+</details>
 
 In order: hpx flashes a second, transport-free build of the firmware
 (`power.firmware: dedicated`, the default) that does model init, warm-up,
@@ -137,7 +137,9 @@ explain what the keys do.
 peak current, average power, the current percentiles (Joulescope), energy
 per inference, inferences per joule, and the health signals the
 verification page lists; the terminal prints a compact power table. The
-[power examples](../../examples/) show captured runs.
+[power examples](../../examples/power-profiling/) provide configurations and
+explain how to read the output. Their validation sections identify which
+steps have captured evidence; they do not provide a validated power benchmark.
 
 ## What next
 

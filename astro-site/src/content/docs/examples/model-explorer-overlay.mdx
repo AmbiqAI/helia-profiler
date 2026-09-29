@@ -66,9 +66,9 @@ Each is Model Explorer's node-data format keyed by graph id:
   maximum. The scale is relative to the one file, so a colour says nothing
   about absolute cost and nothing across two overlays or two runs.
 - Switch overlays on the same graph: a layer red on cycles and red on
-  `ARM_PMU_L1D_CACHE_MISS_RD` is waiting on memory and is a placement
-  question ([Memory placement](../../guide/memory/)); red on cycles and
-  green on cache misses is compute-bound and a kernel or engine question.
+  `ARM_PMU_L1D_CACHE_MISS_RD` warrants investigating
+  [memory placement](../../guide/memory/). Low cache misses alone do not
+  prove a compute bottleneck; inspect stalls and instruction counts too.
 - Node matching: heliaRT and TFLM overlays match by the runtime's
   sequential operator index; heliaAOT overlays use the model's original
   operator index, which the compiler preserves even when it skips

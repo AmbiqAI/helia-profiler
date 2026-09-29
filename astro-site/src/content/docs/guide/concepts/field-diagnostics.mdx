@@ -6,8 +6,6 @@ description: "What hpx doctor --bundle collects, what it redacts and what it nev
 import BlockDiagram from '@ambiqai/helia-ui/astro/BlockDiagram';
 import Block from '@ambiqai/helia-ui/astro/Block';
 
-## Purpose
-
 `hpx doctor --bundle` lets a customer or field engineer hand a maintainer
 one sanitised archive instead of a screen share. This page is the design
 behind it, for anyone extending the collectors or auditing what leaves the
@@ -50,12 +48,15 @@ building; how to produce one is on [Troubleshooting](../../troubleshooting/#4-pr
   </Block>
 </BlockDiagram>
 
-The same structure as a list, for readers of the Markdown rendition:
+<details>
+<summary>Text description of the diagram</summary>
 
 - Collectors (one section each): checks, compatibility, dependencies, modules, config, probes, ports, host
 - Redaction (`diagnostics/redact.py`): paths, URLs, token shapes, secret assignments, serial numbers
 - Manifest (`hpx.support-bundle-manifest` v1): sections, artifacts, redaction counts
 - Archive: deterministic zip, content fingerprint, verify
+
+</details>
 
 ## The blocks
 
