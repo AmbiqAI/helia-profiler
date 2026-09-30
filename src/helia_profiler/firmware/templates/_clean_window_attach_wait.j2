@@ -24,9 +24,8 @@
    drained it).  RdOff is advanced by the J-Link reading target SRAM over SWD,
    so observing the drain is direct evidence that the probe is attached and
    actively driving the DAP -- the same condition DWT needs.  This is a poll on
-   an observable signal with a deadline, per capture/readiness.py's contract,
-   not a blind delay; when the host is already attached it returns immediately
-   and costs nothing.
+   an observable signal with a deadline, not a blind delay; when the host is
+   already attached it returns immediately and costs nothing.
 
    WHY NOT hpx_rtt_drain().  It asks the same question, but its budget is
    nominal only: it paces itself with a volatile-counter+NOP loop sized

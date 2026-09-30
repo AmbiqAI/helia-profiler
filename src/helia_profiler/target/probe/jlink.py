@@ -56,8 +56,19 @@ _RSTGEN_SWPOI_VALUE = 0x1B
 # Default wall-clock budget for a single JLinkExe invocation (seconds);
 # generous enough to absorb slow USB enumeration.
 _DEFAULT_TIMEOUT_S = 15
-_READINESS_POLL_INTERVAL_S = 0.1
-_SBL_SETTLE_S = 0.2
+
+#: Post-reset settle window for the Apollo secure bootloader (SBL) before the
+#: host attempts its first J-Link attach.  The SBL bring-up is not observable
+#: from the host, so a small floor is used; the host then *polls* for attach
+#: readiness (see :func:`open_jlink_with_retry`) rather than assuming the
+#: target is ready after this delay.
+SBL_SETTLE_S = 0.2
+
+#: Default cadence for host-side readiness polling loops (J-Link attach,
+#: device re-enumeration).  Small enough to feel responsive, large enough to
+#: avoid hammering the probe / USB subsystem.
+READINESS_POLL_INTERVAL_S = 0.1
+
 _PROBE_INSPECTION_ATTEMPTS = 2
 _PROBE_INSPECTION_RETRY_S = 0.1
 JLINK_COMMANDER = "JLinkExe"
@@ -505,7 +516,7 @@ class JLinkResetController:
         device: str,
         jlink_serial: str | None = None,
         attach_timeout_s: float = 30.0,
-        settle_s: float = _SBL_SETTLE_S,
+        settle_s: float = SBL_SETTLE_S,
     ) -> AbstractContextManager[DebugMemorySession]:
         return attached_reset_session(
             device=device,
@@ -734,7 +745,7 @@ def open_jlink_with_retry(
     device: str,
     jlink_serial: str | None = None,
     timeout_s: float,
-    interval_s: float = _READINESS_POLL_INTERVAL_S,
+    interval_s: float = READINESS_POLL_INTERVAL_S,
     interface: object | None = None,
     speed_khz: int = 4000,
 ) -> None:
@@ -800,7 +811,7 @@ def attached_reset_session(
     device: str,
     jlink_serial: str | None = None,
     attach_timeout_s: float = 30.0,
-    settle_s: float = _SBL_SETTLE_S,
+    settle_s: float = SBL_SETTLE_S,
 ) -> Iterator[DebugMemorySession]:
     """Reset the target and hold the debugger attached for the whole capture."""
     jlink = create_debug_memory_session()
