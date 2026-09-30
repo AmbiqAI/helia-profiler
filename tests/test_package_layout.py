@@ -8,6 +8,8 @@ import sys
 import zipfile
 from pathlib import Path
 
+import pytest
+
 
 MAX_SOURCE_LINES = 1000
 
@@ -70,6 +72,11 @@ def test_no_engine_adapter_imports_out_of_another_engines_package() -> None:
     )
 
 
+# Receivers whose ``.open()`` is not ``Path.open``: archive modules and the
+# J-Link / Joulescope / serial device handles.
+_NON_FILE_OPENERS = frozenset({"tarfile", "zipfile", "jlink", "drv", "dtr_holder"})
+
+
 def _is_text_mode(mode: ast.expr | None) -> bool:
     return mode is None or not (isinstance(mode, ast.Constant) and "b" in str(mode.value))
 
@@ -85,15 +92,34 @@ def _text_io_without_encoding(call: ast.Call) -> bool:
         return False
     if func.attr in {"read_text", "write_text"}:
         return True
-    # Only ``Path.open("w")``-shaped calls: tarfile.open(path, ...) and device
-    # handles' .open() share the name but take no text mode first.
-    return (
-        func.attr == "open"
-        and bool(call.args)
-        and isinstance(call.args[0], ast.Constant)
-        and isinstance(call.args[0].value, str)
-        and _is_text_mode(call.args[0])
-    )
+    if func.attr != "open":
+        return False
+    receiver = func.value
+    if isinstance(receiver, ast.Name) and receiver.id in _NON_FILE_OPENERS:
+        return False
+    return _is_text_mode(call.args[0] if call.args else mode)
+
+
+@pytest.mark.parametrize(
+    ("source", "flagged"),
+    [
+        ("p.read_text()", True),
+        ('open(p, "w", newline="")', True),
+        ("p.open()", True),
+        ('p.open("w")', True),
+        ('p.open(mode="w")', True),
+        ('open(p, "rb")', False),
+        ('p.open("rb")', False),
+        ('p.open(mode="wb")', False),
+        ('p.write_text(s, encoding="utf-8")', False),
+        ('tarfile.open(p, mode="r:gz")', False),
+        ("jlink.open()", False),
+    ],
+)
+def test_encoding_guard_classifies_calls(source: str, flagged: bool) -> None:
+    call = ast.parse(source, mode="eval").body
+    assert isinstance(call, ast.Call)
+    assert _text_io_without_encoding(call) is flagged
 
 
 def test_text_file_io_names_its_encoding() -> None:
