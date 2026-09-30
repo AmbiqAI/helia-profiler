@@ -206,3 +206,23 @@ def test_cache_key_is_stable_for_ordinary_refs():
     assert download._cache_key("AmbiqAI/helia-rt", "helia-rt-v1.16.0") == (
         "AmbiqAI_helia-rt_helia-rt-v1.16.0"
     )
+
+
+@pytest.mark.parametrize(
+    ("a", "b"),
+    [
+        (("AmbiqAI/helia-rt", "release/x"), ("AmbiqAI/helia-rt", "release_x")),
+        (("AmbiqAI/helia-rt", "release/x"), ("AmbiqAI/helia-rt", "release:x")),
+        (("AmbiqAI/helia_rt", "v1"), ("AmbiqAI/helia", "rt_v1")),
+        (("A/b_c", "d"), ("A/b", "c_d")),
+    ],
+)
+def test_cache_key_distinct_inputs_never_collide(a, b):
+    assert download._cache_key(*a) != download._cache_key(*b)
+
+
+def test_sanitized_key_cannot_equal_plain_key():
+    sanitized = download._cache_key("AmbiqAI/helia-rt", "release/x")
+
+    assert "+" in sanitized
+    assert "+" not in download._cache_key("AmbiqAI/helia-rt", "release_x")

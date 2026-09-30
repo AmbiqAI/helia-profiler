@@ -7,6 +7,7 @@ downloaded archive.
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import logging
@@ -70,13 +71,25 @@ def _fetch_github_release(
     return cache_dir, _detect_version(cache_dir)
 
 
+_PLAIN_REPO = re.compile(r"[A-Za-z0-9-]+/[A-Za-z0-9.-]+")
+_PLAIN_REF = re.compile(r"[A-Za-z0-9._-]+")
+
+
 def _cache_key(repo: str, ref: str) -> str:
-    """Flatten *repo* and *ref* into one path component under the cache root.
+    """Map *repo* and *ref* to a unique single path component under the cache root.
 
     Both are user config; separators or ``..`` must not steer the cache
     directory (which may be deleted when stale) outside the cache root.
+    ``owner/name`` repos without ``_`` and plain refs keep the historical
+    ``owner_name_ref`` key, which is unambiguous because the first two
+    ``_`` split it. Anything else is sanitized and suffixed with ``+`` and
+    a digest of the raw pair; ``+`` never occurs in a plain key.
     """
-    return re.sub(r"[^A-Za-z0-9._-]", "_", f"{repo}_{ref}")
+    if _PLAIN_REPO.fullmatch(repo) and _PLAIN_REF.fullmatch(ref):
+        return f"{repo.replace('/', '_')}_{ref}"
+    sanitized = re.sub(r"[^A-Za-z0-9._-]", "_", f"{repo}_{ref}")
+    digest = hashlib.sha256(json.dumps([repo, ref]).encode()).hexdigest()[:12]
+    return f"{sanitized}+{digest}"
 
 
 def _resolve_release_tag(repo: str, ref: str, *, api_s: float = 30) -> str | None:
