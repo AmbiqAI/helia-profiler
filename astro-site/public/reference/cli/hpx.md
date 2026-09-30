@@ -18,4 +18,4 @@ Defined in `src/helia_profiler/cli/app.py` line 48.
 | --- | --- | --- | --- |
 | `--version` | `Optional[bool]` |  | show program's version number and exit |
 
-Generated from the `src/helia_profiler` tree `cf4575012d6d2f42d4f7a8e03bae3bd4742cf110` with typer 0.26.8 and click 8.3.3.
+Generated from the `src/helia_profiler` tree `c1f9161bab4cda4108244820b444da29b2d22d0b` with typer 0.26.8 and click 8.3.3.
