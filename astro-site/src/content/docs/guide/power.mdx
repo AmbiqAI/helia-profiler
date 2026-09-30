@@ -39,10 +39,9 @@ and one of:
 | Pick it when | You need external current statistics and GPIO-gated energy | You need on-target aggregate energy without a Joulescope |
 
 `power.driver` names the chip or instrument the firmware and host talk to.
-Both `joulescope` and `ina228` are registered drivers
-(`src/helia_profiler/power/__init__.py`); `ondevice` is also registered as
-the generic on-device base but has no firmware producer, so a run that
-selects it raises `PowerError`. Use `ina228` for an on-target measurement.
+The registered drivers are `joulescope` and `ina228`
+(`src/helia_profiler/power/__init__.py`); any other name raises `PowerError`
+with the list of available drivers. Use `ina228` for an on-target measurement.
 Runs made with different instruments carry different `measurement_scope`
 values (`gpio_gated_clean_window` for the Joulescope,
 `on_device_gated_inference` for the INA228), and `hpx compare` omits power
