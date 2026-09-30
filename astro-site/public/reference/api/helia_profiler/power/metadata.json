@@ -3,12 +3,12 @@
   "generatedFrom": {
     "tool": "pyref",
     "version": "1.7.3",
-    "sourceTree": "6772d93973a0b595d291ed5d55b2f8956d84016b"
+    "sourceTree": "b823e287e809c8d9438536a07fc0ab41a3b030c0"
   },
   "language": "python",
   "modules": [
     {
-      "description": "The provenance of a power number: how it was observed, what the measurement boundary included, and whether the capture holds together.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `6772d93973a0b595d291ed5d55b2f8956d84016b`.",
+      "description": "The provenance of a power number: how it was observed, what the measurement boundary included, and whether the capture holds together.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `b823e287e809c8d9438536a07fc0ab41a3b030c0`.",
       "name": "metadata",
       "path": "helia_profiler.power.metadata",
       "submodules": [],
