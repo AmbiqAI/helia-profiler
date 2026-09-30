@@ -5,13 +5,16 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 import hashlib
 import json
+import os
 from pathlib import Path, PurePath
 import re
 
 from .config import ProfileConfig
+from .deps.compatibility import QualificationState, resolve_compatibility
 from .engines import EngineType
 from .engines.base import HeliaAotArtifacts
 from .errors import ConfigError
+from .firmware.launcher import _DISABLED_LAUNCHER_VALUES
 from .pipeline import PipelineContext, PipelineRunner, Stage, serialize_config
 from .placement import ArenaRole, Placement
 from .fixture_image import MAX_IMAGE, MRAM, bounded
@@ -325,8 +328,39 @@ class FixtureBuild:
     aot_arena_scan: tuple[tuple[int, int], ...] = ()
 
 
+#: Environment variables that swap build inputs outside the compatibility classifier.
+FIXTURE_REFUSED_ENVIRONMENT = ("HPX_COMPILER_LAUNCHER", "SEGGER_RTT_PATH")
+
+
+def _refuse_overrides(config: ProfileConfig) -> None:
+    """Refuse any source, module, path or launcher override; fixtures build pinned inputs only."""
+    resolution = resolve_compatibility(
+        config.compatibility_baseline,
+        module_overrides=config.build.nsx_modules,
+        engine_config=config.engine.config,
+        engine_config_path=config.engine.config_path,
+        engine_type=config.engine.type.value,
+        engine_backend=config.engine.backend,
+    )
+    overrides = {*resolution.module_overrides, *resolution.engine_overrides}
+    overrides.update(f"env.{name}" for name in FIXTURE_REFUSED_ENVIRONMENT if os.environ.get(name))
+    if config.target.segger_rtt_path is not None:
+        overrides.add("target.segger_rtt_path")
+    launcher = config.build.compiler_launcher.strip().lower()
+    if launcher != "auto" and launcher not in _DISABLED_LAUNCHER_VALUES:
+        overrides.add("build.compiler_launcher")
+    if resolution.qualification is not QualificationState.QUALIFIED and not overrides:
+        overrides.add(resolution.qualification.value)
+    if overrides:
+        raise ConfigError(
+            f"Fixture builds use pinned inputs only; remove: {', '.join(sorted(overrides))}",
+            hint="Unset the environment variables and drop the config keys named above.",
+        )
+
+
 def _validate(config: ProfileConfig, fixture: FixedFixture | TypedFixture) -> None:
     fixture.verify()
+    _refuse_overrides(config)
     if config.model.path.resolve() != fixture.model.path.resolve():
         raise ConfigError("Profile model differs from the pinned fixture")
     if config.engine.type not in FIXTURE_CAPABILITIES:

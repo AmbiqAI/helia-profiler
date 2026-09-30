@@ -10,6 +10,15 @@ semantics, and `tests/contracts/fixture_api_v1.json` records the surface.
 (everything except the example models) and returns one digest; a consumer
 recomputes it from the installed files instead of trusting the call.
 
+Fixture builds take pinned inputs only. `build_fixed_fixture` refuses any
+module, engine or CMSIS-NN override the compatibility classifier reports,
+plus `SEGGER_RTT_PATH`, `target.segger_rtt_path`, `HPX_COMPILER_LAUNCHER` and
+explicit compiler launchers (`auto` and disabled stay allowed).
+`tests/contracts/test_fixture_environment.py` classifies every environment
+read in the package, so a new one must be refused or justified. Fixture apps
+compile with `-ffile-prefix-map`, so the ELF does not record the work
+directory.
+
 `helia_profiler.fixture.build_fixed_fixture(config, fixture, method=method,
 runtime=runtime, compile=True)` composes the existing platform, engine,
 memory-plan, firmware-generation and NSX build stages. It never probes or
