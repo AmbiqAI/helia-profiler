@@ -105,6 +105,18 @@ def test_session_snapshots_yaml_at_construction(tmp_path: Path, monkeypatch) -> 
     assert session.resolve().model.path == Path("original.tflite")
 
 
+def test_session_records_its_yaml_path(tmp_path: Path) -> None:
+    config_path = tmp_path / "hpx.yml"
+    config_path.write_text("model:\n  path: model.tflite\n")
+
+    session = hpx.Session.from_yaml(config_path)
+
+    assert session.yaml_path == config_path.resolve()
+    assert session.with_target(jlink_serial="1").yaml_path == config_path.resolve()
+    assert hpx.Session(yaml_path=str(config_path)).yaml_path == config_path
+    assert hpx.Session.from_dict({}).yaml_path is None
+
+
 def test_session_can_clear_optional_yaml_values(tmp_path: Path) -> None:
     config_path = tmp_path / "hpx.yml"
     config_path.write_text("model:\n  path: model.tflite\ntarget:\n  jlink_serial: '123'\n")

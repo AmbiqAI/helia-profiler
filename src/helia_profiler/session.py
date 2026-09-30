@@ -90,6 +90,7 @@ class Session:
     CLI. Every ``with_*`` method returns an independent session.
     """
 
+    yaml_path: Path | None = None
     _base: Mapping[str, Any] = field(
         default_factory=lambda: MappingProxyType({}), repr=False, hash=False
     )
@@ -98,13 +99,16 @@ class Session:
     )
 
     def __post_init__(self) -> None:
+        if self.yaml_path is not None:
+            object.__setattr__(self, "yaml_path", Path(self.yaml_path))
         object.__setattr__(self, "_base", _freeze(self._base))
         object.__setattr__(self, "_overrides", _freeze(self._overrides))
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> Self:
         """Create a session from an immutable snapshot of an HPX YAML config."""
-        return cls(_base=read_config_yaml(Path(path).expanduser().resolve()))
+        yaml_path = Path(path).expanduser().resolve()
+        return cls(yaml_path=yaml_path, _base=read_config_yaml(yaml_path))
 
     @classmethod
     def from_dict(cls, intent: Mapping[str, Any]) -> Self:
