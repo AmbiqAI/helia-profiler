@@ -2,13 +2,12 @@
   "$schema": "https://ambiqai.github.io/helia-ui/schema/reference-model-1.json",
   "generatedFrom": {
     "tool": "pyref",
-    "version": "1.7.3",
-    "sourceTree": "8ed1af9e235ea07a9251c94c2453df064d9026d9"
+    "version": "1.7.3"
   },
   "language": "python",
   "modules": [
     {
-      "description": "Comparing two runs and judging one: the comparability rules that decide whether a comparison is meaningful, and the metric policies that turn numbers into a verdict.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `8ed1af9e235ea07a9251c94c2453df064d9026d9`.",
+      "description": "Comparing two runs and judging one: the comparability rules that decide whether a comparison is meaningful, and the metric policies that turn numbers into a verdict.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.",
       "name": "evaluation",
       "path": "helia_profiler.evaluation",
       "submodules": [],

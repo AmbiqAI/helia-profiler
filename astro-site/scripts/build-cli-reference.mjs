@@ -137,6 +137,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     ? path.resolve(process.argv[process.argv.indexOf('--out') + 1])
     : site;
 
+  /* Refuses uncommitted source; the tree itself only reaches the log. */
   const tree = sourceTree(repo, { allowDirty: Boolean(process.env.DOCS_ALLOW_DIRTY_SOURCE) });
   const dataDir = path.join(outRoot, DATA_DIR);
 
@@ -152,8 +153,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       'python',
       'tools/docs/check_reference.py',
       '--write',
-      '--source-tree',
-      tree,
       '--data-dir',
       dataDir,
     ],
