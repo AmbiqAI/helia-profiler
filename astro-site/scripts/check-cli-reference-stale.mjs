@@ -9,9 +9,10 @@
  * before any check runs, so the working tree is never the committed state by
  * the time anything looks at it.
  *
- * Provenance is the git tree of the documented source, which is the same for
- * every commit that does not change src/, so the comparison can be exact:
- * what is committed must be byte-for-byte what the source produces. That is a
+ * No committed file records a hash of the source (the build substitutes the
+ * source tree; see src/integrations/source-ref.mjs), so the comparison is
+ * exact and moves only when the documented content does: what is committed
+ * must be byte-for-byte what the source at HEAD produces. That is a
  * stricter gate than `check_reference.py --check`, which compares meaning and
  * is the gate that names what changed; this one catches a page or a Markdown
  * rendition edited by hand, which the semantic check never reads.
@@ -22,8 +23,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { sourceTree } from './build-reference.mjs';
-import { DATA_DIR, GENERATED, PUBLIC_DIRS } from './build-cli-reference.mjs';
+import { GENERATED } from './build-cli-reference.mjs';
 
 const site = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repo = path.resolve(site, '..');
@@ -86,30 +86,6 @@ try {
     if (!regenerated.has(file)) failures.push(`${file}: committed but no longer generated.`);
   }
 
-  /* Provenance on its own, because it is the one field the extractors stamp
-   * rather than derive: the tree the committed artifacts claim to document,
-   * against the tree this checkout holds. */
-  const expected = sourceTree(repo);
-  const provenanced = [
-    `${DATA_DIR}/cli.json`,
-    `${DATA_DIR}/schema.json`,
-    `${DATA_DIR}/issues.json`,
-    `${PUBLIC_DIRS.cli}/cli.json`,
-    `${PUBLIC_DIRS.configuration}/schema.json`,
-    `${PUBLIC_DIRS.issues}/issues.json`,
-  ];
-  for (const file of provenanced) {
-    const body = committed.get(file);
-    if (body === undefined) {
-      failures.push(`${file}: not committed.`);
-      continue;
-    }
-    const recorded = JSON.parse(body).generatedFrom?.sourceTree;
-    if (recorded !== expected) {
-      failures.push(`${file}: records tree ${recorded}, src/helia_profiler is tree ${expected}.`);
-    }
-  }
-
   if (failures.length > 0) {
     console.error('The committed CLI reference is stale:\n');
     for (const failure of failures) console.error(`- ${failure}`);
@@ -118,8 +94,7 @@ try {
   }
 
   console.log(
-    `CLI reference is current: ${committed.size} committed files match a fresh generation, ` +
-      `source tree ${expected.slice(0, 7)}.`,
+    `CLI reference is current: ${committed.size} committed files match a fresh generation.`,
   );
 } finally {
   fs.rmSync(scratch, { recursive: true, force: true });
