@@ -42,4 +42,4 @@ Analyze a .tflite model without hardware:
   hpx analyze model.tflite --engine helia-aot --compare
 ```
 
-Generated from the `src/helia_profiler` tree `b823e287e809c8d9438536a07fc0ab41a3b030c0` with typer 0.26.8 and click 8.3.3.
+Generated from the `src/helia_profiler` tree `2d92b1f6749fc8334bb1144a88da82e6f5ac8799` with typer 0.26.8 and click 8.3.3.
