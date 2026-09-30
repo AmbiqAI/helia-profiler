@@ -157,10 +157,11 @@ the block test.
 
 ### 5. Template selection
 
-Selection is an inline conditional in `firmware/__init__.py`, in both
-`generate_app()` and `render_power_source()`: `main_aot.cc.j2` for
+Selection lives in `_main_template()` in `firmware/__init__.py`, which
+`generate_app()` and `render_power_source()` both call: `main_aot.cc.j2` for
 `EngineType.HELIA_AOT`, `main_executorch.cc.j2` for `EngineType.EXECUTORCH`,
-`main.cc.j2` for everything else. Extend both for the engine's type.
+`main.cc.j2` for everything else. Add the engine's type there, and raise for
+`power_only` if the engine has no dedicated power binary (as ExecuTorch does).
 
 ### 6. Contract tests
 

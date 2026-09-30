@@ -425,7 +425,6 @@ def _prepare_case(case: _HwCase, workspace: _Workspace, tmp_path: Path) -> tuple
     (scratch / "hpx_pmu_profiler.h").write_text(
         _jinja_env.get_template("hpx_pmu_profiler.h.j2").render(
             cmsis_device_header=kwargs["cmsis_device_header"],
-            profiling_backends=list(kwargs["profiling_backends"]),
             has_armv8m_pmu=kwargs["has_armv8m_pmu"],
             has_ethos_u=kwargs.get("has_ethos_u", False),
             pmu_max_ops=kwargs["pmu_max_ops"],
@@ -434,7 +433,6 @@ def _prepare_case(case: _HwCase, workspace: _Workspace, tmp_path: Path) -> tuple
     )
     if case.extra_profiler_tu:
         profiler_text = _jinja_env.get_template("hpx_pmu_profiler.cc.j2").render(
-            profiling_backends=list(kwargs["profiling_backends"]),
             has_armv8m_pmu=kwargs["has_armv8m_pmu"],
         )
         assert "HpxPmuProfiler::" in profiler_text, f"[{case.case_id}] vacuous profiler TU"

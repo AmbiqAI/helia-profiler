@@ -80,7 +80,6 @@ firmware/build.py
 firmware/context.py
 firmware/fingerprint.py
 firmware/fixture.py
-firmware/fixture_memory.py
 firmware/headers.py
 firmware/image.py
 firmware/launcher.py

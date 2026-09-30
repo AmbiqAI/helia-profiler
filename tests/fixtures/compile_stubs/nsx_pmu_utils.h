@@ -35,13 +35,6 @@ typedef struct nsx_pmu_config {
     nsx_pmu_counter_t counter[NSX_PMU_MAX_COUNTERS];
 } nsx_pmu_config_t;
 
-typedef enum {
-    NSX_PMU_PRESET_BASIC_CPU = 0,
-    NSX_PMU_PRESET_MEMORY = 1,
-    NSX_PMU_PRESET_MVE = 2,
-    NSX_PMU_PRESET_ML_DEFAULT = 3,
-} nsx_pmu_preset_e;
-
 static inline uint32_t nsx_pmu_init(nsx_pmu_config_t *cfg) {
     (void)cfg;
     return 0U;
@@ -57,12 +50,6 @@ static inline void nsx_pmu_event_create(nsx_pmu_event_t *event, uint32_t eventId
     (void)event;
     (void)eventId;
     (void)counterSize;
-}
-
-static inline uint32_t nsx_pmu_apply_preset(nsx_pmu_config_t *cfg, nsx_pmu_preset_e preset) {
-    (void)cfg;
-    (void)preset;
-    return 0U;
 }
 
 static inline void nsx_pmu_reset_counters(void) {}

@@ -19,20 +19,6 @@ void HpxPmuProfiler::SetCounterNames(const char* const names[], int num_names) {
     }
 }
 
-void HpxPmuProfiler::Init(nsx_pmu_preset_e preset) {
-    nsx_pmu_reset_config(&pmu_cfg_);
-    pmu_cfg_.api = &nsx_pmu_V1_0_0;
-    nsx_pmu_apply_preset(&pmu_cfg_, preset);
-    nsx_pmu_init(&pmu_cfg_);
-    num_events_ = 0;
-    // Count how many events the preset configured
-    num_counters_ = 0;
-    for (int i = 0; i < kMaxEvents; i++) {
-        if (pmu_cfg_.events[i].enabled) num_counters_++;
-    }
-    initialized_ = true;
-}
-
 void HpxPmuProfiler::InitCustom(const uint32_t event_ids[], int num_events) {
     nsx_pmu_reset_config(&pmu_cfg_);
     pmu_cfg_.api = &nsx_pmu_V1_0_0;
