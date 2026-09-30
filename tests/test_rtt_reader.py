@@ -486,11 +486,11 @@ def test_capture_pmu_no_clock_warning_when_device_clock_matches(
 
 
 @pytest.mark.parametrize(
-    ("measured_hz", "warns"),
-    [(96_000_000, True), (249_900_000, False), (0, True)],
+    ("measured_hz", "warns", "probe_failed"),
+    [(96_000_000, True, False), (249_900_000, False, False), (0, False, True)],
 )
 def test_capture_pmu_checks_measured_clock(
-    tmp_path: Path, monkeypatch, caplog, measured_hz: int, warns: bool
+    tmp_path: Path, monkeypatch, caplog, measured_hz: int, warns: bool, probe_failed: bool
 ):
     import logging
 
@@ -531,6 +531,43 @@ def test_capture_pmu_checks_measured_clock(
 
     assert result.meta.measured_clock_hz == measured_hz
     assert any("Measured CPU clock" in r.message for r in caplog.records) is warns
+    assert any("clock probe returned 0 Hz" in r.message for r in caplog.records) is probe_failed
+
+
+@pytest.mark.parametrize(
+    ("board", "names_clock"), [("apollo510_evb", True), ("apollo3p_evb", False)]
+)
+def test_swo_capture_without_start_names_core_clock(
+    tmp_path: Path, monkeypatch, board: str, names_clock: bool
+):
+    from helia_profiler.errors import CaptureError
+
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"\x00")
+    config = load_config(
+        None,
+        {
+            "model": {"path": str(model)},
+            "engine": {"type": "helia-rt"},
+            "target": {"board": board, "transport": "swo"},
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ResolvePlatformStage().run(ctx)
+    build_dir = tmp_path / "build"
+    set_profile_firmware(ctx, build_dir=build_dir)
+    build_dir.mkdir()
+    ctx.resolved_jlink_serial = "1160002204"
+
+    monkeypatch.setattr(
+        "helia_profiler.transport.swo.capture_swo_output", lambda **kwargs: ["\x93\x1f garbled"]
+    )
+
+    with pytest.raises(CaptureError) as excinfo:
+        capture_pmu(ctx)
+
+    assert "does not contain HPX_START sentinel" in str(excinfo.value)
+    assert ("SWO baud follows the core clock" in (excinfo.value.hint or "")) is names_clock
 
 
 def test_capture_pmu_passes_resolved_jlink_device_to_usb(tmp_path: Path, monkeypatch):

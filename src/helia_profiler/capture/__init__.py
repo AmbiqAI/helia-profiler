@@ -116,12 +116,24 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
     # templates), so the sentinel does not sit at a fixed offset.  The parser
     # likewise ignores everything before HPX_START.
     if not any(HPX_START_SENTINEL in l for l in lines):
+        hint = (
+            "The firmware may not be running the profiler app, or the "
+            "transport connection failed before data arrived."
+        )
+        soc = ctx.soc
+        if transport is Transport.SWO and soc is not None and soc.swo_trace_clock_mhz is None:
+            # Core-clocked SWO decodes only at the registry clock, so a perf
+            # mode that did not engage garbles the stream before the
+            # HPX_MEASURED_CLOCK_HZ check can run.
+            hint += (
+                " On this SoC SWO baud follows the core clock: if the "
+                "target.clock.cpu perf mode did not take effect, nothing "
+                "decodes. Retry with --transport rtt, which does not depend "
+                "on the core clock and reports the measured clock."
+            )
         raise CaptureError(
             f"Captured data ({len(lines)} lines) does not contain HPX_START sentinel",
-            hint=(
-                "The firmware may not be running the profiler app, or the "
-                "transport connection failed before data arrived."
-            ),
+            hint=hint,
         )
     if not any(l.strip() == HPX_END_SENTINEL for l in lines):
         raise CaptureError(
@@ -691,9 +703,16 @@ def _verify_device_clock(ctx: PipelineContext, result: PmuResult) -> None:
         ("Device reports", result.meta.system_clock_hz),
         ("Measured", result.meta.measured_clock_hz),
     )
+    if result.meta.measured_clock_hz == 0:
+        log.warning(
+            "The on-device clock probe returned 0 Hz (DWT or STIMER did not "
+            "count), so the %d MHz core clock for %s is unverified.",
+            registry_mhz,
+            platform.soc or "this SoC",
+        )
     for label, device_hz in readings:
         # 5% clears HFRC trim, catches perf-mode misses.
-        if device_hz is None or abs(device_hz - registry_hz) <= 0.05 * registry_hz:
+        if not device_hz or abs(device_hz - registry_hz) <= 0.05 * registry_hz:
             continue
         log.warning(
             "%s CPU clock %.3f MHz but the platform registry "
