@@ -50,4 +50,4 @@ Remove all NSX caches and HPX workspaces
 
 Defined in `src/helia_profiler/cli/app.py` line 685.
 
-Generated from the `src/helia_profiler` tree `b7bb9310c99a08e90cda6f291ddbba624eab5ea4` with typer 0.26.8 and click 8.3.3.
+Generated from the `src/helia_profiler` tree `96759a1cc509bad77b30c32ed8047c541373d715` with typer 0.26.8 and click 8.3.3.
