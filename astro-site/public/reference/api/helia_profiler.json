@@ -2,13 +2,12 @@
   "$schema": "https://ambiqai.github.io/helia-ui/schema/reference-model-1.json",
   "generatedFrom": {
     "tool": "pyref",
-    "version": "1.7.3",
-    "sourceTree": "60638c8527d6f08bfb943eb72ca2ee32a639f673"
+    "version": "1.7.3"
   },
   "language": "python",
   "modules": [
     {
-      "description": "The entry points of the heliaPROFILER Python API: one call, one session, and the progress stream they report through.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`\n\nGenerated from the `src/helia_profiler` tree `60638c8527d6f08bfb943eb72ca2ee32a639f673`.\n\n**Re-exports**\n\n| Name | Source |\n| --- | --- |\n| [ProfileConfig][helia_profiler.ProfileConfig] | `helia_profiler.ProfileConfig` |\n| [ModelConfig][helia_profiler.ModelConfig] | `helia_profiler.ModelConfig` |\n| [EngineConfig][helia_profiler.EngineConfig] | `helia_profiler.EngineConfig` |\n| [TargetConfig][helia_profiler.TargetConfig] | `helia_profiler.TargetConfig` |\n| [ProfilingConfig][helia_profiler.ProfilingConfig] | `helia_profiler.ProfilingConfig` |\n| [OutputConfig][helia_profiler.OutputConfig] | `helia_profiler.OutputConfig` |\n| [BuildConfig][helia_profiler.BuildConfig] | `helia_profiler.BuildConfig` |\n| [HeartbeatConfig][helia_profiler.HeartbeatConfig] | `helia_profiler.HeartbeatConfig` |\n| [TimeoutsConfig][helia_profiler.TimeoutsConfig] | `helia_profiler.TimeoutsConfig` |\n| [ClockSelection][helia_profiler.ClockSelection] | `helia_profiler.ClockSelection` |\n| [OutputFormat][helia_profiler.OutputFormat] | `helia_profiler.OutputFormat` |\n| [PowerConfig][helia_profiler.PowerConfig] | `helia_profiler.PowerConfig` |\n| [EngineType][helia_profiler.EngineType] | `helia_profiler.EngineType` |\n| [Toolchain][helia_profiler.Toolchain] | `helia_profiler.Toolchain` |\n| [Transport][helia_profiler.Transport] | `helia_profiler.Transport` |\n| [Placement][helia_profiler.Placement] | `helia_profiler.Placement` |\n| [ResetStrategy][helia_profiler.ResetStrategy] | `helia_profiler.ResetStrategy` |\n| [CompatibilityBaseline][helia_profiler.CompatibilityBaseline] | `helia_profiler.CompatibilityBaseline` |\n| [CompatibilityResolution][helia_profiler.CompatibilityResolution] | `helia_profiler.CompatibilityResolution` |\n| [QualificationState][helia_profiler.QualificationState] | `helia_profiler.QualificationState` |\n| [load_compatibility_baseline][helia_profiler.load_compatibility_baseline] | `helia_profiler.load_compatibility_baseline` |\n| [DependencyLockProvenance][helia_profiler.DependencyLockProvenance] | `helia_profiler.DependencyLockProvenance` |\n| [read_dependency_lock_provenance][helia_profiler.read_dependency_lock_provenance] | `helia_profiler.read_dependency_lock_provenance` |\n| [ProfileResult][helia_profiler.ProfileResult] | `helia_profiler.ProfileResult` |\n| [PmuResult][helia_profiler.PmuResult] | `helia_profiler.PmuResult` |\n| [PresetResult][helia_profiler.PresetResult] | `helia_profiler.PresetResult` |\n| [LayerResult][helia_profiler.LayerResult] | `helia_profiler.LayerResult` |\n| [FirmwareMeta][helia_profiler.FirmwareMeta] | `helia_profiler.FirmwareMeta` |\n| [RunMetadata][helia_profiler.RunMetadata] | `helia_profiler.RunMetadata` |\n| [ResultManifest][helia_profiler.ResultManifest] | `helia_profiler.ResultManifest` |\n| [ResultArtifact][helia_profiler.ResultArtifact] | `helia_profiler.ResultArtifact` |\n| [ResultIssue][helia_profiler.ResultIssue] | `helia_profiler.ResultIssue` |\n| [ResultValidity][helia_profiler.ResultValidity] | `helia_profiler.ResultValidity` |\n| [RunStatus][helia_profiler.RunStatus] | `helia_profiler.RunStatus` |\n| [load_result_manifest][helia_profiler.load_result_manifest] | `helia_profiler.load_result_manifest` |\n| [PowerMode][helia_profiler.PowerMode] | `helia_profiler.PowerMode` |\n| [PowerResult][helia_profiler.PowerResult] | `helia_profiler.PowerResult` |\n| [PowerObservation][helia_profiler.PowerObservation] | `helia_profiler.PowerObservation` |\n| [PowerTerminalRecord][helia_profiler.PowerTerminalRecord] | `helia_profiler.PowerTerminalRecord` |\n| [OnDevicePowerSummary][helia_profiler.OnDevicePowerSummary] | `helia_profiler.OnDevicePowerSummary` |\n| [PowerMetadata][helia_profiler.PowerMetadata] | `helia_profiler.PowerMetadata` |\n| [MeasurementScope][helia_profiler.MeasurementScope] | `helia_profiler.MeasurementScope` |\n| [ObservationMode][helia_profiler.ObservationMode] | `helia_profiler.ObservationMode` |\n| [PowerIntegrity][helia_profiler.PowerIntegrity] | `helia_profiler.PowerIntegrity` |\n| [CompareResult][helia_profiler.CompareResult] | `helia_profiler.CompareResult` |\n| [assess_comparability][helia_profiler.assess_comparability] | `helia_profiler.assess_comparability` |\n| [ComparabilityAssessment][helia_profiler.ComparabilityAssessment] | `helia_profiler.ComparabilityAssessment` |\n| [ComparabilityIssue][helia_profiler.ComparabilityIssue] | `helia_profiler.ComparabilityIssue` |\n| [ComparabilitySeverity][helia_profiler.ComparabilitySeverity] | `helia_profiler.ComparabilitySeverity` |\n| [ComparisonProfile][helia_profiler.ComparisonProfile] | `helia_profiler.ComparisonProfile` |\n| [evaluate_comparison_profile][helia_profiler.evaluate_comparison_profile] | `helia_profiler.evaluate_comparison_profile` |\n| [ComparisonVerdict][helia_profiler.ComparisonVerdict] | `helia_profiler.ComparisonVerdict` |\n| [MetricPolicy][helia_profiler.MetricPolicy] | `helia_profiler.MetricPolicy` |\n| [MetricDirection][helia_profiler.MetricDirection] | `helia_profiler.MetricDirection` |\n| [MetricVerdict][helia_profiler.MetricVerdict] | `helia_profiler.MetricVerdict` |\n| [MissingMetricPolicy][helia_profiler.MissingMetricPolicy] | `helia_profiler.MissingMetricPolicy` |\n| [VerdictStatus][helia_profiler.VerdictStatus] | `helia_profiler.VerdictStatus` |\n| [evaluate_run][helia_profiler.evaluate_run] | `helia_profiler.evaluate_run` |\n| [RunEvaluation][helia_profiler.RunEvaluation] | `helia_profiler.RunEvaluation` |\n| [ModelAnalysis][helia_profiler.ModelAnalysis] | `helia_profiler.ModelAnalysis` |\n| [SupportBundleOptions][helia_profiler.SupportBundleOptions] | `helia_profiler.SupportBundleOptions` |\n| [collect_support_bundle][helia_profiler.collect_support_bundle] | `helia_profiler.collect_support_bundle` |\n| [write_support_bundle][helia_profiler.write_support_bundle] | `helia_profiler.write_support_bundle` |\n| [verify_support_bundle][helia_profiler.verify_support_bundle] | `helia_profiler.verify_support_bundle` |\n| [SupportBundleManifest][helia_profiler.SupportBundleManifest] | `helia_profiler.SupportBundleManifest` |\n| [SupportBundleSection][helia_profiler.SupportBundleSection] | `helia_profiler.SupportBundleSection` |\n| [HpxError][helia_profiler.HpxError] | `helia_profiler.HpxError` |\n| [ConfigError][helia_profiler.ConfigError] | `helia_profiler.ConfigError` |\n| [PlatformError][helia_profiler.PlatformError] | `helia_profiler.PlatformError` |\n| [EngineError][helia_profiler.EngineError] | `helia_profiler.EngineError` |\n| [FirmwareError][helia_profiler.FirmwareError] | `helia_profiler.FirmwareError` |\n| [BuildError][helia_profiler.BuildError] | `helia_profiler.BuildError` |\n| [DependencyError][helia_profiler.DependencyError] | `helia_profiler.DependencyError` |\n| [VersionError][helia_profiler.VersionError] | `helia_profiler.VersionError` |\n| [LockError][helia_profiler.LockError] | `helia_profiler.LockError` |\n| [NetworkError][helia_profiler.NetworkError] | `helia_profiler.NetworkError` |\n| [CaptureError][helia_profiler.CaptureError] | `helia_profiler.CaptureError` |\n| [DeterministicCaptureError][helia_profiler.DeterministicCaptureError] | `helia_profiler.DeterministicCaptureError` |\n| [PowerError][helia_profiler.PowerError] | `helia_profiler.PowerError` |\n| [ReportError][helia_profiler.ReportError] | `helia_profiler.ReportError` |",
+      "description": "The entry points of the heliaPROFILER Python API: one call, one session, and the progress stream they report through.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`\n\nGenerated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.\n\n**Re-exports**\n\n| Name | Source |\n| --- | --- |\n| [ProfileConfig][helia_profiler.ProfileConfig] | `helia_profiler.ProfileConfig` |\n| [ModelConfig][helia_profiler.ModelConfig] | `helia_profiler.ModelConfig` |\n| [EngineConfig][helia_profiler.EngineConfig] | `helia_profiler.EngineConfig` |\n| [TargetConfig][helia_profiler.TargetConfig] | `helia_profiler.TargetConfig` |\n| [ProfilingConfig][helia_profiler.ProfilingConfig] | `helia_profiler.ProfilingConfig` |\n| [OutputConfig][helia_profiler.OutputConfig] | `helia_profiler.OutputConfig` |\n| [BuildConfig][helia_profiler.BuildConfig] | `helia_profiler.BuildConfig` |\n| [HeartbeatConfig][helia_profiler.HeartbeatConfig] | `helia_profiler.HeartbeatConfig` |\n| [TimeoutsConfig][helia_profiler.TimeoutsConfig] | `helia_profiler.TimeoutsConfig` |\n| [ClockSelection][helia_profiler.ClockSelection] | `helia_profiler.ClockSelection` |\n| [OutputFormat][helia_profiler.OutputFormat] | `helia_profiler.OutputFormat` |\n| [PowerConfig][helia_profiler.PowerConfig] | `helia_profiler.PowerConfig` |\n| [EngineType][helia_profiler.EngineType] | `helia_profiler.EngineType` |\n| [Toolchain][helia_profiler.Toolchain] | `helia_profiler.Toolchain` |\n| [Transport][helia_profiler.Transport] | `helia_profiler.Transport` |\n| [Placement][helia_profiler.Placement] | `helia_profiler.Placement` |\n| [ResetStrategy][helia_profiler.ResetStrategy] | `helia_profiler.ResetStrategy` |\n| [CompatibilityBaseline][helia_profiler.CompatibilityBaseline] | `helia_profiler.CompatibilityBaseline` |\n| [CompatibilityResolution][helia_profiler.CompatibilityResolution] | `helia_profiler.CompatibilityResolution` |\n| [QualificationState][helia_profiler.QualificationState] | `helia_profiler.QualificationState` |\n| [load_compatibility_baseline][helia_profiler.load_compatibility_baseline] | `helia_profiler.load_compatibility_baseline` |\n| [DependencyLockProvenance][helia_profiler.DependencyLockProvenance] | `helia_profiler.DependencyLockProvenance` |\n| [read_dependency_lock_provenance][helia_profiler.read_dependency_lock_provenance] | `helia_profiler.read_dependency_lock_provenance` |\n| [ProfileResult][helia_profiler.ProfileResult] | `helia_profiler.ProfileResult` |\n| [PmuResult][helia_profiler.PmuResult] | `helia_profiler.PmuResult` |\n| [PresetResult][helia_profiler.PresetResult] | `helia_profiler.PresetResult` |\n| [LayerResult][helia_profiler.LayerResult] | `helia_profiler.LayerResult` |\n| [FirmwareMeta][helia_profiler.FirmwareMeta] | `helia_profiler.FirmwareMeta` |\n| [RunMetadata][helia_profiler.RunMetadata] | `helia_profiler.RunMetadata` |\n| [ResultManifest][helia_profiler.ResultManifest] | `helia_profiler.ResultManifest` |\n| [ResultArtifact][helia_profiler.ResultArtifact] | `helia_profiler.ResultArtifact` |\n| [ResultIssue][helia_profiler.ResultIssue] | `helia_profiler.ResultIssue` |\n| [ResultValidity][helia_profiler.ResultValidity] | `helia_profiler.ResultValidity` |\n| [RunStatus][helia_profiler.RunStatus] | `helia_profiler.RunStatus` |\n| [load_result_manifest][helia_profiler.load_result_manifest] | `helia_profiler.load_result_manifest` |\n| [PowerMode][helia_profiler.PowerMode] | `helia_profiler.PowerMode` |\n| [PowerResult][helia_profiler.PowerResult] | `helia_profiler.PowerResult` |\n| [PowerObservation][helia_profiler.PowerObservation] | `helia_profiler.PowerObservation` |\n| [PowerTerminalRecord][helia_profiler.PowerTerminalRecord] | `helia_profiler.PowerTerminalRecord` |\n| [OnDevicePowerSummary][helia_profiler.OnDevicePowerSummary] | `helia_profiler.OnDevicePowerSummary` |\n| [PowerMetadata][helia_profiler.PowerMetadata] | `helia_profiler.PowerMetadata` |\n| [MeasurementScope][helia_profiler.MeasurementScope] | `helia_profiler.MeasurementScope` |\n| [ObservationMode][helia_profiler.ObservationMode] | `helia_profiler.ObservationMode` |\n| [PowerIntegrity][helia_profiler.PowerIntegrity] | `helia_profiler.PowerIntegrity` |\n| [CompareResult][helia_profiler.CompareResult] | `helia_profiler.CompareResult` |\n| [assess_comparability][helia_profiler.assess_comparability] | `helia_profiler.assess_comparability` |\n| [ComparabilityAssessment][helia_profiler.ComparabilityAssessment] | `helia_profiler.ComparabilityAssessment` |\n| [ComparabilityIssue][helia_profiler.ComparabilityIssue] | `helia_profiler.ComparabilityIssue` |\n| [ComparabilitySeverity][helia_profiler.ComparabilitySeverity] | `helia_profiler.ComparabilitySeverity` |\n| [ComparisonProfile][helia_profiler.ComparisonProfile] | `helia_profiler.ComparisonProfile` |\n| [evaluate_comparison_profile][helia_profiler.evaluate_comparison_profile] | `helia_profiler.evaluate_comparison_profile` |\n| [ComparisonVerdict][helia_profiler.ComparisonVerdict] | `helia_profiler.ComparisonVerdict` |\n| [MetricPolicy][helia_profiler.MetricPolicy] | `helia_profiler.MetricPolicy` |\n| [MetricDirection][helia_profiler.MetricDirection] | `helia_profiler.MetricDirection` |\n| [MetricVerdict][helia_profiler.MetricVerdict] | `helia_profiler.MetricVerdict` |\n| [MissingMetricPolicy][helia_profiler.MissingMetricPolicy] | `helia_profiler.MissingMetricPolicy` |\n| [VerdictStatus][helia_profiler.VerdictStatus] | `helia_profiler.VerdictStatus` |\n| [evaluate_run][helia_profiler.evaluate_run] | `helia_profiler.evaluate_run` |\n| [RunEvaluation][helia_profiler.RunEvaluation] | `helia_profiler.RunEvaluation` |\n| [ModelAnalysis][helia_profiler.ModelAnalysis] | `helia_profiler.ModelAnalysis` |\n| [SupportBundleOptions][helia_profiler.SupportBundleOptions] | `helia_profiler.SupportBundleOptions` |\n| [collect_support_bundle][helia_profiler.collect_support_bundle] | `helia_profiler.collect_support_bundle` |\n| [write_support_bundle][helia_profiler.write_support_bundle] | `helia_profiler.write_support_bundle` |\n| [verify_support_bundle][helia_profiler.verify_support_bundle] | `helia_profiler.verify_support_bundle` |\n| [SupportBundleManifest][helia_profiler.SupportBundleManifest] | `helia_profiler.SupportBundleManifest` |\n| [SupportBundleSection][helia_profiler.SupportBundleSection] | `helia_profiler.SupportBundleSection` |\n| [HpxError][helia_profiler.HpxError] | `helia_profiler.HpxError` |\n| [ConfigError][helia_profiler.ConfigError] | `helia_profiler.ConfigError` |\n| [PlatformError][helia_profiler.PlatformError] | `helia_profiler.PlatformError` |\n| [EngineError][helia_profiler.EngineError] | `helia_profiler.EngineError` |\n| [FirmwareError][helia_profiler.FirmwareError] | `helia_profiler.FirmwareError` |\n| [BuildError][helia_profiler.BuildError] | `helia_profiler.BuildError` |\n| [DependencyError][helia_profiler.DependencyError] | `helia_profiler.DependencyError` |\n| [VersionError][helia_profiler.VersionError] | `helia_profiler.VersionError` |\n| [LockError][helia_profiler.LockError] | `helia_profiler.LockError` |\n| [NetworkError][helia_profiler.NetworkError] | `helia_profiler.NetworkError` |\n| [CaptureError][helia_profiler.CaptureError] | `helia_profiler.CaptureError` |\n| [DeterministicCaptureError][helia_profiler.DeterministicCaptureError] | `helia_profiler.DeterministicCaptureError` |\n| [PowerError][helia_profiler.PowerError] | `helia_profiler.PowerError` |\n| [ReportError][helia_profiler.ReportError] | `helia_profiler.ReportError` |",
       "name": "helia_profiler",
       "path": "helia_profiler",
       "submodules": [],
@@ -612,7 +611,7 @@
               "summary": "Compare two completed profiles and optionally write diff artifacts."
             },
             {
-              "description": "Return structured host dependency checks.",
+              "description": "Return structured host dependency checks.\n\nSet *include_versions* to also compare installed tool and package\nversions against the HPX compatibility baseline.",
               "examples": [],
               "id": "helia_profiler.Session.doctor",
               "kind": "method",
@@ -622,7 +621,7 @@
               "params": [],
               "raises": [],
               "returns": [],
-              "signature": "doctor() -> DoctorResult",
+              "signature": "doctor(*, include_versions: bool = False) -> DoctorResult",
               "source": {
                 "line": 305,
                 "path": "src/helia_profiler/session.py",
@@ -643,9 +642,9 @@
               "returns": [],
               "signature": "show(value: Any, *, console: Console | None = None) -> Any",
               "source": {
-                "line": 319,
+                "line": 324,
                 "path": "src/helia_profiler/session.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L319"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L324"
               },
               "summary": "Pretty-print a typed interactive value and return it unchanged."
             },
@@ -662,9 +661,9 @@
               "returns": [],
               "signature": "boards() -> tuple[BoardDef, ...]",
               "source": {
-                "line": 325,
+                "line": 330,
                 "path": "src/helia_profiler/session.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L325"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L330"
               },
               "summary": "Return boards visible to this session's platform registry."
             },
@@ -681,9 +680,9 @@
               "returns": [],
               "signature": "engines() -> tuple[EngineType, ...]",
               "source": {
-                "line": 332,
+                "line": 337,
                 "path": "src/helia_profiler/session.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L332"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L337"
               },
               "summary": "Return supported inference engine identifiers."
             },
@@ -700,9 +699,9 @@
               "returns": [],
               "signature": "counter_groups() -> tuple[str, ...]",
               "source": {
-                "line": 338,
+                "line": 343,
                 "path": "src/helia_profiler/session.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L338"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L343"
               },
               "summary": "Return registered PMU counter group names."
             },
@@ -719,9 +718,9 @@
               "returns": [],
               "signature": "counters(group: str | None = None) -> tuple[PmuCounter, ...]",
               "source": {
-                "line": 344,
+                "line": 349,
                 "path": "src/helia_profiler/session.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L344"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L349"
               },
               "summary": "Return registered PMU counters, optionally filtered by group."
             },
@@ -738,9 +737,9 @@
               "returns": [],
               "signature": "probes() -> tuple[JLinkProbe, ...]",
               "source": {
-                "line": 350,
+                "line": 355,
                 "path": "src/helia_profiler/session.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L350"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L355"
               },
               "summary": "Return connected J-Link probes."
             },
@@ -757,9 +756,9 @@
               "returns": [],
               "signature": "inspect_probes(board: str | None = None) -> tuple[JLinkProbeMatch, ...]",
               "source": {
-                "line": 356,
+                "line": 361,
                 "path": "src/helia_profiler/session.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L356"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L361"
               },
               "summary": "Inspect the target core visible through each connected probe."
             },
@@ -776,9 +775,9 @@
               "returns": [],
               "signature": "match_probe(board: str | None = None, *, serial: str | None = None) -> str",
               "source": {
-                "line": 367,
+                "line": 372,
                 "path": "src/helia_profiler/session.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L367"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L372"
               },
               "summary": "Resolve the J-Link serial matching a board target."
             },
@@ -795,9 +794,9 @@
               "returns": [],
               "signature": "ports(*, include_all: bool = False) -> tuple[SerialPortInfo, ...]",
               "source": {
-                "line": 385,
+                "line": 390,
                 "path": "src/helia_profiler/session.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L385"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L390"
               },
               "summary": "Return host serial ports relevant to HPX transports."
             },
@@ -814,9 +813,9 @@
               "returns": [],
               "signature": "reset(board: str | None = None, *, serial: str | None = None, kind: Literal['debug', 'swpoi'] = 'debug') -> None",
               "source": {
-                "line": 391,
+                "line": 396,
                 "path": "src/helia_profiler/session.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L391"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L396"
               },
               "summary": "Reset the configured target through its J-Link probe."
             }

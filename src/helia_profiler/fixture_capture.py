@@ -10,7 +10,7 @@ import time
 from dataclasses import asdict
 from typing import Protocol
 
-from .fixture import FixtureTimingScope
+from ._fixture_build import FixtureTimingScope
 from .fixture_stage import FixtureStage
 from .fixture_runtime import FixtureFile
 from .fixture_target import FixtureTarget
@@ -110,7 +110,7 @@ class FixtureCaptureResult:
 
 def _atomic_json(path: Path, value: object) -> None:
     temporary = path.with_suffix(".tmp")
-    temporary.write_text(json.dumps(value, default=str, sort_keys=True) + "\n")
+    temporary.write_text(json.dumps(value, default=str, sort_keys=True) + "\n", encoding="utf-8")
     temporary.replace(path)
 
 

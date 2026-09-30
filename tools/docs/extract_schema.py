@@ -10,7 +10,7 @@ value type of the ``INA228_BOARD_PRESETS`` lookup table, surfaced through a
 property rather than a field), so the roots are enumerated per class instead
 of walking down from ``ProfileConfig`` alone.
 
-    uv run --isolated --no-dev python tools/docs/extract_schema.py --source-tree <sha>
+    uv run --isolated --no-dev python tools/docs/extract_schema.py
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _common import SCHEMA_VERSION, dump, jsonable, provenance, source_tree  # noqa: E402
+from _common import SCHEMA_VERSION, dump, jsonable, provenance  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUT = REPO_ROOT / "astro-site" / "src" / "data" / "schema.json"
@@ -126,7 +126,7 @@ def _sections(classes: dict[str, Any]) -> dict[str, str]:
     return out
 
 
-def build(tree: str) -> dict[str, Any]:
+def build() -> dict[str, Any]:
     from pydantic import TypeAdapter
 
     classes = {cls.__name__: cls for cls in _config_classes()}
@@ -159,7 +159,7 @@ def build(tree: str) -> dict[str, Any]:
     return {
         "schemaVersion": SCHEMA_VERSION,
         "kind": "config-schema",
-        "generatedFrom": provenance(tree),
+        "generatedFrom": provenance(),
         "counts": {
             "classes": len(classes),
             "declaredFields": sum(c["declared"] for c in coverage.values()),
@@ -185,10 +185,9 @@ def build(tree: str) -> dict[str, Any]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
-    parser.add_argument("--source-tree", type=source_tree, required=True)
     parser.add_argument("--stdout", action="store_true")
     args = parser.parse_args(argv)
-    payload = build(args.source_tree)
+    payload = build()
     if args.stdout:
         json.dump(payload, sys.stdout, indent=2)
         sys.stdout.write("\n")

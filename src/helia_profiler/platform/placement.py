@@ -35,6 +35,14 @@ class Placement(StrEnum):
     MRAM = "mram"
     PSRAM = "psram"
 
+    @property
+    def region(self) -> MemoryRegion:
+        """The physical region this placement lands in.
+
+        ``TCM`` is DTCM: ITCM is code-only and never holds arenas or weights.
+        """
+        return _PLACEMENT_REGION[self]
+
 
 class ArenaRole(StrEnum):
     """Role classification for an AOT arena region.
@@ -69,3 +77,11 @@ class MemoryRegion(StrEnum):
     SRAM = "SRAM"
     MRAM = "MRAM"
     PSRAM = "PSRAM"
+
+
+_PLACEMENT_REGION: dict[Placement, MemoryRegion] = {
+    Placement.TCM: MemoryRegion.DTCM,
+    Placement.SRAM: MemoryRegion.SRAM,
+    Placement.MRAM: MemoryRegion.MRAM,
+    Placement.PSRAM: MemoryRegion.PSRAM,
+}

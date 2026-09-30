@@ -62,7 +62,6 @@ typedef struct nsx_pmu_config {
     nsx_pmu_event_t events[NSX_PMU_MAX_COUNTERS];
     nsx_pmu_counter_t counter[NSX_PMU_MAX_COUNTERS];
 } nsx_pmu_config_t;
-typedef enum { NSX_PMU_PRESET_ML_DEFAULT = 3 } nsx_pmu_preset_e;
 extern uint32_t hpx_sim_count;
 static inline void nsx_pmu_event_create(nsx_pmu_event_t *e, uint32_t id,
                                         nsx_pmu_event_counter_size_e size) {
@@ -71,11 +70,6 @@ static inline void nsx_pmu_event_create(nsx_pmu_event_t *e, uint32_t id,
     e->counterSize = size;
 }
 static inline void nsx_pmu_reset_config(nsx_pmu_config_t *cfg) { *cfg = nsx_pmu_config_t{}; }
-static inline uint32_t nsx_pmu_apply_preset(nsx_pmu_config_t *cfg, nsx_pmu_preset_e) {
-    for (int i = 0; i < 4; ++i)
-        nsx_pmu_event_create(&cfg->events[i], 0x11U + i, NSX_PMU_EVENT_COUNTER_SIZE_32);
-    return 0U;
-}
 static inline uint32_t nsx_pmu_init(nsx_pmu_config_t *) { return 0U; }
 // Mirrors NSX: a reset also writes PMOVSCLR.
 static inline void nsx_pmu_reset_counters(void) { ARM_PMU_Set_CNTR_OVS(0xFFFFFFFFU); }
@@ -106,8 +100,10 @@ void hpx_printf(const char *fmt, ...) {
 
 static HpxPmuProfiler g_profiler;
 
+static const uint32_t kEventIds[] = {0x11U, 0x12U, 0x13U, 0x14U};
+
 int main(int argc, char **argv) {
-    g_profiler.Init();
+    g_profiler.InitCustom(kEventIds, 4);
     // Each arg is one op: "<cycles>:<ovsset>".
     for (int i = 1; i < argc; ++i) {
         unsigned long cycles = strtoul(argv[i], &argv[i], 10);
@@ -129,13 +125,11 @@ int main(int argc, char **argv) {
 def _build(tmp_path: Path, *, armv8m: bool, max_ops: int) -> Path:
     header = _jinja_env.get_template("hpx_pmu_profiler.h.j2").render(
         cmsis_device_header="hpx_sim_device.h",
-        profiling_backends=["armv8m_pmu"] if armv8m else ["dwt"],
         has_armv8m_pmu=armv8m,
         has_ethos_u=False,
         pmu_max_ops=max_ops,
     )
     source = _jinja_env.get_template("hpx_pmu_profiler.cc.j2").render(
-        profiling_backends=["armv8m_pmu"] if armv8m else ["dwt"],
         has_armv8m_pmu=armv8m,
     )
     (tmp_path / "hpx_pmu_profiler.h").write_text(header, encoding="utf-8")
@@ -253,8 +247,10 @@ static void print_iteration(void) {
 {print_block}
 }
 
+static const uint32_t kEventIds[] = {0x11U, 0x12U, 0x13U, 0x14U};
+
 int main(int argc, char **argv) {
-    profiler_init_preset({preset});
+    profiler_init_custom(kEventIds, 4);
     g_profiler_enabled = true;
     profiler_clear();
     // Each arg is one op's cycle count.
@@ -295,13 +291,10 @@ def _build_aot(tmp_path: Path, *, soc: str, max_ops: int) -> Path:
     print_block = _slice(
         text, "if (g_layer_capacity_exceeded)", "profiler_print_csv();", keep_end=True
     )
-    armv8m = "hpx_pmu_read_layer(" in region
     source = (
         _AOT_DRIVER_HEAD.replace("{prefix}", prefix)
         + region
-        + _AOT_DRIVER_MAIN.replace("{prefix}", prefix)
-        .replace("{print_block}", print_block)
-        .replace("{preset}", "NSX_PMU_PRESET_ML_DEFAULT" if armv8m else "0")
+        + _AOT_DRIVER_MAIN.replace("{prefix}", prefix).replace("{print_block}", print_block)
     )
     (tmp_path / "hpx_sim_device.h").write_text(_SIM_DEVICE_H, encoding="utf-8")
     (tmp_path / "nsx_pmu_utils.h").write_text(_SIM_PMU_H, encoding="utf-8")

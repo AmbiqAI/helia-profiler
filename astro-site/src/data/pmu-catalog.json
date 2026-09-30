@@ -2,7 +2,6 @@
   "schemaVersion": 1,
   "kind": "pmu-catalog",
   "generatedFrom": {
-    "sourceTree": "60638c8527d6f08bfb943eb72ca2ee32a639f673",
     "helia_profiler": "0.1.6",
     "typer": "0.26.8",
     "click": "8.3.3",

@@ -55,16 +55,22 @@ covers the CSV and summary that carry the same numbers with more context.
    other available counters before attributing the cost.
 
 A layer that ran in several PMU passes has one value per counter, taken
-from the pass that captured that counter, so every overlay covers every
-operator the firmware instrumented; a counter the SoC could not capture
-has no overlay file rather than a file of zeros.
+from the pass that captured that counter; a counter the SoC could not
+capture has no overlay file rather than a file of zeros.
 
-Node matching depends on the engine. heliaRT and TFLM overlays match by the
-sequential operator index (0, 1, 2, ...). heliaAOT overlays use the original
-TFLite operator index preserved through compilation (the `3` in
-`CONV_2D:3`), because the compiler skips operators such as `VAR_HANDLE`
-without renumbering; see the `source_index` column on
-[Output files](../output/#2-profile_resultscsv).
+Nodes are matched by the original TFLite operator index, the same
+`source_index` that joins MACs on
+[Output files](../output/#2-profile_resultscsv). heliaRT and TFLM run
+operators in graph order, so their overlays use the sequential operator
+index (0, 1, 2, ...). heliaAOT skips operators such as `VAR_HANDLE`
+without renumbering, so its overlays use the original index from the AOT
+operator manifest, or from the label suffix (the `3` in `CONV_2D:3`) when
+the run has no manifest. A layer whose original index cannot be resolved
+(a position the AOT manifest does not name, or any run whose manifest
+extraction failed) is left out of the overlay rather than painted onto an
+unrelated node. ExecuTorch layers name plan instructions, not graph nodes,
+so an ExecuTorch run writes no overlay files. Each run replaces the
+`me_overlay_*.json` files in `model_explorer/`.
 
 ## Disabling
 

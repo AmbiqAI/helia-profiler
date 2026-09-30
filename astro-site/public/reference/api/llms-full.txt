@@ -6,7 +6,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`
 
-Generated from the `src/helia_profiler` tree `60638c8527d6f08bfb943eb72ca2ee32a639f673`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 **Re-exports**
 
@@ -503,10 +503,13 @@ Source: `src/helia_profiler/session.py:277`
 `method` · `python`
 
 ```python
-doctor() -> DoctorResult
+doctor(*, include_versions: bool = False) -> DoctorResult
 ```
 
 Return structured host dependency checks.
+
+Set *include_versions* to also compare installed tool and package
+versions against the HPX compatibility baseline.
 
 Source: `src/helia_profiler/session.py:305`
 
@@ -520,7 +523,7 @@ show(value: Any, *, console: Console | None = None) -> Any
 
 Pretty-print a typed interactive value and return it unchanged.
 
-Source: `src/helia_profiler/session.py:319`
+Source: `src/helia_profiler/session.py:324`
 
 ### helia_profiler.Session.boards
 
@@ -532,7 +535,7 @@ boards() -> tuple[BoardDef, ...]
 
 Return boards visible to this session's platform registry.
 
-Source: `src/helia_profiler/session.py:325`
+Source: `src/helia_profiler/session.py:330`
 
 ### helia_profiler.Session.engines
 
@@ -544,7 +547,7 @@ engines() -> tuple[EngineType, ...]
 
 Return supported inference engine identifiers.
 
-Source: `src/helia_profiler/session.py:332`
+Source: `src/helia_profiler/session.py:337`
 
 ### helia_profiler.Session.counter_groups
 
@@ -556,7 +559,7 @@ counter_groups() -> tuple[str, ...]
 
 Return registered PMU counter group names.
 
-Source: `src/helia_profiler/session.py:338`
+Source: `src/helia_profiler/session.py:343`
 
 ### helia_profiler.Session.counters
 
@@ -568,7 +571,7 @@ counters(group: str | None = None) -> tuple[PmuCounter, ...]
 
 Return registered PMU counters, optionally filtered by group.
 
-Source: `src/helia_profiler/session.py:344`
+Source: `src/helia_profiler/session.py:349`
 
 ### helia_profiler.Session.probes
 
@@ -580,7 +583,7 @@ probes() -> tuple[JLinkProbe, ...]
 
 Return connected J-Link probes.
 
-Source: `src/helia_profiler/session.py:350`
+Source: `src/helia_profiler/session.py:355`
 
 ### helia_profiler.Session.inspect_probes
 
@@ -592,7 +595,7 @@ inspect_probes(board: str | None = None) -> tuple[JLinkProbeMatch, ...]
 
 Inspect the target core visible through each connected probe.
 
-Source: `src/helia_profiler/session.py:356`
+Source: `src/helia_profiler/session.py:361`
 
 ### helia_profiler.Session.match_probe
 
@@ -604,7 +607,7 @@ match_probe(board: str | None = None, *, serial: str | None = None) -> str
 
 Resolve the J-Link serial matching a board target.
 
-Source: `src/helia_profiler/session.py:367`
+Source: `src/helia_profiler/session.py:372`
 
 ### helia_profiler.Session.ports
 
@@ -616,7 +619,7 @@ ports(*, include_all: bool = False) -> tuple[SerialPortInfo, ...]
 
 Return host serial ports relevant to HPX transports.
 
-Source: `src/helia_profiler/session.py:385`
+Source: `src/helia_profiler/session.py:390`
 
 ### helia_profiler.Session.reset
 
@@ -628,7 +631,7 @@ reset(board: str | None = None, *, serial: str | None = None, kind: Literal['deb
 
 Reset the configured target through its J-Link probe.
 
-Source: `src/helia_profiler/session.py:391`
+Source: `src/helia_profiler/session.py:396`
 
 ---
 
@@ -640,7 +643,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`
 
-Generated from the `src/helia_profiler` tree `60638c8527d6f08bfb943eb72ca2ee32a639f673`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 ## helia_profiler.ClockSelection
 
@@ -1655,7 +1658,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`
 
-Generated from the `src/helia_profiler` tree `60638c8527d6f08bfb943eb72ca2ee32a639f673`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 ## helia_profiler.PowerConfig
 
@@ -1940,7 +1943,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`, `experimental`
 
-Generated from the `src/helia_profiler` tree `60638c8527d6f08bfb943eb72ca2ee32a639f673`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 ## helia_profiler.QualificationState
 
@@ -2420,7 +2423,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `experimental`
 
-Generated from the `src/helia_profiler` tree `60638c8527d6f08bfb943eb72ca2ee32a639f673`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 ## helia_profiler.SupportBundleSection
 
@@ -2855,7 +2858,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`, `experimental`
 
-Generated from the `src/helia_profiler` tree `60638c8527d6f08bfb943eb72ca2ee32a639f673`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 ## helia_profiler.HpxError
 
@@ -3002,9 +3005,10 @@ A capture-path refusal no retry or power cycle can change.
 
 Subclass of :class:`CaptureError` so existing ``except CaptureError``
 handlers still catch it, but recovery paths that would otherwise cycle the
-target rail and retry (``stages.flash_power``) re-raise it instead: these
-are configuration/artifact gaps — a missing image, an unknown load
-address — and cycling the rail only frames them as flaky hardware.
+target rail and retry (``stages.flash.deploy_firmware``) re-raise it
+instead: these are configuration/artifact gaps — a missing image, an
+unknown load address — and cycling the rail only frames them as flaky
+hardware.
 
 **API tier:** `stable`
 
@@ -3025,7 +3029,7 @@ still catch it, but callers that want to retry can specifically catch this.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:82`
+Source: `src/helia_profiler/errors.py:83`
 
 ## helia_profiler.DependencyError
 
@@ -3044,7 +3048,7 @@ specifically about an incompatible version or a missing/corrupt lock.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/errors.py:90`
+Source: `src/helia_profiler/errors.py:91`
 
 ## helia_profiler.VersionError
 
@@ -3063,7 +3067,7 @@ dependency failures and surface an actionable upgrade/downgrade hint.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/errors.py:100`
+Source: `src/helia_profiler/errors.py:101`
 
 ## helia_profiler.LockError
 
@@ -3082,7 +3086,7 @@ failing an entire report.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/errors.py:110`
+Source: `src/helia_profiler/errors.py:111`
 
 ## helia_profiler.PowerError
 
@@ -3096,7 +3100,7 @@ Power measurement failure — Joulescope not found, calibration error.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:120`
+Source: `src/helia_profiler/errors.py:121`
 
 ## helia_profiler.ReportError
 
@@ -3110,7 +3114,7 @@ Report generation failure — output path not writable, format error.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:124`
+Source: `src/helia_profiler/errors.py:125`
 
 ---
 
@@ -3122,7 +3126,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `experimental`
 
-Generated from the `src/helia_profiler` tree `60638c8527d6f08bfb943eb72ca2ee32a639f673`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 ## helia_profiler.MetricDirection
 
@@ -3136,7 +3140,7 @@ Preferred candidate direction for one metric.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:23`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:24`
 
 ### helia_profiler.MetricDirection.SMALLER
 
@@ -3146,7 +3150,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:23`
 SMALLER = 'smaller'
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:26`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:27`
 
 ### helia_profiler.MetricDirection.LARGER
 
@@ -3156,7 +3160,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:26`
 LARGER = 'larger'
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:27`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:28`
 
 ### helia_profiler.MetricDirection.EQUAL
 
@@ -3166,7 +3170,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:27`
 EQUAL = 'equal'
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:28`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:29`
 
 ## helia_profiler.MissingMetricPolicy
 
@@ -3180,7 +3184,7 @@ Verdict when a selected metric is unavailable.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:31`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:32`
 
 ### helia_profiler.MissingMetricPolicy.FAIL
 
@@ -3190,7 +3194,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:31`
 FAIL = 'fail'
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:34`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:35`
 
 ### helia_profiler.MissingMetricPolicy.WARN
 
@@ -3200,7 +3204,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:34`
 WARN = 'warn'
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:35`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:36`
 
 ### helia_profiler.MissingMetricPolicy.IGNORE
 
@@ -3210,57 +3214,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:35`
 IGNORE = 'ignore'
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:36`
-
-## helia_profiler.RunEvaluation
-
-`class` · `python`
-
-```python
-RunEvaluation(
-    validity: ResultValidity,
-    issues: tuple[ResultIssue, ...] = (),
-    gate_arbitration: GateArbitration | None = None,
-) -> None
-```
-
-`dataclass`
-
-Authoritative validity and structured issues for one completed run.
-
-**API tier:** `experimental`
-
-Source: `src/helia_profiler/evaluation/validity.py:33`
-
-### helia_profiler.RunEvaluation.validity
-
-`attribute` · `python`
-
-```python
-validity: ResultValidity
-```
-
-Source: `src/helia_profiler/evaluation/validity.py:37`
-
-### helia_profiler.RunEvaluation.issues
-
-`attribute` · `python`
-
-```python
-issues: tuple[ResultIssue, ...] = ()
-```
-
-Source: `src/helia_profiler/evaluation/validity.py:38`
-
-### helia_profiler.RunEvaluation.gate_arbitration
-
-`attribute` · `python`
-
-```python
-gate_arbitration: GateArbitration | None = None
-```
-
-Source: `src/helia_profiler/evaluation/validity.py:42`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:37`
 
 ## helia_profiler.ComparabilityIssue
 
@@ -3318,6 +3272,56 @@ context: dict[str, Any] = field(default_factory=dict)
 
 Source: `src/helia_profiler/evaluation/comparability.py:41`
 
+## helia_profiler.RunEvaluation
+
+`class` · `python`
+
+```python
+RunEvaluation(
+    validity: ResultValidity,
+    issues: tuple[ResultIssue, ...] = (),
+    gate_arbitration: GateArbitration | None = None,
+) -> None
+```
+
+`dataclass`
+
+Authoritative validity and structured issues for one completed run.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/evaluation/validity.py:34`
+
+### helia_profiler.RunEvaluation.validity
+
+`attribute` · `python`
+
+```python
+validity: ResultValidity
+```
+
+Source: `src/helia_profiler/evaluation/validity.py:38`
+
+### helia_profiler.RunEvaluation.issues
+
+`attribute` · `python`
+
+```python
+issues: tuple[ResultIssue, ...] = ()
+```
+
+Source: `src/helia_profiler/evaluation/validity.py:39`
+
+### helia_profiler.RunEvaluation.gate_arbitration
+
+`attribute` · `python`
+
+```python
+gate_arbitration: GateArbitration | None = None
+```
+
+Source: `src/helia_profiler/evaluation/validity.py:43`
+
 ## helia_profiler.VerdictStatus
 
 `class` · `python`
@@ -3330,7 +3334,7 @@ Regression policy outcome.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:39`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:40`
 
 ### helia_profiler.VerdictStatus.PASS
 
@@ -3340,7 +3344,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:39`
 PASS = 'pass'
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:42`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:43`
 
 ### helia_profiler.VerdictStatus.WARN
 
@@ -3350,7 +3354,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:42`
 WARN = 'warn'
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:43`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:44`
 
 ### helia_profiler.VerdictStatus.FAIL
 
@@ -3360,7 +3364,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:43`
 FAIL = 'fail'
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:44`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:45`
 
 ### helia_profiler.VerdictStatus.SKIP
 
@@ -3370,7 +3374,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:44`
 SKIP = 'skip'
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:45`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:46`
 
 ## helia_profiler.ComparabilityAssessment
 
@@ -3474,7 +3478,7 @@ Tolerance and availability policy for one named comparison metric.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:48`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:49`
 
 ### helia_profiler.MetricPolicy.direction
 
@@ -3484,7 +3488,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:48`
 direction: MetricDirection
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:52`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:53`
 
 ### helia_profiler.MetricPolicy.unit
 
@@ -3494,7 +3498,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:52`
 unit: str
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:53`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:54`
 
 ### helia_profiler.MetricPolicy.max_regression_pct
 
@@ -3504,7 +3508,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:53`
 max_regression_pct: float | None = None
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:54`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:55`
 
 ### helia_profiler.MetricPolicy.max_regression_abs
 
@@ -3514,7 +3518,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:54`
 max_regression_abs: float | None = None
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:55`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:56`
 
 ### helia_profiler.MetricPolicy.missing
 
@@ -3524,7 +3528,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:55`
 missing: MissingMetricPolicy | None = None
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:56`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:57`
 
 ### helia_profiler.MetricPolicy.extra
 
@@ -3534,7 +3538,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:56`
 extra: dict[str, Any] = field(default_factory=dict, repr=False)
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:57`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:58`
 
 ### helia_profiler.MetricPolicy.from_dict
 
@@ -3546,7 +3550,7 @@ from_dict(data: dict[str, Any]) -> Self
 
 `classmethod`
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:78`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:79`
 
 ### helia_profiler.MetricPolicy.to_dict
 
@@ -3556,7 +3560,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:78`
 to_dict() -> dict[str, Any]
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:89`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:90`
 
 ## helia_profiler.ComparisonProfile
 
@@ -3580,7 +3584,7 @@ Open v1 profile selecting deterministic metric regression policies.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:98`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:99`
 
 ### helia_profiler.ComparisonProfile.schema
 
@@ -3590,7 +3594,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:98`
 schema: str
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:102`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:103`
 
 ### helia_profiler.ComparisonProfile.schema_version
 
@@ -3600,7 +3604,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:102`
 schema_version: int
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:103`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:104`
 
 ### helia_profiler.ComparisonProfile.metrics
 
@@ -3610,7 +3614,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:103`
 metrics: dict[str, MetricPolicy]
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:104`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:105`
 
 ### helia_profiler.ComparisonProfile.missing
 
@@ -3620,7 +3624,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:104`
 missing: MissingMetricPolicy | None = None
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:105`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:106`
 
 ### helia_profiler.ComparisonProfile.required_dimensions
 
@@ -3630,7 +3634,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:105`
 required_dimensions: tuple[str, ...] = ()
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:106`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:107`
 
 ### helia_profiler.ComparisonProfile.name
 
@@ -3640,7 +3644,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:106`
 name: str | None = None
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:107`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:108`
 
 ### helia_profiler.ComparisonProfile.extra
 
@@ -3650,7 +3654,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:107`
 extra: dict[str, Any] = field(default_factory=dict, repr=False)
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:108`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:109`
 
 ### helia_profiler.ComparisonProfile.from_dict
 
@@ -3662,7 +3666,7 @@ from_dict(data: dict[str, Any]) -> Self
 
 `classmethod`
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:140`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:141`
 
 ### helia_profiler.ComparisonProfile.load
 
@@ -3674,7 +3678,7 @@ load(path: str | Path) -> Self
 
 `classmethod`
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:154`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:155`
 
 ### helia_profiler.ComparisonProfile.to_dict
 
@@ -3684,7 +3688,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:154`
 to_dict() -> dict[str, Any]
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:165`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:166`
 
 ## helia_profiler.CompareResult
 
@@ -3828,7 +3832,7 @@ Verdict and evidence for one selected metric.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:180`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:181`
 
 ### helia_profiler.MetricVerdict.metric
 
@@ -3838,7 +3842,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:180`
 metric: str
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:184`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:185`
 
 ### helia_profiler.MetricVerdict.status
 
@@ -3848,7 +3852,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:184`
 status: VerdictStatus
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:185`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:186`
 
 ### helia_profiler.MetricVerdict.message
 
@@ -3858,7 +3862,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:185`
 message: str
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:186`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:187`
 
 ### helia_profiler.MetricVerdict.baseline
 
@@ -3868,7 +3872,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:186`
 baseline: float | None = None
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:187`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:188`
 
 ### helia_profiler.MetricVerdict.candidate
 
@@ -3878,7 +3882,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:187`
 candidate: float | None = None
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:188`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:189`
 
 ### helia_profiler.MetricVerdict.regression
 
@@ -3888,7 +3892,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:188`
 regression: float | None = None
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:189`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:190`
 
 ### helia_profiler.MetricVerdict.allowed_regression
 
@@ -3898,7 +3902,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:189`
 allowed_regression: float | None = None
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:190`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:191`
 
 ### helia_profiler.MetricVerdict.unit
 
@@ -3908,7 +3912,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:190`
 unit: str = ''
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:191`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:192`
 
 ## helia_profiler.evaluate_run
 
@@ -3922,7 +3926,7 @@ Evaluate captured results without mutating pipeline state.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/evaluation/validity.py:192`
+Source: `src/helia_profiler/evaluation/validity.py:193`
 
 ## helia_profiler.ComparisonVerdict
 
@@ -3946,7 +3950,7 @@ Deterministic verdict for one result pair and profile.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:194`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:195`
 
 ### helia_profiler.ComparisonVerdict.status
 
@@ -3956,7 +3960,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:194`
 status: VerdictStatus
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:198`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:199`
 
 ### helia_profiler.ComparisonVerdict.metrics
 
@@ -3966,7 +3970,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:198`
 metrics: tuple[MetricVerdict, ...]
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:199`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:200`
 
 ### helia_profiler.ComparisonVerdict.dimension_mismatches
 
@@ -3976,7 +3980,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:199`
 dimension_mismatches: tuple[str, ...] = ()
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:200`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:201`
 
 ### helia_profiler.ComparisonVerdict.profile_name
 
@@ -3986,7 +3990,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:200`
 profile_name: str | None = None
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:201`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:202`
 
 ### helia_profiler.ComparisonVerdict.profile_schema
 
@@ -3996,7 +4000,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:201`
 profile_schema: str = COMPARISON_PROFILE_SCHEMA
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:202`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:203`
 
 ### helia_profiler.ComparisonVerdict.profile_schema_version
 
@@ -4006,7 +4010,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:202`
 profile_schema_version: int = COMPARISON_PROFILE_SCHEMA_VERSION
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:203`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:204`
 
 ### helia_profiler.ComparisonVerdict.profile_sha256
 
@@ -4016,7 +4020,7 @@ Source: `src/helia_profiler/evaluation/comparison_profile.py:203`
 profile_sha256: str = ''
 ```
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:204`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:205`
 
 ## helia_profiler.evaluate_comparison_profile
 
@@ -4030,7 +4034,7 @@ Evaluate existing metric deltas against one versioned profile.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/evaluation/comparison_profile.py:207`
+Source: `src/helia_profiler/evaluation/comparison_profile.py:208`
 
 ## helia_profiler.ComparabilitySeverity
 
@@ -4100,7 +4104,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`
 
-Generated from the `src/helia_profiler` tree `60638c8527d6f08bfb943eb72ca2ee32a639f673`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 ---
 
@@ -4112,7 +4116,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `experimental`
 
-Generated from the `src/helia_profiler` tree `60638c8527d6f08bfb943eb72ca2ee32a639f673`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 ## helia_profiler.ModelAnalysis
 
@@ -4224,7 +4228,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`, `experimental`
 
-Generated from the `src/helia_profiler` tree `60638c8527d6f08bfb943eb72ca2ee32a639f673`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 ## helia_profiler.PowerMode
 
@@ -4260,89 +4264,6 @@ INTERNAL = 'internal'
 
 Source: `src/helia_profiler/power/base.py:16`
 
-## helia_profiler.PowerObservation
-
-`class` · `python`
-
-```python
-PowerObservation(
-    mode: ObservationMode,
-    result: PowerResult,
-    gate_rise_observed: bool,
-    gate_fall_observed: bool,
-    deadline_s: float,
-    integrity: PowerIntegrity,
-) -> None
-```
-
-`dataclass`
-
-Host instrument observation, independent of firmware terminal status.
-
-**API tier:** `experimental`
-
-Source: `src/helia_profiler/results/artifacts.py:67`
-
-### helia_profiler.PowerObservation.mode
-
-`attribute` · `python`
-
-```python
-mode: ObservationMode
-```
-
-Source: `src/helia_profiler/results/artifacts.py:71`
-
-### helia_profiler.PowerObservation.result
-
-`attribute` · `python`
-
-```python
-result: PowerResult
-```
-
-Source: `src/helia_profiler/results/artifacts.py:72`
-
-### helia_profiler.PowerObservation.gate_rise_observed
-
-`attribute` · `python`
-
-```python
-gate_rise_observed: bool
-```
-
-Source: `src/helia_profiler/results/artifacts.py:73`
-
-### helia_profiler.PowerObservation.gate_fall_observed
-
-`attribute` · `python`
-
-```python
-gate_fall_observed: bool
-```
-
-Source: `src/helia_profiler/results/artifacts.py:74`
-
-### helia_profiler.PowerObservation.deadline_s
-
-`attribute` · `python`
-
-```python
-deadline_s: float
-```
-
-Source: `src/helia_profiler/results/artifacts.py:75`
-
-### helia_profiler.PowerObservation.integrity
-
-`attribute` · `python`
-
-```python
-integrity: PowerIntegrity
-```
-
-Source: `src/helia_profiler/results/artifacts.py:76`
-
 ## helia_profiler.PowerResult
 
 `class` · `python`
@@ -4352,7 +4273,6 @@ PowerResult(
     summary: PowerSummary,
     samples: list[PowerSample] = list(),
     gated_windows: list[GatedPowerWindow] = list(),
-    per_layer: dict[str, Any] | None = None,
     metadata: PowerMetadata = PowerMetadata(),
 ) -> None
 ```
@@ -4400,16 +4320,6 @@ gated_windows: list[GatedPowerWindow] = field(default_factory=list)
 
 Source: `src/helia_profiler/power/base.py:85`
 
-### helia_profiler.PowerResult.per_layer
-
-`attribute` · `python`
-
-```python
-per_layer: dict[str, Any] | None = None
-```
-
-Source: `src/helia_profiler/power/base.py:86`
-
 ### helia_profiler.PowerResult.metadata
 
 `attribute` · `python`
@@ -4418,7 +4328,90 @@ Source: `src/helia_profiler/power/base.py:86`
 metadata: PowerMetadata = field(default_factory=PowerMetadata)
 ```
 
-Source: `src/helia_profiler/power/base.py:87`
+Source: `src/helia_profiler/power/base.py:86`
+
+## helia_profiler.PowerObservation
+
+`class` · `python`
+
+```python
+PowerObservation(
+    mode: ObservationMode,
+    result: PowerResult,
+    gate_rise_observed: bool,
+    gate_fall_observed: bool,
+    deadline_s: float,
+    integrity: PowerIntegrity,
+) -> None
+```
+
+`dataclass`
+
+Host instrument observation, independent of firmware terminal status.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/results/artifacts.py:79`
+
+### helia_profiler.PowerObservation.mode
+
+`attribute` · `python`
+
+```python
+mode: ObservationMode
+```
+
+Source: `src/helia_profiler/results/artifacts.py:83`
+
+### helia_profiler.PowerObservation.result
+
+`attribute` · `python`
+
+```python
+result: PowerResult
+```
+
+Source: `src/helia_profiler/results/artifacts.py:84`
+
+### helia_profiler.PowerObservation.gate_rise_observed
+
+`attribute` · `python`
+
+```python
+gate_rise_observed: bool
+```
+
+Source: `src/helia_profiler/results/artifacts.py:85`
+
+### helia_profiler.PowerObservation.gate_fall_observed
+
+`attribute` · `python`
+
+```python
+gate_fall_observed: bool
+```
+
+Source: `src/helia_profiler/results/artifacts.py:86`
+
+### helia_profiler.PowerObservation.deadline_s
+
+`attribute` · `python`
+
+```python
+deadline_s: float
+```
+
+Source: `src/helia_profiler/results/artifacts.py:87`
+
+### helia_profiler.PowerObservation.integrity
+
+`attribute` · `python`
+
+```python
+integrity: PowerIntegrity
+```
+
+Source: `src/helia_profiler/results/artifacts.py:88`
 
 ## helia_profiler.PowerTerminalRecord
 
@@ -4445,7 +4438,7 @@ Versioned firmware status emitted only after the power gate is low.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/results/artifacts.py:79`
+Source: `src/helia_profiler/results/artifacts.py:91`
 
 ### helia_profiler.PowerTerminalRecord.version
 
@@ -4455,7 +4448,7 @@ Source: `src/helia_profiler/results/artifacts.py:79`
 version: int
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:83`
+Source: `src/helia_profiler/results/artifacts.py:95`
 
 ### helia_profiler.PowerTerminalRecord.status
 
@@ -4465,7 +4458,7 @@ Source: `src/helia_profiler/results/artifacts.py:83`
 status: Literal['ok', 'error']
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:84`
+Source: `src/helia_profiler/results/artifacts.py:96`
 
 ### helia_profiler.PowerTerminalRecord.requested_count
 
@@ -4475,7 +4468,7 @@ Source: `src/helia_profiler/results/artifacts.py:84`
 requested_count: int
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:85`
+Source: `src/helia_profiler/results/artifacts.py:97`
 
 ### helia_profiler.PowerTerminalRecord.completed_count
 
@@ -4485,7 +4478,7 @@ Source: `src/helia_profiler/results/artifacts.py:85`
 completed_count: int
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:86`
+Source: `src/helia_profiler/results/artifacts.py:98`
 
 ### helia_profiler.PowerTerminalRecord.elapsed_us
 
@@ -4495,7 +4488,7 @@ Source: `src/helia_profiler/results/artifacts.py:86`
 elapsed_us: int | None
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:87`
+Source: `src/helia_profiler/results/artifacts.py:99`
 
 ### helia_profiler.PowerTerminalRecord.final_phase
 
@@ -4505,7 +4498,7 @@ Source: `src/helia_profiler/results/artifacts.py:87`
 final_phase: str
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:88`
+Source: `src/helia_profiler/results/artifacts.py:100`
 
 ### helia_profiler.PowerTerminalRecord.error_code
 
@@ -4515,7 +4508,7 @@ Source: `src/helia_profiler/results/artifacts.py:88`
 error_code: int
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:89`
+Source: `src/helia_profiler/results/artifacts.py:101`
 
 ### helia_profiler.PowerTerminalRecord.gate_asserted
 
@@ -4525,7 +4518,7 @@ Source: `src/helia_profiler/results/artifacts.py:89`
 gate_asserted: bool
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:90`
+Source: `src/helia_profiler/results/artifacts.py:102`
 
 ### helia_profiler.PowerTerminalRecord.gate_lowered
 
@@ -4535,7 +4528,7 @@ Source: `src/helia_profiler/results/artifacts.py:90`
 gate_lowered: bool
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:91`
+Source: `src/helia_profiler/results/artifacts.py:103`
 
 ### helia_profiler.PowerTerminalRecord.gate_elapsed_us
 
@@ -4545,7 +4538,7 @@ Source: `src/helia_profiler/results/artifacts.py:91`
 gate_elapsed_us: int | None = None
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:95`
+Source: `src/helia_profiler/results/artifacts.py:107`
 
 ## helia_profiler.OnDevicePowerSummary
 
@@ -4571,7 +4564,7 @@ Integer-unit aggregate reported by a firmware-side power monitor.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/results/artifacts.py:122`
+Source: `src/helia_profiler/results/artifacts.py:134`
 
 ### helia_profiler.OnDevicePowerSummary.source
 
@@ -4581,7 +4574,7 @@ Source: `src/helia_profiler/results/artifacts.py:122`
 source: str
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:126`
+Source: `src/helia_profiler/results/artifacts.py:138`
 
 ### helia_profiler.OnDevicePowerSummary.scope
 
@@ -4591,7 +4584,7 @@ Source: `src/helia_profiler/results/artifacts.py:126`
 scope: Literal['fixed_n_inference']
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:127`
+Source: `src/helia_profiler/results/artifacts.py:139`
 
 ### helia_profiler.OnDevicePowerSummary.energy_nj
 
@@ -4601,7 +4594,7 @@ Source: `src/helia_profiler/results/artifacts.py:127`
 energy_nj: int
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:128`
+Source: `src/helia_profiler/results/artifacts.py:140`
 
 ### helia_profiler.OnDevicePowerSummary.duration_us
 
@@ -4611,7 +4604,7 @@ Source: `src/helia_profiler/results/artifacts.py:128`
 duration_us: int
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:129`
+Source: `src/helia_profiler/results/artifacts.py:141`
 
 ### helia_profiler.OnDevicePowerSummary.inference_count
 
@@ -4621,7 +4614,7 @@ Source: `src/helia_profiler/results/artifacts.py:129`
 inference_count: int
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:130`
+Source: `src/helia_profiler/results/artifacts.py:142`
 
 ### helia_profiler.OnDevicePowerSummary.overflow
 
@@ -4631,7 +4624,7 @@ Source: `src/helia_profiler/results/artifacts.py:130`
 overflow: bool
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:131`
+Source: `src/helia_profiler/results/artifacts.py:143`
 
 ### helia_profiler.OnDevicePowerSummary.charge_nc
 
@@ -4641,7 +4634,7 @@ Source: `src/helia_profiler/results/artifacts.py:131`
 charge_nc: int | None = None
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:132`
+Source: `src/helia_profiler/results/artifacts.py:144`
 
 ### helia_profiler.OnDevicePowerSummary.bus_voltage_uv
 
@@ -4651,7 +4644,7 @@ Source: `src/helia_profiler/results/artifacts.py:132`
 bus_voltage_uv: int | None = None
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:133`
+Source: `src/helia_profiler/results/artifacts.py:145`
 
 ### helia_profiler.OnDevicePowerSummary.calibration_id
 
@@ -4661,7 +4654,7 @@ Source: `src/helia_profiler/results/artifacts.py:133`
 calibration_id: str | None = None
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:134`
+Source: `src/helia_profiler/results/artifacts.py:146`
 
 ---
 
@@ -4673,7 +4666,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `experimental`
 
-Generated from the `src/helia_profiler` tree `60638c8527d6f08bfb943eb72ca2ee32a639f673`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 ## helia_profiler.MeasurementScope
 
@@ -5281,7 +5274,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`
 
-Generated from the `src/helia_profiler` tree `60638c8527d6f08bfb943eb72ca2ee32a639f673`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 ## helia_profiler.LayerResult
 
@@ -5463,7 +5456,6 @@ FirmwareMeta(
     clean_attach_wait_us: int | None = None,
     psram: PsramInfo | None = None,
     presets: tuple[str, ...] = (),
-    measured_clock_hz: int | None = None,
 ) -> None
 ```
 
@@ -5576,7 +5568,7 @@ Source: `src/helia_profiler/results/models.py:106`
 system_clock_hz: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:108`
+Source: `src/helia_profiler/results/models.py:109`
 
 ### helia_profiler.FirmwareMeta.profiled_infer_count
 
@@ -5586,7 +5578,7 @@ Source: `src/helia_profiler/results/models.py:108`
 profiled_infer_count: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:109`
+Source: `src/helia_profiler/results/models.py:110`
 
 ### helia_profiler.FirmwareMeta.profiled_infer_total_us
 
@@ -5596,7 +5588,7 @@ Source: `src/helia_profiler/results/models.py:109`
 profiled_infer_total_us: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:110`
+Source: `src/helia_profiler/results/models.py:111`
 
 ### helia_profiler.FirmwareMeta.profiled_infer_avg_us
 
@@ -5606,7 +5598,7 @@ Source: `src/helia_profiler/results/models.py:110`
 profiled_infer_avg_us: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:111`
+Source: `src/helia_profiler/results/models.py:112`
 
 ### helia_profiler.FirmwareMeta.clean_infer_count
 
@@ -5616,7 +5608,7 @@ Source: `src/helia_profiler/results/models.py:111`
 clean_infer_count: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:115`
+Source: `src/helia_profiler/results/models.py:116`
 
 ### helia_profiler.FirmwareMeta.clean_infer_total_cycles
 
@@ -5626,7 +5618,7 @@ Source: `src/helia_profiler/results/models.py:115`
 clean_infer_total_cycles: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:116`
+Source: `src/helia_profiler/results/models.py:117`
 
 ### helia_profiler.FirmwareMeta.clean_infer_avg_cycles
 
@@ -5636,7 +5628,7 @@ Source: `src/helia_profiler/results/models.py:116`
 clean_infer_avg_cycles: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:117`
+Source: `src/helia_profiler/results/models.py:118`
 
 ### helia_profiler.FirmwareMeta.clean_infer_avg_us
 
@@ -5646,7 +5638,7 @@ Source: `src/helia_profiler/results/models.py:117`
 clean_infer_avg_us: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:118`
+Source: `src/helia_profiler/results/models.py:119`
 
 ### helia_profiler.FirmwareMeta.clean_stalled_iters
 
@@ -5656,7 +5648,7 @@ Source: `src/helia_profiler/results/models.py:118`
 clean_stalled_iters: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:123`
+Source: `src/helia_profiler/results/models.py:124`
 
 ### helia_profiler.FirmwareMeta.clean_partial_iters
 
@@ -5666,7 +5658,7 @@ Source: `src/helia_profiler/results/models.py:123`
 clean_partial_iters: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:128`
+Source: `src/helia_profiler/results/models.py:129`
 
 ### helia_profiler.FirmwareMeta.clean_ref_cycles
 
@@ -5676,7 +5668,7 @@ Source: `src/helia_profiler/results/models.py:128`
 clean_ref_cycles: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:138`
+Source: `src/helia_profiler/results/models.py:139`
 
 ### helia_profiler.FirmwareMeta.clean_dwt_rate_cyc
 
@@ -5686,7 +5678,7 @@ Source: `src/helia_profiler/results/models.py:138`
 clean_dwt_rate_cyc: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:144`
+Source: `src/helia_profiler/results/models.py:145`
 
 ### helia_profiler.FirmwareMeta.clean_dwt_rate_us
 
@@ -5696,7 +5688,7 @@ Source: `src/helia_profiler/results/models.py:144`
 clean_dwt_rate_us: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:145`
+Source: `src/helia_profiler/results/models.py:146`
 
 ### helia_profiler.FirmwareMeta.clean_attach_wait_us
 
@@ -5706,7 +5698,7 @@ Source: `src/helia_profiler/results/models.py:145`
 clean_attach_wait_us: int | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:150`
+Source: `src/helia_profiler/results/models.py:151`
 
 ### helia_profiler.FirmwareMeta.psram
 
@@ -5716,7 +5708,7 @@ Source: `src/helia_profiler/results/models.py:150`
 psram: PsramInfo | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:151`
+Source: `src/helia_profiler/results/models.py:152`
 
 ### helia_profiler.FirmwareMeta.presets
 
@@ -5726,17 +5718,7 @@ Source: `src/helia_profiler/results/models.py:151`
 presets: tuple[str, ...] = ()
 ```
 
-Source: `src/helia_profiler/results/models.py:152`
-
-### helia_profiler.FirmwareMeta.measured_clock_hz
-
-`attribute` · `python`
-
-```python
-measured_clock_hz: int | None = None
-```
-
-Source: `src/helia_profiler/results/models.py:154`
+Source: `src/helia_profiler/results/models.py:153`
 
 ### helia_profiler.FirmwareMeta.reported_model_bytes
 
@@ -5754,7 +5736,7 @@ as text. Anything that needs a number asks here instead of assuming;
 the raw value stays on ``model_size`` so diagnostics can still quote
 what the device actually said (#281).
 
-Source: `src/helia_profiler/results/models.py:157`
+Source: `src/helia_profiler/results/models.py:156`
 
 ## helia_profiler.PmuResult
 
@@ -5776,7 +5758,7 @@ Complete PMU profiling result across all presets.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/results/models.py:172`
+Source: `src/helia_profiler/results/models.py:171`
 
 ### helia_profiler.PmuResult.meta
 
@@ -5786,7 +5768,7 @@ Source: `src/helia_profiler/results/models.py:172`
 meta: FirmwareMeta
 ```
 
-Source: `src/helia_profiler/results/models.py:176`
+Source: `src/helia_profiler/results/models.py:175`
 
 ### helia_profiler.PmuResult.presets
 
@@ -5796,7 +5778,7 @@ Source: `src/helia_profiler/results/models.py:176`
 presets: dict[str, PresetResult] = field(default_factory=dict)
 ```
 
-Source: `src/helia_profiler/results/models.py:177`
+Source: `src/helia_profiler/results/models.py:176`
 
 ### helia_profiler.PmuResult.layers
 
@@ -5806,7 +5788,7 @@ Source: `src/helia_profiler/results/models.py:177`
 layers: list[LayerResult] = field(default_factory=list)
 ```
 
-Source: `src/helia_profiler/results/models.py:178`
+Source: `src/helia_profiler/results/models.py:177`
 
 ### helia_profiler.PmuResult.overflow_detected
 
@@ -5816,7 +5798,7 @@ Source: `src/helia_profiler/results/models.py:178`
 overflow_detected: bool = False
 ```
 
-Source: `src/helia_profiler/results/models.py:179`
+Source: `src/helia_profiler/results/models.py:178`
 
 ### helia_profiler.PmuResult.groups
 
@@ -5826,7 +5808,7 @@ Source: `src/helia_profiler/results/models.py:179`
 groups: dict[str, list[LayerResult]] = field(default_factory=dict)
 ```
 
-Source: `src/helia_profiler/results/models.py:184`
+Source: `src/helia_profiler/results/models.py:183`
 
 ## helia_profiler.RunMetadata
 
@@ -5857,7 +5839,7 @@ Accumulated run metadata — enriched by stages, consumed by reports.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/results/models.py:278`
+Source: `src/helia_profiler/results/models.py:277`
 
 ### helia_profiler.RunMetadata.hpx_version
 
@@ -5867,7 +5849,7 @@ Source: `src/helia_profiler/results/models.py:278`
 hpx_version: str = ''
 ```
 
-Source: `src/helia_profiler/results/models.py:282`
+Source: `src/helia_profiler/results/models.py:281`
 
 ### helia_profiler.RunMetadata.run_id
 
@@ -5877,7 +5859,7 @@ Source: `src/helia_profiler/results/models.py:282`
 run_id: str = ''
 ```
 
-Source: `src/helia_profiler/results/models.py:283`
+Source: `src/helia_profiler/results/models.py:282`
 
 ### helia_profiler.RunMetadata.timestamp
 
@@ -5887,7 +5869,7 @@ Source: `src/helia_profiler/results/models.py:283`
 timestamp: str = ''
 ```
 
-Source: `src/helia_profiler/results/models.py:284`
+Source: `src/helia_profiler/results/models.py:283`
 
 ### helia_profiler.RunMetadata.config_snapshot
 
@@ -5897,7 +5879,7 @@ Source: `src/helia_profiler/results/models.py:284`
 config_snapshot: dict[str, Any] = field(default_factory=dict)
 ```
 
-Source: `src/helia_profiler/results/models.py:285`
+Source: `src/helia_profiler/results/models.py:284`
 
 ### helia_profiler.RunMetadata.platform
 
@@ -5907,7 +5889,7 @@ Source: `src/helia_profiler/results/models.py:285`
 platform: PlatformInfo | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:286`
+Source: `src/helia_profiler/results/models.py:285`
 
 ### helia_profiler.RunMetadata.model
 
@@ -5917,7 +5899,7 @@ Source: `src/helia_profiler/results/models.py:286`
 model: ModelInfo | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:287`
+Source: `src/helia_profiler/results/models.py:286`
 
 ### helia_profiler.RunMetadata.toolchain
 
@@ -5927,7 +5909,7 @@ Source: `src/helia_profiler/results/models.py:287`
 toolchain: ToolchainInfo | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:288`
+Source: `src/helia_profiler/results/models.py:287`
 
 ### helia_profiler.RunMetadata.build_images
 
@@ -5937,7 +5919,7 @@ Source: `src/helia_profiler/results/models.py:288`
 build_images: tuple[BuildImage, ...] = ()
 ```
 
-Source: `src/helia_profiler/results/models.py:291`
+Source: `src/helia_profiler/results/models.py:290`
 
 ### helia_profiler.RunMetadata.engine
 
@@ -5947,7 +5929,7 @@ Source: `src/helia_profiler/results/models.py:291`
 engine: EngineInfo | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:292`
+Source: `src/helia_profiler/results/models.py:291`
 
 ### helia_profiler.RunMetadata.firmware
 
@@ -5957,7 +5939,7 @@ Source: `src/helia_profiler/results/models.py:292`
 firmware: FirmwareMeta | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:293`
+Source: `src/helia_profiler/results/models.py:292`
 
 ### helia_profiler.RunMetadata.memory_plan
 
@@ -5967,7 +5949,7 @@ Source: `src/helia_profiler/results/models.py:293`
 memory_plan: 'MemoryPlan | None' = None
 ```
 
-Source: `src/helia_profiler/results/models.py:294`
+Source: `src/helia_profiler/results/models.py:293`
 
 ### helia_profiler.RunMetadata.timing
 
@@ -5977,7 +5959,7 @@ Source: `src/helia_profiler/results/models.py:294`
 timing: TimingInfo | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:295`
+Source: `src/helia_profiler/results/models.py:294`
 
 ### helia_profiler.RunMetadata.compatibility
 
@@ -5987,7 +5969,7 @@ Source: `src/helia_profiler/results/models.py:295`
 compatibility: CompatibilityResolution | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:296`
+Source: `src/helia_profiler/results/models.py:295`
 
 ### helia_profiler.RunMetadata.dependencies
 
@@ -5997,7 +5979,7 @@ Source: `src/helia_profiler/results/models.py:296`
 dependencies: 'DependencyProvenance | None' = None
 ```
 
-Source: `src/helia_profiler/results/models.py:297`
+Source: `src/helia_profiler/results/models.py:296`
 
 ## helia_profiler.ProfileResult
 
@@ -6024,7 +6006,7 @@ PMU data, optional power data, run metadata, and report file paths.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/results/models.py:581`
+Source: `src/helia_profiler/results/models.py:587`
 
 ### helia_profiler.ProfileResult.pmu
 
@@ -6034,7 +6016,7 @@ Source: `src/helia_profiler/results/models.py:581`
 pmu: PmuResult
 ```
 
-Source: `src/helia_profiler/results/models.py:589`
+Source: `src/helia_profiler/results/models.py:595`
 
 ### helia_profiler.ProfileResult.power
 
@@ -6044,7 +6026,7 @@ Source: `src/helia_profiler/results/models.py:589`
 power: PowerResult | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:590`
+Source: `src/helia_profiler/results/models.py:596`
 
 ### helia_profiler.ProfileResult.power_observation
 
@@ -6054,7 +6036,7 @@ Source: `src/helia_profiler/results/models.py:590`
 power_observation: PowerObservation | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:591`
+Source: `src/helia_profiler/results/models.py:597`
 
 ### helia_profiler.ProfileResult.power_terminal
 
@@ -6064,7 +6046,7 @@ Source: `src/helia_profiler/results/models.py:591`
 power_terminal: PowerTerminalRecord | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:592`
+Source: `src/helia_profiler/results/models.py:598`
 
 ### helia_profiler.ProfileResult.on_device_power
 
@@ -6074,7 +6056,7 @@ Source: `src/helia_profiler/results/models.py:592`
 on_device_power: OnDevicePowerSummary | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:593`
+Source: `src/helia_profiler/results/models.py:599`
 
 ### helia_profiler.ProfileResult.metadata
 
@@ -6084,7 +6066,7 @@ Source: `src/helia_profiler/results/models.py:593`
 metadata: RunMetadata = field(default_factory=RunMetadata)
 ```
 
-Source: `src/helia_profiler/results/models.py:594`
+Source: `src/helia_profiler/results/models.py:600`
 
 ### helia_profiler.ProfileResult.report_paths
 
@@ -6094,7 +6076,7 @@ Source: `src/helia_profiler/results/models.py:594`
 report_paths: list[Path] = field(default_factory=list)
 ```
 
-Source: `src/helia_profiler/results/models.py:595`
+Source: `src/helia_profiler/results/models.py:601`
 
 ### helia_profiler.ProfileResult.layers
 
@@ -6106,7 +6088,7 @@ layers: list[LayerResult]
 
 Merged per-layer results across all PMU presets.
 
-Source: `src/helia_profiler/results/models.py:598`
+Source: `src/helia_profiler/results/models.py:604`
 
 ### helia_profiler.ProfileResult.total_cycles
 
@@ -6116,7 +6098,7 @@ Source: `src/helia_profiler/results/models.py:598`
 total_cycles: float
 ```
 
-Source: `src/helia_profiler/results/models.py:603`
+Source: `src/helia_profiler/results/models.py:609`
 
 ### helia_profiler.ProfileResult.layer_count
 
@@ -6126,7 +6108,7 @@ Source: `src/helia_profiler/results/models.py:603`
 layer_count: int
 ```
 
-Source: `src/helia_profiler/results/models.py:607`
+Source: `src/helia_profiler/results/models.py:613`
 
 ### helia_profiler.ProfileResult.overflow_detected
 
@@ -6136,7 +6118,7 @@ Source: `src/helia_profiler/results/models.py:607`
 overflow_detected: bool
 ```
 
-Source: `src/helia_profiler/results/models.py:611`
+Source: `src/helia_profiler/results/models.py:617`
 
 ---
 
@@ -6148,7 +6130,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `experimental`
 
-Generated from the `src/helia_profiler` tree `60638c8527d6f08bfb943eb72ca2ee32a639f673`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 ## helia_profiler.RunStatus
 
@@ -6747,7 +6729,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`
 
-Generated from the `src/helia_profiler` tree `60638c8527d6f08bfb943eb72ca2ee32a639f673`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 ## helia_profiler.EngineType
 
@@ -6952,6 +6934,20 @@ PSRAM = 'psram'
 ```
 
 Source: `src/helia_profiler/platform/placement.py:36`
+
+### helia_profiler.Placement.region
+
+`attribute` · `python`
+
+```python
+region: MemoryRegion
+```
+
+The physical region this placement lands in.
+
+``TCM`` is DTCM: ITCM is code-only and never holds arenas or weights.
+
+Source: `src/helia_profiler/platform/placement.py:39`
 
 ## helia_profiler.Transport
 

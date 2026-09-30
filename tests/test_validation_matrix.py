@@ -98,6 +98,7 @@ models:
   kws-pruned:
     path: models/kws-pruned.tflite
     name: KWS pruned
+    category: kws  # retired ModelSpec field; registries that set it must still load
     comparison_group: kws
     arena_size: 65536
 """

@@ -14,7 +14,7 @@ from .memory import (
     _serialise_memory_reconciliation,
     _serialise_memory_regions,
 )
-from .power import _power_summary_to_dict
+from .power import _power_run_records, _power_summary_to_dict
 from .contracts import RUN_SUMMARY_SCHEMA, RUN_SUMMARY_SCHEMA_VERSION
 from ..errors import ReportError
 from ..results.issues import Severity
@@ -187,10 +187,7 @@ def _write_summary(
         ):
             if key in power_meta:
                 summary["power"][key] = power_meta[key]
-        if ctx.power_run is not None and ctx.power_run.terminal is not None:
-            summary["power"]["terminal"] = asdict(ctx.power_run.terminal)
-        if ctx.power_run is not None and ctx.power_run.on_device_summary is not None:
-            summary["power"]["on_device_summary"] = asdict(ctx.power_run.on_device_summary)
+        summary["power"].update(_power_run_records(ctx.power_run))
         # High-level summaries report only the gated (inference) portion. The
         # non-inference whole-capture window is annotated in the detailed power
         # CSV, not here, so users compare like-for-like inference energy.

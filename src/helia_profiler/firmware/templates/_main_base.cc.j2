@@ -117,7 +117,7 @@
 // after reset, and USB CDC needs a brief settle after the host asserts DTR.
 // Keep them named here so they stay discoverable and do not accrete as bare
 // magic numbers throughout main().  The host side polls wherever it can
-// (see capture/readiness.py); these cover only the genuinely-blind windows.
+// (see transport/timing.py); these cover only the genuinely-blind windows.
 // SWO/ITM has no back-pressure, so a one-shot "delay then print the header"
 // races the host's attach+enable: when the host enables SWO a hair late the
 // HPX_START sentinel has already been clocked into the undrained ITM FIFO and

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import json
 import math
 
-from .fixture import FixtureBuild
+from ._fixture_build import FixtureBuild
 from .fixture_capture import FixtureCaptureResult
 from .fixture_metrics import FixtureFootprint, FixtureMetric
 from .fixture_runtime import FixtureFile

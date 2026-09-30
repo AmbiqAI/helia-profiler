@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import math
 
 from .engines import EngineType
-from .fixture import FixedFixture, FixtureBuild, TypedFixture
+from ._fixture_build import FixedFixture, FixtureBuild, TypedFixture
 from .results.models import ProfileResult
 
 #: Clock and placement every fixed fixture is built for (see ``fixture._validate``).

@@ -121,7 +121,7 @@ class Session:
 
         yaml_path = Path(path).expanduser().resolve()
         try:
-            data = yaml.safe_load(yaml_path.read_text()) or {}
+            data = yaml.safe_load(yaml_path.read_text(encoding="utf-8")) or {}
         except FileNotFoundError as exc:
             raise ConfigError(
                 f"Config file not found: {yaml_path}",
@@ -302,8 +302,12 @@ class Session:
             write_compare_artifacts(result, Path(output_dir))
         return result
 
-    def doctor(self) -> DoctorResult:
-        """Return structured host dependency checks."""
+    def doctor(self, *, include_versions: bool = False) -> DoctorResult:
+        """Return structured host dependency checks.
+
+        Set *include_versions* to also compare installed tool and package
+        versions against the HPX compatibility baseline.
+        """
         from .config import Transport
         from .hostenv.doctor import inspect_environment
 
@@ -314,6 +318,7 @@ class Session:
             engine=config.engine.type,
             require_segger_rtt=config.target.transport is Transport.RTT,
             segger_rtt_path=config.target.segger_rtt_path,
+            include_versions=include_versions,
         )
 
     def show(self, value: Any, *, console: Console | None = None) -> Any:

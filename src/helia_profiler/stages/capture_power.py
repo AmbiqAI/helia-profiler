@@ -18,7 +18,7 @@ from ..results import PowerObservation
 from ..config import DEFAULT_POWER_DURATION_S, WindowMode
 from ..errors import PowerError
 from ..pipeline import PipelineContext
-from ..power.base import PowerDriver
+from ..power.base import PowerDriver, PowerMode
 from ..power.diagnostics import (
     BOOT_SETTLE_S,
     CLEAN_WINDOW_WARMUP_REPS,
@@ -30,11 +30,7 @@ from ..target.lifecycle import CapturePhase, prepare_target_for_phase
 
 log = logging.getLogger("hpx")
 
-_BOOT_SETTLE_S = BOOT_SETTLE_S
 _SAFETY_MARGIN_S = 6.0  # extra headroom beyond estimated runtime
-
-
-_AUTO_WINDOW_WARMUP_REPS = CLEAN_WINDOW_WARMUP_REPS
 
 
 def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
@@ -76,7 +72,7 @@ def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
     if total_cycles <= 0:
         return None
 
-    # Use the CPU clock actually selected for this run (resolved in stage 1),
+    # Use the CPU clock actually selected for this run (resolved with the platform),
     # not the SoC's top frequency.
     clock_hz = platform.cpu_clock_mhz * 1_000_000
     if clock_hz <= 0:
@@ -85,15 +81,9 @@ def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
     cycles_per_inference = total_cycles
     inference_time_s = cycles_per_inference / clock_hz
 
-    if (
-        ctx.power_plan is not None
-        and ctx.power_plan.inference_count is not None
-        and ctx.power_plan.reference_inference_us is not None
-    ):
-        planned_run_s = (
-            ctx.power_plan.inference_count * ctx.power_plan.reference_inference_us
-        ) / 1_000_000.0
-        return _BOOT_SETTLE_S + planned_run_s + _SAFETY_MARGIN_S
+    planned_run_s = ctx.power_plan.planned_window_s if ctx.power_plan is not None else None
+    if planned_run_s is not None:
+        return BOOT_SETTLE_S + planned_run_s + _SAFETY_MARGIN_S
 
     profiling = ctx.config.profiling
     num_presets = len(pmu.presets) or 1
@@ -107,7 +97,7 @@ def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
         # real inference time (main.cc.j2's warm loop runs before the spin),
         # so keep them in the margin.
         clean_warmup_reps = (
-            _AUTO_WINDOW_WARMUP_REPS
+            CLEAN_WINDOW_WARMUP_REPS
             if profiling.window_mode is WindowMode.AUTO
             else max(1, profiling.warmup)
         )
@@ -121,15 +111,15 @@ def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
                 target_s / inference_time_s if inference_time_s > 0 else profiling.window_min
             )
             clean_iters = max(profiling.window_min, min(profiling.window_max, clean_iters))
-            clean_warmup_reps = _AUTO_WINDOW_WARMUP_REPS
+            clean_warmup_reps = CLEAN_WINDOW_WARMUP_REPS
         else:
             clean_iters = max(1, profiling.iterations)
-            clean_warmup_reps = max(_AUTO_WINDOW_WARMUP_REPS, profiling.warmup)
+            clean_warmup_reps = max(CLEAN_WINDOW_WARMUP_REPS, profiling.warmup)
         clean_run_s = (clean_iters + clean_warmup_reps) * inference_time_s
 
     firmware_run_s = profiled_run_s + clean_run_s
 
-    estimated = _BOOT_SETTLE_S + firmware_run_s + _SAFETY_MARGIN_S
+    estimated = BOOT_SETTLE_S + firmware_run_s + _SAFETY_MARGIN_S
     return estimated
 
 
@@ -139,7 +129,7 @@ class CapturePowerStage:
         return "capture_power"
 
     def should_skip(self, ctx: PipelineContext) -> bool:
-        return not ctx.config.power.enabled or ctx.config.power.mode.value == "internal"
+        return not ctx.config.power.enabled or ctx.config.power.mode is PowerMode.INTERNAL
 
     def run(self, ctx: PipelineContext) -> None:
         from ..capture import capture_power
@@ -190,18 +180,14 @@ class CapturePowerStage:
             capture_duration = configured
 
         planned_count = ctx.power_plan.inference_count if ctx.power_plan is not None else None
-        planned_us = ctx.power_plan.reference_inference_us if ctx.power_plan is not None else None
+        planned_s = ctx.power_plan.planned_window_s if ctx.power_plan is not None else None
         message = "Arming instrument and resetting target"
         if planned_count is not None:
             noun = count_noun(ctx.config.profiling.clean_window_probe, planned_count)
             message += f" · {planned_count:,} {noun}"
         ctx.report_progress(
             message,
-            eta_s=(
-                planned_count * planned_us / 1_000_000
-                if planned_count is not None and planned_us is not None
-                else capture_duration
-            ),
+            eta_s=planned_s if planned_s is not None else capture_duration,
         )
 
         try:

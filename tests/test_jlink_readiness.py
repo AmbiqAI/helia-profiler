@@ -4,48 +4,9 @@ import types
 
 import pytest
 
-from helia_profiler.capture import readiness
-from helia_profiler.capture.readiness import (
-    open_jlink_with_retry,
-    poll_until,
-    resume_if_halted,
-)
 from helia_profiler.errors import CaptureError
 from helia_profiler.target.probe import jlink as target_jlink
-
-
-def test_poll_until_returns_true_immediately_when_predicate_satisfied(monkeypatch):
-    sleeps: list[float] = []
-    monkeypatch.setattr(readiness.time, "sleep", lambda s: sleeps.append(s))
-
-    assert poll_until(lambda: True, timeout_s=1.0) is True
-    assert sleeps == []
-
-
-def test_poll_until_polls_until_predicate_flips(monkeypatch):
-    monkeypatch.setattr(readiness.time, "sleep", lambda _s: None)
-    calls = {"n": 0}
-
-    def predicate() -> bool:
-        calls["n"] += 1
-        return calls["n"] >= 3
-
-    assert poll_until(predicate, timeout_s=10.0, interval_s=0.01) is True
-    assert calls["n"] == 3
-
-
-def test_poll_until_times_out(monkeypatch):
-    # Advance a fake monotonic clock so the deadline is reached deterministically.
-    clock = {"t": 0.0}
-    monkeypatch.setattr(readiness.time, "monotonic", lambda: clock["t"])
-
-    def fake_sleep(s: float) -> None:
-        clock["t"] += s
-
-    monkeypatch.setattr(readiness.time, "sleep", fake_sleep)
-
-    assert poll_until(lambda: False, timeout_s=0.5, interval_s=0.1) is False
-    assert clock["t"] >= 0.5
+from helia_profiler.target.probe.jlink import open_jlink_with_retry, resume_if_halted
 
 
 # _FakeJLink/_RetryJLink implement only the slice of DebugMemorySession the

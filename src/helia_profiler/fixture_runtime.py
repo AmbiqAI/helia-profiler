@@ -272,7 +272,8 @@ class _PreparedRuntimeStage:
             f"schema_version: 1\nmodule:\n  name: {module_name}\n  type: runtime\n  version: '0.1.0'\n"
             "support:\n  ambiqsuite: true\n  zephyr: false\n"
             f"build:\n  cmake:\n    targets: [{alias}]\n"
-            "depends:\n  required: [nsx-core, nsx-soc-hal]\n"
+            "depends:\n  required: [nsx-core, nsx-soc-hal]\n",
+            encoding="utf-8",
         )
         includes = "\n".join(
             '  "${CMAKE_CURRENT_LIST_DIR}/include/' + name + '"' for name in data.include_dirs
@@ -282,7 +283,8 @@ class _PreparedRuntimeStage:
             f'set_target_properties({library} PROPERTIES IMPORTED_LOCATION "${{CMAKE_CURRENT_LIST_DIR}}/runtime.a")\n'
             f"target_include_directories({library} INTERFACE\n" + includes + "\n)\n"
             f"target_compile_definitions({library} INTERFACE {' '.join(data.consumer_defines)})\n"
-            f"add_library({alias} ALIAS {library})\n"
+            f"add_library({alias} ALIAS {library})\n",
+            encoding="utf-8",
         )
         if ctx.engine_artifacts is None:
             raise ConfigError("Engine preparation did not produce artifacts")

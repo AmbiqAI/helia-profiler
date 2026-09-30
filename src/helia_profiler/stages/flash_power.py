@@ -7,9 +7,9 @@ from datetime import datetime, timezone
 
 from ..config import PowerFirmware
 from ..results import DeploymentRecord
-from ..errors import BuildError, CaptureError, DeterministicCaptureError
+from ..errors import BuildError
 from ..pipeline import PipelineContext
-from ..target.lifecycle import try_power_cycle_for_context
+from .flash import deploy_firmware
 
 log = logging.getLogger("hpx")
 
@@ -28,59 +28,15 @@ class FlashPowerFirmwareStage:
         return not ctx.config.power.enabled or firmware_mode != PowerFirmware.DEDICATED
 
     def run(self, ctx: PipelineContext) -> None:
-        from ..target.probe.flash import flash_binary
-
         if ctx.power_run is None or ctx.power_run.firmware is None:
             raise BuildError(
                 "Dedicated power firmware was requested but no power artifact was built.",
                 hint="Run the power firmware build step before deployment.",
             )
         artifact = ctx.power_run.firmware
-        binary_path = artifact.binary_path
-        if ctx.soc is None:
-            raise BuildError("Cannot flash power firmware before platform resolution.")
-        soc = ctx.soc
 
-        ctx.report_progress(f"Deploying power firmware to {ctx.config.target.board}")
+        deploy_firmware(ctx, artifact.binary_path, role="power")
 
-        jlink_serial = ctx.resolved_jlink_serial or ctx.config.target.jlink_serial
-
-        def deploy() -> None:
-            flash_binary(
-                binary_path,
-                device=soc.jlink_device,
-                load_addr=soc.capabilities.memory.app_flash_load_addr,
-                jlink_serial=jlink_serial,
-                timeout_s=ctx.config.timeouts.flash_s,
-            )
-
-        try:
-            deploy()
-        except DeterministicCaptureError as exc:
-            # Missing image / unknown load address: retrying cannot fix a
-            # config gap. Re-wrap (same type; hint re-attached so it renders
-            # once) so the user sees which deployment step refused (#172).
-            raise DeterministicCaptureError(
-                f"Power firmware deployment failed: {exc.args[0]}",
-                hint=exc.hint,
-            ) from exc
-        except CaptureError as exc:
-            if try_power_cycle_for_context(ctx):
-                try:
-                    deploy()
-                except CaptureError as retry_exc:
-                    # args[0], never str(exc): HpxError.__str__ appends the
-                    # hint, and hint= re-attaches it, so str would print it twice.
-                    raise BuildError(
-                        "Power firmware deployment failed after power-cycle "
-                        f"recovery: {retry_exc.args[0]}",
-                        hint=retry_exc.hint,
-                    ) from retry_exc
-            else:
-                raise BuildError(
-                    f"Power firmware deployment failed: {exc.args[0]}",
-                    hint=exc.hint,
-                ) from exc
         ctx.publish_power_deployment(
             DeploymentRecord(
                 firmware=artifact,
@@ -88,5 +44,5 @@ class FlashPowerFirmwareStage:
                 deployed_at=datetime.now(timezone.utc).isoformat(),
             )
         )
-        log.info("Power firmware deployed: %s", binary_path)
+        log.info("Power firmware deployed: %s", artifact.binary_path)
         ctx.report_progress("Power firmware deployed", kind="checkpoint", min_verbosity=1)

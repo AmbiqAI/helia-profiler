@@ -463,6 +463,7 @@ notebook = [
     { name = "ipykernel" },
 ]
 test = [
+    { name = "packaging" },
     { name = "pytest" },
     { name = "pytest-timeout" },
 ]
@@ -475,7 +476,7 @@ requires-dist = [
     { name = "backports-strenum", marker = "extra == 'aot'", specifier = "<1.3" },
     { name = "click", specifier = ">=8.2" },
     { name = "flatbuffers", marker = "extra == 'analysis'", specifier = ">=24.0" },
-    { name = "helia-aot", marker = "extra == 'aot'", specifier = ">=0.23.0,<0.24.0" },
+    { name = "helia-aot", marker = "extra == 'aot'", specifier = ">=0.23.0,<0.26.0" },
     { name = "jinja2", specifier = ">=3.1" },
     { name = "neuralspotx", specifier = "==0.8.1" },
     { name = "numpy", specifier = ">=2.1,<3" },
@@ -497,6 +498,7 @@ lint = [
 ]
 notebook = [{ name = "ipykernel", specifier = ">=6,<8" }]
 test = [
+    { name = "packaging", specifier = ">=24.0" },
     { name = "pytest", specifier = ">=8.0" },
     { name = "pytest-timeout", specifier = ">=2.3" },
 ]

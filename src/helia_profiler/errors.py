@@ -73,9 +73,10 @@ class DeterministicCaptureError(CaptureError):
 
     Subclass of :class:`CaptureError` so existing ``except CaptureError``
     handlers still catch it, but recovery paths that would otherwise cycle the
-    target rail and retry (``stages.flash_power``) re-raise it instead: these
-    are configuration/artifact gaps — a missing image, an unknown load
-    address — and cycling the rail only frames them as flaky hardware.
+    target rail and retry (``stages.flash.deploy_firmware``) re-raise it
+    instead: these are configuration/artifact gaps — a missing image, an
+    unknown load address — and cycling the rail only frames them as flaky
+    hardware.
     """
 
 

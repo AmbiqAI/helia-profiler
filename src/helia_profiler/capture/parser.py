@@ -37,12 +37,12 @@ from typing import Any
 from ..errors import CaptureError
 from ..vocab import Aggregation
 from ..results import FirmwareMeta, LayerResult, PmuResult, PresetResult, PsramInfo
-from ..transport.protocol import HPX_PROTOCOL_VERSION
 from ..wire import (
     HPX_END_SENTINEL,
     HPX_HEARTBEAT_PREFIX,
     HPX_ITER_SENTINEL_RE,
     HPX_PRESET_SENTINEL_RE,
+    HPX_PROTOCOL_VERSION,
     HPX_START_SENTINEL,
     KEY_VALUE_RE,
     HeartbeatPhase,

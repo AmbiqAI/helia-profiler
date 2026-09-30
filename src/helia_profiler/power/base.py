@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Protocol, runtime_checkable
 
 from .metadata import PowerMetadata
 
 
-class PowerMode(str, Enum):
+class PowerMode(StrEnum):
     """Power measurement mode."""
 
     EXTERNAL = "external"
@@ -83,7 +83,6 @@ class PowerResult:
     summary: PowerSummary
     samples: list[PowerSample] = field(default_factory=list)
     gated_windows: list[GatedPowerWindow] = field(default_factory=list)
-    per_layer: dict[str, Any] | None = None  # internal mode only
     metadata: PowerMetadata = field(default_factory=PowerMetadata)
 
 
@@ -101,6 +100,10 @@ class PowerDriver(Protocol):
     #: True only when firmware generation emits a complete on-device
     #: PowerTerminalEnvelope measurement for this driver.
     supports_firmware_measurement: bool = False
+
+    def __init__(self, *, serial: str | None = None) -> None:
+        """Construct the driver; ``serial`` selects one instrument when several are attached."""
+        ...
 
     @property
     def name(self) -> str:

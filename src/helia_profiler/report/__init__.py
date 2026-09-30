@@ -2,8 +2,7 @@
 
 The ``write_report`` function is called by the report stage and dispatches to
 the appropriate formatters based on ``OutputConfig``. Each writer lives in its
-own module; this file only orchestrates the pipeline and re-exports the
-private helpers that existing tests import directly.
+own module; this file only orchestrates the pipeline.
 
 Output structure
 ----------------
@@ -29,20 +28,19 @@ from __future__ import annotations
 
 import logging
 import shutil
-from dataclasses import asdict
 from pathlib import Path
 from typing import Any, TYPE_CHECKING
 
 from ..errors import ReportError
 from .aot import _write_aot_manifest, _write_aot_memory_layers
-from .csv_writer import _layer_to_flat_dict, _write_csv, _write_preset_csv
+from .csv_writer import _write_csv, _write_preset_csv
 from .json_writer import _write_json
 from ..evaluation import evaluate_run
 from .manifest import _write_result_manifest
-from .memory import _serialise_memory_plan, _write_memory_breakdown
-from .metadata import _firmware_meta_to_dict, _metadata_to_dict, _write_run_metadata
+from .memory import _write_memory_breakdown
+from .metadata import _write_run_metadata
 from .model_explorer import _write_model_explorer_overlays
-from .power import _power_summary_to_dict, _write_power_csv
+from .power import _write_power_csv
 from .summary import _write_summary
 
 if TYPE_CHECKING:
@@ -94,16 +92,7 @@ def write_report(ctx: PipelineContext) -> list[Path]:
             ctx.power_result,
             ctx.run_metadata,
             output_dir,
-            power_terminal=(
-                asdict(ctx.power_run.terminal)
-                if ctx.power_run is not None and ctx.power_run.terminal is not None
-                else None
-            ),
-            on_device_summary=(
-                asdict(ctx.power_run.on_device_summary)
-                if ctx.power_run is not None and ctx.power_run.on_device_summary is not None
-                else None
-            ),
+            power_run=ctx.power_run,
         )
         paths.append(p)
     else:
@@ -138,7 +127,7 @@ def write_report(ctx: PipelineContext) -> list[Path]:
         try:
             me_dir = output_dir / "model_explorer"
             me_dir.mkdir(parents=True, exist_ok=True)
-            _write_model_explorer_overlays(ctx, me_dir, paths)
+            _write_model_explorer_overlays(pmu, me_dir, paths, aot_op_manifest=_aot_manifest(ctx))
         except Exception as exc:
             raise ReportError(
                 f"Model Explorer overlay generation failed: {exc}",

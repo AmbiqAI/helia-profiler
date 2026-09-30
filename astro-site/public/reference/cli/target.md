@@ -10,7 +10,7 @@ hpx target COMMAND [ARGS]...
 
 Run explicit target-side utility operations
 
-Defined in `src/helia_profiler/cli/inspect_app.py` line 216.
+Defined in `src/helia_profiler/cli/inspect_app.py` line 219.
 
 ## hpx target reset
 
@@ -20,7 +20,7 @@ hpx target reset [OPTIONS]
 
 Reset a target through HPX's non-interactive J-Link wrapper
 
-Defined in `src/helia_profiler/cli/inspect_app.py` line 223.
+Defined in `src/helia_profiler/cli/inspect_app.py` line 226.
 
 ### Options
 
@@ -30,4 +30,4 @@ Defined in `src/helia_profiler/cli/inspect_app.py` line 223.
 | `--jlink-serial` | `Optional[str]` |  | J-Link probe serial number |
 | `--kind` | `debug \| swpoi` | debug | Reset kind: debug r/g reset (default) or SWPOI reset |
 
-Generated from the `src/helia_profiler` tree `60638c8527d6f08bfb943eb72ca2ee32a639f673` with typer 0.26.8 and click 8.3.3.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__` with typer 0.26.8 and click 8.3.3.

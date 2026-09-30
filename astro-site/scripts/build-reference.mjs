@@ -32,17 +32,20 @@ export const PAGES_DIR = 'src/content/docs/reference/api';
 export const SIDEBAR_FILE = 'src/generated/api-sidebar.json';
 
 /*
- * The git tree of the documented source, not a commit and not a ref.
+ * The git tree of the documented source, and the guard that it is committed.
  *
- * The reference records what it was generated from, and a commit sha is the
- * wrong identity for that: it changes on every commit under src/, rewriting
- * every generated file, and it does not survive the squash merges this
- * repository uses. Two commits whose `src/helia_profiler` tree is the same
- * produce the same bytes here.
+ * No generated file records it. Any hash of the source, tree or commit,
+ * changes on every commit under src/ whether or not the documented content
+ * moved, and stamping one rewrote every committed reference file on every
+ * such commit. The committed files carry a placeholder instead, which the
+ * build resolves from build-info.json (src/integrations/source-ref.mjs); the
+ * stale checks, which compare the committed files byte for byte with a fresh
+ * generation from HEAD, are what tie them to the source.
  *
- * A source archive or a container copy has no git data at all, which would
- * ship a page claiming a provenance it does not have, so that is named rather
- * than papered over.
+ * The lookup still runs before every generation because it is the check that
+ * the source being documented is the source HEAD holds, and a source archive
+ * or a container copy has no git data at all to answer that with, so that is
+ * named rather than papered over.
  */
 export function sourceTree(repoRoot, { run = gitRunner, allowDirty = false } = {}) {
   let inside;
@@ -51,7 +54,7 @@ export function sourceTree(repoRoot, { run = gitRunner, allowDirty = false } = {
   } catch (error) {
     throw new Error(
       `Cannot read the source tree: ${repoRoot} is not a git checkout ` +
-        `(${error.message}). The reference records the git tree of ${SOURCE_PATH}; ` +
+        `(${error.message}). The reference is generated from the committed ${SOURCE_PATH}; ` +
         'build it from a git checkout, and in CI with actions/checkout fetch-depth: 0.',
     );
   }
@@ -161,23 +164,25 @@ export const urlOf = (slug, extension) =>
   `${BASE}${ROUTE_PREFIX}/${slug.split(path.sep).join('/')}.${extension}`;
 
 /**
- * Record the source tree on every JSON artifact.
+ * Strip source identity from every JSON artifact and normalise its layout.
  *
- * pyref's `--commit` writes `generatedFrom.sourceCommit`, which is the
- * identity this reference deliberately does not carry.
+ * pyref's `--commit` writes `generatedFrom.sourceCommit`, which is an identity
+ * this reference deliberately does not carry; see `sourceTree`.
  */
-export function stampSourceTree(artifactRoot, tree) {
-  const stamp = (file) => {
+export function stripSourceIdentity(artifactRoot) {
+  const strip = (file) => {
     const model = JSON.parse(fs.readFileSync(file, 'utf8'));
-    delete model.generatedFrom?.sourceCommit;
-    model.generatedFrom = { ...model.generatedFrom, sourceTree: tree };
+    if (model.generatedFrom) {
+      delete model.generatedFrom.sourceCommit;
+      delete model.generatedFrom.sourceTree;
+    }
     fs.writeFileSync(file, `${JSON.stringify(model, null, 2)}\n`, 'utf8');
   };
   const walk = (directory) => {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
       const entryPath = path.join(directory, entry.name);
       if (entry.isDirectory()) walk(entryPath);
-      else if (entry.name.endsWith('.json')) stamp(entryPath);
+      else if (entry.name.endsWith('.json')) strip(entryPath);
     }
   };
   walk(artifactRoot);
@@ -196,8 +201,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const run = (command, args, options = {}) =>
     execFileSync(command, args, { cwd: site, stdio: 'inherit', ...options });
 
+  /* Refuses uncommitted source; the tree itself only reaches the log. */
   const tree = sourceTree(repo, { allowDirty: Boolean(process.env.DOCS_ALLOW_DIRTY_SOURCE) });
-  run('node', ['scripts/scope-dump.mjs', '--tree', tree]);
+  run('node', ['scripts/scope-dump.mjs']);
 
   const publicDir = path.join(outRoot, 'public');
   const pagesDir = path.join(outRoot, PAGES_DIR);
@@ -276,7 +282,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     'utf8',
   );
 
-  stampSourceTree(artifactRoot, tree);
+  stripSourceIdentity(artifactRoot);
 
   console.log(
     `reference: ${report.counts.symbols} symbols and ${report.counts.modulePages} module page ` +

@@ -16,6 +16,7 @@ from helia_profiler.results import (
     PowerTerminalRecord,
 )
 from helia_profiler.capture.power_terminal import (
+    collect_power_terminal_envelope_from_chunks,
     collect_power_terminal_envelope_rtt,
     parse_power_terminal_envelope,
 )
@@ -25,9 +26,9 @@ from helia_profiler.pipeline import PipelineContext
 from helia_profiler.power.base import PowerResult, PowerSummary
 from helia_profiler.power.metadata import ObservationMode, PowerIntegrity
 from helia_profiler.capture.terminal_transport import (
+    UartPowerTerminalTransport,
     UsbCdcPowerTerminalTransport,
     _TERMINAL_TRANSPORTS,
-    _collect_chunked_terminal,
     _collect_serial_terminal,
     register_power_terminal_transport,
 )
@@ -541,15 +542,30 @@ def test_collect_power_terminal_rtt_times_out_without_data(
 
 
 class _FakeSerial:
-    def __init__(self, lines: list[bytes]) -> None:
-        self.lines = list(lines)
+    """Byte stream that hands out one queued chunk per ``read``."""
 
-    def readline(self) -> bytes:
-        return self.lines.pop(0) if self.lines else b""
+    def __init__(self, lines: list[bytes]) -> None:
+        self.chunks = list(lines)
+
+    @property
+    def in_waiting(self) -> int:
+        return len(self.chunks[0]) if self.chunks else 0
+
+    def read(self, size: int = 1) -> bytes:
+        if not self.chunks:
+            return b""
+        chunk = self.chunks.pop(0)
+        if len(chunk) > size:
+            self.chunks.insert(0, chunk[size:])
+        return chunk[:size]
+
+
+def _encoded(lines: list[str]) -> list[bytes]:
+    return [f"{line}\n".encode() for line in lines]
 
 
 def test_collect_serial_terminal_ignores_noise_and_parses_fresh_frame() -> None:
-    stream = _FakeSerial([b"stale noise\n", *(f"{line}\n".encode() for line in _lines())])
+    stream = _FakeSerial([b"stale noise\n", *_encoded(_lines())])
 
     envelope = _collect_serial_terminal(stream, timeout_s=1.0)
 
@@ -559,39 +575,87 @@ def test_collect_serial_terminal_ignores_noise_and_parses_fresh_frame() -> None:
 
 def test_collect_serial_terminal_recovers_after_malformed_repeated_frame() -> None:
     malformed = _lines(HPX_POWER_GATE_LOWERED="bad")
-    stream = _FakeSerial(
-        [
-            *(f"{line}\n".encode() for line in malformed),
-            *(f"{line}\n".encode() for line in _lines()),
-        ]
-    )
+    stream = _FakeSerial([*_encoded(malformed), *_encoded(_lines())])
 
     envelope = _collect_serial_terminal(stream, timeout_s=1.0)
 
     assert envelope.terminal.status == "ok"
 
 
-def test_collect_chunked_terminal_handles_split_swo_frames() -> None:
+def test_collect_serial_terminal_times_out_without_record() -> None:
+    stream = _FakeSerial([b"noise\n"])
+
+    with pytest.raises(PowerError, match="power terminal record received within"):
+        _collect_serial_terminal(stream, timeout_s=0.01)
+
+
+def test_uart_adapter_logs_pre_record_diagnostics(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"\x00")
+    config = load_config(
+        None,
+        {
+            "model": {"path": str(model)},
+            "engine": {"type": "helia-rt"},
+            "target": {"transport": "uart"},
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    lines = [
+        "HPX_POWER_INA228_BYSTANDER_FAILED=1",
+        "HPX_POWER_INA228_DIAG=0x2a",
+        *_lines(),
+    ]
+
+    class FakeUartStream(_FakeSerial):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def reset_input_buffer(self):
+            pass
+
+    monkeypatch.setattr(
+        "helia_profiler.transport.uart.find_jlink_vcom_port", lambda serial: "/dev/fake"
+    )
+    monkeypatch.setattr("serial.Serial", lambda **kwargs: FakeUartStream(_encoded(lines)))
+
+    with caplog.at_level("INFO", logger="hpx"):
+        envelope = UartPowerTerminalTransport().collect(ctx, timeout_s=1.0)
+
+    assert envelope.terminal.status == "ok"
+    warnings = [r.getMessage() for r in caplog.records if r.levelname == "WARNING"]
+    assert any("HPX_POWER_INA228_BYSTANDER_FAILED=1" in m for m in warnings)
+    assert any("HPX_POWER_INA228_DIAG=0x2a" in r.getMessage() for r in caplog.records)
+
+
+def test_collect_from_chunks_handles_split_frames() -> None:
     text = "noise\n" + "\n".join(_lines()) + "\n"
     chunks = [text[:33].encode(), text[33:111].encode(), text[111:].encode()]
 
-    envelope = _collect_chunked_terminal(
+    envelope = collect_power_terminal_envelope_from_chunks(
         lambda: chunks.pop(0) if chunks else b"",
         timeout_s=1.0,
+        poll_interval_s=0.0,
     )
 
     assert envelope.terminal.status == "ok"
     assert envelope.terminal.completed_count == 237
 
 
-def test_collect_chunked_terminal_recovers_after_malformed_frame() -> None:
+def test_collect_from_chunks_recovers_after_malformed_frame() -> None:
     malformed = "\n".join(_lines(HPX_POWER_GATE_LOWERED="bad")) + "\n"
     valid = "\n".join(_lines()) + "\n"
     chunks = [malformed.encode(), valid.encode()]
 
-    envelope = _collect_chunked_terminal(
+    envelope = collect_power_terminal_envelope_from_chunks(
         lambda: chunks.pop(0) if chunks else b"",
         timeout_s=1.0,
+        poll_interval_s=0.0,
     )
 
     assert envelope.terminal.status == "ok"
@@ -631,7 +695,7 @@ def test_usb_adapter_preserves_buffer_and_asserts_dtr(
         },
     )
     ctx = PipelineContext(config=config, work_dir=tmp_path)
-    lines = [f"{line}\n".encode() for line in _lines()]
+    lines = _encoded(_lines())
 
     class FakeUsbStream(_FakeSerial):
         def __init__(self):
@@ -656,3 +720,18 @@ def test_usb_adapter_preserves_buffer_and_asserts_dtr(
     assert envelope.terminal.status == "ok"
     assert stream.dtr is True
     assert stream.flush_calls == 0
+
+
+@pytest.mark.parametrize(
+    ("count", "reference_us", "expected_s"),
+    [(200, 5_000, 1.0), (None, 5_000, None), (200, None, None)],
+)
+def test_planned_window_needs_both_count_and_reference(
+    count: int | None, reference_us: int | None, expected_s: float | None
+) -> None:
+    from helia_profiler.results import PowerRunPlan
+
+    plan = PowerRunPlan(
+        firmware_mode="dedicated", inference_count=count, reference_inference_us=reference_us
+    )
+    assert plan.planned_window_s == expected_s

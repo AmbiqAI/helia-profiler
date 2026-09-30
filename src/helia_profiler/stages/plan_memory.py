@@ -60,16 +60,6 @@ _REGION_FIELDS: dict[MemoryRegion, str] = {
     MemoryRegion.PSRAM: "psram_kb",
 }
 
-# Logical region (used by ctx.{arena,weights}_region) → physical region
-# (used in MemoryPlan / NSX layout).  ``Placement.TCM`` means DTCM here —
-# ITCM is a code-only region and not eligible for arena/weights.
-_LOGICAL_TO_PHYSICAL: dict[Placement, MemoryRegion] = {
-    Placement.TCM: MemoryRegion.DTCM,
-    Placement.SRAM: MemoryRegion.SRAM,
-    Placement.MRAM: MemoryRegion.MRAM,
-    Placement.PSRAM: MemoryRegion.PSRAM,
-}
-
 
 class PlanMemoryStage:
     @property
@@ -151,14 +141,8 @@ class PlanMemoryStage:
         except OSError:
             model_bytes = 0
 
-        weight_phys = _LOGICAL_TO_PHYSICAL.get(
-            Placement(ctx.weights_region) if ctx.weights_region else Placement.MRAM,
-            MemoryRegion.MRAM,
-        )
-        arena_phys = _LOGICAL_TO_PHYSICAL.get(
-            Placement(ctx.arena_region) if ctx.arena_region else Placement.TCM,
-            MemoryRegion.DTCM,
-        )
+        weight_phys = (ctx.weights_region or Placement.MRAM).region
+        arena_phys = (ctx.arena_region or Placement.TCM).region
 
         region_map: dict[MemoryRegion, list[MemoryConsumer]] = {}
 
@@ -641,10 +625,10 @@ def _resolve_placement(ctx: PipelineContext) -> tuple[Placement, Placement]:
     """
     cfg = ctx.config
     soc = ctx.soc
-    # The engine adapter owns engine-specific placement policy.  Stage 2
-    # populates ctx.engine_adapter; for the rare early-call path where
-    # soc/adapter aren't yet available we fall back to a fresh adapter
-    # via the registry.
+    # The engine adapter owns engine-specific placement policy.
+    # PrepareEngineStage populates ctx.engine_adapter; for the rare
+    # early-call path where soc/adapter aren't yet available we fall back
+    # to a fresh adapter via the registry.
     adapter = ctx.engine_adapter or get_adapter(cfg.engine.type)
 
     # Capacity probe (in bytes).  If soc is None (very early call), we

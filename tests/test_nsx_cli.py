@@ -6,7 +6,6 @@ so these tests patch the API functions instead of a subprocess.
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from unittest.mock import patch
 
@@ -66,50 +65,6 @@ class TestNsxBuild:
                 nsx.build(tmp_path, timeout_s=1)
         assert "nsx build" in str(exc_info.value)
         assert "timed out" in (exc_info.value.details or "")
-
-
-class TestNsxFlash:
-    def test_flash_forwards_probe_serial(self, tmp_path: Path) -> None:
-        captured: dict[str, str | None] = {}
-
-        def fake_flash(_app, **kwargs) -> None:  # noqa: ANN401
-            captured["probe_serial"] = kwargs.get("probe_serial")
-
-        with patch("helia_profiler.deps.nsx.nsx_api.flash_app", side_effect=fake_flash):
-            nsx.flash(tmp_path, jlink_serial="123456")
-        assert captured["probe_serial"] == "123456"
-
-    def test_flash_no_serial_passes_none(self, tmp_path: Path) -> None:
-        captured: dict[str, str | None] = {}
-
-        def fake_flash(_app, **kwargs) -> None:  # noqa: ANN401
-            captured["probe_serial"] = kwargs.get("probe_serial")
-
-        with patch("helia_profiler.deps.nsx.nsx_api.flash_app", side_effect=fake_flash):
-            nsx.flash(tmp_path)
-        assert captured["probe_serial"] is None
-
-    def test_flash_forwards_frozen(self, tmp_path: Path) -> None:
-        captured: dict[str, object] = {}
-
-        def fake_flash(_app, **kwargs) -> None:  # noqa: ANN401
-            captured["frozen"] = kwargs.get("frozen")
-
-        with patch("helia_profiler.deps.nsx.nsx_api.flash_app", side_effect=fake_flash):
-            nsx.flash(tmp_path, frozen=True)
-        assert captured["frozen"] is True
-
-        with patch("helia_profiler.deps.nsx.nsx_api.flash_app", side_effect=fake_flash):
-            nsx.flash(tmp_path)
-        assert captured["frozen"] is False
-
-    def test_flash_does_not_touch_sncode_env(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        monkeypatch.setenv("SEGGER_SNCODE", "PRIOR")
-        with patch("helia_profiler.deps.nsx.nsx_api.flash_app"):
-            nsx.flash(tmp_path, jlink_serial="OVERRIDE")
-        assert os.environ["SEGGER_SNCODE"] == "PRIOR"
 
 
 class TestNsxConfigure:

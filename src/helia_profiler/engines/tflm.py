@@ -9,12 +9,11 @@ from ..errors import EngineError
 from ..results import NsxModuleRef
 from . import EngineType, TFLM_ENGINE_HEADER
 from .base import PsramWeightsSource, SingleArenaPlacementMixin, TflmArtifacts
+from .cmsis_nn import ARM_CMSIS_NN_MODULE, ARM_CMSIS_NN_PROJECT
 
 
 TFLITE_MICRO_MODULE = "nsx-tflite-micro"
 TFLITE_MICRO_PROJECT = "nsx-tflite-micro"
-ARM_CMSIS_NN_MODULE = "arm-cmsis-nn"
-ARM_CMSIS_NN_PROJECT = "arm-cmsis-nn"
 _SUPPORTED_BACKENDS = frozenset(("reference", "cmsis_nn"))
 
 
@@ -50,22 +49,8 @@ class TFLMAdapter(SingleArenaPlacementMixin):
         if backend == "cmsis_nn":
             # This must precede nsx-tflite-micro in NSX_MODULES: the runtime
             # validates nsx::arm_cmsis_nn while its CMakeLists is processed.
-            extra_modules.append(
-                NsxModuleRef(
-                    name=ARM_CMSIS_NN_MODULE,
-                    path=Path(),
-                    local=False,
-                    project=ARM_CMSIS_NN_PROJECT,
-                )
-            )
-        extra_modules.append(
-            NsxModuleRef(
-                name=TFLITE_MICRO_MODULE,
-                path=Path(),
-                local=False,
-                project=TFLITE_MICRO_PROJECT,
-            )
-        )
+            extra_modules.append(NsxModuleRef.registry(ARM_CMSIS_NN_MODULE, ARM_CMSIS_NN_PROJECT))
+        extra_modules.append(NsxModuleRef.registry(TFLITE_MICRO_MODULE, TFLITE_MICRO_PROJECT))
 
         return TflmArtifacts(
             engine_type=EngineType.TFLM,

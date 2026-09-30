@@ -1,4 +1,4 @@
-"""Tests for firmware generation, build, and flash."""
+"""Tests for firmware generation and build."""
 
 from __future__ import annotations
 
@@ -21,10 +21,8 @@ from helia_profiler.firmware import (
     find_segger_rtt_dir,
     _is_segger_rtt_root,
     _model_to_header,
-    _resolve_module_list,
     _resolve_module_specs,
     build_app,
-    flash_app,
     generate_app,
     render_power_source,
 )
@@ -429,9 +427,9 @@ class TestBoardModuleName:
         assert _board_module_name("apollo3p_evb") == "nsx-board-apollo3p-evb"
 
 
-class TestResolveModuleList:
+class TestResolveModuleSpecs:
     def test_apollo510_profile_modules(self):
-        modules = _resolve_module_list("apollo510_evb")
+        modules = [spec.name for spec in _resolve_module_specs("apollo510_evb")]
         assert "nsx-ambiqsuite-r5" in modules
         assert "nsx-ambiq-hal-r5" in modules
         assert "nsx-ambiq-bsp-r5" in modules
@@ -442,13 +440,13 @@ class TestResolveModuleList:
         assert "nsx-utils" not in modules
 
     def test_apollo4_profile_modules(self):
-        modules = _resolve_module_list("apollo4p_evb")
+        modules = [spec.name for spec in _resolve_module_specs("apollo4p_evb")]
         assert "nsx-ambiqsuite-r4" in modules
         assert "nsx-board-apollo4p-evb" in modules
         assert "nsx-pmu-armv8m" not in modules
 
     def test_apollo3_profile_modules(self):
-        modules = _resolve_module_list("apollo3p_evb")
+        modules = [spec.name for spec in _resolve_module_specs("apollo3p_evb")]
         assert "nsx-ambiqsuite-r3" in modules
 
     def test_r5_sdk_modules_resolve_to_monorepo_project(self):
@@ -484,7 +482,7 @@ class TestResolveModuleList:
         assert by_name["nsx-tooling"].project == "neuralspotx"
 
     def test_power_and_perf_are_not_required_modules(self):
-        modules = _resolve_module_list("apollo510_evb")
+        modules = [spec.name for spec in _resolve_module_specs("apollo510_evb")]
         assert "nsx-power" not in modules
         assert "nsx-perf" not in modules
 
@@ -581,6 +579,14 @@ class TestGenerateApp:
         assert (app_dir / "src" / "model_data.h").exists()
         assert (app_dir / "src" / "hpx_pmu_profiler.h").exists()
         assert (app_dir / "src" / "hpx_pmu_profiler.cc").exists()
+
+    def test_profile_app_keeps_build_paths(self, tmp_path: Path, fake_dist: Path):
+        ctx = _make_ctx(tmp_path, fake_dist)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        assert "file-prefix-map" not in (app_dir / "CMakeLists.txt").read_text(encoding="utf-8")
 
     def test_heliart_wrapper_module_copied(self, tmp_path: Path, fake_dist: Path):
         ctx = _make_ctx(tmp_path, fake_dist)
@@ -1603,45 +1609,7 @@ class TestBuildApp:
         assert ctx.power_binary_path is None
 
 
-class TestFlashApp:
-    def test_prefers_resolved_jlink_serial(self, tmp_path: Path, fake_dist: Path, monkeypatch):
-        ctx = _make_ctx(tmp_path, fake_dist)
-        ResolvePlatformStage().run(ctx)
-        ctx.firmware_dir = tmp_path / "app"
-        ctx.firmware_dir.mkdir(parents=True)
-        ctx.resolved_jlink_serial = "1160002204"
-
-        captured: dict[str, object] = {}
-
-        def fake_flash(*args, **kwargs):
-            captured.update(kwargs)
-
-        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.flash", fake_flash)
-
-        flash_app(ctx)
-
-        assert captured["jlink_serial"] == "1160002204"
-
-    def test_falls_back_to_configured_jlink_serial(
-        self, tmp_path: Path, fake_dist: Path, monkeypatch
-    ):
-        ctx = _make_ctx(tmp_path, fake_dist)
-        ResolvePlatformStage().run(ctx)
-        ctx.firmware_dir = tmp_path / "app"
-        ctx.firmware_dir.mkdir(parents=True)
-        object.__setattr__(ctx.config.target, "jlink_serial", "0011223344")
-
-        captured: dict[str, object] = {}
-
-        def fake_flash(*args, **kwargs):
-            captured.update(kwargs)
-
-        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.flash", fake_flash)
-
-        flash_app(ctx)
-
-        assert captured["jlink_serial"] == "0011223344"
-
+class TestBuildAppFrozen:
     def test_offline_build_still_verifies_dependencies_and_configures_frozen(
         self, tmp_path: Path, fake_dist: Path, monkeypatch
     ):
@@ -2360,3 +2328,12 @@ class TestResolveProjectOverrides:
         user = {"nsx-npu": SimpleNamespace(path=None, ref="my-branch", version=None)}
         overrides = _resolve_project_overrides(self._specs(), user, self._baseline())
         assert overrides["nsx-ambiq-sdk"] == ("ref", "my-branch")
+
+
+def test_executorch_power_binary_has_no_main_template():
+    from helia_profiler.firmware import _main_template
+    from helia_profiler.engines import EngineType
+
+    assert _main_template(EngineType.EXECUTORCH) == "main_executorch.cc.j2"
+    with pytest.raises(FirmwareError, match="ExecuTorch"):
+        _main_template(EngineType.EXECUTORCH, power_only=True)

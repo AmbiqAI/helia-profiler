@@ -19,7 +19,7 @@ from ...results import NsxModuleRef
 from .. import EngineType, TFLM_ENGINE_HEADER
 from ..base import HeliaRtArtifacts, PsramWeightsSource, SingleArenaPlacementMixin
 from ..cmsis_nn import cmsis_nn_cmake_vars, cmsis_nn_module_ref
-from ..ethos_u import NSX_NPU_MODULE, NSX_NPU_PROJECT
+from ..ethos_u import nsx_npu_module_ref
 from .artifacts import (
     HELIART_MODULE,
     HELIART_PROJECT,
@@ -48,21 +48,16 @@ _ETHOSU_NSX_OPTION = re.compile(rf"^[ \t]*option\s*\(\s*{_ETHOSU_CMAKE_FLAG}\b",
 
 
 def _add_ethos_u_artifacts(extra_modules: list[NsxModuleRef], cmake_vars: dict[str, str]) -> None:
-    extra_modules.append(
-        NsxModuleRef(
-            name=NSX_NPU_MODULE,
-            path=Path(),
-            local=False,
-            project=NSX_NPU_PROJECT,
-        )
-    )
+    extra_modules.append(nsx_npu_module_ref())
     cmake_vars[_ETHOSU_CMAKE_FLAG] = "ON"
 
 
 def _require_ethos_u_source_support(source_path: Path) -> None:
     """Refuse an Ethos-U build from a source tree whose NSX wrapper lacks the flag."""
     try:
-        nsx_cmake = (source_path / "nsx" / "CMakeLists.txt").read_text(errors="replace")
+        nsx_cmake = (source_path / "nsx" / "CMakeLists.txt").read_text(
+            encoding="utf-8", errors="replace"
+        )
     except OSError as exc:
         problem = f"its nsx/CMakeLists.txt could not be read ({exc.strerror or exc})"
     else:
@@ -166,13 +161,8 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
                 variant,
             )
             extra_modules.append(
-                NsxModuleRef(
-                    name=HELIART_MODULE,
-                    path=Path(),
-                    version=version,
-                    local=False,
-                    project=HELIART_PROJECT,
-                    ref=HELIART_RELEASE_TAG,
+                NsxModuleRef.registry(
+                    HELIART_MODULE, HELIART_PROJECT, ref=HELIART_RELEASE_TAG, version=version
                 )
             )
             extra_modules.append(cmsis_nn_module_ref(config, work_dir))

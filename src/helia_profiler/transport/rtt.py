@@ -57,11 +57,16 @@ from ..target.probe.jlink import (
 from .protocol import (
     DEFAULT_TIMEOUT_S,
     HEARTBEAT_TIMEOUT_S,
-    HPX_END,
-    HPX_START,
     collect_lines,
 )
-from ..wire import HPX_ERROR_PREFIX, HPX_GO_COMMAND, HPX_READY_LINE, WireKey
+from ..wire import (
+    HPX_END_SENTINEL,
+    HPX_ERROR_PREFIX,
+    HPX_GO_COMMAND,
+    HPX_READY_LINE,
+    HPX_START_SENTINEL,
+    WireKey,
+)
 from .timing import SBL_SETTLE_S, CaptureTimingTracker
 from .rtt_control import (
     RTT_LIVE_NAMED_SCORE,
@@ -320,7 +325,7 @@ def capture_rtt_output(
     Returns:
         List of captured text lines.
     """
-    timing = CaptureTimingTracker(start_marker=HPX_START, end_marker=HPX_END)
+    timing = CaptureTimingTracker(start_marker=HPX_START_SENTINEL, end_marker=HPX_END_SENTINEL)
 
     def record_phase_duration(name: str, started_s: float, *, detail: str = "") -> float:
         elapsed_s = time.monotonic() - started_s
@@ -333,12 +338,12 @@ def capture_rtt_output(
     def on_line(line: str, line_ts: float) -> None:
         first_start = timing.hpx_start_s is None
         timing.observe_line(line, line_ts)
-        if line == HPX_START and first_start:
+        if line == HPX_START_SENTINEL and first_start:
             log.info(
                 "RTT observed HPX_START %.3fs after capture start",
                 line_ts - timing.capture_started_s,
             )
-        elif line == HPX_END and timing.hpx_start_s is not None:
+        elif line == HPX_END_SENTINEL and timing.hpx_start_s is not None:
             log.info(
                 "RTT observed HPX_END %.3fs after HPX_START",
                 line_ts - timing.hpx_start_s,
