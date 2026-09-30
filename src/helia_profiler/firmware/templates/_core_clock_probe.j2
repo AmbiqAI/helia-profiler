@@ -1,4 +1,6 @@
-{# Measure the core clock against STIMER. #}
+{# Measure the core clock against STIMER.
+   Boot cost, outside measured regions: hpx_stimer_init() (two 10 ms settle
+   probes warm, up to its 1 s deadline cold) plus three ~17 ms passes. #}
     if (hpx_stimer_init() != 0U) {
         // Probe attach can freeze DWT; take max.
         dwt_init();
