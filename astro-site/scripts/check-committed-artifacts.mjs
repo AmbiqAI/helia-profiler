@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /*
- * No committed artifact may carry an absolute filesystem path, a commit sha,
- * or a git ref.
+ * No committed artifact may carry an absolute filesystem path, a hash of the
+ * source, or a git ref.
  *
  * The griffe dump records the absolute path of every source file on the
  * machine that produced it, so anything derived from it leaks that machine's
@@ -11,17 +11,19 @@
  * A ref in a committed file is wrong whatever it names: a branch would send
  * every build's source links to that branch, and a commit sha would rewrite
  * every generated file on every change under src/ and would not survive the
- * squash merges this repository uses. The ref is substituted at build time,
- * so what is committed is the placeholder.
+ * squash merges this repository uses. The tree of the documented source is
+ * wrong for the same first reason: it moves on every change under src/,
+ * including the ones that leave the documented content alone, and every open
+ * pull request then conflicts on every generated file. Both are substituted at
+ * build time from build-info.json, so what is committed is the placeholder.
  *
- * Two kinds of 40-hex hash are allowed and no third. The git tree of the
- * documented source is the provenance the reference records. A hash the
- * package itself declares is content, not provenance: the compatibility
- * baseline pins neuralspotx by commit and by sha256, and a configuration
- * reference that dropped the pinned default would be documenting a different
- * package. Membership is decided by looking the hash up in the source at HEAD
- * rather than by a file allowlist, so a build machine's own commit sha still
- * fails wherever it appears.
+ * One kind of 40-hex hash is allowed and no other. A hash the package itself
+ * declares is content, not provenance: the compatibility baseline pins
+ * neuralspotx by commit and by sha256, and a configuration reference that
+ * dropped the pinned default would be documenting a different package.
+ * Membership is decided by looking the hash up in the source at HEAD rather
+ * than by a file allowlist, so a build machine's own commit sha, or the source
+ * tree of this or any earlier commit, still fails wherever it appears.
  *
  * Committed content is read from git rather than from the working tree: the
  * prebuild chain rewrites these files, so by the time a check runs the tree
@@ -33,7 +35,7 @@ import { fileURLToPath } from 'node:url';
 
 import { PAGES_DIR, SOURCE_PATH } from './build-reference.mjs';
 import { PAGE_DIRS } from './build-cli-reference.mjs';
-import { SOURCE_REF_TOKEN } from '../src/integrations/source-ref.mjs';
+import { SOURCE_REF_TOKEN, SOURCE_TREE_TOKEN } from '../src/integrations/source-ref.mjs';
 
 const site = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repo = path.resolve(site, '..');
@@ -96,7 +98,12 @@ for (const file of tracked) {
     if (ABSOLUTE.test(line)) failures.push(`${at}: ${line.trim().slice(0, 160)}`);
     if (line.includes(repo)) failures.push(`${at}: carries the checkout path.`);
     for (const [hash] of line.matchAll(HASH)) {
-      if (hash !== sourceTree && !declaredInSource(hash)) {
+      if (hash === sourceTree) {
+        failures.push(
+          `${at}: carries the ${SOURCE_PATH} tree ${hash}; commit ${SOURCE_TREE_TOKEN} ` +
+            'and let the build substitute it.',
+        );
+      } else if (!declaredInSource(hash)) {
         failures.push(`${at}: carries the hash ${hash}.`);
       }
     }
@@ -114,5 +121,5 @@ if (failures.length > 0) {
 
 console.log(
   `${tracked.length} committed files under ${SCANNED.join(', ')} carry no absolute path, ` +
-    `no ref and no hash but the ${SOURCE_PATH} tree ${sourceTree.slice(0, 7)}.`,
+    'no ref, no source tree and no hash the package does not declare.',
 );

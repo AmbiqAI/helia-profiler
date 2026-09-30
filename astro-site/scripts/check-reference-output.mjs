@@ -18,7 +18,7 @@ import { execFileSync } from 'node:child_process';
 import { gzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 
-import { SOURCE_REF_TOKEN, sourceRef } from '../src/integrations/source-ref.mjs';
+import { TOKENS, sourceRef } from '../src/integrations/source-ref.mjs';
 
 const site = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repo = path.resolve(site, '..');
@@ -226,9 +226,16 @@ const sourceTree = execFileSync('git', ['rev-parse', 'HEAD:src/helia_profiler'],
   cwd: repo,
   encoding: 'utf8',
 }).trim();
+/* The source tree is a property of the build, resolved from build-info.json;
+ * the committed model records none, and the one this build names has to be
+ * the tree the checkout holds or every page below would name the wrong one. */
 check(
-  model.generatedFrom?.sourceTree === sourceTree,
-  `reference.json was generated from tree ${model.generatedFrom?.sourceTree}, src/helia_profiler is tree ${sourceTree}.`,
+  buildInfo.sourceTree === sourceTree,
+  `build-info.json names source tree ${buildInfo.sourceTree}, src/helia_profiler is tree ${sourceTree}.`,
+);
+check(
+  !('sourceTree' in (model.generatedFrom ?? {})),
+  'reference.json records a source tree; the build substitutes it and the model carries none.',
 );
 check(
   !('sourceCommit' in (model.generatedFrom ?? {})),
@@ -239,15 +246,17 @@ check(
   `build-info.json commit is unusable: ${buildInfo.commit}`,
 );
 
-/* The ref is resolved at build time, so no generated file may still carry the
- * placeholder and every source link has to name the ref this build is of. */
+/* The ref and the source tree are resolved at build time, so no generated
+ * file may still carry a placeholder and every source link has to name the
+ * ref this build is of. */
 const expectedRef = sourceRef(buildInfo);
-const stillTokenised = walkFiles(dist).filter((file) =>
-  read(file).includes(SOURCE_REF_TOKEN),
-);
+const stillTokenised = walkFiles(dist).filter((file) => {
+  const body = read(file);
+  return TOKENS.some((token) => body.includes(token));
+});
 check(
   stillTokenised.length === 0,
-  `${stillTokenised.length} built files still carry ${SOURCE_REF_TOKEN}, starting with ` +
+  `${stillTokenised.length} built files still carry ${TOKENS.join(' or ')}, starting with ` +
     `${stillTokenised[0] && path.relative(dist, stillTokenised[0])}.`,
 );
 

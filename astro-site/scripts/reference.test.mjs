@@ -15,6 +15,7 @@ import { test } from 'node:test';
 import { tierMap } from './dump-python.mjs';
 import { sourceTree, splitLlmsFull } from './build-reference.mjs';
 import { groupSummary, provenanceNote, scope, tierNote } from './scope-dump.mjs';
+import { SOURCE_TREE_TOKEN } from '../src/integrations/source-ref.mjs';
 
 test('the source tree lookup fails by name outside a git checkout', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'hpx-nongit-'));
@@ -64,35 +65,25 @@ function scratchRepo() {
   return { root, git };
 }
 
-test('two commits with the same src tree carry the same provenance', () => {
+test('a change under src/ that leaves the documented API alone leaves the pages alone', () => {
   const { root, git } = scratchRepo();
   try {
     fs.writeFileSync(path.join(root, 'src/helia_profiler/__init__.py'), 'x = 1\n');
-    fs.writeFileSync(path.join(root, 'README.md'), 'first\n');
     git('add', '.');
     git('commit', '--quiet', '-m', 'first');
     const first = sourceTree(root);
 
-    /* A commit that touches nothing under src/: the reference documents the
-     * same source and must come out byte-identical. */
-    fs.writeFileSync(path.join(root, 'README.md'), 'second\n');
+    /* A private edit moves the tree; the scoped model must not follow it. */
+    fs.writeFileSync(path.join(root, 'src/helia_profiler/__init__.py'), 'x = 1  # private\n');
     git('add', '.');
     git('commit', '--quiet', '-m', 'second');
     const second = sourceTree(root);
+    assert.notEqual(second, first);
 
-    assert.equal(second, first);
-    assert.notEqual(git('rev-parse', 'HEAD'), git('rev-parse', 'HEAD~1'));
-    assert.equal(provenanceNote(second), provenanceNote(first));
-    assert.equal(
-      JSON.stringify(scope({ ...identicalInput, tree: second })),
-      JSON.stringify(scope({ ...identicalInput, tree: first })),
-    );
-
-    /* And a change under src/ does move it. */
-    fs.writeFileSync(path.join(root, 'src/helia_profiler/__init__.py'), 'x = 2\n');
-    git('add', '.');
-    git('commit', '--quiet', '-m', 'third');
-    assert.notEqual(sourceTree(root), first);
+    const scoped = JSON.stringify(scope(identicalInput));
+    assert.ok(!scoped.includes(first) && !scoped.includes(second));
+    assert.ok(scoped.includes(SOURCE_TREE_TOKEN));
+    assert.equal(provenanceNote(), `Generated from the \`src/helia_profiler\` tree \`${SOURCE_TREE_TOKEN}\`.`);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
