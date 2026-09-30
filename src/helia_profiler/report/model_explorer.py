@@ -13,9 +13,12 @@ The JSON schema mirrors Model Explorer's ``node_data_builder`` data classes:
               │                └── value: float
               └── gradient: [{stop, bgColor}, ...]
 
-Node keys are matched to TFLite graph nodes by either:
-  - output tensor name  (preferred — stable across builds), or
-  - node id             (fallback — index-based, fragile).
+Model Explorer's LiteRT adapter ids each operator node by its index in the
+flatbuffer subgraph, so a layer is keyed by its ORIGINAL tflite operator
+index, resolved by :class:`~helia_profiler.modelcost.LayerAttributor` exactly
+as the CSV report joins it (#218). A layer with no original index (an
+ExecuTorch plan instruction, or an AOT position the manifest does not name)
+is left out rather than painted onto an unrelated node.
 """
 
 from __future__ import annotations
@@ -23,12 +26,14 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Any, Union
+
+from ..modelcost.layer_attribution import LayerAttributor
 
 from ..results.serde import strip_none
 
 if TYPE_CHECKING:
-    from ..pipeline import PipelineContext
+    from ..results import PmuResult
 
 Num = Union[float, int]
 
@@ -150,39 +155,24 @@ def build_multi_metric_overlays(
 
 
 def _write_model_explorer_overlays(
-    ctx: PipelineContext,
+    pmu: PmuResult,
     me_dir: Path,
     paths: list[Path],
+    aot_op_manifest: list[dict[str, Any]] | None = None,
 ) -> None:
     """Build and save Model Explorer overlay files from PMU data."""
-    layers = ctx.captured_pmu.layers
-    if not layers:
-        return
-
-    # Extract per-metric node_key→value dicts from layer data.
-    #
-    # Model Explorer matches nodes by ID (integer string).  For TFLite
-    # models the node ID is the sequential operator index in the graph.
-    #
-    # AOT firmware emits "TYPE:id" in the Op column (e.g. "CONV_2D:3")
-    # where `id` is the original TFLite operator index preserved through
-    # AOT transforms.  We extract that suffix as the node key.
-    #
-    # TFLM firmware emits just the type string (e.g. "CONV_2D").  Since
-    # multiple layers can share the same type, we fall back to the
-    # sequential layer index, which matches TFLite graph operator order.
+    # A reused output directory must not keep a previous run's overlays: this
+    # run may write fewer metrics, or none when no layer is attributable.
+    for stale in me_dir.glob("me_overlay_*.json"):
+        stale.unlink()
+    attributor = LayerAttributor(None, aot_op_manifest)
     metrics: dict[str, dict[str, float]] = {}
-    for layer in layers:
-        op_str = str(layer.op) if layer.op else ""
-        if ":" in op_str:
-            node_key = op_str.rsplit(":", 1)[1]
-        else:
-            node_key = str(layer.id)
+    for layer in pmu.layers:
+        source = attributor.attribute(layer.id, layer.op, layer.source_index).source_index
+        if source is None:
+            continue
         for key, val in layer.counters.items():
-            metrics.setdefault(key, {})[node_key] = val
-
-    if not metrics:
-        return
+            metrics.setdefault(key, {})[str(source)] = val
 
     overlays = build_multi_metric_overlays(metrics)
     for metric_name, overlay in overlays.items():

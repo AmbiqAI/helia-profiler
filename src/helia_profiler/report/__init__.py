@@ -128,7 +128,7 @@ def write_report(ctx: PipelineContext) -> list[Path]:
         try:
             me_dir = output_dir / "model_explorer"
             me_dir.mkdir(parents=True, exist_ok=True)
-            _write_model_explorer_overlays(ctx, me_dir, paths)
+            _write_model_explorer_overlays(pmu, me_dir, paths, aot_op_manifest=_aot_manifest(ctx))
         except Exception as exc:
             raise ReportError(
                 f"Model Explorer overlay generation failed: {exc}",
