@@ -42,7 +42,7 @@ at the lifecycle, the transport, the stream or the parser.
     <Block label="merge presets" emphasis="filled" />
   </Block>
   <Block label="Power capture" sublabel="when enabled" tone="accent" emphasis="dashed" flow="column">
-    <Block label="driver" sublabel="joulescope, ina228, ondevice" emphasis="filled" />
+    <Block label="driver" sublabel="joulescope, ina228" emphasis="filled" />
     <Block label="sync controller" emphasis="filled" />
     <Block label="gated window" emphasis="filled" />
     <Block label="terminal record" emphasis="filled" />
@@ -60,7 +60,7 @@ at the lifecycle, the transport, the stream or the parser.
 - Transport (one per run): rtt (default), usb_cdc, uart, swo
 - Wire stream: sentinels, metadata lines, heartbeats, CSV rows
 - Parser: extract metadata, group presets, aggregate iterations, merge presets
-- Power capture (when enabled): driver (joulescope, ina228, ondevice), sync controller, gated window, terminal record
+- Power capture (when enabled): driver (joulescope, ina228), sync controller, gated window, terminal record
 - Results: `PmuResult`, `PowerResult`
 
 </details>
@@ -136,9 +136,9 @@ sequence in one boot.
 ### Power capture
 
 When `power.enabled` is true, `capture_power()` in `capture/__init__.py`
-resolves the `PowerDriver` (`power/joulescope/`, `power/ina228_driver.py`
-or `power/ondevice_driver.py`), builds the sync controller that owns the
-READY, GO and GATE handshake (`power/sync.py`, `power/joulescope/sync.py`),
+resolves the `PowerDriver` (`power/joulescope/` or `power/ina228_driver.py`),
+builds the sync controller that owns the READY, GO and GATE handshake
+(`power/sync.py`, `power/joulescope/sync.py`),
 runs the lifecycle plan, and calls the driver's `capture_gated()` for the
 GPIO-gated window or `capture()` for a free-form one. The result is a
 `PowerResult` with the accepted window, the energy integration and the

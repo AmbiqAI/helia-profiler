@@ -246,7 +246,6 @@ class TestPowerTypes:
             sample_count=1000,
         )
         result = PowerResult(summary=summary)
-        assert result.per_layer is None
         assert result.samples == []
         assert result.gated_windows == []
         assert result.metadata == PowerMetadata()
@@ -1948,22 +1947,29 @@ class TestPowerMode:
 class TestDriverRegistry:
     def test_list_drivers(self):
         drivers = list_drivers()
-        assert "joulescope" in drivers
-        assert "ondevice" in drivers
+        assert {"ina228", "joulescope"} <= set(drivers)
+        assert "ondevice" not in drivers
 
     def test_get_joulescope(self):
         driver = get_driver("joulescope")
         assert driver.name == "Joulescope"
         assert driver.mode is PowerMode.EXTERNAL
 
-    def test_get_ondevice(self):
-        driver = get_driver("ondevice")
-        assert driver.name == "On-Device"
-        assert driver.mode is PowerMode.INTERNAL
-
     def test_unknown_driver_raises(self):
         with pytest.raises(PowerError, match="Unknown power driver"):
             get_driver("nonexistent")
+
+    def test_driver_constructor_errors_propagate(self):
+        class BrokenDriver:
+            def __init__(self, *, serial: str | None = None) -> None:
+                raise TypeError("broken driver init")
+
+        register_driver(
+            "broken-init-test-driver",
+            BrokenDriver,  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the constructor
+        )
+        with pytest.raises(TypeError, match="broken driver init"):
+            get_driver("broken-init-test-driver")
 
 
 class TestJoulescopeDriver:
@@ -1976,26 +1982,6 @@ class TestJoulescopeDriver:
         driver = get_driver("joulescope")
         with pytest.raises(PowerError, match="not installed"):
             driver.check_available()
-
-
-class TestOnDeviceDriver:
-    def test_mode_is_internal(self):
-        driver = get_driver("ondevice")
-        assert driver.mode is PowerMode.INTERNAL
-
-    def test_check_available_passes(self):
-        driver = get_driver("ondevice")
-        driver.check_available()  # Should not raise
-
-    def test_capture_raises_not_implemented(self):
-        driver = get_driver("ondevice")
-        with pytest.raises(PowerError, match="not yet implemented"):
-            driver.capture(duration_s=10.0, io_voltage=1.8)
-
-    def test_power_cycle_raises_not_supported(self):
-        driver = get_driver("ondevice")
-        with pytest.raises(PowerError, match="cannot power-cycle"):
-            driver.power_cycle()
 
 
 class TestPowerConfig:
@@ -4433,6 +4419,18 @@ class TestPowerFirmwareSelection:
         from helia_profiler.pipeline import PipelineContext
         from helia_profiler.stages.plan_power import PlanPowerRunStage
 
+        class InternalDriverWithoutProducer:
+            supports_firmware_measurement = False
+            mode = PowerMode.INTERNAL
+
+            def __init__(self, *, serial: str | None = None) -> None:
+                del serial
+
+        register_driver(
+            "internal-without-producer-test-driver",
+            InternalDriverWithoutProducer,  # ty: ignore[invalid-argument-type]  # duck-typed fake: only the planning surface
+        )
+
         model = tmp_path / "model.tflite"
         model.write_bytes(b"\x00")
         config = load_config(
@@ -4442,7 +4440,7 @@ class TestPowerFirmwareSelection:
                 "engine": {"type": "helia-rt"},
                 "power": {
                     "enabled": True,
-                    "driver": "ondevice",
+                    "driver": "internal-without-producer-test-driver",
                     "mode": "internal",
                 },
             },

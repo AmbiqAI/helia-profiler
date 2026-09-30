@@ -24,6 +24,7 @@ from .._version import __version__
 from ..config import Aggregation, PowerFirmware, Transport
 from ..engines import EngineType
 from ..placement import Placement
+from ..power import list_drivers
 from ..target.lifecycle import ResetStrategy
 from . import inspect_app as _inspect_app
 from . import validation_app as _validation_app
@@ -70,7 +71,7 @@ _WEIGHTS_LOCATION_CHOICE = TyperChoice([p.value for p in Placement])
 _CORE_OVERRIDE_CHOICE = TyperChoice(["cm4", "cm55"])
 _TRANSPORT_CHOICE = TyperChoice([t.value for t in Transport])
 _AGGREGATION_CHOICE = TyperChoice([a.value for a in Aggregation])
-_POWER_DRIVER_CHOICE = TyperChoice(["joulescope", "ondevice"])
+_POWER_DRIVER_CHOICE = TyperChoice(list_drivers())
 _POWER_MODE_CHOICE = TyperChoice(["external", "internal"])
 _POWER_FIRMWARE_CHOICE = TyperChoice([f.value for f in PowerFirmware])
 _POWER_RESET_STRATEGY_CHOICE = TyperChoice([strategy.value for strategy in ResetStrategy])

@@ -6895,25 +6895,6 @@
                 {
                   "description": "",
                   "examples": [],
-                  "id": "helia_profiler.PowerResult.per_layer",
-                  "kind": "attribute",
-                  "language": "python",
-                  "members": [],
-                  "name": "per_layer",
-                  "params": [],
-                  "raises": [],
-                  "returns": [],
-                  "signature": "per_layer: dict[str, Any] | None = None",
-                  "source": {
-                    "line": 86,
-                    "path": "src/helia_profiler/power/base.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L86"
-                  },
-                  "summary": ""
-                },
-                {
-                  "description": "",
-                  "examples": [],
                   "id": "helia_profiler.PowerResult.metadata",
                   "kind": "attribute",
                   "language": "python",
@@ -6924,9 +6905,9 @@
                   "returns": [],
                   "signature": "metadata: PowerMetadata = field(default_factory=PowerMetadata)",
                   "source": {
-                    "line": 87,
+                    "line": 86,
                     "path": "src/helia_profiler/power/base.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L87"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L86"
                   },
                   "summary": ""
                 }
@@ -6935,7 +6916,7 @@
               "params": [],
               "raises": [],
               "returns": [],
-              "signature": "PowerResult(\n    summary: PowerSummary,\n    samples: list[PowerSample] = list(),\n    gated_windows: list[GatedPowerWindow] = list(),\n    per_layer: dict[str, Any] | None = None,\n    metadata: PowerMetadata = PowerMetadata(),\n) -> None",
+              "signature": "PowerResult(\n    summary: PowerSummary,\n    samples: list[PowerSample] = list(),\n    gated_windows: list[GatedPowerWindow] = list(),\n    metadata: PowerMetadata = PowerMetadata(),\n) -> None",
               "source": {
                 "line": 73,
                 "path": "src/helia_profiler/power/base.py",

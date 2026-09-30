@@ -5,15 +5,15 @@ Two measurement modes:
 - **external**: An off-chip instrument (e.g. Joulescope) samples current on
   the target's power rail while the firmware toggles a GPIO sync pin to
   bracket inference.  Captures whole-inference energy only.
-- **internal**: On-device measurement. INA228 monitor summaries flow
-  through the power terminal today; the standalone ``ondevice`` driver is
-  registered but its capture path is not implemented.
+- **internal**: On-device measurement. The firmware reads an on-target
+  monitor around the fixed-N window and reports it through the power
+  terminal.
 
 Driver names:
 
 - ``joulescope``:       Joulescope JS110, JS220, or JS320 (auto-detected via
   ``pyjoulescope_driver`` device enumeration).
-- ``ondevice``:         On-device measurement (experimental).
+- ``ina228``:           On-target INA228 energy/charge accumulator.
 
 Use :func:`get_driver` to resolve a driver by name.
 """
@@ -68,11 +68,9 @@ def _register_builtins() -> None:
 
     from .ina228_driver import Ina228Driver
     from .joulescope.driver import JoulescopeDriver
-    from .ondevice_driver import OnDeviceDriver
 
     # Single unified Joulescope driver — handles JS110, JS220, and JS320.
     register_driver("joulescope", JoulescopeDriver)
-    register_driver("ondevice", OnDeviceDriver)
     register_driver("ina228", Ina228Driver)
 
 
@@ -80,7 +78,8 @@ def register_driver(name: str, driver_cls: type[PowerDriver]) -> None:
     """Register (or override) the driver class used for ``name``.
 
     Exposed so tests (or future built-ins) can add a driver without reaching
-    into the private ``_DRIVERS`` dict.
+    into the private ``_DRIVERS`` dict. The class is constructed as
+    ``driver_cls(serial=...)``, so it must accept that keyword.
     """
     _DRIVERS[name] = driver_cls
 
@@ -107,14 +106,7 @@ def get_driver(name: str, *, serial: str | None = None) -> PowerDriver:
     enumerated USB device path.
     Raises :class:`PowerError` if the name is unknown.
     """
-    cls = resolve_driver_class(name)
-    try:
-        # PowerDriver deliberately declares no __init__ — constructor kwargs
-        # vary per driver, and the TypeError fallback below is the contract.
-        return cls(serial=serial)  # ty: ignore[unknown-argument]
-    except TypeError:
-        # Driver doesn't accept a serial kwarg (e.g. ondevice).
-        return cls()
+    return resolve_driver_class(name)(serial=serial)
 
 
 def list_drivers() -> list[str]:
