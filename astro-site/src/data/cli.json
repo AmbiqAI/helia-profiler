@@ -319,7 +319,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/inspect_app.py",
-          "line": 132
+          "line": 135
         },
         "arguments": [],
         "options": [],
@@ -715,7 +715,7 @@
             "python_type": "Optional[Path]",
             "default": null,
             "required": false,
-            "help": "Resolve this YAML config and include a sanitized snapshot in the bundle",
+            "help": "YAML config whose target and engine select the checks; with --bundle, a sanitized snapshot of it is included instead",
             "panel": null,
             "is_flag": false,
             "multiple": false,
@@ -909,7 +909,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/inspect_app.py",
-          "line": 125
+          "line": 128
         },
         "arguments": [],
         "options": [],
@@ -929,7 +929,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/inspect_app.py",
-          "line": 191
+          "line": 194
         },
         "arguments": [],
         "options": [],
@@ -950,7 +950,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/inspect_app.py",
-              "line": 198
+              "line": 201
             },
             "arguments": [],
             "options": [
@@ -1102,7 +1102,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/inspect_app.py",
-          "line": 144
+          "line": 147
         },
         "arguments": [],
         "options": [],
@@ -1123,7 +1123,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/inspect_app.py",
-              "line": 151
+              "line": 154
             },
             "arguments": [],
             "options": [
@@ -1223,7 +1223,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/inspect_app.py",
-              "line": 169
+              "line": 172
             },
             "arguments": [],
             "options": [
@@ -2611,7 +2611,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/inspect_app.py",
-          "line": 216
+          "line": 219
         },
         "arguments": [],
         "options": [],
@@ -2632,7 +2632,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/inspect_app.py",
-              "line": 223
+              "line": 226
             },
             "arguments": [],
             "options": [

@@ -37,16 +37,6 @@ _SPECS = {
         section_probe="size",
         heliart_tag="gcc",
     ),
-    Toolchain.GCC: ToolchainSpec(
-        toolchain=Toolchain.GCC,
-        compiler="gcc",
-        nsx_name=None,
-        nm="gcc-nm",
-        size="gcc-size",
-        readelf="readelf",
-        section_probe="size",
-        heliart_tag="gcc",
-    ),
     Toolchain.ARMCLANG: ToolchainSpec(
         toolchain=Toolchain.ARMCLANG,
         compiler="armclang",
@@ -72,10 +62,13 @@ _SPECS = {
 
 
 def get_toolchain_spec(toolchain: str | Toolchain) -> ToolchainSpec:
+    """Return the capabilities of *toolchain*; ``gcc`` is the GNU Arm Embedded alias."""
     try:
         canonical = toolchain if isinstance(toolchain, Toolchain) else Toolchain(toolchain)
     except ValueError as exc:
         raise ValueError(f"Unsupported toolchain: {toolchain!r}.") from exc
+    if canonical is Toolchain.GCC:
+        canonical = Toolchain.ARM_NONE_EABI_GCC
     return _SPECS[canonical]
 
 

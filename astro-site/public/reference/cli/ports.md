@@ -10,7 +10,7 @@ hpx ports COMMAND [ARGS]...
 
 List host serial ports relevant to HPX transports
 
-Defined in `src/helia_profiler/cli/inspect_app.py` line 191.
+Defined in `src/helia_profiler/cli/inspect_app.py` line 194.
 
 ## hpx ports list
 
@@ -20,7 +20,7 @@ hpx ports list [OPTIONS]
 
 List serial ports with J-Link/CDC hints
 
-Defined in `src/helia_profiler/cli/inspect_app.py` line 198.
+Defined in `src/helia_profiler/cli/inspect_app.py` line 201.
 
 ### Options
 

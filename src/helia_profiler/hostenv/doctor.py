@@ -15,6 +15,11 @@ from ..config import Toolchain, Transport
 from ..engines import EngineType
 from ..errors import CaptureError, ConfigError
 from ..target.probe.jlink import JLINK_COMMANDER, find_jlink_exe
+from .toolchains import get_toolchain_spec, resolve_toolchain_executable
+
+# The tools NSX's ATfE toolchain file requires from ATFE_ROOT/bin only:
+# https://github.com/AmbiqAI/neuralspotx/blob/main/src/neuralspotx/cmake/toolchains/atfe.cmake
+_ATFE_EXECUTABLES = ("clang", "clang++", "llvm-ar", "llvm-objcopy", "llvm-size", "llvm-nm")
 
 
 @dataclass(frozen=True)
@@ -172,29 +177,30 @@ def _dependency_specs(
             "Install helia-profiler with its runtime dependencies.",
         ),
     ]
-    if toolchain in (Toolchain.ARM_NONE_EABI_GCC, Toolchain.GCC):
-        specs.append(
-            _DependencySpec(
-                "ARM GCC toolchain",
-                "arm-none-eabi-gcc",
-                "binary",
-                "Install the GNU Arm Embedded toolchain.",
-            )
-        )
-    elif toolchain is Toolchain.ARMCLANG:
+    compiler = get_toolchain_spec(toolchain).compiler
+    if toolchain is Toolchain.ARMCLANG:
         specs.extend(
             (
-                _DependencySpec("ARM Compiler", "armclang", "binary", "Install Arm Compiler 6."),
+                _DependencySpec("ARM Compiler", compiler, "binary", "Install Arm Compiler 6."),
                 _DependencySpec("ARM fromelf", "fromelf", "binary", "Install Arm Compiler 6."),
             )
         )
-    else:
+    elif toolchain is Toolchain.ATFE:
         specs.append(
             _DependencySpec(
                 "Arm Toolchain for Embedded",
                 "ATFE_ROOT",
                 "atfe",
                 "Set ATFE_ROOT to a complete Arm Toolchain for Embedded installation.",
+            )
+        )
+    else:
+        specs.append(
+            _DependencySpec(
+                "ARM GCC toolchain",
+                compiler,
+                "binary",
+                "Install the GNU Arm Embedded toolchain.",
             )
         )
     if transport in (Transport.RTT, Transport.SWO):
@@ -236,18 +242,10 @@ def _inspect_dependency(spec: _DependencySpec) -> DoctorCheck:
     elif spec.kind == "python":
         available = find_spec(spec.name) is not None
     else:
-        root = os.environ.get("ATFE_ROOT")
-        bin_dir = Path(root).expanduser() / "bin" if root else None
-        executables = (
-            "clang",
-            "clang++",
-            "llvm-ar",
-            "llvm-objcopy",
-            "llvm-size",
-            "llvm-nm",
-        )
-        available = bin_dir is not None and all((bin_dir / name).is_file() for name in executables)
-        path = str(bin_dir) if available else None
+        found = [_which_toolchain_executable(Toolchain.ATFE, name) for name in _ATFE_EXECUTABLES]
+        clang = found[0]
+        available = bool(os.environ.get("ATFE_ROOT")) and all(found)
+        path = os.path.dirname(clang) if available and clang else None
     return DoctorCheck(
         spec.label,
         spec.name,
@@ -255,6 +253,17 @@ def _inspect_dependency(spec: _DependencySpec) -> DoctorCheck:
         path=path,
         hint=spec.hint,
     )
+
+
+def _which_toolchain_executable(toolchain: Toolchain, name: str) -> str | None:
+    # which() on the split path, not the joined one, so Windows PATHEXT
+    # (clang -> clang.exe) applies on every supported Python.
+    directory, executable = os.path.split(resolve_toolchain_executable(toolchain, name))
+    if not directory:
+        return shutil.which(executable)
+    found = shutil.which(executable, path=directory)
+    # Windows which() also searches the working directory before *path*.
+    return found if found is not None and Path(found).parent == Path(directory) else None
 
 
 _VERSION_RE = re.compile(r"(\d+)\.(\d+)(?:\.(\d+))?")
