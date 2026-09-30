@@ -35,6 +35,7 @@ import yaml
 
 from ..engines import EngineType
 from ..results.run_summary import load_run_summary
+from ..results.serde import strip_none
 from .matrix import CaseSpec, MemoryProfile
 
 _TRANSIENT_POWER_LOCK_RETRY_DELAY_S = 5.0
@@ -111,7 +112,7 @@ class CaseResult:
     error: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {k: v for k, v in asdict(self).items() if v is not None}
+        return strip_none(asdict(self))
 
 
 def _find_local_cmsis_nn_checkout(repo_root: Path) -> Path | None:

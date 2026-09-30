@@ -342,12 +342,19 @@ class NsxModuleRef:
     version: str = ""
     local: bool = True
     project: str = ""
-    #: ``None`` and ``""`` are distinct on purpose: both engine adapters pass
-    #: an unset ``cmsis_nn_ref`` through as ``None``, and that None reaches
+    #: ``None`` and ``""`` are distinct on purpose: the arm-cmsis-nn resolver
+    #: passes an unset ``cmsis_nn_ref`` through as ``None``, and that None reaches
     #: the dependency-lock digest as ``null`` -- coercing to ``""`` would
     #: silently re-key every existing workspace digest. The default stays
     #: ``""`` for the same reason.
     ref: str | None = ""
+
+    @classmethod
+    def registry(
+        cls, name: str, project: str, *, ref: str | None = "", version: str = ""
+    ) -> NsxModuleRef:
+        """A module NSX clones from its registered upstream project."""
+        return cls(name=name, path=Path(), version=version, local=False, project=project, ref=ref)
 
 
 @dataclass(frozen=True)

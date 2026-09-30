@@ -33,14 +33,14 @@ def _readelf_segments_text() -> str:
 
 class TestReadelfInventory:
     def _inventory(self, monkeypatch, text=None):
-        import helia_profiler.hostenv.toolchain_probe as tp
-
         class _Result:
             returncode = 0
             stdout = text if text is not None else _readelf_sections_text()
             stderr = ""
 
-        monkeypatch.setattr(tp.subprocess, "run", lambda *a, **k: _Result())
+        monkeypatch.setattr(
+            "helia_profiler.hostenv._proc.subprocess.run", lambda *a, **k: _Result()
+        )
         return _inventory_via_readelf(Path("fw.elf"), readelf_cmd="readelf", timeout_s=5)
 
     def _sections(self, monkeypatch, text=None):
@@ -136,21 +136,17 @@ class TestReadelfInventory:
         assert not by_name["ARM_LIB_STACK"].linker_reserved
 
     def test_tool_failure_degrades_to_none(self, monkeypatch):
-        import helia_profiler.hostenv.toolchain_probe as tp
-
         def _boom(*a, **k):
             raise FileNotFoundError("readelf")
 
-        monkeypatch.setattr(tp.subprocess, "run", _boom)
+        monkeypatch.setattr("helia_profiler.hostenv._proc.subprocess.run", _boom)
         assert _inventory_via_readelf(Path("fw.elf"), readelf_cmd="readelf", timeout_s=5) is None
 
     def test_timeout_degrades_to_none(self, monkeypatch):
-        import helia_profiler.hostenv.toolchain_probe as tp
-
         def _slow(*a, **k):
             raise subprocess.TimeoutExpired(cmd="readelf", timeout=5)
 
-        monkeypatch.setattr(tp.subprocess, "run", _slow)
+        monkeypatch.setattr("helia_profiler.hostenv._proc.subprocess.run", _slow)
         assert _inventory_via_readelf(Path("fw.elf"), readelf_cmd="readelf", timeout_s=5) is None
 
 
@@ -159,14 +155,15 @@ class TestReadelfSegments:
         """#133 D3: .data runs at 0x20004000 but LOADS at 0x0041003c —
         != vaddr segment is why MRAM accounting needs program headers,
         and the real capture proves the shape."""
-        import helia_profiler.hostenv.toolchain_probe as tp
 
         class _Result:
             returncode = 0
             stdout = _readelf_segments_text()
             stderr = ""
 
-        monkeypatch.setattr(tp.subprocess, "run", lambda *a, **k: _Result())
+        monkeypatch.setattr(
+            "helia_profiler.hostenv._proc.subprocess.run", lambda *a, **k: _Result()
+        )
         segments = _segments_via_readelf(Path("fw.elf"), readelf_cmd="readelf", timeout_s=5)
         assert (
             LoadSegment(
@@ -182,12 +179,11 @@ class TestReadelfSegments:
     def test_failure_degrades_to_empty_not_none(self, monkeypatch):
         """Segments refine the inventory; their absence must not discard
         the section list."""
-        import helia_profiler.hostenv.toolchain_probe as tp
 
         def _boom(*a, **k):
             raise FileNotFoundError("readelf")
 
-        monkeypatch.setattr(tp.subprocess, "run", _boom)
+        monkeypatch.setattr("helia_profiler.hostenv._proc.subprocess.run", _boom)
         assert _segments_via_readelf(Path("fw.elf"), readelf_cmd="readelf", timeout_s=5) == ()
 
 
@@ -271,8 +267,6 @@ class TestSectionInventoryDispatch:
     branches (#176)."""
 
     def test_gcc_dispatch_runs_readelf_twice_and_threads_results(self, monkeypatch):
-        import helia_profiler.hostenv.toolchain_probe as tp
-
         calls = []
 
         class _Result:
@@ -288,7 +282,7 @@ class TestSectionInventoryDispatch:
                 return _Result(_readelf_sections_text())
             return _Result(_readelf_segments_text())
 
-        monkeypatch.setattr(tp.subprocess, "run", _run)
+        monkeypatch.setattr("helia_profiler.hostenv._proc.subprocess.run", _run)
         inventory = section_inventory(Path("fw.elf"), "arm-none-eabi-gcc")
         assert inventory is not None
         assert len(inventory.sections) == 10
@@ -298,14 +292,14 @@ class TestSectionInventoryDispatch:
         assert all("readelf" in argv[0] for argv in calls)
 
     def test_armclang_dispatch_parses_the_fromelf_listing(self, monkeypatch):
-        import helia_profiler.hostenv.toolchain_probe as tp
-
         class _Result:
             returncode = 0
             stderr = ""
             stdout = (FIXTURES / "fromelf" / "fw_text_v.txt").read_text()
 
-        monkeypatch.setattr(tp.subprocess, "run", lambda *a, **k: _Result())
+        monkeypatch.setattr(
+            "helia_profiler.hostenv._proc.subprocess.run", lambda *a, **k: _Result()
+        )
         inventory = section_inventory(Path("fw.axf"), "armclang")
         assert inventory is not None
         names = [s.name for s in inventory.sections if s.allocated]

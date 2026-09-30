@@ -207,7 +207,7 @@ def resolve_probe_serial(
                 f"J-Link serial '{requested_serial}' was not found.",
                 hint=f"Connected probes: {_format_probe_list(probes)}.",
             )
-        match = _inspect_probe_target(probe, device=device)
+        match = inspect_probe_target(probe, device=device)
         if match.detected_core is not expected_core:
             raise ConfigError(
                 f"J-Link serial '{requested_serial}' does not match the requested target.",
@@ -218,11 +218,8 @@ def resolve_probe_serial(
             )
         return probe.serial
 
-    matches = [
-        match
-        for match in (_inspect_probe_target(probe, device=device) for probe in probes)
-        if match.detected_core is expected_core
-    ]
+    inspections = [inspect_probe_target(probe, device=device) for probe in probes]
+    matches = [match for match in inspections if match.detected_core is expected_core]
     if len(matches) == 1:
         return matches[0].probe.serial
     if len(matches) > 1:
@@ -244,12 +241,17 @@ def resolve_probe_serial(
             f"Expected a {expected_core.value} target. Run `hpx probes list` to see "
             "attached probes and `hpx probes match --board <board>` to check "
             "compatibility. Connected probes: "
-            f"{_format_probe_matches([_inspect_probe_target(probe, device=device) for probe in probes])}."
+            f"{_format_probe_matches(inspections)}."
         ),
     )
 
 
-def _inspect_probe_target(probe: JLinkProbe, *, device: str) -> JLinkProbeMatch:
+def inspect_probe_target(probe: JLinkProbe, *, device: str) -> JLinkProbeMatch:
+    """Inspect the core visible behind a connected probe for *device*.
+
+    Public for diagnostic CLI commands, so users and agents can ask HPX which
+    target a probe can actually reach without driving ``JLinkExe`` themselves.
+    """
     cmd = _jlink_target_cmd(device=device, jlink_serial=probe.serial)
     for attempt in range(_PROBE_INSPECTION_ATTEMPTS):
         result = _invoke_jlink(
@@ -271,16 +273,6 @@ def _inspect_probe_target(probe: JLinkProbe, *, device: str) -> JLinkProbeMatch:
         time.sleep(_PROBE_INSPECTION_RETRY_S)
 
     raise AssertionError("unreachable")
-
-
-def inspect_probe_target(probe: JLinkProbe, *, device: str) -> JLinkProbeMatch:
-    """Inspect the core visible behind a connected probe for *device*.
-
-    This public wrapper exists for diagnostic CLI commands.  It keeps the raw
-    ``JLinkExe`` interaction centralized in this module while letting users and
-    agents ask HPX which target a probe can actually reach.
-    """
-    return _inspect_probe_target(probe, device=device)
 
 
 def _parse_detected_core(output: str) -> CoreArch | None:

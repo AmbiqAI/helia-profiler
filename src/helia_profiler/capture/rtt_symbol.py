@@ -16,10 +16,10 @@ from __future__ import annotations
 
 import logging
 import re
-import subprocess
 from pathlib import Path
 
-from ..hostenv.toolchains import get_toolchain_spec, resolve_toolchain_executable
+from ..hostenv._proc import tool_output
+from ..hostenv.toolchains import nm_command
 
 log = logging.getLogger("hpx")
 
@@ -57,14 +57,6 @@ def _address_from_map(build_dir: Path, target_name: str) -> int | None:
     return None
 
 
-def _nm_command(toolchain: str) -> str | None:
-    try:
-        spec = get_toolchain_spec(toolchain)
-        return resolve_toolchain_executable(toolchain, spec.nm)
-    except ValueError:
-        return None
-
-
 def _address_from_nm(
     build_dir: Path,
     toolchain: str,
@@ -72,8 +64,9 @@ def _address_from_nm(
     target_name: str,
     timeout_s: int,
 ) -> int | None:
-    nm = _nm_command(toolchain)
-    if nm is None:
+    try:
+        nm = nm_command(toolchain)
+    except ValueError:
         return None
     elf_candidates = (
         sorted(build_dir.glob(f"{target_name}.elf"))
@@ -81,20 +74,10 @@ def _address_from_nm(
         or sorted(build_dir.glob(target_name))
     )
     for elf in elf_candidates:
-        try:
-            result = subprocess.run(
-                [nm, str(elf)],
-                capture_output=True,
-                text=True,
-                timeout=timeout_s,
-            )
-        except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
-            log.debug("%s probe failed: %s", nm, exc)
-            return None
-        if result.returncode != 0:
-            log.debug("%s failed: %s", nm, (result.stderr or "").strip())
+        stdout = tool_output([nm, str(elf)], timeout_s=timeout_s)
+        if stdout is None:
             continue
-        match = _NM_SYMBOL_RE.search(result.stdout or "")
+        match = _NM_SYMBOL_RE.search(stdout)
         if match:
             address = int(match.group(1), 16)
             log.debug("resolved %s = 0x%08X from %s via %s", _RTT_SYMBOL, address, elf, nm)

@@ -230,24 +230,14 @@ def test_no_test_builds_a_look_alike_env_over_production_templates():
 
 
 def _sample_pmu_passes() -> list[dict[str, object]]:
-    """One pass, in the shape production actually emits.
+    """One pass, in the shape production emits: real ``0xNNNN`` event ids.
 
-    ``FirmwareRenderContext._resolve_pmu_passes`` builds every pass with
-    ``custom=True``, real ``0xNNNN`` event ids and ``c_enum=None`` -- the
-    preset branch of the pass-init blocks is unreachable from a real run.
-    A ``custom=False`` sample with empty ``event_ids`` is not a shape
-    production can produce, and on the ExecuTorch template it snapshots
-    invalid C: a zero-size ``static const uint32_t ids[]`` that
-    ``profiler_init`` then indexes. Mirroring production keeps the pinned
-    renders compilable and keeps the snapshotted branch the one that ships.
-
-    tests/test_template_render.py keeps a ``custom=False`` sample on purpose --
-    its smoke coverage of the preset branch is the only thing exercising it.
+    Empty ``event_ids`` would snapshot invalid C on the ExecuTorch template: a
+    zero-size ``static const uint32_t ids[]`` that ``profiler_init`` indexes.
     """
     return [
         {
             "name": "Cache",
-            "custom": True,
             "event_ids": ["0x0011", "0x0008", "0x0023", "0x0024"],
             "counter_names": [
                 "ARM_PMU_CPU_CYCLES",
@@ -256,7 +246,6 @@ def _sample_pmu_passes() -> list[dict[str, object]]:
                 "ARM_PMU_STALL_BACKEND",
             ],
             "num_counters": 4,
-            "c_enum": None,
             "group": "cpu",
         }
     ]
@@ -264,7 +253,6 @@ def _sample_pmu_passes() -> list[dict[str, object]]:
 
 def _common_kwargs(soc_name: str, transport: str) -> dict:
     soc = get_soc(soc_name)
-    backends = list(soc.profiling_backends)
     return {
         "iterations": 3,
         "warmup": 1,
@@ -304,8 +292,7 @@ def _common_kwargs(soc_name: str, transport: str) -> dict:
         "extreme_mode": False,
         "arena_region": "tcm",
         "weights_region": "mram",
-        "profiling_backends": backends,
-        "has_armv8m_pmu": "armv8m-pmu" in backends,
+        "has_armv8m_pmu": "armv8m-pmu" in soc.profiling_backends,
         "perf_mode_symbol": "NSX_PERF_LOW",
         "perf_mode_mhz": 48 if soc.family.value == "ap3" else 96,
         "apollo3_burst": False,
@@ -521,7 +508,6 @@ def _npu_pmu_pass() -> dict[str, object]:
     """An ethos_npu pass, in the shape production emits (symbolic events)."""
     return {
         "name": "EthosNpu",
-        "custom": True,
         "event_ids": ["0x0000", "0x0000", "0x0000", "0x0000"],
         "counter_names": [
             "ETHOSU_PMU_CYCLE",
@@ -530,7 +516,6 @@ def _npu_pmu_pass() -> dict[str, object]:
             "ETHOSU_PMU_SRAM_RD_DATA_BEAT_RECEIVED",
         ],
         "num_counters": 4,
-        "c_enum": None,
         "group": "ethos_npu",
     }
 

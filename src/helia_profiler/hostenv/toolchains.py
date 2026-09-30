@@ -89,8 +89,14 @@ def resolve_toolchain_executable(toolchain: str | Toolchain, executable: str) ->
     return executable
 
 
+def nm_command(toolchain: str | Toolchain) -> str:
+    """The ``nm`` executable matching *toolchain*."""
+    return resolve_toolchain_executable(toolchain, get_toolchain_spec(toolchain).nm)
+
+
 __all__ = [
     "ToolchainSpec",
     "get_toolchain_spec",
+    "nm_command",
     "resolve_toolchain_executable",
 ]

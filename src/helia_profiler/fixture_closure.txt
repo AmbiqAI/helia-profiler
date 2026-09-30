@@ -62,6 +62,7 @@ engines/helia_rt/adapter.py
 engines/helia_rt/artifacts.py
 engines/helia_rt/download.py
 engines/helia_rt/nsx_module.py
+engines/semver.py
 engines/templates/heliaaot_attributes.h.j2
 engines/tflm.py
 errors.py
@@ -78,7 +79,6 @@ firmware/build.py
 firmware/context.py
 firmware/fingerprint.py
 firmware/fixture.py
-firmware/fixture_memory.py
 firmware/headers.py
 firmware/image.py
 firmware/launcher.py
@@ -134,6 +134,7 @@ fixture_runtime.py
 fixture_stage.py
 fixture_target.py
 hostenv/__init__.py
+hostenv/_proc.py
 hostenv/cache_dirs.py
 hostenv/doctor.py
 hostenv/elf_inventory.py
