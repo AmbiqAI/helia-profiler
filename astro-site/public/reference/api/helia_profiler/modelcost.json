@@ -3,12 +3,12 @@
   "generatedFrom": {
     "tool": "pyref",
     "version": "1.7.3",
-    "sourceTree": "023bb46e08702310d9f352e26cf0a80caa144625"
+    "sourceTree": "b823e287e809c8d9438536a07fc0ab41a3b030c0"
   },
   "language": "python",
   "modules": [
     {
-      "description": "The static cost model of a network, read from the model file before anything is built or run.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `023bb46e08702310d9f352e26cf0a80caa144625`.",
+      "description": "The static cost model of a network, read from the model file before anything is built or run.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `b823e287e809c8d9438536a07fc0ab41a3b030c0`.",
       "name": "modelcost",
       "path": "helia_profiler.modelcost",
       "submodules": [],
