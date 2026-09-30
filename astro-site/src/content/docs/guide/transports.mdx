@@ -77,10 +77,11 @@ host reads the same protocol stream from that port.
   connector) to the host, with the J-Link still attached for flashing and
   reset. Both stay plugged in for the run.
 - hpx matches the firmware's `HPX-<jlink_serial>` USB serial-number marker
-  when available; otherwise it falls back to `/dev/tty.usbmodem*` (macOS)
-  and `/dev/ttyACM*` (Linux), excluding SEGGER ports and other `HPX-*`
+  when available; otherwise it falls back to the USB serial ports pyserial
+  reports (`COMx` on Windows, `/dev/ttyACM*` or `/dev/ttyUSB*` on Linux,
+  `/dev/cu.usbmodem*` on macOS), excluding SEGGER ports and other `HPX-*`
   devices, and asks for an explicit `--usb-port` when candidates are
-  ambiguous. Reads go through `pyserial`, line-buffered.
+  ambiguous. `hpx ports list --all` shows every port the host enumerates. Reads go through `pyserial`, line-buffered.
 - The firmware pauses USB polling (Timer 3) around each PMU window so USB
   interrupts stay out of the counters; on some boards residual activity
   remains, so RTT is quieter when PMU consistency matters.

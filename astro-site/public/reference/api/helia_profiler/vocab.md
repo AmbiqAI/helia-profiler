@@ -212,6 +212,20 @@ PSRAM = 'psram'
 
 Source: `src/helia_profiler/platform/placement.py:36`
 
+### helia_profiler.Placement.region
+
+`attribute` · `python`
+
+```python
+region: MemoryRegion
+```
+
+The physical region this placement lands in.
+
+``TCM`` is DTCM: ITCM is code-only and never holds arenas or weights.
+
+Source: `src/helia_profiler/platform/placement.py:39`
+
 ## helia_profiler.Transport
 
 `class` · `python`

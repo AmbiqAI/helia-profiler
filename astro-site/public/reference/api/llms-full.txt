@@ -223,7 +223,11 @@ Source: `src/helia_profiler/pipeline.py:69`
 `class` · `python`
 
 ```python
-Session(_base: Mapping[str, Any] = lambda : ...(), _overrides: Mapping[str, Any] = lambda : ...()) -> None
+Session(
+    yaml_path: Path | None = None,
+    _base: Mapping[str, Any] = lambda : ...(),
+    _overrides: Mapping[str, Any] = lambda : ...(),
+) -> None
 ```
 
 `dataclass`
@@ -236,7 +240,17 @@ CLI. Every ``with_*`` method returns an independent session.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/session.py:84`
+Source: `src/helia_profiler/session.py:94`
+
+### helia_profiler.Session.yaml_path
+
+`attribute` · `python`
+
+```python
+yaml_path: Path | None = None
+```
+
+Source: `src/helia_profiler/session.py:103`
 
 ### helia_profiler.Session.from_yaml
 
@@ -250,7 +264,7 @@ from_yaml(path: str | Path) -> Self
 
 Create a session from an immutable snapshot of an HPX YAML config.
 
-Source: `src/helia_profiler/session.py:104`
+Source: `src/helia_profiler/session.py:117`
 
 ### helia_profiler.Session.from_dict
 
@@ -264,7 +278,7 @@ from_dict(intent: Mapping[str, Any]) -> Self
 
 Create a session from unresolved configuration intent.
 
-Source: `src/helia_profiler/session.py:109`
+Source: `src/helia_profiler/session.py:141`
 
 ### helia_profiler.Session.load
 
@@ -278,7 +292,7 @@ load(path: str | Path) -> Self
 
 Load a versioned unresolved-intent snapshot from JSON.
 
-Source: `src/helia_profiler/session.py:116`
+Source: `src/helia_profiler/session.py:148`
 
 ### helia_profiler.Session.intent_dict
 
@@ -290,7 +304,7 @@ intent_dict() -> dict[str, Any]
 
 Return JSON-safe unresolved intent without expanding defaults.
 
-Source: `src/helia_profiler/session.py:142`
+Source: `src/helia_profiler/session.py:174`
 
 ### helia_profiler.Session.resolved_dict
 
@@ -302,7 +316,7 @@ resolved_dict(model: str | Path | None = None) -> dict[str, Any]
 
 Return the fully resolved and validated configuration snapshot.
 
-Source: `src/helia_profiler/session.py:146`
+Source: `src/helia_profiler/session.py:178`
 
 ### helia_profiler.Session.save
 
@@ -314,7 +328,7 @@ save(path: str | Path) -> Path
 
 Persist unresolved intent as a versioned JSON snapshot.
 
-Source: `src/helia_profiler/session.py:152`
+Source: `src/helia_profiler/session.py:184`
 
 ### helia_profiler.Session.with_overrides
 
@@ -326,7 +340,7 @@ with_overrides(overrides: Mapping[str, Any]) -> Self
 
 Return a session with advanced raw configuration overrides merged in.
 
-Source: `src/helia_profiler/session.py:168`
+Source: `src/helia_profiler/session.py:200`
 
 ### helia_profiler.Session.with_model
 
@@ -336,7 +350,7 @@ Source: `src/helia_profiler/session.py:168`
 with_model(path: str | Path, **options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:172`
+Source: `src/helia_profiler/session.py:204`
 
 ### helia_profiler.Session.with_engine
 
@@ -346,7 +360,7 @@ Source: `src/helia_profiler/session.py:172`
 with_engine(engine: Any, **options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:175`
+Source: `src/helia_profiler/session.py:207`
 
 ### helia_profiler.Session.with_target
 
@@ -356,7 +370,7 @@ Source: `src/helia_profiler/session.py:175`
 with_target(**options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:178`
+Source: `src/helia_profiler/session.py:210`
 
 ### helia_profiler.Session.with_profiling
 
@@ -366,7 +380,7 @@ Source: `src/helia_profiler/session.py:178`
 with_profiling(**options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:181`
+Source: `src/helia_profiler/session.py:213`
 
 ### helia_profiler.Session.with_power
 
@@ -376,7 +390,7 @@ Source: `src/helia_profiler/session.py:181`
 with_power(**options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:184`
+Source: `src/helia_profiler/session.py:216`
 
 ### helia_profiler.Session.with_output
 
@@ -386,7 +400,7 @@ Source: `src/helia_profiler/session.py:184`
 with_output(**options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:187`
+Source: `src/helia_profiler/session.py:219`
 
 ### helia_profiler.Session.with_build
 
@@ -396,7 +410,7 @@ Source: `src/helia_profiler/session.py:187`
 with_build(**options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:190`
+Source: `src/helia_profiler/session.py:222`
 
 ### helia_profiler.Session.with_timeouts
 
@@ -406,7 +420,7 @@ Source: `src/helia_profiler/session.py:190`
 with_timeouts(**options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:193`
+Source: `src/helia_profiler/session.py:225`
 
 ### helia_profiler.Session.with_options
 
@@ -424,7 +438,7 @@ with_options(
 
 Return a session with top-level run options.
 
-Source: `src/helia_profiler/session.py:196`
+Source: `src/helia_profiler/session.py:228`
 
 ### helia_profiler.Session.resolve
 
@@ -436,7 +450,7 @@ resolve(model: str | Path | None = None) -> ProfileConfig
 
 Resolve and validate this session as a complete profile config.
 
-Source: `src/helia_profiler/session.py:216`
+Source: `src/helia_profiler/session.py:248`
 
 ### helia_profiler.Session.profile
 
@@ -452,7 +466,7 @@ profile(
 
 Run a profile using this session's resolved configuration.
 
-Source: `src/helia_profiler/session.py:223`
+Source: `src/helia_profiler/session.py:255`
 
 ### helia_profiler.Session.analyze
 
@@ -464,7 +478,7 @@ analyze(model: str | Path | None = None) -> ModelAnalysis
 
 Analyze the configured model without building or flashing firmware.
 
-Source: `src/helia_profiler/session.py:234`
+Source: `src/helia_profiler/session.py:266`
 
 ### helia_profiler.Session.compare
 
@@ -482,7 +496,7 @@ compare(
 
 Compare two completed profiles and optionally write diff artifacts.
 
-Source: `src/helia_profiler/session.py:245`
+Source: `src/helia_profiler/session.py:277`
 
 ### helia_profiler.Session.doctor
 
@@ -497,7 +511,7 @@ Return structured host dependency checks.
 Set *include_versions* to also compare installed tool and package
 versions against the HPX compatibility baseline.
 
-Source: `src/helia_profiler/session.py:273`
+Source: `src/helia_profiler/session.py:305`
 
 ### helia_profiler.Session.show
 
@@ -509,7 +523,7 @@ show(value: Any, *, console: Console | None = None) -> Any
 
 Pretty-print a typed interactive value and return it unchanged.
 
-Source: `src/helia_profiler/session.py:292`
+Source: `src/helia_profiler/session.py:324`
 
 ### helia_profiler.Session.boards
 
@@ -521,7 +535,7 @@ boards() -> tuple[BoardDef, ...]
 
 Return boards visible to this session's platform registry.
 
-Source: `src/helia_profiler/session.py:298`
+Source: `src/helia_profiler/session.py:330`
 
 ### helia_profiler.Session.engines
 
@@ -533,7 +547,7 @@ engines() -> tuple[EngineType, ...]
 
 Return supported inference engine identifiers.
 
-Source: `src/helia_profiler/session.py:305`
+Source: `src/helia_profiler/session.py:337`
 
 ### helia_profiler.Session.counter_groups
 
@@ -545,7 +559,7 @@ counter_groups() -> tuple[str, ...]
 
 Return registered PMU counter group names.
 
-Source: `src/helia_profiler/session.py:311`
+Source: `src/helia_profiler/session.py:343`
 
 ### helia_profiler.Session.counters
 
@@ -557,7 +571,7 @@ counters(group: str | None = None) -> tuple[PmuCounter, ...]
 
 Return registered PMU counters, optionally filtered by group.
 
-Source: `src/helia_profiler/session.py:317`
+Source: `src/helia_profiler/session.py:349`
 
 ### helia_profiler.Session.probes
 
@@ -569,7 +583,7 @@ probes() -> tuple[JLinkProbe, ...]
 
 Return connected J-Link probes.
 
-Source: `src/helia_profiler/session.py:323`
+Source: `src/helia_profiler/session.py:355`
 
 ### helia_profiler.Session.inspect_probes
 
@@ -581,7 +595,7 @@ inspect_probes(board: str | None = None) -> tuple[JLinkProbeMatch, ...]
 
 Inspect the target core visible through each connected probe.
 
-Source: `src/helia_profiler/session.py:329`
+Source: `src/helia_profiler/session.py:361`
 
 ### helia_profiler.Session.match_probe
 
@@ -593,7 +607,7 @@ match_probe(board: str | None = None, *, serial: str | None = None) -> str
 
 Resolve the J-Link serial matching a board target.
 
-Source: `src/helia_profiler/session.py:340`
+Source: `src/helia_profiler/session.py:372`
 
 ### helia_profiler.Session.ports
 
@@ -605,7 +619,7 @@ ports(*, include_all: bool = False) -> tuple[SerialPortInfo, ...]
 
 Return host serial ports relevant to HPX transports.
 
-Source: `src/helia_profiler/session.py:358`
+Source: `src/helia_profiler/session.py:390`
 
 ### helia_profiler.Session.reset
 
@@ -617,7 +631,7 @@ reset(board: str | None = None, *, serial: str | None = None, kind: Literal['deb
 
 Reset the configured target through its J-Link probe.
 
-Source: `src/helia_profiler/session.py:364`
+Source: `src/helia_profiler/session.py:396`
 
 ---
 
@@ -2882,7 +2896,7 @@ Bad configuration — missing model path, invalid YAML, unknown board.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:33`
+Source: `src/helia_profiler/errors.py:29`
 
 ## helia_profiler.PlatformError
 
@@ -2896,7 +2910,7 @@ Unsupported board/SoC combination or missing platform capability.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:37`
+Source: `src/helia_profiler/errors.py:33`
 
 ## helia_profiler.EngineError
 
@@ -2910,7 +2924,7 @@ Engine adapter failure — AOT compile error, missing static lib, etc.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:41`
+Source: `src/helia_profiler/errors.py:37`
 
 ## helia_profiler.FirmwareError
 
@@ -2924,7 +2938,7 @@ Firmware generation failure — template rendering, file I/O.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:45`
+Source: `src/helia_profiler/errors.py:41`
 
 ## helia_profiler.BuildError
 
@@ -2943,7 +2957,7 @@ return code is also captured in :attr:`returncode`.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:49`
+Source: `src/helia_profiler/errors.py:45`
 
 ### helia_profiler.BuildError.returncode
 
@@ -2953,7 +2967,7 @@ Source: `src/helia_profiler/errors.py:49`
 returncode = returncode
 ```
 
-Source: `src/helia_profiler/errors.py:66`
+Source: `src/helia_profiler/errors.py:62`
 
 ### helia_profiler.BuildError.details
 
@@ -2963,7 +2977,7 @@ Source: `src/helia_profiler/errors.py:66`
 details = details
 ```
 
-Source: `src/helia_profiler/errors.py:67`
+Source: `src/helia_profiler/errors.py:63`
 
 ## helia_profiler.CaptureError
 
@@ -2977,7 +2991,7 @@ Data capture failure — serial timeout, corrupt data, SWO framing.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:71`
+Source: `src/helia_profiler/errors.py:67`
 
 ## helia_profiler.DeterministicCaptureError
 
@@ -2991,13 +3005,14 @@ A capture-path refusal no retry or power cycle can change.
 
 Subclass of :class:`CaptureError` so existing ``except CaptureError``
 handlers still catch it, but recovery paths that would otherwise cycle the
-target rail and retry (``stages.flash_power``) re-raise it instead: these
-are configuration/artifact gaps — a missing image, an unknown load
-address — and cycling the rail only frames them as flaky hardware.
+target rail and retry (``stages.flash.deploy_firmware``) re-raise it
+instead: these are configuration/artifact gaps — a missing image, an
+unknown load address — and cycling the rail only frames them as flaky
+hardware.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:75`
+Source: `src/helia_profiler/errors.py:71`
 
 ## helia_profiler.NetworkError
 
@@ -3014,7 +3029,7 @@ still catch it, but callers that want to retry can specifically catch this.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:86`
+Source: `src/helia_profiler/errors.py:83`
 
 ## helia_profiler.DependencyError
 
@@ -3033,7 +3048,7 @@ specifically about an incompatible version or a missing/corrupt lock.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/errors.py:94`
+Source: `src/helia_profiler/errors.py:91`
 
 ## helia_profiler.VersionError
 
@@ -3052,7 +3067,7 @@ dependency failures and surface an actionable upgrade/downgrade hint.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/errors.py:104`
+Source: `src/helia_profiler/errors.py:101`
 
 ## helia_profiler.LockError
 
@@ -3071,7 +3086,7 @@ failing an entire report.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/errors.py:114`
+Source: `src/helia_profiler/errors.py:111`
 
 ## helia_profiler.PowerError
 
@@ -3085,7 +3100,7 @@ Power measurement failure — Joulescope not found, calibration error.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:124`
+Source: `src/helia_profiler/errors.py:121`
 
 ## helia_profiler.ReportError
 
@@ -3099,7 +3114,7 @@ Report generation failure — output path not writable, format error.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:128`
+Source: `src/helia_profiler/errors.py:125`
 
 ---
 
@@ -3201,56 +3216,6 @@ IGNORE = 'ignore'
 
 Source: `src/helia_profiler/evaluation/comparison_profile.py:37`
 
-## helia_profiler.RunEvaluation
-
-`class` · `python`
-
-```python
-RunEvaluation(
-    validity: ResultValidity,
-    issues: tuple[ResultIssue, ...] = (),
-    gate_arbitration: GateArbitration | None = None,
-) -> None
-```
-
-`dataclass`
-
-Authoritative validity and structured issues for one completed run.
-
-**API tier:** `experimental`
-
-Source: `src/helia_profiler/evaluation/validity.py:33`
-
-### helia_profiler.RunEvaluation.validity
-
-`attribute` · `python`
-
-```python
-validity: ResultValidity
-```
-
-Source: `src/helia_profiler/evaluation/validity.py:37`
-
-### helia_profiler.RunEvaluation.issues
-
-`attribute` · `python`
-
-```python
-issues: tuple[ResultIssue, ...] = ()
-```
-
-Source: `src/helia_profiler/evaluation/validity.py:38`
-
-### helia_profiler.RunEvaluation.gate_arbitration
-
-`attribute` · `python`
-
-```python
-gate_arbitration: GateArbitration | None = None
-```
-
-Source: `src/helia_profiler/evaluation/validity.py:42`
-
 ## helia_profiler.ComparabilityIssue
 
 `class` · `python`
@@ -3306,6 +3271,56 @@ context: dict[str, Any] = field(default_factory=dict)
 ```
 
 Source: `src/helia_profiler/evaluation/comparability.py:41`
+
+## helia_profiler.RunEvaluation
+
+`class` · `python`
+
+```python
+RunEvaluation(
+    validity: ResultValidity,
+    issues: tuple[ResultIssue, ...] = (),
+    gate_arbitration: GateArbitration | None = None,
+) -> None
+```
+
+`dataclass`
+
+Authoritative validity and structured issues for one completed run.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/evaluation/validity.py:34`
+
+### helia_profiler.RunEvaluation.validity
+
+`attribute` · `python`
+
+```python
+validity: ResultValidity
+```
+
+Source: `src/helia_profiler/evaluation/validity.py:38`
+
+### helia_profiler.RunEvaluation.issues
+
+`attribute` · `python`
+
+```python
+issues: tuple[ResultIssue, ...] = ()
+```
+
+Source: `src/helia_profiler/evaluation/validity.py:39`
+
+### helia_profiler.RunEvaluation.gate_arbitration
+
+`attribute` · `python`
+
+```python
+gate_arbitration: GateArbitration | None = None
+```
+
+Source: `src/helia_profiler/evaluation/validity.py:43`
 
 ## helia_profiler.VerdictStatus
 
@@ -3911,7 +3926,7 @@ Evaluate captured results without mutating pipeline state.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/evaluation/validity.py:192`
+Source: `src/helia_profiler/evaluation/validity.py:193`
 
 ## helia_profiler.ComparisonVerdict
 
@@ -4249,89 +4264,6 @@ INTERNAL = 'internal'
 
 Source: `src/helia_profiler/power/base.py:16`
 
-## helia_profiler.PowerObservation
-
-`class` · `python`
-
-```python
-PowerObservation(
-    mode: ObservationMode,
-    result: PowerResult,
-    gate_rise_observed: bool,
-    gate_fall_observed: bool,
-    deadline_s: float,
-    integrity: PowerIntegrity,
-) -> None
-```
-
-`dataclass`
-
-Host instrument observation, independent of firmware terminal status.
-
-**API tier:** `experimental`
-
-Source: `src/helia_profiler/results/artifacts.py:67`
-
-### helia_profiler.PowerObservation.mode
-
-`attribute` · `python`
-
-```python
-mode: ObservationMode
-```
-
-Source: `src/helia_profiler/results/artifacts.py:71`
-
-### helia_profiler.PowerObservation.result
-
-`attribute` · `python`
-
-```python
-result: PowerResult
-```
-
-Source: `src/helia_profiler/results/artifacts.py:72`
-
-### helia_profiler.PowerObservation.gate_rise_observed
-
-`attribute` · `python`
-
-```python
-gate_rise_observed: bool
-```
-
-Source: `src/helia_profiler/results/artifacts.py:73`
-
-### helia_profiler.PowerObservation.gate_fall_observed
-
-`attribute` · `python`
-
-```python
-gate_fall_observed: bool
-```
-
-Source: `src/helia_profiler/results/artifacts.py:74`
-
-### helia_profiler.PowerObservation.deadline_s
-
-`attribute` · `python`
-
-```python
-deadline_s: float
-```
-
-Source: `src/helia_profiler/results/artifacts.py:75`
-
-### helia_profiler.PowerObservation.integrity
-
-`attribute` · `python`
-
-```python
-integrity: PowerIntegrity
-```
-
-Source: `src/helia_profiler/results/artifacts.py:76`
-
 ## helia_profiler.PowerResult
 
 `class` · `python`
@@ -4398,6 +4330,89 @@ metadata: PowerMetadata = field(default_factory=PowerMetadata)
 
 Source: `src/helia_profiler/power/base.py:86`
 
+## helia_profiler.PowerObservation
+
+`class` · `python`
+
+```python
+PowerObservation(
+    mode: ObservationMode,
+    result: PowerResult,
+    gate_rise_observed: bool,
+    gate_fall_observed: bool,
+    deadline_s: float,
+    integrity: PowerIntegrity,
+) -> None
+```
+
+`dataclass`
+
+Host instrument observation, independent of firmware terminal status.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/results/artifacts.py:79`
+
+### helia_profiler.PowerObservation.mode
+
+`attribute` · `python`
+
+```python
+mode: ObservationMode
+```
+
+Source: `src/helia_profiler/results/artifacts.py:83`
+
+### helia_profiler.PowerObservation.result
+
+`attribute` · `python`
+
+```python
+result: PowerResult
+```
+
+Source: `src/helia_profiler/results/artifacts.py:84`
+
+### helia_profiler.PowerObservation.gate_rise_observed
+
+`attribute` · `python`
+
+```python
+gate_rise_observed: bool
+```
+
+Source: `src/helia_profiler/results/artifacts.py:85`
+
+### helia_profiler.PowerObservation.gate_fall_observed
+
+`attribute` · `python`
+
+```python
+gate_fall_observed: bool
+```
+
+Source: `src/helia_profiler/results/artifacts.py:86`
+
+### helia_profiler.PowerObservation.deadline_s
+
+`attribute` · `python`
+
+```python
+deadline_s: float
+```
+
+Source: `src/helia_profiler/results/artifacts.py:87`
+
+### helia_profiler.PowerObservation.integrity
+
+`attribute` · `python`
+
+```python
+integrity: PowerIntegrity
+```
+
+Source: `src/helia_profiler/results/artifacts.py:88`
+
 ## helia_profiler.PowerTerminalRecord
 
 `class` · `python`
@@ -4423,7 +4438,7 @@ Versioned firmware status emitted only after the power gate is low.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/results/artifacts.py:79`
+Source: `src/helia_profiler/results/artifacts.py:91`
 
 ### helia_profiler.PowerTerminalRecord.version
 
@@ -4433,7 +4448,7 @@ Source: `src/helia_profiler/results/artifacts.py:79`
 version: int
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:83`
+Source: `src/helia_profiler/results/artifacts.py:95`
 
 ### helia_profiler.PowerTerminalRecord.status
 
@@ -4443,7 +4458,7 @@ Source: `src/helia_profiler/results/artifacts.py:83`
 status: Literal['ok', 'error']
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:84`
+Source: `src/helia_profiler/results/artifacts.py:96`
 
 ### helia_profiler.PowerTerminalRecord.requested_count
 
@@ -4453,7 +4468,7 @@ Source: `src/helia_profiler/results/artifacts.py:84`
 requested_count: int
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:85`
+Source: `src/helia_profiler/results/artifacts.py:97`
 
 ### helia_profiler.PowerTerminalRecord.completed_count
 
@@ -4463,7 +4478,7 @@ Source: `src/helia_profiler/results/artifacts.py:85`
 completed_count: int
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:86`
+Source: `src/helia_profiler/results/artifacts.py:98`
 
 ### helia_profiler.PowerTerminalRecord.elapsed_us
 
@@ -4473,7 +4488,7 @@ Source: `src/helia_profiler/results/artifacts.py:86`
 elapsed_us: int | None
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:87`
+Source: `src/helia_profiler/results/artifacts.py:99`
 
 ### helia_profiler.PowerTerminalRecord.final_phase
 
@@ -4483,7 +4498,7 @@ Source: `src/helia_profiler/results/artifacts.py:87`
 final_phase: str
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:88`
+Source: `src/helia_profiler/results/artifacts.py:100`
 
 ### helia_profiler.PowerTerminalRecord.error_code
 
@@ -4493,7 +4508,7 @@ Source: `src/helia_profiler/results/artifacts.py:88`
 error_code: int
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:89`
+Source: `src/helia_profiler/results/artifacts.py:101`
 
 ### helia_profiler.PowerTerminalRecord.gate_asserted
 
@@ -4503,7 +4518,7 @@ Source: `src/helia_profiler/results/artifacts.py:89`
 gate_asserted: bool
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:90`
+Source: `src/helia_profiler/results/artifacts.py:102`
 
 ### helia_profiler.PowerTerminalRecord.gate_lowered
 
@@ -4513,7 +4528,7 @@ Source: `src/helia_profiler/results/artifacts.py:90`
 gate_lowered: bool
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:91`
+Source: `src/helia_profiler/results/artifacts.py:103`
 
 ### helia_profiler.PowerTerminalRecord.gate_elapsed_us
 
@@ -4523,7 +4538,7 @@ Source: `src/helia_profiler/results/artifacts.py:91`
 gate_elapsed_us: int | None = None
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:95`
+Source: `src/helia_profiler/results/artifacts.py:107`
 
 ## helia_profiler.OnDevicePowerSummary
 
@@ -4549,7 +4564,7 @@ Integer-unit aggregate reported by a firmware-side power monitor.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/results/artifacts.py:122`
+Source: `src/helia_profiler/results/artifacts.py:134`
 
 ### helia_profiler.OnDevicePowerSummary.source
 
@@ -4559,7 +4574,7 @@ Source: `src/helia_profiler/results/artifacts.py:122`
 source: str
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:126`
+Source: `src/helia_profiler/results/artifacts.py:138`
 
 ### helia_profiler.OnDevicePowerSummary.scope
 
@@ -4569,7 +4584,7 @@ Source: `src/helia_profiler/results/artifacts.py:126`
 scope: Literal['fixed_n_inference']
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:127`
+Source: `src/helia_profiler/results/artifacts.py:139`
 
 ### helia_profiler.OnDevicePowerSummary.energy_nj
 
@@ -4579,7 +4594,7 @@ Source: `src/helia_profiler/results/artifacts.py:127`
 energy_nj: int
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:128`
+Source: `src/helia_profiler/results/artifacts.py:140`
 
 ### helia_profiler.OnDevicePowerSummary.duration_us
 
@@ -4589,7 +4604,7 @@ Source: `src/helia_profiler/results/artifacts.py:128`
 duration_us: int
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:129`
+Source: `src/helia_profiler/results/artifacts.py:141`
 
 ### helia_profiler.OnDevicePowerSummary.inference_count
 
@@ -4599,7 +4614,7 @@ Source: `src/helia_profiler/results/artifacts.py:129`
 inference_count: int
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:130`
+Source: `src/helia_profiler/results/artifacts.py:142`
 
 ### helia_profiler.OnDevicePowerSummary.overflow
 
@@ -4609,7 +4624,7 @@ Source: `src/helia_profiler/results/artifacts.py:130`
 overflow: bool
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:131`
+Source: `src/helia_profiler/results/artifacts.py:143`
 
 ### helia_profiler.OnDevicePowerSummary.charge_nc
 
@@ -4619,7 +4634,7 @@ Source: `src/helia_profiler/results/artifacts.py:131`
 charge_nc: int | None = None
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:132`
+Source: `src/helia_profiler/results/artifacts.py:144`
 
 ### helia_profiler.OnDevicePowerSummary.bus_voltage_uv
 
@@ -4629,7 +4644,7 @@ Source: `src/helia_profiler/results/artifacts.py:132`
 bus_voltage_uv: int | None = None
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:133`
+Source: `src/helia_profiler/results/artifacts.py:145`
 
 ### helia_profiler.OnDevicePowerSummary.calibration_id
 
@@ -4639,7 +4654,7 @@ Source: `src/helia_profiler/results/artifacts.py:133`
 calibration_id: str | None = None
 ```
 
-Source: `src/helia_profiler/results/artifacts.py:134`
+Source: `src/helia_profiler/results/artifacts.py:146`
 
 ---
 
@@ -6919,6 +6934,20 @@ PSRAM = 'psram'
 ```
 
 Source: `src/helia_profiler/platform/placement.py:36`
+
+### helia_profiler.Placement.region
+
+`attribute` · `python`
+
+```python
+region: MemoryRegion
+```
+
+The physical region this placement lands in.
+
+``TCM`` is DTCM: ITCM is code-only and never holds arenas or weights.
+
+Source: `src/helia_profiler/platform/placement.py:39`
 
 ## helia_profiler.Transport
 

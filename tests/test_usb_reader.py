@@ -9,6 +9,8 @@ from helia_profiler.transport import usb_cdc as usb_reader
 from helia_profiler.errors import CaptureError
 from helia_profiler.transport.usb_identity import USB_MARKER_PREFIX, usb_marker_serial
 
+_APP_HWID = "USB VID:PID=2AEC:6010 SER=000001"
+
 
 def _port(device, **kw):
     base = dict(
@@ -16,41 +18,39 @@ def _port(device, **kw):
         product=None,
         description=None,
         interface=None,
-        hwid="",
+        hwid=_APP_HWID,
         serial_number=None,
     )
     base.update(kw)
     return SimpleNamespace(device=device, **base)
 
 
+def _jlink(device, **kw):
+    fields = dict(
+        manufacturer="SEGGER",
+        product="J-Link",
+        description="SEGGER J-Link",
+        interface="J-Link VCOM",
+        hwid="USB VID:PID=1366:0105 SER=001160002954",
+        serial_number="001160002954",
+    )
+    fields.update(kw)
+    return _port(device, **fields)
+
+
+def _set_comports(monkeypatch, ports):
+    calls = []
+
+    def comports():
+        calls.append(None)
+        return list(ports)
+
+    monkeypatch.setattr("serial.tools.list_ports.comports", comports)
+    return calls
+
+
 def test_find_cdc_port_raises_when_only_jlink_ports_exist(monkeypatch):
-    monkeypatch.setattr(
-        usb_reader,
-        "_snapshot_cdc_ports",
-        lambda: {"/dev/ttyACM0", "/dev/ttyACM1"},
-    )
-    monkeypatch.setattr(
-        usb_reader.list_ports,
-        "comports",
-        lambda: [
-            SimpleNamespace(
-                device="/dev/ttyACM0",
-                manufacturer="SEGGER",
-                product="J-Link",
-                description="SEGGER J-Link",
-                interface="J-Link VCOM",
-                hwid="USB VID:PID=1366:0105",
-            ),
-            SimpleNamespace(
-                device="/dev/ttyACM1",
-                manufacturer="SEGGER",
-                product="J-Link",
-                description="SEGGER J-Link",
-                interface="J-Link VCOM",
-                hwid="USB VID:PID=1366:0105",
-            ),
-        ],
-    )
+    _set_comports(monkeypatch, [_jlink("/dev/ttyACM0"), _jlink("/dev/ttyACM1")])
 
     with pytest.raises(CaptureError, match="No application USB CDC device appeared") as exc_info:
         usb_reader._find_cdc_port(pre_existing={"/dev/ttyACM0", "/dev/ttyACM1"}, timeout_s=0)
@@ -59,43 +59,28 @@ def test_find_cdc_port_raises_when_only_jlink_ports_exist(monkeypatch):
     assert "J-Link" in hint
 
 
-def test_find_cdc_port_no_device_hint_covers_host_platforms(monkeypatch):
-    monkeypatch.setattr(usb_reader, "_snapshot_cdc_ports", lambda: set())
+def test_find_cdc_port_no_device_hint_points_at_ports_list(monkeypatch):
+    _set_comports(monkeypatch, [])
 
     with pytest.raises(CaptureError, match="No USB CDC device found") as exc_info:
         usb_reader._find_cdc_port(timeout_s=0)
 
     hint = exc_info.value.hint or ""
     assert "hpx ports list --all" in hint
-    assert "ls /dev/tty.usbmodem*" in hint
-    assert "ls /dev/ttyACM*" in hint
+    assert "/dev/" not in hint
 
 
 def test_find_cdc_port_falls_back_to_existing_non_jlink(monkeypatch):
-    monkeypatch.setattr(
-        usb_reader,
-        "_snapshot_cdc_ports",
-        lambda: {"/dev/ttyACM0", "/dev/ttyACM2"},
-    )
-    monkeypatch.setattr(
-        usb_reader.list_ports,
-        "comports",
-        lambda: [
-            SimpleNamespace(
-                device="/dev/ttyACM0",
-                manufacturer="SEGGER",
-                product="J-Link",
-                description="SEGGER J-Link",
-                interface="J-Link VCOM",
-                hwid="USB VID:PID=1366:0105",
-            ),
-            SimpleNamespace(
-                device="/dev/ttyACM2",
+    _set_comports(
+        monkeypatch,
+        [
+            _jlink("/dev/ttyACM0"),
+            _port(
+                "/dev/ttyACM2",
                 manufacturer="Ambiq",
                 product="TinyUSB CDC",
                 description="Apollo USB CDC",
                 interface="CDC",
-                hwid="USB VID:PID=1234:5678",
             ),
         ],
     )
@@ -105,17 +90,72 @@ def test_find_cdc_port_falls_back_to_existing_non_jlink(monkeypatch):
     assert port == "/dev/ttyACM2"
 
 
+@pytest.mark.parametrize(
+    "jlink,app",
+    [
+        pytest.param(
+            _jlink("COM3", description="JLink CDC UART Port (COM3)", manufacturer="SEGGER"),
+            _port("COM7", description="USB Serial Device (COM7)", manufacturer="Microsoft"),
+            id="windows",
+        ),
+        pytest.param(
+            _jlink("/dev/ttyACM0"),
+            _port("/dev/ttyUSB0", manufacturer="Ambiq"),
+            id="linux-ttyusb",
+        ),
+        pytest.param(
+            _jlink("/dev/cu.usbmodem0011600029541", manufacturer=None, description="J-Link"),
+            _port("/dev/cu.usbmodem14201", product="NSX USB Device"),
+            id="macos",
+        ),
+    ],
+)
+def test_find_cdc_port_detects_newly_enumerated_port_on_every_host(monkeypatch, jlink, app):
+    """A fresh CDC device is found whatever the host names it: COMx, ttyUSB, or cu.*."""
+    ports = [jlink]
+    _set_comports(monkeypatch, ports)
+    pre_existing = set(usb_reader._snapshot_cdc_ports())
+    assert pre_existing == {jlink.device}
+
+    ports.append(app)
+    monkeypatch.setattr(usb_reader.time, "sleep", lambda *_: None)
+
+    assert usb_reader._find_cdc_port(pre_existing=pre_existing, timeout_s=1) == app.device
+
+
+def test_find_cdc_port_never_falls_back_to_macos_jlink_vcom(monkeypatch):
+    """macOS J-Link VCOMs enumerate as cu.* devices and are still never app candidates."""
+    _set_comports(
+        monkeypatch,
+        [_jlink("/dev/cu.usbmodem0011600029541"), _jlink("/dev/cu.usbmodem0011600022041")],
+    )
+
+    with pytest.raises(CaptureError, match="No application USB CDC device appeared"):
+        usb_reader._find_cdc_port(timeout_s=0)
+
+
+def test_find_cdc_port_enumerates_once_per_poll(monkeypatch):
+    calls = _set_comports(
+        monkeypatch,
+        [
+            _jlink("/dev/ttyACM0"),
+            _port("/dev/ttyACM1", manufacturer="Ambiq", serial_number="000001"),
+            _port("/dev/ttyACM2", manufacturer="Ambiq", serial_number="000002"),
+        ],
+    )
+
+    with pytest.raises(CaptureError, match="could not be identified automatically") as exc_info:
+        usb_reader._find_cdc_port(timeout_s=0, expected_marker=usb_marker_serial("1"))
+
+    assert len(calls) == 1
+    assert "/dev/ttyACM1 (Ambiq, 000001)" in str(exc_info.value)
+
+
 def test_find_cdc_port_raises_on_multiple_app_devices(monkeypatch):
     """Two non-J-Link CDC devices is ambiguous — must raise, not guess."""
-    monkeypatch.setattr(
-        usb_reader,
-        "_snapshot_cdc_ports",
-        lambda: {"/dev/ttyACM1", "/dev/ttyACM2"},
-    )
-    monkeypatch.setattr(
-        usb_reader.list_ports,
-        "comports",
-        lambda: [
+    _set_comports(
+        monkeypatch,
+        [
             _port("/dev/ttyACM1", manufacturer="Ambiq", product="NSX USB Device"),
             _port("/dev/ttyACM2", manufacturer="Ambiq", product="NSX USB Device"),
         ],
@@ -137,43 +177,38 @@ def test_usb_marker_serial_derivation():
     assert len(truncated) == 31
 
 
-def test_find_port_by_marker_matches_serial_number():
+def test_find_port_by_marker_matches_serial_number(monkeypatch):
     marker = usb_marker_serial("1160001350")
     assert marker is not None
-    monkeypatch_ports = [
-        _port("/dev/ttyACM0", manufacturer="SEGGER", product="J-Link", serial_number="1160001350"),
-        _port(
-            "/dev/ttyACM1", manufacturer="Ambiq", product="NSX HPX Profiler", serial_number=marker
-        ),
-        _port(
-            "/dev/ttyACM2", manufacturer="Ambiq", product="NSX USB Device", serial_number="000001"
-        ),
-    ]
-    import helia_profiler.transport.usb_cdc as mod
+    _set_comports(
+        monkeypatch,
+        [
+            _jlink("/dev/ttyACM0", serial_number="1160001350"),
+            _port(
+                "/dev/ttyACM1",
+                manufacturer="Ambiq",
+                product="NSX HPX Profiler",
+                serial_number=marker,
+            ),
+            _port(
+                "/dev/ttyACM2",
+                manufacturer="Ambiq",
+                product="NSX USB Device",
+                serial_number="000001",
+            ),
+        ],
+    )
 
-    orig = mod.list_ports.comports
-    mod.list_ports.comports = (  # ty: ignore[invalid-assignment]
-        lambda: monkeypatch_ports
-    )  # manual monkeypatch of the pyserial module attr
-    try:
-        assert mod._find_port_by_marker(marker) == "/dev/ttyACM1"
-        assert mod._find_port_by_marker("HPX-nope") is None
-    finally:
-        mod.list_ports.comports = orig
+    assert usb_reader._find_port_by_marker(marker) == "/dev/ttyACM1"
+    assert usb_reader._find_port_by_marker("HPX-nope") is None
 
 
 def test_resolve_cdc_port_prefers_marker(monkeypatch):
     marker = usb_marker_serial("1160001350")
     monkeypatch.setattr(usb_reader.time, "sleep", lambda *_: None)
-    monkeypatch.setattr(
-        usb_reader,
-        "_snapshot_cdc_ports",
-        lambda: {"/dev/ttyACM1", "/dev/ttyACM3"},
-    )
-    monkeypatch.setattr(
-        usb_reader.list_ports,
-        "comports",
-        lambda: [
+    _set_comports(
+        monkeypatch,
+        [
             _port(
                 "/dev/ttyACM1",
                 manufacturer="Ambiq",
@@ -202,18 +237,10 @@ def test_find_cdc_port_rejects_foreign_hpx_device(monkeypatch):
     """
     expected = usb_marker_serial("1160001350")
     foreign = usb_marker_serial("1160002204")
-    monkeypatch.setattr(
-        usb_reader,
-        "_snapshot_cdc_ports",
-        lambda: {"/dev/ttyACM0", "/dev/ttyACM3"},
-    )
-    monkeypatch.setattr(
-        usb_reader.list_ports,
-        "comports",
-        lambda: [
-            _port(
-                "/dev/ttyACM0", manufacturer="SEGGER", product="J-Link", serial_number="1160001350"
-            ),
+    _set_comports(
+        monkeypatch,
+        [
+            _jlink("/dev/ttyACM0", serial_number="1160001350"),
             _port(
                 "/dev/ttyACM3",
                 manufacturer="Ambiq",
@@ -223,23 +250,20 @@ def test_find_cdc_port_rejects_foreign_hpx_device(monkeypatch):
         ],
     )
 
-    with pytest.raises(CaptureError, match="No application USB CDC device appeared"):
+    with pytest.raises(CaptureError, match="stamped for another board") as exc_info:
         usb_reader._find_cdc_port(timeout_s=0, expected_marker=expected)
+
+    assert f"/dev/ttyACM3 (Ambiq, NSX HPX Profiler, {foreign})" in str(exc_info.value)
+    assert "J-Link" not in (exc_info.value.hint or "")
 
 
 def test_resolve_cdc_port_does_not_fall_back_to_foreign_hpx(monkeypatch):
     expected = usb_marker_serial("1160001350")
     foreign = usb_marker_serial("1160002204")
     monkeypatch.setattr(usb_reader.time, "sleep", lambda *_: None)
-    monkeypatch.setattr(
-        usb_reader,
-        "_snapshot_cdc_ports",
-        lambda: {"/dev/ttyACM3"},
-    )
-    monkeypatch.setattr(
-        usb_reader.list_ports,
-        "comports",
-        lambda: [
+    _set_comports(
+        monkeypatch,
+        [
             _port(
                 "/dev/ttyACM3",
                 manufacturer="Ambiq",
@@ -249,7 +273,7 @@ def test_resolve_cdc_port_does_not_fall_back_to_foreign_hpx(monkeypatch):
         ],
     )
 
-    with pytest.raises(CaptureError, match="No application USB CDC device appeared"):
+    with pytest.raises(CaptureError, match="stamped for another board"):
         usb_reader.resolve_cdc_port(marker=expected, pre_existing=set(), timeout_s=0)
 
 

@@ -325,6 +325,25 @@
                 "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/placement.py#L36"
               },
               "summary": ""
+            },
+            {
+              "description": "The physical region this placement lands in.\n\n``TCM`` is DTCM: ITCM is code-only and never holds arenas or weights.",
+              "examples": [],
+              "id": "helia_profiler.Placement.region",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "region",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "region: MemoryRegion",
+              "source": {
+                "line": 39,
+                "path": "src/helia_profiler/platform/placement.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/placement.py#L39"
+              },
+              "summary": "The physical region this placement lands in."
             }
           ],
           "name": "Placement",

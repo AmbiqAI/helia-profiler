@@ -30,15 +30,6 @@ from ..hostenv.toolchain_probe import symbol_address
 
 log = logging.getLogger("hpx")
 
-#: Arena PLACEMENT -> verified-map region. The placement vocabulary calls
-#: the tightly-coupled bank "TCM"; the measured map calls it DTCM.
-_PLACEMENT_REGION = {
-    Placement.TCM: MemoryRegion.DTCM,
-    Placement.SRAM: MemoryRegion.SRAM,
-    Placement.MRAM: MemoryRegion.MRAM,
-    Placement.PSRAM: MemoryRegion.PSRAM,
-}
-
 #: Arena storage symbol emitted by the interpreter firmware template
 #: (``main.cc.j2``).  Mangled to ``_ZL15g_arena_storage`` by C++ compilers;
 #: matched as a suffix so both mangled and plain forms resolve.
@@ -85,11 +76,7 @@ class VerifyPlacementStage:
             return
         family = link_family_for_toolchain(toolchain)
         expected = next(
-            (
-                w.app_window[family]
-                for w in windows
-                if w.region is _PLACEMENT_REGION.get(arena_region)
-            ),
+            (w.app_window[family] for w in windows if w.region is arena_region.region),
             None,
         )
         if expected is None:

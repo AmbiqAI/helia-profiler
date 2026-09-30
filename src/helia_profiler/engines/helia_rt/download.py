@@ -7,11 +7,17 @@ downloaded archive.
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import logging
 import os
+import re
+import shutil
+import tempfile
 import zipfile
+import zlib
+from http.client import HTTPException
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -37,8 +43,7 @@ def _fetch_github_release(
 
     Returns ``(dist_path, detected_version)``.
     """
-    cache_key = f"{repo.replace('/', '_')}_{ref}"
-    cache_dir = _cache_dir() / cache_key
+    cache_dir = _cache_dir() / _cache_key(repo, ref)
 
     if cache_dir.is_dir() and _is_valid_dist(cache_dir):
         log.info("Cache hit: %s", cache_dir)
@@ -62,11 +67,33 @@ def _fetch_github_release(
         )
 
     log.info("Downloading heliaRT from %s ...", asset_url)
-    cache_dir.mkdir(parents=True, exist_ok=True)
     _download_and_extract(asset_url, cache_dir, timeout_s=asset_s)
-
-    _validate_dist(cache_dir)
     return cache_dir, _detect_version(cache_dir)
+
+
+_PLAIN_REPO = re.compile(r"[A-Za-z0-9-]+/[A-Za-z0-9.-]+")
+_PLAIN_REF = re.compile(r"[A-Za-z0-9._-]+")
+
+
+def _cache_key(repo: str, ref: str) -> str:
+    """Map *repo* and *ref* to a unique single path component under the cache root.
+
+    Both are user config; separators or ``..`` must not steer the cache
+    directory (which may be deleted when stale) outside the cache root.
+    ``owner/name`` repos without ``_`` and plain refs keep the historical
+    ``owner_name_ref`` key, which is unambiguous because the first two
+    ``_`` split it. Anything else is sanitized and suffixed with ``+`` and
+    a digest of the raw pair; ``+`` never occurs in a plain key.
+    """
+    if (
+        _PLAIN_REPO.fullmatch(repo)
+        and _PLAIN_REF.fullmatch(ref)
+        and ref == ref.casefold()
+    ):
+        return f"{repo.replace('/', '_')}_{ref}"
+    sanitized = re.sub(r"[^A-Za-z0-9._-]", "_", f"{repo}_{ref}")
+    digest = hashlib.sha256(json.dumps([repo, ref]).encode()).hexdigest()[:12]
+    return f"{sanitized}+{digest}"
 
 
 def _resolve_release_tag(repo: str, ref: str, *, api_s: float = 30) -> str | None:
@@ -159,10 +186,12 @@ def _github_api_get(url: str, *, timeout_s: float = 30) -> dict | None:
 
 
 def _download_and_extract(url: str, dest: Path, *, timeout_s: float = 300) -> None:
-    """Download a zip from *url* and extract into *dest*.
+    """Download a zip from *url* and install it as the distribution at *dest*.
 
     If the zip contains a single top-level directory, its contents are
-    extracted directly into *dest* (strip one level).
+    extracted directly into *dest* (strip one level). The archive is
+    extracted into a temporary sibling of *dest* and validated there, so
+    *dest* only ever appears as a complete distribution.
     """
     token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
     headers: dict[str, str] = {}
@@ -173,13 +202,35 @@ def _download_and_extract(url: str, dest: Path, *, timeout_s: float = 300) -> No
     try:
         with urlopen(req, timeout=timeout_s) as resp:
             data = resp.read()
-    except (URLError, OSError) as exc:
+    except (URLError, OSError, HTTPException) as exc:
         raise EngineError(
             f"Failed to download heliaRT release: {exc}",
             hint="Check your network connection or set engine.config.dist_path.",
         ) from exc
 
-    with zipfile.ZipFile(io.BytesIO(data)) as zf:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=f".{dest.name}.", dir=dest.parent))
+    try:
+        _extract_zip(data, staging, source=url)
+        _validate_dist(staging)
+        _install_dir(staging, dest)
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+
+    log.info("Extracted heliaRT distribution to %s", dest)
+
+
+def _extract_zip(data: bytes, dest: Path, *, source: str) -> None:
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(data))
+    except zipfile.BadZipFile as exc:
+        raise EngineError(
+            f"Downloaded heliaRT release is not a valid zip archive: {source}",
+            hint="Retry the download or set engine.config.dist_path.",
+        ) from exc
+
+    root = dest.resolve()
+    with zf:
         top_dirs = {n.split("/")[0] for n in zf.namelist() if "/" in n}
         strip_prefix = ""
         if len(top_dirs) == 1:
@@ -193,8 +244,44 @@ def _download_and_extract(url: str, dest: Path, *, timeout_s: float = 300) -> No
                 name = name[len(strip_prefix) :]
             if not name:
                 continue
-            out = dest / name
+            out = (root / name).resolve()
+            if out == root or not out.is_relative_to(root):
+                raise EngineError(
+                    f"heliaRT release archive entry escapes the extraction "
+                    f"directory: {member.filename!r} ({source})",
+                    hint="The archive is malformed or malicious; check engine.config.source.repo.",
+                )
             out.parent.mkdir(parents=True, exist_ok=True)
-            out.write_bytes(zf.read(member))
+            try:
+                out.write_bytes(zf.read(member))
+            except (zipfile.BadZipFile, EOFError, zlib.error) as exc:
+                raise EngineError(
+                    f"Corrupt entry {member.filename!r} in heliaRT release archive: {source}",
+                    hint="Retry the download or set engine.config.dist_path.",
+                ) from exc
 
-    log.info("Extracted heliaRT distribution to %s", dest)
+
+def _install_dir(staging: Path, dest: Path) -> None:
+    """Move *staging* to *dest*, replacing a stale (invalid) *dest*.
+
+    A valid *dest* that appears concurrently wins; *staging* is discarded.
+    """
+    if dest.exists():
+        if _is_valid_dist(dest):
+            return
+        # Rename aside so rmtree only touches this snapshot; a concurrent
+        # replacer that got there first surfaces as FileNotFoundError.
+        stale = dest.with_name(f"{staging.name}.stale")
+        try:
+            dest.rename(stale)
+        except FileNotFoundError:
+            pass
+        else:
+            shutil.rmtree(stale, ignore_errors=True)
+    try:
+        staging.rename(dest)
+    except OSError:
+        # Windows refuses to rename onto an existing path; POSIX refuses a
+        # non-empty one. Either way another process installed it first.
+        if not _is_valid_dist(dest):
+            raise

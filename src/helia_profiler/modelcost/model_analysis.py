@@ -206,16 +206,67 @@ def _op_name(code: int) -> str:
     return _OP_NAMES.get(code, f"CUSTOM({code})")
 
 
-def _conv2d_macs(
-    input_shape: list[int],
-    weight_shape: list[int],
-    output_shape: list[int],
-    stride_h: int,
-    stride_w: int,
-    dilation_h: int,
-    dilation_w: int,
-    has_bias: bool,
-) -> int:
+#: One op per output element.  TFLite builtin and heliaAOT ``AirOpType``
+#: share these names; entries one side lacks simply never match there.
+_ELEMENTWISE_OPS = frozenset(
+    {
+        "RELU",
+        "RELU6",
+        "RELU_N1_TO_1",
+        "LEAKY_RELU",
+        "PRELU",
+        "ELU",
+        "LOGISTIC",
+        "TANH",
+        "HARD_SWISH",
+        "ADD",
+        "SUB",
+        "MUL",
+        "DIV",
+        "MAXIMUM",
+        "MINIMUM",
+        "SQUARED_DIFFERENCE",
+        "RSQRT",
+        "SQRT",
+        "ABS",
+        "NEG",
+        "FLOOR",
+        "CEIL",
+        "ROUND",
+        "LOG",
+        "EXP",
+        "SIN",
+        "COS",
+        "QUANTIZE",
+        "DEQUANTIZE",
+    }
+)
+
+#: Data movement only; no arithmetic.
+_ZERO_COST_OPS = frozenset(
+    {
+        "RESHAPE",
+        "SQUEEZE",
+        "EXPAND_DIMS",
+        "TRANSPOSE",
+        "PAD",
+        "PADV2",
+        "MIRROR_PAD",
+        "CONCATENATION",
+        "SPLIT",
+        "SPLIT_V",
+        "SLICE",
+        "STRIDED_SLICE",
+        "GATHER",
+        "GATHER_ND",
+        "CAST",
+        "PACK",
+        "UNPACK",
+    }
+)
+
+
+def _conv2d_macs(weight_shape: list[int], output_shape: list[int]) -> int:
     """Compute MACs for CONV_2D.
 
     Weight shape: [C_out, K_h, K_w, C_in]   (TFLite convention)
@@ -241,7 +292,6 @@ def _depthwise_conv2d_macs(
     weight_shape: list[int],
     output_shape: list[int],
     depth_multiplier: int,
-    has_bias: bool,
 ) -> int:
     """Compute MACs for DEPTHWISE_CONV_2D.
 
@@ -265,11 +315,7 @@ def _depthwise_conv2d_macs(
     return n * k_h * k_w * c_in * depth_multiplier * h_out * w_out
 
 
-def _fully_connected_macs(
-    input_shape: list[int],
-    weight_shape: list[int],
-    has_bias: bool,
-) -> int:
+def _fully_connected_macs(input_shape: list[int], weight_shape: list[int]) -> int:
     """Compute MACs for FULLY_CONNECTED.
 
     Weight shape: [N_out, N_in]
@@ -379,68 +425,7 @@ def analyze_model(model_path: str | Path) -> ModelAnalysis | None:
             return f"CUSTOM({custom.decode('utf-8', errors='replace')})"
         return name
 
-    # Element-wise ops that count as 1 op per element
-    _ELEMENTWISE_OPS = set()
     bo = _schema.BuiltinOperator
-    for name in (
-        "RELU",
-        "RELU6",
-        "RELU_N1_TO_1",
-        "LEAKY_RELU",
-        "PRELU",
-        "ELU",
-        "LOGISTIC",
-        "TANH",
-        "HARD_SWISH",
-        "ADD",
-        "SUB",
-        "MUL",
-        "DIV",
-        "MAXIMUM",
-        "MINIMUM",
-        "SQUARED_DIFFERENCE",
-        "RSQRT",
-        "SQRT",
-        "ABS",
-        "NEG",
-        "FLOOR",
-        "CEIL",
-        "ROUND",
-        "LOG",
-        "EXP",
-        "SIN",
-        "COS",
-        "QUANTIZE",
-        "DEQUANTIZE",
-    ):
-        val = getattr(bo, name, None)
-        if val is not None:
-            _ELEMENTWISE_OPS.add(val)
-
-    # Zero-cost ops (no compute)
-    _ZERO_OPS = set()
-    for name in (
-        "RESHAPE",
-        "SQUEEZE",
-        "EXPAND_DIMS",
-        "TRANSPOSE",
-        "PAD",
-        "PADV2",
-        "MIRROR_PAD",
-        "CONCATENATION",
-        "SPLIT",
-        "SPLIT_V",
-        "SLICE",
-        "STRIDED_SLICE",
-        "GATHER",
-        "GATHER_ND",
-        "CAST",
-        "PACK",
-        "UNPACK",
-    ):
-        val = getattr(bo, name, None)
-        if val is not None:
-            _ZERO_OPS.add(val)
 
     for i in range(sg.OperatorsLength()):
         op = sg.Operators(i)
@@ -482,16 +467,7 @@ def analyze_model(model_path: str | Path) -> ModelAnalysis | None:
                 "dilation_w": conv_opts.DilationWFactor(),
                 "padding": conv_opts.Padding(),
             }
-            macs = _conv2d_macs(
-                in_shapes[0],
-                in_shapes[1],
-                out_shapes[0] if out_shapes else [],
-                conv_opts.StrideH(),
-                conv_opts.StrideW(),
-                conv_opts.DilationHFactor(),
-                conv_opts.DilationWFactor(),
-                has_bias,
-            )
+            macs = _conv2d_macs(in_shapes[1], out_shapes[0] if out_shapes else [])
             ops = 2 * macs
             # Count parameters (weights + bias)
             total_params += _count_tensor_elements(sg, op.Inputs(1))
@@ -515,7 +491,6 @@ def analyze_model(model_path: str | Path) -> ModelAnalysis | None:
                 in_shapes[1],
                 out_shapes[0] if out_shapes else [],
                 dm,
-                has_bias,
             )
             ops = 2 * macs
             total_params += _count_tensor_elements(sg, op.Inputs(1))
@@ -523,7 +498,7 @@ def analyze_model(model_path: str | Path) -> ModelAnalysis | None:
                 total_params += _count_tensor_elements(sg, op.Inputs(2))
 
         elif builtin == bo.FULLY_CONNECTED and len(in_shapes) >= 2:
-            macs = _fully_connected_macs(in_shapes[0], in_shapes[1], has_bias)
+            macs = _fully_connected_macs(in_shapes[0], in_shapes[1])
             ops = 2 * macs
             total_params += _count_tensor_elements(sg, op.Inputs(1))
             if has_bias:
@@ -574,12 +549,12 @@ def analyze_model(model_path: str | Path) -> ModelAnalysis | None:
             if out_shapes:
                 ops = 5 * math.prod(out_shapes[0])
 
-        elif builtin in _ELEMENTWISE_OPS:
+        elif name in _ELEMENTWISE_OPS:
             if out_shapes:
                 ops = _elementwise_ops(out_shapes[0])
 
-        elif builtin in _ZERO_OPS:
-            ops = 0
+        elif name in _ZERO_COST_OPS:
+            pass
 
         else:
             # Unknown ops are logged, not fatal — analysis stays best-effort.
@@ -646,7 +621,6 @@ def analyze_air_model(air_model: Any) -> ModelAnalysis | None:
 
         # Get weight tensor shape via named_tensors
         weight_shape: list[int] = []
-        bias_shape: list[int] = []
         if "weights" in op.named_tensors:
             wt = air_model.get_tensor(op.named_tensors["weights"])
             if wt is not None:
@@ -655,9 +629,7 @@ def analyze_air_model(air_model: Any) -> ModelAnalysis | None:
         if "bias" in op.named_tensors:
             bt = air_model.get_tensor(op.named_tensors["bias"])
             if bt is not None:
-                bias_shape = list(bt.shape)
                 total_params += math.prod(bt.shape)
-        has_bias = len(bias_shape) > 0
 
         ot = op.op_type
 
@@ -669,16 +641,7 @@ def analyze_air_model(air_model: Any) -> ModelAnalysis | None:
                 "dilation_h": getattr(opts, "dilation_height", 1),
                 "dilation_w": getattr(opts, "dilation_width", 1),
             }
-            macs = _conv2d_macs(
-                in_shapes[0] if in_shapes else [],
-                weight_shape,
-                out_shapes[0],
-                params["stride_h"],
-                params["stride_w"],
-                params["dilation_h"],
-                params["dilation_w"],
-                has_bias,
-            )
+            macs = _conv2d_macs(weight_shape, out_shapes[0])
             ops = 2 * macs
 
         elif ot == _AirOpType.DEPTHWISE_CONV_2D and weight_shape and out_shapes:
@@ -696,16 +659,11 @@ def analyze_air_model(air_model: Any) -> ModelAnalysis | None:
                 weight_shape,
                 out_shapes[0],
                 dm,
-                has_bias,
             )
             ops = 2 * macs
 
         elif ot == _AirOpType.FULLY_CONNECTED and weight_shape:
-            macs = _fully_connected_macs(
-                in_shapes[0] if in_shapes else [],
-                weight_shape,
-                has_bias,
-            )
+            macs = _fully_connected_macs(in_shapes[0] if in_shapes else [], weight_shape)
             ops = 2 * macs
 
         elif ot == _AirOpType.TRANSPOSE_CONV and weight_shape and in_shapes:
@@ -730,45 +688,12 @@ def analyze_air_model(air_model: Any) -> ModelAnalysis | None:
             if out_shapes:
                 ops = 5 * math.prod(out_shapes[0])
 
-        elif ot.name in {
-            "RELU",
-            "RELU6",
-            "LEAKY_RELU",
-            "PRELU",
-            "ELU",
-            "LOGISTIC",
-            "TANH",
-            "HARD_SWISH",
-            "ADD",
-            "SUB",
-            "MUL",
-            "DIV",
-            "MAXIMUM",
-            "MINIMUM",
-            "QUANTIZE",
-            "DEQUANTIZE",
-        }:
+        elif op_name in _ELEMENTWISE_OPS:
             if out_shapes:
                 ops = _elementwise_ops(out_shapes[0])
 
-        elif ot.name in {
-            "RESHAPE",
-            "SQUEEZE",
-            "EXPAND_DIMS",
-            "TRANSPOSE",
-            "PAD",
-            "PADV2",
-            "CONCATENATION",
-            "SPLIT",
-            "SPLIT_V",
-            "SLICE",
-            "STRIDED_SLICE",
-            "GATHER",
-            "CAST",
-            "PACK",
-            "UNPACK",
-        }:
-            pass  # 0 ops
+        elif op_name in _ZERO_COST_OPS:
+            pass
 
         else:
             log.debug("air_model_analysis: unhandled op %s", op_name)

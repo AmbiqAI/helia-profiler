@@ -37,7 +37,7 @@ from .platform import BoardDef, SocDef
 from .evaluation import RunEvaluation
 from .modelcost import ModelAnalysis
 from .placement import Placement
-from .power.base import PowerResult
+from .power.base import PowerMode, PowerResult
 from .power.metadata import ObservationMode, classify_observation
 from .results import (
     MeasuredMemoryRegions,
@@ -302,7 +302,7 @@ class PipelineContext:
     def publish_power_terminal(self, terminal: PowerTerminalRecord) -> None:
         if self.power_run is None or self.power_run.deployment is None:
             raise PipelineError("Power firmware must be deployed before terminal status.")
-        if self.power_run.observation is None and self.config.power.mode.value != "internal":
+        if self.power_run.observation is None and self.config.power.mode is not PowerMode.INTERNAL:
             raise PipelineError("Power observation must complete before terminal status.")
         if self.power_run.terminal is not None:
             raise PipelineError("Power terminal status has already been published.")

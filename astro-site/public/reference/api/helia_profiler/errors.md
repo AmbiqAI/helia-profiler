@@ -44,7 +44,7 @@ Bad configuration — missing model path, invalid YAML, unknown board.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:33`
+Source: `src/helia_profiler/errors.py:29`
 
 ## helia_profiler.PlatformError
 
@@ -58,7 +58,7 @@ Unsupported board/SoC combination or missing platform capability.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:37`
+Source: `src/helia_profiler/errors.py:33`
 
 ## helia_profiler.EngineError
 
@@ -72,7 +72,7 @@ Engine adapter failure — AOT compile error, missing static lib, etc.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:41`
+Source: `src/helia_profiler/errors.py:37`
 
 ## helia_profiler.FirmwareError
 
@@ -86,7 +86,7 @@ Firmware generation failure — template rendering, file I/O.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:45`
+Source: `src/helia_profiler/errors.py:41`
 
 ## helia_profiler.BuildError
 
@@ -105,7 +105,7 @@ return code is also captured in :attr:`returncode`.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:49`
+Source: `src/helia_profiler/errors.py:45`
 
 ### helia_profiler.BuildError.returncode
 
@@ -115,7 +115,7 @@ Source: `src/helia_profiler/errors.py:49`
 returncode = returncode
 ```
 
-Source: `src/helia_profiler/errors.py:66`
+Source: `src/helia_profiler/errors.py:62`
 
 ### helia_profiler.BuildError.details
 
@@ -125,7 +125,7 @@ Source: `src/helia_profiler/errors.py:66`
 details = details
 ```
 
-Source: `src/helia_profiler/errors.py:67`
+Source: `src/helia_profiler/errors.py:63`
 
 ## helia_profiler.CaptureError
 
@@ -139,7 +139,7 @@ Data capture failure — serial timeout, corrupt data, SWO framing.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:71`
+Source: `src/helia_profiler/errors.py:67`
 
 ## helia_profiler.DeterministicCaptureError
 
@@ -153,13 +153,14 @@ A capture-path refusal no retry or power cycle can change.
 
 Subclass of :class:`CaptureError` so existing ``except CaptureError``
 handlers still catch it, but recovery paths that would otherwise cycle the
-target rail and retry (``stages.flash_power``) re-raise it instead: these
-are configuration/artifact gaps — a missing image, an unknown load
-address — and cycling the rail only frames them as flaky hardware.
+target rail and retry (``stages.flash.deploy_firmware``) re-raise it
+instead: these are configuration/artifact gaps — a missing image, an
+unknown load address — and cycling the rail only frames them as flaky
+hardware.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:75`
+Source: `src/helia_profiler/errors.py:71`
 
 ## helia_profiler.NetworkError
 
@@ -176,7 +177,7 @@ still catch it, but callers that want to retry can specifically catch this.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:86`
+Source: `src/helia_profiler/errors.py:83`
 
 ## helia_profiler.DependencyError
 
@@ -195,7 +196,7 @@ specifically about an incompatible version or a missing/corrupt lock.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/errors.py:94`
+Source: `src/helia_profiler/errors.py:91`
 
 ## helia_profiler.VersionError
 
@@ -214,7 +215,7 @@ dependency failures and surface an actionable upgrade/downgrade hint.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/errors.py:104`
+Source: `src/helia_profiler/errors.py:101`
 
 ## helia_profiler.LockError
 
@@ -233,7 +234,7 @@ failing an entire report.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/errors.py:114`
+Source: `src/helia_profiler/errors.py:111`
 
 ## helia_profiler.PowerError
 
@@ -247,7 +248,7 @@ Power measurement failure — Joulescope not found, calibration error.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:124`
+Source: `src/helia_profiler/errors.py:121`
 
 ## helia_profiler.ReportError
 
@@ -261,4 +262,4 @@ Report generation failure — output path not writable, format error.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:128`
+Source: `src/helia_profiler/errors.py:125`
