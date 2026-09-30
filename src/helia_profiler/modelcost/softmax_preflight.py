@@ -103,13 +103,12 @@ def _read_aot_absent_beta() -> float:
         return 1.0
 
 
-#: What an ABSENT ``SoftmaxOptions`` table means for beta under helia-aot --
-#: and the engines disagree. TFLM value-initialises the POD
-#: (``ParseSoftmax``'s no-options branch is a deliberate no-op, verified
-#: against the vendored source), so beta reaches the kernel as 0.0, which is
-#: what the TFLite reader records. helia-aot's ``SoftmaxOptions`` is a
-#: pydantic model whose field default is 1.0. Applying TFLM's convention to an
-#: AOT verdict is how this gate came to claim a crash that could not happen.
+#: What an ABSENT ``SoftmaxOptions`` table means for beta under helia-aot.
+#: The engines disagree: TFLM value-initialises the POD (``ParseSoftmax``'s
+#: no-options branch is a deliberate no-op), so beta reaches the kernel as
+#: 0.0, which is what the TFLite reader records; helia-aot's
+#: ``SoftmaxOptions`` is a pydantic model whose field default is 1.0. An AOT
+#: verdict must use this AOT default, never the TFLM 0.0.
 #:
 #: Read LIVE from the installed helia-aot's pydantic field default whenever
 #: the optional extra is present, so a version bump that changes the default

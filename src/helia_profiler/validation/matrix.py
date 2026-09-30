@@ -71,7 +71,7 @@ class ExecuTorchModelSpec:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ModelSpec:
     """One canonical benchmark model."""
 

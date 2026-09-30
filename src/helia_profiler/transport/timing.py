@@ -1,17 +1,16 @@
-"""Centralised timing constants and telemetry for capture transports.
+"""Transport-facing timing constants and telemetry for capture transports.
 
-This module is the **single place** for the few unavoidable blind delays in
-the capture path — the windows where the target is doing something the host
-cannot observe (secure-bootloader bring-up, USB re-enumeration).  Everything
-else should use bounded, signal-driven polling (see
+Capture transports take every unavoidable blind delay from this module — the
+windows where the target is doing something the host cannot observe
+(secure-bootloader bring-up, USB re-enumeration).  Everything else should use
+bounded, signal-driven polling (see
 :func:`~helia_profiler.target.probe.jlink.open_jlink_with_retry`) rather than
 a fixed ``time.sleep()``.
 
-Keeping these here means new fixed delays are discouraged and the existing
-ones stay discoverable and tunable in one spot instead of accreting as magic
-numbers scattered across the readers.  The SBL settle and readiness-poll
-cadence are defined in :mod:`helia_profiler.target.probe.jlink`, which the
-probe layer needs without importing this package, and re-exported here.
+Transport-owned delays (``USB_REENUM_FLOOR_S``) are defined here.  Probe-owned
+timing (``SBL_SETTLE_S``, ``READINESS_POLL_INTERVAL_S``) is defined in
+:mod:`helia_profiler.target.probe.jlink`, which uses it without importing this
+package, and is re-exported here so transports have one import site.
 
 It also owns :class:`CaptureTimingTracker`, the shared HPX_START/HPX_END
 observation bookkeeping every transport reports through ``timing_out``.
