@@ -113,7 +113,7 @@ def test_session_records_its_yaml_path(tmp_path: Path) -> None:
 
     assert session.yaml_path == config_path.resolve()
     assert session.with_target(jlink_serial="1").yaml_path == config_path.resolve()
-    assert hpx.Session(yaml_path=str(config_path)).yaml_path == config_path
+    assert hpx.Session(yaml_path=config_path).yaml_path == config_path
     assert hpx.Session.from_dict({}).yaml_path is None
 
 
