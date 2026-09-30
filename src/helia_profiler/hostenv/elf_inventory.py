@@ -11,21 +11,13 @@ from __future__ import annotations
 
 import logging
 import re
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from .toolchains import get_toolchain_spec, resolve_toolchain_executable
+from ._proc import tool_output
+from .toolchains import get_toolchain_spec, nm_command, resolve_toolchain_executable
 
 log = logging.getLogger("hpx")
-
-
-def _nm_command(toolchain: str) -> str:
-    """The ``nm`` executable matching *toolchain* (mirrors
-    ``toolchain_probe._nm_command``; duplicated here because the import
-    would be circular — toolchain_probe re-exports this module)."""
-    spec = get_toolchain_spec(toolchain)
-    return resolve_toolchain_executable(toolchain, spec.nm)
 
 
 _FROMELF_SECTION_START_RE = re.compile(r"^\*\* Section #(\d+)")
@@ -183,28 +175,12 @@ def _inventory_via_readelf(
     timeout_s: int,
 ) -> tuple[tuple[ElfSection, ...], int] | None:
     """(sections, unparsed_row_count), or None when the tool failed."""
-    try:
-        result = subprocess.run(
-            [readelf_cmd, "-S", "-W", str(binary_path)],
-            capture_output=True,
-            text=True,
-            # Section names are arbitrary bytes; the platform default codec
-            # (cp1252 on Windows) can RAISE mid-decode, escaping the
-            # degrade-to-None contract. Decode deterministically, replace
-            # the undecodable (#176 fresh-review).
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout_s,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
-        log.debug("readelf inventory probe failed: %s", exc)
-        return None
-    if result.returncode != 0:
-        log.debug("readelf -S failed: %s", (result.stderr or "").strip())
+    stdout = tool_output([readelf_cmd, "-S", "-W", str(binary_path)], timeout_s=timeout_s)
+    if stdout is None:
         return None
     sections: list[ElfSection] = []
     unparsed = 0
-    for line in result.stdout.splitlines():
+    for line in stdout.splitlines():
         match = _READELF_INVENTORY_RE.match(line)
         if match is None:
             # A bracket row that fails the type-constrained pattern (e.g. a
@@ -242,23 +218,11 @@ def _segments_via_readelf(
     """PT_LOAD segments; empty on any failure — segments refine the
     inventory (load-image accounting) but their absence must not discard
     it."""
-    try:
-        result = subprocess.run(
-            [readelf_cmd, "-l", "-W", str(binary_path)],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout_s,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
-        log.debug("readelf segment probe failed: %s", exc)
-        return ()
-    if result.returncode != 0:
-        log.debug("readelf -l failed: %s", (result.stderr or "").strip())
+    stdout = tool_output([readelf_cmd, "-l", "-W", str(binary_path)], timeout_s=timeout_s)
+    if stdout is None:
         return ()
     segments: list[LoadSegment] = []
-    for line in result.stdout.splitlines():
+    for line in stdout.splitlines():
         match = _READELF_LOAD_RE.match(line)
         if match is None:
             continue
@@ -385,22 +349,10 @@ def section_inventory(
     """
     spec = get_toolchain_spec(toolchain)
     if spec.section_probe == "fromelf":
-        try:
-            result = subprocess.run(
-                ["fromelf", "--text", "-v", str(binary_path)],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=timeout_s,
-            )
-        except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
-            log.debug("fromelf inventory probe failed: %s", exc)
+        stdout = tool_output(["fromelf", "--text", "-v", str(binary_path)], timeout_s=timeout_s)
+        if stdout is None:
             return None
-        if result.returncode != 0:
-            log.debug("fromelf -v failed: %s", (result.stderr or "").strip())
-            return None
-        parsed = _inventory_from_fromelf_listing(result.stdout or "")
+        parsed = _inventory_from_fromelf_listing(stdout)
         if parsed is None:
             return None
         sections, segments, unparsed = parsed
@@ -472,25 +424,14 @@ def symbol_inventory(
     address only — per-symbol load-image attribution is not recoverable
     on armlink (single aggregate PT_LOAD; see ``LoadSegment``).
     """
-    nm = _nm_command(toolchain)
-    try:
-        result = subprocess.run(
-            [nm, "-S", "--size-sort", str(binary_path)],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout_s,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
-        log.debug("nm symbol inventory probe failed: %s", exc)
-        return None
-    if result.returncode != 0:
-        log.debug("nm -S failed: %s", (result.stderr or "").strip())
+    stdout = tool_output(
+        [nm_command(toolchain), "-S", "--size-sort", str(binary_path)], timeout_s=timeout_s
+    )
+    if stdout is None:
         return None
     symbols: list[SymbolEntry] = []
     unparsed = 0
-    for line in result.stdout.splitlines():
+    for line in stdout.splitlines():
         if not line.strip():
             continue
         match = _NM_SIZED_ROW_RE.match(line)
