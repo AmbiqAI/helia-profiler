@@ -165,7 +165,7 @@ def test_clean_continues_after_entry_deletion_error(
 ) -> None:
     monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "cache"))
     config = _config(tmp_path, "first", cached=True, clean=True)
-    work_dir, _ = pipeline._resolve_work_dir(config)
+    work_dir = pipeline._resolve_work_dir(config)
     blocked = work_dir / "blocked-entry"
     if entry_kind == "directory":
         blocked.mkdir()

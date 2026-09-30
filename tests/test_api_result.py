@@ -77,7 +77,7 @@ def test_profile_result_exposes_grouped_power_contract(tmp_path: Path, monkeypat
         terminal=terminal,
         on_device_summary=on_device,
     )
-    monkeypatch.setattr("helia_profiler.profiler.run_profile", lambda _config: ctx)
+    monkeypatch.setattr("helia_profiler.profiler.run_profile", lambda _config, **_kwargs: ctx)
 
     result = profile(config)
 

@@ -57,10 +57,9 @@ class TestResolveWorkDirFallback:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "cache"))
-        wd, cleanup = _resolve_work_dir(_config(tmp_path))
+        wd = _resolve_work_dir(_config(tmp_path))
         assert wd == tmp_path / "cache" / "workspaces" / "apollo510_evb-arm-none-eabi-gcc-tflm"
         assert wd.is_dir()
-        assert cleanup is False
 
     def test_unwritable_cache_falls_back_to_local_dir(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -75,21 +74,19 @@ class TestResolveWorkDirFallback:
         cwd.mkdir()
         monkeypatch.chdir(cwd)
         try:
-            wd, cleanup = _resolve_work_dir(_config(tmp_path))
+            wd = _resolve_work_dir(_config(tmp_path))
         finally:
             readonly.chmod(0o755)
         assert wd == cwd / ".hpx-cache" / "workspaces" / "apollo510_evb-arm-none-eabi-gcc-tflm"
         assert wd.is_dir()
-        assert cleanup is False
 
     def test_explicit_work_dir_is_untouched_by_fallback(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "cache"))
         cfg = _config(tmp_path, work_dir=str(tmp_path / "explicit-work"))
-        wd, cleanup = _resolve_work_dir(cfg)
+        wd = _resolve_work_dir(cfg)
         assert wd == (tmp_path / "explicit-work").resolve()
-        assert cleanup is False
 
 
 def _can_write(directory: Path) -> bool:

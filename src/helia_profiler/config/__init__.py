@@ -715,6 +715,44 @@ _VALID_FIELD_NAMES = _build_valid_field_names()
 _GENERIC_CONFIG_HINT = "Run with --help or see the config reference."
 
 
+def read_config_yaml(path: Path) -> dict[str, Any]:
+    """Read an HPX YAML config file into an unvalidated mapping.
+
+    An empty file reads as ``{}``. Raises :class:`ConfigError` if the file is
+    missing, is not valid YAML, or its top level is not a mapping.
+    """
+    import yaml
+
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+    except FileNotFoundError as exc:
+        raise ConfigError(
+            f"Config file not found: {path}",
+            hint="Check the config file path.",
+        ) from exc
+    except UnicodeDecodeError as exc:
+        raise ConfigError(
+            f"Config file {path} is not valid UTF-8: {exc}",
+            hint="Save the config file with UTF-8 encoding.",
+        ) from exc
+    except yaml.YAMLError as exc:
+        raise ConfigError(
+            f"Malformed YAML in config file {path}: {exc}",
+            hint="Check the file for YAML syntax errors (indentation, colons, quoting).",
+        ) from exc
+
+    if data is None:
+        return {}
+    if not isinstance(data, dict):
+        raise ConfigError(
+            f"Config file {path} must contain a YAML mapping (key: value pairs), "
+            f"got {type(data).__name__}.",
+            hint="Top-level YAML must be a mapping with keys like model, engine, target.",
+        )
+    return data
+
+
 def load_config(yaml_path: Path | None, cli_overrides: dict[str, Any]) -> ProfileConfig:
     """Merge YAML config file with CLI overrides into a frozen ProfileConfig.
 
@@ -724,31 +762,7 @@ def load_config(yaml_path: Path | None, cli_overrides: dict[str, Any]) -> Profil
     Raises :class:`ConfigError` (never a raw exception) for any problem with
     the YAML file or the merged configuration values.
     """
-    import yaml
-
-    base: dict[str, Any] = {}
-    if yaml_path is not None:
-        try:
-            with open(yaml_path, encoding="utf-8") as f:
-                base = yaml.safe_load(f) or {}
-        except FileNotFoundError as exc:
-            raise ConfigError(
-                f"Config file not found: {yaml_path}",
-                hint="Check the --config path, or omit --config to use CLI-only configuration.",
-            ) from exc
-        except yaml.YAMLError as exc:
-            raise ConfigError(
-                f"Malformed YAML in config file {yaml_path}: {exc}",
-                hint="Check the file for YAML syntax errors (indentation, colons, quoting).",
-            ) from exc
-
-        if not isinstance(base, dict):
-            raise ConfigError(
-                f"Config file {yaml_path} must contain a YAML mapping (key: value pairs), "
-                f"got {type(base).__name__}.",
-                hint="Top-level YAML must be a mapping with keys like model, engine, target.",
-            )
-
+    base = read_config_yaml(yaml_path) if yaml_path is not None else {}
     merged = deep_merge(base, cli_overrides)
     _check_reserved_user_keys(merged)
     _check_required_model_path(merged)

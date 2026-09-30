@@ -1534,7 +1534,7 @@ class TestBuildApp:
         assert build_calls[0].get("target") is None
         assert out_build_dir == build_dir
         assert out_binary == binary
-        assert ctx.power_binary_path is None
+        assert ctx.power_firmware is None
         assert stale_power_binary.read_bytes() == b"stale"
 
     def test_power_disabled_does_not_build_power_target(
@@ -1563,7 +1563,7 @@ class TestBuildApp:
         build_app(ctx)
 
         assert len(build_calls) == 1
-        assert ctx.power_binary_path is None
+        assert ctx.power_firmware is None
 
     def test_power_firmware_shared_does_not_build_power_target(
         self, tmp_path: Path, fake_dist: Path, monkeypatch
@@ -1606,7 +1606,7 @@ class TestBuildApp:
         build_app(ctx)
 
         assert len(build_calls) == 1
-        assert ctx.power_binary_path is None
+        assert ctx.power_firmware is None
 
 
 class TestBuildAppFrozen:

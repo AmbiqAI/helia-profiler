@@ -21,7 +21,7 @@ from helia_profiler.capture.power_terminal import (
     parse_power_terminal_envelope,
 )
 from helia_profiler.config import Transport, load_config
-from helia_profiler.errors import PowerError
+from helia_profiler.errors import PipelineError, PowerError
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.power.base import PowerResult, PowerSummary
 from helia_profiler.power.metadata import ObservationMode, PowerIntegrity
@@ -385,7 +385,7 @@ def test_publish_terminal_into_grouped_power_run(tmp_path: Path) -> None:
     assert ctx.power_run is not None
     assert ctx.power_run.terminal is record
 
-    with pytest.raises(ValueError, match="already been published"):
+    with pytest.raises(PipelineError, match="already been published"):
         ctx.publish_power_terminal(record)
 
 

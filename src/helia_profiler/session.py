@@ -10,7 +10,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal, Self
 
-from .config import ProfileConfig, deep_merge, load_config
+from .config import ProfileConfig, deep_merge, load_config, read_config_yaml
 from .errors import ConfigError
 from .results import ProfileResult
 
@@ -38,16 +38,6 @@ def _merge(base: Mapping[str, Any], override: Mapping[str, Any]) -> dict[str, An
     semantics stay identical.
     """
     return deep_merge(_thaw(base), _thaw(override))
-
-
-def _copy_value(value: Any) -> Any:
-    if isinstance(value, Mapping):
-        return {key: _copy_value(item) for key, item in value.items()}
-    if isinstance(value, list):
-        return [_copy_value(item) for item in value]
-    if isinstance(value, tuple):
-        return tuple(_copy_value(item) for item in value)
-    return value
 
 
 def _freeze(value: Any) -> Any:
@@ -111,32 +101,14 @@ class Session:
     def __post_init__(self) -> None:
         if self.yaml_path is not None:
             object.__setattr__(self, "yaml_path", Path(self.yaml_path))
-        object.__setattr__(self, "_base", _freeze(_copy_value(self._base)))
-        object.__setattr__(self, "_overrides", _freeze(_copy_value(self._overrides)))
+        object.__setattr__(self, "_base", _freeze(self._base))
+        object.__setattr__(self, "_overrides", _freeze(self._overrides))
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> Self:
         """Create a session from an immutable snapshot of an HPX YAML config."""
-        import yaml
-
         yaml_path = Path(path).expanduser().resolve()
-        try:
-            data = yaml.safe_load(yaml_path.read_text(encoding="utf-8")) or {}
-        except FileNotFoundError as exc:
-            raise ConfigError(
-                f"Config file not found: {yaml_path}",
-                hint="Check the config path before creating the session.",
-            ) from exc
-        except yaml.YAMLError as exc:
-            raise ConfigError(
-                f"Malformed YAML in config file {yaml_path}: {exc}",
-                hint="Check the file for YAML syntax errors.",
-            ) from exc
-        if not isinstance(data, Mapping):
-            raise ConfigError(
-                f"Config file {yaml_path} must contain a YAML mapping, got {type(data).__name__}.",
-            )
-        return cls(_base=data)
+        return cls(yaml_path=yaml_path, _base=read_config_yaml(yaml_path))
 
     @classmethod
     def from_dict(cls, intent: Mapping[str, Any]) -> Self:
