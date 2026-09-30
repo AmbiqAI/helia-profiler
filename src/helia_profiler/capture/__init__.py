@@ -33,14 +33,12 @@ from ..power.diagnostics import (
     probe_runs_inferences,
 )
 from ..transport import (
-    HPX_END,
-    HPX_START,
     LINE_TIMEOUT_S,
     CaptureArgs,
     resolve_transport,
 )
 from ..transport.usb_identity import usb_marker_serial
-from ..wire import HPX_ERROR_PREFIX, FirmwareErrorCode
+from ..wire import HPX_END_SENTINEL, HPX_ERROR_PREFIX, HPX_START_SENTINEL, FirmwareErrorCode
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
@@ -117,7 +115,7 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
     # HPX_READY sync preamble before "--- HPX_START ---" (see the firmware
     # templates), so the sentinel does not sit at a fixed offset.  The parser
     # likewise ignores everything before HPX_START.
-    if not any(HPX_START in l for l in lines):
+    if not any(HPX_START_SENTINEL in l for l in lines):
         raise CaptureError(
             f"Captured data ({len(lines)} lines) does not contain HPX_START sentinel",
             hint=(
@@ -125,7 +123,7 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
                 "transport connection failed before data arrived."
             ),
         )
-    if not any(l.strip() == HPX_END for l in lines):
+    if not any(l.strip() == HPX_END_SENTINEL for l in lines):
         raise CaptureError(
             f"Capture ended before HPX_END ({len(lines)} lines).",
             hint=_truncation_hint(str(transport)),

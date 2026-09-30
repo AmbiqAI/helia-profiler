@@ -54,10 +54,6 @@ _MAX_CAPTURE_ATTEMPTS = 3
 #: Poll SWO aggressively enough to keep up with Apollo ITM bursts.
 _SWO_POLL_INTERVAL_S = 0.001
 
-#: Protocol start sentinel.  A capture that has lines but lacks this marker
-#: lost its head to the SWO startup race and is worth one more attempt.
-_HPX_START_SENTINEL = HPX_START_SENTINEL
-
 
 def _remaining(deadline: float | None) -> float | None:
     """Budget left for this attempt."""
@@ -89,7 +85,7 @@ def capture_swo_output(
     Returns:
         List of captured text lines.
     """
-    timing = CaptureTimingTracker(start_marker=_HPX_START_SENTINEL, end_marker=HPX_END_SENTINEL)
+    timing = CaptureTimingTracker(start_marker=HPX_START_SENTINEL, end_marker=HPX_END_SENTINEL)
     on_line = timing.observe_line
 
     def finalize_timing() -> None:
@@ -138,7 +134,7 @@ def capture_swo_output(
             # the host was draining the FIFO (SWO has no back-pressure) — a
             # recoverable startup race, so retry with a fresh reset rather than
             # returning a partial capture that fails downstream validation.
-            have_start = any(_HPX_START_SENTINEL in l for l in lines)
+            have_start = any(HPX_START_SENTINEL in l for l in lines)
             out_of_time = deadline is not None and time.monotonic() >= deadline
             if (lines and have_start) or attempt == _MAX_CAPTURE_ATTEMPTS or out_of_time:
                 finalize_timing()
