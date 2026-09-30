@@ -27,6 +27,11 @@ HPX_UPDATE_SNAPSHOTS=1 uv run pytest tests/contracts/test_firmware_render_snapsh
 uv run python tools/gen_fixture_closure.py            # shipped files → fixture_closure.txt
 ```
 
+The docs-site reference (`cd astro-site && npm run prepare:docs`, then
+commit) only changes when the documented API, CLI, configuration, issue codes,
+PMU catalogue or board list change; it records no hash of `src/`, so other
+source edits leave it untouched. `npm run check:reference` says when it is due.
+
 The public fixture API is `helia_profiler.fixture.__all__`, recorded in
 `tests/contracts/fixture_api_v1.json`. Changing it needs a
 `FIXTURE_API_VERSION` bump (minor to add, major to change or remove) before
