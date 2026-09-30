@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import replace
 from pathlib import Path
 
 from ..config import PowerFirmware
@@ -55,26 +54,20 @@ class BuildPowerFirmwareStage:
             raise BuildError("Cannot build fixed-N power firmware without a resolved power plan.")
         if ctx.firmware_dir is None or ctx.build_dir is None:
             raise BuildError("Profile firmware workspace must be configured before power rebuild.")
+        plan = ctx.power_run.plan
+        inference_count = ctx.power_run.plan.inference_count
 
-        noun = count_noun(
-            ctx.config.profiling.clean_window_probe, ctx.power_run.plan.inference_count
-        )
-        ctx.report_progress(
-            f"Rendering fixed-N source for {ctx.power_run.plan.inference_count:,} {noun}"
-        )
+        noun = count_noun(ctx.config.profiling.clean_window_probe, inference_count)
+        ctx.report_progress(f"Rendering fixed-N source for {inference_count:,} {noun}")
 
         try:
             if ctx.dependency_workspace is None:
                 raise BuildError("Dependency workspace identity is unavailable.")
             with workspace_mutex(ctx.dependency_workspace):
-                render_power_source(ctx, inference_count=ctx.power_run.plan.inference_count)
-                if ctx.power_run is not None:
-                    ctx.power_run = replace(
-                        ctx.power_run,
-                        firmware=None,
-                        deployment=None,
-                        observation=None,
-                    )
+                render_power_source(ctx, inference_count=inference_count)
+                # Restart the power run from its plan so a failed rebuild
+                # cannot leave the previous artifact deployable.
+                ctx.publish_power_plan(plan)
                 _remove_stale_power_outputs(ctx.build_dir)
                 nsx_cli.build(
                     ctx.firmware_dir,
@@ -113,8 +106,8 @@ class BuildPowerFirmwareStage:
         log.info(
             "Power firmware rebuilt: %s (N=%d, source=%s)",
             binary_path,
-            ctx.power_run.plan.inference_count,
-            ctx.power_run.plan.count_source,
+            inference_count,
+            plan.count_source,
         )
         ctx.report_progress(
             "Power firmware ready",

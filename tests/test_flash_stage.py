@@ -181,7 +181,7 @@ class TestFlashFirmwareStageDirect:
         )
 
         with pytest.raises(BuildError) as exc_info:
-            deploy_firmware(ctx, ctx.binary_path, role=stage_role)
+            deploy_firmware(ctx, tmp_path / "app" / "hpx_profiler", role=stage_role)
 
         message = str(exc_info.value)
         assert message.startswith(f"{stage_role.capitalize()} firmware deployment failed: ")

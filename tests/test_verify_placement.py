@@ -181,3 +181,14 @@ class TestMigrationBehaviorPins:
             ctx = _ctx(tmp_path, board=board, arena_region=region)
             monkeypatch.setattr(verify_placement, "symbol_address", lambda *a, **k: (address, "b"))
             VerifyPlacementStage().run(ctx)  # no raise
+
+
+def test_every_placement_maps_to_its_physical_region() -> None:
+    from helia_profiler.placement import MemoryRegion
+
+    assert {p: p.region for p in Placement} == {
+        Placement.TCM: MemoryRegion.DTCM,
+        Placement.SRAM: MemoryRegion.SRAM,
+        Placement.MRAM: MemoryRegion.MRAM,
+        Placement.PSRAM: MemoryRegion.PSRAM,
+    }
