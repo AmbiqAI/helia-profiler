@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from helia_profiler.errors import ReportError, ValidationBundleError
-from helia_profiler.validation.bundle import load_validation_bundle
+from helia_profiler.validation.bundle import SCHEMA_VERSION, load_validation_bundle
 from helia_profiler.validation.compare import (
     CaseOutcome,
     compare_validation_bundles,
@@ -131,6 +131,15 @@ def test_loader_exposes_schema5_resource_data(tmp_path: Path) -> None:
     assert dict(loaded.cases[0].resources) == {}
 
 
+def test_loader_accepts_the_version_the_writer_stamps(tmp_path: Path) -> None:
+    bundle = tmp_path / "bundle"
+    _write_bundle(bundle, 100)
+    manifest = json.loads((bundle / "validation_manifest.json").read_text())
+
+    assert manifest["schema_version"] == SCHEMA_VERSION
+    assert load_validation_bundle(bundle).schema_version == SCHEMA_VERSION
+
+
 def test_loader_exposes_run_origin_metadata(tmp_path: Path) -> None:
     bundle = tmp_path / "bundle"
     _write_bundle(bundle, 100)
@@ -217,10 +226,10 @@ def test_loader_rejects_unsupported_future_schema(tmp_path: Path) -> None:
     _write_bundle(bundle, 100)
     manifest_path = bundle / "validation_manifest.json"
     manifest = json.loads(manifest_path.read_text())
-    manifest["schema_version"] = 7
+    manifest["schema_version"] = SCHEMA_VERSION + 1
     manifest_path.write_text(json.dumps(manifest))
 
-    with pytest.raises(ValidationBundleError, match="schema_version: 7"):
+    with pytest.raises(ValidationBundleError, match=f"schema_version: {SCHEMA_VERSION + 1}"):
         load_validation_bundle(bundle)
 
 

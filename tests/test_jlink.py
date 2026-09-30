@@ -178,7 +178,7 @@ class TestResolveProbeSerial:
         with (
             patch("helia_profiler.target.probe.jlink.list_connected_probes", return_value=[probe]),
             patch(
-                "helia_profiler.target.probe.jlink._inspect_probe_target",
+                "helia_profiler.target.probe.jlink.inspect_probe_target",
                 return_value=_match("111111", CoreArch.CORTEX_M4, "Apollo4"),
             ),
         ):
@@ -194,7 +194,7 @@ class TestResolveProbeSerial:
         with (
             patch("helia_profiler.target.probe.jlink.list_connected_probes", return_value=[probe]),
             patch(
-                "helia_profiler.target.probe.jlink._inspect_probe_target",
+                "helia_profiler.target.probe.jlink.inspect_probe_target",
                 return_value=_match("111111", CoreArch.CORTEX_M55, "Apollo5"),
             ),
         ):
@@ -220,7 +220,7 @@ class TestResolveProbeSerial:
         with (
             patch("helia_profiler.target.probe.jlink.list_connected_probes", return_value=probes),
             patch(
-                "helia_profiler.target.probe.jlink._inspect_probe_target",
+                "helia_profiler.target.probe.jlink.inspect_probe_target",
                 side_effect=inspect,
             ),
         ):
@@ -241,7 +241,7 @@ class TestResolveProbeSerial:
         with (
             patch("helia_profiler.target.probe.jlink.list_connected_probes", return_value=probes),
             patch(
-                "helia_profiler.target.probe.jlink._inspect_probe_target",
+                "helia_profiler.target.probe.jlink.inspect_probe_target",
                 side_effect=inspect,
             ),
         ):
@@ -263,9 +263,9 @@ class TestResolveProbeSerial:
         with (
             patch("helia_profiler.target.probe.jlink.list_connected_probes", return_value=probes),
             patch(
-                "helia_profiler.target.probe.jlink._inspect_probe_target",
+                "helia_profiler.target.probe.jlink.inspect_probe_target",
                 side_effect=inspect,
-            ),
+            ) as inspector,
         ):
             with pytest.raises(
                 ConfigError, match="Could not find a connected J-Link probe"
@@ -276,6 +276,8 @@ class TestResolveProbeSerial:
                 )
         hint = exc_info.value.hint or ""
         assert "cortex-m4" in hint
+        # Each inspection is a JLinkExe run; the error hint must reuse them.
+        assert inspector.call_count == len(probes)
 
 
 class TestFlashBinaryFallback:
@@ -689,16 +691,6 @@ def test_a_family_with_no_registered_address_resolves_to_none(
     monkeypatch.setattr(capabilities, "_FAMILY_APP_FLASH_LOAD_ADDR", trimmed)
 
     assert get_soc("apollo510").capabilities.memory.app_flash_load_addr is None
-
-
-def test_inspect_probe_target_wraps_private_inspector() -> None:
-    probe = _probe("111111", "Apollo5")
-    match = _match("111111", CoreArch.CORTEX_M55, "Apollo5")
-    with patch(
-        "helia_profiler.target.probe.jlink._inspect_probe_target", return_value=match
-    ) as inspect:
-        assert inspect_probe_target(probe, device="AP510NFA-CBR") is match
-    inspect.assert_called_once_with(probe, device="AP510NFA-CBR")
 
 
 def test_inspect_probe_target_retries_unknown_target() -> None:

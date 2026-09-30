@@ -110,7 +110,7 @@ class FixtureCaptureResult:
 
 def _atomic_json(path: Path, value: object) -> None:
     temporary = path.with_suffix(".tmp")
-    temporary.write_text(json.dumps(value, default=str, sort_keys=True) + "\n")
+    temporary.write_text(json.dumps(value, default=str, sort_keys=True) + "\n", encoding="utf-8")
     temporary.replace(path)
 
 

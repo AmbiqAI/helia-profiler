@@ -10,6 +10,12 @@ from typing import Any
 
 from ..errors import ValidationBundleError
 
+#: Written by ``validation.report``; the loader accepts every version up to it.
+#: v6 (#133 Phase 2): per-case ``resources.memory_plan`` is the decision
+#: record only (its ``free``/``overflow``/``has_overflow`` keys are gone,
+#: mirroring run-summary schema v3) and ``resources.memory_regions`` is
+#: added — the measured per-region occupancy from the linked ELF.
+SCHEMA_VERSION = 6
 _REPEAT_SUFFIX = re.compile(r"-run(?P<attempt>[0-9]+)$")
 _WINDOWS_ABSOLUTE = re.compile(r"^(?:[A-Za-z]:|[\\/]{2})")
 _STATUSES = {"pass", "fail", "skip"}
@@ -104,7 +110,7 @@ def load_validation_bundle(root: Path) -> ValidationBundle:
         raise ValidationBundleError(f"Validation bundle is not a directory: {bundle_root}")
     manifest_path = bundle_root / "validation_manifest.json"
     try:
-        manifest = json.loads(manifest_path.read_text())
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
         raise ValidationBundleError(f"Missing validation_manifest.json in {bundle_root}") from exc
     except (OSError, json.JSONDecodeError) as exc:
@@ -120,7 +126,7 @@ def load_validation_bundle(root: Path) -> ValidationBundle:
     if (
         not isinstance(version, int)
         or isinstance(version, bool)
-        or version not in (1, 2, 3, 4, 5, 6)
+        or not 1 <= version <= SCHEMA_VERSION
     ):
         raise ValidationBundleError(f"Unsupported validation manifest schema_version: {version!r}")
     raw_cases = manifest.get("cases")
@@ -150,7 +156,7 @@ def load_validation_bundle(root: Path) -> ValidationBundle:
     github_raw = run.get("github")
     github: dict[str, object] = github_raw if isinstance(github_raw, dict) else {}
     dirty_raw = repo.get("dirty")
-    if version in (4, 5, 6) and not isinstance(manifest.get("validation"), dict):
+    if version >= 4 and not isinstance(manifest.get("validation"), dict):
         raise ValidationBundleError(
             f"Validation manifest schema v{version} field 'validation' must be an object"
         )
@@ -182,7 +188,7 @@ def _load_case(
     if status not in _STATUSES:
         raise ValidationBundleError(f"Validation case {case_id!r} has invalid status {status!r}")
 
-    if version in (2, 3, 4, 5, 6):
+    if version >= 2:
         identity_raw = raw.get("identity")
         if not isinstance(identity_raw, dict):
             raise ValidationBundleError(f"Validation case {case_id!r} has no identity object")
@@ -193,7 +199,7 @@ def _load_case(
         provenance = raw.get("provenance", {})
         resources = raw.get("resources", {})
         comparison_group = identity_raw.get("comparison_group", identity_raw.get("model_id"))
-        if version in (4, 5, 6):
+        if version >= 4:
             repeat = raw.get("repeat")
             if not isinstance(repeat, dict):
                 raise ValidationBundleError(

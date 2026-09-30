@@ -147,7 +147,6 @@ A run whose `power` block has `gated_window_count: 1`, a ratio near 1.0,
 | gate always low or always high | wrong `io_voltage`, floating Vref on JS220 or JS320, or the wrong `INPUTn` | match `io_voltage` and Vref to the board's I/O rail; check the index keys against the physical wiring |
 | `ready_observed: false` or ratio far from 1.0 | handshake or gate timing; or a firmware clock fault that only looks similar | compare `power.terminal.gate_elapsed_us` with `power.capture_duration_s`: agreement to well under 1% means the wiring is fine and only the reference is off (drift); `0` or several times the gate means the firmware timed with a clock it could not read, a rebuild not a rewire |
 | gated average not above whole-capture average | gate or timing; or a genuinely light model | compare the `whole_capture_window` row in `detailed/power_summary.csv` |
-| `driver: ondevice` raises `PowerError` | the generic on-device driver has no firmware producer | use `power.driver: ina228` with a wired INA228, or `joulescope` |
 | TOPS per watt missing | the model cannot be analysed for MACs (ExecuTorch), or the window is not inference-bracketed | expected |
 | power differs between transports | `power.firmware: shared` is set | use `dedicated` to remove the capture transport from the power firmware, then verify the window and monitored rail |
 

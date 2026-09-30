@@ -20,12 +20,12 @@ from pathlib import Path
 
 
 def _layers(run_dir: Path) -> list[dict]:
-    with open(run_dir / "detailed" / "profile_cpu.csv") as handle:
+    with open(run_dir / "detailed" / "profile_cpu.csv", encoding="utf-8") as handle:
         return list(csv.DictReader(handle))
 
 
 def _clean_cycles(run_dir: Path) -> int:
-    summary = json.loads((run_dir / "summary.json").read_text())
+    summary = json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))
     return int(summary["latency"]["device_clean_infer_avg_cycles"])
 
 
@@ -37,7 +37,7 @@ def main() -> None:
     parser.add_argument("--candidate", type=Path, required=True, help="ns run dir")
     args = parser.parse_args()
 
-    manifest = json.loads(args.manifest.read_text())["models"][args.model]
+    manifest = json.loads(args.manifest.read_text(encoding="utf-8"))["models"][args.model]
     maps = {
         provider: {i["id"]: i["op"] for i in manifest["providers"][provider]["instructions"]}
         for provider in ("arm", "ns")

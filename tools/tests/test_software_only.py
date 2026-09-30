@@ -21,7 +21,8 @@ def sandbox(tmp_path):
         package.mkdir()
         package.joinpath("__init__.py").write_text(
             f"from pathlib import Path\nPath({str(marker)!r}).touch()\n"
-            "def Serial(*a, **k):\n    raise RuntimeError('INERT DEVICE SENTINEL')\n"
+            "def Serial(*a, **k):\n    raise RuntimeError('INERT DEVICE SENTINEL')\n",
+            encoding="utf-8",
         )
     return tmp_path, marker
 
@@ -29,7 +30,7 @@ def sandbox(tmp_path):
 def run_probe(sandbox, source, *, guarded=True):
     directory, marker = sandbox
     probe = directory / "probe.py"
-    probe.write_text(source)
+    probe.write_text(source, encoding="utf-8")
     env = dict(os.environ, PYTHONPATH=str(directory), PYTHONSAFEPATH="1")
     command = [sys.executable, str(LAUNCHER), "python"] if guarded else [sys.executable]
     return subprocess.run(
@@ -42,13 +43,15 @@ def test_standalone_sibling_imports_preserve_checkout_and_guard(sandbox, relativ
     directory, marker = sandbox
     probes = directory / "standalone probes"
     probes.mkdir()
-    (probes / "helper.py").write_text("VALUE = 42\n")
+    (probes / "helper.py").write_text("VALUE = 42\n", encoding="utf-8")
     package = probes / "helpers"
     package.mkdir()
-    (package / "__init__.py").write_text("VALUE = 43\n")
+    (package / "__init__.py").write_text("VALUE = 43\n", encoding="utf-8")
     competing = probes / "helia_profiler"
     competing.mkdir()
-    (competing / "__init__.py").write_text("raise AssertionError('wrong checkout')\n")
+    (competing / "__init__.py").write_text(
+        "raise AssertionError('wrong checkout')\n", encoding="utf-8"
+    )
     probe = probes / "probe.py"
     probe.write_text(
         "import helper, helpers, importlib.util\n"
@@ -61,7 +64,8 @@ def test_standalone_sibling_imports_preserve_checkout_and_guard(sandbox, relativ
         "except RuntimeError as error:\n"
         "    assert 'software-only: device import blocked' in str(error)\n"
         "else:\n    raise AssertionError('vendor guard missing')\n"
-        "print('sibling helper and checkout verified')\n"
+        "print('sibling helper and checkout verified')\n",
+        encoding="utf-8",
     )
     argument = probe.relative_to(directory) if relative else probe
     result = subprocess.run(
@@ -117,13 +121,14 @@ def run_port_probe(directory, operation, *, guarded):
     package = directory / "serial" / "tools"
     package.mkdir(parents=True)
     (package.parent / "__init__.py").write_text(
-        f"from pathlib import Path\nPath({str(imported)!r}).touch()\n"
+        f"from pathlib import Path\nPath({str(imported)!r}).touch()\n", encoding="utf-8"
     )
-    (package / "__init__.py").write_text("")
+    (package / "__init__.py").write_text("", encoding="utf-8")
     (package / "list_ports.py").write_text(
         "from pathlib import Path\n"
         f"def comports():\n    Path({str(called)!r}).touch()\n    return []\n"
-        f"def grep(pattern):\n    Path({str(called)!r}).touch()\n    yield from ()\n"
+        f"def grep(pattern):\n    Path({str(called)!r}).touch()\n    yield from ()\n",
+        encoding="utf-8",
     )
     if operation == "hpx":
         source = (
@@ -142,7 +147,7 @@ def run_port_probe(directory, operation, *, guarded):
             else "assert list(list_ports.grep('.*')) == []\n"
         )
     probe = directory / "probe.py"
-    probe.write_text(source)
+    probe.write_text(source, encoding="utf-8")
     command = [sys.executable, str(LAUNCHER), "python"] if guarded else [sys.executable]
     result = subprocess.run(
         command + [str(probe)],
@@ -261,7 +266,7 @@ def test_preloaded_module_rejected(sandbox):
 def test_pytest_collection_is_guarded(sandbox):
     directory, marker = sandbox
     test = directory / "test_probe.py"
-    test.write_text("import pylink\ndef test_never_runs(): assert False\n")
+    test.write_text("import pylink\ndef test_never_runs(): assert False\n", encoding="utf-8")
     env = dict(os.environ, PYTHONPATH=str(directory), PYTEST_DISABLE_PLUGIN_AUTOLOAD="1")
     result = subprocess.run(
         [sys.executable, str(LAUNCHER), "pytest", "--confcutdir", str(directory), str(test)],

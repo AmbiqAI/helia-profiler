@@ -602,7 +602,8 @@ def capture_gated(
                             "gpi_stream_windows_raw": raw_streamed,
                             "gpi_stream_windows": streamed_gate_windows,
                         }
-                    )
+                    ),
+                    encoding="utf-8",
                 )
                 log.info("Gate debug dump written: %s", _fn)
             except Exception:

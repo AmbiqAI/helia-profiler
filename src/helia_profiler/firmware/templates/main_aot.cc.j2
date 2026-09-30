@@ -154,23 +154,6 @@ static void profiler_set_counter_names(const char* const names[], int num_names)
     }
 }
 
-static void profiler_init_preset(nsx_pmu_preset_e preset) {
-    nsx_pmu_reset_config(&g_pmu_cfg);
-    g_pmu_cfg.api = &nsx_pmu_V1_0_0;
-    nsx_pmu_apply_preset(&g_pmu_cfg, preset);
-    nsx_pmu_init(&g_pmu_cfg);
-    g_num_counters = 0;
-    for (int i = 0; i < kMaxEvents; i++) {
-        if (g_pmu_cfg.events[i].enabled) g_num_counters++;
-    }
-}
-{% else %}
-static void profiler_init_preset(int) {
-    g_num_counters = 1;
-}
-{% endif %}
-
-{% if has_armv8m_pmu %}
 static void profiler_init_custom(const uint32_t event_ids[], int num_events) {
     nsx_pmu_reset_config(&g_pmu_cfg);
     g_pmu_cfg.api = &nsx_pmu_V1_0_0;
@@ -184,7 +167,7 @@ static void profiler_init_custom(const uint32_t event_ids[], int num_events) {
 }
 {% else %}
 static void profiler_init_custom(const uint32_t[], int) {
-    profiler_init_preset(0);
+    g_num_counters = 1;
 }
 {% endif %}
 
@@ -539,7 +522,7 @@ static {{ aot_prefix }}_model_context_t {{ aot_prefix }}_model_ctx = {
         profiler_init_custom(nullptr, 0);
         hpx_npu_configure(_pass{{ loop.index0 }}_npu_events, _pass{{ loop.index0 }}_names, {{ pass.num_counters }});
     }
-{% elif has_armv8m_pmu and pass.custom %}
+{% elif has_armv8m_pmu %}
     {
         static const uint32_t _pass{{ loop.index0 }}_ids[] = { {{ pass.event_ids | join(', ') }} };
         static const char* _pass{{ loop.index0 }}_names[] = { {% for name in pass.counter_names %}"{{ name }}"{% if not loop.last %}, {% endif %}{% endfor %} };
@@ -547,15 +530,7 @@ static {{ aot_prefix }}_model_context_t {{ aot_prefix }}_model_ctx = {
         profiler_set_counter_names(_pass{{ loop.index0 }}_names, {{ pass.num_counters }});
     }
 {% else %}
-    {% if has_armv8m_pmu %}
-    {
-        static const char* _pass{{ loop.index0 }}_names[] = { {% for name in pass.counter_names %}"{{ name }}"{% if not loop.last %}, {% endif %}{% endfor %} };
-        profiler_init_preset({{ pass.c_enum }});
-        profiler_set_counter_names(_pass{{ loop.index0 }}_names, {{ pass.num_counters }});
-    }
-    {% else %}
-    profiler_init_preset(0);
-    {% endif %}
+    profiler_init_custom(nullptr, 0);
 {% endif %}
 {%- endblock %}
 

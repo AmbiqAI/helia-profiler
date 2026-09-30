@@ -10,28 +10,27 @@ from __future__ import annotations
 import json
 import sys
 from collections.abc import Mapping, Sequence
+from typing import Any
 
 from ..config import Toolchain, Transport
 from ..engines import EngineType
 from .common import _print_hpx_error
 
-_DOCTOR_DEFAULT_TOOLCHAIN = Toolchain.ARM_NONE_EABI_GCC
-_DOCTOR_DEFAULT_TRANSPORT = Transport.RTT
-_DOCTOR_DEFAULT_ENGINE = EngineType.HELIA_RT
 
-
-def _resolve_doctor_env(
+def _bundle_env(
     toolchain_raw: str | None, transport_raw: str | None, engine_raw: str | None
-) -> tuple[Toolchain, Transport, EngineType]:
-    """Resolve the CLI's plain --toolchain/--transport/--engine strings to enums."""
+) -> dict[str, Any]:
+    """Coerce the --toolchain/--transport/--engine strings given for --bundle."""
     try:
-        toolchain = Toolchain(toolchain_raw) if toolchain_raw else _DOCTOR_DEFAULT_TOOLCHAIN
-        transport = Transport(transport_raw) if transport_raw else _DOCTOR_DEFAULT_TRANSPORT
-        engine = EngineType(engine_raw) if engine_raw else _DOCTOR_DEFAULT_ENGINE
+        env = {
+            "toolchain": Toolchain(toolchain_raw) if toolchain_raw else None,
+            "transport": Transport(transport_raw) if transport_raw else None,
+            "engine": EngineType(engine_raw) if engine_raw else None,
+        }
     except ValueError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(2)
-    return toolchain, transport, engine
+    return {key: value for key, value in env.items() if value is not None}
 
 
 def _cmd_doctor(
@@ -48,8 +47,9 @@ def _cmd_doctor(
     raw_probe_ids: bool = False,
 ) -> None:
     """Check toolchain and dependencies; optionally emit JSON or a support bundle."""
-    from ..hostenv.doctor import inspect_environment
     from ..console import HpxConsole
+    from ..errors import HpxError
+    from ..session import Session
 
     if bundle is not None:
         _cmd_doctor_bundle(
@@ -66,15 +66,16 @@ def _cmd_doctor(
         )
         return
 
-    resolved_toolchain, resolved_transport, resolved_engine = _resolve_doctor_env(
-        toolchain, transport, engine
-    )
-    result = inspect_environment(
-        toolchain=resolved_toolchain,
-        transport=resolved_transport,
-        engine=resolved_engine,
-        include_versions=json_,
-    )
+    try:
+        session = Session.from_yaml(config) if config else Session()
+        target = {"toolchain": toolchain, "transport": transport}
+        session = session.with_target(**{k: v for k, v in target.items() if v is not None})
+        if engine is not None:
+            session = session.with_engine(engine)
+        result = session.doctor(include_versions=json_)
+    except HpxError as exc:
+        _print_hpx_error(exc)
+        sys.exit(1)
     if json_:
         print(json.dumps(result.to_dict(), indent=2))
         return
@@ -112,18 +113,13 @@ def _cmd_doctor_bundle(
             file=sys.stderr,
         )
 
-    resolved_toolchain, resolved_transport, resolved_engine = _resolve_doctor_env(
-        toolchain, transport, engine
-    )
     options = SupportBundleOptions(
         workspace=Path(workspace).expanduser() if workspace else None,
         config_path=Path(config).expanduser() if config else None,
-        toolchain=resolved_toolchain,
-        transport=resolved_transport,
-        engine=resolved_engine,
         include_probes=not no_probes,
         include_ports=not no_ports,
         raw_probe_ids=raw_probe_ids,
+        **_bundle_env(toolchain, transport, engine),
     )
 
     try:

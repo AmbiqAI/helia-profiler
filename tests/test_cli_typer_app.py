@@ -198,3 +198,21 @@ def test_bare_invocation_prints_help_and_exits_zero() -> None:
     result = runner.invoke(app, [])
     assert result.exit_code == 0
     assert "Profile LiteRT and ExecuTorch models on Ambiq silicon." in result.output
+
+
+def test_profile_power_driver_accepts_every_registered_driver(monkeypatch) -> None:
+    import helia_profiler.cli.profile_cmd as profile_cmd
+
+    seen: dict[str, dict] = {}
+
+    def fake_cmd_profile(**kwargs) -> None:
+        seen["kwargs"] = kwargs
+
+    monkeypatch.setattr(profile_cmd, "_cmd_profile", fake_cmd_profile)
+
+    result = runner.invoke(app, ["profile", "model.tflite", "--power-driver", "ina228"])
+    assert result.exit_code == 0, result.output
+    assert seen["kwargs"]["power_driver"] == "ina228"
+
+    result = runner.invoke(app, ["profile", "model.tflite", "--power-driver", "ondevice"])
+    assert result.exit_code == 2

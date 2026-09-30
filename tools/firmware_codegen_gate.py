@@ -113,12 +113,17 @@ def record(out: Path, scratch: Path) -> None:
                 "sections": _sections(_tool(workspace.compiler, "size"), obj),
                 "functions": _functions(_tool(workspace.compiler, "objdump"), obj),
             }
-    out.write_text(json.dumps({"results": results, "skipped": skipped}, indent=1, sort_keys=True))
+    out.write_text(
+        json.dumps({"results": results, "skipped": skipped}, indent=1, sort_keys=True),
+        encoding="utf-8",
+    )
     print(f"recorded {len(results)} objects, skipped {len(skipped)}")
 
 
 def compare(base_path: Path, head_path: Path) -> int:
-    base, head = (json.loads(p.read_text())["results"] for p in (base_path, head_path))
+    base, head = (
+        json.loads(p.read_text(encoding="utf-8"))["results"] for p in (base_path, head_path)
+    )
     failures, notes = [], []
     for key in sorted(set(base) | set(head)):
         b, h = base.get(key), head.get(key)

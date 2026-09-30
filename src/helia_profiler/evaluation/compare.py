@@ -20,7 +20,7 @@ from ..errors import ReportError
 from ..results import ComparisonDimension, ResultManifest, load_result_manifest
 from ..modelcost import source_index_from_op
 from ..results.dimensions import DIMENSION_REGISTRY
-from ..results.serde import nested_get, to_float
+from ..results.serde import nested_get, to_float, write_dict_csv
 
 
 @dataclass(frozen=True)
@@ -344,15 +344,13 @@ def write_compare_artifacts(
     # RFC-8259 JSON for strict downstream readers. Coerce non-finite to
     # null at the emission boundary (#243) -- the regression verdict is
     # unaffected (comparison_profile already rejects non-finite as FAIL).
-    paths[0].write_text(json.dumps(_json_finite(summary), indent=2, default=str) + "\n")
+    paths[0].write_text(
+        json.dumps(_json_finite(summary), indent=2, default=str) + "\n", encoding="utf-8"
+    )
 
     if len(paths) > 1:
         flat_layer_rows = [row.to_flat_dict() for row in result.layer_rows]
-        fieldnames = _layer_fieldnames(flat_layer_rows)
-        with open(paths[1], "w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(flat_layer_rows)
+        write_dict_csv(paths[1], _layer_fieldnames(flat_layer_rows), flat_layer_rows)
 
     return paths
 
@@ -387,7 +385,7 @@ def _read_json(path: Path) -> dict[str, Any]:
     if not path.is_file():
         raise ReportError(f"Missing required compare artifact: {path}")
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
         raise ReportError(f"Could not parse JSON artifact: {path}", hint=str(exc)) from exc
     if not isinstance(data, dict):
@@ -408,7 +406,7 @@ def _json_finite(value: Any) -> Any:
 
 
 def _read_layer_csv(path: Path) -> list[dict[str, Any]]:
-    with open(path, newline="") as f:
+    with path.open(encoding="utf-8", newline="") as f:
         reader = csv.DictReader(f)
         # DictReader files columns past the header under key None (as a
         # list); drop them so a wider-than-header row (foreign/other-version

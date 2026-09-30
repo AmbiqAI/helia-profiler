@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import logging
 import time
+from typing import TYPE_CHECKING
 
 from ..vocab import Transport
 from ..errors import CaptureError
@@ -37,6 +38,10 @@ from ..target.probe.jlink import (
 from .timing import SBL_SETTLE_S, CaptureTimingTracker
 from .protocol import DEFAULT_TIMEOUT_S, HEARTBEAT_TIMEOUT_S, collect_lines
 from ..wire import HPX_END_SENTINEL, HPX_START_SENTINEL
+
+if TYPE_CHECKING:
+    from ..pipeline import PipelineContext
+    from ..target.probe.base import DebugMemorySession
 
 log = logging.getLogger("hpx")
 
@@ -54,9 +59,49 @@ _MAX_CAPTURE_ATTEMPTS = 3
 #: Poll SWO aggressively enough to keep up with Apollo ITM bursts.
 _SWO_POLL_INTERVAL_S = 0.001
 
-#: Protocol start sentinel.  A capture that has lines but lacks this marker
-#: lost its head to the SWO startup race and is worth one more attempt.
-_HPX_START_SENTINEL = HPX_START_SENTINEL
+
+#: SWO pin baud rate the host programs into the J-Link.
+SWO_SPEED_HZ = 1_000_000
+
+#: HPX output rides on ITM stimulus port 0.
+_SWO_STIMULUS_PORT = 0
+
+
+def swo_reference_clock_hz(ctx: PipelineContext) -> int:
+    """TPIU reference clock the J-Link derives the SWO prescaler from.
+
+    It MUST come from the resolved platform, never a hardcoded guess: a wrong
+    value halves/doubles the ITM baud and yields an undecodable stream.  Most
+    SoCs clock the TPIU from the CPU, but Apollo3 uses a dedicated,
+    CPU-independent trace clock that does not change with TurboSPOT burst, so
+    ``swo_trace_clock_mhz`` wins when set.
+    """
+    platform = ctx.run_metadata.platform
+    cpu_clock_mhz = platform.cpu_clock_mhz if platform is not None else 0
+    trace_clock_mhz = ctx.soc.swo_trace_clock_mhz if ctx.soc is not None else None
+    swo_ref_mhz = trace_clock_mhz or cpu_clock_mhz
+    if swo_ref_mhz <= 0:
+        raise CaptureError(
+            "SWO capture requires a resolved trace clock, but none was set.",
+            hint=(
+                "Stage 1 (resolve_platform) must run before capture so the "
+                "selected target.clock.cpu frequency (or the SoC's fixed SWO "
+                "trace clock) drives the SWO baud rate."
+            ),
+        )
+    return swo_ref_mhz * 1_000_000
+
+
+def enable_swo(
+    jlink: DebugMemorySession, *, cpu_speed_hz: int, swo_speed_hz: int = SWO_SPEED_HZ
+) -> None:
+    jlink.swo_enable(
+        cpu_speed=cpu_speed_hz, swo_speed=swo_speed_hz, port_mask=1 << _SWO_STIMULUS_PORT
+    )
+
+
+def read_swo_chunk(jlink: DebugMemorySession) -> bytes:
+    return bytes(jlink.swo_read_stimulus(_SWO_STIMULUS_PORT, 4096))
 
 
 def _remaining(deadline: float | None) -> float | None:
@@ -74,7 +119,7 @@ def capture_swo_output(
     timeout_s: float | None = DEFAULT_TIMEOUT_S,
     heartbeat_timeout_s: float = HEARTBEAT_TIMEOUT_S,
     cpu_freq: int = 96_000_000,
-    swo_freq: int = 1_000_000,
+    swo_freq: int = SWO_SPEED_HZ,
     timing_out: dict[str, float] | None = None,
     reset_controller: ResetController | None = None,
 ) -> list[str]:
@@ -89,7 +134,7 @@ def capture_swo_output(
     Returns:
         List of captured text lines.
     """
-    timing = CaptureTimingTracker(start_marker=_HPX_START_SENTINEL, end_marker=HPX_END_SENTINEL)
+    timing = CaptureTimingTracker(start_marker=HPX_START_SENTINEL, end_marker=HPX_END_SENTINEL)
     on_line = timing.observe_line
 
     def finalize_timing() -> None:
@@ -122,11 +167,11 @@ def capture_swo_output(
             log.info("pylink connected to %s for SWO capture", jlink_device)
             resume_if_halted(jlink)
 
-            jlink.swo_enable(cpu_speed=cpu_freq, swo_speed=swo_freq, port_mask=0x01)
+            enable_swo(jlink, cpu_speed_hz=cpu_freq, swo_speed_hz=swo_freq)
             log.info("SWO enabled (cpu=%d Hz, swo=%d Hz)", cpu_freq, swo_freq)
 
             lines = collect_lines(
-                lambda: bytes(jlink.swo_read_stimulus(0, 4096)),
+                lambda: read_swo_chunk(jlink),
                 transport_name="SWO",
                 overall_timeout_s=_remaining(deadline),
                 heartbeat_timeout_s=heartbeat_timeout_s,
@@ -138,7 +183,7 @@ def capture_swo_output(
             # the host was draining the FIFO (SWO has no back-pressure) — a
             # recoverable startup race, so retry with a fresh reset rather than
             # returning a partial capture that fails downstream validation.
-            have_start = any(_HPX_START_SENTINEL in l for l in lines)
+            have_start = any(HPX_START_SENTINEL in l for l in lines)
             out_of_time = deadline is not None and time.monotonic() >= deadline
             if (lines and have_start) or attempt == _MAX_CAPTURE_ATTEMPTS or out_of_time:
                 finalize_timing()
@@ -197,27 +242,8 @@ class SwoTransport(BaseCaptureTransport):
     #: SWO always resets and re-attaches — it never holds the probe attached.
     honors_keep_attached = False
 
-    def collect(self, ctx) -> list[str]:
+    def collect(self, ctx: PipelineContext) -> list[str]:
         args = self.prepared_args
-
-        # SWO baud is derived from the trace clock, so it MUST come from the
-        # resolved platform — never a hardcoded guess.  A wrong assumption here
-        # halves/doubles the ITM baud and yields an undecodable stream.  Most
-        # SoCs clock the TPIU from the CPU, but Apollo3 uses a dedicated,
-        # CPU-independent trace clock that does not change with TurboSPOT burst —
-        # so honor swo_trace_clock_mhz when set.
-        cpu_clock_mhz = ctx.run_metadata.platform.cpu_clock_mhz
-        swo_ref_mhz = ctx.soc.swo_trace_clock_mhz or cpu_clock_mhz
-        if swo_ref_mhz <= 0:
-            raise CaptureError(
-                "SWO capture requires a resolved trace clock, but none was set.",
-                hint=(
-                    "Stage 1 (resolve_platform) must run before capture so the "
-                    "selected target.clock.cpu frequency (or the SoC's fixed SWO "
-                    "trace clock) drives the SWO baud rate."
-                ),
-            )
-        cpu_freq_hz = swo_ref_mhz * 1_000_000
 
         return capture_swo_output(
             build_dir=args.build_dir,
@@ -225,7 +251,7 @@ class SwoTransport(BaseCaptureTransport):
             jlink_device=args.jlink_device,
             timeout_s=args.overall_timeout_s,
             heartbeat_timeout_s=args.heartbeat_timeout_s,
-            cpu_freq=cpu_freq_hz,
+            cpu_freq=swo_reference_clock_hz(ctx),
             timing_out=args.timing_raw,
             reset_controller=args.reset_controller,
         )

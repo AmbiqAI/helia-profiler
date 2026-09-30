@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from helia_profiler.transport import uart
-from helia_profiler.transport.protocol import HPX_END, HPX_START
+from helia_profiler.wire import HPX_END_SENTINEL, HPX_START_SENTINEL
 
 
 @pytest.mark.parametrize("keep_attached", [False, True])
@@ -38,7 +38,7 @@ def test_capture_preserves_output_received_during_reset(monkeypatch, keep_attach
 
         def debug_reset(self, **kwargs):
             assert port.buffer == b""
-            port.buffer = f"{HPX_START}\nHPX_TEST,1\n{HPX_END}\n".encode()
+            port.buffer = f"{HPX_START_SENTINEL}\nHPX_TEST,1\n{HPX_END_SENTINEL}\n".encode()
 
         @contextmanager
         def attached_reset_session(self, **kwargs):
@@ -56,5 +56,5 @@ def test_capture_preserves_output_received_during_reset(monkeypatch, keep_attach
         reset_controller=ResetController(),
     )
 
-    assert lines == [HPX_START, "HPX_TEST,1", HPX_END]
+    assert lines == [HPX_START_SENTINEL, "HPX_TEST,1", HPX_END_SENTINEL]
     assert not port.is_open

@@ -492,9 +492,12 @@ def build_fixed_fixture(
             return False
 
         def run(self, ctx):
-            if identity_path.exists() and json.loads(identity_path.read_text()) != identity:
+            if (
+                identity_path.exists()
+                and json.loads(identity_path.read_text(encoding="utf-8")) != identity
+            ):
                 raise ConfigError("Work directory belongs to a different fixture")
-            identity_path.write_text(json.dumps(identity, sort_keys=True))
+            identity_path.write_text(json.dumps(identity, sort_keys=True), encoding="utf-8")
             fixture.verify()
 
     from .stages import (
