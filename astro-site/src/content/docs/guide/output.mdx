@@ -17,7 +17,7 @@ A `results/` directory from [First profile](../../getting-started/first-profile/
 | File | Schema | Role | When present |
 |---|---|---|---|
 | `result_manifest.json` | `hpx.result-manifest` v1 (`results/manifest.py`) | the bundle envelope: identity, validity, issues, provenance, comparability, and every artifact's path, media type, size and SHA-256 | always; written last |
-| `summary.json` | `hpx.run-summary` v9 (`results/run_summary.py`) | headline metrics and health signals; read this first | always |
+| `summary.json` | `hpx.run-summary` v10 (`results/run_summary.py`) | headline metrics and health signals; read this first | always |
 | `profile_results.csv` or `.json` | `hpx.profile-results` v1 for the JSON form (`report/contracts.py`); the CSV carries the semantic name without a published schema | one row per layer, one column per counter | always; one of the two per `output.format` |
 | `run_metadata.json` | `hpx.run-metadata` v1 (`report/contracts.py`) | the resolved configuration, platform, model, toolchain, build images | always |
 | `nsx.lock` | neuralSPOT-X lock file | the exact module lock the firmware was built from | always |
@@ -65,13 +65,13 @@ nested memory and analysis tables described below:
 
 (the engine, layer and cycle values are from the shipped bundle
 `examples/results/hardware-validation-2026-09-16/apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto/`,
-which retains schema version 5. New runs use schema version 9; use the
+which retains schema version 5. New runs use schema version 10; use the
 typed loader to read historical bundles without rewriting them). Top-level
 fields in new runs:
 
 | Field | Type | Unit | What it measures |
 |---|---|---|---|
-| `schema`, `schema_version` | string, int | none | `hpx.run-summary`, version 8 |
+| `schema`, `schema_version` | string, int | none | `hpx.run-summary`, version 10 |
 | `engine` | string | none | the engine that ran |
 | `layers` | int | count | operators in the profiled graph |
 | `total_cycles` | number | CPU cycles | the sum of the per-layer instrumented cycle counts (`report/summary.py`), so it includes the per-layer counter reads; the clean window is `latency.device_clean_infer_avg_cycles` |
@@ -271,3 +271,5 @@ Schema v7 uses the INA228 accumulation interval for internal-mode average power 
 Schema v8 corrects MAC counts for `TRANSPOSE_CONV`, non-flat `FULLY_CONNECTED`, and `BATCH_MATMUL`. Models using these operators can have changed total MACs, total operations, TOPS, and cycles per MAC.
 
 Schema v9 publishes `power.energy_per_inference_j` and `power.inferences_per_joule` for on-device gated-inference summaries when the probe ran inferences and the run has no power error; `power.per_inference_metrics_omitted` names the errors otherwise. Earlier summaries lacked these fields for that scope, so comparing v8 and v9 reports an informative schema difference.
+
+Schema v10 counts `SQRT`, `RSQRT`, `ABS`, and `SQUARED_DIFFERENCE` as one operation per output element in the heliaAOT analysis, matching the TFLite analysis. helia-aot models using these operators can have changed total operations and TOPS; MACs are unchanged.
