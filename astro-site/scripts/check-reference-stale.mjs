@@ -8,27 +8,28 @@
  * the same files before the check runs, so the working tree is never the
  * committed state by the time anything looks at it.
  *
- * Provenance no longer moves with the commit, so the comparison is exact:
- * what is committed must be byte-for-byte what the source produces.
+ * No committed file records a hash of the source (the build substitutes the
+ * source tree; see src/integrations/source-ref.mjs), so the comparison is
+ * exact and moves only when the documented content does: what is committed
+ * must be byte-for-byte what the source at HEAD produces. That equality is the
+ * provenance; a stamp would only restate it.
+ *
+ * The Home catalogue rides along: it is read from the same source and has no
+ * stale check of its own.
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  PAGES_DIR,
-  ROUTE_PREFIX,
-  SIDEBAR_FILE,
-  SOURCE_PATH,
-  sourceTree,
-} from './build-reference.mjs';
+import { CATALOG_FILE } from './build-catalog.mjs';
+import { PAGES_DIR, ROUTE_PREFIX, SIDEBAR_FILE } from './build-reference.mjs';
 
 const site = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repo = path.resolve(site, '..');
 
 /** Everything the pipeline writes and git is expected to hold. */
-const GENERATED = [PAGES_DIR, SIDEBAR_FILE, `public/${ROUTE_PREFIX}`];
+const GENERATED = [PAGES_DIR, SIDEBAR_FILE, `public/${ROUTE_PREFIX}`, CATALOG_FILE];
 
 const git = (args, options = {}) =>
   execFileSync('git', args, { cwd: repo, encoding: 'utf8', maxBuffer: 1 << 28, ...options });
@@ -47,10 +48,12 @@ if (uncommitted) {
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'hpx-reference-'));
 try {
-  execFileSync('node', [path.join(site, 'scripts/build-reference.mjs'), '--out', scratch], {
-    cwd: site,
-    stdio: 'inherit',
-  });
+  for (const script of ['build-catalog.mjs', 'build-reference.mjs']) {
+    execFileSync('node', [path.join(site, 'scripts', script), '--out', scratch], {
+      cwd: site,
+      stdio: 'inherit',
+    });
+  }
 
   const committed = new Map();
   for (const tracked of git(['ls-files', '-z', ...TRACKED])
@@ -90,27 +93,16 @@ try {
     if (!regenerated.has(file)) failures.push(`${file}: committed but no longer generated.`);
   }
 
-  /* Provenance on its own: the tree the committed artifacts claim to
-   * document, against the tree this checkout actually holds. */
-  const expected = sourceTree(repo);
-  for (const [file, body] of committed) {
-    if (!file.endsWith('.json') || !file.startsWith(`public/${ROUTE_PREFIX}/`)) continue;
-    const recorded = JSON.parse(body).generatedFrom?.sourceTree;
-    if (recorded !== expected) {
-      failures.push(`${file}: records tree ${recorded}, ${SOURCE_PATH} is tree ${expected}.`);
-    }
-  }
-
   if (failures.length > 0) {
-    console.error('The committed Python reference is stale:\n');
+    console.error('The committed Python reference or catalogue is stale:\n');
     for (const failure of failures) console.error(`- ${failure}`);
     console.error('\nRun `npm run prepare:docs` and commit the result.');
     process.exit(1);
   }
 
   console.log(
-    `Python reference is current: ${committed.size} committed files match a fresh ` +
-      `generation, source tree ${expected.slice(0, 7)}.`,
+    `Python reference and catalogue are current: ${committed.size} committed files match ` +
+      'a fresh generation.',
   );
 } finally {
   fs.rmSync(scratch, { recursive: true, force: true });

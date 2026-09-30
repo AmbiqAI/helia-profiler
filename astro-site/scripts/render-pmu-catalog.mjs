@@ -13,6 +13,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { SOURCE_TREE_TOKEN } from "../src/integrations/source-ref.mjs";
+
 const here = path.dirname(fileURLToPath(import.meta.url));
 const site = path.resolve(here, "..");
 
@@ -55,7 +57,7 @@ export function groupsTables(catalog) {
     out.push("");
   }
   out.push(
-    `Generated from the counter registry at source tree \`${catalog.generatedFrom.sourceTree.slice(0, 7)}\`: ${catalog.counts.counters} counters in ${catalog.counts.groups} groups across ${catalog.counts.socs} SoCs.`,
+    `Generated from the counter registry at source tree \`${SOURCE_TREE_TOKEN}\`: ${catalog.counts.counters} counters in ${catalog.counts.groups} groups across ${catalog.counts.socs} SoCs.`,
   );
   return out.join("\n");
 }

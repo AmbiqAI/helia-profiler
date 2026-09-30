@@ -2,13 +2,12 @@
   "$schema": "https://ambiqai.github.io/helia-ui/schema/reference-model-1.json",
   "generatedFrom": {
     "tool": "pyref",
-    "version": "1.7.3",
-    "sourceTree": "e2002e79782b673256c4670189447637f0713890"
+    "version": "1.7.3"
   },
   "language": "python",
   "modules": [
     {
-      "description": "What a power capture produces: the measured result, the observations behind it, and the on-device summary the firmware reports.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`, `experimental`\n\nGenerated from the `src/helia_profiler` tree `e2002e79782b673256c4670189447637f0713890`.",
+      "description": "What a power capture produces: the measured result, the observations behind it, and the on-device summary the firmware reports.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`, `experimental`\n\nGenerated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.",
       "name": "power",
       "path": "helia_profiler.power",
       "submodules": [],

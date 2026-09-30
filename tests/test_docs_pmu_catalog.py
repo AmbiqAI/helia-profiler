@@ -7,7 +7,6 @@ import sys
 from pathlib import Path
 
 TOOLS_DOCS = Path(__file__).resolve().parents[1] / "tools" / "docs"
-TREE = "0" * 40
 
 
 def _load_extractor():
@@ -27,7 +26,7 @@ extract_pmu = _load_extractor()
 def test_catalog_covers_every_group_and_counter() -> None:
     from helia_profiler.platform.counters import GROUPS, DEFAULT_COUNTERS
 
-    payload = extract_pmu.build(TREE)
+    payload = extract_pmu.build()
     groups = {row["group"]: row for row in payload["groups"]}
     assert set(groups) == set(GROUPS)
     for name, names in GROUPS.items():
@@ -41,7 +40,7 @@ def test_catalog_lists_every_soc_with_its_groups() -> None:
     from helia_profiler.platform.counters import supported_groups_for_domains
     from helia_profiler.platform.registry import list_socs
 
-    payload = extract_pmu.build(TREE)
+    payload = extract_pmu.build()
     rows = {row["soc"]: row for row in payload["socs"]}
     assert set(rows) == {soc.name for soc in list_socs()}
     for soc in list_socs():
