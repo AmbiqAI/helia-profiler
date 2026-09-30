@@ -10,6 +10,8 @@ from __future__ import annotations
 from typing import Final
 
 from ._fixture_build import (
+    FIXTURE_CAPABILITIES,
+    FIXTURE_READBACK_BUDGET,
     FixedFixture,
     FixtureBackend,
     FixtureBuild,
@@ -54,6 +56,9 @@ FIXTURE_API_VERSION: Final[tuple[int, int]] = (1, 0)
 
 __all__ = [
     "FIXTURE_API_VERSION",
+    # Producer declarations
+    "FIXTURE_CAPABILITIES",
+    "FIXTURE_READBACK_BUDGET",
     # Closed sets
     "EngineType",
     "FixtureBackend",

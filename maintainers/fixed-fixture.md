@@ -1,5 +1,15 @@
 # Fixed-input fixture measurements
 
+## Public API
+
+Consumers import only the names in `helia_profiler.fixture.__all__`; the other
+`fixture_*` modules and `_fixture_build` are internal. `FIXTURE_API_VERSION` is
+`(major, minor)`: minor grows with additions, major with removals or changed
+semantics, and `tests/contracts/fixture_api_v1.json` records the surface.
+`source_closure()` hashes every shipped file named in `fixture_closure.txt`
+(everything except the example models) and returns one digest; a consumer
+recomputes it from the installed files instead of trusting the call.
+
 `helia_profiler.fixture.build_fixed_fixture(config, fixture, method=method,
 runtime=runtime, compile=True)` composes the existing platform, engine,
 memory-plan, firmware-generation and NSX build stages. It never probes or
@@ -143,7 +153,8 @@ single scale and zero point is read as per-tensor, even when its quantized axis
 has extent 1, so declare it with `PerTensorQuantization`. A `FixedFixture` keeps
 its single-INT8 rules and renders exactly as before.
 
-`FIXTURE_CAPABILITIES` is the producer's declaration per engine and IO dtype. No heliaRT
+`FIXTURE_CAPABILITIES` is the producer's declaration per engine and IO dtype
+(`FixtureDType`). No heliaRT
 entry is qualified until a device pass. The table uses these statuses:
 
 - `qualified` means an exact device pass;

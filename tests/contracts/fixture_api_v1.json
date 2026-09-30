@@ -21,6 +21,33 @@
         0
       ]
     },
+    "FIXTURE_CAPABILITIES": {
+      "kind": "constant",
+      "value": {
+        "helia-aot": {
+          "float16": "supported",
+          "float32": "supported",
+          "int16": "supported",
+          "int8": "qualified"
+        },
+        "helia-rt": {
+          "float16": "supported",
+          "float32": "supported",
+          "int16": "supported",
+          "int8": "supported"
+        },
+        "tflm": {
+          "float16": "unsupported",
+          "float32": "supported",
+          "int16": "supported",
+          "int8": "qualified"
+        }
+      }
+    },
+    "FIXTURE_READBACK_BUDGET": {
+      "kind": "constant",
+      "value": 131072
+    },
     "FixedFixture": {
       "fields": [
         [
@@ -50,7 +77,13 @@
         ]
       ],
       "frozen": true,
-      "kind": "dataclass"
+      "kind": "dataclass",
+      "methods": {
+        "verify": "(self) -> 'None'"
+      },
+      "properties": [
+        "identity"
+      ]
     },
     "FixtureBackend": {
       "base": "str",
@@ -184,7 +217,9 @@
         ]
       ],
       "frozen": true,
-      "kind": "dataclass"
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
     },
     "FixtureCapability": {
       "base": "str",
@@ -276,7 +311,9 @@
         ]
       ],
       "frozen": true,
-      "kind": "dataclass"
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
     },
     "FixtureCaptureResult": {
       "fields": [
@@ -337,7 +374,9 @@
         ]
       ],
       "frozen": true,
-      "kind": "dataclass"
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
     },
     "FixtureDType": {
       "base": "str",
@@ -388,7 +427,9 @@
         ]
       ],
       "frozen": true,
-      "kind": "dataclass"
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
     },
     "FixtureFile": {
       "fields": [
@@ -404,7 +445,11 @@
         ]
       ],
       "frozen": true,
-      "kind": "dataclass"
+      "kind": "dataclass",
+      "methods": {
+        "read": "(self) -> 'bytes'"
+      },
+      "properties": []
     },
     "FixtureFootprint": {
       "fields": [
@@ -505,7 +550,9 @@
         ]
       ],
       "frozen": true,
-      "kind": "dataclass"
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
     },
     "FixtureIO": {
       "fields": [
@@ -526,7 +573,9 @@
         ]
       ],
       "frozen": true,
-      "kind": "dataclass"
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
     },
     "FixtureMeasurements": {
       "fields": [
@@ -602,7 +651,9 @@
         ]
       ],
       "frozen": true,
-      "kind": "dataclass"
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
     },
     "FixtureMemory": {
       "fields": [
@@ -628,7 +679,9 @@
         ]
       ],
       "frozen": true,
-      "kind": "dataclass"
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
     },
     "FixtureMethod": {
       "fields": [
@@ -639,7 +692,9 @@
         ]
       ],
       "frozen": true,
-      "kind": "dataclass"
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
     },
     "FixtureMetric": {
       "fields": [
@@ -665,7 +720,9 @@
         ]
       ],
       "frozen": true,
-      "kind": "dataclass"
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
     },
     "FixtureRole": {
       "base": "str",
@@ -708,7 +765,11 @@
         ]
       ],
       "frozen": true,
-      "kind": "dataclass"
+      "kind": "dataclass",
+      "methods": {
+        "verify": "(self) -> None"
+      },
+      "properties": []
     },
     "FixtureTensor": {
       "fields": [
@@ -739,7 +800,11 @@
         ]
       ],
       "frozen": true,
-      "kind": "dataclass"
+      "kind": "dataclass",
+      "methods": {},
+      "properties": [
+        "size_bytes"
+      ]
     },
     "FixtureTiming": {
       "fields": [
@@ -780,7 +845,9 @@
         ]
       ],
       "frozen": true,
-      "kind": "dataclass"
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
     },
     "FixtureTimingScope": {
       "base": "str",
@@ -814,7 +881,11 @@
         ]
       ],
       "frozen": true,
-      "kind": "dataclass"
+      "kind": "dataclass",
+      "methods": {},
+      "properties": [
+        "size"
+      ]
     },
     "PerAxisQuantization": {
       "fields": [
@@ -835,7 +906,9 @@
         ]
       ],
       "frozen": true,
-      "kind": "dataclass"
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
     },
     "PerTensorQuantization": {
       "fields": [
@@ -851,7 +924,9 @@
         ]
       ],
       "frozen": true,
-      "kind": "dataclass"
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
     },
     "Placement": {
       "base": "str",
@@ -882,7 +957,11 @@
         ]
       ],
       "frozen": true,
-      "kind": "dataclass"
+      "kind": "dataclass",
+      "methods": {
+        "verify": "(self) -> 'VerifiedPreparedRuntime'"
+      },
+      "properties": []
     },
     "SourceClosure": {
       "fields": [
@@ -903,7 +982,9 @@
         ]
       ],
       "frozen": true,
-      "kind": "dataclass"
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
     },
     "ToolchainInfo": {
       "fields": [
@@ -924,7 +1005,9 @@
         ]
       ],
       "frozen": false,
-      "kind": "dataclass"
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
     },
     "TypedFixture": {
       "fields": [
@@ -945,7 +1028,14 @@
         ]
       ],
       "frozen": true,
-      "kind": "dataclass"
+      "kind": "dataclass",
+      "methods": {
+        "verify": "(self) -> 'None'"
+      },
+      "properties": [
+        "expected",
+        "identity"
+      ]
     },
     "build_fixed_fixture": {
       "kind": "function",

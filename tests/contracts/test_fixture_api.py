@@ -19,10 +19,25 @@ import pytest
 
 import helia_profiler.fixture as fixture
 
-GOLDEN = Path(__file__).with_name("fixture_api_v1.json")
+GOLDEN = Path(__file__).with_name(f"fixture_api_v{fixture.FIXTURE_API_VERSION[0]}.json")
 
 #: Exported dataclasses that are not frozen yet, with the reason.
 _MUTABLE = {"ToolchainInfo": "shared results model filled by the build stage"}
+
+
+def _members(cls: type) -> dict[str, Any]:
+    """Public methods (by signature) and properties a consumer can call on *cls*."""
+    methods = {
+        name: str(inspect.signature(member))
+        for name, member in sorted(vars(cls).items())
+        if inspect.isfunction(member) and not name.startswith("_")
+    }
+    properties = sorted(
+        name
+        for name, member in vars(cls).items()
+        if isinstance(member, property) and not name.startswith("_")
+    )
+    return {"methods": methods, "properties": properties}
 
 
 def _describe(obj: Any) -> dict[str, Any]:
@@ -39,7 +54,12 @@ def _describe(obj: Any) -> dict[str, Any]:
             else:
                 default = "<required>"
             fields.append([f.name, str(f.type), default])
-        return {"kind": "dataclass", "frozen": obj.__dataclass_params__.frozen, "fields": fields}
+        return {
+            "kind": "dataclass",
+            "frozen": obj.__dataclass_params__.frozen,
+            "fields": fields,
+            **_members(obj),
+        }
     if isinstance(obj, type) and getattr(obj, "_is_protocol", False):
         methods = {
             name: str(inspect.signature(member))
@@ -121,3 +141,22 @@ def test_version_is_a_major_minor_pair() -> None:
 )
 def test_existing_module_paths_resolve_to_the_public_objects(module: str, name: str) -> None:
     assert getattr(importlib.import_module(module), name) is getattr(fixture, name)
+
+
+@pytest.mark.parametrize("name", sorted(fixture.__all__))
+def test_every_export_is_the_object_its_defining_module_uses(name: str) -> None:
+    obj = getattr(fixture, name)
+    if inspect.isclass(obj) or inspect.isfunction(obj):
+        assert getattr(importlib.import_module(obj.__module__), obj.__qualname__) is obj
+    elif name != "FIXTURE_API_VERSION":
+        from helia_profiler import _fixture_build
+
+        assert getattr(_fixture_build, name) is obj
+
+
+def test_dtype_closed_set_matches_the_byte_table() -> None:
+    from helia_profiler.fixture_analysis import FIXTURE_DTYPE_BYTES
+
+    assert set(fixture.FixtureDType) == set(FIXTURE_DTYPE_BYTES)
+    for table in fixture.FIXTURE_CAPABILITIES.values():
+        assert set(table) == set(fixture.FixtureDType)
