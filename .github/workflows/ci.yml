@@ -101,7 +101,7 @@ jobs:
         run: uv run --group test pytest tests/ tools/tests/ -q
 
   # ---------------------------------------------------------------
-  # Analysis extra — the tests that need ai-edge-litert.
+  # Extras — the suite again with ai-edge-litert and helia-aot installed.
   #
   # The unit-test matrix deliberately installs no extras, so the litert
   # cross-validation of the minimal flatbuffer reader (#57) skipped in every
@@ -134,13 +134,10 @@ jobs:
           uv run --group test --extra analysis --extra aot python \
             -c "import ai_edge_litert.schema_py_generated; import helia_aot"
 
-      - name: Run the litert- and helia-aot-dependent tests
-        run: |
-          uv run --group test --extra analysis --extra aot pytest \
-            tests/test_softmax_preflight.py tests/test_model_analysis.py \
-            tests/test_example_models.py tests/unit/test_fixture_analysis.py \
-            tests/unit/test_typed_fixture_analysis.py \
-            tests/contracts/test_fixture_closure.py -q
+      # The whole suite, not a list of the files known to need the extras:
+      # a hand list silently missed every new importorskip test.
+      - name: Run the suite with the extras installed
+        run: uv run --group test --extra analysis --extra aot pytest tests/ tools/tests/ -q
 
   # ---------------------------------------------------------------
   # pre-commit — runs the exact hook config contributors run locally, so
