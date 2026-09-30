@@ -326,6 +326,43 @@ class FixtureBuild:
     capabilities: tuple[tuple[str, FixtureCapability], ...] = ()
     #: heliaAOT scratch arenas painted and scanned: (region id, size in bytes).
     aot_arena_scan: tuple[tuple[int, int], ...] = ()
+    #: heliaAOT's ``<prefix>_plan.json`` and ``<prefix>_report.json`` when the
+    #: installed heliaAOT writes them.
+    aot_outputs: tuple[FixtureFile, ...] = ()
+    #: The engine package that generated the model code, when one did.
+    engine_source: EngineSource | None = None
+
+
+@dataclass(frozen=True)
+class EngineSource:
+    """Installed engine package: its version and, for a VCS install, the commit."""
+
+    package: str
+    version: str
+    commit: str | None = None
+
+
+def _engine_source(engine: EngineType) -> EngineSource | None:
+    if engine is not EngineType.HELIA_AOT:
+        return None
+    from importlib import metadata
+
+    distribution = metadata.distribution("helia-aot")
+    commit = None
+    direct_url = distribution.read_text("direct_url.json")
+    if direct_url:
+        commit = json.loads(direct_url).get("vcs_info", {}).get("commit_id")
+    return EngineSource("helia-aot", distribution.version, commit)
+
+
+def _aot_outputs(work_dir: Path, prefix: str) -> tuple[FixtureFile, ...]:
+    found = []
+    for name in (f"{prefix}_plan.json", f"{prefix}_report.json"):
+        matches = sorted((work_dir / "aot_output").rglob(name))
+        if len(matches) > 1:
+            raise ConfigError(f"More than one heliaAOT {name} in the work directory")
+        found += [FixtureFile(m, hashlib.sha256(m.read_bytes()).hexdigest()) for m in matches]
+    return tuple(found)
 
 
 #: Environment variables outside the compatibility classifier that change what a
@@ -437,6 +474,26 @@ def build_fixed_fixture(
     observe_aot_arenas: bool = False,
 ) -> FixtureBuild:
     """Render or compile one fixed fixture through profiler's host-only stages."""
+    return _build(
+        config,
+        fixture,
+        method=method,
+        runtime=runtime,
+        compile=compile,
+        observe_aot_arenas=observe_aot_arenas,
+    )
+
+
+def _build(
+    config: ProfileConfig,
+    fixture: FixedFixture | TypedFixture,
+    *,
+    method: FixtureMethod,
+    runtime: PreparedUpstreamRuntime | None,
+    compile: bool,
+    observe_aot_arenas: bool,
+    intent_identity: str | None = None,
+) -> FixtureBuild:
     if not isinstance(method, FixtureMethod):
         raise ConfigError("Explicit FixtureMethod required")
     _validate(config, fixture)
@@ -565,7 +622,8 @@ def build_fixed_fixture(
             raise ConfigError(
                 f"Flat image is {size} B; fixture capture accepts at most {MAX_IMAGE} B in MRAM"
             )
-    intent_identity = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
+    if intent_identity is None:
+        intent_identity = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
     toolchain = ctx.run_metadata.toolchain if compile else None
     if compile and (toolchain is None or not toolchain.compiler_version):
         raise ConfigError("Compiled fixture requires recorded toolchain provenance")
@@ -629,4 +687,8 @@ def build_fixed_fixture(
             )
             if observe_aot_arenas and r.role is ArenaRole.SCRATCH
         ),
+        aot_outputs=_aot_outputs(root, ctx.engine_artifacts.aot_prefix)
+        if isinstance(ctx.engine_artifacts, HeliaAotArtifacts)
+        else (),
+        engine_source=_engine_source(config.engine.type),
     )

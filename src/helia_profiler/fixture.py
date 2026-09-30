@@ -13,6 +13,7 @@ from ._fixture_build import (
     FIXTURE_CAPABILITIES,
     FIXTURE_READBACK_BUDGET,
     FixedFixture,
+    EngineSource,
     FixtureBackend,
     FixtureBuild,
     FixtureCapability,
@@ -25,6 +26,18 @@ from ._fixture_build import (
     build_fixed_fixture,
 )
 from ._fixture_closure import SourceClosure, source_closure
+from ._fixture_facts import (
+    EngineDTypeCapability,
+    FixtureCapabilities,
+    QualifiedFixtureTarget,
+    fixture_capabilities,
+)
+from ._fixture_request import (
+    FixtureBuildRequest,
+    FixturePlacement,
+    HeliaAotOptions,
+    build_fixture,
+)
 from .engines import EngineType
 from .fixture_analysis import (
     FixtureTensor,
@@ -46,14 +59,22 @@ from .fixture_observation import (
     FixtureMeasurements,
     summarize_fixture_measurements,
 )
-from .fixture_runtime import FixtureFile, PreparedUpstreamRuntime
+from .fixture_runtime import (
+    FixtureFile,
+    PreparedUpstreamRuntime,
+    RuntimeABI,
+    RuntimeHeader,
+    RuntimeProvider,
+    VerifiedPreparedRuntime,
+)
+from .fixture_runtime import RuntimeManifest as PreparedRuntimeManifest
 from .fixture_stage import FixtureStage
 from .fixture_target import FixtureTarget, supported_fixture_target
 from .hostenv.elf_inventory import ElfSection, LoadSegment, SectionInventory, section_inventory
 from .placement import Placement
 from .results.models import ToolchainInfo
 
-FIXTURE_API_VERSION: Final[tuple[int, int]] = (1, 0)
+FIXTURE_API_VERSION: Final[tuple[int, int]] = (1, 1)
 
 __all__ = [
     "FIXTURE_API_VERSION",
@@ -70,6 +91,9 @@ __all__ = [
     "FixtureTimingScope",
     "Placement",
     # Inputs
+    "FixtureBuildRequest",
+    "FixturePlacement",
+    "HeliaAotOptions",
     "FixedFixture",
     "FixtureCaptureRequest",
     "FixtureFile",
@@ -85,6 +109,8 @@ __all__ = [
     # Caller-supplied authority
     "FixtureCaptureGuard",
     # Operations
+    "build_fixture",
+    "fixture_capabilities",
     "build_fixed_fixture",
     "capture_fixture",
     "inspect_fixture_footprint",
@@ -93,6 +119,15 @@ __all__ = [
     "summarize_fixture_measurements",
     "supported_fixture_target",
     # Results
+    "EngineDTypeCapability",
+    "EngineSource",
+    "FixtureCapabilities",
+    "PreparedRuntimeManifest",
+    "QualifiedFixtureTarget",
+    "RuntimeABI",
+    "RuntimeHeader",
+    "RuntimeProvider",
+    "VerifiedPreparedRuntime",
     "FixtureBuild",
     "FixtureCaptureResult",
     "FixtureEnergyWindow",

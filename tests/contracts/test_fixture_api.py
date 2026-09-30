@@ -73,13 +73,42 @@ def _describe(obj: Any) -> dict[str, Any]:
 
 
 def describe_surface() -> dict[str, Any]:
-    return {name: _describe(getattr(fixture, name)) for name in sorted(fixture.__all__)}
+    # The version is recorded beside the surface; listing it here would make every
+    # bump look like a changed constant.
+    return {
+        name: _describe(getattr(fixture, name))
+        for name in sorted(fixture.__all__)
+        if name != "FIXTURE_API_VERSION"
+    }
+
+
+def _extends(old: dict[str, Any], new: dict[str, Any]) -> bool:
+    """Whether *new* keeps every use of *old* working: appended defaulted fields,
+    new members, methods or properties; nothing removed or changed."""
+    if old == new:
+        return True
+    if old["kind"] != new["kind"]:
+        return False
+    if old["kind"] == "enum":
+        return old["base"] == new["base"] and old["members"].items() <= new["members"].items()
+    if old["kind"] == "protocol":
+        return old["methods"].items() <= new["methods"].items()
+    if old["kind"] == "dataclass":
+        count = len(old["fields"])
+        return (
+            old["frozen"] == new["frozen"]
+            and new["fields"][:count] == old["fields"]
+            and all(default != "<required>" for _, _, default in new["fields"][count:])
+            and old["methods"].items() <= new["methods"].items()
+            and set(old["properties"]) <= set(new["properties"])
+        )
+    return False
 
 
 def _required_bump(old: dict[str, Any], new: dict[str, Any]) -> str | None:
     if old == new:
         return None
-    additive = all(name in new and new[name] == entry for name, entry in old.items())
+    additive = all(name in new and _extends(entry, new[name]) for name, entry in old.items())
     return "minor" if additive else "major"
 
 
@@ -109,6 +138,37 @@ def test_version_bump_rule_distinguishes_additions_from_changes() -> None:
     assert _required_bump(old, {**old, "b": {"kind": "constant", "value": 1}}) == "minor"
     assert _required_bump(old, {"a": {"kind": "function", "signature": "(x, y)"}}) == "major"
     assert _required_bump(old, {}) == "major"
+
+
+def test_version_bump_rule_for_records_and_enums() -> None:
+    record = {
+        "kind": "dataclass",
+        "frozen": True,
+        "fields": [["a", "int", "<required>"]],
+        "methods": {"read": "(self)"},
+        "properties": ["size"],
+    }
+    old = {"R": record, "E": {"kind": "enum", "base": "str", "members": {"A": "a"}}}
+
+    def with_record(**changes: Any) -> dict[str, Any]:
+        return {**old, "R": {**record, **changes}}
+
+    assert (
+        _required_bump(old, with_record(fields=[*record["fields"], ["b", "int", "0"]])) == "minor"
+    )
+    assert (
+        _required_bump(old, with_record(fields=[*record["fields"], ["b", "int", "<required>"]]))
+        == "major"
+    )
+    assert (
+        _required_bump(old, with_record(fields=[["b", "int", "0"], *record["fields"]])) == "major"
+    )
+    assert _required_bump(old, with_record(frozen=False)) == "major"
+    assert _required_bump(old, with_record(methods={})) == "major"
+    assert _required_bump(old, with_record(properties=["size", "name"])) == "minor"
+    enum = {"kind": "enum", "base": "str", "members": {"A": "a", "B": "b"}}
+    assert _required_bump(old, {**old, "E": enum}) == "minor"
+    assert _required_bump(old, {**old, "E": {**enum, "members": {"A": "x"}}}) == "major"
 
 
 def test_public_records_are_frozen_dataclasses() -> None:
