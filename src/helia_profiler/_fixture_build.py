@@ -18,7 +18,7 @@ from .firmware.launcher import _DISABLED_LAUNCHER_VALUES
 from .pipeline import PipelineContext, PipelineRunner, Stage, serialize_config
 from .placement import ArenaRole, Placement
 from .fixture_image import MAX_IMAGE, MRAM, bounded
-from .fixture_target import FixtureTarget, supported_fixture_target
+from .fixture_target import FIXTURE_CLOCK_PROFILE, FixtureTarget, supported_fixture_target
 from .results.models import ToolchainInfo, MemoryPlan
 
 
@@ -347,17 +347,35 @@ def _engine_source(engine: EngineType) -> EngineSource | None:
         return None
     from importlib import metadata
 
-    distribution = metadata.distribution("helia-aot")
+    try:
+        distribution = metadata.distribution("helia-aot")
+    except metadata.PackageNotFoundError:
+        return None
     commit = None
-    direct_url = distribution.read_text("direct_url.json")
-    if direct_url:
-        commit = json.loads(direct_url).get("vcs_info", {}).get("commit_id")
+    try:
+        direct_url = json.loads(distribution.read_text("direct_url.json") or "{}")
+    except json.JSONDecodeError:
+        direct_url = {}
+    if isinstance(direct_url, dict) and isinstance(direct_url.get("vcs_info"), dict):
+        found = direct_url["vcs_info"].get("commit_id")
+        commit = found if isinstance(found, str) else None
     return EngineSource("helia-aot", distribution.version, commit)
+
+
+def _aot_output_names(prefix: str) -> tuple[str, str]:
+    return f"{prefix}_plan.json", f"{prefix}_report.json"
+
+
+def _clear_aot_outputs(work_dir: Path, prefix: str) -> None:
+    """Drop plan and report files an earlier conversion left, so a build pins only its own."""
+    for name in _aot_output_names(prefix):
+        for stale in (work_dir / "aot_output").rglob(name):
+            stale.unlink()
 
 
 def _aot_outputs(work_dir: Path, prefix: str) -> tuple[FixtureFile, ...]:
     found = []
-    for name in (f"{prefix}_plan.json", f"{prefix}_report.json"):
+    for name in _aot_output_names(prefix):
         matches = sorted((work_dir / "aot_output").rglob(name))
         if len(matches) > 1:
             raise ConfigError(f"More than one heliaAOT {name} in the work directory")
@@ -432,7 +450,7 @@ def _validate(config: ProfileConfig, fixture: FixedFixture | TypedFixture) -> No
         raise ConfigError("Fixture supports upstream TFLM, heliaRT or helia-AOT only")
     if config.target.custom_socs or config.target.custom_boards:
         raise ConfigError("Fixed fixture does not support custom target declarations")
-    if config.target.board != "apollo510_evb" or config.target.clock.cpu != "lp":
+    if config.target.board != "apollo510_evb" or config.target.clock.cpu != FIXTURE_CLOCK_PROFILE:
         raise ConfigError("Fixed fixture supports Apollo510 EVB LP clock only")
     if (
         config.model.arena_location != Placement.SRAM
@@ -556,6 +574,11 @@ def _build(
                 raise ConfigError("Work directory belongs to a different fixture")
             identity_path.write_text(json.dumps(identity, sort_keys=True), encoding="utf-8")
             fixture.verify()
+            if config.engine.type is EngineType.HELIA_AOT:
+                from .engines.helia_aot.compile import _DEFAULT_PREFIX
+
+                prefix = str(config.engine.config.get("prefix", _DEFAULT_PREFIX))
+                _clear_aot_outputs(root, prefix)
 
     from .stages import (
         ResolvePlatformStage,

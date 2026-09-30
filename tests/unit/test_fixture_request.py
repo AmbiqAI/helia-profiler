@@ -25,10 +25,12 @@ from helia_profiler.fixture import (
     HeliaAotOptions,
     PerTensorQuantization,
     Placement,
+    PreparedUpstreamRuntime,
     TypedFixture,
     build_fixed_fixture,
     build_fixture,
     fixture_capabilities,
+    supported_fixture_target,
 )
 from helia_profiler.fixture_capture import FIXTURE_CPU_HZ, FIXTURE_SETTLE_TICKS, FIXTURE_TIMER_HZ
 
@@ -256,3 +258,128 @@ def test_request_build_matches_the_config_build_and_keeps_its_identity(
         (f.path.name, f.sha256) for f in by_config.generated_sources
     ]
     assert built.engine_source is not None and built.engine_source.package == "helia-aot"
+
+
+def _runtime(root: Path, manifest: bytes) -> PreparedUpstreamRuntime:
+    return PreparedUpstreamRuntime(
+        _pin(root / "runtime.a", b"!<arch>\n"), root, _pin(root / "runtime.json", manifest)
+    )
+
+
+@pytest.mark.parametrize(
+    "aot",
+    [
+        HeliaAotOptions(prefix="m"),
+        HeliaAotOptions(module_name="m"),
+        HeliaAotOptions(linker_profile="lp"),
+        HeliaAotOptions(platform_name="apollo510_evb"),
+    ],
+)
+def test_intent_identity_moves_with_each_heliaaot_option(
+    tmp_path: Path, aot: HeliaAotOptions
+) -> None:
+    plain = _request(tmp_path, aot=HeliaAotOptions())
+    assert _request(tmp_path, aot=aot).intent_identity != plain.intent_identity
+
+
+def test_intent_identity_moves_with_engine_and_runtime(tmp_path: Path) -> None:
+    tflm = _request(
+        tmp_path,
+        engine=EngineType.TFLM,
+        backend=FixtureBackend.CMSIS_NN,
+        runtime=_runtime(tmp_path / "rt1", b'{"a": 1}'),
+    )
+    other_runtime = replace(tflm, runtime=_runtime(tmp_path / "rt2", b'{"a": 2}'))
+    helia_rt = replace(tflm, engine=EngineType.HELIA_RT, backend=FixtureBackend.HELIA)
+    identities = {r.intent_identity for r in (_request(tmp_path), tflm, other_runtime, helia_rt)}
+    assert len(identities) == 4
+
+
+def test_default_heliaaot_options_hash_like_none(tmp_path: Path) -> None:
+    assert (
+        _request(tmp_path).intent_identity
+        == _request(tmp_path, aot=HeliaAotOptions()).intent_identity
+    )
+
+
+def test_an_unqualified_target_is_refused(tmp_path: Path) -> None:
+    target = replace(supported_fixture_target(), board="apollo4p_evb")
+    with pytest.raises(ConfigError, match="Unsupported fixture target"):
+        _request(tmp_path, target=target)
+
+
+def test_request_config_carries_every_heliaaot_option(tmp_path: Path) -> None:
+    aot = HeliaAotOptions(prefix="p", module_name="mod", linker_profile="lp", platform_name="plat")
+    config = _request(tmp_path, aot=aot).to_config()
+    assert config.engine.config == {
+        "prefix": "p",
+        "module_name": "mod",
+        "linker_profile": "lp",
+        "platform_name": "plat",
+        "cmsis_nn_requantize_inline_asm": True,
+    }
+
+
+def test_engine_source_without_the_package_or_with_a_malformed_record(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from importlib import metadata
+
+    def missing(_: str) -> None:
+        raise metadata.PackageNotFoundError("helia-aot")
+
+    monkeypatch.setattr("importlib.metadata.distribution", missing)
+    assert _engine_source(EngineType.HELIA_AOT) is None
+    for text in ("{not json", '["list"]', '{"vcs_info": "text"}', '{"vcs_info": {"commit_id": 7}}'):
+        monkeypatch.setattr("importlib.metadata.distribution", lambda _, t=text: _Distribution(t))
+        source = _engine_source(EngineType.HELIA_AOT)
+        assert source is not None and source.commit is None
+
+
+def _tiny_request(root: Path) -> FixtureBuildRequest:
+    from helia_profiler.fixture_analysis import analyze_typed_fixture_model
+
+    model = _pin(
+        root / "tiny_cnn.tflite", (PACKAGE / "data" / "models" / "tiny_cnn.tflite").read_bytes()
+    )
+    analysis = analyze_typed_fixture_model(model.path)
+    fixture = TypedFixture(
+        model,
+        tuple(
+            FixtureIO(t, _pin(root / f"in{i}.bin", bytes(t.size_bytes)))
+            for i, t in enumerate(analysis.inputs)
+        ),
+        tuple(
+            FixtureIO(t, _pin(root / f"out{i}.bin", bytes(t.size_bytes)))
+            for i, t in enumerate(analysis.outputs)
+        ),
+    )
+    return replace(_request(root), fixture=fixture)
+
+
+def test_a_build_does_not_pin_heliaaot_outputs_an_earlier_build_left(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pytest.importorskip("helia_aot")
+    pytest.importorskip("ai_edge_litert")
+    monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "cache"))
+    request = _tiny_request(tmp_path)
+    stale = _pin(request.work_dir / "aot_output" / "hpx_plan.json", b'{"stale": true}')
+    build = build_fixture(request, compile=False)
+    assert not stale.path.exists()
+    assert all(output.path != stale.path for output in build.aot_outputs)
+
+
+def test_a_foreign_work_directory_keeps_its_heliaaot_outputs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pytest.importorskip("helia_aot")
+    pytest.importorskip("ai_edge_litert")
+    monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "cache"))
+    request = _tiny_request(tmp_path)
+    request.work_dir.mkdir(parents=True)
+    (request.work_dir / "fixed-fixture-identity.json").write_text('{"other": true}')
+    kept = _pin(request.work_dir / "aot_output" / "hpx_plan.json", b"{}")
+    with pytest.raises(ConfigError, match="different fixture"):
+        build_fixture(request, compile=False)
+    assert kept.path.exists()

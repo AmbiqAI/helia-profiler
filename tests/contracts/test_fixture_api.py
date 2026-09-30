@@ -82,7 +82,23 @@ def describe_surface() -> dict[str, Any]:
     }
 
 
-def _extends(old: dict[str, Any], new: dict[str, Any]) -> bool:
+#: Records whose fields feed a fixture identity hash: any new field changes
+#: every existing identity, so they may not grow within a major version.
+_IDENTITY_RECORDS = frozenset(
+    {
+        "FixedFixture",
+        "FixtureFile",
+        "FixtureIO",
+        "FixtureTensor",
+        "Int8Tensor",
+        "PerAxisQuantization",
+        "PerTensorQuantization",
+        "TypedFixture",
+    }
+)
+
+
+def _extends(old: dict[str, Any], new: dict[str, Any], name: str = "") -> bool:
     """Whether *new* keeps every use of *old* working: appended defaulted fields,
     new members, methods or properties; nothing removed or changed."""
     if old == new:
@@ -91,8 +107,9 @@ def _extends(old: dict[str, Any], new: dict[str, Any]) -> bool:
         return False
     if old["kind"] == "enum":
         return old["base"] == new["base"] and old["members"].items() <= new["members"].items()
-    if old["kind"] == "protocol":
-        return old["methods"].items() <= new["methods"].items()
+    if old["kind"] == "protocol" or name in _IDENTITY_RECORDS:
+        # Callers implement protocols, and identity records hash every field.
+        return False
     if old["kind"] == "dataclass":
         count = len(old["fields"])
         return (
@@ -108,7 +125,7 @@ def _extends(old: dict[str, Any], new: dict[str, Any]) -> bool:
 def _required_bump(old: dict[str, Any], new: dict[str, Any]) -> str | None:
     if old == new:
         return None
-    additive = all(name in new and _extends(entry, new[name]) for name, entry in old.items())
+    additive = all(name in new and _extends(entry, new[name], name) for name, entry in old.items())
     return "minor" if additive else "major"
 
 
@@ -166,6 +183,15 @@ def test_version_bump_rule_for_records_and_enums() -> None:
     assert _required_bump(old, with_record(frozen=False)) == "major"
     assert _required_bump(old, with_record(methods={})) == "major"
     assert _required_bump(old, with_record(properties=["size", "name"])) == "minor"
+    assert _required_bump(old, with_record(fields=[])) == "major"
+    assert _required_bump(old, with_record(fields=[["a", "str", "<required>"]])) == "major"
+    assert _required_bump(old, with_record(fields=[["a", "int", "0"]])) == "major"
+    assert _required_bump(old, with_record(methods={"read": "(self, n)"})) == "major"
+    protocol = {"kind": "protocol", "methods": {"check": "(self)"}}
+    grown = {"kind": "protocol", "methods": {"check": "(self)", "close": "(self)"}}
+    assert _required_bump({"P": protocol}, {"P": grown}) == "major"
+    identity_record = {**record, "fields": [*record["fields"], ["b", "int", "0"]]}
+    assert _required_bump({"FixtureIO": record}, {"FixtureIO": identity_record}) == "major"
     enum = {"kind": "enum", "base": "str", "members": {"A": "a", "B": "b"}}
     assert _required_bump(old, {**old, "E": enum}) == "minor"
     assert _required_bump(old, {**old, "E": {**enum, "members": {"A": "x"}}}) == "major"

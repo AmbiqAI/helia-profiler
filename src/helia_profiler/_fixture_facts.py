@@ -13,7 +13,7 @@ from ._fixture_build import (
 from .engines import EngineType
 from .fixture_capture import FIXTURE_CPU_HZ, FIXTURE_SETTLE_TICKS, FIXTURE_TIMER_HZ
 from .fixture_image import MAX_IMAGE
-from .fixture_target import supported_fixture_target
+from .fixture_target import FIXTURE_CLOCK_PROFILE, supported_fixture_target
 
 
 @dataclass(frozen=True)
@@ -59,7 +59,7 @@ def fixture_capabilities() -> FixtureCapabilities:
         targets=(
             QualifiedFixtureTarget(
                 board=target.board,
-                clock_profile="lp",
+                clock_profile=FIXTURE_CLOCK_PROFILE,
                 cpu_hz=FIXTURE_CPU_HZ,
                 device=target.device,
                 load_address=target.load_address,

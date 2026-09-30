@@ -10,15 +10,19 @@ semantics, and `tests/contracts/fixture_api_v1.json` records the surface.
 (everything except the example models) and returns one digest; a consumer
 recomputes it from the installed files instead of trusting the call.
 
-API 1.1 adds a typed build path. `FixtureBuildRequest` names everything that
-decides a build (fixture, method, engine and backend, arena size, iterations,
-warmup, `FixturePlacement`, target, prepared runtime, `HeliaAotOptions`, arena
-observation) plus the work directory, and `build_fixture(request)` builds it.
-Its `intent_identity` hashes those inputs with files as content hashes and no
-paths, so the same request built in two directories has one identity;
+API 1.1 adds a typed build path. `FixtureBuildRequest` names the build inputs
+a caller chooses (fixture, method, engine and backend, arena size,
+iterations, warmup, `FixturePlacement`, target, prepared runtime,
+`HeliaAotOptions`, arena observation) plus the work directory, and
+`build_fixture(request)` builds it. Its `intent_identity` hashes those inputs
+with files as content hashes and no paths, so the same request built in two
+directories has one identity. The installed profiler and engine are outside
+the request: the source closure pins the profiler, and `engine_source`
+records the engine;
 `build_fixed_fixture(config, ...)` is unchanged. `FixtureBuild.aot_outputs`
 pins heliaAOT's `<prefix>_plan.json` and `<prefix>_report.json` when the
-installed heliaAOT writes them, and `FixtureBuild.engine_source` records the
+installed heliaAOT writes them (the build first drops any an earlier build
+left in the work directory), and `FixtureBuild.engine_source` records the
 engine package version and, for a VCS install, its commit.
 `fixture_capabilities()` reports the qualified targets and each engine's IO
 dtype status.

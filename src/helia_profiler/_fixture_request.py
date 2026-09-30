@@ -20,11 +20,9 @@ from .config import ProfileConfig, load_config
 from .engines import EngineType
 from .errors import ConfigError
 from .fixture_runtime import PreparedUpstreamRuntime
-from .fixture_target import FixtureTarget, supported_fixture_target
+from .fixture_target import FIXTURE_CLOCK_PROFILE, FixtureTarget, supported_fixture_target
 from .placement import Placement
 
-#: The only fixture clock profile with a qualified capture path.
-_CLOCK_PROFILE = "lp"
 #: Backends the prepared-runtime engines require; heliaAOT takes none.
 _ENGINE_BACKENDS = {
     EngineType.TFLM: FixtureBackend.CMSIS_NN,
@@ -84,7 +82,12 @@ class HeliaAotOptions:
 
 @dataclass(frozen=True)
 class FixtureBuildRequest:
-    """Everything that decides a fixed-fixture build, except where it is built."""
+    """The build inputs a caller chooses, plus the work directory.
+
+    The installed profiler and engine are not part of the request: the source
+    closure pins the profiler, and ``FixtureBuild.engine_source`` records the
+    engine package.
+    """
 
     fixture: FixedFixture | TypedFixture
     method: FixtureMethod
@@ -110,6 +113,10 @@ class FixtureBuildRequest:
             )
         if self.aot is not None and self.engine is not EngineType.HELIA_AOT:
             raise ConfigError("heliaAOT options apply to heliaAOT fixtures only")
+        try:
+            self.target.verify()
+        except ValueError as exc:
+            raise ConfigError(str(exc)) from exc
         if self.placement != FixturePlacement():
             raise ConfigError(
                 f"Fixture placement not qualified: arena {self.placement.arena.value}, "
@@ -130,7 +137,9 @@ class FixtureBuildRequest:
             "placement": [self.placement.arena.value, self.placement.weights.value],
             "target": asdict(self.target),
             "runtime": self.runtime.manifest.sha256 if self.runtime else None,
-            "aot": asdict(self.aot) if self.aot else None,
+            "aot": asdict(self.aot or HeliaAotOptions())
+            if self.engine is EngineType.HELIA_AOT
+            else None,
             "observe_aot_arenas": self.observe_aot_arenas,
         }
         return hashlib.sha256(json.dumps(intent, sort_keys=True).encode()).hexdigest()
@@ -156,7 +165,7 @@ class FixtureBuildRequest:
                 "target": {
                     "toolchain": "atfe",
                     "board": self.target.board,
-                    "clock": {"cpu": _CLOCK_PROFILE},
+                    "clock": {"cpu": FIXTURE_CLOCK_PROFILE},
                 },
                 "work_dir": str(self.work_dir),
             },
@@ -165,7 +174,6 @@ class FixtureBuildRequest:
 
 def build_fixture(request: FixtureBuildRequest, *, compile: bool = True) -> FixtureBuild:
     """Render or compile the requested fixture; its intent identity is the request's."""
-    request.target.verify()
     return _build(
         request.to_config(),
         request.fixture,
