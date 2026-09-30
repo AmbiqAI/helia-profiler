@@ -630,7 +630,7 @@ def _jlink_dll_candidates_from_wrapper() -> list[Path]:
     candidates.extend(_jlink_dlls_in_dir(exe.parent))
 
     try:
-        text = exe.read_text(errors="ignore")
+        text = exe.read_text(encoding="utf-8", errors="ignore")
     except OSError:
         text = ""
 

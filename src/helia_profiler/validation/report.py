@@ -45,7 +45,7 @@ def load_validation_report(path: Path) -> ValidationReport:
 
     report_path = path.expanduser().resolve()
     try:
-        document = json.loads(report_path.read_text())
+        document = json.loads(report_path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
         raise ReportError(f"Missing validation report: {report_path}") from exc
     except (OSError, json.JSONDecodeError) as exc:
@@ -116,9 +116,10 @@ def write_validation_reports(
             },
             indent=2,
             default=str,
-        )
+        ),
+        encoding="utf-8",
     )
-    paths[1].write_text(render_markdown(results))
+    paths[1].write_text(render_markdown(results), encoding="utf-8")
     paths[2].write_text(
         json.dumps(
             build_manifest(
@@ -130,7 +131,8 @@ def write_validation_reports(
             indent=2,
             default=str,
         )
-        + "\n"
+        + "\n",
+        encoding="utf-8",
     )
     return paths
 
@@ -525,7 +527,7 @@ def _bundle_relative(path: Path, root: Path) -> str:
 
 def _read_optional_json(path: Path) -> dict[str, Any]:
     try:
-        value = json.loads(path.read_text())
+        value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
     return value if isinstance(value, dict) else {}

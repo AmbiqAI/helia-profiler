@@ -70,6 +70,45 @@ def test_no_engine_adapter_imports_out_of_another_engines_package() -> None:
     )
 
 
+def _is_text_mode(mode: ast.expr | None) -> bool:
+    return mode is None or not (isinstance(mode, ast.Constant) and "b" in str(mode.value))
+
+
+def _text_io_without_encoding(call: ast.Call) -> bool:
+    if any(keyword.arg == "encoding" for keyword in call.keywords):
+        return False
+    func = call.func
+    mode = next((kw.value for kw in call.keywords if kw.arg == "mode"), None)
+    if isinstance(func, ast.Name) and func.id == "open":
+        return _is_text_mode(call.args[1] if len(call.args) > 1 else mode)
+    if not isinstance(func, ast.Attribute):
+        return False
+    if func.attr in {"read_text", "write_text"}:
+        return True
+    # Only ``Path.open("w")``-shaped calls: tarfile.open(path, ...) and device
+    # handles' .open() share the name but take no text mode first.
+    return (
+        func.attr == "open"
+        and bool(call.args)
+        and isinstance(call.args[0], ast.Constant)
+        and isinstance(call.args[0].value, str)
+        and _is_text_mode(call.args[0])
+    )
+
+
+def test_text_file_io_names_its_encoding() -> None:
+    """Windows' locale default (cp1252) cannot round-trip what hpx writes."""
+    repo_root = Path(__file__).resolve().parent.parent
+    offenders = [
+        f"{path.relative_to(repo_root).as_posix()}:{node.lineno}"
+        for root in (repo_root / "src" / "helia_profiler", repo_root / "tools")
+        for path in sorted(root.rglob("*.py"))
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
+        if isinstance(node, ast.Call) and _text_io_without_encoding(node)
+    ]
+    assert not offenders, 'text file I/O needs encoding="utf-8":\n  ' + "\n  ".join(offenders)
+
+
 def test_wheel_contains_only_canonical_evaluation_modules(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parent.parent
     # Build from a staged copy, never from the real checkout: with
@@ -187,7 +226,7 @@ def _hpx_import_targets(path: Path, *, module_level_only: bool) -> list[str]:
     ``if TYPE_CHECKING:`` (its ``else:`` branch runs at import time and is
     included); ``False`` walks everything, lazy and guarded alike.
     """
-    tree = ast.parse(path.read_text())
+    tree = ast.parse(path.read_text(encoding="utf-8"))
     if module_level_only:
         nodes: list[ast.stmt] = []
         for node in tree.body:

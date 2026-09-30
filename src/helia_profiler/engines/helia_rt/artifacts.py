@@ -242,21 +242,21 @@ def _detect_version(dist: Path) -> str | None:
     """
     version_h = dist / "tensorflow" / "lite" / "micro" / "helia_rt_version.h"
     if version_h.is_file():
-        text = version_h.read_text(errors="replace")
+        text = version_h.read_text(encoding="utf-8", errors="replace")
         m = re.search(r'#define\s+HELIA_RT_VERSION\s+"v?([^"]+)"', text)
         if m:
             return m.group(1)
 
     legacy_h = dist / "tensorflow" / "lite" / "micro" / "heliart_version.h"
     if legacy_h.is_file():
-        text = legacy_h.read_text(errors="replace")
+        text = legacy_h.read_text(encoding="utf-8", errors="replace")
         m = re.search(r'#define\s+HELIART_VERSION\s+"v?([^"]+)"', text)
         if m:
             return m.group(1)
 
     manifest = dist / "MANIFEST.txt"
     if manifest.is_file():
-        first_line = manifest.read_text(errors="replace").split("\n")[0]
+        first_line = manifest.read_text(encoding="utf-8", errors="replace").split("\n")[0]
         # v1.16.0+: "helia-rt helia-rt-v1.16.0"
         m = re.search(r"helia-rt-v(\S+)", first_line)
         if m:

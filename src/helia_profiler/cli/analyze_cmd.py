@@ -79,8 +79,9 @@ def _write_analysis_file(
     output: Path | None,
     aot: "ModelAnalysis | None" = None,
 ) -> None:
-    import csv
     import json
+
+    from ..results.serde import write_dict_csv
 
     if fmt == "csv":
         rows = []
@@ -102,11 +103,7 @@ def _write_analysis_file(
             dest = Path("model_analysis.csv")
 
         fieldnames = list(rows[0].keys()) if rows else []
-        with open(dest, "w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            for row in rows:
-                writer.writerow(row)
+        write_dict_csv(dest, fieldnames, rows)
         print(f"Wrote {dest}")
 
     elif fmt == "json":
@@ -149,5 +146,5 @@ def _write_analysis_file(
             }
 
         dest = output or Path("model_analysis.json")
-        dest.write_text(json.dumps(data, indent=2, default=str))
+        dest.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
         print(f"Wrote {dest}")

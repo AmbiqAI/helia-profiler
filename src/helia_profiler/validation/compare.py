@@ -227,8 +227,8 @@ def write_validation_compare_artifacts(
         "summary": result.summary,
         "cases": case_documents,
     }
-    json_path.write_text(json.dumps(document, indent=2, default=str) + "\n")
-    markdown_path.write_text(render_validation_compare_markdown(result))
+    json_path.write_text(json.dumps(document, indent=2, default=str) + "\n", encoding="utf-8")
+    markdown_path.write_text(render_validation_compare_markdown(result), encoding="utf-8")
     return [json_path, markdown_path, *written]
 
 

@@ -266,7 +266,9 @@ def export_one(
             "engine.config.portable_ops": portable_ops,
         },
         "toolchain": {
-            "executorch_version": (executorch_root / "version.txt").read_text().strip(),
+            "executorch_version": (executorch_root / "version.txt")
+            .read_text(encoding="utf-8")
+            .strip(),
             "executorch_git_revision": commit,
             "nsx_executorch_git_revision": git_commit(executorch_root.parents[1]),
             "torch_version": torch.__version__,
