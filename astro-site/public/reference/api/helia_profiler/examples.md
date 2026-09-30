@@ -6,4 +6,4 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`
 
-Generated from the `src/helia_profiler` tree `b823e287e809c8d9438536a07fc0ab41a3b030c0`.
+Generated from the `src/helia_profiler` tree `b59beca5bd2eb2e3e64efa2e786a02c3cf3fc240`.

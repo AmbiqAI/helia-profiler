@@ -114,4 +114,4 @@ Quick start:
   hpx profile my_model.tflite --engine helia-rt --power -vv
 ```
 
-Generated from the `src/helia_profiler` tree `b823e287e809c8d9438536a07fc0ab41a3b030c0` with typer 0.26.8 and click 8.3.3.
+Generated from the `src/helia_profiler` tree `b59beca5bd2eb2e3e64efa2e786a02c3cf3fc240` with typer 0.26.8 and click 8.3.3.
