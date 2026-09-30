@@ -135,6 +135,7 @@ fixture_runtime.py
 fixture_stage.py
 fixture_target.py
 hostenv/__init__.py
+hostenv/_proc.py
 hostenv/cache_dirs.py
 hostenv/doctor.py
 hostenv/elf_inventory.py
