@@ -29,7 +29,6 @@ from __future__ import annotations
 
 import logging
 import shutil
-from dataclasses import asdict
 from pathlib import Path
 from typing import Any, TYPE_CHECKING
 
@@ -94,16 +93,7 @@ def write_report(ctx: PipelineContext) -> list[Path]:
             ctx.power_result,
             ctx.run_metadata,
             output_dir,
-            power_terminal=(
-                asdict(ctx.power_run.terminal)
-                if ctx.power_run is not None and ctx.power_run.terminal is not None
-                else None
-            ),
-            on_device_summary=(
-                asdict(ctx.power_run.on_device_summary)
-                if ctx.power_run is not None and ctx.power_run.on_device_summary is not None
-                else None
-            ),
+            power_run=ctx.power_run,
         )
         paths.append(p)
     else:

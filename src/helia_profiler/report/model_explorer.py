@@ -25,6 +25,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Union
 
+from ..results.serde import strip_none
+
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
 
@@ -64,7 +66,7 @@ class ModelNodeData:
 
     def to_json(self, indent: int | None = 2) -> str:
         """Serialize to the JSON format Model Explorer expects."""
-        data = {k: _strip_none(asdict(v)) for k, v in self.graphsData.items()}
+        data = {k: strip_none(asdict(v)) for k, v in self.graphsData.items()}
         return json.dumps(data, indent=indent)
 
     def save(self, path: Path | str, indent: int | None = 2) -> None:
@@ -145,21 +147,6 @@ def build_multi_metric_overlays(
             gradient=gradient,
         )
     return overlays
-
-
-def _strip_none(d: dict) -> dict:
-    """Recursively remove None values from a dict (mirrors ME's remove_none)."""
-    cleaned: dict = {}
-    for k, v in d.items():
-        if v is None:
-            continue
-        if isinstance(v, dict):
-            cleaned[k] = _strip_none(v)
-        elif isinstance(v, list):
-            cleaned[k] = [_strip_none(i) if isinstance(i, dict) else i for i in v]
-        else:
-            cleaned[k] = v
-    return cleaned
 
 
 def _write_model_explorer_overlays(

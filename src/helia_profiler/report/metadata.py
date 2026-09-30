@@ -9,18 +9,22 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from ..results import FirmwareMeta, RunMetadata
+from ..results.serde import strip_none
 from .contracts import RUN_METADATA_SCHEMA, RUN_METADATA_SCHEMA_VERSION
+from .power import _power_run_records
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
 
 log = logging.getLogger("hpx")
 
+_RUN_METADATA_POWER_KEYS = {"terminal": "power_terminal", "on_device_summary": "on_device_power"}
+
 
 def _firmware_meta_to_dict(meta: FirmwareMeta) -> dict[str, Any]:
     """Convert FirmwareMeta to a JSON-safe dict, dropping None values."""
     if isinstance(meta, FirmwareMeta):
-        return {k: v for k, v in asdict(meta).items() if v is not None}
+        return strip_none(asdict(meta))
     return {}
 
 
@@ -43,9 +47,9 @@ def _metadata_to_dict(meta: RunMetadata) -> dict[str, Any]:
     if meta.build_images:
         d["build_images"] = [asdict(image) for image in meta.build_images]
     if meta.engine is not None:
-        d["engine"] = {k: v for k, v in asdict(meta.engine).items() if v is not None}
+        d["engine"] = strip_none(asdict(meta.engine))
     if meta.timing is not None:
-        d["timing"] = {k: v for k, v in asdict(meta.timing).items() if v is not None}
+        d["timing"] = strip_none(asdict(meta.timing))
     if meta.compatibility is not None:
         d["compatibility"] = meta.compatibility.to_dict()
     if meta.dependencies is not None:
@@ -65,10 +69,8 @@ def _write_run_metadata(ctx: PipelineContext, output_dir: Path) -> Path:
         lifecycle = ctx.power_result.metadata.target_lifecycle
         if lifecycle is not None:
             meta_dict["target_lifecycle"] = lifecycle.to_metadata()
-    if ctx.power_run is not None and ctx.power_run.terminal is not None:
-        meta_dict["power_terminal"] = asdict(ctx.power_run.terminal)
-    if ctx.power_run is not None and ctx.power_run.on_device_summary is not None:
-        meta_dict["on_device_power"] = asdict(ctx.power_run.on_device_summary)
+    for key, record in _power_run_records(ctx.power_run).items():
+        meta_dict[_RUN_METADATA_POWER_KEYS[key]] = record
 
     out_path.write_text(
         json.dumps(meta_dict, indent=2, default=str),
