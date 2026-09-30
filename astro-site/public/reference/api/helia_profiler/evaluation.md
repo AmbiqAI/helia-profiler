@@ -96,56 +96,6 @@ IGNORE = 'ignore'
 
 Source: `src/helia_profiler/evaluation/comparison_profile.py:36`
 
-## helia_profiler.RunEvaluation
-
-`class` · `python`
-
-```python
-RunEvaluation(
-    validity: ResultValidity,
-    issues: tuple[ResultIssue, ...] = (),
-    gate_arbitration: GateArbitration | None = None,
-) -> None
-```
-
-`dataclass`
-
-Authoritative validity and structured issues for one completed run.
-
-**API tier:** `experimental`
-
-Source: `src/helia_profiler/evaluation/validity.py:33`
-
-### helia_profiler.RunEvaluation.validity
-
-`attribute` · `python`
-
-```python
-validity: ResultValidity
-```
-
-Source: `src/helia_profiler/evaluation/validity.py:37`
-
-### helia_profiler.RunEvaluation.issues
-
-`attribute` · `python`
-
-```python
-issues: tuple[ResultIssue, ...] = ()
-```
-
-Source: `src/helia_profiler/evaluation/validity.py:38`
-
-### helia_profiler.RunEvaluation.gate_arbitration
-
-`attribute` · `python`
-
-```python
-gate_arbitration: GateArbitration | None = None
-```
-
-Source: `src/helia_profiler/evaluation/validity.py:42`
-
 ## helia_profiler.ComparabilityIssue
 
 `class` · `python`
@@ -201,6 +151,56 @@ context: dict[str, Any] = field(default_factory=dict)
 ```
 
 Source: `src/helia_profiler/evaluation/comparability.py:41`
+
+## helia_profiler.RunEvaluation
+
+`class` · `python`
+
+```python
+RunEvaluation(
+    validity: ResultValidity,
+    issues: tuple[ResultIssue, ...] = (),
+    gate_arbitration: GateArbitration | None = None,
+) -> None
+```
+
+`dataclass`
+
+Authoritative validity and structured issues for one completed run.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/evaluation/validity.py:34`
+
+### helia_profiler.RunEvaluation.validity
+
+`attribute` · `python`
+
+```python
+validity: ResultValidity
+```
+
+Source: `src/helia_profiler/evaluation/validity.py:38`
+
+### helia_profiler.RunEvaluation.issues
+
+`attribute` · `python`
+
+```python
+issues: tuple[ResultIssue, ...] = ()
+```
+
+Source: `src/helia_profiler/evaluation/validity.py:39`
+
+### helia_profiler.RunEvaluation.gate_arbitration
+
+`attribute` · `python`
+
+```python
+gate_arbitration: GateArbitration | None = None
+```
+
+Source: `src/helia_profiler/evaluation/validity.py:43`
 
 ## helia_profiler.VerdictStatus
 
@@ -806,7 +806,7 @@ Evaluate captured results without mutating pipeline state.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/evaluation/validity.py:192`
+Source: `src/helia_profiler/evaluation/validity.py:193`
 
 ## helia_profiler.ComparisonVerdict
 
