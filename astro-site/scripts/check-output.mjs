@@ -107,17 +107,9 @@ check(
 );
 
 /* Keep authored hardware figures aligned with the registry. Experimental
- * engines remain documented but are not promoted on Home. */
+ * engines remain documented but are not promoted on Home. That the committed
+ * catalogue matches the source is check-reference-stale.mjs's question. */
 const catalog = JSON.parse(read(site, "src/data/catalog.json"));
-check(
-  catalog.generatedFrom?.sourceTree ===
-    execFileSync("git", ["rev-parse", `HEAD:${catalog.generatedFrom?.sourcePath}`], {
-      cwd: path.resolve(site, ".."),
-      encoding: "utf8",
-    }).trim(),
-  `src/data/catalog.json was generated from tree ${catalog.generatedFrom?.sourceTree}, ` +
-    `which is not the committed ${catalog.generatedFrom?.sourcePath}. Run npm run catalog:build.`,
-);
 const engineNames = {
   "helia-aot": "heliaAOT",
   "helia-rt": "heliaRT",

@@ -24,6 +24,8 @@ def _isolate_engine_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "HELIART_SOURCE_PATH",
         "HELIART_DIST_PATH",
         "CMSIS_NN_PATH",
+        "SEGGER_RTT_PATH",
+        "HPX_COMPILER_LAUNCHER",
     ):
         monkeypatch.delenv(name, raising=False)
 
