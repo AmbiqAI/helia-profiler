@@ -5,13 +5,16 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 import hashlib
 import json
+import os
 from pathlib import Path, PurePath
 import re
 
 from .config import ProfileConfig
+from .deps.compatibility import resolve_compatibility
 from .engines import EngineType
 from .engines.base import HeliaAotArtifacts
 from .errors import ConfigError
+from .firmware.launcher import _DISABLED_LAUNCHER_VALUES
 from .pipeline import PipelineContext, PipelineRunner, Stage, serialize_config
 from .placement import ArenaRole, Placement
 from .fixture_image import MAX_IMAGE, MRAM, bounded
@@ -325,8 +328,67 @@ class FixtureBuild:
     aot_arena_scan: tuple[tuple[int, int], ...] = ()
 
 
+#: Environment variables outside the compatibility classifier that change what a
+#: fixture build compiles or which inputs it accepts: HPX's own source paths,
+#: variables CMake and the compilers read, and NSX's check bypasses.
+FIXTURE_REFUSED_ENVIRONMENT = (
+    "ASM",
+    "ASMFLAGS",
+    "CC",
+    "CCC_OVERRIDE_OPTIONS",
+    "CFLAGS",
+    "CMAKE_ASM_COMPILER_LAUNCHER",
+    "CMAKE_BUILD_TYPE",
+    "CMAKE_CXX_COMPILER_LAUNCHER",
+    "CMAKE_CXX_LINKER_LAUNCHER",
+    "CMAKE_C_COMPILER_LAUNCHER",
+    "CMAKE_C_LINKER_LAUNCHER",
+    "CMAKE_TOOLCHAIN_FILE",
+    "COMPILER_PATH",
+    "CPATH",
+    "CPLUS_INCLUDE_PATH",
+    "CPPFLAGS",
+    "CXX",
+    "CXXFLAGS",
+    "C_INCLUDE_PATH",
+    "GCC_EXEC_PREFIX",
+    "LDFLAGS",
+    "LIBRARY_PATH",
+    "NSX_ALLOW_VERSION_MISMATCH",
+    "NSX_SKIP_COMPAT_CHECK",
+    "SEGGER_RTT_PATH",
+)
+
+
+def _refuse_overrides(config: ProfileConfig) -> None:
+    """Refuse any source, module, path, flag or launcher override; fixtures build pinned inputs only."""
+    resolution = resolve_compatibility(
+        config.compatibility_baseline,
+        module_overrides=config.build.nsx_modules,
+        engine_config=config.engine.config,
+        engine_config_path=config.engine.config_path,
+        engine_type=config.engine.type.value,
+        engine_backend=config.engine.backend,
+    )
+    overrides = {*resolution.module_overrides, *resolution.engine_overrides}
+    overrides.update(f"env.{name}" for name in FIXTURE_REFUSED_ENVIRONMENT if os.environ.get(name))
+    if config.target.segger_rtt_path is not None:
+        overrides.add("target.segger_rtt_path")
+    launcher, source = os.environ.get("HPX_COMPILER_LAUNCHER"), "env.HPX_COMPILER_LAUNCHER"
+    if launcher is None:
+        launcher, source = config.build.compiler_launcher, "build.compiler_launcher"
+    if launcher.strip().lower() not in {"auto", *_DISABLED_LAUNCHER_VALUES}:
+        overrides.add(source)
+    if overrides:
+        raise ConfigError(
+            f"Fixture builds use pinned inputs only; remove: {', '.join(sorted(overrides))}",
+            hint="Unset the environment variables and drop the config keys named above.",
+        )
+
+
 def _validate(config: ProfileConfig, fixture: FixedFixture | TypedFixture) -> None:
     fixture.verify()
+    _refuse_overrides(config)
     if config.model.path.resolve() != fixture.model.path.resolve():
         raise ConfigError("Profile model differs from the pinned fixture")
     if config.engine.type not in FIXTURE_CAPABILITIES:

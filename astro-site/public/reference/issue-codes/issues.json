@@ -2,7 +2,6 @@
   "schemaVersion": 1,
   "kind": "issue-codes",
   "generatedFrom": {
-    "sourceTree": "ceba9d8ff95de4dd0aaec20af7edddd79e0983c5",
     "helia_profiler": "0.1.6",
     "typer": "0.26.8",
     "click": "8.3.3",

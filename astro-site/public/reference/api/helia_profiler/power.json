@@ -2,13 +2,12 @@
   "$schema": "https://ambiqai.github.io/helia-ui/schema/reference-model-1.json",
   "generatedFrom": {
     "tool": "pyref",
-    "version": "1.7.3",
-    "sourceTree": "ceba9d8ff95de4dd0aaec20af7edddd79e0983c5"
+    "version": "1.7.3"
   },
   "language": "python",
   "modules": [
     {
-      "description": "What a power capture produces: the measured result, the observations behind it, and the on-device summary the firmware reports.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`, `experimental`\n\nGenerated from the `src/helia_profiler` tree `ceba9d8ff95de4dd0aaec20af7edddd79e0983c5`.",
+      "description": "What a power capture produces: the measured result, the observations behind it, and the on-device summary the firmware reports.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`, `experimental`\n\nGenerated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.",
       "name": "power",
       "path": "helia_profiler.power",
       "submodules": [],
@@ -273,6 +272,25 @@
             {
               "description": "",
               "examples": [],
+              "id": "helia_profiler.PowerResult.per_layer",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "per_layer",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "per_layer: dict[str, Any] | None = None",
+              "source": {
+                "line": 86,
+                "path": "src/helia_profiler/power/base.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L86"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
               "id": "helia_profiler.PowerResult.metadata",
               "kind": "attribute",
               "language": "python",
@@ -283,9 +301,9 @@
               "returns": [],
               "signature": "metadata: PowerMetadata = field(default_factory=PowerMetadata)",
               "source": {
-                "line": 86,
+                "line": 87,
                 "path": "src/helia_profiler/power/base.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L86"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L87"
               },
               "summary": ""
             }
@@ -294,7 +312,7 @@
           "params": [],
           "raises": [],
           "returns": [],
-          "signature": "PowerResult(\n    summary: PowerSummary,\n    samples: list[PowerSample] = list(),\n    gated_windows: list[GatedPowerWindow] = list(),\n    metadata: PowerMetadata = PowerMetadata(),\n) -> None",
+          "signature": "PowerResult(\n    summary: PowerSummary,\n    samples: list[PowerSample] = list(),\n    gated_windows: list[GatedPowerWindow] = list(),\n    per_layer: dict[str, Any] | None = None,\n    metadata: PowerMetadata = PowerMetadata(),\n) -> None",
           "source": {
             "line": 73,
             "path": "src/helia_profiler/power/base.py",

@@ -6,7 +6,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`, `experimental`
 
-Generated from the `src/helia_profiler` tree `ceba9d8ff95de4dd0aaec20af7edddd79e0983c5`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 ## helia_profiler.PowerMode
 
@@ -134,6 +134,7 @@ PowerResult(
     summary: PowerSummary,
     samples: list[PowerSample] = list(),
     gated_windows: list[GatedPowerWindow] = list(),
+    per_layer: dict[str, Any] | None = None,
     metadata: PowerMetadata = PowerMetadata(),
 ) -> None
 ```
@@ -181,6 +182,16 @@ gated_windows: list[GatedPowerWindow] = field(default_factory=list)
 
 Source: `src/helia_profiler/power/base.py:85`
 
+### helia_profiler.PowerResult.per_layer
+
+`attribute` · `python`
+
+```python
+per_layer: dict[str, Any] | None = None
+```
+
+Source: `src/helia_profiler/power/base.py:86`
+
 ### helia_profiler.PowerResult.metadata
 
 `attribute` · `python`
@@ -189,7 +200,7 @@ Source: `src/helia_profiler/power/base.py:85`
 metadata: PowerMetadata = field(default_factory=PowerMetadata)
 ```
 
-Source: `src/helia_profiler/power/base.py:86`
+Source: `src/helia_profiler/power/base.py:87`
 
 ## helia_profiler.PowerTerminalRecord
 

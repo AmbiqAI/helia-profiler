@@ -11,6 +11,7 @@ from tests.pipeline_context_helpers import (
 )
 
 import logging
+import sys
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
@@ -1976,15 +1977,11 @@ class TestJoulescopeDriver:
         driver = get_driver("joulescope")
         assert driver.mode is PowerMode.EXTERNAL
 
-    def test_check_available_raises_without_package(self):
+    def test_check_available_raises_without_package(self, monkeypatch):
+        monkeypatch.setitem(sys.modules, "pyjoulescope_driver", None)
         driver = get_driver("joulescope")
-        try:
-            import pyjoulescope_driver  # noqa: F401
-
-            pytest.skip("pyjoulescope_driver is installed — cannot test import failure")
-        except ImportError:
-            with pytest.raises(PowerError, match="not installed"):
-                driver.check_available()
+        with pytest.raises(PowerError, match="not installed"):
+            driver.check_available()
 
 
 class TestPowerConfig:

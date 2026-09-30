@@ -7,7 +7,7 @@ documentation renders this file rather than restating the tables by hand, so a
 counter added to the registry reaches the page on the next build and one
 removed cannot linger.
 
-    uv run --isolated --no-dev python tools/docs/extract_pmu.py --source-tree <sha>
+    uv run --isolated --no-dev python tools/docs/extract_pmu.py
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _common import SCHEMA_VERSION, dump, provenance, source_tree  # noqa: E402
+from _common import SCHEMA_VERSION, dump, provenance  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUT = REPO_ROOT / "astro-site" / "src" / "data" / "pmu-catalog.json"
@@ -68,13 +68,13 @@ def _soc_rows() -> list[dict[str, Any]]:
     return rows
 
 
-def build(tree: str) -> dict[str, Any]:
+def build() -> dict[str, Any]:
     groups = _group_rows()
     socs = _soc_rows()
     return {
         "schemaVersion": SCHEMA_VERSION,
         "kind": "pmu-catalog",
-        "generatedFrom": provenance(tree),
+        "generatedFrom": provenance(),
         "counts": {
             "groups": len(groups),
             "counters": sum(len(group["counters"]) for group in groups),
@@ -88,10 +88,9 @@ def build(tree: str) -> dict[str, Any]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
-    parser.add_argument("--source-tree", type=source_tree, required=True)
     parser.add_argument("--stdout", action="store_true")
     args = parser.parse_args(argv)
-    payload = build(args.source_tree)
+    payload = build()
     if args.stdout:
         json.dump(payload, sys.stdout, indent=2)
         sys.stdout.write("\n")
