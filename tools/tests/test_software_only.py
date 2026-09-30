@@ -131,12 +131,15 @@ def run_port_probe(directory, operation, *, guarded):
         encoding="utf-8",
     )
     if operation == "hpx":
+        src = ROOT / "src" / "helia_profiler"
         source = (
-            "import importlib.util, sys\n"
-            "spec = importlib.util.spec_from_file_location('guard_test_ports', "
-            f"{str(ROOT / 'src' / 'helia_profiler' / 'transport' / 'ports.py')!r})\n"
-            "ports = importlib.util.module_from_spec(spec)\n"
-            "sys.modules[spec.name] = ports\nspec.loader.exec_module(ports)\n"
+            "import sys, types\n"
+            f"for name, path in (('helia_profiler', {str(src)!r}), "
+            f"('helia_profiler.transport', {str(src / 'transport')!r})):\n"
+            "    package = types.ModuleType(name)\n"
+            "    package.__path__ = [path]\n"
+            "    sys.modules[name] = package\n"
+            "from helia_profiler.transport import ports\n"
             "assert ports.list_serial_ports(include_all=True) == ()\n"
         )
     else:
