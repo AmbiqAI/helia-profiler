@@ -20,8 +20,6 @@ ROOT = Path(__file__).resolve().parents[1]
 TOOLS_DOCS = ROOT / "tools" / "docs"
 MODULES = ("_common", "source_audit", "extract_cli", "extract_schema", "extract_issues")
 
-TREE = "0" * 40
-
 
 def _load(name):
     """Import a docs extractor by path, the way the docs build runs them.
@@ -52,7 +50,7 @@ check_reference = _load("check_reference")
 
 @pytest.fixture(scope="module")
 def cli_payload():
-    return extract_cli.build(TREE)
+    return extract_cli.build()
 
 
 def test_the_walk_finds_every_group_and_leaf(cli_payload):
@@ -115,29 +113,23 @@ def test_no_command_is_documented_from_outside_the_package(cli_payload):
 
 def test_every_artifact_records_what_produced_it():
     for payload in (
-        extract_cli.build(TREE),
-        extract_schema.build(TREE),
-        extract_issues.build(TREE),
+        extract_cli.build(),
+        extract_schema.build(),
+        extract_issues.build(),
     ):
         recorded = payload["generatedFrom"]
-        assert recorded["sourceTree"] == TREE
+        assert "sourceTree" not in recorded
         assert "sourceCommit" not in recorded
         for tool in ("typer", "click", "pydantic"):
             assert recorded[tool]
 
 
-def test_provenance_has_to_be_a_source_tree():
-    """An artifact with no provenance claims a source it cannot name."""
-    with pytest.raises(ValueError, match="40-hex git tree"):
-        _common.source_tree("main")
-    with pytest.raises(ValueError, match="40-hex git tree"):
-        _common.source_tree("")
-
-
-def test_writing_without_provenance_fails_loudly(tmp_path):
-    with pytest.raises(SystemExit) as raised:
-        check_reference.main(["--write", "--data-dir", str(tmp_path)])
-    assert raised.value.code == 2
+def test_a_committed_source_tree_is_drift():
+    """A hash of the source rewrites every artifact on every change under src/."""
+    payload = extract_issues.build()
+    payload["generatedFrom"]["sourceTree"] = "0" * 40
+    problems = check_reference.check_provenance({"issues": payload})
+    assert any("source tree" in problem for problem in problems)
 
 
 def test_the_configuration_walk_records_what_it_could_not_reach():
@@ -147,7 +139,7 @@ def test_the_configuration_walk_records_what_it_could_not_reach():
     enumerates the classes and records the gap rather than publishing a
     configuration reference that is quietly missing a type.
     """
-    payload = extract_schema.build(TREE)
+    payload = extract_schema.build()
     counts = payload["counts"]
     assert counts["classes"] == 15
     assert counts["declaredFields"] == 106
@@ -162,7 +154,7 @@ def test_the_issue_families_are_published_as_their_wire_codes():
     A reader expanding the pattern by hand writes a code that is never
     emitted, so the artifact carries what ``code_for`` produces.
     """
-    payload = extract_issues.build(TREE)
+    payload = extract_issues.build()
     assert payload["counts"]["issues"] == 27
     assert payload["counts"]["comparability"] == 8
     assert payload["counts"]["families"] == 3
@@ -175,7 +167,7 @@ def test_the_issue_families_are_published_as_their_wire_codes():
 
 def test_the_drift_check_names_what_changed(cli_payload):
     """A drift is reported as the command and the option, not as a diff."""
-    mutated = extract_cli.build(TREE)
+    mutated = extract_cli.build()
     analyze = next(node for node in mutated["root"]["commands"] if node["name"] == "analyze")
     analyze["options"][0]["default"] = "drifted"
     problems = check_reference.diff_cli(mutated, cli_payload)
@@ -198,4 +190,4 @@ def test_invalid_artifacts_report_before_fresh_payload_access(tmp_path, capsys, 
             (tmp_path / f"{stem}.json").write_text(json.dumps({}), encoding="utf-8")
     assert check_reference.main(["--check", "--data-dir", str(tmp_path)]) == 1
     captured = capsys.readouterr()
-    assert "missing committed artifact" in captured.err if missing else "sourceTree" in captured.err
+    assert "missing committed artifact" in captured.err if missing else "typer" in captured.err

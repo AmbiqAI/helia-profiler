@@ -24,6 +24,9 @@ export const UNGROUPED = 'Options';
 export const SOURCE_URL =
   'https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/{path}#L{line}';
 
+/** Resolved at build time like the ref; see src/integrations/source-ref.mjs. */
+const SOURCE_TREE_TOKEN = '__DOCS_SOURCE_TREE__';
+
 /** Longest meta description before search engines truncate it. */
 const DESCRIPTION_LIMIT = 160;
 
@@ -329,7 +332,7 @@ export function renderCommandMarkdown(node, generatedFrom) {
     }
   }
   lines.push(
-    `Generated from the \`src/helia_profiler\` tree \`${generatedFrom.sourceTree}\` with ` +
+    `Generated from the \`src/helia_profiler\` tree \`${SOURCE_TREE_TOKEN}\` with ` +
       `typer ${generatedFrom.typer} and click ${generatedFrom.click}.`,
     '',
   );
@@ -361,9 +364,9 @@ export function renderConfigurationMarkdown(schema) {
   for (const [name, members] of Object.entries(schema['x-hpx'].enums)) {
     lines.push(`## ${name}`, '', ...table(['Value'], members.map((member) => [`\`${member}\``])));
   }
-  const { sourceTree, pydantic } = schema.generatedFrom;
+  const { pydantic } = schema.generatedFrom;
   lines.push(
-    `Generated from the \`src/helia_profiler\` tree \`${sourceTree}\` with pydantic ${pydantic}.`,
+    `Generated from the \`src/helia_profiler\` tree \`${SOURCE_TREE_TOKEN}\` with pydantic ${pydantic}.`,
     '',
   );
   return lines.join('\n');
@@ -399,7 +402,7 @@ export function renderIssuesMarkdown(issues) {
     lines.push(...table(['Code', 'Dimension'], family.codes.map((code, index) => [`\`${code}\``, `\`${family.dimensions[index]}\``])));
   }
   lines.push(
-    `Generated from the \`src/helia_profiler\` tree \`${issues.generatedFrom.sourceTree}\`.`,
+    `Generated from the \`src/helia_profiler\` tree \`${SOURCE_TREE_TOKEN}\`.`,
     '',
   );
   return lines.join('\n');

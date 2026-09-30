@@ -18,16 +18,14 @@ Four comparisons, none of them byte equality:
   and per family the expanded wire codes.
 * The source audit, an independent AST parse of the same CLI modules.
 
-``generatedFrom`` is outside all four. It carries the source tree, which moves
-with every commit under ``src/``, so comparing it would report every commit as
-drift; presence and agreement across the three artifacts are asserted on their
-own instead. That is also why ``--check`` needs no ``--source-tree``: the fresh
-build is stamped with whatever the committed artifacts claim, and the claim
-itself is what gets checked.
+``generatedFrom`` is outside all four. It carries the resolved tool versions,
+which a lock bump moves without changing the contract; they are asserted to be
+present on their own instead. It carries no hash of the source: a tree or commit
+sha moves on every change under ``src/`` and would rewrite every artifact with
+it, so an artifact that records one is a failure.
 
     uv run --isolated --no-dev python tools/docs/check_reference.py --check
-    uv run --isolated --no-dev python tools/docs/check_reference.py --write \
-        --source-tree $(git rev-parse HEAD:src/helia_profiler)
+    uv run --isolated --no-dev python tools/docs/check_reference.py --write
 """
 
 from __future__ import annotations
@@ -44,7 +42,7 @@ import extract_cli  # noqa: E402
 import extract_issues  # noqa: E402
 import extract_pmu  # noqa: E402
 import extract_schema  # noqa: E402
-from _common import dump, source_tree  # noqa: E402
+from _common import dump  # noqa: E402
 from source_audit import audit  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -279,33 +277,22 @@ def payload_params(payload: dict[str, Any], path: tuple[str, ...]) -> list[dict[
 
 
 def check_provenance(committed: dict[str, dict[str, Any]]) -> list[str]:
-    """Provenance on its own, since the diffs exclude it.
-
-    Three artifacts generated from one source tree have to claim that one
-    tree; a mismatch means one of them was regenerated and the others were
-    not, which no semantic diff would see.
-    """
+    """Provenance on its own, since the diffs exclude it."""
     problems: list[str] = []
-    trees = {}
     for stem, payload in committed.items():
         recorded = payload.get("generatedFrom", {})
-        tree = recorded.get("sourceTree")
-        try:
-            trees[stem] = source_tree(tree or "")
-        except ValueError:
-            problems.append(f"{stem}.json: generatedFrom.sourceTree is {tree!r}, not a git tree.")
         for tool in ("typer", "click", "pydantic"):
             if not recorded.get(tool):
                 problems.append(f"{stem}.json: generatedFrom records no resolved {tool} version.")
+        if "sourceTree" in recorded:
+            problems.append(
+                f"{stem}.json: records a source tree, which moves with every change under "
+                "src/; the docs build substitutes it at build time."
+            )
         if "sourceCommit" in recorded:
             problems.append(
                 f"{stem}.json: records a source commit, which does not survive a squash merge."
             )
-    if len(set(trees.values())) > 1:
-        problems.append(
-            "the artifacts claim different source trees: "
-            + ", ".join(f"{stem}={tree[:7]}" for stem, tree in sorted(trees.items()))
-        )
     return problems
 
 
@@ -314,24 +301,17 @@ def main(argv: list[str] | None = None) -> int:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--check", action="store_true")
     mode.add_argument("--write", action="store_true")
-    parser.add_argument("--source-tree", type=source_tree, default=None)
     parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA_DIR)
     args = parser.parse_args(argv)
 
     paths = {stem: args.data_dir / f"{stem}.json" for stem in ARTIFACTS}
 
     if args.write:
-        if args.source_tree is None:
-            parser.error(
-                "--write needs --source-tree: an artifact with no provenance claims a "
-                "source it cannot name. The docs build passes "
-                "`git rev-parse HEAD:src/helia_profiler`."
-            )
         payloads = {
-            "cli": extract_cli.build(args.source_tree),
-            "schema": extract_schema.build(args.source_tree),
-            "issues": extract_issues.build(args.source_tree),
-            "pmu-catalog": extract_pmu.build(args.source_tree),
+            "cli": extract_cli.build(),
+            "schema": extract_schema.build(),
+            "issues": extract_issues.build(),
+            "pmu-catalog": extract_pmu.build(),
         }
         for stem, payload in payloads.items():
             dump(payload, paths[stem])
@@ -348,15 +328,12 @@ def main(argv: list[str] | None = None) -> int:
     committed = {stem: json.loads(path.read_text(encoding="utf-8")) for stem, path in paths.items()}
     problems += check_provenance(committed)
 
-    # Stamp the fresh build with what the committed artifacts claim: the diffs
-    # ignore provenance, and check_provenance has already judged the claim.
-    claimed = committed["cli"].get("generatedFrom", {}).get("sourceTree", "")
     if not problems:
         fresh = {
-            "cli": extract_cli.build(claimed),
-            "schema": extract_schema.build(claimed),
-            "issues": extract_issues.build(claimed),
-            "pmu-catalog": extract_pmu.build(claimed),
+            "cli": extract_cli.build(),
+            "schema": extract_schema.build(),
+            "issues": extract_issues.build(),
+            "pmu-catalog": extract_pmu.build(),
         }
         problems += diff_cli(committed["cli"], fresh["cli"])
         problems += diff_schema(committed["schema"], fresh["schema"])
@@ -366,7 +343,7 @@ def main(argv: list[str] | None = None) -> int:
 
         for name, old_version in committed["cli"]["generatedFrom"].items():
             new_version = fresh["cli"]["generatedFrom"].get(name)
-            if name != "sourceTree" and old_version != new_version:
+            if old_version != new_version:
                 print(f"note: {name} {old_version} -> {new_version} (not a failure)")
 
     if problems:
@@ -389,8 +366,7 @@ def main(argv: list[str] | None = None) -> int:
         f"{schema_counts['schemaProperties']} schema properties; "
         f"{issue_counts['issues']} issue codes, {issue_counts['comparability']} comparability "
         f"codes, {issue_counts['families']} families ({issue_counts['familyCodes']} codes); "
-        f"typer {versions['typer']}, click {versions['click']}, pydantic {versions['pydantic']}, "
-        f"source tree {versions['sourceTree'][:7]}"
+        f"typer {versions['typer']}, click {versions['click']}, pydantic {versions['pydantic']}"
         f"; pmu catalogue {pmu_counts['counters']} counters in {pmu_counts['groups']} groups, {pmu_counts['socs']} SoCs."
     )
     return 0
