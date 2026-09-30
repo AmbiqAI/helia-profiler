@@ -28,9 +28,12 @@ uv run python tools/gen_fixture_closure.py            # shipped files → fixtur
 ```
 
 The docs-site reference (`cd astro-site && npm run prepare:docs`, then
-commit) only changes when the documented API, CLI, configuration, issue codes,
-PMU catalogue or board list change; it records no hash of `src/`, so other
-source edits leave it untouched. `npm run check:reference` says when it is due.
+commit) records no hash of `src/`, so it changes only when something it
+documents changes: for example a public symbol or docstring, a CLI option, a
+config field, an issue code, a PMU counter, a board or engine, a recorded
+package or tool version, or the source line of a documented definition. The
+full list is in `maintainers/documentation.md`; `npm run check:reference` is
+the authority on when it is due.
 
 The public fixture API is `helia_profiler.fixture.__all__`, recorded in
 `tests/contracts/fixture_api_v1.json`. Changing it needs a
