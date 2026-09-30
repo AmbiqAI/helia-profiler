@@ -1,8 +1,17 @@
-"""Typed host serial-port discovery for interactive and CLI use."""
+"""Typed host serial-port discovery shared by the CLI and the serial transports."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+
+from .usb_identity import USB_MARKER_PREFIX
+
+JLINK_VCOM = "jlink-vcom"
+HPX_USB_CDC = "hpx-usb-cdc"
+SERIAL = "serial"
+
+_SEGGER_VID = "VID:PID=1366:"
+_JLINK_MARKERS = ("segger", "jlink")
 
 
 @dataclass(frozen=True)
@@ -20,13 +29,38 @@ class SerialPortInfo:
 
 
 def list_serial_ports(*, include_all: bool = False) -> tuple[SerialPortInfo, ...]:
-    """Return host serial ports, filtering unrelated devices by default."""
+    """Return host serial ports from one enumeration, filtering unrelated devices by default.
+
+    The default view keeps USB serial ports (pyserial reports ``VID:PID`` in
+    ``hwid`` on every platform) and anything classified as a J-Link VCOM or
+    an HPX CDC device, which drops built-in UARTs and Bluetooth ports.
+    """
     from serial.tools import list_ports
 
     ports = tuple(_describe_serial_port(info) for info in list_ports.comports())
     if include_all:
         return ports
     return tuple(port for port in ports if _is_relevant_serial_port(port))
+
+
+def normalize_descriptor(value: str | None) -> str:
+    """Lowercased alphanumeric-only form of *value* for tolerant descriptor matching."""
+    return "".join(ch for ch in (value or "") if ch.isalnum()).lower()
+
+
+def _classify(fields: dict[str, str]) -> str:
+    if _SEGGER_VID in fields["hwid"].upper():
+        return JLINK_VCOM
+    haystack = normalize_descriptor(
+        " ".join(
+            fields[name] for name in ("manufacturer", "product", "description", "interface", "hwid")
+        )
+    )
+    if any(marker in haystack for marker in _JLINK_MARKERS):
+        return JLINK_VCOM
+    if fields["serial_number"].startswith(USB_MARKER_PREFIX):
+        return HPX_USB_CDC
+    return SERIAL
 
 
 def _describe_serial_port(info: object) -> SerialPortInfo:
@@ -39,17 +73,8 @@ def _describe_serial_port(info: object) -> SerialPortInfo:
         "interface": str(getattr(info, "interface", "") or ""),
         "hwid": str(getattr(info, "hwid", "") or ""),
     }
-    text = " ".join(fields.values()).lower()
-    if "segger" in text or "j-link" in text or "jlink" in text:
-        kind = "jlink-vcom"
-    elif fields["serial_number"].startswith("HPX-"):
-        kind = "hpx-usb-cdc"
-    else:
-        kind = "serial"
-    return SerialPortInfo(kind=kind, **fields)
+    return SerialPortInfo(kind=_classify(fields), **fields)
 
 
 def _is_relevant_serial_port(port: SerialPortInfo) -> bool:
-    if port.kind in ("jlink-vcom", "hpx-usb-cdc"):
-        return True
-    return any(token in port.device for token in ("ttyACM", "ttyUSB", "tty.usbmodem"))
+    return port.kind != SERIAL or "VID:PID=" in port.hwid.upper()

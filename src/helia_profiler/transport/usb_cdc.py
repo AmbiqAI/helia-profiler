@@ -19,18 +19,18 @@ Sequence:
 from __future__ import annotations
 
 import contextlib
-import glob
 import logging
 import time
+from collections.abc import Mapping
 
 import serial  # pyserial
-from serial.tools import list_ports
 
 from ..vocab import Transport
 from ..errors import CaptureError
 from .base import BaseCaptureTransport, CaptureArgs
 from ..target.probe.base import ResetController
 from ..target.probe.jlink import JLinkResetController
+from .ports import JLINK_VCOM, SerialPortInfo, list_serial_ports
 from .usb_identity import USB_MARKER_PREFIX
 from .timing import READINESS_POLL_INTERVAL_S, USB_REENUM_FLOOR_S, CaptureTimingTracker
 from .protocol import (
@@ -46,49 +46,14 @@ log = logging.getLogger("hpx")
 _ENUM_TIMEOUT_S = 15
 _READ_CHUNK = 4096
 BAUD = 115200  # CDC ignores baud, but pyserial requires a value
-_CDC_PATTERNS = ["/dev/tty.usbmodem*", "/dev/ttyACM*"]
-_JLINK_MARKERS = ("segger", "j-link")
 
 
-def _snapshot_cdc_ports() -> set[str]:
-    ports: set[str] = set()
-    for pat in _CDC_PATTERNS:
-        ports.update(glob.glob(pat))
-    return ports
+def _snapshot_cdc_ports() -> dict[str, SerialPortInfo]:
+    """Return the host's USB serial ports keyed by device, from one enumeration."""
+    return {port.device: port for port in list_serial_ports()}
 
 
-def _is_jlink_port(port: str) -> bool:
-    for info in list_ports.comports():
-        if info.device != port:
-            continue
-        fields = [
-            info.manufacturer,
-            info.product,
-            info.description,
-            info.interface,
-            info.hwid,
-        ]
-        text = " ".join(field for field in fields if field).lower()
-        return any(marker in text for marker in _JLINK_MARKERS)
-    return False
-
-
-def _app_cdc_ports(ports: set[str] | None = None) -> list[str]:
-    """Return the non-J-Link CDC ports (candidate application devices), sorted."""
-    if ports is None:
-        ports = _snapshot_cdc_ports()
-    return sorted(port for port in ports if not _is_jlink_port(port))
-
-
-def _port_serial_number(port: str) -> str:
-    """Return the USB iSerialNumber descriptor for *port* (empty if unknown)."""
-    for info in list_ports.comports():
-        if info.device == port:
-            return info.serial_number or ""
-    return ""
-
-
-def _is_foreign_hpx_port(port: str, expected_marker: str | None) -> bool:
+def _is_foreign_hpx_port(port: SerialPortInfo, expected_marker: str | None) -> bool:
     """Return True when *port* advertises a *different* hpx marker.
 
     Every hpx-profiled board stamps ``HPX-<jlink_serial>`` into its CDC serial
@@ -99,12 +64,24 @@ def _is_foreign_hpx_port(port: str, expected_marker: str | None) -> bool:
     """
     if not expected_marker:
         return False
-    serial = _port_serial_number(port)
-    return serial.startswith(USB_MARKER_PREFIX) and serial != expected_marker
+    return (
+        port.serial_number.startswith(USB_MARKER_PREFIX) and port.serial_number != expected_marker
+    )
 
 
-def _drop_foreign_hpx_ports(ports: list[str], expected_marker: str | None) -> list[str]:
-    return [p for p in ports if not _is_foreign_hpx_port(p, expected_marker)]
+def _app_cdc_ports(
+    ports: Mapping[str, SerialPortInfo], expected_marker: str | None
+) -> list[SerialPortInfo]:
+    """Return the candidate application CDC devices in *ports*, sorted by device.
+
+    Drops SEGGER J-Link VCOMs and devices carrying another board's hpx marker.
+    """
+    return [
+        ports[device]
+        for device in sorted(ports)
+        if ports[device].kind != JLINK_VCOM
+        and not _is_foreign_hpx_port(ports[device], expected_marker)
+    ]
 
 
 def _find_port_by_marker(marker: str) -> str | None:
@@ -115,21 +92,18 @@ def _find_port_by_marker(marker: str) -> str | None:
     when several Ambiq boards are attached.  pyserial exposes ``serial_number``
     from the descriptor on Linux, macOS, and Windows.
     """
-    for info in list_ports.comports():
-        if (info.serial_number or "") == marker:
-            return info.device
+    for port in _snapshot_cdc_ports().values():
+        if port.serial_number == marker:
+            return port.device
     return None
 
 
-def _describe_port(port: str) -> str:
-    for info in list_ports.comports():
-        if info.device == port:
-            bits = [b for b in (info.manufacturer, info.product, info.serial_number) if b]
-            return f"{port} ({', '.join(bits)})" if bits else port
-    return port
+def _describe_port(port: SerialPortInfo) -> str:
+    bits = [b for b in (port.manufacturer, port.product, port.serial_number) if b]
+    return f"{port.device} ({', '.join(bits)})" if bits else port.device
 
 
-def _ambiguous_cdc_error(candidates: list[str]) -> CaptureError:
+def _ambiguous_cdc_error(candidates: list[SerialPortInfo]) -> CaptureError:
     listing = ", ".join(_describe_port(port) for port in candidates)
     return CaptureError(
         "Multiple application USB CDC devices are present and the target could "
@@ -202,29 +176,32 @@ def _find_cdc_port(
         pre_existing = set()
 
     while time.monotonic() < deadline:
-        new_ports = _drop_foreign_hpx_ports(
-            _app_cdc_ports(_snapshot_cdc_ports() - pre_existing), expected_marker
+        present = _snapshot_cdc_ports()
+        new_ports = _app_cdc_ports(
+            {device: port for device, port in present.items() if device not in pre_existing},
+            expected_marker,
         )
         if len(new_ports) == 1:
-            log.info("Found new USB CDC port: %s", new_ports[0])
-            return new_ports[0]
+            log.info("Found new USB CDC port: %s", new_ports[0].device)
+            return new_ports[0].device
         time.sleep(0.5)
 
     # No single fresh device appeared — fall back to currently present
     # non-J-Link devices. Refuse to open SEGGER VCOM, which only causes a long
     # timeout and hides the real enumeration failure.  Also refuse a CDC device
     # that advertises a different board's hpx marker.
-    candidates = _drop_foreign_hpx_ports(_app_cdc_ports(), expected_marker)
+    present = _snapshot_cdc_ports()
+    candidates = _app_cdc_ports(present, expected_marker)
     if len(candidates) == 1:
         log.warning(
             "No new USB CDC device appeared; using the only application CDC device present: %s",
-            candidates[0],
+            candidates[0].device,
         )
-        return candidates[0]
+        return candidates[0].device
     if len(candidates) > 1:
         raise _ambiguous_cdc_error(candidates)
 
-    if _snapshot_cdc_ports():
+    if present:
         raise CaptureError(
             "No application USB CDC device appeared after reset",
             hint=(
@@ -238,8 +215,8 @@ def _find_cdc_port(
         f"No USB CDC device found within {timeout_s}s",
         hint=(
             "Ensure the board is connected via USB and the firmware "
-            "initialises nsx_usb.  Check 'hpx ports list --all', "
-            "'ls /dev/tty.usbmodem*' (macOS), or 'ls /dev/ttyACM*' (Linux)."
+            "initialises nsx_usb.  Run 'hpx ports list --all' to see every "
+            "serial port the host enumerates."
         ),
     )
 
@@ -276,7 +253,7 @@ def capture_usb_output(
         List of captured text lines.
     """
     timing = CaptureTimingTracker(start_marker=HPX_START, end_marker=HPX_END)
-    pre_existing = _snapshot_cdc_ports()
+    pre_existing = set(_snapshot_cdc_ports())
     log.info("Pre-existing CDC ports: %s", sorted(pre_existing) or "(none)")
 
     # --- Step 1: reset the target ---

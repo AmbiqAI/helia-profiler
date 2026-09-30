@@ -27,13 +27,13 @@ from __future__ import annotations
 import logging
 
 import serial  # pyserial
-from serial.tools import list_ports
 
 from ..vocab import Transport
 from ..errors import CaptureError
 from .base import BaseCaptureTransport, CaptureArgs
 from ..target.probe.base import ResetController
 from ..target.probe.jlink import JLinkResetController
+from .ports import JLINK_VCOM, list_serial_ports, normalize_descriptor
 from .protocol import (
     DEFAULT_TIMEOUT_S,
     HEARTBEAT_TIMEOUT_S,
@@ -46,23 +46,7 @@ from .timing import CaptureTimingTracker
 log = logging.getLogger("hpx")
 
 BAUD = 115200  # firmware COM UART runs 115200 8N1, no flow control
-_JLINK_MARKERS = ("segger", "j-link")
 _READ_CHUNK = 4096
-
-
-def _norm(value: str | None) -> str:
-    """Lowercased alphanumeric-only form of *value* for tolerant matching."""
-    return "".join(ch for ch in (value or "") if ch.isalnum()).lower()
-
-
-def _is_jlink_vcom(info: object) -> bool:
-    haystack = _norm(
-        " ".join(
-            str(getattr(info, attr, "") or "")
-            for attr in ("hwid", "manufacturer", "product", "description")
-        )
-    )
-    return any(_norm(marker) in haystack for marker in _JLINK_MARKERS)
 
 
 def find_jlink_vcom_port(jlink_serial: str | None) -> str:
@@ -72,21 +56,21 @@ def find_jlink_vcom_port(jlink_serial: str | None) -> str:
     that serial so the correct board is selected with several probes
     attached.  Otherwise fall back to the single J-Link VCOM present.
     """
-    vcom_ports = [info for info in list_ports.comports() if _is_jlink_vcom(info)]
+    vcom_ports = [port for port in list_serial_ports() if port.kind == JLINK_VCOM]
 
     if jlink_serial:
-        target = _norm(jlink_serial)
+        target = normalize_descriptor(jlink_serial)
         matched = [
-            info
-            for info in vcom_ports
-            if target in _norm(getattr(info, "serial_number", ""))
-            or target in _norm(getattr(info, "hwid", ""))
+            port
+            for port in vcom_ports
+            if target in normalize_descriptor(port.serial_number)
+            or target in normalize_descriptor(port.hwid)
         ]
         if len(matched) == 1:
             log.info("Found J-Link VCOM for probe %s: %s", jlink_serial, matched[0].device)
             return matched[0].device
         if len(matched) > 1:
-            listing = ", ".join(info.device for info in matched)
+            listing = ", ".join(port.device for port in matched)
             raise CaptureError(
                 f"Multiple J-Link VCOM ports match probe serial {jlink_serial}: {listing}",
                 hint="Disconnect the duplicate probe or pin the port explicitly.",
@@ -102,11 +86,12 @@ def find_jlink_vcom_port(jlink_serial: str | None) -> str:
             hint=(
                 "The UART transport reads firmware output from the J-Link OB "
                 "VCOM. Ensure the board's J-Link probe is connected and that "
-                "its VCOM interface is enabled. Check 'ls /dev/ttyACM*'."
+                "its VCOM interface is enabled. Run 'hpx ports list --all' to "
+                "see every serial port the host enumerates."
             ),
         )
 
-    listing = ", ".join(info.device for info in vcom_ports)
+    listing = ", ".join(port.device for port in vcom_ports)
     raise CaptureError(
         f"Multiple J-Link VCOM ports present and no probe serial to disambiguate: {listing}",
         hint="Pass --jlink-serial to select the probe whose VCOM to read.",
