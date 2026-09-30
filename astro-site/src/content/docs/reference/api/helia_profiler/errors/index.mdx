@@ -16,7 +16,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`, `experimental`
 
-Generated from the `src/helia_profiler` tree `c2b4d5f7dedb8939ea0e0967a9ba0c09caa1e6b3`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 [Machine-readable model](/helia-profiler/reference/api/helia_profiler/errors.json)
 
@@ -203,10 +203,9 @@ Generated from the `src/helia_profiler` tree `c2b4d5f7dedb8939ea0e0967a9ba0c09ca
 
   Subclass of :class:`CaptureError` so existing ``except CaptureError``
   handlers still catch it, but recovery paths that would otherwise cycle the
-  target rail and retry (``stages.flash.deploy_firmware``) re-raise it
-  instead: these are configuration/artifact gaps — a missing image, an
-  unknown load address — and cycling the rail only frames them as flaky
-  hardware.
+  target rail and retry (``stages.flash_power``) re-raise it instead: these
+  are configuration/artifact gaps — a missing image, an unknown load
+  address — and cycling the rail only frames them as flaky hardware.
 
   **API tier:** `stable`
 
@@ -220,7 +219,7 @@ Generated from the `src/helia_profiler` tree `c2b4d5f7dedb8939ea0e0967a9ba0c09ca
   signature={"NetworkError()"}
   level={2}
   summary={"Transient network failure during sync/lock (git fetch, module download)."}
-  source={{"path":"src/helia_profiler/errors.py","line":83,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L83"}}
+  source={{"path":"src/helia_profiler/errors.py","line":82,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L82"}}
 >
 
   Transient network failure during sync/lock (git fetch, module download).
@@ -240,7 +239,7 @@ Generated from the `src/helia_profiler` tree `c2b4d5f7dedb8939ea0e0967a9ba0c09ca
   signature={"DependencyError()"}
   level={2}
   summary={"Deterministic dependency lock/workspace failure (base class)."}
-  source={{"path":"src/helia_profiler/errors.py","line":91,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L91"}}
+  source={{"path":"src/helia_profiler/errors.py","line":90,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L90"}}
 >
 
   Deterministic dependency lock/workspace failure (base class).
@@ -262,7 +261,7 @@ Generated from the `src/helia_profiler` tree `c2b4d5f7dedb8939ea0e0967a9ba0c09ca
   signature={"VersionError()"}
   level={2}
   summary={"A tool, package, engine, or lock schema version is incompatible."}
-  source={{"path":"src/helia_profiler/errors.py","line":101,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L101"}}
+  source={{"path":"src/helia_profiler/errors.py","line":100,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L100"}}
 >
 
   A tool, package, engine, or lock schema version is incompatible.
@@ -284,7 +283,7 @@ Generated from the `src/helia_profiler` tree `c2b4d5f7dedb8939ea0e0967a9ba0c09ca
   signature={"LockError()"}
   level={2}
   summary={"A dependency lock file or its recorded provenance is unusable."}
-  source={{"path":"src/helia_profiler/errors.py","line":111,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L111"}}
+  source={{"path":"src/helia_profiler/errors.py","line":110,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L110"}}
 >
 
   A dependency lock file or its recorded provenance is unusable.
@@ -306,7 +305,7 @@ Generated from the `src/helia_profiler` tree `c2b4d5f7dedb8939ea0e0967a9ba0c09ca
   signature={"PowerError()"}
   level={2}
   summary={"Power measurement failure — Joulescope not found, calibration error."}
-  source={{"path":"src/helia_profiler/errors.py","line":121,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L121"}}
+  source={{"path":"src/helia_profiler/errors.py","line":120,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L120"}}
 >
 
   Power measurement failure — Joulescope not found, calibration error.
@@ -323,7 +322,7 @@ Generated from the `src/helia_profiler` tree `c2b4d5f7dedb8939ea0e0967a9ba0c09ca
   signature={"ReportError()"}
   level={2}
   summary={"Report generation failure — output path not writable, format error."}
-  source={{"path":"src/helia_profiler/errors.py","line":125,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L125"}}
+  source={{"path":"src/helia_profiler/errors.py","line":124,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L124"}}
 >
 
   Report generation failure — output path not writable, format error.

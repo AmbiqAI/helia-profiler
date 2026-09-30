@@ -2,13 +2,12 @@
   "$schema": "https://ambiqai.github.io/helia-ui/schema/reference-model-1.json",
   "generatedFrom": {
     "tool": "pyref",
-    "version": "1.7.3",
-    "sourceTree": "c2b4d5f7dedb8939ea0e0967a9ba0c09caa1e6b3"
+    "version": "1.7.3"
   },
   "language": "python",
   "modules": [
     {
-      "description": "Comparing two runs and judging one: the comparability rules that decide whether a comparison is meaningful, and the metric policies that turn numbers into a verdict.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `c2b4d5f7dedb8939ea0e0967a9ba0c09caa1e6b3`.",
+      "description": "Comparing two runs and judging one: the comparability rules that decide whether a comparison is meaningful, and the metric policies that turn numbers into a verdict.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.",
       "name": "evaluation",
       "path": "helia_profiler.evaluation",
       "submodules": [],
@@ -169,6 +168,83 @@
           "summary": "Verdict when a selected metric is unavailable."
         },
         {
+          "description": "`dataclass`\n\nAuthoritative validity and structured issues for one completed run.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.RunEvaluation",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.RunEvaluation.validity",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "validity",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "validity: ResultValidity",
+              "source": {
+                "line": 37,
+                "path": "src/helia_profiler/evaluation/validity.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L37"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.RunEvaluation.issues",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "issues",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "issues: tuple[ResultIssue, ...] = ()",
+              "source": {
+                "line": 38,
+                "path": "src/helia_profiler/evaluation/validity.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L38"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.RunEvaluation.gate_arbitration",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "gate_arbitration",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "gate_arbitration: GateArbitration | None = None",
+              "source": {
+                "line": 42,
+                "path": "src/helia_profiler/evaluation/validity.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L42"
+              },
+              "summary": ""
+            }
+          ],
+          "name": "RunEvaluation",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "RunEvaluation(\n    validity: ResultValidity,\n    issues: tuple[ResultIssue, ...] = (),\n    gate_arbitration: GateArbitration | None = None,\n) -> None",
+          "source": {
+            "line": 33,
+            "path": "src/helia_profiler/evaluation/validity.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L33"
+          },
+          "summary": "Authoritative validity and structured issues for one completed run."
+        },
+        {
           "description": "`dataclass`\n\nOne machine-readable compatibility decision.\n\n**API tier:** `experimental`",
           "examples": [],
           "id": "helia_profiler.ComparabilityIssue",
@@ -263,83 +339,6 @@
             "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparability.py#L34"
           },
           "summary": "One machine-readable compatibility decision."
-        },
-        {
-          "description": "`dataclass`\n\nAuthoritative validity and structured issues for one completed run.\n\n**API tier:** `experimental`",
-          "examples": [],
-          "id": "helia_profiler.RunEvaluation",
-          "kind": "class",
-          "language": "python",
-          "members": [
-            {
-              "description": "",
-              "examples": [],
-              "id": "helia_profiler.RunEvaluation.validity",
-              "kind": "attribute",
-              "language": "python",
-              "members": [],
-              "name": "validity",
-              "params": [],
-              "raises": [],
-              "returns": [],
-              "signature": "validity: ResultValidity",
-              "source": {
-                "line": 38,
-                "path": "src/helia_profiler/evaluation/validity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L38"
-              },
-              "summary": ""
-            },
-            {
-              "description": "",
-              "examples": [],
-              "id": "helia_profiler.RunEvaluation.issues",
-              "kind": "attribute",
-              "language": "python",
-              "members": [],
-              "name": "issues",
-              "params": [],
-              "raises": [],
-              "returns": [],
-              "signature": "issues: tuple[ResultIssue, ...] = ()",
-              "source": {
-                "line": 39,
-                "path": "src/helia_profiler/evaluation/validity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L39"
-              },
-              "summary": ""
-            },
-            {
-              "description": "",
-              "examples": [],
-              "id": "helia_profiler.RunEvaluation.gate_arbitration",
-              "kind": "attribute",
-              "language": "python",
-              "members": [],
-              "name": "gate_arbitration",
-              "params": [],
-              "raises": [],
-              "returns": [],
-              "signature": "gate_arbitration: GateArbitration | None = None",
-              "source": {
-                "line": 43,
-                "path": "src/helia_profiler/evaluation/validity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L43"
-              },
-              "summary": ""
-            }
-          ],
-          "name": "RunEvaluation",
-          "params": [],
-          "raises": [],
-          "returns": [],
-          "signature": "RunEvaluation(\n    validity: ResultValidity,\n    issues: tuple[ResultIssue, ...] = (),\n    gate_arbitration: GateArbitration | None = None,\n) -> None",
-          "source": {
-            "line": 34,
-            "path": "src/helia_profiler/evaluation/validity.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L34"
-          },
-          "summary": "Authoritative validity and structured issues for one completed run."
         },
         {
           "description": "Regression policy outcome.\n\n**API tier:** `experimental`",
@@ -1329,9 +1328,9 @@
           "returns": [],
           "signature": "evaluate_run(ctx: PipelineContext) -> RunEvaluation",
           "source": {
-            "line": 193,
+            "line": 192,
             "path": "src/helia_profiler/evaluation/validity.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L193"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L192"
           },
           "summary": "Evaluate captured results without mutating pipeline state."
         },
