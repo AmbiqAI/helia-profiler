@@ -10,7 +10,7 @@ hpx compare [OPTIONS] BASELINE CANDIDATE
 
 Compare two hpx result directories
 
-Defined in `src/helia_profiler/cli/app.py` line 611.
+Defined in `src/helia_profiler/cli/app.py` line 612.
 
 ### Arguments
 

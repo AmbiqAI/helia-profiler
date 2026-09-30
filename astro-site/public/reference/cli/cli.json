@@ -70,7 +70,7 @@
     "hidden": false,
     "source": {
       "path": "src/helia_profiler/cli/app.py",
-      "line": 48
+      "line": 49
     },
     "arguments": [],
     "options": [
@@ -117,7 +117,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 536
+          "line": 537
         },
         "arguments": [
           {
@@ -339,7 +339,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 678
+          "line": 679
         },
         "arguments": [],
         "options": [],
@@ -360,7 +360,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 692
+              "line": 693
             },
             "arguments": [],
             "options": [],
@@ -381,7 +381,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 685
+              "line": 686
             },
             "arguments": [],
             "options": [],
@@ -403,7 +403,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 611
+          "line": 612
         },
         "arguments": [
           {
@@ -1049,7 +1049,7 @@
             "python_type": "str",
             "default": "joulescope",
             "required": false,
-            "help": "Joulescope driver (default: auto-detect)",
+            "help": "Power driver that holds the target rail on (JS110/JS220/JS320 auto-detected)",
             "panel": null,
             "is_flag": false,
             "multiple": false,
@@ -1324,7 +1324,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 88
+          "line": 89
         },
         "arguments": [
           {
@@ -2149,8 +2149,8 @@
               "name": "choice",
               "class": "TyperChoice",
               "choices": [
-                "joulescope",
-                "ondevice"
+                "ina228",
+                "joulescope"
               ]
             },
             "python_type": "Optional[str]",
