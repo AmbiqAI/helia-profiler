@@ -68,7 +68,10 @@ def doctor_command(
         Optional[Path],
         typer.Option(
             "--config",
-            help="Resolve this YAML config and include a sanitized snapshot in the bundle",
+            help=(
+                "YAML config whose target and engine select the checks; "
+                "with --bundle, a sanitized snapshot of it is included instead"
+            ),
         ),
     ] = None,
     toolchain: Annotated[

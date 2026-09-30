@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import shutil
 from unittest.mock import patch
 
 import pytest
@@ -37,7 +38,7 @@ def _make_ctx(tmp_path: Path, overrides: dict | None = None) -> PipelineContext:
     return PipelineContext(config=config, work_dir=tmp_path / "work")
 
 
-def _all_tools_present(_name: str) -> str:
+def _all_tools_present(_name: str, path: str | None = None) -> str:
     return f"/usr/bin/{_name}"
 
 
@@ -469,12 +470,16 @@ class TestPreflightHostTools:
             "llvm-nm",
         ):
             (bin_dir / tool).write_text("")
+            (bin_dir / tool).chmod(0o755)
+        real_which = shutil.which
 
-        def which_no_atfe_binary(name: str) -> str | None:
-            return None if name == "atfe" else f"/usr/bin/{name}"
+        def which_atfe_root_only(name: str, path: str | None = None) -> str | None:
+            if path is not None:
+                return real_which(name, path=path)
+            return None if name in ("atfe", "clang") else f"/usr/bin/{name}"
 
         with patch.dict("os.environ", {"ATFE_ROOT": str(atfe_root)}):
-            with patch("shutil.which", side_effect=which_no_atfe_binary):
+            with patch("shutil.which", side_effect=which_atfe_root_only):
                 PreflightStage().run(ctx)
 
     def test_atfe_missing_root_raises(self, tmp_path: Path):
