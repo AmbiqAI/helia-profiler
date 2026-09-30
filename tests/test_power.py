@@ -2711,8 +2711,8 @@ class TestEstimateCaptureDuration:
         return ctx
 
     def test_fixed_window_includes_clean_iterations(self, tmp_path: Path):
+        from helia_profiler.power.diagnostics import BOOT_SETTLE_S
         from helia_profiler.stages.capture_power import (
-            _BOOT_SETTLE_S,
             _SAFETY_MARGIN_S,
             _estimate_capture_duration,
         )
@@ -2733,12 +2733,12 @@ class TestEstimateCaptureDuration:
         # firmware arm floors its measured warmup there (#164), and for
         # DWT-timed fixed builds the overestimate only adds headroom.
         # total = 604 inferences * 1 ms/inference = 0.604 s.
-        expected = _BOOT_SETTLE_S + 0.604 + _SAFETY_MARGIN_S
+        expected = BOOT_SETTLE_S + 0.604 + _SAFETY_MARGIN_S
         assert estimated == pytest.approx(expected, rel=1e-6)
 
     def test_auto_window_scales_with_target_ms(self, tmp_path: Path):
+        from helia_profiler.power.diagnostics import BOOT_SETTLE_S
         from helia_profiler.stages.capture_power import (
-            _BOOT_SETTLE_S,
             _SAFETY_MARGIN_S,
             _estimate_capture_duration,
         )
@@ -2759,7 +2759,7 @@ class TestEstimateCaptureDuration:
         # profiled pass: 1 * (1 + 3) = 4 inferences = 4ms.
         # clean pass (auto): target 8000ms / 1ms = 8000 iters, clamped to
         # window_max=500, plus 3 hardcoded warm reps = 503 inferences = 0.503s.
-        expected = _BOOT_SETTLE_S + (0.004 + 0.503) + _SAFETY_MARGIN_S
+        expected = BOOT_SETTLE_S + (0.004 + 0.503) + _SAFETY_MARGIN_S
         assert estimated == pytest.approx(expected, rel=1e-6)
 
     def test_a_spin_window_is_estimated_in_seconds_not_inferences(self, tmp_path: Path):
@@ -2771,8 +2771,8 @@ class TestEstimateCaptureDuration:
         deadline well inside the window: exactly the miss this function's
         docstring says it exists to prevent (#136).
         """
+        from helia_profiler.power.diagnostics import BOOT_SETTLE_S
         from helia_profiler.stages.capture_power import (
-            _BOOT_SETTLE_S,
             _SAFETY_MARGIN_S,
             _estimate_capture_duration,
         )
@@ -2795,13 +2795,13 @@ class TestEstimateCaptureDuration:
         # the spin itself -- 20 s, whatever the inference count says -- plus
         # the warm reps, which main.cc.j2 runs above the spin whatever the
         # probe is: max(1, warmup) = 1 inference = 1 ms in fixed mode.
-        expected = _BOOT_SETTLE_S + (0.004 + 20.0 + 0.001) + _SAFETY_MARGIN_S
+        expected = BOOT_SETTLE_S + (0.004 + 20.0 + 0.001) + _SAFETY_MARGIN_S
         assert estimated == pytest.approx(expected, rel=1e-6)
         assert estimated > 20.0, "the bound must outlast the window it contains"
 
     def test_fixed_power_plan_controls_capture_duration(self, tmp_path: Path):
+        from helia_profiler.power.diagnostics import BOOT_SETTLE_S
         from helia_profiler.stages.capture_power import (
-            _BOOT_SETTLE_S,
             _SAFETY_MARGIN_S,
             _estimate_capture_duration,
         )
@@ -2819,7 +2819,7 @@ class TestEstimateCaptureDuration:
 
         estimated = _estimate_capture_duration(ctx)
 
-        expected = _BOOT_SETTLE_S + (2247 * 2226 / 1_000_000) + _SAFETY_MARGIN_S
+        expected = BOOT_SETTLE_S + (2247 * 2226 / 1_000_000) + _SAFETY_MARGIN_S
         assert estimated == pytest.approx(expected, rel=1e-6)
 
     def test_auto_window_regression_reproduces_prior_underestimate_bug(self, tmp_path: Path):
@@ -2908,12 +2908,12 @@ class TestGateFallWait:
     def test_without_lockstep_the_wait_also_covers_boot_and_warmup(self):
         """Without lock-step the wait starts at reset, not at GO."""
         from helia_profiler.power.diagnostics import gate_fall_wait_s
-        from helia_profiler.stages.capture_power import _BOOT_SETTLE_S
+        from helia_profiler.power.diagnostics import BOOT_SETTLE_S
 
         def bound(lockstep: bool) -> float:
             return gate_fall_wait_s(1.0, longest_window_s=5.75, lockstep=lockstep, pre_window_s=9.0)
 
-        assert bound(False) - bound(True) >= _BOOT_SETTLE_S + 9.0 - 1e-9
+        assert bound(False) - bound(True) >= BOOT_SETTLE_S + 9.0 - 1e-9
 
     def test_warmup_is_not_charged_under_lockstep(self):
         """READY follows warm-up, so a lock-step wait starts after it."""
@@ -3305,7 +3305,7 @@ class TestCapturePowerWrapper:
     ):
         """A bound just above the planned window leaves no room for the fall (#302)."""
         from helia_profiler.capture import capture_power
-        from helia_profiler.stages.capture_power import _BOOT_SETTLE_S
+        from helia_profiler.power.diagnostics import BOOT_SETTLE_S
 
         ctx = self._shared_ctx_with_planned_window(tmp_path, duration_s=5)
         called = self._recording_gated_driver(monkeypatch)
@@ -3318,7 +3318,7 @@ class TestCapturePowerWrapper:
         # This driver offers no sync controller, so the target free-runs from
         # reset and the wait must also hold the boot the estimate allows for.
         assert called["lockstep"] is False
-        assert bound - self._longest_accepted_s(called, 233, 21_425) >= _BOOT_SETTLE_S
+        assert bound - self._longest_accepted_s(called, 233, 21_425) >= BOOT_SETTLE_S
         assert result.metadata.capture_safety_bound_s == bound
         raised = [r for r in caplog.records if "Raising the capture bound" in r.getMessage()]
         assert [r.levelno for r in raised] == [logging.WARNING]
@@ -3332,7 +3332,7 @@ class TestCapturePowerWrapper:
         """Without lock-step the warm reps run inside the wait, before the gate;
         the firmware never warms fewer than 3."""
         from helia_profiler.capture import capture_power
-        from helia_profiler.stages.capture_power import _BOOT_SETTLE_S
+        from helia_profiler.power.diagnostics import BOOT_SETTLE_S
 
         ctx = self._shared_ctx_with_planned_window(
             tmp_path, count=10, avg_us=3_000_000, profiling={"warmup": warmup}
@@ -3344,7 +3344,7 @@ class TestCapturePowerWrapper:
         bound = called["duration_s"]
         assert isinstance(bound, float)
         longest = self._longest_accepted_s(called, 10, 3_000_000)
-        assert bound - (_BOOT_SETTLE_S + warm_reps * 3.0 + longest) >= 1.0
+        assert bound - (BOOT_SETTLE_S + warm_reps * 3.0 + longest) >= 1.0
 
     def test_busy_loop_warmup_is_not_charged_a_whole_spin_per_rep(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
@@ -3352,7 +3352,7 @@ class TestCapturePowerWrapper:
         """A busy_loop unit is the whole spin, not an inference."""
         from helia_profiler.capture import capture_power
         from helia_profiler.power.diagnostics import FALL_WAIT_HEADROOM_S
-        from helia_profiler.stages.capture_power import _BOOT_SETTLE_S
+        from helia_profiler.power.diagnostics import BOOT_SETTLE_S
 
         ctx = self._shared_ctx_with_planned_window(
             tmp_path, count=1, avg_us=5_000_000, profiling={"clean_window_probe": "busy_loop"}
@@ -3366,7 +3366,7 @@ class TestCapturePowerWrapper:
         assert isinstance(bound, float)
         # Charging warm reps would add whole 5 s spins; allow less than one.
         extra_s = bound - self._longest_accepted_s(called, 1, 5_000_000)
-        assert extra_s < _BOOT_SETTLE_S + FALL_WAIT_HEADROOM_S + 5.0
+        assert extra_s < BOOT_SETTLE_S + FALL_WAIT_HEADROOM_S + 5.0
         raised = [
             r.getMessage() for r in caplog.records if "Raising the capture bound" in r.getMessage()
         ]

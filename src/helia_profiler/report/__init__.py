@@ -2,8 +2,7 @@
 
 The ``write_report`` function is called by the report stage and dispatches to
 the appropriate formatters based on ``OutputConfig``. Each writer lives in its
-own module; this file only orchestrates the pipeline and re-exports the
-private helpers that existing tests import directly.
+own module; this file only orchestrates the pipeline.
 
 Output structure
 ----------------
@@ -34,14 +33,14 @@ from typing import Any, TYPE_CHECKING
 
 from ..errors import ReportError
 from .aot import _write_aot_manifest, _write_aot_memory_layers
-from .csv_writer import _layer_to_flat_dict, _write_csv, _write_preset_csv
+from .csv_writer import _write_csv, _write_preset_csv
 from .json_writer import _write_json
 from ..evaluation import evaluate_run
 from .manifest import _write_result_manifest
-from .memory import _serialise_memory_plan, _write_memory_breakdown
-from .metadata import _firmware_meta_to_dict, _metadata_to_dict, _write_run_metadata
+from .memory import _write_memory_breakdown
+from .metadata import _write_run_metadata
 from .model_explorer import _write_model_explorer_overlays
-from .power import _power_summary_to_dict, _write_power_csv
+from .power import _write_power_csv
 from .summary import _write_summary
 
 if TYPE_CHECKING:

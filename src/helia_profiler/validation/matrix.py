@@ -71,13 +71,12 @@ class ExecuTorchModelSpec:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ModelSpec:
     """One canonical benchmark model."""
 
     id: str  # short stable ID (used on CLI + in reports)
     name: str
-    category: str  # MLPerf Tiny category (kws / vww / ic / ad)
     fixture_path: str  # path relative to helia-profiler root
     arena_size: int  # tensor arena in bytes (RT / TFLM)
     description: str = ""
@@ -270,7 +269,6 @@ MODELS: dict[str, ModelSpec] = {
     "kws": ModelSpec(
         id="kws",
         name="Keyword Spotting (DS-CNN)",
-        category="kws",
         fixture_path="tests/fixtures/mlperf_tiny/kws/kws_ref_model.tflite",
         # 32 KB covers heliaRT's arena across toolchains with headroom while
         # keeping TCM/SRAM presets viable on small boards (AP3 DTCM is 64 KB).
@@ -289,7 +287,6 @@ MODELS: dict[str, ModelSpec] = {
     "vww": ModelSpec(
         id="vww",
         name="Visual Wake Words (MobileNetV1)",
-        category="vww",
         fixture_path="tests/fixtures/mlperf_tiny/vww/vww_96_int8.tflite",
         arena_size=524288,
         description="MLPerf Tiny visual wake words — MobileNetV1 96x96 int8",
@@ -305,7 +302,6 @@ MODELS: dict[str, ModelSpec] = {
     "ic": ModelSpec(
         id="ic",
         name="Image Classification (ResNet CIFAR-10)",
-        category="ic",
         fixture_path="tests/fixtures/mlperf_tiny/ic/ic_resnet_int8.tflite",
         arena_size=262144,
         description="MLPerf Tiny image classification — ResNet int8",
@@ -321,7 +317,6 @@ MODELS: dict[str, ModelSpec] = {
     "ad": ModelSpec(
         id="ad",
         name="Anomaly Detection (DeepAutoEncoder)",
-        category="ad",
         fixture_path="tests/fixtures/mlperf_tiny/ad/ad01_int8.tflite",
         arena_size=131072,
         description="MLPerf Tiny anomaly detection — DeepAutoEncoder ToyADMX int8",
@@ -389,7 +384,6 @@ def load_model_file(path: Path) -> dict[str, ModelSpec]:
         models[model_id] = ModelSpec(
             id=model_id,
             name=str(raw_spec.get("name", model_id)),
-            category=str(raw_spec.get("category", comparison_group)),
             fixture_path=str(model_path),
             arena_size=arena_size,
             description=str(raw_spec.get("description", "")),
@@ -424,7 +418,6 @@ def models_from_paths(
         models[model_id] = ModelSpec(
             id=model_id,
             name=model_path.stem,
-            category=group,
             fixture_path=str(model_path),
             arena_size=arena_size,
             comparison_group=group,
@@ -535,7 +528,7 @@ def build_matrix(
             power-sync wiring.
 
     Returns:
-        Ordered deterministically — by board → model category → engine →
+        Ordered deterministically — by board → model → engine →
         power → attempt.
 
     Raises:

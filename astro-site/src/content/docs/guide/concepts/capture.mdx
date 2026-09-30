@@ -74,9 +74,9 @@ Before either capture phase, `prepare_target_for_phase()` in
 the board through the power driver, then applies a `ResetStrategy` through
 the `ResetController` the probe stage installed, and returns the actions
 it took so the run metadata records them. `EnsureBoardPoweredStage` ran
-earlier so the rail is up before the probe is touched; `capture/readiness.py`
-supplies the `poll_until()` loop the transports use to wait for the
-firmware to announce itself after a reset.
+earlier so the rail is up before the probe is touched. After a reset the
+transports poll for readiness with a deadline (`open_jlink_with_retry()` in
+`target/probe/jlink.py` for the J-Link attach) instead of sleeping blindly.
 
 ### Transport backends
 
@@ -162,7 +162,7 @@ signals are on [Power measurement](../../power/) and
 
 | Block | Path under `src/helia_profiler/` |
 |---|---|
-| target lifecycle | `target/lifecycle.py`, `target/probe/`, `stages/ensure_powered.py`, `capture/readiness.py` |
+| target lifecycle | `target/lifecycle.py`, `target/probe/`, `stages/ensure_powered.py` |
 | transports | `transport/{rtt,usb_cdc,uart,swo}.py`, `transport/base.py`, `transport/protocol.py`, `transport/timing.py` |
 | wire stream | `wire/` |
 | parser | `capture/parser.py`, `results/models.py` |

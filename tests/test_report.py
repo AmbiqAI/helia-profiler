@@ -43,13 +43,13 @@ from helia_profiler.target.lifecycle import (
 )
 
 from helia_profiler.report import (
-    _metadata_to_dict,
     _write_csv,
     _write_json,
     _write_run_metadata,
     _write_summary,
     write_report,
 )
+from helia_profiler.report.metadata import _metadata_to_dict
 from helia_profiler.results import load_result_manifest
 from helia_profiler.modelcost import ETHOS_U_OP_NAME, LayerOps, ModelAnalysis
 from helia_profiler.results.issues import IssueCode

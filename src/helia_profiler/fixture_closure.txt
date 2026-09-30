@@ -6,7 +6,6 @@ api.py
 capture/__init__.py
 capture/parser.py
 capture/power_terminal.py
-capture/readiness.py
 capture/rtt_symbol.py
 capture/terminal_transport.py
 cli/__init__.py

@@ -1466,7 +1466,7 @@ def test_attach_wait_budget_fits_the_power_capture_boot_allowance():
     Two things are pinned, because the budget is only as good as the clock
     enforcing it:
 
-    * the nominal budget is a small fraction of ``_BOOT_SETTLE_S``, read from
+    * the nominal budget is a small fraction of ``BOOT_SETTLE_S``, read from
       the host module rather than restated, so the two cannot drift apart;
     * the loop paces itself with ``nsx_delay_us`` (calibrated) rather than
       ``hpx_rtt_drain`` (whose spin assumes 2 cycles per iteration where a
@@ -1476,16 +1476,16 @@ def test_attach_wait_budget_fits_the_power_capture_boot_allowance():
     """
     import re
 
-    from helia_profiler.stages.capture_power import _BOOT_SETTLE_S
+    from helia_profiler.power.diagnostics import BOOT_SETTLE_S
 
     rendered = _render("apollo4p", "rtt", "tflm")
     match = re.search(r"#define\s+HPX_CLEAN_WINDOW_ATTACH_WAIT_MS\s+(\d+)U", rendered)
     assert match, "attach wait renders no nominal budget to check"
     budget_s = int(match.group(1)) / 1000.0
 
-    assert 0 < budget_s <= _BOOT_SETTLE_S / 4, (
+    assert 0 < budget_s <= BOOT_SETTLE_S / 4, (
         f"attach wait budget {budget_s:.3f}s is too large a share of the "
-        f"{_BOOT_SETTLE_S:.1f}s host boot allowance it is charged against on a "
+        f"{BOOT_SETTLE_S:.1f}s host boot allowance it is charged against on a "
         "free-running shared-firmware power pass"
     )
 

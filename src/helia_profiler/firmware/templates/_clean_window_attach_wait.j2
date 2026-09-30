@@ -24,9 +24,8 @@
    drained it).  RdOff is advanced by the J-Link reading target SRAM over SWD,
    so observing the drain is direct evidence that the probe is attached and
    actively driving the DAP -- the same condition DWT needs.  This is a poll on
-   an observable signal with a deadline, per capture/readiness.py's contract,
-   not a blind delay; when the host is already attached it returns immediately
-   and costs nothing.
+   an observable signal with a deadline, not a blind delay; when the host is
+   already attached it returns immediately and costs nothing.
 
    WHY NOT hpx_rtt_drain().  It asks the same question, but its budget is
    nominal only: it paces itself with a volatile-counter+NOP loop sized
@@ -45,7 +44,7 @@
    capture_pmu has already closed its pylink session, so nothing reads RTT and
    this poll ALWAYS runs to timeout.  It lands after capture_gated's
    on_started hook returns, so it is charged against the poller's boot
-   allowance (_BOOT_SETTLE_S in stages/capture_power.py) -- overrun it and the
+   allowance (BOOT_SETTLE_S in power/diagnostics.py) -- overrun it and the
    poller stops before or mid-window, which the host reports as no_gate_rise.
    The budget below is sized against the measured gap with headroom and pinned
    against that host constant by
