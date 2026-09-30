@@ -111,7 +111,7 @@ def test_find_cdc_port_falls_back_to_existing_non_jlink(monkeypatch):
     ],
 )
 def test_find_cdc_port_detects_newly_enumerated_port_on_every_host(monkeypatch, jlink, app):
-    """Regression: the snapshot used to glob POSIX paths, missing COMx and ttyUSB."""
+    """A fresh CDC device is found whatever the host names it: COMx, ttyUSB, or cu.*."""
     ports = [jlink]
     _set_comports(monkeypatch, ports)
     pre_existing = set(usb_reader._snapshot_cdc_ports())
@@ -124,7 +124,7 @@ def test_find_cdc_port_detects_newly_enumerated_port_on_every_host(monkeypatch, 
 
 
 def test_find_cdc_port_never_falls_back_to_macos_jlink_vcom(monkeypatch):
-    """Regression: macOS J-Link VCOMs were compared by tty.* path against cu.* devices."""
+    """macOS J-Link VCOMs enumerate as cu.* devices and are still never app candidates."""
     _set_comports(
         monkeypatch,
         [_jlink("/dev/cu.usbmodem0011600029541"), _jlink("/dev/cu.usbmodem0011600022041")],
@@ -250,8 +250,11 @@ def test_find_cdc_port_rejects_foreign_hpx_device(monkeypatch):
         ],
     )
 
-    with pytest.raises(CaptureError, match="No application USB CDC device appeared"):
+    with pytest.raises(CaptureError, match="stamped for another board") as exc_info:
         usb_reader._find_cdc_port(timeout_s=0, expected_marker=expected)
+
+    assert f"/dev/ttyACM3 (Ambiq, NSX HPX Profiler, {foreign})" in str(exc_info.value)
+    assert "J-Link" not in (exc_info.value.hint or "")
 
 
 def test_resolve_cdc_port_does_not_fall_back_to_foreign_hpx(monkeypatch):
@@ -270,7 +273,7 @@ def test_resolve_cdc_port_does_not_fall_back_to_foreign_hpx(monkeypatch):
         ],
     )
 
-    with pytest.raises(CaptureError, match="No application USB CDC device appeared"):
+    with pytest.raises(CaptureError, match="stamped for another board"):
         usb_reader.resolve_cdc_port(marker=expected, pre_existing=set(), timeout_s=0)
 
 

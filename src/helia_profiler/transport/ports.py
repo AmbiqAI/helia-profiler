@@ -31,9 +31,10 @@ class SerialPortInfo:
 def list_serial_ports(*, include_all: bool = False) -> tuple[SerialPortInfo, ...]:
     """Return host serial ports from one enumeration, filtering unrelated devices by default.
 
-    The default view keeps USB serial ports (pyserial reports ``VID:PID`` in
-    ``hwid`` on every platform) and anything classified as a J-Link VCOM or
-    an HPX CDC device, which drops built-in UARTs and Bluetooth ports.
+    The default view keeps ports whose ``hwid`` carries a ``VID:PID`` and
+    anything classified as a J-Link VCOM or an HPX CDC device; every other port
+    is dropped. pyserial writes ``USB VID:PID=`` into ``hwid`` for USB devices:
+    https://github.com/pyserial/pyserial/blob/master/serial/tools/list_ports_common.py
     """
     from serial.tools import list_ports
 

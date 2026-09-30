@@ -201,6 +201,19 @@ def _find_cdc_port(
     if len(candidates) > 1:
         raise _ambiguous_cdc_error(candidates)
 
+    foreign = [port for port in present.values() if _is_foreign_hpx_port(port, expected_marker)]
+    if foreign:
+        listing = ", ".join(_describe_port(port) for port in foreign)
+        raise CaptureError(
+            "No application USB CDC device appeared after reset; only CDC devices "
+            f"stamped for another board are visible: {listing}",
+            hint=(
+                f"Those devices do not carry this board's marker {expected_marker!r}. "
+                "Check this board's USB data connection and that nsx_usb is "
+                "enumerating, or pin the port with --usb-port."
+            ),
+        )
+
     if present:
         raise CaptureError(
             "No application USB CDC device appeared after reset",
