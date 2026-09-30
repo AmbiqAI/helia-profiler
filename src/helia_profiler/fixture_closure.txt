@@ -63,6 +63,7 @@ engines/helia_rt/adapter.py
 engines/helia_rt/artifacts.py
 engines/helia_rt/download.py
 engines/helia_rt/nsx_module.py
+engines/semver.py
 engines/templates/heliaaot_attributes.h.j2
 engines/tflm.py
 errors.py
