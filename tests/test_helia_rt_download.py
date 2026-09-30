@@ -148,3 +148,61 @@ def test_concurrently_installed_dist_wins(dest, monkeypatch):
 
     assert (dest / "winner.txt").read_text() == "first"
     assert _leftovers(dest) == []
+
+
+def test_corrupt_deflate_member_raises_engine_error(dest, monkeypatch):
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for name, payload in _dist_members().items():
+            zf.writestr(name, payload * 100)
+    data = bytearray(buf.getvalue())
+    info = zipfile.ZipFile(io.BytesIO(bytes(data))).infolist()[0]
+    # First byte of the deflate stream; 0xFF encodes the reserved block type.
+    data[info.header_offset + 30 + len(info.filename.encode()) + len(info.extra)] = 0xFF
+    _serve(monkeypatch, _Resp(bytes(data)))
+
+    with pytest.raises(EngineError, match="Corrupt entry"):
+        download._download_and_extract(URL, dest)
+
+    assert not dest.exists()
+    assert _leftovers(dest) == []
+
+
+def test_stale_cache_removed_concurrently_is_tolerated(dest, monkeypatch):
+    _serve(monkeypatch, _Resp(_zip(_dist_members())))
+    (dest / "lib").mkdir(parents=True)
+    real_rename = Path.rename
+
+    def racing_rename(self, target):
+        if self == dest:
+            (dest / "lib").rmdir()
+            dest.rmdir()
+        return real_rename(self, target)
+
+    monkeypatch.setattr(Path, "rename", racing_rename)
+
+    download._download_and_extract(URL, dest)
+
+    assert _is_valid_dist(dest)
+    assert _leftovers(dest) == []
+
+
+@pytest.mark.parametrize(
+    ("repo", "ref"),
+    [
+        ("AmbiqAI/helia-rt", "../../../victim"),
+        ("../../victim", "v1"),
+        ("AmbiqAI/helia-rt", "..\\..\\victim"),
+        ("AmbiqAI/helia-rt", "/abs/victim"),
+    ],
+)
+def test_cache_key_stays_under_cache_root(tmp_path, repo, ref):
+    key = download._cache_key(repo, ref)
+
+    assert (tmp_path / key).resolve().parent == tmp_path.resolve()
+
+
+def test_cache_key_is_stable_for_ordinary_refs():
+    assert download._cache_key("AmbiqAI/helia-rt", "helia-rt-v1.16.0") == (
+        "AmbiqAI_helia-rt_helia-rt-v1.16.0"
+    )

@@ -11,9 +11,11 @@ import io
 import json
 import logging
 import os
+import re
 import shutil
 import tempfile
 import zipfile
+import zlib
 from http.client import HTTPException
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -40,8 +42,7 @@ def _fetch_github_release(
 
     Returns ``(dist_path, detected_version)``.
     """
-    cache_key = f"{repo.replace('/', '_')}_{ref}"
-    cache_dir = _cache_dir() / cache_key
+    cache_dir = _cache_dir() / _cache_key(repo, ref)
 
     if cache_dir.is_dir() and _is_valid_dist(cache_dir):
         log.info("Cache hit: %s", cache_dir)
@@ -67,6 +68,15 @@ def _fetch_github_release(
     log.info("Downloading heliaRT from %s ...", asset_url)
     _download_and_extract(asset_url, cache_dir, timeout_s=asset_s)
     return cache_dir, _detect_version(cache_dir)
+
+
+def _cache_key(repo: str, ref: str) -> str:
+    """Flatten *repo* and *ref* into one path component under the cache root.
+
+    Both are user config; separators or ``..`` must not steer the cache
+    directory (which may be deleted when stale) outside the cache root.
+    """
+    return re.sub(r"[^A-Za-z0-9._-]", "_", f"{repo}_{ref}")
 
 
 def _resolve_release_tag(repo: str, ref: str, *, api_s: float = 30) -> str | None:
@@ -227,7 +237,7 @@ def _extract_zip(data: bytes, dest: Path, *, source: str) -> None:
             out.parent.mkdir(parents=True, exist_ok=True)
             try:
                 out.write_bytes(zf.read(member))
-            except (zipfile.BadZipFile, EOFError) as exc:
+            except (zipfile.BadZipFile, EOFError, zlib.error) as exc:
                 raise EngineError(
                     f"Corrupt entry {member.filename!r} in heliaRT release archive: {source}",
                     hint="Retry the download or set engine.config.dist_path.",
@@ -242,7 +252,15 @@ def _install_dir(staging: Path, dest: Path) -> None:
     if dest.exists():
         if _is_valid_dist(dest):
             return
-        shutil.rmtree(dest)
+        # Rename aside so rmtree only touches this snapshot; a concurrent
+        # replacer that got there first surfaces as FileNotFoundError.
+        stale = dest.with_name(f"{staging.name}.stale")
+        try:
+            dest.rename(stale)
+        except FileNotFoundError:
+            pass
+        else:
+            shutil.rmtree(stale, ignore_errors=True)
     try:
         staging.rename(dest)
     except OSError:
