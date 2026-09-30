@@ -95,4 +95,4 @@ informative. A comparison dimension differs between the runs; deltas remain comp
 | `dimension.architecture_flags_differs` | `architecture_flags` |
 | `dimension.engine_backend_differs` | `engine_backend` |
 
-Generated from the `src/helia_profiler` tree `994e2040821505e35c624dcc56071fd48a952498`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.

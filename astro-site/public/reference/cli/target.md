@@ -30,4 +30,4 @@ Defined in `src/helia_profiler/cli/inspect_app.py` line 223.
 | `--jlink-serial` | `Optional[str]` |  | J-Link probe serial number |
 | `--kind` | `debug \| swpoi` | debug | Reset kind: debug r/g reset (default) or SWPOI reset |
 
-Generated from the `src/helia_profiler` tree `994e2040821505e35c624dcc56071fd48a952498` with typer 0.26.8 and click 8.3.3.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__` with typer 0.26.8 and click 8.3.3.
