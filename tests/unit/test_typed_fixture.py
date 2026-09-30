@@ -504,3 +504,11 @@ def test_aot_scan_paints_scratch_after_init_and_scans_after_timing(tmp_path):
 def test_aot_scan_is_absent_unless_requested(tmp_path):
     source = render(tmp_path, typed(tmp_path), EngineType.HELIA_AOT, regions=REGIONS)
     assert "arena_scan" not in source and "0xA5" not in source
+
+
+def test_heliaaot_region_outside_sram_or_mram_is_refused_at_render(tmp_path):
+    region = ArenaRegion(
+        0, "scratch", "M_SCRATCH", 4096, 16, ArenaRole.SCRATCH, "tcm", Placement.TCM
+    )
+    with pytest.raises(ConfigError, match="SRAM/MRAM AOT regions only"):
+        render(tmp_path, typed(tmp_path), EngineType.HELIA_AOT, regions=(region,))

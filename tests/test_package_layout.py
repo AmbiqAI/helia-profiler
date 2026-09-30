@@ -75,6 +75,9 @@ def test_no_engine_adapter_imports_out_of_another_engines_package() -> None:
 # Receivers whose ``.open()`` is not ``Path.open``: archive modules and the
 # J-Link / Joulescope / serial device handles.
 _NON_FILE_OPENERS = frozenset({"tarfile", "zipfile", "jlink", "drv", "dtr_holder"})
+# ``importlib.metadata.Distribution.read_text`` takes a metadata file name, has
+# no encoding parameter, and reads UTF-8 itself.
+_NON_FILE_READERS = frozenset({"distribution"})
 
 
 def _is_text_mode(mode: ast.expr | None) -> bool:
@@ -90,7 +93,10 @@ def _text_io_without_encoding(call: ast.Call) -> bool:
         return _is_text_mode(call.args[1] if len(call.args) > 1 else mode)
     if not isinstance(func, ast.Attribute):
         return False
-    if func.attr in {"read_text", "write_text"}:
+    if func.attr == "read_text":
+        receiver = func.value
+        return not (isinstance(receiver, ast.Name) and receiver.id in _NON_FILE_READERS)
+    if func.attr == "write_text":
         return True
     if func.attr != "open":
         return False
@@ -114,6 +120,10 @@ def _text_io_without_encoding(call: ast.Call) -> bool:
         ('p.write_text(s, encoding="utf-8")', False),
         ('tarfile.open(p, mode="r:gz")', False),
         ("jlink.open()", False),
+        ('distribution.read_text("direct_url.json")', False),
+        ("path.read_text()", True),
+        ("distribution.path.read_text()", True),
+        ("distribution.write_text(s)", True),
     ],
 )
 def test_encoding_guard_classifies_calls(source: str, flagged: bool) -> None:

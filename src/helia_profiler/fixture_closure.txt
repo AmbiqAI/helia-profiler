@@ -1,6 +1,8 @@
 __init__.py
 _fixture_build.py
 _fixture_closure.py
+_fixture_facts.py
+_fixture_request.py
 _version.py
 api.py
 capture/__init__.py

@@ -18,7 +18,7 @@ from .firmware.launcher import _DISABLED_LAUNCHER_VALUES
 from .pipeline import PipelineContext, PipelineRunner, Stage, serialize_config
 from .placement import ArenaRole, Placement
 from .fixture_image import MAX_IMAGE, MRAM, bounded
-from .fixture_target import FixtureTarget, supported_fixture_target
+from .fixture_target import FIXTURE_CLOCK_PROFILE, FixtureTarget, supported_fixture_target
 from .results.models import ToolchainInfo, MemoryPlan
 
 
@@ -326,6 +326,61 @@ class FixtureBuild:
     capabilities: tuple[tuple[str, FixtureCapability], ...] = ()
     #: heliaAOT scratch arenas painted and scanned: (region id, size in bytes).
     aot_arena_scan: tuple[tuple[int, int], ...] = ()
+    #: heliaAOT's ``<prefix>_plan.json`` and ``<prefix>_report.json`` when the
+    #: installed heliaAOT writes them.
+    aot_outputs: tuple[FixtureFile, ...] = ()
+    #: The engine package that generated the model code, when one did.
+    engine_source: EngineSource | None = None
+
+
+@dataclass(frozen=True)
+class EngineSource:
+    """Installed engine package: its version and, for a VCS install, the commit."""
+
+    package: str
+    version: str
+    commit: str | None = None
+
+
+def _engine_source(engine: EngineType) -> EngineSource | None:
+    if engine is not EngineType.HELIA_AOT:
+        return None
+    from importlib import metadata
+
+    try:
+        distribution = metadata.distribution("helia-aot")
+    except metadata.PackageNotFoundError:
+        return None
+    commit = None
+    try:
+        direct_url = json.loads(distribution.read_text("direct_url.json") or "{}")
+    except json.JSONDecodeError:
+        direct_url = {}
+    if isinstance(direct_url, dict) and isinstance(direct_url.get("vcs_info"), dict):
+        found = direct_url["vcs_info"].get("commit_id")
+        commit = found if isinstance(found, str) else None
+    return EngineSource("helia-aot", distribution.version, commit)
+
+
+def _aot_output_names(prefix: str) -> tuple[str, str]:
+    return f"{prefix}_plan.json", f"{prefix}_report.json"
+
+
+def _clear_aot_outputs(work_dir: Path, prefix: str) -> None:
+    """Drop plan and report files an earlier conversion left, so a build pins only its own."""
+    for name in _aot_output_names(prefix):
+        for stale in (work_dir / "aot_output").rglob(name):
+            stale.unlink()
+
+
+def _aot_outputs(work_dir: Path, prefix: str) -> tuple[FixtureFile, ...]:
+    found = []
+    for name in _aot_output_names(prefix):
+        matches = sorted((work_dir / "aot_output").rglob(name))
+        if len(matches) > 1:
+            raise ConfigError(f"More than one heliaAOT {name} in the work directory")
+        found += [FixtureFile(m, hashlib.sha256(m.read_bytes()).hexdigest()) for m in matches]
+    return tuple(found)
 
 
 #: Environment variables outside the compatibility classifier that change what a
@@ -395,7 +450,7 @@ def _validate(config: ProfileConfig, fixture: FixedFixture | TypedFixture) -> No
         raise ConfigError("Fixture supports upstream TFLM, heliaRT or helia-AOT only")
     if config.target.custom_socs or config.target.custom_boards:
         raise ConfigError("Fixed fixture does not support custom target declarations")
-    if config.target.board != "apollo510_evb" or config.target.clock.cpu != "lp":
+    if config.target.board != "apollo510_evb" or config.target.clock.cpu != FIXTURE_CLOCK_PROFILE:
         raise ConfigError("Fixed fixture supports Apollo510 EVB LP clock only")
     if (
         config.model.arena_location != Placement.SRAM
@@ -437,6 +492,26 @@ def build_fixed_fixture(
     observe_aot_arenas: bool = False,
 ) -> FixtureBuild:
     """Render or compile one fixed fixture through profiler's host-only stages."""
+    return _build(
+        config,
+        fixture,
+        method=method,
+        runtime=runtime,
+        compile=compile,
+        observe_aot_arenas=observe_aot_arenas,
+    )
+
+
+def _build(
+    config: ProfileConfig,
+    fixture: FixedFixture | TypedFixture,
+    *,
+    method: FixtureMethod,
+    runtime: PreparedUpstreamRuntime | None,
+    compile: bool,
+    observe_aot_arenas: bool,
+    intent_identity: str | None = None,
+) -> FixtureBuild:
     if not isinstance(method, FixtureMethod):
         raise ConfigError("Explicit FixtureMethod required")
     _validate(config, fixture)
@@ -499,6 +574,11 @@ def build_fixed_fixture(
                 raise ConfigError("Work directory belongs to a different fixture")
             identity_path.write_text(json.dumps(identity, sort_keys=True), encoding="utf-8")
             fixture.verify()
+            if config.engine.type is EngineType.HELIA_AOT:
+                from .engines.helia_aot.compile import _DEFAULT_PREFIX
+
+                prefix = str(config.engine.config.get("prefix", _DEFAULT_PREFIX))
+                _clear_aot_outputs(root, prefix)
 
     from .stages import (
         ResolvePlatformStage,
@@ -565,7 +645,8 @@ def build_fixed_fixture(
             raise ConfigError(
                 f"Flat image is {size} B; fixture capture accepts at most {MAX_IMAGE} B in MRAM"
             )
-    intent_identity = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
+    if intent_identity is None:
+        intent_identity = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
     toolchain = ctx.run_metadata.toolchain if compile else None
     if compile and (toolchain is None or not toolchain.compiler_version):
         raise ConfigError("Compiled fixture requires recorded toolchain provenance")
@@ -629,4 +710,8 @@ def build_fixed_fixture(
             )
             if observe_aot_arenas and r.role is ArenaRole.SCRATCH
         ),
+        aot_outputs=_aot_outputs(root, ctx.engine_artifacts.aot_prefix)
+        if isinstance(ctx.engine_artifacts, HeliaAotArtifacts)
+        else (),
+        engine_source=_engine_source(config.engine.type),
     )

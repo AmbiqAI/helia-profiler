@@ -38,6 +38,10 @@ class FixtureCaptureGuard(Protocol):
         ...
 
 
+#: Core clock, STIMER rate and STIMER settle window the qualified fixture reports.
+FIXTURE_CPU_HZ = 96_000_000
+FIXTURE_TIMER_HZ = 32768
+FIXTURE_SETTLE_TICKS = (245, 410)
 _STATUS_POISON = struct.unpack("<i", bytes([0xA5]) * 4)[0]
 _STATUS_RUNNING = -1
 _FIRST_POLL_S = 1.0
@@ -407,10 +411,10 @@ def capture_fixture(
         require(crc == computed, "Output checksum mismatch")
         require(
             timing.iterations > 0
-            and timing.timer_hz == 32768
-            and timing.cpu_hz == 96000000
+            and timing.timer_hz == FIXTURE_TIMER_HZ
+            and timing.cpu_hz == FIXTURE_CPU_HZ
             and 0 < timing.ticks < 60 * timing.timer_hz
-            and 245 <= timing.settle_ticks <= 410,
+            and FIXTURE_SETTLE_TICKS[0] <= timing.settle_ticks <= FIXTURE_SETTLE_TICKS[1],
             "Invalid timing completion terminal",
         )
         if request.arena_capacity is not None:

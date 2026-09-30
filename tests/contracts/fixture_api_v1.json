@@ -1,7 +1,7 @@
 {
   "api_version": [
     1,
-    0
+    1
   ],
   "surface": {
     "ElfSection": {
@@ -47,6 +47,52 @@
       "methods": {},
       "properties": []
     },
+    "EngineDTypeCapability": {
+      "fields": [
+        [
+          "engine",
+          "EngineType",
+          "<required>"
+        ],
+        [
+          "dtype",
+          "FixtureDType",
+          "<required>"
+        ],
+        [
+          "capability",
+          "FixtureCapability",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "EngineSource": {
+      "fields": [
+        [
+          "package",
+          "str",
+          "<required>"
+        ],
+        [
+          "version",
+          "str",
+          "<required>"
+        ],
+        [
+          "commit",
+          "str | None",
+          "None"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
     "EngineType": {
       "base": "str",
       "kind": "enum",
@@ -56,13 +102,6 @@
         "HELIA_RT": "helia-rt",
         "TFLM": "tflm"
       }
-    },
-    "FIXTURE_API_VERSION": {
-      "kind": "constant",
-      "value": [
-        1,
-        0
-      ]
     },
     "FIXTURE_CAPABILITIES": {
       "kind": "constant",
@@ -257,6 +296,121 @@
           "aot_arena_scan",
           "tuple[tuple[int, int], ...]",
           "()"
+        ],
+        [
+          "aot_outputs",
+          "tuple[FixtureFile, ...]",
+          "()"
+        ],
+        [
+          "engine_source",
+          "EngineSource | None",
+          "None"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "FixtureBuildRequest": {
+      "fields": [
+        [
+          "fixture",
+          "FixedFixture | TypedFixture",
+          "<required>"
+        ],
+        [
+          "method",
+          "FixtureMethod",
+          "<required>"
+        ],
+        [
+          "work_dir",
+          "Path",
+          "<required>"
+        ],
+        [
+          "engine",
+          "EngineType",
+          "<required>"
+        ],
+        [
+          "arena_size",
+          "int",
+          "<required>"
+        ],
+        [
+          "iterations",
+          "int",
+          "<required>"
+        ],
+        [
+          "warmup",
+          "int",
+          "<required>"
+        ],
+        [
+          "backend",
+          "FixtureBackend | None",
+          "None"
+        ],
+        [
+          "placement",
+          "FixturePlacement",
+          "<factory>"
+        ],
+        [
+          "target",
+          "FixtureTarget",
+          "<factory>"
+        ],
+        [
+          "runtime",
+          "PreparedUpstreamRuntime | None",
+          "None"
+        ],
+        [
+          "aot",
+          "HeliaAotOptions | None",
+          "None"
+        ],
+        [
+          "observe_aot_arenas",
+          "bool",
+          "False"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {
+        "to_config": "(self) -> 'ProfileConfig'"
+      },
+      "properties": [
+        "intent_identity"
+      ]
+    },
+    "FixtureCapabilities": {
+      "fields": [
+        [
+          "api_version",
+          "tuple[int, int]",
+          "<required>"
+        ],
+        [
+          "targets",
+          "tuple[QualifiedFixtureTarget, ...]",
+          "<required>"
+        ],
+        [
+          "engines",
+          "tuple[EngineDTypeCapability, ...]",
+          "<required>"
+        ],
+        [
+          "readback_budget",
+          "int",
+          "<required>"
         ]
       ],
       "frozen": true,
@@ -767,6 +921,24 @@
       "methods": {},
       "properties": []
     },
+    "FixturePlacement": {
+      "fields": [
+        [
+          "arena",
+          "Placement",
+          "<Placement.SRAM: 'sram'>"
+        ],
+        [
+          "weights",
+          "Placement",
+          "<Placement.MRAM: 'mram'>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
     "FixtureRole": {
       "base": "str",
       "kind": "enum",
@@ -900,6 +1072,46 @@
         "RESTORE_AND_INVOKE": "restore_and_invoke"
       }
     },
+    "HeliaAotOptions": {
+      "fields": [
+        [
+          "prefix",
+          "str | None",
+          "None"
+        ],
+        [
+          "module_name",
+          "str | None",
+          "None"
+        ],
+        [
+          "linker_profile",
+          "str | None",
+          "None"
+        ],
+        [
+          "platform_name",
+          "str | None",
+          "None"
+        ],
+        [
+          "cmsis_nn_requantize_inline_asm",
+          "bool",
+          "True"
+        ],
+        [
+          "convert_args_json",
+          "str",
+          "'{}'"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {
+        "engine_config": "(self) -> 'dict[str, Any]'"
+      },
+      "properties": []
+    },
     "Int8Tensor": {
       "fields": [
         [
@@ -1009,6 +1221,59 @@
         "TCM": "tcm"
       }
     },
+    "PreparedRuntimeManifest": {
+      "fields": [
+        [
+          "schema_version",
+          "int",
+          "<required>"
+        ],
+        [
+          "archive_sha256",
+          "str",
+          "<required>"
+        ],
+        [
+          "providers",
+          "tuple[RuntimeProvider, ...]",
+          "<required>"
+        ],
+        [
+          "abi",
+          "RuntimeABI",
+          "<required>"
+        ],
+        [
+          "headers",
+          "tuple[RuntimeHeader, ...]",
+          "<required>"
+        ],
+        [
+          "include_dirs",
+          "tuple[str, ...]",
+          "<required>"
+        ],
+        [
+          "stack",
+          "str",
+          "'upstream'"
+        ],
+        [
+          "consumer_defines",
+          "tuple[str, ...]",
+          "('TF_LITE_STATIC_MEMORY', 'CMSIS_NN', 'ARM_NN_ENABLE_F16=0', 'ARM_NN_ENABLE_F32=0')"
+        ],
+        [
+          "kernel_dir",
+          "str | None",
+          "None"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
     "PreparedUpstreamRuntime": {
       "fields": [
         [
@@ -1032,6 +1297,123 @@
       "methods": {
         "verify": "(self) -> 'VerifiedPreparedRuntime'"
       },
+      "properties": []
+    },
+    "QualifiedFixtureTarget": {
+      "fields": [
+        [
+          "board",
+          "str",
+          "<required>"
+        ],
+        [
+          "clock_profile",
+          "str",
+          "<required>"
+        ],
+        [
+          "cpu_hz",
+          "int",
+          "<required>"
+        ],
+        [
+          "device",
+          "str",
+          "<required>"
+        ],
+        [
+          "load_address",
+          "int",
+          "<required>"
+        ],
+        [
+          "timer_hz",
+          "int",
+          "<required>"
+        ],
+        [
+          "image_limit",
+          "int",
+          "<required>"
+        ],
+        [
+          "settle_ticks",
+          "tuple[int, int]",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "RuntimeABI": {
+      "fields": [
+        [
+          "toolchain",
+          "str",
+          "<required>"
+        ],
+        [
+          "cpu",
+          "str",
+          "<required>"
+        ],
+        [
+          "float_abi",
+          "str",
+          "<required>"
+        ],
+        [
+          "short_enums",
+          "bool",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "RuntimeHeader": {
+      "fields": [
+        [
+          "name",
+          "str",
+          "<required>"
+        ],
+        [
+          "sha256",
+          "str",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "RuntimeProvider": {
+      "fields": [
+        [
+          "name",
+          "str",
+          "<required>"
+        ],
+        [
+          "url",
+          "str",
+          "<required>"
+        ],
+        [
+          "revision",
+          "str",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
       "properties": []
     },
     "SectionInventory": {
@@ -1131,13 +1513,51 @@
         "identity"
       ]
     },
+    "VerifiedPreparedRuntime": {
+      "fields": [
+        [
+          "archive",
+          "FixtureFile",
+          "<required>"
+        ],
+        [
+          "header_root",
+          "Path",
+          "<required>"
+        ],
+        [
+          "manifest",
+          "FixtureFile",
+          "<required>"
+        ],
+        [
+          "record",
+          "RuntimeManifest",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {
+        "header_path": "(self, name: 'str') -> 'Path'"
+      },
+      "properties": []
+    },
     "build_fixed_fixture": {
       "kind": "function",
       "signature": "(config: 'ProfileConfig', fixture: 'FixedFixture | TypedFixture', *, method: 'FixtureMethod', runtime: 'PreparedUpstreamRuntime | None' = None, compile: 'bool' = True, observe_aot_arenas: 'bool' = False) -> 'FixtureBuild'"
     },
+    "build_fixture": {
+      "kind": "function",
+      "signature": "(request: 'FixtureBuildRequest', *, compile: 'bool' = True) -> 'FixtureBuild'"
+    },
     "capture_fixture": {
       "kind": "function",
       "signature": "(request: 'FixtureCaptureRequest', *, guard: 'FixtureCaptureGuard') -> 'FixtureCaptureResult'"
+    },
+    "fixture_capabilities": {
+      "kind": "function",
+      "signature": "() -> 'FixtureCapabilities'"
     },
     "inspect_fixture_footprint": {
       "kind": "function",
