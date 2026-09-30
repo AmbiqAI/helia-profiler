@@ -157,3 +157,15 @@ def test_overlay_keys_are_original_tflite_operator_indices(
     expected: dict[str, float],
 ):
     assert _overlay_values(tmp_path, layers, manifest) == expected
+
+
+def test_overlay_writer_removes_previous_runs_overlays(tmp_path: Path):
+    stale = tmp_path / "me_overlay_ARM_PMU_CPU_CYCLES.json"
+    stale.write_text("{}")
+    unrelated = tmp_path / "notes.json"
+    unrelated.write_text("{}")
+
+    assert _overlay_values(tmp_path, [_layer(0, "aten::add.out:c3i12", 10)]) == {}
+
+    assert not stale.exists()
+    assert unrelated.exists()

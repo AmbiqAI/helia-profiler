@@ -174,6 +174,10 @@ def _write_model_explorer_overlays(
     aot_op_manifest: list[dict[str, Any]] | None = None,
 ) -> None:
     """Build and save Model Explorer overlay files from PMU data."""
+    # A reused output directory must not keep a previous run's overlays: this
+    # run may write fewer metrics, or none when no layer is attributable.
+    for stale in me_dir.glob("me_overlay_*.json"):
+        stale.unlink()
     attributor = LayerAttributor(None, aot_op_manifest)
     metrics: dict[str, dict[str, float]] = {}
     for layer in pmu.layers:
