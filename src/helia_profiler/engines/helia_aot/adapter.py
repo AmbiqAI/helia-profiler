@@ -1,11 +1,11 @@
 """heliaAOT engine adapter.
 
 Invokes the heliaAOT compiler to produce an NSX module from a .tflite model,
-generates a memory-placement attribute header, and wraps ns-cmsis-nn as a
-local NSX module for the profiler firmware build. See :mod:`.compile` for
-platform mapping / AOT compiler invocation, :mod:`.manifest` for operator
-manifest and memory-plan extraction, and :mod:`.cmsis_nn` for ns-cmsis-nn
-resolution and NSX module wrapping.
+generates a memory-placement attribute header, and declares the ns-cmsis-nn
+module it links against. See :mod:`.compile` for platform mapping / AOT
+compiler invocation, :mod:`.manifest` for operator manifest and memory-plan
+extraction, and :mod:`helia_profiler.engines.cmsis_nn` for ns-cmsis-nn
+resolution.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from ...results import NsxModuleRef
 from .. import EngineType
 from ..base import ArenaRegion, HeliaAotArtifacts, PsramWeightsSource
 from ..cmsis_nn import cmsis_nn_cmake_vars, cmsis_nn_module_ref
-from ..ethos_u import NSX_NPU_MODULE, NSX_NPU_PROJECT
+from ..ethos_u import nsx_npu_module_ref
 from .compile import (
     _DEFAULT_MODULE_NAME,
     _DEFAULT_PREFIX,
@@ -106,14 +106,7 @@ def _build_extra_modules(
     """
     extra_modules = [cmsis_nn_ref]
     if config.engine.backend == "ethos_u":
-        extra_modules.append(
-            NsxModuleRef(
-                name=NSX_NPU_MODULE,
-                path=Path(),
-                local=False,
-                project=NSX_NPU_PROJECT,
-            )
-        )
+        extra_modules.append(nsx_npu_module_ref())
     extra_modules.append(NsxModuleRef(name=module_name, path=aot_module_dir))
     return extra_modules
 
@@ -179,9 +172,6 @@ class HeliaAOTAdapter:
         # *scratch* arenas there.  Persistent/constant regions stay
         # where the AOT planner placed them — those typically hold
         # weights/state and have separate placement controls.
-        if target not in (Placement.PSRAM, Placement.TCM, Placement.SRAM, Placement.MRAM):
-            return regions
-
         return [
             _dc_replace(r, placement=target) if r.role is ArenaRole.SCRATCH else r for r in regions
         ]

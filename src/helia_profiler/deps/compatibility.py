@@ -272,12 +272,13 @@ def cmsis_nn_provider_module(engine_type: str, engine_backend: str | None) -> st
 def select_cmsis_nn_override(engine_config: Any, *, provider_module: str) -> CmsisNnOverride | None:
     """Return the CMSIS-NN selector that actually takes effect, if any.
 
-    Mirrors the adapters' precedence (``engines/cmsis_nn.py``): an explicit
+    The single precedence the engine adapters build from (they validate it via
+    ``engines.cmsis_nn.resolve_cmsis_nn_selector``): an explicit
     ``cmsis_nn_path`` wins, then ``cmsis_nn_ref``, then the ``CMSIS_NN_PATH``
     environment fallback — which only reaches ``nsx-cmsis-nn`` builds;
-    ExecuTorch's ``arm`` provider never reads it. Empty values are not
-    overrides: every adapter gates on truthiness and falls back to the
-    baseline ref, so they must not change the qualification stamp either.
+    ExecuTorch's ``arm`` provider never reads it. Explicit config beats the
+    environment so a resolved commit stays a git-backed lock entry rather
+    than an unversioned local module. Empty values are not overrides.
     """
     config = engine_config if isinstance(engine_config, Mapping) else {}
     path = config.get("cmsis_nn_path")

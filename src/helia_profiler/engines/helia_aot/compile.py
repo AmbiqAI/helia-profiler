@@ -23,6 +23,7 @@ from ...config import DEFAULT_ARENA_SIZE_BYTES, ProfileConfig
 from ...errors import EngineError
 from ...placement import Placement, resolve_fastest_fit_placement
 from ...platform import SocDef, get_soc_for_board
+from ..semver import parse_semver
 
 log = logging.getLogger("hpx")
 
@@ -45,7 +46,6 @@ HELIAAOT_MAX_VERSION_EXCLUSIVE = "0.24.0"
 _DEFAULT_PREFIX = "hpx"
 _DEFAULT_MODULE_NAME = "hpx_model"
 
-# Jinja2 template environment (shared loader with heliaRT adapter)
 _jinja_env = jinja2.Environment(
     loader=jinja2.PackageLoader("helia_profiler.engines", "templates"),
     keep_trailing_newline=True,
@@ -233,11 +233,11 @@ def _run_aot_compiler(
         from helia_aot.cli.defines import ConvertArgs
         from helia_aot.converter import AotConverter
         from helia_aot.defines import ModuleType
-    except ImportError:
+    except ImportError as exc:
         raise EngineError(
             "heliaAOT package not installed",
-            hint=("Install helia-aot: pip install 'helia-profiler[aot]' or pip install helia-aot"),
-        )
+            hint="Install helia-aot: pip install 'helia-profiler[aot]' or pip install helia-aot",
+        ) from exc
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -290,7 +290,7 @@ def _run_aot_compiler(
         raise EngineError(
             f"Failed to build heliaAOT ConvertArgs: {exc}",
             hint="Check engine.config_path and engine.config.aot_args.",
-        )
+        ) from exc
 
     convert_args.model.path = config.model.path
     convert_args.module.path = output_dir
@@ -313,10 +313,7 @@ def _run_aot_compiler(
         converter = AotConverter(config=convert_args)
         codegen_ctx = converter.convert()
     except Exception as exc:
-        raise EngineError(
-            f"heliaAOT compilation failed: {exc}",
-            hint=str(exc)[:500],
-        )
+        raise EngineError(f"heliaAOT compilation failed: {exc}") from exc
 
     module_dir = output_dir / module_name
     if not module_dir.is_dir():
@@ -504,9 +501,9 @@ def _check_helia_aot_version(config: ProfileConfig | None = None) -> str:
             ),
         ) from exc
 
-    actual = _parse_semver(installed)
-    minimum = _parse_semver(HELIAAOT_MIN_VERSION)
-    maximum: tuple[int, int, int] | None = _parse_semver(HELIAAOT_MAX_VERSION_EXCLUSIVE)
+    actual = parse_semver(installed)
+    minimum = parse_semver(HELIAAOT_MIN_VERSION)
+    maximum: tuple[int, int, int] | None = parse_semver(HELIAAOT_MAX_VERSION_EXCLUSIVE)
     if config is not None and config.compatibility is not None:
         policy = config.compatibility.baseline.engine("helia-aot")
         if policy.min_version is not None or policy.max_version_exclusive is not None:
@@ -514,10 +511,10 @@ def _check_helia_aot_version(config: ProfileConfig | None = None) -> str:
             # could silently re-bound the baseline's floor with an unrelated
             # ceiling, rejecting every version instead of leaving it open.
             minimum = (
-                _parse_semver(policy.min_version) if policy.min_version is not None else (0, 0, 0)
+                parse_semver(policy.min_version) if policy.min_version is not None else (0, 0, 0)
             )
             maximum = (
-                _parse_semver(policy.max_version_exclusive)
+                parse_semver(policy.max_version_exclusive)
                 if policy.max_version_exclusive is not None
                 else None
             )
@@ -566,11 +563,3 @@ def _check_helia_aot_version(config: ProfileConfig | None = None) -> str:
     )
 
     return installed
-
-
-def _parse_semver(version: str) -> tuple[int, int, int]:
-    """Parse a semver-ish string into (major, minor, patch); (0,0,0) on failure."""
-    m = re.match(r"v?(\d+)\.(\d+)\.(\d+)", version)
-    if not m:
-        return (0, 0, 0)
-    return int(m.group(1)), int(m.group(2)), int(m.group(3))
