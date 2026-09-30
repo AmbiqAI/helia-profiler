@@ -18,7 +18,7 @@ from helia_profiler.engines import EngineType
 from helia_profiler.engines.base import HeliaRtArtifacts
 from helia_profiler.errors import ConfigError
 from helia_profiler.firmware.op_resolver import build_fixture_resolver_plan
-from helia_profiler.fixture import (
+from helia_profiler._fixture_build import (
     FixedFixture,
     FixtureCapability,
     FixtureFile,
@@ -326,9 +326,9 @@ def test_heliart_build_links_and_proves_the_prepared_archive(tmp_path, monkeypat
     f, analysis = _fixture(tmp_path)
     rt = runtime(tmp_path / "rt")
     calls = []
-    monkeypatch.setattr("helia_profiler.fixture.analyze_fixture_model", lambda _: analysis)
+    monkeypatch.setattr("helia_profiler._fixture_build.analyze_fixture_model", lambda _: analysis)
     monkeypatch.setattr(
-        "helia_profiler.fixture.PipelineRunner",
+        "helia_profiler._fixture_build.PipelineRunner",
         _runner(tmp_path, rt, calls, lock_modules=GOOD_LOCK, map_lines=GOOD_MAP),
     )
     r = build_fixed_fixture(_config(tmp_path, f), f, method=METHOD, runtime=rt)
@@ -369,9 +369,9 @@ def test_heliart_build_refuses_any_other_runtime_provider(
 ):
     f, analysis = _fixture(tmp_path)
     rt = runtime(tmp_path / "rt")
-    monkeypatch.setattr("helia_profiler.fixture.analyze_fixture_model", lambda _: analysis)
+    monkeypatch.setattr("helia_profiler._fixture_build.analyze_fixture_model", lambda _: analysis)
     monkeypatch.setattr(
-        "helia_profiler.fixture.PipelineRunner",
+        "helia_profiler._fixture_build.PipelineRunner",
         _runner(tmp_path, rt, [], lock_modules=lock, map_lines=map_lines),
     )
     with pytest.raises(ConfigError, match=match):
@@ -407,9 +407,9 @@ def test_heliart_proof_reads_inputs_below_the_app_not_above_it(
     ]
     if extra:
         lines.append(f"{root}/{extra}")
-    monkeypatch.setattr("helia_profiler.fixture.analyze_fixture_model", lambda _: analysis)
+    monkeypatch.setattr("helia_profiler._fixture_build.analyze_fixture_model", lambda _: analysis)
     monkeypatch.setattr(
-        "helia_profiler.fixture.PipelineRunner",
+        "helia_profiler._fixture_build.PipelineRunner",
         _runner(work, rt, [], lock_modules=GOOD_LOCK, map_lines=lines),
     )
     if refused:
@@ -434,9 +434,9 @@ def test_engine_and_prepared_stack_must_agree(
     tmp_path, monkeypatch, engine, backend, schema, match
 ):
     f, analysis = _fixture(tmp_path)
-    monkeypatch.setattr("helia_profiler.fixture.analyze_fixture_model", lambda _: analysis)
+    monkeypatch.setattr("helia_profiler._fixture_build.analyze_fixture_model", lambda _: analysis)
     monkeypatch.setattr(
-        "helia_profiler.fixture.PipelineRunner", lambda *_: pytest.fail("pipeline reached")
+        "helia_profiler._fixture_build.PipelineRunner", lambda *_: pytest.fail("pipeline reached")
     )
     rt = None if schema is None else runtime(tmp_path / "rt", schema=schema)
     with pytest.raises(ConfigError, match=match):
@@ -446,7 +446,7 @@ def test_engine_and_prepared_stack_must_agree(
 def test_upstream_build_still_refuses_a_heliart_module(tmp_path, monkeypatch):
     f, analysis = _fixture(tmp_path)
     rt = runtime(tmp_path / "rt", schema=1)
-    monkeypatch.setattr("helia_profiler.fixture.analyze_fixture_model", lambda _: analysis)
+    monkeypatch.setattr("helia_profiler._fixture_build.analyze_fixture_model", lambda _: analysis)
 
     class Runner:
         def __init__(self, stages):
@@ -475,7 +475,7 @@ def test_upstream_build_still_refuses_a_heliart_module(tmp_path, monkeypatch):
                 profile_run=SimpleNamespace(firmware=SimpleNamespace(binary_path=binary)),
             )
 
-    monkeypatch.setattr("helia_profiler.fixture.PipelineRunner", Runner)
+    monkeypatch.setattr("helia_profiler._fixture_build.PipelineRunner", Runner)
     with pytest.raises(ConfigError, match="dependency lock"):
         build_fixed_fixture(
             _config(tmp_path, f, EngineType.TFLM, "cmsis_nn"), f, method=METHOD, runtime=rt
@@ -483,7 +483,7 @@ def test_upstream_build_still_refuses_a_heliart_module(tmp_path, monkeypatch):
 
 
 def test_heliart_accepts_float16_models_that_tflm_refuses(tmp_path):
-    from helia_profiler.fixture import FixtureIO, TypedFixture, _check_typed_fixture
+    from helia_profiler._fixture_build import FixtureIO, TypedFixture, _check_typed_fixture
     from helia_profiler.fixture_analysis import FixtureTensor, TypedFixtureModelAnalysis
 
     tensors = (FixtureTensor("x", 0, "float16", (1, 4), None),)
@@ -508,7 +508,7 @@ def test_linked_inputs_keep_a_windows_drive_letter(sep):
     """ATfE maps on Windows name inputs as ``C:\\...`` with either separator."""
     from pathlib import PureWindowsPath
 
-    from helia_profiler.fixture import _linked_components
+    from helia_profiler._fixture_build import _linked_components
 
     root = sep.join(["C:", "Users", "r", "helia-rt-bench", "modules", "tflite-micro", "app"])
     app = PureWindowsPath(root)
@@ -562,7 +562,7 @@ def test_link_map_proof_on_posix_and_windows_paths(stack, style, host, case, ref
     """Every map-scan case under POSIX and Windows paths, spaces and either separator."""
     from pathlib import PurePosixPath, PureWindowsPath
 
-    from helia_profiler.fixture import PREPARED_RUNTIME_MODULES, _prove_link_map
+    from helia_profiler._fixture_build import PREPARED_RUNTIME_MODULES, _prove_link_map
 
     base = host.replace("-lower-drive", "")
     root, native = _APPS[base]

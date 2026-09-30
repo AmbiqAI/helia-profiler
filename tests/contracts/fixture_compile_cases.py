@@ -8,7 +8,8 @@ from helia_profiler.config import load_config
 from helia_profiler.engines import EngineType
 from helia_profiler.engines.base import ArenaRegion
 from helia_profiler.placement import ArenaRole, Placement
-from helia_profiler.fixture import (
+from helia_profiler._fixture_build import (
+    FixtureRole,
     FixedFixture,
     FixtureFile,
     FixtureIO,
@@ -119,7 +120,7 @@ def _render_typed(engine: str, scope: str, *, aot_prefix: str) -> tuple[str, dic
                 FixtureIO(
                     t,
                     pin(f"{t.name}.bin", bytes(t.size_bytes)),
-                    "aux" if t.name == "gain" else "signal",
+                    FixtureRole.AUX if t.name == "gain" else FixtureRole.SIGNAL,
                 )
                 for t in _TYPED_INPUTS
             ),
