@@ -10,6 +10,6 @@ hpx boards
 
 List supported boards and SoC capabilities
 
-Defined in `src/helia_profiler/cli/inspect_app.py` line 132.
+Defined in `src/helia_profiler/cli/inspect_app.py` line 135.
 
-Generated from the `src/helia_profiler` tree `cf4575012d6d2f42d4f7a8e03bae3bd4742cf110` with typer 0.26.8 and click 8.3.3.
+Generated from the `src/helia_profiler` tree `8a55717bd88fefa98ddefe190e40b8a63283747c` with typer 0.26.8 and click 8.3.3.
