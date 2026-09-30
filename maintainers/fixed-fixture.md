@@ -12,10 +12,14 @@ recomputes it from the installed files instead of trusting the call.
 
 Fixture builds take pinned inputs only. `build_fixed_fixture` refuses any
 module, engine or CMSIS-NN override the compatibility classifier reports,
-plus `SEGGER_RTT_PATH`, `target.segger_rtt_path`, `HPX_COMPILER_LAUNCHER` and
-explicit compiler launchers (`auto` and disabled stay allowed).
+plus `SEGGER_RTT_PATH`, `target.segger_rtt_path`, the variables CMake and
+the compilers read that change compiled output (`CFLAGS`, `CPATH`,
+`CMAKE_BUILD_TYPE` and the rest of `FIXTURE_REFUSED_ENVIRONMENT`), NSX's
+check bypasses, and explicit compiler launchers (`auto` and disabled stay
+allowed, from config or `HPX_COMPILER_LAUNCHER`).
 `tests/contracts/test_fixture_environment.py` classifies every environment
-read in the package, so a new one must be refused or justified. Fixture apps
+read in this package and in the pinned neuralspotx, so a new one must be
+refused or justified. Fixture apps
 compile with `-ffile-prefix-map`, so the ELF does not record the work
 directory.
 

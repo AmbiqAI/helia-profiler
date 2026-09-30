@@ -10,7 +10,7 @@ from pathlib import Path, PurePath
 import re
 
 from .config import ProfileConfig
-from .deps.compatibility import QualificationState, resolve_compatibility
+from .deps.compatibility import resolve_compatibility
 from .engines import EngineType
 from .engines.base import HeliaAotArtifacts
 from .errors import ConfigError
@@ -328,12 +328,40 @@ class FixtureBuild:
     aot_arena_scan: tuple[tuple[int, int], ...] = ()
 
 
-#: Environment variables that swap build inputs outside the compatibility classifier.
-FIXTURE_REFUSED_ENVIRONMENT = ("HPX_COMPILER_LAUNCHER", "SEGGER_RTT_PATH")
+#: Environment variables outside the compatibility classifier that change what a
+#: fixture build compiles or which inputs it accepts: HPX's own source paths,
+#: variables CMake and the compilers read, and NSX's check bypasses.
+FIXTURE_REFUSED_ENVIRONMENT = (
+    "ASM",
+    "ASMFLAGS",
+    "CC",
+    "CCC_OVERRIDE_OPTIONS",
+    "CFLAGS",
+    "CMAKE_ASM_COMPILER_LAUNCHER",
+    "CMAKE_BUILD_TYPE",
+    "CMAKE_CXX_COMPILER_LAUNCHER",
+    "CMAKE_CXX_LINKER_LAUNCHER",
+    "CMAKE_C_COMPILER_LAUNCHER",
+    "CMAKE_C_LINKER_LAUNCHER",
+    "CMAKE_TOOLCHAIN_FILE",
+    "COMPILER_PATH",
+    "CPATH",
+    "CPLUS_INCLUDE_PATH",
+    "CPPFLAGS",
+    "CXX",
+    "CXXFLAGS",
+    "C_INCLUDE_PATH",
+    "GCC_EXEC_PREFIX",
+    "LDFLAGS",
+    "LIBRARY_PATH",
+    "NSX_ALLOW_VERSION_MISMATCH",
+    "NSX_SKIP_COMPAT_CHECK",
+    "SEGGER_RTT_PATH",
+)
 
 
 def _refuse_overrides(config: ProfileConfig) -> None:
-    """Refuse any source, module, path or launcher override; fixtures build pinned inputs only."""
+    """Refuse any source, module, path, flag or launcher override; fixtures build pinned inputs only."""
     resolution = resolve_compatibility(
         config.compatibility_baseline,
         module_overrides=config.build.nsx_modules,
@@ -346,11 +374,11 @@ def _refuse_overrides(config: ProfileConfig) -> None:
     overrides.update(f"env.{name}" for name in FIXTURE_REFUSED_ENVIRONMENT if os.environ.get(name))
     if config.target.segger_rtt_path is not None:
         overrides.add("target.segger_rtt_path")
-    launcher = config.build.compiler_launcher.strip().lower()
-    if launcher != "auto" and launcher not in _DISABLED_LAUNCHER_VALUES:
-        overrides.add("build.compiler_launcher")
-    if resolution.qualification is not QualificationState.QUALIFIED and not overrides:
-        overrides.add(resolution.qualification.value)
+    launcher, source = os.environ.get("HPX_COMPILER_LAUNCHER"), "env.HPX_COMPILER_LAUNCHER"
+    if launcher is None:
+        launcher, source = config.build.compiler_launcher, "build.compiler_launcher"
+    if launcher.strip().lower() not in {"auto", *_DISABLED_LAUNCHER_VALUES}:
+        overrides.add(source)
     if overrides:
         raise ConfigError(
             f"Fixture builds use pinned inputs only; remove: {', '.join(sorted(overrides))}",
