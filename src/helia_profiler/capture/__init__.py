@@ -116,12 +116,24 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
     # templates), so the sentinel does not sit at a fixed offset.  The parser
     # likewise ignores everything before HPX_START.
     if not any(HPX_START_SENTINEL in l for l in lines):
+        hint = (
+            "The firmware may not be running the profiler app, or the "
+            "transport connection failed before data arrived."
+        )
+        soc = ctx.soc
+        if transport is Transport.SWO and soc is not None and soc.swo_trace_clock_mhz is None:
+            # Core-clocked SWO decodes only at the registry clock, so a perf
+            # mode that did not engage garbles the stream before the
+            # HPX_MEASURED_CLOCK_HZ check can run.
+            hint += (
+                " On this SoC SWO baud follows the core clock: if the "
+                "target.clock.cpu perf mode did not take effect, nothing "
+                "decodes. Retry with --transport rtt, which does not depend "
+                "on the core clock and reports the measured clock."
+            )
         raise CaptureError(
             f"Captured data ({len(lines)} lines) does not contain HPX_START sentinel",
-            hint=(
-                "The firmware may not be running the profiler app, or the "
-                "transport connection failed before data arrived."
-            ),
+            hint=hint,
         )
     if not any(l.strip() == HPX_END_SENTINEL for l in lines):
         raise CaptureError(
@@ -136,9 +148,6 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
             hint=_truncation_hint(str(transport)),
         )
 
-    # Cross-check the device's actual clock against the registry value the host
-    # assumed.  This catches registry drift or an NSX perf-mode that silently
-    # failed to apply — both of which corrupt SWO baud and cycle->time math.
     _verify_device_clock(ctx, result)
 
     if timing_raw:
@@ -672,33 +681,46 @@ def _truncation_hint(transport: str) -> str:
 
 
 def _verify_device_clock(ctx: PipelineContext, result: PmuResult) -> None:
-    """Warn if the device's actual clock disagrees with the registry value.
+    """Warn if the device's clock disagrees with the registry value.
 
     The host derives SWO baud and every cycle->time conversion from the
     ``target.clock.cpu`` selection resolved against the platform registry.
-    The firmware reports its real ``SystemCoreClock`` so we can detect when
-    that assumption is wrong — e.g. a stale registry entry or an NSX perf-mode
-    that did not take effect on this SoC.  A mismatch does not abort the run
-    (the cycle counts themselves are still valid), but it makes every derived
-    time value suspect, so surface it loudly.
+    Two device readings can contradict it: ``HPX_SYSTEM_CLOCK_HZ`` (the
+    firmware's ``SystemCoreClock``, which only differs when Apollo3 burst
+    fails to engage) and ``HPX_MEASURED_CLOCK_HZ`` (DWT cycles over a STIMER
+    interval, which catches a perf mode that silently did not apply).  A
+    mismatch does not abort the run (the cycle counts themselves are still
+    valid), but it makes every derived time value suspect.
     """
     platform = ctx.run_metadata.platform
     if platform is None:
         return
-    device_hz = result.meta.system_clock_hz
     registry_mhz = platform.cpu_clock_mhz
-    if not device_hz or registry_mhz <= 0:
+    if registry_mhz <= 0:
         return
-
     registry_hz = registry_mhz * 1_000_000
-    # HFRC trim tolerance is a few percent; 5% comfortably clears real trim
-    # variation while still catching integer-ratio mistakes (48 vs 96 MHz).
-    if abs(device_hz - registry_hz) > 0.05 * registry_hz:
+    readings = (
+        ("Device reports", result.meta.system_clock_hz),
+        ("Measured", result.meta.measured_clock_hz),
+    )
+    if result.meta.measured_clock_hz == 0:
         log.warning(
-            "Device reports CPU clock %.3f MHz but the platform registry "
+            "The on-device clock probe returned 0 Hz (DWT or STIMER did not "
+            "count), so the %d MHz core clock for %s is unverified.",
+            registry_mhz,
+            platform.soc or "this SoC",
+        )
+    for label, device_hz in readings:
+        # 5% clears HFRC trim, catches perf-mode misses.
+        if not device_hz or abs(device_hz - registry_hz) <= 0.05 * registry_hz:
+            continue
+        log.warning(
+            "%s CPU clock %.3f MHz but the platform registry "
             "assumed %d MHz (cpu=%s) for %s. SWO baud and all cycle->time "
-            "values use the registry value and will be wrong. Fix the clock "
-            "for %s in the platform registry or the target.clock.cpu setting.",
+            "values use the registry value and will be wrong. Check that "
+            "the perf mode took effect, or fix the clock for %s in the "
+            "platform registry or the target.clock.cpu setting.",
+            label,
             device_hz / 1_000_000,
             registry_mhz,
             platform.cpu_clock_name or "?",

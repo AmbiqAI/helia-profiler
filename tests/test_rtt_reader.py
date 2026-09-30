@@ -485,6 +485,91 @@ def test_capture_pmu_no_clock_warning_when_device_clock_matches(
     assert not any("Device reports CPU clock" in r.message for r in caplog.records)
 
 
+@pytest.mark.parametrize(
+    ("measured_hz", "warns", "probe_failed"),
+    [(96_000_000, True, False), (249_900_000, False, False), (0, False, True)],
+)
+def test_capture_pmu_checks_measured_clock(
+    tmp_path: Path, monkeypatch, caplog, measured_hz: int, warns: bool, probe_failed: bool
+):
+    import logging
+
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"\x00")
+    config = load_config(
+        None,
+        {
+            "model": {"path": str(model)},
+            "engine": {"type": "helia-rt"},
+            "target": {"transport": "swo", "clock": {"cpu": "hp"}},
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ResolvePlatformStage().run(ctx)
+    build_dir = tmp_path / "build"
+    set_profile_firmware(ctx, build_dir=build_dir)
+    build_dir.mkdir()
+    ctx.resolved_jlink_serial = "1160002204"
+
+    def fake_capture_swo_output(**kwargs):
+        # SystemCoreClock echoes the host's 250 MHz; only the probe can differ.
+        return [
+            "--- HPX_START ---",
+            "HPX_SYSTEM_CLOCK_HZ=250000000",
+            f"HPX_MEASURED_CLOCK_HZ={measured_hz}",
+            "--- HPX_PRESET basic_cpu ---",
+            "--- HPX_ITER 0 ---",
+            "Layer,Op,ARM_PMU_CPU_CYCLES",
+            "0,CONV_2D,1",
+            "--- HPX_END ---",
+        ]
+
+    monkeypatch.setattr("helia_profiler.transport.swo.capture_swo_output", fake_capture_swo_output)
+
+    with caplog.at_level(logging.WARNING, logger="hpx"):
+        result = capture_pmu(ctx)
+
+    assert result.meta.measured_clock_hz == measured_hz
+    assert any("Measured CPU clock" in r.message for r in caplog.records) is warns
+    assert any("clock probe returned 0 Hz" in r.message for r in caplog.records) is probe_failed
+
+
+@pytest.mark.parametrize(
+    ("board", "names_clock"), [("apollo510_evb", True), ("apollo3p_evb", False)]
+)
+def test_swo_capture_without_start_names_core_clock(
+    tmp_path: Path, monkeypatch, board: str, names_clock: bool
+):
+    from helia_profiler.errors import CaptureError
+
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"\x00")
+    config = load_config(
+        None,
+        {
+            "model": {"path": str(model)},
+            "engine": {"type": "helia-rt"},
+            "target": {"board": board, "transport": "swo"},
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ResolvePlatformStage().run(ctx)
+    build_dir = tmp_path / "build"
+    set_profile_firmware(ctx, build_dir=build_dir)
+    build_dir.mkdir()
+    ctx.resolved_jlink_serial = "1160002204"
+
+    monkeypatch.setattr(
+        "helia_profiler.transport.swo.capture_swo_output", lambda **kwargs: ["\x93\x1f garbled"]
+    )
+
+    with pytest.raises(CaptureError) as excinfo:
+        capture_pmu(ctx)
+
+    assert "does not contain HPX_START sentinel" in str(excinfo.value)
+    assert ("SWO baud follows the core clock" in (excinfo.value.hint or "")) is names_clock
+
+
 def test_capture_pmu_passes_resolved_jlink_device_to_usb(tmp_path: Path, monkeypatch):
     model = tmp_path / "model.tflite"
     model.write_bytes(b"\x00")
@@ -1561,3 +1646,13 @@ def test_capture_swo_retries_share_one_deadline(monkeypatch):
 
     assert budgets == [60.0, 20.0]
     assert lines == ["no start sentinel"]
+
+
+def test_firmware_meta_keeps_positional_order():
+    from dataclasses import fields
+
+    from helia_profiler.results.models import FirmwareMeta
+
+    names = [f.name for f in fields(FirmwareMeta)]
+    assert names.index("profiled_infer_count") == names.index("system_clock_hz") + 1
+    assert names[-1] == "measured_clock_hz"

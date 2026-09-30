@@ -27,7 +27,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "6632c9b55249a601f4764802a46b7b30b35b3c27f1eca1b82cf0c7d99d48a689"
+    "sha256": "406bab5c594f5947cc3f3c30a2f88805f559f83a61bc4b15f03b3187324a5f63"
   },
   "apollo3p|rtt|helia-aot|busy_loop": {
     "markers": {
@@ -57,7 +57,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "d85a98b622310a4b51c73f294c584aa8f3e96955a78b677c2bb12044177a00ab"
+    "sha256": "8c7a0573161376b9bcec65578175fe18c7f7d81a991ad49bb01a7d176de5af0a"
   },
   "apollo3p|rtt|helia-aot|power": {
     "markers": {
@@ -87,7 +87,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "6d1b8138f53eadb6f4bc83ba75829dc95f9ef399adbc83e27f2e5e1f67799da4"
+    "sha256": "22a4cf0294b4e61aeeaf3d9c5be645ca885c7f7b2c98d031cf97fb189dea134f"
   },
   "apollo3p|rtt|helia-aot|power|busy_loop": {
     "markers": {
@@ -117,7 +117,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "e4b9a026f91dcea22b95ede28bffa00c041917c4f2632146ab56989484d6630c"
+    "sha256": "1ba6f9d5f344b45e13dacd7fd03aea11b8bba66d0e1cf5a93c774c55ae1b249b"
   },
   "apollo3p|rtt|helia-rt": {
     "markers": {
@@ -147,7 +147,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "94863b4fb1a2338053b81ea3f1a00581718522249d6bbf4fe1cd0317f253d5e9"
+    "sha256": "ed402fa68f4422c502d3a2827a359ccec2a10ab48006c0b5b33839798c197347"
   },
   "apollo3p|rtt|helia-rt|busy_loop": {
     "markers": {
@@ -177,7 +177,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "6350510da160b0d69037c67f4cc79f39b81990277b4fbbd570467ede41a2b04b"
+    "sha256": "6bce243a26c800dc95444193cfb46741342ed1b8b0a8943052238ac41665bdae"
   },
   "apollo3p|rtt|helia-rt|power": {
     "markers": {
@@ -207,7 +207,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "35eb886c937099d7e4a76c0844171b49effc881038c1dbea16ddaa9cd08914c6"
+    "sha256": "12d54f5777ddf5e655aaec00d8957173058a229e151720d433837307fe771e6e"
   },
   "apollo3p|rtt|helia-rt|power|busy_loop": {
     "markers": {
@@ -237,7 +237,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "554f006080b798c4636eaf9105dc83d21c29d6f389771cdd232213c887fe7302"
+    "sha256": "4c2ee35959f331cd8a5714a3df3693cd2c640887bcfe0657ab894e53ce295dad"
   },
   "apollo3p|rtt|tflm": {
     "markers": {
@@ -267,7 +267,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "1936a3f86729e74c6eed260e859a20a3112ae53408bc1dabeac0d10a81a01664"
+    "sha256": "4850bba35cd22a5e53c9d9421e8ce424fa2944d6bbd2aa5c79b4d04a054e3bce"
   },
   "apollo3p|rtt|tflm|busy_loop": {
     "markers": {
@@ -297,7 +297,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "05fc177b160c22188902e2afa71190906a76eab2a2a29951f27b0fca36c3c7e7"
+    "sha256": "746511d22d5f9fdd1f80bce6189e13bd4c78060d0b3fba214a49b61cda373797"
   },
   "apollo3p|rtt|tflm|power": {
     "markers": {
@@ -327,7 +327,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "35eb886c937099d7e4a76c0844171b49effc881038c1dbea16ddaa9cd08914c6"
+    "sha256": "12d54f5777ddf5e655aaec00d8957173058a229e151720d433837307fe771e6e"
   },
   "apollo3p|rtt|tflm|power|busy_loop": {
     "markers": {
@@ -357,7 +357,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "554f006080b798c4636eaf9105dc83d21c29d6f389771cdd232213c887fe7302"
+    "sha256": "4c2ee35959f331cd8a5714a3df3693cd2c640887bcfe0657ab894e53ce295dad"
   },
   "apollo3p|swo|helia-aot": {
     "markers": {
@@ -387,7 +387,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "e9b0ed29b3ff6d7634f7efbc35414d9646d2724fd834343afc2b3da599dfe4b0"
+    "sha256": "a27f1837422d61f35ef02a35d0d0364caa03b8d2345e8e05571b48244ac42c01"
   },
   "apollo3p|swo|helia-rt": {
     "markers": {
@@ -417,7 +417,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "3e22c34cf594d0c63bed8552f75865bca73b39300e5092f65b104cf8a078dfd4"
+    "sha256": "65600393daa310214621454bed4b0ab5badf62d1b399ad65700af1db6905fd34"
   },
   "apollo3p|swo|tflm": {
     "markers": {
@@ -447,7 +447,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "48008ffe88569888d140e7a5792b38ecbe741194d65e87c804987ff9601d26eb"
+    "sha256": "497a62f88d097ccaafb8157fff5502781d70f62cbe0240e1d28ddef6c3482d21"
   },
   "apollo3p|uart|helia-aot": {
     "markers": {
@@ -477,7 +477,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "07814bfa823e1f8a335a1c3e84027ccd2c74dcf710ea46dd55485fc10bbe160e"
+    "sha256": "2251936958c6566bc7a595c7874bf04346b23e2e5dae876dae5ac1cc01365592"
   },
   "apollo3p|uart|helia-rt": {
     "markers": {
@@ -507,7 +507,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "bb30b2d143925262f05944bcc36f1aac15bd0fb68d772a517cc12787d531d8c8"
+    "sha256": "ec9c3d03c5df95e93fec7342a9c4326a66b8f47f207f874951adf687d57e54e8"
   },
   "apollo3p|uart|tflm": {
     "markers": {
@@ -537,7 +537,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "8227226f5685d4bf2eef0953c6fe64293407543b38c15b6e415070ff2fba7d6f"
+    "sha256": "6254e87c721e739c1448bbd562af241e73596186b0a16fb46fa1938b02fafe1f"
   },
   "apollo3p|usb_cdc|helia-aot": {
     "markers": {
@@ -567,7 +567,7 @@
       "stimer_window": false,
       "usb_timer": true
     },
-    "sha256": "91846ec0f6a92e2b6f8731ec32aa6630b8cd88e03a9a53a48959c8e288980689"
+    "sha256": "427ed2d743408d70ee20aee85e39c66f036e98f188b00dd018e296a556c20ab8"
   },
   "apollo3p|usb_cdc|helia-rt": {
     "markers": {
@@ -597,7 +597,7 @@
       "stimer_window": false,
       "usb_timer": true
     },
-    "sha256": "06b9a833a4a0d53ded7c9d6cbb35b10b21ba5ddeac9aacf57ba9ffb0775ad7ef"
+    "sha256": "6b16427a8123082b17394bd2bc22eb4cacda7708c9f2309ce3710ceac8e20664"
   },
   "apollo3p|usb_cdc|tflm": {
     "markers": {
@@ -627,7 +627,7 @@
       "stimer_window": false,
       "usb_timer": true
     },
-    "sha256": "a311e74e2f41f28d64ff7edbe2b9453f9c1e1a64e466570574363db1e922b7e7"
+    "sha256": "a94ebcea1c7765a5ed1c9db5e17f35a97c0175947a25de3ebf53e469495135c0"
   },
   "apollo4p|rtt|helia-aot": {
     "markers": {
@@ -657,7 +657,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "7fd7538aa538b5fb0dbd6d22717263b871ce08db253f91e9324ac32c15b569ea"
+    "sha256": "e42207c2c93f098e27250983c4ea4ae4406de5483ecdb60caf2948b9a37f48ba"
   },
   "apollo4p|rtt|helia-aot|busy_loop": {
     "markers": {
@@ -687,7 +687,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "10a21bdbd143b4016f716a3fe0a90c72f18710358ed2d131db53fa481ca87993"
+    "sha256": "b6d48cc369842305fef897f7591789cc8911e40bf55ba25ae08a80273b603386"
   },
   "apollo4p|rtt|helia-aot|power": {
     "markers": {
@@ -717,7 +717,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "01a2fe54e0a95334e092a9eba3266c50d65fed569bffe4db12d285964b8a88e2"
+    "sha256": "9e56b7bb06869905c010e1d785d7e721a8705e4936698b4581d7d1d152f5cdb5"
   },
   "apollo4p|rtt|helia-aot|power|busy_loop": {
     "markers": {
@@ -747,7 +747,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "1aaa0edf41aca12d2c2620994bf1559fb951f5444e37d4d6c6f124761c369cbc"
+    "sha256": "47491fc6ca5bdf54b82b5a763b5d51248ee986ff41586aa29a6bd91b5d409e3b"
   },
   "apollo4p|rtt|helia-rt": {
     "markers": {
@@ -777,7 +777,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "6c647b23df5ff96f8a6dc8995ddcd0a058195c33bfc6203793e7a5cf4d9555da"
+    "sha256": "9224d868e686f7bb197050f850664021b27a4685f40095927cf10ae26d25713d"
   },
   "apollo4p|rtt|helia-rt|busy_loop": {
     "markers": {
@@ -807,7 +807,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "b087c67c755ef65cbeedb6204d097955f715e7f4488e962064952d08c9df8870"
+    "sha256": "42c5010370843ce1571aa8d394c19ee79da8e400ab905b9a909f76a06d8ed6ac"
   },
   "apollo4p|rtt|helia-rt|power": {
     "markers": {
@@ -837,7 +837,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "371559a63b7898563b479c10a63770627ea8a79a0a81090584e9d239680fd24f"
+    "sha256": "b6d376bd7d3b5814f3524f6837487379da6b23ab89a66bb1e117ace5b78e0229"
   },
   "apollo4p|rtt|helia-rt|power|busy_loop": {
     "markers": {
@@ -867,7 +867,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "959bad8b4c2b552b02d7dcb01fced9de3b7ac79badbafacee1bf8185ccdbc9c2"
+    "sha256": "dd6c1a4075e1501a8f96f929d4ee7cb9e83aec99cf93ec666012a8b5f90b0524"
   },
   "apollo4p|rtt|tflm": {
     "markers": {
@@ -897,7 +897,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "830b322e4652b6799ff54f7301d9d87d95904455f90647f46d38ef80b62929c9"
+    "sha256": "f6e8ff397ba6f69836b3e1f28b0994f4268972ac7294084b90397e5916a42983"
   },
   "apollo4p|rtt|tflm|busy_loop": {
     "markers": {
@@ -927,7 +927,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "2f13fbd67de31734e2e89474ebdab4c1b4151b207815c552504dfe757b693f47"
+    "sha256": "736f3b2edf1c557744e826ece3f7b40fd17d189a74e5fc1d97b125d7a25a6730"
   },
   "apollo4p|rtt|tflm|power": {
     "markers": {
@@ -957,7 +957,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "371559a63b7898563b479c10a63770627ea8a79a0a81090584e9d239680fd24f"
+    "sha256": "b6d376bd7d3b5814f3524f6837487379da6b23ab89a66bb1e117ace5b78e0229"
   },
   "apollo4p|rtt|tflm|power|busy_loop": {
     "markers": {
@@ -987,7 +987,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "959bad8b4c2b552b02d7dcb01fced9de3b7ac79badbafacee1bf8185ccdbc9c2"
+    "sha256": "dd6c1a4075e1501a8f96f929d4ee7cb9e83aec99cf93ec666012a8b5f90b0524"
   },
   "apollo4p|swo|helia-aot": {
     "markers": {
@@ -1017,7 +1017,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "e7dcaec3a3d2bfa9d9cf058f6758f0b6f449c60cf8b8f3f056ad226fde280ea2"
+    "sha256": "f03f71446b582f780e371e826c7e47ce0a684ee1910daed6c8c27bf0cde88d46"
   },
   "apollo4p|swo|helia-rt": {
     "markers": {
@@ -1047,7 +1047,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "11976808b9741126a696b37cd45ace6607b0ca7ad0cdd0cb34b7c0313e5d50d2"
+    "sha256": "faf5f7032588a91bc22ee1ef67d185e9c3b77490ac75585824479627f358675e"
   },
   "apollo4p|swo|tflm": {
     "markers": {
@@ -1077,7 +1077,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "60326bde260743e954d7d918a56f55cf6d9ea082157cb0243d420c3d1916f808"
+    "sha256": "d3f2352aaa3f0eb55f856860a69e849faf57034bfd745996c69c43fce08ac149"
   },
   "apollo4p|uart|helia-aot": {
     "markers": {
@@ -1107,7 +1107,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "32928c099fbe82d32052aced98cb18c859a4bcddca9be1e12df44683d02c7916"
+    "sha256": "92717a5299fe8bdac90adac12a6d543094e04dced1d274aec9488a7ffb9dcdbf"
   },
   "apollo4p|uart|helia-rt": {
     "markers": {
@@ -1137,7 +1137,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "bff3aaab51ff5eaff96ecc1bbafc48195870a87776557bd89c0723d2dc10e5d9"
+    "sha256": "bd06b50b7b994fb48ba0f3cbe8457d246279ab6267e3942f469a2b5e9f9f845b"
   },
   "apollo4p|uart|tflm": {
     "markers": {
@@ -1167,7 +1167,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "9d4049dce87faa2a22a663043a0849939c314f005a3e423e25a85a4d7bc4acf0"
+    "sha256": "85756a317ad808230f57dcf08742e49374bf1283bd99097ab8f5e57ab5f5a6c8"
   },
   "apollo4p|usb_cdc|helia-aot": {
     "markers": {
@@ -1197,7 +1197,7 @@
       "stimer_window": false,
       "usb_timer": true
     },
-    "sha256": "38c823ae2afedf1022df5b94a355b68fc0c72d11573a914d2f1917f956b731c7"
+    "sha256": "6f0c179ca012881d2d2d795b94ea471dfe1749a296ef628e41b719751a21d2b3"
   },
   "apollo4p|usb_cdc|helia-rt": {
     "markers": {
@@ -1227,7 +1227,7 @@
       "stimer_window": false,
       "usb_timer": true
     },
-    "sha256": "e7f537c168df2078594ee93c62f116941edf255ac97e21ac986b84d448eeb7a6"
+    "sha256": "64d492c33650f74e989db2326c84f509197b1a3395fa7a8549f53a29db41aa93"
   },
   "apollo4p|usb_cdc|tflm": {
     "markers": {
@@ -1257,7 +1257,7 @@
       "stimer_window": false,
       "usb_timer": true
     },
-    "sha256": "004e5deac1b1ca66a4366aa7fb453827c7d26940c11a946d11bf68d0cb6532d9"
+    "sha256": "94172c5be1b5e27543ea02d5479d34469f3dadd1f787b14202ac8bf18d7ec1e7"
   },
   "apollo510|rtt|executorch": {
     "markers": {
@@ -1287,7 +1287,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "627d9b0cb3b389d4a9bd59e38fdeadb415b5f30089ca27e49974de88e6bc6266"
+    "sha256": "eeb7c40d83abc91bdf34a7612295ef1b81fad2842957fd0453d4a66857f1aa19"
   },
   "apollo510|rtt|helia-aot": {
     "markers": {
@@ -1317,7 +1317,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "a62808c031292b7dec161f1dce21a977d035cbcc92a7e7857c94c4d07a88c835"
+    "sha256": "184aa44be5ee7e4e3aae4473b315514ba818f70336c17acc93c4ca529bdc3f44"
   },
   "apollo510|rtt|helia-aot|busy_loop": {
     "markers": {
@@ -1347,7 +1347,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "36a2bc6f5470e638a2309fe8a52d6ccf5750d54e1e8811f54b88bee0ecafe58d"
+    "sha256": "def2d63e03d4a9ba4cde415e68016c177b11c9ff46106bdd2a22eafee898c1fe"
   },
   "apollo510|rtt|helia-aot|power": {
     "markers": {
@@ -1377,7 +1377,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "2f604b00b25c9bf7e9eee138eb82b3d94475980b6630811cda3718cf89bfbad7"
+    "sha256": "1730690418277ce32baca1dae75670cf4a527b720a0fb772f358e43e7e6d4d0c"
   },
   "apollo510|rtt|helia-aot|power|busy_loop": {
     "markers": {
@@ -1407,7 +1407,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "4cc5ff7a1a21f5adfe44dbcea2f07a33e33c2c041c94c1f4a7d65d3c08e4b7e0"
+    "sha256": "963f106618afad579d2bc8712c6440b2075dcfe694f6fac506153749f0fa0286"
   },
   "apollo510|rtt|helia-rt": {
     "markers": {
@@ -1437,7 +1437,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "3eb8d5e8c7614bc48c77fbec7d1b34d4fe5ace1e4339883176f323dab5e7d5db"
+    "sha256": "765847fd1a58e60bcb76797fdcc5a8f4aeedfb602c93176df1f87ca39527c7a6"
   },
   "apollo510|rtt|helia-rt|busy_loop": {
     "markers": {
@@ -1467,7 +1467,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "79e571d15a91470a87404d12a89fd127150c686d68702808a022612b7a59a09e"
+    "sha256": "b1f23afc6f74b6b37247cf18d77fa8f3959911abbd4c1d7e918c0d75ae086788"
   },
   "apollo510|rtt|helia-rt|power": {
     "markers": {
@@ -1497,7 +1497,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "d167082574c1185478c869740a8bea038b96d0b3601735e6ef114dc25b98ff48"
+    "sha256": "b7bb2c52e9a12a9c8a5d054003a58c10d84dda34f1e90fe026e092bd41c91460"
   },
   "apollo510|rtt|helia-rt|power|busy_loop": {
     "markers": {
@@ -1527,7 +1527,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "e79aac6a244834777b8a6a7c4e523153c85fc81581d6dc071b97174fa6ffe07d"
+    "sha256": "2790912054570e8c6f7b0a7610febd0c06897d4e90f6058dd26205db7b11cb88"
   },
   "apollo510|rtt|tflm": {
     "markers": {
@@ -1557,7 +1557,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "8512d28a6d7d498febe0448dcee40043b293332a48687004a4f860d365093df8"
+    "sha256": "2ed37818f5d707ab08d41b26d955a3bedaab4214f71aec91b01287cbffc119f1"
   },
   "apollo510|rtt|tflm|busy_loop": {
     "markers": {
@@ -1587,7 +1587,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "3ed06dfaf3db0877919b1a6b9615e0ae4856e56f37ffe9553d8ceaf61a57ac98"
+    "sha256": "3919435a9ede4483b951c6c48b98e6cbf5fa119ed493246967e2da1587426495"
   },
   "apollo510|rtt|tflm|power": {
     "markers": {
@@ -1617,7 +1617,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "d167082574c1185478c869740a8bea038b96d0b3601735e6ef114dc25b98ff48"
+    "sha256": "b7bb2c52e9a12a9c8a5d054003a58c10d84dda34f1e90fe026e092bd41c91460"
   },
   "apollo510|rtt|tflm|power|busy_loop": {
     "markers": {
@@ -1647,7 +1647,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "e79aac6a244834777b8a6a7c4e523153c85fc81581d6dc071b97174fa6ffe07d"
+    "sha256": "2790912054570e8c6f7b0a7610febd0c06897d4e90f6058dd26205db7b11cb88"
   },
   "apollo510|swo|executorch": {
     "markers": {
@@ -1677,7 +1677,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "d72f3b746bcbedfb9237308d630ada3de6ba83ec668677d8de32edc477bed8be"
+    "sha256": "ffde0f4b2bf9943a646a46f79f9ad6b3721117339e337928b4d341d267be56cc"
   },
   "apollo510|swo|helia-aot": {
     "markers": {
@@ -1707,7 +1707,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "c09b8a88e25645ae7cb57805512b00175689cf5dff0f3bb59fb4d458deb4d288"
+    "sha256": "783ddf74efaa6b3ff612f0ab1690fbbd196ea68bd15da2b17212f0fca77541fc"
   },
   "apollo510|swo|helia-rt": {
     "markers": {
@@ -1737,7 +1737,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "e7a186cc66f43b15d516b011c0c08e0aefc8f47f69130e908d02fed64d750e9f"
+    "sha256": "3a9201c3ac35209b096f8ee962a61c52aa95f4621b07861ebb894b3451a0e3e8"
   },
   "apollo510|swo|tflm": {
     "markers": {
@@ -1767,7 +1767,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "8645854bae5c62beac51f0d39534fcd6e4030a80f2c69225c1786bcde5c6d982"
+    "sha256": "4544d24c7c6e455036e213c414e376e49642da062d0a6d6d38b87b75cf84a56d"
   },
   "apollo510|uart|executorch": {
     "markers": {
@@ -1797,7 +1797,7 @@
       "stimer_window": false,
       "usb_timer": false
     },
-    "sha256": "7a0776e20cc2b51aa3f8312f741aa8c9073d2541f1f5666fc10beb686847f85d"
+    "sha256": "f67b50b5e37bcfb7c696c73d00c1429edda4c0884ceda6474f945d70c429cc65"
   },
   "apollo510|uart|helia-aot": {
     "markers": {
@@ -1827,7 +1827,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "955de228abc531fab8cd58c6daea88dc1980303260cad5077b39904703c9ab5d"
+    "sha256": "035dfa1121b52eeec5d95ebcd2e985dc59ba87d71e028b4f2c24b702f3937061"
   },
   "apollo510|uart|helia-rt": {
     "markers": {
@@ -1857,7 +1857,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "ea32fbc1779a1ba4c3dbc30db1158c61d4c4108dd87d8eaa706b31630f4b4217"
+    "sha256": "a83c9f00b89e98be8d943627323f907dfd2d956be16b45a1489211c6a4c9bae3"
   },
   "apollo510|uart|tflm": {
     "markers": {
@@ -1887,7 +1887,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "751bce7e32f92eb22a0ed471696c5ba2dbdbd13b7f42a16a16634196a4fcc86d"
+    "sha256": "214c4d099eac8d8ef70de7eb3afe57b1190a1d1a832849cfc8db9a06ab91d43b"
   },
   "apollo510|usb_cdc|executorch": {
     "markers": {
@@ -1917,7 +1917,7 @@
       "stimer_window": false,
       "usb_timer": true
     },
-    "sha256": "946a1eab137fbf7999fb782f234e814a496aa1a8ef778ac5b469cfd10044527b"
+    "sha256": "4aa15d2ae75d7514b3e61d4b6df40d325ffa1fff384433702e8f6b9392845e67"
   },
   "apollo510|usb_cdc|helia-aot": {
     "markers": {
@@ -1947,7 +1947,7 @@
       "stimer_window": true,
       "usb_timer": true
     },
-    "sha256": "e7ab000aae8b65c4de5463d78f514cde118a24d6bb6661576dec827e0b42574d"
+    "sha256": "3eed0590a098f7e016fc40e45214c8c7e5280f1aab1fdb6af824db5f6a54b195"
   },
   "apollo510|usb_cdc|helia-rt": {
     "markers": {
@@ -1977,7 +1977,7 @@
       "stimer_window": true,
       "usb_timer": true
     },
-    "sha256": "07df1cfd1d7eccd6d21c02f271a2f927f8d19062726bae83b8dc90f59ac968a9"
+    "sha256": "04df6405df5da4a14eeeeac77ab5148053fa1e8148276950784b42220f85553c"
   },
   "apollo510|usb_cdc|tflm": {
     "markers": {
@@ -2007,7 +2007,7 @@
       "stimer_window": true,
       "usb_timer": true
     },
-    "sha256": "8d588afa8bed14a953d7ea3b1f0e5c226306d740ea208995b1b4209914857948"
+    "sha256": "e75c548930447c5c8906612175bd0f9fcd64c639653e96312091af652e56d9b0"
   },
   "atomiq110|rtt|helia-aot": {
     "markers": {
@@ -2037,7 +2037,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "9742fd53814cda5a7a968b3d553ddf3fdd8cf842cbc3130944033aedc14aac8d"
+    "sha256": "15bbe5cf78c7e8cd60628545ee8dfaaa232d2f3520801d0dc81d648d63b0e5d2"
   },
   "atomiq110|rtt|helia-rt": {
     "markers": {
@@ -2067,7 +2067,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "aaac46beccad7c24db5cd7f01e448b29fae87bb2c5f2ab2397e13f1cbfcd43cc"
+    "sha256": "408bee6a18cdebfd04d6bf5fa23c3fae3c2b5d90fe34b16ab88203df6507ebe6"
   },
   "atomiq110|swo|helia-aot": {
     "markers": {
@@ -2097,7 +2097,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "64088752671fd8a110abe684e736074faeca74416aa1ee16fee5b4c4aee21a4d"
+    "sha256": "541b031226092b17022edc7a6426158700d482aada9dc231c62aca2575d68d6c"
   },
   "atomiq110|swo|helia-rt": {
     "markers": {
@@ -2127,7 +2127,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "2c98f85b7228211e2b0bc81cdb1ad6ef143adba2c3b9a93497aac330015f9207"
+    "sha256": "fc1326325425725cf8ba8cfebd756f86ae972f70c953fe3089f9bd16f617cdbe"
   },
   "atomiq110|uart|helia-aot": {
     "markers": {
@@ -2157,7 +2157,7 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "162774cd11c9e173776aca039fecbe37a74c803426a552baa336eb1544c09463"
+    "sha256": "b77c84198ffd4e2193090fdcb62cd2c8fcac8f8c1c764007f96826370ed1ac7a"
   },
   "atomiq110|uart|helia-rt": {
     "markers": {
@@ -2187,6 +2187,6 @@
       "stimer_window": true,
       "usb_timer": false
     },
-    "sha256": "5ea8d199bb01e24f767431a1aeff8c7a086c7012a4d5579bdbc1b515507be8b5"
+    "sha256": "983dbef33cea2c0da3898f0d941b1a83bf639739ba974832caadc714c4c21545"
   }
 }

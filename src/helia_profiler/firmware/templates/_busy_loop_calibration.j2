@@ -34,13 +34,13 @@
         // not transfer.  STIMER is the clock (see the file header): unlike
         // SystemCoreClock it is measured rather than assumed.
         //
-        // The window-begin block below calls hpx_stimer_init() again -- each
-        // call drops and re-requests the XT, but since #124 landed the settle
-        // lives inside hpx_stimer_init() itself, so every call verifies the
-        // crystal before its caller reads a tick.  Cost per call: two 10 ms
-        // probes warm, up to the 1 s deadline cold -- so this probe pays it
-        // twice per run (calibration + window begin), all outside measured
-        // regions.
+        // The boot clock probe and the window-begin block also call
+        // hpx_stimer_init() -- each call drops and re-requests the XT, but
+        // since #124 landed the settle lives inside hpx_stimer_init() itself,
+        // so every call verifies the crystal before its caller reads a tick.
+        // Cost per call: two 10 ms probes warm, up to the 1 s deadline cold --
+        // so this probe pays it three times per run (clock probe, calibration,
+        // window begin), all outside measured regions.
         if (hpx_stimer_init() == 0U) {
 {% if power_only | default(false) %}
             hpx_power_terminal_fail("stimer_dead", g_hpx_stimer_last_ticks + 1U);

@@ -92,6 +92,7 @@ firmware/templates/_busy_loop_calibration.j2
 firmware/templates/_cache_shims.j2
 firmware/templates/_clean_window_attach_wait.j2
 firmware/templates/_clean_window_rate_probe.j2
+firmware/templates/_core_clock_probe.j2
 firmware/templates/_crypto_otp_shutdown.j2
 firmware/templates/_dwt_init.j2
 firmware/templates/_extreme_mode.j2
