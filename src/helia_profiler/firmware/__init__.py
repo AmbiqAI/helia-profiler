@@ -33,9 +33,9 @@ from ..placement import Placement
 from ..platform import get_soc_for_board
 from .context import FirmwareRenderContext, _resolve_pmu_passes
 
-# NB: measured_power_fingerprint and _resolve_module_list below look unused
-# in this module but are LIVE re-export surface — report/manifest.py,
-# report/summary.py, and tests import them from the package root. Do not
+# NB: measured_power_fingerprint below looks unused
+# in this module but is LIVE re-export surface — report/manifest.py,
+# report/summary.py, and tests import it from the package root. Do not
 # remove in a dead-import cleanup (#194).
 from .fingerprint import measured_power_fingerprint
 from .project import (
@@ -50,7 +50,6 @@ from .project import (
     _module_project,
     _POWER_SYNC_MODULE_NAMES,
     _render_module_registry,
-    _resolve_module_list,
     _resolve_module_specs,
     _resolve_project_overrides,
     _soc_has_backend,
@@ -60,14 +59,13 @@ from .project import (
 from .render import _jinja_env, _write_text
 
 # The compiler-launcher, SEGGER RTT vendoring, generated-C-header, and NSX
-# build/flash invocation APIs live in dedicated modules (extracted at the
+# build invocation APIs live in dedicated modules (extracted at the
 # module size ceiling — the elf_inventory precedent, see toolchain_probe);
 # re-exported here so callers keep one import surface.
 from .build import (
     _DEFAULT_RTT_BUFFER_SIZE_UP,
     build_app,
     find_target_binary,
-    flash_app,
     nsx_toolchain,
     rtt_buffer_size_up,
 )
@@ -294,7 +292,6 @@ def generate_app(ctx: PipelineContext) -> Path:
         arena_regions=aot_arena_regions,
     )
     template_vars = render_context.to_template_vars()
-    profiling_backends = list(render_context.pmu.profiling_backends)
     has_armv8m_pmu = render_context.pmu.has_armv8m_pmu
 
     compiler_launcher = _resolve_compiler_launcher(config)
@@ -302,7 +299,6 @@ def generate_app(ctx: PipelineContext) -> Path:
         ProjectRenderContext(
             app_dir=app_dir,
             board=board,
-            soc=soc,
             config=config,
             artifacts=artifacts,
             modules=modules,
@@ -362,7 +358,7 @@ def generate_app(ctx: PipelineContext) -> Path:
             )
         _write_text(
             src_dir / "main.cc",
-            _jinja_env.get_template("main_executorch.cc.j2").render(**template_vars),
+            _jinja_env.get_template(_main_template(engine_type)).render(**template_vars),
         )
     elif engine_type is EngineType.HELIA_AOT:
         # The heliaAOT adapter is the only producer of this engine_type, and
@@ -413,7 +409,7 @@ def generate_app(ctx: PipelineContext) -> Path:
         _write_text(
             src_dir / "main.cc",
             _jinja_env.get_template(
-                "fixed_fixture.cc.j2" if ctx.fixture else "main_aot.cc.j2"
+                "fixed_fixture.cc.j2" if ctx.fixture else _main_template(engine_type)
             ).render(**template_vars),
         )
         if power_binary_enabled:
@@ -421,7 +417,7 @@ def generate_app(ctx: PipelineContext) -> Path:
             # PMU passes -- see main_aot.cc.j2's power_only branches (WP1).
             _write_text(
                 src_dir / "main_power.cc",
-                _jinja_env.get_template("main_aot.cc.j2").render(
+                _jinja_env.get_template(_main_template(engine_type, power_only=True)).render(
                     **render_context.to_template_vars(power_only=True),
                 ),
             )
@@ -433,7 +429,9 @@ def generate_app(ctx: PipelineContext) -> Path:
 
         _write_text(
             src_dir / "main.cc",
-            _jinja_env.get_template("fixed_fixture.cc.j2" if ctx.fixture else "main.cc.j2").render(
+            _jinja_env.get_template(
+                "fixed_fixture.cc.j2" if ctx.fixture else _main_template(engine_type)
+            ).render(
                 **template_vars,
             ),
         )
@@ -442,7 +440,7 @@ def generate_app(ctx: PipelineContext) -> Path:
             # PMU passes -- see main.cc.j2's power_only branches (WP1).
             _write_text(
                 src_dir / "main_power.cc",
-                _jinja_env.get_template("main.cc.j2").render(
+                _jinja_env.get_template(_main_template(engine_type, power_only=True)).render(
                     **render_context.to_template_vars(power_only=True),
                 ),
             )
@@ -452,7 +450,6 @@ def generate_app(ctx: PipelineContext) -> Path:
             src_dir / "hpx_pmu_profiler.h",
             _jinja_env.get_template("hpx_pmu_profiler.h.j2").render(
                 cmsis_device_header=render_context.pmu.cmsis_device_header,
-                profiling_backends=profiling_backends,
                 has_armv8m_pmu=has_armv8m_pmu,
                 has_ethos_u=render_context.engine.has_ethos_u,
                 pmu_max_ops=soc.pmu_max_ops,
@@ -461,7 +458,6 @@ def generate_app(ctx: PipelineContext) -> Path:
         _write_text(
             src_dir / "hpx_pmu_profiler.cc",
             _jinja_env.get_template("hpx_pmu_profiler.cc.j2").render(
-                profiling_backends=profiling_backends,
                 has_armv8m_pmu=has_armv8m_pmu,
             ),
         )
@@ -521,6 +517,17 @@ def _resolved_aot_arena_regions(ctx: PipelineContext) -> list[ArenaRegion]:
     )
 
 
+def _main_template(engine_type: EngineType, *, power_only: bool = False) -> str:
+    """Main-source template for *engine_type*'s profile or dedicated power binary."""
+    if engine_type is EngineType.HELIA_AOT:
+        return "main_aot.cc.j2"
+    if engine_type is EngineType.EXECUTORCH:
+        if power_only:
+            raise FirmwareError("ExecuTorch has no dedicated power binary.")
+        return "main_executorch.cc.j2"
+    return "main.cc.j2"
+
+
 def render_power_source(ctx: PipelineContext, *, inference_count: int) -> Path:
     """Rewrite only the dedicated power source with a host-selected fixed N."""
     if inference_count < 1:
@@ -539,15 +546,7 @@ def render_power_source(ctx: PipelineContext, *, inference_count: int) -> Path:
         window_mode=WindowMode.FIXED,
         clean_iters=inference_count,
     )
-    template_name = (
-        "main_aot.cc.j2"
-        if ctx.engine_artifacts.engine_type is EngineType.HELIA_AOT
-        else (
-            "main_executorch.cc.j2"
-            if ctx.engine_artifacts.engine_type is EngineType.EXECUTORCH
-            else "main.cc.j2"
-        )
-    )
+    template_name = _main_template(ctx.engine_artifacts.engine_type, power_only=True)
     destination = ctx.firmware_dir / "src" / "main_power.cc"
     _write_text(
         destination,

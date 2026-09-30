@@ -29,11 +29,9 @@ if TYPE_CHECKING:
 @dataclass(frozen=True)
 class PmuPassContext:
     name: str
-    custom: bool
     event_ids: tuple[str, ...]
     counter_names: tuple[str, ...]
     num_counters: int
-    c_enum: str | None
     group: str
 
 
@@ -167,7 +165,6 @@ class MemoryContext:
 class PmuContext:
     pmu_passes: tuple[PmuPassContext, ...]
     pmu_pass_names: tuple[str, ...]
-    profiling_backends: tuple[str, ...]
     has_armv8m_pmu: bool
     cmsis_device_header: str
     perf_mode_symbol: str
@@ -264,7 +261,6 @@ class FirmwareRenderContext:
         weights_region = ctx.weights_region or Placement.MRAM
         aot_arena_regions = tuple(arena_regions or ())
         power_sync_enabled = config.power.gated_external_capture
-        profiling_backends = tuple(soc.profiling_backends)
         clock = ctx.run_metadata.platform
         if clock is None:
             # A sub-field of the (non-optional) run_metadata, so no
@@ -373,8 +369,7 @@ class FirmwareRenderContext:
             pmu=PmuContext(
                 pmu_passes=pmu_passes,
                 pmu_pass_names=tuple(p.name for p in pmu_passes),
-                profiling_backends=profiling_backends,
-                has_armv8m_pmu="armv8m-pmu" in profiling_backends,
+                has_armv8m_pmu="armv8m-pmu" in soc.profiling_backends,
                 cmsis_device_header=soc.cmsis_header,
                 perf_mode_symbol=clock.cpu_perf_tier,
                 perf_mode_mhz=perf_mode_mhz,
@@ -488,7 +483,6 @@ class FirmwareRenderContext:
             "psram_clock_hz": self.memory.psram_clock_hz,
             "pmu_passes": self.pmu.pmu_passes,
             "pmu_pass_names": self.pmu.pmu_pass_names,
-            "profiling_backends": self.pmu.profiling_backends,
             "has_armv8m_pmu": self.pmu.has_armv8m_pmu,
             "cmsis_device_header": self.pmu.cmsis_device_header,
             "perf_mode_symbol": self.pmu.perf_mode_symbol,
@@ -503,14 +497,11 @@ class FirmwareRenderContext:
             "window_target_ms": self.power_window.window_target_ms,
             "window_min": self.power_window.window_min,
             "window_max": self.power_window.window_max,
-            "clean_window_probe": self.power_window.clean_window_probe,
             "clean_window_trace": self.power_window.clean_window_trace,
             "extreme_mode": self.power_window.extreme_mode,
             "heartbeat_enabled": self.power_window.heartbeat_enabled,
             "heartbeat_every_n_ops": self.power_window.heartbeat_every_n_ops,
             "heartbeat_every_ms": self.power_window.heartbeat_every_ms,
-            "clean_window_timer": self.power_window.clean_window_timer,
-            "power_window_timer": self.power_window.power_window_timer,
             "clean_window_needs_probe_attach": (self.power_window.clean_window_needs_probe_attach),
             "gate_debug_domain_in_window": self.power_window.gate_debug_domain_in_window,
             "broad_peripheral_shutdown": self.power_window.broad_peripheral_shutdown,
@@ -527,7 +518,6 @@ class FirmwareRenderContext:
             "ina228_conversion_time_us": self.power_monitor.ina228_conversion_time_us,
             "ina228_averaging_count": self.power_monitor.ina228_averaging_count,
             "ina228_adc_range": self.power_monitor.ina228_adc_range,
-            "ina228_shunt_cal": self.power_monitor.ina228_shunt_cal,
             "ina228_current_lsb_divisor": self.power_monitor.ina228_current_lsb_divisor,
             "ina228_calibration_id": self.power_monitor.ina228_calibration_id,
             # Wire-protocol spelling of the engine, emitted as HPX_ENGINE= by
@@ -634,11 +624,9 @@ def _resolve_pmu_passes(config: Any, soc: Any | None = None) -> list[PmuPassCont
     return [
         PmuPassContext(
             name=p.name,
-            custom=True,
             event_ids=tuple(f"0x{c.event_id:04X}" for c in p.counters),
             counter_names=tuple(c.name for c in p.counters),
             num_counters=len(p.counters),
-            c_enum=None,
             group=p.group,
         )
         for p in passes

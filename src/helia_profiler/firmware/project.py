@@ -22,7 +22,7 @@ from .render import _jinja_env, _write_text
 if TYPE_CHECKING:
     from ..config import ProfileConfig
     from ..engines.base import EngineArtifacts, ArenaRegion
-    from ..platform import BoardDef, PlatformRegistry, SocDef
+    from ..platform import BoardDef, PlatformRegistry
 
 log = logging.getLogger("hpx")
 
@@ -275,19 +275,6 @@ def _resolve_module_specs(
     return [NsxModuleSpec(name, _module_project(name, profile)) for name in ordered_names]
 
 
-def _resolve_module_list(
-    board: str,
-    *,
-    profile_board: str | None = None,
-    registry: PlatformRegistry | None = None,
-) -> list[str]:
-    """Backward-compatible wrapper returning only module names."""
-    return [
-        spec.name
-        for spec in _resolve_module_specs(board, profile_board=profile_board, registry=registry)
-    ]
-
-
 def _resolve_project_overrides(
     module_specs: list[NsxModuleSpec],
     nsx_overrides: dict[str, Any],
@@ -375,7 +362,6 @@ def _copy_local_engine_module(dest: Path, source: Path) -> None:
 class ProjectRenderContext:
     app_dir: Path
     board: "BoardDef"
-    soc: "SocDef"
     config: "ProfileConfig"
     artifacts: "EngineArtifacts"
     modules: list[dict[str, object]]
@@ -397,7 +383,6 @@ def render_project_files(ctx: ProjectRenderContext) -> None:
         ctx.app_dir / "nsx.yml",
         _jinja_env.get_template("nsx.yml.j2").render(
             board=ctx.board.name,
-            soc=ctx.soc.name,
             toolchain=ctx.config.target.toolchain,
             channel=ctx.channel,
             modules=ctx.modules,
@@ -433,11 +418,9 @@ def render_project_files(ctx: ProjectRenderContext) -> None:
                 else ""
             ),
             transport=ctx.config.target.transport,
-            toolchain=ctx.config.target.toolchain,
             rtt_buffer_size_up=ctx.rtt_buffer_size_up,
             arena_region=ctx.render_context.memory.arena_region,
             weights_region=ctx.render_context.memory.weights_region,
-            profiling_backends=list(ctx.render_context.pmu.profiling_backends),
             has_armv8m_pmu=ctx.render_context.pmu.has_armv8m_pmu,
             power_sync_enabled=ctx.render_context.sync.power_sync_enabled,
             # Same flag the nsx_gpio.h include gates on: the power binary
