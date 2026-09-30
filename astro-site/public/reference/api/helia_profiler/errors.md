@@ -6,7 +6,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`, `experimental`
 
-Generated from the `src/helia_profiler` tree `8a55717bd88fefa98ddefe190e40b8a63283747c`.
+Generated from the `src/helia_profiler` tree `b823e287e809c8d9438536a07fc0ab41a3b030c0`.
 
 ## helia_profiler.HpxError
 
