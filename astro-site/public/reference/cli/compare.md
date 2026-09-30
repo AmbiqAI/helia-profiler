@@ -10,7 +10,7 @@ hpx compare [OPTIONS] BASELINE CANDIDATE
 
 Compare two hpx result directories
 
-Defined in `src/helia_profiler/cli/app.py` line 611.
+Defined in `src/helia_profiler/cli/app.py` line 612.
 
 ### Arguments
 
@@ -40,4 +40,4 @@ Examples:
   hpx compare results/baseline-validation results/candidate-validation --validation --output-dir results/validation-compare
 ```
 
-Generated from the `src/helia_profiler` tree `cf4575012d6d2f42d4f7a8e03bae3bd4742cf110` with typer 0.26.8 and click 8.3.3.
+Generated from the `src/helia_profiler` tree `b67e332cd4cc51ae9149e14c32e910517775062c` with typer 0.26.8 and click 8.3.3.

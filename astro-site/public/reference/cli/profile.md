@@ -10,7 +10,7 @@ hpx profile [OPTIONS] [MODEL]
 
 Profile a model on target hardware
 
-Defined in `src/helia_profiler/cli/app.py` line 88.
+Defined in `src/helia_profiler/cli/app.py` line 89.
 
 ### Arguments
 
@@ -79,7 +79,7 @@ Defined in `src/helia_profiler/cli/app.py` line 88.
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
 | `--power` | `bool` | false | Enable power capture |
-| `--power-driver` | `joulescope \| ondevice` |  | Power driver (default: joulescope = auto-detect JS110/JS220/JS320) |
+| `--power-driver` | `ina228 \| joulescope` |  | Power driver (default: joulescope = auto-detect JS110/JS220/JS320) |
 | `--power-mode` | `external \| internal` |  | Power mode (default: external) |
 | `--power-duration` | `Optional[int]` |  | Upper bound on the power capture, in seconds; a gated capture raises it to fit the planned window, and it does not set the window length (default: auto-tuned from profile timing) |
 | `--power-firmware` | `dedicated \| shared` |  | Which binary is on target during power capture (default: dedicated). 'dedicated' flashes the transport-free hpx_profiler_power image to avoid SWO/UART/RTT/USB current contamination (measured on AP510 EVBs); 'shared' reuses the already-flashed transport binary. |
@@ -114,4 +114,4 @@ Quick start:
   hpx profile my_model.tflite --engine helia-rt --power -vv
 ```
 
-Generated from the `src/helia_profiler` tree `cf4575012d6d2f42d4f7a8e03bae3bd4742cf110` with typer 0.26.8 and click 8.3.3.
+Generated from the `src/helia_profiler` tree `b67e332cd4cc51ae9149e14c32e910517775062c` with typer 0.26.8 and click 8.3.3.
