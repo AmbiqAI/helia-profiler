@@ -14,15 +14,12 @@ from ..errors import EngineError
 from ..results import NsxModuleRef
 from . import EngineType
 from .base import ExecutorchArtifacts, PsramWeightsSource, SingleArenaPlacementMixin
+from .cmsis_nn import arm_cmsis_nn_module_ref, cmsis_nn_module_ref
 
 log = logging.getLogger("hpx")
 
 EXECUTORCH_MODULE = "nsx-executorch"
 EXECUTORCH_PROJECT = "nsx-executorch"
-ARM_CMSIS_NN_MODULE = "arm-cmsis-nn"
-ARM_CMSIS_NN_PROJECT = "arm-cmsis-nn"
-NS_CMSIS_NN_MODULE = "nsx-cmsis-nn"
-NS_CMSIS_NN_PROJECT = "ns-cmsis-nn"
 
 
 # Nested ExecuTorch submodules required by nsx-executorch's stock CMake
@@ -73,10 +70,9 @@ def _run_git(args: list[str], cwd: Path, *, timeout: int) -> subprocess.Complete
 def _auto_clone_nsx_executorch(url: str, ref: str) -> Path:
     """Materialize the baseline-pinned nsx-executorch checkout in the cache.
 
-    Uses the same cache root as the ns-cmsis-nn auto-clone but a stricter
-    strategy: the exact pinned ref is checked out (re-synced when the pin
-    moves) and the minimal Cortex-M submodule set from the repository README
-    is initialized. The caller's verification of version/ref/submodule pins
+    The exact pinned ref is checked out (re-synced when the pin moves) and
+    the minimal Cortex-M submodule set from the repository README is
+    initialized. The caller's verification of version/ref/submodule pins
     runs unchanged afterwards, so a stale or corrupted cache can never be
     profiled silently.
     """
@@ -234,41 +230,8 @@ def _gitlink_commit(path: Path, submodule: str) -> str:
 def _provider_module_ref(config: ProfileConfig, work_dir: Path, provider: str) -> NsxModuleRef:
     """Resolve exactly one provider through the normal NSX module contract."""
     if provider == "ns":
-        from .cmsis_nn import cmsis_nn_module_ref
-
         return cmsis_nn_module_ref(config, work_dir)
-
-    configured_path = config.engine.config.get("cmsis_nn_path")
-    requested_ref = config.engine.config.get("cmsis_nn_ref")
-    if configured_path and requested_ref:
-        raise EngineError("engine.config.cmsis_nn_path and cmsis_nn_ref are mutually exclusive")
-    if configured_path is not None:
-        if not isinstance(configured_path, (str, Path)) or not str(configured_path).strip():
-            raise EngineError("engine.config.cmsis_nn_path must be a non-empty filesystem path")
-        source = Path(configured_path).expanduser().resolve()
-        if not (source / "nsx-module.yaml").is_file() or not (source / "CMakeLists.txt").is_file():
-            raise EngineError(
-                f"Invalid arm-cmsis-nn checkout: {source}",
-                hint="Expected nsx-module.yaml and CMakeLists.txt at the repository root.",
-            )
-        return NsxModuleRef(
-            name=ARM_CMSIS_NN_MODULE,
-            path=source,
-            local=True,
-            project=ARM_CMSIS_NN_PROJECT,
-        )
-    if requested_ref is not None and (
-        not isinstance(requested_ref, str) or not requested_ref.strip()
-    ):
-        raise EngineError("engine.config.cmsis_nn_ref must be a non-empty git ref")
-    return NsxModuleRef(
-        name=ARM_CMSIS_NN_MODULE,
-        path=Path(),
-        local=False,
-        project=ARM_CMSIS_NN_PROJECT,
-        # None must reach the dependency-lock digest as null; "" is a different key.
-        ref=requested_ref,
-    )
+    return arm_cmsis_nn_module_ref(config)
 
 
 def _positive_int(config: dict[str, Any], name: str, default: int | None = None) -> int:

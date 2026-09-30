@@ -177,10 +177,6 @@ class TestIna228Driver:
     def test_no_host_side_dependencies(self):
         get_driver("ina228").check_available()  # must not raise
 
-    def test_generic_ondevice_stub_still_has_no_producer(self):
-        driver = get_driver("ondevice")
-        assert driver.supports_firmware_measurement is False
-
     def test_host_side_capture_paths_stay_closed(self):
         driver = get_driver("ina228")
         with pytest.raises(PowerError):

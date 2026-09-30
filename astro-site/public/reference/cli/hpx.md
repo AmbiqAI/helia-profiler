@@ -10,7 +10,7 @@ hpx [OPTIONS] COMMAND [ARGS]...
 
 Profile LiteRT and ExecuTorch models on Ambiq silicon.
 
-Defined in `src/helia_profiler/cli/app.py` line 48.
+Defined in `src/helia_profiler/cli/app.py` line 49.
 
 ### Options
 

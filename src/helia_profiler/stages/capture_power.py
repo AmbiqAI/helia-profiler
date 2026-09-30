@@ -30,11 +30,7 @@ from ..target.lifecycle import CapturePhase, prepare_target_for_phase
 
 log = logging.getLogger("hpx")
 
-_BOOT_SETTLE_S = BOOT_SETTLE_S
 _SAFETY_MARGIN_S = 6.0  # extra headroom beyond estimated runtime
-
-
-_AUTO_WINDOW_WARMUP_REPS = CLEAN_WINDOW_WARMUP_REPS
 
 
 def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
@@ -87,7 +83,7 @@ def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
 
     planned_run_s = ctx.power_plan.planned_window_s if ctx.power_plan is not None else None
     if planned_run_s is not None:
-        return _BOOT_SETTLE_S + planned_run_s + _SAFETY_MARGIN_S
+        return BOOT_SETTLE_S + planned_run_s + _SAFETY_MARGIN_S
 
     profiling = ctx.config.profiling
     num_presets = len(pmu.presets) or 1
@@ -101,7 +97,7 @@ def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
         # real inference time (main.cc.j2's warm loop runs before the spin),
         # so keep them in the margin.
         clean_warmup_reps = (
-            _AUTO_WINDOW_WARMUP_REPS
+            CLEAN_WINDOW_WARMUP_REPS
             if profiling.window_mode is WindowMode.AUTO
             else max(1, profiling.warmup)
         )
@@ -115,15 +111,15 @@ def _estimate_capture_duration(ctx: PipelineContext) -> float | None:
                 target_s / inference_time_s if inference_time_s > 0 else profiling.window_min
             )
             clean_iters = max(profiling.window_min, min(profiling.window_max, clean_iters))
-            clean_warmup_reps = _AUTO_WINDOW_WARMUP_REPS
+            clean_warmup_reps = CLEAN_WINDOW_WARMUP_REPS
         else:
             clean_iters = max(1, profiling.iterations)
-            clean_warmup_reps = max(_AUTO_WINDOW_WARMUP_REPS, profiling.warmup)
+            clean_warmup_reps = max(CLEAN_WINDOW_WARMUP_REPS, profiling.warmup)
         clean_run_s = (clean_iters + clean_warmup_reps) * inference_time_s
 
     firmware_run_s = profiled_run_s + clean_run_s
 
-    estimated = _BOOT_SETTLE_S + firmware_run_s + _SAFETY_MARGIN_S
+    estimated = BOOT_SETTLE_S + firmware_run_s + _SAFETY_MARGIN_S
     return estimated
 
 

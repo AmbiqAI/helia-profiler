@@ -256,7 +256,8 @@ def main() -> None:
             },
             indent=2,
         )
-        + "\n"
+        + "\n",
+        encoding="utf-8",
     )
     print(f"Wrote {MODEL_PATH} ({len(data)} bytes, sha256={digest})")
 

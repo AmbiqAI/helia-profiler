@@ -17,6 +17,8 @@ from typer.testing import CliRunner
 
 from helia_profiler.cli import inspect_cmds as cli
 from helia_profiler.cli.app import app
+from helia_profiler.hostenv.doctor import DoctorCheck, DoctorResult
+from helia_profiler.session import Session
 
 runner = CliRunner()
 
@@ -169,11 +171,69 @@ def test_doctor_bundle_explicit_zip_path_used_verbatim(tmp_path: Path) -> None:
     assert archive_path.is_file()
 
 
-def test_doctor_invalid_toolchain_exits_with_usage_error() -> None:
+def test_doctor_invalid_toolchain_exits_with_config_error(capsys) -> None:
     with pytest.raises(SystemExit) as exc:
         cli._cmd_doctor(toolchain="not-a-real-toolchain")
 
+    assert exc.value.code == 1
+    assert "Unknown toolchain 'not-a-real-toolchain'" in capsys.readouterr().err
+
+
+def test_doctor_bundle_invalid_toolchain_exits_with_usage_error(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit) as exc:
+        cli._cmd_doctor(bundle=str(tmp_path), toolchain="not-a-real-toolchain")
+
     assert exc.value.code == 2
+
+
+def _record_session_doctor(monkeypatch) -> list[Session]:
+    seen: list[Session] = []
+
+    def fake_doctor(self: Session, *, include_versions: bool = False) -> DoctorResult:
+        seen.append(self)
+        return DoctorResult((DoctorCheck("tool", "tool", True),))
+
+    monkeypatch.setattr(Session, "doctor", fake_doctor)
+    return seen
+
+
+def test_doctor_runs_through_session_with_flag_overrides(monkeypatch) -> None:
+    seen = _record_session_doctor(monkeypatch)
+
+    result = runner.invoke(
+        app,
+        ["doctor", "--toolchain", "atfe", "--transport", "usb_cdc", "--engine", "tflm"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert seen[0].intent_dict() == {
+        "target": {"toolchain": "atfe", "transport": "usb_cdc"},
+        "engine": {"type": "tflm"},
+    }
+
+
+def test_doctor_config_selects_checks_and_flags_override_it(monkeypatch, tmp_path: Path) -> None:
+    config = tmp_path / "hpx.yml"
+    config.write_text("target:\n  toolchain: armclang\n  transport: swo\n", encoding="utf-8")
+    seen = _record_session_doctor(monkeypatch)
+
+    result = runner.invoke(app, ["doctor", "--config", str(config), "--transport", "rtt"])
+
+    assert result.exit_code == 0, result.output
+    assert seen[0].intent_dict()["target"] == {"toolchain": "armclang", "transport": "rtt"}
+
+
+def test_doctor_checks_segger_rtt_sources_like_session(monkeypatch) -> None:
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.shutil.which", lambda name: name)
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.find_jlink_exe", lambda: "JLinkExe")
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.find_spec", lambda _name: object())
+
+    result = runner.invoke(app, ["doctor", "--json"])
+
+    assert result.exit_code == 0, result.output
+    names = [check["name"] for check in json.loads(result.output)["checks"]]
+    assert "SEGGER_RTT_PATH" in names
+    assert names == [check.name for check in Session().doctor().checks]
 
 
 def test_cmd_doctor_defaults_print_table(capsys) -> None:

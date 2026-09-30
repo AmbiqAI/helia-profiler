@@ -51,7 +51,6 @@ PowerResult(
     summary: PowerSummary,
     samples: list[PowerSample] = list(),
     gated_windows: list[GatedPowerWindow] = list(),
-    per_layer: dict[str, Any] | None = None,
     metadata: PowerMetadata = PowerMetadata(),
 ) -> None
 ```
@@ -99,16 +98,6 @@ gated_windows: list[GatedPowerWindow] = field(default_factory=list)
 
 Source: `src/helia_profiler/power/base.py:85`
 
-### helia_profiler.PowerResult.per_layer
-
-`attribute` · `python`
-
-```python
-per_layer: dict[str, Any] | None = None
-```
-
-Source: `src/helia_profiler/power/base.py:86`
-
 ### helia_profiler.PowerResult.metadata
 
 `attribute` · `python`
@@ -117,7 +106,7 @@ Source: `src/helia_profiler/power/base.py:86`
 metadata: PowerMetadata = field(default_factory=PowerMetadata)
 ```
 
-Source: `src/helia_profiler/power/base.py:87`
+Source: `src/helia_profiler/power/base.py:86`
 
 ## helia_profiler.PowerObservation
 

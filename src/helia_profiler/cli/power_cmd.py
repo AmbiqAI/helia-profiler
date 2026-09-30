@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 import sys
 import threading
+
+log = logging.getLogger("hpx")
 
 
 def _cmd_power_on(driver_name: str, *, power_serial: str | None = None) -> None:
@@ -36,6 +39,7 @@ def _cmd_power_on(driver_name: str, *, power_serial: str | None = None) -> None:
     finally:
         try:
             driver.disable_passthrough()
-        except Exception:
-            pass
-        print("\nJoulescope released.")
+        except Exception as exc:
+            log.warning("Failed to release %s: %s", driver.name, exc)
+        else:
+            print(f"\n{driver.name} released.")

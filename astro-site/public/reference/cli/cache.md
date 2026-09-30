@@ -10,7 +10,7 @@ hpx cache COMMAND [ARGS]...
 
 Manage hpx/nsx caches
 
-Defined in `src/helia_profiler/cli/app.py` line 678.
+Defined in `src/helia_profiler/cli/app.py` line 679.
 
 ### Examples
 
@@ -38,7 +38,7 @@ hpx cache info
 
 Show cache location and disk usage
 
-Defined in `src/helia_profiler/cli/app.py` line 692.
+Defined in `src/helia_profiler/cli/app.py` line 693.
 
 ## hpx cache purge
 
@@ -48,6 +48,6 @@ hpx cache purge
 
 Remove all NSX caches and HPX workspaces
 
-Defined in `src/helia_profiler/cli/app.py` line 685.
+Defined in `src/helia_profiler/cli/app.py` line 686.
 
 Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__` with typer 0.26.8 and click 8.3.3.
