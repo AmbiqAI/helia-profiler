@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from ..results import PowerRunPlan
 from ..config import DEFAULT_POWER_WINDOW_TARGET_MS, PowerFirmware, WindowMode
 from ..errors import PowerError
+from ..power.base import PowerMode
 from ..power.diagnostics import count_noun, probe_runs_inferences
 from ..pipeline import PipelineContext
 
@@ -84,12 +85,12 @@ MIN_INA228_ACCUMULATOR_UPDATES = 20
 def _check_ina228_cadence(ctx: PipelineContext, plan: PowerRunPlan) -> None:
     """Reject internal-mode plans whose window undersamples the accumulator."""
     ina = ctx.config.power.ina228
-    if ina is None or ctx.config.power.mode.value != "internal":
+    if ina is None or ctx.config.power.mode is not PowerMode.INTERNAL:
         return
     # CONT_BUS_SHUNT: one shunt + one bus conversion per averaging sample.
     update_period_us = ina.averaging_count * 2 * ina.conversion_time_us
-    if plan.inference_count is not None and plan.reference_inference_us is not None:
-        window_us = plan.inference_count * plan.reference_inference_us
+    window_us = plan.planned_window_us
+    if window_us is not None:
         window_source = "planned window"
     else:
         target_ms = plan.target_duration_ms
@@ -243,7 +244,7 @@ class PlanPowerRunStage:
                 f"'{ctx.config.power.mode.value}'.",
                 hint="Select a driver and power.mode with matching ownership.",
             )
-        if driver.mode.value == "internal" and not getattr(
+        if driver.mode is PowerMode.INTERNAL and not getattr(
             driver, "supports_firmware_measurement", False
         ):
             raise PowerError(
