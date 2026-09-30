@@ -24,8 +24,6 @@ FIXTURES = Path(__file__).parent / "fixtures" / "readelf"
 
 @pytest.fixture
 def gcc_inventory(monkeypatch):
-    import helia_profiler.hostenv.toolchain_probe as tp
-
     sections_text = (FIXTURES / "sections.txt").read_text()
     segments_text = (FIXTURES / "segments.txt").read_text()
 
@@ -39,7 +37,7 @@ def gcc_inventory(monkeypatch):
     def _run(argv, **kwargs):
         return _Result(sections_text if "-S" in argv else segments_text)
 
-    monkeypatch.setattr(tp.subprocess, "run", _run)
+    monkeypatch.setattr("helia_profiler.hostenv._proc.subprocess.run", _run)
 
 
 def _measure(**kwargs) -> MeasuredMemoryRegions | None:
@@ -104,12 +102,10 @@ class TestDegradation:
         assert measure_memory_regions(Path("fw.elf"), "arm-none-eabi-gcc", custom) is None
 
     def test_tool_failure_degrades_to_none(self, monkeypatch):
-        import helia_profiler.hostenv.toolchain_probe as tp
-
         def _boom(*a, **k):
             raise FileNotFoundError("readelf")
 
-        monkeypatch.setattr(tp.subprocess, "run", _boom)
+        monkeypatch.setattr("helia_profiler.hostenv._proc.subprocess.run", _boom)
         assert _measure() is None
 
     def test_partial_inventory_is_refused(self, monkeypatch):
@@ -308,7 +304,6 @@ def test_serialised_shape_is_the_contract():
 
 class TestSymbolInventory:
     def _symbols(self, monkeypatch, text=None):
-        import helia_profiler.hostenv.toolchain_probe as tp
         from helia_profiler.hostenv.toolchain_probe import symbol_inventory
 
         class _Result:
@@ -316,7 +311,9 @@ class TestSymbolInventory:
             stderr = ""
             stdout = text if text is not None else (FIXTURES / "symbols.txt").read_text()
 
-        monkeypatch.setattr(tp.subprocess, "run", lambda *a, **k: _Result())
+        monkeypatch.setattr(
+            "helia_profiler.hostenv._proc.subprocess.run", lambda *a, **k: _Result()
+        )
         return symbol_inventory(Path("fw.elf"), "arm-none-eabi-gcc")
 
     def test_real_capture_parses_every_row(self, monkeypatch):
@@ -336,13 +333,12 @@ class TestSymbolInventory:
         assert len(symbols) == 1 and unparsed == 1
 
     def test_tool_failure_degrades_to_none(self, monkeypatch):
-        import helia_profiler.hostenv.toolchain_probe as tp
         from helia_profiler.hostenv.toolchain_probe import symbol_inventory
 
         def _boom(*a, **k):
             raise FileNotFoundError("nm")
 
-        monkeypatch.setattr(tp.subprocess, "run", _boom)
+        monkeypatch.setattr("helia_profiler.hostenv._proc.subprocess.run", _boom)
         assert symbol_inventory(Path("fw.elf"), "arm-none-eabi-gcc") is None
 
 
@@ -614,7 +610,6 @@ class TestReviewRegressionPins:
         """M-5: llvm-nm emits U rows and size-0-omitted shapes under
         --size-sort; they are legitimate output, not parse failures — one
         of them must not mark the listing partial and drop attribution."""
-        import helia_profiler.hostenv.elf_inventory as ei
         from helia_profiler.hostenv.toolchain_probe import symbol_inventory
 
         class _Result:
@@ -627,21 +622,14 @@ class TestReviewRegressionPins:
                 "utter garbage row\n"
             )
 
-        monkeypatch.setattr(ei.subprocess, "run", lambda *a, **k: _Result())
+        monkeypatch.setattr(
+            "helia_profiler.hostenv._proc.subprocess.run", lambda *a, **k: _Result()
+        )
         result = symbol_inventory(Path("fw.elf"), "arm-none-eabi-gcc")
         assert result is not None
         symbols, unparsed = result
         assert [s.name for s in symbols] == ["g_pui32Stack"]
         assert unparsed == 1  # only the garbage row
-
-    def test_nm_command_duplicate_stays_in_sync(self):
-        """m7: elf_inventory duplicates toolchain_probe._nm_command to
-        avoid an import cycle — pin that they agree for every toolchain."""
-        import helia_profiler.hostenv.elf_inventory as ei
-        import helia_profiler.hostenv.toolchain_probe as tp
-
-        for toolchain in ("arm-none-eabi-gcc", "gcc", "armclang", "atfe"):
-            assert ei._nm_command(toolchain) == tp._nm_command(toolchain)
 
 
 def test_llvm_nm_capture_parses_with_the_same_regexes():

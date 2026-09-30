@@ -4,16 +4,19 @@ from __future__ import annotations
 
 import json
 import logging
+from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from .csv_writer import _layer_to_flat_dict
 from .contracts import PROFILE_RESULTS_SCHEMA, PROFILE_RESULTS_SCHEMA_VERSION
 from .metadata import _firmware_meta_to_dict, _metadata_to_dict
+from .power import _power_run_records
 
 if TYPE_CHECKING:
     from ..power.base import PowerResult
     from ..results import PmuResult, RunMetadata
+    from ..results.artifacts import PowerRun
 
 log = logging.getLogger("hpx")
 
@@ -23,8 +26,7 @@ def _write_json(
     power: PowerResult | None,
     run_metadata: RunMetadata,
     output_dir: Path,
-    power_terminal: dict[str, Any] | None = None,
-    on_device_summary: dict[str, Any] | None = None,
+    power_run: PowerRun | None = None,
 ) -> Path:
     out_path = output_dir / "profile_results.json"
     total_cycles = sum(layer.cycles or 0 for layer in pmu.layers)
@@ -51,14 +53,7 @@ def _write_json(
     }
 
     if power is not None:
-        power_data: dict[str, Any] = {
-            "avg_current_a": power.summary.avg_current_a,
-            "avg_power_w": power.summary.avg_power_w,
-            "peak_current_a": power.summary.peak_current_a,
-            "energy_j": power.summary.energy_j,
-            "duration_s": power.summary.duration_s,
-            "sample_count": power.summary.sample_count,
-        }
+        power_data: dict[str, Any] = asdict(power.summary)
         data["power"] = power_data
         flat_meta = power.metadata.to_metadata_dict()
         observation = {
@@ -77,10 +72,7 @@ def _write_json(
             observation["gate_failure"] = flat_meta["gate_failure"]
         if observation:
             power_data["observation"] = observation
-        if power_terminal is not None:
-            power_data["terminal"] = power_terminal
-        if on_device_summary is not None:
-            power_data["on_device_summary"] = on_device_summary
+        power_data.update(_power_run_records(power_run))
 
     out_path.write_text(
         json.dumps(data, indent=2, default=str),

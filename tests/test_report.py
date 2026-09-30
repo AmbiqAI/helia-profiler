@@ -1322,7 +1322,7 @@ def test_console_labels_the_window_and_gate_intervals(tmp_path: Path):
     assert any("Firmware gate" in line and "4.987792 s" in line for line in lines)
 
 
-def test_summary_serializes_power_terminal_status(tmp_path: Path):
+def test_power_run_records_keep_each_documents_key_names(tmp_path: Path):
     config = load_config(
         None,
         {
@@ -1393,6 +1393,29 @@ def test_summary_serializes_power_terminal_status(tmp_path: Path):
         "bus_voltage_uv": 1_800_000,
         "calibration_id": "board-rev-a",
     }
+
+    assert summary["power"]["capture_duration_s"] == 5.0
+    assert "duration_s" not in summary["power"] and "sample_count" not in summary["power"]
+
+    assert ctx.power_result is not None
+    results = json.loads(
+        _write_json(
+            ctx.captured_pmu,
+            ctx.power_result,
+            ctx.run_metadata,
+            tmp_path,
+            power_run=ctx.power_run,
+        ).read_text()
+    )
+    assert results["power"]["terminal"] == summary["power"]["terminal"]
+    assert results["power"]["on_device_summary"] == summary["power"]["on_device_summary"]
+    assert results["power"]["duration_s"] == 5.0
+    assert results["power"]["sample_count"] == 5000
+
+    metadata = json.loads(_write_run_metadata(ctx, tmp_path).read_text())
+    assert metadata["power_terminal"] == summary["power"]["terminal"]
+    assert metadata["on_device_power"] == summary["power"]["on_device_summary"]
+    assert "terminal" not in metadata and "on_device_summary" not in metadata
 
 
 def test_write_summary_handles_sub_inference_dedicated_gate(tmp_path: Path):

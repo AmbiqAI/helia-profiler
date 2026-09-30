@@ -4,16 +4,23 @@ from __future__ import annotations
 
 import csv
 import logging
+from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from ..power.base import PowerResult, PowerSummary
+    from ..results.artifacts import PowerRun
 
 log = logging.getLogger("hpx")
 
 
 def _power_summary_to_dict(summary: PowerSummary) -> dict[str, Any]:
+    """``summary.json``'s published power keys.
+
+    ``profile_results.json`` and ``power_summary.csv`` publish the
+    ``PowerSummary`` field names instead.
+    """
     return {
         "avg_current_a": summary.avg_current_a,
         "avg_power_w": summary.avg_power_w,
@@ -21,6 +28,18 @@ def _power_summary_to_dict(summary: PowerSummary) -> dict[str, Any]:
         "energy_j": summary.energy_j,
         "capture_duration_s": summary.duration_s,
     }
+
+
+def _power_run_records(power_run: PowerRun | None) -> dict[str, dict[str, Any]]:
+    """The power run's ``terminal`` and ``on_device_summary``, whichever exist."""
+    if power_run is None:
+        return {}
+    records: dict[str, dict[str, Any]] = {}
+    if power_run.terminal is not None:
+        records["terminal"] = asdict(power_run.terminal)
+    if power_run.on_device_summary is not None:
+        records["on_device_summary"] = asdict(power_run.on_device_summary)
+    return records
 
 
 def _write_power_csv(power: PowerResult, output_dir: Path) -> Path:
@@ -39,12 +58,8 @@ def _write_power_csv(power: PowerResult, output_dir: Path) -> Path:
     with open(out_path, "w", encoding="utf-8", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["scope", "metric", "value"])
-        writer.writerow([scope, "avg_current_a", summary.avg_current_a])
-        writer.writerow([scope, "avg_power_w", summary.avg_power_w])
-        writer.writerow([scope, "peak_current_a", summary.peak_current_a])
-        writer.writerow([scope, "energy_j", summary.energy_j])
-        writer.writerow([scope, "duration_s", summary.duration_s])
-        writer.writerow([scope, "sample_count", summary.sample_count])
+        for key, value in asdict(summary).items():
+            writer.writerow([scope, key, value])
 
         for i, w in enumerate(power.gated_windows):
             writer.writerow([f"gated_window_{i}", "start_s", w.start_s])

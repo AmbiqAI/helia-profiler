@@ -6,13 +6,14 @@ forward-compatible parse contract: known dataclass fields are populated
 in an ``extra`` bucket so newer writers round-trip through older readers.
 This module is the single implementation of that contract and the home of
 the small helpers those documents and their producers share (file digests,
-nested reads, float coercion) (#229 D6).
+nested reads, number coercion, ``None`` stripping) (#229 D6).
 """
 
 from __future__ import annotations
 
 import csv
 import hashlib
+import math
 from dataclasses import fields
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
@@ -57,19 +58,46 @@ def nested_get(mapping: Any, *keys: str) -> Any:
     return current
 
 
-def to_float(value: Any) -> float | None:
+def to_float(value: Any, *, finite: bool = False) -> float | None:
     """Bool-rejecting float coercion; ``None`` on anything unconvertible.
 
-    Bools are not measurements (#229 D6).
+    Bools are not measurements (#229 D6). ``finite=True`` also rejects
+    NaN and infinities, for arithmetic that must not propagate them.
     """
-    if isinstance(value, bool) or value is None:
+    if value is None or isinstance(value, bool):
         return None
-    if isinstance(value, (int, float)):
-        return float(value)
     try:
-        return float(value)
-    except (TypeError, ValueError):
+        number = float(value)
+    except (TypeError, ValueError, OverflowError):
         return None
+    if finite and not math.isfinite(number):
+        return None
+    return number
+
+
+def to_int(value: Any) -> int | None:
+    """Bool-rejecting int coercion; ``None`` on anything unconvertible.
+
+    A boolean where a count belongs is garbage, not a 0/1 measurement.
+    """
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
+def strip_none(value: Any) -> Any:
+    """Recursively drop ``None`` values from dicts, including dicts in lists.
+
+    ``None`` list items are kept: position is meaningful in a list.
+    """
+    if isinstance(value, dict):
+        return {key: strip_none(item) for key, item in value.items() if item is not None}
+    if isinstance(value, list):
+        return [strip_none(item) for item in value]
+    return value
 
 
 def dataclass_from_dict(

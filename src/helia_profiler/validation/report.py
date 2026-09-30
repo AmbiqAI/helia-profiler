@@ -15,7 +15,7 @@ from typing import Any
 from ..firmware.workload import AOT_CLEAN_WORKLOAD
 from .._version import __version__
 from ..errors import ReportError
-from ..results.serde import nested_get
+from ..results.serde import nested_get, strip_none
 from .bundle import SCHEMA_VERSION
 from .runner import CaseResult
 
@@ -248,7 +248,7 @@ def _case_manifest(result: CaseResult, output_dir: Path) -> dict[str, Any]:
         "arena_location": model_config.get("arena_location"),
         "weights_location": model_config.get("weights_location"),
     }
-    requested_memory = _strip_none(requested_memory)
+    requested_memory = strip_none(requested_memory)
     engine = _enum_value(result.engine)
     cmsis_nn_provider = _resolve_cmsis_nn_provider(engine, result.backend, result.cmsis_nn_provider)
     identity = {
@@ -271,7 +271,7 @@ def _case_manifest(result: CaseResult, output_dir: Path) -> dict[str, Any]:
         "identity": identity,
         "repeat": {"attempt": result.attempt, "total": result.repeat_total},
         "health_issues": list(result.health_issues),
-        "provenance": _strip_none(
+        "provenance": strip_none(
             {
                 "jlink_serial": result.jlink_serial,
                 "power_serial": result.power_serial,
@@ -316,7 +316,7 @@ def _case_manifest(result: CaseResult, output_dir: Path) -> dict[str, Any]:
     }
     if result.error:
         case_data["error"] = result.error
-    return _strip_none(case_data)
+    return strip_none(case_data)
 
 
 def _case_report(result: CaseResult, output_dir: Path) -> dict[str, Any]:
@@ -325,7 +325,7 @@ def _case_report(result: CaseResult, output_dir: Path) -> dict[str, Any]:
     summary = _read_optional_json(_case_dir(result, output_dir) / "summary.json")
     case_data["resources"] = _case_resources(summary)
     case_data["power_metrics"] = _nested_dict(summary, "power") or None
-    case_data = _strip_none(case_data)
+    case_data = strip_none(case_data)
     return case_data
 
 
@@ -354,7 +354,7 @@ def _case_dir(result: CaseResult, output_dir: Path) -> Path:
 
 
 def _case_resources(summary: dict[str, Any]) -> dict[str, Any]:
-    return _strip_none(
+    return strip_none(
         {
             "binary_sections": _nested_dict(summary, "binary") or None,
             "runtime_memory": _nested_dict(summary, "memory") or None,
@@ -370,7 +370,7 @@ def _runtime_provenance(metadata: dict[str, Any]) -> dict[str, Any]:
     runtime: dict[str, Any] = {}
     toolchain = _nested_dict(metadata, "toolchain")
     if toolchain:
-        runtime["toolchain"] = _strip_none(
+        runtime["toolchain"] = strip_none(
             {
                 "compiler": toolchain.get("compiler"),
                 "compiler_version": toolchain.get("compiler_version"),
@@ -379,7 +379,7 @@ def _runtime_provenance(metadata: dict[str, Any]) -> dict[str, Any]:
         )
     engine = _nested_dict(metadata, "engine")
     if engine:
-        runtime["engine"] = _strip_none(
+        runtime["engine"] = strip_none(
             {
                 "type": engine.get("type"),
                 "version": engine.get("version"),
@@ -415,7 +415,7 @@ def _run_provenance_from_env() -> dict[str, Any]:
         if server_url and repository and run_id is not None
         else None
     )
-    github = _strip_none(
+    github = strip_none(
         {
             "event_name": event_name or None,
             "repository": repository or None,
@@ -424,7 +424,7 @@ def _run_provenance_from_env() -> dict[str, Any]:
             "run_url": run_url,
         }
     )
-    return _strip_none({"origin": origin, "github": github or None})
+    return strip_none({"origin": origin, "github": github or None})
 
 
 def _positive_int_from_env(name: str) -> int | None:
@@ -549,12 +549,4 @@ def _json_safe(value: Any) -> Any:
         return {str(k): _json_safe(v) for k, v in value.items()}
     if isinstance(value, (list, tuple)):
         return [_json_safe(v) for v in value]
-    return value
-
-
-def _strip_none(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {k: _strip_none(v) for k, v in value.items() if v is not None}
-    if isinstance(value, list):
-        return [_strip_none(v) for v in value]
     return value
