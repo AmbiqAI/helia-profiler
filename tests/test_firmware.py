@@ -427,7 +427,7 @@ class TestBoardModuleName:
         assert _board_module_name("apollo3p_evb") == "nsx-board-apollo3p-evb"
 
 
-class TestResolveModuleList:
+class TestResolveModuleSpecs:
     def test_apollo510_profile_modules(self):
         modules = [spec.name for spec in _resolve_module_specs("apollo510_evb")]
         assert "nsx-ambiqsuite-r5" in modules
