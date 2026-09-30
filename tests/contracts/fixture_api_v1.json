@@ -4,6 +4,49 @@
     0
   ],
   "surface": {
+    "ElfSection": {
+      "fields": [
+        [
+          "name",
+          "str",
+          "<required>"
+        ],
+        [
+          "address",
+          "int",
+          "<required>"
+        ],
+        [
+          "size",
+          "int",
+          "<required>"
+        ],
+        [
+          "nobits",
+          "bool",
+          "<required>"
+        ],
+        [
+          "allocated",
+          "bool",
+          "<required>"
+        ],
+        [
+          "index",
+          "int",
+          "-1"
+        ],
+        [
+          "linker_reserved",
+          "bool",
+          "False"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
     "EngineType": {
       "base": "str",
       "kind": "enum",
@@ -887,6 +930,34 @@
         "size"
       ]
     },
+    "LoadSegment": {
+      "fields": [
+        [
+          "virtual_address",
+          "int",
+          "<required>"
+        ],
+        [
+          "physical_address",
+          "int",
+          "<required>"
+        ],
+        [
+          "file_size",
+          "int",
+          "<required>"
+        ],
+        [
+          "memory_size",
+          "int",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
     "PerAxisQuantization": {
       "fields": [
         [
@@ -961,6 +1032,29 @@
       "methods": {
         "verify": "(self) -> 'VerifiedPreparedRuntime'"
       },
+      "properties": []
+    },
+    "SectionInventory": {
+      "fields": [
+        [
+          "sections",
+          "tuple[ElfSection, ...]",
+          "<required>"
+        ],
+        [
+          "segments",
+          "tuple[LoadSegment, ...]",
+          "()"
+        ],
+        [
+          "unparsed_rows",
+          "int",
+          "0"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
       "properties": []
     },
     "SourceClosure": {
@@ -1048,6 +1142,10 @@
     "inspect_fixture_footprint": {
       "kind": "function",
       "signature": "(*, elf: 'FixtureFile', image: 'FixtureFile', link_map: 'FixtureFile', target: 'FixtureTarget', toolchain: 'str') -> 'FixtureFootprint'"
+    },
+    "section_inventory": {
+      "kind": "function",
+      "signature": "(binary_path: 'Path', toolchain: 'str', *, timeout_s: 'int' = 30) -> 'SectionInventory | None'"
     },
     "source_closure": {
       "kind": "function",

@@ -49,6 +49,7 @@ from .fixture_observation import (
 from .fixture_runtime import FixtureFile, PreparedUpstreamRuntime
 from .fixture_stage import FixtureStage
 from .fixture_target import FixtureTarget, supported_fixture_target
+from .hostenv.elf_inventory import ElfSection, LoadSegment, SectionInventory, section_inventory
 from .placement import Placement
 from .results.models import ToolchainInfo
 
@@ -87,6 +88,7 @@ __all__ = [
     "build_fixed_fixture",
     "capture_fixture",
     "inspect_fixture_footprint",
+    "section_inventory",
     "source_closure",
     "summarize_fixture_measurements",
     "supported_fixture_target",
@@ -99,6 +101,9 @@ __all__ = [
     "FixtureMemory",
     "FixtureMetric",
     "FixtureTiming",
+    "ElfSection",
+    "LoadSegment",
+    "SectionInventory",
     "SourceClosure",
     "ToolchainInfo",
 ]
