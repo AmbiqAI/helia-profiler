@@ -5,20 +5,21 @@ section-INVENTORY shell-outs live in ``elf_inventory``, re-exported here)
 so that:
 
 * ``build_firmware`` does not need ``subprocess`` at all;
-* timeout handling, error capture, and output parsing live in one place;
-* tests can monkeypatch a single module to simulate missing toolchains.
+* output parsing lives in one place, and every shell-out goes through
+  ``_proc.tool_output`` for timeout handling and error capture;
+* tests can monkeypatch a single function to simulate missing toolchains.
 """
 
 from __future__ import annotations
 
 import logging
 import re
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 from ..results import BinarySections
-from .toolchains import get_toolchain_spec, resolve_toolchain_executable
+from ._proc import tool_output
+from .toolchains import get_toolchain_spec, nm_command, resolve_toolchain_executable
 
 # The #133 inventory API lives in elf_inventory (extracted at the module
 # size ceiling); re-exported here so probes keep one import surface.
@@ -58,17 +59,7 @@ def _compiler_command(toolchain: str) -> str:
 
 def _run_version(cmd: str, *, timeout_s: int) -> str:
     """Return the first line of ``<cmd> --version`` stdout, or ``""``."""
-    try:
-        result = subprocess.run(
-            [cmd, "--version"], capture_output=True, text=True, timeout=timeout_s
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
-        log.debug("%s --version probe failed: %s", cmd, exc)
-        return ""
-    if result.returncode != 0:
-        log.debug("%s --version returned rc=%d", cmd, result.returncode)
-        return ""
-    out = (result.stdout or "").strip().splitlines()
+    out = (tool_output([cmd, "--version"], timeout_s=timeout_s) or "").strip().splitlines()
     return out[0] if out else ""
 
 
@@ -94,20 +85,10 @@ def _sections_via_size(
            text    data     bss     dec     hex filename
          123420   27032   92412  242864   3b4b0 hpx_profiler
     """
-    try:
-        result = subprocess.run(
-            [size_cmd, str(binary_path)],
-            capture_output=True,
-            text=True,
-            timeout=timeout_s,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
-        log.debug("%s probe failed: %s", size_cmd, exc)
+    stdout = tool_output([size_cmd, str(binary_path)], timeout_s=timeout_s)
+    if stdout is None:
         return None
-    if result.returncode != 0:
-        log.debug("%s failed: %s", size_cmd, (result.stderr or "").strip())
-        return None
-    lines = (result.stdout or "").strip().splitlines()
+    lines = stdout.strip().splitlines()
     if len(lines) < 2:
         return None
     parts = lines[1].split()
@@ -231,23 +212,13 @@ def _reserved_via_readelf(
     parsed, so the caller keeps the unadjusted numbers rather than inventing
     an adjustment.
     """
-    try:
-        result = subprocess.run(
-            [readelf_cmd, "-S", "-W", str(binary_path)],
-            capture_output=True,
-            text=True,
-            timeout=timeout_s,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
-        log.debug("%s section probe failed: %s", readelf_cmd, exc)
-        return None
-    if result.returncode != 0:
-        log.debug("%s failed: %s", readelf_cmd, (result.stderr or "").strip())
+    stdout = tool_output([readelf_cmd, "-S", "-W", str(binary_path)], timeout_s=timeout_s)
+    if stdout is None:
         return None
 
     reserved = 0
     seen_section = False
-    for line in (result.stdout or "").splitlines():
+    for line in stdout.splitlines():
         match = _READELF_SECTION_RE.match(line)
         if match is None:
             continue
@@ -296,20 +267,8 @@ def _reserved_via_fromelf(
     so the caller keeps the unadjusted totals rather than inventing an
     adjustment -- the same degradation contract as the readelf probe.
     """
-    try:
-        result = subprocess.run(
-            ["fromelf", "--text", "-v", str(binary_path)],
-            capture_output=True,
-            text=True,
-            timeout=timeout_s,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
-        log.debug("fromelf section probe failed: %s", exc)
-        return None
-    if result.returncode != 0:
-        log.debug("fromelf -v failed: %s", (result.stderr or "").strip())
-        return None
-    return _reserved_from_section_listing(result.stdout or "")
+    stdout = tool_output(["fromelf", "--text", "-v", str(binary_path)], timeout_s=timeout_s)
+    return None if stdout is None else _reserved_from_section_listing(stdout)
 
 
 def _reserved_from_section_listing(stdout: str) -> int | None:
@@ -415,20 +374,10 @@ def _sections_via_fromelf(
     the per-section output is unavailable or unparseable, the totals are
     reported unadjusted (#132's documented degradation) rather than failing.
     """
-    try:
-        result = subprocess.run(
-            ["fromelf", "--text", "-z", str(binary_path)],
-            capture_output=True,
-            text=True,
-            timeout=timeout_s,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
-        log.debug("fromelf probe failed: %s", exc)
+    stdout = tool_output(["fromelf", "--text", "-z", str(binary_path)], timeout_s=timeout_s)
+    if stdout is None:
         return None
-    if result.returncode != 0:
-        log.debug("fromelf failed: %s", (result.stderr or "").strip())
-        return None
-    totals = _fromelf_totals(result.stdout or "")
+    totals = _fromelf_totals(stdout)
     if totals is None:
         log.debug("Could not find component sizes or Grand Totals in fromelf output")
         return None
@@ -493,16 +442,6 @@ def binary_sections(
     )
 
 
-def _nm_command(toolchain: str) -> str:
-    """Return the ``nm`` executable matching *toolchain*.
-
-    armclang / ATfE ship the LLVM binutils (``llvm-nm``); GCC uses the
-    cross-prefixed ``<prefix>-nm`` (e.g. ``arm-none-eabi-nm``).
-    """
-    spec = get_toolchain_spec(toolchain)
-    return resolve_toolchain_executable(toolchain, spec.nm)
-
-
 def symbol_address(
     binary_path: Path,
     toolchain: str,
@@ -517,25 +456,15 @@ def symbol_address(
     (``g_arena_storage``) both resolve.  Returns ``None`` on any failure
     (missing tool, symbol absent, parse error) so callers stay best-effort.
     """
-    nm = _nm_command(toolchain)
-    try:
-        result = subprocess.run(
-            [nm, str(binary_path)],
-            capture_output=True,
-            text=True,
-            timeout=timeout_s,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
-        log.debug("%s probe failed: %s", nm, exc)
-        return None
-    if result.returncode != 0:
-        log.debug("%s failed: %s", nm, (result.stderr or "").strip())
+    nm = nm_command(toolchain)
+    stdout = tool_output([nm, str(binary_path)], timeout_s=timeout_s)
+    if stdout is None:
         return None
     pattern = re.compile(
         rf"^([0-9a-fA-F]+)\s+(\S)\s+\S*{re.escape(symbol)}\s*$",
         re.MULTILINE,
     )
-    match = pattern.search(result.stdout or "")
+    match = pattern.search(stdout)
     if match is None:
         log.debug("symbol %s not found via %s in %s", symbol, nm, binary_path)
         return None

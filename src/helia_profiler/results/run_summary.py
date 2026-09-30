@@ -35,6 +35,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
+from .serde import to_float, to_int
+
 RUN_SUMMARY_SCHEMA = "hpx.run-summary"
 #: Version history lives with the shape it versions (re-exported by
 #: report/contracts.py for its long-standing import sites):
@@ -111,12 +113,12 @@ class MemorySection:
             "output_size",
         }
         return cls(
-            arena_size=_opt_int(data.get("arena_size")),
-            allocated_arena=_opt_int(data.get("allocated_arena")),
-            model_size=_opt_int(data.get("model_size")),
-            num_tensors=_opt_int(data.get("num_tensors")),
-            input_size=_opt_int(data.get("input_size")),
-            output_size=_opt_int(data.get("output_size")),
+            arena_size=to_int(data.get("arena_size")),
+            allocated_arena=to_int(data.get("allocated_arena")),
+            model_size=to_int(data.get("model_size")),
+            num_tensors=to_int(data.get("num_tensors")),
+            input_size=to_int(data.get("input_size")),
+            output_size=to_int(data.get("output_size")),
             extras={k: v for k, v in data.items() if k not in known},
         )
 
@@ -150,11 +152,11 @@ class BinarySection:
     def from_dict(cls, data: Mapping[str, Any]) -> BinarySection:
         known = {"text", "data", "bss", "total", "reserved"}
         return cls(
-            text=_opt_int(data.get("text")),
-            data=_opt_int(data.get("data")),
-            bss=_opt_int(data.get("bss")),
-            total=_opt_int(data.get("total")),
-            reserved=_opt_int(data.get("reserved")),
+            text=to_int(data.get("text")),
+            data=to_int(data.get("data")),
+            bss=to_int(data.get("bss")),
+            total=to_int(data.get("total")),
+            reserved=to_int(data.get("reserved")),
             extras={k: v for k, v in data.items() if k not in known},
         )
 
@@ -266,10 +268,10 @@ class LatencySection:
         the fallback — the precedence the validation runner has always
         applied, now stated once.
         """
-        clean = _opt_float(self.device_clean_infer_avg_us)
+        clean = to_float(self.device_clean_infer_avg_us)
         if clean is not None:
             return clean
-        return _opt_float(self.device_profiled_infer_avg_us)
+        return to_float(self.device_profiled_infer_avg_us)
 
 
 @dataclass(frozen=True)
@@ -418,39 +420,39 @@ class PowerSection:
         source instead of raising.
         """
         for legacy in ("total_energy_uj", "energy_uJ"):
-            value = _opt_float(self.extras.get(legacy))
+            value = to_float(self.extras.get(legacy))
             if value is not None:
                 return value
-        value = _opt_float(self.energy_j)
+        value = to_float(self.energy_j)
         return value * 1e6 if value is not None else None
 
     @property
     def avg_current_ma(self) -> float | None:
-        value = _opt_float(self.extras.get("avg_current_ma"))
+        value = to_float(self.extras.get("avg_current_ma"))
         if value is not None:
             return value
-        value = _opt_float(self.avg_current_a)
+        value = to_float(self.avg_current_a)
         return value * 1e3 if value is not None else None
 
     @property
     def avg_power_mw(self) -> float | None:
-        value = _opt_float(self.extras.get("avg_power_mw"))
+        value = to_float(self.extras.get("avg_power_mw"))
         if value is not None:
             return value
-        value = _opt_float(self.avg_power_w)
+        value = to_float(self.avg_power_w)
         return value * 1e3 if value is not None else None
 
     @property
     def peak_current_ma(self) -> float | None:
-        value = _opt_float(self.extras.get("peak_current_ma"))
+        value = to_float(self.extras.get("peak_current_ma"))
         if value is not None:
             return value
-        value = _opt_float(self.peak_current_a)
+        value = to_float(self.peak_current_a)
         return value * 1e3 if value is not None else None
 
     @property
     def energy_per_inference_uj(self) -> float | None:
-        value = _opt_float(self.energy_per_inference_j)
+        value = to_float(self.energy_per_inference_j)
         return value * 1e6 if value is not None else None
 
     @property
@@ -514,7 +516,7 @@ class RunSummary:
     def total_cycles_int(self) -> int | None:
         if not self.total_cycles:
             return None
-        return _opt_int(self.total_cycles)
+        return to_int(self.total_cycles)
 
     def to_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
@@ -581,13 +583,13 @@ class RunSummary:
         latency = data.get("latency")
         return cls(
             engine=str(data.get("engine", "")),
-            layers=_opt_int(data.get("layers")) or 0,
+            layers=to_int(data.get("layers")) or 0,
             total_cycles=data.get("total_cycles") or 0,
             overflow_detected=bool(data.get("overflow_detected", False)),
             validity=(str(data["validity"]) if data.get("validity") is not None else None),
             issues=_tuple_of_mappings(data.get("issues")),
             schema=str(data.get("schema", RUN_SUMMARY_SCHEMA)),
-            schema_version=_opt_int(data.get("schema_version")) or 1,
+            schema_version=to_int(data.get("schema_version")) or 1,
             compatibility=data.get("compatibility"),
             dependencies=data.get("dependencies"),
             top_layers=_tuple_of_mappings(data.get("top_layers")),
@@ -624,23 +626,3 @@ def _tuple_of_mappings(value: Any) -> tuple[Mapping[str, Any], ...]:
     if isinstance(value, list):
         return tuple(item for item in value if isinstance(item, Mapping))
     return ()
-
-
-def _opt_int(value: Any) -> int | None:
-    # bool is an int subclass; a boolean where a count belongs is garbage,
-    # not a 0/1 measurement (matches the runner's historical parser).
-    if value is None or isinstance(value, bool):
-        return None
-    try:
-        return int(value)
-    except (TypeError, ValueError, OverflowError):
-        return None
-
-
-def _opt_float(value: Any) -> float | None:
-    if value is None or isinstance(value, bool):
-        return None
-    try:
-        return float(value)
-    except (TypeError, ValueError, OverflowError):
-        return None

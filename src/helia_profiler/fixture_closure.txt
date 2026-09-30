@@ -6,7 +6,6 @@ api.py
 capture/__init__.py
 capture/parser.py
 capture/power_terminal.py
-capture/readiness.py
 capture/rtt_symbol.py
 capture/terminal_transport.py
 cli/__init__.py
@@ -63,6 +62,7 @@ engines/helia_rt/adapter.py
 engines/helia_rt/artifacts.py
 engines/helia_rt/download.py
 engines/helia_rt/nsx_module.py
+engines/semver.py
 engines/templates/heliaaot_attributes.h.j2
 engines/tflm.py
 errors.py
@@ -79,7 +79,6 @@ firmware/build.py
 firmware/context.py
 firmware/fingerprint.py
 firmware/fixture.py
-firmware/fixture_memory.py
 firmware/headers.py
 firmware/image.py
 firmware/launcher.py
@@ -135,6 +134,7 @@ fixture_runtime.py
 fixture_stage.py
 fixture_target.py
 hostenv/__init__.py
+hostenv/_proc.py
 hostenv/cache_dirs.py
 hostenv/doctor.py
 hostenv/elf_inventory.py
@@ -170,7 +170,6 @@ power/joulescope/driver.py
 power/joulescope/stats.py
 power/joulescope/sync.py
 power/metadata.py
-power/ondevice_driver.py
 power/sync.py
 profiler.py
 report/__init__.py

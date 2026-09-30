@@ -28,8 +28,7 @@ def _sample_pmu_passes() -> list[dict[str, object]]:
     return [
         {
             "name": "Cache",
-            "custom": False,
-            "event_ids": [],
+            "event_ids": ["0x0011", "0x0008", "0x0023", "0x0024"],
             "counter_names": [
                 "ARM_PMU_CPU_CYCLES",
                 "ARM_PMU_INST_RETIRED",
@@ -37,7 +36,6 @@ def _sample_pmu_passes() -> list[dict[str, object]]:
                 "ARM_PMU_STALL_BACKEND",
             ],
             "num_counters": 4,
-            "c_enum": "NSX_PMU_PRESET_BASIC_CPU",
             "group": "cpu",
         }
     ]
@@ -46,7 +44,6 @@ def _sample_pmu_passes() -> list[dict[str, object]]:
 def _npu_pmu_pass() -> dict[str, object]:
     return {
         "name": "EthosNpu",
-        "custom": True,
         "event_ids": ["0x0000", "0x0000", "0x0000", "0x0000"],
         "counter_names": [
             "ETHOSU_PMU_CYCLE",
@@ -55,7 +52,6 @@ def _npu_pmu_pass() -> dict[str, object]:
             "ETHOSU_PMU_SRAM_RD_DATA_BEAT_RECEIVED",
         ],
         "num_counters": 4,
-        "c_enum": None,
         "group": "ethos_npu",
     }
 
@@ -122,7 +118,6 @@ def _render_tflm(
         arena_region=arena_region,
         weights_region=weights_region,
         model_size=1024,
-        profiling_backends=["dwt", "armv8m-pmu"] if has_armv8m_pmu else ["dwt"],
         has_armv8m_pmu=has_armv8m_pmu,
         perf_mode_symbol=perf_mode_symbol,
         perf_mode_mhz=perf_mode_mhz,
@@ -197,7 +192,6 @@ def _render_aot(
         arena_regions=arena_regions or [],
         allocate_arenas=False,
         extreme_mode=False,
-        profiling_backends=["dwt", "armv8m-pmu"] if has_armv8m_pmu else ["dwt"],
         has_armv8m_pmu=has_armv8m_pmu,
         perf_mode_symbol=perf_mode_symbol,
         perf_mode_mhz=perf_mode_mhz,
@@ -399,7 +393,6 @@ class TestMainCcRender:
             resolver_registrations=["r.AddConv2D();", "r.AddSoftmax();"],
             resource_variable_count=0,
             extreme_mode=False,
-            profiling_backends=["dwt"],
             has_armv8m_pmu=False,
             perf_mode_symbol="NSX_PERF_HIGH",
             perf_mode_mhz=96,
@@ -509,7 +502,6 @@ class TestMainCcRender:
             resolver_registrations=["r.AddConv2D();", "r.AddSoftmax();"],
             resource_variable_count=0,
             extreme_mode=False,
-            profiling_backends=["dwt", "armv8m-pmu"],
             has_armv8m_pmu=True,
             perf_mode_symbol="NSX_PERF_LOW",
             perf_mode_mhz=96,
@@ -936,7 +928,6 @@ class TestMainAotCcRender:
 
         small = template.render(
             cmsis_device_header="apollo330P.h",
-            profiling_backends=["dwt", "armv8m-pmu"],
             has_armv8m_pmu=True,
             has_ethos_u=False,
             pmu_max_ops=512,
@@ -945,7 +936,6 @@ class TestMainAotCcRender:
 
         large = template.render(
             cmsis_device_header="apollo510.h",
-            profiling_backends=["dwt", "armv8m-pmu"],
             has_armv8m_pmu=True,
             has_ethos_u=False,
             pmu_max_ops=4096,
@@ -960,7 +950,6 @@ class TestMainAotCcRender:
         template = _env.get_template("hpx_pmu_profiler.h.j2")
         kwargs = dict(
             cmsis_device_header="apollo510.h",
-            profiling_backends=["dwt", "armv8m-pmu"],
             has_armv8m_pmu=True,
             pmu_max_ops=512,
         )

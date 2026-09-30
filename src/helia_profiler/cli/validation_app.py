@@ -60,7 +60,7 @@ def power_on_command(
         typer.Option(
             "--driver",
             click_type=_POWER_ON_DRIVER_CHOICE,
-            help="Joulescope driver (default: auto-detect)",
+            help="Power driver that holds the target rail on (JS110/JS220/JS320 auto-detected)",
         ),
     ] = "joulescope",
     power_serial: Annotated[

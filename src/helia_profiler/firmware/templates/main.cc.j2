@@ -282,8 +282,7 @@ static tflite::MicroMutableOpResolver<kMaxOps> &get_resolver() {
     // First pass samples the Ethos-U's own PMU; the ARM-side profiler only
     // records layer ordinals/tags (0 ARM counters).
     g_profiler.InitCustom(nullptr, 0);
-{% elif pmu_passes[0].custom %}
-{% if has_armv8m_pmu %}
+{% elif has_armv8m_pmu %}
     {
         static const uint32_t _init_ids[] = { {{ pmu_passes[0].event_ids | join(', ') }} };
         static const char* _init_names[] = { {% for name in pmu_passes[0].counter_names %}"{{ name }}"{% if not loop.last %}, {% endif %}{% endfor %} };
@@ -292,17 +291,6 @@ static tflite::MicroMutableOpResolver<kMaxOps> &get_resolver() {
     }
 {% else %}
     g_profiler.Init(0);
-{% endif %}
-{% else %}
-{% if has_armv8m_pmu %}
-    {
-        static const char* _init_names[] = { {% for name in pmu_passes[0].counter_names %}"{{ name }}"{% if not loop.last %}, {% endif %}{% endfor %} };
-        g_profiler.Init({{ pmu_passes[0].c_enum }});
-        g_profiler.SetCounterNames(_init_names, {{ pmu_passes[0].num_counters }});
-    }
-{% else %}
-    g_profiler.Init(0);
-{% endif %}
 {% endif %}
     g_profiler.SetHeartbeat(hb_every_cyc, hb_every_ops);
 
@@ -447,8 +435,7 @@ static tflite::MicroMutableOpResolver<kMaxOps> &get_resolver() {
         g_profiler.InitCustom(nullptr, 0);
         hpx_npu_configure(_pass{{ loop.index0 }}_npu_events, _pass{{ loop.index0 }}_names, {{ pass.num_counters }});
     }
-{% elif pass.custom %}
-{% if has_armv8m_pmu %}
+{% elif has_armv8m_pmu %}
     {
         static const uint32_t _pass{{ loop.index0 }}_ids[] = { {{ pass.event_ids | join(', ') }} };
         static const char* _pass{{ loop.index0 }}_names[] = { {% for name in pass.counter_names %}"{{ name }}"{% if not loop.last %}, {% endif %}{% endfor %} };
@@ -457,17 +444,6 @@ static tflite::MicroMutableOpResolver<kMaxOps> &get_resolver() {
     }
 {% else %}
     g_profiler.Init(0);
-{% endif %}
-{% else %}
-{% if has_armv8m_pmu %}
-    {
-        static const char* _pass{{ loop.index0 }}_names[] = { {% for name in pass.counter_names %}"{{ name }}"{% if not loop.last %}, {% endif %}{% endfor %} };
-        g_profiler.Init({{ pass.c_enum }});
-        g_profiler.SetCounterNames(_pass{{ loop.index0 }}_names, {{ pass.num_counters }});
-    }
-{% else %}
-    g_profiler.Init(0);
-{% endif %}
 {% endif %}
     // Init resets PMU state; re-arm heartbeat thresholds.
     g_profiler.SetHeartbeat(hb_every_cyc, hb_every_ops);

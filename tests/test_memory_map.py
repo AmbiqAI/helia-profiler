@@ -273,8 +273,6 @@ def test_real_gcc_fixture_inventory_classifies_correctly():
     right apollo510 region."""
     from helia_profiler.hostenv.toolchain_probe import _inventory_via_readelf
 
-    import helia_profiler.hostenv.toolchain_probe as tp
-
     text = (Path(__file__).parent / "fixtures" / "readelf" / "sections.txt").read_text()
 
     class _Result:
@@ -284,10 +282,7 @@ def test_real_gcc_fixture_inventory_classifies_correctly():
 
     import unittest.mock as mock
 
-    # NOTE: tp.subprocess IS the global subprocess module; the patch is
-    # process-wide for the with-block. Kept because a module-local alias
-    # would churn toolchain_probe for a test-only nicety.
-    with mock.patch.object(tp.subprocess, "run", lambda *a, **k: _Result()):
+    with mock.patch("helia_profiler.hostenv._proc.subprocess.run", lambda *a, **k: _Result()):
         inventory = _inventory_via_readelf(Path("fw.elf"), readelf_cmd="readelf", timeout_s=5)
     assert inventory is not None
     sections, unparsed = inventory

@@ -5,7 +5,7 @@ this module (rather than ``neuralspotx`` directly) so that:
 
 * failures surface as :class:`BuildError` with our standard hint structure;
 * a single place enforces the per-subprocess wall-clock timeout for every
-  long-running NSX operation (configure/build/flash/sync);
+  long-running NSX operation (configure/build/lock/sync);
 * the call sites stay agnostic of whether NSX is exposed as a CLI or a Python
   API in any given release.
 
@@ -34,11 +34,9 @@ from ..errors import BuildError, NetworkError
 log = logging.getLogger("hpx")
 
 # Conservative default timeouts — cmake configure is fast, builds can be
-# slow, flash involves J-Link probe negotiation. These are *defaults*; the
-# profiler pipeline passes explicit values from ``ProfileConfig.timeouts``.
+# slow. These are *defaults*; the profiler pipeline passes explicit values from ``ProfileConfig.timeouts``.
 _DEFAULT_CONFIGURE_TIMEOUT_S = 120
 _DEFAULT_BUILD_TIMEOUT_S = 300
-_DEFAULT_FLASH_TIMEOUT_S = 120
 _DEFAULT_LOCK_TIMEOUT_S = 180
 _DEFAULT_SYNC_TIMEOUT_S = 300
 
@@ -153,48 +151,6 @@ def build(
         "nsx build",
         lambda: nsx_api.build_app(
             app_dir, toolchain=toolchain, target=target, timeout_s=timeout_s, emit=emit
-        ),
-    )
-
-
-def flash(
-    app_dir: Path,
-    *,
-    toolchain: str | None = None,
-    jlink_serial: str | None = None,
-    frozen: bool = False,
-    timeout_s: float = _DEFAULT_FLASH_TIMEOUT_S,
-    verbose: int = 0,
-) -> None:
-    """Run ``nsx flash`` on the given app directory.
-
-    When *jlink_serial* is provided it is forwarded to ``flash_app`` as the
-    ``probe_serial`` so the underlying J-Link tool selects the correct probe
-    (required when multiple probes are attached).
-
-    ``frozen`` verifies ``modules/`` against ``nsx.lock`` and raises on any
-    drift instead of silently re-vendoring, when a (re)configure is
-    triggered (requires neuralspotx>=0.7.5, AmbiqAI/neuralspotx#178). Note
-    that passing *jlink_serial* always forces a reconfigure regardless of
-    *frozen* — the probe serial is baked into the CMake cache, so a stale
-    build must not be flashed against a different probe. *frozen* only
-    changes how the accompanying module sync behaves when a reconfigure is
-    already happening, not whether it happens.
-    """
-    log.info("nsx flash: %s (toolchain=%s)", app_dir, toolchain or "default")
-    emit = emitter_for_verbosity(verbose)
-
-    if jlink_serial:
-        log.info("  J-Link serial: %s", jlink_serial)
-    _translate(
-        "nsx flash",
-        lambda: nsx_api.flash_app(
-            app_dir,
-            toolchain=toolchain,
-            probe_serial=jlink_serial,
-            frozen=frozen,
-            timeout_s=timeout_s,
-            emit=emit,
         ),
     )
 

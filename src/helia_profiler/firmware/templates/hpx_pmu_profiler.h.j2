@@ -36,10 +36,7 @@ class HpxPmuProfiler : public tflite::MicroProfilerInterface {
     HpxPmuProfiler() = default;
     ~HpxPmuProfiler() override = default;
 
-    /// Legacy preset-based init (backward compatibility).
-{% if has_armv8m_pmu %}
-    void Init(nsx_pmu_preset_e preset = NSX_PMU_PRESET_ML_DEFAULT);
-{% else %}
+{% if not has_armv8m_pmu %}
     void Init(int preset = 0);
 {% endif %}
 

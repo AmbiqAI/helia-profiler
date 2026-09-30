@@ -33,7 +33,6 @@ from collections.abc import Callable
 from ..wire import (
     HPX_END_SENTINEL,
     HPX_HEARTBEAT_PREFIX,
-    HPX_PROTOCOL_VERSION,
     HPX_START_SENTINEL,
     HeartbeatPhase,
 )
@@ -49,22 +48,11 @@ log = logging.getLogger("hpx")
 _LEADING_GLITCH_RE = re.compile(r"^[^\x20-\x7e]+")
 
 
-# Declared once in ``helia_profiler.wire`` and re-exported here under the names
-# every transport already imports, so no transport had to change when the
-# registry landed.  ``HPX_PROTOCOL_VERSION`` comes along for the same reason.
-
-HPX_START = HPX_START_SENTINEL
-HPX_END = HPX_END_SENTINEL
-#: ``HPX_PROTOCOL_VERSION`` is re-exported by the import above: ``capture``
-#: and ``capture.parser`` both reach it through this module.
-
-
-#: Legacy hard overall deadline (kept for back-compat with callers that do
-#: not pass ``overall_timeout_s``).  ``None`` = rely entirely on heartbeats.
+#: Default absolute capture ceiling for the transport readers' ``timeout_s``.
 DEFAULT_TIMEOUT_S = 600
 
-#: Legacy per-line gap timeout — used when heartbeats are disabled.  Large
-#: PSRAM models can keep the firmware busy for minutes between lines.
+#: Per-line gap timeout used when heartbeats are disabled.  Large PSRAM
+#: models can keep the firmware busy for minutes between lines.
 LINE_TIMEOUT_S = 300
 
 #: Default inactivity timeout when heartbeats are enabled.  Any line from
@@ -272,9 +260,9 @@ def collect_lines(
                 else:
                     log.debug("%s: %s", transport_name, line)
 
-                if line == HPX_START:
+                if line == HPX_START_SENTINEL:
                     seen_start = True
-                if line == HPX_END:
+                if line == HPX_END_SENTINEL:
                     log.info("Captured %d lines (HPX_END received)", len(lines))
                     return lines
         if time.monotonic() > hb_deadline:
