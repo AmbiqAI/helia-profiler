@@ -3,12 +3,12 @@
   "generatedFrom": {
     "tool": "pyref",
     "version": "1.7.3",
-    "sourceTree": "d8a97d642945a55bb8b865b07368b1e02c0e38e3"
+    "sourceTree": "b823e287e809c8d9438536a07fc0ab41a3b030c0"
   },
   "language": "python",
   "modules": [
     {
-      "description": "Comparing two runs and judging one: the comparability rules that decide whether a comparison is meaningful, and the metric policies that turn numbers into a verdict.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `d8a97d642945a55bb8b865b07368b1e02c0e38e3`.",
+      "description": "Comparing two runs and judging one: the comparability rules that decide whether a comparison is meaningful, and the metric policies that turn numbers into a verdict.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `b823e287e809c8d9438536a07fc0ab41a3b030c0`.",
       "name": "evaluation",
       "path": "helia_profiler.evaluation",
       "submodules": [],
@@ -34,9 +34,9 @@
               "returns": [],
               "signature": "SMALLER = 'smaller'",
               "source": {
-                "line": 27,
+                "line": 26,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L27"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L26"
               },
               "summary": ""
             },
@@ -53,9 +53,9 @@
               "returns": [],
               "signature": "LARGER = 'larger'",
               "source": {
-                "line": 28,
+                "line": 27,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L28"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L27"
               },
               "summary": ""
             },
@@ -72,9 +72,9 @@
               "returns": [],
               "signature": "EQUAL = 'equal'",
               "source": {
-                "line": 29,
+                "line": 28,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L29"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L28"
               },
               "summary": ""
             }
@@ -85,9 +85,9 @@
           "returns": [],
           "signature": "MetricDirection()",
           "source": {
-            "line": 24,
+            "line": 23,
             "path": "src/helia_profiler/evaluation/comparison_profile.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L24"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L23"
           },
           "summary": "Preferred candidate direction for one metric."
         },
@@ -111,9 +111,9 @@
               "returns": [],
               "signature": "FAIL = 'fail'",
               "source": {
-                "line": 35,
+                "line": 34,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L35"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L34"
               },
               "summary": ""
             },
@@ -130,9 +130,9 @@
               "returns": [],
               "signature": "WARN = 'warn'",
               "source": {
-                "line": 36,
+                "line": 35,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L36"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L35"
               },
               "summary": ""
             },
@@ -149,9 +149,9 @@
               "returns": [],
               "signature": "IGNORE = 'ignore'",
               "source": {
-                "line": 37,
+                "line": 36,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L37"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L36"
               },
               "summary": ""
             }
@@ -162,9 +162,9 @@
           "returns": [],
           "signature": "MissingMetricPolicy()",
           "source": {
-            "line": 32,
+            "line": 31,
             "path": "src/helia_profiler/evaluation/comparison_profile.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L32"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L31"
           },
           "summary": "Verdict when a selected metric is unavailable."
         },
@@ -361,9 +361,9 @@
               "returns": [],
               "signature": "PASS = 'pass'",
               "source": {
-                "line": 43,
+                "line": 42,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L43"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L42"
               },
               "summary": ""
             },
@@ -380,9 +380,9 @@
               "returns": [],
               "signature": "WARN = 'warn'",
               "source": {
-                "line": 44,
+                "line": 43,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L44"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L43"
               },
               "summary": ""
             },
@@ -399,9 +399,9 @@
               "returns": [],
               "signature": "FAIL = 'fail'",
               "source": {
-                "line": 45,
+                "line": 44,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L45"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L44"
               },
               "summary": ""
             },
@@ -418,9 +418,9 @@
               "returns": [],
               "signature": "SKIP = 'skip'",
               "source": {
-                "line": 46,
+                "line": 45,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L46"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L45"
               },
               "summary": ""
             }
@@ -431,9 +431,9 @@
           "returns": [],
           "signature": "VerdictStatus()",
           "source": {
-            "line": 40,
+            "line": 39,
             "path": "src/helia_profiler/evaluation/comparison_profile.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L40"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L39"
           },
           "summary": "Regression policy outcome."
         },
@@ -591,9 +591,9 @@
               "returns": [],
               "signature": "direction: MetricDirection",
               "source": {
-                "line": 53,
+                "line": 52,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L53"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L52"
               },
               "summary": ""
             },
@@ -610,9 +610,9 @@
               "returns": [],
               "signature": "unit: str",
               "source": {
-                "line": 54,
+                "line": 53,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L54"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L53"
               },
               "summary": ""
             },
@@ -629,9 +629,9 @@
               "returns": [],
               "signature": "max_regression_pct: float | None = None",
               "source": {
-                "line": 55,
+                "line": 54,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L55"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L54"
               },
               "summary": ""
             },
@@ -648,9 +648,9 @@
               "returns": [],
               "signature": "max_regression_abs: float | None = None",
               "source": {
-                "line": 56,
+                "line": 55,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L56"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L55"
               },
               "summary": ""
             },
@@ -667,9 +667,9 @@
               "returns": [],
               "signature": "missing: MissingMetricPolicy | None = None",
               "source": {
-                "line": 57,
+                "line": 56,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L57"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L56"
               },
               "summary": ""
             },
@@ -686,9 +686,9 @@
               "returns": [],
               "signature": "extra: dict[str, Any] = field(default_factory=dict, repr=False)",
               "source": {
-                "line": 58,
+                "line": 57,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L58"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L57"
               },
               "summary": ""
             },
@@ -705,9 +705,9 @@
               "returns": [],
               "signature": "from_dict(data: dict[str, Any]) -> Self",
               "source": {
-                "line": 79,
+                "line": 78,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L79"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L78"
               },
               "summary": ""
             },
@@ -724,9 +724,9 @@
               "returns": [],
               "signature": "to_dict() -> dict[str, Any]",
               "source": {
-                "line": 90,
+                "line": 89,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L90"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L89"
               },
               "summary": ""
             }
@@ -737,9 +737,9 @@
           "returns": [],
           "signature": "MetricPolicy(\n    direction: MetricDirection,\n    unit: str,\n    max_regression_pct: float | None = None,\n    max_regression_abs: float | None = None,\n    missing: MissingMetricPolicy | None = None,\n    extra: dict[str, Any] = dict(),\n) -> None",
           "source": {
-            "line": 49,
+            "line": 48,
             "path": "src/helia_profiler/evaluation/comparison_profile.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L49"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L48"
           },
           "summary": "Tolerance and availability policy for one named comparison metric."
         },
@@ -763,9 +763,9 @@
               "returns": [],
               "signature": "schema: str",
               "source": {
-                "line": 103,
+                "line": 102,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L103"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L102"
               },
               "summary": ""
             },
@@ -782,9 +782,9 @@
               "returns": [],
               "signature": "schema_version: int",
               "source": {
-                "line": 104,
+                "line": 103,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L104"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L103"
               },
               "summary": ""
             },
@@ -801,9 +801,9 @@
               "returns": [],
               "signature": "metrics: dict[str, MetricPolicy]",
               "source": {
-                "line": 105,
+                "line": 104,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L105"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L104"
               },
               "summary": ""
             },
@@ -820,9 +820,9 @@
               "returns": [],
               "signature": "missing: MissingMetricPolicy | None = None",
               "source": {
-                "line": 106,
+                "line": 105,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L106"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L105"
               },
               "summary": ""
             },
@@ -839,9 +839,9 @@
               "returns": [],
               "signature": "required_dimensions: tuple[str, ...] = ()",
               "source": {
-                "line": 107,
+                "line": 106,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L107"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L106"
               },
               "summary": ""
             },
@@ -858,9 +858,9 @@
               "returns": [],
               "signature": "name: str | None = None",
               "source": {
-                "line": 108,
+                "line": 107,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L108"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L107"
               },
               "summary": ""
             },
@@ -877,9 +877,9 @@
               "returns": [],
               "signature": "extra: dict[str, Any] = field(default_factory=dict, repr=False)",
               "source": {
-                "line": 109,
+                "line": 108,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L109"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L108"
               },
               "summary": ""
             },
@@ -896,9 +896,9 @@
               "returns": [],
               "signature": "from_dict(data: dict[str, Any]) -> Self",
               "source": {
-                "line": 141,
+                "line": 140,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L141"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L140"
               },
               "summary": ""
             },
@@ -915,9 +915,9 @@
               "returns": [],
               "signature": "load(path: str | Path) -> Self",
               "source": {
-                "line": 155,
+                "line": 154,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L155"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L154"
               },
               "summary": ""
             },
@@ -934,9 +934,9 @@
               "returns": [],
               "signature": "to_dict() -> dict[str, Any]",
               "source": {
-                "line": 166,
+                "line": 165,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L166"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L165"
               },
               "summary": ""
             }
@@ -947,9 +947,9 @@
           "returns": [],
           "signature": "ComparisonProfile(\n    schema: str,\n    schema_version: int,\n    metrics: dict[str, MetricPolicy],\n    missing: MissingMetricPolicy | None = None,\n    required_dimensions: tuple[str, ...] = (),\n    name: str | None = None,\n    extra: dict[str, Any] = dict(),\n) -> None",
           "source": {
-            "line": 99,
+            "line": 98,
             "path": "src/helia_profiler/evaluation/comparison_profile.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L99"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L98"
           },
           "summary": "Open v1 profile selecting deterministic metric regression policies."
         },
@@ -1164,9 +1164,9 @@
               "returns": [],
               "signature": "metric: str",
               "source": {
-                "line": 185,
+                "line": 184,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L185"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L184"
               },
               "summary": ""
             },
@@ -1183,9 +1183,9 @@
               "returns": [],
               "signature": "status: VerdictStatus",
               "source": {
-                "line": 186,
+                "line": 185,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L186"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L185"
               },
               "summary": ""
             },
@@ -1202,9 +1202,9 @@
               "returns": [],
               "signature": "message: str",
               "source": {
-                "line": 187,
+                "line": 186,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L187"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L186"
               },
               "summary": ""
             },
@@ -1221,9 +1221,9 @@
               "returns": [],
               "signature": "baseline: float | None = None",
               "source": {
-                "line": 188,
+                "line": 187,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L188"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L187"
               },
               "summary": ""
             },
@@ -1240,9 +1240,9 @@
               "returns": [],
               "signature": "candidate: float | None = None",
               "source": {
-                "line": 189,
+                "line": 188,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L189"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L188"
               },
               "summary": ""
             },
@@ -1259,9 +1259,9 @@
               "returns": [],
               "signature": "regression: float | None = None",
               "source": {
-                "line": 190,
+                "line": 189,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L190"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L189"
               },
               "summary": ""
             },
@@ -1278,9 +1278,9 @@
               "returns": [],
               "signature": "allowed_regression: float | None = None",
               "source": {
-                "line": 191,
+                "line": 190,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L191"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L190"
               },
               "summary": ""
             },
@@ -1297,9 +1297,9 @@
               "returns": [],
               "signature": "unit: str = ''",
               "source": {
-                "line": 192,
+                "line": 191,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L192"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L191"
               },
               "summary": ""
             }
@@ -1310,9 +1310,9 @@
           "returns": [],
           "signature": "MetricVerdict(\n    metric: str,\n    status: VerdictStatus,\n    message: str,\n    baseline: float | None = None,\n    candidate: float | None = None,\n    regression: float | None = None,\n    allowed_regression: float | None = None,\n    unit: str = '',\n) -> None",
           "source": {
-            "line": 181,
+            "line": 180,
             "path": "src/helia_profiler/evaluation/comparison_profile.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L181"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L180"
           },
           "summary": "Verdict and evidence for one selected metric."
         },
@@ -1355,9 +1355,9 @@
               "returns": [],
               "signature": "status: VerdictStatus",
               "source": {
-                "line": 199,
+                "line": 198,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L199"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L198"
               },
               "summary": ""
             },
@@ -1374,9 +1374,9 @@
               "returns": [],
               "signature": "metrics: tuple[MetricVerdict, ...]",
               "source": {
-                "line": 200,
+                "line": 199,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L200"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L199"
               },
               "summary": ""
             },
@@ -1393,9 +1393,9 @@
               "returns": [],
               "signature": "dimension_mismatches: tuple[str, ...] = ()",
               "source": {
-                "line": 201,
+                "line": 200,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L201"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L200"
               },
               "summary": ""
             },
@@ -1412,9 +1412,9 @@
               "returns": [],
               "signature": "profile_name: str | None = None",
               "source": {
-                "line": 202,
+                "line": 201,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L202"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L201"
               },
               "summary": ""
             },
@@ -1431,9 +1431,9 @@
               "returns": [],
               "signature": "profile_schema: str = COMPARISON_PROFILE_SCHEMA",
               "source": {
-                "line": 203,
+                "line": 202,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L203"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L202"
               },
               "summary": ""
             },
@@ -1450,9 +1450,9 @@
               "returns": [],
               "signature": "profile_schema_version: int = COMPARISON_PROFILE_SCHEMA_VERSION",
               "source": {
-                "line": 204,
+                "line": 203,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L204"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L203"
               },
               "summary": ""
             },
@@ -1469,9 +1469,9 @@
               "returns": [],
               "signature": "profile_sha256: str = ''",
               "source": {
-                "line": 205,
+                "line": 204,
                 "path": "src/helia_profiler/evaluation/comparison_profile.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L205"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L204"
               },
               "summary": ""
             }
@@ -1482,9 +1482,9 @@
           "returns": [],
           "signature": "ComparisonVerdict(\n    status: VerdictStatus,\n    metrics: tuple[MetricVerdict, ...],\n    dimension_mismatches: tuple[str, ...] = (),\n    profile_name: str | None = None,\n    profile_schema: str = COMPARISON_PROFILE_SCHEMA,\n    profile_schema_version: int = COMPARISON_PROFILE_SCHEMA_VERSION,\n    profile_sha256: str = '',\n) -> None",
           "source": {
-            "line": 195,
+            "line": 194,
             "path": "src/helia_profiler/evaluation/comparison_profile.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L195"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L194"
           },
           "summary": "Deterministic verdict for one result pair and profile."
         },
@@ -1501,9 +1501,9 @@
           "returns": [],
           "signature": "evaluate_comparison_profile(result: CompareResult, profile: ComparisonProfile) -> ComparisonVerdict",
           "source": {
-            "line": 208,
+            "line": 207,
             "path": "src/helia_profiler/evaluation/comparison_profile.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L208"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L207"
           },
           "summary": "Evaluate existing metric deltas against one versioned profile."
         },
