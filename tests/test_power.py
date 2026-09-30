@@ -4318,7 +4318,6 @@ class TestPowerFirmwareSelection:
         assert stale_binary.read_bytes() == b"fresh"
         assert ctx.power_run is not None
         assert ctx.power_run.deployment is None
-        assert ctx.power_run.deployment is None
 
     def test_failed_power_rebuild_invalidates_prior_artifact_state(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

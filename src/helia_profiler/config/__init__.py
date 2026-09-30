@@ -725,11 +725,16 @@ def read_config_yaml(path: Path) -> dict[str, Any]:
 
     try:
         with open(path, encoding="utf-8") as f:
-            data = yaml.safe_load(f) or {}
+            data = yaml.safe_load(f)
     except FileNotFoundError as exc:
         raise ConfigError(
             f"Config file not found: {path}",
             hint="Check the config file path.",
+        ) from exc
+    except UnicodeDecodeError as exc:
+        raise ConfigError(
+            f"Config file {path} is not valid UTF-8: {exc}",
+            hint="Save the config file with UTF-8 encoding.",
         ) from exc
     except yaml.YAMLError as exc:
         raise ConfigError(
@@ -737,6 +742,8 @@ def read_config_yaml(path: Path) -> dict[str, Any]:
             hint="Check the file for YAML syntax errors (indentation, colons, quoting).",
         ) from exc
 
+    if data is None:
+        return {}
     if not isinstance(data, dict):
         raise ConfigError(
             f"Config file {path} must contain a YAML mapping (key: value pairs), "

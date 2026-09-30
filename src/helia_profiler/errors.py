@@ -23,7 +23,11 @@ class HpxError(Exception):
 
 
 class PipelineError(HpxError):
-    """A pipeline stage's product was read or published out of order."""
+    """A pipeline invariant was violated.
+
+    A stage's product was read before the stage ran, or a run record was
+    published out of order or with the wrong firmware role.
+    """
 
 
 class ConfigError(HpxError):

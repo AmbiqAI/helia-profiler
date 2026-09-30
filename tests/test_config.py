@@ -565,6 +565,28 @@ def test_load_config_non_dict_yaml_raises_config_error(tmp_path: Path):
         load_config(scalar, {})
 
 
+@pytest.mark.parametrize("document", ["false\n", "0\n", "[]\n", "''\n"])
+def test_load_config_falsy_non_dict_yaml_raises_config_error(tmp_path: Path, document: str):
+    falsy = tmp_path / "falsy.yaml"
+    falsy.write_text(document)
+    with pytest.raises(ConfigError, match="must contain a YAML mapping"):
+        load_config(falsy, {})
+
+
+def test_load_config_empty_yaml_reads_as_empty_mapping(tmp_path: Path):
+    empty = tmp_path / "empty.yaml"
+    empty.write_text("")
+    with pytest.raises(ConfigError, match=r"model\.path is required"):
+        load_config(empty, {})
+
+
+def test_load_config_non_utf8_yaml_raises_config_error(tmp_path: Path):
+    latin1 = tmp_path / "latin1.yaml"
+    latin1.write_bytes("model:\n  path: caf\u00e9.tflite\n".encode("latin-1"))
+    with pytest.raises(ConfigError, match="not valid UTF-8"):
+        load_config(latin1, {})
+
+
 def test_load_config_missing_model_path_raises_config_error():
     """Missing model.path should raise a clear ConfigError, not KeyError."""
     cli = {"engine": {"type": "helia-rt"}}
