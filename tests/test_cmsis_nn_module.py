@@ -129,6 +129,14 @@ def test_selector_precedence_matches_the_qualification_stamp(
         ({"cmsis_nn_ref": 7}, "cmsis_nn_ref must be a non-empty git ref"),
         ({"cmsis_nn_path": "   "}, "cmsis_nn_path must be a non-empty filesystem path"),
         ({"cmsis_nn_path": 7}, "cmsis_nn_path must be a non-empty filesystem path"),
+        # Falsy non-paths must not be mistaken for unset (only "" is).
+        ({"cmsis_nn_path": 0}, "cmsis_nn_path must be a non-empty filesystem path"),
+        ({"cmsis_nn_path": False}, "cmsis_nn_path must be a non-empty filesystem path"),
+        ({"cmsis_nn_path": []}, "cmsis_nn_path must be a non-empty filesystem path"),
+        (
+            {"cmsis_nn_path": {}, "cmsis_nn_ref": "v1"},
+            "cmsis_nn_path must be a non-empty filesystem path",
+        ),
     ],
 )
 def test_selector_rejects_invalid_values(

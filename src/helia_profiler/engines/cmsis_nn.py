@@ -81,7 +81,14 @@ def resolve_cmsis_nn_selector(
     stamp cannot disagree on which selector took effect.
     """
     engine_config = config.engine.config
-    if engine_config.get("cmsis_nn_path") and engine_config.get("cmsis_nn_ref"):
+    configured_path = engine_config.get("cmsis_nn_path")
+    # "" is the one falsy value that means unset; any other non-path value
+    # would otherwise be skipped by the truthiness-based selection.
+    if configured_path not in (None, "") and (
+        not isinstance(configured_path, (str, Path)) or not str(configured_path).strip()
+    ):
+        raise EngineError("engine.config.cmsis_nn_path must be a non-empty filesystem path")
+    if configured_path and engine_config.get("cmsis_nn_ref"):
         raise EngineError("engine.config.cmsis_nn_path and cmsis_nn_ref are mutually exclusive")
     selected = select_cmsis_nn_override(engine_config, provider_module=provider_module)
     if selected is None or selected.mode == "ref":
