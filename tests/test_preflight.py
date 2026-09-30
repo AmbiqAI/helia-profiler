@@ -469,8 +469,9 @@ class TestPreflightHostTools:
             "llvm-size",
             "llvm-nm",
         ):
-            (bin_dir / tool).write_text("")
-            (bin_dir / tool).chmod(0o755)
+            executable = bin_dir / f"{tool}{'.exe' if os.name == 'nt' else ''}"
+            executable.write_text("")
+            executable.chmod(0o755)
         real_which = shutil.which
 
         def which_atfe_root_only(name: str, path: str | None = None) -> str | None:

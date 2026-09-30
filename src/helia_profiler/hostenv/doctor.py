@@ -17,7 +17,8 @@ from ..errors import CaptureError, ConfigError
 from ..target.probe.jlink import JLINK_COMMANDER, find_jlink_exe
 from .toolchains import get_toolchain_spec, resolve_toolchain_executable
 
-# What NSX's atfe.cmake find_program()s under ATFE_ROOT/bin (NO_DEFAULT_PATH).
+# The tools NSX's ATfE toolchain file requires from ATFE_ROOT/bin only:
+# https://github.com/AmbiqAI/neuralspotx/blob/main/src/neuralspotx/cmake/toolchains/atfe.cmake
 _ATFE_EXECUTABLES = ("clang", "clang++", "llvm-ar", "llvm-objcopy", "llvm-size", "llvm-nm")
 
 
@@ -258,7 +259,11 @@ def _which_toolchain_executable(toolchain: Toolchain, name: str) -> str | None:
     # which() on the split path, not the joined one, so Windows PATHEXT
     # (clang -> clang.exe) applies on every supported Python.
     directory, executable = os.path.split(resolve_toolchain_executable(toolchain, name))
-    return shutil.which(executable, path=directory or None)
+    if not directory:
+        return shutil.which(executable)
+    found = shutil.which(executable, path=directory)
+    # Windows which() also searches the working directory before *path*.
+    return found if found is not None and Path(found).parent == Path(directory) else None
 
 
 _VERSION_RE = re.compile(r"(\d+)\.(\d+)(?:\.(\d+))?")

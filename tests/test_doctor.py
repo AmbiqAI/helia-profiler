@@ -71,9 +71,13 @@ def test_inspect_environment_requires_aot_only_for_aot_engine(monkeypatch) -> No
 _ATFE_TOOLS = ("clang", "clang++", "llvm-ar", "llvm-objcopy", "llvm-size", "llvm-nm")
 
 
-def _fake_atfe_root(root: Path, suffix: str = "") -> Path:
+# Real Windows which() only matches PATHEXT extensions.
+_HOST_EXE_SUFFIX = ".exe" if os.name == "nt" else ""
+
+
+def _fake_atfe_root(root: Path, suffix: str = _HOST_EXE_SUFFIX) -> Path:
     bin_dir = root / "bin"
-    bin_dir.mkdir()
+    bin_dir.mkdir(parents=True)
     for name in _ATFE_TOOLS:
         tool = bin_dir / f"{name}{suffix}"
         tool.touch()
@@ -105,7 +109,7 @@ def test_inspect_environment_validates_atfe_root(tmp_path: Path, monkeypatch) ->
 
 def test_inspect_environment_reports_incomplete_atfe_root(tmp_path: Path, monkeypatch) -> None:
     bin_dir = _fake_atfe_root(tmp_path)
-    (bin_dir / "llvm-objcopy").unlink()
+    (bin_dir / f"llvm-objcopy{_HOST_EXE_SUFFIX}").unlink()
     monkeypatch.setenv("ATFE_ROOT", str(tmp_path))
 
     check = _atfe_check(monkeypatch)
@@ -127,7 +131,7 @@ def test_inspect_environment_requires_atfe_root_even_with_clang_on_path(monkeypa
 def test_inspect_environment_finds_windows_atfe_executables(tmp_path: Path, monkeypatch) -> None:
     bin_dir = _fake_atfe_root(tmp_path, suffix=".exe")
     monkeypatch.setenv("ATFE_ROOT", str(tmp_path))
-    monkeypatch.setenv("PATHEXT", os.pathsep.join((".COM", ".EXE", ".BAT")))
+    monkeypatch.setenv("PATHEXT", os.pathsep.join((".com", ".exe", ".bat")))
     monkeypatch.setattr(sys, "platform", "win32")
     monkeypatch.setattr(shutil, "_win_path_needs_curdir", lambda _cmd, _mode: False, raising=False)
 
@@ -135,6 +139,30 @@ def test_inspect_environment_finds_windows_atfe_executables(tmp_path: Path, monk
 
     assert check.available
     assert check.path == str(bin_dir)
+
+
+def test_inspect_environment_ignores_atfe_tools_found_outside_the_root(
+    tmp_path: Path, monkeypatch
+) -> None:
+    # Windows which() searches the working directory first; NSX would not.
+    bin_dir = _fake_atfe_root(tmp_path / "atfe")
+    (bin_dir / f"llvm-objcopy{_HOST_EXE_SUFFIX}").unlink()
+    monkeypatch.setenv("ATFE_ROOT", str(tmp_path / "atfe"))
+    real_which = shutil.which
+
+    def which_with_cwd(name: str, path: str | None = None) -> str | None:
+        if path is None:
+            return f"/usr/bin/{name}"
+        return real_which(name, path=path) or str(tmp_path / "cwd" / name)
+
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.shutil.which", which_with_cwd)
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.find_jlink_exe", _jlink_found)
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.find_spec", lambda _name: object())
+
+    result = inspect_environment(toolchain=Toolchain.ATFE)
+
+    check = next(check for check in result.checks if check.name == "ATFE_ROOT")
+    assert not check.available
 
 
 def test_inspect_environment_checks_arm_gcc_for_gcc_alias(monkeypatch) -> None:
