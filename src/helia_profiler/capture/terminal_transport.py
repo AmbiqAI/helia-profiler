@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import time
-from collections.abc import Callable
-
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from ..errors import PowerError
@@ -70,51 +67,24 @@ class RttPowerTerminalTransport:
         )
 
 
-class _ByteLineStream(Protocol):
-    """The one method both serial-port collectors need from ``serial.Serial``."""
+class _SerialByteStream(Protocol):
+    """The slice of ``serial.Serial`` the serial terminal collectors need."""
 
-    def readline(self) -> bytes: ...
+    @property
+    def in_waiting(self) -> int: ...
+
+    def read(self, size: int = 1) -> bytes: ...
 
 
 def _collect_serial_terminal(
-    serial_port: _ByteLineStream,
-    *,
-    timeout_s: float,
+    stream: _SerialByteStream, *, timeout_s: float
 ) -> PowerTerminalEnvelope:
-    from .power_terminal import (
-        POWER_TERMINAL_END,
-        POWER_TERMINAL_START,
-        parse_power_terminal_envelope,
-    )
+    from .power_terminal import collect_power_terminal_envelope_from_chunks
 
-    deadline = time.monotonic() + timeout_s
-    lines: list[str] = []
-    in_record = False
-    last_error: PowerError | None = None
-    while time.monotonic() < deadline:
-        raw = serial_port.readline()
-        if not raw:
-            continue
-        line = raw.decode("utf-8", errors="replace").strip()
-        if line == POWER_TERMINAL_START:
-            lines = [line]
-            in_record = True
-            continue
-        if not in_record:
-            continue
-        lines.append(line)
-        if line == POWER_TERMINAL_END:
-            try:
-                return parse_power_terminal_envelope(lines)
-            except PowerError as exc:
-                last_error = exc
-                lines = []
-                in_record = False
-    if last_error is not None:
-        raise PowerError(
-            f"No valid power terminal record received within {timeout_s:.1f}s: {last_error}"
-        ) from last_error
-    raise PowerError(f"No complete power terminal record received within {timeout_s:.1f}s.")
+    # read() blocks up to the port timeout when idle, so no extra poll sleep.
+    return collect_power_terminal_envelope_from_chunks(
+        lambda: stream.read(stream.in_waiting or 1), timeout_s=timeout_s, poll_interval_s=0.0
+    )
 
 
 class UartPowerTerminalTransport:
@@ -137,28 +107,17 @@ class UartPowerTerminalTransport:
             ) from exc
 
 
-def _collect_chunked_terminal(
-    read_fn: Callable[[], bytes], *, timeout_s: float
-) -> PowerTerminalEnvelope:
-    from .power_terminal import collect_power_terminal_envelope_from_chunks
-
-    return collect_power_terminal_envelope_from_chunks(
-        read_fn, timeout_s=timeout_s, poll_interval_s=0.001
-    )
-
-
 class SwoPowerTerminalTransport:
     transport = Transport.SWO
 
     def collect(self, ctx: PipelineContext, *, timeout_s: float) -> PowerTerminalEnvelope:
+        from .power_terminal import collect_power_terminal_envelope_from_chunks
         from ..target.probe.jlink import attached_session
+        from ..transport.swo import enable_swo, read_swo_chunk, swo_reference_clock_hz
 
-        if ctx.soc is None or ctx.run_metadata.platform is None:
-            raise PowerError("SWO terminal collection requires resolved platform clocks.")
-        cpu_clock_mhz = ctx.run_metadata.platform.cpu_clock_mhz
-        swo_ref_mhz = ctx.soc.swo_trace_clock_mhz or cpu_clock_mhz
-        if swo_ref_mhz <= 0:
-            raise PowerError("SWO terminal collection requires a resolved trace clock.")
+        if ctx.soc is None:
+            raise PowerError("SWO terminal collection requires resolved platform state.")
+        cpu_speed_hz = swo_reference_clock_hz(ctx)
 
         with attached_session(
             device=ctx.soc.jlink_device,
@@ -166,14 +125,11 @@ class SwoPowerTerminalTransport:
             attach_timeout_s=timeout_s,
         ) as jlink:
             try:
-                jlink.swo_enable(
-                    cpu_speed=swo_ref_mhz * 1_000_000,
-                    swo_speed=1_000_000,
-                    port_mask=0x01,
-                )
-                return _collect_chunked_terminal(
-                    lambda: bytes(jlink.swo_read_stimulus(0, 4096)),
+                enable_swo(jlink, cpu_speed_hz=cpu_speed_hz)
+                return collect_power_terminal_envelope_from_chunks(
+                    lambda: read_swo_chunk(jlink),
                     timeout_s=timeout_s,
+                    poll_interval_s=0.001,
                 )
             finally:
                 try:
