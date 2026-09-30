@@ -85,20 +85,6 @@ _MULTIPLIER_SHIFT = 31 - TFLM_SOFTMAX_INTEGER_BITS
 # tests/test_softmax_preflight.py drives the REAL helia-aot functions across
 # every edge, both signs, and fails CI if a version bump moves any of it.
 
-#: What an ABSENT ``SoftmaxOptions`` table means for beta, per engine -- and
-#: they disagree, which is why the verdict cannot be computed once and shared.
-#: TFLM value-initialises the POD (``ParseSoftmax``'s no-options branch is a
-#: deliberate no-op, verified against the vendored source), so beta reaches
-#: the kernel as 0.0. helia-aot's ``SoftmaxOptions`` is a pydantic model whose
-#: field default is 1.0. Applying TFLM's convention to an AOT verdict is how
-#: this gate came to claim a crash that could not happen.
-#:
-#: AOT_ABSENT_BETA is read LIVE from the installed helia-aot's pydantic field
-#: default whenever the optional extra is present, so a version bump that
-#: changes the default changes this constant with it; 1.0 is the fallback for
-#: installs without the extra, pinned by test_softmax_preflight (#147).
-TFLM_ABSENT_BETA = 0.0
-
 
 def _read_aot_absent_beta() -> float:
     """Live-read helia-aot's beta default, degrading to 1.0 on ANY failure.
@@ -117,6 +103,18 @@ def _read_aot_absent_beta() -> float:
         return 1.0
 
 
+#: What an ABSENT ``SoftmaxOptions`` table means for beta under helia-aot --
+#: and the engines disagree. TFLM value-initialises the POD
+#: (``ParseSoftmax``'s no-options branch is a deliberate no-op, verified
+#: against the vendored source), so beta reaches the kernel as 0.0, which is
+#: what the TFLite reader records. helia-aot's ``SoftmaxOptions`` is a
+#: pydantic model whose field default is 1.0. Applying TFLM's convention to an
+#: AOT verdict is how this gate came to claim a crash that could not happen.
+#:
+#: Read LIVE from the installed helia-aot's pydantic field default whenever
+#: the optional extra is present, so a version bump that changes the default
+#: changes this constant with it; 1.0 is the fallback for installs without
+#: the extra, pinned by test_softmax_preflight (#147).
 AOT_ABSENT_BETA = _read_aot_absent_beta()
 
 

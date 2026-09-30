@@ -84,13 +84,6 @@ GRADIENT_COST: list[GradientItem] = [
     GradientItem(stop=1, bgColor="#ef4444"),
 ]
 
-#: Inverted gradient (red → green) for efficiency metrics.
-GRADIENT_EFFICIENCY: list[GradientItem] = [
-    GradientItem(stop=0, bgColor="#ef4444"),
-    GradientItem(stop=0.5, bgColor="#eab308"),
-    GradientItem(stop=1, bgColor="#22c55e"),
-]
-
 
 def build_overlay(
     layer_values: dict[str, Num],

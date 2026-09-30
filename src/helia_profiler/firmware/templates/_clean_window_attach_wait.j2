@@ -44,7 +44,7 @@
    capture_pmu has already closed its pylink session, so nothing reads RTT and
    this poll ALWAYS runs to timeout.  It lands after capture_gated's
    on_started hook returns, so it is charged against the poller's boot
-   allowance (_BOOT_SETTLE_S in stages/capture_power.py) -- overrun it and the
+   allowance (BOOT_SETTLE_S in power/diagnostics.py) -- overrun it and the
    poller stops before or mid-window, which the host reports as no_gate_rise.
    The budget below is sized against the measured gap with headroom and pinned
    against that host constant by
