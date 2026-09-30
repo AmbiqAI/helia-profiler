@@ -8,10 +8,10 @@ import math
 from .engines import EngineType
 from ._fixture_build import FixedFixture, FixtureBuild, TypedFixture
 from .results.models import ProfileResult
+from .fixture_capture import FIXTURE_CPU_HZ
+from .fixture_target import FIXTURE_CLOCK_PROFILE
 
 #: Clock and placement every fixed fixture is built for (see ``fixture._validate``).
-FIXTURE_CPU_HZ = 96_000_000
-FIXTURE_CLOCK = "lp"
 FIXTURE_PLACEMENT = {"arena_location": "sram", "weights_location": "mram"}
 FIXTURE_TFLM_BACKEND = "cmsis_nn"
 #: Layer-sum agreement with the uninstrumented clean window, in percent of clean.
@@ -92,7 +92,7 @@ def _identity_reason(
     if meta.platform is None or meta.platform.board != build.target.board:
         return "board_mismatch"
     if (
-        meta.platform.cpu_clock_name != FIXTURE_CLOCK
+        meta.platform.cpu_clock_name != FIXTURE_CLOCK_PROFILE
         or profile.pmu.meta.system_clock_hz != FIXTURE_CPU_HZ
     ):
         return "clock_mismatch"

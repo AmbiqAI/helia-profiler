@@ -88,6 +88,8 @@ _IDENTITY_RECORDS = frozenset(
     {
         "FixedFixture",
         "FixtureFile",
+        "FixtureTarget",
+        "HeliaAotOptions",
         "FixtureIO",
         "FixtureTensor",
         "Int8Tensor",
@@ -192,6 +194,8 @@ def test_version_bump_rule_for_records_and_enums() -> None:
     assert _required_bump({"P": protocol}, {"P": grown}) == "major"
     identity_record = {**record, "fields": [*record["fields"], ["b", "int", "0"]]}
     assert _required_bump({"FixtureIO": record}, {"FixtureIO": identity_record}) == "major"
+    for name in ("FixtureTarget", "HeliaAotOptions"):
+        assert _required_bump({name: record}, {name: identity_record}) == "major"
     enum = {"kind": "enum", "base": "str", "members": {"A": "a", "B": "b"}}
     assert _required_bump(old, {**old, "E": enum}) == "minor"
     assert _required_bump(old, {**old, "E": {**enum, "members": {"A": "x"}}}) == "major"

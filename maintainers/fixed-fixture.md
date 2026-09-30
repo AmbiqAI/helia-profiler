@@ -18,7 +18,7 @@ iterations, warmup, `FixturePlacement`, target, prepared runtime,
 with files as content hashes and no paths, so the same request built in two
 directories has one identity. The installed profiler and engine are outside
 the request: the source closure pins the profiler, and `engine_source`
-records the engine;
+records the engine.
 `build_fixed_fixture(config, ...)` is unchanged. `FixtureBuild.aot_outputs`
 pins heliaAOT's `<prefix>_plan.json` and `<prefix>_report.json` when the
 installed heliaAOT writes them (the build first drops any an earlier build
