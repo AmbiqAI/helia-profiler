@@ -463,6 +463,7 @@ notebook = [
     { name = "ipykernel" },
 ]
 test = [
+    { name = "packaging" },
     { name = "pytest" },
     { name = "pytest-timeout" },
 ]
@@ -497,6 +498,7 @@ lint = [
 ]
 notebook = [{ name = "ipykernel", specifier = ">=6,<8" }]
 test = [
+    { name = "packaging", specifier = ">=24.0" },
     { name = "pytest", specifier = ">=8.0" },
     { name = "pytest-timeout", specifier = ">=2.3" },
 ]

@@ -69,7 +69,7 @@ lint = [
     # releases -- upgrades are deliberate, with a re-triage of diagnostics.
     "ty==0.0.74",
 ]
-test = ["pytest>=8.0", "pytest-timeout>=2.3"]
+test = ["pytest>=8.0", "pytest-timeout>=2.3", "packaging>=24.0"]
 notebook = ["ipykernel>=6,<8"]
 
 [tool.uv]
