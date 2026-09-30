@@ -609,7 +609,7 @@ _register_soc(
         # device string at all and silently fails core identification
         # (JLinkExe still resets generically via -autoconnect without
         # full device-DB knowledge, but never prints the "Cortex-M55
-        # identified" banner _inspect_probe_target()/probes match parses,
+        # identified" banner inspect_probe_target()/probes match parses,
         # so probe resolution always reports "unknown target").
         jlink_device="Apollo330P_510L",
         # Bounds the static per-layer PMU buffer (HpxPmuProfiler/g_profiler

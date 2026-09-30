@@ -35,6 +35,7 @@ import yaml
 
 from ..engines import EngineType
 from ..results.run_summary import load_run_summary
+from ..results.serde import strip_none
 from .matrix import CaseSpec, MemoryProfile
 
 _TRANSIENT_POWER_LOCK_RETRY_DELAY_S = 5.0
@@ -111,7 +112,7 @@ class CaseResult:
     error: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {k: v for k, v in asdict(self).items() if v is not None}
+        return strip_none(asdict(self))
 
 
 def _find_local_cmsis_nn_checkout(repo_root: Path) -> Path | None:
@@ -440,7 +441,7 @@ def run_case(
 
     config_path = case_dir / "config.yml"
     config = _build_config(case, repo_root, case_dir, ns_cmsis_nn_ref=ns_cmsis_nn_ref)
-    config_path.write_text(yaml.safe_dump(config, sort_keys=False))
+    config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
 
     if in_process is None:
         in_process = _env_truthy("HPX_VALIDATE_INPROCESS")
@@ -498,8 +499,8 @@ def run_case(
     stdout_tail = proc.stdout[-2000:] if proc.stdout else None
     stderr_tail = proc.stderr[-2000:] if proc.stderr else None
 
-    (case_dir / "hpx_stdout.log").write_text(proc.stdout or "")
-    (case_dir / "hpx_stderr.log").write_text(proc.stderr or "")
+    (case_dir / "hpx_stdout.log").write_text(proc.stdout or "", encoding="utf-8")
+    (case_dir / "hpx_stderr.log").write_text(proc.stderr or "", encoding="utf-8")
 
     # Always persist the full child output (final attempt) for diagnostics.
     log_path: str | None = None
@@ -512,7 +513,8 @@ def run_case(
             f"{proc.stdout or ''}\n"
             "\n"
             "--- stderr ---\n"
-            f"{proc.stderr or ''}\n"
+            f"{proc.stderr or ''}\n",
+            encoding="utf-8",
         )
         log_path = str(log_file)
     except OSError:
@@ -641,7 +643,7 @@ def run_case(
         manifest_path = case_dir / "aot_operator_manifest.json"
         if manifest_path.exists():
             try:
-                manifest = json.loads(manifest_path.read_text())
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
                 if isinstance(manifest, list):
                     result.aot_operator_count = len(manifest)
             except ValueError:

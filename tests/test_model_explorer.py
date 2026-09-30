@@ -1,12 +1,17 @@
 import json
 from pathlib import Path
+from typing import Any
+
+import pytest
 
 from helia_profiler.report.model_explorer import (
     GRADIENT_COST,
     ModelNodeData,
+    _write_model_explorer_overlays,
     build_multi_metric_overlays,
     build_overlay,
 )
+from helia_profiler.results import FirmwareMeta, LayerResult, PmuResult
 
 
 def test_build_overlay_basic():
@@ -74,3 +79,93 @@ def test_none_values_stripped_from_json():
     assert "value" in result
     assert "bgColor" not in result
     assert "textColor" not in result
+
+
+def _overlay_values(
+    tmp_path: Path,
+    layers: list[LayerResult],
+    aot_op_manifest: list[dict[str, Any]] | None = None,
+) -> dict[str, float]:
+    paths: list[Path] = []
+    _write_model_explorer_overlays(
+        PmuResult(meta=FirmwareMeta(), layers=layers), tmp_path, paths, aot_op_manifest
+    )
+    if not paths:
+        return {}
+    (path,) = paths
+    results = json.loads(path.read_text())["main"]["results"]
+    return {key: result["value"] for key, result in results.items()}
+
+
+def _layer(layer_id: int, op: str, cycles: float, **kwargs: Any) -> LayerResult:
+    return LayerResult(id=layer_id, op=op, counters={"ARM_PMU_CPU_CYCLES": cycles}, **kwargs)
+
+
+# Model Explorer's LiteRT adapter ids operator nodes by flatbuffer operator
+# index, so every expected key is an ORIGINAL tflite operator index.
+@pytest.mark.parametrize(
+    ("layers", "manifest", "expected"),
+    [
+        pytest.param(
+            [_layer(0, "CONV_2D", 10), _layer(1, "CONV_2D", 20)],
+            None,
+            {"0": 10, "1": 20},
+            id="tflm-plain-labels-use-execution-order",
+        ),
+        pytest.param(
+            [_layer(0, "DEPTHWISE_CONV_2D", 10), _layer(1, "FULLY_CONNECTED", 20)],
+            None,
+            {"0": 10, "1": 20},
+            id="helia-rt-plain-labels-use-execution-order",
+        ),
+        pytest.param(
+            [_layer(0, "CONV_2D:2", 10), _layer(1, "FULLY_CONNECTED:43", 20)],
+            None,
+            {"2": 10, "43": 20},
+            id="helia-aot-label-suffix-without-manifest",
+        ),
+        pytest.param(
+            [_layer(0, "CONV_2D:0", 10), _layer(1, "FULLY_CONNECTED:1", 20)],
+            [{"idx": 0, "id": 2}, {"idx": 1, "id": 43}],
+            {"2": 10, "43": 20},
+            id="helia-aot-manifest-outranks-positional-suffix",
+        ),
+        pytest.param(
+            [_layer(0, "CONV_2D:0", 10)],
+            [],
+            {},
+            id="helia-aot-failed-manifest-attributes-nothing",
+        ),
+        pytest.param(
+            [_layer(0, "aten::add.out:c3i12", 10), _layer(1, "OPERATOR_CALL:c3i13", 20)],
+            None,
+            {},
+            id="executorch-plan-instructions-name-no-graph-node",
+        ),
+        pytest.param(
+            [_layer(0, "CONV_2D", 10, source_index=5)],
+            None,
+            {"5": 10},
+            id="carried-source-index-outranks-execution-order",
+        ),
+    ],
+)
+def test_overlay_keys_are_original_tflite_operator_indices(
+    tmp_path: Path,
+    layers: list[LayerResult],
+    manifest: list[dict[str, Any]] | None,
+    expected: dict[str, float],
+):
+    assert _overlay_values(tmp_path, layers, manifest) == expected
+
+
+def test_overlay_writer_removes_previous_runs_overlays(tmp_path: Path):
+    stale = tmp_path / "me_overlay_ARM_PMU_CPU_CYCLES.json"
+    stale.write_text("{}")
+    unrelated = tmp_path / "notes.json"
+    unrelated.write_text("{}")
+
+    assert _overlay_values(tmp_path, [_layer(0, "aten::add.out:c3i12", 10)]) == {}
+
+    assert not stale.exists()
+    assert unrelated.exists()

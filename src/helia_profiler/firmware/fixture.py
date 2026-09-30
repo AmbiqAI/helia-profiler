@@ -26,7 +26,6 @@ def _fixture_io(spec, *, inputs: bool) -> list[dict[str, object]]:
     if isinstance(spec.fixture, TypedFixture):
         entries = [
             (
-                io.tensor.name,
                 io.tensor.index,
                 io.tensor.dtype,
                 io.tensor.shape,
@@ -40,16 +39,15 @@ def _fixture_io(spec, *, inputs: bool) -> list[dict[str, object]]:
         tensor = spec.model.input_tensor if inputs else spec.model.output_tensor
         quant = PerTensorQuantization(tensor.scale, tensor.zero_point)
         data = spec.fixture.input if inputs else spec.fixture.expected
-        entries = [("", tensor.tensor_index, "int8", tensor.shape, quant, tensor.size, data)]
+        entries = [(tensor.tensor_index, "int8", tensor.shape, quant, tensor.size, data)]
     records = []
-    for position, (name, index, dtype, shape, quant, size, data) in enumerate(entries):
+    for position, (index, dtype, shape, quant, size, data) in enumerate(entries):
         suffix = "" if position == 0 else f"_{position}"
         tflite_type, member = _TFLITE_TYPES[dtype]
         per_tensor = quant if isinstance(quant, PerTensorQuantization) else None
         records.append(
             {
                 "position": position,
-                "name": name,
                 "tensor_index": index,
                 "size": size,
                 "shape": shape,

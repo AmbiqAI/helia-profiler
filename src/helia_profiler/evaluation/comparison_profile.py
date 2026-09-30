@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any, Self
 
 from ..errors import ReportError
 from ..results.serde import dataclass_from_dict as _from_dict
+from ..results.serde import to_float
 
 if TYPE_CHECKING:
     from .compare import CompareResult, MetricDiff
@@ -262,8 +263,8 @@ def _evaluate_metric(
             f"Metric unit is {metric.unit!r}, expected {policy.unit!r}.",
             unit=metric.unit,
         )
-    baseline = _number(metric.baseline)
-    candidate = _number(metric.candidate)
+    baseline = to_float(metric.baseline, finite=True)
+    candidate = to_float(metric.candidate, finite=True)
     if baseline is None or candidate is None:
         return MetricVerdict(name, VerdictStatus.FAIL, "Metric values are not numeric.")
     delta = candidate - baseline
@@ -293,16 +294,6 @@ def _evaluate_metric(
         allowed_regression=allowed,
         unit=metric.unit,
     )
-
-
-def _number(value: Any) -> float | None:
-    if isinstance(value, bool):
-        return None
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return None
-    return number if math.isfinite(number) else None
 
 
 def _profile_digest(profile: ComparisonProfile) -> str:

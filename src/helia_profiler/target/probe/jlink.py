@@ -56,8 +56,19 @@ _RSTGEN_SWPOI_VALUE = 0x1B
 # Default wall-clock budget for a single JLinkExe invocation (seconds);
 # generous enough to absorb slow USB enumeration.
 _DEFAULT_TIMEOUT_S = 15
-_READINESS_POLL_INTERVAL_S = 0.1
-_SBL_SETTLE_S = 0.2
+
+#: Post-reset settle window for the Apollo secure bootloader (SBL) before the
+#: host attempts its first J-Link attach.  The SBL bring-up is not observable
+#: from the host, so a small floor is used; the host then *polls* for attach
+#: readiness (see :func:`open_jlink_with_retry`) rather than assuming the
+#: target is ready after this delay.
+SBL_SETTLE_S = 0.2
+
+#: Default cadence for host-side readiness polling loops (J-Link attach,
+#: device re-enumeration).  Small enough to feel responsive, large enough to
+#: avoid hammering the probe / USB subsystem.
+READINESS_POLL_INTERVAL_S = 0.1
+
 _PROBE_INSPECTION_ATTEMPTS = 2
 _PROBE_INSPECTION_RETRY_S = 0.1
 JLINK_COMMANDER = "JLinkExe"
@@ -196,7 +207,7 @@ def resolve_probe_serial(
                 f"J-Link serial '{requested_serial}' was not found.",
                 hint=f"Connected probes: {_format_probe_list(probes)}.",
             )
-        match = _inspect_probe_target(probe, device=device)
+        match = inspect_probe_target(probe, device=device)
         if match.detected_core is not expected_core:
             raise ConfigError(
                 f"J-Link serial '{requested_serial}' does not match the requested target.",
@@ -207,11 +218,8 @@ def resolve_probe_serial(
             )
         return probe.serial
 
-    matches = [
-        match
-        for match in (_inspect_probe_target(probe, device=device) for probe in probes)
-        if match.detected_core is expected_core
-    ]
+    inspections = [inspect_probe_target(probe, device=device) for probe in probes]
+    matches = [match for match in inspections if match.detected_core is expected_core]
     if len(matches) == 1:
         return matches[0].probe.serial
     if len(matches) > 1:
@@ -233,12 +241,17 @@ def resolve_probe_serial(
             f"Expected a {expected_core.value} target. Run `hpx probes list` to see "
             "attached probes and `hpx probes match --board <board>` to check "
             "compatibility. Connected probes: "
-            f"{_format_probe_matches([_inspect_probe_target(probe, device=device) for probe in probes])}."
+            f"{_format_probe_matches(inspections)}."
         ),
     )
 
 
-def _inspect_probe_target(probe: JLinkProbe, *, device: str) -> JLinkProbeMatch:
+def inspect_probe_target(probe: JLinkProbe, *, device: str) -> JLinkProbeMatch:
+    """Inspect the core visible behind a connected probe for *device*.
+
+    Public for diagnostic CLI commands, so users and agents can ask HPX which
+    target a probe can actually reach without driving ``JLinkExe`` themselves.
+    """
     cmd = _jlink_target_cmd(device=device, jlink_serial=probe.serial)
     for attempt in range(_PROBE_INSPECTION_ATTEMPTS):
         result = _invoke_jlink(
@@ -260,16 +273,6 @@ def _inspect_probe_target(probe: JLinkProbe, *, device: str) -> JLinkProbeMatch:
         time.sleep(_PROBE_INSPECTION_RETRY_S)
 
     raise AssertionError("unreachable")
-
-
-def inspect_probe_target(probe: JLinkProbe, *, device: str) -> JLinkProbeMatch:
-    """Inspect the core visible behind a connected probe for *device*.
-
-    This public wrapper exists for diagnostic CLI commands.  It keeps the raw
-    ``JLinkExe`` interaction centralized in this module while letting users and
-    agents ask HPX which target a probe can actually reach.
-    """
-    return _inspect_probe_target(probe, device=device)
 
 
 def _parse_detected_core(output: str) -> CoreArch | None:
@@ -505,7 +508,7 @@ class JLinkResetController:
         device: str,
         jlink_serial: str | None = None,
         attach_timeout_s: float = 30.0,
-        settle_s: float = _SBL_SETTLE_S,
+        settle_s: float = SBL_SETTLE_S,
     ) -> AbstractContextManager[DebugMemorySession]:
         return attached_reset_session(
             device=device,
@@ -630,7 +633,7 @@ def _jlink_dll_candidates_from_wrapper() -> list[Path]:
     candidates.extend(_jlink_dlls_in_dir(exe.parent))
 
     try:
-        text = exe.read_text(errors="ignore")
+        text = exe.read_text(encoding="utf-8", errors="ignore")
     except OSError:
         text = ""
 
@@ -734,7 +737,7 @@ def open_jlink_with_retry(
     device: str,
     jlink_serial: str | None = None,
     timeout_s: float,
-    interval_s: float = _READINESS_POLL_INTERVAL_S,
+    interval_s: float = READINESS_POLL_INTERVAL_S,
     interface: object | None = None,
     speed_khz: int = 4000,
 ) -> None:
@@ -800,7 +803,7 @@ def attached_reset_session(
     device: str,
     jlink_serial: str | None = None,
     attach_timeout_s: float = 30.0,
-    settle_s: float = _SBL_SETTLE_S,
+    settle_s: float = SBL_SETTLE_S,
 ) -> Iterator[DebugMemorySession]:
     """Reset the target and hold the debugger attached for the whole capture."""
     jlink = create_debug_memory_session()

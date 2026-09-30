@@ -1,19 +1,21 @@
-"""ns-cmsis-nn (heliaCORE) NSX module resolution and build options.
+"""CMSIS-NN provider NSX module resolution and build options.
 
-Shared by the heliaRT, heliaAOT, and ExecuTorch-ns source routes: the module is
-declared at the compatibility baseline's qualified ref unless the user overrides
-it, and :func:`cmsis_nn_cmake_vars` supplies the kernel switches it needs.
+ns-cmsis-nn (heliaCORE) is shared by the heliaRT, heliaAOT, and ExecuTorch-ns
+source routes: the module is declared at the compatibility baseline's qualified
+ref unless the user overrides it, and :func:`cmsis_nn_cmake_vars` supplies the
+kernel switches it needs. ARM's upstream ``arm-cmsis-nn`` serves stock TFLM and
+the ExecuTorch-arm route.
 """
 
 from __future__ import annotations
 
 import logging
-import os
 import shutil
 import struct
 from pathlib import Path
 
 from ..config import ProfileConfig
+from ..deps.compatibility import CmsisNnOverride, select_cmsis_nn_override
 from ..errors import EngineError
 from ..modelcost._tflite_reader import TENSOR_TYPE_FLOAT16, read_float_compute_types
 from ..platform import get_soc_for_board
@@ -23,6 +25,8 @@ log = logging.getLogger("hpx")
 
 CMSIS_NN_PROJECT = "ns-cmsis-nn"  # registry project (path: modules/ns-cmsis-nn)
 CMSIS_NN_MODULE = "nsx-cmsis-nn"
+ARM_CMSIS_NN_PROJECT = "arm-cmsis-nn"
+ARM_CMSIS_NN_MODULE = "arm-cmsis-nn"
 
 
 def _float_compute_types(config: ProfileConfig) -> set[int] | None:
@@ -67,6 +71,37 @@ def _baseline_cmsis_nn_ref(config: ProfileConfig) -> str:
     return config.compatibility_baseline.module(CMSIS_NN_MODULE).ref
 
 
+def resolve_cmsis_nn_selector(
+    config: ProfileConfig, provider_module: str
+) -> CmsisNnOverride | None:
+    """Validate and return the CMSIS-NN selector a build applies, or None for the default.
+
+    Precedence is :func:`select_cmsis_nn_override`'s, the same function that
+    stamps qualification and records lock provenance, so a build and its
+    stamp cannot disagree on which selector took effect.
+    """
+    engine_config = config.engine.config
+    configured_path = engine_config.get("cmsis_nn_path")
+    # "" is the one falsy value that means unset; any other non-path value
+    # would otherwise be skipped by the truthiness-based selection.
+    if configured_path not in (None, "") and (
+        not isinstance(configured_path, (str, Path)) or not str(configured_path).strip()
+    ):
+        raise EngineError("engine.config.cmsis_nn_path must be a non-empty filesystem path")
+    if configured_path and engine_config.get("cmsis_nn_ref"):
+        raise EngineError("engine.config.cmsis_nn_path and cmsis_nn_ref are mutually exclusive")
+    selected = select_cmsis_nn_override(engine_config, provider_module=provider_module)
+    if selected is None or selected.mode == "ref":
+        requested_ref = engine_config.get("cmsis_nn_ref")
+        if requested_ref is not None and (
+            not isinstance(requested_ref, str) or not requested_ref.strip()
+        ):
+            raise EngineError("engine.config.cmsis_nn_ref must be a non-empty git ref")
+    elif not isinstance(selected.requested, (str, Path)) or not str(selected.requested).strip():
+        raise EngineError(f"{selected.selector} must be a non-empty filesystem path")
+    return selected
+
+
 def cmsis_nn_module_ref(config: ProfileConfig, work_dir: Path) -> NsxModuleRef:
     """Resolve the ns-cmsis-nn NSX module reference.
 
@@ -75,16 +110,9 @@ def cmsis_nn_module_ref(config: ProfileConfig, work_dir: Path) -> NsxModuleRef:
     ``engine.config.cmsis_nn_ref`` overrides the ref, ``cmsis_nn_path`` /
     ``CMSIS_NN_PATH`` vendors a local checkout under ``modules/ns-cmsis-nn``.
     """
-    configured_path = config.engine.config.get("cmsis_nn_path")
-    requested_ref = config.engine.config.get("cmsis_nn_ref")
-    if configured_path and requested_ref:
-        raise EngineError("engine.config.cmsis_nn_path and cmsis_nn_ref are mutually exclusive")
-
-    # Explicit config wins over the environment fallback so a resolved commit
-    # stays a git-backed lock entry rather than an unversioned local module.
-    raw = configured_path or (None if requested_ref else os.environ.get("CMSIS_NN_PATH"))
-    if raw:
-        cmsis_nn_path = Path(str(raw)).expanduser().resolve()
+    selected = resolve_cmsis_nn_selector(config, CMSIS_NN_MODULE)
+    if selected is not None and selected.mode == "path":
+        cmsis_nn_path = Path(selected.requested).expanduser().resolve()
         _validate_cmsis_nn(cmsis_nn_path)
         mod_dir = work_dir / "modules" / CMSIS_NN_PROJECT
         _write_cmsis_nn_wrapper(mod_dir, cmsis_nn_path)
@@ -96,25 +124,41 @@ def cmsis_nn_module_ref(config: ProfileConfig, work_dir: Path) -> NsxModuleRef:
             project=CMSIS_NN_PROJECT,
         )
 
-    if requested_ref is not None and (
-        not isinstance(requested_ref, str) or not requested_ref.strip()
-    ):
-        raise EngineError("engine.config.cmsis_nn_ref must be a non-empty git ref")
-
-    ref = requested_ref or _baseline_cmsis_nn_ref(config)
+    ref = selected.requested if selected is not None else _baseline_cmsis_nn_ref(config)
     log.info(
         "ns-cmsis-nn — resolving %s from NSX registry (project=%s, ref=%s)",
         CMSIS_NN_MODULE,
         CMSIS_NN_PROJECT,
         ref,
     )
-    return NsxModuleRef(
-        name=CMSIS_NN_MODULE,
-        path=Path(),
-        local=False,
-        project=CMSIS_NN_PROJECT,
+    return NsxModuleRef.registry(CMSIS_NN_MODULE, CMSIS_NN_PROJECT, ref=ref)
+
+
+def arm_cmsis_nn_module_ref(config: ProfileConfig) -> NsxModuleRef:
+    """Resolve ARM's upstream ``arm-cmsis-nn`` NSX module reference.
+
+    Unlike ns-cmsis-nn, an unset ref stays None so NSX resolves the registry's
+    own pin, and the ``CMSIS_NN_PATH`` fallback does not apply.
+    """
+    selected = resolve_cmsis_nn_selector(config, ARM_CMSIS_NN_MODULE)
+    if selected is not None and selected.mode == "path":
+        source = Path(selected.requested).expanduser().resolve()
+        if not (source / "nsx-module.yaml").is_file() or not (source / "CMakeLists.txt").is_file():
+            raise EngineError(
+                f"Invalid arm-cmsis-nn checkout: {source}",
+                hint="Expected nsx-module.yaml and CMakeLists.txt at the repository root.",
+            )
+        return NsxModuleRef(
+            name=ARM_CMSIS_NN_MODULE,
+            path=source,
+            local=True,
+            project=ARM_CMSIS_NN_PROJECT,
+        )
+    return NsxModuleRef.registry(
+        ARM_CMSIS_NN_MODULE,
+        ARM_CMSIS_NN_PROJECT,
         # None must reach the dependency-lock digest as null; "" is a different key.
-        ref=ref,
+        ref=selected.requested if selected is not None else None,
     )
 
 
@@ -164,7 +208,8 @@ def _write_cmsis_nn_wrapper(module_dir: Path, cmsis_nn_path: Path) -> None:
     shutil.copy2(native_nsx / "CMakeLists.txt", nsx_subdir / "CMakeLists.txt")
 
     (module_dir / "CMakeLists.txt").write_text(
-        "# Shim — delegates to the native ns-cmsis-nn NSX build.\nadd_subdirectory(nsx)\n"
+        "# Shim — delegates to the native ns-cmsis-nn NSX build.\nadd_subdirectory(nsx)\n",
+        encoding="utf-8",
     )
 
     # No symlinks — Windows-safe.

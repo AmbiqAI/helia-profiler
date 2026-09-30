@@ -58,7 +58,7 @@ def _install_nsx_module(
         variant=variant,
         core_override_block=core_override_block,
     )
-    (module_dir / "CMakeLists.txt").write_text(cmake_text)
+    (module_dir / "CMakeLists.txt").write_text(cmake_text, encoding="utf-8")
 
     for d in _DIST_DIRS:
         target = module_dir / d
@@ -89,7 +89,8 @@ def _write_nested_nsx_shim(module_dir: Path) -> None:
         "# Do not edit — regenerated on every hpx run.\n"
         "cmake_minimum_required(VERSION 3.21)\n"
         "\n"
-        'include("${CMAKE_CURRENT_LIST_DIR}/../CMakeLists.txt")\n'
+        'include("${CMAKE_CURRENT_LIST_DIR}/../CMakeLists.txt")\n',
+        encoding="utf-8",
     )
 
 
@@ -226,7 +227,7 @@ def _install_nsx_module_source(
         "# supplied source checkout.\n"
         f'include("{nsx_cmake.as_posix()}")\n'
     )
-    (module_dir / "CMakeLists.txt").write_text(cmake_text)
+    (module_dir / "CMakeLists.txt").write_text(cmake_text, encoding="utf-8")
 
     shutil.copy2(
         source_path / "nsx" / "nsx-module.yaml",

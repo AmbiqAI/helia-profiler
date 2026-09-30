@@ -7,7 +7,6 @@ from helia_profiler.hostenv.toolchains import get_toolchain_spec, resolve_toolch
 def test_toolchain_specs_are_complete_and_consistent() -> None:
     expected = {
         Toolchain.ARM_NONE_EABI_GCC: ("arm-none-eabi-gcc", None, "gcc"),
-        Toolchain.GCC: ("gcc", None, "gcc"),
         Toolchain.ARMCLANG: ("armclang", "armclang", "armclang"),
         Toolchain.ATFE: ("clang", "atfe", "atfe"),
     }
@@ -24,6 +23,12 @@ def test_toolchain_specs_are_complete_and_consistent() -> None:
         else:
             assert spec.section_probe == "fromelf"
             assert spec.size is None
+
+
+def test_gcc_alias_resolves_to_arm_none_eabi_gcc() -> None:
+    # config normalizes the alias too; a host-gcc spec would probe the wrong binaries.
+    assert get_toolchain_spec(Toolchain.GCC) is get_toolchain_spec(Toolchain.ARM_NONE_EABI_GCC)
+    assert get_toolchain_spec("gcc").compiler == "arm-none-eabi-gcc"
 
 
 def test_atfe_uses_reduced_default_rtt_buffer() -> None:

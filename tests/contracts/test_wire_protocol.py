@@ -271,7 +271,6 @@ class _Render:
             # link both of them (see CMakeLists.txt.j2): the per-operator
             # heartbeat lives in the profiler class, not in main.cc.
             self.text += _jinja_env.get_template("hpx_pmu_profiler.cc.j2").render(
-                profiling_backends=list(_common_kwargs(soc, transport)["profiling_backends"]),
                 has_armv8m_pmu=_common_kwargs(soc, transport)["has_armv8m_pmu"],
             )
 
@@ -1199,7 +1198,6 @@ def _csv_emitter(soc: str, engine: str, *, has_armv8m_pmu: bool = True) -> str:
     text = _render(soc, "rtt", engine)
     if engine in ("tflm", "helia-rt"):
         text += _jinja_env.get_template("hpx_pmu_profiler.cc.j2").render(
-            profiling_backends=["armv8m-pmu"] if has_armv8m_pmu else ["dwt"],
             has_armv8m_pmu=has_armv8m_pmu,
         )
     return text
@@ -1220,9 +1218,7 @@ def test_csv_header_shape_is_the_same_for_every_engine():
     # so it prints a fixed single-counter header from its own printf rather
     # than looping over the pass's counter names. Rendering only the Armv8-M
     # variant left that whole branch — half the file — unpinned.
-    m4 = _jinja_env.get_template("hpx_pmu_profiler.cc.j2").render(
-        profiling_backends=["dwt"], has_armv8m_pmu=False
-    )
+    m4 = _jinja_env.get_template("hpx_pmu_profiler.cc.j2").render(has_armv8m_pmu=False)
     assert '\\"Layer\\",\\"Op\\",\\"ARM_PMU_CPU_CYCLES\\",\\"overflow\\"\\n' in m4
 
 
@@ -1239,9 +1235,7 @@ def test_csv_row_format_is_pinned_per_engine():
     # The tag comes from TFLM's per-op tag string, with `?` where it has none.
     assert 'hpx_printf("%d,%s", i, rec.tag ? rec.tag : "?");' in tflm
     # ...and the non-Armv8-M profiler prints the whole row in one call.
-    m4 = _jinja_env.get_template("hpx_pmu_profiler.cc.j2").render(
-        profiling_backends=["dwt"], has_armv8m_pmu=False
-    )
+    m4 = _jinja_env.get_template("hpx_pmu_profiler.cc.j2").render(has_armv8m_pmu=False)
     assert 'hpx_printf("%d,%s,%lu,%d\\n",' in m4
 
     aot = _render("apollo510", "rtt", "helia-aot")

@@ -37,10 +37,9 @@ from .ports import JLINK_VCOM, list_serial_ports, normalize_descriptor
 from .protocol import (
     DEFAULT_TIMEOUT_S,
     HEARTBEAT_TIMEOUT_S,
-    HPX_END,
-    HPX_START,
     collect_lines,
 )
+from ..wire import HPX_END_SENTINEL, HPX_START_SENTINEL
 from .timing import CaptureTimingTracker
 
 log = logging.getLogger("hpx")
@@ -119,13 +118,13 @@ def capture_uart_output(
             (reset+go via pylink) instead of releasing the probe.  Required on
             SoCs that gate the DWT cycle counter behind the debug power domain
             (Apollo4) or per-layer cycles read back as 0.  See
-            :func:`~helia_profiler.capture.readiness.attached_reset_session`.
+            :func:`~helia_profiler.target.probe.jlink.attached_reset_session`.
         timing_out: Optional dict populated with capture-timing telemetry.
 
     Returns:
         List of captured text lines.
     """
-    timing = CaptureTimingTracker(start_marker=HPX_START, end_marker=HPX_END)
+    timing = CaptureTimingTracker(start_marker=HPX_START_SENTINEL, end_marker=HPX_END_SENTINEL)
     on_line = timing.observe_line
 
     port = find_jlink_vcom_port(jlink_serial)

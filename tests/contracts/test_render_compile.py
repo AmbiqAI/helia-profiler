@@ -145,7 +145,6 @@ def _render_pmu_profiler_header(vars: dict) -> str:
     """
     return _jinja_env.get_template("hpx_pmu_profiler.h.j2").render(
         cmsis_device_header=vars["cmsis_device_header"],
-        profiling_backends=list(vars["profiling_backends"]),
         has_armv8m_pmu=vars["has_armv8m_pmu"],
         has_ethos_u=vars.get("has_ethos_u", False),
         pmu_max_ops=vars["pmu_max_ops"],
@@ -155,7 +154,6 @@ def _render_pmu_profiler_header(vars: dict) -> str:
 def _render_pmu_profiler_cc(vars: dict) -> str:
     """Render hpx_pmu_profiler.cc exactly as firmware/__init__.py does."""
     return _jinja_env.get_template("hpx_pmu_profiler.cc.j2").render(
-        profiling_backends=list(vars["profiling_backends"]),
         has_armv8m_pmu=vars["has_armv8m_pmu"],
     )
 
@@ -287,7 +285,6 @@ def _build_cases() -> list[_CompileCase]:
     # NPU-PMU program/accumulate/overflow/CSV blocks.
     npu_pass = {
         "name": "EthosNpu",
-        "custom": True,
         "event_ids": ["0x0000", "0x0000", "0x0000", "0x0000"],
         "counter_names": [
             "ETHOSU_PMU_CYCLE",
@@ -296,7 +293,6 @@ def _build_cases() -> list[_CompileCase]:
             "ETHOSU_PMU_SRAM_RD_DATA_BEAT_RECEIVED",
         ],
         "num_counters": 4,
-        "c_enum": None,
         "group": "ethos_npu",
     }
     npu_overrides = {

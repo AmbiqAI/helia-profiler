@@ -36,10 +36,9 @@ from .timing import READINESS_POLL_INTERVAL_S, USB_REENUM_FLOOR_S, CaptureTiming
 from .protocol import (
     DEFAULT_TIMEOUT_S,
     HEARTBEAT_TIMEOUT_S,
-    HPX_END,
-    HPX_START,
     collect_lines,
 )
+from ..wire import HPX_END_SENTINEL, HPX_START_SENTINEL
 
 log = logging.getLogger("hpx")
 
@@ -257,7 +256,7 @@ def capture_usb_output(
     whole capture (reset+go through pylink) instead of releasing the probe.
     This is required on SoCs that gate the DWT cycle counter behind the debug
     power domain (Apollo4) — see
-    :func:`~helia_profiler.capture.readiness.attached_reset_session`.
+    :func:`~helia_profiler.target.probe.jlink.attached_reset_session`.
 
     *timeout_s* is the absolute capture ceiling (``None`` = unbounded) and
     *heartbeat_timeout_s* the max gap between received lines.
@@ -265,7 +264,7 @@ def capture_usb_output(
     Returns:
         List of captured text lines.
     """
-    timing = CaptureTimingTracker(start_marker=HPX_START, end_marker=HPX_END)
+    timing = CaptureTimingTracker(start_marker=HPX_START_SENTINEL, end_marker=HPX_END_SENTINEL)
     pre_existing = set(_snapshot_cdc_ports())
     log.info("Pre-existing CDC ports: %s", sorted(pre_existing) or "(none)")
 

@@ -1,15 +1,14 @@
-"""Build/flash invocation — ``nsx configure/build/flash`` on the generated app.
+"""Build invocation — ``nsx configure/build`` on the generated app.
 
 Owns the NSX build-invocation vocabulary: the config→``nsx --toolchain``
-mapping, the compile-time RTT up-buffer sizing, the build itself, the
-deterministic target-binary search, and flashing.  Extracted from
+mapping, the compile-time RTT up-buffer sizing, the build itself, and the
+deterministic target-binary search.  Extracted from
 ``firmware/__init__`` at the module size ceiling (see the elf_inventory
 precedent in toolchain_probe); the package re-exports every name so callers
 (stages/build_firmware, stages/build_power_firmware, stages/plan_memory)
-keep one import surface.  Flashing is NOT invoked through here by the
-pipeline anymore — both firmware deployments run the NSX-generated J-Link
-recipe directly (target/probe/flash.flash_binary); ``flash_app`` remains as
-the ``nsx flash`` convenience wrapper for callers outside the pipeline.
+keep one import surface.  Flashing does not go through NSX — both firmware
+deployments run the NSX-generated J-Link recipe directly
+(target/probe/flash.flash_binary).
 
 NOTE: ``nsx_cli`` and ``glob`` are imported as modules (never ``from ... import
 build`` / ``from glob import glob``) so tests that monkeypatch
@@ -21,7 +20,6 @@ from __future__ import annotations
 
 import glob
 import logging
-from contextlib import nullcontext
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -146,25 +144,3 @@ def find_target_binary(build_dir: Path, target_name: str) -> Path | None:
         if matches:
             return Path(matches[0])
     return None
-
-
-def flash_app(ctx: PipelineContext) -> None:
-    firmware_dir = ctx.resolved_firmware_dir
-    toolchain = ctx.config.target.toolchain
-    nsx_tc = nsx_toolchain(toolchain)
-    from ..deps.dependencies import workspace_mutex
-
-    lock = (
-        workspace_mutex(ctx.dependency_workspace)
-        if ctx.dependency_workspace is not None
-        else nullcontext()
-    )
-    with lock:
-        nsx_cli.flash(
-            firmware_dir,
-            toolchain=nsx_tc,
-            jlink_serial=ctx.resolved_jlink_serial or ctx.config.target.jlink_serial,
-            frozen=True,
-            timeout_s=ctx.config.timeouts.flash_s,
-            verbose=ctx.config.verbose,
-        )

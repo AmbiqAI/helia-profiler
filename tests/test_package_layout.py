@@ -8,6 +8,8 @@ import sys
 import zipfile
 from pathlib import Path
 
+import pytest
+
 
 MAX_SOURCE_LINES = 1000
 
@@ -68,6 +70,69 @@ def test_no_engine_adapter_imports_out_of_another_engines_package() -> None:
         "these engine modules import from another engine's package; move the "
         "shared piece up into helia_profiler.engines instead:\n  " + "\n  ".join(offenders)
     )
+
+
+# Receivers whose ``.open()`` is not ``Path.open``: archive modules and the
+# J-Link / Joulescope / serial device handles.
+_NON_FILE_OPENERS = frozenset({"tarfile", "zipfile", "jlink", "drv", "dtr_holder"})
+
+
+def _is_text_mode(mode: ast.expr | None) -> bool:
+    return mode is None or not (isinstance(mode, ast.Constant) and "b" in str(mode.value))
+
+
+def _text_io_without_encoding(call: ast.Call) -> bool:
+    if any(keyword.arg == "encoding" for keyword in call.keywords):
+        return False
+    func = call.func
+    mode = next((kw.value for kw in call.keywords if kw.arg == "mode"), None)
+    if isinstance(func, ast.Name) and func.id == "open":
+        return _is_text_mode(call.args[1] if len(call.args) > 1 else mode)
+    if not isinstance(func, ast.Attribute):
+        return False
+    if func.attr in {"read_text", "write_text"}:
+        return True
+    if func.attr != "open":
+        return False
+    receiver = func.value
+    if isinstance(receiver, ast.Name) and receiver.id in _NON_FILE_OPENERS:
+        return False
+    return _is_text_mode(call.args[0] if call.args else mode)
+
+
+@pytest.mark.parametrize(
+    ("source", "flagged"),
+    [
+        ("p.read_text()", True),
+        ('open(p, "w", newline="")', True),
+        ("p.open()", True),
+        ('p.open("w")', True),
+        ('p.open(mode="w")', True),
+        ('open(p, "rb")', False),
+        ('p.open("rb")', False),
+        ('p.open(mode="wb")', False),
+        ('p.write_text(s, encoding="utf-8")', False),
+        ('tarfile.open(p, mode="r:gz")', False),
+        ("jlink.open()", False),
+    ],
+)
+def test_encoding_guard_classifies_calls(source: str, flagged: bool) -> None:
+    call = ast.parse(source, mode="eval").body
+    assert isinstance(call, ast.Call)
+    assert _text_io_without_encoding(call) is flagged
+
+
+def test_text_file_io_names_its_encoding() -> None:
+    """Windows' locale default (cp1252) cannot round-trip what hpx writes."""
+    repo_root = Path(__file__).resolve().parent.parent
+    offenders = [
+        f"{path.relative_to(repo_root).as_posix()}:{node.lineno}"
+        for root in (repo_root / "src" / "helia_profiler", repo_root / "tools")
+        for path in sorted(root.rglob("*.py"))
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
+        if isinstance(node, ast.Call) and _text_io_without_encoding(node)
+    ]
+    assert not offenders, 'text file I/O needs encoding="utf-8":\n  ' + "\n  ".join(offenders)
 
 
 def test_wheel_contains_only_canonical_evaluation_modules(tmp_path: Path) -> None:
@@ -187,7 +252,7 @@ def _hpx_import_targets(path: Path, *, module_level_only: bool) -> list[str]:
     ``if TYPE_CHECKING:`` (its ``else:`` branch runs at import time and is
     included); ``False`` walks everything, lazy and guarded alike.
     """
-    tree = ast.parse(path.read_text())
+    tree = ast.parse(path.read_text(encoding="utf-8"))
     if module_level_only:
         nodes: list[ast.stmt] = []
         for node in tree.body:

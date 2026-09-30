@@ -137,6 +137,7 @@ def test_package_dependency_matches_qualified_baseline() -> None:
 
 def test_aot_extra_and_lock_match_the_qualified_helia_aot_range() -> None:
     from helia_profiler.engines.helia_aot import compile as aot_compile
+    from helia_profiler.engines.semver import parse_semver
 
     repo_root = Path(__file__).resolve().parent.parent
     aot = load_compatibility_baseline().engine("helia-aot")
@@ -162,8 +163,8 @@ def test_aot_extra_and_lock_match_the_qualified_helia_aot_range() -> None:
     )
     assert locked["specifier"] == specifier
     version = next(package for package in packages if package["name"] == "helia-aot")["version"]
-    assert aot_compile._parse_semver(aot.min_version) <= aot_compile._parse_semver(version)
-    assert aot_compile._parse_semver(version) < aot_compile._parse_semver(aot.max_version_exclusive)
+    assert parse_semver(aot.min_version) <= parse_semver(version)
+    assert parse_semver(version) < parse_semver(aot.max_version_exclusive)
 
 
 def test_helia_rt_and_core_pins_agree_across_the_baseline() -> None:
