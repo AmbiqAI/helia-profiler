@@ -170,7 +170,6 @@ power/joulescope/driver.py
 power/joulescope/stats.py
 power/joulescope/sync.py
 power/metadata.py
-power/ondevice_driver.py
 power/sync.py
 profiler.py
 report/__init__.py
