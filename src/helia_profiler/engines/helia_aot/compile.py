@@ -41,7 +41,7 @@ log = logging.getLogger("hpx")
 # a user with an unqualified install gets a clear error instead of a confusing
 # build failure (e.g. missing ModuleType.nsx).
 HELIAAOT_MIN_VERSION = "0.23.0"
-HELIAAOT_MAX_VERSION_EXCLUSIVE = "0.24.0"
+HELIAAOT_MAX_VERSION_EXCLUSIVE = "0.26.0"
 
 _DEFAULT_PREFIX = "hpx"
 _DEFAULT_MODULE_NAME = "hpx_model"
