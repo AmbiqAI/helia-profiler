@@ -594,9 +594,10 @@ class TestEthosUBackend:
         assert "NSX_HELIA_RT_ENABLE_ETHOSU" not in artifacts.cmake_vars
 
     def test_registry_pin_carries_the_nsx_ethos_u_option(self):
-        from helia_profiler.engines.helia_rt.artifacts import HELIART_VERSION, _parse_semver
+        from helia_profiler.engines.helia_rt.artifacts import HELIART_VERSION
+        from helia_profiler.engines.semver import parse_semver
 
-        assert _parse_semver(HELIART_VERSION) >= (1, 18, 0)
+        assert parse_semver(HELIART_VERSION) >= (1, 18, 0)
 
     def test_unreadable_nsx_wrapper_is_refused_with_its_reason(
         self, tmp_path: Path, fake_source_tree: Path, monkeypatch: pytest.MonkeyPatch
