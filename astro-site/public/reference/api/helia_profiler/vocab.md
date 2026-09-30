@@ -6,7 +6,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`
 
-Generated from the `src/helia_profiler` tree `b823e287e809c8d9438536a07fc0ab41a3b030c0`.
+Generated from the `src/helia_profiler` tree `c2b4d5f7dedb8939ea0e0967a9ba0c09caa1e6b3`.
 
 ## helia_profiler.EngineType
 
@@ -211,6 +211,20 @@ PSRAM = 'psram'
 ```
 
 Source: `src/helia_profiler/platform/placement.py:36`
+
+### helia_profiler.Placement.region
+
+`attribute` · `python`
+
+```python
+region: MemoryRegion
+```
+
+The physical region this placement lands in.
+
+``TCM`` is DTCM: ITCM is code-only and never holds arenas or weights.
+
+Source: `src/helia_profiler/platform/placement.py:39`
 
 ## helia_profiler.Transport
 
