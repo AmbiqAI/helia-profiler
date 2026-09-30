@@ -16,11 +16,11 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `experimental`
 
-Generated from the `src/helia_profiler` tree `cf4575012d6d2f42d4f7a8e03bae3bd4742cf110`.
+Generated from the `src/helia_profiler` tree `282cb22b4e53cfcc184f00d48a02a261e2e64356`.
 
 [Machine-readable model](/helia-profiler/reference/api/helia_profiler/evaluation.json)
 
-<RefMembers label="On this page" items={[{"id":"helia_profiler.MetricDirection","name":"MetricDirection","kind":"class","summary":"Preferred candidate direction for one metric."},{"id":"helia_profiler.MissingMetricPolicy","name":"MissingMetricPolicy","kind":"class","summary":"Verdict when a selected metric is unavailable."},{"id":"helia_profiler.RunEvaluation","name":"RunEvaluation","kind":"class","summary":"Authoritative validity and structured issues for one completed run."},{"id":"helia_profiler.ComparabilityIssue","name":"ComparabilityIssue","kind":"class","summary":"One machine-readable compatibility decision."},{"id":"helia_profiler.VerdictStatus","name":"VerdictStatus","kind":"class","summary":"Regression policy outcome."},{"id":"helia_profiler.ComparabilityAssessment","name":"ComparabilityAssessment","kind":"class","summary":"Whether run-level and per-layer deltas may be computed."},{"id":"helia_profiler.MetricPolicy","name":"MetricPolicy","kind":"class","summary":"Tolerance and availability policy for one named comparison metric."},{"id":"helia_profiler.ComparisonProfile","name":"ComparisonProfile","kind":"class","summary":"Open v1 profile selecting deterministic metric regression policies."},{"id":"helia_profiler.CompareResult","name":"CompareResult","kind":"class","summary":"Full comparison between two profile runs."},{"id":"helia_profiler.assess_comparability","name":"assess_comparability","kind":"function","summary":"Compare identity, validity, topology, and intentional run dimensions."},{"id":"helia_profiler.MetricVerdict","name":"MetricVerdict","kind":"class","summary":"Verdict and evidence for one selected metric."},{"id":"helia_profiler.evaluate_run","name":"evaluate_run","kind":"function","summary":"Evaluate captured results without mutating pipeline state."},{"id":"helia_profiler.ComparisonVerdict","name":"ComparisonVerdict","kind":"class","summary":"Deterministic verdict for one result pair and profile."},{"id":"helia_profiler.evaluate_comparison_profile","name":"evaluate_comparison_profile","kind":"function","summary":"Evaluate existing metric deltas against one versioned profile."},{"id":"helia_profiler.ComparabilitySeverity","name":"ComparabilitySeverity","kind":"class","summary":"Effect of one comparability issue on comparison output."}]} />
+<RefMembers label="On this page" items={[{"id":"helia_profiler.MetricDirection","name":"MetricDirection","kind":"class","summary":"Preferred candidate direction for one metric."},{"id":"helia_profiler.MissingMetricPolicy","name":"MissingMetricPolicy","kind":"class","summary":"Verdict when a selected metric is unavailable."},{"id":"helia_profiler.ComparabilityIssue","name":"ComparabilityIssue","kind":"class","summary":"One machine-readable compatibility decision."},{"id":"helia_profiler.RunEvaluation","name":"RunEvaluation","kind":"class","summary":"Authoritative validity and structured issues for one completed run."},{"id":"helia_profiler.VerdictStatus","name":"VerdictStatus","kind":"class","summary":"Regression policy outcome."},{"id":"helia_profiler.ComparabilityAssessment","name":"ComparabilityAssessment","kind":"class","summary":"Whether run-level and per-layer deltas may be computed."},{"id":"helia_profiler.MetricPolicy","name":"MetricPolicy","kind":"class","summary":"Tolerance and availability policy for one named comparison metric."},{"id":"helia_profiler.ComparisonProfile","name":"ComparisonProfile","kind":"class","summary":"Open v1 profile selecting deterministic metric regression policies."},{"id":"helia_profiler.CompareResult","name":"CompareResult","kind":"class","summary":"Full comparison between two profile runs."},{"id":"helia_profiler.assess_comparability","name":"assess_comparability","kind":"function","summary":"Compare identity, validity, topology, and intentional run dimensions."},{"id":"helia_profiler.MetricVerdict","name":"MetricVerdict","kind":"class","summary":"Verdict and evidence for one selected metric."},{"id":"helia_profiler.evaluate_run","name":"evaluate_run","kind":"function","summary":"Evaluate captured results without mutating pipeline state."},{"id":"helia_profiler.ComparisonVerdict","name":"ComparisonVerdict","kind":"class","summary":"Deterministic verdict for one result pair and profile."},{"id":"helia_profiler.evaluate_comparison_profile","name":"evaluate_comparison_profile","kind":"function","summary":"Evaluate existing metric deltas against one versioned profile."},{"id":"helia_profiler.ComparabilitySeverity","name":"ComparabilitySeverity","kind":"class","summary":"Effect of one comparability issue on comparison output."}]} />
 
 <RefSymbol
   id={"helia_profiler.MetricDirection"}
@@ -141,67 +141,6 @@ Generated from the `src/helia_profiler` tree `cf4575012d6d2f42d4f7a8e03bae3bd474
 </RefSymbol>
 
 <RefSymbol
-  id={"helia_profiler.RunEvaluation"}
-  name={"RunEvaluation"}
-  kind={"class"}
-  language={"python"}
-  signature={"RunEvaluation(\n    validity: ResultValidity,\n    issues: tuple[ResultIssue, ...] = (),\n    gate_arbitration: GateArbitration | None = None,\n) -> None"}
-  level={2}
-  summary={"Authoritative validity and structured issues for one completed run."}
-  source={{"path":"src/helia_profiler/evaluation/validity.py","line":33,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L33"}}
->
-
-  `dataclass`
-
-  Authoritative validity and structured issues for one completed run.
-
-  **API tier:** `experimental`
-
-  <RefSymbol
-    id={"helia_profiler.RunEvaluation.validity"}
-    name={"validity"}
-    kind={"attribute"}
-    language={"python"}
-    signature={"validity: ResultValidity"}
-    level={3}
-    source={{"path":"src/helia_profiler/evaluation/validity.py","line":37,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L37"}}
-  >
-
-
-
-  </RefSymbol>
-
-  <RefSymbol
-    id={"helia_profiler.RunEvaluation.issues"}
-    name={"issues"}
-    kind={"attribute"}
-    language={"python"}
-    signature={"issues: tuple[ResultIssue, ...] = ()"}
-    level={3}
-    source={{"path":"src/helia_profiler/evaluation/validity.py","line":38,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L38"}}
-  >
-
-
-
-  </RefSymbol>
-
-  <RefSymbol
-    id={"helia_profiler.RunEvaluation.gate_arbitration"}
-    name={"gate_arbitration"}
-    kind={"attribute"}
-    language={"python"}
-    signature={"gate_arbitration: GateArbitration | None = None"}
-    level={3}
-    source={{"path":"src/helia_profiler/evaluation/validity.py","line":42,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L42"}}
-  >
-
-
-
-  </RefSymbol>
-
-</RefSymbol>
-
-<RefSymbol
   id={"helia_profiler.ComparabilityIssue"}
   name={"ComparabilityIssue"}
   kind={"class"}
@@ -268,6 +207,67 @@ Generated from the `src/helia_profiler` tree `cf4575012d6d2f42d4f7a8e03bae3bd474
     signature={"context: dict[str, Any] = field(default_factory=dict)"}
     level={3}
     source={{"path":"src/helia_profiler/evaluation/comparability.py","line":41,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparability.py#L41"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.RunEvaluation"}
+  name={"RunEvaluation"}
+  kind={"class"}
+  language={"python"}
+  signature={"RunEvaluation(\n    validity: ResultValidity,\n    issues: tuple[ResultIssue, ...] = (),\n    gate_arbitration: GateArbitration | None = None,\n) -> None"}
+  level={2}
+  summary={"Authoritative validity and structured issues for one completed run."}
+  source={{"path":"src/helia_profiler/evaluation/validity.py","line":34,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L34"}}
+>
+
+  `dataclass`
+
+  Authoritative validity and structured issues for one completed run.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.RunEvaluation.validity"}
+    name={"validity"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"validity: ResultValidity"}
+    level={3}
+    source={{"path":"src/helia_profiler/evaluation/validity.py","line":38,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L38"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RunEvaluation.issues"}
+    name={"issues"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"issues: tuple[ResultIssue, ...] = ()"}
+    level={3}
+    source={{"path":"src/helia_profiler/evaluation/validity.py","line":39,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L39"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RunEvaluation.gate_arbitration"}
+    name={"gate_arbitration"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"gate_arbitration: GateArbitration | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/evaluation/validity.py","line":43,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L43"}}
   >
 
 
@@ -1032,7 +1032,7 @@ Generated from the `src/helia_profiler` tree `cf4575012d6d2f42d4f7a8e03bae3bd474
   signature={"evaluate_run(ctx: PipelineContext) -> RunEvaluation"}
   level={2}
   summary={"Evaluate captured results without mutating pipeline state."}
-  source={{"path":"src/helia_profiler/evaluation/validity.py","line":192,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L192"}}
+  source={{"path":"src/helia_profiler/evaluation/validity.py","line":193,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L193"}}
 >
 
   Evaluate captured results without mutating pipeline state.

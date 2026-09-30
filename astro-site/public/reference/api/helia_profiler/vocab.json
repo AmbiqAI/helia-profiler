@@ -3,12 +3,12 @@
   "generatedFrom": {
     "tool": "pyref",
     "version": "1.7.3",
-    "sourceTree": "cf4575012d6d2f42d4f7a8e03bae3bd4742cf110"
+    "sourceTree": "282cb22b4e53cfcc184f00d48a02a261e2e64356"
   },
   "language": "python",
   "modules": [
     {
-      "description": "The fixed vocabularies a configuration selects from: engines, toolchains, capture transports, memory placements and reset strategies.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`\n\nGenerated from the `src/helia_profiler` tree `cf4575012d6d2f42d4f7a8e03bae3bd4742cf110`.",
+      "description": "The fixed vocabularies a configuration selects from: engines, toolchains, capture transports, memory placements and reset strategies.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`\n\nGenerated from the `src/helia_profiler` tree `282cb22b4e53cfcc184f00d48a02a261e2e64356`.",
       "name": "vocab",
       "path": "helia_profiler.vocab",
       "submodules": [],
@@ -326,6 +326,25 @@
                 "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/placement.py#L36"
               },
               "summary": ""
+            },
+            {
+              "description": "The physical region this placement lands in.\n\n``TCM`` is DTCM: ITCM is code-only and never holds arenas or weights.",
+              "examples": [],
+              "id": "helia_profiler.Placement.region",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "region",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "region: MemoryRegion",
+              "source": {
+                "line": 39,
+                "path": "src/helia_profiler/platform/placement.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/placement.py#L39"
+              },
+              "summary": "The physical region this placement lands in."
             }
           ],
           "name": "Placement",

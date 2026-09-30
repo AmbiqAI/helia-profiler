@@ -6,7 +6,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`, `experimental`
 
-Generated from the `src/helia_profiler` tree `cf4575012d6d2f42d4f7a8e03bae3bd4742cf110`.
+Generated from the `src/helia_profiler` tree `282cb22b4e53cfcc184f00d48a02a261e2e64356`.
 
 ## helia_profiler.HpxError
 
@@ -153,9 +153,10 @@ A capture-path refusal no retry or power cycle can change.
 
 Subclass of :class:`CaptureError` so existing ``except CaptureError``
 handlers still catch it, but recovery paths that would otherwise cycle the
-target rail and retry (``stages.flash_power``) re-raise it instead: these
-are configuration/artifact gaps — a missing image, an unknown load
-address — and cycling the rail only frames them as flaky hardware.
+target rail and retry (``stages.flash.deploy_firmware``) re-raise it
+instead: these are configuration/artifact gaps — a missing image, an
+unknown load address — and cycling the rail only frames them as flaky
+hardware.
 
 **API tier:** `stable`
 
@@ -176,7 +177,7 @@ still catch it, but callers that want to retry can specifically catch this.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:82`
+Source: `src/helia_profiler/errors.py:83`
 
 ## helia_profiler.DependencyError
 
@@ -195,7 +196,7 @@ specifically about an incompatible version or a missing/corrupt lock.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/errors.py:90`
+Source: `src/helia_profiler/errors.py:91`
 
 ## helia_profiler.VersionError
 
@@ -214,7 +215,7 @@ dependency failures and surface an actionable upgrade/downgrade hint.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/errors.py:100`
+Source: `src/helia_profiler/errors.py:101`
 
 ## helia_profiler.LockError
 
@@ -233,7 +234,7 @@ failing an entire report.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/errors.py:110`
+Source: `src/helia_profiler/errors.py:111`
 
 ## helia_profiler.PowerError
 
@@ -247,7 +248,7 @@ Power measurement failure — Joulescope not found, calibration error.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:120`
+Source: `src/helia_profiler/errors.py:121`
 
 ## helia_profiler.ReportError
 
@@ -261,4 +262,4 @@ Report generation failure — output path not writable, format error.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:124`
+Source: `src/helia_profiler/errors.py:125`
