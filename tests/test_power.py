@@ -3640,7 +3640,7 @@ class TestPowerFirmwareSelection:
         monkeypatch.setattr("helia_profiler.target.probe.flash.flash_binary", flash_binary)
         cycles: list[str] = []
         monkeypatch.setattr(
-            "helia_profiler.stages.flash_power.try_power_cycle_for_context",
+            "helia_profiler.stages.flash.try_power_cycle_for_context",
             lambda _ctx: cycles.append("cycle") or True,
         )
 
@@ -3690,7 +3690,7 @@ class TestPowerFirmwareSelection:
         monkeypatch.setattr("helia_profiler.target.probe.flash.flash_binary", flash_binary)
         cycles: list[str] = []
         monkeypatch.setattr(
-            "helia_profiler.stages.flash_power.try_power_cycle_for_context",
+            "helia_profiler.stages.flash.try_power_cycle_for_context",
             lambda _ctx: cycles.append("cycle") or True,
         )
 
@@ -3744,7 +3744,7 @@ class TestPowerFirmwareSelection:
 
         monkeypatch.setattr("helia_profiler.target.probe.flash.flash_binary", flash_binary)
         monkeypatch.setattr(
-            "helia_profiler.stages.flash_power.try_power_cycle_for_context",
+            "helia_profiler.stages.flash.try_power_cycle_for_context",
             lambda _ctx: cycle_succeeds,
         )
 

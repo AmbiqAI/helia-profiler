@@ -149,7 +149,41 @@ class TestFlashFirmwareStageDirect:
             lambda ctx: cycles.append(1) or True,
         )
 
-        with pytest.raises(BuildError, match="no flashable image"):
+        with pytest.raises(DeterministicCaptureError) as exc_info:
             FlashFirmwareStage().run(ctx)
 
         assert not cycles
+        assert str(exc_info.value).startswith("Profile firmware deployment failed: ")
+        assert str(exc_info.value).count("Hint:") == 1
+
+    @pytest.mark.parametrize(
+        ("stage_role", "passthrough_skipped"),
+        [("profile", True), ("profile", False), ("power", True)],
+    )
+    def test_unrecoverable_failure_hints_at_evb_power_when_passthrough_skipped(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        stage_role: str,
+        passthrough_skipped: bool,
+    ) -> None:
+        from helia_profiler.stages.flash import deploy_firmware
+
+        ctx = _make_ctx(tmp_path)
+        ctx.passthrough_skipped = passthrough_skipped
+
+        def locked(binary_path, **kwargs):
+            raise CaptureError("debug domain locked")
+
+        monkeypatch.setattr("helia_profiler.target.probe.flash.flash_binary", locked)
+        monkeypatch.setattr(
+            "helia_profiler.stages.flash.try_power_cycle_for_context", lambda ctx: False
+        )
+
+        with pytest.raises(BuildError) as exc_info:
+            deploy_firmware(ctx, ctx.binary_path, role=stage_role)
+
+        message = str(exc_info.value)
+        assert message.startswith(f"{stage_role.capitalize()} firmware deployment failed: ")
+        assert "connected via JLink" in message
+        assert ("Verify the EVB is powered" in message) is passthrough_skipped
