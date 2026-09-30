@@ -3,12 +3,12 @@
   "generatedFrom": {
     "tool": "pyref",
     "version": "1.7.3",
-    "sourceTree": "b823e287e809c8d9438536a07fc0ab41a3b030c0"
+    "sourceTree": "4a3cc9f2bcb581a2c4b433b623dcc80962035a8b"
   },
   "language": "python",
   "modules": [
     {
-      "description": "What a profiling run produces: the run result, its per-layer and PMU detail, and the firmware and run metadata that say how it was measured.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`\n\nGenerated from the `src/helia_profiler` tree `b823e287e809c8d9438536a07fc0ab41a3b030c0`.",
+      "description": "What a profiling run produces: the run result, its per-layer and PMU detail, and the firmware and run metadata that say how it was measured.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`\n\nGenerated from the `src/helia_profiler` tree `4a3cc9f2bcb581a2c4b433b623dcc80962035a8b`.",
       "name": "results",
       "path": "helia_profiler.results",
       "submodules": [],

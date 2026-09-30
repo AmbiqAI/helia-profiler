@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "kind": "config-schema",
   "generatedFrom": {
-    "sourceTree": "b823e287e809c8d9438536a07fc0ab41a3b030c0",
+    "sourceTree": "4a3cc9f2bcb581a2c4b433b623dcc80962035a8b",
     "helia_profiler": "0.1.6",
     "typer": "0.26.8",
     "click": "8.3.3",
