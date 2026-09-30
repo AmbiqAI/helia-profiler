@@ -8,8 +8,9 @@
  * page carries every one of them.
  *
  * Extraction is `scripts/dump-catalog.py`, which parses rather than imports.
- * The provenance is the git tree of the documented source, the same identity
- * the Python reference carries and for the same reasons; see `sourceTree`.
+ * The artifact records the source path it was read from and no hash of it,
+ * for the same reasons as the Python reference; see `sourceTree`. The stale
+ * check compares it byte for byte with a fresh extraction.
  *
  * Only identity travels. Channel is the registry's own word ("stable",
  * "preview"). Everything else Home says about a board or an engine, including
@@ -42,11 +43,11 @@ function pythonCommand({ exec = (cmd, args) => execFileSync(cmd, args, { encodin
 }
 
 /**
- * The committed artifact, from the extractor's output and the source tree.
+ * The committed artifact, from the extractor's output.
  *
  * Separated from the IO so the shape is assertable without a Python process.
  */
-export function catalogFrom(dump, tree) {
+export function catalogFrom(dump) {
   const { boards, engines } = dump;
   if (!Array.isArray(boards) || boards.length === 0) {
     throw new Error('Catalog dump carries no boards.');
@@ -66,7 +67,7 @@ export function catalogFrom(dump, tree) {
     }
   }
   return {
-    generatedFrom: { sourceTree: tree, sourcePath: SOURCE_PATH },
+    generatedFrom: { sourcePath: SOURCE_PATH },
     counts: { boards: boards.length, engines: engines.length },
     boards,
     engines,
@@ -87,8 +88,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     }),
   );
 
+  /* Refuses uncommitted source; the tree itself only reaches the log. */
   const tree = sourceTree(repo, { allowDirty: Boolean(process.env.DOCS_ALLOW_DIRTY_SOURCE) });
-  const catalog = catalogFrom(dump, tree);
+  const catalog = catalogFrom(dump);
 
   const target = path.join(outRoot, CATALOG_FILE);
   fs.mkdirSync(path.dirname(target), { recursive: true });

@@ -580,6 +580,14 @@ class TestGenerateApp:
         assert (app_dir / "src" / "hpx_pmu_profiler.h").exists()
         assert (app_dir / "src" / "hpx_pmu_profiler.cc").exists()
 
+    def test_profile_app_keeps_build_paths(self, tmp_path: Path, fake_dist: Path):
+        ctx = _make_ctx(tmp_path, fake_dist)
+        ResolvePlatformStage().run(ctx)
+        PrepareEngineStage().run(ctx)
+        app_dir = generate_app(ctx)
+
+        assert "file-prefix-map" not in (app_dir / "CMakeLists.txt").read_text(encoding="utf-8")
+
     def test_heliart_wrapper_module_copied(self, tmp_path: Path, fake_dist: Path):
         ctx = _make_ctx(tmp_path, fake_dist)
         ResolvePlatformStage().run(ctx)

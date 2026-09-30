@@ -1,12 +1,14 @@
 /*
- * Resolve the source ref of the generated Python reference at build time.
+ * Resolve the build provenance of the generated reference at build time.
  *
- * The committed pages and artifacts carry a placeholder where a git ref would
- * go. A committed branch name would link to that branch whatever this build is
- * of, and a committed commit sha would rewrite every generated file on every
- * change under src/. The ref is a property of the build, not of the source, so
- * it is substituted here from build-info.json, which carries the ref the
- * workflow checked out: a release tag, a branch, or main.
+ * The committed pages and artifacts carry placeholders where a git ref or the
+ * source tree would go. A committed branch name would link to that branch
+ * whatever this build is of, and a committed commit sha or tree sha would
+ * rewrite every generated file on every change under src/, including changes
+ * that leave the documented content alone. Both are properties of the build,
+ * not of the documented content, so they are substituted here from
+ * build-info.json, which carries the ref the workflow checked out (a release
+ * tag, a branch, or main) and the tree of `src/helia_profiler` at that commit.
  *
  * This runs over the artifact rather than through a Markdown plugin because
  * Astro 7 defaults to the Sätteri processor, where remark plugins need
@@ -20,6 +22,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const SOURCE_REF_TOKEN = '__DOCS_SOURCE_REF__';
+export const SOURCE_TREE_TOKEN = '__DOCS_SOURCE_TREE__';
+export const TOKENS = [SOURCE_REF_TOKEN, SOURCE_TREE_TOKEN];
 
 const REWRITTEN = new Set(['.html', '.json', '.md', '.txt', '.xml']);
 
@@ -32,6 +36,36 @@ const REWRITTEN = new Set(['.html', '.json', '.md', '.txt', '.xml']);
  */
 export const sourceRef = (buildInfo) =>
   buildInfo?.sourceRef || buildInfo?.releaseTag || 'main';
+
+/**
+ * The git tree of `src/helia_profiler` this build documents.
+ *
+ * The stale checks prove the committed reference is byte-for-byte what the
+ * source at HEAD produces, so naming HEAD's tree at build time makes the same
+ * claim a committed stamp would, without the churn. A build-info.json with no
+ * tree would publish the placeholder, so that is refused by name.
+ */
+export function sourceTreeOf(buildInfo) {
+  const tree = buildInfo?.sourceTree;
+  if (!/^[0-9a-f]{40}$/.test(tree ?? '')) {
+    throw new Error(
+      `build-info.json carries no usable sourceTree (${JSON.stringify(tree ?? null)}). ` +
+        'It is written by npm run prepare:docs, which runs in prebuild.',
+    );
+  }
+  return tree;
+}
+
+/** Every placeholder the committed files carry, paired with this build's value. */
+export const substitutions = (buildInfo) => [
+  [SOURCE_REF_TOKEN, sourceRef(buildInfo)],
+  [SOURCE_TREE_TOKEN, sourceTreeOf(buildInfo)],
+];
+
+export const substitute = (body, pairs) =>
+  pairs.reduce((text, [token, value]) => text.replaceAll(token, value), body);
+
+const tokenised = (body) => TOKENS.some((token) => body.includes(token));
 
 export function readBuildInfo(siteDir) {
   const file = path.join(siteDir, 'src/data/build-info.json');
@@ -59,9 +93,11 @@ export function sourceRefArtifacts() {
                 name: 'helia-profiler:source-ref-mdx',
                 enforce: 'pre',
                 transform(code, id) {
-                  if (!id.endsWith('.mdx') || !code.includes(SOURCE_REF_TOKEN)) return null;
-                  const ref = sourceRef(readBuildInfo(siteDir));
-                  return { code: code.replaceAll(SOURCE_REF_TOKEN, ref), map: null };
+                  if (!id.endsWith('.mdx') || !tokenised(code)) return null;
+                  return {
+                    code: substitute(code, substitutions(readBuildInfo(siteDir))),
+                    map: null,
+                  };
                 },
               },
             ],
@@ -69,7 +105,7 @@ export function sourceRefArtifacts() {
         });
       },
       'astro:build:done': ({ dir }) => {
-        const ref = sourceRef(readBuildInfo(siteDir));
+        const pairs = substitutions(readBuildInfo(siteDir));
         const root = fileURLToPath(dir);
         let rewritten = 0;
         const walk = (directory) => {
@@ -81,13 +117,16 @@ export function sourceRefArtifacts() {
             }
             if (!REWRITTEN.has(path.extname(entry.name))) continue;
             const body = fs.readFileSync(entryPath, 'utf8');
-            if (!body.includes(SOURCE_REF_TOKEN)) continue;
-            fs.writeFileSync(entryPath, body.replaceAll(SOURCE_REF_TOKEN, ref), 'utf8');
+            if (!tokenised(body)) continue;
+            fs.writeFileSync(entryPath, substitute(body, pairs), 'utf8');
             rewritten += 1;
           }
         };
         walk(root);
-        console.log(`source ref: ${ref} written into ${rewritten} files.`);
+        const [[, ref], [, tree]] = pairs;
+        console.log(
+          `source ref ${ref} and source tree ${tree.slice(0, 7)} written into ${rewritten} files.`,
+        );
       },
     },
   };

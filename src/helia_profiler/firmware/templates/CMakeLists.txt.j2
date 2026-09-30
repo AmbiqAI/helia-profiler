@@ -18,6 +18,11 @@ set({{ var_name }} "{{ var_value }}" CACHE STRING "Profiler engine option" FORCE
 
 # Export configured compile commands for module and application provenance.
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+{%- if strip_build_paths %}
+
+# Record no build-machine paths, so the ELF depends only on its inputs.
+add_compile_options("-ffile-prefix-map=${CMAKE_CURRENT_LIST_DIR}=.")
+{%- endif %}
 
 {% if compiler_launcher %}
 # Compiler launcher (e.g. sccache/ccache) — caches object output across builds.

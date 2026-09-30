@@ -56,7 +56,6 @@ const leaf = (overrides = {}) => ({
 });
 
 const generatedFrom = {
-  sourceTree: '0'.repeat(40),
   helia_profiler: '0.1.6',
   typer: '0.26.8',
   click: '8.3.3',
@@ -149,7 +148,10 @@ test('the Markdown rendition heads every command path and rows every parameter',
   /* The epilog is an example block the author laid out; reflowing it would
    * change what the reader is told to type. */
   assert.ok(markdown.includes('Line one.\n\n  Line two.'));
-  assert.ok(markdown.includes(generatedFrom.sourceTree));
+  /* The rendition names the source tree by placeholder; the build resolves
+   * it, so the committed file does not move with unrelated source changes. */
+  assert.ok(markdown.includes('`__DOCS_SOURCE_TREE__`'));
+  assert.doesNotMatch(markdown, /\b[0-9a-f]{40}\b/);
 });
 
 const schema = {
