@@ -3,7 +3,7 @@
   "kind": "cli",
   "program": "hpx",
   "generatedFrom": {
-    "sourceTree": "2af09336fb229827e1c78e19ee6eda9809bb628e",
+    "sourceTree": "b823e287e809c8d9438536a07fc0ab41a3b030c0",
     "helia_profiler": "0.1.6",
     "typer": "0.26.8",
     "click": "8.3.3",
