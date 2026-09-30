@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Protocol
 from ..config import DEFAULT_POWER_DURATION_S
 from ..vocab import Transport
 from ..errors import CaptureError, PowerError
+from ..results.models import DEVICE_CLOCK_TOLERANCE
 from ..power.diagnostics import (
     CLEAN_WINDOW_WARMUP_REPS,
     SyncHandshakeMetadata,
@@ -711,8 +712,7 @@ def _verify_device_clock(ctx: PipelineContext, result: PmuResult) -> None:
             platform.soc or "this SoC",
         )
     for label, device_hz in readings:
-        # 5% clears HFRC trim, catches perf-mode misses.
-        if not device_hz or abs(device_hz - registry_hz) <= 0.05 * registry_hz:
+        if not device_hz or abs(device_hz - registry_hz) <= DEVICE_CLOCK_TOLERANCE * registry_hz:
             continue
         log.warning(
             "%s CPU clock %.3f MHz but the platform registry "
