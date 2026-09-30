@@ -121,7 +121,7 @@ class Session:
 
         yaml_path = Path(path).expanduser().resolve()
         try:
-            data = yaml.safe_load(yaml_path.read_text()) or {}
+            data = yaml.safe_load(yaml_path.read_text(encoding="utf-8")) or {}
         except FileNotFoundError as exc:
             raise ConfigError(
                 f"Config file not found: {yaml_path}",

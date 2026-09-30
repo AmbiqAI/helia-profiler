@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import csv
 import json
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from ..engines.base import HeliaAotArtifacts
+from ..results.serde import write_dict_csv
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
@@ -110,9 +110,6 @@ def _write_aot_memory_layers(ctx: PipelineContext, output_dir: Path) -> Path | N
         "size",
         "shape",
     ]
-    with open(out_path, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(rows)
+    write_dict_csv(out_path, fieldnames, rows)
     log.info("Wrote AOT memory placement CSV: %s", out_path)
     return out_path

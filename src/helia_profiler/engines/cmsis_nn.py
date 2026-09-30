@@ -208,7 +208,8 @@ def _write_cmsis_nn_wrapper(module_dir: Path, cmsis_nn_path: Path) -> None:
     shutil.copy2(native_nsx / "CMakeLists.txt", nsx_subdir / "CMakeLists.txt")
 
     (module_dir / "CMakeLists.txt").write_text(
-        "# Shim — delegates to the native ns-cmsis-nn NSX build.\nadd_subdirectory(nsx)\n"
+        "# Shim — delegates to the native ns-cmsis-nn NSX build.\nadd_subdirectory(nsx)\n",
+        encoding="utf-8",
     )
 
     # No symlinks — Windows-safe.

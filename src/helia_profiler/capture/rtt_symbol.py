@@ -45,7 +45,7 @@ def _address_from_map(build_dir: Path, target_name: str) -> int | None:
     )
     for map_path in candidates:
         try:
-            text = map_path.read_text(errors="replace")
+            text = map_path.read_text(encoding="utf-8", errors="replace")
         except OSError as exc:
             log.debug("could not read map %s: %s", map_path, exc)
             continue

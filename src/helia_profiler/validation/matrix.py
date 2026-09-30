@@ -348,7 +348,7 @@ def load_model_file(path: Path) -> dict[str, ModelSpec]:
     """
     source = path.expanduser().resolve()
     try:
-        document = yaml.safe_load(source.read_text())
+        document = yaml.safe_load(source.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
         raise ValueError(f"Model registry not found: {source}") from exc
     except (OSError, yaml.YAMLError) as exc:

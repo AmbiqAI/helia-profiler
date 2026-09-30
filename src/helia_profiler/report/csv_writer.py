@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-import csv
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -15,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 from ..errors import ReportError
 from ..modelcost.layer_attribution import LayerAttribution, LayerAttributor
 from ..results import LayerResult
+from ..results.serde import write_dict_csv
 
 if TYPE_CHECKING:
     from ..modelcost import ModelAnalysis
@@ -91,11 +91,7 @@ def _write_csv(
             if col not in fieldnames:
                 fieldnames.append(col)
 
-    with open(out_path, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        for row in rows:
-            writer.writerow(row)
+    write_dict_csv(out_path, fieldnames, rows)
 
     log.info("Wrote CSV report: %s (%d layers)", out_path, len(layers))
     return out_path
@@ -114,11 +110,7 @@ def _write_preset_csv(
     rows = [_layer_to_flat_dict(layer, total_cycles=total_cycles) for layer in layers]
     fieldnames = _union_fieldnames(rows)
 
-    with open(out_path, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        for row in rows:
-            writer.writerow(row)
+    write_dict_csv(out_path, fieldnames, rows)
 
     log.info("Wrote preset CSV: %s (%d layers)", out_path, len(layers))
     return out_path

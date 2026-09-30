@@ -55,7 +55,9 @@ def _add_ethos_u_artifacts(extra_modules: list[NsxModuleRef], cmake_vars: dict[s
 def _require_ethos_u_source_support(source_path: Path) -> None:
     """Refuse an Ethos-U build from a source tree whose NSX wrapper lacks the flag."""
     try:
-        nsx_cmake = (source_path / "nsx" / "CMakeLists.txt").read_text(errors="replace")
+        nsx_cmake = (source_path / "nsx" / "CMakeLists.txt").read_text(
+            encoding="utf-8", errors="replace"
+        )
     except OSError as exc:
         problem = f"its nsx/CMakeLists.txt could not be read ({exc.strerror or exc})"
     else:

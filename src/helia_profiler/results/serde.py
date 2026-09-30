@@ -11,11 +11,12 @@ nested reads, number coercion, ``None`` stripping) (#229 D6).
 
 from __future__ import annotations
 
+import csv
 import hashlib
 import math
 from dataclasses import fields
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Iterable, Mapping
 
 from ..errors import ReportError
 
@@ -31,6 +32,16 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def write_dict_csv(
+    path: Path, fieldnames: Iterable[str], rows: Iterable[Mapping[str, Any]]
+) -> None:
+    """Write *rows* as a UTF-8 CSV with a header row."""
+    with path.open("w", encoding="utf-8", newline="") as stream:
+        writer = csv.DictWriter(stream, fieldnames=list(fieldnames))
+        writer.writeheader()
+        writer.writerows(rows)
 
 
 def nested_get(mapping: Any, *keys: str) -> Any:
