@@ -48,7 +48,7 @@ from .results import (
     BinarySections,
 )
 from .hostenv.toolchain_probe import SymbolEntry
-from .target.probe.base import Probe, ResetController
+from .target.probe.base import ResetController
 
 if TYPE_CHECKING:
     from ._fixture_build import FixtureRenderSpec
@@ -106,7 +106,6 @@ class PipelineContext:
     soc: SocDef | None = None
     board: BoardDef | None = None
     resolved_jlink_serial: str | None = None
-    probe: Probe | None = None
     reset_controller: ResetController | None = None
 
     # Engine preparation (stage: prepare_engine)
@@ -164,16 +163,6 @@ class PipelineContext:
     # Report (stage: generate_report)
     report_paths: list[Path] = field(default_factory=list)
 
-    #: Optional long-lived power driver handle owned by the pipeline.
-    #:
-    #: Stages that need to keep a Joulescope (or other power driver) USB
-    #: handle open across multiple stages assign it here; the
-    #: :class:`PipelineRunner` ``finally`` block calls
-    #: ``disable_passthrough()`` on whatever is stored to leave hardware in
-    #: a clean state.  Most drivers latch the relay in hardware and release
-    #: the handle immediately, so this stays ``None`` for typical runs.
-    power_driver_handle: Any | None = None
-
     #: True if :class:`EnsureBoardPoweredStage` skipped passthrough (no JS,
     #: driver missing, ambiguous selection, etc.). Used by downstream stages
     #: (notably ``flash_firmware``) to surface a "is your EVB powered?" hint
@@ -196,10 +185,6 @@ class PipelineContext:
         return self.profile_run.firmware.binary_path if self.profile_run else None
 
     @property
-    def profile_firmware(self) -> FirmwareArtifact | None:
-        return self.profile_run.firmware if self.profile_run else None
-
-    @property
     def pmu_result(self) -> PmuResult | None:
         return self.profile_run.result if self.profile_run else None
 
@@ -210,24 +195,6 @@ class PipelineContext:
     @property
     def power_firmware(self) -> FirmwareArtifact | None:
         return self.power_run.firmware if self.power_run else None
-
-    @property
-    def deployed_power_firmware(self) -> FirmwareArtifact | None:
-        if self.power_run is None or self.power_run.deployment is None:
-            return None
-        return self.power_run.deployment.firmware
-
-    @property
-    def power_binary_path(self) -> Path | None:
-        """Path to the dedicated transport-free power binary (hpx_profiler_power).
-
-        Built alongside ``hpx_profiler`` only when config.power.enabled. WP3
-        wires this into the power-capture flash/run path; this accessor only
-        exposes it.
-        """
-        if self.power_run is None or self.power_run.firmware is None:
-            return None
-        return self.power_run.firmware.binary_path
 
     @property
     def power_result(self) -> PowerResult | None:
@@ -279,19 +246,19 @@ class PipelineContext:
 
     def publish_profile_firmware(self, firmware: FirmwareArtifact) -> None:
         if firmware.role != "profile":
-            raise ValueError("Profile run requires a profile firmware artifact.")
+            raise PipelineError("Profile run requires a profile firmware artifact.")
         self.profile_run = ProfileRun(firmware=firmware)
 
     def publish_profile_deployment(self, deployment: DeploymentRecord) -> None:
         if self.profile_run is None:
-            raise ValueError("Profile firmware must be published before deployment.")
+            raise PipelineError("Profile firmware must be published before deployment.")
         if deployment.firmware != self.profile_run.firmware:
-            raise ValueError("Profile deployment must reference the current firmware artifact.")
+            raise PipelineError("Profile deployment must reference the current firmware artifact.")
         self.profile_run = replace(self.profile_run, deployment=deployment)
 
     def publish_profile_result(self, result: PmuResult) -> None:
         if self.profile_run is None or self.profile_run.deployment is None:
-            raise ValueError("Profile firmware must be deployed before capture.")
+            raise PipelineError("Profile firmware must be deployed before capture.")
         self.profile_run = replace(self.profile_run, result=result)
 
     def publish_power_plan(self, plan: PowerRunPlan) -> None:
@@ -299,11 +266,11 @@ class PipelineContext:
 
     def publish_power_firmware(self, firmware: FirmwareArtifact) -> None:
         if self.power_run is None:
-            raise ValueError("Power plan must be published before firmware.")
+            raise PipelineError("Power plan must be published before firmware.")
         if self.power_run.plan.firmware_mode != "dedicated":
-            raise ValueError("Shared power runs do not accept dedicated firmware artifacts.")
+            raise PipelineError("Shared power runs do not accept dedicated firmware artifacts.")
         if firmware.role != "power":
-            raise ValueError("Power run requires a power firmware artifact.")
+            raise PipelineError("Power run requires a power firmware artifact.")
         self.power_run = replace(
             self.power_run,
             firmware=firmware,
@@ -313,16 +280,16 @@ class PipelineContext:
 
     def publish_power_deployment(self, deployment: DeploymentRecord) -> None:
         if self.power_run is None or self.power_run.firmware is None:
-            raise ValueError("Power firmware must be published before deployment.")
+            raise PipelineError("Power firmware must be published before deployment.")
         if deployment.firmware != self.power_run.firmware:
-            raise ValueError("Power deployment must reference the current firmware artifact.")
+            raise PipelineError("Power deployment must reference the current firmware artifact.")
         self.power_run = replace(self.power_run, deployment=deployment)
 
     def publish_power_observation(self, observation: PowerObservation) -> None:
         if self.power_run is None:
-            raise ValueError("Power plan must be published before capture.")
+            raise PipelineError("Power plan must be published before capture.")
         if self.power_run.plan.firmware_mode == "dedicated" and self.power_run.deployment is None:
-            raise ValueError("Dedicated power firmware must be deployed before capture.")
+            raise PipelineError("Dedicated power firmware must be deployed before capture.")
         observation.result.metadata.set_observation(
             observation_mode=ObservationMode(observation.mode),
             integrity=observation.integrity,
@@ -334,11 +301,11 @@ class PipelineContext:
 
     def publish_power_terminal(self, terminal: PowerTerminalRecord) -> None:
         if self.power_run is None or self.power_run.deployment is None:
-            raise ValueError("Power firmware must be deployed before terminal status.")
+            raise PipelineError("Power firmware must be deployed before terminal status.")
         if self.power_run.observation is None and self.config.power.mode.value != "internal":
-            raise ValueError("Power observation must complete before terminal status.")
+            raise PipelineError("Power observation must complete before terminal status.")
         if self.power_run.terminal is not None:
-            raise ValueError("Power terminal status has already been published.")
+            raise PipelineError("Power terminal status has already been published.")
         self.power_run = replace(self.power_run, terminal=terminal)
 
     def publish_power_terminal_envelope(self, envelope: PowerTerminalEnvelope) -> None:
@@ -346,7 +313,7 @@ class PipelineContext:
         # publish_power_terminal raised if power_run was None, so this is a
         # post-condition restated for the type-narrowing, not a stage gate.
         if self.power_run is None:  # pragma: no cover - unreachable
-            raise ValueError("publish_power_terminal left power_run unset.")
+            raise PipelineError("publish_power_terminal left power_run unset.")
         self.power_run = replace(
             self.power_run,
             on_device_summary=envelope.measurement,
@@ -418,7 +385,7 @@ class PipelineRunner:
         self._progress_sink = progress_sink
 
     def run(self, config: ProfileConfig) -> PipelineContext:
-        work_dir, should_cleanup = _resolve_work_dir(config)
+        work_dir = _resolve_work_dir(config)
         lock_path = work_dir / ".hpx-run.lock"
         with file_mutex(lock_path):
             if config.clean and config.work_dir is None:
@@ -439,11 +406,9 @@ class PipelineRunner:
                             exc,
                         )
                 log.info("Finished cached workspace cleanup: %s", work_dir)
-            return self._run_in_workspace(config, work_dir, should_cleanup)
+            return self._run_in_workspace(config, work_dir)
 
-    def _run_in_workspace(
-        self, config: ProfileConfig, work_dir: Path, should_cleanup: bool
-    ) -> PipelineContext:
+    def _run_in_workspace(self, config: ProfileConfig, work_dir: Path) -> PipelineContext:
         """Hold workspace ownership through engine preparation, capture, and reporting."""
         ctx = PipelineContext(config=config, work_dir=work_dir)
         if self._progress_sink is not None:
@@ -457,53 +422,42 @@ class PipelineRunner:
         ctx.run_metadata.config_snapshot = serialize_config(config)
         ctx.run_metadata.compatibility = config.compatibility
 
-        try:
-            total_stages = len(self._stages)
-            for stage_index, stage in enumerate(self._stages, start=1):
-                if stage.should_skip(ctx):
-                    log.info("[skip] %s", stage.name)
-                    if self._console is not None:
-                        self._console.stage_skip(stage.name)
-                    continue
-
-                log.info("[start] %s", stage.name)
+        total_stages = len(self._stages)
+        for stage_index, stage in enumerate(self._stages, start=1):
+            if stage.should_skip(ctx):
+                log.info("[skip] %s", stage.name)
                 if self._console is not None:
-                    self._console.stage_start(stage.name, stage_index, total_stages)
-                try:
-                    stage.run(ctx)
-                except KeyboardInterrupt:
-                    if self._console is not None:
-                        self._console._stop_spinner()
-                    raise
-                except HpxError:
-                    if self._console is not None:
-                        self._console._stop_spinner()
-                    raise  # already typed — propagate as-is
-                except Exception as exc:
-                    if self._console is not None:
-                        self._console._stop_spinner()
-                    raise HpxError(
-                        f"Unexpected error in stage '{stage.name}': {exc}",
-                        hint="This is likely a bug in heliaPROFILER. "
-                        "Please file an issue with the full traceback.",
-                    ) from exc
-                log.info("[done]  %s", stage.name)
-                if self._console is not None:
-                    self._console.stage_done(stage.name)
+                    self._console.stage_skip(stage.name)
+                continue
 
-            # Signal end of pipeline — clears any live spinner.
+            log.info("[start] %s", stage.name)
             if self._console is not None:
-                self._console.pipeline_done()
+                self._console.stage_start(stage.name, stage_index, total_stages)
+            try:
+                stage.run(ctx)
+            except KeyboardInterrupt:
+                if self._console is not None:
+                    self._console._stop_spinner()
+                raise
+            except HpxError:
+                if self._console is not None:
+                    self._console._stop_spinner()
+                raise  # already typed — propagate as-is
+            except Exception as exc:
+                if self._console is not None:
+                    self._console._stop_spinner()
+                raise HpxError(
+                    f"Unexpected error in stage '{stage.name}': {exc}",
+                    hint="This is likely a bug in heliaPROFILER. "
+                    "Please file an issue with the full traceback.",
+                ) from exc
+            log.info("[done]  %s", stage.name)
+            if self._console is not None:
+                self._console.stage_done(stage.name)
 
-        finally:
-            handle = ctx.power_driver_handle
-            if handle is not None:
-                try:
-                    handle.disable_passthrough()
-                except Exception:  # pragma: no cover — best-effort cleanup
-                    log.debug("Joulescope passthrough release failed (ignored)")
-            if should_cleanup:
-                shutil.rmtree(work_dir, ignore_errors=True)
+        # Signal end of pipeline — clears any live spinner.
+        if self._console is not None:
+            self._console.pipeline_done()
 
         return ctx
 
@@ -519,8 +473,8 @@ def _default_cache_work_dir(config: ProfileConfig) -> Path:
     return hpx_cache_root() / "workspaces" / _cache_work_key(config)
 
 
-def _resolve_work_dir(config: ProfileConfig) -> tuple[Path, bool]:
-    """Return (work_dir, should_cleanup).
+def _resolve_work_dir(config: ProfileConfig) -> Path:
+    """Return the run's work directory, creating it if needed.
 
     Resolution order:
     1. Explicit ``--work-dir`` — used as-is, never cleaned up.
@@ -536,7 +490,7 @@ def _resolve_work_dir(config: ProfileConfig) -> tuple[Path, bool]:
     if config.work_dir is not None:
         wd = config.work_dir.resolve()
         wd.mkdir(parents=True, exist_ok=True)
-        return wd, False
+        return wd
 
     wd = _default_cache_work_dir(config)
     try:
@@ -553,7 +507,7 @@ def _resolve_work_dir(config: ProfileConfig) -> tuple[Path, bool]:
         )
         fallback.mkdir(parents=True, exist_ok=True)
         wd = fallback
-    return wd.resolve(), False
+    return wd.resolve()
 
 
 def serialize_config(config: ProfileConfig) -> dict[str, Any]:

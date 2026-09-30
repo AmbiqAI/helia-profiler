@@ -23,7 +23,7 @@ class HpxError(Exception):
 
 
 class PipelineError(HpxError):
-    """A pipeline stage's product was read before the stage ran."""
+    """A pipeline stage's product was read or published out of order."""
 
 
 class ConfigError(HpxError):

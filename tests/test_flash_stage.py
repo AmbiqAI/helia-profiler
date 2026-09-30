@@ -80,7 +80,7 @@ class TestFlashFirmwareStageDirect:
         assert calls[0]["load_addr"] == 0x00410000
         assert ctx.profile_run is not None
         assert ctx.profile_run.deployment is not None
-        assert ctx.profile_run.deployment.firmware is ctx.profile_firmware
+        assert ctx.profile_run.deployment.firmware is ctx.profile_run.firmware
 
     def test_load_addr_resolved_per_soc(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

@@ -3803,7 +3803,7 @@ class TestPowerFirmwareSelection:
         from helia_profiler.stages.flash_power import FlashPowerFirmwareStage
 
         ctx = self._make_ctx(tmp_path, firmware="dedicated")
-        assert ctx.power_binary_path is None
+        assert ctx.power_firmware is None
 
         with pytest.raises(BuildError, match="no power artifact"):
             FlashPowerFirmwareStage().run(ctx)
@@ -4316,12 +4316,11 @@ class TestPowerFirmwareSelection:
 
         assert rendered == [123]
         assert build_calls[0]["target"] == "hpx_profiler_power"
-        assert ctx.power_binary_path == stale_binary
         assert ctx.power_firmware is not None
         assert ctx.power_firmware.binary_path == stale_binary
         assert stale_binary.read_bytes() == b"fresh"
-        assert ctx.deployed_power_firmware is None
         assert ctx.power_run is not None
+        assert ctx.power_run.deployment is None
         assert ctx.power_run.deployment is None
 
     def test_failed_power_rebuild_invalidates_prior_artifact_state(
@@ -4385,8 +4384,6 @@ class TestPowerFirmwareSelection:
         assert ctx.power_run.deployment is None
         assert ctx.power_run.observation is None
         assert ctx.power_firmware is None
-        assert ctx.deployed_power_firmware is None
-        assert ctx.power_binary_path is None
         assert ctx.power_result is None
 
     def test_shared_power_plan_does_not_claim_unbuilt_fixed_count(self, tmp_path: Path):

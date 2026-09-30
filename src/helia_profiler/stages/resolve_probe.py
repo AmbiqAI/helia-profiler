@@ -7,11 +7,7 @@ import time
 
 from ..errors import ConfigError
 from ..pipeline import PipelineContext
-from ..target.probe.jlink import (
-    JLinkProbe,
-    JLinkResetController,
-    resolve_probe_serial,
-)
+from ..target.probe.jlink import JLinkResetController, resolve_probe_serial
 
 log = logging.getLogger("hpx")
 
@@ -46,6 +42,5 @@ class ResolveJLinkProbeStage:
                 log.info("Waiting for J-Link to re-enumerate after target power-on: %s", exc)
                 time.sleep(_POST_POWER_PROBE_RETRY_S)
         ctx.resolved_jlink_serial = serial
-        ctx.probe = JLinkProbe(serial=serial)
         ctx.reset_controller = JLinkResetController()
         log.info("Using J-Link serial: %s", serial)

@@ -209,6 +209,18 @@ class TestPipelineRunner:
         with pytest.raises(HpxError, match="Unexpected error.*unexpected_fail"):
             runner.run(config)
 
+    def test_publish_ordering_violation_is_not_rewrapped(self, tmp_path: Path):
+        from helia_profiler.results import FirmwareMeta, PmuResult
+
+        class PublishTooEarlyStage(PassStage):
+            def run(self, ctx: PipelineContext) -> None:
+                ctx.publish_profile_result(PmuResult(meta=FirmwareMeta()))
+
+        runner = PipelineRunner([PublishTooEarlyStage()])
+        with pytest.raises(PipelineError, match="must be deployed before capture") as excinfo:
+            runner.run(_make_config(tmp_path))
+        assert "Unexpected error" not in str(excinfo.value)
+
     def test_context_has_work_dir(self, tmp_path: Path):
         config = _make_config(tmp_path)
         runner = PipelineRunner([PassStage()])
@@ -247,9 +259,7 @@ class TestPipelineContext:
     def test_explicit_artifacts_start_empty(self, tmp_path: Path):
         config = _make_config(tmp_path)
         ctx = PipelineContext(config=config, work_dir=tmp_path)
-        assert ctx.profile_firmware is None
         assert ctx.power_firmware is None
-        assert ctx.deployed_power_firmware is None
         assert ctx.power_plan is None
         assert ctx.profile_run is None
         assert ctx.power_run is None
@@ -270,7 +280,7 @@ class TestPipelineContext:
         ctx.publish_profile_firmware(firmware)
         built_run = ctx.profile_run
         assert built_run is not None
-        assert ctx.profile_firmware is firmware
+        assert built_run.firmware is firmware
         with pytest.raises(FrozenInstanceError):
             # Deliberate invalid assignment: proves the record is frozen.
             built_run.result = PmuResult(meta=FirmwareMeta())  # ty: ignore[invalid-assignment]
@@ -320,11 +330,10 @@ class TestPipelineContext:
             deployed_at="2026-07-18T00:00:00+00:00",
         )
         ctx.publish_power_deployment(deployment)
-        assert ctx.deployed_power_firmware is firmware
+        assert ctx.power_run.deployment is deployment
 
         ctx.publish_power_firmware(firmware)
         assert ctx.power_run.deployment is None
-        assert ctx.deployed_power_firmware is None
         ctx.publish_power_deployment(deployment)
 
         result = PowerResult(summary=PowerSummary(0.01, 0.02, 0.03, 0.04, 1.0, 10))
@@ -357,7 +366,7 @@ class TestPipelineContext:
         )
         ctx.publish_profile_firmware(current)
 
-        with pytest.raises(ValueError, match="current firmware artifact"):
+        with pytest.raises(PipelineError, match="current firmware artifact"):
             ctx.publish_profile_deployment(
                 DeploymentRecord(
                     firmware=other,
@@ -372,7 +381,7 @@ class TestPipelineContext:
         ctx = PipelineContext(config=_make_config(tmp_path), work_dir=tmp_path)
         ctx.publish_power_plan(PowerRunPlan(firmware_mode="dedicated"))
 
-        with pytest.raises(ValueError, match="must be deployed"):
+        with pytest.raises(PipelineError, match="must be deployed"):
             ctx.publish_power_result(
                 PowerResult(summary=PowerSummary(0.01, 0.02, 0.03, 0.04, 1.0, 10))
             )
@@ -382,8 +391,8 @@ class TestPipelineContext:
 
         ctx = PipelineContext(config=_make_config(tmp_path), work_dir=tmp_path)
         set_power_firmware(ctx, binary_path=tmp_path / "old-power")
-        old_power_binary = ctx.power_binary_path
-        assert old_power_binary is not None
+        assert ctx.power_firmware is not None
+        old_power_binary = ctx.power_firmware.binary_path
         set_power_firmware(
             ctx,
             artifact=FirmwareArtifact(
@@ -399,9 +408,7 @@ class TestPipelineContext:
 
         ctx.publish_power_plan(PowerRunPlan(firmware_mode="dedicated", inference_count=7))
 
-        assert ctx.power_binary_path is None
         assert ctx.power_firmware is None
-        assert ctx.deployed_power_firmware is None
         assert ctx.power_result is None
 
     def test_context_is_mutable(self, tmp_path: Path):

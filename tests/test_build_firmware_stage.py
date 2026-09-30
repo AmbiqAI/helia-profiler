@@ -45,7 +45,7 @@ def test_missing_binary_sections_does_not_fail_successful_build(
     BuildFirmwareStage().run(ctx)
 
     assert ctx.binary_sections is None
-    assert ctx.profile_firmware is not None
+    assert ctx.profile_run is not None
     assert progress[-1].message == "Profile firmware ready"
 
 
