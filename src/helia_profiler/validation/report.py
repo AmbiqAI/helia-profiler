@@ -16,14 +16,9 @@ from ..firmware.workload import AOT_CLEAN_WORKLOAD
 from .._version import __version__
 from ..errors import ReportError
 from ..results.serde import nested_get
+from .bundle import SCHEMA_VERSION
 from .runner import CaseResult
 
-
-#: v6 (#133 Phase 2): per-case ``resources.memory_plan`` is the decision
-#: record only (its ``free``/``overflow``/``has_overflow`` keys are gone,
-#: mirroring run-summary schema v3) and ``resources.memory_regions`` is
-#: added — the measured per-region occupancy from the linked ELF.
-SCHEMA_VERSION = 6
 _COMMIT_SHA_RE = re.compile(r"[0-9a-f]{40}")
 
 
