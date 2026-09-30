@@ -3,12 +3,12 @@
   "generatedFrom": {
     "tool": "pyref",
     "version": "1.7.3",
-    "sourceTree": "cf4575012d6d2f42d4f7a8e03bae3bd4742cf110"
+    "sourceTree": "c776fb85d629ba3fbf7c9e89a3b6b2155b622d97"
   },
   "language": "python",
   "modules": [
     {
-      "description": "Collecting a redacted support bundle from a run directory, and reading one back.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `cf4575012d6d2f42d4f7a8e03bae3bd4742cf110`.",
+      "description": "Collecting a redacted support bundle from a run directory, and reading one back.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `c776fb85d629ba3fbf7c9e89a3b6b2155b622d97`.",
       "name": "diagnostics",
       "path": "helia_profiler.diagnostics",
       "submodules": [],
