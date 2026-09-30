@@ -85,7 +85,11 @@ def _cache_key(repo: str, ref: str) -> str:
     ``_`` split it. Anything else is sanitized and suffixed with ``+`` and
     a digest of the raw pair; ``+`` never occurs in a plain key.
     """
-    if _PLAIN_REPO.fullmatch(repo) and _PLAIN_REF.fullmatch(ref):
+    if (
+        _PLAIN_REPO.fullmatch(repo)
+        and _PLAIN_REF.fullmatch(ref)
+        and ref == ref.casefold()
+    ):
         return f"{repo.replace('/', '_')}_{ref}"
     sanitized = re.sub(r"[^A-Za-z0-9._-]", "_", f"{repo}_{ref}")
     digest = hashlib.sha256(json.dumps([repo, ref]).encode()).hexdigest()[:12]
