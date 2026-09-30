@@ -21,7 +21,7 @@ The current baseline is `hpx-neuralspotx-0.8.1-2026-09`:
 | `nsx-pmu-armv8m` | `5725c065…c88` |
 | `nsx-tflite-micro` | `7afcf2b4…333` |
 | `arm-cmsis-nn` | `6d21a6f8…f7c` |
-| `ns-cmsis-nn` | `82786f27…9db` (`v7.38.0`, hpx-declared, see below) |
+| `ns-cmsis-nn` | `72482be6…649` (`v7.38.1`, hpx-declared, see below) |
 | `nsx-executorch` | `5514ac1e…b48e` |
 | `nsx-sensors` | `c219a2bc…3e25` (`v0.3.0`, peeled) |
 | heliaRT | `1.21.2`, commit `ce03af57…a11` (min supported `1.16.0`, from `HELIART_MIN_VERSION` in code, not a baseline-JSON field) |
@@ -220,6 +220,31 @@ fp16 sleep-staging models.
 benchmark plans on an Apollo510 EVB; the remaining TimePPG A8W8 failure is
 fixed by helia-aot#537, which no device run covers yet. Neither release has a
 device run on v7.38.0.
+
+`ns-cmsis-nn v7.38.1` (`72482be6…649`) then replaces v7.38.0; the heliaAOT
+range and every other ref above are unchanged. v7.38.1 carries eight kernel
+correctness fixes over v7.38.0 and a test-suite fix: the MVE s8 GEMM and
+vec-mat loads, the fp16 conv1d k5 tail, the depthwise s8_opt scratch check, s4
+nibble decoding, and the s8 1xN convolution routing and staging. The 1xN
+routing sits inside `arm_convolve_wrapper_s8`, so it reaches every engine
+that calls the wrapper. heliaAOT main from `5bec204b`
+routes one-row int8 convolutions to `arm_convolve_1_x_n_s8` as v7.38.1 does
+(helia-aot#548), and its generated modules refuse to compile against an older
+core.
+
+**Verified (host).** heliaAOT main (`5bec204b`) converts the 36 benchmark
+models through HPX's heliaAOT adapter with the same Apollo510 placement rules,
+links them for Cortex-M55 against v7.38.1, and the plain-C host build produces
+outputs bit-identical to `1ba7ed57` on v7.38.0. As before, that host run does
+not exercise the MVE kernels (its integer rows run from modules converted for
+apollo4p_evb). Under QEMU (Cortex-M55, MVE on and off) the int8 TimePPG and
+heart-segmentation 1xN layers match exactly.
+The released helia-aot 0.23.0 and 0.24.0 each convert and build the same ten
+models listed above against v7.38.1 through HPX's firmware build with ATfE
+for Apollo510. heliaRT 1.21.2 builds from source against v7.38.1 with ATfE
+for the int8 keyword-spotting model and the fp32 and fp16 sleep-staging
+models. ExecuTorch's `ns` backend and TFLM with the `ns` kernels use the same
+core and are not separately verified here. No device run covers v7.38.1 yet.
 
 The previous revision is recorded below. heliaRT 1.19.0 and heliaAOT 0.19.0
 (issue #246) are the releases that add FP16
