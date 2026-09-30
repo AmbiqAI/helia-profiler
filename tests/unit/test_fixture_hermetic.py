@@ -125,6 +125,7 @@ def test_build_refuses_before_any_stage_or_work_directory(
 def test_fixture_flag_only_inserts_the_prefix_map_before_the_modules() -> None:
     from helia_profiler.firmware.render import _jinja_env
 
+    assert _jinja_env.loader is not None
     source, _, _ = _jinja_env.loader.get_source(_jinja_env, "CMakeLists.txt.j2")
     template = _jinja_env.overlay(undefined=jinja2.ChainableUndefined).from_string(source)
     values = {
