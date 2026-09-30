@@ -3,7 +3,7 @@
   "kind": "cli",
   "program": "hpx",
   "generatedFrom": {
-    "sourceTree": "b67e332cd4cc51ae9149e14c32e910517775062c",
+    "sourceTree": "b823e287e809c8d9438536a07fc0ab41a3b030c0",
     "helia_profiler": "0.1.6",
     "typer": "0.26.8",
     "click": "8.3.3",
@@ -71,7 +71,7 @@
     "hidden": false,
     "source": {
       "path": "src/helia_profiler/cli/app.py",
-      "line": 49
+      "line": 48
     },
     "arguments": [],
     "options": [
@@ -118,7 +118,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 537
+          "line": 536
         },
         "arguments": [
           {
@@ -340,7 +340,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 679
+          "line": 678
         },
         "arguments": [],
         "options": [],
@@ -361,7 +361,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 693
+              "line": 692
             },
             "arguments": [],
             "options": [],
@@ -382,7 +382,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 686
+              "line": 685
             },
             "arguments": [],
             "options": [],
@@ -404,7 +404,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 612
+          "line": 611
         },
         "arguments": [
           {
@@ -1050,7 +1050,7 @@
             "python_type": "str",
             "default": "joulescope",
             "required": false,
-            "help": "Power driver that holds the target rail on (JS110/JS220/JS320 auto-detected)",
+            "help": "Joulescope driver (default: auto-detect)",
             "panel": null,
             "is_flag": false,
             "multiple": false,
@@ -1325,7 +1325,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 89
+          "line": 88
         },
         "arguments": [
           {
@@ -2150,8 +2150,8 @@
               "name": "choice",
               "class": "TyperChoice",
               "choices": [
-                "ina228",
-                "joulescope"
+                "joulescope",
+                "ondevice"
               ]
             },
             "python_type": "Optional[str]",

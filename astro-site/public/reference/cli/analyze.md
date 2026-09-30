@@ -10,7 +10,7 @@ hpx analyze [OPTIONS] MODEL
 
 Analyze model compute/parameter breakdown (no hardware needed)
 
-Defined in `src/helia_profiler/cli/app.py` line 537.
+Defined in `src/helia_profiler/cli/app.py` line 536.
 
 ### Arguments
 
@@ -42,4 +42,4 @@ Analyze a .tflite model without hardware:
   hpx analyze model.tflite --engine helia-aot --compare
 ```
 
-Generated from the `src/helia_profiler` tree `b67e332cd4cc51ae9149e14c32e910517775062c` with typer 0.26.8 and click 8.3.3.
+Generated from the `src/helia_profiler` tree `b823e287e809c8d9438536a07fc0ab41a3b030c0` with typer 0.26.8 and click 8.3.3.

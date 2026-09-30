@@ -16,7 +16,7 @@ Defined in `src/helia_profiler/cli/validation_app.py` line 57.
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
-| `--driver` | `joulescope` | joulescope | Power driver that holds the target rail on (JS110/JS220/JS320 auto-detected) |
+| `--driver` | `joulescope` | joulescope | Joulescope driver (default: auto-detect) |
 | `--power-serial` | `Optional[str]` |  | Joulescope serial number to select when multiple are connected |
 
 ### Examples
@@ -31,4 +31,4 @@ Ctrl-C.  Useful when the Joulescope app is not running and the
 board would otherwise be unpowered.
 ```
 
-Generated from the `src/helia_profiler` tree `b67e332cd4cc51ae9149e14c32e910517775062c` with typer 0.26.8 and click 8.3.3.
+Generated from the `src/helia_profiler` tree `b823e287e809c8d9438536a07fc0ab41a3b030c0` with typer 0.26.8 and click 8.3.3.

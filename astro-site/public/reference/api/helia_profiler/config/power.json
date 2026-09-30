@@ -3,12 +3,12 @@
   "generatedFrom": {
     "tool": "pyref",
     "version": "1.7.3",
-    "sourceTree": "b67e332cd4cc51ae9149e14c32e910517775062c"
+    "sourceTree": "b823e287e809c8d9438536a07fc0ab41a3b030c0"
   },
   "language": "python",
   "modules": [
     {
-      "description": "Power capture settings: which instrument measures the rail, how it is wired to the board, and which window of the run is integrated.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`\n\nGenerated from the `src/helia_profiler` tree `b67e332cd4cc51ae9149e14c32e910517775062c`.",
+      "description": "Power capture settings: which instrument measures the rail, how it is wired to the board, and which window of the run is integrated.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`\n\nGenerated from the `src/helia_profiler` tree `b823e287e809c8d9438536a07fc0ab41a3b030c0`.",
       "name": "power",
       "path": "helia_profiler.config.power",
       "submodules": [],
