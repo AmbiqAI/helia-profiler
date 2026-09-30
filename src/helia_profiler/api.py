@@ -35,10 +35,7 @@ def profile(
     """
     from .profiler import run_profile
 
-    if progress_sink is None:
-        ctx = run_profile(config)
-    else:
-        ctx = run_profile(config, progress_sink=progress_sink)
+    ctx = run_profile(config, progress_sink=progress_sink)
 
     return ProfileResult(
         pmu=ctx.captured_pmu,
