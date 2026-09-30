@@ -51,7 +51,7 @@ from .hostenv.toolchain_probe import SymbolEntry
 from .target.probe.base import Probe, ResetController
 
 if TYPE_CHECKING:
-    from .fixture import FixtureRenderSpec
+    from ._fixture_build import FixtureRenderSpec
 
 log = logging.getLogger("hpx")
 

@@ -10,7 +10,7 @@ from helia_profiler.config import load_config
 from helia_profiler.engines import EngineType
 from helia_profiler.engines.base import HeliaAotArtifacts
 from helia_profiler.errors import PlatformError
-from helia_profiler.fixture import (
+from helia_profiler._fixture_build import (
     FixedFixture,
     FixtureFile,
     Int8Tensor,

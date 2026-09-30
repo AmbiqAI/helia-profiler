@@ -103,6 +103,7 @@ helia_profiler = [
     "data/models/*.json",
     "data/models/*.tflite",
     "vendor/segger_rtt/**/*",
+    "fixture_closure.txt",
 ]
 
 [tool.pytest.ini_options]

@@ -20,7 +20,7 @@ from helia_profiler.fixture_analysis import FixtureModelAnalysis
 from helia_profiler.modelcost.model_analysis import ModelAnalysis, LayerOps
 from helia_profiler.firmware.op_resolver import build_fixture_resolver_plan
 from helia_profiler.vocab import Toolchain
-from helia_profiler.fixture import (
+from helia_profiler._fixture_build import (
     FixtureFile,
     Int8Tensor,
     FixedFixture,
@@ -71,7 +71,9 @@ def analyzed(f, ops=("CONV_2D", "RESHAPE")):
 
 
 def mock_analysis(monkeypatch, f):
-    monkeypatch.setattr("helia_profiler.fixture.analyze_fixture_model", lambda _: analyzed(f))
+    monkeypatch.setattr(
+        "helia_profiler._fixture_build.analyze_fixture_model", lambda _: analyzed(f)
+    )
 
 
 def runtime(tmp_path):
@@ -106,7 +108,7 @@ def test_hash_or_unsupported_config_stops_before_pipeline(tmp_path, monkeypatch)
     def forbidden(*a, **kw):
         pytest.fail("pipeline reached")
 
-    monkeypatch.setattr("helia_profiler.fixture.PipelineRunner", forbidden)
+    monkeypatch.setattr("helia_profiler._fixture_build.PipelineRunner", forbidden)
     with pytest.raises(Exception, match="upstream"):
         build_fixed_fixture(
             replace(c, engine=EngineConfig(type=EngineType.EXECUTORCH)),
@@ -176,7 +178,7 @@ def test_host_only_stage_selection_and_source_receipt(
                 profile_run=SimpleNamespace(firmware=SimpleNamespace(binary_path=binary)),
             )
 
-    monkeypatch.setattr("helia_profiler.fixture.PipelineRunner", Runner)
+    monkeypatch.setattr("helia_profiler._fixture_build.PipelineRunner", Runner)
     r = build_fixed_fixture(c, f, method=METHOD, runtime=selected_runtime, compile=False)
     assert not r.built and r.binary is None and len(r.generated_sources) == 4
     assert r.build_identity is None
@@ -304,7 +306,7 @@ def test_render_derives_extents_ops_counts_and_scope(tmp_path, kind, scope):
 def test_declaration_mismatch_stops_before_pipeline(tmp_path, monkeypatch):
     c, f = fixture(tmp_path)
     model = analyzed(f)
-    monkeypatch.setattr("helia_profiler.fixture.analyze_fixture_model", lambda _: model)
+    monkeypatch.setattr("helia_profiler._fixture_build.analyze_fixture_model", lambda _: model)
     wrong = replace(f, input_tensor=replace(f.input_tensor, scale=0.5))
     with pytest.raises(Exception, match="declarations differ"):
         build_fixed_fixture(c, wrong, method=METHOD, runtime=runtime(tmp_path))
@@ -313,7 +315,7 @@ def test_declaration_mismatch_stops_before_pipeline(tmp_path, monkeypatch):
 def test_invalid_model_stops_before_pipeline(tmp_path, monkeypatch):
     c, f = fixture(tmp_path)
     monkeypatch.setattr(
-        "helia_profiler.fixture.PipelineRunner", lambda *_: pytest.fail("pipeline reached")
+        "helia_profiler._fixture_build.PipelineRunner", lambda *_: pytest.fail("pipeline reached")
     )
     with pytest.raises(ValueError, match="fixture model|analysis extra"):
         build_fixed_fixture(c, f, method=METHOD, runtime=runtime(tmp_path))
@@ -444,7 +446,7 @@ def test_build_refuses_a_flat_image_capture_cannot_flash(tmp_path, monkeypatch, 
                 profile_run=SimpleNamespace(firmware=SimpleNamespace(binary_path=binary)),
             )
 
-    monkeypatch.setattr("helia_profiler.fixture.PipelineRunner", Runner)
+    monkeypatch.setattr("helia_profiler._fixture_build.PipelineRunner", Runner)
     if refused:
         with pytest.raises(ConfigError, match=f"Flat image is {size} B"):
             build_fixed_fixture(c, f, method=METHOD)

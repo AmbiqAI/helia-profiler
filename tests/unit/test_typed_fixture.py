@@ -23,7 +23,7 @@ from helia_profiler.errors import ConfigError
 from helia_profiler.firmware.fixture import fixture_template_vars
 from helia_profiler.firmware.op_resolver import build_fixture_resolver_plan
 from helia_profiler.firmware.render import _jinja_env
-from helia_profiler.fixture import (
+from helia_profiler._fixture_build import (
     FIXTURE_CAPABILITIES,
     FIXTURE_READBACK_BUDGET,
     FixedFixture,
@@ -326,13 +326,15 @@ def test_typed_build_reports_outputs_capabilities_and_scan(tmp_path, monkeypatch
     c = config_for(tmp_path, f, engine)
     calls = []
     monkeypatch.setattr(
-        "helia_profiler.fixture.analyze_typed_fixture_model", lambda _: analysis_of(f)
+        "helia_profiler._fixture_build.analyze_typed_fixture_model", lambda _: analysis_of(f)
     )
     monkeypatch.setattr(
-        "helia_profiler.fixture.analyze_fixture_model",
+        "helia_profiler._fixture_build.analyze_fixture_model",
         lambda _: pytest.fail("typed fixture used the single-INT8 analysis"),
     )
-    monkeypatch.setattr("helia_profiler.fixture.PipelineRunner", _runner(tmp_path, calls, REGIONS))
+    monkeypatch.setattr(
+        "helia_profiler._fixture_build.PipelineRunner", _runner(tmp_path, calls, REGIONS)
+    )
     rt = runtime(tmp_path) if engine is EngineType.TFLM else None
     observe = engine is EngineType.HELIA_AOT
     r = build_fixed_fixture(
@@ -350,9 +352,11 @@ def test_arena_observation_changes_intent_and_binds_the_work_dir(tmp_path, monke
     f = typed(tmp_path)
     c = config_for(tmp_path, f, EngineType.HELIA_AOT)
     monkeypatch.setattr(
-        "helia_profiler.fixture.analyze_typed_fixture_model", lambda _: analysis_of(f)
+        "helia_profiler._fixture_build.analyze_typed_fixture_model", lambda _: analysis_of(f)
     )
-    monkeypatch.setattr("helia_profiler.fixture.PipelineRunner", _runner(tmp_path, [], REGIONS))
+    monkeypatch.setattr(
+        "helia_profiler._fixture_build.PipelineRunner", _runner(tmp_path, [], REGIONS)
+    )
     plain = build_fixed_fixture(c, f, method=METHOD, compile=False)
     with pytest.raises(ConfigError, match="different fixture"):
         build_fixed_fixture(c, f, method=METHOD, compile=False, observe_aot_arenas=True)
@@ -378,8 +382,8 @@ def test_single_int8_intent_identity_is_unchanged_by_the_scan_option(tmp_path, m
     ops = ModelAnalysis([LayerOps(0, "RELU")], 0, 0, 0)
     single = FixtureModelAnalysis(t_in, t_out, ops, build_fixture_resolver_plan(ops))
     c = config_for(tmp_path, f, EngineType.HELIA_AOT)
-    monkeypatch.setattr("helia_profiler.fixture.analyze_fixture_model", lambda _: single)
-    monkeypatch.setattr("helia_profiler.fixture.PipelineRunner", _runner(tmp_path, []))
+    monkeypatch.setattr("helia_profiler._fixture_build.analyze_fixture_model", lambda _: single)
+    monkeypatch.setattr("helia_profiler._fixture_build.PipelineRunner", _runner(tmp_path, []))
     r = build_fixed_fixture(c, f, method=METHOD, compile=False)
     assert c.work_dir is not None
     identity = json.loads((c.work_dir / "fixed-fixture-identity.json").read_text())
@@ -395,10 +399,10 @@ def test_single_int8_intent_identity_is_unchanged_by_the_scan_option(tmp_path, m
 def test_arena_observation_is_heliaaot_only(tmp_path, monkeypatch):
     f = typed(tmp_path)
     monkeypatch.setattr(
-        "helia_profiler.fixture.analyze_typed_fixture_model", lambda _: analysis_of(f)
+        "helia_profiler._fixture_build.analyze_typed_fixture_model", lambda _: analysis_of(f)
     )
     monkeypatch.setattr(
-        "helia_profiler.fixture.PipelineRunner", lambda *_: pytest.fail("pipeline reached")
+        "helia_profiler._fixture_build.PipelineRunner", lambda *_: pytest.fail("pipeline reached")
     )
     with pytest.raises(ConfigError, match="heliaAOT fixtures only"):
         build_fixed_fixture(
@@ -413,16 +417,16 @@ def test_arena_observation_is_heliaaot_only(tmp_path, monkeypatch):
 def test_typed_mismatch_or_float16_on_tflm_stops_before_pipeline(tmp_path, monkeypatch):
     f = typed(tmp_path)
     monkeypatch.setattr(
-        "helia_profiler.fixture.PipelineRunner", lambda *_: pytest.fail("pipeline reached")
+        "helia_profiler._fixture_build.PipelineRunner", lambda *_: pytest.fail("pipeline reached")
     )
     monkeypatch.setattr(
-        "helia_profiler.fixture.analyze_typed_fixture_model",
+        "helia_profiler._fixture_build.analyze_typed_fixture_model",
         lambda _: analysis_of(f, has_float16=True),
     )
     with pytest.raises(ConfigError, match="float16"):
         build_fixed_fixture(config_for(tmp_path, f), f, method=METHOD, runtime=runtime(tmp_path))
     monkeypatch.setattr(
-        "helia_profiler.fixture.analyze_typed_fixture_model",
+        "helia_profiler._fixture_build.analyze_typed_fixture_model",
         lambda _: analysis_of(typed(tmp_path / "other", outputs=(LABEL,))),
     )
     with pytest.raises(ConfigError, match="declarations differ"):

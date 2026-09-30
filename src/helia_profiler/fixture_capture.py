@@ -10,7 +10,7 @@ import time
 from dataclasses import asdict
 from typing import Protocol
 
-from .fixture import FixtureTimingScope
+from ._fixture_build import FixtureTimingScope
 from .fixture_stage import FixtureStage
 from .fixture_runtime import FixtureFile
 from .fixture_target import FixtureTarget

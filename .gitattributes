@@ -1,6 +1,8 @@
 tests/fixtures/mlperf_tiny/**/*.tflite filter=lfs diff=lfs merge=lfs -text
 tests/fixtures/mlperf_tiny/**/*.pte filter=lfs diff=lfs merge=lfs -text
 tests/fixtures/mlperf_tiny/**/*.pt2 filter=lfs diff=lfs merge=lfs -text
+# The fixture source closure hashes shipped bytes, so they must not depend on the checkout OS.
+src/helia_profiler/** text=auto eol=lf
 src/helia_profiler/vendor/segger_rtt/RTT/* -whitespace
 src/helia_profiler/vendor/segger_rtt/** text eol=lf
 
