@@ -6,7 +6,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `experimental`
 
-Generated from the `src/helia_profiler` tree `cf4575012d6d2f42d4f7a8e03bae3bd4742cf110`.
+Generated from the `src/helia_profiler` tree `5b23fc6d94f43aab5fcd9bbb5218a4c8eaad43fb`.
 
 ## helia_profiler.RunStatus
 
