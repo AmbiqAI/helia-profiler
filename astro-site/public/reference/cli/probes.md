@@ -10,7 +10,7 @@ hpx probes COMMAND [ARGS]...
 
 Inspect connected J-Link probes without opening an interactive SEGGER commander session
 
-Defined in `src/helia_profiler/cli/inspect_app.py` line 147.
+Defined in `src/helia_profiler/cli/inspect_app.py` line 144.
 
 ## hpx probes list
 
@@ -20,7 +20,7 @@ hpx probes list [OPTIONS]
 
 List connected J-Link probes
 
-Defined in `src/helia_profiler/cli/inspect_app.py` line 154.
+Defined in `src/helia_profiler/cli/inspect_app.py` line 151.
 
 ### Options
 
@@ -38,7 +38,7 @@ hpx probes match [OPTIONS]
 
 Resolve the J-Link serial for a board using HPX's normal selection policy
 
-Defined in `src/helia_profiler/cli/inspect_app.py` line 172.
+Defined in `src/helia_profiler/cli/inspect_app.py` line 169.
 
 ### Options
 
@@ -48,4 +48,4 @@ Defined in `src/helia_profiler/cli/inspect_app.py` line 172.
 | `--jlink-serial` | `Optional[str]` |  | Optional requested serial to validate against the selected board |
 | `--json` | `bool` | false | Emit machine-readable JSON |
 
-Generated from the `src/helia_profiler` tree `f9fcb930a54d6d0375883a66e2c2676e60566329` with typer 0.26.8 and click 8.3.3.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__` with typer 0.26.8 and click 8.3.3.

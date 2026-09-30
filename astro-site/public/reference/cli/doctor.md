@@ -19,7 +19,7 @@ Defined in `src/helia_profiler/cli/inspect_app.py` line 44.
 | `--json` | `bool` | false | Emit machine-readable JSON |
 | `--bundle` | `Optional[Path]` |  | Write a sanitized support-bundle archive to this file or directory instead of printing the toolchain table |
 | `--workspace` | `Optional[Path]` |  | Prepared profiler_app directory (or its nsx.lock/hpx-dependencies.json, or the parent fingerprint workspace) to include exact dependency lock provenance in the bundle |
-| `--config` | `Optional[Path]` |  | YAML config whose target and engine select the checks; with --bundle, a sanitized snapshot of it is included instead |
+| `--config` | `Optional[Path]` |  | Resolve this YAML config and include a sanitized snapshot in the bundle |
 | `--toolchain` | `Optional[str]` |  | Toolchain to check (default: arm-none-eabi-gcc) |
 | `--transport` | `rtt \| usb_cdc \| swo \| uart` |  | Transport to check (default: rtt) |
 | `--engine` | `tflm \| helia-rt \| helia-aot \| executorch` |  | Engine to check (default: helia-rt) |
@@ -27,4 +27,4 @@ Defined in `src/helia_profiler/cli/inspect_app.py` line 44.
 | `--no-ports` | `bool` | false | Skip live serial port enumeration in --bundle |
 | `--raw-probe-ids` | `bool` | false | Include unredacted device serial numbers in --bundle (opt-in; prints a warning) |
 
-Generated from the `src/helia_profiler` tree `f9fcb930a54d6d0375883a66e2c2676e60566329` with typer 0.26.8 and click 8.3.3.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__` with typer 0.26.8 and click 8.3.3.

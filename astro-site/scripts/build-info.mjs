@@ -1,5 +1,7 @@
 /*
- * Writes the build provenance the site imports and the deploy guard reads.
+ * Writes the build provenance the site imports and the deploy guard reads,
+ * including the source ref and source tree the committed reference leaves as
+ * placeholders (see src/integrations/source-ref.mjs).
  *
  * Two copies on purpose: src/data/ is what astro.config and the version
  * component import at build time, public/ is what ends up at /build-info.json
@@ -65,6 +67,15 @@ try {
   commitsSinceTag = null;
 }
 
+/* The tree of the documented source at HEAD. The committed reference carries
+ * a placeholder rather than this, so that a change under src/ that leaves the
+ * documented content alone does not rewrite it; the site gets the tree here,
+ * at build time, and source-ref.mjs substitutes it. */
+const sourceTree = git('rev-parse', 'HEAD:src/helia_profiler');
+if (!/^[0-9a-f]{40}$/.test(sourceTree)) {
+  throw new Error(`Refusing to build: HEAD:src/helia_profiler resolved to "${sourceTree}".`);
+}
+
 const shortCommit = commit.slice(0, 7);
 const modified = Boolean(git('status', '--porcelain', '--untracked-files=normal'));
 const display =
@@ -89,6 +100,7 @@ const buildInfo = {
   commitsSinceTag,
   releaseTag,
   sourceRef,
+  sourceTree,
   sourceUrl: `https://github.com/AmbiqAI/helia-profiler/tree/${commit}`,
   buildTime: new Date().toISOString(),
   modified,

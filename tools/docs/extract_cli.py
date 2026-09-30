@@ -6,7 +6,7 @@ artifact. Typer vendors click (``typer._click``), so ``isinstance`` against
 the top-level ``click`` package is always False here; group detection is
 duck-typed on ``.commands`` instead.
 
-    uv run --isolated --no-dev python tools/docs/extract_cli.py --source-tree <sha>
+    uv run --isolated --no-dev python tools/docs/extract_cli.py
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _common import SCHEMA_VERSION, dump, jsonable, provenance, source_tree  # noqa: E402
+from _common import SCHEMA_VERSION, dump, jsonable, provenance  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUT = REPO_ROOT / "astro-site" / "src" / "data" / "cli.json"
@@ -245,13 +245,13 @@ def _envvar_total(node: dict[str, Any]) -> int:
     return total
 
 
-def build(tree: str) -> dict[str, Any]:
+def build() -> dict[str, Any]:
     root = _node(_load_app(), [])
     return {
         "schemaVersion": SCHEMA_VERSION,
         "kind": "cli",
         "program": "hpx",
-        "generatedFrom": provenance(tree),
+        "generatedFrom": provenance(),
         "counts": _counts(root),
         "root": root,
     }
@@ -260,10 +260,9 @@ def build(tree: str) -> dict[str, Any]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
-    parser.add_argument("--source-tree", type=source_tree, required=True)
     parser.add_argument("--stdout", action="store_true", help="print instead of writing")
     args = parser.parse_args(argv)
-    payload = build(args.source_tree)
+    payload = build()
     if args.stdout:
         json.dump(payload, sys.stdout, indent=2)
         sys.stdout.write("\n")

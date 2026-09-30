@@ -262,15 +262,22 @@ const sourceTree = execFileSync('git', ['rev-parse', 'HEAD:src/helia_profiler'],
   cwd: repo,
   encoding: 'utf8',
 }).trim();
+const buildInfo = readJson(dist, 'build-info.json');
+check(
+  buildInfo.sourceTree === sourceTree,
+  `build-info.json names source tree ${buildInfo.sourceTree}, src/helia_profiler is tree ${sourceTree}.`,
+);
 for (const [name, artifact] of [
   ['cli.json', cli],
   ['schema.json', schema],
   ['issues.json', issues],
 ]) {
+  /* The build substitutes the source tree into the renditions; the JSON
+   * records none, so a change under src/ that leaves the contract alone
+   * leaves the committed artifact alone. */
   check(
-    artifact.generatedFrom?.sourceTree === sourceTree,
-    `${name} was generated from tree ${artifact.generatedFrom?.sourceTree}, ` +
-      `src/helia_profiler is tree ${sourceTree}.`,
+    !('sourceTree' in (artifact.generatedFrom ?? {})),
+    `${name} records a source tree; the build substitutes it and the artifact carries none.`,
   );
   check(
     !('sourceCommit' in (artifact.generatedFrom ?? {})),
@@ -282,6 +289,16 @@ for (const [name, artifact] of [
       `${name} records no resolved ${tool} version.`,
     );
   }
+}
+for (const [kind, file] of [
+  ['cli', 'hpx.md'],
+  ['configuration', 'configuration.md'],
+  ['issues', 'issue-codes.md'],
+]) {
+  check(
+    read(path.join(served(kind), file)).includes(sourceTree),
+    `${file}: does not name the source tree ${sourceTree.slice(0, 7)} this build is of.`,
+  );
 }
 
 /* helia-ui's discoverability integration files a page the sidebar never names

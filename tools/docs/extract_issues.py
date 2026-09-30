@@ -10,7 +10,7 @@ The parameterized families are expanded here rather than left as a pattern.
 through it is the one way the published list cannot drift from the emitted
 one.
 
-    uv run --isolated --no-dev python tools/docs/extract_issues.py --source-tree <sha>
+    uv run --isolated --no-dev python tools/docs/extract_issues.py
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _common import SCHEMA_VERSION, dump, provenance, source_tree  # noqa: E402
+from _common import SCHEMA_VERSION, dump, provenance  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUT = REPO_ROOT / "astro-site" / "src" / "data" / "issues.json"
@@ -88,14 +88,14 @@ def _family_rows() -> list[dict[str, Any]]:
     return rows
 
 
-def build(tree: str) -> dict[str, Any]:
+def build() -> dict[str, Any]:
     issues = _issue_rows()
     comparability = _comparability_rows()
     families = _family_rows()
     return {
         "schemaVersion": SCHEMA_VERSION,
         "kind": "issue-codes",
-        "generatedFrom": provenance(tree),
+        "generatedFrom": provenance(),
         "counts": {
             "issues": len(issues),
             "comparability": len(comparability),
@@ -111,10 +111,9 @@ def build(tree: str) -> dict[str, Any]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
-    parser.add_argument("--source-tree", type=source_tree, required=True)
     parser.add_argument("--stdout", action="store_true")
     args = parser.parse_args(argv)
-    payload = build(args.source_tree)
+    payload = build()
     if args.stdout:
         json.dump(payload, sys.stdout, indent=2)
         sys.stdout.write("\n")

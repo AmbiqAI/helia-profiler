@@ -6,7 +6,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`
 
-Generated from the `src/helia_profiler` tree `f9fcb930a54d6d0375883a66e2c2676e60566329`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 **Re-exports**
 
@@ -503,13 +503,10 @@ Source: `src/helia_profiler/session.py:277`
 `method` · `python`
 
 ```python
-doctor(*, include_versions: bool = False) -> DoctorResult
+doctor() -> DoctorResult
 ```
 
 Return structured host dependency checks.
-
-Set *include_versions* to also compare installed tool and package
-versions against the HPX compatibility baseline.
 
 Source: `src/helia_profiler/session.py:305`
 
@@ -523,7 +520,7 @@ show(value: Any, *, console: Console | None = None) -> Any
 
 Pretty-print a typed interactive value and return it unchanged.
 
-Source: `src/helia_profiler/session.py:324`
+Source: `src/helia_profiler/session.py:319`
 
 ### helia_profiler.Session.boards
 
@@ -535,7 +532,7 @@ boards() -> tuple[BoardDef, ...]
 
 Return boards visible to this session's platform registry.
 
-Source: `src/helia_profiler/session.py:330`
+Source: `src/helia_profiler/session.py:325`
 
 ### helia_profiler.Session.engines
 
@@ -547,7 +544,7 @@ engines() -> tuple[EngineType, ...]
 
 Return supported inference engine identifiers.
 
-Source: `src/helia_profiler/session.py:337`
+Source: `src/helia_profiler/session.py:332`
 
 ### helia_profiler.Session.counter_groups
 
@@ -559,7 +556,7 @@ counter_groups() -> tuple[str, ...]
 
 Return registered PMU counter group names.
 
-Source: `src/helia_profiler/session.py:343`
+Source: `src/helia_profiler/session.py:338`
 
 ### helia_profiler.Session.counters
 
@@ -571,7 +568,7 @@ counters(group: str | None = None) -> tuple[PmuCounter, ...]
 
 Return registered PMU counters, optionally filtered by group.
 
-Source: `src/helia_profiler/session.py:349`
+Source: `src/helia_profiler/session.py:344`
 
 ### helia_profiler.Session.probes
 
@@ -583,7 +580,7 @@ probes() -> tuple[JLinkProbe, ...]
 
 Return connected J-Link probes.
 
-Source: `src/helia_profiler/session.py:355`
+Source: `src/helia_profiler/session.py:350`
 
 ### helia_profiler.Session.inspect_probes
 
@@ -595,7 +592,7 @@ inspect_probes(board: str | None = None) -> tuple[JLinkProbeMatch, ...]
 
 Inspect the target core visible through each connected probe.
 
-Source: `src/helia_profiler/session.py:361`
+Source: `src/helia_profiler/session.py:356`
 
 ### helia_profiler.Session.match_probe
 
@@ -607,7 +604,7 @@ match_probe(board: str | None = None, *, serial: str | None = None) -> str
 
 Resolve the J-Link serial matching a board target.
 
-Source: `src/helia_profiler/session.py:372`
+Source: `src/helia_profiler/session.py:367`
 
 ### helia_profiler.Session.ports
 
@@ -619,7 +616,7 @@ ports(*, include_all: bool = False) -> tuple[SerialPortInfo, ...]
 
 Return host serial ports relevant to HPX transports.
 
-Source: `src/helia_profiler/session.py:390`
+Source: `src/helia_profiler/session.py:385`
 
 ### helia_profiler.Session.reset
 
@@ -631,7 +628,7 @@ reset(board: str | None = None, *, serial: str | None = None, kind: Literal['deb
 
 Reset the configured target through its J-Link probe.
 
-Source: `src/helia_profiler/session.py:396`
+Source: `src/helia_profiler/session.py:391`
 
 ---
 
@@ -643,7 +640,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`
 
-Generated from the `src/helia_profiler` tree `f9fcb930a54d6d0375883a66e2c2676e60566329`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 ## helia_profiler.ClockSelection
 
@@ -1658,7 +1655,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`
 
-Generated from the `src/helia_profiler` tree `f9fcb930a54d6d0375883a66e2c2676e60566329`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 ## helia_profiler.PowerConfig
 
@@ -1943,7 +1940,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`, `experimental`
 
-Generated from the `src/helia_profiler` tree `f9fcb930a54d6d0375883a66e2c2676e60566329`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 ## helia_profiler.QualificationState
 
@@ -2423,7 +2420,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `experimental`
 
-Generated from the `src/helia_profiler` tree `f9fcb930a54d6d0375883a66e2c2676e60566329`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 ## helia_profiler.SupportBundleSection
 
@@ -2858,7 +2855,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`, `experimental`
 
-Generated from the `src/helia_profiler` tree `f9fcb930a54d6d0375883a66e2c2676e60566329`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 ## helia_profiler.HpxError
 
@@ -3125,7 +3122,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `experimental`
 
-Generated from the `src/helia_profiler` tree `f9fcb930a54d6d0375883a66e2c2676e60566329`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 ## helia_profiler.MetricDirection
 
@@ -4103,7 +4100,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`
 
-Generated from the `src/helia_profiler` tree `f9fcb930a54d6d0375883a66e2c2676e60566329`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 ---
 
@@ -4115,7 +4112,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `experimental`
 
-Generated from the `src/helia_profiler` tree `f9fcb930a54d6d0375883a66e2c2676e60566329`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 ## helia_profiler.ModelAnalysis
 
@@ -4227,7 +4224,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`, `experimental`
 
-Generated from the `src/helia_profiler` tree `f9fcb930a54d6d0375883a66e2c2676e60566329`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 ## helia_profiler.PowerMode
 
@@ -4676,7 +4673,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `experimental`
 
-Generated from the `src/helia_profiler` tree `f9fcb930a54d6d0375883a66e2c2676e60566329`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 ## helia_profiler.MeasurementScope
 
@@ -5284,7 +5281,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`
 
-Generated from the `src/helia_profiler` tree `f9fcb930a54d6d0375883a66e2c2676e60566329`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 ## helia_profiler.LayerResult
 
@@ -6140,7 +6137,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `experimental`
 
-Generated from the `src/helia_profiler` tree `f9fcb930a54d6d0375883a66e2c2676e60566329`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 ## helia_profiler.RunStatus
 
@@ -6739,7 +6736,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`
 
-Generated from the `src/helia_profiler` tree `f9fcb930a54d6d0375883a66e2c2676e60566329`.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 ## helia_profiler.EngineType
 
