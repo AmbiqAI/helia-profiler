@@ -6,7 +6,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`
 
-Generated from the `src/helia_profiler` tree `b823e287e809c8d9438536a07fc0ab41a3b030c0`.
+Generated from the `src/helia_profiler` tree `f659ca0788eb8a0531970eb50e65a4be82c79f12`.
 
 **Re-exports**
 
@@ -640,7 +640,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`
 
-Generated from the `src/helia_profiler` tree `b823e287e809c8d9438536a07fc0ab41a3b030c0`.
+Generated from the `src/helia_profiler` tree `f659ca0788eb8a0531970eb50e65a4be82c79f12`.
 
 ## helia_profiler.ClockSelection
 
@@ -1655,7 +1655,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`
 
-Generated from the `src/helia_profiler` tree `b823e287e809c8d9438536a07fc0ab41a3b030c0`.
+Generated from the `src/helia_profiler` tree `f659ca0788eb8a0531970eb50e65a4be82c79f12`.
 
 ## helia_profiler.PowerConfig
 
@@ -1940,7 +1940,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`, `experimental`
 
-Generated from the `src/helia_profiler` tree `b823e287e809c8d9438536a07fc0ab41a3b030c0`.
+Generated from the `src/helia_profiler` tree `f659ca0788eb8a0531970eb50e65a4be82c79f12`.
 
 ## helia_profiler.QualificationState
 
@@ -2420,7 +2420,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `experimental`
 
-Generated from the `src/helia_profiler` tree `b823e287e809c8d9438536a07fc0ab41a3b030c0`.
+Generated from the `src/helia_profiler` tree `f659ca0788eb8a0531970eb50e65a4be82c79f12`.
 
 ## helia_profiler.SupportBundleSection
 
@@ -2855,7 +2855,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`, `experimental`
 
-Generated from the `src/helia_profiler` tree `b823e287e809c8d9438536a07fc0ab41a3b030c0`.
+Generated from the `src/helia_profiler` tree `f659ca0788eb8a0531970eb50e65a4be82c79f12`.
 
 ## helia_profiler.HpxError
 
@@ -3122,7 +3122,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `experimental`
 
-Generated from the `src/helia_profiler` tree `b823e287e809c8d9438536a07fc0ab41a3b030c0`.
+Generated from the `src/helia_profiler` tree `f659ca0788eb8a0531970eb50e65a4be82c79f12`.
 
 ## helia_profiler.MetricDirection
 
@@ -4100,7 +4100,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`
 
-Generated from the `src/helia_profiler` tree `b823e287e809c8d9438536a07fc0ab41a3b030c0`.
+Generated from the `src/helia_profiler` tree `f659ca0788eb8a0531970eb50e65a4be82c79f12`.
 
 ---
 
@@ -4112,7 +4112,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `experimental`
 
-Generated from the `src/helia_profiler` tree `b823e287e809c8d9438536a07fc0ab41a3b030c0`.
+Generated from the `src/helia_profiler` tree `f659ca0788eb8a0531970eb50e65a4be82c79f12`.
 
 ## helia_profiler.ModelAnalysis
 
@@ -4224,7 +4224,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`, `experimental`
 
-Generated from the `src/helia_profiler` tree `b823e287e809c8d9438536a07fc0ab41a3b030c0`.
+Generated from the `src/helia_profiler` tree `f659ca0788eb8a0531970eb50e65a4be82c79f12`.
 
 ## helia_profiler.PowerMode
 
@@ -4673,7 +4673,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `experimental`
 
-Generated from the `src/helia_profiler` tree `b823e287e809c8d9438536a07fc0ab41a3b030c0`.
+Generated from the `src/helia_profiler` tree `f659ca0788eb8a0531970eb50e65a4be82c79f12`.
 
 ## helia_profiler.MeasurementScope
 
@@ -5281,7 +5281,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`
 
-Generated from the `src/helia_profiler` tree `b823e287e809c8d9438536a07fc0ab41a3b030c0`.
+Generated from the `src/helia_profiler` tree `f659ca0788eb8a0531970eb50e65a4be82c79f12`.
 
 ## helia_profiler.LayerResult
 
@@ -6137,7 +6137,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `experimental`
 
-Generated from the `src/helia_profiler` tree `b823e287e809c8d9438536a07fc0ab41a3b030c0`.
+Generated from the `src/helia_profiler` tree `f659ca0788eb8a0531970eb50e65a4be82c79f12`.
 
 ## helia_profiler.RunStatus
 
@@ -6736,7 +6736,7 @@ Every name on this page is imported from `helia_profiler`.
 
 **API tier:** `stable`
 
-Generated from the `src/helia_profiler` tree `b823e287e809c8d9438536a07fc0ab41a3b030c0`.
+Generated from the `src/helia_profiler` tree `f659ca0788eb8a0531970eb50e65a4be82c79f12`.
 
 ## helia_profiler.EngineType
 
