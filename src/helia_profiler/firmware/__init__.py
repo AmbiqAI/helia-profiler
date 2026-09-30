@@ -326,6 +326,7 @@ def generate_app(ctx: PipelineContext) -> Path:
                 config.target.rtt_buffer_size_up,
             ),
             power_binary_enabled=power_binary_enabled,
+            strip_build_paths=ctx.fixture is not None,
         )
     )
 
