@@ -9,16 +9,9 @@ from __future__ import annotations
 import enum
 import json
 import pathlib
-import re
 from typing import Any
 
 SCHEMA_VERSION = 1
-
-#: The tree whose provenance every artifact records, matching the
-#: ``SOURCE_PATH`` the site's build chain documents.
-SOURCE_PATH = "src/helia_profiler"
-
-_TREE = re.compile(r"^[0-9a-f]{40}$")
 
 
 def jsonable(value: Any) -> Any:
@@ -54,24 +47,14 @@ def tool_versions() -> dict[str, str]:
     }
 
 
-def source_tree(value: str) -> str:
-    """Validate the git tree sha the build chain hands down.
+def provenance() -> dict[str, str]:
+    """What produced an artifact: the package and the tool versions it asked.
 
-    The tree of ``src/helia_profiler`` is the identity these artifacts record:
-    a commit sha rewrites every generated file on every commit and does not
-    survive a squash merge, and a branch name is a property of the build, not
-    of the source. Resolving it here would be a second copy of the policy the
-    site's build chain already owns, including how it refuses a checkout with
-    no git data, so the sha arrives as an argument and is only checked.
+    No hash of the source is recorded. A tree or commit sha moves on every
+    change under ``src/``, including changes that leave the documented contract
+    alone, and would rewrite every committed artifact each time. The docs build
+    compares the committed files byte for byte with a fresh generation from
+    HEAD, which is what ties them to the source, and substitutes the tree into
+    the published pages at build time.
     """
-    if not _TREE.match(value):
-        raise ValueError(
-            f"--source-tree must be the 40-hex git tree of {SOURCE_PATH}, got {value!r}. "
-            "The docs build passes it; run the extractors through "
-            "`npm run reference:build` rather than by hand."
-        )
-    return value
-
-
-def provenance(tree: str) -> dict[str, str]:
-    return {"sourceTree": source_tree(tree), **tool_versions()}
+    return tool_versions()

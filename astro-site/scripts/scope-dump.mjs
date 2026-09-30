@@ -27,6 +27,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { SOURCE_TREE_TOKEN } from '../src/integrations/source-ref.mjs';
+
 const site = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 export const PACKAGE = 'helia_profiler';
@@ -95,16 +97,16 @@ export const withNote = (docstring, note) => {
 /**
  * The provenance line every page carries.
  *
- * It names the git tree of `src/helia_profiler`, not a commit and not a ref.
- * A commit sha would rewrite every generated file on any change under src/,
- * and would not survive the squash merges this repository uses; the tree sha
- * is the identity of the source that was read, and two commits carrying the
- * same source produce the same bytes here.
+ * It names the git tree of `src/helia_profiler`, but only as a placeholder
+ * that the build resolves (src/integrations/source-ref.mjs). Any hash written
+ * here would rewrite every generated page on any change under src/, even one
+ * that leaves the documented API alone; the placeholder keeps the committed
+ * pages a function of the documented content only.
  */
-export const provenanceNote = (tree) =>
-  tree ? `Generated from the \`src/helia_profiler\` tree \`${tree}\`.` : '';
+export const provenanceNote = () =>
+  `Generated from the \`src/helia_profiler\` tree \`${SOURCE_TREE_TOKEN}\`.`;
 
-export function scope({ dump, tiers, groups: manifest, tree = '' }) {
+export function scope({ dump, tiers, groups: manifest }) {
   const pkg = dump[PACKAGE];
   if (!pkg) throw new Error(`The dump has no package "${PACKAGE}".`);
 
@@ -220,7 +222,7 @@ export function scope({ dump, tiers, groups: manifest, tree = '' }) {
     const note = [
       `Every name on this page is imported from \`${manifest.importFrom}\`.`,
       tierNote(pageTiers),
-      provenanceNote(tree),
+      provenanceNote(),
     ]
       .filter(Boolean)
       .join('\n\n');
@@ -291,12 +293,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const generated = path.join(site, '.generated');
   const readJson = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
 
-  const treeFlag = process.argv.indexOf('--tree');
   const { scoped, report } = scope({
     dump: readJson(path.join(generated, 'griffe.json')),
     tiers: readJson(path.join(generated, 'api-tiers.json')),
     groups: readJson(path.join(site, 'src/data/api-groups.json')),
-    tree: treeFlag === -1 ? '' : process.argv[treeFlag + 1],
   });
 
   fs.writeFileSync(path.join(generated, 'griffe.scoped.json'), `${JSON.stringify(scoped)}\n`);
