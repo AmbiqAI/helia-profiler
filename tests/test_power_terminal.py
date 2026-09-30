@@ -720,3 +720,18 @@ def test_usb_adapter_preserves_buffer_and_asserts_dtr(
     assert envelope.terminal.status == "ok"
     assert stream.dtr is True
     assert stream.flush_calls == 0
+
+
+@pytest.mark.parametrize(
+    ("count", "reference_us", "expected_s"),
+    [(200, 5_000, 1.0), (None, 5_000, None), (200, None, None)],
+)
+def test_planned_window_needs_both_count_and_reference(
+    count: int | None, reference_us: int | None, expected_s: float | None
+) -> None:
+    from helia_profiler.results import PowerRunPlan
+
+    plan = PowerRunPlan(
+        firmware_mode="dedicated", inference_count=count, reference_inference_us=reference_us
+    )
+    assert plan.planned_window_s == expected_s

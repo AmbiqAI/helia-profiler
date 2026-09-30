@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
+from pathlib import Path
 
 from ..results import DeploymentRecord
 from ..errors import BuildError, CaptureError, DeterministicCaptureError
@@ -21,6 +22,64 @@ from ..pipeline import PipelineContext
 from ..target.lifecycle import try_power_cycle_for_context
 
 log = logging.getLogger("hpx")
+
+
+def deploy_firmware(ctx: PipelineContext, binary_path: Path, *, role: str) -> None:
+    """Flash *binary_path*, power-cycling once to recover a locked debug domain.
+
+    *role* names the image (``"profile"`` / ``"power"``) in progress and
+    error messages.  Wrapped messages use ``args[0]``, never ``str(exc)``:
+    ``HpxError.__str__`` appends the hint, which ``hint=`` re-attaches.
+    """
+    from ..target.probe.flash import flash_binary
+
+    if ctx.soc is None:
+        raise BuildError(f"Cannot flash {role} firmware before platform resolution.")
+    soc = ctx.soc
+    jlink_serial = ctx.resolved_jlink_serial or ctx.config.target.jlink_serial
+    failed = f"{role.capitalize()} firmware deployment failed"
+
+    def flash() -> None:
+        try:
+            flash_binary(
+                binary_path,
+                device=soc.jlink_device,
+                load_addr=soc.capabilities.memory.app_flash_load_addr,
+                jlink_serial=jlink_serial,
+                timeout_s=ctx.config.timeouts.flash_s,
+            )
+        except DeterministicCaptureError as exc:
+            raise DeterministicCaptureError(f"{failed}: {exc.args[0]}", hint=exc.hint) from exc
+
+    ctx.report_progress(f"Deploying {role} firmware to {ctx.config.target.board}")
+    try:
+        flash()
+    except DeterministicCaptureError:
+        # Missing image / unknown load address: a power cycle cannot change
+        # these, so retrying would frame a config gap as flaky hardware.
+        raise
+    except CaptureError as first_exc:
+        # The debug domain can be locked (e.g. a previous run put the chip to
+        # sleep); when a power instrument can cycle the rail, retry once.
+        if try_power_cycle_for_context(ctx):
+            try:
+                flash()
+            except DeterministicCaptureError:
+                raise
+            except CaptureError as retry_exc:
+                raise BuildError(
+                    f"{failed} after power-cycle recovery: {retry_exc.args[0]}",
+                    hint=retry_exc.hint,
+                ) from retry_exc
+        else:
+            hint = first_exc.hint or "Check that the board is connected via JLink."
+            if ctx.passthrough_skipped:
+                hint += (
+                    " Verify the EVB is powered (USB / bench supply), "
+                    "or pass --power-serial <NNNN> to select a "
+                    "specific power instrument for passthrough."
+                )
+            raise BuildError(f"{failed}: {first_exc.args[0]}", hint=hint) from first_exc
 
 
 class FlashFirmwareStage:
@@ -32,61 +91,11 @@ class FlashFirmwareStage:
         return False
 
     def run(self, ctx: PipelineContext) -> None:
-        from ..target.probe.flash import flash_binary
-
         if ctx.profile_run is None:
             raise BuildError("No profile artifact to flash — build stage did not run.")
         artifact = ctx.profile_run.firmware
-        if ctx.soc is None:
-            raise BuildError("Cannot flash firmware before platform resolution.")
-        soc = ctx.soc
 
-        ctx.report_progress(f"Deploying profile firmware to {ctx.config.target.board}")
-        jlink_serial = ctx.resolved_jlink_serial or ctx.config.target.jlink_serial
-
-        def flash_firmware() -> None:
-            flash_binary(
-                artifact.binary_path,
-                device=soc.jlink_device,
-                load_addr=soc.capabilities.memory.app_flash_load_addr,
-                jlink_serial=jlink_serial,
-                timeout_s=ctx.config.timeouts.flash_s,
-            )
-
-        try:
-            flash_firmware()
-        except DeterministicCaptureError as exc:
-            # Missing image / unknown load address: a power cycle cannot
-            # change these, so retrying frames a config gap as flaky
-            # hardware (mirrors stages/flash_power).
-            raise BuildError(
-                f"Flash failed: {exc.args[0]}",
-                hint=exc.hint,
-            ) from exc
-        except CaptureError as first_exc:
-            # Flash can fail when the debug domain is locked (e.g. after a
-            # previous run put the chip to sleep).  If a Joulescope is
-            # available, power-cycle to recover and retry once.
-            if try_power_cycle_for_context(ctx):
-                try:
-                    flash_firmware()
-                except CaptureError as retry_exc:
-                    raise BuildError(
-                        f"Flash failed after power-cycle recovery: {retry_exc.args[0]}",
-                        hint=retry_exc.hint,
-                    ) from retry_exc
-            else:
-                hint = first_exc.hint or "Check that the board is connected via JLink."
-                if ctx.passthrough_skipped:
-                    hint += (
-                        " Verify the EVB is powered (USB / bench supply), "
-                        "or pass --power-serial <NNNN> to select a "
-                        "specific power instrument for passthrough."
-                    )
-                raise BuildError(
-                    f"Flash failed: {first_exc.args[0]}",
-                    hint=hint,
-                ) from first_exc
+        deploy_firmware(ctx, artifact.binary_path, role="profile")
 
         log.info("Firmware flashed to %s", ctx.config.target.board)
         ctx.publish_profile_deployment(

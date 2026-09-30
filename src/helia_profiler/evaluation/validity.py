@@ -20,6 +20,7 @@ from ..power.diagnostics import (
     probe_runs_inferences,
     window_inference_count,
 )
+from ..power.base import PowerMode
 from ..power.metadata import MeasurementScope
 from ..errors import ReportError
 from ..results import ISSUE_REGISTRY, IssueCode, ResultIssue, ResultValidity, Severity
@@ -296,7 +297,7 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
         terminal = power_run.terminal
         on_device = power_run.on_device_summary
 
-        internal_mode = ctx.config.power.mode.value == "internal"
+        internal_mode = ctx.config.power.mode is PowerMode.INTERNAL
         if observation is None and not internal_mode:
             issues.append(
                 _error(IssueCode.POWER_OBSERVATION_MISSING, "Power observation is missing.")

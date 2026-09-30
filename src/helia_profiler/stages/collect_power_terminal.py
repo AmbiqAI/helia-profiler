@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 from ..errors import PowerError
 from ..pipeline import PipelineContext
-from ..power.base import PowerResult, PowerSummary
+from ..power.base import PowerMode, PowerResult, PowerSummary
 from ..power.metadata import (
     MeasurementScope,
     ObservationMode,
@@ -72,7 +72,7 @@ class CollectPowerTerminalStage:
 
         if ctx.power_run is None or ctx.power_run.firmware is None:
             raise PowerError("Cannot collect terminal status without power firmware.")
-        internal_mode = ctx.config.power.mode.value == "internal"
+        internal_mode = ctx.config.power.mode is PowerMode.INTERNAL
         if ctx.power_run.observation is None and not internal_mode:
             raise PowerError("Cannot collect terminal status before power observation.")
         if ctx.soc is None:
@@ -83,11 +83,9 @@ class CollectPowerTerminalStage:
         if ctx.power_run.observation is not None:
             timeout_s = max(2.0, min(10.0, ctx.power_run.observation.deadline_s / 10.0))
         else:
-            planned_s = (
-                plan.inference_count * plan.reference_inference_us / 1_000_000
-                if plan.inference_count is not None and plan.reference_inference_us is not None
-                else 5.0
-            )
+            planned_s = plan.planned_window_s
+            if planned_s is None:
+                planned_s = 5.0
             timeout_s = max(5.0, min(30.0, planned_s * 2.0 + 5.0))
         ctx.report_progress("Collecting post-GATE firmware diagnostics", eta_s=timeout_s)
         collector = get_power_terminal_transport(ctx.config.target.transport)
@@ -156,7 +154,7 @@ class CollectPowerTerminalStage:
             # internal mode the denominator is read from that same clock, so
             # average power and current are wrong by the same factor. The measurement of record
             # is corrupt, which is terminal here for the same reason the
-            # all-zero INA228 reading above is.
+            # all-zero INA228 reading below is.
             raise PowerError(
                 "Power firmware reported zero elapsed time for "
                 f"{terminal.completed_count} completed "
@@ -288,7 +286,7 @@ class CollectPowerTerminalStage:
             # published power number here, so a frozen firmware clock corrupts
             # elapsed_us and nothing else; raising would throw away a good
             # capture before any artifact exists. Same shape as the
-            # bystander-overflow path below.
+            # bystander-overflow path above.
             log.warning(
                 "Power firmware reported zero elapsed time for %d completed "
                 "%s: its window clock never advanced. The %s owns this "

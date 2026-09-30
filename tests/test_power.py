@@ -3623,7 +3623,7 @@ class TestPowerFirmwareSelection:
         monkeypatch.setattr("helia_profiler.target.probe.flash.flash_binary", flash_binary)
         cycles: list[str] = []
         monkeypatch.setattr(
-            "helia_profiler.stages.flash_power.try_power_cycle_for_context",
+            "helia_profiler.stages.flash.try_power_cycle_for_context",
             lambda _ctx: cycles.append("cycle") or True,
         )
 
@@ -3673,7 +3673,7 @@ class TestPowerFirmwareSelection:
         monkeypatch.setattr("helia_profiler.target.probe.flash.flash_binary", flash_binary)
         cycles: list[str] = []
         monkeypatch.setattr(
-            "helia_profiler.stages.flash_power.try_power_cycle_for_context",
+            "helia_profiler.stages.flash.try_power_cycle_for_context",
             lambda _ctx: cycles.append("cycle") or True,
         )
 
@@ -3727,7 +3727,7 @@ class TestPowerFirmwareSelection:
 
         monkeypatch.setattr("helia_profiler.target.probe.flash.flash_binary", flash_binary)
         monkeypatch.setattr(
-            "helia_profiler.stages.flash_power.try_power_cycle_for_context",
+            "helia_profiler.stages.flash.try_power_cycle_for_context",
             lambda _ctx: cycle_succeeds,
         )
 
@@ -4307,10 +4307,11 @@ class TestPowerFirmwareSelection:
         assert ctx.power_run is not None
         assert ctx.power_run.deployment is None
 
+    @pytest.mark.parametrize("failing_step", ["render", "compile"])
     def test_failed_power_rebuild_invalidates_prior_artifact_state(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failing_step: str
     ):
-        from helia_profiler.errors import BuildError
+        from helia_profiler.errors import BuildError, FirmwareError
         from helia_profiler.power.base import PowerResult, PowerSummary
         from helia_profiler.stages.build_power_firmware import BuildPowerFirmwareStage
 
@@ -4346,23 +4347,24 @@ class TestPowerFirmwareSelection:
         set_power_result(ctx, PowerResult(summary=PowerSummary(0.01, 0.02, 0.03, 0.04, 1.0, 10)))
         set_power_firmware(ctx, binary_path=binary)
 
+        def fail(error):
+            return lambda *_args, **_kwargs: (_ for _ in ()).throw(error)
+
+        render_error = FirmwareError("render failed") if failing_step == "render" else None
         monkeypatch.setattr(
             "helia_profiler.firmware.render_power_source",
-            lambda *_args, **_kwargs: None,
+            fail(render_error) if render_error else (lambda *_args, **_kwargs: None),
         )
-        monkeypatch.setattr(
-            "helia_profiler.deps.nsx.build",
-            lambda *_args, **_kwargs: (_ for _ in ()).throw(BuildError("compile failed")),
-        )
+        monkeypatch.setattr("helia_profiler.deps.nsx.build", fail(BuildError("compile failed")))
         monkeypatch.setattr(
             "helia_profiler.deps.dependencies.workspace_mutex",
             lambda _workspace: __import__("contextlib").nullcontext(),
         )
 
-        with pytest.raises(BuildError, match="compile failed"):
+        with pytest.raises((BuildError, FirmwareError), match=f"{failing_step} failed"):
             BuildPowerFirmwareStage().run(ctx)
 
-        assert not binary.exists()
+        assert binary.exists() is (failing_step == "render")
         assert ctx.power_run is not None
         assert ctx.power_run.firmware is None
         assert ctx.power_run.deployment is None

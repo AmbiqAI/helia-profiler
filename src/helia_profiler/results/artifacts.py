@@ -45,6 +45,18 @@ class PowerRunPlan:
         "firmware_auto"
     )
 
+    @property
+    def planned_window_us(self) -> int | None:
+        """Planned measured-window length, when count and reference are both known."""
+        if self.inference_count is None or self.reference_inference_us is None:
+            return None
+        return self.inference_count * self.reference_inference_us
+
+    @property
+    def planned_window_s(self) -> float | None:
+        window_us = self.planned_window_us
+        return None if window_us is None else window_us / 1_000_000
+
 
 @dataclass(frozen=True)
 class DeploymentRecord:
