@@ -31,4 +31,4 @@ Ctrl-C.  Useful when the Joulescope app is not running and the
 board would otherwise be unpowered.
 ```
 
-Generated from the `src/helia_profiler` tree `cf4575012d6d2f42d4f7a8e03bae3bd4742cf110` with typer 0.26.8 and click 8.3.3.
+Generated from the `src/helia_profiler` tree `9a1a4feb5418e0f3a3c0a9feb58f36979af52834` with typer 0.26.8 and click 8.3.3.
