@@ -156,6 +156,24 @@ class TestFlashFirmwareStageDirect:
         assert str(exc_info.value).startswith("Profile firmware deployment failed: ")
         assert str(exc_info.value).count("Hint:") == 1
 
+    def test_deterministic_error_on_retry_keeps_its_type(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        ctx = _make_ctx(tmp_path)
+        errors = [CaptureError("debug domain locked"), DeterministicCaptureError("image gone")]
+
+        def fail_in_order(binary_path, **kwargs):
+            raise errors.pop(0)
+
+        monkeypatch.setattr("helia_profiler.target.probe.flash.flash_binary", fail_in_order)
+        monkeypatch.setattr(
+            "helia_profiler.stages.flash.try_power_cycle_for_context", lambda ctx: True
+        )
+
+        with pytest.raises(DeterministicCaptureError, match="image gone"):
+            FlashFirmwareStage().run(ctx)
+        assert errors == []
+
     @pytest.mark.parametrize(
         ("stage_role", "passthrough_skipped"),
         [("profile", True), ("profile", False), ("power", True)],

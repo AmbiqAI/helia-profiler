@@ -40,27 +40,32 @@ def deploy_firmware(ctx: PipelineContext, binary_path: Path, *, role: str) -> No
     failed = f"{role.capitalize()} firmware deployment failed"
 
     def flash() -> None:
-        flash_binary(
-            binary_path,
-            device=soc.jlink_device,
-            load_addr=soc.capabilities.memory.app_flash_load_addr,
-            jlink_serial=jlink_serial,
-            timeout_s=ctx.config.timeouts.flash_s,
-        )
+        try:
+            flash_binary(
+                binary_path,
+                device=soc.jlink_device,
+                load_addr=soc.capabilities.memory.app_flash_load_addr,
+                jlink_serial=jlink_serial,
+                timeout_s=ctx.config.timeouts.flash_s,
+            )
+        except DeterministicCaptureError as exc:
+            raise DeterministicCaptureError(f"{failed}: {exc.args[0]}", hint=exc.hint) from exc
 
     ctx.report_progress(f"Deploying {role} firmware to {ctx.config.target.board}")
     try:
         flash()
-    except DeterministicCaptureError as exc:
+    except DeterministicCaptureError:
         # Missing image / unknown load address: a power cycle cannot change
         # these, so retrying would frame a config gap as flaky hardware.
-        raise DeterministicCaptureError(f"{failed}: {exc.args[0]}", hint=exc.hint) from exc
+        raise
     except CaptureError as first_exc:
         # The debug domain can be locked (e.g. a previous run put the chip to
         # sleep); when a power instrument can cycle the rail, retry once.
         if try_power_cycle_for_context(ctx):
             try:
                 flash()
+            except DeterministicCaptureError:
+                raise
             except CaptureError as retry_exc:
                 raise BuildError(
                     f"{failed} after power-cycle recovery: {retry_exc.args[0]}",

@@ -59,15 +59,15 @@ class BuildPowerFirmwareStage:
 
         noun = count_noun(ctx.config.profiling.clean_window_probe, inference_count)
         ctx.report_progress(f"Rendering fixed-N source for {inference_count:,} {noun}")
+        # Restart the power run from its plan so a failed rebuild cannot leave
+        # the previous artifact deployable.
+        ctx.publish_power_plan(plan)
 
         try:
             if ctx.dependency_workspace is None:
                 raise BuildError("Dependency workspace identity is unavailable.")
             with workspace_mutex(ctx.dependency_workspace):
                 render_power_source(ctx, inference_count=inference_count)
-                # Restart the power run from its plan so a failed rebuild
-                # cannot leave the previous artifact deployable.
-                ctx.publish_power_plan(plan)
                 _remove_stale_power_outputs(ctx.build_dir)
                 nsx_cli.build(
                     ctx.firmware_dir,

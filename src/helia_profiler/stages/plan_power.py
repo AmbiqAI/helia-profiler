@@ -264,9 +264,8 @@ class PlanPowerRunStage:
             plan.count_source,
         )
         count = plan.inference_count
-        reference_us = plan.reference_inference_us
-        if count is not None and reference_us is not None:
-            runtime_s = count * reference_us / 1_000_000
+        runtime_s = plan.planned_window_s
+        if count is not None and runtime_s is not None:
             noun = count_noun(ctx.config.profiling.clean_window_probe, count)
             ctx.report_progress(
                 f"Power run planned · {count:,} {noun}",
