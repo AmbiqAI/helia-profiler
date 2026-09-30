@@ -7,6 +7,7 @@ asserts the analyzers report that count.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -235,7 +236,7 @@ def test_fully_connected_counts_flattened_rows(
 
 
 def test_fully_connected_4d_example():
-    assert _fully_connected_macs([1, 4, 4, 8], [10, 128], has_bias=True) == 1 * 128 * 10
+    assert _fully_connected_macs([1, 4, 4, 8], [10, 128]) == 1 * 128 * 10
 
 
 def _batch_matmul_model(tmp_path: Path, adj_x: bool) -> tuple[Path, int]:
@@ -288,5 +289,32 @@ def test_air_batch_matmul_counts_shared_dim(tmp_path: Path, adj_x: bool):
 def test_helpers_reject_malformed_shapes():
     assert _transpose_conv_macs([1, 8, 8, 16], [32, 3, 3]) == 0
     assert _transpose_conv_macs([], [32, 3, 3, 16]) == 0
-    assert _fully_connected_macs([1, 128], [64, 0], has_bias=False) == 0
+    assert _fully_connected_macs([1, 128], [64, 0]) == 0
     assert _batch_matmul_macs([4], [4], adj_x=False) == 0
+
+
+@_needs_aot
+@pytest.mark.parametrize(
+    ("op_name", "arity"),
+    [("SQRT", 1), ("RSQRT", 1), ("ABS", 1), ("SQUARED_DIFFERENCE", 2)],
+)
+def test_air_elementwise_ops_match_tflite(tmp_path: Path, op_name: str, arity: int):
+    shape = (1, 4, 4, 8)
+    path = _write_model(
+        tmp_path / f"{op_name.lower()}.tflite",
+        getattr(schema.BuiltinOperator, op_name),
+        [_Tensor(shape) for _ in range(arity + 1)],
+        inputs=list(range(arity)),
+        outputs=[arity],
+        options_type=0,
+        options=None,
+    )
+    from helia_aot.converters import convert_backend_model
+    from helia_aot.registry.context import build_default_registry_context
+
+    air = analyze_air_model(
+        convert_backend_model(path, build_default_registry_context(), verbose=0)
+    )
+    assert air is not None
+    assert [(layer.op, layer.ops) for layer in air.layers] == [(op_name, math.prod(shape))]
+    assert air.total_ops == analyze_for_engine(path, engine="tflm").total_ops

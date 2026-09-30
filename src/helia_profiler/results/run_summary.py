@@ -54,7 +54,10 @@ RUN_SUMMARY_SCHEMA = "hpx.run-summary"
 #: cycles_per_mac move for models with those ops.
 #: v9: #386 on-device gated inference publishes per-inference energy and
 #: inferences-per-joule alongside the existing gated totals.
-RUN_SUMMARY_SCHEMA_VERSION = 9
+#: v10: heliaAOT model_analysis counts SQRT, RSQRT, ABS and
+#: SQUARED_DIFFERENCE as elementwise; helia-aot total_ops and TOPS move for
+#: models with those ops.
+RUN_SUMMARY_SCHEMA_VERSION = 10
 
 __all__ = [
     "RUN_SUMMARY_SCHEMA",
