@@ -203,13 +203,19 @@ depthwise tails, and accumulate MVE float16 dot products in float32 every 32
 terms (ns-cmsis-nn#600), which changes float16 results. ExecuTorch's `ns`
 backend uses the same core and is not separately verified here.
 
-**Verified (host, ATfE, Apollo510).** heliaAOT main (`1ba7ed57`) converts and
-builds the 36 benchmark models against v7.38.0. The released helia-aot 0.23.0
-and 0.24.0 each convert and build int8 keyword-spotting, visual-wake-word,
-image-classification, anomaly-detection, temporal-convolution, heart-rhythm
-and segmentation models and fp32 and fp16 sleep-staging and fp16 denoising
-models against v7.38.0. heliaRT 1.21.2 builds from source against v7.38.0 for
-the int8 keyword-spotting model and the fp32 and fp16 sleep-staging models.
+**Verified (host).** heliaAOT main (`1ba7ed57`) converts the 36 benchmark
+models through HPX's heliaAOT adapter, with placement rules for an Apollo510
+SRAM arena and MRAM weights; the generated modules link for Cortex-M55 against
+v7.38.0 with Arm GNU, and a plain-C host build runs them. That host run does
+not exercise the MVE kernels (its integer rows run from modules converted for
+apollo4p_evb) and does not cover HPX's own firmware build. The released
+helia-aot 0.23.0 and 0.24.0 each convert and build int8 keyword-spotting,
+visual-wake-word, image-classification, anomaly-detection,
+temporal-convolution, heart-rhythm and segmentation models and fp32 and fp16
+sleep-staging and fp16 denoising models against v7.38.0 through HPX's
+firmware build with ATfE for Apollo510. heliaRT 1.21.2 builds from source
+against v7.38.0 with ATfE for the int8 keyword-spotting model and the fp32 and
+fp16 sleep-staging models.
 **On hardware**, heliaAOT `0d0acc58` on v7.38.0 passed 35 of 36 fixed-fixture
 benchmark plans on an Apollo510 EVB; the remaining TimePPG A8W8 failure is
 fixed by helia-aot#537, which no device run covers yet. Neither release has a
