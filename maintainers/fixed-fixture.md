@@ -267,7 +267,8 @@ build. The fixture image has no per-operator hooks, so these are approximate
 shares from a PMU-instrumented sibling image, never the fixture's latency. The
 record is null with a reason unless the fixture is the one the build was made
 from and the model hash, engine, TFLM `cmsis_nn` or heliaRT `helia` backend, compiler version, board,
-LP 96 MHz clock and SRAM/MRAM placement match, every layer has finite cycles, no
+LP 96 MHz clock and SRAM/MRAM placement match, the core clock measured on the
+device (when the run recorded one) is within 5 % of 96 MHz, every layer has finite cycles, no
 counter overflowed, the clean window ran inferences, and the per-layer sum agrees
 with the clean-window cycles within 1 % (2 % below 2 ms). The prepared runtime of a TFLM or heliaRT
 fixture is not selectable by `hpx profile`; `allow_runtime_difference=True` accepts the

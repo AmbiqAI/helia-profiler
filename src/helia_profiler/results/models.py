@@ -87,6 +87,13 @@ class PsramInfo:
     rxdqs_delay: int
 
 
+#: Largest relative difference between an on-device clock reading and the clock
+#: the host assumed that still counts as agreement. The STIMER probe is quantized
+#: to one 32.768 kHz tick over its ~17 ms window (~0.2%), so the margin covers
+#: core-oscillator (HFRC) trim; a perf mode that did not engage is off by a multiple.
+DEVICE_CLOCK_TOLERANCE = 0.05
+
+
 @dataclass(frozen=True)
 class FirmwareMeta:
     """Metadata reported by the profiler firmware at startup.

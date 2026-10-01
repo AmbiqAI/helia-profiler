@@ -48,6 +48,7 @@ def profile(name: str, **override) -> ProfileResult:
     meta = FirmwareMeta(
         system_clock_hz=raw["system_clock_hz"],
         clean_infer_avg_cycles=raw["clean_infer_avg_cycles"],
+        measured_clock_hz=raw.get("measured_clock_hz"),
     )
     metadata = RunMetadata(
         config_snapshot=raw["config"],
@@ -201,6 +202,8 @@ def test_busy_loop_clean_window_is_refused(tmp_path):
         ({"board": "apollo510b_evb"}, "board_mismatch"),
         ({"cpu_clock_name": "hp"}, "clock_mismatch"),
         ({"system_clock_hz": 192_000_000}, "clock_mismatch"),
+        ({"measured_clock_hz": 250_000_000}, "measured_clock_mismatch"),
+        ({"measured_clock_hz": 90_000_000}, "measured_clock_mismatch"),
         (
             {"config": {"model": {"arena_location": "tcm", "weights_location": "mram"}}},
             "placement_mismatch",
@@ -225,6 +228,34 @@ def test_identity_or_counter_mismatch_is_null_with_reason(tmp_path, override, re
     )
     assert result.operators is None and not result.accepted
     assert result.reason == reason
+
+
+@pytest.mark.parametrize("measured", [None, 0, 96_000_000, 91_200_000, 100_800_000])
+def test_measured_clock_absent_zero_or_within_tolerance_still_binds(tmp_path, measured):
+    fixture = fixture_for(KWS_SHA, tmp_path)
+    result = bind_operator_timing(
+        build_for(EngineType.HELIA_AOT, fixture),
+        fixture,
+        profile("kws_aot", measured_clock_hz=measured),
+    )
+    assert result.accepted, result.reason
+
+
+def test_measured_clock_shares_the_capture_tolerance(tmp_path, monkeypatch):
+    from helia_profiler import capture, fixture_operator_timing
+    from helia_profiler.results.models import DEVICE_CLOCK_TOLERANCE
+
+    assert DEVICE_CLOCK_TOLERANCE == 0.05
+    assert capture.DEVICE_CLOCK_TOLERANCE is DEVICE_CLOCK_TOLERANCE
+    # The check reads the shared constant, not a copy of its value.
+    monkeypatch.setattr(fixture_operator_timing, "DEVICE_CLOCK_TOLERANCE", 0.25)
+    fixture = fixture_for(KWS_SHA, tmp_path)
+    result = bind_operator_timing(
+        build_for(EngineType.HELIA_AOT, fixture),
+        fixture,
+        profile("kws_aot", measured_clock_hz=110_000_000),
+    )
+    assert result.accepted, result.reason
 
 
 def test_layer_overflow_is_refused(tmp_path):

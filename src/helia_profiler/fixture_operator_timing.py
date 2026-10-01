@@ -7,7 +7,7 @@ import math
 
 from .engines import EngineType
 from ._fixture_build import FixedFixture, FixtureBuild, TypedFixture
-from .results.models import ProfileResult
+from .results.models import DEVICE_CLOCK_TOLERANCE, ProfileResult
 from .fixture_capture import FIXTURE_CPU_HZ
 from .fixture_target import FIXTURE_CLOCK_PROFILE
 
@@ -96,6 +96,10 @@ def _identity_reason(
         or profile.pmu.meta.system_clock_hz != FIXTURE_CPU_HZ
     ):
         return "clock_mismatch"
+    # Absent before the on-device probe existed; 0 when it could not count.
+    measured = profile.pmu.meta.measured_clock_hz
+    if measured and abs(measured - FIXTURE_CPU_HZ) > DEVICE_CLOCK_TOLERANCE * FIXTURE_CPU_HZ:
+        return "measured_clock_mismatch"
     if any(model.get(key) != value for key, value in FIXTURE_PLACEMENT.items()):
         return "placement_mismatch"
     if build.runtime_manifest is not None and not allow_runtime:

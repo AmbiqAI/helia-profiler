@@ -486,13 +486,28 @@ def test_capture_pmu_no_clock_warning_when_device_clock_matches(
 
 
 @pytest.mark.parametrize(
-    ("measured_hz", "warns", "probe_failed"),
-    [(96_000_000, True, False), (249_900_000, False, False), (0, False, True)],
+    ("measured_hz", "warns", "probe_failed", "tolerance"),
+    [
+        (96_000_000, True, False, None),
+        (249_900_000, False, False, None),
+        (0, False, True, None),
+        # The check reads the shared DEVICE_CLOCK_TOLERANCE, not a copy of it.
+        (96_000_000, False, False, 0.7),
+    ],
 )
 def test_capture_pmu_checks_measured_clock(
-    tmp_path: Path, monkeypatch, caplog, measured_hz: int, warns: bool, probe_failed: bool
+    tmp_path: Path,
+    monkeypatch,
+    caplog,
+    measured_hz: int,
+    warns: bool,
+    probe_failed: bool,
+    tolerance: float | None,
 ):
     import logging
+
+    if tolerance is not None:
+        monkeypatch.setattr("helia_profiler.capture.DEVICE_CLOCK_TOLERANCE", tolerance)
 
     model = tmp_path / "model.tflite"
     model.write_bytes(b"\x00")
