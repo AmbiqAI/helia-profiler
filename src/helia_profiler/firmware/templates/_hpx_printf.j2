@@ -47,10 +47,9 @@
 // window — the host is watching the GPIO gate via a separate instrument, not
 // draining the ring buffer — so hitting a slow host is actually the *expected*
 // steady state there, not a rare dead-host edge case.  Spinning the full 2s
-// budget per queued line (found 2026-07-05: forensics showed the firmware
-// parked in hpx_rtt_write_lossless for the entire post-window CSV dump with
-// no host attached) turns a handful of trailing lines into many seconds of
-// silent, pointless spin.  100ms is enough for a host that *is* still
+// budget per queued line parks the firmware in hpx_rtt_write_lossless for the
+// entire post-window CSV dump and turns a handful of trailing lines into many
+// seconds of silent, pointless spin.  100ms is enough for a host that *is* still
 // attached (e.g. a PMU-then-power run in the same session) to keep draining
 // promptly, without paying the full dead-host budget by default.
 #ifndef HPX_RTT_LOSSLESS_TIMEOUT_POST_WINDOW_MS

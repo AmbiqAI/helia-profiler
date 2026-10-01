@@ -1,5 +1,5 @@
 {
-  "_comment": "Census of every top-level key written into PowerResult.metadata, taken at 80fb77f for #154 Phase 2. 'writers' and 'readers' are src/ sites at census time (artifact-side readers of summary.json noted separately). 'disposition': 'typed' keys become PowerMetadata fields holding the named type; 'artifact_only' keys are written-never-read diagnostics kept for wire stability and documented as such. The completeness test asserts PowerMetadata covers exactly this key set.",
+  "_comment": "Census of every top-level key written into PowerResult.metadata, taken at 80fb77f for #154. 'writers' and 'readers' are src/ sites at census time (artifact-side readers of summary.json noted separately). 'disposition': 'typed' keys become PowerMetadata fields holding the named type; 'artifact_only' keys are written-never-read diagnostics kept for wire stability and documented as such. The completeness test asserts PowerMetadata covers exactly this key set.",
   "keys": {
     "capture_safety_bound_s": {
       "type": "float",

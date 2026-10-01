@@ -133,8 +133,7 @@
 // hpx_printf() call reports the clean-window results -- with zero settle
 // margin that first line (HPX_CLEAN_INFER_COUNT=...) can be dropped or
 // garbled, silently losing clean_infer_count and falling the host back to
-// an unrelated whole-capture-window power estimate (found 2026-07-06 on the
-// first hardware test of the UART teardown fix). 5ms is generous versus a
+// an unrelated whole-capture-window power estimate. 5ms is generous versus a
 // UART/ITM clock-domain-crossing settle.
 #define HPX_DEBUG_REENABLE_SETTLE_US (5U * 1000U)
 
