@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import field
+from dataclasses import field, replace
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -548,7 +548,10 @@ class BuildConfig:
         if self.update_dependencies and self.offline:
             raise ConfigError(
                 "build.update_dependencies and build.offline cannot both be true",
-                hint="Dependency updates require network access; select exactly one mode.",
+                hint=(
+                    "Dependency updates require network access; drop either "
+                    "--update-dependencies or --offline/--frozen."
+                ),
             )
         return self
 
@@ -626,11 +629,8 @@ class ProfileConfig:
     verbose: int = 0
 
     def __post_init__(self) -> None:
-        if self.frozen and self.build.update_dependencies:
-            raise ConfigError(
-                "frozen and build.update_dependencies cannot both be enabled",
-                hint="Remove --frozen/--offline when intentionally updating dependencies.",
-            )
+        if self.frozen and not self.build.offline:
+            object.__setattr__(self, "build", replace(self.build, offline=True))
         if self.compatibility is None:
             object.__setattr__(
                 self,

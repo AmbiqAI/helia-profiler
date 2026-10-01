@@ -6,6 +6,7 @@ import os
 import hashlib
 import json
 from contextlib import nullcontext
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -1628,7 +1629,7 @@ class TestBuildAppFrozen:
         binary = build_dir / "hpx_profiler.bin"
         binary.write_bytes(b"bin")
         object.__setattr__(ctx, "firmware_dir", app_dir)
-        object.__setattr__(ctx.config, "frozen", True)
+        object.__setattr__(ctx.config, "build", replace(ctx.config.build, offline=True))
         prepared = _stub_locked_dependencies(ctx, app_dir, monkeypatch)
 
         lock_calls: list[tuple] = []
@@ -1680,7 +1681,7 @@ class TestBuildAppFrozen:
         binary = build_dir / "hpx_profiler.bin"
         binary.write_bytes(b"bin")
         object.__setattr__(ctx, "firmware_dir", app_dir)
-        object.__setattr__(ctx.config, "frozen", True)
+        object.__setattr__(ctx.config, "build", replace(ctx.config.build, offline=True))
         prepared = _stub_locked_dependencies(ctx, app_dir, monkeypatch)
 
         lock_calls: list[tuple] = []

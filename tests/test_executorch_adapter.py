@@ -894,6 +894,18 @@ def test_offline_cache_never_synchronizes(tmp_path, monkeypatch, cache_state):
         assert "online run" in (exc.value.hint or "")
 
 
+def test_frozen_alias_resolves_the_offline_cache(tmp_path, monkeypatch):
+    from dataclasses import replace
+
+    config = replace(_config(tmp_path, tmp_path, source_path=None), frozen=True)
+    cache = tmp_path / "cache"
+    monkeypatch.setattr(
+        executorch_mod, "_auto_clone_nsx_executorch", lambda *_: pytest.fail("frozen auto-clone")
+    )
+    monkeypatch.setattr(executorch_mod, "_offline_cached_source", lambda _ref: cache)
+    assert executorch_mod._resolve_source_root(config) == cache
+
+
 def test_offline_explicit_source_does_not_access_cache(tmp_path, monkeypatch):
     source = _source_tree(tmp_path)
     monkeypatch.setattr(

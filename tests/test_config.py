@@ -331,6 +331,11 @@ def test_dependency_update_rejects_offline_modes(overrides: dict):
         )
 
 
+def test_frozen_alias_resolves_to_build_offline():
+    config = load_config(None, {"model": {"path": "test.tflite"}, "frozen": True})
+    assert config.build.offline is True
+
+
 def test_engine_defaults_to_helia_rt():
     cli = {
         "model": {"path": "test.tflite"},
