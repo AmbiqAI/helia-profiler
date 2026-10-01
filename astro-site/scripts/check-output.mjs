@@ -179,9 +179,10 @@ for (const [label, segment] of SECTIONS) {
       ? "Home renders a sidebar at desktop width."
       : `Section "${label}" has no sidebar of its own.`,
   );
-  for (const [other] of SECTIONS) {
+  const sectionMenu = html.match(/<nav\b[^>]*aria-label="Choose section"[^>]*>([\s\S]*?)<\/nav>/)?.[1] ?? "";
+  for (const [other, destination] of SECTIONS) {
     check(
-      html.includes(`>${other}</span>`),
+      sectionMenu.includes(`href="${base}${destination}"`) && sectionMenu.includes(`>${other}</a>`),
       `Section "${label}" landing page does not link to "${other}".`,
     );
   }
