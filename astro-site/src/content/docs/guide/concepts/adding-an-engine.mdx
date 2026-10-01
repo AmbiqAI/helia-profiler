@@ -88,9 +88,9 @@ that map is asserted complete over `EngineType`.
 
 Create `src/helia_profiler/engines/your_engine.py` implementing the
 `EngineAdapter` protocol: `name`, `engine_type`, `prepare(config, work_dir)`,
-and the placement hooks (`default_auto_placement()` returning `None` to
-accept the shared policy, `apply_arena_placement_override()` as the
-identity unless the engine emits arena regions). `prepare()` validates
+and the placement hooks (`apply_arena_placement_override()` as the
+identity unless the engine emits arena regions, `check_psram_placement()`
+for engine-specific PSRAM constraints). `prepare()` validates
 `config.engine.*`, creates any local NSX module under `work_dir`, and
 returns the artifact type fully populated:
 
@@ -123,8 +123,7 @@ two calls with the same inputs produce the same output.
 
 In `engines/__init__.py`, add the `EngineType` member, a deferred factory
 function that imports the adapter module, and the factory's entry in
-`_ADAPTER_FACTORIES`. `get_adapter()` needs no change, and tests can
-substitute a stub with `register_engine_adapter()`.
+`_ADAPTER_FACTORIES`. `get_adapter()` needs no change.
 
 ### 4. Template child
 

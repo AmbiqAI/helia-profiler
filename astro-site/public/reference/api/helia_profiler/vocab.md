@@ -292,7 +292,7 @@ User-selectable reset policy for target lifecycle preparation.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/target/lifecycle.py:42`
+Source: `src/helia_profiler/target/lifecycle.py:41`
 
 ### helia_profiler.ResetStrategy.AUTO
 
@@ -302,7 +302,7 @@ Source: `src/helia_profiler/target/lifecycle.py:42`
 AUTO = 'auto'
 ```
 
-Source: `src/helia_profiler/target/lifecycle.py:45`
+Source: `src/helia_profiler/target/lifecycle.py:44`
 
 ### helia_profiler.ResetStrategy.POWER_CYCLE
 
@@ -312,7 +312,7 @@ Source: `src/helia_profiler/target/lifecycle.py:45`
 POWER_CYCLE = 'power_cycle'
 ```
 
-Source: `src/helia_profiler/target/lifecycle.py:46`
+Source: `src/helia_profiler/target/lifecycle.py:45`
 
 ### helia_profiler.ResetStrategy.NONE
 
@@ -322,7 +322,7 @@ Source: `src/helia_profiler/target/lifecycle.py:46`
 NONE = ResetAction.NONE.value
 ```
 
-Source: `src/helia_profiler/target/lifecycle.py:47`
+Source: `src/helia_profiler/target/lifecycle.py:46`
 
 ### helia_profiler.ResetStrategy.DEBUG_RESET
 
@@ -332,7 +332,7 @@ Source: `src/helia_profiler/target/lifecycle.py:47`
 DEBUG_RESET = ResetAction.DEBUG_RESET.value
 ```
 
-Source: `src/helia_profiler/target/lifecycle.py:48`
+Source: `src/helia_profiler/target/lifecycle.py:47`
 
 ### helia_profiler.ResetStrategy.SWPOI_RESET
 
@@ -342,7 +342,7 @@ Source: `src/helia_profiler/target/lifecycle.py:48`
 SWPOI_RESET = ResetAction.SWPOI_RESET.value
 ```
 
-Source: `src/helia_profiler/target/lifecycle.py:49`
+Source: `src/helia_profiler/target/lifecycle.py:48`
 
 ### helia_profiler.ResetStrategy.DEBUG_RESET_THEN_SWPOI
 
@@ -352,4 +352,4 @@ Source: `src/helia_profiler/target/lifecycle.py:49`
 DEBUG_RESET_THEN_SWPOI = ResetAction.DEBUG_RESET_THEN_SWPOI.value
 ```
 
-Source: `src/helia_profiler/target/lifecycle.py:50`
+Source: `src/helia_profiler/target/lifecycle.py:49`

@@ -31,9 +31,7 @@ HPX_START_SENTINEL = "--- HPX_START ---"
 HPX_END_SENTINEL = "--- HPX_END ---"
 
 #: Per-pass and per-iteration frames. The firmware formats the name/index in;
-#: the host matches with the anchored patterns below.
-HPX_PRESET_SENTINEL_PREFIX = "--- HPX_PRESET "
-HPX_ITER_SENTINEL_PREFIX = "--- HPX_ITER "
+#: the host matches with these anchored patterns.
 HPX_PRESET_SENTINEL_PATTERN = r"^--- HPX_PRESET (\S+) ---$"
 HPX_ITER_SENTINEL_PATTERN = r"^--- HPX_ITER (\d+) ---$"
 HPX_PRESET_SENTINEL_RE = re.compile(HPX_PRESET_SENTINEL_PATTERN)
