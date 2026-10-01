@@ -181,7 +181,7 @@ def _override_inputs(ctx: PipelineContext) -> tuple[dict[str, Any], tuple[Depend
     engine_config = ctx.config.engine.config
     for key in ("dist_path", "source_path"):
         raw = engine_config.get(key)
-        if raw is None:
+        if raw is None or raw == "":
             continue
         if not isinstance(raw, (str, Path)):
             raise DependencyError(

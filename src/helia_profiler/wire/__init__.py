@@ -54,7 +54,7 @@ The ``HPX_ERROR`` shadow
 ``^HPX_(\\w+)=(.+)$`` key/value regex, so the parser incidentally stores
 ``meta_kv["error"]`` / ``meta_kv["warn"]`` holding the *payload* of the last
 such line. Nothing reads them (``FirmwareMeta`` names neither), and the real
-consumer is ``capture._raise_on_firmware_error``, which scans raw lines before
+consumer is ``transport.firmware_errors.raise_on_firmware_error``, which scans raw lines before
 parsing. The shadow is harmless and deliberately left alone; it is recorded
 here so a future reader does not mistake it for a real key.
 

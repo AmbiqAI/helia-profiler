@@ -201,7 +201,7 @@ class FirmwareErrorCode(StrEnum):
 
     The code is the first token of the payload, delimited by a space or a
     colon (``schema_mismatch:1234_vs_3``, ``unsupported_op kind=custom …``);
-    ``capture._raise_on_firmware_error`` splits it exactly that way. Every
+    ``transport.firmware_errors.raise_on_firmware_error`` splits it exactly that way. Every
     code carries a host hint — see :attr:`WireSpec.has_host_hint`.
     """
 
@@ -425,7 +425,7 @@ class WireSpec:
     #: Terminal kind only: ``True`` = required envelope field, ``False`` =
     #: optional measurement field, ``None`` = pre-record diagnostic.
     required: bool | None = None
-    #: Error kind only: whether ``capture._ERROR_HINTS`` explains this code.
+    #: Error kind only: whether ``transport.firmware_errors.ERROR_HINTS`` explains this code.
     has_host_hint: bool = False
     #: ``False`` for tokens the host accepts but no template emits.
     emitted_by_firmware: bool = True

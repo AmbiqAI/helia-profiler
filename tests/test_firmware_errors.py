@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from helia_profiler.capture import _raise_on_firmware_error
 from helia_profiler.errors import CaptureError
+from helia_profiler.transport.firmware_errors import firmware_error_kind, raise_on_firmware_error
 
 
 def test_no_error_returns_none():
@@ -12,7 +12,7 @@ def test_no_error_returns_none():
         "HPX_VERSION=1",
         "--- HPX_END ---",
     ]
-    _raise_on_firmware_error(lines)
+    raise_on_firmware_error(lines)
 
 
 def test_unsupported_op_is_classified():
@@ -22,7 +22,7 @@ def test_unsupported_op_is_classified():
         "HPX_ERROR=missing_ops count=1 hint=rebuild_with_op_registration",
     ]
     with pytest.raises(CaptureError) as exc_info:
-        _raise_on_firmware_error(lines)
+        raise_on_firmware_error(lines)
     msg = str(exc_info.value)
     assert "unsupported_op" in msg
     # Hint mentions the resolver fix, not the arena.
@@ -38,7 +38,7 @@ def test_alloc_tensors_failed_mentions_both_possibilities():
         "hint=arena_too_small_or_kernel_prepare_failed",
     ]
     with pytest.raises(CaptureError) as exc_info:
-        _raise_on_firmware_error(lines)
+        raise_on_firmware_error(lines)
     hint = exc_info.value.hint or ""
     assert "arena" in hint.lower()
     assert "kernel" in hint.lower() or "prepare" in hint.lower()
@@ -50,7 +50,7 @@ def test_schema_mismatch_payload_with_colon():
         "HPX_ERROR=schema_mismatch:5_vs_3",
     ]
     with pytest.raises(CaptureError) as exc_info:
-        _raise_on_firmware_error(lines)
+        raise_on_firmware_error(lines)
     assert "schema" in str(exc_info.value).lower()
 
 
@@ -59,7 +59,7 @@ def test_unknown_kind_still_raises():
         "HPX_ERROR=brand_new_error_kind detail=foo",
     ]
     with pytest.raises(CaptureError):
-        _raise_on_firmware_error(lines)
+        raise_on_firmware_error(lines)
 
 
 def test_only_first_error_is_raised():
@@ -68,40 +68,45 @@ def test_only_first_error_is_raised():
         "HPX_ERROR=alloc_tensors_failed arena=1024",
     ]
     with pytest.raises(CaptureError) as exc_info:
-        _raise_on_firmware_error(lines)
+        raise_on_firmware_error(lines)
     assert "unsupported_op" in str(exc_info.value)
 
 
 class TestStimerDeadSeverity:
     def test_fatal_when_power_is_enabled(self):
-        from helia_profiler.capture import _raise_on_firmware_error
-        from helia_profiler.errors import CaptureError
-
         with pytest.raises(CaptureError, match="stimer_dead"):
-            _raise_on_firmware_error(
+            raise_on_firmware_error(
                 ["HPX_ERROR=stimer_dead settle_us=1000000 last_ticks=0"],
                 power_enabled=True,
             )
 
     def test_warns_and_continues_without_power(self, caplog):
-        from helia_profiler.capture import _raise_on_firmware_error
-
         with caplog.at_level("WARNING", logger="hpx"):
-            _raise_on_firmware_error(
+            raise_on_firmware_error(
                 ["HPX_ERROR=stimer_dead settle_us=1000000 last_ticks=0"],
                 power_enabled=False,
             )
         assert any("stimer_dead" in r.message for r in caplog.records)
 
     def test_downgrade_does_not_swallow_later_errors(self):
-        from helia_profiler.capture import _raise_on_firmware_error
-        from helia_profiler.errors import CaptureError
-
         with pytest.raises(CaptureError, match="schema_mismatch"):
-            _raise_on_firmware_error(
+            raise_on_firmware_error(
                 [
                     "HPX_ERROR=stimer_dead settle_us=1000000 last_ticks=0",
                     "HPX_ERROR=schema_mismatch:1_vs_2",
                 ],
                 power_enabled=False,
             )
+
+
+@pytest.mark.parametrize(
+    ("line", "kind"),
+    [
+        ("HPX_ERROR=unsupported_op kind=builtin builtin=42", "unsupported_op"),
+        ("HPX_ERROR=schema_mismatch:5_vs_3", "schema_mismatch"),
+        ("HPX_ERROR=bind_arena_failed:-2:region=1 extra", "bind_arena_failed"),
+        ("  HPX_ERROR=psram_init_failed\r\n", "psram_init_failed"),
+    ],
+)
+def test_firmware_error_kind_is_the_first_space_or_colon_token(line, kind):
+    assert firmware_error_kind(line) == kind

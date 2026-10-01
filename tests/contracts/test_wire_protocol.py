@@ -44,9 +44,9 @@ from pathlib import Path
 
 import pytest
 
-from helia_profiler.capture import _ERROR_HINTS
 from helia_profiler.engines import EngineType
 from helia_profiler.firmware import _jinja_env
+from helia_profiler.transport.firmware_errors import ERROR_HINTS
 from helia_profiler.wire import (
     EST_MS_GAP,
     HPX_ITER_SENTINEL_PATTERN,
@@ -998,22 +998,22 @@ def test_warn_code_catalogue():
 
 
 def test_error_hints_are_keyed_by_the_enum_and_agree_with_the_registry():
-    assert set(_ERROR_HINTS) <= set(FirmwareErrorCode)
+    assert set(ERROR_HINTS) <= set(FirmwareErrorCode)
     hinted = {
         FirmwareErrorCode(spec.token.removeprefix("HPX_ERROR="))
         for spec in WIRE_REGISTRY.values()
         if spec.kind is WireKind.ERROR and spec.has_host_hint
     }
-    assert hinted == set(_ERROR_HINTS)
+    assert hinted == set(ERROR_HINTS)
 
 
 def test_every_error_code_carries_a_hint():
-    """Every ``FirmwareErrorCode`` must carry a hint in ``_ERROR_HINTS``.
+    """Every ``FirmwareErrorCode`` must carry a hint in ``ERROR_HINTS``.
 
     A new code with no remediation hint fails this test instead of reaching
     users as a generic "the payload is shown above" message.
     """
-    hintless = {code.value for code in FirmwareErrorCode} - {code.value for code in _ERROR_HINTS}
+    hintless = {code.value for code in FirmwareErrorCode} - {code.value for code in ERROR_HINTS}
     assert hintless == set()
 
 
