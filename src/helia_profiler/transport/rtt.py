@@ -61,12 +61,12 @@ from .protocol import (
 )
 from ..wire import (
     HPX_END_SENTINEL,
-    HPX_ERROR_PREFIX,
     HPX_GO_COMMAND,
     HPX_READY_LINE,
     HPX_START_SENTINEL,
     WireKey,
 )
+from .firmware_errors import raise_on_firmware_error
 from .timing import SBL_SETTLE_S, CaptureTimingTracker
 from .rtt_control import (
     RTT_LIVE_NAMED_SCORE,
@@ -128,11 +128,7 @@ def _wait_for_rtt_line(
                     continue
                 if line == expected_line:
                     return captured + buf
-                if line.startswith(HPX_ERROR_PREFIX):
-                    raise CaptureError(
-                        f"Firmware reported RTT startup error: {line}",
-                        hint="Check target boot logs and RTT handshake state.",
-                    )
+                raise_on_firmware_error([line])
         else:
             time.sleep(0.005)
 
@@ -229,12 +225,7 @@ def _upload_model_to_psram(
             psram_addr = int(m.group(1), 16)
             expected_size = int(m.group(2))
             break
-        # Check for init errors
-        if HPX_ERROR_PREFIX in text:
-            raise CaptureError(
-                f"Firmware error during PSRAM init: {text.strip()}",
-                hint="Check that the board has PSRAM and it is connected.",
-            )
+        raise_on_firmware_error(text.rpartition("\n")[0].splitlines())
         if time.monotonic() >= deadline:
             break
         chunk = bytes(jlink.rtt_read(0, 4096))
