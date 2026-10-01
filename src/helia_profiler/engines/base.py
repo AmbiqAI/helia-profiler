@@ -225,6 +225,11 @@ class HeliaAotArtifacts(EngineArtifacts):
 
     #: False when the AOT module expects externally bound arenas.
     aot_allocate_arenas: bool = True
+    #: True when the user supplied their own heliaAOT memory config (an
+    #: ``engine.config_path`` file or ``memory.tensors`` rules); firmware
+    #: then keeps the planner's arena placement instead of applying the
+    #: profiler's arena override.
+    aot_user_memory_config: bool = False
     #: Arena buffers the firmware binds individually via ``bind_arena()``.
     aot_arena_regions: list[ArenaRegion] = field(default_factory=list)
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -822,8 +823,6 @@ def test_auto_clone_failure_without_stderr_still_reports_cause(
 
 
 def _offline_config(tmp_path, source, *, explicit=False):
-    from dataclasses import replace
-
     config = _config(tmp_path, source, source_path=str(source) if explicit else None)
     return replace(config, build=replace(config.build, offline=True))
 
@@ -893,6 +892,16 @@ def test_offline_cache_never_synchronizes(tmp_path, monkeypatch, cache_state):
         ) as exc:
             ExecuTorchAdapter().prepare(config, tmp_path / "work")
         assert "online run" in (exc.value.hint or "")
+
+
+def test_frozen_alias_resolves_the_offline_cache(tmp_path, monkeypatch):
+    config = replace(_config(tmp_path, tmp_path, source_path=None), frozen=True)
+    cache = tmp_path / "cache"
+    monkeypatch.setattr(
+        executorch_mod, "_auto_clone_nsx_executorch", lambda *_: pytest.fail("frozen auto-clone")
+    )
+    monkeypatch.setattr(executorch_mod, "_offline_cached_source", lambda _ref: cache)
+    assert executorch_mod._resolve_source_root(config) == cache
 
 
 def test_offline_explicit_source_does_not_access_cache(tmp_path, monkeypatch):

@@ -455,7 +455,7 @@ def prepare_locked_dependencies(ctx: PipelineContext) -> DependencyProvenance:
     workspace = ctx.resolved_workspace
     config = ctx.config
     update_requested = config.build.update_dependencies
-    offline = config.build.offline or config.frozen
+    offline = config.build.offline
     reason = _lock_incompatibility(app_dir, board)
 
     if update_requested:

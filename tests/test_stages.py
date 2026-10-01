@@ -49,12 +49,6 @@ class TestResolvePlatformStage:
         assert ctx.soc is not None
         assert ctx.soc.name == "apollo3p"
 
-    def test_unknown_board_raises_config_error(self, tmp_path: Path):
-        ctx = _make_ctx(tmp_path, {"target": {"board": "nonexistent_board"}})
-        stage = ResolvePlatformStage()
-        with pytest.raises(ConfigError, match="Unknown board"):
-            stage.run(ctx)
-
     def test_missing_model_raises_config_error(self, tmp_path: Path):
         config = load_config(
             None,

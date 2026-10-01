@@ -12,6 +12,7 @@ minimum-supported version.
 
 from __future__ import annotations
 
+import copy
 import logging
 import re
 from pathlib import Path
@@ -160,11 +161,8 @@ def _resolve_aot_placement_intent(
         tcm_cap=soc.memory.dtcm_kb * 1024 if soc else 1 << 31,
         sram_cap=soc.memory.sram_kb * 1024 if soc else 1 << 31,
     )
-    # Explicit locations are preflight-validated; Placement() is identity for members.
-    if config.model.arena_location:
-        arena = Placement(config.model.arena_location)
-    if config.model.weights_location:
-        weights = Placement(config.model.weights_location)
+    arena = config.model.arena_location or arena
+    weights = config.model.weights_location or weights
 
     # Ethos-U backend: NPU-visible buffers (scratch/IO and the command
     # stream/weights) default to SRAM/MRAM. The automatic choice never picks
@@ -210,6 +208,55 @@ def _resolve_aot_tensor_rulesets(config: ProfileConfig, soc: SocDef | None) -> l
     return rulesets
 
 
+def _merged_aot_args(config: ProfileConfig) -> dict[str, Any]:
+    """The heliaAOT ``ConvertArgs`` data this config asks for, as a fresh dict.
+
+    ``engine.config_path`` is loaded as a YAML mapping, then
+    ``engine.config.aot_args`` is deep-merged over it.  Every reader of the
+    AOT config (preflight, ``prepare()``, the compiler call) goes through
+    here so they agree on what heliaAOT is told.  The result always has a
+    ``memory`` mapping whose ``tensors``, when present, is a list.
+    """
+    base_data: dict[str, Any] = {}
+    if config.engine.config_path is not None:
+        import yaml
+
+        cfg_path = Path(config.engine.config_path).expanduser().resolve()
+        if not cfg_path.is_file():
+            raise EngineError(
+                f"heliaAOT config file not found: {cfg_path}",
+                hint="Check engine.config_path in your profiler YAML.",
+            )
+        try:
+            with open(cfg_path, encoding="utf-8") as f:
+                loaded = yaml.safe_load(f)
+        except UnicodeDecodeError as exc:
+            raise EngineError(
+                f"heliaAOT config file is not valid UTF-8: {cfg_path}: {exc}",
+                hint="Save engine.config_path with UTF-8 encoding.",
+            ) from exc
+        except yaml.YAMLError as exc:
+            raise EngineError(
+                f"heliaAOT config file is not valid YAML: {cfg_path}: {exc}",
+                hint="Check engine.config_path in your profiler YAML.",
+            ) from exc
+        if loaded is None:
+            loaded = {}
+        if not isinstance(loaded, dict):
+            raise EngineError(
+                f"heliaAOT config must contain a YAML mapping, got {type(loaded).__name__}: "
+                f"{cfg_path}",
+                hint="Check engine.config_path and use key/value YAML fields.",
+            )
+        base_data = loaded
+
+    extra = config.engine.config.get("aot_args", {})
+    if isinstance(extra, dict):
+        _deep_merge(base_data, copy.deepcopy(extra))
+    _prepare_aot_memory_config(base_data)
+    return base_data
+
+
 def _run_aot_compiler(
     config: ProfileConfig,
     output_dir: Path,
@@ -222,12 +269,9 @@ def _run_aot_compiler(
     Uses ``AotConverter.convert()`` so we get the full post-transform graph
     (operator list, AIR model, memory plan) without parsing generated C.
 
-    Config passthrough:
-    * ``engine.config_path``  — loaded as a YAML dict and merged into
-      ``ConvertArgs``.  The profiler's mandatory fields (model, module,
-      platform) override any YAML values.
-    * ``engine.config.aot_args`` — dict of additional ConvertArgs overrides
-      (applied last).
+    ``ConvertArgs`` come from :func:`_merged_aot_args` plus the profiler's
+    tensor rulesets; the profiler's mandatory fields (model, module,
+    platform) override any values there.
     """
     try:
         from helia_aot.cli.defines import ConvertArgs
@@ -241,28 +285,7 @@ def _run_aot_compiler(
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    base_data: dict[str, Any] = {}
-    if config.engine.config_path is not None:
-        import yaml
-
-        cfg_path = Path(config.engine.config_path).expanduser().resolve()
-        if not cfg_path.is_file():
-            raise EngineError(
-                f"heliaAOT config file not found: {cfg_path}",
-                hint="Check engine.config_path in your profiler YAML.",
-            )
-        with open(cfg_path, encoding="utf-8") as f:
-            loaded = yaml.safe_load(f) or {}
-        if not isinstance(loaded, dict):
-            raise EngineError(
-                "heliaAOT config must contain a YAML mapping",
-                hint="Check engine.config_path and use key/value YAML fields.",
-            )
-        base_data = loaded
-
-    extra = config.engine.config.get("aot_args", {})
-    if isinstance(extra, dict):
-        _deep_merge(base_data, extra)
+    aot_args = _merged_aot_args(config)
 
     # Pin the three AIR tensor kinds (constant/persistent/scratch) onto the
     # profiler's requested memories via wildcard attribute rulesets.  A
@@ -272,7 +295,7 @@ def _run_aot_compiler(
     profiler_rulesets = _resolve_aot_tensor_rulesets(
         config, get_soc_for_board(config.target.board, registry=config.platform_registry)
     )
-    mem, user_tensors = _prepare_aot_memory_config(base_data)
+    mem, user_tensors = _prepare_aot_memory_config(aot_args)
     merged_rulesets = _merge_aot_tensor_rulesets(profiler_rulesets, user_tensors)
     if merged_rulesets:
         mem["tensors"] = merged_rulesets
@@ -285,7 +308,7 @@ def _run_aot_compiler(
 
     # Build ConvertArgs — profiler mandatory fields always win
     try:
-        convert_args = ConvertArgs(**base_data)
+        convert_args = ConvertArgs(**aot_args)
     except Exception as exc:
         raise EngineError(
             f"Failed to build heliaAOT ConvertArgs: {exc}",
@@ -363,8 +386,8 @@ def _prepare_aot_memory_config(
         memory = raw_memory
     else:
         raise EngineError(
-            "engine.config.aot_args.memory must be a mapping",
-            hint="Use memory: {tensors: [...]} in the heliaAOT configuration.",
+            "heliaAOT memory must be a mapping",
+            hint="Use memory: {tensors: [...]} in engine.config_path or engine.config.aot_args.",
         )
 
     raw_tensors = memory.get("tensors")
@@ -372,7 +395,7 @@ def _prepare_aot_memory_config(
         return memory, []
     if not isinstance(raw_tensors, list):
         raise EngineError(
-            "engine.config.aot_args.memory.tensors must be a list",
+            "heliaAOT memory.tensors must be a list",
             hint="Provide a YAML list of heliaAOT tensor placement rules.",
         )
     return memory, raw_tensors

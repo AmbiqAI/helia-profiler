@@ -23,6 +23,7 @@ from helia_profiler.config import (
 )
 from helia_profiler.errors import ConfigError
 from helia_profiler.pipeline import serialize_config
+from helia_profiler.placement import Placement
 from helia_profiler.power.base import PowerMode
 
 
@@ -329,6 +330,11 @@ def test_dependency_update_rejects_offline_modes(overrides: dict):
                 **overrides,
             },
         )
+
+
+def test_frozen_alias_resolves_to_build_offline():
+    config = load_config(None, {"model": {"path": "test.tflite"}, "frozen": True})
+    assert config.build.offline is True
 
 
 def test_engine_defaults_to_helia_rt():
@@ -843,3 +849,47 @@ def test_effective_window_target_applies_the_power_floor_only_when_auto_sized(
     )
 
     assert config.effective_window_target_ms == expected_ms
+
+
+@pytest.mark.parametrize(
+    ("overrides", "match"),
+    [
+        ({"model": {"arena_size": 0}}, "model.arena_size"),
+        ({"model": {"arena_size": -5}}, "model.arena_size"),
+        ({"target": {"rtt_buffer_size_up": 0}}, "target.rtt_buffer_size_up"),
+        ({"target": {"rtt_buffer_size_up": -1}}, "target.rtt_buffer_size_up"),
+        ({"model": {"arena_location": "bogus"}}, "model.arena_location"),
+        ({"model": {"arena_location": "mram"}}, "model.arena_location"),
+        ({"model": {"weights_location": "flash"}}, "model.weights_location"),
+        ({"target": {"board": "nope"}}, "Unknown board 'nope'"),
+        ({"target": {"board": ""}}, "Unknown board ''"),
+    ],
+)
+def test_load_config_rejects_invalid_values(overrides: dict, match: str):
+    cli: dict = {"model": {"path": "test.tflite"}, "engine": {"type": "helia-rt"}}
+    for section, values in overrides.items():
+        cli[section] = {**cli.get(section, {}), **values}
+    with pytest.raises(ConfigError, match=match) as excinfo:
+        load_config(None, cli)
+    assert excinfo.value.hint
+
+
+def test_invalid_arena_location_hint_lists_only_arena_regions():
+    with pytest.raises(ConfigError) as excinfo:
+        load_config(None, {"model": {"path": "test.tflite", "arena_location": "mram"}})
+    assert excinfo.value.hint == "Expected one of: tcm, sram, psram."
+
+
+def test_unknown_board_hint_lists_known_boards():
+    with pytest.raises(ConfigError) as excinfo:
+        load_config(None, {"model": {"path": "test.tflite"}, "target": {"board": "nope"}})
+    assert "apollo510_evb" in (excinfo.value.hint or "")
+
+
+def test_placement_strings_resolve_to_placement_members():
+    config = load_config(
+        None,
+        {"model": {"path": "test.tflite", "arena_location": "sram", "weights_location": "mram"}},
+    )
+    assert config.model.arena_location is Placement.SRAM
+    assert config.model.weights_location is Placement.MRAM

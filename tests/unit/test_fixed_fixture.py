@@ -29,6 +29,7 @@ from helia_profiler.firmware.op_resolver import build_fixture_resolver_plan
 from helia_profiler.fixture_analysis import FixtureModelAnalysis
 from helia_profiler.modelcost.model_analysis import LayerOps, ModelAnalysis
 from helia_profiler.pipeline import PipelineContext
+from helia_profiler.placement import Placement
 from helia_profiler.results.models import MemoryPlan, RunMetadata, ToolchainInfo
 from helia_profiler.vocab import Toolchain
 
@@ -48,7 +49,10 @@ def fixture(tmp_path):
     )
     c = ProfileConfig(
         model=ModelConfig(
-            path=f.model.path, arena_size=262144, arena_location="sram", weights_location="mram"
+            path=f.model.path,
+            arena_size=262144,
+            arena_location=Placement.SRAM,
+            weights_location=Placement.MRAM,
         ),
         engine=EngineConfig(type=EngineType.TFLM, backend="cmsis_nn"),
         target=TargetConfig(

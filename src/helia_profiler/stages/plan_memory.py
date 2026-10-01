@@ -701,9 +701,7 @@ def _apply_explicit_overrides(
             hint="Use --weights-location tcm | sram | mram, or pick a PSRAM-capable board.",
         )
 
-    if requested_arena is not None:
-        arena_region = Placement(requested_arena)
-    if requested_weights is not None:
-        weights_region = Placement(requested_weights)
+    arena_region = requested_arena or arena_region
+    weights_region = requested_weights or weights_region
 
     return arena_region, weights_region

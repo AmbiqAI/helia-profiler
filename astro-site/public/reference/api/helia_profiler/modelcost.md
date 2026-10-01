@@ -94,7 +94,7 @@ ethos_u_op_count: int
 
 Number of Vela-generated ethos-u custom ops in the graph.
 
-Source: `src/helia_profiler/modelcost/model_analysis.py:178`
+Source: `src/helia_profiler/modelcost/model_analysis.py:182`
 
 ### helia_profiler.ModelAnalysis.has_ethos_u_op
 
@@ -106,4 +106,16 @@ has_ethos_u_op: bool
 
 True when the model was compiled by Vela (contains ethos-u ops).
 
-Source: `src/helia_profiler/modelcost/model_analysis.py:183`
+Source: `src/helia_profiler/modelcost/model_analysis.py:187`
+
+### helia_profiler.ModelAnalysis.to_dict
+
+`method` · `python`
+
+```python
+to_dict() -> dict[str, Any]
+```
+
+Return the analysis and its layers as plain dicts.
+
+Source: `src/helia_profiler/modelcost/model_analysis.py:177`

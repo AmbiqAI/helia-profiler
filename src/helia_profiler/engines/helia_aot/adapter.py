@@ -14,6 +14,7 @@ import json
 import logging
 from dataclasses import replace as _dc_replace
 from pathlib import Path
+from typing import Any
 
 from ...config import ProfileConfig
 from ...errors import ConfigError
@@ -27,6 +28,7 @@ from .compile import (
     _DEFAULT_MODULE_NAME,
     _DEFAULT_PREFIX,
     _check_helia_aot_version,
+    _merged_aot_args,
     _resolve_aot_platform,
     _run_aot_compiler,
     _validate_pragmas,
@@ -46,21 +48,20 @@ def _engine_cmake_vars(config: ProfileConfig) -> dict[str, str]:
     return cmake_vars
 
 
-def _psram_requested(config: ProfileConfig) -> bool:
+def _user_tensor_rules(aot_args: dict[str, Any]) -> list[Any]:
+    return aot_args["memory"].get("tensors") or []
+
+
+def _psram_requested(config: ProfileConfig, aot_args: dict[str, Any]) -> bool:
     """True when any part of this config steers tensors into PSRAM.
 
     Two routes exist: the coarse split fields, and per-tensor rules in
     ``aot_args.memory.tensors`` (``memory: psram`` or a staged
-    ``constant_destination_memory: psram``).  Detection is best-effort on
-    the raw dicts — malformed rules are ``EngineError``s for
-    ``_prepare_aot_memory_config`` later, not this check's concern.
+    ``constant_destination_memory: psram``).
     """
     if Placement.PSRAM in (config.model.arena_location, config.model.weights_location):
         return True
-    tensors = config.engine.config.get("aot_args", {}).get("memory", {}).get("tensors", [])
-    if not isinstance(tensors, list):
-        return False
-    for rule in tensors:
+    for rule in _user_tensor_rules(aot_args):
         if not isinstance(rule, dict):
             continue
         attributes = rule.get("attributes")
@@ -74,7 +75,7 @@ def _psram_requested(config: ProfileConfig) -> bool:
     return False
 
 
-def _external_arena_mode(config: ProfileConfig) -> bool:
+def _external_arena_mode(aot_args: dict[str, Any]) -> bool:
     """True when arena buffers are host-app allocated and bound at runtime.
 
     heliaAOT's entire PSRAM path — sidecar constant blobs, ``nsx_psram_init``,
@@ -85,9 +86,7 @@ def _external_arena_mode(config: ProfileConfig) -> bool:
     memory plan and the generated firmware can disagree about where the
     tensors live (#219).
     """
-    return (
-        not config.engine.config.get("aot_args", {}).get("memory", {}).get("allocate_arenas", True)
-    )
+    return not aot_args["memory"].get("allocate_arenas", True)
 
 
 def _build_extra_modules(
@@ -141,7 +140,8 @@ class HeliaAOTAdapter:
         return PsramWeightsSource.SELF_CONTAINED
 
     def check_psram_placement(self, config: ProfileConfig) -> None:
-        if _external_arena_mode(config) or not _psram_requested(config):
+        aot_args = _merged_aot_args(config)
+        if _external_arena_mode(aot_args) or not _psram_requested(config, aot_args):
             return
         # Under the default allocate_arenas=True, main_aot.cc.j2 renders
         # ZERO PSRAM code while plan_memory happily reports tensors placed
@@ -151,7 +151,8 @@ class HeliaAOTAdapter:
             "helia-aot PSRAM placement requires external-arena mode, "
             "which is disabled (aot_args.memory.allocate_arenas defaults to true).",
             hint=(
-                "Set engine.config.aot_args.memory.allocate_arenas: false — "
+                "Set memory.allocate_arenas: false in engine.config.aot_args "
+                "or the engine.config_path file — "
                 "heliaAOT then writes its sidecar constant blobs into PSRAM "
                 "itself at boot. Without it the generated firmware contains "
                 "no PSRAM code at all, while the memory plan claims tensors "
@@ -182,6 +183,12 @@ class HeliaAOTAdapter:
 
         aot_version = _check_helia_aot_version(config)
         aot_platform = _resolve_aot_platform(config)
+
+        aot_args = _merged_aot_args(config)
+        allocate_arenas = not _external_arena_mode(aot_args)
+        user_memory_config = config.engine.config_path is not None or bool(
+            _user_tensor_rules(aot_args)
+        )
 
         aot_output_dir = work_dir / "aot_output"
         aot_module_dir = aot_output_dir / module_name
@@ -231,11 +238,8 @@ class HeliaAOTAdapter:
 
         # Build a MemoryPlan from the AOT codegen context so the
         # plan_memory stage can validate placement against the SoC's
-        # physical memory layout.
-        # Extract arena binding info for external-arena mode — resolved
-        # BEFORE plan extraction, which needs it to hint the symbols the
+        # physical memory layout.  allocate_arenas hints the symbols the
         # templates actually emit in each mode (#179).
-        allocate_arenas = not _external_arena_mode(config)
         memory_plan = _extract_memory_plan(codegen_ctx, prefix, allocate_arenas=allocate_arenas)
         arena_regions = _extract_arena_regions(codegen_ctx, prefix)
 
@@ -255,6 +259,7 @@ class HeliaAOTAdapter:
             aot_cmake_target=f"nsx::{cmake_name}",
             helia_aot_version=aot_version,
             aot_allocate_arenas=allocate_arenas,
+            aot_user_memory_config=user_memory_config,
             aot_arena_regions=arena_regions,
             aot_op_manifest=op_manifest or None,
             memory_plan=memory_plan,

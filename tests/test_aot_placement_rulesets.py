@@ -337,6 +337,31 @@ class TestRunAotCompilerUsesConfigRegistry:
         soc = config.platform_registry.socs["apollo510_custom"]
         assert soc.jlink_device == "AP510-CUSTOM"
 
+    def test_inline_aot_args_are_not_mutated(self, tmp_path, monkeypatch):
+        from helia_profiler.engines.helia_aot import compile as compile_mod
+
+        self._install_fake_helia_aot(monkeypatch)
+        config = load_config(
+            None,
+            {
+                "model": {"path": "m.tflite"},
+                "engine": {
+                    "type": "helia-aot",
+                    "config": {"aot_args": {"memory": {"allocate_arenas": False}}},
+                },
+            },
+        )
+
+        compile_mod._run_aot_compiler(
+            config,
+            output_dir=tmp_path / "out",
+            module_name="profiler_module",
+            prefix="hpx",
+            aot_platform="apollo510_evb",
+        )
+
+        assert config.engine.config["aot_args"] == {"memory": {"allocate_arenas": False}}
+
 
 class TestEthosUPlacement:
     """engine.backend=ethos_u defaults NPU-visible buffers off TCM.
