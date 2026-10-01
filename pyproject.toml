@@ -128,9 +128,6 @@ select = [
 ]
 ignore = [
     "E741",
-    "F401",
-    "F841",
-    "I001",
 ]
 
 [tool.ruff.format]
