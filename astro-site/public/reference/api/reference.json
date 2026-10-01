@@ -4136,9 +4136,9 @@
                   "returns": [],
                   "signature": "validity: ResultValidity",
                   "source": {
-                    "line": 39,
+                    "line": 41,
                     "path": "src/helia_profiler/evaluation/validity.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L39"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L41"
                   },
                   "summary": ""
                 },
@@ -4155,9 +4155,9 @@
                   "returns": [],
                   "signature": "issues: tuple[ResultIssue, ...] = ()",
                   "source": {
-                    "line": 40,
+                    "line": 42,
                     "path": "src/helia_profiler/evaluation/validity.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L40"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L42"
                   },
                   "summary": ""
                 },
@@ -4174,9 +4174,9 @@
                   "returns": [],
                   "signature": "gate_arbitration: GateArbitration | None = None",
                   "source": {
-                    "line": 44,
+                    "line": 46,
                     "path": "src/helia_profiler/evaluation/validity.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L44"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L46"
                   },
                   "summary": ""
                 }
@@ -4187,9 +4187,9 @@
               "returns": [],
               "signature": "RunEvaluation(\n    validity: ResultValidity,\n    issues: tuple[ResultIssue, ...] = (),\n    gate_arbitration: GateArbitration | None = None,\n) -> None",
               "source": {
-                "line": 35,
+                "line": 37,
                 "path": "src/helia_profiler/evaluation/validity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L35"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L37"
               },
               "summary": "Authoritative validity and structured issues for one completed run."
             },
@@ -5181,9 +5181,9 @@
               "returns": [],
               "signature": "evaluate_run(ctx: PipelineContext) -> RunEvaluation",
               "source": {
-                "line": 192,
+                "line": 194,
                 "path": "src/helia_profiler/evaluation/validity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L192"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L194"
               },
               "summary": "Evaluate captured results without mutating pipeline state."
             },
@@ -10181,9 +10181,9 @@
                   "returns": [],
                   "signature": "AUTO = 'auto'",
                   "source": {
-                    "line": 45,
+                    "line": 44,
                     "path": "src/helia_profiler/target/lifecycle.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/target/lifecycle.py#L45"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/target/lifecycle.py#L44"
                   },
                   "summary": ""
                 },
@@ -10200,9 +10200,9 @@
                   "returns": [],
                   "signature": "POWER_CYCLE = 'power_cycle'",
                   "source": {
-                    "line": 46,
+                    "line": 45,
                     "path": "src/helia_profiler/target/lifecycle.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/target/lifecycle.py#L46"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/target/lifecycle.py#L45"
                   },
                   "summary": ""
                 },
@@ -10219,9 +10219,9 @@
                   "returns": [],
                   "signature": "NONE = ResetAction.NONE.value",
                   "source": {
-                    "line": 47,
+                    "line": 46,
                     "path": "src/helia_profiler/target/lifecycle.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/target/lifecycle.py#L47"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/target/lifecycle.py#L46"
                   },
                   "summary": ""
                 },
@@ -10238,9 +10238,9 @@
                   "returns": [],
                   "signature": "DEBUG_RESET = ResetAction.DEBUG_RESET.value",
                   "source": {
-                    "line": 48,
+                    "line": 47,
                     "path": "src/helia_profiler/target/lifecycle.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/target/lifecycle.py#L48"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/target/lifecycle.py#L47"
                   },
                   "summary": ""
                 },
@@ -10257,9 +10257,9 @@
                   "returns": [],
                   "signature": "SWPOI_RESET = ResetAction.SWPOI_RESET.value",
                   "source": {
-                    "line": 49,
+                    "line": 48,
                     "path": "src/helia_profiler/target/lifecycle.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/target/lifecycle.py#L49"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/target/lifecycle.py#L48"
                   },
                   "summary": ""
                 },
@@ -10276,9 +10276,9 @@
                   "returns": [],
                   "signature": "DEBUG_RESET_THEN_SWPOI = ResetAction.DEBUG_RESET_THEN_SWPOI.value",
                   "source": {
-                    "line": 50,
+                    "line": 49,
                     "path": "src/helia_profiler/target/lifecycle.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/target/lifecycle.py#L50"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/target/lifecycle.py#L49"
                   },
                   "summary": ""
                 }
@@ -10289,9 +10289,9 @@
               "returns": [],
               "signature": "ResetStrategy()",
               "source": {
-                "line": 42,
+                "line": 41,
                 "path": "src/helia_profiler/target/lifecycle.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/target/lifecycle.py#L42"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/target/lifecycle.py#L41"
               },
               "summary": "User-selectable reset policy for target lifecycle preparation."
             }
