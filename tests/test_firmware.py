@@ -17,17 +17,21 @@ import yaml
 
 from helia_profiler.config import load_config
 from helia_profiler.errors import BuildError, FirmwareError
+from helia_profiler.engines.base import ArenaRegion, HeliaAotArtifacts
+from helia_profiler.engines.helia_aot.adapter import HeliaAOTAdapter
 from helia_profiler.firmware import (
     _board_module_name,
     find_segger_rtt_dir,
     _is_segger_rtt_root,
     _model_to_header,
     _resolve_module_specs,
+    _resolved_aot_arena_regions,
     build_app,
     generate_app,
     render_power_source,
 )
 from helia_profiler.pipeline import PipelineContext
+from helia_profiler.placement import ArenaRole, Placement
 from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 from helia_profiler.stages.plan_memory import PlanMemoryStage
 from helia_profiler.stages.prepare_engine import PrepareEngineStage
@@ -2338,3 +2342,31 @@ def test_executorch_power_binary_has_no_main_template():
     assert _main_template(EngineType.EXECUTORCH) == "main_executorch.cc.j2"
     with pytest.raises(FirmwareError, match="ExecuTorch"):
         _main_template(EngineType.EXECUTORCH, power_only=True)
+
+
+@pytest.mark.parametrize(
+    ("user_memory_config", "expected"),
+    [(False, Placement.TCM), (True, Placement.SRAM)],
+    ids=["profiler-override", "user-placement-kept"],
+)
+def test_resolved_aot_arena_regions_follow_user_memory_config_flag(
+    tmp_path, user_memory_config, expected
+):
+    config = load_config(None, {"model": {"path": "m.tflite"}, "engine": {"type": "helia-aot"}})
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ctx.engine_adapter = HeliaAOTAdapter()
+    ctx.engine_artifacts = HeliaAotArtifacts(
+        engine_header="hpx_model.h",
+        aot_prefix="hpx",
+        aot_module_name="hpx_model",
+        aot_cmake_target="nsx::hpx_model",
+        helia_aot_version="0.0.0",
+        aot_user_memory_config=user_memory_config,
+        aot_arena_regions=[
+            ArenaRegion(0, "scratch", "S", 64, 16, ArenaRole.SCRATCH, "sram", Placement.SRAM)
+        ],
+    )
+    ctx.arena_region = Placement.TCM
+
+    (region,) = _resolved_aot_arena_regions(ctx)
+    assert region.placement is expected
