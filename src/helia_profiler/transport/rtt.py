@@ -625,7 +625,7 @@ def capture_rtt_output(
 
         def read_rtt_chunk() -> bytes:
             # Pure J-Link RTT engine read.  Do NOT mix in a direct-SWD read on
-            # this path: the background RTT engine and a manual _direct_rtt_read
+            # this path: the background RTT engine and a manual direct_rtt_read
             # would both drain the same up buffer and advance RdOff, racing each
             # other and interleaving/corrupting the byte stream (CSV rows spliced
             # mid-row with heartbeats).  The attach probe already proved the

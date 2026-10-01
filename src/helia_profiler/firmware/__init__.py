@@ -29,10 +29,9 @@ from ..engines.base import ArenaRegion, HeliaAotArtifacts
 from ..errors import ConfigError, FirmwareError
 from ..placement import Placement
 
-# The compiler-launcher, SEGGER RTT vendoring, generated-C-header, and NSX
-# build invocation APIs live in dedicated modules (extracted at the
-# module size ceiling — the elf_inventory precedent, see toolchain_probe);
-# re-exported here so callers keep one import surface.
+# .build, .headers, .launcher and .segger were extracted at the module
+# size ceiling (the elf_inventory precedent, see toolchain_probe); their
+# APIs are re-exported here so callers keep one import surface.
 from .build import (
     build_app,
     find_target_binary,
