@@ -13,8 +13,8 @@ import re
 import pytest
 
 # The PRODUCTION environment, not a look-alike (issue #119): a separate env
-# built here previously diverged in whitespace control (trim_blocks/
-# lstrip_blocks) and let real rendering bugs through undetected.
+# built here can drift in whitespace control (trim_blocks/lstrip_blocks) and
+# let real rendering bugs through undetected.
 from helia_profiler.firmware import _jinja_env as _env
 
 # Window-clock resolution happens host-side (#118); deriving the vars here
