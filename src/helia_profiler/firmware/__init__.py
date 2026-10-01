@@ -506,13 +506,9 @@ def _resolved_aot_arena_regions(ctx: PipelineContext) -> list[ArenaRegion]:
     artifacts = ctx.prepared_artifacts
     if not isinstance(artifacts, HeliaAotArtifacts):
         return []
-    adapter = ctx.prepared_adapter
-    has_custom_aot_memory = ctx.config.engine.config_path is not None or bool(
-        ctx.config.engine.config.get("aot_args", {}).get("memory", {}).get("tensors")
-    )
-    if has_custom_aot_memory:
+    if artifacts.aot_user_memory_config:
         return list(artifacts.aot_arena_regions)
-    return adapter.apply_arena_placement_override(
+    return ctx.prepared_adapter.apply_arena_placement_override(
         list(artifacts.aot_arena_regions),
         ctx.arena_region or Placement.TCM,
     )

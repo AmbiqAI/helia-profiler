@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from helia_profiler.config import load_config
-from helia_profiler.errors import CaptureError, ConfigError
+from helia_profiler.errors import CaptureError, ConfigError, EngineError
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.stages.preflight import PreflightStage
 
@@ -225,6 +225,47 @@ class TestPreflightHappyPath:
             patch("helia_profiler.hostenv.doctor.find_spec", return_value=object()),
         ):
             PreflightStage().run(ctx)
+
+    def test_helia_aot_rejects_config_path_tensor_rule_psram_without_external_arena_mode(
+        self, tmp_path: Path
+    ):
+        aot_yaml = tmp_path / "aot.yaml"
+        aot_yaml.write_text(
+            "memory:\n  tensors:\n    - type: constant\n      attributes: {memory: psram}\n",
+            encoding="utf-8",
+        )
+        ctx = _make_ctx(
+            tmp_path,
+            {"engine": {"type": "helia-aot", "config_path": str(aot_yaml)}},
+        )
+        with patch("shutil.which", side_effect=_all_tools_present):
+            with pytest.raises(ConfigError, match="external-arena mode"):
+                PreflightStage().run(ctx)
+
+    def test_helia_aot_accepts_psram_with_config_path_external_arena_mode(self, tmp_path: Path):
+        aot_yaml = tmp_path / "aot.yaml"
+        aot_yaml.write_text("memory:\n  allocate_arenas: false\n", encoding="utf-8")
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "model": {"weights_location": "psram"},
+                "engine": {"type": "helia-aot", "config_path": str(aot_yaml)},
+            },
+        )
+        with (
+            patch("shutil.which", side_effect=_all_tools_present),
+            patch("helia_profiler.hostenv.doctor.find_spec", return_value=object()),
+        ):
+            PreflightStage().run(ctx)
+
+    def test_helia_aot_missing_config_path_fails_preflight(self, tmp_path: Path):
+        ctx = _make_ctx(
+            tmp_path,
+            {"engine": {"type": "helia-aot", "config_path": str(tmp_path / "missing.yaml")}},
+        )
+        with patch("shutil.which", side_effect=_all_tools_present):
+            with pytest.raises(EngineError, match="heliaAOT config file not found"):
+                PreflightStage().run(ctx)
 
     def test_host_upload_engine_psram_weights_still_require_rtt(self, tmp_path: Path):
         model = tmp_path / "model.tflite"
