@@ -31,6 +31,12 @@ def _isolate_engine_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture()
+def no_lockstep_reset_grace(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Skip the real-hardware settle delay in mocked lock-step captures."""
+    monkeypatch.setattr("helia_profiler.capture._LOCKSTEP_RESET_GRACE_S", 0.0)
+
+
+@pytest.fixture()
 def kws_model() -> Path:
     """A real quantised keyword-spotting model, for end-to-end firmware
     generation tests."""

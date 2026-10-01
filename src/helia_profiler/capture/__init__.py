@@ -50,6 +50,8 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("hpx")
 
+_LOCKSTEP_RESET_GRACE_S = 0.5
+
 
 def capture_pmu(ctx: PipelineContext) -> PmuResult:
     """Read PMU data from the target via serial port.
@@ -422,7 +424,7 @@ def capture_power(
                         # state. Discard them, then allow the target and JS320
                         # digital input path to settle before qualifying READY.
                         capture_phase["name"] = "reset_grace"
-                        time.sleep(0.5)
+                        time.sleep(_LOCKSTEP_RESET_GRACE_S)
                         capture_phase["name"] = "waiting_ready"
                         ready_started = time.monotonic()
                         ready = (
