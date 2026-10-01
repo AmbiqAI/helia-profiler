@@ -230,7 +230,7 @@
         },
         {
           "name": "arena_location",
-          "pythonType": "Placement | None",
+          "pythonType": "Literal[Placement.TCM, Placement.SRAM, Placement.PSRAM] | None",
           "required": false,
           "default": null,
           "defaultFromFactory": false
@@ -1586,13 +1586,19 @@
         "arena_location": {
           "anyOf": [
             {
-              "$ref": "#/$defs/Placement"
+              "enum": [
+                "tcm",
+                "sram",
+                "psram"
+              ],
+              "type": "string"
             },
             {
               "type": "null"
             }
           ],
-          "default": null
+          "default": null,
+          "title": "Arena Location"
         },
         "weights_location": {
           "anyOf": [

@@ -6,7 +6,7 @@ import re
 from dataclasses import field, replace
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, get_args
 import difflib
 
 from pydantic import ConfigDict, TypeAdapter, ValidationError, field_validator, model_validator
@@ -186,6 +186,10 @@ DEFAULT_DOWNLOAD_API_S = 30
 DEFAULT_DOWNLOAD_ASSET_S = 300
 
 
+ArenaPlacement = Literal[Placement.TCM, Placement.SRAM, Placement.PSRAM]
+"""Regions the tensor arena may live in; MRAM is read-only at runtime."""
+
+
 def _coerce_placement(value: Any, *, key: str, valid: tuple[Placement, ...]) -> Placement | None:
     if value is None:
         return None
@@ -213,7 +217,7 @@ class ModelConfig:
 
     path: Path
     arena_size: int | None = None  # bytes; None = let engine/firmware report
-    arena_location: Placement | None = None
+    arena_location: ArenaPlacement | None = None
     weights_location: Placement | None = None
 
     @field_validator("arena_size")
@@ -232,7 +236,7 @@ class ModelConfig:
         return _coerce_placement(
             value,
             key="model.arena_location",
-            valid=(Placement.TCM, Placement.SRAM, Placement.PSRAM),
+            valid=get_args(ArenaPlacement),
         )
 
     @field_validator("weights_location", mode="before")
