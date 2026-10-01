@@ -54,7 +54,6 @@ class ArenaRegion:
             ``bind_arena()`` from firmware.
         name: Human-readable region name (used in firmware logs / report
             tables).
-        enum_name: C symbol name of the corresponding region enum value.
         size: Byte size of the backing buffer.
         alignment: Required alignment of the backing buffer.
         role: Region role — drives firmware-level placement overrides.
@@ -68,7 +67,6 @@ class ArenaRegion:
 
     region_id: int
     name: str
-    enum_name: str
     size: int
     alignment: int
     role: ArenaRole
@@ -106,9 +104,6 @@ class EngineArtifacts:
 
     extra_modules: list[NsxModuleRef] = field(default_factory=list)
     cmake_vars: dict[str, str] = field(default_factory=dict)
-    source_files: list[Path] = field(default_factory=list)
-    include_dirs: list[Path] = field(default_factory=list)
-    static_libs: list[Path] = field(default_factory=list)
 
     # Optional memory plan built from engine-specific internals (e.g.
     # heliaAOT's ``codegen_ctx.memory_plan``).  If None, ``plan_memory``
@@ -333,16 +328,6 @@ class EngineAdapter(Protocol):
         """
         ...
 
-    def default_auto_placement(
-        self, *, tcm_cap: int, sram_cap: int
-    ) -> tuple[Placement, Placement] | None:
-        """Engine-specific default when split placement fields are omitted.
-
-        Returns a ``(arena, weights)`` pair, or ``None`` to fall through
-        to the shared greedy fastest-fit policy in ``plan_memory``.
-        """
-        ...
-
     def apply_arena_placement_override(
         self,
         regions: list["ArenaRegion"],
@@ -364,13 +349,6 @@ class SingleArenaPlacementMixin:
     ExecuTorch) share these identity implementations; AOT-style engines
     override both hooks with real placement logic.
     """
-
-    def default_auto_placement(
-        self, *, tcm_cap: int, sram_cap: int
-    ) -> tuple[Placement, Placement] | None:
-        # Fall through to the shared greedy fastest-fit policy.
-        del tcm_cap, sram_cap
-        return None
 
     def apply_arena_placement_override(
         self, regions: list[ArenaRegion], target: Placement

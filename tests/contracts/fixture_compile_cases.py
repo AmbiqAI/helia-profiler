@@ -154,7 +154,6 @@ def _render_typed(engine: str, scope: str, *, aot_prefix: str) -> tuple[str, dic
                 ArenaRegion(
                     0,
                     "scratch",
-                    "FAKE_ARENA_SCRATCH",
                     4096,
                     16,
                     ArenaRole.SCRATCH,
@@ -164,7 +163,6 @@ def _render_typed(engine: str, scope: str, *, aot_prefix: str) -> tuple[str, dic
                 ArenaRegion(
                     1,
                     "persistent",
-                    "FAKE_ARENA_PERSISTENT",
                     256,
                     16,
                     ArenaRole.PERSISTENT,

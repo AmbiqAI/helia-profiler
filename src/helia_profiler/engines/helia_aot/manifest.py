@@ -174,7 +174,6 @@ def _extract_arena_regions(codegen_ctx: Any, prefix: str) -> list[ArenaRegion]:
                 ArenaRegion(
                     region_id=arena.region_id,
                     name=name,
-                    enum_name=name,
                     size=int(arena.size),
                     alignment=int(arena.alignment),
                     role=role,
