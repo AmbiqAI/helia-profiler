@@ -5587,9 +5587,9 @@
                   "returns": [],
                   "signature": "ethos_u_op_count: int",
                   "source": {
-                    "line": 178,
+                    "line": 182,
                     "path": "src/helia_profiler/modelcost/model_analysis.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L178"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L182"
                   },
                   "summary": "Number of Vela-generated ethos-u custom ops in the graph."
                 },
@@ -5606,11 +5606,30 @@
                   "returns": [],
                   "signature": "has_ethos_u_op: bool",
                   "source": {
-                    "line": 183,
+                    "line": 187,
                     "path": "src/helia_profiler/modelcost/model_analysis.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L183"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L187"
                   },
                   "summary": "True when the model was compiled by Vela (contains ethos-u ops)."
+                },
+                {
+                  "description": "Return the analysis and its layers as plain dicts.",
+                  "examples": [],
+                  "id": "helia_profiler.ModelAnalysis.to_dict",
+                  "kind": "method",
+                  "language": "python",
+                  "members": [],
+                  "name": "to_dict",
+                  "params": [],
+                  "raises": [],
+                  "returns": [],
+                  "signature": "to_dict() -> dict[str, Any]",
+                  "source": {
+                    "line": 177,
+                    "path": "src/helia_profiler/modelcost/model_analysis.py",
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L177"
+                  },
+                  "summary": "Return the analysis and its layers as plain dicts."
                 }
               ],
               "name": "ModelAnalysis",
