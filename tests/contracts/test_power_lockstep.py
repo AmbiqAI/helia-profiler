@@ -34,7 +34,7 @@ from helia_profiler.target.lifecycle import (
     resolve_power_lockstep,
 )
 
-from .conftest import BOARD_FOR_FAMILY, make_pmu_ctx
+from .conftest import make_pmu_ctx
 
 
 def _mark_deployed(ctx, tmp_path) -> None:

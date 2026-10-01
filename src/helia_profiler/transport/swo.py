@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING
 
 from ..vocab import Transport
 from ..errors import CaptureError
-from .base import BaseCaptureTransport, CaptureArgs
+from .base import BaseCaptureTransport
 from ..target.probe.base import ResetController
 from ..target.probe.jlink import (
     JLinkResetController,

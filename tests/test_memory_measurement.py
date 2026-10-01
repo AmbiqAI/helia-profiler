@@ -360,7 +360,6 @@ class TestReconciliation:
 
     def _plan(self, consumers_by_region):
         from helia_profiler.results import (
-            MemoryConsumer,
             MemoryPlan,
             MemoryRegionUsage,
         )

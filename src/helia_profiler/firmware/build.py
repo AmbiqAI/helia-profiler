@@ -73,10 +73,10 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
     ninja_already_configured = (build_dir / "build.ninja").exists()
 
     from ..deps.dependencies import (
-        invalidate_sync_stamp,
         prepare_locked_dependencies,
         workspace_mutex,
     )
+    from ..deps.sync import invalidate_sync_stamp
 
     with workspace_mutex(ctx.resolved_workspace):
         dependency_state = prepare_locked_dependencies(ctx)

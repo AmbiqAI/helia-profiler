@@ -8,7 +8,6 @@ heliaAOT itself to be importable (which pulls in TVM / flatbuffers).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 import pytest
 

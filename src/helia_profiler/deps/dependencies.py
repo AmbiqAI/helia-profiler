@@ -20,7 +20,7 @@ from neuralspotx.nsx_lock import LOCK_SCHEMA_VERSION, hash_manifest, read_lock
 
 from . import nsx as nsx_cli
 from .._version import __version__
-from ..errors import BuildError, DependencyError, LockError, VersionError
+from ..errors import DependencyError, LockError, VersionError
 from ..results.dependencies import (
     ContentDigest,
     DependencyLockMode,
@@ -44,7 +44,6 @@ from .sync import (
     _run_frozen_sync_with_repair,
     _sync_stamp_matches,
     _write_sync_stamp,
-    invalidate_sync_stamp,
 )
 
 if TYPE_CHECKING:

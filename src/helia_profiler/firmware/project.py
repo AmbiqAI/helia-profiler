@@ -12,7 +12,6 @@ import yaml
 
 from ..deps import nsx as nsx_cli
 from ..deps.compatibility import CompatibilityBaseline
-from ..config import Transport
 from ..engines.base import HeliaAotArtifacts
 from ..errors import ConfigError, FirmwareError
 from ..platform import get_soc_for_board

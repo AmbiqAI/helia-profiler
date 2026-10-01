@@ -1,6 +1,5 @@
 from dataclasses import replace
 from hashlib import sha256
-from pathlib import Path
 from types import SimpleNamespace
 import pytest
 import json

@@ -10,7 +10,6 @@ from helia_profiler.engines.base import ExecutorchArtifacts, HeliaAotArtifacts, 
 from helia_profiler.errors import PlatformError
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.placement import MemoryRegion
-from helia_profiler.platform import BoardDef, MemoryLayout, SocDef, SocFamily, CoreArch, PmuTier
 from helia_profiler.results import ConsumerKind, MemoryConsumer, MemoryPlan, MemoryRegionUsage
 from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 from helia_profiler.stages.plan_memory import PlanMemoryStage

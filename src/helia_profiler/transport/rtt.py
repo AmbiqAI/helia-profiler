@@ -55,7 +55,6 @@ from ..target.probe.jlink import (
     resume_if_halted,
 )
 from .protocol import (
-    DEFAULT_TIMEOUT_S,
     HEARTBEAT_TIMEOUT_S,
     collect_lines,
 )
@@ -70,12 +69,8 @@ from ..wire import (
 from .timing import SBL_SETTLE_S, CaptureTimingTracker
 from .rtt_control import (
     RTT_LIVE_NAMED_SCORE,
-    direct_rtt_read as _direct_rtt_read,
     direct_rtt_read_any as _direct_rtt_read_any,
-    read_rtt_up_channel0_name as _read_rtt_up_channel0_name,
     scan_for_rtt_control_block as _scan_for_rtt_control_block,
-    scan_rtt_control_blocks as _scan_rtt_control_blocks,
-    score_rtt_control_block as _score_rtt_control_block,
     wipe_rtt_control_blocks as _wipe_rtt_control_blocks,
 )
 

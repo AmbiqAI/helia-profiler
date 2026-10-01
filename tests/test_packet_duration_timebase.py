@@ -10,7 +10,6 @@ from helia_profiler.power.joulescope.stats import (
     _packets_without_counter_span,
     _packet_duration_ticks,
     _process_gated_stats,
-    _stats_arrays,
 )
 
 NAMEPLATE = 16_000_000.0

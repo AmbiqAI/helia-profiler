@@ -11,12 +11,14 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from helia_profiler.hostenv.toolchain_probe import (
-    ElfSection,
-    LoadSegment,
+from helia_profiler.hostenv.elf_inventory import (
     _inventory_from_fromelf_listing,
     _inventory_via_readelf,
     _segments_via_readelf,
+)
+from helia_profiler.hostenv.toolchain_probe import (
+    ElfSection,
+    LoadSegment,
     section_inventory,
 )
 
@@ -333,7 +335,7 @@ def test_llvm_readelf_atfe_captures_parse_identically_to_gnu():
     fixture ELF must yield the same inventory and segments as GNU readelf
     — the captures differ only in header wording the parser never
     reads."""
-    from helia_profiler.hostenv.toolchain_probe import (
+    from helia_profiler.hostenv.elf_inventory import (
         _READELF_INVENTORY_RE,
         _READELF_LOAD_RE,
     )

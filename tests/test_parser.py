@@ -325,8 +325,6 @@ def test_multi_group_separate():
 
 
 def test_iteration_averaging():
-    header = ["Layer", "Op", "ARM_PMU_CPU_CYCLES"]
-    rows = [["0", "CONV_2D", "1000"]]
     lines = [
         "--- HPX_START ---",
         "HPX_PRESETS=basic_cpu",

@@ -16,7 +16,7 @@ from pathlib import Path
 from dataclasses import replace as _dc_replace
 
 from ...config import ProfileConfig
-from ...errors import ConfigError, EngineError
+from ...errors import ConfigError
 from ...placement import ArenaRole, Placement
 from ...results import NsxModuleRef
 from .. import EngineType

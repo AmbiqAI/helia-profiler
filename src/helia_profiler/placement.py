@@ -44,3 +44,13 @@ def resolve_fastest_fit_placement(
         Placement.SRAM if arena_size <= sram_cap else Placement.MRAM,
         Placement.MRAM,
     )
+
+
+__all__ = [
+    "SRAM_PLACEMENT_SLACK_BYTES",
+    "TCM_PLACEMENT_SLACK_BYTES",
+    "ArenaRole",
+    "MemoryRegion",
+    "Placement",
+    "resolve_fastest_fit_placement",
+]

@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass
 from pathlib import Path
 
 from ..results import BinarySections
@@ -26,19 +25,11 @@ from .toolchains import get_toolchain_spec, nm_command, resolve_toolchain_execut
 from .elf_inventory import (
     _FROMELF_SECTION_START_RE,
     _FROMELF_SIZE_BYTES_RE,
-    _RESERVED_NOBITS_NAMES,
     _is_reserved_section_name,
     ElfSection,
     LoadSegment,
     SectionInventory,
     SymbolEntry,
-    _FROMELF_INVENTORY_FIELD_RE,
-    _NM_SIZED_ROW_RE,
-    _READELF_INVENTORY_RE,
-    _READELF_LOAD_RE,
-    _inventory_from_fromelf_listing,
-    _inventory_via_readelf,
-    _segments_via_readelf,
     section_inventory,
     symbol_inventory,
 )
