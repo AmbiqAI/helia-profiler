@@ -22,7 +22,8 @@ from ..results.run_summary import RunSummary
 from ..evaluation import evaluate_run
 from ..firmware import measured_power_fingerprint
 from ..firmware.workload import measured_clean_workload
-from ..power.diagnostics import probe_runs_inferences, window_inference_count
+from ..power.clean_window import window_inference_count
+from ..power.diagnostics import probe_runs_inferences
 
 if TYPE_CHECKING:
     from ..evaluation import RunEvaluation

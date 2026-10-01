@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from tests.pipeline_context_helpers import (
+    publish_power_result,
     set_power_deployment,
     set_power_firmware,
     set_power_result,
@@ -337,7 +338,7 @@ class TestPipelineContext:
         ctx.publish_power_deployment(deployment)
 
         result = PowerResult(summary=PowerSummary(0.01, 0.02, 0.03, 0.04, 1.0, 10))
-        ctx.publish_power_result(result)
+        publish_power_result(ctx, result)
         assert ctx.power_run.observation is not None
         assert ctx.power_run.observation.result is result
         assert ctx.power_run.observation.mode == "free_form"
@@ -382,8 +383,8 @@ class TestPipelineContext:
         ctx.publish_power_plan(PowerRunPlan(firmware_mode="dedicated"))
 
         with pytest.raises(PipelineError, match="must be deployed"):
-            ctx.publish_power_result(
-                PowerResult(summary=PowerSummary(0.01, 0.02, 0.03, 0.04, 1.0, 10))
+            publish_power_result(
+                ctx, PowerResult(summary=PowerSummary(0.01, 0.02, 0.03, 0.04, 1.0, 10))
             )
 
     def test_replanning_clears_legacy_power_state(self, tmp_path: Path):

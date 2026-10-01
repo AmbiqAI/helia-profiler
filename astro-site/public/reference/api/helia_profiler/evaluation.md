@@ -170,7 +170,7 @@ Authoritative validity and structured issues for one completed run.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/evaluation/validity.py:34`
+Source: `src/helia_profiler/evaluation/validity.py:36`
 
 ### helia_profiler.RunEvaluation.validity
 
@@ -180,7 +180,7 @@ Source: `src/helia_profiler/evaluation/validity.py:34`
 validity: ResultValidity
 ```
 
-Source: `src/helia_profiler/evaluation/validity.py:38`
+Source: `src/helia_profiler/evaluation/validity.py:40`
 
 ### helia_profiler.RunEvaluation.issues
 
@@ -190,7 +190,7 @@ Source: `src/helia_profiler/evaluation/validity.py:38`
 issues: tuple[ResultIssue, ...] = ()
 ```
 
-Source: `src/helia_profiler/evaluation/validity.py:39`
+Source: `src/helia_profiler/evaluation/validity.py:41`
 
 ### helia_profiler.RunEvaluation.gate_arbitration
 
@@ -200,7 +200,7 @@ Source: `src/helia_profiler/evaluation/validity.py:39`
 gate_arbitration: GateArbitration | None = None
 ```
 
-Source: `src/helia_profiler/evaluation/validity.py:43`
+Source: `src/helia_profiler/evaluation/validity.py:45`
 
 ## helia_profiler.VerdictStatus
 
@@ -806,7 +806,7 @@ Evaluate captured results without mutating pipeline state.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/evaluation/validity.py:193`
+Source: `src/helia_profiler/evaluation/validity.py:195`
 
 ## helia_profiler.ComparisonVerdict
 

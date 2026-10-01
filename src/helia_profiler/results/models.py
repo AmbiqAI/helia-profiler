@@ -141,7 +141,7 @@ class FirmwareMeta:
     #: build whose window is not DWT-timed per-iteration (Apollo5 / STIMER, or
     #: the busy_loop probe), or firmware predating the check.  Absence is
     #: "unknown", never "healthy".  See
-    #: ``power.diagnostics.assess_clean_window_stall``.
+    #: ``power.clean_window.assess_clean_window_stall``.
     clean_ref_cycles: int | None = None
     #: DWT cycles counted across the firmware's ``HPX_CLEAN_DWT_RATE_US``
     #: calibration interval (``HPX_CLEAN_DWT_RATE_CYC``), timed by

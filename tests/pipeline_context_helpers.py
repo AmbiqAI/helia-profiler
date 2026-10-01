@@ -179,5 +179,20 @@ def set_power_result(ctx: PipelineContext, result: PowerResult | None) -> None:
     ctx.power_run = replace(ctx.power_run, observation=observation)
 
 
+def publish_power_result(ctx: PipelineContext, result: PowerResult) -> None:
+    """Publish *result* through the real observation gate, classifying it first."""
+    mode, integrity, rise, fall, deadline = classify_observation(result.metadata)
+    ctx.publish_power_observation(
+        PowerObservation(
+            mode=mode,
+            result=result,
+            gate_rise_observed=rise,
+            gate_fall_observed=fall,
+            deadline_s=float(deadline if deadline is not None else result.summary.duration_s),
+            integrity=integrity,
+        )
+    )
+
+
 def clear_power_run(ctx: PipelineContext) -> None:
     ctx.power_run = None

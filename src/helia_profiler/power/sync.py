@@ -34,8 +34,6 @@ class DeviceState(Enum):
     UNKNOWN = "unknown"
     READY = "ready"
     RUNNING = "running"
-    DONE = "done"
-    FAULT = "fault"
 
 
 @dataclass(frozen=True)
