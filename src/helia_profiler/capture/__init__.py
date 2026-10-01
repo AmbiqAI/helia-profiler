@@ -187,21 +187,11 @@ class _UsbDtrHolder:
         self._ser = None
 
     def open(self) -> None:
-        import serial
+        from ..transport.usb_cdc import open_cdc_port, resolve_target_cdc_port
 
-        from ..transport.usb_cdc import BAUD, resolve_cdc_port
-
-        port = self._usb_port
-        if port is None:
-            port = resolve_cdc_port(marker=self._usb_marker)
+        port = resolve_target_cdc_port(usb_port=self._usb_port, marker=self._usb_marker)
         log.info("Opening USB CDC port for gated power capture: %s", port)
-        self._ser = serial.Serial(
-            port=port,
-            baudrate=BAUD,
-            timeout=1.0,
-            dsrdtr=True,  # assert DTR so nsx_usb_connected() returns true
-        )
-        self._ser.dtr = True
+        self._ser = open_cdc_port(port, timeout=1.0)
 
     def close(self) -> None:
         if self._ser is not None:
