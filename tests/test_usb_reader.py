@@ -331,3 +331,69 @@ def test_usb_capture_honours_heartbeat_timeout(monkeypatch):
     )
     assert lines == ["--- HPX_START ---"]
     assert time.monotonic() - started < 5
+
+
+def test_resolve_target_cdc_port_prefers_pinned_port(monkeypatch):
+    def _fail(**_):
+        raise AssertionError("a pinned port must not be resolved")
+
+    monkeypatch.setattr(usb_reader, "resolve_cdc_port", _fail)
+    assert usb_reader.resolve_target_cdc_port(usb_port="COM9", marker="HPX-1") == "COM9"
+
+
+def test_resolve_target_cdc_port_forwards_to_resolver(monkeypatch):
+    calls = []
+
+    def _resolve(**kwargs):
+        calls.append(kwargs)
+        return "/dev/ttyACM3"
+
+    monkeypatch.setattr(usb_reader, "resolve_cdc_port", _resolve)
+    port = usb_reader.resolve_target_cdc_port(usb_port=None, marker="HPX-1", timeout_s=2)
+    assert port == "/dev/ttyACM3"
+    assert calls == [{"marker": "HPX-1", "timeout_s": 2}]
+
+
+def test_open_cdc_port_asserts_dtr(monkeypatch):
+    opened = []
+
+    class _Serial:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+            self.dtr = False
+            opened.append(self)
+
+    monkeypatch.setattr(usb_reader.serial, "Serial", _Serial)
+    ser = usb_reader.open_cdc_port("COM9", timeout=0.5)
+    assert ser is opened[0]
+    assert ser.dtr is True
+    assert ser.kwargs == {
+        "port": "COM9",
+        "baudrate": usb_reader.BAUD,
+        "timeout": 0.5,
+        "dsrdtr": True,
+    }
+
+
+def test_open_cdc_port_closes_when_dtr_fails(monkeypatch):
+    closed = []
+
+    class _Serial:
+        def __init__(self, **_):
+            pass
+
+        @property
+        def dtr(self):
+            return False
+
+        @dtr.setter
+        def dtr(self, _value):
+            raise usb_reader.serial.SerialException("dtr failed")
+
+        def close(self):
+            closed.append(self)
+
+    monkeypatch.setattr(usb_reader.serial, "Serial", _Serial)
+    with pytest.raises(usb_reader.serial.SerialException):
+        usb_reader.open_cdc_port("COM9", timeout=None)
+    assert len(closed) == 1

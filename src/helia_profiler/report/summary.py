@@ -22,6 +22,7 @@ from ..results.run_summary import RunSummary
 from ..evaluation import evaluate_run
 from ..firmware import measured_power_fingerprint
 from ..firmware.workload import measured_clean_workload
+from ..power.clean_window import window_reference_inference_us
 from ..power.diagnostics import probe_runs_inferences, window_inference_count
 
 if TYPE_CHECKING:
@@ -256,16 +257,12 @@ def _write_summary(
                 and meta.clean_infer_count
                 and meta.clean_infer_count > 0
             ):
-                plan_meta = power_meta.get("power_plan")
-                # The window's inference count is resolved in ONE place
-                # (#240) -- energy/inference, TOPS, and the gate-duration
-                # check share window_inference_count so the per-inference
-                # denominator cannot silently diverge again. avg_us stays
-                # local; only the duration-integrity narration uses it.
+                # The window's inference count and reference duration are
+                # resolved in ONE place (#240) -- energy/inference, TOPS, and
+                # the gate-duration check share them so the per-inference
+                # denominator cannot silently diverge again.
                 effective_count = window_inference_count(ctx) or meta.clean_infer_count
-                effective_avg_us = meta.clean_infer_avg_us
-                if isinstance(plan_meta, dict) and plan_meta.get("reference_inference_us"):
-                    effective_avg_us = int(plan_meta["reference_inference_us"])
+                effective_avg_us = window_reference_inference_us(ctx)
                 if effective_avg_us and effective_avg_us > 0 and ps.duration_s > 0:
                     # Render the composed #142/#181 verdict (#202): the
                     # arbitration -- integrity, observer, terminal health,

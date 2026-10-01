@@ -4136,9 +4136,9 @@
                   "returns": [],
                   "signature": "validity: ResultValidity",
                   "source": {
-                    "line": 38,
+                    "line": 39,
                     "path": "src/helia_profiler/evaluation/validity.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L38"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L39"
                   },
                   "summary": ""
                 },
@@ -4155,9 +4155,9 @@
                   "returns": [],
                   "signature": "issues: tuple[ResultIssue, ...] = ()",
                   "source": {
-                    "line": 39,
+                    "line": 40,
                     "path": "src/helia_profiler/evaluation/validity.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L39"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L40"
                   },
                   "summary": ""
                 },
@@ -4174,9 +4174,9 @@
                   "returns": [],
                   "signature": "gate_arbitration: GateArbitration | None = None",
                   "source": {
-                    "line": 43,
+                    "line": 44,
                     "path": "src/helia_profiler/evaluation/validity.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L43"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L44"
                   },
                   "summary": ""
                 }
@@ -4187,9 +4187,9 @@
               "returns": [],
               "signature": "RunEvaluation(\n    validity: ResultValidity,\n    issues: tuple[ResultIssue, ...] = (),\n    gate_arbitration: GateArbitration | None = None,\n) -> None",
               "source": {
-                "line": 34,
+                "line": 35,
                 "path": "src/helia_profiler/evaluation/validity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L34"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L35"
               },
               "summary": "Authoritative validity and structured issues for one completed run."
             },
@@ -5181,9 +5181,9 @@
               "returns": [],
               "signature": "evaluate_run(ctx: PipelineContext) -> RunEvaluation",
               "source": {
-                "line": 193,
+                "line": 192,
                 "path": "src/helia_profiler/evaluation/validity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L193"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L192"
               },
               "summary": "Evaluate captured results without mutating pipeline state."
             },

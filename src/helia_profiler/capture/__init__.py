@@ -61,7 +61,7 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
 
     transport = ctx.config.target.transport
 
-    jlink_serial = ctx.resolved_jlink_serial or ctx.config.target.jlink_serial
+    jlink_serial = ctx.effective_jlink_serial
     hb = ctx.config.target.heartbeat
     heartbeat_timeout_s = hb.host_timeout_s if hb.enabled else LINE_TIMEOUT_S
     overall_timeout_s = hb.overall_timeout_s
@@ -187,21 +187,11 @@ class _UsbDtrHolder:
         self._ser = None
 
     def open(self) -> None:
-        import serial
+        from ..transport.usb_cdc import open_cdc_port, resolve_target_cdc_port
 
-        from ..transport.usb_cdc import BAUD, resolve_cdc_port
-
-        port = self._usb_port
-        if port is None:
-            port = resolve_cdc_port(marker=self._usb_marker)
+        port = resolve_target_cdc_port(usb_port=self._usb_port, marker=self._usb_marker)
         log.info("Opening USB CDC port for gated power capture: %s", port)
-        self._ser = serial.Serial(
-            port=port,
-            baudrate=BAUD,
-            timeout=1.0,
-            dsrdtr=True,  # assert DTR so nsx_usb_connected() returns true
-        )
-        self._ser.dtr = True
+        self._ser = open_cdc_port(port, timeout=1.0)
 
     def close(self) -> None:
         if self._ser is not None:
@@ -343,10 +333,9 @@ def capture_power(
         # live. The dedicated power binary has no USB stack and skips this.
         dtr_holder: _UsbDtrHolder | None = None
         if effective_firmware == "shared" and ctx.config.target.transport == Transport.USB_CDC:
-            jlink_serial = ctx.resolved_jlink_serial or ctx.config.target.jlink_serial
             dtr_holder = _UsbDtrHolder(
                 usb_port=ctx.config.target.usb_port,
-                usb_marker=usb_marker_serial(jlink_serial),
+                usb_marker=usb_marker_serial(ctx.effective_jlink_serial),
             )
 
         # 3-wire lock-step: arm the host GO line first, then run the reset +

@@ -256,6 +256,26 @@ class TestPipelineContext:
         assert ctx.power_result is None
         assert ctx.report_paths == []
 
+    def test_effective_jlink_serial_prefers_the_resolved_probe(self, tmp_path: Path):
+        model_file = tmp_path / "test.tflite"
+        model_file.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model_file)},
+                "engine": {"type": "helia-rt"},
+                "target": {"jlink_serial": "1160000001"},
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        assert ctx.effective_jlink_serial == "1160000001"
+        ctx.resolved_jlink_serial = "1160002204"
+        assert ctx.effective_jlink_serial == "1160002204"
+
+    def test_effective_jlink_serial_is_none_without_either(self, tmp_path: Path):
+        ctx = PipelineContext(config=_make_config(tmp_path), work_dir=tmp_path)
+        assert ctx.effective_jlink_serial is None
+
     def test_explicit_artifacts_start_empty(self, tmp_path: Path):
         config = _make_config(tmp_path)
         ctx = PipelineContext(config=config, work_dir=tmp_path)
