@@ -36,6 +36,8 @@ from helia_profiler.target.lifecycle import (
 
 from .conftest import BOARD_FOR_FAMILY, make_pmu_ctx
 
+pytestmark = pytest.mark.usefixtures("no_lockstep_reset_grace")
+
 
 def _mark_deployed(ctx, tmp_path) -> None:
     binary = tmp_path / "hpx_profiler_power"
