@@ -827,3 +827,33 @@ def test_provider_override_does_not_exempt_unselected_provider(
     monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
     with pytest.raises(VersionError, match="qualified baseline pins"):
         prepare_locked_dependencies(ctx)
+
+
+@pytest.mark.parametrize(
+    ("engine_config", "env"),
+    [
+        ({"dist_path": ""}, {}),
+        ({"source_path": ""}, {}),
+        ({}, {"HELIART_DIST_PATH": ""}),
+        ({}, {"HELIART_SOURCE_PATH": ""}),
+    ],
+)
+def test_empty_engine_source_override_is_not_digested(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    engine_config: dict[str, str],
+    env: dict[str, str],
+) -> None:
+    from helia_profiler.deps.dependencies import _override_inputs
+
+    def no_digest(path: Path):
+        raise AssertionError(f"digested {path!r} for an empty override")
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("helia_profiler.deps.dependencies._digest_path", no_digest)
+    for variable, value in env.items():
+        monkeypatch.setenv(variable, value)
+    ctx = _context(tmp_path, engine_type="helia-rt", engine_config=engine_config)
+
+    _, overrides = _override_inputs(ctx)
+    assert [o for o in overrides if o.scope == "engine"] == []
