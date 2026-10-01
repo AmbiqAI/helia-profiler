@@ -72,7 +72,7 @@
           "summary": "Power measurement mode."
         },
         {
-          "description": "`dataclass`\n\nComplete result of a power capture.\n\n``metadata`` is the typed :class:`~helia_profiler.power.metadata.PowerMetadata`\n(#154 Phase 2); the flat dict view is ``metadata.to_metadata_dict()``.\nThe result is frozen but its metadata is deliberately mutable: pipeline\nstages enrich it after capture, like ``RunMetadata``.\n\n**API tier:** `stable`",
+          "description": "`dataclass`\n\nComplete result of a power capture.\n\n``metadata`` is the typed :class:`~helia_profiler.power.metadata.PowerMetadata`\n(#154); the flat dict view is ``metadata.to_metadata_dict()``.\nThe result is frozen but its metadata is deliberately mutable: pipeline\nstages enrich it after capture, like ``RunMetadata``.\n\n**API tier:** `stable`",
           "examples": [],
           "id": "helia_profiler.PowerResult",
           "kind": "class",
