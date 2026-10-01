@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING
 
 from ..config import DEFAULT_POWER_DURATION_S
 from ..vocab import Transport
@@ -45,7 +45,7 @@ from ..wire import HPX_END_SENTINEL, HPX_START_SENTINEL
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
     from ..power.base import PowerDriver, PowerResult
-    from ..power.sync import SyncController, SyncWiring
+    from ..power.sync import SyncController
     from ..results import PmuResult
     from ..target.lifecycle import TargetLifecyclePlan
 
@@ -99,11 +99,7 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
         reset_controller=ctx.reset_controller,
     )
     backend.prepare(ctx, capture_args)
-    backend.start(ctx)
-    try:
-        lines = backend.collect(ctx)
-    finally:
-        backend.close()
+    lines = backend.collect(ctx)
     if not lines:
         raise CaptureError(
             f"No data captured via {transport} transport",
@@ -206,17 +202,7 @@ class _UsbDtrHolder:
                 self._ser = None
 
 
-class _SyncControllerFactory(Protocol):
-    """Optional driver surface for building a 3-wire lock-step controller.
-
-    Not part of :class:`~helia_profiler.power.base.PowerDriver`: only drivers
-    with a host-drivable GO output (Joulescope) provide it.
-    """
-
-    def make_sync_controller(self, wiring: SyncWiring) -> SyncController: ...
-
-
-def _make_sync_controller(ctx: PipelineContext, driver: PowerDriver):
+def _make_sync_controller(ctx: PipelineContext, driver: PowerDriver) -> SyncController:
     """Build a host sync controller from config, or a gate-only fallback.
 
     Lock-step is resolved via ``target.lifecycle.resolve_power_lockstep``
@@ -231,11 +217,12 @@ def _make_sync_controller(ctx: PipelineContext, driver: PowerDriver):
     from ..target.lifecycle import resolve_power_lockstep
 
     resolved_lockstep = resolve_power_lockstep(ctx)
-    # getattr, not a Protocol isinstance: runtime_checkable isinstance uses
-    # getattr_static, which misses a driver exposing the method dynamically
-    # (__getattr__) -- such a driver would silently degrade to gate-only
-    # capture. Duck typing is the contract here; _SyncControllerFactory
-    # documents the shape for readers and type checkers.
+    # make_sync_controller(wiring) -> SyncController is an optional driver
+    # method, not part of PowerDriver: only drivers with a host-drivable GO
+    # output (Joulescope) provide it. getattr, not a Protocol isinstance:
+    # runtime_checkable isinstance uses getattr_static, which misses a driver
+    # exposing the method dynamically (__getattr__) -- such a driver would
+    # silently degrade to gate-only capture.
     make_controller = getattr(driver, "make_sync_controller", None)
     log.debug(
         "gate-race timeline: resolve_power_lockstep=%s (configured=%s, "

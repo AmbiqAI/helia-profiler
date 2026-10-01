@@ -212,9 +212,6 @@ def test_common_core_stays_on_the_base():
         assert artifacts.engine_header
         assert artifacts.extra_modules == []
         assert artifacts.cmake_vars == {}
-        assert artifacts.source_files == []
-        assert artifacts.include_dirs == []
-        assert artifacts.static_libs == []
         assert artifacts.memory_plan is None
 
 

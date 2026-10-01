@@ -11,19 +11,6 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
-# Profile clean-window clock integrity lives in ``clean_window``, re-exported
-# here (``_as_count`` included) so existing import sites keep working.
-from .clean_window import (  # noqa: F401
-    DWT_RATE_MIN_RATIO,
-    CleanWindowClockRate,
-    CleanWindowStall,
-    _as_count,
-    assess_clean_window_clock_rate,
-    assess_clean_window_stall,
-    window_inference_count,
-)
-from .sync import DeviceState
-
 if TYPE_CHECKING:
     from .base import PowerResult
 
@@ -41,7 +28,6 @@ class SyncHandshakeMetadata:
     lockstep: bool
     ready_wait_s: float | None = None
     ready_observed: bool | None = None
-    last_state: DeviceState | None = None
 
     def to_metadata(self) -> dict[str, object]:
         metadata: dict[str, object] = {"lockstep": self.lockstep}
@@ -49,8 +35,6 @@ class SyncHandshakeMetadata:
             metadata["ready_wait_s"] = self.ready_wait_s
         if self.ready_observed is not None:
             metadata["ready_observed"] = self.ready_observed
-        if self.last_state is not None:
-            metadata["last_state"] = self.last_state.value
         return metadata
 
 
@@ -204,9 +188,9 @@ def assess_gate_duration(
 # result as HPX_POWER_ELAPSED_US. That clock is independent of every host
 # measurement, which makes it the one number that can be silently wrong
 # without anything else looking unhealthy: the completed/requested counts
-# still match, and the gate edges are still observed (a powered-down debug
-# domain or a dead crystal can corrupt this clock without any other signal
-# noticing; see helia-profiler#107).
+# still match, and the gate edges are still observed (WORKAROUND
+# helia-profiler#107: a powered-down debug domain or a dead crystal can
+# corrupt this clock without any other signal noticing).
 #
 # What that costs depends on the mode, and the difference matters:
 #   * INTERNAL: the firmware clock IS the denominator. capture/power_terminal.py
@@ -969,9 +953,6 @@ __all__ = [
     "NO_GATE_RISE_LOCKSTEP_HINT",
     "NO_GATE_RISE_WIRING_HINT",
     "WINDOW_CLOCK_CEILING_SLACK_S",
-    "CleanWindowClockRate",
-    "CleanWindowStall",
-    "DWT_RATE_MIN_RATIO",
     "GateArbitration",
     "GateDurationIntegrity",
     "GateSuppressionReason",
@@ -981,8 +962,6 @@ __all__ = [
     "SyncHandshakeMetadata",
     "WindowClockAgreement",
     "WindowClockCeiling",
-    "assess_clean_window_clock_rate",
-    "assess_clean_window_stall",
     "assess_gate_duration",
     "assess_gate_observer",
     "assess_run_window_clock",
