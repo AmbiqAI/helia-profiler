@@ -11,9 +11,8 @@
 {% set _linkage = printf_linkage | default("") %}
 {% if power_only | default(false) %}
 // power_only: no transport is ever initialized on this binary -- UART
-// leaves UART0-3 powered (measurably inflating current on an AP510 EVB),
-// SWO holds PD_DBG
-// (also measurably inflating current), USB PHY likewise.  The
+// leaves UART0-3 powered, SWO holds PD_DBG, and USB keeps its PHY powered,
+// each adding target current to the measured window.  The
 // dedicated power binary must be clean by construction, so hpx_printf
 // compiles away to nothing rather than merely disabling a transport at
 // runtime (which still leaves pad/pinmux/clock residue).  The host observes
