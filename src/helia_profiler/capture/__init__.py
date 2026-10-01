@@ -96,11 +96,7 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
         reset_controller=ctx.reset_controller,
     )
     backend.prepare(ctx, capture_args)
-    backend.start(ctx)
-    try:
-        lines = backend.collect(ctx)
-    finally:
-        backend.close()
+    lines = backend.collect(ctx)
     if not lines:
         raise CaptureError(
             f"No data captured via {transport} transport",

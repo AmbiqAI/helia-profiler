@@ -700,8 +700,6 @@ class RttTransport(BaseCaptureTransport):
     """
 
     transport = Transport.RTT
-    #: RTT always resets and re-attaches — it never holds the probe attached.
-    honors_keep_attached = False
 
     def prepare(self, ctx, args: CaptureArgs) -> None:
         super().prepare(ctx, args)
