@@ -30,7 +30,7 @@ _NOTHING_PROGRAMMED = "Nothing was programmed — this was refused before JLinkE
 # The recipe grammar below is NSX's, ported from ``validate_flash_recipe`` /
 # ``_LOAD_FILE_RE`` in ``neuralspotx.operations._hardware`` rather than
 # imported: that module is private and NSX is only optionally importable here
-# (AGENTS.md "NSX as Build Backend"), but the recipe hpx runs verbatim is
+# (AGENTS.md, "NSX is the build backend"), but the recipe hpx runs verbatim is
 # emitted by NSX's own ``flash_cmds.jlink.in`` template, so the two must agree.
 # Handles the quoted form NSX generates and the unquoted form a hand-rolled or
 # hand-edited recipe may use.

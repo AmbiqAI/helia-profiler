@@ -1,7 +1,6 @@
 """Profile clean-window clock integrity.
 
-Split from ``power.diagnostics`` at its size ceiling; that module re-exports
-every public name here.
+``power.diagnostics`` re-exports every public name here.
 
 ``power.diagnostics`` polices the POWER binary's window clock. These checks
 police the clock that measures the PROFILE binary's clean window -- the

@@ -3443,7 +3443,7 @@ class TestCapturePowerWrapper:
 
 
 class TestPowerFirmwareSelection:
-    """WP3: flashing the dedicated power binary before gated power capture."""
+    """Flashing the dedicated power binary before gated power capture."""
 
     def _make_ctx(
         self,

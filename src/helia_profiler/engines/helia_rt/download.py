@@ -1,8 +1,7 @@
 """heliaRT GitHub release download helpers.
 
-Split out of :mod:`.artifacts` to keep the distribution-resolution module
-focused: this module only talks to the GitHub Releases API and unpacks the
-downloaded archive.
+This module only talks to the GitHub Releases API and unpacks the downloaded
+archive; :mod:`.artifacts` owns distribution resolution.
 """
 
 from __future__ import annotations

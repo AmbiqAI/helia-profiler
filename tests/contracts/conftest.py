@@ -1,4 +1,4 @@
-"""Shared fixtures/helpers for the WP0 architectural contract tests.
+"""Shared fixtures/helpers for the architectural contract tests.
 
 Everything here mocks external tools at the same boundaries the existing
 suite uses (see ``tests/test_rtt_reader.py`` and ``tests/test_power.py``):

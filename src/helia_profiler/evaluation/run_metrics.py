@@ -2,8 +2,7 @@
 
 The declared metric table (``_METRIC_FIELDS``: name, summary path, unit,
 gating group, direction) and the per-region memory rows expanded from each
-summary's ``memory_regions`` block (#206). Extracted from ``compare.py``
-when that module crossed the size ceiling; ``compare.py`` re-imports what
+summary's ``memory_regions`` block (#206). ``compare.py`` re-imports what
 its callers expect from it.
 """
 

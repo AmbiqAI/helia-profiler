@@ -11,9 +11,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
-# Profile clean-window clock integrity, extracted to its own module at this
-# file's size ceiling. Re-exported here (``_as_count`` included) so existing
-# import sites keep working.
+# Profile clean-window clock integrity lives in ``clean_window``, re-exported
+# here (``_as_count`` included) so existing import sites keep working.
 from .clean_window import (  # noqa: F401
     DWT_RATE_MIN_RATIO,
     CleanWindowClockRate,

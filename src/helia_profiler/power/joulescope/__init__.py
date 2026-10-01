@@ -1,7 +1,6 @@
 """Joulescope external power measurement driver package (JS110/JS220/JS320).
 
-Split into focused submodules to stay under the repo's per-file line budget;
-this ``__init__`` re-exports the public surface.
+This ``__init__`` re-exports the public surface of its submodules.
 """
 
 from __future__ import annotations

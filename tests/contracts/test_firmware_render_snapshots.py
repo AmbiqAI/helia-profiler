@@ -464,11 +464,11 @@ def _all_combos() -> list[tuple[str, str, str]]:
     ]
 
 
-# power_only variant matrix (WP1): dedicated power binary, no transport ever
+# power_only variant matrix: dedicated power binary, no transport ever
 # initialized.  Only rendered for "rtt" — power_only forces NSX_DEBUG_NONE
 # regardless of the requested transport, so varying transport here would not
 # exercise any additional code path (see main.cc.j2/main_aot.cc.j2 power_only
-# guards).  Covers every SoC family x engine per the WP1 verification matrix.
+# guards).  Covers every SoC family x engine.
 _POWER_TRANSPORT = "rtt"
 
 
@@ -665,7 +665,7 @@ def test_render_matches_snapshot(soc, transport, engine):
     ids=[_key(*c, power_only=True) for c in _power_combos()],
 )
 def test_power_only_render_matches_snapshot(soc, transport, engine):
-    """WP1: dedicated power binary (power_only=true) render snapshots.
+    """Dedicated power binary (power_only=true) render snapshots.
 
     Rendered from the SAME main.cc.j2 / main_aot.cc.j2 templates as the
     regular (non-power) matrix above — power_only never introduces a new
@@ -796,7 +796,7 @@ def test_npu_render_matches_snapshot(soc, transport, engine):
 
 
 def test_power_only_never_initializes_transport():
-    """WP1 content contract: power_only firmware never brings up UART/SWO/USB,
+    """Content contract: power_only firmware never brings up UART/SWO/USB,
     never emits the per-layer PMU pass loop / CSV dump / HPX_START/HPX_END
     sentinels, but still runs the shared model-init + gated clean window.
     """
@@ -1064,7 +1064,7 @@ def test_free_running_power_binary_never_times_the_window_with_dwt():
     fatal mechanism: on the Cortex-M4F parts DWT lives in the core debug power
     domain and stays powered only while a debugger asserts CDBGPWRUPREQ, which
     firmware cannot set. The dedicated power binary free-runs unwatched once
-    flashed (WP4 -- the probe is released after flash+reset and the Joulescope
+    flashed (the probe is released after flash+reset and the Joulescope
     watches GPIO, not SWD), so on Apollo3 the counter never advances: elapsed_us
     lands at 0, HPX_CLEAN_INFER_AVG_US at 0, and every per-inference power
     metric derived from them is suppressed or wrong.

@@ -31,8 +31,8 @@ def _is_reserved_section_name(name: str) -> bool:
 
     Matches any dot- or underscore-separated token, not just the first: a
     region-qualified name like ``.ram_heap`` or ``.tcm_heap`` stems to
-    "ram"/"tcm" under first-token-only matching and was silently missed --
-    proven by review on a real ELF (#24). Case-insensitive because armlink's
+    "ram"/"tcm" under first-token-only matching and was silently missed
+    (#24). Case-insensitive because armlink's
     execution-region sections are conventionally upper-case (``ARM_LIB_HEAP``
     in NSX's own scatter files) where GNU linker scripts use ``.heap``.
 
