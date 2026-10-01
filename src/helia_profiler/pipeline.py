@@ -28,7 +28,7 @@ from .modelcost import ModelAnalysis
 from .placement import Placement
 from .platform import BoardDef, SocDef
 from .power.base import PowerMode, PowerResult
-from .power.metadata import ObservationMode, classify_observation
+from .power.metadata import ObservationMode
 from .results import (
     BinarySections,
     DependencyWorkspace,
@@ -320,20 +320,6 @@ class PipelineContext:
         self.power_run = replace(
             self.power_run,
             on_device_summary=envelope.measurement,
-        )
-
-    def publish_power_result(self, result: PowerResult) -> None:
-        """Compatibility publisher for non-observing drivers and tests."""
-        mode, integrity, rise, fall, deadline = classify_observation(result.metadata)
-        self.publish_power_observation(
-            PowerObservation(
-                mode=mode,
-                result=result,
-                gate_rise_observed=rise,
-                gate_fall_observed=fall,
-                deadline_s=float(deadline if deadline is not None else result.summary.duration_s),
-                integrity=integrity,
-            )
         )
 
     def report_progress(

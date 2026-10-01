@@ -265,7 +265,6 @@ def _find_cdc_port(
 
 def capture_usb_output(
     *,
-    build_dir: None = None,  # unused — kept for interface parity with SWO
     jlink_serial: str | None = None,
     jlink_device: str,
     timeout_s: float | None = DEFAULT_TIMEOUT_S,
@@ -373,8 +372,6 @@ class UsbCdcTransport(BaseCaptureTransport):
     """
 
     transport = Transport.USB_CDC
-    #: USB CDC holds the probe attached when the SoC requires it (AP3/AP4).
-    honors_keep_attached = True
 
     def collect(self, ctx) -> list[str]:
         from .usb_identity import usb_marker_serial

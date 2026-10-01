@@ -12,8 +12,8 @@ from ..errors import ReportError
 from ..evaluation import evaluate_run
 from ..firmware import measured_power_fingerprint
 from ..firmware.workload import measured_clean_workload
-from ..power.clean_window import window_reference_inference_us
-from ..power.diagnostics import probe_runs_inferences, window_inference_count
+from ..power.clean_window import window_inference_count, window_reference_inference_us
+from ..power.diagnostics import probe_runs_inferences
 from ..results.issues import Severity
 from ..results.run_summary import RunSummary
 from .contracts import RUN_SUMMARY_SCHEMA, RUN_SUMMARY_SCHEMA_VERSION

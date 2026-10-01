@@ -35,7 +35,7 @@ from __future__ import annotations
 import logging
 
 from ..config import DEFAULT_ARENA_SIZE_BYTES, Transport
-from ..engines import EngineType, get_adapter
+from ..engines import EngineType
 from ..engines.base import ExecutorchArtifacts, HeliaAotArtifacts
 from ..errors import PlatformError
 from ..pipeline import PipelineContext
@@ -620,11 +620,6 @@ def _resolve_placement(ctx: PipelineContext) -> tuple[Placement, Placement]:
     """
     cfg = ctx.config
     soc = ctx.soc
-    # The engine adapter owns engine-specific placement policy.
-    # PrepareEngineStage populates ctx.engine_adapter; for the rare
-    # early-call path where soc/adapter aren't yet available we fall back
-    # to a fresh adapter via the registry.
-    adapter = ctx.engine_adapter or get_adapter(cfg.engine.type)
 
     # Capacity probe (in bytes).  If soc is None (very early call), we
     # treat all regions as unbounded; the validate pass will catch real
@@ -639,21 +634,12 @@ def _resolve_placement(ctx: PipelineContext) -> tuple[Placement, Placement]:
     except OSError:
         model_size = 0
 
-    arena_region: Placement
-    weights_region: Placement
-
-    # Engine-specific auto policy (e.g. AOT pins arena=TCM, weights=MRAM).
-    if (
-        engine_default := adapter.default_auto_placement(tcm_cap=tcm_cap, sram_cap=sram_cap)
-    ) is not None:
-        arena_region, weights_region = engine_default
-    else:
-        arena_region, weights_region = resolve_fastest_fit_placement(
-            arena_size=arena_size,
-            weights_size=model_size,
-            tcm_cap=tcm_cap,
-            sram_cap=sram_cap,
-        )
+    arena_region, weights_region = resolve_fastest_fit_placement(
+        arena_size=arena_size,
+        weights_size=model_size,
+        tcm_cap=tcm_cap,
+        sram_cap=sram_cap,
+    )
 
     arena_region, weights_region = _apply_explicit_overrides(
         cfg,

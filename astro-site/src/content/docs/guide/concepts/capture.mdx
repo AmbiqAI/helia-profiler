@@ -83,8 +83,8 @@ transports poll for readiness with a deadline (`open_jlink_with_retry()` in
 `transport/__init__.py` holds a registry keyed by the `Transport` enum;
 `resolve_transport()` returns the backend and `register_transport()` lets
 tests swap one in. Every backend implements the `CaptureTransport` protocol
-in `transport/base.py`: `prepare(ctx, args)`, `start(ctx)`, `collect(ctx)`
-returning the captured lines, and `close()`. The shared line-collection
+in `transport/base.py`: `prepare(ctx, args)`, then `collect(ctx)`
+returning the captured lines. The shared line-collection
 loop is `transport/protocol.py`: it reads until the end sentinel or a
 timeout, and any `HPX_HEARTBEAT` line resets the inactivity deadline
 (`HEARTBEAT_TIMEOUT_S`), with the `clean_window_begin` heartbeat extending

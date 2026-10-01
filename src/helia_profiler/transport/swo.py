@@ -113,7 +113,6 @@ def _remaining(deadline: float | None) -> float | None:
 
 def capture_swo_output(
     *,
-    build_dir=None,  # unused — kept for interface parity
     jlink_serial: str | None = None,
     jlink_device: str,
     timeout_s: float | None = DEFAULT_TIMEOUT_S,
@@ -239,14 +238,11 @@ class SwoTransport(BaseCaptureTransport):
     """
 
     transport = Transport.SWO
-    #: SWO always resets and re-attaches — it never holds the probe attached.
-    honors_keep_attached = False
 
     def collect(self, ctx: PipelineContext) -> list[str]:
         args = self.prepared_args
 
         return capture_swo_output(
-            build_dir=args.build_dir,
             jlink_serial=args.jlink_serial,
             jlink_device=args.jlink_device,
             timeout_s=args.overall_timeout_s,

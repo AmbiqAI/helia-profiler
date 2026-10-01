@@ -14,7 +14,7 @@ from ..results import PowerRunPlan
 
 if TYPE_CHECKING:
     from ..config import ProfileConfig
-from ..power.diagnostics import assess_clean_window_stall
+from ..power.clean_window import assess_clean_window_stall
 
 log = logging.getLogger("hpx")
 

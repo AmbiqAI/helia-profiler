@@ -142,9 +142,9 @@ def test_observed_aot_scratch_arenas_reserve_their_scan_sink(tmp_path, observe):
     ctx.engine_artifacts = replace(
         ctx.engine_artifacts,
         aot_arena_regions=[
-            ArenaRegion(0, "s0", "S0", 256, 16, ArenaRole.SCRATCH, "sram", Placement.SRAM),
-            ArenaRegion(1, "p", "P", 64, 16, ArenaRole.PERSISTENT, "sram", Placement.SRAM),
-            ArenaRegion(2, "s1", "S1", 128, 16, ArenaRole.SCRATCH, "sram", Placement.SRAM),
+            ArenaRegion(0, "s0", 256, 16, ArenaRole.SCRATCH, "sram", Placement.SRAM),
+            ArenaRegion(1, "p", 64, 16, ArenaRole.PERSISTENT, "sram", Placement.SRAM),
+            ArenaRegion(2, "s1", 128, 16, ArenaRole.SCRATCH, "sram", Placement.SRAM),
         ],
     )
     PlanMemoryStage().run(ctx)

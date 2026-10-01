@@ -28,6 +28,7 @@ from helia_profiler.power.metadata import (
 )
 from helia_profiler.results import DeploymentRecord, FirmwareArtifact, PowerRunPlan
 from tests.pipeline_context_helpers import (
+    publish_power_result,
     set_power_firmware,
     set_power_plan,
     set_power_result,
@@ -2381,7 +2382,7 @@ class TestCapturePowerStage:
             metadata=PowerMetadata(measurement_scope="custom_gated"),
         )
 
-        ctx.publish_power_result(result)
+        publish_power_result(ctx, result)
 
         assert ctx.power_run is not None
         assert ctx.power_run.observation is not None

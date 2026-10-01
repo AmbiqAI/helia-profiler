@@ -7,12 +7,15 @@ from typing import TYPE_CHECKING, Any
 
 from ..errors import ReportError
 from ..power.base import PowerMode
-from ..power.clean_window import window_reference_inference_us
+from ..power.clean_window import (
+    assess_clean_window_clock_rate,
+    assess_clean_window_stall,
+    window_inference_count,
+    window_reference_inference_us,
+)
 from ..power.diagnostics import (
     DRIFT_PLAUSIBLE_RATIO_DEVIATION,
     GateArbitration,
-    assess_clean_window_clock_rate,
-    assess_clean_window_stall,
     assess_gate_duration,
     assess_gate_observer,
     assess_run_window_clock,
@@ -21,7 +24,6 @@ from ..power.diagnostics import (
     firmware_window_clock_is_frozen,
     gate_relative_tolerance_for,
     probe_runs_inferences,
-    window_inference_count,
 )
 from ..power.metadata import MeasurementScope
 from ..results import ISSUE_REGISTRY, IssueCode, ResultIssue, ResultValidity, Severity

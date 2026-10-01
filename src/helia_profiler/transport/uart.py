@@ -189,8 +189,6 @@ class UartTransport(BaseCaptureTransport):
     """
 
     transport = Transport.UART
-    #: UART holds the probe attached when the SoC requires it (AP3/AP4).
-    honors_keep_attached = True
 
     def collect(self, ctx) -> list[str]:
         args = self.prepared_args
