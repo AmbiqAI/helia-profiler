@@ -62,7 +62,7 @@ class RttPowerTerminalTransport:
             build_dir=ctx.power_run.firmware.build_dir,
             toolchain=ctx.config.target.toolchain,
             device=ctx.soc.jlink_device,
-            jlink_serial=ctx.resolved_jlink_serial or ctx.config.target.jlink_serial,
+            jlink_serial=ctx.effective_jlink_serial,
             timeout_s=timeout_s,
         )
 
@@ -95,7 +95,7 @@ class UartPowerTerminalTransport:
 
         from ..transport.uart import BAUD, find_jlink_vcom_port
 
-        port = find_jlink_vcom_port(ctx.resolved_jlink_serial or ctx.config.target.jlink_serial)
+        port = find_jlink_vcom_port(ctx.effective_jlink_serial)
         try:
             with serial.Serial(port=port, baudrate=BAUD, timeout=0.1) as stream:
                 stream.reset_input_buffer()
@@ -121,7 +121,7 @@ class SwoPowerTerminalTransport:
 
         with attached_session(
             device=ctx.soc.jlink_device,
-            jlink_serial=ctx.resolved_jlink_serial or ctx.config.target.jlink_serial,
+            jlink_serial=ctx.effective_jlink_serial,
             attach_timeout_s=timeout_s,
         ) as jlink:
             try:
@@ -149,7 +149,7 @@ class UsbCdcPowerTerminalTransport:
 
         port = resolve_target_cdc_port(
             usb_port=ctx.config.target.usb_port,
-            marker=usb_marker_serial(ctx.resolved_jlink_serial or ctx.config.target.jlink_serial),
+            marker=usb_marker_serial(ctx.effective_jlink_serial),
             timeout_s=timeout_s,
         )
         try:

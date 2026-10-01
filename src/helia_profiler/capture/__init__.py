@@ -61,7 +61,7 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
 
     transport = ctx.config.target.transport
 
-    jlink_serial = ctx.resolved_jlink_serial or ctx.config.target.jlink_serial
+    jlink_serial = ctx.effective_jlink_serial
     hb = ctx.config.target.heartbeat
     heartbeat_timeout_s = hb.host_timeout_s if hb.enabled else LINE_TIMEOUT_S
     overall_timeout_s = hb.overall_timeout_s
@@ -333,10 +333,9 @@ def capture_power(
         # live. The dedicated power binary has no USB stack and skips this.
         dtr_holder: _UsbDtrHolder | None = None
         if effective_firmware == "shared" and ctx.config.target.transport == Transport.USB_CDC:
-            jlink_serial = ctx.resolved_jlink_serial or ctx.config.target.jlink_serial
             dtr_holder = _UsbDtrHolder(
                 usb_port=ctx.config.target.usb_port,
-                usb_marker=usb_marker_serial(jlink_serial),
+                usb_marker=usb_marker_serial(ctx.effective_jlink_serial),
             )
 
         # 3-wire lock-step: arm the host GO line first, then run the reset +
