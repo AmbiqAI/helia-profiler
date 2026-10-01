@@ -11,8 +11,8 @@ import logging
 import os
 import threading
 import time
-from dataclasses import replace
 from collections.abc import Callable
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 from ...errors import PowerError

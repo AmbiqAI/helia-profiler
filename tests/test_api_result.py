@@ -2,18 +2,14 @@
 
 from __future__ import annotations
 
-from tests.pipeline_context_helpers import set_power_result, set_profile_result
-
 from pathlib import Path
 
-from helia_profiler.wire import POWER_TERMINAL_VERSION
 from helia_profiler import (
     OnDevicePowerSummary,
     PowerObservation,
     PowerTerminalRecord,
 )
 from helia_profiler.api import profile
-from helia_profiler.results import PowerRun, PowerRunPlan
 from helia_profiler.config import load_config
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.power.base import PowerResult, PowerSummary
@@ -23,7 +19,9 @@ from helia_profiler.power.metadata import (
     PowerIntegrity,
     PowerMetadata,
 )
-from helia_profiler.results import FirmwareMeta, PmuResult
+from helia_profiler.results import FirmwareMeta, PmuResult, PowerRun, PowerRunPlan
+from helia_profiler.wire import POWER_TERMINAL_VERSION
+from tests.pipeline_context_helpers import set_power_result, set_profile_result
 
 
 def test_profile_result_exposes_grouped_power_contract(tmp_path: Path, monkeypatch) -> None:

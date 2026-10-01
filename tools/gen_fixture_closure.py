@@ -13,10 +13,10 @@ from __future__ import annotations
 
 import argparse
 import glob
-from pathlib import Path
 import subprocess
 import sys
 import tomllib
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = ROOT / "src" / "helia_profiler"

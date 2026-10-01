@@ -321,9 +321,9 @@ class TestConsoleJoin:
         from helia_profiler.config import load_config
         from helia_profiler.console import HpxConsole
         from helia_profiler.console.results import print_results
+        from helia_profiler.engines import EngineType
         from helia_profiler.engines.base import HeliaAotArtifacts
         from helia_profiler.pipeline import PipelineContext
-        from helia_profiler.engines import EngineType
         from helia_profiler.results import FirmwareMeta, PmuResult
         from tests.pipeline_context_helpers import set_profile_result
 

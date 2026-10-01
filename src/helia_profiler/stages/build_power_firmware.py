@@ -6,11 +6,11 @@ import logging
 from pathlib import Path
 
 from ..config import PowerFirmware
-from ..results import FirmwareArtifact
 from ..errors import BuildError, FirmwareError
 from ..firmware.image import record_build_image
-from ..power.diagnostics import count_noun
 from ..pipeline import PipelineContext
+from ..power.diagnostics import count_noun
+from ..results import FirmwareArtifact
 
 log = logging.getLogger("hpx")
 
@@ -42,13 +42,13 @@ class BuildPowerFirmwareStage:
         )
 
     def run(self, ctx: PipelineContext) -> None:
+        from ..deps import nsx as nsx_cli
+        from ..deps.dependencies import workspace_mutex
         from ..firmware import (
             find_target_binary,
             nsx_toolchain,
             render_power_source,
         )
-        from ..deps import nsx as nsx_cli
-        from ..deps.dependencies import workspace_mutex
 
         if ctx.power_run is None or ctx.power_run.plan.inference_count is None:
             raise BuildError("Cannot build fixed-N power firmware without a resolved power plan.")

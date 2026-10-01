@@ -1,7 +1,9 @@
 """Fixed-input measurements composed into the normal firmware renderer."""
 
 from __future__ import annotations
+
 from pathlib import Path
+
 from ..engines import EngineType
 from ..engines.base import ArenaRegion, HeliaAotArtifacts
 from ..errors import ConfigError
@@ -11,7 +13,6 @@ from ..fixture_stage import FixtureStage
 from ..pipeline import PipelineContext
 from ..placement import ArenaRole
 from .render import _jinja_env, _write_text
-
 
 _TFLITE_TYPES = {
     "int8": ("kTfLiteInt8", "int8"),

@@ -28,18 +28,18 @@ import logging
 
 import serial  # pyserial
 
-from ..vocab import Transport
 from ..errors import CaptureError
-from .base import BaseCaptureTransport, CaptureArgs
 from ..target.probe.base import ResetController
 from ..target.probe.jlink import JLinkResetController
+from ..vocab import Transport
+from ..wire import HPX_END_SENTINEL, HPX_START_SENTINEL
+from .base import BaseCaptureTransport
 from .ports import JLINK_VCOM, list_serial_ports, normalize_descriptor
 from .protocol import (
     DEFAULT_TIMEOUT_S,
     HEARTBEAT_TIMEOUT_S,
     collect_lines,
 )
-from ..wire import HPX_END_SENTINEL, HPX_START_SENTINEL
 from .timing import CaptureTimingTracker
 
 log = logging.getLogger("hpx")

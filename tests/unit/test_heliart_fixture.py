@@ -1,11 +1,21 @@
 """heliaRT fixed fixtures link a schema-2 prepared runtime archive and prove it."""
 
-from hashlib import sha256
 import json
+from hashlib import sha256
 from types import SimpleNamespace
 
 import pytest
 
+from helia_profiler._fixture_build import (
+    FixedFixture,
+    FixtureCapability,
+    FixtureFile,
+    FixtureMethod,
+    FixtureTimingScope,
+    Int8Tensor,
+    PreparedUpstreamRuntime,
+    build_fixed_fixture,
+)
 from helia_profiler.config import (
     ClockSelection,
     EngineConfig,
@@ -18,16 +28,6 @@ from helia_profiler.engines import EngineType
 from helia_profiler.engines.base import HeliaRtArtifacts
 from helia_profiler.errors import ConfigError
 from helia_profiler.firmware.op_resolver import build_fixture_resolver_plan
-from helia_profiler._fixture_build import (
-    FixedFixture,
-    FixtureCapability,
-    FixtureFile,
-    FixtureMethod,
-    FixtureTimingScope,
-    Int8Tensor,
-    PreparedUpstreamRuntime,
-    build_fixed_fixture,
-)
 from helia_profiler.fixture_analysis import FixtureModelAnalysis
 from helia_profiler.fixture_runtime import _PreparedRuntimeStage
 from helia_profiler.modelcost.model_analysis import LayerOps, ModelAnalysis

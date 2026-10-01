@@ -8,16 +8,6 @@ from typing import Literal
 
 import pytest
 
-from helia_profiler.wire import POWER_TERMINAL_VERSION
-from helia_profiler.results import (
-    DeploymentRecord,
-    FirmwareArtifact,
-    PowerObservation,
-    PowerRunPlan,
-    PowerTerminalEnvelope,
-    PowerTerminalRecord,
-    OnDevicePowerSummary,
-)
 from helia_profiler.config import load_config
 from helia_profiler.errors import PowerError
 from helia_profiler.pipeline import PipelineContext
@@ -28,8 +18,18 @@ from helia_profiler.power.metadata import (
     PowerIntegrity,
     PowerMetadata,
 )
+from helia_profiler.results import (
+    DeploymentRecord,
+    FirmwareArtifact,
+    OnDevicePowerSummary,
+    PowerObservation,
+    PowerRunPlan,
+    PowerTerminalEnvelope,
+    PowerTerminalRecord,
+)
 from helia_profiler.stages.collect_power_terminal import CollectPowerTerminalStage
 from helia_profiler.stages.resolve_platform import ResolvePlatformStage
+from helia_profiler.wire import POWER_TERMINAL_VERSION
 
 
 def _gated_window(duration_s: float) -> GatedPowerWindow:

@@ -22,8 +22,8 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from ..vocab import Transport
 from ..errors import CaptureError
+from ..vocab import Transport
 
 if TYPE_CHECKING:
     from pathlib import Path

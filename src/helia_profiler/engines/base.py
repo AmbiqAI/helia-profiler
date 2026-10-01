@@ -9,7 +9,7 @@ from typing import Any, ClassVar, Protocol, runtime_checkable
 
 from ..config import ProfileConfig
 from ..placement import ArenaRole, Placement
-from ..results import NsxModuleRef, MemoryPlan
+from ..results import MemoryPlan, NsxModuleRef
 from . import EngineType
 
 

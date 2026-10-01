@@ -1,28 +1,13 @@
 """Typed multi-tensor fixed fixtures: declarations, capabilities, budget, build and render."""
 
+import hashlib
+import json
 from dataclasses import replace
 from hashlib import sha256
 from types import SimpleNamespace
 
-import hashlib
-import json
-
 import pytest
 
-from helia_profiler.config import (
-    ClockSelection,
-    EngineConfig,
-    ModelConfig,
-    ProfileConfig,
-    ProfilingConfig,
-    TargetConfig,
-)
-from helia_profiler.engines import EngineType
-from helia_profiler.engines.base import ArenaRegion, HeliaAotArtifacts
-from helia_profiler.errors import ConfigError
-from helia_profiler.firmware.fixture import fixture_template_vars
-from helia_profiler.firmware.op_resolver import build_fixture_resolver_plan
-from helia_profiler.firmware.render import _jinja_env
 from helia_profiler._fixture_build import (
     FIXTURE_CAPABILITIES,
     FIXTURE_READBACK_BUDGET,
@@ -40,6 +25,20 @@ from helia_profiler._fixture_build import (
     _check_typed_fixture,
     build_fixed_fixture,
 )
+from helia_profiler.config import (
+    ClockSelection,
+    EngineConfig,
+    ModelConfig,
+    ProfileConfig,
+    ProfilingConfig,
+    TargetConfig,
+)
+from helia_profiler.engines import EngineType
+from helia_profiler.engines.base import ArenaRegion, HeliaAotArtifacts
+from helia_profiler.errors import ConfigError
+from helia_profiler.firmware.fixture import fixture_template_vars
+from helia_profiler.firmware.op_resolver import build_fixture_resolver_plan
+from helia_profiler.firmware.render import _jinja_env
 from helia_profiler.fixture_analysis import (
     FixtureModelAnalysis,
     FixtureTensor,
@@ -52,7 +51,6 @@ from helia_profiler.pipeline import PipelineContext
 from helia_profiler.placement import ArenaRole, Placement
 from helia_profiler.results.models import MemoryPlan, RunMetadata, ToolchainInfo
 from helia_profiler.vocab import Toolchain
-
 
 SIGNAL = FixtureTensor("signal", 0, "int16", (1, 16), PerTensorQuantization(2**-10, 0))
 GAIN = FixtureTensor("gain", 1, "float32", (1, 1), None)

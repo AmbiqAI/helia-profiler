@@ -16,9 +16,9 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ..results import DeploymentRecord
 from ..errors import BuildError, CaptureError, DeterministicCaptureError
 from ..pipeline import PipelineContext
+from ..results import DeploymentRecord
 from ..target.lifecycle import try_power_cycle_for_context
 
 log = logging.getLogger("hpx")

@@ -94,6 +94,13 @@ if _GXX is None:
 from helia_profiler.firmware import _jinja_env  # noqa: E402
 from helia_profiler.firmware.op_resolver import _ALL_REGISTRATIONS  # noqa: E402
 
+from .fixture_compile_cases import (  # noqa: E402
+    FIXTURE_ENGINES,
+    FIXTURE_KINDS,
+    FIXTURE_SCOPES,
+    render_fixture,
+)
+
 # Reuse the render machinery and both scenario matrices wholesale: the
 # snapshot module's matrix is the canonical "every arm renders" enumeration
 # (#187 D2) and the wire census matrix carries every condition-variant
@@ -115,13 +122,6 @@ from .test_firmware_render_snapshots import (  # noqa: E402
     _render,
 )
 from .test_wire_protocol import _MATRIX as _CENSUS_MATRIX  # noqa: E402
-
-from .fixture_compile_cases import (  # noqa: E402
-    FIXTURE_ENGINES,
-    FIXTURE_KINDS,
-    FIXTURE_SCOPES,
-    render_fixture,
-)
 
 _STUB_DIR = Path(__file__).parent.parent / "fixtures" / "compile_stubs"
 

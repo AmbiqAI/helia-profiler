@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import logging
 import shutil
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -12,7 +12,6 @@ import yaml
 
 from ..deps import nsx as nsx_cli
 from ..deps.compatibility import CompatibilityBaseline
-from ..config import Transport
 from ..engines.base import HeliaAotArtifacts
 from ..errors import ConfigError, FirmwareError
 from ..platform import get_soc_for_board
@@ -21,7 +20,7 @@ from .render import _jinja_env, _write_text
 
 if TYPE_CHECKING:
     from ..config import ProfileConfig
-    from ..engines.base import EngineArtifacts, ArenaRegion
+    from ..engines.base import ArenaRegion, EngineArtifacts
     from ..platform import BoardDef, PlatformRegistry
 
 log = logging.getLogger("hpx")

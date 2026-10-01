@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Literal
 
 from helia_profiler.firmware.fingerprint import (
@@ -10,7 +9,6 @@ from helia_profiler.firmware.fingerprint import (
     firmware_code_fingerprint,
     measured_power_fingerprint,
 )
-
 from tests.test_template_render import _render_tflm
 
 

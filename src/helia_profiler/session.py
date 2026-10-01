@@ -18,16 +18,17 @@ SESSION_INTENT_SCHEMA = "hpx.session-intent"
 SESSION_INTENT_SCHEMA_VERSION = 1
 
 if TYPE_CHECKING:
-    from .evaluation import CompareResult, ComparisonProfile
-    from .platform.counters import PmuCounter
-    from .hostenv.doctor import DoctorResult
+    from rich.console import Console
+
     from .engines import EngineType
+    from .evaluation import CompareResult, ComparisonProfile
+    from .hostenv.doctor import DoctorResult
     from .modelcost import ModelAnalysis
     from .pipeline import ProgressUpdate
     from .platform import BoardDef
+    from .platform.counters import PmuCounter
     from .target.probe.jlink import JLinkProbe, JLinkProbeMatch
     from .transport.ports import SerialPortInfo
-    from rich.console import Console
 
 
 def _merge(base: Mapping[str, Any], override: Mapping[str, Any]) -> dict[str, Any]:

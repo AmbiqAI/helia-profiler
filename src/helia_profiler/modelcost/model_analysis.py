@@ -53,8 +53,8 @@ _HAS_AOT = False
 _AirModel: type[AirModel] | None
 _AirOpType: type[AirOpType] | None
 try:
-    from helia_aot.air.model import AirModel as _imported_air_model
     from helia_aot.air.enums import AirOpType as _imported_air_op_type
+    from helia_aot.air.model import AirModel as _imported_air_model
 
     _AirModel = _imported_air_model
     _AirOpType = _imported_air_op_type

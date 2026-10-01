@@ -12,12 +12,12 @@ from __future__ import annotations
 
 import json
 import logging
-from pathlib import Path
 from dataclasses import replace as _dc_replace
+from pathlib import Path
 from typing import Any
 
 from ...config import ProfileConfig
-from ...errors import ConfigError, EngineError
+from ...errors import ConfigError
 from ...placement import ArenaRole, Placement
 from ...results import NsxModuleRef
 from .. import EngineType

@@ -263,9 +263,9 @@
               "returns": [],
               "signature": "TCM = 'tcm'",
               "source": {
-                "line": 33,
+                "line": 32,
                 "path": "src/helia_profiler/platform/placement.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/placement.py#L33"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/placement.py#L32"
               },
               "summary": ""
             },
@@ -282,9 +282,9 @@
               "returns": [],
               "signature": "SRAM = 'sram'",
               "source": {
-                "line": 34,
+                "line": 33,
                 "path": "src/helia_profiler/platform/placement.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/placement.py#L34"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/placement.py#L33"
               },
               "summary": ""
             },
@@ -301,9 +301,9 @@
               "returns": [],
               "signature": "MRAM = 'mram'",
               "source": {
-                "line": 35,
+                "line": 34,
                 "path": "src/helia_profiler/platform/placement.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/placement.py#L35"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/placement.py#L34"
               },
               "summary": ""
             },
@@ -320,9 +320,9 @@
               "returns": [],
               "signature": "PSRAM = 'psram'",
               "source": {
-                "line": 36,
+                "line": 35,
                 "path": "src/helia_profiler/platform/placement.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/placement.py#L36"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/placement.py#L35"
               },
               "summary": ""
             },
@@ -339,9 +339,9 @@
               "returns": [],
               "signature": "region: MemoryRegion",
               "source": {
-                "line": 39,
+                "line": 38,
                 "path": "src/helia_profiler/platform/placement.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/placement.py#L39"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/placement.py#L38"
               },
               "summary": "The physical region this placement lands in."
             }
@@ -352,9 +352,9 @@
           "returns": [],
           "signature": "Placement()",
           "source": {
-            "line": 24,
+            "line": 23,
             "path": "src/helia_profiler/platform/placement.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/placement.py#L24"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/placement.py#L23"
           },
           "summary": "Logical placement region for arenas / weights / model data."
         },

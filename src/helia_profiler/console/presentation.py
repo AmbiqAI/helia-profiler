@@ -10,10 +10,10 @@ from rich.console import Console
 from rich.pretty import Pretty
 from rich.table import Table
 
-from ..platform.counters import PmuCounter
-from ..hostenv.doctor import DoctorResult
 from ..engines import EngineType
+from ..hostenv.doctor import DoctorResult
 from ..platform import BoardDef
+from ..platform.counters import PmuCounter
 from ..target.probe.jlink import JLinkProbe, JLinkProbeMatch
 from ..transport.ports import SerialPortInfo
 

@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import math
 import re
+from dataclasses import dataclass
 
 from .fixture_runtime import FixtureFile
 from .fixture_target import FixtureTarget
-from .hostenv.toolchain_probe import section_inventory, symbol_inventory, SymbolEntry
+from .hostenv.toolchain_probe import SymbolEntry, section_inventory, symbol_inventory
+from .placement import MemoryRegion
 from .platform import get_soc_for_board
 from .platform.memory_map import linked_memory_map
-from .placement import MemoryRegion
 
 
 @dataclass(frozen=True)

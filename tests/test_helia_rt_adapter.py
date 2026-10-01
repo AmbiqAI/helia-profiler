@@ -285,8 +285,8 @@ class TestHeliaRTAdapter:
 
     def test_prepare_via_stage(self, tmp_path: Path, fake_dist: Path):
         from helia_profiler.pipeline import PipelineContext
-        from helia_profiler.stages.resolve_platform import ResolvePlatformStage
         from helia_profiler.stages.prepare_engine import PrepareEngineStage
+        from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 
         model = tmp_path / "model.tflite"
         model.write_bytes(b"\x00")
@@ -320,8 +320,8 @@ class TestSourceBuildMode:
         monkeypatch: pytest.MonkeyPatch,
     ):
         from helia_profiler.pipeline import PipelineContext
-        from helia_profiler.stages.resolve_platform import ResolvePlatformStage
         from helia_profiler.stages.prepare_engine import PrepareEngineStage
+        from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 
         monkeypatch.setenv("CMSIS_NN_PATH", str(fake_cmsis_nn))
 
@@ -422,8 +422,8 @@ class TestSourceBuildMode:
         monkeypatch: pytest.MonkeyPatch,
     ):
         from helia_profiler.pipeline import PipelineContext
-        from helia_profiler.stages.resolve_platform import ResolvePlatformStage
         from helia_profiler.stages.prepare_engine import PrepareEngineStage
+        from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 
         monkeypatch.setenv("CMSIS_NN_PATH", str(fake_cmsis_nn))
 

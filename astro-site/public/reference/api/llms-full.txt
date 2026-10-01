@@ -146,7 +146,7 @@ User-meaningful progress within a pipeline stage.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/pipeline.py:59`
+Source: `src/helia_profiler/pipeline.py:57`
 
 ### helia_profiler.ProgressUpdate.message
 
@@ -156,7 +156,7 @@ Source: `src/helia_profiler/pipeline.py:59`
 message: str
 ```
 
-Source: `src/helia_profiler/pipeline.py:63`
+Source: `src/helia_profiler/pipeline.py:61`
 
 ### helia_profiler.ProgressUpdate.kind
 
@@ -166,7 +166,7 @@ Source: `src/helia_profiler/pipeline.py:63`
 kind: Literal['status', 'checkpoint'] = 'status'
 ```
 
-Source: `src/helia_profiler/pipeline.py:64`
+Source: `src/helia_profiler/pipeline.py:62`
 
 ### helia_profiler.ProgressUpdate.completed
 
@@ -176,7 +176,7 @@ Source: `src/helia_profiler/pipeline.py:64`
 completed: int | None = None
 ```
 
-Source: `src/helia_profiler/pipeline.py:65`
+Source: `src/helia_profiler/pipeline.py:63`
 
 ### helia_profiler.ProgressUpdate.total
 
@@ -186,7 +186,7 @@ Source: `src/helia_profiler/pipeline.py:65`
 total: int | None = None
 ```
 
-Source: `src/helia_profiler/pipeline.py:66`
+Source: `src/helia_profiler/pipeline.py:64`
 
 ### helia_profiler.ProgressUpdate.unit
 
@@ -196,7 +196,7 @@ Source: `src/helia_profiler/pipeline.py:66`
 unit: str | None = None
 ```
 
-Source: `src/helia_profiler/pipeline.py:67`
+Source: `src/helia_profiler/pipeline.py:65`
 
 ### helia_profiler.ProgressUpdate.eta_s
 
@@ -206,7 +206,7 @@ Source: `src/helia_profiler/pipeline.py:67`
 eta_s: float | None = None
 ```
 
-Source: `src/helia_profiler/pipeline.py:68`
+Source: `src/helia_profiler/pipeline.py:66`
 
 ### helia_profiler.ProgressUpdate.min_verbosity
 
@@ -216,7 +216,7 @@ Source: `src/helia_profiler/pipeline.py:68`
 min_verbosity: int = 0
 ```
 
-Source: `src/helia_profiler/pipeline.py:69`
+Source: `src/helia_profiler/pipeline.py:67`
 
 ## helia_profiler.Session
 
@@ -240,7 +240,7 @@ CLI. Every ``with_*`` method returns an independent session.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/session.py:84`
+Source: `src/helia_profiler/session.py:85`
 
 ### helia_profiler.Session.yaml_path
 
@@ -250,7 +250,7 @@ Source: `src/helia_profiler/session.py:84`
 yaml_path: Path | None = None
 ```
 
-Source: `src/helia_profiler/session.py:93`
+Source: `src/helia_profiler/session.py:94`
 
 ### helia_profiler.Session.from_yaml
 
@@ -264,7 +264,7 @@ from_yaml(path: str | Path) -> Self
 
 Create a session from an immutable snapshot of an HPX YAML config.
 
-Source: `src/helia_profiler/session.py:107`
+Source: `src/helia_profiler/session.py:108`
 
 ### helia_profiler.Session.from_dict
 
@@ -278,7 +278,7 @@ from_dict(intent: Mapping[str, Any]) -> Self
 
 Create a session from unresolved configuration intent.
 
-Source: `src/helia_profiler/session.py:113`
+Source: `src/helia_profiler/session.py:114`
 
 ### helia_profiler.Session.load
 
@@ -292,7 +292,7 @@ load(path: str | Path) -> Self
 
 Load a versioned unresolved-intent snapshot from JSON.
 
-Source: `src/helia_profiler/session.py:120`
+Source: `src/helia_profiler/session.py:121`
 
 ### helia_profiler.Session.intent_dict
 
@@ -304,7 +304,7 @@ intent_dict() -> dict[str, Any]
 
 Return JSON-safe unresolved intent without expanding defaults.
 
-Source: `src/helia_profiler/session.py:146`
+Source: `src/helia_profiler/session.py:147`
 
 ### helia_profiler.Session.resolved_dict
 
@@ -316,7 +316,7 @@ resolved_dict(model: str | Path | None = None) -> dict[str, Any]
 
 Return the fully resolved and validated configuration snapshot.
 
-Source: `src/helia_profiler/session.py:150`
+Source: `src/helia_profiler/session.py:151`
 
 ### helia_profiler.Session.save
 
@@ -328,7 +328,7 @@ save(path: str | Path) -> Path
 
 Persist unresolved intent as a versioned JSON snapshot.
 
-Source: `src/helia_profiler/session.py:156`
+Source: `src/helia_profiler/session.py:157`
 
 ### helia_profiler.Session.with_overrides
 
@@ -340,7 +340,7 @@ with_overrides(overrides: Mapping[str, Any]) -> Self
 
 Return a session with advanced raw configuration overrides merged in.
 
-Source: `src/helia_profiler/session.py:172`
+Source: `src/helia_profiler/session.py:173`
 
 ### helia_profiler.Session.with_model
 
@@ -350,7 +350,7 @@ Source: `src/helia_profiler/session.py:172`
 with_model(path: str | Path, **options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:176`
+Source: `src/helia_profiler/session.py:177`
 
 ### helia_profiler.Session.with_engine
 
@@ -360,7 +360,7 @@ Source: `src/helia_profiler/session.py:176`
 with_engine(engine: Any, **options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:179`
+Source: `src/helia_profiler/session.py:180`
 
 ### helia_profiler.Session.with_target
 
@@ -370,7 +370,7 @@ Source: `src/helia_profiler/session.py:179`
 with_target(**options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:182`
+Source: `src/helia_profiler/session.py:183`
 
 ### helia_profiler.Session.with_profiling
 
@@ -380,7 +380,7 @@ Source: `src/helia_profiler/session.py:182`
 with_profiling(**options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:185`
+Source: `src/helia_profiler/session.py:186`
 
 ### helia_profiler.Session.with_power
 
@@ -390,7 +390,7 @@ Source: `src/helia_profiler/session.py:185`
 with_power(**options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:188`
+Source: `src/helia_profiler/session.py:189`
 
 ### helia_profiler.Session.with_output
 
@@ -400,7 +400,7 @@ Source: `src/helia_profiler/session.py:188`
 with_output(**options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:191`
+Source: `src/helia_profiler/session.py:192`
 
 ### helia_profiler.Session.with_build
 
@@ -410,7 +410,7 @@ Source: `src/helia_profiler/session.py:191`
 with_build(**options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:194`
+Source: `src/helia_profiler/session.py:195`
 
 ### helia_profiler.Session.with_timeouts
 
@@ -420,7 +420,7 @@ Source: `src/helia_profiler/session.py:194`
 with_timeouts(**options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:197`
+Source: `src/helia_profiler/session.py:198`
 
 ### helia_profiler.Session.with_options
 
@@ -438,7 +438,7 @@ with_options(
 
 Return a session with top-level run options.
 
-Source: `src/helia_profiler/session.py:200`
+Source: `src/helia_profiler/session.py:201`
 
 ### helia_profiler.Session.resolve
 
@@ -450,7 +450,7 @@ resolve(model: str | Path | None = None) -> ProfileConfig
 
 Resolve and validate this session as a complete profile config.
 
-Source: `src/helia_profiler/session.py:220`
+Source: `src/helia_profiler/session.py:221`
 
 ### helia_profiler.Session.profile
 
@@ -466,7 +466,7 @@ profile(
 
 Run a profile using this session's resolved configuration.
 
-Source: `src/helia_profiler/session.py:227`
+Source: `src/helia_profiler/session.py:228`
 
 ### helia_profiler.Session.analyze
 
@@ -478,7 +478,7 @@ analyze(model: str | Path | None = None) -> ModelAnalysis
 
 Analyze the configured model without building or flashing firmware.
 
-Source: `src/helia_profiler/session.py:238`
+Source: `src/helia_profiler/session.py:239`
 
 ### helia_profiler.Session.compare
 
@@ -496,7 +496,7 @@ compare(
 
 Compare two completed profiles and optionally write diff artifacts.
 
-Source: `src/helia_profiler/session.py:249`
+Source: `src/helia_profiler/session.py:250`
 
 ### helia_profiler.Session.doctor
 
@@ -511,7 +511,7 @@ Return structured host dependency checks.
 Set *include_versions* to also compare installed tool and package
 versions against the HPX compatibility baseline.
 
-Source: `src/helia_profiler/session.py:277`
+Source: `src/helia_profiler/session.py:278`
 
 ### helia_profiler.Session.show
 
@@ -523,7 +523,7 @@ show(value: Any, *, console: Console | None = None) -> Any
 
 Pretty-print a typed interactive value and return it unchanged.
 
-Source: `src/helia_profiler/session.py:296`
+Source: `src/helia_profiler/session.py:297`
 
 ### helia_profiler.Session.boards
 
@@ -535,7 +535,7 @@ boards() -> tuple[BoardDef, ...]
 
 Return boards visible to this session's platform registry.
 
-Source: `src/helia_profiler/session.py:302`
+Source: `src/helia_profiler/session.py:303`
 
 ### helia_profiler.Session.engines
 
@@ -547,7 +547,7 @@ engines() -> tuple[EngineType, ...]
 
 Return supported inference engine identifiers.
 
-Source: `src/helia_profiler/session.py:309`
+Source: `src/helia_profiler/session.py:310`
 
 ### helia_profiler.Session.counter_groups
 
@@ -559,7 +559,7 @@ counter_groups() -> tuple[str, ...]
 
 Return registered PMU counter group names.
 
-Source: `src/helia_profiler/session.py:315`
+Source: `src/helia_profiler/session.py:316`
 
 ### helia_profiler.Session.counters
 
@@ -571,7 +571,7 @@ counters(group: str | None = None) -> tuple[PmuCounter, ...]
 
 Return registered PMU counters, optionally filtered by group.
 
-Source: `src/helia_profiler/session.py:321`
+Source: `src/helia_profiler/session.py:322`
 
 ### helia_profiler.Session.probes
 
@@ -583,7 +583,7 @@ probes() -> tuple[JLinkProbe, ...]
 
 Return connected J-Link probes.
 
-Source: `src/helia_profiler/session.py:327`
+Source: `src/helia_profiler/session.py:328`
 
 ### helia_profiler.Session.inspect_probes
 
@@ -595,7 +595,7 @@ inspect_probes(board: str | None = None) -> tuple[JLinkProbeMatch, ...]
 
 Inspect the target core visible through each connected probe.
 
-Source: `src/helia_profiler/session.py:333`
+Source: `src/helia_profiler/session.py:334`
 
 ### helia_profiler.Session.match_probe
 
@@ -607,7 +607,7 @@ match_probe(board: str | None = None, *, serial: str | None = None) -> str
 
 Resolve the J-Link serial matching a board target.
 
-Source: `src/helia_profiler/session.py:344`
+Source: `src/helia_profiler/session.py:345`
 
 ### helia_profiler.Session.ports
 
@@ -619,7 +619,7 @@ ports(*, include_all: bool = False) -> tuple[SerialPortInfo, ...]
 
 Return host serial ports relevant to HPX transports.
 
-Source: `src/helia_profiler/session.py:362`
+Source: `src/helia_profiler/session.py:363`
 
 ### helia_profiler.Session.reset
 
@@ -631,7 +631,7 @@ reset(board: str | None = None, *, serial: str | None = None, kind: Literal['deb
 
 Reset the configured target through its J-Link probe.
 
-Source: `src/helia_profiler/session.py:368`
+Source: `src/helia_profiler/session.py:369`
 
 ---
 
@@ -2411,7 +2411,7 @@ recorded run state before a surface is returned.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/deps/dependencies.py:525`
+Source: `src/helia_profiler/deps/dependencies.py:524`
 
 ---
 
@@ -6167,7 +6167,7 @@ Publication status of a result bundle.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/results/manifest.py:18`
+Source: `src/helia_profiler/results/manifest.py:19`
 
 ### helia_profiler.RunStatus.COMPLETE
 
@@ -6177,7 +6177,7 @@ Source: `src/helia_profiler/results/manifest.py:18`
 COMPLETE = 'complete'
 ```
 
-Source: `src/helia_profiler/results/manifest.py:21`
+Source: `src/helia_profiler/results/manifest.py:22`
 
 ### helia_profiler.RunStatus.INCOMPLETE
 
@@ -6187,7 +6187,7 @@ Source: `src/helia_profiler/results/manifest.py:21`
 INCOMPLETE = 'incomplete'
 ```
 
-Source: `src/helia_profiler/results/manifest.py:22`
+Source: `src/helia_profiler/results/manifest.py:23`
 
 ### helia_profiler.RunStatus.FAILED
 
@@ -6197,7 +6197,7 @@ Source: `src/helia_profiler/results/manifest.py:22`
 FAILED = 'failed'
 ```
 
-Source: `src/helia_profiler/results/manifest.py:23`
+Source: `src/helia_profiler/results/manifest.py:24`
 
 ## helia_profiler.ResultValidity
 
@@ -6211,7 +6211,7 @@ Whether measurements in a completed bundle are authoritative.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/results/manifest.py:26`
+Source: `src/helia_profiler/results/manifest.py:27`
 
 ### helia_profiler.ResultValidity.VALID
 
@@ -6221,7 +6221,7 @@ Source: `src/helia_profiler/results/manifest.py:26`
 VALID = 'valid'
 ```
 
-Source: `src/helia_profiler/results/manifest.py:29`
+Source: `src/helia_profiler/results/manifest.py:30`
 
 ### helia_profiler.ResultValidity.DEGRADED
 
@@ -6231,7 +6231,7 @@ Source: `src/helia_profiler/results/manifest.py:29`
 DEGRADED = 'degraded'
 ```
 
-Source: `src/helia_profiler/results/manifest.py:30`
+Source: `src/helia_profiler/results/manifest.py:31`
 
 ### helia_profiler.ResultValidity.INVALID
 
@@ -6241,7 +6241,7 @@ Source: `src/helia_profiler/results/manifest.py:30`
 INVALID = 'invalid'
 ```
 
-Source: `src/helia_profiler/results/manifest.py:31`
+Source: `src/helia_profiler/results/manifest.py:32`
 
 ## helia_profiler.ResultIssue
 
@@ -6263,7 +6263,7 @@ One stable machine-readable issue with optional open context.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/results/manifest.py:34`
+Source: `src/helia_profiler/results/manifest.py:35`
 
 ### helia_profiler.ResultIssue.code
 
@@ -6273,7 +6273,7 @@ Source: `src/helia_profiler/results/manifest.py:34`
 code: str
 ```
 
-Source: `src/helia_profiler/results/manifest.py:38`
+Source: `src/helia_profiler/results/manifest.py:39`
 
 ### helia_profiler.ResultIssue.severity
 
@@ -6283,7 +6283,7 @@ Source: `src/helia_profiler/results/manifest.py:38`
 severity: str
 ```
 
-Source: `src/helia_profiler/results/manifest.py:39`
+Source: `src/helia_profiler/results/manifest.py:40`
 
 ### helia_profiler.ResultIssue.message
 
@@ -6293,7 +6293,7 @@ Source: `src/helia_profiler/results/manifest.py:39`
 message: str
 ```
 
-Source: `src/helia_profiler/results/manifest.py:40`
+Source: `src/helia_profiler/results/manifest.py:41`
 
 ### helia_profiler.ResultIssue.context
 
@@ -6303,7 +6303,7 @@ Source: `src/helia_profiler/results/manifest.py:40`
 context: dict[str, Any] = field(default_factory=dict)
 ```
 
-Source: `src/helia_profiler/results/manifest.py:41`
+Source: `src/helia_profiler/results/manifest.py:42`
 
 ### helia_profiler.ResultIssue.extra
 
@@ -6313,7 +6313,7 @@ Source: `src/helia_profiler/results/manifest.py:41`
 extra: dict[str, Any] = field(default_factory=dict, repr=False)
 ```
 
-Source: `src/helia_profiler/results/manifest.py:42`
+Source: `src/helia_profiler/results/manifest.py:43`
 
 ### helia_profiler.ResultIssue.from_dict
 
@@ -6325,7 +6325,7 @@ from_dict(data: dict[str, Any]) -> Self
 
 `classmethod`
 
-Source: `src/helia_profiler/results/manifest.py:54`
+Source: `src/helia_profiler/results/manifest.py:55`
 
 ### helia_profiler.ResultIssue.to_dict
 
@@ -6335,7 +6335,7 @@ Source: `src/helia_profiler/results/manifest.py:54`
 to_dict() -> dict[str, Any]
 ```
 
-Source: `src/helia_profiler/results/manifest.py:58`
+Source: `src/helia_profiler/results/manifest.py:59`
 
 ## helia_profiler.ResultArtifact
 
@@ -6363,7 +6363,7 @@ One content-addressed file in a result bundle.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/results/manifest.py:62`
+Source: `src/helia_profiler/results/manifest.py:63`
 
 ### helia_profiler.ResultArtifact.path
 
@@ -6373,7 +6373,7 @@ Source: `src/helia_profiler/results/manifest.py:62`
 path: str
 ```
 
-Source: `src/helia_profiler/results/manifest.py:66`
+Source: `src/helia_profiler/results/manifest.py:67`
 
 ### helia_profiler.ResultArtifact.media_type
 
@@ -6383,7 +6383,7 @@ Source: `src/helia_profiler/results/manifest.py:66`
 media_type: str
 ```
 
-Source: `src/helia_profiler/results/manifest.py:67`
+Source: `src/helia_profiler/results/manifest.py:68`
 
 ### helia_profiler.ResultArtifact.size_bytes
 
@@ -6393,7 +6393,7 @@ Source: `src/helia_profiler/results/manifest.py:67`
 size_bytes: int
 ```
 
-Source: `src/helia_profiler/results/manifest.py:68`
+Source: `src/helia_profiler/results/manifest.py:69`
 
 ### helia_profiler.ResultArtifact.sha256
 
@@ -6403,7 +6403,7 @@ Source: `src/helia_profiler/results/manifest.py:68`
 sha256: str
 ```
 
-Source: `src/helia_profiler/results/manifest.py:69`
+Source: `src/helia_profiler/results/manifest.py:70`
 
 ### helia_profiler.ResultArtifact.role
 
@@ -6413,7 +6413,7 @@ Source: `src/helia_profiler/results/manifest.py:69`
 role: str | None = None
 ```
 
-Source: `src/helia_profiler/results/manifest.py:70`
+Source: `src/helia_profiler/results/manifest.py:71`
 
 ### helia_profiler.ResultArtifact.name
 
@@ -6423,7 +6423,7 @@ Source: `src/helia_profiler/results/manifest.py:70`
 name: str | None = None
 ```
 
-Source: `src/helia_profiler/results/manifest.py:71`
+Source: `src/helia_profiler/results/manifest.py:72`
 
 ### helia_profiler.ResultArtifact.schema
 
@@ -6433,7 +6433,7 @@ Source: `src/helia_profiler/results/manifest.py:71`
 schema: str | None = None
 ```
 
-Source: `src/helia_profiler/results/manifest.py:72`
+Source: `src/helia_profiler/results/manifest.py:73`
 
 ### helia_profiler.ResultArtifact.schema_version
 
@@ -6443,7 +6443,7 @@ Source: `src/helia_profiler/results/manifest.py:72`
 schema_version: int | None = None
 ```
 
-Source: `src/helia_profiler/results/manifest.py:73`
+Source: `src/helia_profiler/results/manifest.py:74`
 
 ### helia_profiler.ResultArtifact.producer
 
@@ -6453,7 +6453,7 @@ Source: `src/helia_profiler/results/manifest.py:73`
 producer: str | None = None
 ```
 
-Source: `src/helia_profiler/results/manifest.py:74`
+Source: `src/helia_profiler/results/manifest.py:75`
 
 ### helia_profiler.ResultArtifact.optional
 
@@ -6463,7 +6463,7 @@ Source: `src/helia_profiler/results/manifest.py:74`
 optional: bool | None = None
 ```
 
-Source: `src/helia_profiler/results/manifest.py:75`
+Source: `src/helia_profiler/results/manifest.py:76`
 
 ### helia_profiler.ResultArtifact.extra
 
@@ -6473,7 +6473,7 @@ Source: `src/helia_profiler/results/manifest.py:75`
 extra: dict[str, Any] = field(default_factory=dict, repr=False)
 ```
 
-Source: `src/helia_profiler/results/manifest.py:76`
+Source: `src/helia_profiler/results/manifest.py:77`
 
 ### helia_profiler.ResultArtifact.from_dict
 
@@ -6485,7 +6485,7 @@ from_dict(data: dict[str, Any]) -> Self
 
 `classmethod`
 
-Source: `src/helia_profiler/results/manifest.py:110`
+Source: `src/helia_profiler/results/manifest.py:111`
 
 ### helia_profiler.ResultArtifact.to_dict
 
@@ -6495,7 +6495,7 @@ Source: `src/helia_profiler/results/manifest.py:110`
 to_dict() -> dict[str, Any]
 ```
 
-Source: `src/helia_profiler/results/manifest.py:114`
+Source: `src/helia_profiler/results/manifest.py:115`
 
 ## helia_profiler.ResultManifest
 
@@ -6526,7 +6526,7 @@ Stable result envelope with open provenance and extension payloads.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/results/manifest.py:118`
+Source: `src/helia_profiler/results/manifest.py:119`
 
 ### helia_profiler.ResultManifest.schema
 
@@ -6536,7 +6536,7 @@ Source: `src/helia_profiler/results/manifest.py:118`
 schema: str
 ```
 
-Source: `src/helia_profiler/results/manifest.py:122`
+Source: `src/helia_profiler/results/manifest.py:123`
 
 ### helia_profiler.ResultManifest.schema_version
 
@@ -6546,7 +6546,7 @@ Source: `src/helia_profiler/results/manifest.py:122`
 schema_version: int
 ```
 
-Source: `src/helia_profiler/results/manifest.py:123`
+Source: `src/helia_profiler/results/manifest.py:124`
 
 ### helia_profiler.ResultManifest.run_id
 
@@ -6556,7 +6556,7 @@ Source: `src/helia_profiler/results/manifest.py:123`
 run_id: str
 ```
 
-Source: `src/helia_profiler/results/manifest.py:124`
+Source: `src/helia_profiler/results/manifest.py:125`
 
 ### helia_profiler.ResultManifest.timestamp
 
@@ -6566,7 +6566,7 @@ Source: `src/helia_profiler/results/manifest.py:124`
 timestamp: str
 ```
 
-Source: `src/helia_profiler/results/manifest.py:125`
+Source: `src/helia_profiler/results/manifest.py:126`
 
 ### helia_profiler.ResultManifest.hpx_version
 
@@ -6576,7 +6576,7 @@ Source: `src/helia_profiler/results/manifest.py:125`
 hpx_version: str
 ```
 
-Source: `src/helia_profiler/results/manifest.py:126`
+Source: `src/helia_profiler/results/manifest.py:127`
 
 ### helia_profiler.ResultManifest.status
 
@@ -6586,7 +6586,7 @@ Source: `src/helia_profiler/results/manifest.py:126`
 status: RunStatus
 ```
 
-Source: `src/helia_profiler/results/manifest.py:127`
+Source: `src/helia_profiler/results/manifest.py:128`
 
 ### helia_profiler.ResultManifest.validity
 
@@ -6596,7 +6596,7 @@ Source: `src/helia_profiler/results/manifest.py:127`
 validity: ResultValidity
 ```
 
-Source: `src/helia_profiler/results/manifest.py:128`
+Source: `src/helia_profiler/results/manifest.py:129`
 
 ### helia_profiler.ResultManifest.issues
 
@@ -6606,7 +6606,7 @@ Source: `src/helia_profiler/results/manifest.py:128`
 issues: tuple[ResultIssue, ...]
 ```
 
-Source: `src/helia_profiler/results/manifest.py:129`
+Source: `src/helia_profiler/results/manifest.py:130`
 
 ### helia_profiler.ResultManifest.provenance
 
@@ -6616,7 +6616,7 @@ Source: `src/helia_profiler/results/manifest.py:129`
 provenance: dict[str, Any]
 ```
 
-Source: `src/helia_profiler/results/manifest.py:130`
+Source: `src/helia_profiler/results/manifest.py:131`
 
 ### helia_profiler.ResultManifest.comparability
 
@@ -6626,7 +6626,7 @@ Source: `src/helia_profiler/results/manifest.py:130`
 comparability: dict[str, Any]
 ```
 
-Source: `src/helia_profiler/results/manifest.py:131`
+Source: `src/helia_profiler/results/manifest.py:132`
 
 ### helia_profiler.ResultManifest.artifacts
 
@@ -6636,7 +6636,7 @@ Source: `src/helia_profiler/results/manifest.py:131`
 artifacts: tuple[ResultArtifact, ...]
 ```
 
-Source: `src/helia_profiler/results/manifest.py:132`
+Source: `src/helia_profiler/results/manifest.py:133`
 
 ### helia_profiler.ResultManifest.bundle_type
 
@@ -6646,7 +6646,7 @@ Source: `src/helia_profiler/results/manifest.py:132`
 bundle_type: str | None = None
 ```
 
-Source: `src/helia_profiler/results/manifest.py:133`
+Source: `src/helia_profiler/results/manifest.py:134`
 
 ### helia_profiler.ResultManifest.extensions
 
@@ -6656,7 +6656,7 @@ Source: `src/helia_profiler/results/manifest.py:133`
 extensions: dict[str, Any] = field(default_factory=dict)
 ```
 
-Source: `src/helia_profiler/results/manifest.py:134`
+Source: `src/helia_profiler/results/manifest.py:135`
 
 ### helia_profiler.ResultManifest.extra
 
@@ -6666,7 +6666,7 @@ Source: `src/helia_profiler/results/manifest.py:134`
 extra: dict[str, Any] = field(default_factory=dict, repr=False)
 ```
 
-Source: `src/helia_profiler/results/manifest.py:135`
+Source: `src/helia_profiler/results/manifest.py:136`
 
 ### helia_profiler.ResultManifest.from_dict
 
@@ -6678,7 +6678,7 @@ from_dict(data: dict[str, Any]) -> Self
 
 `classmethod`
 
-Source: `src/helia_profiler/results/manifest.py:168`
+Source: `src/helia_profiler/results/manifest.py:169`
 
 ### helia_profiler.ResultManifest.load
 
@@ -6692,7 +6692,7 @@ load(path: str | Path) -> Self
 
 Load a manifest while preserving unknown fields.
 
-Source: `src/helia_profiler/results/manifest.py:184`
+Source: `src/helia_profiler/results/manifest.py:185`
 
 ### helia_profiler.ResultManifest.to_dict
 
@@ -6702,7 +6702,7 @@ Source: `src/helia_profiler/results/manifest.py:184`
 to_dict() -> dict[str, Any]
 ```
 
-Source: `src/helia_profiler/results/manifest.py:196`
+Source: `src/helia_profiler/results/manifest.py:197`
 
 ### helia_profiler.ResultManifest.write
 
@@ -6714,7 +6714,7 @@ write(path: str | Path) -> Path
 
 Write the manifest without discarding unknown fields.
 
-Source: `src/helia_profiler/results/manifest.py:199`
+Source: `src/helia_profiler/results/manifest.py:200`
 
 ### helia_profiler.ResultManifest.verify
 
@@ -6726,7 +6726,7 @@ verify(bundle_dir: str | Path) -> None
 
 Verify all declared artifact paths, sizes, and SHA-256 digests.
 
-Source: `src/helia_profiler/results/manifest.py:211`
+Source: `src/helia_profiler/results/manifest.py:212`
 
 ## helia_profiler.load_result_manifest
 
@@ -6740,7 +6740,7 @@ Load a result manifest and optionally verify its sibling artifacts.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/results/manifest.py:243`
+Source: `src/helia_profiler/results/manifest.py:244`
 
 ---
 
@@ -6916,7 +6916,7 @@ Engine adapters that emit physical names (heliaAOT's ``DTCM``,
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/platform/placement.py:24`
+Source: `src/helia_profiler/platform/placement.py:23`
 
 ### helia_profiler.Placement.TCM
 
@@ -6926,7 +6926,7 @@ Source: `src/helia_profiler/platform/placement.py:24`
 TCM = 'tcm'
 ```
 
-Source: `src/helia_profiler/platform/placement.py:33`
+Source: `src/helia_profiler/platform/placement.py:32`
 
 ### helia_profiler.Placement.SRAM
 
@@ -6936,7 +6936,7 @@ Source: `src/helia_profiler/platform/placement.py:33`
 SRAM = 'sram'
 ```
 
-Source: `src/helia_profiler/platform/placement.py:34`
+Source: `src/helia_profiler/platform/placement.py:33`
 
 ### helia_profiler.Placement.MRAM
 
@@ -6946,7 +6946,7 @@ Source: `src/helia_profiler/platform/placement.py:34`
 MRAM = 'mram'
 ```
 
-Source: `src/helia_profiler/platform/placement.py:35`
+Source: `src/helia_profiler/platform/placement.py:34`
 
 ### helia_profiler.Placement.PSRAM
 
@@ -6956,7 +6956,7 @@ Source: `src/helia_profiler/platform/placement.py:35`
 PSRAM = 'psram'
 ```
 
-Source: `src/helia_profiler/platform/placement.py:36`
+Source: `src/helia_profiler/platform/placement.py:35`
 
 ### helia_profiler.Placement.region
 
@@ -6970,7 +6970,7 @@ The physical region this placement lands in.
 
 ``TCM`` is DTCM: ITCM is code-only and never holds arenas or weights.
 
-Source: `src/helia_profiler/platform/placement.py:39`
+Source: `src/helia_profiler/platform/placement.py:38`
 
 ## helia_profiler.Transport
 

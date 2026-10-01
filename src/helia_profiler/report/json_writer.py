@@ -8,8 +8,8 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from .csv_writer import _layer_to_flat_dict
 from .contracts import PROFILE_RESULTS_SCHEMA, PROFILE_RESULTS_SCHEMA_VERSION
+from .csv_writer import _layer_to_flat_dict
 from .metadata import _firmware_meta_to_dict, _metadata_to_dict
 from .power import _power_run_records
 

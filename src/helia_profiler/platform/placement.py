@@ -16,7 +16,6 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-
 TCM_PLACEMENT_SLACK_BYTES = 128 * 1024
 SRAM_PLACEMENT_SLACK_BYTES = 32 * 1024
 

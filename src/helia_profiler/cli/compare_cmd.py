@@ -15,9 +15,9 @@ def _cmd_compare(
     validation: bool = False,
     top_layers: int = 10,
 ) -> None:
-    from ..evaluation import compare_runs, write_compare_artifacts
     from ..console import HpxConsole
     from ..errors import HpxError
+    from ..evaluation import compare_runs, write_compare_artifacts
 
     console = HpxConsole()
     try:

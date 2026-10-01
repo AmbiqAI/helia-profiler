@@ -170,7 +170,7 @@ Engine adapters that emit physical names (heliaAOT's ``DTCM``,
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/platform/placement.py:24`
+Source: `src/helia_profiler/platform/placement.py:23`
 
 ### helia_profiler.Placement.TCM
 
@@ -180,7 +180,7 @@ Source: `src/helia_profiler/platform/placement.py:24`
 TCM = 'tcm'
 ```
 
-Source: `src/helia_profiler/platform/placement.py:33`
+Source: `src/helia_profiler/platform/placement.py:32`
 
 ### helia_profiler.Placement.SRAM
 
@@ -190,7 +190,7 @@ Source: `src/helia_profiler/platform/placement.py:33`
 SRAM = 'sram'
 ```
 
-Source: `src/helia_profiler/platform/placement.py:34`
+Source: `src/helia_profiler/platform/placement.py:33`
 
 ### helia_profiler.Placement.MRAM
 
@@ -200,7 +200,7 @@ Source: `src/helia_profiler/platform/placement.py:34`
 MRAM = 'mram'
 ```
 
-Source: `src/helia_profiler/platform/placement.py:35`
+Source: `src/helia_profiler/platform/placement.py:34`
 
 ### helia_profiler.Placement.PSRAM
 
@@ -210,7 +210,7 @@ Source: `src/helia_profiler/platform/placement.py:35`
 PSRAM = 'psram'
 ```
 
-Source: `src/helia_profiler/platform/placement.py:36`
+Source: `src/helia_profiler/platform/placement.py:35`
 
 ### helia_profiler.Placement.region
 
@@ -224,7 +224,7 @@ The physical region this placement lands in.
 
 ``TCM`` is DTCM: ITCM is code-only and never holds arenas or weights.
 
-Source: `src/helia_profiler/platform/placement.py:39`
+Source: `src/helia_profiler/platform/placement.py:38`
 
 ## helia_profiler.Transport
 

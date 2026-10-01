@@ -10,10 +10,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from neuralspotx.api import NSXError
 
 from helia_profiler.deps import nsx
 from helia_profiler.errors import BuildError
-from neuralspotx.api import NSXError
 
 
 class TestNsxBuild:

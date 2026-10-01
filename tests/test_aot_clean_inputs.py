@@ -257,6 +257,7 @@ def test_validation_preserves_measured_workload(tmp_path: Path, monkeypatch, ide
     assert loaded.cases[0].clean_workload == expected
     assert loaded.cases[0].power_workload == expected
     from rich.console import Console
+
     from helia_profiler.console import HpxConsole
 
     console = HpxConsole()

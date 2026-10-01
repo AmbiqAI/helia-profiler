@@ -1,37 +1,37 @@
+import json
 from dataclasses import replace
 from hashlib import sha256
-from pathlib import Path
 from types import SimpleNamespace
-import pytest
-import json
 
+import pytest
+
+from helia_profiler._fixture_build import (
+    FixedFixture,
+    FixtureFile,
+    FixtureMethod,
+    FixtureRenderSpec,
+    FixtureTimingScope,
+    Int8Tensor,
+    PreparedUpstreamRuntime,
+    _BindFixtureStage,
+    build_fixed_fixture,
+)
 from helia_profiler.config import (
-    ProfileConfig,
-    ModelConfig,
-    EngineConfig,
-    TargetConfig,
     ClockSelection,
+    EngineConfig,
+    ModelConfig,
+    ProfileConfig,
     ProfilingConfig,
+    TargetConfig,
 )
 from helia_profiler.engines import EngineType
+from helia_profiler.firmware.op_resolver import build_fixture_resolver_plan
+from helia_profiler.fixture_analysis import FixtureModelAnalysis
+from helia_profiler.modelcost.model_analysis import LayerOps, ModelAnalysis
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.placement import Placement
-from helia_profiler.results.models import ToolchainInfo, RunMetadata, MemoryPlan
-from helia_profiler.fixture_analysis import FixtureModelAnalysis
-from helia_profiler.modelcost.model_analysis import ModelAnalysis, LayerOps
-from helia_profiler.firmware.op_resolver import build_fixture_resolver_plan
+from helia_profiler.results.models import MemoryPlan, RunMetadata, ToolchainInfo
 from helia_profiler.vocab import Toolchain
-from helia_profiler._fixture_build import (
-    FixtureFile,
-    Int8Tensor,
-    FixedFixture,
-    PreparedUpstreamRuntime,
-    build_fixed_fixture,
-    FixtureMethod,
-    FixtureTimingScope,
-    FixtureRenderSpec,
-    _BindFixtureStage,
-)
 
 
 def fixture(tmp_path):

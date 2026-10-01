@@ -23,7 +23,6 @@ from helia_profiler.results.run_summary import (
     RunSummary,
     load_run_summary,
 )
-
 from tests.test_report import _attach_power_terminal, _gated_power_ctx
 
 

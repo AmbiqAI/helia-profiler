@@ -111,9 +111,9 @@ class SwoPowerTerminalTransport:
     transport = Transport.SWO
 
     def collect(self, ctx: PipelineContext, *, timeout_s: float) -> PowerTerminalEnvelope:
-        from .power_terminal import collect_power_terminal_envelope_from_chunks
         from ..target.probe.jlink import attached_session
         from ..transport.swo import enable_swo, read_swo_chunk, swo_reference_clock_hz
+        from .power_terminal import collect_power_terminal_envelope_from_chunks
 
         if ctx.soc is None:
             raise PowerError("SWO terminal collection requires resolved platform state.")

@@ -33,9 +33,9 @@
               "returns": [],
               "signature": "COMPLETE = 'complete'",
               "source": {
-                "line": 21,
+                "line": 22,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L21"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L22"
               },
               "summary": ""
             },
@@ -52,9 +52,9 @@
               "returns": [],
               "signature": "INCOMPLETE = 'incomplete'",
               "source": {
-                "line": 22,
+                "line": 23,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L22"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L23"
               },
               "summary": ""
             },
@@ -71,9 +71,9 @@
               "returns": [],
               "signature": "FAILED = 'failed'",
               "source": {
-                "line": 23,
+                "line": 24,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L23"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L24"
               },
               "summary": ""
             }
@@ -84,9 +84,9 @@
           "returns": [],
           "signature": "RunStatus()",
           "source": {
-            "line": 18,
+            "line": 19,
             "path": "src/helia_profiler/results/manifest.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L18"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L19"
           },
           "summary": "Publication status of a result bundle."
         },
@@ -110,9 +110,9 @@
               "returns": [],
               "signature": "VALID = 'valid'",
               "source": {
-                "line": 29,
+                "line": 30,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L29"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L30"
               },
               "summary": ""
             },
@@ -129,9 +129,9 @@
               "returns": [],
               "signature": "DEGRADED = 'degraded'",
               "source": {
-                "line": 30,
+                "line": 31,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L30"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L31"
               },
               "summary": ""
             },
@@ -148,9 +148,9 @@
               "returns": [],
               "signature": "INVALID = 'invalid'",
               "source": {
-                "line": 31,
+                "line": 32,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L31"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L32"
               },
               "summary": ""
             }
@@ -161,9 +161,9 @@
           "returns": [],
           "signature": "ResultValidity()",
           "source": {
-            "line": 26,
+            "line": 27,
             "path": "src/helia_profiler/results/manifest.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L26"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L27"
           },
           "summary": "Whether measurements in a completed bundle are authoritative."
         },
@@ -187,9 +187,9 @@
               "returns": [],
               "signature": "code: str",
               "source": {
-                "line": 38,
+                "line": 39,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L38"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L39"
               },
               "summary": ""
             },
@@ -206,9 +206,9 @@
               "returns": [],
               "signature": "severity: str",
               "source": {
-                "line": 39,
+                "line": 40,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L39"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L40"
               },
               "summary": ""
             },
@@ -225,9 +225,9 @@
               "returns": [],
               "signature": "message: str",
               "source": {
-                "line": 40,
+                "line": 41,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L40"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L41"
               },
               "summary": ""
             },
@@ -244,9 +244,9 @@
               "returns": [],
               "signature": "context: dict[str, Any] = field(default_factory=dict)",
               "source": {
-                "line": 41,
+                "line": 42,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L41"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L42"
               },
               "summary": ""
             },
@@ -263,9 +263,9 @@
               "returns": [],
               "signature": "extra: dict[str, Any] = field(default_factory=dict, repr=False)",
               "source": {
-                "line": 42,
+                "line": 43,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L42"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L43"
               },
               "summary": ""
             },
@@ -282,9 +282,9 @@
               "returns": [],
               "signature": "from_dict(data: dict[str, Any]) -> Self",
               "source": {
-                "line": 54,
+                "line": 55,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L54"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L55"
               },
               "summary": ""
             },
@@ -301,9 +301,9 @@
               "returns": [],
               "signature": "to_dict() -> dict[str, Any]",
               "source": {
-                "line": 58,
+                "line": 59,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L58"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L59"
               },
               "summary": ""
             }
@@ -314,9 +314,9 @@
           "returns": [],
           "signature": "ResultIssue(\n    code: str,\n    severity: str,\n    message: str,\n    context: dict[str, Any] = dict(),\n    extra: dict[str, Any] = dict(),\n) -> None",
           "source": {
-            "line": 34,
+            "line": 35,
             "path": "src/helia_profiler/results/manifest.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L34"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L35"
           },
           "summary": "One stable machine-readable issue with optional open context."
         },
@@ -340,9 +340,9 @@
               "returns": [],
               "signature": "path: str",
               "source": {
-                "line": 66,
+                "line": 67,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L66"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L67"
               },
               "summary": ""
             },
@@ -359,9 +359,9 @@
               "returns": [],
               "signature": "media_type: str",
               "source": {
-                "line": 67,
+                "line": 68,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L67"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L68"
               },
               "summary": ""
             },
@@ -378,9 +378,9 @@
               "returns": [],
               "signature": "size_bytes: int",
               "source": {
-                "line": 68,
+                "line": 69,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L68"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L69"
               },
               "summary": ""
             },
@@ -397,9 +397,9 @@
               "returns": [],
               "signature": "sha256: str",
               "source": {
-                "line": 69,
+                "line": 70,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L69"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L70"
               },
               "summary": ""
             },
@@ -416,9 +416,9 @@
               "returns": [],
               "signature": "role: str | None = None",
               "source": {
-                "line": 70,
+                "line": 71,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L70"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L71"
               },
               "summary": ""
             },
@@ -435,9 +435,9 @@
               "returns": [],
               "signature": "name: str | None = None",
               "source": {
-                "line": 71,
+                "line": 72,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L71"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L72"
               },
               "summary": ""
             },
@@ -454,9 +454,9 @@
               "returns": [],
               "signature": "schema: str | None = None",
               "source": {
-                "line": 72,
+                "line": 73,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L72"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L73"
               },
               "summary": ""
             },
@@ -473,9 +473,9 @@
               "returns": [],
               "signature": "schema_version: int | None = None",
               "source": {
-                "line": 73,
+                "line": 74,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L73"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L74"
               },
               "summary": ""
             },
@@ -492,9 +492,9 @@
               "returns": [],
               "signature": "producer: str | None = None",
               "source": {
-                "line": 74,
+                "line": 75,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L74"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L75"
               },
               "summary": ""
             },
@@ -511,9 +511,9 @@
               "returns": [],
               "signature": "optional: bool | None = None",
               "source": {
-                "line": 75,
+                "line": 76,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L75"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L76"
               },
               "summary": ""
             },
@@ -530,9 +530,9 @@
               "returns": [],
               "signature": "extra: dict[str, Any] = field(default_factory=dict, repr=False)",
               "source": {
-                "line": 76,
+                "line": 77,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L76"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L77"
               },
               "summary": ""
             },
@@ -549,9 +549,9 @@
               "returns": [],
               "signature": "from_dict(data: dict[str, Any]) -> Self",
               "source": {
-                "line": 110,
+                "line": 111,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L110"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L111"
               },
               "summary": ""
             },
@@ -568,9 +568,9 @@
               "returns": [],
               "signature": "to_dict() -> dict[str, Any]",
               "source": {
-                "line": 114,
+                "line": 115,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L114"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L115"
               },
               "summary": ""
             }
@@ -581,9 +581,9 @@
           "returns": [],
           "signature": "ResultArtifact(\n    path: str,\n    media_type: str,\n    size_bytes: int,\n    sha256: str,\n    role: str | None = None,\n    name: str | None = None,\n    schema: str | None = None,\n    schema_version: int | None = None,\n    producer: str | None = None,\n    optional: bool | None = None,\n    extra: dict[str, Any] = dict(),\n) -> None",
           "source": {
-            "line": 62,
+            "line": 63,
             "path": "src/helia_profiler/results/manifest.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L62"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L63"
           },
           "summary": "One content-addressed file in a result bundle."
         },
@@ -607,9 +607,9 @@
               "returns": [],
               "signature": "schema: str",
               "source": {
-                "line": 122,
+                "line": 123,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L122"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L123"
               },
               "summary": ""
             },
@@ -626,9 +626,9 @@
               "returns": [],
               "signature": "schema_version: int",
               "source": {
-                "line": 123,
+                "line": 124,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L123"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L124"
               },
               "summary": ""
             },
@@ -645,9 +645,9 @@
               "returns": [],
               "signature": "run_id: str",
               "source": {
-                "line": 124,
+                "line": 125,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L124"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L125"
               },
               "summary": ""
             },
@@ -664,9 +664,9 @@
               "returns": [],
               "signature": "timestamp: str",
               "source": {
-                "line": 125,
+                "line": 126,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L125"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L126"
               },
               "summary": ""
             },
@@ -683,9 +683,9 @@
               "returns": [],
               "signature": "hpx_version: str",
               "source": {
-                "line": 126,
+                "line": 127,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L126"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L127"
               },
               "summary": ""
             },
@@ -702,9 +702,9 @@
               "returns": [],
               "signature": "status: RunStatus",
               "source": {
-                "line": 127,
+                "line": 128,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L127"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L128"
               },
               "summary": ""
             },
@@ -721,9 +721,9 @@
               "returns": [],
               "signature": "validity: ResultValidity",
               "source": {
-                "line": 128,
+                "line": 129,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L128"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L129"
               },
               "summary": ""
             },
@@ -740,9 +740,9 @@
               "returns": [],
               "signature": "issues: tuple[ResultIssue, ...]",
               "source": {
-                "line": 129,
+                "line": 130,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L129"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L130"
               },
               "summary": ""
             },
@@ -759,9 +759,9 @@
               "returns": [],
               "signature": "provenance: dict[str, Any]",
               "source": {
-                "line": 130,
+                "line": 131,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L130"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L131"
               },
               "summary": ""
             },
@@ -778,9 +778,9 @@
               "returns": [],
               "signature": "comparability: dict[str, Any]",
               "source": {
-                "line": 131,
+                "line": 132,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L131"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L132"
               },
               "summary": ""
             },
@@ -797,9 +797,9 @@
               "returns": [],
               "signature": "artifacts: tuple[ResultArtifact, ...]",
               "source": {
-                "line": 132,
+                "line": 133,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L132"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L133"
               },
               "summary": ""
             },
@@ -816,9 +816,9 @@
               "returns": [],
               "signature": "bundle_type: str | None = None",
               "source": {
-                "line": 133,
+                "line": 134,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L133"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L134"
               },
               "summary": ""
             },
@@ -835,9 +835,9 @@
               "returns": [],
               "signature": "extensions: dict[str, Any] = field(default_factory=dict)",
               "source": {
-                "line": 134,
+                "line": 135,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L134"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L135"
               },
               "summary": ""
             },
@@ -854,9 +854,9 @@
               "returns": [],
               "signature": "extra: dict[str, Any] = field(default_factory=dict, repr=False)",
               "source": {
-                "line": 135,
+                "line": 136,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L135"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L136"
               },
               "summary": ""
             },
@@ -873,9 +873,9 @@
               "returns": [],
               "signature": "from_dict(data: dict[str, Any]) -> Self",
               "source": {
-                "line": 168,
+                "line": 169,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L168"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L169"
               },
               "summary": ""
             },
@@ -892,9 +892,9 @@
               "returns": [],
               "signature": "load(path: str | Path) -> Self",
               "source": {
-                "line": 184,
+                "line": 185,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L184"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L185"
               },
               "summary": "Load a manifest while preserving unknown fields."
             },
@@ -911,9 +911,9 @@
               "returns": [],
               "signature": "to_dict() -> dict[str, Any]",
               "source": {
-                "line": 196,
+                "line": 197,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L196"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L197"
               },
               "summary": ""
             },
@@ -930,9 +930,9 @@
               "returns": [],
               "signature": "write(path: str | Path) -> Path",
               "source": {
-                "line": 199,
+                "line": 200,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L199"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L200"
               },
               "summary": "Write the manifest without discarding unknown fields."
             },
@@ -949,9 +949,9 @@
               "returns": [],
               "signature": "verify(bundle_dir: str | Path) -> None",
               "source": {
-                "line": 211,
+                "line": 212,
                 "path": "src/helia_profiler/results/manifest.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L211"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L212"
               },
               "summary": "Verify all declared artifact paths, sizes, and SHA-256 digests."
             }
@@ -962,9 +962,9 @@
           "returns": [],
           "signature": "ResultManifest(\n    schema: str,\n    schema_version: int,\n    run_id: str,\n    timestamp: str,\n    hpx_version: str,\n    status: RunStatus,\n    validity: ResultValidity,\n    issues: tuple[ResultIssue, ...],\n    provenance: dict[str, Any],\n    comparability: dict[str, Any],\n    artifacts: tuple[ResultArtifact, ...],\n    bundle_type: str | None = None,\n    extensions: dict[str, Any] = dict(),\n    extra: dict[str, Any] = dict(),\n) -> None",
           "source": {
-            "line": 118,
+            "line": 119,
             "path": "src/helia_profiler/results/manifest.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L118"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L119"
           },
           "summary": "Stable result envelope with open provenance and extension payloads."
         },
@@ -981,9 +981,9 @@
           "returns": [],
           "signature": "load_result_manifest(path: str | Path, *, verify: bool = False) -> ResultManifest",
           "source": {
-            "line": 243,
+            "line": 244,
             "path": "src/helia_profiler/results/manifest.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L243"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L244"
           },
           "summary": "Load a result manifest and optionally verify its sibling artifacts."
         }

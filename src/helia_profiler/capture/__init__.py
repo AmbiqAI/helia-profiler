@@ -20,26 +20,26 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from ..config import DEFAULT_POWER_DURATION_S
-from ..vocab import Transport
 from ..errors import CaptureError, PowerError
-from ..results.models import DEVICE_CLOCK_TOLERANCE
 from ..power.diagnostics import (
     CLEAN_WINDOW_WARMUP_REPS,
     SyncHandshakeMetadata,
     count_noun,
     gate_fall_wait_s,
-    lockstep_ready_wait_s,
     gate_relative_tolerance_for,
+    lockstep_ready_wait_s,
     longest_accepted_window_s,
     probe_runs_inferences,
 )
+from ..results.models import DEVICE_CLOCK_TOLERANCE
 from ..transport import (
     LINE_TIMEOUT_S,
     CaptureArgs,
     resolve_transport,
 )
-from ..transport.usb_identity import usb_marker_serial
 from ..transport.firmware_errors import raise_on_firmware_error
+from ..transport.usb_identity import usb_marker_serial
+from ..vocab import Transport
 from ..wire import HPX_END_SENTINEL, HPX_START_SENTINEL
 
 if TYPE_CHECKING:

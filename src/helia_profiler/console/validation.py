@@ -12,9 +12,8 @@ from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
 
-from .tables import _fmt_bytes
-
 from ..firmware.workload import AOT_CLEAN_WORKLOAD
+from .tables import _fmt_bytes
 
 if TYPE_CHECKING:
     from ..validation.report import ValidationReport

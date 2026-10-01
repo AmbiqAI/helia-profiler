@@ -507,7 +507,8 @@ def _check_helia_aot_version(config: ProfileConfig | None = None) -> str:
     some other way (pinned ``version`` or ``governed_by_modules``). Logs
     the detected version on success so it shows up in run logs.
     """
-    from importlib.metadata import PackageNotFoundError, version as _pkg_version
+    from importlib.metadata import PackageNotFoundError
+    from importlib.metadata import version as _pkg_version
 
     try:
         installed = _pkg_version("helia-aot")

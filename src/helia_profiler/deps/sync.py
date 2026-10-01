@@ -28,9 +28,9 @@ from typing import TYPE_CHECKING
 
 from neuralspotx.nsx_lock import read_lock
 
-from . import nsx as nsx_cli
 from ..errors import BuildError, LockError
 from ..results.serde import sha256_file
+from . import nsx as nsx_cli
 
 if TYPE_CHECKING:
     from ..config import ProfileConfig

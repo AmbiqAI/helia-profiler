@@ -44,9 +44,9 @@ from pathlib import Path
 
 import pytest
 
-from helia_profiler.transport.firmware_errors import ERROR_HINTS
 from helia_profiler.engines import EngineType
 from helia_profiler.firmware import _jinja_env
+from helia_profiler.transport.firmware_errors import ERROR_HINTS
 from helia_profiler.wire import (
     EST_MS_GAP,
     HPX_ITER_SENTINEL_PATTERN,

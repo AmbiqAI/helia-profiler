@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from helia_profiler.capture.parser import parse_firmware_output, _infer_group
+from helia_profiler.capture.parser import _infer_group, parse_firmware_output
 from helia_profiler.config import Aggregation
 
 
@@ -325,8 +325,6 @@ def test_multi_group_separate():
 
 
 def test_iteration_averaging():
-    header = ["Layer", "Op", "ARM_PMU_CPU_CYCLES"]
-    rows = [["0", "CONV_2D", "1000"]]
     lines = [
         "--- HPX_START ---",
         "HPX_PRESETS=basic_cpu",
@@ -531,6 +529,7 @@ def test_reordered_iterations_and_presets_keep_layer_identity():
 
 def test_incomplete_or_conflicting_iterations_are_rejected():
     import pytest
+
     from helia_profiler.errors import CaptureError
 
     complete = ["0,CONV,100,0", "1,RELU,10,0", "2,ADD,900,0"]
@@ -551,6 +550,7 @@ def test_incomplete_or_conflicting_iterations_are_rejected():
 
 def test_incomplete_or_conflicting_presets_are_rejected():
     import pytest
+
     from helia_profiler.errors import CaptureError
 
     complete = ["0,CONV,100,0", "1,ADD,900,0"]
@@ -561,6 +561,7 @@ def test_incomplete_or_conflicting_presets_are_rejected():
 
 def test_identity_failure_describes_missing_extra_and_conflicting_rows():
     import pytest
+
     from helia_profiler.errors import CaptureError
 
     expected = ["0,CONV,100,0", "1,RELU,10,0", "2,ADD,900,0"]
@@ -576,6 +577,7 @@ def test_identity_failure_describes_missing_extra_and_conflicting_rows():
 
 def test_identity_failure_bounds_large_differences_and_labels():
     import pytest
+
     from helia_profiler.capture.parser import _check_identities
     from helia_profiler.errors import CaptureError
 
@@ -618,6 +620,7 @@ def test_complete_two_pass_session_parses():
 
 def test_stream_cut_at_pass_boundary_is_rejected():
     import pytest
+
     from helia_profiler.errors import CaptureError
 
     lines = _two_pass_session()
@@ -628,6 +631,7 @@ def test_stream_cut_at_pass_boundary_is_rejected():
 
 def test_announced_pass_missing_is_rejected():
     import pytest
+
     from helia_profiler.errors import CaptureError
 
     lines = _two_pass_session()
@@ -638,6 +642,7 @@ def test_announced_pass_missing_is_rejected():
 
 def test_announced_pass_count_mismatch_is_rejected():
     import pytest
+
     from helia_profiler.errors import CaptureError
 
     lines = [line.replace("HPX_NUM_PRESETS=2", "HPX_NUM_PRESETS=3") for line in _two_pass_session()]
@@ -652,6 +657,7 @@ def _memory_pass_bounds(lines: list[str]) -> tuple[int, int]:
 
 def test_pass_with_dropped_iteration_is_rejected():
     import pytest
+
     from helia_profiler.errors import CaptureError
 
     lines = _two_pass_session()
@@ -664,6 +670,7 @@ def test_pass_with_dropped_iteration_is_rejected():
 
 def test_announced_pass_without_data_is_rejected():
     import pytest
+
     from helia_profiler.errors import CaptureError
 
     lines = _two_pass_session()
@@ -674,6 +681,7 @@ def test_announced_pass_without_data_is_rejected():
 
 def test_empty_iteration_block_is_rejected():
     import pytest
+
     from helia_profiler.errors import CaptureError
 
     lines = _two_pass_session()
@@ -692,6 +700,7 @@ def test_legacy_single_pass_without_preset_marker_parses():
 
 def test_repeated_pass_is_rejected():
     import pytest
+
     from helia_profiler.errors import CaptureError
 
     lines = _two_pass_session()
@@ -702,6 +711,7 @@ def test_repeated_pass_is_rejected():
 
 def test_stream_cut_after_final_iter_marker_is_rejected():
     import pytest
+
     from helia_profiler.errors import CaptureError
 
     lines = _two_pass_session()
@@ -712,6 +722,7 @@ def test_stream_cut_after_final_iter_marker_is_rejected():
 
 def test_stream_without_end_is_rejected():
     import pytest
+
     from helia_profiler.errors import CaptureError
 
     lines = _single_layer_iters(["100", "101"])

@@ -22,8 +22,8 @@ from helia_profiler.config import (
     load_config,
 )
 from helia_profiler.errors import ConfigError
-from helia_profiler.placement import Placement
 from helia_profiler.pipeline import serialize_config
+from helia_profiler.placement import Placement
 from helia_profiler.power.base import PowerMode
 
 

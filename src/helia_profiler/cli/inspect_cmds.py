@@ -99,12 +99,12 @@ def _cmd_doctor_bundle(
     from pathlib import Path
 
     from ..console import HpxConsole
-    from ..errors import HpxError
     from ..diagnostics.support_bundle import (
         SupportBundleOptions,
         collect_support_bundle,
         write_support_bundle,
     )
+    from ..errors import HpxError
 
     if raw_probe_ids:
         print(
@@ -148,8 +148,8 @@ def _cmd_engines() -> None:
 
 
 def _cmd_boards() -> None:
-    from ..platform import get_soc, list_boards
     from ..console import HpxConsole
+    from ..platform import get_soc, list_boards
 
     boards = list_boards()
     rows: list[tuple[str, str, str, str, str, str]] = []

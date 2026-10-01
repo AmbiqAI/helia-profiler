@@ -20,7 +20,6 @@ from helia_profiler.config import Transport
 
 from .conftest import BOARD_FOR_FAMILY, CANNED_PMU_LINES
 
-
 # The authoritative set of transports the profiler supports.  Iterating the
 # enum means a newly added transport forces this contract to be updated.
 ALL_TRANSPORTS = [t.value for t in Transport]

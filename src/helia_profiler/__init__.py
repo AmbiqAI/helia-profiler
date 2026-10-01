@@ -1,24 +1,8 @@
 """heliaPROFILER — Profile LiteRT and ExecuTorch models on Ambiq silicon"""
 
+from . import examples
 from ._version import __version__
 from .api import profile
-from .evaluation import (
-    CompareResult,
-    ComparabilityAssessment,
-    ComparabilityIssue,
-    ComparabilitySeverity,
-    ComparisonProfile,
-    ComparisonVerdict,
-    MetricDirection,
-    MetricPolicy,
-    MetricVerdict,
-    MissingMetricPolicy,
-    VerdictStatus,
-    assess_comparability,
-    evaluate_comparison_profile,
-    RunEvaluation,
-    evaluate_run,
-)
 from .config import (
     BuildConfig,
     ClockSelection,
@@ -36,7 +20,6 @@ from .config import (
     Toolchain,
     Transport,
 )
-from .modelcost import ModelAnalysis
 from .deps.compatibility import (
     CompatibilityBaseline,
     CompatibilityResolution,
@@ -44,16 +27,19 @@ from .deps.compatibility import (
     load_compatibility_baseline,
 )
 from .deps.dependencies import read_dependency_lock_provenance
+from .diagnostics.support_bundle import (
+    SupportBundleOptions,
+    collect_support_bundle,
+    verify_support_bundle,
+    write_support_bundle,
+)
 from .engines import EngineType
-from . import examples
-from .platform.counters import PmuCounter
-from .hostenv.doctor import DoctorCheck, DoctorResult, DoctorVersionCheck
 from .errors import (
     BuildError,
     CaptureError,
-    DeterministicCaptureError,
     ConfigError,
     DependencyError,
+    DeterministicCaptureError,
     EngineError,
     FirmwareError,
     HpxError,
@@ -64,9 +50,29 @@ from .errors import (
     ReportError,
     VersionError,
 )
-from .placement import Placement
+from .evaluation import (
+    ComparabilityAssessment,
+    ComparabilityIssue,
+    ComparabilitySeverity,
+    CompareResult,
+    ComparisonProfile,
+    ComparisonVerdict,
+    MetricDirection,
+    MetricPolicy,
+    MetricVerdict,
+    MissingMetricPolicy,
+    RunEvaluation,
+    VerdictStatus,
+    assess_comparability,
+    evaluate_comparison_profile,
+    evaluate_run,
+)
+from .hostenv.doctor import DoctorCheck, DoctorResult, DoctorVersionCheck
+from .modelcost import ModelAnalysis
 from .pipeline import ProgressUpdate
+from .placement import Placement
 from .platform import BoardDef, SocDef, build_platform_registry, get_soc
+from .platform.counters import PmuCounter
 from .power.base import PowerMode, PowerResult
 from .power.metadata import (
     MeasurementScope,
@@ -79,31 +85,25 @@ from .results import (
     FirmwareMeta,
     LayerResult,
     NsxModuleRef,
-    PmuResult,
-    PresetResult,
-    ProfileResult,
-    RunMetadata,
     OnDevicePowerSummary,
+    PmuResult,
     PowerObservation,
     PowerTerminalRecord,
+    PresetResult,
+    ProfileResult,
     ResultArtifact,
     ResultIssue,
     ResultManifest,
     ResultValidity,
+    RunMetadata,
     RunStatus,
     SupportBundleManifest,
     SupportBundleSection,
     load_result_manifest,
 )
-from .diagnostics.support_bundle import (
-    SupportBundleOptions,
-    collect_support_bundle,
-    verify_support_bundle,
-    write_support_bundle,
-)
 from .session import Session
-from .target.probe.jlink import JLinkProbe, JLinkProbeMatch
 from .target.lifecycle import ResetStrategy
+from .target.probe.jlink import JLinkProbe, JLinkProbeMatch
 from .transport.ports import SerialPortInfo
 
 __all__ = [

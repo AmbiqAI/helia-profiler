@@ -34,13 +34,13 @@ from ..engines import EngineType
 from ..errors import DependencyError, HpxError, ReportError
 from ..hostenv.doctor import inspect_environment
 from ..results import DependencyLockProvenance, ResultArtifact
-from .redact import RedactionCounts, RedactionPolicy, redact_known_serial, redact_text, redact_value
 from ..results.support_bundle import (
     SUPPORT_BUNDLE_SCHEMA,
     SUPPORT_BUNDLE_SCHEMA_VERSION,
     SupportBundleManifest,
     SupportBundleSection,
 )
+from .redact import RedactionCounts, RedactionPolicy, redact_known_serial, redact_text, redact_value
 
 
 @dataclass(frozen=True)

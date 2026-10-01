@@ -1,11 +1,11 @@
 """Mocked raw capture checks preserve evidence and reject unsafe images."""
 
-from contextlib import contextmanager
-from dataclasses import replace
-from hashlib import sha256
 import json
 import re
 import struct
+from contextlib import contextmanager
+from dataclasses import replace
+from hashlib import sha256
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -13,11 +13,10 @@ import pytest
 
 from helia_profiler import fixture_capture as capture
 from helia_profiler.fixture import FixtureTimingScope
-from helia_profiler.fixture_stage import FixtureStage
 from helia_profiler.fixture_image import Sink, inspect_elf
-from helia_profiler.fixture_target import supported_fixture_target
 from helia_profiler.fixture_runtime import FixtureFile
-
+from helia_profiler.fixture_stage import FixtureStage
+from helia_profiler.fixture_target import supported_fixture_target
 
 _SINKS = {
     "deployment_status": 4,

@@ -5,16 +5,19 @@ from pathlib import Path
 
 import pytest
 
+from helia_profiler.errors import ReportError
 from helia_profiler.evaluation import (
+    CompareResult,
     ComparisonProfile,
+    ConfigDiffRow,
+    MetricDiff,
     MetricDirection,
     MetricPolicy,
     MissingMetricPolicy,
+    RunArtifacts,
     VerdictStatus,
     evaluate_comparison_profile,
 )
-from helia_profiler.evaluation import CompareResult, ConfigDiffRow, MetricDiff, RunArtifacts
-from helia_profiler.errors import ReportError
 
 
 def _result(*metrics: MetricDiff) -> CompareResult:

@@ -19,12 +19,12 @@ from ..results import (
     Severity,
     error_metric_group,
 )
-from ..results.serde import nested_get
 from ..results.dimensions import DIMENSION_REGISTRY, ArtifactSource
 
 # Not re-exported by the results package (#154); imported from the registry
 # module directly.
 from ..results.issues import ComparabilityCodeFamily
+from ..results.serde import nested_get
 
 if TYPE_CHECKING:
     from ..results import ResultManifest

@@ -7,10 +7,10 @@ capture phase so stages do not encode board and SoC folklore inline.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from enum import StrEnum
 import logging
 import time
+from dataclasses import dataclass
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from ..errors import PowerError

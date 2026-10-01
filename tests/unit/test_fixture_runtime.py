@@ -1,19 +1,19 @@
 """Prepared runtime ingress rejects malformed records and changed sources."""
 
+import json
 from dataclasses import FrozenInstanceError
 from hashlib import sha256
-import json
-from helia_profiler.pipeline import PipelineContext
-from helia_profiler.config import ProfileConfig, ModelConfig
 
 import pytest
 
+from helia_profiler.config import ModelConfig, ProfileConfig
 from helia_profiler.fixture_runtime import (
     FixtureFile,
     PreparedUpstreamRuntime,
     RuntimeManifest,
     _PreparedRuntimeStage,
 )
+from helia_profiler.pipeline import PipelineContext
 
 
 def runtime(tmp_path, mutate=None):

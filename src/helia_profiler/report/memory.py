@@ -15,9 +15,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from ..hostenv.toolchain_probe import SymbolEntry
     from ..pipeline import PipelineContext
     from ..results import LayerResult, MeasuredMemoryRegions, MemoryPlan, MemoryReconciliation
-    from ..hostenv.toolchain_probe import SymbolEntry
 
 log = logging.getLogger("hpx")
 

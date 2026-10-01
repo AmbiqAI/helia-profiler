@@ -1,19 +1,19 @@
 from __future__ import annotations
 
-from pathlib import Path
 import os
 import shutil
 import sys
+from pathlib import Path
 
 from helia_profiler.config import Toolchain, Transport
+from helia_profiler.engines import EngineType
+from helia_profiler.errors import CaptureError, ConfigError
 from helia_profiler.hostenv.doctor import (
     DoctorCheck,
     DoctorVersionCheck,
     check_versions,
     inspect_environment,
 )
-from helia_profiler.engines import EngineType
-from helia_profiler.errors import CaptureError, ConfigError
 
 
 def _which_all(name: str) -> str:

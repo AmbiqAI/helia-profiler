@@ -9,18 +9,17 @@ publication, and the power-cycle retry taxonomy.
 
 from __future__ import annotations
 
-from tests.pipeline_context_helpers import clear_profile_run, set_profile_firmware
-
 from pathlib import Path
 
 import pytest
 
-from helia_profiler.results import FirmwareArtifact
 from helia_profiler.config import load_config
 from helia_profiler.errors import BuildError, CaptureError, DeterministicCaptureError
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.platform import get_soc_for_board
+from helia_profiler.results import FirmwareArtifact
 from helia_profiler.stages.flash import FlashFirmwareStage
+from tests.pipeline_context_helpers import clear_profile_run, set_profile_firmware
 
 
 def _make_ctx(tmp_path: Path, *, board: str = "apollo510_evb") -> PipelineContext:

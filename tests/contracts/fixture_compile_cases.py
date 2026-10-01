@@ -4,32 +4,32 @@ from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from helia_profiler.config import load_config
-from helia_profiler.engines import EngineType
-from helia_profiler.engines.base import ArenaRegion
-from helia_profiler.placement import ArenaRole, Placement
 from helia_profiler._fixture_build import (
-    FixtureRole,
     FixedFixture,
     FixtureFile,
     FixtureIO,
-    Int8Tensor,
-    FixtureRenderSpec,
     FixtureMethod,
+    FixtureRenderSpec,
+    FixtureRole,
     FixtureTimingScope,
+    Int8Tensor,
     TypedFixture,
 )
+from helia_profiler.config import load_config
+from helia_profiler.engines import EngineType
+from helia_profiler.engines.base import ArenaRegion
+from helia_profiler.firmware.fixture import fixture_template_vars, write_fixture_headers
+from helia_profiler.firmware.op_resolver import ResolverPlan
+from helia_profiler.firmware.render import _jinja_env
 from helia_profiler.fixture_analysis import (
     FixtureModelAnalysis,
     FixtureTensor,
     PerTensorQuantization,
     TypedFixtureModelAnalysis,
 )
-from helia_profiler.firmware.op_resolver import ResolverPlan
 from helia_profiler.modelcost import ModelAnalysis
 from helia_profiler.pipeline import PipelineContext
-from helia_profiler.firmware.fixture import fixture_template_vars, write_fixture_headers
-from helia_profiler.firmware.render import _jinja_env
+from helia_profiler.placement import ArenaRole, Placement
 
 FIXTURE_KINDS = ("tcn", "kws", "typed")
 FIXTURE_ENGINES = ("tflm", "helia-rt", "helia-aot")

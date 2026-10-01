@@ -17,7 +17,7 @@ import shutil
 from pathlib import Path
 
 from ...errors import EngineError
-from .artifacts import HELIART_MIN_VERSION, _DIST_DIRS
+from .artifacts import _DIST_DIRS, HELIART_MIN_VERSION
 
 log = logging.getLogger("hpx")
 

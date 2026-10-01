@@ -23,7 +23,6 @@ from __future__ import annotations
 import argparse
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 NS_ABI_SYMBOLS = ("arm_convolve_weight_sum", "arm_convolve_s8_get_weights_sum_size")

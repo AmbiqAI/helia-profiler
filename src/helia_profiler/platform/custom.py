@@ -35,7 +35,6 @@ from .soc import (
     SocFamily,
 )
 
-
 #: Told to every rejected address, so the user is always shown the shape to
 #: write rather than only what was wrong with what they wrote.
 _ADDRESS_HINT = (

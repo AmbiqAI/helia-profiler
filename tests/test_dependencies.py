@@ -17,20 +17,19 @@ from neuralspotx.nsx_lock import (
 )
 
 from helia_profiler.config import load_config
+from helia_profiler.deps.compatibility import QualificationState
 from helia_profiler.deps.dependencies import (
     create_workspace,
-    invalidate_sync_stamp,
     normalize_path,
     prepare_locked_dependencies,
     read_dependency_lock_provenance,
 )
+from helia_profiler.deps.sync import invalidate_sync_stamp
 from helia_profiler.engines import TFLM_ENGINE_HEADER
 from helia_profiler.engines.base import ExecutorchArtifacts, TflmArtifacts
-from helia_profiler.errors import DependencyError, LockError, VersionError
-from helia_profiler.errors import BuildError
+from helia_profiler.errors import BuildError, DependencyError, LockError, VersionError
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.results import DependencyLockMode, DependencyOverride, NsxModuleRef
-from helia_profiler.deps.compatibility import QualificationState
 from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 
 

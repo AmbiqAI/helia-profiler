@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from tests.pipeline_context_helpers import set_power_result, set_profile_result
-
 import csv
 import json
 from pathlib import Path
@@ -9,25 +7,18 @@ from typing import Literal
 
 import pytest
 
-from helia_profiler.wire import POWER_TERMINAL_VERSION
 from helia_profiler.config import CleanWindowProbe, load_config
-from helia_profiler.results import (
-    OnDevicePowerSummary,
-    PowerRun,
-    PowerRunPlan,
-    PowerTerminalRecord,
-)
-from helia_profiler.results.run_summary import RUN_SUMMARY_SCHEMA_VERSION
-from helia_profiler.pipeline import PipelineContext
 from helia_profiler.errors import ReportError
+from helia_profiler.modelcost import ETHOS_U_OP_NAME, LayerOps, ModelAnalysis
+from helia_profiler.pipeline import PipelineContext
 from helia_profiler.power.base import GatedPowerWindow, PowerResult, PowerSummary
-from helia_profiler.power.diagnostics import WindowClockCeiling
 from helia_profiler.power.diagnostics import (
     GateDurationIntegrity,
     GateFailure,
     GateFailureKind,
     GateTransitionTiming,
     SyncHandshakeMetadata,
+    WindowClockCeiling,
 )
 from helia_profiler.power.metadata import (
     MeasurementScope,
@@ -35,13 +26,6 @@ from helia_profiler.power.metadata import (
     PowerIntegrity,
     PowerMetadata,
 )
-from helia_profiler.target.lifecycle import (
-    CapturePhase,
-    ResetAction,
-    ResetStrategy,
-    TargetLifecyclePlan,
-)
-
 from helia_profiler.report import (
     _write_csv,
     _write_json,
@@ -50,20 +34,32 @@ from helia_profiler.report import (
     write_report,
 )
 from helia_profiler.report.metadata import _metadata_to_dict
-from helia_profiler.results import load_result_manifest
-from helia_profiler.modelcost import ETHOS_U_OP_NAME, LayerOps, ModelAnalysis
-from helia_profiler.results.issues import IssueCode
 from helia_profiler.results import (
     EngineInfo,
     FirmwareMeta,
     LayerResult,
+    OnDevicePowerSummary,
     PmuResult,
+    PowerRun,
+    PowerRunPlan,
+    PowerTerminalRecord,
     PresetResult,
     PsramInfo,
     RunMetadata,
     TimingInfo,
     ToolchainInfo,
+    load_result_manifest,
 )
+from helia_profiler.results.issues import IssueCode
+from helia_profiler.results.run_summary import RUN_SUMMARY_SCHEMA_VERSION
+from helia_profiler.target.lifecycle import (
+    CapturePhase,
+    ResetAction,
+    ResetStrategy,
+    TargetLifecyclePlan,
+)
+from helia_profiler.wire import POWER_TERMINAL_VERSION
+from tests.pipeline_context_helpers import set_power_result, set_profile_result
 
 # Built from the real producer type: the old hand-written lifecycle dicts
 # were under-specified (four keys) relative to what production always wrote.

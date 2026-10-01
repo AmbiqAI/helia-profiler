@@ -18,8 +18,6 @@ rules -- deliberately NOT from `predicted_window_ms`, the thing under test.
 
 from __future__ import annotations
 
-from tests.pipeline_context_helpers import set_profile_result
-
 from pathlib import Path
 
 import pytest
@@ -27,12 +25,12 @@ import pytest
 from helia_profiler.config import DEFAULT_POWER_WINDOW_TARGET_MS, load_config
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.platform import get_soc_for_board
+from helia_profiler.power.base import PowerResult, PowerSummary
 from helia_profiler.power.diagnostics import (
     assess_gate_duration,
     gate_relative_tolerance_for,
     probe_runs_inferences,
 )
-from helia_profiler.power.base import PowerResult, PowerSummary
 from helia_profiler.power.metadata import MeasurementScope, PowerMetadata
 from helia_profiler.results import (
     DeploymentRecord,
@@ -44,6 +42,7 @@ from helia_profiler.results import (
 )
 from helia_profiler.stages.capture_power import _estimate_capture_duration
 from helia_profiler.stages.plan_power import plan_power_run
+from tests.pipeline_context_helpers import set_profile_result
 
 #: A real Apollo4 per-inference figure, so the arithmetic lands on realistic
 #: counts rather than round numbers that could hide an off-by-one.

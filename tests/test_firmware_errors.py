@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from helia_profiler.transport.firmware_errors import firmware_error_kind, raise_on_firmware_error
 from helia_profiler.errors import CaptureError
+from helia_profiler.transport.firmware_errors import firmware_error_kind, raise_on_firmware_error
 
 
 def test_no_error_returns_none():

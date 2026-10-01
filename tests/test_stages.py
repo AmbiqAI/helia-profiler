@@ -10,10 +10,10 @@ from helia_profiler.config import load_config
 from helia_profiler.engines.helia_rt import HELIART_VERSION
 from helia_profiler.errors import ConfigError, EngineError, FirmwareError
 from helia_profiler.pipeline import PipelineContext
+from helia_profiler.stages.generate_firmware import GenerateFirmwareStage
+from helia_profiler.stages.prepare_engine import PrepareEngineStage
 from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 from helia_profiler.stages.resolve_probe import ResolveJLinkProbeStage
-from helia_profiler.stages.prepare_engine import PrepareEngineStage
-from helia_profiler.stages.generate_firmware import GenerateFirmwareStage
 
 
 def _make_ctx(tmp_path: Path, overrides: dict | None = None) -> PipelineContext:

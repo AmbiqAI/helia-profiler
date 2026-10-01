@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from .platform import get_soc_for_board
 from .platform.capabilities import resolve_app_flash_load_addr
 
-
 #: The only clock profile with a qualified fixture build and capture path.
 FIXTURE_CLOCK_PROFILE = "lp"
 

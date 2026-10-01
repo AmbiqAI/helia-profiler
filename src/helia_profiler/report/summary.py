@@ -8,6 +8,15 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from ..errors import ReportError
+from ..evaluation import evaluate_run
+from ..firmware import measured_power_fingerprint
+from ..firmware.workload import measured_clean_workload
+from ..power.clean_window import window_inference_count, window_reference_inference_us
+from ..power.diagnostics import probe_runs_inferences
+from ..results.issues import Severity
+from ..results.run_summary import RunSummary
+from .contracts import RUN_SUMMARY_SCHEMA, RUN_SUMMARY_SCHEMA_VERSION
 from .memory import (
     _cache_totals,
     _serialise_memory_plan,
@@ -15,15 +24,6 @@ from .memory import (
     _serialise_memory_regions,
 )
 from .power import _power_run_records, _power_summary_to_dict
-from .contracts import RUN_SUMMARY_SCHEMA, RUN_SUMMARY_SCHEMA_VERSION
-from ..errors import ReportError
-from ..results.issues import Severity
-from ..results.run_summary import RunSummary
-from ..evaluation import evaluate_run
-from ..firmware import measured_power_fingerprint
-from ..firmware.workload import measured_clean_workload
-from ..power.clean_window import window_inference_count, window_reference_inference_us
-from ..power.diagnostics import probe_runs_inferences
 
 if TYPE_CHECKING:
     from ..evaluation import RunEvaluation

@@ -7,10 +7,9 @@ from pathlib import Path
 from ..config import ProfileConfig
 from ..errors import EngineError
 from ..results import NsxModuleRef
-from . import EngineType, TFLM_ENGINE_HEADER
+from . import TFLM_ENGINE_HEADER, EngineType
 from .base import PsramWeightsSource, SingleArenaPlacementMixin, TflmArtifacts
 from .cmsis_nn import ARM_CMSIS_NN_MODULE, ARM_CMSIS_NN_PROJECT
-
 
 TFLITE_MICRO_MODULE = "nsx-tflite-micro"
 TFLITE_MICRO_PROJECT = "nsx-tflite-micro"

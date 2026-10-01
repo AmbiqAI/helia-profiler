@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-from dataclasses import replace
 import subprocess
 import sys
+from dataclasses import replace
 from pathlib import Path
 
-from helia_profiler.firmware import _jinja_env
-from helia_profiler.firmware.context import resolve_window_timer
 import pytest
 
 import helia_profiler.engines.executorch as executorch_mod
 from helia_profiler.config import load_config
 from helia_profiler.engines.executorch import ExecuTorchAdapter
 from helia_profiler.errors import EngineError
+from helia_profiler.firmware import _jinja_env
+from helia_profiler.firmware.context import resolve_window_timer
 
 
 def _render_executorch_template(**overrides) -> str:

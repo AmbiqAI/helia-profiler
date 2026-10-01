@@ -2,39 +2,38 @@
 
 from __future__ import annotations
 
-import os
 import hashlib
 import json
+import os
 from contextlib import nullcontext
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
-from neuralspotx.models import AppConfig
-
 import pytest
 import yaml
+from neuralspotx.models import AppConfig
 
 from helia_profiler.config import load_config
-from helia_profiler.errors import BuildError, FirmwareError
 from helia_profiler.engines.base import ArenaRegion, HeliaAotArtifacts
 from helia_profiler.engines.helia_aot.adapter import HeliaAOTAdapter
+from helia_profiler.errors import BuildError, FirmwareError
 from helia_profiler.firmware import (
     _board_module_name,
-    find_segger_rtt_dir,
     _is_segger_rtt_root,
     _model_to_header,
     _resolve_module_specs,
     _resolved_aot_arena_regions,
     build_app,
+    find_segger_rtt_dir,
     generate_app,
     render_power_source,
 )
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.placement import ArenaRole, Placement
-from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 from helia_profiler.stages.plan_memory import PlanMemoryStage
 from helia_profiler.stages.prepare_engine import PrepareEngineStage
+from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 
 
 def _fake_starter_profiles() -> dict[str, dict]:
@@ -2336,8 +2335,8 @@ class TestResolveProjectOverrides:
 
 
 def test_executorch_power_binary_has_no_main_template():
-    from helia_profiler.firmware import _main_template
     from helia_profiler.engines import EngineType
+    from helia_profiler.firmware import _main_template
 
     assert _main_template(EngineType.EXECUTORCH) == "main_executorch.cc.j2"
     with pytest.raises(FirmwareError, match="ExecuTorch"):

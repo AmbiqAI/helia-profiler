@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import shutil
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -11,7 +11,6 @@ from helia_profiler.config import load_config
 from helia_profiler.errors import CaptureError, ConfigError, EngineError
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.stages.preflight import PreflightStage
-
 
 # A minimal valid TFLite flatbuffer header is just the 'TFL3' magic in the
 # first 16 bytes.  The stage only sniffs for the magic — it does not parse

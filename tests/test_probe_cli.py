@@ -1,19 +1,19 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
 import sys
+from types import SimpleNamespace
 
 import pytest
 
 from helia_profiler.cli import inspect_cmds as cli
 from helia_profiler.errors import BuildError, CaptureError
+from helia_profiler.platform import CoreArch
 from helia_profiler.target.probe.jlink import (
     JLinkProbe,
     JLinkProbeMatch,
     _split_posix_path_list,
     create_debug_memory_session,
 )
-from helia_profiler.platform import CoreArch
 
 
 def test_engines_lists_tflm(capsys) -> None:

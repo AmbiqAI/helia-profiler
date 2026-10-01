@@ -21,8 +21,8 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from ..deps import nsx as nsx_cli
 from ..config import Transport
+from ..deps import nsx as nsx_cli
 from ..errors import BuildError
 
 if TYPE_CHECKING:
@@ -71,10 +71,10 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
     ninja_already_configured = (build_dir / "build.ninja").exists()
 
     from ..deps.dependencies import (
-        invalidate_sync_stamp,
         prepare_locked_dependencies,
         workspace_mutex,
     )
+    from ..deps.sync import invalidate_sync_stamp
 
     with workspace_mutex(ctx.resolved_workspace):
         dependency_state = prepare_locked_dependencies(ctx)

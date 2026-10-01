@@ -6,8 +6,8 @@ from types import ModuleType, SimpleNamespace
 
 from typer.testing import CliRunner
 
-from helia_profiler.cli.app import app
 from helia_profiler.cli import cache_cmd as cli
+from helia_profiler.cli.app import app
 
 
 def test_cache_purge_removes_workspace_cache(tmp_path: Path, monkeypatch, capsys) -> None:

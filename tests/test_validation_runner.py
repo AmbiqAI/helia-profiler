@@ -4,8 +4,8 @@ import json
 import subprocess
 from pathlib import Path
 
-import yaml
 import pytest
+import yaml
 
 from helia_profiler.config import Toolchain, Transport
 from helia_profiler.engines import EngineType

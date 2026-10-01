@@ -12,18 +12,6 @@ from neuralspotx.nsx_lock import LockKind, NsxLock, ResolvedModule, hash_manifes
 
 from helia_profiler.config import load_config
 from helia_profiler.deps.dependencies import create_workspace, prepare_locked_dependencies
-from helia_profiler.engines import TFLM_ENGINE_HEADER
-from helia_profiler.engines.base import TflmArtifacts
-from helia_profiler.errors import ReportError
-from helia_profiler.pipeline import PipelineContext
-from helia_profiler.results.support_bundle import (
-    SUPPORT_BUNDLE_SCHEMA,
-    SUPPORT_BUNDLE_SCHEMA_VERSION,
-    SupportBundleManifest,
-    SupportBundleSection,
-)
-from helia_profiler.results import ResultArtifact
-from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 from helia_profiler.diagnostics.support_bundle import (
     SupportBundleOptions,
     collect_support_bundle,
@@ -31,6 +19,18 @@ from helia_profiler.diagnostics.support_bundle import (
     verify_support_bundle,
     write_support_bundle,
 )
+from helia_profiler.engines import TFLM_ENGINE_HEADER
+from helia_profiler.engines.base import TflmArtifacts
+from helia_profiler.errors import ReportError
+from helia_profiler.pipeline import PipelineContext
+from helia_profiler.results import ResultArtifact
+from helia_profiler.results.support_bundle import (
+    SUPPORT_BUNDLE_SCHEMA,
+    SUPPORT_BUNDLE_SCHEMA_VERSION,
+    SupportBundleManifest,
+    SupportBundleSection,
+)
+from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 
 pytestmark = pytest.mark.timeout(30)
 

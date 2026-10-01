@@ -271,7 +271,7 @@ def test_real_gcc_fixture_inventory_classifies_correctly():
     """End-to-end with the section inventory: every allocated section of the real
     readelf fixture (built with the NSX-shaped linker.ld) lands in the
     right apollo510 region."""
-    from helia_profiler.hostenv.toolchain_probe import _inventory_via_readelf
+    from helia_profiler.hostenv.elf_inventory import _inventory_via_readelf
 
     text = (Path(__file__).parent / "fixtures" / "readelf" / "sections.txt").read_text()
 

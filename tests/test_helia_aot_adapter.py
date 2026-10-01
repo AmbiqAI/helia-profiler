@@ -14,8 +14,8 @@ from pathlib import Path
 import pytest
 
 from helia_profiler.config import load_config
-from helia_profiler.engines.ethos_u import NSX_NPU_MODULE, NSX_NPU_PROJECT
 from helia_profiler.engines.base import HeliaAotArtifacts
+from helia_profiler.engines.ethos_u import NSX_NPU_MODULE, NSX_NPU_PROJECT
 from helia_profiler.engines.helia_aot.adapter import HeliaAOTAdapter, _build_extra_modules
 from helia_profiler.engines.helia_aot.compile import (
     _BOARD_TO_AOT_PLATFORM,
@@ -24,7 +24,6 @@ from helia_profiler.engines.helia_aot.compile import (
 )
 from helia_profiler.errors import EngineError
 from helia_profiler.results import NsxModuleRef
-
 
 _CMSIS_REF = NsxModuleRef(name="ns-cmsis-nn", path=Path("/tmp/cmsis"))
 
@@ -73,8 +72,8 @@ class TestEngineBackendPropagation:
     def test_config_backend_reaches_artifacts_field(self):
         # HeliaAotArtifacts.engine_backend drives has_ethos_u in
         # firmware/project.py; ensure the dataclass accepts the field.
-        from helia_profiler.engines.base import HeliaAotArtifacts
         from helia_profiler.engines import EngineType
+        from helia_profiler.engines.base import HeliaAotArtifacts
 
         artifacts = HeliaAotArtifacts(
             engine_type=EngineType.HELIA_AOT,

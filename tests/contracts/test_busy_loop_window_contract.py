@@ -14,8 +14,6 @@ a second rule cannot come back without failing them.
 
 from __future__ import annotations
 
-from tests.pipeline_context_helpers import set_profile_result
-
 import re
 from pathlib import Path
 
@@ -28,6 +26,7 @@ from helia_profiler.firmware.context import FirmwareRenderContext
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.results import FirmwareMeta, PmuResult
 from helia_profiler.stages.plan_power import plan_power_run
+from tests.pipeline_context_helpers import set_profile_result
 
 from .conftest import make_pmu_ctx
 

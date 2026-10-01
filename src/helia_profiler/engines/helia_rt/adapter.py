@@ -16,7 +16,7 @@ from pathlib import Path
 from ...config import ProfileConfig
 from ...errors import EngineError
 from ...results import NsxModuleRef
-from .. import EngineType, TFLM_ENGINE_HEADER
+from .. import TFLM_ENGINE_HEADER, EngineType
 from ..base import HeliaRtArtifacts, PsramWeightsSource, SingleArenaPlacementMixin
 from ..cmsis_nn import cmsis_nn_cmake_vars, cmsis_nn_module_ref
 from ..ethos_u import nsx_npu_module_ref

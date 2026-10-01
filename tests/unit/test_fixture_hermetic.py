@@ -10,6 +10,8 @@ import jinja2
 import pytest
 
 from helia_profiler._fixture_build import FIXTURE_REFUSED_ENVIRONMENT, _refuse_overrides
+from helia_profiler.config import ProfileConfig, load_config
+from helia_profiler.errors import ConfigError
 from helia_profiler.fixture import (
     FixtureFile,
     FixtureIO,
@@ -20,8 +22,6 @@ from helia_profiler.fixture import (
     TypedFixture,
     build_fixed_fixture,
 )
-from helia_profiler.config import ProfileConfig, load_config
-from helia_profiler.errors import ConfigError
 
 
 def _config(tmp_path: Path, **sections: dict[str, Any]) -> ProfileConfig:

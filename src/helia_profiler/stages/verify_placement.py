@@ -22,11 +22,11 @@ import logging
 
 from ..engines import EngineType
 from ..errors import BuildError
+from ..hostenv.toolchain_probe import symbol_address
 from ..pipeline import PipelineContext
-from ..placement import MemoryRegion, Placement
+from ..placement import Placement
 from ..platform import classify_address, linked_memory_map, soc_placement_ranges
 from ..platform.memory_map import link_family_for_toolchain
-from ..hostenv.toolchain_probe import symbol_address
 
 log = logging.getLogger("hpx")
 

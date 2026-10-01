@@ -1,7 +1,7 @@
 """Per-operator timing binds to a fixture build only when the profile run describes it."""
 
-from dataclasses import replace
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest

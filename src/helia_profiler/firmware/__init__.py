@@ -16,29 +16,39 @@ from __future__ import annotations
 import glob
 import logging
 import shutil
-from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
-import yaml
+from ..config import PowerFirmware, Transport, WindowMode
 
+# Unused here, but tests patch ``helia_profiler.firmware.nsx_cli.<fn>``.
 from ..deps import nsx as nsx_cli
 from ..deps.compatibility import ENGINE_OWNED_MODULE_NAMES
-from ..config import PowerFirmware, Transport, WindowMode
 from ..engines import EngineType
 from ..engines.base import ArenaRegion, HeliaAotArtifacts
-from ..errors import ConfigError
-from ..errors import FirmwareError
+from ..errors import ConfigError, FirmwareError
 from ..placement import Placement
-from ..platform import get_soc_for_board
-from .context import FirmwareRenderContext, _resolve_pmu_passes
+
+# The compiler-launcher, SEGGER RTT vendoring, generated-C-header, and NSX
+# build invocation APIs live in .build, .headers, .launcher and .segger,
+# re-exported here so callers keep one import surface.
+from .build import (
+    build_app,
+    find_target_binary,
+    nsx_toolchain,
+    rtt_buffer_size_up,
+)
+from .context import FirmwareRenderContext
 
 # NB: measured_power_fingerprint below looks unused
 # in this module but is LIVE re-export surface — report/manifest.py,
 # report/summary.py, and tests import it from the package root. Do not
 # remove in a dead-import cleanup (#194).
 from .fingerprint import measured_power_fingerprint
+from .headers import _blob_to_header, _model_to_header
+from .launcher import _resolve_compiler_launcher
 from .project import (
+    _POWER_SYNC_MODULE_NAMES,
     NsxModuleSpec,
     ProjectRenderContext,
     _board_module_name,
@@ -48,44 +58,20 @@ from .project import (
     _install_local_module_override,
     _module_names_by_project,
     _module_project,
-    _POWER_SYNC_MODULE_NAMES,
     _render_module_registry,
     _resolve_module_specs,
     _resolve_project_overrides,
-    _soc_has_backend,
     _usb_provider_module_names,
     render_project_files,
 )
 from .render import _jinja_env, _write_text
-
-# The compiler-launcher, SEGGER RTT vendoring, generated-C-header, and NSX
-# build invocation APIs live in dedicated modules, re-exported here so
-# callers keep one import surface.
-from .build import (
-    _DEFAULT_RTT_BUFFER_SIZE_UP,
-    build_app,
-    find_target_binary,
-    nsx_toolchain,
-    rtt_buffer_size_up,
-)
-from .headers import _blob_to_header, _model_to_header
-from .launcher import (
-    _AUTO_COMPILER_LAUNCHERS,
-    _DISABLED_LAUNCHER_VALUES,
-    _LAUNCHER_UNSUPPORTED_TOOLCHAINS,
-    _launcher_basename,
-    _launcher_supports_toolchain,
-    _resolve_compiler_launcher,
-)
 from .segger import (
-    _bundled_segger_rtt_dir,
     _copy_segger_rtt,
     _is_segger_rtt_root,
     find_segger_rtt_dir,
 )
 
 if TYPE_CHECKING:
-    from ..config import ProfileConfig
     from ..pipeline import PipelineContext
 
 log = logging.getLogger("hpx")

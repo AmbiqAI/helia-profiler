@@ -33,20 +33,15 @@ because of the runtime upload handshake.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
 
-from ..config import DEFAULT_ARENA_SIZE_BYTES
-from ..errors import PlatformError
+from ..config import DEFAULT_ARENA_SIZE_BYTES, Transport
 from ..engines import EngineType
 from ..engines.base import ExecutorchArtifacts, HeliaAotArtifacts
+from ..errors import PlatformError
 from ..pipeline import PipelineContext
 from ..placement import ArenaRole, MemoryRegion, Placement, resolve_fastest_fit_placement
-from ..config import Transport
 from ..platform import MemoryLayout, PmuTier, SocDef, SocFamily
 from ..results import ConsumerKind, MemoryConsumer, MemoryPlan, MemoryRegionUsage
-
-if TYPE_CHECKING:
-    from ..config import ProfileConfig
 
 log = logging.getLogger("hpx")
 

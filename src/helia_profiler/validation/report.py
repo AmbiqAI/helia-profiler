@@ -12,9 +12,9 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from ..firmware.workload import AOT_CLEAN_WORKLOAD
 from .._version import __version__
 from ..errors import ReportError
+from ..firmware.workload import AOT_CLEAN_WORKLOAD
 from ..results.serde import nested_get, strip_none
 from .bundle import SCHEMA_VERSION
 from .runner import CaseResult

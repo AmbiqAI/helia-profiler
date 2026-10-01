@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
 import hashlib
 import json
 import os
-from pathlib import Path, PurePath
 import re
+from dataclasses import asdict, dataclass
+from enum import StrEnum
+from pathlib import Path, PurePath
 
 from .config import ProfileConfig
 from .deps.compatibility import resolve_compatibility
@@ -15,20 +16,6 @@ from .engines import EngineType
 from .engines.base import HeliaAotArtifacts
 from .errors import ConfigError
 from .firmware.launcher import _DISABLED_LAUNCHER_VALUES
-from .pipeline import PipelineContext, PipelineRunner, Stage, serialize_config
-from .placement import ArenaRole, Placement
-from .fixture_image import MAX_IMAGE, MRAM, bounded
-from .fixture_target import FIXTURE_CLOCK_PROFILE, FixtureTarget, supported_fixture_target
-from .results.models import ToolchainInfo, MemoryPlan
-
-
-from enum import StrEnum
-from .fixture_runtime import (
-    PREPARED_RUNTIME_MODULES,
-    FixtureFile,
-    PreparedUpstreamRuntime,
-    _PreparedRuntimeStage,
-)
 from .fixture_analysis import (
     FixtureModelAnalysis,
     FixtureTensor,
@@ -38,6 +25,17 @@ from .fixture_analysis import (
     analyze_fixture_model,
     analyze_typed_fixture_model,
 )
+from .fixture_image import MAX_IMAGE, MRAM, bounded
+from .fixture_runtime import (
+    PREPARED_RUNTIME_MODULES,
+    FixtureFile,
+    PreparedUpstreamRuntime,
+    _PreparedRuntimeStage,
+)
+from .fixture_target import FIXTURE_CLOCK_PROFILE, FixtureTarget, supported_fixture_target
+from .pipeline import PipelineContext, PipelineRunner, Stage, serialize_config
+from .placement import ArenaRole, Placement
+from .results.models import MemoryPlan, ToolchainInfo
 
 
 class FixtureTimingScope(StrEnum):
@@ -581,11 +579,11 @@ def _build(
                 _clear_aot_outputs(root, prefix)
 
     from .stages import (
-        ResolvePlatformStage,
-        PrepareEngineStage,
+        BuildFirmwareStage,
         GenerateFirmwareStage,
         PlanMemoryStage,
-        BuildFirmwareStage,
+        PrepareEngineStage,
+        ResolvePlatformStage,
     )
 
     stages: list[Stage] = [

@@ -12,8 +12,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from ..vocab import Transport
 from ..errors import CaptureError
+from ..vocab import Transport
 from .base import BaseCaptureTransport, CaptureArgs, CaptureTransport
 from .protocol import (
     CLEAN_WINDOW_BEGIN_PHASE,

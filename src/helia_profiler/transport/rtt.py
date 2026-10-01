@@ -42,9 +42,7 @@ import re
 import time
 from pathlib import Path
 
-from ..vocab import Transport
 from ..errors import CaptureError
-from .base import BaseCaptureTransport, CaptureArgs
 from ..target.probe.base import DebugMemorySession, ResetController
 from ..target.probe.jlink import (
     JLinkResetController,
@@ -54,11 +52,7 @@ from ..target.probe.jlink import (
     open_jlink_with_retry,
     resume_if_halted,
 )
-from .protocol import (
-    DEFAULT_TIMEOUT_S,
-    HEARTBEAT_TIMEOUT_S,
-    collect_lines,
-)
+from ..vocab import Transport
 from ..wire import (
     HPX_END_SENTINEL,
     HPX_GO_COMMAND,
@@ -66,18 +60,25 @@ from ..wire import (
     HPX_START_SENTINEL,
     WireKey,
 )
+from .base import BaseCaptureTransport, CaptureArgs
 from .firmware_errors import raise_on_firmware_error
-from .timing import SBL_SETTLE_S, CaptureTimingTracker
+from .protocol import (
+    HEARTBEAT_TIMEOUT_S,
+    collect_lines,
+)
 from .rtt_control import (
     RTT_LIVE_NAMED_SCORE,
-    direct_rtt_read as _direct_rtt_read,
+)
+from .rtt_control import (
     direct_rtt_read_any as _direct_rtt_read_any,
-    read_rtt_up_channel0_name as _read_rtt_up_channel0_name,
+)
+from .rtt_control import (
     scan_for_rtt_control_block as _scan_for_rtt_control_block,
-    scan_rtt_control_blocks as _scan_rtt_control_blocks,
-    score_rtt_control_block as _score_rtt_control_block,
+)
+from .rtt_control import (
     wipe_rtt_control_blocks as _wipe_rtt_control_blocks,
 )
+from .timing import SBL_SETTLE_S, CaptureTimingTracker
 
 log = logging.getLogger("hpx")
 
@@ -615,7 +616,7 @@ def capture_rtt_output(
 
         def read_rtt_chunk() -> bytes:
             # Pure J-Link RTT engine read.  Do NOT mix in a direct-SWD read on
-            # this path: the background RTT engine and a manual _direct_rtt_read
+            # this path: the background RTT engine and a manual direct_rtt_read
             # would both drain the same up buffer and advance RdOff, racing each
             # other and interleaving/corrupting the byte stream (CSV rows spliced
             # mid-row with heartbeats).  The attach probe already proved the

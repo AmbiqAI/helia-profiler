@@ -21,12 +21,12 @@ from typing import TYPE_CHECKING, Any
 from ..deps.compatibility import CompatibilityResolution
 from ..engines import EngineType
 from ..modelcost.layer_attribution import source_index_from_op
-from ..power.base import PowerResult
 from ..placement import MemoryRegion
+from ..power.base import PowerResult
 
 if TYPE_CHECKING:
-    from .dependencies import DependencyProvenance
     from .artifacts import OnDevicePowerSummary, PowerObservation, PowerTerminalRecord
+    from .dependencies import DependencyProvenance
 
 
 class ConsumerKind(StrEnum):

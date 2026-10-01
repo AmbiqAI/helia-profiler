@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from tests.pipeline_context_helpers import set_profile_firmware
-
 import sys
 import types
 from pathlib import Path
@@ -9,21 +7,22 @@ from pathlib import Path
 import pytest
 
 from helia_profiler.capture import capture_pmu
-from helia_profiler.transport.rtt import (
-    _direct_rtt_read,
-    _scan_for_rtt_control_block,
-    _write_rtt_command_api,
-    _wipe_rtt_control_blocks,
-    capture_rtt_output,
-)
-from helia_profiler.errors import CaptureError
-from helia_profiler.transport.firmware_errors import ERROR_HINTS
-from helia_profiler.wire import FirmwareErrorCode
-from helia_profiler.transport.swo import capture_swo_output
 from helia_profiler.config import load_config
+from helia_profiler.errors import CaptureError
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.placement import Placement
 from helia_profiler.stages.resolve_platform import ResolvePlatformStage
+from helia_profiler.transport.firmware_errors import ERROR_HINTS
+from helia_profiler.transport.rtt import (
+    _scan_for_rtt_control_block,
+    _wipe_rtt_control_blocks,
+    _write_rtt_command_api,
+    capture_rtt_output,
+)
+from helia_profiler.transport.rtt_control import direct_rtt_read
+from helia_profiler.transport.swo import capture_swo_output
+from helia_profiler.wire import FirmwareErrorCode
+from tests.pipeline_context_helpers import set_profile_firmware
 
 
 class _FakeJLink:
@@ -84,7 +83,7 @@ def test_scan_for_rtt_control_block_uses_provided_ranges():
 def test_direct_rtt_read_advances_rd_off():
     jlink = _FakeDirectRttJLink()
 
-    data = _direct_rtt_read(
+    data = direct_rtt_read(
         jlink,  # ty: ignore[invalid-argument-type]  # fake J-Link: only the surface under test
         block_address=0x20000000,
         max_bytes=16,

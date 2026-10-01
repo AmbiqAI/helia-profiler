@@ -19,35 +19,33 @@ from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeVar, runtime_check
 from neuralspotx.file_lock import file_mutex
 
 from ._version import __version__
+from .config import ProfileConfig
+from .engines.base import EngineAdapter, EngineArtifacts
+from .errors import HpxError, PipelineError
+from .evaluation import RunEvaluation
+from .hostenv.toolchain_probe import SymbolEntry
+from .modelcost import ModelAnalysis
+from .placement import Placement
+from .platform import BoardDef, SocDef
+from .power.base import PowerMode, PowerResult
+from .power.metadata import ObservationMode
 from .results import (
+    BinarySections,
     DependencyWorkspace,
     DeploymentRecord,
     FirmwareArtifact,
+    MeasuredMemoryRegions,
+    MemoryPlan,
+    MemoryReconciliation,
+    PmuResult,
     PowerObservation,
     PowerRun,
     PowerRunPlan,
     PowerTerminalEnvelope,
     PowerTerminalRecord,
     ProfileRun,
-)
-from .config import ProfileConfig
-from .engines.base import EngineAdapter, EngineArtifacts
-from .errors import HpxError, PipelineError
-from .platform import BoardDef, SocDef
-from .evaluation import RunEvaluation
-from .modelcost import ModelAnalysis
-from .placement import Placement
-from .power.base import PowerMode, PowerResult
-from .power.metadata import ObservationMode, classify_observation
-from .results import (
-    MeasuredMemoryRegions,
-    MemoryPlan,
-    MemoryReconciliation,
-    PmuResult,
     RunMetadata,
-    BinarySections,
 )
-from .hostenv.toolchain_probe import SymbolEntry
 from .target.probe.base import ResetController
 
 if TYPE_CHECKING:

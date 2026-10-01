@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import math
+from dataclasses import dataclass
 
-from .engines import EngineType
 from ._fixture_build import FixedFixture, FixtureBuild, TypedFixture
-from .results.models import DEVICE_CLOCK_TOLERANCE, ProfileResult
+from .engines import EngineType
 from .fixture_capture import FIXTURE_CPU_HZ
 from .fixture_target import FIXTURE_CLOCK_PROFILE
+from .results.models import DEVICE_CLOCK_TOLERANCE, ProfileResult
 
 #: Clock and placement every fixed fixture is built for (see ``fixture._validate``).
 FIXTURE_PLACEMENT = {"arena_location": "sram", "weights_location": "mram"}

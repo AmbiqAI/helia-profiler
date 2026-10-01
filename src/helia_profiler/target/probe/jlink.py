@@ -17,20 +17,20 @@ elsewhere.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 import contextlib
 import ctypes
 import ctypes.util
-from dataclasses import dataclass
 import logging
 import os
-from pathlib import Path
 import re
 import shutil
 import subprocess
 import sys
 import time
+from collections.abc import Iterator
 from contextlib import AbstractContextManager
+from dataclasses import dataclass
+from pathlib import Path
 
 from ...errors import CaptureError, ConfigError
 from ...platform import CoreArch

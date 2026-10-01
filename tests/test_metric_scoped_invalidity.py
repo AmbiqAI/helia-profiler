@@ -12,8 +12,12 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
-from helia_profiler.evaluation import ComparabilitySeverity, assess_comparability, RunArtifacts
-from helia_profiler.evaluation import comparability
+from helia_profiler.evaluation import (
+    ComparabilitySeverity,
+    RunArtifacts,
+    assess_comparability,
+    comparability,
+)
 from helia_profiler.results import (
     METRIC_BLOCKING_CODE_BY_GROUP,
     ComparabilityCode,

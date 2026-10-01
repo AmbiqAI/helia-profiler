@@ -155,7 +155,6 @@ from ._stream import (
     START_HEADER_SPECS,
 )
 
-
 _ALL_SPECS: tuple[WireSpec, ...] = (
     SENTINEL_SPECS
     + HANDSHAKE_SPECS
