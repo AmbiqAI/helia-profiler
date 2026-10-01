@@ -202,6 +202,11 @@ class PipelineContext:
             return None
         return self.power_run.observation.result
 
+    @property
+    def effective_jlink_serial(self) -> str | None:
+        """The probe ResolveProbeStage selected, else the configured serial."""
+        return self.resolved_jlink_serial or self.config.target.jlink_serial
+
     # Narrowing accessors: the *write* surface above is set by the stage
     # that produces it; these are the *read* surface, returning the
     # non-optional type or raising :class:`PipelineError` naming the

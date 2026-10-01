@@ -23,6 +23,7 @@ from ..power.clean_window import (
     window_inference_count,
 )
 from ..power.base import PowerMode
+from ..power.clean_window import window_reference_inference_us
 from ..power.metadata import MeasurementScope
 from ..errors import ReportError
 from ..results import ISSUE_REGISTRY, IssueCode, ResultIssue, ResultValidity, Severity
@@ -62,13 +63,11 @@ def _rederive_integrity(
     meta = ctx.pmu_result.meta if ctx.pmu_result is not None else None
     if meta is None or meta.clean_infer_count is None or meta.clean_infer_count <= 0:
         return None
-    # One resolution of the window's inference count (#240): energy/inference
-    # (report.summary), TOPS, and this gate-duration check share it.
+    # One resolution of the window's inference count and reference duration
+    # (#240): energy/inference (report.summary), TOPS, and this gate-duration
+    # check share them.
     effective_count = window_inference_count(ctx) or meta.clean_infer_count
-    effective_avg_us = meta.clean_infer_avg_us
-    plan_meta = result.metadata.power_plan
-    if isinstance(plan_meta, dict) and plan_meta.get("reference_inference_us"):
-        effective_avg_us = int(plan_meta["reference_inference_us"])
+    effective_avg_us = window_reference_inference_us(ctx)
     if not effective_avg_us or effective_avg_us <= 0 or result.summary.duration_s <= 0:
         return None
     return assess_gate_duration(

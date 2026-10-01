@@ -283,9 +283,9 @@
               "returns": [],
               "signature": "validity: ResultValidity",
               "source": {
-                "line": 40,
+                "line": 39,
                 "path": "src/helia_profiler/evaluation/validity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L40"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L39"
               },
               "summary": ""
             },
@@ -302,9 +302,9 @@
               "returns": [],
               "signature": "issues: tuple[ResultIssue, ...] = ()",
               "source": {
-                "line": 41,
+                "line": 40,
                 "path": "src/helia_profiler/evaluation/validity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L41"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L40"
               },
               "summary": ""
             },
@@ -321,9 +321,9 @@
               "returns": [],
               "signature": "gate_arbitration: GateArbitration | None = None",
               "source": {
-                "line": 45,
+                "line": 44,
                 "path": "src/helia_profiler/evaluation/validity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L45"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L44"
               },
               "summary": ""
             }
@@ -334,9 +334,9 @@
           "returns": [],
           "signature": "RunEvaluation(\n    validity: ResultValidity,\n    issues: tuple[ResultIssue, ...] = (),\n    gate_arbitration: GateArbitration | None = None,\n) -> None",
           "source": {
-            "line": 36,
+            "line": 35,
             "path": "src/helia_profiler/evaluation/validity.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L36"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L35"
           },
           "summary": "Authoritative validity and structured issues for one completed run."
         },
@@ -1316,6 +1316,25 @@
           "summary": "Verdict and evidence for one selected metric."
         },
         {
+          "description": "Evaluate captured results without mutating pipeline state.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.evaluate_run",
+          "kind": "function",
+          "language": "python",
+          "members": [],
+          "name": "evaluate_run",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "evaluate_run(ctx: PipelineContext) -> RunEvaluation",
+          "source": {
+            "line": 192,
+            "path": "src/helia_profiler/evaluation/validity.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L192"
+          },
+          "summary": "Evaluate captured results without mutating pipeline state."
+        },
+        {
           "description": "`dataclass`\n\nDeterministic verdict for one result pair and profile.\n\n**API tier:** `experimental`",
           "examples": [],
           "id": "helia_profiler.ComparisonVerdict",
@@ -1467,25 +1486,6 @@
             "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L195"
           },
           "summary": "Deterministic verdict for one result pair and profile."
-        },
-        {
-          "description": "Evaluate captured results without mutating pipeline state.\n\n**API tier:** `experimental`",
-          "examples": [],
-          "id": "helia_profiler.evaluate_run",
-          "kind": "function",
-          "language": "python",
-          "members": [],
-          "name": "evaluate_run",
-          "params": [],
-          "raises": [],
-          "returns": [],
-          "signature": "evaluate_run(ctx: PipelineContext) -> RunEvaluation",
-          "source": {
-            "line": 195,
-            "path": "src/helia_profiler/evaluation/validity.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L195"
-          },
-          "summary": "Evaluate captured results without mutating pipeline state."
         },
         {
           "description": "Evaluate existing metric deltas against one versioned profile.\n\n**API tier:** `experimental`",

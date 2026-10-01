@@ -153,6 +153,36 @@ def resolve_cdc_port(
     )
 
 
+def resolve_target_cdc_port(
+    *,
+    usb_port: str | None,
+    marker: str | None,
+    timeout_s: float = _ENUM_TIMEOUT_S,
+) -> str:
+    """Return the pinned *usb_port*, else :func:`resolve_cdc_port` by *marker*.
+
+    A pinned port is returned at once, without the re-enumeration floor; a
+    caller that has just reset the target must wait that out itself.
+    """
+    if usb_port is not None:
+        return usb_port
+    return resolve_cdc_port(marker=marker, timeout_s=timeout_s)
+
+
+def open_cdc_port(port: str, *, timeout: float | None) -> serial.Serial:
+    """Open *port* with DTR asserted, which releases ``nsx_usb_connected()``.
+
+    The firmware spins until the host opens its CDC port and raises DTR.
+    """
+    ser = serial.Serial(port=port, baudrate=BAUD, timeout=timeout, dsrdtr=True)
+    try:
+        ser.dtr = True
+    except BaseException:
+        ser.close()
+        raise
+    return ser
+
+
 def _find_cdc_port(
     pre_existing: set[str] | None = None,
     timeout_s: float = _ENUM_TIMEOUT_S,
@@ -298,13 +328,7 @@ def capture_usb_output(
             port = resolve_cdc_port(marker=usb_marker, pre_existing=pre_existing)
 
         log.info("Opening USB CDC port: %s", port)
-        ser = opened = serial.Serial(
-            port=port,
-            baudrate=BAUD,
-            timeout=0,
-            dsrdtr=True,  # assert DTR so nsx_usb_connected() returns true
-        )
-        opened.dtr = True
+        ser = opened = open_cdc_port(port, timeout=0)
         opened.reset_input_buffer()
 
         def read_fn() -> bytes:

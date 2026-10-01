@@ -291,3 +291,19 @@ def window_inference_count(ctx: "PipelineContext") -> int | None:
         count = meta.clean_infer_count if meta is not None else None
         return count if count and count > 0 else None
     return None
+
+
+def window_reference_inference_us(ctx: "PipelineContext") -> int | None:
+    """Return the per-inference duration (us) the measured window is judged by.
+
+    The companion of :func:`window_inference_count`: the power plan's
+    ``reference_inference_us`` when it carries one, else the profile phase's
+    ``clean_infer_avg_us``. ``None`` when neither exists; callers still
+    reject non-positive values.
+    """
+    result = ctx.power_result
+    plan = result.metadata.power_plan if result is not None else None
+    if isinstance(plan, dict) and plan.get("reference_inference_us"):
+        return int(plan["reference_inference_us"])
+    meta = ctx.pmu_result.meta if ctx.pmu_result is not None else None
+    return meta.clean_infer_avg_us if meta is not None else None

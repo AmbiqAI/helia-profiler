@@ -231,7 +231,7 @@ def _execute_reset_strategy(ctx: PipelineContext, strategy: ResetStrategy) -> Re
 
     from .probe.jlink import JLinkResetController
 
-    jlink_serial = ctx.resolved_jlink_serial or ctx.config.target.jlink_serial
+    jlink_serial = ctx.effective_jlink_serial
     reset_controller = ctx.reset_controller or JLinkResetController()
     device = ctx.resolved_soc.jlink_device
 

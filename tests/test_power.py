@@ -37,6 +37,8 @@ from helia_profiler.power.base import (
     PowerSummary,
 )
 
+pytestmark = pytest.mark.usefixtures("no_lockstep_reset_grace")
+
 #: time64 tick rate (2**30 ticks per second), mirrors ``pyjoulescope_driver.time64.SECOND``.
 _SECOND = 1 << 30
 

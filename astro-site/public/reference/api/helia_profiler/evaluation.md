@@ -170,7 +170,7 @@ Authoritative validity and structured issues for one completed run.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/evaluation/validity.py:36`
+Source: `src/helia_profiler/evaluation/validity.py:35`
 
 ### helia_profiler.RunEvaluation.validity
 
@@ -180,7 +180,7 @@ Source: `src/helia_profiler/evaluation/validity.py:36`
 validity: ResultValidity
 ```
 
-Source: `src/helia_profiler/evaluation/validity.py:40`
+Source: `src/helia_profiler/evaluation/validity.py:39`
 
 ### helia_profiler.RunEvaluation.issues
 
@@ -190,7 +190,7 @@ Source: `src/helia_profiler/evaluation/validity.py:40`
 issues: tuple[ResultIssue, ...] = ()
 ```
 
-Source: `src/helia_profiler/evaluation/validity.py:41`
+Source: `src/helia_profiler/evaluation/validity.py:40`
 
 ### helia_profiler.RunEvaluation.gate_arbitration
 
@@ -200,7 +200,7 @@ Source: `src/helia_profiler/evaluation/validity.py:41`
 gate_arbitration: GateArbitration | None = None
 ```
 
-Source: `src/helia_profiler/evaluation/validity.py:45`
+Source: `src/helia_profiler/evaluation/validity.py:44`
 
 ## helia_profiler.VerdictStatus
 
@@ -794,6 +794,20 @@ unit: str = ''
 
 Source: `src/helia_profiler/evaluation/comparison_profile.py:192`
 
+## helia_profiler.evaluate_run
+
+`function` · `python`
+
+```python
+evaluate_run(ctx: PipelineContext) -> RunEvaluation
+```
+
+Evaluate captured results without mutating pipeline state.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/evaluation/validity.py:192`
+
 ## helia_profiler.ComparisonVerdict
 
 `class` · `python`
@@ -887,20 +901,6 @@ profile_sha256: str = ''
 ```
 
 Source: `src/helia_profiler/evaluation/comparison_profile.py:205`
-
-## helia_profiler.evaluate_run
-
-`function` · `python`
-
-```python
-evaluate_run(ctx: PipelineContext) -> RunEvaluation
-```
-
-Evaluate captured results without mutating pipeline state.
-
-**API tier:** `experimental`
-
-Source: `src/helia_profiler/evaluation/validity.py:195`
 
 ## helia_profiler.evaluate_comparison_profile
 
