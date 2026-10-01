@@ -27,7 +27,6 @@ class CapturePhase(StrEnum):
 
     PMU = "pmu"
     POWER = "power"
-    SYNC_SELFTEST = "sync_selftest"
 
 
 class ResetAction(StrEnum):

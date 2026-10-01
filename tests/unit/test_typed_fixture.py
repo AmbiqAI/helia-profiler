@@ -310,13 +310,9 @@ def _runner(tmp_path, calls, regions=()):
 
 
 REGIONS = (
-    ArenaRegion(0, "scratch", "M_SCRATCH", 4096, 16, ArenaRole.SCRATCH, "sram", Placement.SRAM),
-    ArenaRegion(
-        1, "persistent", "M_PERSISTENT", 64, 16, ArenaRole.PERSISTENT, "sram", Placement.SRAM
-    ),
-    ArenaRegion(
-        2, "constant", "M_CONST", 128, 16, ArenaRole.CONSTANT, "mram", Placement.MRAM, "c.bin"
-    ),
+    ArenaRegion(0, "scratch", 4096, 16, ArenaRole.SCRATCH, "sram", Placement.SRAM),
+    ArenaRegion(1, "persistent", 64, 16, ArenaRole.PERSISTENT, "sram", Placement.SRAM),
+    ArenaRegion(2, "constant", 128, 16, ArenaRole.CONSTANT, "mram", Placement.MRAM, "c.bin"),
 )
 
 
@@ -507,8 +503,6 @@ def test_aot_scan_is_absent_unless_requested(tmp_path):
 
 
 def test_heliaaot_region_outside_sram_or_mram_is_refused_at_render(tmp_path):
-    region = ArenaRegion(
-        0, "scratch", "M_SCRATCH", 4096, 16, ArenaRole.SCRATCH, "tcm", Placement.TCM
-    )
+    region = ArenaRegion(0, "scratch", 4096, 16, ArenaRole.SCRATCH, "tcm", Placement.TCM)
     with pytest.raises(ConfigError, match="SRAM/MRAM AOT regions only"):
         render(tmp_path, typed(tmp_path), EngineType.HELIA_AOT, regions=(region,))

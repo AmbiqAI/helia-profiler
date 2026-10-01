@@ -68,17 +68,15 @@ engine package.
 `helia-aot` and `executorch`, so YAML and Jinja compare against the hyphen
 form without unwrapping. `_ADAPTER_FACTORIES` maps each member to a
 deferred import, so registering an engine does not import its package
-until `get_adapter(engine_type)` asks for it; `register_engine_adapter()`
-lets tests substitute a stub.
+until `get_adapter(engine_type)` asks for it.
 
 ### The adapter protocol
 
 `EngineAdapter` in `engines/base.py` has a `name`, an `engine_type`, and
-`prepare(config, work_dir)` returning that engine's artifact subtype. Three
-optional hooks let an engine shape memory placement:
-`default_auto_placement()` (return `None` to accept the shared greedy
-policy), `apply_arena_placement_override()` for engines that emit typed
-arena regions, and `check_psram_placement()` together with
+`prepare(config, work_dir)` returning that engine's artifact subtype. Two
+hooks let an engine shape memory placement:
+`apply_arena_placement_override()` for engines that emit typed arena
+regions, and `check_psram_placement()` together with
 `psram_weights_source`, which is how the PSRAM preflight on
 [Memory placement](../../memory/#6-psram) is enforced per engine.
 
@@ -102,8 +100,7 @@ SoC is a registry question, answered on [Engines](../../engines/) and
 
 `EngineArtifacts` carries only what every engine produces: `engine_type`,
 `engine_header` (no default; each adapter states its own), `extra_modules`,
-`cmake_vars`, `source_files`, `include_dirs`, `static_libs` and
-`memory_plan`. Engine-specific fields live on the subclass, so reading
+`cmake_vars` and `memory_plan`. Engine-specific fields live on the subclass, so reading
 another engine's field is an `AttributeError` at the access site rather
 than a silent `None`; each subclass pins its `engine_type` and raises
 `ValueError` if constructed with another. Four `resolved_*` properties

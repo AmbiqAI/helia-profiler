@@ -160,12 +160,6 @@ class HeliaAOTAdapter:
             ),
         )
 
-    def default_auto_placement(
-        self, *, tcm_cap: int, sram_cap: int
-    ) -> tuple[Placement, Placement] | None:
-        del tcm_cap, sram_cap
-        return None
-
     def apply_arena_placement_override(
         self, regions: list[ArenaRegion], target: Placement
     ) -> list[ArenaRegion]:

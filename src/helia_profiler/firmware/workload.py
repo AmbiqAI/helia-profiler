@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ..power.diagnostics import window_inference_count
+from ..power.clean_window import window_inference_count
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext

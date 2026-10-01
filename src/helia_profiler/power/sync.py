@@ -34,8 +34,6 @@ class DeviceState(Enum):
     UNKNOWN = "unknown"
     READY = "ready"
     RUNNING = "running"
-    DONE = "done"
-    FAULT = "fault"
 
 
 @dataclass(frozen=True)
@@ -86,7 +84,12 @@ class SyncController(Protocol):
         ...
 
     def read_state(self) -> DeviceState:
-        """Sample the device state wire (ready/fault) outside the window."""
+        """Sample the gate and state wires outside the window.
+
+        Returns RUNNING while the gate is high, READY while the state wire is
+        high, and UNKNOWN otherwise; a fault blink on the state wire is not
+        decoded.
+        """
         ...
 
     def release(self) -> None:

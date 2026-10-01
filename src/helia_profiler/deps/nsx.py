@@ -22,7 +22,7 @@ import functools
 import logging
 import time
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, TypeVar
 
 from neuralspotx import api as nsx_api
 from neuralspotx._io import Emitter, Event
@@ -32,6 +32,8 @@ from neuralspotx.nsx_lock import NsxLock
 from ..errors import BuildError, NetworkError
 
 log = logging.getLogger("hpx")
+
+_T = TypeVar("_T")
 
 # Conservative default timeouts — cmake configure is fast, builds can be
 # slow. These are *defaults*; the profiler pipeline passes explicit values from ``ProfileConfig.timeouts``.
@@ -56,7 +58,7 @@ def emitter_for_verbosity(verbose: int) -> Emitter | None:
     return _quiet_emitter
 
 
-def _translate(label: str, func: Callable[[], Any]) -> Any:
+def _translate(label: str, func: Callable[[], _T]) -> _T:
     """Run *func* and translate :class:`NSXError` → :class:`BuildError`.
 
     NSX raises ``NSXError`` for both ordinary subprocess failures and for
@@ -234,21 +236,12 @@ def load_registry() -> dict[str, Any]:
     This is the in-memory registry.lock with derived ``starter_profiles``. It
     resolves purely from the local neuralspotx install — no network or git.
     """
-    if hasattr(nsx_api, "load_registry"):
-        return nsx_api.load_registry()
-
-    from neuralspotx.project_config import _load_registry
-
-    return _load_registry()
+    return nsx_api.load_registry()
 
 
 def starter_profile(board: str) -> dict[str, Any] | None:
     """Return the ``{board}_minimal`` starter profile, or *None* if absent."""
-    if hasattr(nsx_api, "starter_profile"):
-        return nsx_api.starter_profile(board)
-
-    profiles = load_registry().get("starter_profiles", {})
-    return profiles.get(f"{board}_minimal")
+    return nsx_api.starter_profile(board)
 
 
 def registry_module_project(name: str) -> str | None:
@@ -257,15 +250,7 @@ def registry_module_project(name: str) -> str | None:
     Returns *None* when the module has no registry entry (e.g. a local module
     such as a generated heliaRT wrapper).
     """
-    if hasattr(nsx_api, "registry_module_project"):
-        return nsx_api.registry_module_project(name)
-
-    from neuralspotx.metadata import registry_entry_for_module
-
-    try:
-        return registry_entry_for_module(load_registry(), name).project
-    except (KeyError, ValueError):
-        return None
+    return nsx_api.registry_module_project(name)
 
 
 def registry_project(name: str) -> dict[str, Any] | None:
