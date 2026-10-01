@@ -347,9 +347,7 @@ class FirmwareRenderContext:
             ),
             transport=TransportContext(
                 transport=transport,
-                usb_serial_marker=usb_marker_serial(
-                    ctx.resolved_jlink_serial or config.target.jlink_serial
-                ),
+                usb_serial_marker=usb_marker_serial(ctx.effective_jlink_serial),
                 usb_serial_product=USB_MARKER_PRODUCT,
                 printf_linkage=printf_linkage,
             ),

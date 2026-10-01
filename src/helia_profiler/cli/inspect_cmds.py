@@ -14,7 +14,6 @@ from typing import Any
 
 from ..config import Toolchain, Transport
 from ..engines import EngineType
-from .common import _print_hpx_error
 
 
 def _bundle_env(
@@ -66,6 +65,7 @@ def _cmd_doctor(
         )
         return
 
+    console = HpxConsole()
     try:
         session = Session.from_yaml(config) if config else Session()
         target = {"toolchain": toolchain, "transport": transport}
@@ -74,12 +74,11 @@ def _cmd_doctor(
             session = session.with_engine(engine)
         result = session.doctor(include_versions=json_)
     except HpxError as exc:
-        _print_hpx_error(exc)
+        console.print_error(exc)
         sys.exit(1)
     if json_:
         print(json.dumps(result.to_dict(), indent=2))
         return
-    console = HpxConsole()
     console.print_doctor(result)
 
 
@@ -99,6 +98,7 @@ def _cmd_doctor_bundle(
     """Collect and write an ``hpx doctor --bundle`` support archive."""
     from pathlib import Path
 
+    from ..console import HpxConsole
     from ..errors import HpxError
     from ..diagnostics.support_bundle import (
         SupportBundleOptions,
@@ -126,7 +126,7 @@ def _cmd_doctor_bundle(
         collection = collect_support_bundle(options)
         path = write_support_bundle(collection, Path(bundle).expanduser())
     except HpxError as exc:
-        _print_hpx_error(exc)
+        HpxConsole().print_error(exc)
         sys.exit(1)
 
     if json_:
@@ -173,6 +173,7 @@ def _cmd_boards() -> None:
 def _cmd_probes_list(
     *, board: str | None = None, inspect: bool = False, json_: bool = False
 ) -> None:
+    from ..console import HpxConsole
     from ..errors import HpxError
     from ..target.probe.jlink import inspect_probe_target, list_connected_probes
 
@@ -210,7 +211,7 @@ def _cmd_probes_list(
                 row["jlink_device"] = soc.jlink_device
             rows.append(row)
     except HpxError as exc:
-        _print_hpx_error(exc)
+        HpxConsole().print_error(exc)
         sys.exit(1)
 
     if json_:
@@ -226,6 +227,7 @@ def _cmd_probes_list(
 
 
 def _cmd_probes_match(*, board: str, jlink_serial: str | None = None, json_: bool = False) -> None:
+    from ..console import HpxConsole
     from ..errors import HpxError
     from ..target.probe.jlink import resolve_probe_serial
 
@@ -244,7 +246,7 @@ def _cmd_probes_match(*, board: str, jlink_serial: str | None = None, json_: boo
             requested_serial=jlink_serial,
         )
     except HpxError as exc:
-        _print_hpx_error(exc)
+        HpxConsole().print_error(exc)
         sys.exit(1)
 
     if json_:
@@ -284,6 +286,7 @@ def _cmd_ports_list(*, show_all: bool = False, json_: bool = False) -> None:
 
 
 def _cmd_target_reset(*, board: str, jlink_serial: str | None = None, kind: str = "debug") -> None:
+    from ..console import HpxConsole
     from ..errors import HpxError
     from ..target.probe.jlink import reset_target, reset_target_poi
 
@@ -301,7 +304,7 @@ def _cmd_target_reset(*, board: str, jlink_serial: str | None = None, kind: str 
         else:
             reset_target(device=soc.jlink_device, jlink_serial=jlink_serial)
     except HpxError as exc:
-        _print_hpx_error(exc)
+        HpxConsole().print_error(exc)
         sys.exit(1)
 
     serial = jlink_serial or "auto"
