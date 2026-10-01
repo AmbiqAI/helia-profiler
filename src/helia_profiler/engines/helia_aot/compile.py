@@ -232,15 +232,23 @@ def _merged_aot_args(config: ProfileConfig) -> dict[str, Any]:
             )
         try:
             with open(cfg_path, encoding="utf-8") as f:
-                loaded = yaml.safe_load(f) or {}
+                loaded = yaml.safe_load(f)
+        except UnicodeDecodeError as exc:
+            raise EngineError(
+                f"heliaAOT config file is not valid UTF-8: {cfg_path}: {exc}",
+                hint="Save engine.config_path with UTF-8 encoding.",
+            ) from exc
         except yaml.YAMLError as exc:
             raise EngineError(
                 f"heliaAOT config file is not valid YAML: {cfg_path}: {exc}",
                 hint="Check engine.config_path in your profiler YAML.",
             ) from exc
+        if loaded is None:
+            loaded = {}
         if not isinstance(loaded, dict):
             raise EngineError(
-                "heliaAOT config must contain a YAML mapping",
+                f"heliaAOT config must contain a YAML mapping, got {type(loaded).__name__}: "
+                f"{cfg_path}",
                 hint="Check engine.config_path and use key/value YAML fields.",
             )
         base_data = loaded

@@ -141,14 +141,39 @@ class TestMergedAotArgs:
         [
             ("memory: [\n", "not valid YAML"),
             ("- a\n", "must contain a YAML mapping"),
+            ("false\n", "must contain a YAML mapping"),
+            ("0\n", "must contain a YAML mapping"),
+            ("[]\n", "must contain a YAML mapping"),
+            ("''\n", "must contain a YAML mapping"),
             ("memory: psram\n", "memory must be a mapping"),
             ("memory:\n  tensors: psram\n", "memory.tensors must be a list"),
         ],
-        ids=["syntax", "not-mapping", "memory", "tensors"],
+        ids=[
+            "syntax",
+            "not-mapping",
+            "false",
+            "zero",
+            "empty-list",
+            "empty-string",
+            "memory",
+            "tensors",
+        ],
     )
     def test_malformed_config_path_raises_engine_error(self, tmp_path, text, message):
         config = _aot_cfg({"config_path": str(_write_aot_yaml(tmp_path, text))})
         with pytest.raises(EngineError, match=message):
+            _merged_aot_args(config)
+
+    @pytest.mark.parametrize("text", ["", "# comment only\n", "null\n", "~\n"])
+    def test_empty_config_path_reads_as_no_config(self, tmp_path, text):
+        config = _aot_cfg({"config_path": str(_write_aot_yaml(tmp_path, text))})
+        assert _merged_aot_args(config) == {"memory": {}}
+
+    def test_non_utf8_config_path_raises_engine_error(self, tmp_path):
+        path = tmp_path / "aot.yaml"
+        path.write_bytes(b"memory:\n  planner: \xff\xfe\n")
+        config = _aot_cfg({"config_path": str(path)})
+        with pytest.raises(EngineError, match="not valid UTF-8"):
             _merged_aot_args(config)
 
 

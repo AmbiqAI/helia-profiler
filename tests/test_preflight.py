@@ -267,6 +267,17 @@ class TestPreflightHappyPath:
             with pytest.raises(EngineError, match="heliaAOT config file not found"):
                 PreflightStage().run(ctx)
 
+    def test_helia_aot_falsy_config_path_document_fails_preflight(self, tmp_path: Path):
+        aot_yaml = tmp_path / "aot.yaml"
+        aot_yaml.write_text("false\n", encoding="utf-8")
+        ctx = _make_ctx(
+            tmp_path,
+            {"engine": {"type": "helia-aot", "config_path": str(aot_yaml)}},
+        )
+        with patch("shutil.which", side_effect=_all_tools_present):
+            with pytest.raises(EngineError, match="must contain a YAML mapping, got bool"):
+                PreflightStage().run(ctx)
+
     def test_host_upload_engine_psram_weights_still_require_rtt(self, tmp_path: Path):
         model = tmp_path / "model.tflite"
         model.write_bytes(b"\x00\x00\x00\x00TFL3" + b"\x00" * 512)
