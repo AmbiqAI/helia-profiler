@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import subprocess
 import sys
 from pathlib import Path
@@ -597,8 +598,9 @@ def test_adapter_rejects_sidecar_with_bad_planned_size(tmp_path: Path):
         ExecuTorchAdapter().prepare(config, tmp_path / "work")
 
 
+@pytest.mark.parametrize("source_path", [None, ""])
 def test_adapter_auto_clones_pinned_checkout_when_source_path_absent(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, source_path: str | None
 ):
     source = _source_tree(tmp_path)
     seen: dict[str, str] = {}
@@ -610,7 +612,7 @@ def test_adapter_auto_clones_pinned_checkout_when_source_path_absent(
 
     monkeypatch.setattr(executorch_mod, "_auto_clone_nsx_executorch", fake_auto_clone)
     artifacts = ExecuTorchAdapter().prepare(
-        _config(tmp_path, source, source_path=None), tmp_path / "work"
+        _config(tmp_path, source, source_path=source_path), tmp_path / "work"
     )
 
     # URL from the baseline's nsx-executorch project; ref is the engine pin —
@@ -821,8 +823,6 @@ def test_auto_clone_failure_without_stderr_still_reports_cause(
 
 
 def _offline_config(tmp_path, source, *, explicit=False):
-    from dataclasses import replace
-
     config = _config(tmp_path, source, source_path=str(source) if explicit else None)
     return replace(config, build=replace(config.build, offline=True))
 
@@ -892,6 +892,16 @@ def test_offline_cache_never_synchronizes(tmp_path, monkeypatch, cache_state):
         ) as exc:
             ExecuTorchAdapter().prepare(config, tmp_path / "work")
         assert "online run" in (exc.value.hint or "")
+
+
+def test_frozen_alias_resolves_the_offline_cache(tmp_path, monkeypatch):
+    config = replace(_config(tmp_path, tmp_path, source_path=None), frozen=True)
+    cache = tmp_path / "cache"
+    monkeypatch.setattr(
+        executorch_mod, "_auto_clone_nsx_executorch", lambda *_: pytest.fail("frozen auto-clone")
+    )
+    monkeypatch.setattr(executorch_mod, "_offline_cached_source", lambda _ref: cache)
+    assert executorch_mod._resolve_source_root(config) == cache
 
 
 def test_offline_explicit_source_does_not_access_cache(tmp_path, monkeypatch):

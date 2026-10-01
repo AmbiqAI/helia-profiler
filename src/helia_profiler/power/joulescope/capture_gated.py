@@ -33,7 +33,11 @@ from .device import (
     _open_device,
     _read_gpi_snapshot,
 )
-from .diagnostics import _gated_stats_diagnostics, _poll_edge_uncertainty_s
+from .diagnostics import (
+    _gated_stats_diagnostics,
+    _poll_edge_uncertainty_s,
+    _with_gpi_poll_failures,
+)
 from .stats import (
     _counter_rate_ratio,
     _fullrate_energy_over_windows,
@@ -79,6 +83,7 @@ def _degraded_observation_result(
     gate_high_s: float | None = None,
     longest_window_s: float | None = None,
     rise_due_s: float | None = None,
+    gpi_poll_failures: int = 0,
 ) -> PowerResult:
     failure = classify_gate_failure(
         saw_gate_rise=saw_gate_rise,
@@ -91,6 +96,7 @@ def _degraded_observation_result(
         longest_window_s=longest_window_s,
         rise_due_s=rise_due_s,
     )
+    failure = _with_gpi_poll_failures(failure, gpi_poll_failures)
     whole_summary = _whole_summary_from_stats(packets)
     return PowerResult(
         summary=whole_summary,
@@ -206,6 +212,7 @@ def capture_gated(
     gpi_condition = threading.Condition()
     latest_gpi_value: int | None = None
     gpi_sample_sequence = 0
+    gpi_poll_failures = 0
 
     def _wait_gpi_state(index: int, high: bool, timeout_s: float) -> bool:
         bit_mask = 1 << index
@@ -313,12 +320,13 @@ def capture_gated(
         nonlocal first_high_at, first_low_after_high_at, short_pulse_first_s
         nonlocal saw_any_gate_rise, saw_any_gate_fall
         nonlocal gpi_sample_sequence, latest_gpi_value, short_pulse_last_s
-        nonlocal short_pulses_ignored, windows_done
+        nonlocal short_pulses_ignored, windows_done, gpi_poll_failures
         prev_level = 0
         high_seen = False
         high_phase = "unknown"
         complete_at: float | None = None
         while not stop.is_set():
+            gpi_value: int | None = None
             try:
                 read_start = _host_monotonic_time64(time64)
                 gpi_value = _read_gpi_snapshot(driver, device_path)
@@ -411,7 +419,15 @@ def capture_gated(
                         high_seen = False
                 prev_level = level
             except Exception:
-                pass
+                if gpi_value is not None:
+                    log.debug("GPI poller iteration failed", exc_info=True)
+                else:
+                    gpi_poll_failures += 1
+                    if gpi_poll_failures == 1:
+                        log.debug(
+                            "GPI snapshot poll failed; later failures are only counted",
+                            exc_info=True,
+                        )
             # Early-stop once we have the gated window(s) plus a settle guard
             # so the trailing stat packets covering the window arrive.
             if complete_at is not None and (time.monotonic() - complete_at) >= guard_s:
@@ -618,6 +634,8 @@ def capture_gated(
         )
         if fr_requested and not fr_xcheck:
             gating_diagnostics["fullrate_xcheck_unavailable_reason"] = "stream_setup_failed"
+        if gpi_poll_failures:
+            gating_diagnostics["gpi_poll_failures"] = gpi_poll_failures
         if gate_edge_source == "gpi_snapshot_poll":
             gating_diagnostics["poll_edge_uncertainty_s"] = _poll_edge_uncertainty_s(
                 poll_reads, minimum_window_s=minimum_gate_s
@@ -683,6 +701,7 @@ def capture_gated(
                 longest_window_s=longest_window_s,
                 rise_due_s=rise_due_s,
             )
+            failure = _with_gpi_poll_failures(failure, gpi_poll_failures)
             if not packets:
                 raise PowerError(failure.message, hint=failure.hint)
             captured_s = time.monotonic() - capture_start
@@ -707,6 +726,7 @@ def capture_gated(
                 gate_high_s=gate_high_s,
                 longest_window_s=longest_window_s,
                 rise_due_s=rise_due_s,
+                gpi_poll_failures=gpi_poll_failures,
             )
             # The hint is logged, not just stored in metadata: on the degraded
             # path there is no PowerError to carry it, so the terminal warning

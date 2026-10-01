@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from helia_profiler.config import load_config
-from helia_profiler.errors import CaptureError, ConfigError
+from helia_profiler.errors import CaptureError, ConfigError, EngineError
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.stages.preflight import PreflightStage
 
@@ -226,6 +226,58 @@ class TestPreflightHappyPath:
         ):
             PreflightStage().run(ctx)
 
+    def test_helia_aot_rejects_config_path_tensor_rule_psram_without_external_arena_mode(
+        self, tmp_path: Path
+    ):
+        aot_yaml = tmp_path / "aot.yaml"
+        aot_yaml.write_text(
+            "memory:\n  tensors:\n    - type: constant\n      attributes: {memory: psram}\n",
+            encoding="utf-8",
+        )
+        ctx = _make_ctx(
+            tmp_path,
+            {"engine": {"type": "helia-aot", "config_path": str(aot_yaml)}},
+        )
+        with patch("shutil.which", side_effect=_all_tools_present):
+            with pytest.raises(ConfigError, match="external-arena mode"):
+                PreflightStage().run(ctx)
+
+    def test_helia_aot_accepts_psram_with_config_path_external_arena_mode(self, tmp_path: Path):
+        aot_yaml = tmp_path / "aot.yaml"
+        aot_yaml.write_text("memory:\n  allocate_arenas: false\n", encoding="utf-8")
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "model": {"weights_location": "psram"},
+                "engine": {"type": "helia-aot", "config_path": str(aot_yaml)},
+            },
+        )
+        with (
+            patch("shutil.which", side_effect=_all_tools_present),
+            patch("helia_profiler.hostenv.doctor.find_spec", return_value=object()),
+        ):
+            PreflightStage().run(ctx)
+
+    def test_helia_aot_missing_config_path_fails_preflight(self, tmp_path: Path):
+        ctx = _make_ctx(
+            tmp_path,
+            {"engine": {"type": "helia-aot", "config_path": str(tmp_path / "missing.yaml")}},
+        )
+        with patch("shutil.which", side_effect=_all_tools_present):
+            with pytest.raises(EngineError, match="heliaAOT config file not found"):
+                PreflightStage().run(ctx)
+
+    def test_helia_aot_falsy_config_path_document_fails_preflight(self, tmp_path: Path):
+        aot_yaml = tmp_path / "aot.yaml"
+        aot_yaml.write_text("false\n", encoding="utf-8")
+        ctx = _make_ctx(
+            tmp_path,
+            {"engine": {"type": "helia-aot", "config_path": str(aot_yaml)}},
+        )
+        with patch("shutil.which", side_effect=_all_tools_present):
+            with pytest.raises(EngineError, match="must contain a YAML mapping, got bool"):
+                PreflightStage().run(ctx)
+
     def test_host_upload_engine_psram_weights_still_require_rtt(self, tmp_path: Path):
         model = tmp_path / "model.tflite"
         model.write_bytes(b"\x00\x00\x00\x00TFL3" + b"\x00" * 512)
@@ -291,48 +343,6 @@ class TestPreflightModel:
 
 
 class TestPreflightConfig:
-    def test_zero_arena_raises(self, tmp_path: Path):
-        ctx = _make_ctx(tmp_path, {"model": {"arena_size": 0}})
-        with patch("shutil.which", side_effect=_all_tools_present):
-            with pytest.raises(ConfigError, match="arena_size"):
-                PreflightStage().run(ctx)
-
-    def test_negative_arena_raises(self, tmp_path: Path):
-        ctx = _make_ctx(tmp_path, {"model": {"arena_size": -1}})
-        with patch("shutil.which", side_effect=_all_tools_present):
-            with pytest.raises(ConfigError, match="arena_size"):
-                PreflightStage().run(ctx)
-
-    def test_zero_rtt_buffer_size_raises(self, tmp_path: Path):
-        ctx = _make_ctx(tmp_path, {"target": {"rtt_buffer_size_up": 0}})
-        with patch("shutil.which", side_effect=_all_tools_present):
-            with pytest.raises(ConfigError, match="rtt_buffer_size_up"):
-                PreflightStage().run(ctx)
-
-    def test_negative_rtt_buffer_size_raises(self, tmp_path: Path):
-        ctx = _make_ctx(tmp_path, {"target": {"rtt_buffer_size_up": -1}})
-        with patch("shutil.which", side_effect=_all_tools_present):
-            with pytest.raises(ConfigError, match="rtt_buffer_size_up"):
-                PreflightStage().run(ctx)
-
-    def test_invalid_runtime_arena_location_raises(self, tmp_path: Path):
-        ctx = _make_ctx(
-            tmp_path,
-            {"model": {"arena_location": "mram"}},
-        )
-        with patch("shutil.which", side_effect=_all_tools_present):
-            with pytest.raises(ConfigError, match="arena_location"):
-                PreflightStage().run(ctx)
-
-    def test_invalid_runtime_weights_location_raises(self, tmp_path: Path):
-        ctx = _make_ctx(
-            tmp_path,
-            {"model": {"weights_location": "flash"}},
-        )
-        with patch("shutil.which", side_effect=_all_tools_present):
-            with pytest.raises(ConfigError, match="weights_location"):
-                PreflightStage().run(ctx)
-
     def test_split_placement_is_accepted_for_helia_aot(self, tmp_path: Path):
         ctx = _make_ctx(
             tmp_path,

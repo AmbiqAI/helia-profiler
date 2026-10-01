@@ -26,7 +26,7 @@ from __future__ import annotations
 import logging
 import math
 import struct
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -173,6 +173,10 @@ class ModelAnalysis:
     """Approximate parameter count (weights + biases)."""
     engine: str = "tflite"
     """Engine/interpreter that produced this analysis ('tflite', 'helia-rt', 'helia-aot')."""
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return the analysis and its layers as plain dicts."""
+        return asdict(self)
 
     @property
     def ethos_u_op_count(self) -> int:

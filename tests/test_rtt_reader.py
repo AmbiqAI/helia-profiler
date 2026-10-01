@@ -17,6 +17,8 @@ from helia_profiler.transport.rtt import (
     capture_rtt_output,
 )
 from helia_profiler.errors import CaptureError
+from helia_profiler.transport.firmware_errors import ERROR_HINTS
+from helia_profiler.wire import FirmwareErrorCode
 from helia_profiler.transport.swo import capture_swo_output
 from helia_profiler.config import load_config
 from helia_profiler.pipeline import PipelineContext
@@ -1553,6 +1555,44 @@ def test_psram_upload_timeout_surfaces_firmware_output(tmp_path):
             initial_buf=firmware_said,
         )
     assert "HPX_PSRAM_ARENA_REGION=0,0x60000000,35376" in str(excinfo.value)
+
+
+@pytest.mark.parametrize(
+    ("code", "hint_fragment"),
+    [
+        (FirmwareErrorCode.PSRAM_INIT_FAILED, "populated"),
+        (FirmwareErrorCode.PSRAM_INFO_FAILED, "info query failed"),
+    ],
+)
+def test_psram_upload_firmware_error_carries_its_code_hint(tmp_path, code, hint_fragment):
+    from helia_profiler.transport.rtt import _upload_model_to_psram
+
+    model = tmp_path / "m.tflite"
+    model.write_bytes(b"\xcc")
+
+    with pytest.raises(CaptureError) as excinfo:
+        _upload_model_to_psram(
+            _FakePsramSession(),  # ty: ignore[invalid-argument-type]  # fake J-Link: only the surface under test
+            model,
+            timeout_s=0.5,
+            initial_buf=f"HPX_READY\nHPX_ERROR={code}\n".encode(),
+        )
+    assert excinfo.value.hint == ERROR_HINTS[code]
+    assert hint_fragment in excinfo.value.hint
+
+
+def test_rtt_handshake_firmware_error_carries_its_code_hint():
+    from helia_profiler.transport.rtt import _wait_for_rtt_line
+
+    chunks = [b"HPX_ERROR=npu_init_failed rc=3\n"]
+    with pytest.raises(CaptureError) as excinfo:
+        _wait_for_rtt_line(
+            lambda: chunks.pop(0) if chunks else b"",
+            expected_line="HPX_READY",
+            timeout_s=0.5,
+        )
+    assert "npu_init_failed rc=3" in str(excinfo.value)
+    assert excinfo.value.hint == ERROR_HINTS[FirmwareErrorCode.NPU_INIT_FAILED]
 
 
 @pytest.mark.parametrize(

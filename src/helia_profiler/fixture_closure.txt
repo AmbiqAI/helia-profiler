@@ -224,6 +224,7 @@ target/probe/flash.py
 target/probe/jlink.py
 transport/__init__.py
 transport/base.py
+transport/firmware_errors.py
 transport/ports.py
 transport/protocol.py
 transport/rtt.py

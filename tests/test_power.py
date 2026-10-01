@@ -292,6 +292,20 @@ class TestPowerDiagnostics:
         assert failure.kind is GateFailureKind.NO_GATE_RISE
         assert "rising edge" in failure.message
 
+    @pytest.mark.parametrize("saw_rise", [False, True])
+    def test_gate_failure_names_failed_gpi_polls(self, saw_rise):
+        from helia_profiler.power.diagnostics import classify_gate_failure
+        from helia_profiler.power.joulescope.diagnostics import _with_gpi_poll_failures
+
+        clean = classify_gate_failure(saw_gate_rise=saw_rise, duration_s=7.0)
+        failure = _with_gpi_poll_failures(clean, 3)
+
+        assert _with_gpi_poll_failures(clean, 0) is clean
+        assert failure.kind is clean.kind
+        assert failure.message == clean.message
+        assert failure.hint.startswith(clean.hint)
+        assert "3 GPI snapshot poll(s) failed" in failure.hint
+
     def test_gate_failure_classifies_missing_fall(self):
         from helia_profiler.power.diagnostics import GateFailureKind, classify_gate_failure
 
@@ -1433,6 +1447,7 @@ class TestMissedGateWarningNamesTheFix:
         on_started: Callable[..., None] | None = None,
         pre_window_s: float = 0.0,
         boot_settle_s: float | None = None,
+        gpi_read_error: Exception | None = None,
     ):
         from helia_profiler.power.joulescope import capture_gated as module
         from helia_profiler.power.joulescope.driver import JoulescopeDriver
@@ -1446,6 +1461,8 @@ class TestMissedGateWarningNamesTheFix:
         # GPI never goes high by default: the gate was missed entirely. A
         # scheduled rise is exact on the fake clock.
         def read_gpi(_driver, _path) -> int:
+            if gpi_read_error is not None:
+                raise gpi_read_error
             if gpi_rises_after_s is not None:
                 return int(clock.elapsed_s >= gpi_rises_after_s)
             return gpi_level
@@ -1736,6 +1753,30 @@ class TestMissedGateWarningNamesTheFix:
         assert "No GPIO gate rising edge detected" in warnings
         assert "power.lockstep" not in warnings
         assert "wiring" in warnings
+
+    def test_failed_gpi_reads_are_counted_and_named_in_the_hint(self, monkeypatch, caplog):
+        with caplog.at_level(logging.DEBUG, logger="hpx"):
+            result = self._run_capture(
+                monkeypatch,
+                lockstep=True,
+                wired=True,
+                gpi_read_error=TimeoutError("publish_and_wait timed out"),
+            )
+
+        failure = result.metadata.gate_failure
+        assert failure.kind == "no_gate_rise"
+        failures = result.metadata.gating_diagnostics["gpi_poll_failures"]
+        assert failures > 0
+        assert f"{failures} GPI snapshot poll(s) failed" in failure.hint
+        logged = [r for r in caplog.records if "GPI snapshot poll failed" in r.getMessage()]
+        assert len(logged) == 1
+        assert logged[0].exc_info is not None
+
+    def test_clean_gpi_reads_record_no_poll_failures(self, monkeypatch):
+        result = self._run_capture(monkeypatch, lockstep=True, wired=True)
+
+        assert "gpi_poll_failures" not in result.metadata.gating_diagnostics
+        assert "GPI snapshot poll" not in result.metadata.gate_failure.hint
 
 
 class TestJoulescopeUngatedCapture:

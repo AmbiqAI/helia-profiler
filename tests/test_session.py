@@ -355,6 +355,11 @@ def test_session_probe_inspection_and_matching_use_target(monkeypatch) -> None:
     assert resolve_serial.call_args.kwargs["requested_serial"] == "123"
 
 
+def test_session_unknown_board_raises_config_error() -> None:
+    with pytest.raises(ConfigError, match="Unknown board 'nope'"):
+        hpx.Session().with_target(board="nope").match_probe()
+
+
 def test_session_reset_uses_board_and_serial(monkeypatch) -> None:
     calls: list[dict[str, str | None]] = []
 

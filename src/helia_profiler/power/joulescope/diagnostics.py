@@ -10,8 +10,10 @@ any power driver, not just Joulescope.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any
 
+from ..diagnostics import GateFailure
 from .stats import _gated_mask_axis, _segment_gpi_windows, _stats_arrays
 
 
@@ -33,6 +35,25 @@ def _poll_edge_uncertainty_s(
                 total += rise_bound + end - previous[0]
             rise = None
     return total / time64.SECOND
+
+
+def _with_gpi_poll_failures(failure: GateFailure, poll_failures: int) -> GateFailure:
+    """Name failed GPI snapshot polls in *failure*'s hint, if there were any.
+
+    The classification only sees which edges the poller observed, so a dead
+    read path would otherwise read as a wiring or timing fault.
+    """
+    if not poll_failures:
+        return failure
+    return replace(
+        failure,
+        hint=(
+            f"{failure.hint} {poll_failures} GPI snapshot poll(s) failed during the "
+            "capture, so the host may have missed a gate edge the target did drive; "
+            "check the Joulescope USB connection, and re-run with -vv to see the "
+            "first error."
+        ),
+    )
 
 
 def _gated_stats_diagnostics(
