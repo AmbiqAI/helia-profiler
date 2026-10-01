@@ -5169,25 +5169,6 @@
               "summary": "Verdict and evidence for one selected metric."
             },
             {
-              "description": "Evaluate captured results without mutating pipeline state.\n\n**API tier:** `experimental`",
-              "examples": [],
-              "id": "helia_profiler.evaluate_run",
-              "kind": "function",
-              "language": "python",
-              "members": [],
-              "name": "evaluate_run",
-              "params": [],
-              "raises": [],
-              "returns": [],
-              "signature": "evaluate_run(ctx: PipelineContext) -> RunEvaluation",
-              "source": {
-                "line": 195,
-                "path": "src/helia_profiler/evaluation/validity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L195"
-              },
-              "summary": "Evaluate captured results without mutating pipeline state."
-            },
-            {
               "description": "`dataclass`\n\nDeterministic verdict for one result pair and profile.\n\n**API tier:** `experimental`",
               "examples": [],
               "id": "helia_profiler.ComparisonVerdict",
@@ -5339,6 +5320,25 @@
                 "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/comparison_profile.py#L195"
               },
               "summary": "Deterministic verdict for one result pair and profile."
+            },
+            {
+              "description": "Evaluate captured results without mutating pipeline state.\n\n**API tier:** `experimental`",
+              "examples": [],
+              "id": "helia_profiler.evaluate_run",
+              "kind": "function",
+              "language": "python",
+              "members": [],
+              "name": "evaluate_run",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "evaluate_run(ctx: PipelineContext) -> RunEvaluation",
+              "source": {
+                "line": 195,
+                "path": "src/helia_profiler/evaluation/validity.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/validity.py#L195"
+              },
+              "summary": "Evaluate captured results without mutating pipeline state."
             },
             {
               "description": "Evaluate existing metric deltas against one versioned profile.\n\n**API tier:** `experimental`",

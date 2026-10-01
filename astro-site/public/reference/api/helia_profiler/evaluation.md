@@ -794,20 +794,6 @@ unit: str = ''
 
 Source: `src/helia_profiler/evaluation/comparison_profile.py:192`
 
-## helia_profiler.evaluate_run
-
-`function` · `python`
-
-```python
-evaluate_run(ctx: PipelineContext) -> RunEvaluation
-```
-
-Evaluate captured results without mutating pipeline state.
-
-**API tier:** `experimental`
-
-Source: `src/helia_profiler/evaluation/validity.py:195`
-
 ## helia_profiler.ComparisonVerdict
 
 `class` · `python`
@@ -901,6 +887,20 @@ profile_sha256: str = ''
 ```
 
 Source: `src/helia_profiler/evaluation/comparison_profile.py:205`
+
+## helia_profiler.evaluate_run
+
+`function` · `python`
+
+```python
+evaluate_run(ctx: PipelineContext) -> RunEvaluation
+```
+
+Evaluate captured results without mutating pipeline state.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/evaluation/validity.py:195`
 
 ## helia_profiler.evaluate_comparison_profile
 
