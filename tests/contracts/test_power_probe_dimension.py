@@ -20,15 +20,14 @@ comparison.
 
 from __future__ import annotations
 
-from tests.pipeline_context_helpers import set_power_result
-
 from pathlib import Path
 
 import pytest
 
-from helia_profiler.power.metadata import MeasurementScope, PowerMetadata
 from helia_profiler.power.base import PowerResult, PowerSummary
+from helia_profiler.power.metadata import MeasurementScope, PowerMetadata
 from helia_profiler.report.manifest import _comparability
+from tests.pipeline_context_helpers import set_power_result
 
 from .conftest import make_pmu_ctx
 

@@ -49,8 +49,8 @@ from pathlib import Path
 
 import pytest
 
-from helia_profiler.hostenv.cache_dirs import hpx_cache_root
 from helia_profiler.deps.compatibility import load_compatibility_baseline
+from helia_profiler.hostenv.cache_dirs import hpx_cache_root
 from tests.contracts.test_firmware_render_snapshots import (
     _ENGINES,
     _common_kwargs,
@@ -58,9 +58,7 @@ from tests.contracts.test_firmware_render_snapshots import (
     _render,
 )
 
-
 from .fixture_compile_cases import FIXTURE_ENGINES, FIXTURE_KINDS, render_fixture
-
 
 # The matrix (D3) — one row per (workspace leg, target, render arm).
 # rtt-only: power/busy arms are rtt-only and transport variation is Tier 1's

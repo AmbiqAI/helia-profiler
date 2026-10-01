@@ -2,14 +2,6 @@
 
 from __future__ import annotations
 
-from tests.pipeline_context_helpers import (
-    set_power_firmware,
-    set_power_plan,
-    set_power_result,
-    set_profile_firmware,
-    set_profile_result,
-)
-
 import logging
 import sys
 from collections.abc import Callable
@@ -20,20 +12,27 @@ import pytest
 
 from helia_profiler.config import CleanWindowProbe, WindowMode
 from helia_profiler.errors import PowerError
-from helia_profiler.results import DeploymentRecord, FirmwareArtifact, PowerRunPlan
 from helia_profiler.power import get_driver, list_drivers, register_driver
-from helia_profiler.power.metadata import (
-    MeasurementScope,
-    ObservationMode,
-    PowerIntegrity,
-    PowerMetadata,
-)
 from helia_profiler.power.base import (
     GatedPowerWindow,
     PowerMode,
     PowerResult,
     PowerSample,
     PowerSummary,
+)
+from helia_profiler.power.metadata import (
+    MeasurementScope,
+    ObservationMode,
+    PowerIntegrity,
+    PowerMetadata,
+)
+from helia_profiler.results import DeploymentRecord, FirmwareArtifact, PowerRunPlan
+from tests.pipeline_context_helpers import (
+    set_power_firmware,
+    set_power_plan,
+    set_power_result,
+    set_profile_firmware,
+    set_profile_result,
 )
 
 #: time64 tick rate (2**30 ticks per second), mirrors ``pyjoulescope_driver.time64.SECOND``.
@@ -2812,8 +2811,8 @@ class TestEstimateCaptureDuration:
         # Mirrors the real config that triggered "No GPIO-high windows
         # detected": a model with representative per-inference timing and
         # window_target_ms 8000 needs ~379 clean iterations (~8s).
-        from helia_profiler.stages.capture_power import _estimate_capture_duration
         from helia_profiler.results import FirmwareMeta, LayerResult, PmuResult
+        from helia_profiler.stages.capture_power import _estimate_capture_duration
 
         ctx = self._make_ctx(
             tmp_path,
@@ -2893,8 +2892,7 @@ class TestGateFallWait:
 
     def test_without_lockstep_the_wait_also_covers_boot_and_warmup(self):
         """Without lock-step the wait starts at reset, not at GO."""
-        from helia_profiler.power.diagnostics import gate_fall_wait_s
-        from helia_profiler.power.diagnostics import BOOT_SETTLE_S
+        from helia_profiler.power.diagnostics import BOOT_SETTLE_S, gate_fall_wait_s
 
         def bound(lockstep: bool) -> float:
             return gate_fall_wait_s(1.0, longest_window_s=5.75, lockstep=lockstep, pre_window_s=9.0)
@@ -3337,8 +3335,7 @@ class TestCapturePowerWrapper:
     ):
         """A busy_loop unit is the whole spin, not an inference."""
         from helia_profiler.capture import capture_power
-        from helia_profiler.power.diagnostics import FALL_WAIT_HEADROOM_S
-        from helia_profiler.power.diagnostics import BOOT_SETTLE_S
+        from helia_profiler.power.diagnostics import BOOT_SETTLE_S, FALL_WAIT_HEADROOM_S
 
         ctx = self._shared_ctx_with_planned_window(
             tmp_path, count=1, avg_us=5_000_000, profiling={"clean_window_probe": "busy_loop"}
@@ -3864,8 +3861,8 @@ class TestPowerFirmwareSelection:
         assert plan.count_source == "configured"
 
     def test_power_plan_derives_count_from_profile_timing(self, tmp_path: Path):
-        from helia_profiler.stages.plan_power import plan_power_run
         from helia_profiler.results import FirmwareMeta, PmuResult
+        from helia_profiler.stages.plan_power import plan_power_run
 
         ctx = self._make_ctx(tmp_path, firmware="dedicated")
         set_profile_result(
@@ -3896,8 +3893,8 @@ class TestPowerFirmwareSelection:
         dedicated` path could not finish. `firmware: shared` only worked by
         accident, because both binaries spin.
         """
-        from helia_profiler.stages.plan_power import plan_power_run
         from helia_profiler.results import FirmwareMeta, PmuResult
+        from helia_profiler.stages.plan_power import plan_power_run
 
         ctx = self._make_ctx(tmp_path, firmware="dedicated")
         object.__setattr__(ctx.config.profiling, "clean_window_probe", CleanWindowProbe.BUSY_LOOP)
@@ -3956,8 +3953,8 @@ class TestPowerFirmwareSelection:
         firmware-mode branch is tested before the probe branch. The window
         length is a property of the PROBE, not of the plan's firmware mode.
         """
-        from helia_profiler.stages.plan_power import plan_power_run
         from helia_profiler.results import FirmwareMeta, PmuResult
+        from helia_profiler.stages.plan_power import plan_power_run
 
         ctx = self._make_ctx(tmp_path, firmware="shared")
         object.__setattr__(ctx.config.profiling, "clean_window_probe", CleanWindowProbe.BUSY_LOOP)
@@ -3979,8 +3976,8 @@ class TestPowerFirmwareSelection:
 
     def test_infer_probe_plan_is_unchanged(self, tmp_path: Path):
         """The default probe must keep deriving N from per-inference timing."""
-        from helia_profiler.stages.plan_power import plan_power_run
         from helia_profiler.results import FirmwareMeta, PmuResult
+        from helia_profiler.stages.plan_power import plan_power_run
 
         ctx = self._make_ctx(tmp_path, firmware="dedicated")
         set_profile_result(ctx, PmuResult(meta=FirmwareMeta(clean_infer_avg_us=2226), layers=[]))
@@ -4002,8 +3999,8 @@ class TestPowerFirmwareSelection:
         public `plan_power_run(ctx, inference_count=...)` API; the shipping pipeline
         constructs `PlanPowerRunStage()` with no count.
         """
-        from helia_profiler.stages.plan_power import plan_power_run
         from helia_profiler.results import FirmwareMeta, PmuResult
+        from helia_profiler.stages.plan_power import plan_power_run
 
         ctx = self._make_ctx(tmp_path, firmware="dedicated")
         object.__setattr__(ctx.config.profiling, "clean_window_probe", CleanWindowProbe.BUSY_LOOP)
@@ -4165,8 +4162,8 @@ class TestPowerFirmwareSelection:
         """
         import logging
 
-        from helia_profiler.stages.plan_power import plan_power_run
         from helia_profiler.results import FirmwareMeta, PmuResult
+        from helia_profiler.stages.plan_power import plan_power_run
 
         ctx = self._make_ctx(tmp_path, firmware="dedicated")
         set_profile_result(
@@ -4453,6 +4450,7 @@ class TestPowerFirmwareSelection:
         self, tmp_path: Path, enabled: bool, firmware: str
     ):
         from dataclasses import replace
+
         from helia_profiler.stages.flash_power import FlashPowerFirmwareStage
 
         ctx = self._make_ctx(tmp_path, firmware=firmware)

@@ -9,7 +9,6 @@ from helia_profiler.firmware.fingerprint import (
     firmware_code_fingerprint,
     measured_power_fingerprint,
 )
-
 from tests.test_template_render import _render_tflm
 
 

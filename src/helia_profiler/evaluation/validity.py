@@ -5,24 +5,24 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from ..errors import ReportError
+from ..power.base import PowerMode
 from ..power.diagnostics import (
     DRIFT_PLAUSIBLE_RATIO_DEVIATION,
     GateArbitration,
     assess_clean_window_clock_rate,
-    count_noun,
     assess_clean_window_stall,
     assess_gate_duration,
     assess_gate_observer,
     assess_run_window_clock,
+    count_noun,
     expected_terminal_requested_count,
     firmware_window_clock_is_frozen,
     gate_relative_tolerance_for,
     probe_runs_inferences,
     window_inference_count,
 )
-from ..power.base import PowerMode
 from ..power.metadata import MeasurementScope
-from ..errors import ReportError
 from ..results import ISSUE_REGISTRY, IssueCode, ResultIssue, ResultValidity, Severity
 
 if TYPE_CHECKING:

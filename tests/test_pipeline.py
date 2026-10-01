@@ -1,25 +1,12 @@
 from __future__ import annotations
 
-from tests.pipeline_context_helpers import (
-    set_power_deployment,
-    set_power_firmware,
-    set_power_result,
-    set_profile_firmware,
-    set_profile_result,
-)
-
 import dataclasses
 import re
-from pathlib import Path
 from dataclasses import FrozenInstanceError
+from pathlib import Path
 
 import pytest
 
-from helia_profiler.results import (
-    DeploymentRecord,
-    FirmwareArtifact,
-    PowerRunPlan,
-)
 from helia_profiler.config import load_config
 from helia_profiler.errors import CaptureError, HpxError, PipelineError
 from helia_profiler.pipeline import (
@@ -27,6 +14,18 @@ from helia_profiler.pipeline import (
     PipelineRunner,
     ProgressUpdate,
     Stage,
+)
+from helia_profiler.results import (
+    DeploymentRecord,
+    FirmwareArtifact,
+    PowerRunPlan,
+)
+from tests.pipeline_context_helpers import (
+    set_power_deployment,
+    set_power_firmware,
+    set_power_result,
+    set_profile_firmware,
+    set_profile_result,
 )
 
 

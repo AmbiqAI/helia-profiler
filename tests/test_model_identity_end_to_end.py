@@ -10,11 +10,9 @@ seam that could break sits downstream of hand-built metadata.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
-from tests.pipeline_context_helpers import set_profile_result
-
-import json
 import pytest
 from rich.console import Console
 
@@ -28,6 +26,7 @@ from helia_profiler.report import write_report
 from helia_profiler.results import ModelInfo, RunMetadata
 from helia_profiler.results.issues import IssueCode
 from helia_profiler.wire import HPX_END_SENTINEL, HPX_START_SENTINEL
+from tests.pipeline_context_helpers import set_profile_result
 
 SENT_BYTES = 53_744
 

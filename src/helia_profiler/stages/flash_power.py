@@ -6,9 +6,9 @@ import logging
 from datetime import datetime, timezone
 
 from ..config import PowerFirmware
-from ..results import DeploymentRecord
 from ..errors import BuildError
 from ..pipeline import PipelineContext
+from ..results import DeploymentRecord
 from .flash import deploy_firmware
 
 log = logging.getLogger("hpx")

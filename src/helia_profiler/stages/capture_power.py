@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import logging
 
-from ..results import PowerObservation
 from ..config import DEFAULT_POWER_DURATION_S, WindowMode
 from ..errors import PowerError
 from ..pipeline import PipelineContext
@@ -26,6 +25,7 @@ from ..power.diagnostics import (
     probe_runs_inferences,
 )
 from ..power.metadata import classify_observation
+from ..results import PowerObservation
 from ..target.lifecycle import CapturePhase, prepare_target_for_phase
 
 log = logging.getLogger("hpx")

@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+import difflib
 import re
 from dataclasses import field
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
-import difflib
 
 from pydantic import ConfigDict, TypeAdapter, ValidationError, field_validator, model_validator
 from pydantic.dataclasses import dataclass as pydantic_dataclass
@@ -33,6 +33,7 @@ from ..platform import (
     get_default_sync_gpio_pin,
 )
 from ..power.base import PowerMode
+from ..target.lifecycle import ResetStrategy
 from ..vocab import Aggregation, Toolchain, Transport
 from .power import (
     DEFAULT_INA228_AVERAGING_COUNT,
@@ -56,7 +57,6 @@ from .power import (
     PowerConfig,
     PowerFirmware,
 )
-from ..target.lifecycle import ResetStrategy
 
 # Shared default used when the user leaves model.arena_size unset.
 # Keep plan-memory and firmware generation aligned so auto placement

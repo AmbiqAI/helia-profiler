@@ -15,8 +15,8 @@ from pathlib import Path
 import pytest
 
 from helia_profiler.validation import MODELS, build_matrix, load_model_file, models_from_paths
-from helia_profiler.validation.runner import CaseResult
 from helia_profiler.validation.report import write_validation_reports
+from helia_profiler.validation.runner import CaseResult
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:

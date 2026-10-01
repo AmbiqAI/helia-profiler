@@ -7,7 +7,23 @@ from pathlib import Path
 
 import pytest
 
-from helia_profiler.wire import POWER_TERMINAL_VERSION
+from helia_profiler.capture.power_terminal import (
+    collect_power_terminal_envelope_from_chunks,
+    collect_power_terminal_envelope_rtt,
+    parse_power_terminal_envelope,
+)
+from helia_profiler.capture.terminal_transport import (
+    _TERMINAL_TRANSPORTS,
+    UartPowerTerminalTransport,
+    UsbCdcPowerTerminalTransport,
+    _collect_serial_terminal,
+    register_power_terminal_transport,
+)
+from helia_profiler.config import Transport, load_config
+from helia_profiler.errors import PipelineError, PowerError
+from helia_profiler.pipeline import PipelineContext
+from helia_profiler.power.base import PowerResult, PowerSummary
+from helia_profiler.power.metadata import ObservationMode, PowerIntegrity
 from helia_profiler.results import (
     DeploymentRecord,
     FirmwareArtifact,
@@ -15,23 +31,7 @@ from helia_profiler.results import (
     PowerRunPlan,
     PowerTerminalRecord,
 )
-from helia_profiler.capture.power_terminal import (
-    collect_power_terminal_envelope_from_chunks,
-    collect_power_terminal_envelope_rtt,
-    parse_power_terminal_envelope,
-)
-from helia_profiler.config import Transport, load_config
-from helia_profiler.errors import PipelineError, PowerError
-from helia_profiler.pipeline import PipelineContext
-from helia_profiler.power.base import PowerResult, PowerSummary
-from helia_profiler.power.metadata import ObservationMode, PowerIntegrity
-from helia_profiler.capture.terminal_transport import (
-    UartPowerTerminalTransport,
-    UsbCdcPowerTerminalTransport,
-    _TERMINAL_TRANSPORTS,
-    _collect_serial_terminal,
-    register_power_terminal_transport,
-)
+from helia_profiler.wire import POWER_TERMINAL_VERSION
 
 
 def _lines(**overrides: str) -> list[str]:

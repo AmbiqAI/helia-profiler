@@ -11,8 +11,6 @@ suite uses (see ``tests/test_rtt_reader.py`` and ``tests/test_power.py``):
 
 from __future__ import annotations
 
-from tests.pipeline_context_helpers import set_profile_firmware
-
 from pathlib import Path
 
 import pytest
@@ -21,6 +19,7 @@ from helia_profiler.config import load_config
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.placement import Placement
 from helia_profiler.stages.resolve_platform import ResolvePlatformStage
+from tests.pipeline_context_helpers import set_profile_firmware
 
 # Mirrors the canned stream used in ``tests/test_rtt_reader.py``.
 CANNED_PMU_LINES: list[str] = [

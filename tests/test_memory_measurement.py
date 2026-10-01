@@ -14,10 +14,10 @@ import pytest
 
 from helia_profiler.engines import EngineType
 from helia_profiler.hostenv.memory_measurement import measure_memory_regions
+from helia_profiler.hostenv.toolchain_probe import SectionInventory
 from helia_profiler.placement import MemoryRegion
 from helia_profiler.platform import get_soc
 from helia_profiler.results import ConsumerKind, MeasuredMemoryRegions
-from helia_profiler.hostenv.toolchain_probe import SectionInventory
 
 FIXTURES = Path(__file__).parent / "fixtures" / "readelf"
 
@@ -442,8 +442,8 @@ class TestReconciliation:
         """Two MATCHING names over one object (the extern alias plus the
         mangled static) must sum once."""
         from helia_profiler.hostenv.memory_measurement import reconcile_memory
-        from helia_profiler.results import MemoryConsumer
         from helia_profiler.hostenv.toolchain_probe import SymbolEntry
+        from helia_profiler.results import MemoryConsumer
 
         plan = self._plan(
             {
@@ -470,8 +470,8 @@ class TestReconciliation:
         (records + 252 header on ARMV8M_PMU parts), so against the real
         symbol the delta is exactly zero."""
         from helia_profiler.hostenv.memory_measurement import reconcile_memory
-        from helia_profiler.results import MemoryConsumer
         from helia_profiler.hostenv.toolchain_probe import SymbolEntry
+        from helia_profiler.results import MemoryConsumer
 
         plan = self._plan(
             {
@@ -491,8 +491,8 @@ class TestReconciliation:
 
     def test_aot_symbol_hint_wins_over_the_name_table(self):
         from helia_profiler.hostenv.memory_measurement import reconcile_memory
-        from helia_profiler.results import MemoryConsumer
         from helia_profiler.hostenv.toolchain_probe import SymbolEntry
+        from helia_profiler.results import MemoryConsumer
 
         plan = self._plan(
             {
@@ -566,8 +566,8 @@ class TestReviewRegressionPins:
         mangles to _ZL10model_data — matching it would report the planned
         megabytes as shortfall."""
         from helia_profiler.hostenv.memory_measurement import reconcile_memory
-        from helia_profiler.results import MemoryConsumer
         from helia_profiler.hostenv.toolchain_probe import SymbolEntry
+        from helia_profiler.results import MemoryConsumer
 
         plan = TestReconciliation()._plan(
             {
@@ -587,8 +587,8 @@ class TestReviewRegressionPins:
         than the plan intended must say so — the check that catches
         wrong-region 'clean' matches."""
         from helia_profiler.hostenv.memory_measurement import reconcile_memory
-        from helia_profiler.results import MemoryConsumer
         from helia_profiler.hostenv.toolchain_probe import SymbolEntry
+        from helia_profiler.results import MemoryConsumer
 
         plan = TestReconciliation()._plan(
             {

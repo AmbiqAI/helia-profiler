@@ -42,9 +42,7 @@ import re
 import time
 from pathlib import Path
 
-from ..vocab import Transport
 from ..errors import CaptureError
-from .base import BaseCaptureTransport, CaptureArgs
 from ..target.probe.base import DebugMemorySession, ResetController
 from ..target.probe.jlink import (
     JLinkResetController,
@@ -54,10 +52,7 @@ from ..target.probe.jlink import (
     open_jlink_with_retry,
     resume_if_halted,
 )
-from .protocol import (
-    HEARTBEAT_TIMEOUT_S,
-    collect_lines,
-)
+from ..vocab import Transport
 from ..wire import (
     HPX_END_SENTINEL,
     HPX_ERROR_PREFIX,
@@ -66,13 +61,24 @@ from ..wire import (
     HPX_START_SENTINEL,
     WireKey,
 )
-from .timing import SBL_SETTLE_S, CaptureTimingTracker
+from .base import BaseCaptureTransport, CaptureArgs
+from .protocol import (
+    HEARTBEAT_TIMEOUT_S,
+    collect_lines,
+)
 from .rtt_control import (
     RTT_LIVE_NAMED_SCORE,
+)
+from .rtt_control import (
     direct_rtt_read_any as _direct_rtt_read_any,
+)
+from .rtt_control import (
     scan_for_rtt_control_block as _scan_for_rtt_control_block,
+)
+from .rtt_control import (
     wipe_rtt_control_blocks as _wipe_rtt_control_blocks,
 )
+from .timing import SBL_SETTLE_S, CaptureTimingTracker
 
 log = logging.getLogger("hpx")
 

@@ -7,8 +7,8 @@ from pyjoulescope_driver import time64
 
 from helia_profiler.power.joulescope.stats import (
     _counter_rate_ratio,
-    _packets_without_counter_span,
     _packet_duration_ticks,
+    _packets_without_counter_span,
     _process_gated_stats,
 )
 

@@ -6,11 +6,11 @@ import subprocess
 from pathlib import Path
 
 from helia_profiler.config import Toolchain
-from helia_profiler.results import BinarySections
 from helia_profiler.hostenv.toolchain_probe import (
     _reserved_from_section_listing,
     binary_sections,
 )
+from helia_profiler.results import BinarySections
 
 
 def test_atfe_binary_sections_uses_llvm_size_from_atfe_root(tmp_path: Path, monkeypatch) -> None:

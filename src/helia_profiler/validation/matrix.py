@@ -10,11 +10,11 @@ benchmark is one entry in ``MODELS`` — nothing else needs to change.
 
 from __future__ import annotations
 
+import functools
+import re
 from dataclasses import dataclass
 from enum import StrEnum
-import functools
 from pathlib import Path
-import re
 from typing import Any
 
 import yaml

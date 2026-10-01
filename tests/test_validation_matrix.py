@@ -527,8 +527,8 @@ class TestBuildMatrix:
 
 class TestCaseValidityGuards:
     def _case(self, **overrides: object) -> CaseSpec:
-        from helia_profiler.validation.matrix import BOARDS, MODELS, CaseSpec
         from helia_profiler.engines import EngineType
+        from helia_profiler.validation.matrix import BOARDS, MODELS, CaseSpec
 
         # replace() on the frozen, __post_init__-free CaseSpec is exactly
         # CaseSpec(**{**defaults, **overrides}) — but each field is typed.

@@ -1,38 +1,39 @@
 from __future__ import annotations
 
-from tests.pipeline_context_helpers import set_power_result, set_profile_result
-
 from dataclasses import replace
 from pathlib import Path
 from typing import Literal
 
-from helia_profiler.results import (
-    OnDevicePowerSummary,
-    PowerObservation,
-    PowerRun,
-    PowerRunPlan,
-    PowerTerminalRecord,
-)
+from helia_profiler.capture.parser import parse_firmware_output
 from helia_profiler.config import load_config
+from helia_profiler.evaluation import evaluate_run
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.power.base import GatedPowerWindow, PowerResult, PowerSummary
+from helia_profiler.power.diagnostics import (
+    WINDOW_CLOCK_CEILING_SLACK_S,
+    GateDurationIntegrity,
+    WindowClockCeiling,
+)
 from helia_profiler.power.metadata import (
     MeasurementScope,
     ObservationMode,
     PowerIntegrity,
     PowerMetadata,
 )
-from helia_profiler.power.diagnostics import (
-    WINDOW_CLOCK_CEILING_SLACK_S,
-    GateDurationIntegrity,
-    WindowClockCeiling,
+from helia_profiler.results import (
+    FirmwareMeta,
+    ModelInfo,
+    OnDevicePowerSummary,
+    PmuResult,
+    PowerObservation,
+    PowerRun,
+    PowerRunPlan,
+    PowerTerminalRecord,
+    ResultValidity,
 )
-from helia_profiler.results import ResultValidity
-from helia_profiler.results import FirmwareMeta, ModelInfo, PmuResult
-from helia_profiler.capture.parser import parse_firmware_output
-from helia_profiler.evaluation import evaluate_run
-from helia_profiler.wire import HPX_END_SENTINEL, HPX_START_SENTINEL, POWER_TERMINAL_VERSION
 from helia_profiler.results.issues import IssueCode
+from helia_profiler.wire import HPX_END_SENTINEL, HPX_START_SENTINEL, POWER_TERMINAL_VERSION
+from tests.pipeline_context_helpers import set_power_result, set_profile_result
 
 
 def _context(tmp_path: Path, *, mode: str = "external", probe: str = "infer") -> PipelineContext:

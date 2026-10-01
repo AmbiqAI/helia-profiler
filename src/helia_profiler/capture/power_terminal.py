@@ -7,12 +7,12 @@ import time
 from collections.abc import Callable, Iterable
 from pathlib import Path
 
+from ..errors import PowerError
 from ..results import (
     OnDevicePowerSummary,
     PowerTerminalEnvelope,
     PowerTerminalRecord,
 )
-from ..errors import PowerError
 from ..wire import (
     HPX_POWER_PREFIX,
     POWER_TERMINAL_END_SENTINEL,
@@ -308,8 +308,8 @@ def collect_power_terminal_envelope_rtt(
     timeout_s: float,
 ) -> PowerTerminalEnvelope:
     """Attach without reset and collect one terminal envelope over RTT."""
-    from .rtt_symbol import resolve_rtt_control_block_address
     from ..target.probe.jlink import attached_session
+    from .rtt_symbol import resolve_rtt_control_block_address
 
     address = resolve_rtt_control_block_address(
         build_dir,

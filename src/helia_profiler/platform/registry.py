@@ -7,13 +7,13 @@ from dataclasses import dataclass, replace
 from types import MappingProxyType
 
 from .board import (
+    _BOARDS,
     DEFAULT_GO_GPIO_PIN,
     DEFAULT_STATE_GPIO_PIN,
     DEFAULT_SYNC_GPIO_PIN,
     BoardDef,
-    _BOARDS,
 )
-from .soc import SocDef, _SOCS
+from .soc import _SOCS, SocDef
 
 
 @dataclass(frozen=True)

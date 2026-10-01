@@ -18,8 +18,8 @@ Future compute units can be added by extending ``_COUNTERS`` and
 
 from __future__ import annotations
 
-import json
 import importlib.resources as resources
+import json
 import math
 from dataclasses import dataclass
 from typing import Collection, Mapping

@@ -19,40 +19,15 @@ import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from ..config import PowerFirmware, Transport, WindowMode
+
 # Unused here, but tests patch ``helia_profiler.firmware.nsx_cli.<fn>``.
 from ..deps import nsx as nsx_cli
 from ..deps.compatibility import ENGINE_OWNED_MODULE_NAMES
-from ..config import PowerFirmware, Transport, WindowMode
 from ..engines import EngineType
 from ..engines.base import ArenaRegion, HeliaAotArtifacts
-from ..errors import ConfigError
-from ..errors import FirmwareError
+from ..errors import ConfigError, FirmwareError
 from ..placement import Placement
-from .context import FirmwareRenderContext
-
-# NB: measured_power_fingerprint below looks unused
-# in this module but is LIVE re-export surface — report/manifest.py,
-# report/summary.py, and tests import it from the package root. Do not
-# remove in a dead-import cleanup (#194).
-from .fingerprint import measured_power_fingerprint
-from .project import (
-    NsxModuleSpec,
-    ProjectRenderContext,
-    _board_module_name,
-    _copy_local_engine_module,
-    _default_nsx_channel,
-    _get_starter_profile,
-    _install_local_module_override,
-    _module_names_by_project,
-    _module_project,
-    _POWER_SYNC_MODULE_NAMES,
-    _render_module_registry,
-    _resolve_module_specs,
-    _resolve_project_overrides,
-    _usb_provider_module_names,
-    render_project_files,
-)
-from .render import _jinja_env, _write_text
 
 # The compiler-launcher, SEGGER RTT vendoring, generated-C-header, and NSX
 # build invocation APIs live in dedicated modules (extracted at the
@@ -64,8 +39,33 @@ from .build import (
     nsx_toolchain,
     rtt_buffer_size_up,
 )
+from .context import FirmwareRenderContext
+
+# NB: measured_power_fingerprint below looks unused
+# in this module but is LIVE re-export surface — report/manifest.py,
+# report/summary.py, and tests import it from the package root. Do not
+# remove in a dead-import cleanup (#194).
+from .fingerprint import measured_power_fingerprint
 from .headers import _blob_to_header, _model_to_header
 from .launcher import _resolve_compiler_launcher
+from .project import (
+    _POWER_SYNC_MODULE_NAMES,
+    NsxModuleSpec,
+    ProjectRenderContext,
+    _board_module_name,
+    _copy_local_engine_module,
+    _default_nsx_channel,
+    _get_starter_profile,
+    _install_local_module_override,
+    _module_names_by_project,
+    _module_project,
+    _render_module_registry,
+    _resolve_module_specs,
+    _resolve_project_overrides,
+    _usb_provider_module_names,
+    render_project_files,
+)
+from .render import _jinja_env, _write_text
 from .segger import (
     _copy_segger_rtt,
     _is_segger_rtt_root,

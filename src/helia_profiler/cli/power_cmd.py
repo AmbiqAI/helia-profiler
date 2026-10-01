@@ -10,8 +10,8 @@ log = logging.getLogger("hpx")
 
 
 def _cmd_power_on(driver_name: str, *, power_serial: str | None = None) -> None:
-    from ..power import get_driver
     from ..errors import PowerError
+    from ..power import get_driver
 
     try:
         driver = get_driver(driver_name, serial=power_serial)

@@ -9,18 +9,18 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
+from ..errors import ReportError
+from ..modelcost import source_index_from_op
+from ..results import ComparisonDimension, ResultManifest, load_result_manifest
+from ..results.dimensions import DIMENSION_REGISTRY
+from ..results.serde import nested_get, to_float, write_dict_csv
 from .comparability import ComparabilityAssessment, assess_comparability, read_dimensions
-from .run_metrics import MetricDiff, _compare_metrics
 from .comparison_profile import (
     ComparisonProfile,
     ComparisonVerdict,
     evaluate_comparison_profile,
 )
-from ..errors import ReportError
-from ..results import ComparisonDimension, ResultManifest, load_result_manifest
-from ..modelcost import source_index_from_op
-from ..results.dimensions import DIMENSION_REGISTRY
-from ..results.serde import nested_get, to_float, write_dict_csv
+from .run_metrics import MetricDiff, _compare_metrics
 
 
 @dataclass(frozen=True)

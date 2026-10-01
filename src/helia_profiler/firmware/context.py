@@ -22,8 +22,8 @@ from .op_resolver import build_resolver_plan
 
 if TYPE_CHECKING:
     from ..config import ProfileConfig
-    from ..pipeline import PipelineContext
     from ..engines.base import ArenaRegion
+    from ..pipeline import PipelineContext
 
 
 @dataclass(frozen=True)

@@ -3,8 +3,8 @@ from __future__ import annotations
 import pytest
 
 from helia_profiler.platform.counters import (
-    GROUPS,
     DEFAULT_COUNTERS,
+    GROUPS,
     MAX_COUNTERS_PER_PASS,
     get_counter,
     list_counters,

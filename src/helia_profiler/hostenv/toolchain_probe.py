@@ -18,22 +18,21 @@ from pathlib import Path
 
 from ..results import BinarySections
 from ._proc import tool_output
-from .toolchains import get_toolchain_spec, nm_command, resolve_toolchain_executable
 
 # The #133 inventory API lives in elf_inventory (extracted at the module
 # size ceiling); re-exported here so probes keep one import surface.
 from .elf_inventory import (
     _FROMELF_SECTION_START_RE,
     _FROMELF_SIZE_BYTES_RE,
-    _is_reserved_section_name,
     ElfSection,
     LoadSegment,
     SectionInventory,
     SymbolEntry,
+    _is_reserved_section_name,
     section_inventory,
     symbol_inventory,
 )
-
+from .toolchains import get_toolchain_spec, nm_command, resolve_toolchain_executable
 
 log = logging.getLogger("hpx")
 

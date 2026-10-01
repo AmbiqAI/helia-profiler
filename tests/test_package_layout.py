@@ -10,7 +10,6 @@ from pathlib import Path
 
 import pytest
 
-
 MAX_SOURCE_LINES = 1000
 
 

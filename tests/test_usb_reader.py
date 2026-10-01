@@ -5,8 +5,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from helia_profiler.transport import usb_cdc as usb_reader
 from helia_profiler.errors import CaptureError
+from helia_profiler.transport import usb_cdc as usb_reader
 from helia_profiler.transport.usb_identity import USB_MARKER_PREFIX, usb_marker_serial
 
 _APP_HWID = "USB VID:PID=2AEC:6010 SER=000001"

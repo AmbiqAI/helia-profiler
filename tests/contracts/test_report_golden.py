@@ -26,8 +26,6 @@ output-format change, never to paper over a split-introduced diff) with::
 
 from __future__ import annotations
 
-from tests.pipeline_context_helpers import set_power_result, set_profile_result
-
 import dataclasses
 import hashlib
 import json
@@ -36,48 +34,49 @@ from pathlib import Path
 
 import pytest
 
+from helia_profiler.config import load_config
+from helia_profiler.engines import EngineType
+from helia_profiler.engines.base import HeliaAotArtifacts
+from helia_profiler.hostenv.toolchain_probe import SymbolEntry
+from helia_profiler.modelcost import LayerOps, ModelAnalysis
+from helia_profiler.pipeline import PipelineContext
+from helia_profiler.placement import MemoryRegion
+from helia_profiler.power.base import GatedPowerWindow, PowerResult, PowerSummary
 from helia_profiler.power.diagnostics import (
     GateTransitionTiming,
     SyncHandshakeMetadata,
 )
 from helia_profiler.power.metadata import MeasurementScope, PowerMetadata
+from helia_profiler.report import write_report
+from helia_profiler.results import (
+    BinarySections,
+    ConsumerKind,
+    ConsumerReconciliation,
+    FirmwareMeta,
+    LayerResult,
+    MeasuredMemoryRegions,
+    MeasuredRegion,
+    MemoryConsumer,
+    MemoryPlan,
+    MemoryReconciliation,
+    MemoryRegionUsage,
+    ModelInfo,
+    PlatformInfo,
+    PmuResult,
+    PresetResult,
+    RegionReconciliation,
+    RunMetadata,
+    TimingInfo,
+    ToolchainInfo,
+    UnattributedSection,
+)
 from helia_profiler.target.lifecycle import (
     CapturePhase,
     ResetAction,
     ResetStrategy,
     TargetLifecyclePlan,
 )
-from helia_profiler.config import load_config
-from helia_profiler.engines.base import HeliaAotArtifacts
-from helia_profiler.engines import EngineType
-from helia_profiler.modelcost import LayerOps, ModelAnalysis
-from helia_profiler.pipeline import PipelineContext
-from helia_profiler.hostenv.toolchain_probe import SymbolEntry
-from helia_profiler.placement import MemoryRegion
-from helia_profiler.power.base import GatedPowerWindow, PowerResult, PowerSummary
-from helia_profiler.report import write_report
-from helia_profiler.results import (
-    BinarySections,
-    ConsumerKind,
-    FirmwareMeta,
-    LayerResult,
-    MemoryConsumer,
-    ConsumerReconciliation,
-    MeasuredMemoryRegions,
-    MeasuredRegion,
-    MemoryReconciliation,
-    RegionReconciliation,
-    UnattributedSection,
-    MemoryPlan,
-    MemoryRegionUsage,
-    ModelInfo,
-    PlatformInfo,
-    PresetResult,
-    PmuResult,
-    RunMetadata,
-    TimingInfo,
-    ToolchainInfo,
-)
+from tests.pipeline_context_helpers import set_power_result, set_profile_result
 
 _SNAPSHOT_PATH = Path(__file__).parent / "snapshots" / "report_golden.json"
 _UPDATE = os.environ.get("HPX_UPDATE_SNAPSHOTS") == "1"

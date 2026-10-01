@@ -5,12 +5,12 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from ..results import PowerRunPlan
 from ..config import DEFAULT_POWER_WINDOW_TARGET_MS, PowerFirmware, WindowMode
 from ..errors import PowerError
+from ..pipeline import PipelineContext
 from ..power.base import PowerMode
 from ..power.diagnostics import count_noun, probe_runs_inferences
-from ..pipeline import PipelineContext
+from ..results import PowerRunPlan
 
 if TYPE_CHECKING:
     from ..config import ProfileConfig

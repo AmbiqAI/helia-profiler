@@ -12,11 +12,11 @@ from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
 
-from .tables import _fmt_bytes, _progress_bar
 from ..firmware.workload import measured_clean_workload
 from ..power.metadata import PowerIntegrity
 from ..report.memory import _cache_totals
 from ..results.serde import to_float
+from .tables import _fmt_bytes, _progress_bar
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext

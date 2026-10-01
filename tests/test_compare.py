@@ -8,19 +8,17 @@ from pathlib import Path
 
 import pytest
 
+from helia_profiler.errors import ReportError
 from helia_profiler.evaluation import (
+    ComparisonProfile,
     ConfigDiffRow,
     CounterDiff,
     LayerDiffRow,
+    MetricDirection,
+    MetricPolicy,
     compare_runs,
     write_compare_artifacts,
 )
-from helia_profiler.evaluation import (
-    ComparisonProfile,
-    MetricDirection,
-    MetricPolicy,
-)
-from helia_profiler.errors import ReportError
 from helia_profiler.report.csv_writer import _write_csv
 from helia_profiler.results import (
     FirmwareMeta,

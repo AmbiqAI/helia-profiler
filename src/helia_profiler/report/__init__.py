@@ -29,13 +29,13 @@ from __future__ import annotations
 import logging
 import shutil
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..errors import ReportError
+from ..evaluation import evaluate_run
 from .aot import _write_aot_manifest, _write_aot_memory_layers
 from .csv_writer import _write_csv, _write_preset_csv
 from .json_writer import _write_json
-from ..evaluation import evaluate_run
 from .manifest import _write_result_manifest
 from .memory import _write_memory_breakdown
 from .metadata import _write_run_metadata

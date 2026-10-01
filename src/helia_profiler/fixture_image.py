@@ -1,9 +1,9 @@
 """Bounded ARM ELF image and writable terminal extent validation."""
 
-from dataclasses import dataclass
-from hashlib import sha256
 import re
 import struct
+from dataclasses import dataclass
+from hashlib import sha256
 
 #: Largest flat image a fixture capture flashes and reads back in full, well inside the
 #: MRAM application region below; each capture pays for flashing and verifying every byte.

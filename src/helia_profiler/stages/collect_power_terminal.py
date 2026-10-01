@@ -8,12 +8,6 @@ from datetime import datetime, timezone
 from ..errors import PowerError
 from ..pipeline import PipelineContext
 from ..power.base import PowerMode, PowerResult, PowerSummary
-from ..power.metadata import (
-    MeasurementScope,
-    ObservationMode,
-    PowerIntegrity,
-    PowerMetadata,
-)
 from ..power.diagnostics import (
     FROZEN_WINDOW_CLOCK_HINT,
     assess_run_window_clock,
@@ -22,6 +16,12 @@ from ..power.diagnostics import (
     expected_terminal_requested_count,
     firmware_window_clock_is_frozen,
     probe_runs_inferences,
+)
+from ..power.metadata import (
+    MeasurementScope,
+    ObservationMode,
+    PowerIntegrity,
+    PowerMetadata,
 )
 from ..results import PowerObservation
 

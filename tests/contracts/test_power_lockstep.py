@@ -19,20 +19,24 @@ Three invariants:
 
 from __future__ import annotations
 
-from tests.pipeline_context_helpers import set_profile_result
-
 import pytest
 
-from helia_profiler.results import DeploymentRecord, FirmwareArtifact, PowerRunPlan
 from helia_profiler.capture import capture_power
 from helia_profiler.power.base import PowerResult, PowerSummary
 from helia_profiler.power.sync import DeviceState
-from helia_profiler.results import FirmwareMeta, PmuResult
+from helia_profiler.results import (
+    DeploymentRecord,
+    FirmwareArtifact,
+    FirmwareMeta,
+    PmuResult,
+    PowerRunPlan,
+)
 from helia_profiler.target.lifecycle import (
     CapturePhase,
     prepare_target_for_phase,
     resolve_power_lockstep,
 )
+from tests.pipeline_context_helpers import set_profile_result
 
 from .conftest import make_pmu_ctx
 

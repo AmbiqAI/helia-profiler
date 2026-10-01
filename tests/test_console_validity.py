@@ -9,8 +9,6 @@ as abort must not silently re-abort a degrade-don't-abort run.
 
 from __future__ import annotations
 
-from tests.pipeline_context_helpers import set_profile_result
-
 from pathlib import Path
 
 import pytest
@@ -21,8 +19,8 @@ from helia_profiler.console import HpxConsole
 from helia_profiler.console.results import render_validity
 from helia_profiler.evaluation import RunEvaluation
 from helia_profiler.pipeline import PipelineContext
-from helia_profiler.results import FirmwareMeta, PmuResult, ResultValidity
-from helia_profiler.results import ResultIssue
+from helia_profiler.results import FirmwareMeta, PmuResult, ResultIssue, ResultValidity
+from tests.pipeline_context_helpers import set_profile_result
 
 
 def _ctx(tmp_path: Path, *, fail_on_invalid: bool = False) -> PipelineContext:
@@ -212,7 +210,6 @@ def test_write_report_stores_the_evaluation_it_rendered(tmp_path: Path) -> None:
     import json
 
     from helia_profiler.report import write_report
-
     from helia_profiler.results import LayerResult, RunMetadata
 
     ctx = _ctx(tmp_path)

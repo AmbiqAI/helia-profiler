@@ -10,7 +10,6 @@ import pytest
 from rich.console import Console
 
 from helia_profiler.console import HpxConsole
-
 from helia_profiler.validation.report import (
     build_manifest,
     load_validation_report,

@@ -21,9 +21,9 @@ def _cmd_analyze(
     output: Path | None = None,
     board: str = "apollo510_evb",
 ) -> None:
+    from ..console import HpxConsole
     from ..evaluation import analyze_for_engine
     from ..modelcost import analyze_model, is_available
-    from ..console import HpxConsole
 
     console = HpxConsole(verbosity=1)  # always show output
 

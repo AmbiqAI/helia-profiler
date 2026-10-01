@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import Any, Self
 
 from ..errors import ReportError
-from .serde import dataclass_from_dict as _from_dict, sha256_file
+from .serde import dataclass_from_dict as _from_dict
+from .serde import sha256_file
 
 RESULT_MANIFEST_SCHEMA = "hpx.result-manifest"
 RESULT_MANIFEST_SCHEMA_VERSION = 1

@@ -24,7 +24,7 @@ extract_pmu = _load_extractor()
 
 
 def test_catalog_covers_every_group_and_counter() -> None:
-    from helia_profiler.platform.counters import GROUPS, DEFAULT_COUNTERS
+    from helia_profiler.platform.counters import DEFAULT_COUNTERS, GROUPS
 
     payload = extract_pmu.build()
     groups = {row["group"]: row for row in payload["groups"]}

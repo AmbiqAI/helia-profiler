@@ -8,17 +8,17 @@ from unittest.mock import patch
 import pytest
 
 from helia_profiler.errors import CaptureError, ConfigError, DeterministicCaptureError
+from helia_profiler.platform import CoreArch, SocFamily
 from helia_profiler.target.probe.flash import flash_binary
 from helia_profiler.target.probe.jlink import (
     JLinkProbe,
     JLinkProbeMatch,
     attached_session,
-    inspect_probe_target,
     find_jlink_exe,
+    inspect_probe_target,
     list_connected_probes,
     resolve_probe_serial,
 )
-from helia_profiler.platform import CoreArch, SocFamily
 
 
 def _probe(serial: str, product: str = "J-Link") -> JLinkProbe:

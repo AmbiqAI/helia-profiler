@@ -16,7 +16,6 @@ is stale relative to the registry.
 from __future__ import annotations
 
 import re
-
 from pathlib import Path
 
 from helia_profiler.engines import EngineType

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
 import math
+from dataclasses import dataclass
 
 from ._fixture_build import FixtureBuild
 from .fixture_capture import FixtureCaptureResult

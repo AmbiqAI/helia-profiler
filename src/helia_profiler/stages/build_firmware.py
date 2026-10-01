@@ -4,10 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from ..results import FirmwareArtifact
 from ..errors import BuildError
-from ..pipeline import PipelineContext
-from ..results import ToolchainInfo
 from ..firmware.image import record_build_image
 from ..hostenv.memory_measurement import measure_memory_regions, reconcile_memory
 from ..hostenv.toolchain_probe import (
@@ -16,6 +13,8 @@ from ..hostenv.toolchain_probe import (
     compiler_version,
     symbol_inventory,
 )
+from ..pipeline import PipelineContext
+from ..results import FirmwareArtifact, ToolchainInfo
 
 log = logging.getLogger("hpx")
 

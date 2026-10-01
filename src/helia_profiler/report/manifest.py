@@ -8,6 +8,8 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from ..evaluation import evaluate_run
+from ..firmware import measured_power_fingerprint
 from ..results import (
     RESULT_MANIFEST_SCHEMA,
     RESULT_MANIFEST_SCHEMA_VERSION,
@@ -16,10 +18,8 @@ from ..results import (
     ResultManifest,
     RunStatus,
 )
-from ..firmware import measured_power_fingerprint
 from ..results.dimensions import derive_architecture_flags
 from ..results.serde import nested_get, sha256_file
-from ..evaluation import evaluate_run
 from .contracts import (
     PROFILE_RESULTS_SCHEMA,
     PROFILE_RESULTS_SCHEMA_VERSION,

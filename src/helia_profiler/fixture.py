@@ -12,8 +12,8 @@ from typing import Final
 from ._fixture_build import (
     FIXTURE_CAPABILITIES,
     FIXTURE_READBACK_BUDGET,
-    FixedFixture,
     EngineSource,
+    FixedFixture,
     FixtureBackend,
     FixtureBuild,
     FixtureCapability,

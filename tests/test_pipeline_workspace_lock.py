@@ -10,10 +10,10 @@ from typing import Iterator
 
 import pytest
 
+import helia_profiler.pipeline as pipeline
 from helia_profiler.config import ProfileConfig, load_config
 from helia_profiler.errors import HpxError
 from helia_profiler.pipeline import PipelineContext, PipelineRunner
-import helia_profiler.pipeline as pipeline
 
 
 def _config(tmp_path: Path, label: str, *, cached: bool, clean: bool = False) -> ProfileConfig:

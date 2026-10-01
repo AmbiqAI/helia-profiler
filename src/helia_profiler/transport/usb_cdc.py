@@ -25,20 +25,20 @@ from collections.abc import Mapping
 
 import serial  # pyserial
 
-from ..vocab import Transport
 from ..errors import CaptureError
-from .base import BaseCaptureTransport
 from ..target.probe.base import ResetController
 from ..target.probe.jlink import JLinkResetController
+from ..vocab import Transport
+from ..wire import HPX_END_SENTINEL, HPX_START_SENTINEL
+from .base import BaseCaptureTransport
 from .ports import JLINK_VCOM, SerialPortInfo, list_serial_ports
-from .usb_identity import USB_MARKER_PREFIX
-from .timing import READINESS_POLL_INTERVAL_S, USB_REENUM_FLOOR_S, CaptureTimingTracker
 from .protocol import (
     DEFAULT_TIMEOUT_S,
     HEARTBEAT_TIMEOUT_S,
     collect_lines,
 )
-from ..wire import HPX_END_SENTINEL, HPX_START_SENTINEL
+from .timing import READINESS_POLL_INTERVAL_S, USB_REENUM_FLOOR_S, CaptureTimingTracker
+from .usb_identity import USB_MARKER_PREFIX
 
 log = logging.getLogger("hpx")
 

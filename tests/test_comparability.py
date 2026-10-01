@@ -3,14 +3,13 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
-from helia_profiler.evaluation import ComparabilitySeverity, assess_comparability
-from helia_profiler.evaluation import RunArtifacts
+from helia_profiler.evaluation import ComparabilitySeverity, RunArtifacts, assess_comparability
 from helia_profiler.results.issues import (
-    ComparabilityCode,
-    ComparisonDimension,
     DIMENSION_DIFFERS,
     MEMORY_DIMENSION_MISMATCH,
     POWER_DIMENSION_MISMATCH,
+    ComparabilityCode,
+    ComparisonDimension,
 )
 
 

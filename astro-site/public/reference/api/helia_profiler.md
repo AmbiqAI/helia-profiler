@@ -146,7 +146,7 @@ User-meaningful progress within a pipeline stage.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/pipeline.py:59`
+Source: `src/helia_profiler/pipeline.py:57`
 
 ### helia_profiler.ProgressUpdate.message
 
@@ -156,7 +156,7 @@ Source: `src/helia_profiler/pipeline.py:59`
 message: str
 ```
 
-Source: `src/helia_profiler/pipeline.py:63`
+Source: `src/helia_profiler/pipeline.py:61`
 
 ### helia_profiler.ProgressUpdate.kind
 
@@ -166,7 +166,7 @@ Source: `src/helia_profiler/pipeline.py:63`
 kind: Literal['status', 'checkpoint'] = 'status'
 ```
 
-Source: `src/helia_profiler/pipeline.py:64`
+Source: `src/helia_profiler/pipeline.py:62`
 
 ### helia_profiler.ProgressUpdate.completed
 
@@ -176,7 +176,7 @@ Source: `src/helia_profiler/pipeline.py:64`
 completed: int | None = None
 ```
 
-Source: `src/helia_profiler/pipeline.py:65`
+Source: `src/helia_profiler/pipeline.py:63`
 
 ### helia_profiler.ProgressUpdate.total
 
@@ -186,7 +186,7 @@ Source: `src/helia_profiler/pipeline.py:65`
 total: int | None = None
 ```
 
-Source: `src/helia_profiler/pipeline.py:66`
+Source: `src/helia_profiler/pipeline.py:64`
 
 ### helia_profiler.ProgressUpdate.unit
 
@@ -196,7 +196,7 @@ Source: `src/helia_profiler/pipeline.py:66`
 unit: str | None = None
 ```
 
-Source: `src/helia_profiler/pipeline.py:67`
+Source: `src/helia_profiler/pipeline.py:65`
 
 ### helia_profiler.ProgressUpdate.eta_s
 
@@ -206,7 +206,7 @@ Source: `src/helia_profiler/pipeline.py:67`
 eta_s: float | None = None
 ```
 
-Source: `src/helia_profiler/pipeline.py:68`
+Source: `src/helia_profiler/pipeline.py:66`
 
 ### helia_profiler.ProgressUpdate.min_verbosity
 
@@ -216,7 +216,7 @@ Source: `src/helia_profiler/pipeline.py:68`
 min_verbosity: int = 0
 ```
 
-Source: `src/helia_profiler/pipeline.py:69`
+Source: `src/helia_profiler/pipeline.py:67`
 
 ## helia_profiler.Session
 
@@ -240,7 +240,7 @@ CLI. Every ``with_*`` method returns an independent session.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/session.py:84`
+Source: `src/helia_profiler/session.py:85`
 
 ### helia_profiler.Session.yaml_path
 
@@ -250,7 +250,7 @@ Source: `src/helia_profiler/session.py:84`
 yaml_path: Path | None = None
 ```
 
-Source: `src/helia_profiler/session.py:93`
+Source: `src/helia_profiler/session.py:94`
 
 ### helia_profiler.Session.from_yaml
 
@@ -264,7 +264,7 @@ from_yaml(path: str | Path) -> Self
 
 Create a session from an immutable snapshot of an HPX YAML config.
 
-Source: `src/helia_profiler/session.py:107`
+Source: `src/helia_profiler/session.py:108`
 
 ### helia_profiler.Session.from_dict
 
@@ -278,7 +278,7 @@ from_dict(intent: Mapping[str, Any]) -> Self
 
 Create a session from unresolved configuration intent.
 
-Source: `src/helia_profiler/session.py:113`
+Source: `src/helia_profiler/session.py:114`
 
 ### helia_profiler.Session.load
 
@@ -292,7 +292,7 @@ load(path: str | Path) -> Self
 
 Load a versioned unresolved-intent snapshot from JSON.
 
-Source: `src/helia_profiler/session.py:120`
+Source: `src/helia_profiler/session.py:121`
 
 ### helia_profiler.Session.intent_dict
 
@@ -304,7 +304,7 @@ intent_dict() -> dict[str, Any]
 
 Return JSON-safe unresolved intent without expanding defaults.
 
-Source: `src/helia_profiler/session.py:146`
+Source: `src/helia_profiler/session.py:147`
 
 ### helia_profiler.Session.resolved_dict
 
@@ -316,7 +316,7 @@ resolved_dict(model: str | Path | None = None) -> dict[str, Any]
 
 Return the fully resolved and validated configuration snapshot.
 
-Source: `src/helia_profiler/session.py:150`
+Source: `src/helia_profiler/session.py:151`
 
 ### helia_profiler.Session.save
 
@@ -328,7 +328,7 @@ save(path: str | Path) -> Path
 
 Persist unresolved intent as a versioned JSON snapshot.
 
-Source: `src/helia_profiler/session.py:156`
+Source: `src/helia_profiler/session.py:157`
 
 ### helia_profiler.Session.with_overrides
 
@@ -340,7 +340,7 @@ with_overrides(overrides: Mapping[str, Any]) -> Self
 
 Return a session with advanced raw configuration overrides merged in.
 
-Source: `src/helia_profiler/session.py:172`
+Source: `src/helia_profiler/session.py:173`
 
 ### helia_profiler.Session.with_model
 
@@ -350,7 +350,7 @@ Source: `src/helia_profiler/session.py:172`
 with_model(path: str | Path, **options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:176`
+Source: `src/helia_profiler/session.py:177`
 
 ### helia_profiler.Session.with_engine
 
@@ -360,7 +360,7 @@ Source: `src/helia_profiler/session.py:176`
 with_engine(engine: Any, **options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:179`
+Source: `src/helia_profiler/session.py:180`
 
 ### helia_profiler.Session.with_target
 
@@ -370,7 +370,7 @@ Source: `src/helia_profiler/session.py:179`
 with_target(**options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:182`
+Source: `src/helia_profiler/session.py:183`
 
 ### helia_profiler.Session.with_profiling
 
@@ -380,7 +380,7 @@ Source: `src/helia_profiler/session.py:182`
 with_profiling(**options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:185`
+Source: `src/helia_profiler/session.py:186`
 
 ### helia_profiler.Session.with_power
 
@@ -390,7 +390,7 @@ Source: `src/helia_profiler/session.py:185`
 with_power(**options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:188`
+Source: `src/helia_profiler/session.py:189`
 
 ### helia_profiler.Session.with_output
 
@@ -400,7 +400,7 @@ Source: `src/helia_profiler/session.py:188`
 with_output(**options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:191`
+Source: `src/helia_profiler/session.py:192`
 
 ### helia_profiler.Session.with_build
 
@@ -410,7 +410,7 @@ Source: `src/helia_profiler/session.py:191`
 with_build(**options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:194`
+Source: `src/helia_profiler/session.py:195`
 
 ### helia_profiler.Session.with_timeouts
 
@@ -420,7 +420,7 @@ Source: `src/helia_profiler/session.py:194`
 with_timeouts(**options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:197`
+Source: `src/helia_profiler/session.py:198`
 
 ### helia_profiler.Session.with_options
 
@@ -438,7 +438,7 @@ with_options(
 
 Return a session with top-level run options.
 
-Source: `src/helia_profiler/session.py:200`
+Source: `src/helia_profiler/session.py:201`
 
 ### helia_profiler.Session.resolve
 
@@ -450,7 +450,7 @@ resolve(model: str | Path | None = None) -> ProfileConfig
 
 Resolve and validate this session as a complete profile config.
 
-Source: `src/helia_profiler/session.py:220`
+Source: `src/helia_profiler/session.py:221`
 
 ### helia_profiler.Session.profile
 
@@ -466,7 +466,7 @@ profile(
 
 Run a profile using this session's resolved configuration.
 
-Source: `src/helia_profiler/session.py:227`
+Source: `src/helia_profiler/session.py:228`
 
 ### helia_profiler.Session.analyze
 
@@ -478,7 +478,7 @@ analyze(model: str | Path | None = None) -> ModelAnalysis
 
 Analyze the configured model without building or flashing firmware.
 
-Source: `src/helia_profiler/session.py:238`
+Source: `src/helia_profiler/session.py:239`
 
 ### helia_profiler.Session.compare
 
@@ -496,7 +496,7 @@ compare(
 
 Compare two completed profiles and optionally write diff artifacts.
 
-Source: `src/helia_profiler/session.py:249`
+Source: `src/helia_profiler/session.py:250`
 
 ### helia_profiler.Session.doctor
 
@@ -511,7 +511,7 @@ Return structured host dependency checks.
 Set *include_versions* to also compare installed tool and package
 versions against the HPX compatibility baseline.
 
-Source: `src/helia_profiler/session.py:277`
+Source: `src/helia_profiler/session.py:278`
 
 ### helia_profiler.Session.show
 
@@ -523,7 +523,7 @@ show(value: Any, *, console: Console | None = None) -> Any
 
 Pretty-print a typed interactive value and return it unchanged.
 
-Source: `src/helia_profiler/session.py:296`
+Source: `src/helia_profiler/session.py:297`
 
 ### helia_profiler.Session.boards
 
@@ -535,7 +535,7 @@ boards() -> tuple[BoardDef, ...]
 
 Return boards visible to this session's platform registry.
 
-Source: `src/helia_profiler/session.py:302`
+Source: `src/helia_profiler/session.py:303`
 
 ### helia_profiler.Session.engines
 
@@ -547,7 +547,7 @@ engines() -> tuple[EngineType, ...]
 
 Return supported inference engine identifiers.
 
-Source: `src/helia_profiler/session.py:309`
+Source: `src/helia_profiler/session.py:310`
 
 ### helia_profiler.Session.counter_groups
 
@@ -559,7 +559,7 @@ counter_groups() -> tuple[str, ...]
 
 Return registered PMU counter group names.
 
-Source: `src/helia_profiler/session.py:315`
+Source: `src/helia_profiler/session.py:316`
 
 ### helia_profiler.Session.counters
 
@@ -571,7 +571,7 @@ counters(group: str | None = None) -> tuple[PmuCounter, ...]
 
 Return registered PMU counters, optionally filtered by group.
 
-Source: `src/helia_profiler/session.py:321`
+Source: `src/helia_profiler/session.py:322`
 
 ### helia_profiler.Session.probes
 
@@ -583,7 +583,7 @@ probes() -> tuple[JLinkProbe, ...]
 
 Return connected J-Link probes.
 
-Source: `src/helia_profiler/session.py:327`
+Source: `src/helia_profiler/session.py:328`
 
 ### helia_profiler.Session.inspect_probes
 
@@ -595,7 +595,7 @@ inspect_probes(board: str | None = None) -> tuple[JLinkProbeMatch, ...]
 
 Inspect the target core visible through each connected probe.
 
-Source: `src/helia_profiler/session.py:333`
+Source: `src/helia_profiler/session.py:334`
 
 ### helia_profiler.Session.match_probe
 
@@ -607,7 +607,7 @@ match_probe(board: str | None = None, *, serial: str | None = None) -> str
 
 Resolve the J-Link serial matching a board target.
 
-Source: `src/helia_profiler/session.py:344`
+Source: `src/helia_profiler/session.py:345`
 
 ### helia_profiler.Session.ports
 
@@ -619,7 +619,7 @@ ports(*, include_all: bool = False) -> tuple[SerialPortInfo, ...]
 
 Return host serial ports relevant to HPX transports.
 
-Source: `src/helia_profiler/session.py:362`
+Source: `src/helia_profiler/session.py:363`
 
 ### helia_profiler.Session.reset
 
@@ -631,4 +631,4 @@ reset(board: str | None = None, *, serial: str | None = None, kind: Literal['deb
 
 Reset the configured target through its J-Link probe.
 
-Source: `src/helia_profiler/session.py:368`
+Source: `src/helia_profiler/session.py:369`

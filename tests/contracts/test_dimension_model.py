@@ -9,10 +9,8 @@ catch.
 
 from __future__ import annotations
 
-
 from pathlib import Path
 
-from tests.pipeline_context_helpers import set_power_result
 from helia_profiler.power.base import PowerResult, PowerSummary
 from helia_profiler.power.metadata import MeasurementScope, PowerIntegrity, PowerMetadata
 from helia_profiler.report.manifest import _comparability
@@ -23,6 +21,7 @@ from helia_profiler.results.dimensions import (
     DimensionEffect,
     dimensions_with_effect,
 )
+from tests.pipeline_context_helpers import set_power_result
 
 from .conftest import make_pmu_ctx
 

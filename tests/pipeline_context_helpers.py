@@ -11,11 +11,11 @@ from helia_profiler.power.metadata import PowerIntegrity, classify_observation
 from helia_profiler.results import (
     DeploymentRecord,
     FirmwareArtifact,
+    PmuResult,
     PowerObservation,
     PowerRun,
     PowerRunPlan,
     ProfileRun,
-    PmuResult,
 )
 
 _MISSING = object()

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from tests.pipeline_context_helpers import clear_profile_run, set_profile_firmware
-
 from pathlib import Path
 
 import pytest
@@ -17,6 +15,7 @@ from helia_profiler.platform import (
 )
 from helia_profiler.stages import verify_placement
 from helia_profiler.stages.verify_placement import VerifyPlacementStage
+from tests.pipeline_context_helpers import clear_profile_run, set_profile_firmware
 
 
 class TestMemoryRange:

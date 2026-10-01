@@ -18,7 +18,6 @@ from typing import TYPE_CHECKING, Any, Iterator
 from neuralspotx.file_lock import file_mutex
 from neuralspotx.nsx_lock import LOCK_SCHEMA_VERSION, hash_manifest, read_lock
 
-from . import nsx as nsx_cli
 from .._version import __version__
 from ..errors import DependencyError, LockError, VersionError
 from ..results.dependencies import (
@@ -33,6 +32,7 @@ from ..results.dependencies import (
     DependencyWorkspace,
 )
 from ..results.serde import sha256_file
+from . import nsx as nsx_cli
 from .compatibility import (
     CMSIS_NN_PROVIDER_MODULES,
     QualificationState,

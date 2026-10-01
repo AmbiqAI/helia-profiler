@@ -8,12 +8,12 @@ from pathlib import Path
 
 import pytest
 
+from helia_profiler.config import load_config
 from helia_profiler.deps.compatibility import (
     BASELINE_SCHEMA_VERSION,
     QualificationState,
     load_compatibility_baseline,
 )
-from helia_profiler.config import load_config
 from helia_profiler.errors import ConfigError
 from helia_profiler.report.metadata import _metadata_to_dict
 from helia_profiler.results import RunMetadata

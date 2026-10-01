@@ -17,6 +17,7 @@ import pathlib
 import pytest
 
 from helia_profiler.config import load_config
+from helia_profiler.placement import Placement
 from helia_profiler.platform import (
     get_default_go_gpio_pin,
     get_default_state_gpio_pin,
@@ -25,7 +26,6 @@ from helia_profiler.platform import (
     list_boards,
     soc_placement_ranges,
 )
-from helia_profiler.placement import Placement
 
 _ALL_BOARDS = list_boards()
 _BOARD_IDS = [b.name for b in _ALL_BOARDS]

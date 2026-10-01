@@ -67,8 +67,8 @@ class TestEngineBackendPropagation:
     def test_config_backend_reaches_artifacts_field(self):
         # HeliaAotArtifacts.engine_backend drives has_ethos_u in
         # firmware/project.py; ensure the dataclass accepts the field.
-        from helia_profiler.engines.base import HeliaAotArtifacts
         from helia_profiler.engines import EngineType
+        from helia_profiler.engines.base import HeliaAotArtifacts
 
         artifacts = HeliaAotArtifacts(
             engine_type=EngineType.HELIA_AOT,

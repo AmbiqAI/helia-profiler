@@ -6,8 +6,8 @@ Composes the pipeline stages and delegates to ``PipelineRunner``.
 from __future__ import annotations
 
 import logging
-from contextlib import contextmanager
 from collections.abc import Iterator
+from contextlib import contextmanager
 
 from .config import ProfileConfig
 from .console import HpxConsole

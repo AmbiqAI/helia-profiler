@@ -24,9 +24,7 @@ import logging
 import time
 from typing import TYPE_CHECKING
 
-from ..vocab import Transport
 from ..errors import CaptureError
-from .base import BaseCaptureTransport
 from ..target.probe.base import ResetController
 from ..target.probe.jlink import (
     JLinkResetController,
@@ -35,9 +33,11 @@ from ..target.probe.jlink import (
     open_jlink_with_retry,
     resume_if_halted,
 )
-from .timing import SBL_SETTLE_S, CaptureTimingTracker
-from .protocol import DEFAULT_TIMEOUT_S, HEARTBEAT_TIMEOUT_S, collect_lines
+from ..vocab import Transport
 from ..wire import HPX_END_SENTINEL, HPX_START_SENTINEL
+from .base import BaseCaptureTransport
+from .protocol import DEFAULT_TIMEOUT_S, HEARTBEAT_TIMEOUT_S, collect_lines
+from .timing import SBL_SETTLE_S, CaptureTimingTracker
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext

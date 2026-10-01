@@ -1,17 +1,6 @@
 """Public result models and persisted/workflow result contracts."""
 
 from ..deps.compatibility import CompatibilityResolution
-from .dependencies import (
-    ContentDigest,
-    DependencyLockMode,
-    DependencyLockProvenance,
-    DependencyLockState,
-    DependencyModule,
-    DependencyOverride,
-    DependencyProvenance,
-    DependencyRequest,
-    DependencyWorkspace,
-)
 from .artifacts import (
     DeploymentRecord,
     FirmwareArtifact,
@@ -22,6 +11,17 @@ from .artifacts import (
     PowerTerminalEnvelope,
     PowerTerminalRecord,
     ProfileRun,
+)
+from .dependencies import (
+    ContentDigest,
+    DependencyLockMode,
+    DependencyLockProvenance,
+    DependencyLockState,
+    DependencyModule,
+    DependencyOverride,
+    DependencyProvenance,
+    DependencyRequest,
+    DependencyWorkspace,
 )
 
 # Spec/family *classes* (IssueSpec, ComparabilitySpec, ComparabilityCodeFamily,
@@ -37,9 +37,9 @@ from .issues import (
     COMPARABILITY_FAMILIES,
     COMPARABILITY_REGISTRY,
     DIMENSION_DIFFERS,
+    ISSUE_REGISTRY,
     MEMORY_DIMENSION_MISMATCH,
     METRIC_BLOCKING_CODE_BY_GROUP,
-    ISSUE_REGISTRY,
     POWER_DIMENSION_MISMATCH,
     ComparabilityCode,
     ComparabilitySeverity,
@@ -58,20 +58,14 @@ from .manifest import (
     RunStatus,
     load_result_manifest,
 )
-from .support_bundle import (
-    SUPPORT_BUNDLE_SCHEMA,
-    SUPPORT_BUNDLE_SCHEMA_VERSION,
-    SupportBundleManifest,
-    SupportBundleSection,
-)
 from .models import (
     BinarySections,
     BuildImage,
     ConsumerKind,
+    ConsumerReconciliation,
     EngineInfo,
     FirmwareMeta,
     LayerResult,
-    ConsumerReconciliation,
     MeasuredMemoryRegions,
     MeasuredRegion,
     MemoryConsumer,
@@ -85,11 +79,17 @@ from .models import (
     PresetResult,
     ProfileResult,
     PsramInfo,
+    RegionReconciliation,
     RunMetadata,
     TimingInfo,
-    RegionReconciliation,
     ToolchainInfo,
     UnattributedSection,
+)
+from .support_bundle import (
+    SUPPORT_BUNDLE_SCHEMA,
+    SUPPORT_BUNDLE_SCHEMA_VERSION,
+    SupportBundleManifest,
+    SupportBundleSection,
 )
 
 __all__ = [

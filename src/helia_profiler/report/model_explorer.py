@@ -29,7 +29,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Union
 
 from ..modelcost.layer_attribution import LayerAttributor
-
 from ..results.serde import strip_none
 
 if TYPE_CHECKING:

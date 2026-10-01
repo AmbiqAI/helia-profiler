@@ -35,8 +35,8 @@ import statistics
 from typing import Any
 
 from ..errors import CaptureError
-from ..vocab import Aggregation
 from ..results import FirmwareMeta, LayerResult, PmuResult, PresetResult, PsramInfo
+from ..vocab import Aggregation
 from ..wire import (
     HPX_END_SENTINEL,
     HPX_HEARTBEAT_PREFIX,

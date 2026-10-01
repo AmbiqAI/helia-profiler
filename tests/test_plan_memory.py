@@ -11,8 +11,8 @@ from helia_profiler.errors import PlatformError
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.placement import MemoryRegion
 from helia_profiler.results import ConsumerKind, MemoryConsumer, MemoryPlan, MemoryRegionUsage
-from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 from helia_profiler.stages.plan_memory import PlanMemoryStage
+from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 
 
 def _make_ctx(tmp_path: Path, overrides: dict | None = None) -> PipelineContext:

@@ -6,6 +6,14 @@ plus ``engine_analysis``, the engine-dispatch shim over the model-cost
 core that now lives in :mod:`helia_profiler.modelcost` (#229 D4).
 """
 
+from ..modelcost import (
+    ETHOS_U_OP_NAME,
+    LayerOps,
+    ModelAnalysis,
+    analyze_model,
+    is_available,
+    vela_accelerator_config,
+)
 from .comparability import (
     ComparabilityAssessment,
     ComparabilityIssue,
@@ -32,16 +40,8 @@ from .comparison_profile import (
     VerdictStatus,
     evaluate_comparison_profile,
 )
-from .validity import RunEvaluation, evaluate_run
 from .engine_analysis import analyze_for_engine
-from ..modelcost import (
-    ETHOS_U_OP_NAME,
-    LayerOps,
-    ModelAnalysis,
-    analyze_model,
-    is_available,
-    vela_accelerator_config,
-)
+from .validity import RunEvaluation, evaluate_run
 
 __all__ = [
     "ComparabilityAssessment",

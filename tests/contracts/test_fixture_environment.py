@@ -9,8 +9,8 @@ fails here until it is classified.
 from __future__ import annotations
 
 import ast
-from pathlib import Path
 import re
+from pathlib import Path
 
 import pytest
 

@@ -6,20 +6,20 @@ from pathlib import Path
 
 import pytest
 
+from helia_profiler._fixture_build import (
+    FixedFixture,
+    FixtureFile,
+    FixtureMethod,
+    FixtureRenderSpec,
+    FixtureTimingScope,
+    Int8Tensor,
+)
 from helia_profiler.config import load_config
 from helia_profiler.engines import EngineType
 from helia_profiler.engines.base import HeliaAotArtifacts
 from helia_profiler.errors import PlatformError
-from helia_profiler._fixture_build import (
-    FixedFixture,
-    FixtureFile,
-    Int8Tensor,
-    FixtureMethod,
-    FixtureTimingScope,
-    FixtureRenderSpec,
-)
-from helia_profiler.fixture_analysis import FixtureModelAnalysis
 from helia_profiler.firmware.op_resolver import ResolverPlan
+from helia_profiler.fixture_analysis import FixtureModelAnalysis
 from helia_profiler.modelcost import ModelAnalysis
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.results import MemoryPlan

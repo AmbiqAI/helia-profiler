@@ -1,20 +1,20 @@
 """Typed raw fixture capture through the existing profiler probe APIs."""
 
 from __future__ import annotations
-from dataclasses import dataclass
+
 import json
-from pathlib import Path
-import struct
 import math
+import struct
 import time
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
+from pathlib import Path
 from typing import Protocol
 
 from ._fixture_build import FixtureTimingScope
-from .fixture_stage import FixtureStage
+from .fixture_image import DTCM, MAX_ELF, MAX_IMAGE, digest, inspect_elf, require
 from .fixture_runtime import FixtureFile
+from .fixture_stage import FixtureStage
 from .fixture_target import FixtureTarget
-from .fixture_image import MAX_ELF, MAX_IMAGE, DTCM, digest, require, inspect_elf
 from .target.probe.flash import flash_binary
 from .target.probe.jlink import (
     attached_session,

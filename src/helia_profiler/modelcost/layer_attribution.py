@@ -33,7 +33,6 @@ from typing import Any, Mapping, Sequence
 
 from .model_analysis import LayerOps, ModelAnalysis
 
-
 __all__ = [
     "LayerAttribution",
     "LayerAttributor",

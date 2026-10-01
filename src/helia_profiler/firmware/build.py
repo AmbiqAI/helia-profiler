@@ -23,8 +23,8 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from ..deps import nsx as nsx_cli
 from ..config import Transport
+from ..deps import nsx as nsx_cli
 from ..errors import BuildError
 
 if TYPE_CHECKING:

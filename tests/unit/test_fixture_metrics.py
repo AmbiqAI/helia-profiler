@@ -1,26 +1,26 @@
 """Fixture measurements reject incomplete attribution and stale observation bindings."""
 
+import json
 from dataclasses import replace
 from hashlib import sha256
-import json
 
 import pytest
 
 from helia_profiler import fixture_metrics as metrics
+from helia_profiler.engines import EngineType
 from helia_profiler.fixture import FixtureBuild, FixtureTimingScope
-from helia_profiler.fixture_capture import FixtureCaptureResult, FixtureTiming, FixtureMemory
+from helia_profiler.fixture_capture import FixtureCaptureResult, FixtureMemory, FixtureTiming
 from helia_profiler.fixture_observation import FixtureEnergyWindow, summarize_fixture_measurements
 from helia_profiler.fixture_runtime import FixtureFile
 from helia_profiler.fixture_target import supported_fixture_target
-from helia_profiler.engines import EngineType
 from helia_profiler.hostenv.elf_inventory import (
     ElfSection,
     LoadSegment,
     SectionInventory,
     SymbolEntry,
 )
-from helia_profiler.power.base import PowerResult, PowerSummary, GatedPowerWindow
-from helia_profiler.power.metadata import PowerMetadata, PowerIntegrity, MeasurementScope
+from helia_profiler.power.base import GatedPowerWindow, PowerResult, PowerSummary
+from helia_profiler.power.metadata import MeasurementScope, PowerIntegrity, PowerMetadata
 
 
 @pytest.fixture
