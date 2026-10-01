@@ -93,7 +93,7 @@ jobs:
         run: uv sync --locked --group test
 
       - name: Run pytest
-        run: uv run --group test pytest tests/ tools/tests/ -q
+        run: uv run --group test pytest -q
 
   # ---------------------------------------------------------------
   # Extras — the suite again with ai-edge-litert and helia-aot installed.
@@ -132,7 +132,7 @@ jobs:
       # The whole suite, not a list of the files known to need the extras:
       # a hand list silently missed every new importorskip test.
       - name: Run the suite with the extras installed
-        run: uv run --group test --extra analysis --extra aot pytest tests/ tools/tests/ -q
+        run: uv run --group test --extra analysis --extra aot pytest -q
 
   # ---------------------------------------------------------------
   # pre-commit — runs the exact hook config contributors run locally, so

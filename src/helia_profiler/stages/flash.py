@@ -36,7 +36,7 @@ def deploy_firmware(ctx: PipelineContext, binary_path: Path, *, role: str) -> No
     if ctx.soc is None:
         raise BuildError(f"Cannot flash {role} firmware before platform resolution.")
     soc = ctx.soc
-    jlink_serial = ctx.resolved_jlink_serial or ctx.config.target.jlink_serial
+    jlink_serial = ctx.effective_jlink_serial
     failed = f"{role.capitalize()} firmware deployment failed"
 
     def flash() -> None:

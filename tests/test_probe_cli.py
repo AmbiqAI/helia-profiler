@@ -6,7 +6,7 @@ import sys
 import pytest
 
 from helia_profiler.cli import inspect_cmds as cli
-from helia_profiler.errors import CaptureError
+from helia_profiler.errors import BuildError, CaptureError
 from helia_profiler.target.probe.jlink import (
     JLinkProbe,
     JLinkProbeMatch,
@@ -150,7 +150,26 @@ def test_probe_cli_reports_hpx_errors(monkeypatch, capsys) -> None:
         cli._cmd_probes_list()
 
     assert exc_info.value.code == 1
-    assert "JLinkExe not found" in capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert "Error: JLinkExe not found" in err
+    assert err.lower().count("hint: install segger tools") == 1
+
+
+def test_target_reset_error_renders_hint_once_and_details(monkeypatch, capsys) -> None:
+    def fail(*, device: str, jlink_serial: str | None = None) -> None:
+        raise BuildError("reset failed", hint="power-cycle the board", details="J-Link: no target")
+
+    monkeypatch.setattr("helia_profiler.target.probe.jlink.reset_target", fail)
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli._cmd_target_reset(board="apollo510_evb")
+
+    assert exc_info.value.code == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "Error: reset failed" in captured.err
+    assert captured.err.lower().count("hint: power-cycle the board") == 1
+    assert "details: J-Link: no target" in captured.err
 
 
 def test_create_debug_memory_session_uses_default_pylink_first(monkeypatch) -> None:
