@@ -1,7 +1,5 @@
 """Profile clean-window clock integrity.
 
-Import these names from this module directly.
-
 ``power.diagnostics`` polices the POWER binary's window clock. These checks
 police the clock that measures the PROFILE binary's clean window -- the
 number published as clean_infer_avg_us and the reference the power plan sizes
