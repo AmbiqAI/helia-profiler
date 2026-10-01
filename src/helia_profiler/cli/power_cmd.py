@@ -10,15 +10,15 @@ log = logging.getLogger("hpx")
 
 
 def _cmd_power_on(driver_name: str, *, power_serial: str | None = None) -> None:
+    from ..console import HpxConsole
     from ..errors import PowerError
     from ..power import get_driver
 
+    console = HpxConsole()
     try:
         driver = get_driver(driver_name, serial=power_serial)
     except PowerError as exc:
-        print(f"Error: {exc}", file=sys.stderr)
-        if exc.hint:
-            print(f"  Hint: {exc.hint}", file=sys.stderr)
+        console.print_error(exc)
         sys.exit(1)
 
     print(f"Enabling current passthrough via {driver.name}...")
@@ -26,9 +26,7 @@ def _cmd_power_on(driver_name: str, *, power_serial: str | None = None) -> None:
     try:
         driver.enable_passthrough()
     except PowerError as exc:
-        print(f"Error: {exc}", file=sys.stderr)
-        if exc.hint:
-            print(f"  Hint: {exc.hint}", file=sys.stderr)
+        console.print_error(exc)
         sys.exit(1)
 
     print("Board powered — press Ctrl-C to release.")

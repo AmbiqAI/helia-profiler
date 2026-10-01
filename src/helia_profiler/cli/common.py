@@ -2,12 +2,7 @@
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
-
-
-def _print_hpx_error(exc: Exception) -> None:
-    print(f"Error: {exc}", file=sys.stderr)
 
 
 def _find_repo_root() -> Path:

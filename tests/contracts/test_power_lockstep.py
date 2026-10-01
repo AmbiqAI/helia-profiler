@@ -40,6 +40,8 @@ from tests.pipeline_context_helpers import set_profile_result
 
 from .conftest import make_pmu_ctx
 
+pytestmark = pytest.mark.usefixtures("no_lockstep_reset_grace")
+
 
 def _mark_deployed(ctx, tmp_path) -> None:
     binary = tmp_path / "hpx_profiler_power"

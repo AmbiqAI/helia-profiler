@@ -62,7 +62,7 @@ class RttPowerTerminalTransport:
             build_dir=ctx.power_run.firmware.build_dir,
             toolchain=ctx.config.target.toolchain,
             device=ctx.soc.jlink_device,
-            jlink_serial=ctx.resolved_jlink_serial or ctx.config.target.jlink_serial,
+            jlink_serial=ctx.effective_jlink_serial,
             timeout_s=timeout_s,
         )
 
@@ -95,7 +95,7 @@ class UartPowerTerminalTransport:
 
         from ..transport.uart import BAUD, find_jlink_vcom_port
 
-        port = find_jlink_vcom_port(ctx.resolved_jlink_serial or ctx.config.target.jlink_serial)
+        port = find_jlink_vcom_port(ctx.effective_jlink_serial)
         try:
             with serial.Serial(port=port, baudrate=BAUD, timeout=0.1) as stream:
                 stream.reset_input_buffer()
@@ -121,7 +121,7 @@ class SwoPowerTerminalTransport:
 
         with attached_session(
             device=ctx.soc.jlink_device,
-            jlink_serial=ctx.resolved_jlink_serial or ctx.config.target.jlink_serial,
+            jlink_serial=ctx.effective_jlink_serial,
             attach_timeout_s=timeout_s,
         ) as jlink:
             try:
@@ -144,23 +144,16 @@ class UsbCdcPowerTerminalTransport:
     def collect(self, ctx: PipelineContext, *, timeout_s: float) -> PowerTerminalEnvelope:
         import serial
 
-        from ..transport.usb_cdc import BAUD, resolve_cdc_port
+        from ..transport.usb_cdc import open_cdc_port, resolve_target_cdc_port
         from ..transport.usb_identity import usb_marker_serial
 
-        marker = usb_marker_serial(ctx.resolved_jlink_serial or ctx.config.target.jlink_serial)
-        port = (
-            ctx.config.target.usb_port
-            if ctx.config.target.usb_port is not None
-            else resolve_cdc_port(marker=marker, timeout_s=timeout_s)
+        port = resolve_target_cdc_port(
+            usb_port=ctx.config.target.usb_port,
+            marker=usb_marker_serial(ctx.effective_jlink_serial),
+            timeout_s=timeout_s,
         )
         try:
-            with serial.Serial(
-                port=port,
-                baudrate=BAUD,
-                timeout=0.1,
-                dsrdtr=True,
-            ) as stream:
-                stream.dtr = True
+            with open_cdc_port(port, timeout=0.1) as stream:
                 return _collect_serial_terminal(stream, timeout_s=timeout_s)
         except serial.SerialException as exc:
             raise PowerError(
