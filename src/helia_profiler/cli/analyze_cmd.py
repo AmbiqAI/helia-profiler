@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING
 from ..engines import EngineType
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from ..modelcost import ModelAnalysis
 
 
@@ -21,130 +23,65 @@ def _cmd_analyze(
     output: Path | None = None,
     board: str = "apollo510_evb",
 ) -> None:
-    from ..evaluation import analyze_for_engine
-    from ..modelcost import analyze_model, is_available
     from ..console import HpxConsole
+    from ..errors import ConfigError, HpxError
+    from ..evaluation import analyze_for_engine
 
     console = HpxConsole(verbosity=1)  # always show output
 
-    if not model.exists():
-        print(f"Error: model file not found: {model}", file=sys.stderr)
-        sys.exit(1)
-
-    if not is_available():
-        print(
-            "Error: ai-edge-litert is not installed.\n"
-            "  Install with: pip install 'helia-profiler[analysis]'",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    is_aot = engine == EngineType.HELIA_AOT.value
-
-    original = analyze_model(str(model))
-    if original is None:
-        print("Error: failed to analyze model.", file=sys.stderr)
-        sys.exit(1)
-
-    engine_result: ModelAnalysis | None = None
-    if is_aot:
-        try:
-            engine_result = analyze_for_engine(
-                model,
-                engine=EngineType.HELIA_AOT,
-                board=board,
+    try:
+        if compare and format == "csv":
+            raise ConfigError(
+                "--compare is not supported with --format csv.",
+                hint="Use --format json to write both graphs, or drop --compare.",
             )
-        except Exception as exc:
-            print(f"Error: {exc}", file=sys.stderr)
-            sys.exit(1)
+        if engine == EngineType.HELIA_AOT:
+            primary = analyze_for_engine(model, engine=EngineType.HELIA_AOT, board=board)
+            reference = (
+                analyze_for_engine(model, engine=EngineType.TFLM, board=board) if compare else None
+            )
+            graphs = {"original": reference, "aot_transformed": primary}
+        else:
+            primary = analyze_for_engine(model, engine=EngineType.TFLM, board=board)
+            reference = None
+            graphs = {"original": primary}
+    except HpxError as exc:
+        console.print_error(exc)
+        sys.exit(1)
 
-    # Determine which analysis is "primary" (what the engine actually runs)
-    # and whether to show comparison
-    if engine_result is not None:
-        primary = engine_result
-        reference = original if compare else None
-    else:
-        primary = original
-        reference = None
-
-    if format in ("csv", "json"):
-        _write_analysis_file(primary, format, output, reference)
+    if format == "json":
+        _write_json(graphs, output)
+    elif format == "csv":
+        _write_csv(primary, output)
     else:
         console.print_analysis(primary, model.name, reference)
 
 
-def _write_analysis_file(
-    analysis: "ModelAnalysis",
-    fmt: str,
-    output: Path | None,
-    aot: "ModelAnalysis | None" = None,
-) -> None:
-    import json
-
+def _write_csv(analysis: ModelAnalysis, output: Path | None) -> None:
     from ..results.serde import write_dict_csv
 
-    if fmt == "csv":
-        rows = []
-        for la in analysis.layers:
-            row = {
-                "id": la.id,
-                "op": la.op,
-                "macs": la.macs,
-                "ops": la.ops,
-                "input_shapes": str(la.input_shapes),
-                "output_shapes": str(la.output_shapes),
-            }
-            row.update(la.params)
-            rows.append(row)
-
-        if output:
-            dest = output
-        else:
-            dest = Path("model_analysis.csv")
-
-        fieldnames = list(rows[0].keys()) if rows else []
-        write_dict_csv(dest, fieldnames, rows)
-        print(f"Wrote {dest}")
-
-    elif fmt == "json":
-        data: dict = {
-            "original": {
-                "total_macs": analysis.total_macs,
-                "total_ops": analysis.total_ops,
-                "num_parameters": analysis.num_parameters,
-                "layers": [
-                    {
-                        "id": la.id,
-                        "op": la.op,
-                        "macs": la.macs,
-                        "ops": la.ops,
-                        "input_shapes": la.input_shapes,
-                        "output_shapes": la.output_shapes,
-                        "params": la.params,
-                    }
-                    for la in analysis.layers
-                ],
-            }
+    rows = [
+        {
+            "id": la.id,
+            "op": la.op,
+            "macs": la.macs,
+            "ops": la.ops,
+            "input_shapes": str(la.input_shapes),
+            "output_shapes": str(la.output_shapes),
+            **la.params,
         }
-        if aot is not None:
-            data["aot_transformed"] = {
-                "total_macs": aot.total_macs,
-                "total_ops": aot.total_ops,
-                "num_parameters": aot.num_parameters,
-                "layers": [
-                    {
-                        "id": la.id,
-                        "op": la.op,
-                        "macs": la.macs,
-                        "ops": la.ops,
-                        "input_shapes": la.input_shapes,
-                        "output_shapes": la.output_shapes,
-                        "params": la.params,
-                    }
-                    for la in aot.layers
-                ],
-            }
+        for la in analysis.layers
+    ]
+    fieldnames = list(dict.fromkeys(key for row in rows for key in row))
+    dest = output or Path("model_analysis.csv")
+    write_dict_csv(dest, fieldnames, rows)
+    print(f"Wrote {dest}")
 
-        dest = output or Path("model_analysis.json")
-        dest.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
-        print(f"Wrote {dest}")
+
+def _write_json(graphs: Mapping[str, ModelAnalysis | None], output: Path | None) -> None:
+    import json
+
+    data = {name: graph.to_dict() for name, graph in graphs.items() if graph is not None}
+    dest = output or Path("model_analysis.json")
+    dest.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
+    print(f"Wrote {dest}")
