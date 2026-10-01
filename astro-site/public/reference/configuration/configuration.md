@@ -49,8 +49,8 @@ tensor arena, while weights are the model flatbuffer/constant data.
 | --- | --- | --- | --- |
 | `path` | `Path` |  | Path Required. |
 | `arena_size` | `int \| None` |  | Arena Size |
-| `arena_location` | `Placement \| str \| None` |  | Arena Location |
-| `weights_location` | `Placement \| str \| None` |  | Weights Location |
+| `arena_location` | `Placement \| None` |  |  |
+| `weights_location` | `Placement \| None` |  |  |
 
 ## EngineConfig
 

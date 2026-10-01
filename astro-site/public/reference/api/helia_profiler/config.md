@@ -103,7 +103,7 @@ tensor arena, while weights are the model flatbuffer/constant data.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/config/__init__.py:189`
+Source: `src/helia_profiler/config/__init__.py:200`
 
 ### helia_profiler.ModelConfig.path
 
@@ -113,7 +113,7 @@ Source: `src/helia_profiler/config/__init__.py:189`
 path: Path
 ```
 
-Source: `src/helia_profiler/config/__init__.py:203`
+Source: `src/helia_profiler/config/__init__.py:214`
 
 ### helia_profiler.ModelConfig.arena_size
 
@@ -123,27 +123,27 @@ Source: `src/helia_profiler/config/__init__.py:203`
 arena_size: int | None = None
 ```
 
-Source: `src/helia_profiler/config/__init__.py:204`
+Source: `src/helia_profiler/config/__init__.py:215`
 
 ### helia_profiler.ModelConfig.arena_location
 
 `attribute` · `python`
 
 ```python
-arena_location: Placement | str | None = None
+arena_location: Placement | None = None
 ```
 
-Source: `src/helia_profiler/config/__init__.py:205`
+Source: `src/helia_profiler/config/__init__.py:216`
 
 ### helia_profiler.ModelConfig.weights_location
 
 `attribute` · `python`
 
 ```python
-weights_location: Placement | str | None = None
+weights_location: Placement | None = None
 ```
 
-Source: `src/helia_profiler/config/__init__.py:206`
+Source: `src/helia_profiler/config/__init__.py:217`
 
 ## helia_profiler.EngineConfig
 
@@ -157,7 +157,7 @@ Inference engine selection and passthrough config.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/config/__init__.py:219`
+Source: `src/helia_profiler/config/__init__.py:244`
 
 ### helia_profiler.EngineConfig.type
 
@@ -167,7 +167,7 @@ Source: `src/helia_profiler/config/__init__.py:219`
 type: EngineType = EngineType.HELIA_RT
 ```
 
-Source: `src/helia_profiler/config/__init__.py:223`
+Source: `src/helia_profiler/config/__init__.py:248`
 
 ### helia_profiler.EngineConfig.backend
 
@@ -177,7 +177,7 @@ Source: `src/helia_profiler/config/__init__.py:223`
 backend: str | None = None
 ```
 
-Source: `src/helia_profiler/config/__init__.py:224`
+Source: `src/helia_profiler/config/__init__.py:249`
 
 ### helia_profiler.EngineConfig.config
 
@@ -187,7 +187,7 @@ Source: `src/helia_profiler/config/__init__.py:224`
 config: dict[str, Any] = field(default_factory=dict)
 ```
 
-Source: `src/helia_profiler/config/__init__.py:225`
+Source: `src/helia_profiler/config/__init__.py:250`
 
 ### helia_profiler.EngineConfig.config_path
 
@@ -197,7 +197,7 @@ Source: `src/helia_profiler/config/__init__.py:225`
 config_path: Path | None = None
 ```
 
-Source: `src/helia_profiler/config/__init__.py:226`
+Source: `src/helia_profiler/config/__init__.py:251`
 
 ## helia_profiler.HeartbeatConfig
 
@@ -215,7 +215,7 @@ timeout, and (b) show the user live progress.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/config/__init__.py:248`
+Source: `src/helia_profiler/config/__init__.py:273`
 
 ### helia_profiler.HeartbeatConfig.enabled
 
@@ -228,7 +228,7 @@ enabled: bool = True
 Master switch.  When ``False``, no heartbeats are emitted or
 expected and the host falls back to the legacy line-gap timeout.
 
-Source: `src/helia_profiler/config/__init__.py:274`
+Source: `src/helia_profiler/config/__init__.py:299`
 
 ### helia_profiler.HeartbeatConfig.every_n_ops
 
@@ -242,7 +242,7 @@ Emit a heartbeat after this many profiled ops.  ``0``
 disables this trigger.  Lower values add more PMU/inter-op
 overhead but give finer-grained progress.
 
-Source: `src/helia_profiler/config/__init__.py:275`
+Source: `src/helia_profiler/config/__init__.py:300`
 
 ### helia_profiler.HeartbeatConfig.every_ms
 
@@ -258,7 +258,7 @@ disables this trigger.  Useful for engines with a single large
 invocation (e.g. AOT command streams) where ``every_n_ops`` does
 not fire.
 
-Source: `src/helia_profiler/config/__init__.py:276`
+Source: `src/helia_profiler/config/__init__.py:301`
 
 ### helia_profiler.HeartbeatConfig.host_timeout_s
 
@@ -271,7 +271,7 @@ host_timeout_s: int = DEFAULT_HB_HOST_TIMEOUT_S
 Maximum time the host will wait without receiving
 *any* line from the firmware before declaring the run hung.
 
-Source: `src/helia_profiler/config/__init__.py:277`
+Source: `src/helia_profiler/config/__init__.py:302`
 
 ### helia_profiler.HeartbeatConfig.overall_timeout_s
 
@@ -285,7 +285,7 @@ Hard ceiling on total capture time, in seconds.
 ``None`` means unbounded (rely on heartbeats).  Set to a positive
 int for a safety net in CI or unattended runs.
 
-Source: `src/helia_profiler/config/__init__.py:278`
+Source: `src/helia_profiler/config/__init__.py:303`
 
 ## helia_profiler.TimeoutsConfig
 
@@ -307,7 +307,7 @@ because they are tied to the on-device progress protocol.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/config/__init__.py:281`
+Source: `src/helia_profiler/config/__init__.py:306`
 
 ### helia_profiler.TimeoutsConfig.configure_s
 
@@ -317,7 +317,7 @@ Source: `src/helia_profiler/config/__init__.py:281`
 configure_s: int = DEFAULT_CONFIGURE_TIMEOUT_S
 ```
 
-Source: `src/helia_profiler/config/__init__.py:294`
+Source: `src/helia_profiler/config/__init__.py:319`
 
 ### helia_profiler.TimeoutsConfig.build_s
 
@@ -327,7 +327,7 @@ Source: `src/helia_profiler/config/__init__.py:294`
 build_s: int = DEFAULT_BUILD_TIMEOUT_S
 ```
 
-Source: `src/helia_profiler/config/__init__.py:295`
+Source: `src/helia_profiler/config/__init__.py:320`
 
 ### helia_profiler.TimeoutsConfig.flash_s
 
@@ -337,7 +337,7 @@ Source: `src/helia_profiler/config/__init__.py:295`
 flash_s: int = DEFAULT_FLASH_TIMEOUT_S
 ```
 
-Source: `src/helia_profiler/config/__init__.py:296`
+Source: `src/helia_profiler/config/__init__.py:321`
 
 ### helia_profiler.TimeoutsConfig.toolchain_probe_s
 
@@ -347,7 +347,7 @@ Source: `src/helia_profiler/config/__init__.py:296`
 toolchain_probe_s: int = DEFAULT_TOOLCHAIN_PROBE_S
 ```
 
-Source: `src/helia_profiler/config/__init__.py:297`
+Source: `src/helia_profiler/config/__init__.py:322`
 
 ### helia_profiler.TimeoutsConfig.binary_probe_s
 
@@ -357,7 +357,7 @@ Source: `src/helia_profiler/config/__init__.py:297`
 binary_probe_s: int = DEFAULT_BINARY_PROBE_S
 ```
 
-Source: `src/helia_profiler/config/__init__.py:298`
+Source: `src/helia_profiler/config/__init__.py:323`
 
 ### helia_profiler.TimeoutsConfig.download_api_s
 
@@ -367,7 +367,7 @@ Source: `src/helia_profiler/config/__init__.py:298`
 download_api_s: int = DEFAULT_DOWNLOAD_API_S
 ```
 
-Source: `src/helia_profiler/config/__init__.py:299`
+Source: `src/helia_profiler/config/__init__.py:324`
 
 ### helia_profiler.TimeoutsConfig.download_asset_s
 
@@ -377,7 +377,7 @@ Source: `src/helia_profiler/config/__init__.py:299`
 download_asset_s: int = DEFAULT_DOWNLOAD_ASSET_S
 ```
 
-Source: `src/helia_profiler/config/__init__.py:300`
+Source: `src/helia_profiler/config/__init__.py:325`
 
 ## helia_profiler.TargetConfig
 
@@ -391,7 +391,7 @@ Hardware target.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/config/__init__.py:303`
+Source: `src/helia_profiler/config/__init__.py:328`
 
 ### helia_profiler.TargetConfig.board
 
@@ -401,7 +401,7 @@ Source: `src/helia_profiler/config/__init__.py:303`
 board: str = DEFAULT_BOARD
 ```
 
-Source: `src/helia_profiler/config/__init__.py:307`
+Source: `src/helia_profiler/config/__init__.py:332`
 
 ### helia_profiler.TargetConfig.toolchain
 
@@ -411,7 +411,7 @@ Source: `src/helia_profiler/config/__init__.py:307`
 toolchain: Toolchain = DEFAULT_TOOLCHAIN
 ```
 
-Source: `src/helia_profiler/config/__init__.py:308`
+Source: `src/helia_profiler/config/__init__.py:333`
 
 ### helia_profiler.TargetConfig.jlink_serial
 
@@ -421,7 +421,7 @@ Source: `src/helia_profiler/config/__init__.py:308`
 jlink_serial: str | None = None
 ```
 
-Source: `src/helia_profiler/config/__init__.py:309`
+Source: `src/helia_profiler/config/__init__.py:334`
 
 ### helia_profiler.TargetConfig.transport
 
@@ -431,7 +431,7 @@ Source: `src/helia_profiler/config/__init__.py:309`
 transport: Transport = DEFAULT_TRANSPORT
 ```
 
-Source: `src/helia_profiler/config/__init__.py:310`
+Source: `src/helia_profiler/config/__init__.py:335`
 
 ### helia_profiler.TargetConfig.usb_port
 
@@ -441,7 +441,7 @@ Source: `src/helia_profiler/config/__init__.py:310`
 usb_port: str | None = None
 ```
 
-Source: `src/helia_profiler/config/__init__.py:311`
+Source: `src/helia_profiler/config/__init__.py:336`
 
 ### helia_profiler.TargetConfig.segger_rtt_path
 
@@ -451,7 +451,7 @@ Source: `src/helia_profiler/config/__init__.py:311`
 segger_rtt_path: Path | None = None
 ```
 
-Source: `src/helia_profiler/config/__init__.py:312`
+Source: `src/helia_profiler/config/__init__.py:337`
 
 ### helia_profiler.TargetConfig.rtt_buffer_size_up
 
@@ -461,7 +461,7 @@ Source: `src/helia_profiler/config/__init__.py:312`
 rtt_buffer_size_up: int | None = None
 ```
 
-Source: `src/helia_profiler/config/__init__.py:313`
+Source: `src/helia_profiler/config/__init__.py:338`
 
 ### helia_profiler.TargetConfig.clock
 
@@ -471,7 +471,7 @@ Source: `src/helia_profiler/config/__init__.py:313`
 clock: ClockSelection = field(default_factory=ClockSelection)
 ```
 
-Source: `src/helia_profiler/config/__init__.py:314`
+Source: `src/helia_profiler/config/__init__.py:339`
 
 ### helia_profiler.TargetConfig.psram
 
@@ -481,7 +481,7 @@ Source: `src/helia_profiler/config/__init__.py:314`
 psram: PsramConfig = field(default_factory=PsramConfig)
 ```
 
-Source: `src/helia_profiler/config/__init__.py:315`
+Source: `src/helia_profiler/config/__init__.py:340`
 
 ### helia_profiler.TargetConfig.heartbeat
 
@@ -491,7 +491,7 @@ Source: `src/helia_profiler/config/__init__.py:315`
 heartbeat: HeartbeatConfig = field(default_factory=HeartbeatConfig)
 ```
 
-Source: `src/helia_profiler/config/__init__.py:316`
+Source: `src/helia_profiler/config/__init__.py:341`
 
 ### helia_profiler.TargetConfig.custom_socs
 
@@ -501,7 +501,7 @@ Source: `src/helia_profiler/config/__init__.py:316`
 custom_socs: dict[str, Any] | None = None
 ```
 
-Source: `src/helia_profiler/config/__init__.py:317`
+Source: `src/helia_profiler/config/__init__.py:342`
 
 ### helia_profiler.TargetConfig.custom_boards
 
@@ -511,7 +511,7 @@ Source: `src/helia_profiler/config/__init__.py:317`
 custom_boards: dict[str, Any] | None = None
 ```
 
-Source: `src/helia_profiler/config/__init__.py:318`
+Source: `src/helia_profiler/config/__init__.py:343`
 
 ### helia_profiler.TargetConfig.ensure_board_powered
 
@@ -521,7 +521,7 @@ Source: `src/helia_profiler/config/__init__.py:318`
 ensure_board_powered: bool = False
 ```
 
-Source: `src/helia_profiler/config/__init__.py:327`
+Source: `src/helia_profiler/config/__init__.py:352`
 
 ## helia_profiler.ProfilingConfig
 
@@ -547,7 +547,7 @@ plus ``engine.backend: ethos_u`` (engine.type helia-rt or helia-aot).
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/config/__init__.py:360`
+Source: `src/helia_profiler/config/__init__.py:398`
 
 ### helia_profiler.ProfilingConfig.pmu_counters
 
@@ -557,7 +557,7 @@ Source: `src/helia_profiler/config/__init__.py:360`
 pmu_counters: dict[str, str | list[str]] = field(default_factory=lambda : ...)
 ```
 
-Source: `src/helia_profiler/config/__init__.py:378`
+Source: `src/helia_profiler/config/__init__.py:416`
 
 ### helia_profiler.ProfilingConfig.per_layer
 
@@ -567,7 +567,7 @@ Source: `src/helia_profiler/config/__init__.py:378`
 per_layer: bool = True
 ```
 
-Source: `src/helia_profiler/config/__init__.py:379`
+Source: `src/helia_profiler/config/__init__.py:417`
 
 ### helia_profiler.ProfilingConfig.iterations
 
@@ -577,7 +577,7 @@ Source: `src/helia_profiler/config/__init__.py:379`
 iterations: int = DEFAULT_ITERATIONS
 ```
 
-Source: `src/helia_profiler/config/__init__.py:380`
+Source: `src/helia_profiler/config/__init__.py:418`
 
 ### helia_profiler.ProfilingConfig.warmup
 
@@ -587,7 +587,7 @@ Source: `src/helia_profiler/config/__init__.py:380`
 warmup: int = DEFAULT_WARMUP
 ```
 
-Source: `src/helia_profiler/config/__init__.py:381`
+Source: `src/helia_profiler/config/__init__.py:419`
 
 ### helia_profiler.ProfilingConfig.window_mode
 
@@ -597,7 +597,7 @@ Source: `src/helia_profiler/config/__init__.py:381`
 window_mode: WindowMode = DEFAULT_WINDOW_MODE
 ```
 
-Source: `src/helia_profiler/config/__init__.py:387`
+Source: `src/helia_profiler/config/__init__.py:425`
 
 ### helia_profiler.ProfilingConfig.window_target_ms
 
@@ -607,7 +607,7 @@ Source: `src/helia_profiler/config/__init__.py:387`
 window_target_ms: int = DEFAULT_WINDOW_TARGET_MS
 ```
 
-Source: `src/helia_profiler/config/__init__.py:388`
+Source: `src/helia_profiler/config/__init__.py:426`
 
 ### helia_profiler.ProfilingConfig.window_min
 
@@ -617,7 +617,7 @@ Source: `src/helia_profiler/config/__init__.py:388`
 window_min: int = DEFAULT_WINDOW_MIN
 ```
 
-Source: `src/helia_profiler/config/__init__.py:389`
+Source: `src/helia_profiler/config/__init__.py:427`
 
 ### helia_profiler.ProfilingConfig.window_max
 
@@ -627,7 +627,7 @@ Source: `src/helia_profiler/config/__init__.py:389`
 window_max: int = DEFAULT_WINDOW_MAX
 ```
 
-Source: `src/helia_profiler/config/__init__.py:390`
+Source: `src/helia_profiler/config/__init__.py:428`
 
 ### helia_profiler.ProfilingConfig.clean_window_probe
 
@@ -637,7 +637,7 @@ Source: `src/helia_profiler/config/__init__.py:390`
 clean_window_probe: CleanWindowProbe = DEFAULT_CLEAN_WINDOW_PROBE
 ```
 
-Source: `src/helia_profiler/config/__init__.py:393`
+Source: `src/helia_profiler/config/__init__.py:431`
 
 ### helia_profiler.ProfilingConfig.clean_window_trace
 
@@ -647,7 +647,7 @@ Source: `src/helia_profiler/config/__init__.py:393`
 clean_window_trace: bool = False
 ```
 
-Source: `src/helia_profiler/config/__init__.py:400`
+Source: `src/helia_profiler/config/__init__.py:438`
 
 ### helia_profiler.ProfilingConfig.force_shared_sram
 
@@ -657,7 +657,7 @@ Source: `src/helia_profiler/config/__init__.py:400`
 force_shared_sram: bool = False
 ```
 
-Source: `src/helia_profiler/config/__init__.py:407`
+Source: `src/helia_profiler/config/__init__.py:445`
 
 ### helia_profiler.ProfilingConfig.aggregation
 
@@ -667,7 +667,7 @@ Source: `src/helia_profiler/config/__init__.py:407`
 aggregation: Aggregation = DEFAULT_AGGREGATION
 ```
 
-Source: `src/helia_profiler/config/__init__.py:411`
+Source: `src/helia_profiler/config/__init__.py:449`
 
 ### helia_profiler.ProfilingConfig.extreme_mode
 
@@ -677,7 +677,7 @@ Source: `src/helia_profiler/config/__init__.py:411`
 extreme_mode: bool = False
 ```
 
-Source: `src/helia_profiler/config/__init__.py:417`
+Source: `src/helia_profiler/config/__init__.py:455`
 
 ## helia_profiler.OutputConfig
 
@@ -691,7 +691,7 @@ Report output settings.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/config/__init__.py:450`
+Source: `src/helia_profiler/config/__init__.py:488`
 
 ### helia_profiler.OutputConfig.format
 
@@ -701,7 +701,7 @@ Source: `src/helia_profiler/config/__init__.py:450`
 format: OutputFormat = OutputFormat.CSV
 ```
 
-Source: `src/helia_profiler/config/__init__.py:454`
+Source: `src/helia_profiler/config/__init__.py:492`
 
 ### helia_profiler.OutputConfig.dir
 
@@ -711,7 +711,7 @@ Source: `src/helia_profiler/config/__init__.py:454`
 dir: Path = Path('./results')
 ```
 
-Source: `src/helia_profiler/config/__init__.py:455`
+Source: `src/helia_profiler/config/__init__.py:493`
 
 ### helia_profiler.OutputConfig.model_explorer
 
@@ -721,7 +721,7 @@ Source: `src/helia_profiler/config/__init__.py:455`
 model_explorer: bool = True
 ```
 
-Source: `src/helia_profiler/config/__init__.py:456`
+Source: `src/helia_profiler/config/__init__.py:494`
 
 ### helia_profiler.OutputConfig.detailed
 
@@ -731,7 +731,7 @@ Source: `src/helia_profiler/config/__init__.py:456`
 detailed: bool = False
 ```
 
-Source: `src/helia_profiler/config/__init__.py:457`
+Source: `src/helia_profiler/config/__init__.py:495`
 
 ### helia_profiler.OutputConfig.fail_on_invalid
 
@@ -741,7 +741,7 @@ Source: `src/helia_profiler/config/__init__.py:457`
 fail_on_invalid: bool = False
 ```
 
-Source: `src/helia_profiler/config/__init__.py:462`
+Source: `src/helia_profiler/config/__init__.py:500`
 
 ## helia_profiler.BuildConfig
 
@@ -777,7 +777,7 @@ requires the exact lock and all locked module trees to already exist.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/config/__init__.py:513`
+Source: `src/helia_profiler/config/__init__.py:551`
 
 ### helia_profiler.BuildConfig.channel
 
@@ -787,7 +787,7 @@ Source: `src/helia_profiler/config/__init__.py:513`
 channel: str | None = None
 ```
 
-Source: `src/helia_profiler/config/__init__.py:540`
+Source: `src/helia_profiler/config/__init__.py:578`
 
 ### helia_profiler.BuildConfig.nsx_modules
 
@@ -797,7 +797,7 @@ Source: `src/helia_profiler/config/__init__.py:540`
 nsx_modules: dict[str, NsxModuleOverride] = field(default_factory=dict)
 ```
 
-Source: `src/helia_profiler/config/__init__.py:541`
+Source: `src/helia_profiler/config/__init__.py:579`
 
 ### helia_profiler.BuildConfig.compiler_launcher
 
@@ -807,7 +807,7 @@ Source: `src/helia_profiler/config/__init__.py:541`
 compiler_launcher: str = 'auto'
 ```
 
-Source: `src/helia_profiler/config/__init__.py:542`
+Source: `src/helia_profiler/config/__init__.py:580`
 
 ### helia_profiler.BuildConfig.update_dependencies
 
@@ -817,7 +817,7 @@ Source: `src/helia_profiler/config/__init__.py:542`
 update_dependencies: bool = False
 ```
 
-Source: `src/helia_profiler/config/__init__.py:543`
+Source: `src/helia_profiler/config/__init__.py:581`
 
 ### helia_profiler.BuildConfig.offline
 
@@ -827,7 +827,7 @@ Source: `src/helia_profiler/config/__init__.py:543`
 offline: bool = False
 ```
 
-Source: `src/helia_profiler/config/__init__.py:544`
+Source: `src/helia_profiler/config/__init__.py:582`
 
 ## helia_profiler.ProfileConfig
 
@@ -841,7 +841,7 @@ Top-level immutable configuration for a profiling run.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/config/__init__.py:594`
+Source: `src/helia_profiler/config/__init__.py:635`
 
 ### helia_profiler.ProfileConfig.model
 
@@ -851,7 +851,7 @@ Source: `src/helia_profiler/config/__init__.py:594`
 model: ModelConfig
 ```
 
-Source: `src/helia_profiler/config/__init__.py:601`
+Source: `src/helia_profiler/config/__init__.py:642`
 
 ### helia_profiler.ProfileConfig.engine
 
@@ -861,7 +861,7 @@ Source: `src/helia_profiler/config/__init__.py:601`
 engine: EngineConfig = field(default_factory=lambda : ...)
 ```
 
-Source: `src/helia_profiler/config/__init__.py:602`
+Source: `src/helia_profiler/config/__init__.py:643`
 
 ### helia_profiler.ProfileConfig.target
 
@@ -871,7 +871,7 @@ Source: `src/helia_profiler/config/__init__.py:602`
 target: TargetConfig = field(default_factory=TargetConfig)
 ```
 
-Source: `src/helia_profiler/config/__init__.py:603`
+Source: `src/helia_profiler/config/__init__.py:644`
 
 ### helia_profiler.ProfileConfig.profiling
 
@@ -881,7 +881,7 @@ Source: `src/helia_profiler/config/__init__.py:603`
 profiling: ProfilingConfig = field(default_factory=ProfilingConfig)
 ```
 
-Source: `src/helia_profiler/config/__init__.py:604`
+Source: `src/helia_profiler/config/__init__.py:645`
 
 ### helia_profiler.ProfileConfig.power
 
@@ -891,7 +891,7 @@ Source: `src/helia_profiler/config/__init__.py:604`
 power: PowerConfig = field(default_factory=PowerConfig)
 ```
 
-Source: `src/helia_profiler/config/__init__.py:605`
+Source: `src/helia_profiler/config/__init__.py:646`
 
 ### helia_profiler.ProfileConfig.output
 
@@ -901,7 +901,7 @@ Source: `src/helia_profiler/config/__init__.py:605`
 output: OutputConfig = field(default_factory=OutputConfig)
 ```
 
-Source: `src/helia_profiler/config/__init__.py:606`
+Source: `src/helia_profiler/config/__init__.py:647`
 
 ### helia_profiler.ProfileConfig.timeouts
 
@@ -911,7 +911,7 @@ Source: `src/helia_profiler/config/__init__.py:606`
 timeouts: TimeoutsConfig = field(default_factory=TimeoutsConfig)
 ```
 
-Source: `src/helia_profiler/config/__init__.py:607`
+Source: `src/helia_profiler/config/__init__.py:648`
 
 ### helia_profiler.ProfileConfig.build
 
@@ -921,7 +921,7 @@ Source: `src/helia_profiler/config/__init__.py:607`
 build: BuildConfig = field(default_factory=BuildConfig)
 ```
 
-Source: `src/helia_profiler/config/__init__.py:608`
+Source: `src/helia_profiler/config/__init__.py:649`
 
 ### helia_profiler.ProfileConfig.platform_registry
 
@@ -931,7 +931,7 @@ Source: `src/helia_profiler/config/__init__.py:608`
 platform_registry: PlatformRegistry = field(default_factory=build_platform_registry)
 ```
 
-Source: `src/helia_profiler/config/__init__.py:609`
+Source: `src/helia_profiler/config/__init__.py:650`
 
 ### helia_profiler.ProfileConfig.compatibility_baseline
 
@@ -941,7 +941,7 @@ Source: `src/helia_profiler/config/__init__.py:609`
 compatibility_baseline: CompatibilityBaseline = field(default_factory=load_compatibility_baseline, init=False, repr=False)
 ```
 
-Source: `src/helia_profiler/config/__init__.py:612`
+Source: `src/helia_profiler/config/__init__.py:653`
 
 ### helia_profiler.ProfileConfig.compatibility
 
@@ -951,7 +951,7 @@ Source: `src/helia_profiler/config/__init__.py:612`
 compatibility: CompatibilityResolution | None = field(default=None, init=False, repr=False, compare=False)
 ```
 
-Source: `src/helia_profiler/config/__init__.py:617`
+Source: `src/helia_profiler/config/__init__.py:658`
 
 ### helia_profiler.ProfileConfig.frozen
 
@@ -961,7 +961,7 @@ Source: `src/helia_profiler/config/__init__.py:617`
 frozen: bool = False
 ```
 
-Source: `src/helia_profiler/config/__init__.py:623`
+Source: `src/helia_profiler/config/__init__.py:664`
 
 ### helia_profiler.ProfileConfig.work_dir
 
@@ -971,7 +971,7 @@ Source: `src/helia_profiler/config/__init__.py:623`
 work_dir: Path | None = None
 ```
 
-Source: `src/helia_profiler/config/__init__.py:624`
+Source: `src/helia_profiler/config/__init__.py:665`
 
 ### helia_profiler.ProfileConfig.clean
 
@@ -981,7 +981,7 @@ Source: `src/helia_profiler/config/__init__.py:624`
 clean: bool = False
 ```
 
-Source: `src/helia_profiler/config/__init__.py:625`
+Source: `src/helia_profiler/config/__init__.py:666`
 
 ### helia_profiler.ProfileConfig.verbose
 
@@ -991,7 +991,7 @@ Source: `src/helia_profiler/config/__init__.py:625`
 verbose: int = 0
 ```
 
-Source: `src/helia_profiler/config/__init__.py:626`
+Source: `src/helia_profiler/config/__init__.py:667`
 
 ### helia_profiler.ProfileConfig.effective_window_target_ms
 
@@ -1009,4 +1009,4 @@ derived property rather than a helper each caller re-implements,
 because the rule spans two config sections and every caller (firmware
 render, power planner) must agree on the same effective value (#136).
 
-Source: `src/helia_profiler/config/__init__.py:649`
+Source: `src/helia_profiler/config/__init__.py:695`
