@@ -10,9 +10,8 @@ refresh path still re-verifies: a lock rewrite (``--update-dependencies``),
 a cleaned workspace (``--clean``), or stamp invalidation after a failed
 build (see ``firmware.build.build_app``).
 
-Extracted from ``dependencies`` at the module size ceiling (see the
-launcher/elf_inventory precedent); ``dependencies`` re-exports the public
-name so callers keep one import surface.
+``dependencies`` re-exports the public name so callers keep one import
+surface.
 
 NOTE: ``nsx_cli`` is imported as a module (never ``from .nsx import <name>``)
 so tests that monkeypatch ``helia_profiler.deps.dependencies.nsx_cli.*`` keep

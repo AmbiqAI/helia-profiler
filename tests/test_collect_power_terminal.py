@@ -510,7 +510,7 @@ class TestFirmwareWindowClockIntegrity:
     ):
         """A degraded capture has no gated window, only a whole-capture
         free-form summary. Falling back to it fabricates a disagreement out
-        of an unrelated interval (WORKAROUND helia-profiler#107). There must
+        of an unrelated interval (helia-profiler#107). There must
         be no window-clock warning here; power.observation_degraded already
         says what actually went wrong."""
         ctx = self._bench_ctx(tmp_path)

@@ -25,11 +25,9 @@ class HpxPmuProfiler : public tflite::MicroProfilerInterface {
     // Sized from the target SoC's pmu_max_ops (platform/soc.py) rather
     // than a single hardcoded constant -- this static array's footprint
     // (~24 bytes/entry) must fit inside the real, sometimes much smaller,
-    // TCM budget of the target board (e.g. apollo330P's real 240 KB vs
-    // apollo510's ~496 KB -- confirmed on real Apollo330mP Rev1 EVB
-    // hardware, 2026-07: kMaxLayers=4096 alone reserved ~96 KB, over a
-    // third of that board's actual budget, for models needing far fewer
-    // layers).
+    // TCM budget of the target board (e.g. apollo330P's 240 KB vs
+    // apollo510's ~496 KB: kMaxLayers=4096 alone reserves ~96 KB, over a
+    // third of apollo330P's budget, for models needing far fewer layers).
     static constexpr int kMaxLayers = {{ pmu_max_ops }};
     static constexpr int kMaxEvents = 4;
 

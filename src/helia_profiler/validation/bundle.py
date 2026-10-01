@@ -11,7 +11,7 @@ from typing import Any
 from ..errors import ValidationBundleError
 
 #: Written by ``validation.report``; the loader accepts every version up to it.
-#: v6 (#133 Phase 2): per-case ``resources.memory_plan`` is the decision
+#: v6 (#133): per-case ``resources.memory_plan`` is the decision
 #: record only (its ``free``/``overflow``/``has_overflow`` keys are gone,
 #: mirroring run-summary schema v3) and ``resources.memory_regions`` is
 #: added — the measured per-region occupancy from the linked ELF.

@@ -67,7 +67,7 @@ def measured_memory_is_renderable(measured: Any) -> bool:
 
 
 def render_memory_regions(console: HpxConsole, measured: Any) -> None:
-    """Render the MEASURED per-region occupancy (#133 Phase 2) — what the
+    """Render the MEASURED per-region occupancy (#133) — what the
     linker actually did, from the ELF classified into the verified map.
 
     Used/free are against the link family's app extent; ``Reserved`` is
@@ -139,7 +139,7 @@ def render_memory_regions(console: HpxConsole, measured: Any) -> None:
 
 
 def render_memory_reconciliation(console: HpxConsole, rec: Any) -> None:
-    """Plan-vs-measured verdicts (#133 Phase 3): one row per plan
+    """Plan-vs-measured verdicts (#133): one row per plan
     consumer. Positive delta (firmware reserves MORE than planned) and
     missing consumers render red; unmatchable rows are dim (structural,
     not failures). Per-symbol rows never reach the console — they live in

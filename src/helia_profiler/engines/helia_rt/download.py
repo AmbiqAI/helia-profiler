@@ -1,8 +1,7 @@
 """heliaRT GitHub release download helpers.
 
-Split out of :mod:`.artifacts` to keep the distribution-resolution module
-focused: this module only talks to the GitHub Releases API and unpacks the
-downloaded archive.
+This module only talks to the GitHub Releases API and unpacks the downloaded
+archive; :mod:`.artifacts` owns distribution resolution.
 """
 
 from __future__ import annotations
@@ -38,8 +37,8 @@ def _fetch_github_release(
     """Download a heliaRT release from GitHub.
 
     Checks the local cache first.  On a cache miss, queries the GitHub
-    Releases API, downloads the NSX bundle (preferred) or the legacy
-    neuralSPOT bundle, and extracts it into the cache directory.
+    Releases API, downloads the ``helia-rt-*.zip`` release asset, and
+    extracts it into the cache directory.
 
     Returns ``(dist_path, detected_version)``.
     """

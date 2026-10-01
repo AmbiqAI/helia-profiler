@@ -10,7 +10,7 @@
 void nsx_printf(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 static inline void nsx_delay_us(uint32_t usec) { (void)usec; }
 
-// Real signatures return void (fidelity fix, #187 round 2).
+// Real signatures return void (#187).
 static inline void nsx_itm_printf_enable(void) {}
 static inline void nsx_itm_printf_disable(void) {}
 static inline void nsx_uart_printf_enable(void) {}

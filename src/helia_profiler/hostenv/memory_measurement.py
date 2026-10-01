@@ -1,6 +1,6 @@
 """Measured memory regions — the join of the ELF inventory and the map.
 
-The #133 Phase 2 measurement: classify the linked binary's section
+The #133 measurement: classify the linked binary's section
 inventory (``toolchain_probe.section_inventory``) into the verified per-SoC
 windows (``platform.memory_map.linked_memory_map``) and compute per-region
 occupancy under the contract those modules define:

@@ -1,8 +1,7 @@
 """Shared transport utilities for heliaPROFILER data capture.
 
 Defines HPX protocol constants and the byte-stream line-collection loop
-shared by the RTT, SWO, and UART transports.  USB CDC uses pyserial's
-``readline()`` and handles line collection internally.
+shared by the RTT, SWO, UART, and USB CDC transports.
 
 HPX Protocol
 ------------

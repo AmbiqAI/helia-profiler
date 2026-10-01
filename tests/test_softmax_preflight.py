@@ -686,8 +686,8 @@ class TestReaderRejectsOffsetsOutsideTheBuffer:
     """An offset or length outside the buffer raises instead of being read (#239).
 
     ``struct.unpack_from`` accepts a negative offset and reads from the end of
-    the buffer, and a slice past the end simply truncates, so both used to
-    return plausible values instead of failing.
+    the buffer, and a slice past the end simply truncates, so without bounds
+    checks both return plausible values instead of failing.
     """
 
     @staticmethod
@@ -715,8 +715,9 @@ class TestReaderRejectsOffsetsOutsideTheBuffer:
     def test_a_hostile_root_table_fails_the_scan_instead_of_passing_it(self, read):
         from helia_profiler.modelcost import _tflite_reader as r
 
-        # vtable at -12 used to read the zeroed tail as an empty vtable, so
-        # every field looked absent and the scan found nothing to reject.
+        # A vtable at -12 would read the zeroed tail as an empty vtable, so
+        # every field would look absent and the scan would find nothing to
+        # reject.
         with pytest.raises(struct.error):
             read(r, self._table_with_soffset(20))
 

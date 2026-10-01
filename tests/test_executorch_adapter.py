@@ -18,7 +18,7 @@ from helia_profiler.errors import EngineError
 def _render_executorch_template(**overrides) -> str:
     """Render ``main_executorch.cc.j2`` through the production env (#119).
 
-    Since #154 phase 4 that template is a child of ``_main_base.cc.j2``, so a
+    That template is a child of ``_main_base.cc.j2`` (#154), so a
     render needs the shared skeleton's whole variable set, not just the
     ExecuTorch-specific half these tests care about.  The defaults below are
     the Apollo5/Cortex-M55 shape ExecuTorch actually ships on (it is the only

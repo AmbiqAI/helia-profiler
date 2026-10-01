@@ -89,7 +89,7 @@ target_compile_definitions(hpx_profiler PRIVATE BUFFER_SIZE_UP={{ rtt_buffer_siz
 {% endif %}
 {% if power_binary_enabled %}
 
-# --- Dedicated power binary (WP2) ---
+# --- Dedicated power binary ---
 # Same AOT model + link deps as hpx_profiler, minus any transport (SEGGER
 # RTT / USB): main_power.cc (power_only=true render) never references a
 # transport symbol, so no transport sources/defines are added here.
@@ -186,11 +186,11 @@ target_compile_definitions(hpx_profiler PRIVATE BUFFER_SIZE_UP={{ rtt_buffer_siz
 {% endif %}
 {% if power_binary_enabled %}
 
-# --- Dedicated power binary (WP2) ---
+# --- Dedicated power binary ---
 # Same TFLM/heliaRT model + profiler sources as hpx_profiler, minus any
 # transport (SEGGER RTT / USB): main_power.cc (power_only=true render) never
 # references a transport symbol, so no transport sources/defines are added
-# here — that is the whole point of the dedicated binary (see AGENTS.md).
+# here — that is the whole point of the dedicated binary.
 add_executable(hpx_profiler_power EXCLUDE_FROM_ALL
     src/main_power.cc
     src/hpx_pmu_profiler.cc

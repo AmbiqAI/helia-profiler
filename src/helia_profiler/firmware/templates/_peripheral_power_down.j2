@@ -19,7 +19,7 @@
      - Crypto, VCOMP: not used by profiling; powered down like AutoDeploy.
      - DEBUG power domain: explicit HAL-level disable (not just relying on
        debugger-detach timing) -- safe here because the dedicated power
-       binary never needs the debugger attached once flashed (WP4: it
+       binary never needs the debugger attached once flashed (it
        free-runs, unwatched, until the gated measurement window). #}
 {% set _psram_needed = (arena_region | default("") == "psram") or (weights_region | default("") == "psram") %}
 {% if power_only | default(false) and (broad_peripheral_shutdown | default(false)) %}

@@ -106,9 +106,8 @@ _MARKERS: dict[str, str | tuple[str, ...]] = {
     "rtt_config": "SEGGER_RTT_ConfigUpBuffer",
     "armv8m_pmu": "ARM_PMU_",
     # Keyed on the emitted wire token, not the bare word: "busy_loop" appears
-    # in template comments on every STIMER render (found in the #169
-    # review, where a new comment flipped the last four discriminating
-    # apollo510 cases), so the bare word made this marker a constant there.
+    # in template comments on every STIMER render (#169), so the bare word
+    # made this marker a constant there.
     # The probe announce line renders exactly when the probe is active.
     "busy_loop_probe": "HPX_CLEAN_WINDOW_PROBE=busy_loop",
     "auto_window": "window_min",
@@ -326,7 +325,7 @@ def test_engine_wire_names_mirror_the_engine_type_property():
     from ``EngineType.wire_name``; the map above mirrors it so renders can be
     built without a PipelineContext.  Unbound, the HPX_ENGINE contract below
     would only prove the mirror is self-consistent -- exactly the dead-branch
-    shape #162 Phase 2 review found.  The literals are pinned too: these
+    shape in #162.  The literals are pinned too: these
     values go out on the wire and label every result for their engine.
     """
     assert _ENGINE_WIRE_NAMES == {engine.value: engine.wire_name for engine in EngineType}
@@ -464,11 +463,11 @@ def _all_combos() -> list[tuple[str, str, str]]:
     ]
 
 
-# power_only variant matrix (WP1): dedicated power binary, no transport ever
+# power_only variant matrix: dedicated power binary, no transport ever
 # initialized.  Only rendered for "rtt" — power_only forces NSX_DEBUG_NONE
 # regardless of the requested transport, so varying transport here would not
 # exercise any additional code path (see main.cc.j2/main_aot.cc.j2 power_only
-# guards).  Covers every SoC family x engine per the WP1 verification matrix.
+# guards).  Covers every SoC family x engine.
 _POWER_TRANSPORT = "rtt"
 
 
@@ -665,7 +664,7 @@ def test_render_matches_snapshot(soc, transport, engine):
     ids=[_key(*c, power_only=True) for c in _power_combos()],
 )
 def test_power_only_render_matches_snapshot(soc, transport, engine):
-    """WP1: dedicated power binary (power_only=true) render snapshots.
+    """Dedicated power binary (power_only=true) render snapshots.
 
     Rendered from the SAME main.cc.j2 / main_aot.cc.j2 templates as the
     regular (non-power) matrix above — power_only never introduces a new
@@ -796,7 +795,7 @@ def test_npu_render_matches_snapshot(soc, transport, engine):
 
 
 def test_power_only_never_initializes_transport():
-    """WP1 content contract: power_only firmware never brings up UART/SWO/USB,
+    """Content contract: power_only firmware never brings up UART/SWO/USB,
     never emits the per-layer PMU pass loop / CSV dump / HPX_START/HPX_END
     sentinels, but still runs the shared model-init + gated clean window.
     """
@@ -1064,14 +1063,14 @@ def test_free_running_power_binary_never_times_the_window_with_dwt():
     fatal mechanism: on the Cortex-M4F parts DWT lives in the core debug power
     domain and stays powered only while a debugger asserts CDBGPWRUPREQ, which
     firmware cannot set. The dedicated power binary free-runs unwatched once
-    flashed (WP4 -- the probe is released after flash+reset and the Joulescope
+    flashed (the probe is released after flash+reset and the Joulescope
     watches GPIO, not SWD), so on Apollo3 the counter never advances: elapsed_us
     lands at 0, HPX_CLEAN_INFER_AVG_US at 0, and every per-inference power
     metric derived from them is suppressed or wrong.
 
     ``transport.requires_attached_probe_for_cycles`` is the capability that
-    already records exactly this fact (confirmed empirically on AP3 in
-    2026-06: AOT-over-UART read 0 cycles until a probe was held attached), so
+    already records exactly this fact (on AP3, AOT-over-UART reads 0 cycles
+    unless a probe is held attached), so
     this keys on it rather than on any single shutdown spelling.
 
     Checked for every clean-window probe, over the region that includes the
@@ -1753,8 +1752,7 @@ def test_pmu_profiler_sram_placement_transport_only_on_ap5():
     ap510_transport = _render("apollo510", "rtt", "tflm", power_only=False)
     # NSX_MEM_SRAM (initialized .shared, copied from MRAM), NOT SRAM_BSS
     # (NOLOAD zero-fill would discard the polymorphic object's vtable
-    # pointer image -- NULL-vptr bus fault at the first virtual call,
-    # found on real Apollo330mP hardware 2026-07).
+    # pointer image -- NULL-vptr bus fault at the first virtual call).
     assert "NSX_MEM_SRAM static HpxPmuProfiler g_profiler;" in ap510_transport
     assert "AM_HAL_PWRCTRL_SRAM_3M" in ap510_transport  # SSRAM powered on
 
@@ -1805,8 +1803,7 @@ def test_ssram_full_power_enum_is_per_soc():
     varies by SoC (it encodes each part's actual SSRAM capacity) even
     though it maps to the same underlying register value on every AP5
     part. AP510 has 3 MB (AM_HAL_PWRCTRL_SRAM_3M); apollo330P's real
-    SSRAM is only ~1.75 MB and its HAL does not define SRAM_3M at all
-    (confirmed 2026-07 against the real synced HAL headers) -- it must
+    SSRAM is only ~1.75 MB and its HAL does not define SRAM_3M at all -- it must
     use AM_HAL_PWRCTRL_SRAM_1P75M instead, or the generated firmware
     fails to compile on that board.
     """

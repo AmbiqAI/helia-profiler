@@ -20,7 +20,7 @@ Power measurement settings.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/config/power.py:232`
+Source: `src/helia_profiler/config/power.py:231`
 
 ### helia_profiler.PowerConfig.enabled
 
@@ -30,7 +30,7 @@ Source: `src/helia_profiler/config/power.py:232`
 enabled: bool = False
 ```
 
-Source: `src/helia_profiler/config/power.py:236`
+Source: `src/helia_profiler/config/power.py:235`
 
 ### helia_profiler.PowerConfig.driver
 
@@ -40,7 +40,7 @@ Source: `src/helia_profiler/config/power.py:236`
 driver: str = DEFAULT_POWER_DRIVER
 ```
 
-Source: `src/helia_profiler/config/power.py:237`
+Source: `src/helia_profiler/config/power.py:236`
 
 ### helia_profiler.PowerConfig.firmware
 
@@ -50,7 +50,7 @@ Source: `src/helia_profiler/config/power.py:237`
 firmware: PowerFirmware = DEFAULT_POWER_FIRMWARE
 ```
 
-Source: `src/helia_profiler/config/power.py:238`
+Source: `src/helia_profiler/config/power.py:237`
 
 ### helia_profiler.PowerConfig.mode
 
@@ -60,7 +60,7 @@ Source: `src/helia_profiler/config/power.py:238`
 mode: PowerMode = DEFAULT_POWER_MODE
 ```
 
-Source: `src/helia_profiler/config/power.py:239`
+Source: `src/helia_profiler/config/power.py:238`
 
 ### helia_profiler.PowerConfig.duration_s
 
@@ -70,7 +70,7 @@ Source: `src/helia_profiler/config/power.py:239`
 duration_s: int | None = None
 ```
 
-Source: `src/helia_profiler/config/power.py:245`
+Source: `src/helia_profiler/config/power.py:244`
 
 ### helia_profiler.PowerConfig.io_voltage
 
@@ -80,7 +80,7 @@ Source: `src/helia_profiler/config/power.py:245`
 io_voltage: float = DEFAULT_IO_VOLTAGE
 ```
 
-Source: `src/helia_profiler/config/power.py:246`
+Source: `src/helia_profiler/config/power.py:245`
 
 ### helia_profiler.PowerConfig.sync_gpio_pin
 
@@ -90,7 +90,7 @@ Source: `src/helia_profiler/config/power.py:246`
 sync_gpio_pin: int = DEFAULT_SYNC_GPIO_PIN
 ```
 
-Source: `src/helia_profiler/config/power.py:247`
+Source: `src/helia_profiler/config/power.py:246`
 
 ### helia_profiler.PowerConfig.sync_input_index
 
@@ -100,7 +100,7 @@ Source: `src/helia_profiler/config/power.py:247`
 sync_input_index: int = DEFAULT_POWER_SYNC_INPUT_INDEX
 ```
 
-Source: `src/helia_profiler/config/power.py:250`
+Source: `src/helia_profiler/config/power.py:249`
 
 ### helia_profiler.PowerConfig.lockstep
 
@@ -110,7 +110,7 @@ Source: `src/helia_profiler/config/power.py:250`
 lockstep: bool | None = None
 ```
 
-Source: `src/helia_profiler/config/power.py:254`
+Source: `src/helia_profiler/config/power.py:253`
 
 ### helia_profiler.PowerConfig.state_gpio_pin
 
@@ -120,7 +120,7 @@ Source: `src/helia_profiler/config/power.py:254`
 state_gpio_pin: int = DEFAULT_STATE_GPIO_PIN
 ```
 
-Source: `src/helia_profiler/config/power.py:255`
+Source: `src/helia_profiler/config/power.py:254`
 
 ### helia_profiler.PowerConfig.go_gpio_pin
 
@@ -130,7 +130,7 @@ Source: `src/helia_profiler/config/power.py:255`
 go_gpio_pin: int = DEFAULT_GO_GPIO_PIN
 ```
 
-Source: `src/helia_profiler/config/power.py:256`
+Source: `src/helia_profiler/config/power.py:255`
 
 ### helia_profiler.PowerConfig.state_input_index
 
@@ -140,7 +140,7 @@ Source: `src/helia_profiler/config/power.py:256`
 state_input_index: int = DEFAULT_POWER_STATE_INPUT_INDEX
 ```
 
-Source: `src/helia_profiler/config/power.py:257`
+Source: `src/helia_profiler/config/power.py:256`
 
 ### helia_profiler.PowerConfig.go_output_index
 
@@ -150,7 +150,7 @@ Source: `src/helia_profiler/config/power.py:257`
 go_output_index: int = DEFAULT_POWER_GO_OUTPUT_INDEX
 ```
 
-Source: `src/helia_profiler/config/power.py:258`
+Source: `src/helia_profiler/config/power.py:257`
 
 ### helia_profiler.PowerConfig.stats_rate_hz
 
@@ -160,7 +160,7 @@ Source: `src/helia_profiler/config/power.py:258`
 stats_rate_hz: int = DEFAULT_POWER_STATS_RATE_HZ
 ```
 
-Source: `src/helia_profiler/config/power.py:262`
+Source: `src/helia_profiler/config/power.py:261`
 
 ### helia_profiler.PowerConfig.reset_strategy
 
@@ -170,7 +170,7 @@ Source: `src/helia_profiler/config/power.py:262`
 reset_strategy: ResetStrategy = ResetStrategy.AUTO
 ```
 
-Source: `src/helia_profiler/config/power.py:265`
+Source: `src/helia_profiler/config/power.py:264`
 
 ### helia_profiler.PowerConfig.serial
 
@@ -180,7 +180,7 @@ Source: `src/helia_profiler/config/power.py:265`
 serial: str | None = None
 ```
 
-Source: `src/helia_profiler/config/power.py:269`
+Source: `src/helia_profiler/config/power.py:268`
 
 ### helia_profiler.PowerConfig.ina228
 
@@ -190,7 +190,7 @@ Source: `src/helia_profiler/config/power.py:269`
 ina228: Ina228Config | None = None
 ```
 
-Source: `src/helia_profiler/config/power.py:275`
+Source: `src/helia_profiler/config/power.py:274`
 
 ### helia_profiler.PowerConfig.monitor_selected
 
@@ -207,7 +207,7 @@ selection in ``firmware/__init__.py`` and render-context derivation
 in ``PowerMonitorContext.from_config`` must agree, or a run could
 silently build no monitor while appearing to configure one.
 
-Source: `src/helia_profiler/config/power.py:278`
+Source: `src/helia_profiler/config/power.py:277`
 
 ### helia_profiler.PowerConfig.gated_external_capture
 
@@ -226,7 +226,7 @@ machinery: the firmware's ``kPowerSyncEnabled`` (via
 Internal (on-device monitor) mode measures inside the firmware and has
 no host poller to race, so it is excluded.
 
-Source: `src/helia_profiler/config/power.py:289`
+Source: `src/helia_profiler/config/power.py:288`
 
 ### helia_profiler.PowerConfig.lockstep_wiring_available
 
@@ -245,7 +245,7 @@ same question and must agree: the lock-step default
 validator, and the ``no_gate_rise`` diagnostic, which only names
 lock-step as the likely fix when the wiring can actually support it.
 
-Source: `src/helia_profiler/config/power.py:302`
+Source: `src/helia_profiler/config/power.py:301`
 
 ### helia_profiler.PowerConfig.lockstep_resolved
 
@@ -279,4 +279,4 @@ the host-side capture path (which must arm/wait/signal accordingly)
 resolve the *same* answer -- callers must not read
 :attr:`lockstep` directly.
 
-Source: `src/helia_profiler/config/power.py:315`
+Source: `src/helia_profiler/config/power.py:314`

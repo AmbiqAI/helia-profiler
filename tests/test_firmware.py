@@ -2363,7 +2363,7 @@ def test_resolved_aot_arena_regions_follow_user_memory_config_flag(
         helia_aot_version="0.0.0",
         aot_user_memory_config=user_memory_config,
         aot_arena_regions=[
-            ArenaRegion(0, "scratch", "S", 64, 16, ArenaRole.SCRATCH, "sram", Placement.SRAM)
+            ArenaRegion(0, "scratch", 64, 16, ArenaRole.SCRATCH, "sram", Placement.SRAM)
         ],
     )
     ctx.arena_region = Placement.TCM

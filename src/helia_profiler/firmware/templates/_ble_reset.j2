@@ -8,8 +8,7 @@
    have, since it has no BLE radio present at all. AutoDeploy's power
    template (ns_power_down_peripherals(), bNeedBluetooth=false) always drives
    this pin low-high-low to force the controller into reset before a power
-   capture; hpx did not replicate this until now (see AGENTS.md power-parity
-   investigation, 2026-07 AP4 KXR run).
+   capture, and hpx does the same.
 
    Only rendered when the board actually has a Cooper BLE controller
    (board.ble_reset_gpio_pin is set) -- a plain, non-Blue board leaves this

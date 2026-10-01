@@ -156,9 +156,8 @@ ERROR_SPECS: tuple[WireSpec, ...] = (
         runtime_gate="the capacity was actually exceeded during the pass",
         has_host_hint=True,
         note="The firmware parks immediately after printing this, so NO CSV "
-        "body follows at all — the pre-#175 claim that rows were merely "
-        "truncated described a print that is unreachable (hpx_park() "
-        "precedes print_layers()).",
+        "body follows at all, not a truncated one: hpx_park() precedes "
+        "print_layers() (#175).",
     ),
     _spec(
         error_token(FirmwareErrorCode.PMU_INIT_OR_SELFTEST_FAILED),

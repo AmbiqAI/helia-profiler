@@ -409,8 +409,7 @@ def run_jlink_script(
         # J-Link Commander reports most failures (cannot connect, LoadFile
         # errors, script refusals) on stdout and exits with an empty stderr,
         # so a stderr-only hint renders as a blank — fall back to the stdout
-        # tail so a bare rc=1 is diagnosable from the error alone (the CI
-        # dark-board flash failures in #203 were opaque for exactly this).
+        # tail so a bare rc=1 is diagnosable from the error alone.
         stderr = (result.stderr or "").strip()
         detail = stderr if stderr else (result.stdout or "").strip()[-600:]
         raise CaptureError(

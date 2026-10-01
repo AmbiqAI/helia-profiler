@@ -200,7 +200,7 @@ def test_reconciliation_table_renders_all_three_statuses():
 
 
 def test_wrong_region_match_renders_the_region():
-    """#179 MINOR-3: the user-facing half of M-6 — a matched
+    """#179: the user-facing half of the wrong-region check — a matched
     consumer whose dominant symbol lives in a different region than
     planned must SAY so in the measured cell."""
     from helia_profiler.console.results import render_memory_reconciliation

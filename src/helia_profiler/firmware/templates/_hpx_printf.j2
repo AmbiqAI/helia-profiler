@@ -10,10 +10,9 @@
 // ---------------------------------------------------------------------------
 {% set _linkage = printf_linkage | default("") %}
 {% if power_only | default(false) %}
-// power_only: no transport is ever initialized on this binary (see the
-// design note in AGENTS.md / WP1) -- UART leaves UART0-3 powered
-// (measurably inflating current on an AP510 EVB), SWO holds PD_DBG
-// (also measurably inflating current), USB PHY likewise.  The
+// power_only: no transport is ever initialized on this binary -- UART
+// leaves UART0-3 powered, SWO holds PD_DBG, and USB keeps its PHY powered,
+// each adding target current to the measured window.  The
 // dedicated power binary must be clean by construction, so hpx_printf
 // compiles away to nothing rather than merely disabling a transport at
 // runtime (which still leaves pad/pinmux/clock residue).  The host observes
@@ -48,10 +47,9 @@
 // window — the host is watching the GPIO gate via a separate instrument, not
 // draining the ring buffer — so hitting a slow host is actually the *expected*
 // steady state there, not a rare dead-host edge case.  Spinning the full 2s
-// budget per queued line (found 2026-07-05: forensics showed the firmware
-// parked in hpx_rtt_write_lossless for the entire post-window CSV dump with
-// no host attached) turns a handful of trailing lines into many seconds of
-// silent, pointless spin.  100ms is enough for a host that *is* still
+// budget per queued line parks the firmware in hpx_rtt_write_lossless for the
+// entire post-window CSV dump and turns a handful of trailing lines into many
+// seconds of silent, pointless spin.  100ms is enough for a host that *is* still
 // attached (e.g. a PMU-then-power run in the same session) to keep draining
 // promptly, without paying the full dead-host budget by default.
 #ifndef HPX_RTT_LOSSLESS_TIMEOUT_POST_WINDOW_MS

@@ -1,11 +1,11 @@
-"""Contracts binding the firmware template children to _main_base.cc.j2 (#154 Phase 4).
+"""Contracts binding the firmware template children to _main_base.cc.j2 (#154).
 
 Template inheritance introduces one failure mode the render itself cannot
 catch: a child block whose name matches nothing in the base is silently
 ignored, and the base's default (often empty) renders in its place — the
 engine's code simply vanishes from the firmware with no error. These
-contracts make that a test failure, the same move Phase 1-3 made for
-issue codes and comparability dimensions: the base's block set is the
+contracts make that a test failure, the same registry-and-views pattern used
+for issue codes and comparability dimensions: the base's block set is the
 registry, the children's override sets are the views, and every set is
 pinned literally so drift is a reviewed decision rather than an accident.
 """
@@ -174,7 +174,7 @@ def test_child_override_sets_are_the_documented_ones():
         "engine_profiled_summary",
         # Overridden EMPTY: ET has no PSRAM support (preflight rejects it)
         # and declares no psram_info — the base's metadata include made
-        # test-rendered psram arms uncompilable (#187 gate finding).
+        # test-rendered psram arms uncompilable (#187).
         "engine_psram_metadata",
     }
 

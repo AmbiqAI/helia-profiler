@@ -94,10 +94,8 @@ static uint8_t *g_arena = g_arena_storage;
    POLYMORPHIC C++ object whose vtable pointer lives in its constant-
    initialized data image. Placing it in a zero-filled section discards
    that image, so the first virtual BeginEvent() call dereferences a NULL
-   vptr and bus-faults (vtable slot read at address 0x8). Found 2026-07 on
-   real Apollo330mP hardware: firmware hung at the first inference invoke
-   (fault frame: ScopedMicroProfiler ctor, BFAR=0x8, CFSR=0x8200 precise
-   bus fault, R0=0x20080000 = the zeroed g_profiler).
+   vptr and bus-faults (vtable slot read at address 0x8), hanging the
+   firmware at the first inference invoke.
 
    Left in default .bss for the dedicated power binary (power_only=true)
    deliberately, even though g_profiler is never actually used there

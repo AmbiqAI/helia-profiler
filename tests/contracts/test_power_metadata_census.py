@@ -1,4 +1,4 @@
-"""Census contract for `PowerResult.metadata` (#154 Phase 2).
+"""Census contract for `PowerResult.metadata` (#154).
 
 ``snapshots/power_metadata_census.json`` records every top-level key any
 writer put into power metadata, taken by direct code audit at ``80fb77f``.
@@ -89,7 +89,7 @@ def _sentinel_for(name: str):
 
 
 def test_no_string_keyed_census_access_survives_in_src():
-    """#154 Phase 2 acceptance: power metadata is read through typed fields.
+    """#154 acceptance: power metadata is read through typed fields.
 
     Matches `.metadata["<census key>"]` / `.metadata.get("<census key>")` in
     src/ outside the model module. Flat-view dicts obtained from

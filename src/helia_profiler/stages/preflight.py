@@ -411,7 +411,7 @@ def _check_transport_support(cfg) -> None:
         # known-shape window to gate on, and reports HPX_CLEAN_INFER_COUNT=1
         # for the single unit of work it performs.  ExecuTorch has no power
         # support at all (rejected just above), so the probe has nothing to
-        # gate -- and since #154 phase 4 the render would silently succeed:
+        # gate -- and the render would silently succeed (#154):
         # main_executorch.cc.j2's engine_clean_window override delegates the
         # busy_loop branch straight back to the base, so the firmware would
         # come back with a nop-loop window reporting COUNT=1 where this

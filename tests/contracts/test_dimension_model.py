@@ -1,4 +1,4 @@
-"""Contracts binding the four dimension views to DIMENSION_REGISTRY (#154 Phase 3).
+"""Contracts binding the four dimension views to DIMENSION_REGISTRY (#154).
 
 The registry (``results/dimensions.py``) is the single declaration; the
 writer (``report/manifest.py``), reader (``evaluation/comparability.py``),

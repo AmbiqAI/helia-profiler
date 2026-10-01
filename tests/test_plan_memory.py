@@ -91,7 +91,7 @@ class TestPlanMemorySynthesise:
             "temporary_arena": 32768,
             "input_buffer": 12288,
             "output_buffer": 40,
-            # hpx-owned (#133 Phase 3): 16 KB boot stack + RTT statics
+            # hpx-owned (#133): 16 KB boot stack + RTT statics
             # (32768 up + 16 down + 168 control block) land in DTCM on
             # the AP5 family.
             "boot_stack": 16384,
@@ -442,7 +442,7 @@ class TestPlanMemoryEngineProvided:
         assert dtcm.capacity > 0
         # 4 KiB engine arena + hpx-owned boot_stack (16384) +
         # rtt_buffers (32952): the engine-supplied plan gains the shared
-        # consumers too (#133 Phase 3).
+        # consumers too (#133).
         assert dtcm.used == 4_096 + 16_384 + 32_952
 
 
@@ -487,7 +487,7 @@ class TestPlanMemoryOverflow:
 
 
 class TestHpxOwnedConsumers:
-    """#133 Phase 3 D1/D2: the consumers every firmware reserves that hpx
+    """#133 D1/D2: the consumers every firmware reserves that hpx
     decides host-side. Sizes pin the frozen template-mirror tables so
     drift is a reviewed edit."""
 
@@ -639,7 +639,7 @@ class TestHpxOwnedConsumers:
         assert [c.size for c in stack3] == [4_096]
 
     def test_aot_extraction_failure_no_longer_fabricates_a_tflm_plan(self, tmp_path):
-        """#133 Phase 3 D5: a failed AOT extraction must not book a
+        """#133 D5: a failed AOT extraction must not book a
         tensor_arena or model_flatbuffer, since neither exists in an AOT
         binary."""
         ctx = _make_ctx(tmp_path, {"engine": {"type": "helia-aot"}})
