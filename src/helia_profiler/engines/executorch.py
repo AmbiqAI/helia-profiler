@@ -168,7 +168,7 @@ def _resolve_source_root(config: ProfileConfig) -> Path:
     ``engine.config.source_path`` overrides with a development checkout.
     """
     source_value = config.engine.config.get("source_path")
-    if source_value is None:
+    if source_value is None or source_value == "":
         baseline = config.compatibility_baseline
         # Clone at the same ref the checkout verification enforces; the
         # project entry contributes the URL.

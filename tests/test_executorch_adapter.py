@@ -597,8 +597,9 @@ def test_adapter_rejects_sidecar_with_bad_planned_size(tmp_path: Path):
         ExecuTorchAdapter().prepare(config, tmp_path / "work")
 
 
+@pytest.mark.parametrize("source_path", [None, ""])
 def test_adapter_auto_clones_pinned_checkout_when_source_path_absent(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, source_path: str | None
 ):
     source = _source_tree(tmp_path)
     seen: dict[str, str] = {}
@@ -610,7 +611,7 @@ def test_adapter_auto_clones_pinned_checkout_when_source_path_absent(
 
     monkeypatch.setattr(executorch_mod, "_auto_clone_nsx_executorch", fake_auto_clone)
     artifacts = ExecuTorchAdapter().prepare(
-        _config(tmp_path, source, source_path=None), tmp_path / "work"
+        _config(tmp_path, source, source_path=source_path), tmp_path / "work"
     )
 
     # URL from the baseline's nsx-executorch project; ref is the engine pin —
