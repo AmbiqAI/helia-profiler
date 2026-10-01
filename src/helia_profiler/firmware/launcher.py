@@ -3,9 +3,7 @@
 Owns the ``build.compiler_launcher`` / ``HPX_COMPILER_LAUNCHER`` resolution:
 the auto-detect launcher list, the disabled-value vocabulary, the
 per-toolchain launcher compatibility table, and the resolver itself.
-Extracted from ``firmware/__init__`` at the module size ceiling (see the
-elf_inventory precedent in toolchain_probe); the package re-exports every
-name so callers keep one import surface.
+The package re-exports every name so callers keep one import surface.
 
 NOTE: ``shutil`` is imported as a module (never ``from shutil import
 which``) so tests that monkeypatch ``helia_profiler.firmware.shutil.which``

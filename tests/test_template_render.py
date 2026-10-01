@@ -1000,8 +1000,9 @@ class TestEthosURender:
 
     def test_npu_pmu_uses_driver_probe_not_strong_hooks(self):
         """The driver owns ethosu_inference_begin/end; redefining them collides
-        at link (WORKAROUND helia-profiler#183: nsx-ethos-u-driver ships strong
-        overrides via INTERFACE_SOURCES). We must register a probe instead."""
+        at link (nsx-ethos-u-driver ships strong overrides via
+        INTERFACE_SOURCES; see helia-profiler#183). We must register a probe
+        instead."""
         out = _render_tflm(has_ethos_u=True)
         # No *definition* of the driver-owned symbols (prose mentioning them in
         # the explanatory comment is fine).

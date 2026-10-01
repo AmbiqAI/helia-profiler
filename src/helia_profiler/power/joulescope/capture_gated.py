@@ -1,9 +1,8 @@
 """Joulescope GPIO-gated capture (:meth:`JoulescopeDriver.capture_gated`).
 
-Split out of ``driver.py`` purely to keep module line counts manageable;
-this function is attached to :class:`~.driver.JoulescopeDriver` as the
-``capture_gated`` method (see the bottom of ``driver.py``). It is not a
-public entry point on its own.
+This function is bound as the ``capture_gated`` method in the
+:class:`~.driver.JoulescopeDriver` class body. It is not a public entry
+point on its own.
 """
 
 from __future__ import annotations

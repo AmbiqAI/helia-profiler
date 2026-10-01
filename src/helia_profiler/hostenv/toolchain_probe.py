@@ -21,8 +21,8 @@ from ..results import BinarySections
 from ._proc import tool_output
 from .toolchains import get_toolchain_spec, nm_command, resolve_toolchain_executable
 
-# The #133 inventory API lives in elf_inventory (extracted at the module
-# size ceiling); re-exported here so probes keep one import surface.
+# The section-inventory API lives in elf_inventory, re-exported here so
+# probes keep one import surface.
 from .elf_inventory import (
     _FROMELF_SECTION_START_RE,
     _FROMELF_SIZE_BYTES_RE,
@@ -136,8 +136,7 @@ def _sections_via_size(
 #: "ELF Image Totals" for defense). FULL-match, not prefix: fromelf echoes
 #: the input path in the Object Name column, so a relative path whose
 #: LEADING component is a totals label ("ROM Totals/fw.axf") must still
-#: read as an image row (#175 round-2 review m-1 — the prefix version
-#: traded the substring hazard for this narrower one).
+#: read as an image row (a prefix match would misread it as a totals row).
 _FROMELF_TOTALS_LABEL_RE = re.compile(
     r"(?:ROM|Object|Library|Grand|ELF Image)\s+Totals(?:\s+for\s+.*)?"
 )
@@ -200,9 +199,7 @@ def _reserved_via_readelf(
     address but **no TYPE** -- so a ``.heap`` carrying contents (PROGBITS,
     which ``size`` correctly counts in *data*) was indistinguishable from the
     NOLOAD reservation, and subtracting it from bss understated real
-    zero-initialized state while double-counting those bytes. Adversarial
-    review caught that on a purpose-built ELF; issue #24 had named readelf
-    for this reason from the start.
+    zero-initialized state while double-counting those bytes (issue #24).
 
     So the type is checked: only ``NOBITS`` sections carrying the ``A``
     (alloc) flag are candidates, which is exactly the set ``size`` folds into

@@ -2,11 +2,9 @@
 
 Owns the NSX build-invocation vocabulary: the config→``nsx --toolchain``
 mapping, the compile-time RTT up-buffer sizing, the build itself, and the
-deterministic target-binary search.  Extracted from
-``firmware/__init__`` at the module size ceiling (see the elf_inventory
-precedent in toolchain_probe); the package re-exports every name so callers
-(stages/build_firmware, stages/build_power_firmware, stages/plan_memory)
-keep one import surface.  Flashing does not go through NSX — both firmware
+deterministic target-binary search.  The package re-exports every name so
+callers (stages/build_firmware, stages/build_power_firmware,
+stages/plan_memory) keep one import surface.  Flashing does not go through NSX — both firmware
 deployments run the NSX-generated J-Link recipe directly
 (target/probe/flash.flash_binary).
 

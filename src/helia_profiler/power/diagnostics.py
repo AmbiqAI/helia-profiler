@@ -205,9 +205,9 @@ def assess_gate_duration(
 # result as HPX_POWER_ELAPSED_US. That clock is independent of every host
 # measurement, which makes it the one number that can be silently wrong
 # without anything else looking unhealthy: the completed/requested counts
-# still match, and the gate edges are still observed (WORKAROUND
-# helia-profiler#107: a powered-down debug domain or a dead crystal can
-# corrupt this clock without any other signal noticing).
+# still match, and the gate edges are still observed (a powered-down debug
+# domain or a dead crystal can corrupt this clock without any other signal
+# noticing; see helia-profiler#107).
 #
 # What that costs depends on the mode, and the difference matters:
 #   * INTERNAL: the firmware clock IS the denominator. capture/power_terminal.py

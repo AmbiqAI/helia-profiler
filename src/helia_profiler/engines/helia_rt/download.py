@@ -38,8 +38,8 @@ def _fetch_github_release(
     """Download a heliaRT release from GitHub.
 
     Checks the local cache first.  On a cache miss, queries the GitHub
-    Releases API, downloads the NSX bundle (preferred) or the legacy
-    neuralSPOT bundle, and extracts it into the cache directory.
+    Releases API, downloads the ``helia-rt-*.zip`` release asset, and
+    extracts it into the cache directory.
 
     Returns ``(dist_path, detected_version)``.
     """

@@ -1,6 +1,5 @@
 """ELF inventory probes — sections, segments, and sized symbols (#133).
 
-Extracted from ``toolchain_probe`` when it outgrew the module-size ceiling;
 ``toolchain_probe`` re-exports everything here, so importers keep their
 single probe entry point. Same disciplines throughout: shell out via the
 toolchain's own tools, degrade to None (never guess) per #131, and count
@@ -75,7 +74,7 @@ class ElfSection:
     region per content class all named after the region (a real NSX AP510
     scatter link yields two ``MCU_TCM`` sections, PROGBITS + NOBITS), and
     NSX's own gcc scripts declare ``.text`` twice. Never key a collection
-    of these on ``name`` alone — bytes vanish (#176 fresh-review M-2).
+    of these on ``name`` alone — bytes vanish (#176).
 
     ``linker_reserved`` marks the NOBITS+allocated regions the linker
     manufactures rather than the program needing them (today: fill-to-end

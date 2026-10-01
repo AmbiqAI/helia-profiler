@@ -56,7 +56,7 @@ class PowerMonitorContext:
 
     ``power_monitor`` is ``None`` for every run without a ``power.ina228``
     config block, and all template content is gated on it — non-monitor
-    renders stay byte-identical (WP2). Physical quantities are carried as
+    renders stay byte-identical. Physical quantities are carried as
     scaled integers so the rendered C literals are exact and the render
     digest is stable across float formatting.
     """

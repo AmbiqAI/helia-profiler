@@ -30,7 +30,7 @@ class PowerFirmware(StrEnum):
     """Which binary is on the target during power capture.
 
     ``DEDICATED`` flashes the transport-free ``hpx_profiler_power`` image
-    (see ``firmware/__init__.py`` WP2) before capture, avoiding SWO/UART/
+    (see ``firmware/__init__.py``) before capture, avoiding SWO/UART/
     RTT/USB current contamination in the GPIO-gated Joulescope window, so
     ``DEDICATED`` is the default.  ``SHARED`` reuses the already-flashed
     transport binary for power capture (useful when no J-Link is free to
