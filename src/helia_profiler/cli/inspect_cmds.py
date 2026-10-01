@@ -65,6 +65,7 @@ def _cmd_doctor(
         )
         return
 
+    console = HpxConsole()
     try:
         session = Session.from_yaml(config) if config else Session()
         target = {"toolchain": toolchain, "transport": transport}
@@ -73,12 +74,11 @@ def _cmd_doctor(
             session = session.with_engine(engine)
         result = session.doctor(include_versions=json_)
     except HpxError as exc:
-        HpxConsole().print_error(exc)
+        console.print_error(exc)
         sys.exit(1)
     if json_:
         print(json.dumps(result.to_dict(), indent=2))
         return
-    console = HpxConsole()
     console.print_doctor(result)
 
 

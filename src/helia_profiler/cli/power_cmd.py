@@ -14,10 +14,11 @@ def _cmd_power_on(driver_name: str, *, power_serial: str | None = None) -> None:
     from ..errors import PowerError
     from ..power import get_driver
 
+    console = HpxConsole()
     try:
         driver = get_driver(driver_name, serial=power_serial)
     except PowerError as exc:
-        HpxConsole().print_error(exc)
+        console.print_error(exc)
         sys.exit(1)
 
     print(f"Enabling current passthrough via {driver.name}...")
@@ -25,7 +26,7 @@ def _cmd_power_on(driver_name: str, *, power_serial: str | None = None) -> None:
     try:
         driver.enable_passthrough()
     except PowerError as exc:
-        HpxConsole().print_error(exc)
+        console.print_error(exc)
         sys.exit(1)
 
     print("Board powered — press Ctrl-C to release.")
