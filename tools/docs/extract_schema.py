@@ -21,6 +21,7 @@ import enum
 import json
 import re
 import sys
+import types
 import typing
 from pathlib import Path
 from typing import Any
@@ -36,9 +37,22 @@ _MODULE_PREFIX = re.compile(r"\b(?:[A-Za-z_]\w*\.)+([A-Z]\w*)")
 
 
 def _type_name(obj: Any) -> str:
+    if obj is type(None):
+        return "None"
     if isinstance(obj, type):
         return obj.__name__
+    origin = typing.get_origin(obj)
+    if origin is typing.Union or origin is types.UnionType:
+        return " | ".join(_type_name(arg) for arg in typing.get_args(obj))
+    if origin is typing.Literal:
+        return f"Literal[{', '.join(_literal_name(arg) for arg in typing.get_args(obj))}]"
     return _MODULE_PREFIX.sub(r"\1", str(obj).replace("typing.", ""))
+
+
+def _literal_name(value: Any) -> str:
+    if isinstance(value, enum.Enum):
+        return f"{type(value).__name__}.{value.name}"
+    return repr(value)
 
 
 def _config_classes() -> list[Any]:

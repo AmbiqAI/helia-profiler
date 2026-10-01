@@ -32,6 +32,7 @@ from helia_profiler.fixture_analysis import FixtureModelAnalysis
 from helia_profiler.fixture_runtime import _PreparedRuntimeStage
 from helia_profiler.modelcost.model_analysis import LayerOps, ModelAnalysis
 from helia_profiler.pipeline import PipelineContext
+from helia_profiler.placement import Placement
 from helia_profiler.results import NsxModuleRef
 from helia_profiler.results.models import EngineInfo, MemoryPlan, RunMetadata, ToolchainInfo
 from helia_profiler.vocab import Toolchain
@@ -275,7 +276,10 @@ def _fixture(tmp_path):
 def _config(tmp_path, f, engine=EngineType.HELIA_RT, backend="helia"):
     return ProfileConfig(
         model=ModelConfig(
-            path=f.model.path, arena_size=262144, arena_location="sram", weights_location="mram"
+            path=f.model.path,
+            arena_size=262144,
+            arena_location=Placement.SRAM,
+            weights_location=Placement.MRAM,
         ),
         engine=EngineConfig(type=engine, backend=backend),
         target=TargetConfig(
