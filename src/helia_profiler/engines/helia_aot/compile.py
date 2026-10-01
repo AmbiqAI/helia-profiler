@@ -160,11 +160,8 @@ def _resolve_aot_placement_intent(
         tcm_cap=soc.memory.dtcm_kb * 1024 if soc else 1 << 31,
         sram_cap=soc.memory.sram_kb * 1024 if soc else 1 << 31,
     )
-    # Explicit locations are preflight-validated; Placement() is identity for members.
-    if config.model.arena_location:
-        arena = Placement(config.model.arena_location)
-    if config.model.weights_location:
-        weights = Placement(config.model.weights_location)
+    arena = config.model.arena_location or arena
+    weights = config.model.weights_location or weights
 
     # Ethos-U backend: NPU-visible buffers (scratch/IO and the command
     # stream/weights) default to SRAM/MRAM. The automatic choice never picks

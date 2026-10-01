@@ -8,12 +8,12 @@ Checks performed (in order):
 
 1. **Model file** — exists, is a regular file, non-empty, and matches the
    selected engine: TFLite ``.tflite``/``TFL3`` or ExecuTorch ``.pte``/``ET``.
-2. **Arena size** — if specified, is positive.
-3. **Model placement** — optional arena/weights overrides use supported regions.
-4. **Output directory** — can be created + written to.
-5. **Host toolchain** — ``nsx``, ``cmake``, ``ninja``, the selected compiler,
+2. **Model placement** — PSRAM arena/weights placement is supported by the
+   selected engine and transport.
+3. **Output directory** — can be created + written to.
+4. **Host toolchain** — ``nsx``, ``cmake``, ``ninja``, the selected compiler,
    and ``SEGGER commander`` are available. ATfE is located via ``ATFE_ROOT``.
-6. **Transport-specific tools** — e.g. ``pylink`` when ``transport=swo``;
+5. **Transport-specific tools** — e.g. ``pylink`` when ``transport=swo``;
     the Python ``pyocd`` module isn't required because heliaPROFILER uses
     J-Link directly.
 
@@ -47,12 +47,6 @@ log = logging.getLogger("hpx")
 # TFLite flatbuffers carry a 4-byte file identifier near the start;
 # match it within the first bytes rather than at a fixed offset.
 _TFLITE_MAGIC = b"TFL3"
-_VALID_RUNTIME_ARENA_LOCATIONS: tuple[Placement, ...] = (
-    Placement.TCM,
-    Placement.SRAM,
-    Placement.PSRAM,
-)
-_VALID_RUNTIME_WEIGHTS_LOCATIONS: tuple[Placement, ...] = tuple(Placement)
 
 
 class PreflightStage:
@@ -67,8 +61,6 @@ class PreflightStage:
         cfg = ctx.config
         _check_model(cfg.model.path, cfg.engine.type)
         _check_softmax_scaling(cfg.model.path, cfg.engine.type)
-        _check_arena_size(cfg.model.arena_size)
-        _check_rtt_buffer_size(cfg.target.rtt_buffer_size_up)
         _check_runtime_split_locations(cfg)
         _check_pmu_selection(cfg)
         _check_npu_backend(cfg)
@@ -244,36 +236,6 @@ def _check_softmax_scaling(path: Path, engine: EngineType) -> None:
     )
 
 
-def _check_arena_size(arena_size: int | None) -> None:
-    if arena_size is None:
-        return
-    if arena_size <= 0:
-        raise ConfigError(
-            f"model.arena_size must be positive (got {arena_size}).",
-            hint="Leave arena_size unset to let the engine choose, or set a positive byte count.",
-        )
-
-
-def _check_explicit_location(loc: str | None, *, name: str, valid: tuple[Placement, ...]) -> None:
-    if loc is None:
-        return
-    if loc not in valid:
-        raise ConfigError(
-            f"Invalid {name}: '{loc}'.",
-            hint=f"Expected one of: {', '.join(valid)}.",
-        )
-
-
-def _check_rtt_buffer_size(size: int | None) -> None:
-    if size is None:
-        return
-    if not isinstance(size, int) or isinstance(size, bool) or size <= 0:
-        raise ConfigError(
-            f"target.rtt_buffer_size_up must be a positive integer (got {size!r}).",
-            hint="Set target.rtt_buffer_size_up to a positive byte count, or leave it unset to use the toolchain-aware default.",
-        )
-
-
 def _check_runtime_split_locations(cfg) -> None:
     runtime_arena = cfg.model.arena_location
     runtime_weights = cfg.model.weights_location
@@ -307,23 +269,9 @@ def _check_runtime_split_locations(cfg) -> None:
     # must hit the same fail-fast wall.
     adapter.check_psram_placement(cfg)
 
-    _check_explicit_location(
-        runtime_arena,
-        name="model.arena_location",
-        valid=_VALID_RUNTIME_ARENA_LOCATIONS,
-    )
-    _check_explicit_location(
-        runtime_weights,
-        name="model.weights_location",
-        valid=_VALID_RUNTIME_WEIGHTS_LOCATIONS,
-    )
-
 
 def _check_pmu_selection(cfg) -> None:
-    try:
-        soc = get_soc_for_board(cfg.target.board, registry=cfg.platform_registry)
-    except ValueError as exc:
-        raise ConfigError(str(exc)) from exc
+    soc = get_soc_for_board(cfg.target.board, registry=cfg.platform_registry)
 
     supported_groups = supported_groups_for_domains(soc.profiling_domains)
     try:
@@ -371,10 +319,7 @@ def _check_npu_backend(cfg) -> None:
             "Vela-compiled ethos-u ops.",
             hint="Set engine.type to helia-rt or helia-aot.",
         )
-    try:
-        soc = get_soc_for_board(cfg.target.board, registry=cfg.platform_registry)
-    except ValueError as exc:
-        raise ConfigError(str(exc)) from exc
+    soc = get_soc_for_board(cfg.target.board, registry=cfg.platform_registry)
     if soc.npu is None:
         from ..platform import list_boards
 
@@ -483,10 +428,7 @@ def _check_transport_support(cfg) -> None:
         )
     if cfg.target.transport != Transport.USB_CDC:
         return
-    try:
-        soc = get_soc_for_board(cfg.target.board, registry=cfg.platform_registry)
-    except ValueError as exc:
-        raise ConfigError(str(exc)) from exc
+    soc = get_soc_for_board(cfg.target.board, registry=cfg.platform_registry)
     if not soc.has_usb:
         raise ConfigError(
             f"Board '{cfg.target.board}' ({soc.name}) has no USB device support.",

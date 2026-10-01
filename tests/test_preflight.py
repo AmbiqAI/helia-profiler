@@ -291,48 +291,6 @@ class TestPreflightModel:
 
 
 class TestPreflightConfig:
-    def test_zero_arena_raises(self, tmp_path: Path):
-        ctx = _make_ctx(tmp_path, {"model": {"arena_size": 0}})
-        with patch("shutil.which", side_effect=_all_tools_present):
-            with pytest.raises(ConfigError, match="arena_size"):
-                PreflightStage().run(ctx)
-
-    def test_negative_arena_raises(self, tmp_path: Path):
-        ctx = _make_ctx(tmp_path, {"model": {"arena_size": -1}})
-        with patch("shutil.which", side_effect=_all_tools_present):
-            with pytest.raises(ConfigError, match="arena_size"):
-                PreflightStage().run(ctx)
-
-    def test_zero_rtt_buffer_size_raises(self, tmp_path: Path):
-        ctx = _make_ctx(tmp_path, {"target": {"rtt_buffer_size_up": 0}})
-        with patch("shutil.which", side_effect=_all_tools_present):
-            with pytest.raises(ConfigError, match="rtt_buffer_size_up"):
-                PreflightStage().run(ctx)
-
-    def test_negative_rtt_buffer_size_raises(self, tmp_path: Path):
-        ctx = _make_ctx(tmp_path, {"target": {"rtt_buffer_size_up": -1}})
-        with patch("shutil.which", side_effect=_all_tools_present):
-            with pytest.raises(ConfigError, match="rtt_buffer_size_up"):
-                PreflightStage().run(ctx)
-
-    def test_invalid_runtime_arena_location_raises(self, tmp_path: Path):
-        ctx = _make_ctx(
-            tmp_path,
-            {"model": {"arena_location": "mram"}},
-        )
-        with patch("shutil.which", side_effect=_all_tools_present):
-            with pytest.raises(ConfigError, match="arena_location"):
-                PreflightStage().run(ctx)
-
-    def test_invalid_runtime_weights_location_raises(self, tmp_path: Path):
-        ctx = _make_ctx(
-            tmp_path,
-            {"model": {"weights_location": "flash"}},
-        )
-        with patch("shutil.which", side_effect=_all_tools_present):
-            with pytest.raises(ConfigError, match="weights_location"):
-                PreflightStage().run(ctx)
-
     def test_split_placement_is_accepted_for_helia_aot(self, tmp_path: Path):
         ctx = _make_ctx(
             tmp_path,

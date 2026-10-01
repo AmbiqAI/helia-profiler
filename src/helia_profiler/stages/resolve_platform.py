@@ -1,4 +1,4 @@
-"""Resolve platform: validate board/SoC and enrich context."""
+"""Resolve platform: resolve board/SoC and enrich context."""
 
 from __future__ import annotations
 
@@ -23,25 +23,8 @@ class ResolvePlatformStage:
 
     def run(self, ctx: PipelineContext) -> None:
         board_name = ctx.config.target.board
-        if not board_name:
-            raise ConfigError(
-                "No target board specified.",
-                hint="Set 'target.board' in hpx.yml or pass --board on the CLI.",
-            )
-
-        try:
-            board = get_board(board_name, registry=ctx.config.platform_registry)
-        except ValueError as exc:
-            raise ConfigError(str(exc)) from exc
-
-        try:
-            soc = get_soc_for_board(board_name, registry=ctx.config.platform_registry)
-        except ValueError as exc:
-            raise PlatformError(
-                f"Board '{board_name}' references unknown SoC '{board.soc}'.",
-                hint="This is likely a bug in the platform registry.",
-            ) from exc
-
+        board = get_board(board_name, registry=ctx.config.platform_registry)
+        soc = get_soc_for_board(board_name, registry=ctx.config.platform_registry)
         ctx.board = board
         ctx.soc = soc
 

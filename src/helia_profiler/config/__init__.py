@@ -186,6 +186,17 @@ DEFAULT_DOWNLOAD_API_S = 30
 DEFAULT_DOWNLOAD_ASSET_S = 300
 
 
+def _coerce_placement(value: Any, *, key: str, valid: tuple[Placement, ...]) -> Placement | None:
+    if value is None:
+        return None
+    if value not in valid:
+        raise ConfigError(
+            f"Invalid {key}: {value!r}.",
+            hint=f"Expected one of: {', '.join(valid)}.",
+        )
+    return Placement(value)
+
+
 @pydantic_dataclass(frozen=True, config=ConfigDict(extra="forbid"))
 class ModelConfig:
     """Model file and arena sizing.
@@ -202,18 +213,32 @@ class ModelConfig:
 
     path: Path
     arena_size: int | None = None  # bytes; None = let engine/firmware report
-    arena_location: Placement | str | None = None
-    weights_location: Placement | str | None = None
+    arena_location: Placement | None = None
+    weights_location: Placement | None = None
 
-    @field_validator("arena_location", "weights_location", mode="before")
+    @field_validator("arena_size")
     @classmethod
-    def _coerce_placement(cls, value: Any) -> Any:
-        if value is None or isinstance(value, Placement):
-            return value
-        try:
-            return Placement(value)
-        except ValueError:
-            return value
+    def _validate_arena_size(cls, value: int | None) -> int | None:
+        if value is not None and value <= 0:
+            raise ConfigError(
+                f"model.arena_size must be positive (got {value}).",
+                hint="Leave arena_size unset to let the engine choose, or set a positive byte count.",
+            )
+        return value
+
+    @field_validator("arena_location", mode="before")
+    @classmethod
+    def _coerce_arena_location(cls, value: Any) -> Placement | None:
+        return _coerce_placement(
+            value,
+            key="model.arena_location",
+            valid=(Placement.TCM, Placement.SRAM, Placement.PSRAM),
+        )
+
+    @field_validator("weights_location", mode="before")
+    @classmethod
+    def _coerce_weights_location(cls, value: Any) -> Placement | None:
+        return _coerce_placement(value, key="model.weights_location", valid=tuple(Placement))
 
 
 @pydantic_dataclass(frozen=True, config=ConfigDict(extra="forbid"))
@@ -325,6 +350,19 @@ class TargetConfig:
     # Joulescope rail. Always runs when power.enabled is True, since power
     # capture requires the driver regardless.
     ensure_board_powered: bool = False
+
+    @field_validator("rtt_buffer_size_up")
+    @classmethod
+    def _validate_rtt_buffer_size_up(cls, value: int | None) -> int | None:
+        if value is not None and value <= 0:
+            raise ConfigError(
+                f"target.rtt_buffer_size_up must be a positive integer (got {value}).",
+                hint=(
+                    "Set target.rtt_buffer_size_up to a positive byte count, or leave it "
+                    "unset to use the toolchain-aware default."
+                ),
+            )
+        return value
 
     @field_validator("toolchain", mode="before")
     @classmethod
@@ -629,6 +667,14 @@ class ProfileConfig:
     verbose: int = 0
 
     def __post_init__(self) -> None:
+        if self.target.board not in self.platform_registry.boards:
+            raise ConfigError(
+                f"Unknown board '{self.target.board}'.",
+                hint=(
+                    f"Known boards: {', '.join(sorted(self.platform_registry.boards))}. "
+                    "Define other boards under target.custom_boards."
+                ),
+            )
         if self.frozen and not self.build.offline:
             object.__setattr__(self, "build", replace(self.build, offline=True))
         if self.compatibility is None:

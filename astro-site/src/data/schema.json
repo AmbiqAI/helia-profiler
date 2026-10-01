@@ -230,14 +230,14 @@
         },
         {
           "name": "arena_location",
-          "pythonType": "Placement | str | None",
+          "pythonType": "Placement | None",
           "required": false,
           "default": null,
           "defaultFromFactory": false
         },
         {
           "name": "weights_location",
-          "pythonType": "Placement | str | None",
+          "pythonType": "Placement | None",
           "required": false,
           "default": null,
           "defaultFromFactory": false
@@ -1589,14 +1589,10 @@
               "$ref": "#/$defs/Placement"
             },
             {
-              "type": "string"
-            },
-            {
               "type": "null"
             }
           ],
-          "default": null,
-          "title": "Arena Location"
+          "default": null
         },
         "weights_location": {
           "anyOf": [
@@ -1604,14 +1600,10 @@
               "$ref": "#/$defs/Placement"
             },
             {
-              "type": "string"
-            },
-            {
               "type": "null"
             }
           ],
-          "default": null,
-          "title": "Weights Location"
+          "default": null
         }
       },
       "required": [

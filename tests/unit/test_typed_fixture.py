@@ -102,8 +102,8 @@ def config_for(tmp_path, fixture, engine=EngineType.TFLM):
         model=ModelConfig(
             path=fixture.model.path,
             arena_size=262144,
-            arena_location="sram",
-            weights_location="mram",
+            arena_location=Placement.SRAM,
+            weights_location=Placement.MRAM,
         ),
         engine=EngineConfig(type=engine, backend="cmsis_nn"),
         target=TargetConfig(

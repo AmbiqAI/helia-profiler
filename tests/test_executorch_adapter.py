@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import subprocess
 import sys
 from pathlib import Path
@@ -821,8 +822,6 @@ def test_auto_clone_failure_without_stderr_still_reports_cause(
 
 
 def _offline_config(tmp_path, source, *, explicit=False):
-    from dataclasses import replace
-
     config = _config(tmp_path, source, source_path=str(source) if explicit else None)
     return replace(config, build=replace(config.build, offline=True))
 
@@ -895,8 +894,6 @@ def test_offline_cache_never_synchronizes(tmp_path, monkeypatch, cache_state):
 
 
 def test_frozen_alias_resolves_the_offline_cache(tmp_path, monkeypatch):
-    from dataclasses import replace
-
     config = replace(_config(tmp_path, tmp_path, source_path=None), frozen=True)
     cache = tmp_path / "cache"
     monkeypatch.setattr(
