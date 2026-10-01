@@ -1,8 +1,8 @@
 """Hardware-facing CLI commands: ``hpx power-on`` and ``hpx validate``.
 
-Split from ``app.py`` at its size ceiling, following the ``inspect_app``
-pattern: plain command functions here, attached to the main Typer app via
-:func:`register` so the module needs no import of ``app`` itself.
+Follows the ``inspect_app`` pattern: plain command functions here, attached
+to the main Typer app via :func:`register` so the module needs no import of
+``app`` itself.
 """
 
 from __future__ import annotations

@@ -3,10 +3,8 @@
     Activated when profiling.extreme_mode is true AND both arena+weights live
     in TCM AND this is the dedicated power binary (power_only).
 
-    Scoped to power_only only (2026-07 finding): this file used to be
-    included unconditionally in both the transport-attached PMU-phase
-    binary and the dedicated power binary. That's the wrong scope for two
-    reasons: (1) it never actually benefits PMU/cycle counting -- DWT/PMU
+    Scoped to power_only, not the transport-attached PMU-phase binary,
+    for two reasons: (1) it never actually benefits PMU/cycle counting -- DWT/PMU
     counts CPU cycles regardless of SSRAM/NVM-bank power state, so there is
     no measurement value in paying the risk during that phase; (2)
     AM_HAL_PWRCTRL_NVM0_ONLY assumes the running firmware fits inside the

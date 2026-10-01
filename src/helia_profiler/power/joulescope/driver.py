@@ -41,8 +41,6 @@ class JoulescopeDriver:
     supports_gated_capture = True
     supports_firmware_measurement = False
 
-    #: Implemented in ``capture_gated.py`` (rather than inline) to keep this
-    #: module under the repo's per-file line budget; see its docstring there.
     capture_gated = capture_gated
 
     @property

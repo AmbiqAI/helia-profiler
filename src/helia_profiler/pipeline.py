@@ -128,14 +128,14 @@ class PipelineContext:
 
     # Memory plan (stage: plan_memory)
     memory_plan: MemoryPlan | None = None
-    #: Measured per-region occupancy from the built ELF (#133 Phase 2);
+    #: Measured per-region occupancy from the built ELF (#133);
     #: None whenever it cannot be true (uncharacterized map, tool failure,
     #: partial inventory).
     memory_regions: MeasuredMemoryRegions | None = None
-    #: Sized symbols from the built ELF (#133 Phase 3); None when nm is
+    #: Sized symbols from the built ELF (#133); None when nm is
     #: unavailable or its listing was partial.
     memory_symbols: tuple[SymbolEntry, ...] | None = None
-    #: Plan-vs-measured reconciliation (#133 Phase 3); needs plan,
+    #: Plan-vs-measured reconciliation (#133); needs plan,
     #: measured regions, AND symbols.
     memory_reconciliation: MemoryReconciliation | None = None
 

@@ -169,7 +169,7 @@ class SocCapabilities:
           ``transport.requires_attached_probe_for_cycles`` records that DWT
           only stays powered while a debugger asserts ``CDBGPWRUPREQ``, a
           signal firmware cannot set.  The dedicated power binary free-runs
-          unwatched once flashed (WP4), so no debugger is holding it.
+          unwatched once flashed, so no debugger is holding it.
 
         Either way an in-window DWT read is frozen or garbage, the accumulated
         cycle count is meaningless, and the terminal report's ``elapsed_us`` —

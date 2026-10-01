@@ -1,8 +1,8 @@
-"""Flash a secondary NSX target image via ``JLinkExe``.
+"""Flash an NSX target image via ``JLinkExe``.
 
-Split out of :mod:`.jlink` so that module stays under the package size
-ceiling; this is the flashing responsibility, which has exactly one caller
-(``stages.flash_power``) and its own NSX-recipe-versus-fallback policy.
+Owns the flashing responsibility and its NSX-recipe-versus-fallback policy;
+scripts run through :func:`.jlink.run_jlink_script` like every other
+``JLinkExe`` operation.
 """
 
 from __future__ import annotations
@@ -20,9 +20,8 @@ log = logging.getLogger("hpx")
 # left alone: "refused" and "failed halfway through programming" call for
 # opposite next steps.  ``TestFlashRecipeValidation._refuse`` asserts that
 # invariant across all of them by substring, so the phrase is pinned here
-# rather than respelled at each site -- eight sites had drifted into three
-# spellings (em-dash, colon, "this" versus "the recipe"), any of which a future
-# reword could push out from under the assertion without failing a test.
+# rather than respelled at each site, where a reword could slip out from
+# under the assertion without failing a test.
 _NOTHING_PROGRAMMED_RECIPE = "Nothing was programmed — the recipe was refused before JLinkExe ran."
 # The fallback branch has no recipe to name: it is reached precisely because
 # the recipe is missing, so "the recipe was refused" would be a lie there.
@@ -31,7 +30,7 @@ _NOTHING_PROGRAMMED = "Nothing was programmed — this was refused before JLinkE
 # The recipe grammar below is NSX's, ported from ``validate_flash_recipe`` /
 # ``_LOAD_FILE_RE`` in ``neuralspotx.operations._hardware`` rather than
 # imported: that module is private and NSX is only optionally importable here
-# (AGENTS.md "NSX as Build Backend"), but the recipe hpx runs verbatim is
+# (AGENTS.md, "NSX is the build backend"), but the recipe hpx runs verbatim is
 # emitted by NSX's own ``flash_cmds.jlink.in`` template, so the two must agree.
 # Handles the quoted form NSX generates and the unquoted form a hand-rolled or
 # hand-edited recipe may use.
@@ -88,10 +87,10 @@ _ANY_LOAD_FILE_RE = re.compile(r"^\s*LoadFile\b", re.IGNORECASE | re.MULTILINE)
 # touched.  That covers the wrong-board case #150 was filed for, because every
 # registered part's ``app_flash_load_addr`` is exactly its bank base (verified
 # against J-Link's device database: apollo3p 0xC000, apollo4p/apollo4l
-# 0x18000, apollo510/apollo510b/apollo5b 0x410000, plus all 23 NSX recipes on
-# the bench host), so requested-address equality and bank equality coincide
-# there.  apollo330P uses a custom Ambiq device entry absent from the stock
-# database and could not be verified this way.
+# 0x18000, apollo510/apollo510b/apollo5b 0x410000, and against the NSX
+# recipes), so requested-address equality and bank equality coincide there.
+# apollo330P uses a custom Ambiq device entry absent from the stock database
+# and could not be verified this way.
 #
 # What it does NOT catch: a wrong address INSIDE a bank J-Link did program.
 # apollo3p is a four-bank part (0xC000, 0x80000, 0x100000, 0x180000), so a

@@ -1929,7 +1929,7 @@
       "type": "object"
     },
     "PowerFirmware": {
-      "description": "Which binary is on the target during power capture.\n\n``DEDICATED`` flashes the transport-free ``hpx_profiler_power`` image\n(see ``firmware/__init__.py`` WP2) before capture, avoiding SWO/UART/\nRTT/USB current contamination in the GPIO-gated Joulescope window, so\n``DEDICATED`` is the default.  ``SHARED`` reuses the already-flashed\ntransport binary for power capture (useful when no J-Link is free to\nreflash, or for bring-up comparisons against the contaminated\nbaseline).",
+      "description": "Which binary is on the target during power capture.\n\n``DEDICATED`` flashes the transport-free ``hpx_profiler_power`` image\n(see ``stages.flash_power``) before capture, avoiding SWO/UART/\nRTT/USB current contamination in the GPIO-gated Joulescope window, so\n``DEDICATED`` is the default.  ``SHARED`` reuses the already-flashed\ntransport binary for power capture (useful when no J-Link is free to\nreflash, or for bring-up comparisons against the contaminated\nbaseline).",
       "enum": [
         "dedicated",
         "shared"

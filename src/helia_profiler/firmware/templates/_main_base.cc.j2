@@ -1,6 +1,5 @@
 {# _main_base.cc.j2 — engine-agnostic heliaPROFILER firmware skeleton. #}
-{#- Extracted from main.cc.j2 (#154 phase 4); main_aot.cc.j2 joined as a
-   second child in step 3 and main_executorch.cc.j2 as the third in step 4.
+{#- Children: main.cc.j2, main_aot.cc.j2, main_executorch.cc.j2 (#154).
    Everything outside an `engine_*` block is shared by every inference engine;
    the blocks are the only place engine-specific code may appear.  Keep it
    that way: a child template can override a block, but it can never remove
@@ -86,7 +85,7 @@
    anything else (a Python-spelled "True", a stray "1") hits the guarded
    empty-dict lookup below, whose KEY is the error message — StrictUndefined
    surfaces it verbatim, naming the seam, instead of a silently un-backed
-   SSRAM array (#172 review, message wording round 2). #}{% set _pmu_storage_decl %}{% block engine_pmu_storage_sram_resident %}true{% endblock %}{% endset %}{% set _pmu_storage_value = _pmu_storage_decl | trim %}{% if _pmu_storage_value not in ("true", "false") %}{{ {}["engine_pmu_storage_sram_resident must render exactly 'true' or 'false', got '" ~ _pmu_storage_value ~ "'"] }}{% endif %}{% set pmu_profiler_sram_resident = (_pmu_storage_value == "true") and not (power_only | default(false)) %}{% include "_system_includes.j2" %}
+   SSRAM array (#172). #}{% set _pmu_storage_decl %}{% block engine_pmu_storage_sram_resident %}true{% endblock %}{% endset %}{% set _pmu_storage_value = _pmu_storage_decl | trim %}{% if _pmu_storage_value not in ("true", "false") %}{{ {}["engine_pmu_storage_sram_resident must render exactly 'true' or 'false', got '" ~ _pmu_storage_value ~ "'"] }}{% endif %}{% set pmu_profiler_sram_resident = (_pmu_storage_value == "true") and not (power_only | default(false)) %}{% include "_system_includes.j2" %}
 {% if apollo3_burst %}
 // Apollo3/3P TurboSPOT (burst) control lives in the AmbiqSuite HAL umbrella.
 #include "am_mcu_apollo.h"
@@ -102,10 +101,9 @@
 // (_peripheral_power_down.j2) and the crypto-otp shutdown
 // (_crypto_otp_shutdown.j2) all need register definitions from the same
 // AmbiqSuite HAL umbrella header.  One merged guard rather than several
-// mutually-exclusive ones so the header can never be emitted twice or, as
-// happened before the guard covered STIMER, not at all: an AP3 power render
-// needs STIMER without running either shutdown, and used to reference
-// am_hal_stimer_* with no HAL header in scope.
+// mutually-exclusive ones so the header can never be emitted twice or not at
+// all: an AP3 power render needs STIMER without running either shutdown, and
+// still needs am_hal_stimer_* in scope.
 #include "am_mcu_apollo.h"
 {% endif %}
 
@@ -135,8 +133,7 @@
 // hpx_printf() call reports the clean-window results -- with zero settle
 // margin that first line (HPX_CLEAN_INFER_COUNT=...) can be dropped or
 // garbled, silently losing clean_infer_count and falling the host back to
-// an unrelated whole-capture-window power estimate (found 2026-07-06 on the
-// first hardware test of the UART teardown fix). 5ms is generous versus a
+// an unrelated whole-capture-window power estimate. 5ms is generous versus a
 // UART/ITM clock-domain-crossing settle.
 #define HPX_DEBUG_REENABLE_SETTLE_US (5U * 1000U)
 
@@ -189,7 +186,7 @@ int main(void) {
    profile-only or lives behind not-use_stimer_window, and power windows are
    STIMER on every SoC.  Enabling TRCENA/CYCCNTENA there was debug circuitry
    turned on for nothing in the image whose whole design is minimal
-   circuitry (#161/#164 review finding). -#}
+   circuitry (#161, #164). -#}
 {%- if not power_only | default(false) %}
     dwt_init();
 {%- endif %}
@@ -252,8 +249,8 @@ int main(void) {
 {% endif %}
 {# pmu_profiler_sram_resident is set at the TOP of this file, glued to the
    _system_includes.j2 include -- that partial reads it too (its narrow
-   am_hal_pwrctrl.h guard), and it used to be set here, 160 lines after the
-   only other reader had already tested it. #}
+   am_hal_pwrctrl.h guard), so it must be set before that include, not down
+   here where the remaining readers are. #}
 {% include "_ssram_power.j2" %}
 {% include "_extreme_mode.j2" %}
 {% include "_ble_reset.j2" %}
@@ -523,8 +520,8 @@ int main(void) {
         // reason: the window completes exactly one busy pass
         // (clean_count = 1), and on a lossy transport that drops
         // HPX_CLEAN_INFER_COUNT the host's iters fallback feeds the
-        // gate-duration check — the old planned-count announce made that
-        // check compute N x spin_us and kill a healthy run with a
+        // gate-duration check — announcing the planned count would make
+        // that check compute N x spin_us and kill a healthy run with a
         // duration-mismatch PowerError.
         //
         // This announce was clean_iters_n's only busy-path consumer, so
@@ -677,7 +674,7 @@ int main(void) {
             // phase "stimer_dead", error_code = last probe's tick count
             // PLUS ONE: the envelope invariant forbids error_code 0 with
             // status=error, and 0 ticks IS the stopped-crystal signature
-            // (#180 review B2). The host subtracts the bias in its hint.
+            // (#180). The host subtracts the bias in its hint.
             // terminal_fail parks; no window opens on a dead clock.
             hpx_power_terminal_fail("stimer_dead", g_hpx_stimer_last_ticks + 1U);
 {% else %}

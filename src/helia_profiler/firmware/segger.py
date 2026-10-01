@@ -3,10 +3,8 @@
 Owns locating a SEGGER RTT source checkout (config path, ``SEGGER_RTT_PATH``,
 or the pinned sources bundled with heliaPROFILER), validating its layout, and
 copying it into the generated app — including the per-SoC buffer-placement
-snippet appended to ``SEGGER_RTT_Conf.h``.  Extracted from
-``firmware/__init__`` at the module size ceiling (see the elf_inventory
-precedent in toolchain_probe); the package re-exports every name so callers
-(including doctor) keep one import surface.
+snippet appended to ``SEGGER_RTT_Conf.h``.  The package re-exports every
+name so callers (including doctor) keep one import surface.
 """
 
 from __future__ import annotations

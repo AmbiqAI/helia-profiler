@@ -1,4 +1,4 @@
-"""Tests for toolchain_probe's section inventory (#133 Phase 1).
+"""Tests for toolchain_probe's section inventory (#133).
 
 Fixtures are UNEDITED real captures: tests/fixtures/readelf/* from
 Arm GNU Toolchain on an ELF built by the committed linker.ld + main.c,
@@ -89,7 +89,7 @@ class TestReadelfInventory:
         """A section whose sh_type readelf renders numerically (LOOS+…)
         fails the type-constrained pattern. Silently dropping it would
         understate occupancy, so the inventory carries a structural count
-        a Phase-2 consumer can refuse to publish on."""
+        a consumer can refuse to publish on."""
         rows = (
             "  [ 1] .text             PROGBITS        00410000 001000 00003c 00  AX  0   0  4\n"
             "  [ 2] .weird            LOOS+0xd        20000000 003000 004000 00  WA  0   0  4\n"

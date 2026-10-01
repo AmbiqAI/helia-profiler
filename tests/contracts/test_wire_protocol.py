@@ -19,7 +19,7 @@ appear against the tokens the registry predicts — in *both* directions:
   something that no longer exists.
 
 Plus literal catalogue pins (error codes, heartbeat phases, power-terminal key
-sets, the CSV header shape) in the style of #154 Phase 3, and the grep-guard
+sets, the CSV header shape) in the style of #154, and the grep-guard
 that keeps bare ``HPX_`` protocol literals out of ``src/``.
 
 Stated limit of the census: every assertion here is *set-valued* per render —
@@ -1298,10 +1298,10 @@ def _placeholder_free_fstring(text: str) -> str | None:
 def _constant_strings(source: str) -> list[tuple[tuple[int, int], str, str]]:
     """Every string constant in *source* as (position, content, source text).
 
-    Constant f-strings are included: ``f"HPX_START"`` is a wire literal wearing
-    a disguise the tokenizer used to hide, because CPython 3.12 splits an
-    f-string into FSTRING_START / FSTRING_MIDDLE / FSTRING_END and the guard
-    only looked at ``STRING``. F-strings that *do* interpolate are excluded —
+    Constant f-strings are included: ``f"HPX_START"`` is a wire literal in
+    disguise. CPython 3.12+ tokenizes an f-string as FSTRING_START /
+    FSTRING_MIDDLE / FSTRING_END, so a guard that only looks at ``STRING``
+    misses it. F-strings that *do* interpolate are excluded —
     ``f"HPX_{name}"`` composes a token rather than duplicating one, which is
     the documented limit of this scan and the reason the registry ships
     ``heartbeat_token()`` and friends.

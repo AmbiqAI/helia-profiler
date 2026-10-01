@@ -66,9 +66,9 @@ class BuildFirmwareStage:
                 linker_profile=linker_profile,
                 timeout_s=ctx.config.timeouts.binary_probe_s,
             )
-        # Symbol inventory + plan-vs-measured reconciliation (#133 Phase
-        # 3). A partial nm listing is refused like a partial section
-        # inventory — never understate.
+        # Symbol inventory + plan-vs-measured reconciliation (#133). A
+        # partial nm listing is refused like a partial section inventory —
+        # never understate.
         inventory = symbol_inventory(
             binary_path, toolchain, timeout_s=ctx.config.timeouts.binary_probe_s
         )

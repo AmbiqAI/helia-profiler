@@ -95,7 +95,7 @@ def _serialise_memory_plan(plan: MemoryPlan) -> dict[str, Any]:
 
 
 def _serialise_memory_regions(measured: MeasuredMemoryRegions) -> dict[str, Any]:
-    """Serialise the measured per-region occupancy (#133 Phase 2).
+    """Serialise the measured per-region occupancy (#133).
 
     ``free`` is emitted per region (``app.length − used``, unclamped —
     negative means the inventory and the characterized extent disagree,
@@ -127,7 +127,7 @@ def _serialise_memory_regions(measured: MeasuredMemoryRegions) -> dict[str, Any]
 
 
 def _serialise_memory_reconciliation(rec: MemoryReconciliation) -> dict[str, Any]:
-    """The #133 Phase 3 payoff block: per-consumer verdicts + per-region
+    """The #133 payoff block: per-consumer verdicts + per-region
     plan-vs-measured deltas. ``delta`` is measured minus planned."""
     return {
         "consumers": [
@@ -264,8 +264,8 @@ def _write_memory_breakdown(ctx: PipelineContext, detail_dir: Path) -> Path:
     if ctx.memory_regions is not None:
         data["memory_regions"] = _serialise_memory_regions(ctx.memory_regions)
 
-    # Plan-vs-measured reconciliation + the per-symbol enumeration (#133
-    # Phase 3; symbols are detailed-only by the aggregates convention)
+    # Plan-vs-measured reconciliation + the per-symbol enumeration (#133;
+    # symbols are detailed-only by the aggregates convention)
     if ctx.memory_reconciliation is not None:
         data["memory_reconciliation"] = _serialise_memory_reconciliation(ctx.memory_reconciliation)
     if ctx.memory_symbols is not None and ctx.memory_regions is not None:

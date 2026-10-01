@@ -1434,9 +1434,8 @@ def test_write_summary_flags_zero_device_cycles_as_suspect(tmp_path: Path):
     # clean_infer_count > 0 but the device reported clean_infer_avg_us=0 --
     # an inference cannot take zero time, so this means the device-side
     # DWT-based clean-window cycle measurement was corrupted (known cause:
-    # a debugger/RTT attach racing the one-shot DWT->CYCCNT read). Previously
-    # this silently skipped the duration sanity check with no warning at
-    # all; it should now flag the run as suspect instead.
+    # a debugger/RTT attach racing the one-shot DWT->CYCCNT read). That must
+    # flag the run as suspect, not silently skip the duration sanity check.
     ctx = _gated_power_ctx(tmp_path, clean_infer_count=11, clean_infer_avg_us=0, duration_s=0.230)
 
     out_path = _write_summary(ctx, tmp_path)
@@ -1639,8 +1638,8 @@ def test_tops_suppressed_for_whole_capture(tmp_path: Path):
 def test_on_device_energy_published(tmp_path: Path):
     """The monitor's bracket IS its N inferences, so energy/N is measured.
 
-    The on-device scope used to fall into the whole-capture estimate, which
-    scales power by profiled time and labels it not gated.
+    The on-device scope must not fall back to the whole-capture estimate,
+    which scales power by profiled time and labels it not gated.
     """
     ctx = _tops_ctx(
         tmp_path,

@@ -1421,9 +1421,9 @@ class TestFlashRecipeValidation(_FlashRecipeFixtures):
 
         Written with real cp1252 BYTES because the bug is in the decode: a
         ``str`` fixture would be re-encoded as UTF-8 on write and never fail.
-        On POSIX this is pre-existing (``read_text`` with no encoding raised
-        here too), but stating the codec newly exposes it on Windows, where
-        cp1252 is the default and used to decode this file without complaint.
+        On POSIX ``read_text`` raises here with or without an encoding; on
+        Windows, where cp1252 is the default and would decode this file
+        without complaint, only the explicit codec makes it fail.
         """
         binary = self._build(tmp_path)
         recipe = tmp_path / "jlink" / "hpx_profiler_power" / "flash_cmds.jlink"

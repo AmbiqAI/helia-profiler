@@ -1,8 +1,7 @@
 """Power measurement configuration — constants, `PowerConfig`, `Ina228Config`.
 
-Extracted from ``config.py`` as a cohesive responsibility; everything here is
-re-exported from :mod:`helia_profiler.config`, which remains the public import
-surface (``from helia_profiler.config import PowerConfig`` keeps working).
+Everything here is re-exported from :mod:`helia_profiler.config`, which
+remains the public import surface (``from helia_profiler.config import PowerConfig`` keeps working).
 """
 
 from __future__ import annotations
@@ -30,7 +29,7 @@ class PowerFirmware(StrEnum):
     """Which binary is on the target during power capture.
 
     ``DEDICATED`` flashes the transport-free ``hpx_profiler_power`` image
-    (see ``firmware/__init__.py`` WP2) before capture, avoiding SWO/UART/
+    (see ``stages.flash_power``) before capture, avoiding SWO/UART/
     RTT/USB current contamination in the GPIO-gated Joulescope window, so
     ``DEDICATED`` is the default.  ``SHARED`` reuses the already-flashed
     transport binary for power capture (useful when no J-Link is free to

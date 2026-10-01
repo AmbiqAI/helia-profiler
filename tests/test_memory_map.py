@@ -1,4 +1,4 @@
-"""Contract tests for the verified linked-memory map (#133 Phase 1b).
+"""Contract tests for the verified linked-memory map (#133).
 
 The constants under test were characterized from the NSX linker scripts and
 scatter files hpx actually links against (citations in memory_map.py) and
@@ -57,7 +57,7 @@ def test_app_windows_nest_inside_the_classification_window():
 
 def test_partial_app_window_mapping_is_rejected():
     """LinkedRegionWindow is a public export; a partial mapping must fail
-    at construction, not KeyError at a Phase-2 consumer."""
+    at construction, not KeyError at a consumer."""
     import pytest
 
     from helia_profiler.platform import LinkedRegionWindow, MemoryRange
@@ -110,7 +110,7 @@ def test_apollo510_windows_are_the_linker_script_values():
 # soc_placement_ranges) and the verified windows, pinned EXACTLY per SoC
 # (#176): real MRAM start plus (legacy length, verified length) for
 # MRAM / TCM / SRAM. Every legacy MRAM base is 0x0 except atomiq110's
-# (asserted in the test body); a Phase-2 edit that turns any known
+# (asserted in the test body); an edit that turns any known
 # divergence into agreement — or vice versa — must consciously edit this
 # table.
 _EXPECTED_LEGACY_VS_VERIFIED = {
@@ -131,9 +131,9 @@ _EXPECTED_LEGACY_VS_VERIFIED["apollo510L"] = _EXPECTED_LEGACY_VS_VERIFIED["apoll
 
 
 def test_known_divergences_from_the_legacy_placement_table_are_pinned():
-    """capabilities._FAMILY_MEMORY_BASES stays untouched in Phase 1 (verify-
-    placement depends on it); this test pins EVERY known divergence — bases
-    AND lengths — so the Phase-2 migration is a reviewed edit, not silent
+    """capabilities._FAMILY_MEMORY_BASES stays as is (verify-placement
+    depends on it); this test pins EVERY known divergence — bases
+    AND lengths — so migrating it is a reviewed edit, not silent
     drift. Notable pinned facts: every legacy MRAM base is 0x0, entirely
     disjoint from the real windows on the AP5 family (0x0 is ITCM there);
     apollo330P's legacy 240 KB TCM is the gcc linker region while the
@@ -268,7 +268,7 @@ def test_link_family_rejects_unknown_toolchains():
 
 
 def test_real_gcc_fixture_inventory_classifies_correctly():
-    """End-to-end with Phase 1a: every allocated section of the real
+    """End-to-end with the section inventory: every allocated section of the real
     readelf fixture (built with the NSX-shaped linker.ld) lands in the
     right apollo510 region."""
     from helia_profiler.hostenv.elf_inventory import _inventory_via_readelf
@@ -291,7 +291,7 @@ def test_real_gcc_fixture_inventory_classifies_correctly():
     # Keyed on (name, address), NOT name alone — section names are not
     # unique in general (armlink emits same-named sections per region;
     # NSX's gcc scripts declare .text twice). The fixture happens to have
-    # unique names; the keying models the idiom Phase 2 must copy.
+    # unique names; the keying models the idiom consumers must copy.
     classified = {
         (s.name, s.address): classify_address(s.address, windows) for s in sections if s.allocated
     }
@@ -441,7 +441,7 @@ def test_every_app_window_extent_is_pinned_exactly():
 
 
 def test_psram_window_is_board_knowledge_and_not_section_attributable():
-    """No linker region maps PSRAM on any SoC — Phase 2 must reconcile it
+    """No linker region maps PSRAM on any SoC — consumers must reconcile it
     from the plan, never report used=0/free=capacity off an inventory that
     structurally cannot see it (#176)."""
     for name in CHARACTERIZED_SOCS:

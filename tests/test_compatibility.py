@@ -695,8 +695,8 @@ def test_helia_aot_single_sided_baseline_range_is_not_backfilled_from_constants(
 
 def test_baseline_helia_rt_entry_matches_canonical_artifacts_constants() -> None:
     # engines/helia_rt/artifacts.py is the single canonical source for the
-    # default heliaRT version/ref (see AGENTS.md: "bump HELIART_VERSION when
-    # adopting a new release"). The baseline only mirrors these values for
+    # default heliaRT version/ref (see AGENTS.md: "bump ``HELIART_VERSION``
+    # in ``artifacts.py`` to adopt a release"). The baseline only mirrors these values for
     # reporting/classification; it must never drift from them, and runtime
     # resolution must keep consulting the constants directly, not the
     # baseline (see engines/helia_rt/adapter.py and artifacts.py).

@@ -653,8 +653,8 @@ def test_a_custom_soc_named_after_an_override_part_still_refuses_to_guess():
     answer, so a non-``None`` result here means the name reached the table.
 
     Deliberately not monkeypatched: this uses the production table, so it keeps
-    holding when PR #98 registers ``atomiq110`` as a built-in and the entry
-    stops being reachable only through a user-chosen name.
+    holding if ``atomiq110`` becomes a built-in (#98) and the entry stops
+    being reachable only through a user-chosen name.
 
     The cost of that choice is that the guard assert below pins a production
     value, and ``platform/capabilities.py`` says this one is expected to move:

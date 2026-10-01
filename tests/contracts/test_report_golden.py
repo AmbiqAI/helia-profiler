@@ -232,7 +232,7 @@ def _sample_power() -> PowerResult:
 
 
 def _sample_memory_regions() -> MeasuredMemoryRegions:
-    """The measured block (#133 Phase 2), with every emission path live:
+    """The measured block (#133), with every emission path live:
     figure, a nonzero load_image, and one unattributed section (with those
     at defaults the corresponding summary/console lines are dead and the
     digests could not see them)."""

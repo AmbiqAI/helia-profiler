@@ -1,4 +1,4 @@
-"""Tests for the measured memory-regions join (#133 Phase 2).
+"""Tests for the measured memory-regions join (#133).
 
 Driven by the real readelf fixture (tests/fixtures/readelf/) against the
 verified apollo510 map, with every number derived by hand from the capture:
@@ -532,11 +532,11 @@ class TestReconciliation:
         assert sram.delta == 98_556 - 4096 * 24
 
 
-class TestReviewRegressionPins:
-    """#179 round: each finding pinned so it cannot recur."""
+class TestSymbolMatchingRegressionPins:
+    """#179: each matcher/reconciliation bug pinned so it cannot recur."""
 
     def test_hal_symbols_do_not_false_positive_the_matcher(self):
-        """M-1: am_hal_gpio_pincfg_input ENDS WITH g_input — a bare
+        """am_hal_gpio_pincfg_input ENDS WITH g_input — a bare
         suffix test matched a 4-byte MRAM constant and flipped verdicts."""
         from helia_profiler.hostenv.memory_measurement import _match_symbols
         from helia_profiler.hostenv.toolchain_probe import SymbolEntry
@@ -550,7 +550,7 @@ class TestReviewRegressionPins:
         assert [m.name for m in matched] == ["_ZL7g_input", "g_input"]
 
     def test_zero_size_symbols_never_match(self):
-        """M-5: llvm-nm reports st_size verbatim — armlink's linker
+        """llvm-nm reports st_size verbatim — armlink's linker
         markers are 0 and a zero-size 'match' manufactures
         measured_size=0, delta=-planned."""
         from helia_profiler.hostenv.memory_measurement import _match_symbols
@@ -562,7 +562,7 @@ class TestReviewRegressionPins:
     def test_psram_consumers_are_unmatchable_even_when_the_pointer_matches(
         self,
     ):
-        """M-2: the PSRAM-weights render declares a 4-byte POINTER that
+        """the PSRAM-weights render declares a 4-byte POINTER that
         mangles to _ZL10model_data — matching it would report the planned
         megabytes as shortfall."""
         from helia_profiler.hostenv.memory_measurement import reconcile_memory
@@ -583,7 +583,7 @@ class TestReviewRegressionPins:
         assert weights.measured_size is None
 
     def test_measured_region_flags_a_wrong_region_match(self):
-        """M-6: a matched symbol whose address is in a DIFFERENT region
+        """a matched symbol whose address is in a DIFFERENT region
         than the plan intended must say so — the check that catches
         wrong-region 'clean' matches."""
         from helia_profiler.hostenv.memory_measurement import reconcile_memory
@@ -606,7 +606,7 @@ class TestReviewRegressionPins:
         assert arena.measured_region == "SRAM"
 
     def test_unsized_and_undefined_nm_rows_skip_silently(self, monkeypatch):
-        """M-5: llvm-nm emits U rows and size-0-omitted shapes under
+        """llvm-nm emits U rows and size-0-omitted shapes under
         --size-sort; they are legitimate output, not parse failures — one
         of them must not mark the listing partial and drop attribution."""
         from helia_profiler.hostenv.toolchain_probe import symbol_inventory

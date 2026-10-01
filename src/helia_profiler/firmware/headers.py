@@ -2,10 +2,8 @@
 
 Owns the xxd-style header generation embedded into generated apps: the
 ``.tflite`` model array with its placement-driven section attribute, and the
-AOT constant-arena sidecar blob arrays.  Extracted from ``firmware/__init__``
-at the module size ceiling (see the elf_inventory precedent in
-toolchain_probe); the package re-exports every name so callers keep one
-import surface.
+AOT constant-arena sidecar blob arrays.  The package re-exports every name
+so callers keep one import surface.
 """
 
 from __future__ import annotations

@@ -24,10 +24,10 @@
         // {{ window_target_ms }} ms target, then run a plain bounded counter loop
         // with no clock reads at all inside the window itself.  A live
         // "while (elapsed < target) nop();" exit condition is not an option:
-        // when it read DWT it hung forever once the debug domain went off
-        // (found 2026-07-03: real firmware hang, required a J-Link reset to
-        // recover the board), and polling STIMER every iteration would put
-        // peripheral traffic inside the measured region.
+        // when it read DWT it hung forever once the debug domain went off (a
+        // hang that needs a J-Link reset to recover the board), and polling
+        // STIMER every iteration would put peripheral traffic inside the
+        // measured region.
         //
         // The calibration loop must keep the SAME shape as the measured loop
         // below -- volatile counter, one nop -- or its per-iteration cost does

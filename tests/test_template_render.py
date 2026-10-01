@@ -13,8 +13,8 @@ import re
 import pytest
 
 # The PRODUCTION environment, not a look-alike (issue #119): a separate env
-# built here previously diverged in whitespace control (trim_blocks/
-# lstrip_blocks) and let real rendering bugs through undetected.
+# built here can drift in whitespace control (trim_blocks/lstrip_blocks) and
+# let real rendering bugs through undetected.
 from helia_profiler.firmware import _jinja_env as _env
 
 # Window-clock resolution happens host-side (#118); deriving the vars here
@@ -1000,8 +1000,9 @@ class TestEthosURender:
 
     def test_npu_pmu_uses_driver_probe_not_strong_hooks(self):
         """The driver owns ethosu_inference_begin/end; redefining them collides
-        at link (WORKAROUND helia-profiler#183: nsx-ethos-u-driver ships strong
-        overrides via INTERFACE_SOURCES). We must register a probe instead."""
+        at link (nsx-ethos-u-driver ships strong overrides via
+        INTERFACE_SOURCES; see helia-profiler#183). We must register a probe
+        instead."""
         out = _render_tflm(has_ethos_u=True)
         # No *definition* of the driver-owned symbols (prose mentioning them in
         # the explanatory comment is fine).
@@ -1198,7 +1199,7 @@ class TestIna228PowerRender:
             'hpx_power_terminal_fail("ina228_arm"',
             'hpx_power_terminal_fail("ina228_read"',
             # SHUNT_CAL is read back and required non-zero: an uncalibrated
-            # part silently reports zero current/energy (hardware finding).
+            # part silently reports zero current/energy.
             "g_hpx_ina228_shunt_cal == 0U",
             # Accumulators read raw (40-bit) rather than through the float API.
             "ina228_read_energy_raw",

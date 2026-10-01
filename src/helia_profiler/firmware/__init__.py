@@ -29,9 +29,9 @@ from ..engines.base import ArenaRegion, HeliaAotArtifacts
 from ..errors import ConfigError, FirmwareError
 from ..placement import Placement
 
-# .build, .headers, .launcher and .segger were extracted at the module
-# size ceiling (the elf_inventory precedent, see toolchain_probe); their
-# APIs are re-exported here so callers keep one import surface.
+# The compiler-launcher, SEGGER RTT vendoring, generated-C-header, and NSX
+# build invocation APIs live in .build, .headers, .launcher and .segger,
+# re-exported here so callers keep one import surface.
 from .build import (
     build_app,
     find_target_binary,
@@ -101,7 +101,7 @@ def generate_app(ctx: PipelineContext) -> Path:
     # power capture is actually requested AND the dedicated firmware mode is
     # selected, so non-power runs (and "shared"-mode power runs, which reuse
     # the transport binary and never touch hpx_profiler_power) keep an
-    # unchanged CMakeLists.txt / firmware-render digest (see AGENTS.md WP2).
+    # unchanged CMakeLists.txt / firmware-render digest.
     power_binary_enabled = config.power.enabled and config.power.firmware is PowerFirmware.DEDICATED
     aot_arena_regions = _resolved_aot_arena_regions(ctx)
 
@@ -400,7 +400,7 @@ def generate_app(ctx: PipelineContext) -> Path:
         )
         if power_binary_enabled:
             # Same template, power_only=True: no transport init, no per-layer
-            # PMU passes -- see main_aot.cc.j2's power_only branches (WP1).
+            # PMU passes -- see main_aot.cc.j2's power_only branches.
             _write_text(
                 src_dir / "main_power.cc",
                 _jinja_env.get_template(_main_template(engine_type, power_only=True)).render(
@@ -423,7 +423,7 @@ def generate_app(ctx: PipelineContext) -> Path:
         )
         if power_binary_enabled:
             # Same template, power_only=True: no transport init, no per-layer
-            # PMU passes -- see main.cc.j2's power_only branches (WP1).
+            # PMU passes -- see main.cc.j2's power_only branches.
             _write_text(
                 src_dir / "main_power.cc",
                 _jinja_env.get_template(_main_template(engine_type, power_only=True)).render(
