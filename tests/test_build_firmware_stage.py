@@ -184,7 +184,7 @@ def test_partial_nm_listing_is_refused(tmp_path: Path, monkeypatch) -> None:
 
 
 def test_find_target_binary_is_deterministic(tmp_path: Path) -> None:
-    """PR #180: glob order is filesystem-dependent — the shallowest match
+    """#180: glob order is filesystem-dependent — the shallowest match
     must win reproducibly, and the per-pattern loop keeps extension
     precedence (a bare/axf match beats a fresh .elf in a later pattern)."""
     from helia_profiler.firmware import find_target_binary

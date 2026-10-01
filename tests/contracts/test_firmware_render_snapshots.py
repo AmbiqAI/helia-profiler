@@ -1069,8 +1069,8 @@ def test_free_running_power_binary_never_times_the_window_with_dwt():
     metric derived from them is suppressed or wrong.
 
     ``transport.requires_attached_probe_for_cycles`` is the capability that
-    already records exactly this fact (confirmed empirically on AP3 in
-    2026-06: AOT-over-UART read 0 cycles until a probe was held attached), so
+    already records exactly this fact (on AP3, AOT-over-UART reads 0 cycles
+    unless a probe is held attached), so
     this keys on it rather than on any single shutdown spelling.
 
     Checked for every clean-window probe, over the region that includes the
@@ -1752,8 +1752,7 @@ def test_pmu_profiler_sram_placement_transport_only_on_ap5():
     ap510_transport = _render("apollo510", "rtt", "tflm", power_only=False)
     # NSX_MEM_SRAM (initialized .shared, copied from MRAM), NOT SRAM_BSS
     # (NOLOAD zero-fill would discard the polymorphic object's vtable
-    # pointer image -- NULL-vptr bus fault at the first virtual call,
-    # found on real Apollo330mP hardware 2026-07).
+    # pointer image -- NULL-vptr bus fault at the first virtual call).
     assert "NSX_MEM_SRAM static HpxPmuProfiler g_profiler;" in ap510_transport
     assert "AM_HAL_PWRCTRL_SRAM_3M" in ap510_transport  # SSRAM powered on
 
@@ -1804,8 +1803,7 @@ def test_ssram_full_power_enum_is_per_soc():
     varies by SoC (it encodes each part's actual SSRAM capacity) even
     though it maps to the same underlying register value on every AP5
     part. AP510 has 3 MB (AM_HAL_PWRCTRL_SRAM_3M); apollo330P's real
-    SSRAM is only ~1.75 MB and its HAL does not define SRAM_3M at all
-    (confirmed 2026-07 against the real synced HAL headers) -- it must
+    SSRAM is only ~1.75 MB and its HAL does not define SRAM_3M at all -- it must
     use AM_HAL_PWRCTRL_SRAM_1P75M instead, or the generated firmware
     fails to compile on that board.
     """

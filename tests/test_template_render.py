@@ -1199,7 +1199,7 @@ class TestIna228PowerRender:
             'hpx_power_terminal_fail("ina228_arm"',
             'hpx_power_terminal_fail("ina228_read"',
             # SHUNT_CAL is read back and required non-zero: an uncalibrated
-            # part silently reports zero current/energy (hardware finding).
+            # part silently reports zero current/energy.
             "g_hpx_ina228_shunt_cal == 0U",
             # Accumulators read raw (40-bit) rather than through the float API.
             "ina228_read_energy_raw",

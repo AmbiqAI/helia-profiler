@@ -1,4 +1,4 @@
-"""Tests for the measured memory-regions join (#133 Phase 2).
+"""Tests for the measured memory-regions join (#133).
 
 Driven by the real readelf fixture (tests/fixtures/readelf/) against the
 verified apollo510 map, with every number derived by hand from the capture:

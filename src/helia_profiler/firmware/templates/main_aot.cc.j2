@@ -61,9 +61,8 @@
 // Large proxy models can compile to well over 2048 operators; keep enough
 // headroom here to avoid silently truncating the capture stream. Templated
 // from soc.pmu_max_ops (not hardcoded -- see hpx_pmu_profiler.h.j2's
-// kMaxLayers for the analogous heliaRT constant and the same 2026-07
-// AP330 finding: a fixed 4096 here is ~96 KB of g_layers[] alone,
-// meaningful on 240 KB-TCM parts).
+// kMaxLayers for the analogous heliaRT constant: a fixed 4096 here is
+// ~96 KB of g_layers[] alone, meaningful on 240 KB-TCM parts).
 static constexpr int kMaxLayers = {{ pmu_max_ops }};
 static constexpr int kMaxEvents = 4;
 

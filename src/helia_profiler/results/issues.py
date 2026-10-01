@@ -36,8 +36,8 @@ from typing import Mapping
 
 from ..errors import ReportError
 
-# Re-exported for compatibility: ComparisonDimension moved to the dimension
-# model in Phase 3; both import paths remain valid.
+# Re-exported for compatibility: ComparisonDimension lives in the dimension
+# model (#154); both import paths remain valid.
 from .dimensions import (
     DIMENSION_REGISTRY,
     ComparisonDimension,
@@ -432,7 +432,7 @@ class ComparabilityCodeFamily:
     embeds a dimension name that itself starts with ``power_``, so the
     emitted code doubles the prefix (``metric.power_power_scope_mismatch``).
     That is the shipped format the report goldens and downstream consumers
-    pin; renaming it is a deliberate wire-format change for Phase 3 of #154,
+    pin; renaming it is a deliberate wire-format change (#154),
     not a side effect of typing.
     """
 

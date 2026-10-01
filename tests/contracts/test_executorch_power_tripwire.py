@@ -110,9 +110,9 @@ def test_preflight_accepting_executorch_power_requires_engine_matrix_coverage(
         preflight_accepts_executorch_power = True
 
     if preflight_accepts_executorch_power:
-        # Two matrices, because #154 phase 4 split them. ``_ENGINES`` is the
-        # non-power render matrix and executorch joined it when
-        # main_executorch.cc.j2 became a child of _main_base.cc.j2 -- so
+        # Two matrices (#154). ``_ENGINES`` is the non-power render matrix
+        # and includes executorch because main_executorch.cc.j2 is a child
+        # of _main_base.cc.j2 -- so
         # keying only on that would leave this tripwire vacuous, passing the
         # moment the preflight gate is lifted while nothing pinned a single
         # power render. ``_MATRIX_ENGINES`` is the one that still excludes
@@ -139,9 +139,8 @@ def test_preflight_rejects_executorch_with_the_busy_loop_clean_window_probe(tmp_
     firmware reports ``HPX_CLEAN_INFER_COUNT=1`` for that single unit of work.
     It exists only to serve a power capture, which ExecuTorch does not support.
 
-    Before #154 phase 4 this combination was harmless by accident: the
-    standalone template had no busy_loop branch, so the option simply did
-    nothing. As a child of ``_main_base.cc.j2`` it now inherits one --
+    As a child of ``_main_base.cc.j2`` (#154) the ExecuTorch template
+    inherits a busy_loop branch --
     ``engine_clean_window``'s override delegates the busy_loop case straight
     back to ``super()`` -- so the render would succeed and ship a nop-loop
     window under keys this engine defines as real execute-only inference

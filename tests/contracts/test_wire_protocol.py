@@ -19,7 +19,7 @@ appear against the tokens the registry predicts — in *both* directions:
   something that no longer exists.
 
 Plus literal catalogue pins (error codes, heartbeat phases, power-terminal key
-sets, the CSV header shape) in the style of #154 Phase 3, and the grep-guard
+sets, the CSV header shape) in the style of #154, and the grep-guard
 that keeps bare ``HPX_`` protocol literals out of ``src/``.
 
 Stated limit of the census: every assertion here is *set-valued* per render —

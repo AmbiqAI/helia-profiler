@@ -22,8 +22,8 @@ from ..results import (
 from ..results.serde import nested_get
 from ..results.dimensions import DIMENSION_REGISTRY, ArtifactSource
 
-# Not re-exported by the results package (construction shape changes in #154
-# Phase 3); imported from the registry module directly.
+# Not re-exported by the results package (#154); imported from the registry
+# module directly.
 from ..results.issues import ComparabilityCodeFamily
 
 if TYPE_CHECKING:
@@ -340,7 +340,7 @@ def read_dimensions(run: RunArtifacts) -> dict[str, Any]:
     Each spec declares its source and path (``results/dimensions.py``); the
     ``_nested`` traversal is deliberately crash-tolerant because artifacts
     from other HPX versions may hold shapes this build would not write —
-    pre-#154-Phase-2 artifacts on disk store ``summary.power.sync`` as a
+    pre-#154 artifacts on disk store ``summary.power.sync`` as a
     bare bool, which an unguarded ``.get()`` chain dies on with an
     ``AttributeError`` that is not an ``HpxError``, aborting a whole
     multi-case validation compare instead of recording one COMPARE_ERROR.

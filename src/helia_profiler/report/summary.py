@@ -115,7 +115,7 @@ def _write_summary(
     if ctx.memory_regions is not None:
         summary["memory_regions"] = _serialise_memory_regions(ctx.memory_regions)
 
-    # Plan-vs-measured reconciliation (#133 Phase 3)
+    # Plan-vs-measured reconciliation (#133)
     if ctx.memory_reconciliation is not None:
         summary["memory_reconciliation"] = _serialise_memory_reconciliation(
             ctx.memory_reconciliation

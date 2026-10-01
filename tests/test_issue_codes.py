@@ -1,4 +1,4 @@
-"""Contract tests for the issue-code registry (#154 Phase 1).
+"""Contract tests for the issue-code registry (#154).
 
 The registry in ``results/issues.py`` is the single declaration of every
 machine-readable code HPX can emit. These tests pin three properties:
@@ -176,7 +176,7 @@ def test_emitted_issue_code_is_a_plain_string():
 
 
 def test_no_bare_registered_code_literal_survives_in_src():
-    """The acceptance criterion of #154 Phase 1, as a test.
+    """The acceptance criterion of #154, as a test.
 
     Every registered code string (static and family-generated) must appear as
     a quoted literal only inside the registry module. Prose mentions in

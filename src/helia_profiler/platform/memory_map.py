@@ -1,4 +1,4 @@
-"""Verified linked-memory map per SoC (#133 Phase 1b).
+"""Verified linked-memory map per SoC (#133).
 
 The characterized truth of where the LINKER puts things, per SoC and — where
 the two link families disagree — per link family. Every constant below was
@@ -17,8 +17,8 @@ that older table records the datasheet-flavored values ``soc_placement_ranges``
 and ``VerifyPlacementStage`` grew up on, and its MRAM bases are wrong for
 accounting — apollo5's ``MRAM: 0x0`` is entirely disjoint from the real app
 flash window ``0x00410000+`` (0x0 is ITCM there). Correcting it in place would
-silently change verify-placement behavior mid-epic; Phase 2 migrates the old
-callers here, and a contract test pins the known divergences until then.
+silently change verify-placement behavior, so a contract test pins the known
+divergences until the old callers migrate here (#133).
 
 The toolchain axis is TWO-valued: there is no ATfE-specific script anywhere —
 ATfE links the gcc ``*.ld`` scripts (confirmed from nsx's cmake and an
@@ -51,7 +51,7 @@ no ELF section can ever land there, so occupancy must come from the plan.
 ``nvm_kb`` likewise has no linker counterpart and is deliberately absent
 here.
 
-Phase-2 free math (the contract these shapes exist for):
+Free math (the contract these shapes exist for):
 ``free = app_window[family].length − Σ(size of allocated sections whose
 address falls inside app_window[family], excluding linker_reserved ones)``.
 Sections inside ``window`` but outside ``app_window`` are the linker's
@@ -114,7 +114,7 @@ class LinkedRegionWindow:
     ``window`` is the CLASSIFICATION aperture — an allocated section whose
     address falls inside it belongs to this region. ``app_window`` is the
     address EXTENT of the linked region the app's image occupies under
-    each link family. Honest Phase-2 free math is
+    each link family. Honest free math is
     ``app_window.length − Σ(allocated sections inside app_window,
     excluding linker_reserved ones)``.
 
@@ -156,7 +156,7 @@ class LinkedRegionWindow:
     #: or board knowledge (PSRAM).
     app_provenance: str = "linker-script"
     #: False when no ELF section can ever land here (PSRAM: no linker
-    #: region exists on any SoC). Phase 2 must reconcile such regions from
+    #: region exists on any SoC). Consumers must reconcile such regions from
     #: the PLAN, never report "used 0, free capacity" from an inventory
     #: that structurally cannot see them — that would recreate the exact
     #: #133 pathology this module exists to close.
@@ -414,7 +414,7 @@ def linked_memory_map(
     nbl-based on atomiq110). ``itcm`` is a
     documented engine knob (the ``guide/engines`` page) forwarded straight
     to CMake, and its scripts declare DIFFERENT regions — on apollo330P,
-    AP510-sized ones (the upstream NSX bug in PR #176's report) — so any
+    AP510-sized ones (the upstream NSX bug reported in #176) — so any
     profile other than ``default`` returns empty: the honest "unavailable"
     instead of a confidently wrong map.
     """
@@ -446,7 +446,7 @@ def linked_memory_map(
 def classify_address(address: int, windows: tuple[LinkedRegionWindow, ...]) -> MemoryRegion | None:
     """The region whose window contains *address*, or None (the honest flag
     for an occupant outside every verified window — including the table
-    itself being wrong, which is exactly what Phase 2's police check
+    itself being wrong, which is exactly what the measurement's police check
     surfaces)."""
     for entry in windows:
         if entry.window.contains(address):

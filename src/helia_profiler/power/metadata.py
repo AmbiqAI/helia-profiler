@@ -1,4 +1,4 @@
-"""Typed model behind ``PowerResult.metadata`` (#154 Phase 2).
+"""Typed model behind ``PowerResult.metadata`` (#154).
 
 ``PowerMetadata`` is a plain **mutable** dataclass, not a ``dict[str, Any]``
 bag: its optional fields are enriched across pipeline stages (capture →

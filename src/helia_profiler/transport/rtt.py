@@ -24,9 +24,9 @@ For ordinary RTT runs, the firmware emits ``HPX_READY`` and then writes the
 ``HPX_START`` header in lossless (wait-for-space) mode: it blocks until the
 host drains the up-buffer, so the protocol sentinels are never lost no matter
 when the host attaches.  The host therefore only waits for ``HPX_READY`` as a
-liveness signal and does **not** reply on the down-channel.  (The old
-``HPX_HOST_READY`` down-channel handshake was the fragile path — stale D-cache
-on the target's down-buffer descriptor — that repeatedly regressed.)
+liveness signal and does **not** reply on the down-channel: a down-channel
+handshake is fragile because of stale D-cache on the target's down-buffer
+descriptor.
 
 Sequence:
   1. Reset the target via SEGGER commander (handles Apollo510 SBL correctly).
@@ -169,9 +169,9 @@ def _perform_rtt_ready_handshake(
     # Wait for the firmware's HPX_READY liveness line.  We do NOT reply on the
     # RTT down-channel: the firmware emits HPX_READY and the entire HPX_START
     # header in lossless (wait-for-space) mode, so it blocks until we drain the
-    # up-buffer and nothing is lost regardless of attach timing.  The old
-    # HPX_HOST_READY down-channel reply was the fragile path (stale D-cache on
-    # the target's down-buffer descriptor) that repeatedly regressed.
+    # up-buffer and nothing is lost regardless of attach timing.  A
+    # down-channel reply is fragile (stale D-cache on the target's
+    # down-buffer descriptor).
     return _wait_for_rtt_line(
         read_chunk,
         expected_line=_RTT_READY_LINE,

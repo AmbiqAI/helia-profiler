@@ -1,4 +1,4 @@
-"""The comparability dimension model (#154 Phase 3).
+"""The comparability dimension model (#154).
 
 One registry declaring every comparison dimension: its effect on comparison
 output, where its value lives in the run artifacts, whether the manifest may
@@ -36,8 +36,7 @@ from .run_summary import PowerSection
 class ComparisonDimension(StrEnum):
     """Comparison dimensions (the vocabulary behind comparability codes).
 
-    Moved here from ``results/issues.py`` in Phase 3 (which re-exports it);
-    now also covers the two dimensions that participate in comparability
+    Re-exported by ``results/issues.py``. Also covers the two dimensions that participate in comparability
     without appearing inside code strings: ``MODEL_SHA256`` (identity) and
     ``POWER_INTEGRITY`` (metric gate).
     """

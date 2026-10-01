@@ -1,4 +1,4 @@
-# readelf inventory fixtures (#133 Phase 1)
+# readelf inventory fixtures (#133)
 
 Unedited captures from the Arm GNU toolchain on an ELF built from the
 committed `main.c` + `linker.ld` (the NSX region shape: fill-to-end `.heap`,
@@ -17,7 +17,7 @@ llvm-nm -S --size-sort fw.elf > symbols_atfe.txt
 rm fw.elf
 ```
 
-`symbols.txt` is the sized-symbol listing of the SAME ELF (#133 Phase 3).
+`symbols.txt` is the sized-symbol listing of the SAME ELF (#133).
 The real objects match their sections byte-for-byte (g_stack == .stack,
 g_initialized == .data, g_zero_init == .bss). NB `__HeapBase`'s size is
 GNU nm SYNTHESIS (gap to the next symbol — it happens to equal .heap);

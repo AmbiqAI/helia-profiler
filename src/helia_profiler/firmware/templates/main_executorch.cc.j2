@@ -10,15 +10,13 @@
    that terminates the last line), and a single-line block holds exactly one
    line with no newlines of its own.
 
-   This conversion is a deliberate, disclosed BEHAVIOUR CHANGE (#154 phase 4,
-   step 4).  Standing alone, this template had drifted away from the skeleton
-   and lost features the other engines carry: the HPX_ENGINE / HPX_ITERATIONS
-   / HPX_WARMUP / HPX_POWER_SYNC wire lines, the heartbeat protocol (config
-   lines, phase heartbeats and in-op heartbeats -- the host's only hang
-   detector), the RTT lossless/non-blocking discipline around CSV dumps and
-   the final sentinel, the USB DTR settle and usb_timer pause/resume, the
-   named-constant SWO sync preamble, and UART support at all.  Inheriting the
-   skeleton restores all of them.  What it must NOT inherit is the clean
+   Inheriting the skeleton (#154) is what gives this engine the features the
+   other engines carry: the HPX_ENGINE / HPX_ITERATIONS / HPX_WARMUP /
+   HPX_POWER_SYNC wire lines, the heartbeat protocol (config lines, phase
+   heartbeats and in-op heartbeats -- the host's only hang detector), the RTT
+   lossless/non-blocking discipline around CSV dumps and the final sentinel,
+   the USB DTR settle and usb_timer pause/resume, the named-constant SWO sync
+   preamble, and UART support at all.  What it must NOT inherit is the clean
    window's measurement semantics (see engine_clean_window below) or the
    HPX_PROFILED_INFER_* summary (see engine_profiled_summary at the bottom):
    both would put this engine's load+execute cost on the wire under keys every
@@ -90,10 +88,9 @@ static bool g_profile_enabled = false;
 static bool g_layer_capacity_exceeded = false;
 
 // Heartbeat state — cheap counters/timestamps updated on each operator finish
-// so the host can detect a hung run without wall-clock timeouts.  Ported from
-// the heliaAOT callback in step 4: standing alone this template emitted no
-// in-op heartbeats at all, so a stalled ExecuTorch run looked identical to a
-// slow one from the host side.
+// so the host can detect a hung run without wall-clock timeouts.  Mirrors the
+// heliaAOT callback: without in-op heartbeats a stalled ExecuTorch run looks
+// identical to a slow one from the host side.
 static uint32_t g_hb_every_cyc = 0;
 static int      g_hb_every_ops = 0;
 static uint32_t g_hb_last_cyc = 0;
@@ -199,9 +196,9 @@ static const nsx::executorch::ProfilingCallbacks g_callbacks = {
 // single engine_invoke seam reused by the warmup, clean-window and profiled
 // loops, so whether a run is profiled is read from g_profile_enabled (armed by
 // engine_pass_warmup_arm / engine_pass_profile_arm / engine_profiler_off)
-// rather than passed as an argument.  The input/output memsets that used to
-// live here moved out to engine_reset_inputs / engine_reset_inputs_warm:
-// skeleton discipline puts input setup outside the measured region.
+// rather than passed as an argument.  The input/output memsets live in
+// engine_reset_inputs / engine_reset_inputs_warm: skeleton discipline puts
+// input setup outside the measured region.
 static nsx::executorch::RunResult run_model(void) {
     const nsx::executorch::Buffer inputs[] = { {g_input, sizeof(g_input)} };
     nsx::executorch::Buffer outputs[] = { {g_output, sizeof(g_output)} };

@@ -41,7 +41,7 @@ def _is_reserved_section_name(name: str) -> bool:
     for the same reason ``.stack`` does not: it is the live stack (armlink
     points the initial SP at its top), so it belongs in the footprint.
 
-    Reachability (#133 Phase 1): both the fromelf path and the INVENTORY
+    Reachability (#133): both the fromelf path and the INVENTORY
     readelf path (which takes general names, unlike the reserved-path
     readelf regex anchored on a leading dot) can produce armlink-style
     names like ARM_LIB_HEAP, so the case-insensitivity is load-bearing on
@@ -61,8 +61,8 @@ def _is_reserved_section_name(name: str) -> bool:
 # name/type/size/flags and deliberately discarded the Addr column; fromelf's
 # -v blocks carry Addr and full program headers. Everything below is
 # ADDITIVE: the BinarySections paths above are untouched, and every probe
-# degrades to None per #131's never-guess discipline. Nothing here reaches
-# an artifact yet (Phase 2 owns serialization and the region attribution).
+# degrades to None per #131's never-guess discipline. Serialization and the
+# region attribution live in ``memory_measurement`` and ``report``.
 
 
 @dataclass(frozen=True)
@@ -110,8 +110,7 @@ class LoadSegment:
     ~400x. Region-level load-image accounting that works on BOTH families:
     sum ``file_size`` grouped by ``classify_address(physical_address)``,
     never walk sections into segments. Per-symbol load-image attribution
-    on armlink is NOT recoverable from these primitives (Phase-3 scope
-    note)."""
+    on armlink is NOT recoverable from these primitives."""
 
     virtual_address: int
     physical_address: int
@@ -126,7 +125,7 @@ class SectionInventory:
     ``unparsed_rows`` counts SECTION rows/blocks that LOOKED like
     inventory entries but failed to parse. When nonzero the section
     inventory is PARTIAL — occupancy computed from it is understated, and
-    a Phase-2 consumer must treat the measured view as unavailable rather
+    a consumer must treat the measured view as unavailable rather
     than publish a silently-low number (#131's discipline, structural
     instead of a debug log). Segment parse failures are NOT counted:
     segments refine the inventory and their absence degrades
@@ -419,7 +418,7 @@ def symbol_inventory(
     unparsed count like a partial section inventory: refuse, never
     understate.
 
-    Scope limit carried from Phase 1: symbols attribute by VIRTUAL
+    Scope limit: symbols attribute by VIRTUAL
     address only — per-symbol load-image attribution is not recoverable
     on armlink (single aggregate PT_LOAD; see ``LoadSegment``).
     """

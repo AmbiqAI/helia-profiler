@@ -82,8 +82,8 @@ class PlanMemoryStage:
         )
 
         # 2. Build / select the memory plan, then append the hpx-owned
-        #    consumers every firmware reserves regardless of engine (#133
-        #    Phase 3) so the overflow check finally sees them.
+        #    consumers every firmware reserves regardless of engine (#133)
+        #    so the overflow check sees them.
         plan = self._select_plan(ctx)
         plan = _add_hpx_owned_consumers(plan, ctx)
         plan = self._apply_capacities(plan, ctx)
@@ -206,8 +206,8 @@ class PlanMemoryStage:
                 artifacts.executorch_output_size,
                 "other",
             )
-            # pmu_layer_records moved to _add_hpx_owned_consumers (#133
-            # Phase 3): every engine reserves the array, not just this one.
+            # pmu_layer_records is booked by _add_hpx_owned_consumers (#133):
+            # every engine reserves the array, not just this one.
         else:
             add(arena_phys, "tensor_arena", arena, "arena")
 
@@ -250,7 +250,7 @@ class PlanMemoryStage:
                     # An engine-supplied capacity (heliaAOT's own view of
                     # the part) disagrees with SocDef.memory. hpx's table
                     # wins, but silently resolving the disagreement hid a
-                    # real signal (#133 Phase 3 survey).
+                    # real signal (#133 survey).
                     log.warning(
                         "%s capacity: engine says %d B, SoC layout says "
                         "%d B — using the SoC layout.",
@@ -325,7 +325,7 @@ class PlanMemoryStage:
         )
 
 
-# hpx-owned consumers (#133 Phase 3)
+# hpx-owned consumers (#133)
 #
 # Sizes the firmware reserves that hpx decides HOST-SIDE, a priori — they
 # belong in the PLAN (the decision record) so the overflow check accounts
@@ -379,7 +379,7 @@ USB_CDC_BUFFER_BYTES = 4096 + 1024
 #: Boot stack, keyed on the STARTUP DECLARATION, not STACK_SIZE: AP4/AP5
 #: startup files declare g_pui32Stack[STACK_SIZE] as uint32 (4096 words =
 #: 16 KB); the AP3 family hardcodes g_pui32Stack[1024] = 4 KB and ignores
-#: STACK_SIZE entirely (nsx-core startup_gcc.c per part; #133 Phase 3
+#: STACK_SIZE entirely (nsx-core startup_gcc.c per part; #133
 #: survey). armlink reserves the same amounts as fixed scatter regions.
 _BOOT_STACK_BYTES: dict[SocFamily, int] = {
     SocFamily.AP3: 4_096,

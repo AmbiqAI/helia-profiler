@@ -151,7 +151,7 @@ class TestRun:
 
 
 class TestMigrationBehaviorPins:
-    """#177: the deltas the Phase-1 divergence pins exist to make
+    """#177: the deltas the legacy-table divergence pins exist to make
     reviewable, pinned as stage behavior."""
 
     def test_arena_inside_a_stack_reservation_now_fails(self, tmp_path, monkeypatch):
