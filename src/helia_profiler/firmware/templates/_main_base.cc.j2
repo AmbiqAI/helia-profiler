@@ -86,7 +86,7 @@
    anything else (a Python-spelled "True", a stray "1") hits the guarded
    empty-dict lookup below, whose KEY is the error message — StrictUndefined
    surfaces it verbatim, naming the seam, instead of a silently un-backed
-   SSRAM array (#172 review, message wording round 2). #}{% set _pmu_storage_decl %}{% block engine_pmu_storage_sram_resident %}true{% endblock %}{% endset %}{% set _pmu_storage_value = _pmu_storage_decl | trim %}{% if _pmu_storage_value not in ("true", "false") %}{{ {}["engine_pmu_storage_sram_resident must render exactly 'true' or 'false', got '" ~ _pmu_storage_value ~ "'"] }}{% endif %}{% set pmu_profiler_sram_resident = (_pmu_storage_value == "true") and not (power_only | default(false)) %}{% include "_system_includes.j2" %}
+   SSRAM array (#172). #}{% set _pmu_storage_decl %}{% block engine_pmu_storage_sram_resident %}true{% endblock %}{% endset %}{% set _pmu_storage_value = _pmu_storage_decl | trim %}{% if _pmu_storage_value not in ("true", "false") %}{{ {}["engine_pmu_storage_sram_resident must render exactly 'true' or 'false', got '" ~ _pmu_storage_value ~ "'"] }}{% endif %}{% set pmu_profiler_sram_resident = (_pmu_storage_value == "true") and not (power_only | default(false)) %}{% include "_system_includes.j2" %}
 {% if apollo3_burst %}
 // Apollo3/3P TurboSPOT (burst) control lives in the AmbiqSuite HAL umbrella.
 #include "am_mcu_apollo.h"
@@ -189,7 +189,7 @@ int main(void) {
    profile-only or lives behind not-use_stimer_window, and power windows are
    STIMER on every SoC.  Enabling TRCENA/CYCCNTENA there was debug circuitry
    turned on for nothing in the image whose whole design is minimal
-   circuitry (#161/#164 review finding). -#}
+   circuitry (#161, #164). -#}
 {%- if not power_only | default(false) %}
     dwt_init();
 {%- endif %}
@@ -677,7 +677,7 @@ int main(void) {
             // phase "stimer_dead", error_code = last probe's tick count
             // PLUS ONE: the envelope invariant forbids error_code 0 with
             // status=error, and 0 ticks IS the stopped-crystal signature
-            // (#180 review B2). The host subtracts the bias in its hint.
+            // (#180). The host subtracts the bias in its hint.
             // terminal_fail parks; no window opens on a dead clock.
             hpx_power_terminal_fail("stimer_dead", g_hpx_stimer_last_ticks + 1U);
 {% else %}

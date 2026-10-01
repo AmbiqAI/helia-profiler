@@ -83,10 +83,9 @@ def _executorch_power_cfg(tmp_path, mode="external", board="apollo510_evb"):
 # And one board per SoC family, because the bug class's two root causes ARE
 # family-specific (AP4 powers the debug domain down via
 # broad_peripheral_shutdown; AP3 simply has nothing asserting CDBGPWRUPREQ), so
-# "exempt one family" is a plausible narrowing too. Adversarial review proved
-# the gap: exempting AP3 from the gate left a mode-only tripwire fully green
-# while the family this module's own docstring names as vulnerable walked
-# straight through.
+# "exempt one family" is a plausible narrowing too: exempting AP3 from the
+# gate would leave a mode-only tripwire fully green while the family this
+# module's own docstring names as vulnerable walks straight through.
 @pytest.mark.parametrize("board", ["apollo3p_evb", "apollo4p_evb", "apollo510_evb"])
 @pytest.mark.parametrize("mode", ["external", "internal"])
 def test_preflight_accepting_executorch_power_requires_engine_matrix_coverage(

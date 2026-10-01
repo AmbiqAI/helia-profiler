@@ -106,9 +106,8 @@ _MARKERS: dict[str, str | tuple[str, ...]] = {
     "rtt_config": "SEGGER_RTT_ConfigUpBuffer",
     "armv8m_pmu": "ARM_PMU_",
     # Keyed on the emitted wire token, not the bare word: "busy_loop" appears
-    # in template comments on every STIMER render (found in the #169
-    # review, where a new comment flipped the last four discriminating
-    # apollo510 cases), so the bare word made this marker a constant there.
+    # in template comments on every STIMER render (#169), so the bare word
+    # made this marker a constant there.
     # The probe announce line renders exactly when the probe is active.
     "busy_loop_probe": "HPX_CLEAN_WINDOW_PROBE=busy_loop",
     "auto_window": "window_min",
@@ -326,7 +325,7 @@ def test_engine_wire_names_mirror_the_engine_type_property():
     from ``EngineType.wire_name``; the map above mirrors it so renders can be
     built without a PipelineContext.  Unbound, the HPX_ENGINE contract below
     would only prove the mirror is self-consistent -- exactly the dead-branch
-    shape #162 Phase 2 review found.  The literals are pinned too: these
+    shape in #162.  The literals are pinned too: these
     values go out on the wire and label every result for their engine.
     """
     assert _ENGINE_WIRE_NAMES == {engine.value: engine.wire_name for engine in EngineType}

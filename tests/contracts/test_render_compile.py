@@ -607,7 +607,7 @@ def _compile_doctored(tmp_path: Path, doctor) -> subprocess.CompletedProcess[str
 
 
 def test_gate_fails_on_an_undeclared_identifier(tmp_path):
-    """#171 round 2's bug class: a render arm referencing a name nothing declares."""
+    """The #171 bug class: a render arm referencing a name nothing declares."""
     anchor = _INJECT_ANCHOR
 
     def doctor(rendered: str) -> str:

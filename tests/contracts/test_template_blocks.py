@@ -174,7 +174,7 @@ def test_child_override_sets_are_the_documented_ones():
         "engine_profiled_summary",
         # Overridden EMPTY: ET has no PSRAM support (preflight rejects it)
         # and declares no psram_info — the base's metadata include made
-        # test-rendered psram arms uncompilable (#187 gate finding).
+        # test-rendered psram arms uncompilable (#187).
         "engine_psram_metadata",
     }
 
