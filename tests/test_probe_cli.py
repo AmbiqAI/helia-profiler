@@ -150,7 +150,9 @@ def test_probe_cli_reports_hpx_errors(monkeypatch, capsys) -> None:
         cli._cmd_probes_list()
 
     assert exc_info.value.code == 1
-    assert "JLinkExe not found" in capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert "Error: JLinkExe not found" in err
+    assert err.lower().count("hint: install segger tools") == 1
 
 
 def test_create_debug_memory_session_uses_default_pylink_first(monkeypatch) -> None:
