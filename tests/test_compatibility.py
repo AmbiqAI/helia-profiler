@@ -46,10 +46,10 @@ def test_default_baseline_has_exact_qualified_refs(tmp_path: Path) -> None:
     assert baseline.project("nsx-tflite-micro").ref == "7afcf2b4170e039caf4c49f91e2c45d5869be333"
     assert baseline.project("arm-cmsis-nn").ref == "6d21a6f821fb72541173a6c4d05d83329fa74f7c"
     assert baseline.module("arm-cmsis-nn").ref == "6d21a6f821fb72541173a6c4d05d83329fa74f7c"
-    assert baseline.project("ns-cmsis-nn").ref == "72482be6c941e7f49fe4d9442728e76fae710649"
+    assert baseline.project("ns-cmsis-nn").ref == "5f3fed9f21a57390cc7f00f77a37db8f5f110cb8"
     assert baseline.project("nsx-executorch").ref == "5514ac1ea8439b3fe615d180bf68c75a9dabb48e"
     assert baseline.engine("executorch").ref == "5514ac1ea8439b3fe615d180bf68c75a9dabb48e"
-    assert baseline.engine("helia-rt").ref == "ce03af575c5369605fea447f8a0b9c2808ea3a11"
+    assert baseline.engine("helia-rt").ref == "dc8533abe0ec7e01c251a067ce54c60f54237f5f"
     assert baseline.engine("helia-aot").min_version == "0.23.0"
     assert baseline.engine("helia-aot").max_version_exclusive == "0.26.0"
     assert len(baseline.fingerprint) == 64
@@ -69,9 +69,9 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "nsx-pmu-armv8m": "5725c065a0c3603132f1064ee2684d1fa8587c88",
         "nsx-tflite-micro": "7afcf2b4170e039caf4c49f91e2c45d5869be333",
         "arm-cmsis-nn": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",
-        "ns-cmsis-nn": "72482be6c941e7f49fe4d9442728e76fae710649",
+        "ns-cmsis-nn": "5f3fed9f21a57390cc7f00f77a37db8f5f110cb8",
         "nsx-executorch": "5514ac1ea8439b3fe615d180bf68c75a9dabb48e",
-        "helia-rt": "ce03af575c5369605fea447f8a0b9c2808ea3a11",
+        "helia-rt": "dc8533abe0ec7e01c251a067ce54c60f54237f5f",
         # nsx-sensors: INA228 driver pinned for the shunt-cal register
         # fixes and raw 40-bit accumulator reads power.driver: ina228
         # needs (issue #95).
@@ -83,12 +83,12 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "nsx-pmu-armv8m": "5725c065a0c3603132f1064ee2684d1fa8587c88",
         "nsx-tflite-micro": "7afcf2b4170e039caf4c49f91e2c45d5869be333",
         "arm-cmsis-nn": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",
-        "nsx-cmsis-nn": "72482be6c941e7f49fe4d9442728e76fae710649",
+        "nsx-cmsis-nn": "5f3fed9f21a57390cc7f00f77a37db8f5f110cb8",
         "nsx-executorch": "5514ac1ea8439b3fe615d180bf68c75a9dabb48e",
-        "nsx-helia-rt": "ce03af575c5369605fea447f8a0b9c2808ea3a11",
+        "nsx-helia-rt": "dc8533abe0ec7e01c251a067ce54c60f54237f5f",
         "nsx-sensors": "c219a2bc98c62f96819fae20ab6c8911fcea3e25",
     }
-    assert baseline.engine("helia-rt").version == "1.21.2"
+    assert baseline.engine("helia-rt").version == "1.21.3"
     assert baseline.engine("helia-aot").min_version == "0.23.0"
     assert baseline.engine("helia-aot").max_version_exclusive == "0.26.0"
     assert baseline.engine("tflm").governed_by_modules
