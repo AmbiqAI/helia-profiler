@@ -52,6 +52,108 @@ UNSUPPORTED = 'unsupported'
 
 Source: `src/helia_profiler/runtime_records.py:37`
 
+## helia_profiler.RuntimeSource
+
+`class` · `python`
+
+```python
+RuntimeSource(repo: str, commit: str) -> None
+```
+
+`dataclass`
+
+The repository and commit a runtime version is built from.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/runtime_records.py:40`
+
+### helia_profiler.RuntimeSource.repo
+
+`attribute` · `python`
+
+```python
+repo: str
+```
+
+Source: `src/helia_profiler/runtime_records.py:44`
+
+### helia_profiler.RuntimeSource.commit
+
+`attribute` · `python`
+
+```python
+commit: str
+```
+
+Source: `src/helia_profiler/runtime_records.py:45`
+
+## helia_profiler.QualifiedTarget
+
+`class` · `python`
+
+```python
+QualifiedTarget(board: str, clock: str, precisions: tuple[str, ...], basis: str, trace: str) -> None
+```
+
+`dataclass`
+
+A board class and clock the runtime is qualified on, and why.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/runtime_records.py:48`
+
+### helia_profiler.QualifiedTarget.board
+
+`attribute` · `python`
+
+```python
+board: str
+```
+
+Source: `src/helia_profiler/runtime_records.py:52`
+
+### helia_profiler.QualifiedTarget.clock
+
+`attribute` · `python`
+
+```python
+clock: str
+```
+
+Source: `src/helia_profiler/runtime_records.py:53`
+
+### helia_profiler.QualifiedTarget.precisions
+
+`attribute` · `python`
+
+```python
+precisions: tuple[str, ...]
+```
+
+Source: `src/helia_profiler/runtime_records.py:54`
+
+### helia_profiler.QualifiedTarget.basis
+
+`attribute` · `python`
+
+```python
+basis: str
+```
+
+Source: `src/helia_profiler/runtime_records.py:55`
+
+### helia_profiler.QualifiedTarget.trace
+
+`attribute` · `python`
+
+```python
+trace: str
+```
+
+Source: `src/helia_profiler/runtime_records.py:56`
+
 ## helia_profiler.RuntimeRecord
 
 `class` · `python`
@@ -69,9 +171,11 @@ RuntimeRecord(
 
 `dataclass`
 
+One runtime version: its source, supported precisions and qualified targets.
+
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/runtime_records.py:57`
+Source: `src/helia_profiler/runtime_records.py:59`
 
 ### helia_profiler.RuntimeRecord.name
 
@@ -81,7 +185,7 @@ Source: `src/helia_profiler/runtime_records.py:57`
 name: str
 ```
 
-Source: `src/helia_profiler/runtime_records.py:59`
+Source: `src/helia_profiler/runtime_records.py:63`
 
 ### helia_profiler.RuntimeRecord.version
 
@@ -91,7 +195,7 @@ Source: `src/helia_profiler/runtime_records.py:59`
 version: str
 ```
 
-Source: `src/helia_profiler/runtime_records.py:60`
+Source: `src/helia_profiler/runtime_records.py:64`
 
 ### helia_profiler.RuntimeRecord.default
 
@@ -101,7 +205,7 @@ Source: `src/helia_profiler/runtime_records.py:60`
 default: bool
 ```
 
-Source: `src/helia_profiler/runtime_records.py:61`
+Source: `src/helia_profiler/runtime_records.py:65`
 
 ### helia_profiler.RuntimeRecord.source
 
@@ -111,7 +215,7 @@ Source: `src/helia_profiler/runtime_records.py:61`
 source: RuntimeSource
 ```
 
-Source: `src/helia_profiler/runtime_records.py:62`
+Source: `src/helia_profiler/runtime_records.py:66`
 
 ### helia_profiler.RuntimeRecord.precisions
 
@@ -121,7 +225,7 @@ Source: `src/helia_profiler/runtime_records.py:62`
 precisions: Mapping[str, str | None]
 ```
 
-Source: `src/helia_profiler/runtime_records.py:64`
+Source: `src/helia_profiler/runtime_records.py:68`
 
 ### helia_profiler.RuntimeRecord.qualified
 
@@ -131,7 +235,7 @@ Source: `src/helia_profiler/runtime_records.py:64`
 qualified: tuple[QualifiedTarget, ...]
 ```
 
-Source: `src/helia_profiler/runtime_records.py:65`
+Source: `src/helia_profiler/runtime_records.py:69`
 
 ## helia_profiler.Qualification
 
@@ -143,9 +247,11 @@ Qualification(state: RuntimeQualification, reason: str | None, record: RuntimeRe
 
 `dataclass`
 
+The answer for one runtime version, precision and target, with the record it came from.
+
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/runtime_records.py:68`
+Source: `src/helia_profiler/runtime_records.py:72`
 
 ### helia_profiler.Qualification.state
 
@@ -155,7 +261,7 @@ Source: `src/helia_profiler/runtime_records.py:68`
 state: RuntimeQualification
 ```
 
-Source: `src/helia_profiler/runtime_records.py:70`
+Source: `src/helia_profiler/runtime_records.py:76`
 
 ### helia_profiler.Qualification.reason
 
@@ -165,7 +271,7 @@ Source: `src/helia_profiler/runtime_records.py:70`
 reason: str | None
 ```
 
-Source: `src/helia_profiler/runtime_records.py:71`
+Source: `src/helia_profiler/runtime_records.py:77`
 
 ### helia_profiler.Qualification.record
 
@@ -175,7 +281,7 @@ Source: `src/helia_profiler/runtime_records.py:71`
 record: RuntimeRecord | None
 ```
 
-Source: `src/helia_profiler/runtime_records.py:72`
+Source: `src/helia_profiler/runtime_records.py:78`
 
 ## helia_profiler.runtimes
 
@@ -191,7 +297,7 @@ Every runtime record shipped with this heliaPROFILER, by name then version.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/runtime_records.py:75`
+Source: `src/helia_profiler/runtime_records.py:81`
 
 ## helia_profiler.qualification
 
@@ -203,9 +309,10 @@ qualification(name: str, version: str | None = None, *, board: str, clock: str, 
 
 Whether ``name`` at ``version`` is qualified for ``precision`` on ``board`` at ``clock``.
 
-A version without a record is unsupported here, even one an engine's own
-version check would build: this heliaPROFILER makes no claim about it.
+A version without a record, or a precision its record does not declare,
+is unsupported here, even when an engine's own version check would build
+it: this heliaPROFILER makes no claim about it.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/runtime_records.py:121`
+Source: `src/helia_profiler/runtime_records.py:127`
