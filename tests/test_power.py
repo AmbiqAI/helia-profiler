@@ -5585,7 +5585,7 @@ class TestImplausibleGateRejection:
         result, _clock = self._capture(monkeypatch, [(2, 6), (300, 7)], stream=stream)
 
         assert len(result.gated_windows) == 1
-        assert result.gated_windows[0].duration_s == pytest.approx(0.007, rel=0.15)
+        assert result.gated_windows[0].duration_s == pytest.approx(0.007, rel=1e-6)
         timing = result.metadata.sync_timing_s
         assert timing is not None
         assert timing.capture_to_gate_rise_s == pytest.approx(0.300, abs=0.003)
@@ -5602,6 +5602,13 @@ class TestImplausibleGateRejection:
         assert with_boot.metadata.gating_diagnostics["poll_edge_uncertainty_s"] == pytest.approx(
             alone.metadata.gating_diagnostics["poll_edge_uncertainty_s"]
         )
+
+    def test_noise_blip_at_the_bound_does_not_drop_a_short_window(self, monkeypatch):
+        # A sub-minimum rise just before the bound is not an open window.
+        result, _clock = self._capture(monkeypatch, [(2, 7), (999, 5)])
+
+        assert len(result.gated_windows) == 1
+        assert result.gated_windows[0].duration_s == pytest.approx(0.007, rel=1e-6)
 
     def test_window_open_at_the_bound_is_not_replaced_by_a_short_high(self, monkeypatch):
         # The real window rises at 900 ms and is still high when the 1 s bound

@@ -564,7 +564,9 @@ def capture_gated(
         # A high open at the stop is the window the bound cut short: with a plan,
         # no shorter high stands in for it and it degrades as no_gate_fall.
         open_high = (
-            windows_done == 0 and first_high_at is not None and first_low_after_high_at is None
+            first_high_at is not None
+            and first_low_after_high_at is None
+            and time.monotonic() - first_high_at >= minimum_gate_s
         )
         allow_fallback = not (open_high and plan_floor_s > minimum_gate_s)
         fall_seen = saw_any_gate_fall and allow_fallback
@@ -593,12 +595,15 @@ def capture_gated(
         if selected_windows is None and plan_floor_s > minimum_gate_s:
             # The poll samples can hold a high the plan rejected as well as the
             # real window: select by the stream's rule instead of summing both.
-            selected_windows = _plan_ranked_candidates(
+            polled = _plan_ranked_candidates(
                 _segment_gpi_windows(aligned_poll_samples),
                 minimum_gate_s=minimum_gate_s,
                 plan_floor_s=plan_floor_s,
                 allow_fallback=allow_fallback,
-            )[-1:]
+            )
+            # An empty override forces the degraded path when an open window
+            # withheld the fallback; otherwise no candidate keeps the legacy one.
+            selected_windows = polled[-1:] if polled or not allow_fallback else None
 
         dump_dir = os.environ.get("HPX_GATE_DEBUG_DUMP")
         if dump_dir:
