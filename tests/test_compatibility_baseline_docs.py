@@ -1,9 +1,9 @@
 """Drift guard: the Reference compatibility-baseline page vs the baseline.
 
 The page's qualified-reference table is hand-maintained prose mirroring
-``src/helia_profiler/data/compatibility-baseline-v1.json`` plus the default
-runtime records and two code constants (#193), the same drift-guard precedent as pipeline.md
-(pinned by test_pipeline.py).
+``src/helia_profiler/data/compatibility-baseline-v1.json``, the runtime
+records and the code constants derived from them (#193), the same
+drift-guard precedent as pipeline.md (pinned by test_pipeline.py).
 
 Mechanics follow the pipeline.md precedent: the doc stays hand-written, the
 test extracts the table region and cross-checks it against the data. Refs in

@@ -31,10 +31,13 @@ The current baseline is `hpx-neuralspotx-0.8.1-2026-09`:
 
 Every baseline project and module ref is immutable by policy: only a full
 40-character Git object ID is accepted. Newly promoted annotated tags are
-verified and peeled before being recorded. Engine versions are not part of the baseline. Each runtime version hpx
-builds has a runtime record, `src/helia_profiler/data/runtimes/<name>/<version>.json`
-(listed by `hpx runtimes list`): its source commit, the precisions it supports
-and the targets it is qualified on. The default heliaRT version and source
+verified and peeled before being recorded.
+
+Engine versions are not part of the baseline. Each runtime version hpx
+builds has a runtime record,
+`src/helia_profiler/data/runtimes/<name>/<version>.json` (listed by
+`hpx runtimes list`): its source commit, the precisions it supports and the
+targets it is qualified on. The default heliaRT version and source
 commit (`HELIART_VERSION`, `HELIART_SOURCE_COMMIT` in
 `engines/helia_rt/artifacts.py`) and the ExecuTorch version and commit come
 from each engine's default record. The baseline's `helia-rt` and

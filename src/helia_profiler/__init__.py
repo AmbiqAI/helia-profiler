@@ -103,8 +103,10 @@ from .results import (
 )
 from .runtime_records import (
     Qualification,
+    QualifiedTarget,
     RuntimeQualification,
     RuntimeRecord,
+    RuntimeSource,
     qualification,
     runtimes,
 )
@@ -127,8 +129,10 @@ __all__ = [
     "QualificationState",
     "load_compatibility_baseline",
     "Qualification",
+    "QualifiedTarget",
     "RuntimeQualification",
     "RuntimeRecord",
+    "RuntimeSource",
     "qualification",
     "runtimes",
     "ModelConfig",
@@ -273,8 +277,10 @@ _STABLE_API = {
 
 _EXPERIMENTAL_API = {
     "Qualification",
+    "QualifiedTarget",
     "RuntimeQualification",
     "RuntimeRecord",
+    "RuntimeSource",
     "qualification",
     "runtimes",
     "MeasurementScope",

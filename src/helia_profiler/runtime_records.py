@@ -39,6 +39,8 @@ class RuntimeQualification(StrEnum):
 
 @dataclass(frozen=True)
 class RuntimeSource:
+    """The repository and commit a runtime version is built from."""
+
     repo: str
     commit: str
 
@@ -56,6 +58,8 @@ class QualifiedTarget:
 
 @dataclass(frozen=True)
 class RuntimeRecord:
+    """One runtime version: its source, supported precisions and qualified targets."""
+
     name: str
     version: str
     default: bool
@@ -67,6 +71,8 @@ class RuntimeRecord:
 
 @dataclass(frozen=True)
 class Qualification:
+    """The answer for one runtime version, precision and target, with the record it came from."""
+
     state: RuntimeQualification
     reason: str | None
     record: RuntimeRecord | None
@@ -123,8 +129,9 @@ def qualification(
 ) -> Qualification:
     """Whether ``name`` at ``version`` is qualified for ``precision`` on ``board`` at ``clock``.
 
-    A version without a record is unsupported here, even one an engine's own
-    version check would build: this heliaPROFILER makes no claim about it.
+    A version without a record, or a precision its record does not declare,
+    is unsupported here, even when an engine's own version check would build
+    it: this heliaPROFILER makes no claim about it.
     """
     if precision not in PRECISIONS:
         raise ValueError(

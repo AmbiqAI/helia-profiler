@@ -65,9 +65,12 @@ marker alone does not guard anything.
   `console/`. The library never prints; only the console layer does.
 - The heliaRT NSX wrapper (`engines/helia_rt/`) is a shim until heliaRT ships
   a native `nsx-module.yaml`.
-- Runtime versions live only in `src/helia_profiler/data/runtimes/<name>/<version>.json`.
-  Adopt a release by adding its record (and moving `default`), then update
-  the baseline's project and module refs to its commit.
+- Runtime versions and qualification live in
+  `src/helia_profiler/data/runtimes/<name>/<version>.json`. Adopt a release
+  by adding its record (and moving `default`), then update what still
+  mirrors it: the baseline's project and module refs (heliaRT, ExecuTorch)
+  or the `helia-aot` range in `pyproject.toml` and `uv.lock` (heliaAOT).
+  Tests check each mirror against the records.
 
 ## Hardware and probes
 

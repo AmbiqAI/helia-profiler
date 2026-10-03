@@ -213,7 +213,7 @@ def test_the_helia_aot_range_spans_the_records() -> None:
     assert _recorded_range([replace(newest[0], version="1.2.3")]) == ("1.2.3", "1.3.0")
     with pytest.raises(ConfigError, match="major.minor.patch"):
         _recorded_range([replace(newest[0], version="next")])
-    with pytest.raises(ConfigError, match="major.minor.patch"):
+    with pytest.raises(ConfigError, match="no heliaAOT runtime record"):
         _recorded_range([])
 
 
