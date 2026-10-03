@@ -101,6 +101,7 @@ helia_profiler = [
     "engines/templates/**/*",
     "data/*.json",
     "data/models/*.json",
+    "data/runtimes/*/*.json",
     "data/models/*.tflite",
     "vendor/segger_rtt/**/*",
     "fixture_closure.txt",

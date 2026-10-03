@@ -32,6 +32,7 @@ from ..results.dependencies import (
     DependencyWorkspace,
 )
 from ..results.serde import sha256_file
+from ..runtimes import runtimes
 from . import nsx as nsx_cli
 from .compatibility import (
     CMSIS_NN_PROVIDER_MODULES,
@@ -639,7 +640,8 @@ def _verify_baseline_resolution(ctx: PipelineContext, provenance: DependencyProv
         return
     baseline = compatibility.baseline
     pinned = {project.name: project.ref for project in baseline.projects}
-    engine_projects = {engine.name for engine in baseline.engines if engine.ref is not None}
+    # Projects whose source a runtime record pins: an engine source override redirects them.
+    engine_projects = {record.source.repo.rsplit("/", 1)[-1] for record in runtimes()} & set(pinned)
     module_projects = {module.name: module.project for module in provenance.modules}
     skipped: set[str] = set()
     baseline_module_projects = {module.name: module.project for module in baseline.modules}

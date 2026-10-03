@@ -36,6 +36,7 @@ from .fixture_target import FIXTURE_CLOCK_PROFILE, FixtureTarget, supported_fixt
 from .pipeline import PipelineContext, PipelineRunner, Stage, serialize_config
 from .placement import ArenaRole, Placement
 from .results.models import MemoryPlan, ToolchainInfo
+from .runtimes import qualification
 
 
 class FixtureTimingScope(StrEnum):
@@ -120,27 +121,31 @@ class FixtureCapability(StrEnum):
     UNSUPPORTED = "unsupported"
 
 
-#: Fixture support per engine and IO dtype. ``qualified`` has an exact device
-#: pass; ``supported`` builds but has none yet; ``unsupported`` is refused.
+#: The precision each fixture IO dtype stands for in the runtime records.
+_DTYPE_PRECISION = {
+    FixtureDType.INT8: "a8w8",
+    FixtureDType.INT16: "a16w8",
+    FixtureDType.FLOAT16: "fp16",
+    FixtureDType.FLOAT32: "fp32",
+}
+
+
+def _record_capability(engine: EngineType, dtype: FixtureDType) -> FixtureCapability:
+    answer = qualification(
+        engine.value,
+        board=supported_fixture_target().board,
+        clock=FIXTURE_CLOCK_PROFILE,
+        precision=_DTYPE_PRECISION[dtype],
+    )
+    return FixtureCapability(answer.state.value)
+
+
+#: Fixture support per engine and IO dtype, from each engine's default runtime
+#: record on the fixture target: ``qualified`` has a device pass, ``supported``
+#: builds but has none yet, ``unsupported`` is refused.
 FIXTURE_CAPABILITIES: dict[EngineType, dict[str, FixtureCapability]] = {
-    EngineType.TFLM: {
-        FixtureDType.INT8: FixtureCapability.QUALIFIED,
-        FixtureDType.INT16: FixtureCapability.SUPPORTED,
-        FixtureDType.FLOAT32: FixtureCapability.SUPPORTED,
-        FixtureDType.FLOAT16: FixtureCapability.UNSUPPORTED,
-    },
-    EngineType.HELIA_AOT: {
-        FixtureDType.INT8: FixtureCapability.QUALIFIED,
-        FixtureDType.INT16: FixtureCapability.SUPPORTED,
-        FixtureDType.FLOAT16: FixtureCapability.SUPPORTED,
-        FixtureDType.FLOAT32: FixtureCapability.SUPPORTED,
-    },
-    EngineType.HELIA_RT: {
-        FixtureDType.INT8: FixtureCapability.SUPPORTED,
-        FixtureDType.INT16: FixtureCapability.SUPPORTED,
-        FixtureDType.FLOAT16: FixtureCapability.SUPPORTED,
-        FixtureDType.FLOAT32: FixtureCapability.SUPPORTED,
-    },
+    engine: {dtype: _record_capability(engine, dtype) for dtype in FixtureDType}
+    for engine in (EngineType.TFLM, EngineType.HELIA_AOT, EngineType.HELIA_RT)
 }
 #: Engines that link a prepared runtime archive: (manifest stack, required backend).
 PREPARED_RUNTIME_ENGINES = {

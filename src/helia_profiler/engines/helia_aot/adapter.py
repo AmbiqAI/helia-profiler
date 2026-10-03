@@ -175,7 +175,7 @@ class HeliaAOTAdapter:
         prefix = config.engine.config.get("prefix", _DEFAULT_PREFIX)
         module_name = config.engine.config.get("module_name", _DEFAULT_MODULE_NAME)
 
-        aot_version = _check_helia_aot_version(config)
+        aot_version = _check_helia_aot_version()
         aot_platform = _resolve_aot_platform(config)
 
         aot_args = _merged_aot_args(config)

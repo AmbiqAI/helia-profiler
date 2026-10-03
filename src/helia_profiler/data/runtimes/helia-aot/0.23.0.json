@@ -1,0 +1,27 @@
+{
+  "schema": "helia-profiler/runtime@1",
+  "name": "helia-aot",
+  "version": "0.23.0",
+  "default": false,
+  "source": {
+    "repo": "AmbiqAI/helia-aot",
+    "commit": "d75c96eb84df05d7b7da554d28db0fe972368df0"
+  },
+  "precisions": {
+    "fp32": "supported",
+    "fp16": "supported",
+    "a8w8": "supported",
+    "a16w8": "supported"
+  },
+  "qualified": [
+    {
+      "board": "apollo510_evb",
+      "clock": "lp",
+      "precisions": [
+        "a8w8"
+      ],
+      "basis": "Exact device pass with one input and one output tensor, carried from the fixed-fixture capability table.",
+      "trace": "helia-profiler 0.1.6"
+    }
+  ]
+}

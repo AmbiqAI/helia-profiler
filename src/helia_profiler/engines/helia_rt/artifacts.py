@@ -23,27 +23,26 @@ import re
 from pathlib import Path
 
 from ...config import ProfileConfig
-from ...errors import EngineError
+from ...errors import ConfigError, EngineError
 from ...platform import CoreArch, PlatformRegistry, get_board, get_soc
+from ...runtimes import runtime
 from ..semver import parse_semver
 
 log = logging.getLogger("hpx")
 
-# - HELIART_VERSION     : pinned default. Used when the user provides no
-#                         override. Bump when a new release is adopted.
-# - HELIART_MIN_VERSION : minimum-supported version. Any resolved
-#                         distribution (default download, custom GitHub
-#                         ref, or local dist_path) must be >= this.
-#                         Bump only on incompatible API changes.
-HELIART_VERSION = "1.21.3"
+# The pinned default comes from the default helia-rt runtime record; adopt a
+# new release by adding its record. HELIART_MIN_VERSION is the oldest
+# distribution (default download, custom GitHub ref, or local dist_path) the
+# adapter can read; bump it only on incompatible API changes.
+_DEFAULT_RECORD = runtime("helia-rt")
+if _DEFAULT_RECORD is None:
+    raise ConfigError("heliaPROFILER ships no default helia-rt runtime record")
+HELIART_VERSION = _DEFAULT_RECORD.version
 HELIART_MIN_VERSION = "1.16.0"
-HELIART_GH_REPO = "AmbiqAI/helia-rt"
+HELIART_GH_REPO = _DEFAULT_RECORD.source.repo
 # The tag format changed at HELIART_MIN_VERSION; _detect_version handles the legacy one.
 HELIART_RELEASE_TAG = f"helia-rt-v{HELIART_VERSION}"
-# Immutable source identity corresponding to HELIART_RELEASE_TAG. Keep this
-# alongside the release pin so compatibility metadata never depends on a
-# movable tag name.
-HELIART_SOURCE_COMMIT = "dc8533abe0ec7e01c251a067ce54c60f54237f5f"
+HELIART_SOURCE_COMMIT = _DEFAULT_RECORD.source.commit
 
 # NSX registry identity for heliaRT. By default hpx declares this module and
 # lets NSX clone it from the registered GitHub upstream; a user-provided

@@ -1,8 +1,8 @@
 """Drift guard: the Reference compatibility-baseline page vs the baseline.
 
 The page's qualified-reference table is hand-maintained prose mirroring
-``src/helia_profiler/data/compatibility-baseline-v1.json`` plus two code
-constants (#193), the same drift-guard precedent as pipeline.md
+``src/helia_profiler/data/compatibility-baseline-v1.json`` plus the default
+runtime records and two code constants (#193), the same drift-guard precedent as pipeline.md
 (pinned by test_pipeline.py).
 
 Mechanics follow the pipeline.md precedent: the doc stays hand-written, the
@@ -19,10 +19,15 @@ import json
 import re
 from pathlib import Path
 
+from helia_profiler.engines.helia_aot.compile import (
+    HELIAAOT_MAX_VERSION_EXCLUSIVE,
+    HELIAAOT_MIN_VERSION,
+)
 from helia_profiler.engines.helia_rt.artifacts import (
     HELIART_MIN_VERSION,
     HELIART_VERSION,
 )
+from helia_profiler.runtimes import runtimes
 
 _REPO = Path(__file__).resolve().parents[1]
 _DOC = (
@@ -68,30 +73,30 @@ def test_every_baseline_entry_has_a_doc_row_with_its_ref():
             "table — the doc has drifted from the baseline JSON"
         )
 
-    for name, engine in data["engines"].items():
-        assert name in _ENGINE_DOC_NAMES, (
-            f"engine '{name}' is new to the baseline JSON -- add it to "
-            "_ENGINE_DOC_NAMES here and give it a doc row"
+    for record in runtimes():
+        assert record.name in _ENGINE_DOC_NAMES, (
+            f"runtime '{record.name}' is new -- add it to _ENGINE_DOC_NAMES here "
+            "and give it a doc row"
         )
-        doc_name = _ENGINE_DOC_NAMES[name]
-        assert doc_name in table, f"engine '{name}' has no doc row"
-        if "version" in engine:
-            assert str(engine["version"]) in table, (
-                f"engine '{name}' version={engine['version']} missing from the doc table"
+        row = next(
+            (
+                line
+                for line in table.splitlines()
+                if f"| {_ENGINE_DOC_NAMES[record.name]} |" in line
+            ),
+            None,
+        )
+        assert row is not None, f"runtime '{record.name}' has no doc row"
+        if record.name != "tflm":  # the tflm row documents the profile path's module refs
+            assert f"`{record.version}`" in row, (
+                f"runtime record {record.name} {record.version} missing from the doc table"
             )
-        for key in ("min_version", "max_version_exclusive"):
-            # Key-scoped, not table-wide: a one-sided range bump can alias an
-            # unrelated value elsewhere in the table (#207).
-            if key in engine:
-                assert f"{key}={engine[key]}" in table, (
-                    f"engine '{name}' {key}={engine[key]} missing from the doc "
-                    "table (expected as 'key=value')"
-                )
-        if "ref" in engine:
-            assert engine["ref"][:8] in table, f"engine '{name}' ref missing from the doc table"
-        if engine.get("governed_by_modules"):
-            row = next(line for line in table.splitlines() if f"| {doc_name} |" in line)
-            assert "governed" in row, f"'{doc_name}' row no longer states module governance"
+        if record.default and record.name in ("helia-rt", "executorch"):
+            assert record.source.commit[:8] in row, f"{record.name} commit missing from the doc"
+    tflm_row = next(line for line in table.splitlines() if "| tflm |" in line)
+    assert "governed" in tflm_row, "the tflm row no longer states module governance"
+    aot_row = next(line for line in table.splitlines() if "| heliaAOT |" in line)
+    assert f"`>={HELIAAOT_MIN_VERSION},<{HELIAAOT_MAX_VERSION_EXCLUSIVE}`" in aot_row
 
     package = data["neuralspotx"]
     assert package["version"] in table
@@ -105,7 +110,7 @@ def test_every_doc_ref_exists_in_the_baseline():
     data = json.loads(_JSON.read_text(encoding="utf-8"))
 
     known_hex = {p["ref"] for p in data["projects"].values()}
-    known_hex |= {e["ref"] for e in data["engines"].values() if "ref" in e}
+    known_hex |= {record.source.commit for record in runtimes()}
     known_hex.add(data["neuralspotx"]["sha256"])
 
     # Hygiene first: a stale ref typed with an ASCII "..." or truncated below

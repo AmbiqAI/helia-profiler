@@ -38,7 +38,6 @@ _REQUIRED_MODULES = frozenset(
         "nsx-executorch",
     }
 )
-_REQUIRED_ENGINES = frozenset({"helia-rt", "helia-aot", "tflm", "executorch"})
 
 
 class QualificationState(StrEnum):
@@ -68,25 +67,6 @@ class CompatibilityModule:
 
 
 @dataclass(frozen=True)
-class CompatibilityEngine:
-    """Engine version policy and default source reference.
-
-    Exactly one of ``version``, ``min_version``, or ``governed_by_modules``
-    must be set: a pinned engine release, a semver floor/ceiling policy, or a
-    marker that the engine's qualification is fully carried by its NSX
-    module refs (e.g. stock TFLM, pinned via ``nsx-tflite-micro`` /
-    ``arm-cmsis-nn``).
-    """
-
-    name: str
-    version: str | None = None
-    ref: str | None = None
-    min_version: str | None = None
-    max_version_exclusive: str | None = None
-    governed_by_modules: bool = False
-
-
-@dataclass(frozen=True)
 class CompatibilityBaseline:
     """Validated, immutable baseline loaded from HPX package data."""
 
@@ -98,7 +78,6 @@ class CompatibilityBaseline:
     neuralspotx_sha256: str
     projects: tuple[CompatibilityProject, ...]
     modules: tuple[CompatibilityModule, ...]
-    engines: tuple[CompatibilityEngine, ...]
 
     def project(self, name: str) -> CompatibilityProject:
         for project in self.projects:
@@ -116,15 +95,6 @@ class CompatibilityBaseline:
         raise ConfigError(
             f"Compatibility baseline does not define module '{name}'",
             hint="Update the HPX compatibility baseline before using this module.",
-        )
-
-    def engine(self, name: str) -> CompatibilityEngine:
-        for engine in self.engines:
-            if engine.name == name:
-                return engine
-        raise ConfigError(
-            f"Compatibility baseline does not define engine '{name}'",
-            hint="Update the HPX compatibility baseline before using this engine.",
         )
 
     @property
@@ -151,20 +121,6 @@ class CompatibilityBaseline:
             "modules": {
                 module.name: {"project": module.project, "ref": module.ref}
                 for module in self.modules
-            },
-            "engines": {
-                engine.name: {
-                    key: value
-                    for key, value in {
-                        "version": engine.version,
-                        "ref": engine.ref,
-                        "min_version": engine.min_version,
-                        "max_version_exclusive": engine.max_version_exclusive,
-                        "governed_by_modules": engine.governed_by_modules or None,
-                    }.items()
-                    if value is not None
-                }
-                for engine in self.engines
             },
         }
 
@@ -411,78 +367,6 @@ def _parse_baseline(raw: Any) -> CompatibilityBaseline:
                 f"project '{module.project}'"
             )
 
-    engines = tuple(
-        CompatibilityEngine(
-            name=name,
-            version=_optional_string(entry, "version"),
-            ref=(
-                _immutable_ref(entry, "ref", f"engine '{name}'")
-                if entry.get("ref") is not None
-                else None
-            ),
-            min_version=_optional_string(entry, "min_version"),
-            max_version_exclusive=_optional_string(entry, "max_version_exclusive"),
-            governed_by_modules=_optional_bool(entry, "governed_by_modules"),
-        )
-        for name, value in _mapping(raw, "engines").items()
-        for entry in (_entry(value, f"engine '{name}'"),)
-    )
-    for engine in engines:
-        # The three policy modes (pinned version, semver range, or fully
-        # module-governed) are mutually exclusive per CompatibilityEngine's
-        # docstring — enforce that here, not just "at least one is set",
-        # so an ambiguous baseline (e.g. both `version` and `min_version`)
-        # fails loudly instead of leaving it to each consumer to pick a
-        # winner independently.
-        policy_modes = (
-            engine.version is not None,
-            engine.min_version is not None or engine.max_version_exclusive is not None,
-            engine.governed_by_modules,
-        )
-        if sum(policy_modes) == 0:
-            raise ConfigError(
-                f"Compatibility baseline engine '{engine.name}' needs a version, a "
-                "min_version/max_version_exclusive policy, or governed_by_modules."
-            )
-        if sum(policy_modes) > 1:
-            raise ConfigError(
-                f"Compatibility baseline engine '{engine.name}' sets more than one "
-                "policy mode — exactly one of a pinned version, a "
-                "min_version/max_version_exclusive range, or governed_by_modules "
-                "is allowed."
-            )
-        if engine.version is not None:
-            # A pinned version is documented (the Reference compatibility-baseline page) as a version/ref *pair*, and must
-            # itself be strict major.minor.patch like the range bounds —
-            # otherwise a malformed pin would silently produce incomplete
-            # provenance instead of failing loudly at load time.
-            _semver_tuple(engine.version)
-            if engine.ref is None:
-                raise ConfigError(
-                    f"Compatibility baseline engine '{engine.name}' sets a pinned "
-                    "version but no ref — a pinned engine policy requires both."
-                )
-        # Validate each bound individually (not only when both are present) so a
-        # malformed single-sided policy fails loudly at load time instead of
-        # silently disabling the floor/ceiling check downstream.
-        min_tuple = _semver_tuple(engine.min_version) if engine.min_version is not None else None
-        max_tuple = (
-            _semver_tuple(engine.max_version_exclusive)
-            if engine.max_version_exclusive is not None
-            else None
-        )
-        if min_tuple is not None and max_tuple is not None and min_tuple >= max_tuple:
-            raise ConfigError(
-                f"Compatibility baseline engine '{engine.name}' has an empty or "
-                f"inverted version range: >={engine.min_version},"
-                f"<{engine.max_version_exclusive}"
-            )
-    missing_engines = sorted(_REQUIRED_ENGINES - {engine.name for engine in engines})
-    if missing_engines:
-        raise ConfigError(
-            "Compatibility baseline is missing required engines: " + ", ".join(missing_engines)
-        )
-
     return CompatibilityBaseline(
         schema=BASELINE_SCHEMA,
         schema_version=BASELINE_SCHEMA_VERSION,
@@ -492,7 +376,6 @@ def _parse_baseline(raw: Any) -> CompatibilityBaseline:
         neuralspotx_sha256=package_sha256,
         projects=projects,
         modules=modules,
-        engines=engines,
     )
 
 
@@ -513,22 +396,6 @@ def _string(value: Mapping[str, Any], key: str) -> str:
     result = value.get(key)
     if not isinstance(result, str) or not result.strip():
         raise ConfigError(f"Compatibility baseline field '{key}' must be a non-empty string.")
-    return result
-
-
-def _optional_string(value: Mapping[str, Any], key: str) -> str | None:
-    result = value.get(key)
-    if result is None:
-        return None
-    if not isinstance(result, str) or not result.strip():
-        raise ConfigError(f"Compatibility baseline field '{key}' must be a string when set.")
-    return result
-
-
-def _optional_bool(value: Mapping[str, Any], key: str) -> bool:
-    result = value.get(key, False)
-    if not isinstance(result, bool):
-        raise ConfigError(f"Compatibility baseline field '{key}' must be a boolean when set.")
     return result
 
 
@@ -556,14 +423,3 @@ def _immutable_ref(value: Mapping[str, Any], key: str, owner: str) -> str:
 
 def _is_sha256(value: str) -> bool:
     return len(value) == 64 and all(char in "0123456789abcdef" for char in value)
-
-
-def _semver_tuple(value: str) -> tuple[int, int, int]:
-    """Parse a strict ``major.minor.patch`` version for range validation."""
-    parts = value.split(".")
-    if len(parts) != 3 or not all(part.isdigit() for part in parts):
-        raise ConfigError(
-            f"Compatibility baseline version {value!r} must be in major.minor.patch form."
-        )
-    major, minor, patch = (int(part) for part in parts)
-    return (major, minor, patch)

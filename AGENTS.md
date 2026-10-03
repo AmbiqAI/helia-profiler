@@ -64,8 +64,10 @@ marker alone does not guard anything.
 - **`cli/` stays thin:** parse args, call `api`/`Session`, hand results to
   `console/`. The library never prints; only the console layer does.
 - The heliaRT NSX wrapper (`engines/helia_rt/`) is a shim until heliaRT ships
-  a native `nsx-module.yaml`; bump `HELIART_VERSION` in `artifacts.py` to
-  adopt a release.
+  a native `nsx-module.yaml`.
+- Runtime versions live only in `src/helia_profiler/data/runtimes/<name>/<version>.json`.
+  Adopt a release by adding its record (and moving `default`), then update
+  the baseline's project and module refs to its commit.
 
 ## Hardware and probes
 

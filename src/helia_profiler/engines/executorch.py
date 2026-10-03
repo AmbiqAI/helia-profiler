@@ -12,6 +12,7 @@ from typing import Any
 from ..config import ProfileConfig
 from ..errors import EngineError
 from ..results import NsxModuleRef
+from ..runtimes import RuntimeRecord, runtime
 from . import EngineType
 from .base import ExecutorchArtifacts, PsramWeightsSource, SingleArenaPlacementMixin
 from .cmsis_nn import arm_cmsis_nn_module_ref, cmsis_nn_module_ref
@@ -20,6 +21,13 @@ log = logging.getLogger("hpx")
 
 EXECUTORCH_MODULE = "nsx-executorch"
 EXECUTORCH_PROJECT = "nsx-executorch"
+
+
+def _executorch_record() -> RuntimeRecord:
+    record = runtime("executorch")
+    if record is None:
+        raise EngineError("heliaPROFILER ships no default executorch runtime record")
+    return record
 
 
 # Nested ExecuTorch submodules required by nsx-executorch's stock CMake
@@ -170,9 +178,9 @@ def _resolve_source_root(config: ProfileConfig) -> Path:
     source_value = config.engine.config.get("source_path")
     if source_value is None or source_value == "":
         baseline = config.compatibility_baseline
-        # Clone at the same ref the checkout verification enforces; the
+        # Clone at the commit the checkout verification enforces; the
         # project entry contributes the URL.
-        ref = baseline.engine("executorch").ref or baseline.project(EXECUTORCH_PROJECT).ref
+        ref = _executorch_record().source.commit
         if config.build.offline:
             return _offline_cached_source(ref)
         return _auto_clone_nsx_executorch(baseline.project(EXECUTORCH_PROJECT).url, ref)
@@ -444,7 +452,7 @@ class ExecuTorchAdapter(SingleArenaPlacementMixin):
                 f"Invalid nsx-executorch checkout: {source_root}",
                 hint="Expected version.txt, nsx-module.yaml, and CMakeLists.txt at the checkout root.",
             )
-        expected_engine = config.compatibility_baseline.engine("executorch")
+        expected_engine = _executorch_record()
         actual_version = (source_root / "version.txt").read_text(encoding="utf-8").strip()
         if actual_version != expected_engine.version:
             raise EngineError(
@@ -453,9 +461,9 @@ class ExecuTorchAdapter(SingleArenaPlacementMixin):
                 hint="Check out the exact nsx-executorch commit pinned by HPX.",
             )
         actual_ref = _checkout_commit(source_root)
-        if actual_ref != expected_engine.ref:
+        if actual_ref != expected_engine.source.commit:
             raise EngineError(
-                f"nsx-executorch checkout is at {actual_ref}, expected {expected_engine.ref}",
+                f"nsx-executorch checkout is at {actual_ref}, expected {expected_engine.source.commit}",
                 hint="Fetch nsx-executorch main and check out the exact commit pinned by HPX.",
             )
         if not (source_root / "external" / "executorch" / "version.txt").is_file():

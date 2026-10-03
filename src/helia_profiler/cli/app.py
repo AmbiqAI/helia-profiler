@@ -700,4 +700,36 @@ def cache_info_command() -> None:
 app.add_typer(cache_app, name="cache")
 
 
+runtimes_app = typer.Typer(
+    help="Show the runtime versions this hpx records and their qualification"
+)
+
+
+@runtimes_app.callback(invoke_without_command=True)
+def _runtimes_callback(ctx: typer.Context) -> None:
+    if ctx.invoked_subcommand is None:
+        click.echo(ctx.get_help())
+        raise typer.Exit(0)
+
+
+@runtimes_app.command("list", help="List every runtime record")
+def runtimes_list_command() -> None:
+    from .runtimes_cmd import _cmd_runtimes_list
+
+    _cmd_runtimes_list()
+
+
+@runtimes_app.command("show", help="Print one runtime record (the default when VERSION is omitted)")
+def runtimes_show_command(
+    name: Annotated[str, typer.Argument(help="Runtime name, e.g. helia-rt")],
+    version: Annotated[Optional[str], typer.Argument(help="Runtime version")] = None,
+) -> None:
+    from .runtimes_cmd import _cmd_runtimes_show
+
+    _cmd_runtimes_show(name, version)
+
+
+app.add_typer(runtimes_app, name="runtimes")
+
+
 __all__ = ["app"]

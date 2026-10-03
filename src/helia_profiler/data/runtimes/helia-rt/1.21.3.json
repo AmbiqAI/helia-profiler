@@ -1,0 +1,17 @@
+{
+  "schema": "helia-profiler/runtime@1",
+  "name": "helia-rt",
+  "version": "1.21.3",
+  "default": true,
+  "source": {
+    "repo": "AmbiqAI/helia-rt",
+    "commit": "dc8533abe0ec7e01c251a067ce54c60f54237f5f"
+  },
+  "precisions": {
+    "fp32": "supported",
+    "fp16": "supported",
+    "a8w8": "supported",
+    "a16w8": "supported"
+  },
+  "qualified": []
+}

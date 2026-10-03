@@ -184,8 +184,10 @@ has extent 1, so declare it with `PerTensorQuantization`. A `FixedFixture` keeps
 its single-INT8 rules and renders exactly as before.
 
 `FIXTURE_CAPABILITIES` is the producer's declaration per engine and IO dtype
-(`FixtureDType`). No heliaRT
-entry is qualified until a device pass. The table uses these statuses:
+(`FixtureDType`), read from each engine's default runtime record on the
+fixture target (int8 is `a8w8`, int16 `a16w8`, float16 `fp16`, float32
+`fp32`). No heliaRT entry is qualified until a device pass. The table uses
+these statuses:
 
 - `qualified` means an exact device pass;
 - `supported` means it builds but has no device pass yet;
