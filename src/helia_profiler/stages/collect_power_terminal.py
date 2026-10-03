@@ -304,7 +304,7 @@ class CollectPowerTerminalStage:
         # time the gated loop alone, so the firmware side is the gate bracket,
         # not the whole window around the monitor's arm and read (#299).
         agreement = assess_run_window_clock(
-            elapsed_us=terminal.gate_elapsed_us,
+            gate_elapsed_us=terminal.gate_elapsed_us,
             internal_mode=internal_mode,
             gated_result=(
                 ctx.power_run.observation.result if ctx.power_run.observation is not None else None
@@ -326,7 +326,7 @@ class CollectPowerTerminalStage:
                 "window clock and the reference disagree, so elapsed time, "
                 "average power and average current derived from it are "
                 "suspect; integrated energy and charge are not.",
-                agreement.elapsed_s,
+                agreement.gate_elapsed_s,
                 agreement.reference_source,
                 agreement.reference_s,
                 agreement.relative_error * 100.0,

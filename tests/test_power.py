@@ -4717,7 +4717,7 @@ class TestObserverAbsoluteSlack:
             ),
         )
         agreement = assess_run_window_clock(
-            elapsed_us=130_000,
+            gate_elapsed_us=130_000,
             internal_mode=False,
             gated_result=result,
             planned_inference_count=None,
@@ -4734,7 +4734,7 @@ class TestObserverAbsoluteSlack:
         # 1 s reference, 12 ms disagreement: outside the pure 1% band, inside
         # the quantization floor a 100 Hz stats stream implies.
         floored = assess_window_clock(
-            elapsed_us=1_012_000,
+            gate_elapsed_us=1_012_000,
             reference_s=1.0,
             reference_source="gated_windows",
             relative_tolerance=0.01,
@@ -4744,7 +4744,7 @@ class TestObserverAbsoluteSlack:
         assert floored.to_metadata()["absolute_slack_s"] == pytest.approx(0.028)
 
         bare = assess_window_clock(
-            elapsed_us=1_012_000,
+            gate_elapsed_us=1_012_000,
             reference_s=1.0,
             reference_source="gated_windows",
             relative_tolerance=0.01,
@@ -4759,7 +4759,7 @@ class TestObserverAbsoluteSlack:
         # 60 ms disagreement still fails -- the floor must never widen the
         # band where the relative term already covers quantization.
         agreement = assess_window_clock(
-            elapsed_us=5_060_000,
+            gate_elapsed_us=5_060_000,
             reference_s=5.0,
             reference_source="gated_windows",
             relative_tolerance=0.01,
@@ -4789,7 +4789,7 @@ class TestGateArbitrationComposition:
         from helia_profiler.power.diagnostics import WindowClockAgreement
 
         return WindowClockAgreement(
-            elapsed_us=4_427_000 if agrees else 5_017_000,
+            gate_elapsed_us=4_427_000 if agrees else 5_017_000,
             reference_s=4.427,
             reference_source="gated_windows",
             relative_tolerance=0.01,

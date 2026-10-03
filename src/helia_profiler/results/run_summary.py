@@ -59,7 +59,10 @@ RUN_SUMMARY_SCHEMA = "hpx.run-summary"
 #: v10: heliaAOT model_analysis counts SQRT, RSQRT, ABS and
 #: SQUARED_DIFFERENCE as elementwise; helia-aot total_ops and TOPS move for
 #: models with those ops.
-RUN_SUMMARY_SCHEMA_VERSION = 10
+#: v11: #370 the window-clock agreement contexts (power.window_observer_mismatch,
+#: power.window_clock_mismatch) name the firmware gate interval gate_elapsed_us /
+#: gate_elapsed_s; elapsed_us stays the whole firmware window (ceiling, frozen).
+RUN_SUMMARY_SCHEMA_VERSION = 11
 
 __all__ = [
     "RUN_SUMMARY_SCHEMA",

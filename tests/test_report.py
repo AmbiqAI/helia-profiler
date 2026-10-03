@@ -1094,6 +1094,30 @@ def test_write_summary_carries_the_power_firmware_fingerprint(tmp_path: Path):
     assert "firmware_code_fingerprint" not in bare_summary["power"]
 
 
+def test_window_clock_agreement_metadata_names_the_gate_interval():
+    # The agreement compares the firmware gate interval; the ceiling and the
+    # frozen-clock record use elapsed_us for the whole window. One key name for
+    # two intervals let a reader pair the wrong numbers (#370).
+    from helia_profiler.power.diagnostics import WindowClockAgreement
+
+    agreement = WindowClockAgreement(
+        gate_elapsed_us=5_000_000,
+        reference_s=5.0,
+        reference_source="gpi_stream",
+        relative_tolerance=0.01,
+    )
+
+    assert set(agreement.to_metadata()) == {
+        "gate_elapsed_us",
+        "gate_elapsed_s",
+        "reference_s",
+        "reference_source",
+        "relative_error",
+        "relative_tolerance",
+        "ratio",
+    }
+
+
 def test_window_clock_ceiling_metadata_keys_are_the_documented_set():
     # the guide/power page names these fields for users reading summary.json,
     # and #115 put them in the summary's power block. Nothing else pins the

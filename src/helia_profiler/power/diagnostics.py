@@ -430,7 +430,7 @@ class WindowClockAgreement:
 
     #: The firmware's gate interval (``HPX_POWER_GATE_ELAPSED_US``): both
     #: references time the gated loop alone.
-    elapsed_us: int
+    gate_elapsed_us: int
     reference_s: float
     #: Which independent measurement ``reference_s`` came from, so a warning
     #: can name it and a reader knows how much to trust the comparison.
@@ -444,18 +444,18 @@ class WindowClockAgreement:
     absolute_slack_s: float = 0.0
 
     @property
-    def elapsed_s(self) -> float:
-        return self.elapsed_us / 1_000_000.0
+    def gate_elapsed_s(self) -> float:
+        return self.gate_elapsed_us / 1_000_000.0
 
     @property
     def ratio(self) -> float:
-        return self.elapsed_s / self.reference_s if self.reference_s > 0 else 0.0
+        return self.gate_elapsed_s / self.reference_s if self.reference_s > 0 else 0.0
 
     @property
     def relative_error(self) -> float:
         if self.reference_s <= 0:
             return 0.0
-        return abs(self.elapsed_s - self.reference_s) / self.reference_s
+        return abs(self.gate_elapsed_s - self.reference_s) / self.reference_s
 
     @property
     def tolerance_s(self) -> float:
@@ -463,12 +463,12 @@ class WindowClockAgreement:
 
     @property
     def agrees(self) -> bool:
-        return abs(self.elapsed_s - self.reference_s) <= self.tolerance_s
+        return abs(self.gate_elapsed_s - self.reference_s) <= self.tolerance_s
 
     def to_metadata(self) -> dict[str, float | int | str]:
         metadata: dict[str, float | int | str] = {
-            "elapsed_us": self.elapsed_us,
-            "elapsed_s": round(self.elapsed_s, 6),
+            "gate_elapsed_us": self.gate_elapsed_us,
+            "gate_elapsed_s": round(self.gate_elapsed_s, 6),
             "reference_s": round(self.reference_s, 6),
             "reference_source": self.reference_source,
             "relative_error": round(self.relative_error, 6),
@@ -482,7 +482,7 @@ class WindowClockAgreement:
 
 def assess_window_clock(
     *,
-    elapsed_us: int,
+    gate_elapsed_us: int,
     reference_s: float,
     reference_source: str,
     relative_tolerance: float,
@@ -496,7 +496,7 @@ def assess_window_clock(
     if reference_s <= 0:
         return None
     return WindowClockAgreement(
-        elapsed_us=elapsed_us,
+        gate_elapsed_us=gate_elapsed_us,
         reference_s=reference_s,
         reference_source=reference_source,
         relative_tolerance=relative_tolerance,
@@ -609,7 +609,7 @@ def assess_window_clock_ceiling(
 
 def assess_run_window_clock(
     *,
-    elapsed_us: int | None,
+    gate_elapsed_us: int | None,
     internal_mode: bool,
     gated_result: "PowerResult | None",
     planned_inference_count: int | None,
@@ -625,7 +625,7 @@ def assess_run_window_clock(
     timing, loose bound). Returns ``None`` whenever no usable reference exists,
     which callers treat as "nothing to say", not "passed".
     """
-    if elapsed_us is None or elapsed_us <= 0:
+    if gate_elapsed_us is None or gate_elapsed_us <= 0:
         # 0 is the frozen-clock case, handled by
         # firmware_window_clock_is_frozen() with a far better message; a ratio
         # of 0.0 here would only restate it less clearly.
@@ -657,7 +657,7 @@ def assess_run_window_clock(
         # absolute floor would only ever be the smaller term here.
         absolute_slack_s = 0.0
     return assess_window_clock(
-        elapsed_us=elapsed_us,
+        gate_elapsed_us=gate_elapsed_us,
         reference_s=reference_s,
         reference_source=reference_source,
         relative_tolerance=tolerance,
@@ -667,7 +667,7 @@ def assess_run_window_clock(
 
 def assess_gate_observer(
     *,
-    elapsed_us: int | None,
+    gate_elapsed_us: int | None,
     gated_result: "PowerResult | None",
     stats_rate_hz: int | None = None,
 ) -> WindowClockAgreement | None:
@@ -682,7 +682,7 @@ def assess_gate_observer(
     the est*count fallback keeps its authority exactly there.
     """
     return assess_run_window_clock(
-        elapsed_us=elapsed_us,
+        gate_elapsed_us=gate_elapsed_us,
         internal_mode=False,
         gated_result=gated_result,
         planned_inference_count=None,
