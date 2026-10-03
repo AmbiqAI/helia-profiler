@@ -5580,11 +5580,37 @@ class TestImplausibleGateRejection:
         assert timing is not None
         assert timing.capture_to_gate_rise_s == pytest.approx(0.300, abs=0.003)
 
-    def test_of_two_short_highs_only_the_last_is_kept(self, monkeypatch):
-        result, _clock = self._capture(monkeypatch, [(2, 6), (300, 7)])
+    @pytest.mark.parametrize("stream", [True, False], ids=["gpi_stream", "poll_only"])
+    def test_of_two_short_highs_only_the_last_is_kept(self, monkeypatch, stream):
+        result, _clock = self._capture(monkeypatch, [(2, 6), (300, 7)], stream=stream)
 
         assert len(result.gated_windows) == 1
-        assert result.gated_windows[0].duration_s == pytest.approx(0.007, rel=1e-6)
+        assert result.gated_windows[0].duration_s == pytest.approx(0.007, rel=0.15)
+        timing = result.metadata.sync_timing_s
+        assert timing is not None
+        assert timing.capture_to_gate_rise_s == pytest.approx(0.300, abs=0.003)
+        assert timing.capture_to_gate_fall_s == pytest.approx(0.307, abs=0.003)
+
+    def test_passed_over_high_does_not_widen_the_edge_uncertainty(self, monkeypatch):
+        # Poll-edge uncertainty feeds the window-clock check's absolute slack;
+        # only the kept window's edges belong in it.
+        alone, _ = self._capture(monkeypatch, [(300, 10)], stream=False)
+        with_boot, _ = self._capture(monkeypatch, [(2, 7), (300, 10)], stream=False)
+
+        assert alone.metadata.gating_diagnostics is not None
+        assert with_boot.metadata.gating_diagnostics is not None
+        assert with_boot.metadata.gating_diagnostics["poll_edge_uncertainty_s"] == pytest.approx(
+            alone.metadata.gating_diagnostics["poll_edge_uncertainty_s"]
+        )
+
+    def test_window_open_at_the_bound_is_not_replaced_by_a_short_high(self, monkeypatch):
+        # The real window rises at 900 ms and is still high when the 1 s bound
+        # ends; the earlier boot high must not be published as the window.
+        result, _clock = self._capture(monkeypatch, [(2, 7), (900, 500)])
+
+        assert result.gated_windows == []
+        assert result.metadata.gate_failure is not None
+        assert result.metadata.gate_failure.kind == "no_gate_fall"
 
     def test_a_short_real_window_is_still_kept_for_the_duration_check(self, monkeypatch):
         # Nothing reaches the plan floor, so the last high past the minimum is
@@ -5600,6 +5626,7 @@ class TestImplausibleGateRejection:
         timing = result.metadata.sync_timing_s
         assert timing is not None
         assert timing.capture_to_gate_rise_s == pytest.approx(0.002, abs=0.003)
+        assert timing.capture_to_gate_fall_s == pytest.approx(0.009, abs=0.003)
 
     def test_without_a_plan_the_fixed_minimum_still_decides(self, monkeypatch):
         result, _clock = self._capture(monkeypatch, [(2, 7), (300, 10)], planned=False)

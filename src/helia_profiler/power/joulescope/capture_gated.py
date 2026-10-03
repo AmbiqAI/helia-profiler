@@ -49,6 +49,7 @@ from .stats import (
     _process_gated_stats,
     _segment_gpi_windows,
     _segment_streamed_gpi,
+    _select_streamed_window,
     _streamed_gpi_timebase,
     _summary_to_dict,
     _whole_summary_from_stats,
@@ -560,39 +561,26 @@ def capture_gated(
         # snapshot-poll segmentation stays authoritative otherwise — including
         # the degraded no-usable-window path, whose classification must keep
         # seeing exactly what the poller saw.
+        # A high open at the stop is the window the bound cut short: with a plan,
+        # no shorter high stands in for it and it degrades as no_gate_fall.
+        open_high = (
+            windows_done == 0 and first_high_at is not None and first_low_after_high_at is None
+        )
+        allow_fallback = not (open_high and plan_floor_s > minimum_gate_s)
+        fall_seen = saw_any_gate_fall and allow_fallback
         streamed_gate_windows: list[tuple[float, float]] | None = None
         raw_streamed: list[tuple[float, float]] = []
         gate_edge_source = "gpi_snapshot_poll"
         if gpi_stream_enabled and gpi_stream_frames:
             raw_streamed = _segment_streamed_gpi(gpi_stream_frames)
-            qualifying = _plan_ranked_candidates(
-                raw_streamed, minimum_gate_s=minimum_gate_s, plan_floor_s=plan_floor_s
+            streamed_gate_windows = _select_streamed_window(
+                raw_streamed,
+                minimum_gate_s=minimum_gate_s,
+                plan_floor_s=plan_floor_s,
+                allow_fallback=allow_fallback,
             )
-            if qualifying:
-                # The firmware asserts the gate exactly once per run, as the
-                # LAST thing the sync line does before the device parks and
-                # the capture early-stops.  Any earlier qualifying stretch is
-                # the undriven line coupling to pre-window device activity,
-                # which a duration floor alone cannot reject.  Sub-minimum
-                # segments before OR after are noise pulses; the raw list
-                # goes to diagnostics unfiltered.
-                streamed_gate_windows = [qualifying[-1]]
+            if streamed_gate_windows is not None:
                 gate_edge_source = "gpi_stream"
-                if len(qualifying) > 1:
-                    log.info(
-                        "GPI stream saw %d qualifying gate segments; using the "
-                        "final one (the firmware window) and attributing the "
-                        "earlier %d to pre-window line coupling",
-                        len(qualifying),
-                        len(qualifying) - 1,
-                    )
-            elif raw_streamed:
-                log.warning(
-                    "GPI stream saw %d gate segment(s) but none reached the "
-                    "%.3fs minimum; gate edges fall back to snapshot polling",
-                    len(raw_streamed),
-                    minimum_gate_s,
-                )
 
         if use_device_time_axis and streamed_gate_windows is None:
             aligned_poll_samples = _map_poll_samples_to_packet_time(
@@ -603,15 +591,14 @@ def capture_gated(
 
         selected_windows = streamed_gate_windows
         if selected_windows is None and plan_floor_s > minimum_gate_s:
-            # The poller no longer stops on a high the plan rejects, so the
-            # poll samples can hold that high and the real window: select one
-            # by the same rule as the stream instead of summing both.
-            polled = _plan_ranked_candidates(
+            # The poll samples can hold a high the plan rejected as well as the
+            # real window: select by the stream's rule instead of summing both.
+            selected_windows = _plan_ranked_candidates(
                 _segment_gpi_windows(aligned_poll_samples),
                 minimum_gate_s=minimum_gate_s,
                 plan_floor_s=plan_floor_s,
-            )
-            selected_windows = polled[-1:] if polled else None
+                allow_fallback=allow_fallback,
+            )[-1:]
 
         dump_dir = os.environ.get("HPX_GATE_DEBUG_DUMP")
         if dump_dir:
@@ -684,7 +671,7 @@ def capture_gated(
             gating_diagnostics["below_plan_highs"] = below_plan_highs
         if gate_edge_source == "gpi_snapshot_poll":
             gating_diagnostics["poll_edge_uncertainty_s"] = _poll_edge_uncertainty_s(
-                poll_reads, minimum_window_s=minimum_gate_s
+                poll_reads, minimum_window_s=minimum_gate_s, plan_floor_s=plan_floor_s
             )
 
         # How the streamed-GPI time base was derived (#249). Both gate edges
@@ -738,7 +725,7 @@ def capture_gated(
             rise_due_s = BOOT_SETTLE_S + pre_window_s if lockstep is False else None
             failure = classify_gate_failure(
                 saw_gate_rise=saw_any_gate_rise,
-                saw_gate_fall=saw_any_gate_fall,
+                saw_gate_fall=fall_seen,
                 duration_s=duration_s,
                 lockstep=lockstep,
                 lockstep_wiring_available=lockstep_wiring_available,
@@ -763,7 +750,7 @@ def capture_gated(
                 duration_s=duration_s,
                 captured_s=captured_s,
                 saw_gate_rise=saw_any_gate_rise,
-                saw_gate_fall=saw_any_gate_fall,
+                saw_gate_fall=fall_seen,
                 short_pulses_ignored=short_pulses_ignored,
                 gating_diagnostics=gating_diagnostics,
                 lockstep=lockstep,

@@ -95,8 +95,11 @@ W·max(tol, 0.15))`, the mirror of `L`:
   a shorter high past the minimum resets the poller, which keeps waiting;
 - the window chosen from the GPI stream (JS220/JS320, not phase-gated) or from
   the poll samples is the last high that reaches it;
-- if no high reaches it, the last high past the fixed minimum is kept, and the
-  C-E5 duration check, which still uses the fixed minimum, judges it.
+- if no high reaches it, the capture runs to its bound and the last high past
+  the fixed minimum is kept, for the C-E5 duration check (which still uses the
+  fixed minimum) to judge; a high still open at the bound is not replaced by a
+  shorter one but degrades as `no_gate_fall`;
+- the poll-edge uncertainty counts only the kept window's edges.
 
 So a sync-line high during reset or boot that is shorter than the plan accepts
 neither ends the capture nor displaces the real window. A reset-time pulse of

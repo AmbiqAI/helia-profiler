@@ -780,6 +780,7 @@ def _plan_ranked_candidates(
     *,
     minimum_gate_s: float,
     plan_floor_s: float,
+    allow_fallback: bool = True,
 ) -> list:
     """Gate candidates in time order: those the plan accepts, else those past the minimum.
 
@@ -793,7 +794,7 @@ def _plan_ranked_candidates(
         return [(rise, fall) for rise, fall in segments if (fall - rise) / time64.SECOND >= floor_s]
 
     planned = at_least(plan_floor_s)
-    if planned or plan_floor_s <= minimum_gate_s:
+    if planned or plan_floor_s <= minimum_gate_s or not allow_fallback:
         return planned
     fallback = at_least(minimum_gate_s)
     if fallback:
@@ -831,3 +832,44 @@ def _plan_gate_floor_s(
             relative_tolerance=relative_tolerance,
         ),
     )
+
+
+def _select_streamed_window(
+    raw_streamed: list[tuple[float, float]],
+    *,
+    minimum_gate_s: float,
+    plan_floor_s: float,
+    allow_fallback: bool,
+) -> list[tuple[float, float]] | None:
+    """The streamed gate window, or None when the stream has no qualifying one.
+
+    The firmware asserts the gate exactly once per run, as the LAST thing the
+    sync line does before the device parks and the capture early-stops. Any
+    earlier qualifying stretch is the undriven line coupling to pre-window
+    device activity, which a duration floor alone cannot reject. Sub-minimum
+    segments before OR after are noise pulses; the raw list goes to diagnostics
+    unfiltered.
+    """
+    qualifying = _plan_ranked_candidates(
+        raw_streamed,
+        minimum_gate_s=minimum_gate_s,
+        plan_floor_s=plan_floor_s,
+        allow_fallback=allow_fallback,
+    )
+    if qualifying:
+        if len(qualifying) > 1:
+            log.info(
+                "GPI stream saw %d qualifying gate segments; using the final one "
+                "(the firmware window) and attributing the earlier %d to pre-window "
+                "line coupling",
+                len(qualifying),
+                len(qualifying) - 1,
+            )
+        return [qualifying[-1]]
+    if raw_streamed:
+        log.warning(
+            "GPI stream saw %d gate segment(s) but none qualified as the gate window; "
+            "gate edges fall back to snapshot polling",
+            len(raw_streamed),
+        )
+    return None
