@@ -13,7 +13,7 @@ from typer.testing import CliRunner
 from helia_profiler.cli.app import app
 from helia_profiler.engines import EngineType
 from helia_profiler.errors import ConfigError
-from helia_profiler.platform import build_platform_registry
+from helia_profiler.platform import build_platform_registry, get_soc_for_board
 from helia_profiler.runtime_records import (
     RuntimeQualification,
     load_runtime_records,
@@ -62,7 +62,8 @@ def test_shipped_records_name_engines_targets_and_one_default_each() -> None:
     for record in records:
         assert runtime(record.name) is not None
         for target in record.qualified:
-            assert target.board in boards
+            clocks = get_soc_for_board(target.board).cpu_clock.speed_names
+            assert target.board in boards and target.clock in clocks
 
 
 def test_shipped_records_keep_the_fixture_capability_table() -> None:
@@ -135,6 +136,19 @@ def test_an_omitted_version_means_the_default_record() -> None:
 def test_qualification_refuses_a_precision_outside_the_vocabulary() -> None:
     with pytest.raises(ValueError, match="Unknown precision 'int8'"):
         qualification("tflm", board="apollo510_evb", clock="lp", precision="int8")
+
+
+@pytest.mark.parametrize(
+    ("board", "clock", "message"),
+    [
+        ("nonexistent", "lp", "Unknown board 'nonexistent'"),
+        ("apollo510_evb", "xp", "apollo510_evb has no 'xp' clock"),
+        ("apollo4p_evb", "ulp", "apollo4p_evb has no 'ulp' clock"),
+    ],
+)
+def test_qualification_refuses_an_unregistered_target(board: str, clock: str, message: str) -> None:
+    with pytest.raises(ValueError, match=message):
+        qualification("tflm", board=board, clock=clock, precision="a8w8")
 
 
 def test_records_load_from_a_directory(tmp_path: Path) -> None:

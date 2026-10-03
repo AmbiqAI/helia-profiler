@@ -5,12 +5,15 @@ import struct
 from dataclasses import dataclass
 from hashlib import sha256
 
+from .fixture_target import fixture_app_region, supported_fixture_target
+from .platform.memory_map import MemoryRegion
+
 #: Largest flat image a fixture capture flashes and reads back in full, well inside the
 #: MRAM application region below; each capture pays for flashing and verifying every byte.
 MAX_IMAGE = 2 * 1024 * 1024
 MAX_ELF = 32 * MAX_IMAGE
-MRAM = (0x00410000, 0x00800000)
-DTCM = (0x20000000, 0x2007C000)
+MRAM = fixture_app_region(MemoryRegion.MRAM)
+DTCM = fixture_app_region(MemoryRegion.DTCM)
 
 
 class ContractError(ValueError):
@@ -84,8 +87,6 @@ _TYPED_SINK = re.compile(r"deployment_output_[1-9][0-9]*|deployment_arena_scan")
 
 
 def inspect_elf(data: bytes, binary: bytes, load_address: int, sizes: dict[str, int]) -> Image:
-    from .fixture_target import supported_fixture_target
-
     require(
         load_address == supported_fixture_target().load_address,
         "unsupported application boot origin",

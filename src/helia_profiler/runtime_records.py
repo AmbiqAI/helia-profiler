@@ -19,6 +19,7 @@ from importlib.resources.abc import Traversable
 from typing import Any
 
 from .errors import ConfigError
+from .platform import get_soc_for_board
 
 RUNTIME_SCHEMA = "helia-profiler/runtime@1"
 #: The precision vocabulary shared with helia-model-zoo and helia-benchmark.
@@ -129,6 +130,10 @@ def qualification(
 ) -> Qualification:
     """Whether ``name`` at ``version`` is qualified for ``precision`` on ``board`` at ``clock``.
 
+    ``board`` and ``clock`` must be a registered board and one of its CPU clock
+    profiles, and ``precision`` one of :data:`PRECISIONS`; anything else raises
+    ``ValueError``.
+
     A version without a record, or a precision its record does not declare,
     is unsupported here, even when an engine's own version check would build
     it: this heliaPROFILER makes no claim about it.
@@ -136,6 +141,11 @@ def qualification(
     if precision not in PRECISIONS:
         raise ValueError(
             f"Unknown precision {precision!r}; expected one of {', '.join(PRECISIONS)}"
+        )
+    clocks = get_soc_for_board(board).cpu_clock.speed_names
+    if clock not in clocks:
+        raise ValueError(
+            f"Board {board} has no {clock!r} clock; expected one of {', '.join(clocks)}"
         )
     record = runtime(name, version)
     if record is None:
