@@ -21,12 +21,12 @@ The current baseline is `hpx-neuralspotx-0.8.1-2026-09`:
 | `nsx-pmu-armv8m` | `5725c065…c88` |
 | `nsx-tflite-micro` | `7afcf2b4…333` |
 | `arm-cmsis-nn` | `6d21a6f8…f7c` |
-| `ns-cmsis-nn` | `72482be6…649` (`v7.38.1`, hpx-declared, see below) |
+| `ns-cmsis-nn` | `5f3fed9f…cb8` (`v7.39.2`, hpx-declared, see below) |
 | `nsx-executorch` | `5514ac1e…b48e` |
 | `nsx-sensors` | `c219a2bc…3e25` (`v0.3.0`, peeled) |
-| heliaRT | `1.21.2`, commit `ce03af57…a11` (min supported `1.16.0`, from `HELIART_MIN_VERSION` in code, not a baseline-JSON field) |
+| heliaRT | `1.21.3`, commit `dc8533ab…f5f` (min supported `1.16.0`, from `HELIART_MIN_VERSION` in code, not a baseline-JSON field) |
 | heliaAOT | `min_version=0.23.0`, `max_version_exclusive=0.26.0` |
-| tflm | governed entirely by the `nsx-tflite-micro` / `arm-cmsis-nn` module refs above |
+| tflm | governed by the `nsx-tflite-micro` and `arm-cmsis-nn` module refs above; `nsx-tflite-micro` builds TFLM from the `helia-rt-source` project, which the baseline does not list and the neuralSPOT-X 0.8.1 registry lock fixes at `7c1b162c` (helia-rt v1.17.0) |
 | executorch | `0.1.0`, module ref `5514ac1e…b48e` (a checkout's `version.txt` is verified against the baseline) |
 
 Every baseline project and module ref is immutable by policy: only a full
@@ -243,8 +243,44 @@ The released helia-aot 0.23.0 and 0.24.0 each convert and build the same ten
 models listed above against v7.38.1 through HPX's firmware build with ATfE
 for Apollo510. heliaRT 1.21.2 builds from source against v7.38.1 with ATfE
 for the int8 keyword-spotting model and the fp32 and fp16 sleep-staging
-models. ExecuTorch's `ns` backend and TFLM with the `ns` kernels use the same
-core and are not separately verified here. No device run covers v7.38.1 yet.
+models. ExecuTorch's `ns` backend uses the same core and is not separately
+verified here; HPX's TFLM engine offers only the reference and `cmsis_nn`
+backends, so it does not use this core. No device run covered v7.38.1 when
+that revision was made.
+
+heliaRT 1.21.3 (`dc8533ab…f5f`) and `ns-cmsis-nn v7.39.2` (`5f3fed9f…cb8`)
+then replace 1.21.2 and v7.38.1; heliaAOT's range is unchanged and the
+locked heliaAOT is the 0.25.0 release. heliaRT 1.21.3 is the release built on
+v7.39.2. v7.39.0 to v7.39.2 add a table-free int16 square root and fix
+pooling window checks, float ARG_MAX/ARG_MIN NaN handling, the float
+depthwise scratch sizers and the pack include path. Results change where
+float ARG_MAX/ARG_MIN meet a NaN (a NaN never wins), where float32 TANH on
+Cortex-M55 meets NaN or signed zero (now passed through), and in the last bits
+of fp16 depthwise with `ch_mult > 1` on targets without MVE. Costs change
+too: float32 TANH is up to about 5% slower per layer on Cortex-M55, and each
+pooling call costs a fixed ~150 cycles more (`arm_avgpool_s8`, ~118). heliaAOT
+0.25.0 stops at configure time when the linked core is older than its
+generated module needs. heliaAOT 0.23.0 and 0.24.0 stay inside the range but
+were not re-verified against v7.39.2. The TFLM engine is unaffected: its
+`nsx-tflite-micro` module (`7afcf2b4…333`) builds TFLM from the
+`helia-rt-source` project, which this baseline does not list; the
+neuralSPOT-X 0.8.1 registry fixes it at `7c1b162c` (helia-rt v1.17.0).
+ExecuTorch's `ns` backend builds against the same ns-cmsis-nn core and is
+not separately verified here.
+
+**Verified.** For int8 keyword spotting, `hpx analyze` and `hpx doctor`
+succeed on each of heliaAOT, heliaRT and TFLM.
+On an Apollo510 EVB (LP, MRAM weights, SRAM arena), heliaAOT 0.25.0 and
+heliaRT 1.21.3 ran the MLPerf Tiny keyword-spotting, visual-wake-word,
+image-classification and anomaly-detection models at A8W8 and A16W8, plus
+nine HeartKit, SleepKit, CompressionKIT, TimePPG, keyword and voice-activity
+models, all qualified against this baseline. heliaAOT latency is within
+1.7% of earlier runs of heliaAOT main `5bec204b` (which reports 0.24.0) on
+v7.38.1 for every model. heliaRT 1.21.3 is 5-15% faster than 1.21.2 on the
+int8 keyword-spotting, visual-wake-word and image-classification models and
+within 1% on the other MLPerf Tiny rows; the other nine models have no
+heliaRT 1.21.2 device run to compare. Those device runs do not compare
+outputs.
 
 The previous revision is recorded below. heliaRT 1.19.0 and heliaAOT 0.19.0
 (issue #246) are the releases that add FP16

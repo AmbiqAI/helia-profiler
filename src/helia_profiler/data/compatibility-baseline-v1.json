@@ -34,7 +34,7 @@
     },
     "ns-cmsis-nn": {
       "url": "https://github.com/AmbiqAI/ns-cmsis-nn.git",
-      "ref": "72482be6c941e7f49fe4d9442728e76fae710649"
+      "ref": "5f3fed9f21a57390cc7f00f77a37db8f5f110cb8"
     },
     "nsx-executorch": {
       "url": "https://github.com/AmbiqAI/nsx-executorch.git",
@@ -42,7 +42,7 @@
     },
     "helia-rt": {
       "url": "https://github.com/AmbiqAI/helia-rt.git",
-      "ref": "ce03af575c5369605fea447f8a0b9c2808ea3a11"
+      "ref": "dc8533abe0ec7e01c251a067ce54c60f54237f5f"
     },
     "nsx-sensors": {
       "url": "https://github.com/AmbiqAI/nsx-sensors.git",
@@ -72,7 +72,7 @@
     },
     "nsx-cmsis-nn": {
       "project": "ns-cmsis-nn",
-      "ref": "72482be6c941e7f49fe4d9442728e76fae710649"
+      "ref": "5f3fed9f21a57390cc7f00f77a37db8f5f110cb8"
     },
     "nsx-executorch": {
       "project": "nsx-executorch",
@@ -80,7 +80,7 @@
     },
     "nsx-helia-rt": {
       "project": "helia-rt",
-      "ref": "ce03af575c5369605fea447f8a0b9c2808ea3a11"
+      "ref": "dc8533abe0ec7e01c251a067ce54c60f54237f5f"
     },
     "nsx-sensors": {
       "project": "nsx-sensors",
@@ -89,8 +89,8 @@
   },
   "engines": {
     "helia-rt": {
-      "version": "1.21.2",
-      "ref": "ce03af575c5369605fea447f8a0b9c2808ea3a11"
+      "version": "1.21.3",
+      "ref": "dc8533abe0ec7e01c251a067ce54c60f54237f5f"
     },
     "helia-aot": {
       "min_version": "0.23.0",

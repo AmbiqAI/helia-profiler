@@ -35,7 +35,7 @@ log = logging.getLogger("hpx")
 #                         distribution (default download, custom GitHub
 #                         ref, or local dist_path) must be >= this.
 #                         Bump only on incompatible API changes.
-HELIART_VERSION = "1.21.2"
+HELIART_VERSION = "1.21.3"
 HELIART_MIN_VERSION = "1.16.0"
 HELIART_GH_REPO = "AmbiqAI/helia-rt"
 # The tag format changed at HELIART_MIN_VERSION; _detect_version handles the legacy one.
@@ -43,7 +43,7 @@ HELIART_RELEASE_TAG = f"helia-rt-v{HELIART_VERSION}"
 # Immutable source identity corresponding to HELIART_RELEASE_TAG. Keep this
 # alongside the release pin so compatibility metadata never depends on a
 # movable tag name.
-HELIART_SOURCE_COMMIT = "ce03af575c5369605fea447f8a0b9c2808ea3a11"
+HELIART_SOURCE_COMMIT = "dc8533abe0ec7e01c251a067ce54c60f54237f5f"
 
 # NSX registry identity for heliaRT. By default hpx declares this module and
 # lets NSX clone it from the registered GitHub upstream; a user-provided
