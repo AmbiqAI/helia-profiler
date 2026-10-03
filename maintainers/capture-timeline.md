@@ -34,7 +34,7 @@ A bench run turns [E] and [U] into [M], or revises the number.
 | `N`, `a` | Planned inference count and reference per-inference time (`clean_infer_avg_us`). Dedicated firmware takes them from the power plan; shared firmware from the profile boot. |
 | `W` | Planned window, `N·a`. |
 | `L` | The longest window the gate wait is sized for: `W` plus `max(a/2 if N>1, 2/stats_rate_hz, W·max(tol, 0.15))`. `tol` is 0.10 for counted probes and 0.25 for busy_loop; the 0.15 floor covers cross-boot drift. The capture-time duration check (C-E5) uses `tol` without the floor, so for counted probes a gate between `1.10·W` and `1.15·W` is within `L` but still draws the C-E5 warning. |
-| `P` | Warm-up before the window, as the host budgets it: `max(3, profiling.warmup)·a` for probes that run inferences, `0` for busy_loop. |
+| `P` | Warm-up before the window, as the host budgets it: `max(3, profiling.warmup)` inferences. A counted probe prices them at `a`; busy_loop, whose `a` is the whole spin, prices them from the profiled per-inference cycles at the run's CPU clock. `0` when neither is known. |
 
 ## 2. Steps
 
@@ -129,9 +129,8 @@ wait and the gate fall:
 For counted probes this holds if the 8 s boot allowance and the 2 s headroom
 hold. Both are [E].
 
-It does not yet hold for busy_loop in FR: the host budgets `P = 0` while the
-firmware still runs warm-up inferences before the window. Open: #302
-follow-up 3.
+For busy_loop in FR, `P` prices the firmware's warm-up inferences from the
+profiled per-inference cycles (#302 follow-up 3).
 
 In LS, busy_loop calibration and a second STIMER settle run after GO (S12),
 each up to 1 s cold [D]. For busy_loop `L` is `1.25·W`, so `F` leaves
@@ -139,8 +138,7 @@ each up to 1 s cold [D]. For busy_loop `L` is `1.25·W`, so `F` leaves
 
 **C-W2.** `R` must cover S5 to S7, which is boot, init and warm-up (and, for
 shared firmware, the core clock probe and any attach wait in S5). It depends
-on the same [E] allowance. For busy_loop it lacks the warm-up term, for the
-same reason as C-W1 in FR.
+on the same [E] allowance.
 
 **C-W3.** A configured `D` above the derived minimum is kept. A lower one is
 raised:
@@ -301,7 +299,7 @@ simply times out.
 
 | Item | Clauses | Status under this contract |
 | --- | --- | --- |
-| #302 follow-up 3: busy_loop warm-up not budgeted (FR) | C-W1, C-W2 | open |
+| #302 follow-up 3: busy_loop warm-up not budgeted (FR) | C-W1, C-W2 | resolved: `P` prices busy_loop warm-up from the profiled cycles |
 | #302 follow-up 4: stalled reference | C-W4, C-H1 | open. The contract fixes the direction: the window runs longer. |
 | #302 stage-hint follow-up | C-E2, C-H1 | resolved: heliaPROFILER errors pass through the capture stage unchanged |
 | #302 (from #373): shared USB CDC with lock-step | C-S3 | resolved: rejected at preflight. #373 was closed as not planned and folded into #302. |

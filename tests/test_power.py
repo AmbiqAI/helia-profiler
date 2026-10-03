@@ -3118,6 +3118,64 @@ class TestCapturePowerWrapper:
             "pre_window_s": 0.0,
         }
 
+    def test_busy_loop_warm_up_is_budgeted_before_the_window(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        # The firmware runs real warm-up inferences before the busy_loop spin;
+        # budgeting none let a slow model's warm-up eat the free-running and
+        # READY bounds (capture timeline contract C-W1 FR, C-W2; #302 follow-up 3).
+        from helia_profiler.capture import capture_power
+        from helia_profiler.config import load_config
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.power.diagnostics import CLEAN_WINDOW_WARMUP_REPS
+        from helia_profiler.results import FirmwareMeta, LayerResult, PlatformInfo, PmuResult
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+                "profiling": {"clean_window_probe": "busy_loop"},
+                "power": {"enabled": True, "driver": "joulescope", "sync_input_index": 0},
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        ctx.run_metadata.platform = PlatformInfo(cpu_clock_mhz=96)
+        # 96,000 cycles at 96 MHz is 1 ms per inference.
+        set_profile_result(
+            ctx,
+            PmuResult(
+                meta=FirmwareMeta(clean_infer_count=1),
+                layers=[LayerResult(id=0, op="CONV_2D", cycles=96_000.0)],
+            ),
+        )
+        _mark_power_firmware_deployed(ctx, tmp_path)
+        called: dict[str, object] = {}
+
+        class FakeDriver:
+            supports_gated_capture = True
+
+            def check_available(self):
+                pass
+
+            def capture_gated(self, **kwargs):
+                called.update(kwargs)
+                return PowerResult(
+                    summary=PowerSummary(0.01, 0.02, 0.03, 0.04, 0.05, 6),
+                    metadata=PowerMetadata(
+                        measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW
+                    ),
+                )
+
+        monkeypatch.setattr("helia_profiler.power.get_driver", lambda *_a, **_k: FakeDriver())
+
+        capture_power(ctx, duration_override_s=7.0)
+
+        reps = max(CLEAN_WINDOW_WARMUP_REPS, config.profiling.warmup)
+        assert called["pre_window_s"] == pytest.approx(reps * 0.001)
+
     def test_capture_power_waits_for_lockstep_ready_before_go(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):

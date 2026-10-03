@@ -242,6 +242,16 @@ def _make_sync_controller(ctx: PipelineContext, driver: PowerDriver) -> SyncCont
     return make_controller(wiring)
 
 
+def _profiled_inference_s(ctx: PipelineContext) -> float | None:
+    """One inference at the run's CPU clock, from the profiled PMU cycles."""
+    pmu = ctx.pmu_result
+    platform = ctx.run_metadata.platform
+    if pmu is None or platform is None or platform.cpu_clock_mhz <= 0:
+        return None
+    cycles = sum(layer.cycles or 0 for layer in pmu.layers)
+    return cycles / (platform.cpu_clock_mhz * 1_000_000) if cycles > 0 else None
+
+
 def capture_power(
     ctx: PipelineContext,
     *,
@@ -350,11 +360,18 @@ def capture_power(
             if clean_count and clean_avg_us
             else None
         )
-        # Warm reps are inferences only for a counted probe; a busy_loop unit
-        # is the whole spin, so its per-inference cost is not in the plan.
-        warmup_s = (
-            max(CLEAN_WINDOW_WARMUP_REPS, ctx.config.profiling.warmup) * clean_avg_us / 1e6
+        # The firmware runs real warm-up inferences before the window for every
+        # probe. A counted probe's reference is one inference; a busy_loop unit
+        # is the whole spin, so its warm-up is priced from the profiled
+        # per-inference cycles instead.
+        warm_inference_s = (
+            clean_avg_us / 1e6
             if clean_avg_us and probe_runs_inferences(probe)
+            else _profiled_inference_s(ctx)
+        )
+        warmup_s = (
+            max(CLEAN_WINDOW_WARMUP_REPS, ctx.config.profiling.warmup) * warm_inference_s
+            if warm_inference_s
             else 0.0
         )
         fall_wait_s = gate_fall_wait_s(
