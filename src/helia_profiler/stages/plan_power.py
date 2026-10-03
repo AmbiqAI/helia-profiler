@@ -31,8 +31,9 @@ def _derive_inference_count(
     ``clean_infer_avg_us`` comes from the profile binary's clean window, and on
     the Cortex-M4F families that window is DWT-timed and can stall (#121). A
     reference that reads low makes this pick too MANY iterations, so the power
-    window runs longer than planned; the capture stretches its fall wait to
-    match (``capture._reference_stall_factor``). (The
+    window runs longer than planned. An external gated capture stretches its
+    fall wait to match (``capture._reference_stall_factor``); internal mode's
+    terminal wait does not yet. (The
     ``active_window_estimated_*`` fields are NOT affected: ``report/summary.py``
     derives those from ``profiled_infer_total_us``, a different measurement.)
     The contamination is flagged
@@ -63,7 +64,7 @@ def _warn_if_reference_stalled(ctx: PipelineContext) -> None:
     log.warning(
         "Power window sized from a stalled clean-window reference: %d of %d "
         "profile iterations lost their cycle delta (%d frozen, %d partial), so "
-        "clean_infer_avg_us reads at least ~%.1f%% low, so the fixed count will "
+        "clean_infer_avg_us reads at least ~%.1f%% low and the fixed count will "
         "run longer than the planned window (see the "
         "profile.clean_window_stalled validity issue).",
         stall.affected_iters,

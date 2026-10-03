@@ -300,7 +300,7 @@ simply times out.
 | Item | Clauses | Status under this contract |
 | --- | --- | --- |
 | #302 follow-up 3: busy_loop warm-up not budgeted (FR) | C-W1, C-W2 | resolved: `P` prices busy_loop warm-up from the profiled cycles |
-| #302 follow-up 4: stalled reference | C-W4, C-H1 | resolved: the fall wait stretches by the stall's understatement bound, and the planner text says the window runs long |
+| #302 follow-up 4: stalled reference | C-W4, C-H1 | resolved for the external gated capture: the fall wait stretches by the stall's understatement bound, and the planner text says the window runs long. Internal (INA228) mode's terminal wait is not stretched. |
 | #302 stage-hint follow-up | C-E2, C-H1 | resolved: heliaPROFILER errors pass through the capture stage unchanged |
 | #302 (from #373): shared USB CDC with lock-step | C-S3 | resolved: rejected at preflight. #373 was closed as not planned and folded into #302. |
 | #374: live definitions only | none | outside the timeline (render hygiene) |
