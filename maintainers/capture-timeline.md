@@ -34,7 +34,7 @@ A bench run turns [E] and [U] into [M], or revises the number.
 | `N`, `a` | Planned inference count and reference per-inference time (`clean_infer_avg_us`). Dedicated firmware takes them from the power plan; shared firmware from the profile boot. |
 | `W` | Planned window, `N·a`. |
 | `L` | The longest window the gate wait is sized for: `W` plus `max(a/2 if N>1, 2/stats_rate_hz, W·max(tol, 0.15))`. `tol` is 0.10 for counted probes and 0.25 for busy_loop; the 0.15 floor covers cross-boot drift. The capture-time duration check (C-E5) uses `tol` without the floor, so for counted probes a gate between `1.10·W` and `1.15·W` is within `L` but still draws the C-E5 warning. |
-| `P` | Warm-up before the window, as the host budgets it: `max(3, profiling.warmup)·a` for probes that run inferences, `0` for busy_loop. |
+| `P` | Warm-up before the window, as the host budgets it: `max(3, profiling.warmup)` inferences. A counted probe prices them at `a`; busy_loop, whose `a` is the whole spin, prices them from the profiled per-inference cycles at the run's CPU clock. `0` when neither is known. |
 
 ## 2. Steps
 
@@ -104,10 +104,10 @@ the terminal arbitration (C-I2) can catch it afterwards. Open: candidate
 (§9).
 
 **C-S3.** With shared firmware over USB CDC in LS, S5 waits for DTR while the
-host waits for READY (S8) before asserting DTR (S9). As written, that
-combination cannot complete. It is not reproduced on hardware and is not
-rejected at preflight. Open: #302 (folded in from #373, closed as not planned
-on 2026-09-26).
+host waits for READY (S8) before asserting DTR (S9), so that combination
+cannot complete. Preflight rejects it (shared firmware, USB CDC, lock-step
+resolved true) and names the alternatives: free-running, dedicated firmware
+or another transport. Not reproduced on hardware.
 
 ## 3. Host wait bounds
 
@@ -129,9 +129,8 @@ wait and the gate fall:
 For counted probes this holds if the 8 s boot allowance and the 2 s headroom
 hold. Both are [E].
 
-It does not yet hold for busy_loop in FR: the host budgets `P = 0` while the
-firmware still runs warm-up inferences before the window. Open: #302
-follow-up 3.
+For busy_loop in FR, `P` prices the firmware's warm-up inferences from the
+profiled per-inference cycles (#302 follow-up 3).
 
 In LS, busy_loop calibration and a second STIMER settle run after GO (S12),
 each up to 1 s cold [D]. For busy_loop `L` is `1.25·W`, so `F` leaves
@@ -139,8 +138,7 @@ each up to 1 s cold [D]. For busy_loop `L` is `1.25·W`, so `F` leaves
 
 **C-W2.** `R` must cover S5 to S7, which is boot, init and warm-up (and, for
 shared firmware, the core clock probe and any attach wait in S5). It depends
-on the same [E] allowance. For busy_loop it lacks the warm-up term, for the
-same reason as C-W1 in FR.
+on the same [E] allowance.
 
 **C-W3.** A configured `D` above the derived minimum is kept. A lower one is
 raised:
@@ -150,12 +148,14 @@ raised:
 
 `D` never changes the window the firmware runs.
 
-**C-W4.** `F` must also cover a window that runs longer than planned, up to
-`L`. A stalled clean-window reference reads `a` low, which sizes `N` too high,
-so the real window runs longer than `W` and can pass `L`. The planning
-docstring and warning in `stages/plan_power.py` say the opposite: that the
-window comes out short. Open: #302 follow-up 4 (stall-aware sizing and
-corrected text).
+**C-W4.** `F` must also cover a window that runs longer than planned. A
+stalled clean-window reference reads `a` low, which sizes `N` too high, so the
+real window runs longer than `W`. When the profile window stalled, `L` and the
+warm-up term use `a` stretched by `1/(1 - u)`, where `u` is the stall's
+understatement lower bound, capped at 0.9 [D]. A stall report with an unknown
+total gives `u = 0` and an inconsistent one (more affected iterations than
+ran) is ignored, so neither stretches. The C-E5 duration check still
+compares against the planned `W`.
 
 ## 4. Published intervals
 
@@ -200,14 +200,10 @@ what they mean.
   any error the capture would otherwise raise;
 - a replaced capture error is hidden as context.
 
-**C-E2.** The capture stage passes a `PowerError` through unchanged. It wraps
-any other exception in a `PowerError` whose hint names the instrument. For
-errors from the reset probe or the USB CDC port, this clause is not met:
-- a J-Link reset failure or a CDC port failure surfaces with the hint "Check
-  that the joulescope is connected and powered on. Mode: external.";
-- the correct hint is kept only in the cause.
-
-Open: the #302 stage-hint follow-up.
+**C-E2.** The capture stage passes any heliaPROFILER error through unchanged:
+a `PowerError`, and the `CaptureError` from a failed J-Link reset or USB CDC
+port open, keep their own message and hint. It wraps any other exception in a
+`PowerError` whose hint names the instrument.
 
 **C-E3.** No usable window, but stats packets arrived: the capture returns a
 degraded result carrying a `gate_failure` classification, with no
@@ -254,13 +250,13 @@ simply times out.
 | Hint | Claims | Meets C-H1 | Missing cause and item |
 | --- | --- | --- | --- |
 | READY timeout | wiring, reset strategy, firmware not parked at the sync wait | no | A dedicated init failure (the terminal is not collected), the shared USB CDC ordering (C-S3, #302), and failed GPI reads. Candidate for the capture follow-up PR. |
-| Stage wrapper | the instrument is not connected | no | The step that actually failed, for probe and CDC errors. #302 stage-hint follow-up. |
+| Stage wrapper | the instrument is not connected, for an exception that is not a heliaPROFILER error | yes | Probe and CDC errors keep their own hint (C-E2). |
 | `no_gate_rise`, bound exhausted | the bound likely ended before the window was due | yes | FR only. Reachable only when the window is unknown, because a known window makes FR `F` at least `L + 10 + P`, which exceeds `rise_due`. |
 | `no_gate_rise`, lock-step suspect | the likeliest cause is a free-running window racing the poller, with wiring as the fallback | no | Firmware that never reached the window (init failure, `stimer_dead`). Candidate. |
 | `no_gate_rise`, wiring | wiring, the wait state or reset | no | `stimer_dead`, and a GO later than the firmware's GO wait. Candidate. |
 | `no_stats_window` | host timestamps did not overlap the stats timeline | no | The only pulse was shorter than the 1.0 s minimum (C-S2). Candidate. |
 | `no_gate_fall` | a hang when high longer than `L`; a bound too short when shorter | yes | |
-| Stalled reference warning | the window will be short | no | The window runs long (C-W4). #302 follow-up 4. |
+| Stalled reference warning | the fixed count will run longer than the planned window | yes | |
 
 ## 7. Lock-step and free-running
 
@@ -305,10 +301,10 @@ simply times out.
 
 | Item | Clauses | Status under this contract |
 | --- | --- | --- |
-| #302 follow-up 3: busy_loop warm-up not budgeted (FR) | C-W1, C-W2 | open |
-| #302 follow-up 4: stalled reference | C-W4, C-H1 | open. The contract fixes the direction: the window runs longer. |
-| #302 stage-hint follow-up | C-E2, C-H1 | open |
-| #302 (from #373): shared USB CDC with lock-step | C-S3 | open, unconfirmed. #373 was closed as not planned and folded into #302, which also carries the #370 rename of the window-clock context key `elapsed_us`. |
+| #302 follow-up 3: busy_loop warm-up not budgeted (FR) | C-W1, C-W2 | resolved: `P` prices busy_loop warm-up from the profiled cycles |
+| #302 follow-up 4: stalled reference | C-W4, C-H1 | resolved for the external gated capture: the fall wait stretches by the stall's understatement bound, and the planner text says the window runs long. Internal (INA228) mode's terminal wait is not stretched. |
+| #302 stage-hint follow-up | C-E2, C-H1 | resolved: heliaPROFILER errors pass through the capture stage unchanged |
+| #302 (from #373): shared USB CDC with lock-step | C-S3 | resolved: rejected at preflight. #373 was closed as not planned and folded into #302. |
 | #374: live definitions only | none | outside the timeline (render hygiene) |
 | #376: guarded test harness | all clauses | open. Each clause needs a guarded test, and several capture tests cannot yet run under the guard. |
 

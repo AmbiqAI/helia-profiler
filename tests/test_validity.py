@@ -456,7 +456,10 @@ class TestWindowClockValidity:
             if issue.code == IssueCode.POWER_WINDOW_OBSERVER_MISMATCH
         ]
         assert len(mismatch) == 1
-        assert mismatch[0].context["elapsed_us"] == int(self.BENCH_ELAPSED_US * 0.8)
+        assert mismatch[0].context["gate_elapsed_us"] == int(self.BENCH_ELAPSED_US * 0.8)
+        # The whole-window records (ceiling, frozen clock) keep elapsed_us; the
+        # gate interval must not reuse that name (#370).
+        assert "elapsed_us" not in mismatch[0].context
 
     def test_internal_plan_check_judges_the_gate_not_the_whole_window(self, tmp_path: Path):
         planned = self.BENCH_COUNT * self.BENCH_REFERENCE_US

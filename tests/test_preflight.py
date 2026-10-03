@@ -381,6 +381,70 @@ class TestPreflightConfig:
         with patch("shutil.which", side_effect=_all_tools_present):
             PreflightStage().run(ctx)
 
+    @staticmethod
+    def _shared_usb_cdc_power(tmp_path: Path, lockstep: bool | None) -> PipelineContext:
+        power: dict = {
+            "enabled": True,
+            "firmware": "shared",
+            "state_gpio_pin": 30,
+            "go_gpio_pin": 31,
+        }
+        if lockstep is not None:
+            power["lockstep"] = lockstep
+        return _make_ctx(tmp_path, {"target": {"transport": "usb_cdc"}, "power": power})
+
+    @pytest.mark.parametrize("lockstep", [True, None], ids=["explicit", "auto"])
+    def test_shared_usb_cdc_lockstep_is_rejected(self, tmp_path: Path, lockstep: bool | None):
+        # The shared USB CDC firmware blocks for DTR before it can raise READY,
+        # while the lock-step host waits for READY before opening the port, so
+        # the run can only time out (capture timeline contract C-S3, #302/#373).
+        ctx = self._shared_usb_cdc_power(tmp_path, lockstep)
+        assert ctx.config.power.lockstep_resolved
+        with patch("shutil.which", side_effect=_all_tools_present):
+            with pytest.raises(ConfigError, match="lock-step") as excinfo:
+                PreflightStage().run(ctx)
+        assert "lockstep: false" in (excinfo.value.hint or "")
+
+    def test_dedicated_usb_cdc_lockstep_is_accepted(self, tmp_path: Path):
+        # The dedicated power binary has no USB stack, so lock-step over a
+        # USB CDC profile transport is fine.
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "target": {"transport": "usb_cdc"},
+                "power": {
+                    "enabled": True,
+                    "firmware": "dedicated",
+                    "state_gpio_pin": 30,
+                    "go_gpio_pin": 31,
+                    "lockstep": True,
+                },
+            },
+        )
+        with patch("shutil.which", side_effect=_all_tools_present):
+            PreflightStage().run(ctx)
+
+    def test_shared_usb_cdc_without_power_is_accepted(self, tmp_path: Path):
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "target": {"transport": "usb_cdc"},
+                "power": {
+                    "enabled": False,
+                    "firmware": "shared",
+                    "state_gpio_pin": 30,
+                    "go_gpio_pin": 31,
+                },
+            },
+        )
+        with patch("shutil.which", side_effect=_all_tools_present):
+            PreflightStage().run(ctx)
+
+    def test_shared_usb_cdc_free_running_is_accepted(self, tmp_path: Path):
+        ctx = self._shared_usb_cdc_power(tmp_path, lockstep=False)
+        with patch("shutil.which", side_effect=_all_tools_present):
+            PreflightStage().run(ctx)
+
     def test_ap4_rejects_mve_counter_group(self, tmp_path: Path):
         ctx = _make_ctx(
             tmp_path,

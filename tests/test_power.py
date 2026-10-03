@@ -2286,6 +2286,64 @@ class TestCapturePowerStage:
         assert ctx.power_run.observation.integrity == "degraded"
         assert ctx.power_result is degraded
 
+    @staticmethod
+    def _shared_power_ctx(tmp_path: Path):
+        from helia_profiler.config import load_config
+        from helia_profiler.pipeline import PipelineContext
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+                "power": {"enabled": True, "firmware": "shared"},
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        ctx.publish_power_plan(PowerRunPlan(firmware_mode="shared"))
+        return ctx
+
+    def test_probe_error_keeps_its_own_hint(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        # A J-Link reset or USB CDC failure already says what failed and what to
+        # check; wrapping it in "check the instrument" sent users to the wrong
+        # device (capture timeline contract C-E2).
+        from helia_profiler.errors import CaptureError
+        from helia_profiler.stages.capture_power import CapturePowerStage
+
+        ctx = self._shared_power_ctx(tmp_path)
+
+        def fail(*_args, **_kwargs):
+            raise CaptureError("J-Link reset failed", hint="Check the J-Link probe.")
+
+        monkeypatch.setattr("helia_profiler.capture.capture_power", fail)
+
+        with pytest.raises(CaptureError) as excinfo:
+            CapturePowerStage().run(ctx)
+
+        assert str(excinfo.value).startswith("J-Link reset failed")
+        assert excinfo.value.hint == "Check the J-Link probe."
+
+    def test_unexpected_error_names_the_instrument(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from helia_profiler.stages.capture_power import CapturePowerStage
+
+        ctx = self._shared_power_ctx(tmp_path)
+
+        def fail(*_args, **_kwargs):
+            raise RuntimeError("usb transfer stalled")
+
+        monkeypatch.setattr("helia_profiler.capture.capture_power", fail)
+
+        with pytest.raises(
+            PowerError, match="Power capture failed: usb transfer stalled"
+        ) as excinfo:
+            CapturePowerStage().run(ctx)
+
+        assert "joulescope" in (excinfo.value.hint or "")
+
     def test_busy_loop_progress_message_says_pass_not_inference(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
@@ -3059,6 +3117,223 @@ class TestCapturePowerWrapper:
             # No per-inference time, so no counted warm-up before the window.
             "pre_window_s": 0.0,
         }
+
+    def test_busy_loop_warm_up_is_budgeted_before_the_window(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        # The firmware runs real warm-up inferences before the busy_loop spin;
+        # budgeting none let a slow model's warm-up eat the free-running and
+        # READY bounds (capture timeline contract C-W1 FR, C-W2; #302 follow-up 3).
+        from helia_profiler.capture import capture_power
+        from helia_profiler.config import load_config
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.power.diagnostics import CLEAN_WINDOW_WARMUP_REPS
+        from helia_profiler.results import FirmwareMeta, LayerResult, PlatformInfo, PmuResult
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+                "profiling": {"clean_window_probe": "busy_loop"},
+                "power": {"enabled": True, "driver": "joulescope", "sync_input_index": 0},
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        ctx.run_metadata.platform = PlatformInfo(cpu_clock_mhz=96)
+        # 96,000 cycles at 96 MHz is 1 ms per inference.
+        set_profile_result(
+            ctx,
+            PmuResult(
+                meta=FirmwareMeta(clean_infer_count=1),
+                layers=[LayerResult(id=0, op="CONV_2D", cycles=96_000.0)],
+            ),
+        )
+        # The plan's busy_loop reference is the whole 5 s spin, not an inference.
+        _mark_power_firmware_deployed(ctx, tmp_path, reference_inference_us=5_000_000)
+        called: dict[str, object] = {}
+
+        class FakeDriver:
+            supports_gated_capture = True
+
+            def check_available(self):
+                pass
+
+            def capture_gated(self, **kwargs):
+                called.update(kwargs)
+                return PowerResult(
+                    summary=PowerSummary(0.01, 0.02, 0.03, 0.04, 0.05, 6),
+                    metadata=PowerMetadata(
+                        measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW
+                    ),
+                )
+
+        monkeypatch.setattr("helia_profiler.power.get_driver", lambda *_a, **_k: FakeDriver())
+
+        capture_power(ctx, duration_override_s=7.0)
+
+        reps = max(CLEAN_WINDOW_WARMUP_REPS, config.profiling.warmup)
+        # Priced at 1 ms per profiled inference, not at the 5 s spin.
+        assert called["pre_window_s"] == pytest.approx(reps * 0.001)
+
+    def test_stalled_reference_stretches_the_fall_wait(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        # A stalled clean-window reference reads low, so the fixed count runs
+        # LONGER than planned. The fall wait must hold that window, not the
+        # planned one (capture timeline contract C-W4; #302 follow-up 4).
+        from helia_profiler.capture import capture_power
+        from helia_profiler.config import load_config
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.power.diagnostics import (
+            CLEAN_WINDOW_WARMUP_REPS,
+            gate_fall_wait_s,
+            longest_accepted_window_s,
+        )
+        from helia_profiler.results import FirmwareMeta, PmuResult
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+                "power": {"enabled": True, "driver": "joulescope", "sync_input_index": 0},
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        # Five of ten profile iterations froze: the reference reads >= 50% low.
+        set_profile_result(
+            ctx,
+            PmuResult(
+                meta=FirmwareMeta(clean_infer_count=10, clean_stalled_iters=5),
+                layers=[],
+            ),
+        )
+        _mark_power_firmware_deployed(ctx, tmp_path, reference_inference_us=1_000_000)
+        called: dict[str, object] = {}
+
+        class FakeDriver:
+            supports_gated_capture = True
+
+            def check_available(self):
+                pass
+
+            def capture_gated(self, **kwargs):
+                called.update(kwargs)
+                return PowerResult(
+                    summary=PowerSummary(0.01, 0.02, 0.03, 0.04, 0.05, 6),
+                    metadata=PowerMetadata(
+                        measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW
+                    ),
+                )
+
+        monkeypatch.setattr("helia_profiler.power.get_driver", lambda *_a, **_k: FakeDriver())
+
+        capture_power(ctx, duration_override_s=7.0)
+
+        def bound(avg_us: int) -> float:
+            longest = longest_accepted_window_s(
+                clean_infer_count=5,
+                clean_infer_avg_us=avg_us,
+                stats_rate_hz=1000,
+                relative_tolerance=0.10,
+            )
+            warm = max(CLEAN_WINDOW_WARMUP_REPS, config.profiling.warmup) * avg_us / 1e6
+            return gate_fall_wait_s(
+                7.0, longest_window_s=longest, lockstep=False, pre_window_s=warm
+            )
+
+        duration_s = called["duration_s"]
+        assert isinstance(duration_s, float)
+        assert duration_s == pytest.approx(bound(2_000_000))
+        assert duration_s > bound(1_000_000)
+        # The duration check still compares against the planned window.
+        assert called["clean_infer_avg_us"] == 1_000_000
+
+    def test_inconsistent_stall_report_does_not_stretch(self, tmp_path: Path):
+        # More affected iterations than the window ran is a corrupt report, not
+        # evidence of a long window; it must not take the 10x cap.
+        from helia_profiler.capture import _reference_stall_factor
+        from helia_profiler.config import load_config
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.results import FirmwareMeta, PmuResult
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(None, {"model": {"path": str(model)}, "engine": {"type": "helia-rt"}})
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        set_profile_result(
+            ctx,
+            PmuResult(meta=FirmwareMeta(clean_infer_count=4, clean_stalled_iters=9), layers=[]),
+        )
+
+        assert _reference_stall_factor(ctx) == 1.0
+
+    def test_stalled_profile_does_not_stretch_a_busy_loop_spin(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        # A busy_loop reference is the calibrated spin, not a stalled
+        # per-inference average, so a stall in the profile window says nothing
+        # about how long the spin runs.
+        from helia_profiler.capture import capture_power
+        from helia_profiler.config import load_config
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.power.diagnostics import gate_fall_wait_s, longest_accepted_window_s
+        from helia_profiler.results import FirmwareMeta, PmuResult
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+                "profiling": {"clean_window_probe": "busy_loop"},
+                "power": {"enabled": True, "driver": "joulescope", "sync_input_index": 0},
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        set_profile_result(
+            ctx,
+            PmuResult(meta=FirmwareMeta(clean_infer_count=10, clean_stalled_iters=5), layers=[]),
+        )
+        _mark_power_firmware_deployed(ctx, tmp_path, reference_inference_us=5_000_000)
+        called: dict[str, object] = {}
+
+        class FakeDriver:
+            supports_gated_capture = True
+
+            def check_available(self):
+                pass
+
+            def capture_gated(self, **kwargs):
+                called.update(kwargs)
+                return PowerResult(
+                    summary=PowerSummary(0.01, 0.02, 0.03, 0.04, 0.05, 6),
+                    metadata=PowerMetadata(
+                        measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW
+                    ),
+                )
+
+        monkeypatch.setattr("helia_profiler.power.get_driver", lambda *_a, **_k: FakeDriver())
+
+        capture_power(ctx, duration_override_s=7.0)
+
+        longest = longest_accepted_window_s(
+            clean_infer_count=5,
+            clean_infer_avg_us=5_000_000,
+            stats_rate_hz=1000,
+            relative_tolerance=0.25,
+        )
+        duration_s = called["duration_s"]
+        assert isinstance(duration_s, float)
+        assert duration_s == pytest.approx(
+            gate_fall_wait_s(7.0, longest_window_s=longest, lockstep=False, pre_window_s=0.0)
+        )
 
     def test_capture_power_waits_for_lockstep_ready_before_go(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -4717,7 +4992,7 @@ class TestObserverAbsoluteSlack:
             ),
         )
         agreement = assess_run_window_clock(
-            elapsed_us=130_000,
+            gate_elapsed_us=130_000,
             internal_mode=False,
             gated_result=result,
             planned_inference_count=None,
@@ -4734,7 +5009,7 @@ class TestObserverAbsoluteSlack:
         # 1 s reference, 12 ms disagreement: outside the pure 1% band, inside
         # the quantization floor a 100 Hz stats stream implies.
         floored = assess_window_clock(
-            elapsed_us=1_012_000,
+            gate_elapsed_us=1_012_000,
             reference_s=1.0,
             reference_source="gated_windows",
             relative_tolerance=0.01,
@@ -4744,7 +5019,7 @@ class TestObserverAbsoluteSlack:
         assert floored.to_metadata()["absolute_slack_s"] == pytest.approx(0.028)
 
         bare = assess_window_clock(
-            elapsed_us=1_012_000,
+            gate_elapsed_us=1_012_000,
             reference_s=1.0,
             reference_source="gated_windows",
             relative_tolerance=0.01,
@@ -4759,7 +5034,7 @@ class TestObserverAbsoluteSlack:
         # 60 ms disagreement still fails -- the floor must never widen the
         # band where the relative term already covers quantization.
         agreement = assess_window_clock(
-            elapsed_us=5_060_000,
+            gate_elapsed_us=5_060_000,
             reference_s=5.0,
             reference_source="gated_windows",
             relative_tolerance=0.01,
@@ -4789,7 +5064,7 @@ class TestGateArbitrationComposition:
         from helia_profiler.power.diagnostics import WindowClockAgreement
 
         return WindowClockAgreement(
-            elapsed_us=4_427_000 if agrees else 5_017_000,
+            gate_elapsed_us=4_427_000 if agrees else 5_017_000,
             reference_s=4.427,
             reference_source="gated_windows",
             relative_tolerance=0.01,

@@ -35,7 +35,9 @@ ADVERTISED = (
 def test_the_artifact_table_advertises_the_live_schema_versions():
     text = DOCS_PATH.read_text(encoding="utf-8")
     for schema, version in ADVERTISED:
-        found = re.findall(rf"`{re.escape(schema)}` v(\d+)", text)
+        # Both phrasings: the artifact table ("`schema` vN") and the field
+        # tables ("`schema`, version N").
+        found = re.findall(rf"`{re.escape(schema)}`(?: v|, version )(\d+)", text)
         assert found, f"{DOCS_PATH.name} never advertises {schema}"
         assert found == [str(version)] * len(found), (
             f"{DOCS_PATH.name} advertises {schema} v{found} but the contract is v{version}"
