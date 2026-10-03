@@ -317,8 +317,8 @@ candidates for the capture follow-up PR:
 - a sync-line high of at least the minimum during reset or boot is accepted as
   the window (C-S2, §11);
 - the current range is never restored on teardown. A capture sets `auto` at
-  start; only a power-cycle reset writes `off`, and an interruption in its off
-  window leaves the target unpowered until the next run (§11).
+  start and only a power-cycle reset writes `off`; that reset now restores
+  `auto` on every exit from its off window, an interrupt included (#302).
 
 ## 10. Bench acceptance
 

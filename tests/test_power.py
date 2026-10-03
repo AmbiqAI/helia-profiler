@@ -5377,3 +5377,46 @@ def test_bound_equal_to_the_due_time_is_not_called_exhausted():
     )
 
     assert "before the window was due" not in failure.message
+
+
+class TestJoulescopePowerCycleRestoresSupply:
+    """An interrupted power cycle must not leave the target unpowered (contract §9)."""
+
+    def _driver(self, monkeypatch: pytest.MonkeyPatch, publishes: list[tuple[str, object]]):
+        from helia_profiler.power.joulescope import driver as js_driver
+
+        class FakeJsdrv:
+            def publish(self, topic, value):
+                publishes.append((topic, value))
+
+        monkeypatch.setattr(
+            js_driver, "_open_device", lambda _serial: (FakeJsdrv(), "u/js320/0001", "js320")
+        )
+        monkeypatch.setattr(js_driver, "_close_device", lambda *_a: None)
+        return js_driver.JoulescopeDriver()
+
+    def test_interrupt_in_the_off_window_restores_the_range(self, monkeypatch: pytest.MonkeyPatch):
+        publishes: list[tuple[str, object]] = []
+        driver = self._driver(monkeypatch, publishes)
+
+        def interrupted(_seconds):
+            raise KeyboardInterrupt
+
+        monkeypatch.setattr("helia_profiler.power.joulescope.driver.time.sleep", interrupted)
+
+        with pytest.raises(KeyboardInterrupt):
+            driver.power_cycle(off_time_s=0.5, settle_time_s=0.0)
+
+        assert publishes == [
+            ("u/js320/0001/s/i/range/mode", "off"),
+            ("u/js320/0001/s/i/range/mode", "auto"),
+        ]
+
+    def test_completed_cycle_publishes_off_then_auto(self, monkeypatch: pytest.MonkeyPatch):
+        publishes: list[tuple[str, object]] = []
+        driver = self._driver(monkeypatch, publishes)
+        monkeypatch.setattr("helia_profiler.power.joulescope.driver.time.sleep", lambda _s: None)
+
+        driver.power_cycle(off_time_s=0.5, settle_time_s=0.0)
+
+        assert [value for _topic, value in publishes] == ["off", "auto"]

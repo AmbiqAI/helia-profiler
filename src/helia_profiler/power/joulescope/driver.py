@@ -198,8 +198,13 @@ class JoulescopeDriver:
         try:
             driver.publish(f"{device_path}/{topic}", off_value)
             log.info("Target power OFF")
-            time.sleep(off_time_s)
-            driver.publish(f"{device_path}/{topic}", on_value)
+            try:
+                time.sleep(off_time_s)
+            finally:
+                # Restore the supply on every exit from the off window, an
+                # interrupt included: nothing else puts the range back, so an
+                # early exit here left the target unpowered until the next run.
+                driver.publish(f"{device_path}/{topic}", on_value)
             log.info("Target power ON — waiting %.1fs for boot", settle_time_s)
             time.sleep(settle_time_s)
         except PowerError:
