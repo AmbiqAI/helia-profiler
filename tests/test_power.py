@@ -5412,6 +5412,27 @@ class TestJoulescopePowerCycleRestoresSupply:
             ("u/js320/0001/s/i/range/mode", "auto"),
         ]
 
+    def test_interrupt_as_the_supply_goes_off_still_restores(self, monkeypatch: pytest.MonkeyPatch):
+        from helia_profiler.power.joulescope import driver as js_driver
+
+        publishes: list[object] = []
+
+        class InterruptedOff:
+            def publish(self, _topic, value):
+                publishes.append(value)
+                if value == "off":
+                    raise KeyboardInterrupt
+
+        monkeypatch.setattr(
+            js_driver, "_open_device", lambda _serial: (InterruptedOff(), "u/js320/0001", "js320")
+        )
+        monkeypatch.setattr(js_driver, "_close_device", lambda *_a: None)
+
+        with pytest.raises(KeyboardInterrupt):
+            js_driver.JoulescopeDriver().power_cycle(off_time_s=0.5, settle_time_s=0.0)
+
+        assert publishes == ["off", "auto"]
+
     def test_failed_restore_does_not_replace_the_interrupt(self, monkeypatch: pytest.MonkeyPatch):
         # The interrupt is what the caller must see; a restore that also fails
         # is logged, not raised in its place (a best-effort caller would
@@ -5459,8 +5480,9 @@ class TestImplausibleGateRejection:
     """
 
     class _LiveInstrument:
-        def __init__(self, highs: list[tuple[int, int]]) -> None:
+        def __init__(self, highs: list[tuple[int, int]], *, stream: bool = True) -> None:
             self.highs = highs  # (start_ms, length_ms) of each sync-line high
+            self.stream = stream  # False: no GPI stream, edges come from polling
             self.now_ms = 0
             self._subs: dict[str, object] = {}
 
@@ -5468,6 +5490,8 @@ class TestImplausibleGateRejection:
             pass
 
         def subscribe(self, topic, _flags, callback) -> None:
+            if not self.stream and "/s/gpi/" in topic:
+                raise RuntimeError("GPI stream unavailable")
             self._subs[topic] = callback
 
         def unsubscribe(self, topic, _callback) -> None:
@@ -5505,11 +5529,18 @@ class TestImplausibleGateRejection:
             self.now_ms += 1
             return self.level(t)
 
-    def _capture(self, monkeypatch, highs: list[tuple[int, int]], *, planned: bool = True):
+    def _capture(
+        self,
+        monkeypatch,
+        highs: list[tuple[int, int]],
+        *,
+        planned: bool = True,
+        stream: bool = True,
+    ):
         from helia_profiler.power.joulescope import capture_gated as module
         from helia_profiler.power.joulescope.driver import JoulescopeDriver
 
-        instrument = self._LiveInstrument(highs)
+        instrument = self._LiveInstrument(highs, stream=stream)
         clock = _install_fake_capture_clock(monkeypatch)
         monkeypatch.setattr(
             module, "_open_device", lambda _serial: (instrument, "u/js320/test", "js320")
@@ -5532,13 +5563,28 @@ class TestImplausibleGateRejection:
         )
         return result, clock
 
-    def test_boot_time_high_does_not_end_the_capture_before_the_window(self, monkeypatch):
+    @pytest.mark.parametrize("stream", [True, False], ids=["gpi_stream", "poll_only"])
+    def test_boot_time_high_does_not_end_the_capture_before_the_window(self, monkeypatch, stream):
         # A 7 ms high at 2 ms (boot), then the real 10 ms window at 300 ms,
         # past the 150 ms post-fall guard.
-        result, _clock = self._capture(monkeypatch, [(2, 7), (300, 10)])
+        result, _clock = self._capture(monkeypatch, [(2, 7), (300, 10)], stream=stream)
 
         assert len(result.gated_windows) == 1
-        assert result.gated_windows[0].duration_s == pytest.approx(0.010, rel=1e-6)
+        assert result.gated_windows[0].duration_s == pytest.approx(0.010, rel=0.15)
+        diagnostics = result.metadata.gating_diagnostics
+        assert diagnostics is not None
+        # Diagnostics and integration see the same single window, not both highs.
+        assert diagnostics["window_count"] == 1
+        assert diagnostics["below_plan_highs"] == 1
+        timing = result.metadata.sync_timing_s
+        assert timing is not None
+        assert timing.capture_to_gate_rise_s == pytest.approx(0.300, abs=0.003)
+
+    def test_of_two_short_highs_only_the_last_is_kept(self, monkeypatch):
+        result, _clock = self._capture(monkeypatch, [(2, 6), (300, 7)])
+
+        assert len(result.gated_windows) == 1
+        assert result.gated_windows[0].duration_s == pytest.approx(0.007, rel=1e-6)
 
     def test_a_short_real_window_is_still_kept_for_the_duration_check(self, monkeypatch):
         # Nothing reaches the plan floor, so the last high past the minimum is
@@ -5551,6 +5597,9 @@ class TestImplausibleGateRejection:
         assert result.metadata.gate_duration_integrity.minimum_s == pytest.approx(0.002)
         # No plan-accepted gate to stop on, so the capture ran to its bound.
         assert clock.elapsed_s >= 1.0
+        timing = result.metadata.sync_timing_s
+        assert timing is not None
+        assert timing.capture_to_gate_rise_s == pytest.approx(0.002, abs=0.003)
 
     def test_without_a_plan_the_fixed_minimum_still_decides(self, monkeypatch):
         result, _clock = self._capture(monkeypatch, [(2, 7), (300, 10)], planned=False)
