@@ -465,8 +465,14 @@ def _validate(config: ProfileConfig, fixture: FixedFixture | TypedFixture) -> No
         raise ConfigError("Fixture supports upstream TFLM, heliaRT or helia-AOT only")
     if config.target.custom_socs or config.target.custom_boards:
         raise ConfigError("Fixed fixture does not support custom target declarations")
-    if config.target.board != "apollo510_evb" or config.target.clock.cpu != FIXTURE_CLOCK_PROFILE:
-        raise ConfigError("Fixed fixture supports Apollo510 EVB LP clock only")
+    if (
+        config.target.board != supported_fixture_target().board
+        or config.target.clock.cpu != FIXTURE_CLOCK_PROFILE
+    ):
+        raise ConfigError(
+            f"Fixed fixture supports {supported_fixture_target().board} "
+            f"at the {FIXTURE_CLOCK_PROFILE} clock only"
+        )
     if (
         config.model.arena_location != Placement.SRAM
         or config.model.weights_location != Placement.MRAM
