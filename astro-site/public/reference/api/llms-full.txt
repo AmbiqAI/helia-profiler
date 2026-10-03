@@ -35,6 +35,13 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 | [load_compatibility_baseline](/helia-profiler/reference/api/helia_profiler/deps/#helia_profiler.load_compatibility_baseline) | `helia_profiler.load_compatibility_baseline` |
 | [DependencyLockProvenance](/helia-profiler/reference/api/helia_profiler/deps/#helia_profiler.DependencyLockProvenance) | `helia_profiler.DependencyLockProvenance` |
 | [read_dependency_lock_provenance](/helia-profiler/reference/api/helia_profiler/deps/#helia_profiler.read_dependency_lock_provenance) | `helia_profiler.read_dependency_lock_provenance` |
+| [qualification](/helia-profiler/reference/api/helia_profiler/runtime_records/#helia_profiler.qualification) | `helia_profiler.qualification` |
+| [Qualification](/helia-profiler/reference/api/helia_profiler/runtime_records/#helia_profiler.Qualification) | `helia_profiler.Qualification` |
+| [RuntimeQualification](/helia-profiler/reference/api/helia_profiler/runtime_records/#helia_profiler.RuntimeQualification) | `helia_profiler.RuntimeQualification` |
+| [runtimes](/helia-profiler/reference/api/helia_profiler/runtime_records/#helia_profiler.runtimes) | `helia_profiler.runtimes` |
+| [RuntimeRecord](/helia-profiler/reference/api/helia_profiler/runtime_records/#helia_profiler.RuntimeRecord) | `helia_profiler.RuntimeRecord` |
+| [RuntimeSource](/helia-profiler/reference/api/helia_profiler/runtime_records/#helia_profiler.RuntimeSource) | `helia_profiler.RuntimeSource` |
+| [QualifiedTarget](/helia-profiler/reference/api/helia_profiler/runtime_records/#helia_profiler.QualifiedTarget) | `helia_profiler.QualifiedTarget` |
 | [ProfileResult](/helia-profiler/reference/api/helia_profiler/results/#helia_profiler.ProfileResult) | `helia_profiler.ProfileResult` |
 | [PmuResult](/helia-profiler/reference/api/helia_profiler/results/#helia_profiler.PmuResult) | `helia_profiler.PmuResult` |
 | [PresetResult](/helia-profiler/reference/api/helia_profiler/results/#helia_profiler.PresetResult) | `helia_profiler.PresetResult` |
@@ -1957,7 +1964,7 @@ Compatibility state of a resolved profiling configuration.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/deps/compatibility.py:44`
+Source: `src/helia_profiler/deps/compatibility.py:43`
 
 ### helia_profiler.QualificationState.QUALIFIED
 
@@ -1967,7 +1974,7 @@ Source: `src/helia_profiler/deps/compatibility.py:44`
 QUALIFIED = 'qualified'
 ```
 
-Source: `src/helia_profiler/deps/compatibility.py:47`
+Source: `src/helia_profiler/deps/compatibility.py:46`
 
 ### helia_profiler.QualificationState.QUALIFIED_WITH_ENGINE_OVERRIDE
 
@@ -1977,7 +1984,7 @@ Source: `src/helia_profiler/deps/compatibility.py:47`
 QUALIFIED_WITH_ENGINE_OVERRIDE = 'qualified-with-engine-override'
 ```
 
-Source: `src/helia_profiler/deps/compatibility.py:48`
+Source: `src/helia_profiler/deps/compatibility.py:47`
 
 ### helia_profiler.QualificationState.DEVELOPMENT_OVERRIDES
 
@@ -1987,7 +1994,7 @@ Source: `src/helia_profiler/deps/compatibility.py:48`
 DEVELOPMENT_OVERRIDES = 'development-overrides'
 ```
 
-Source: `src/helia_profiler/deps/compatibility.py:49`
+Source: `src/helia_profiler/deps/compatibility.py:48`
 
 ## helia_profiler.CompatibilityBaseline
 
@@ -2003,7 +2010,6 @@ CompatibilityBaseline(
     neuralspotx_sha256: str,
     projects: tuple[CompatibilityProject, ...],
     modules: tuple[CompatibilityModule, ...],
-    engines: tuple[CompatibilityEngine, ...],
 ) -> None
 ```
 
@@ -2013,7 +2019,7 @@ Validated, immutable baseline loaded from HPX package data.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/deps/compatibility.py:89`
+Source: `src/helia_profiler/deps/compatibility.py:69`
 
 ### helia_profiler.CompatibilityBaseline.schema
 
@@ -2023,7 +2029,7 @@ Source: `src/helia_profiler/deps/compatibility.py:89`
 schema: str
 ```
 
-Source: `src/helia_profiler/deps/compatibility.py:93`
+Source: `src/helia_profiler/deps/compatibility.py:73`
 
 ### helia_profiler.CompatibilityBaseline.schema_version
 
@@ -2033,7 +2039,7 @@ Source: `src/helia_profiler/deps/compatibility.py:93`
 schema_version: int
 ```
 
-Source: `src/helia_profiler/deps/compatibility.py:94`
+Source: `src/helia_profiler/deps/compatibility.py:74`
 
 ### helia_profiler.CompatibilityBaseline.baseline_id
 
@@ -2043,7 +2049,7 @@ Source: `src/helia_profiler/deps/compatibility.py:94`
 baseline_id: str
 ```
 
-Source: `src/helia_profiler/deps/compatibility.py:95`
+Source: `src/helia_profiler/deps/compatibility.py:75`
 
 ### helia_profiler.CompatibilityBaseline.neuralspotx_package
 
@@ -2053,7 +2059,7 @@ Source: `src/helia_profiler/deps/compatibility.py:95`
 neuralspotx_package: str
 ```
 
-Source: `src/helia_profiler/deps/compatibility.py:96`
+Source: `src/helia_profiler/deps/compatibility.py:76`
 
 ### helia_profiler.CompatibilityBaseline.neuralspotx_version
 
@@ -2063,7 +2069,7 @@ Source: `src/helia_profiler/deps/compatibility.py:96`
 neuralspotx_version: str
 ```
 
-Source: `src/helia_profiler/deps/compatibility.py:97`
+Source: `src/helia_profiler/deps/compatibility.py:77`
 
 ### helia_profiler.CompatibilityBaseline.neuralspotx_sha256
 
@@ -2073,7 +2079,7 @@ Source: `src/helia_profiler/deps/compatibility.py:97`
 neuralspotx_sha256: str
 ```
 
-Source: `src/helia_profiler/deps/compatibility.py:98`
+Source: `src/helia_profiler/deps/compatibility.py:78`
 
 ### helia_profiler.CompatibilityBaseline.projects
 
@@ -2083,7 +2089,7 @@ Source: `src/helia_profiler/deps/compatibility.py:98`
 projects: tuple[CompatibilityProject, ...]
 ```
 
-Source: `src/helia_profiler/deps/compatibility.py:99`
+Source: `src/helia_profiler/deps/compatibility.py:79`
 
 ### helia_profiler.CompatibilityBaseline.modules
 
@@ -2093,17 +2099,7 @@ Source: `src/helia_profiler/deps/compatibility.py:99`
 modules: tuple[CompatibilityModule, ...]
 ```
 
-Source: `src/helia_profiler/deps/compatibility.py:100`
-
-### helia_profiler.CompatibilityBaseline.engines
-
-`attribute` · `python`
-
-```python
-engines: tuple[CompatibilityEngine, ...]
-```
-
-Source: `src/helia_profiler/deps/compatibility.py:101`
+Source: `src/helia_profiler/deps/compatibility.py:80`
 
 ### helia_profiler.CompatibilityBaseline.fingerprint
 
@@ -2115,7 +2111,7 @@ fingerprint: str
 
 Return the canonical SHA-256 identity reserved for Stage 5.
 
-Source: `src/helia_profiler/deps/compatibility.py:131`
+Source: `src/helia_profiler/deps/compatibility.py:101`
 
 ### helia_profiler.CompatibilityBaseline.project
 
@@ -2125,7 +2121,7 @@ Source: `src/helia_profiler/deps/compatibility.py:131`
 project(name: str) -> CompatibilityProject
 ```
 
-Source: `src/helia_profiler/deps/compatibility.py:103`
+Source: `src/helia_profiler/deps/compatibility.py:82`
 
 ### helia_profiler.CompatibilityBaseline.module
 
@@ -2135,17 +2131,7 @@ Source: `src/helia_profiler/deps/compatibility.py:103`
 module(name: str) -> CompatibilityModule
 ```
 
-Source: `src/helia_profiler/deps/compatibility.py:112`
-
-### helia_profiler.CompatibilityBaseline.engine
-
-`method` · `python`
-
-```python
-engine(name: str) -> CompatibilityEngine
-```
-
-Source: `src/helia_profiler/deps/compatibility.py:121`
+Source: `src/helia_profiler/deps/compatibility.py:91`
 
 ### helia_profiler.CompatibilityBaseline.to_dict
 
@@ -2157,7 +2143,90 @@ to_dict() -> dict[str, Any]
 
 Return a stable JSON-safe representation for reports and Stage 5.
 
-Source: `src/helia_profiler/deps/compatibility.py:137`
+Source: `src/helia_profiler/deps/compatibility.py:107`
+
+## helia_profiler.CompatibilityResolution
+
+`class` · `python`
+
+```python
+CompatibilityResolution(
+    baseline: CompatibilityBaseline,
+    qualification: QualificationState,
+    module_overrides: tuple[str, ...] = (),
+    engine_overrides: tuple[str, ...] = (),
+) -> None
+```
+
+`dataclass`
+
+Resolved baseline plus explicit override classification.
+
+**API tier:** `stable`
+
+Source: `src/helia_profiler/deps/compatibility.py:128`
+
+### helia_profiler.CompatibilityResolution.baseline
+
+`attribute` · `python`
+
+```python
+baseline: CompatibilityBaseline
+```
+
+Source: `src/helia_profiler/deps/compatibility.py:132`
+
+### helia_profiler.CompatibilityResolution.qualification
+
+`attribute` · `python`
+
+```python
+qualification: QualificationState
+```
+
+Source: `src/helia_profiler/deps/compatibility.py:133`
+
+### helia_profiler.CompatibilityResolution.module_overrides
+
+`attribute` · `python`
+
+```python
+module_overrides: tuple[str, ...] = ()
+```
+
+Source: `src/helia_profiler/deps/compatibility.py:144`
+
+### helia_profiler.CompatibilityResolution.engine_overrides
+
+`attribute` · `python`
+
+```python
+engine_overrides: tuple[str, ...] = ()
+```
+
+Source: `src/helia_profiler/deps/compatibility.py:145`
+
+### helia_profiler.CompatibilityResolution.fingerprint
+
+`attribute` · `python`
+
+```python
+fingerprint: str
+```
+
+Source: `src/helia_profiler/deps/compatibility.py:148`
+
+### helia_profiler.CompatibilityResolution.to_dict
+
+`method` · `python`
+
+```python
+to_dict() -> dict[str, Any]
+```
+
+Return structured result provenance without lossy enum conversion.
+
+Source: `src/helia_profiler/deps/compatibility.py:151`
 
 ## helia_profiler.DependencyLockProvenance
 
@@ -2297,89 +2366,6 @@ update_requested: bool
 
 Source: `src/helia_profiler/results/dependencies.py:142`
 
-## helia_profiler.CompatibilityResolution
-
-`class` · `python`
-
-```python
-CompatibilityResolution(
-    baseline: CompatibilityBaseline,
-    qualification: QualificationState,
-    module_overrides: tuple[str, ...] = (),
-    engine_overrides: tuple[str, ...] = (),
-) -> None
-```
-
-`dataclass`
-
-Resolved baseline plus explicit override classification.
-
-**API tier:** `stable`
-
-Source: `src/helia_profiler/deps/compatibility.py:172`
-
-### helia_profiler.CompatibilityResolution.baseline
-
-`attribute` · `python`
-
-```python
-baseline: CompatibilityBaseline
-```
-
-Source: `src/helia_profiler/deps/compatibility.py:176`
-
-### helia_profiler.CompatibilityResolution.qualification
-
-`attribute` · `python`
-
-```python
-qualification: QualificationState
-```
-
-Source: `src/helia_profiler/deps/compatibility.py:177`
-
-### helia_profiler.CompatibilityResolution.module_overrides
-
-`attribute` · `python`
-
-```python
-module_overrides: tuple[str, ...] = ()
-```
-
-Source: `src/helia_profiler/deps/compatibility.py:188`
-
-### helia_profiler.CompatibilityResolution.engine_overrides
-
-`attribute` · `python`
-
-```python
-engine_overrides: tuple[str, ...] = ()
-```
-
-Source: `src/helia_profiler/deps/compatibility.py:189`
-
-### helia_profiler.CompatibilityResolution.fingerprint
-
-`attribute` · `python`
-
-```python
-fingerprint: str
-```
-
-Source: `src/helia_profiler/deps/compatibility.py:192`
-
-### helia_profiler.CompatibilityResolution.to_dict
-
-`method` · `python`
-
-```python
-to_dict() -> dict[str, Any]
-```
-
-Return structured result provenance without lossy enum conversion.
-
-Source: `src/helia_profiler/deps/compatibility.py:195`
-
 ## helia_profiler.load_compatibility_baseline
 
 `function` · `python`
@@ -2392,7 +2378,7 @@ Load and strictly validate an HPX compatibility baseline.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/deps/compatibility.py:206`
+Source: `src/helia_profiler/deps/compatibility.py:162`
 
 ## helia_profiler.read_dependency_lock_provenance
 
@@ -2411,7 +2397,7 @@ recorded run state before a surface is returned.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/deps/dependencies.py:524`
+Source: `src/helia_profiler/deps/dependencies.py:525`
 
 ---
 
@@ -6741,6 +6727,327 @@ Load a result manifest and optionally verify its sibling artifacts.
 **API tier:** `experimental`
 
 Source: `src/helia_profiler/results/manifest.py:244`
+
+---
+
+# helia_profiler.runtime_records
+
+The runtime versions this heliaPROFILER records, and whether each is qualified for a precision on a board and clock.
+
+Every name on this page is imported from `helia_profiler`.
+
+**API tier:** `experimental`
+
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
+
+## helia_profiler.RuntimeQualification
+
+`class` · `python`
+
+```python
+RuntimeQualification()
+```
+
+What heliaPROFILER says about one runtime version, precision and target.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/runtime_records.py:32`
+
+### helia_profiler.RuntimeQualification.QUALIFIED
+
+`constant` · `python`
+
+```python
+QUALIFIED = 'qualified'
+```
+
+Source: `src/helia_profiler/runtime_records.py:35`
+
+### helia_profiler.RuntimeQualification.SUPPORTED
+
+`constant` · `python`
+
+```python
+SUPPORTED = 'supported'
+```
+
+Source: `src/helia_profiler/runtime_records.py:36`
+
+### helia_profiler.RuntimeQualification.UNSUPPORTED
+
+`constant` · `python`
+
+```python
+UNSUPPORTED = 'unsupported'
+```
+
+Source: `src/helia_profiler/runtime_records.py:37`
+
+## helia_profiler.RuntimeSource
+
+`class` · `python`
+
+```python
+RuntimeSource(repo: str, commit: str) -> None
+```
+
+`dataclass`
+
+The repository and commit a runtime version is built from.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/runtime_records.py:40`
+
+### helia_profiler.RuntimeSource.repo
+
+`attribute` · `python`
+
+```python
+repo: str
+```
+
+Source: `src/helia_profiler/runtime_records.py:44`
+
+### helia_profiler.RuntimeSource.commit
+
+`attribute` · `python`
+
+```python
+commit: str
+```
+
+Source: `src/helia_profiler/runtime_records.py:45`
+
+## helia_profiler.QualifiedTarget
+
+`class` · `python`
+
+```python
+QualifiedTarget(board: str, clock: str, precisions: tuple[str, ...], basis: str, trace: str) -> None
+```
+
+`dataclass`
+
+A board class and clock the runtime is qualified on, and why.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/runtime_records.py:48`
+
+### helia_profiler.QualifiedTarget.board
+
+`attribute` · `python`
+
+```python
+board: str
+```
+
+Source: `src/helia_profiler/runtime_records.py:52`
+
+### helia_profiler.QualifiedTarget.clock
+
+`attribute` · `python`
+
+```python
+clock: str
+```
+
+Source: `src/helia_profiler/runtime_records.py:53`
+
+### helia_profiler.QualifiedTarget.precisions
+
+`attribute` · `python`
+
+```python
+precisions: tuple[str, ...]
+```
+
+Source: `src/helia_profiler/runtime_records.py:54`
+
+### helia_profiler.QualifiedTarget.basis
+
+`attribute` · `python`
+
+```python
+basis: str
+```
+
+Source: `src/helia_profiler/runtime_records.py:55`
+
+### helia_profiler.QualifiedTarget.trace
+
+`attribute` · `python`
+
+```python
+trace: str
+```
+
+Source: `src/helia_profiler/runtime_records.py:56`
+
+## helia_profiler.RuntimeRecord
+
+`class` · `python`
+
+```python
+RuntimeRecord(
+    name: str,
+    version: str,
+    default: bool,
+    source: RuntimeSource,
+    precisions: Mapping[str, str | None],
+    qualified: tuple[QualifiedTarget, ...],
+) -> None
+```
+
+`dataclass`
+
+One runtime version: its source, supported precisions and qualified targets.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/runtime_records.py:59`
+
+### helia_profiler.RuntimeRecord.name
+
+`attribute` · `python`
+
+```python
+name: str
+```
+
+Source: `src/helia_profiler/runtime_records.py:63`
+
+### helia_profiler.RuntimeRecord.version
+
+`attribute` · `python`
+
+```python
+version: str
+```
+
+Source: `src/helia_profiler/runtime_records.py:64`
+
+### helia_profiler.RuntimeRecord.default
+
+`attribute` · `python`
+
+```python
+default: bool
+```
+
+Source: `src/helia_profiler/runtime_records.py:65`
+
+### helia_profiler.RuntimeRecord.source
+
+`attribute` · `python`
+
+```python
+source: RuntimeSource
+```
+
+Source: `src/helia_profiler/runtime_records.py:66`
+
+### helia_profiler.RuntimeRecord.precisions
+
+`attribute` · `python`
+
+```python
+precisions: Mapping[str, str | None]
+```
+
+Source: `src/helia_profiler/runtime_records.py:68`
+
+### helia_profiler.RuntimeRecord.qualified
+
+`attribute` · `python`
+
+```python
+qualified: tuple[QualifiedTarget, ...]
+```
+
+Source: `src/helia_profiler/runtime_records.py:69`
+
+## helia_profiler.Qualification
+
+`class` · `python`
+
+```python
+Qualification(state: RuntimeQualification, reason: str | None, record: RuntimeRecord | None) -> None
+```
+
+`dataclass`
+
+The answer for one runtime version, precision and target, with the record it came from.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/runtime_records.py:72`
+
+### helia_profiler.Qualification.state
+
+`attribute` · `python`
+
+```python
+state: RuntimeQualification
+```
+
+Source: `src/helia_profiler/runtime_records.py:76`
+
+### helia_profiler.Qualification.reason
+
+`attribute` · `python`
+
+```python
+reason: str | None
+```
+
+Source: `src/helia_profiler/runtime_records.py:77`
+
+### helia_profiler.Qualification.record
+
+`attribute` · `python`
+
+```python
+record: RuntimeRecord | None
+```
+
+Source: `src/helia_profiler/runtime_records.py:78`
+
+## helia_profiler.runtimes
+
+`function` · `python`
+
+```python
+runtimes() -> tuple[RuntimeRecord, ...]
+```
+
+`cached`
+
+Every runtime record shipped with this heliaPROFILER, by name then version.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/runtime_records.py:81`
+
+## helia_profiler.qualification
+
+`function` · `python`
+
+```python
+qualification(name: str, version: str | None = None, *, board: str, clock: str, precision: str) -> Qualification
+```
+
+Whether ``name`` at ``version`` is qualified for ``precision`` on ``board`` at ``clock``.
+
+A version without a record, or a precision its record does not declare,
+is unsupported here, even when an engine's own version check would build
+it: this heliaPROFILER makes no claim about it.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/runtime_records.py:127`
 
 ---
 

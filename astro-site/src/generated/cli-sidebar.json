@@ -47,6 +47,10 @@
         "slug": "reference/cli/profile"
       },
       {
+        "label": "hpx runtimes",
+        "slug": "reference/cli/runtimes"
+      },
+      {
         "label": "hpx target",
         "slug": "reference/cli/target"
       },

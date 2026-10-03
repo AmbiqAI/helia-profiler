@@ -72,6 +72,10 @@
       ]
     },
     {
+      "label": "runtime_records",
+      "slug": "reference/api/helia_profiler/runtime_records"
+    },
+    {
       "label": "vocab",
       "slug": "reference/api/helia_profiler/vocab"
     }

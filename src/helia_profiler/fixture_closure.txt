@@ -20,6 +20,7 @@ cli/inspect_app.py
 cli/inspect_cmds.py
 cli/power_cmd.py
 cli/profile_cmd.py
+cli/runtimes_cmd.py
 cli/validate_cmd.py
 cli/validation_app.py
 config/__init__.py
@@ -41,6 +42,12 @@ data/profile_results.schema.v1.json
 data/result_manifest.schema.v1.json
 data/run_metadata.schema.v1.json
 data/run_summary.schema.v1.json
+data/runtimes/executorch/0.1.0.json
+data/runtimes/helia-aot/0.23.0.json
+data/runtimes/helia-aot/0.24.0.json
+data/runtimes/helia-aot/0.25.0.json
+data/runtimes/helia-rt/1.21.3.json
+data/runtimes/tflm/85638f0.json
 data/session_intent.schema.v1.json
 deps/__init__.py
 deps/compatibility.py
@@ -196,6 +203,7 @@ results/models.py
 results/run_summary.py
 results/serde.py
 results/support_bundle.py
+runtime_records.py
 session.py
 stages/__init__.py
 stages/analyze_model.py

@@ -27,8 +27,8 @@ def test_stability_tiers_partition_the_public_surface() -> None:
     }
     sizes = {name: len(members) for name, members in tiers.items()}
 
-    assert sizes == {"stable": 45, "experimental": 40, "implementation": 13}
-    assert sum(sizes.values()) == 98 == len(helia_profiler.__all__)
+    assert sizes == {"stable": 45, "experimental": 47, "implementation": 13}
+    assert sum(sizes.values()) == 105 == len(helia_profiler.__all__)
 
     for left, right in combinations(tiers, 2):
         assert not tiers[left] & tiers[right], (
@@ -133,7 +133,9 @@ def test_public_surface_membership_snapshot() -> None:
         "ProfileResult",
         "ProfilingConfig",
         "ProgressUpdate",
+        "Qualification",
         "QualificationState",
+        "QualifiedTarget",
         "ReportError",
         "ResetStrategy",
         "ResultArtifact",
@@ -143,6 +145,9 @@ def test_public_surface_membership_snapshot() -> None:
         "RunEvaluation",
         "RunMetadata",
         "RunStatus",
+        "RuntimeQualification",
+        "RuntimeRecord",
+        "RuntimeSource",
         "SerialPortInfo",
         "Session",
         "SocDef",
@@ -166,7 +171,9 @@ def test_public_surface_membership_snapshot() -> None:
         "load_compatibility_baseline",
         "load_result_manifest",
         "profile",
+        "qualification",
         "read_dependency_lock_provenance",
+        "runtimes",
         "verify_support_bundle",
         "write_support_bundle",
     ]

@@ -15,15 +15,17 @@ from __future__ import annotations
 import copy
 import logging
 import re
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
 import jinja2
 
 from ...config import DEFAULT_ARENA_SIZE_BYTES, ProfileConfig
-from ...errors import EngineError
+from ...errors import ConfigError, EngineError
 from ...placement import Placement, resolve_fastest_fit_placement
 from ...platform import SocDef, get_soc_for_board
+from ...runtime_records import RuntimeRecord, runtimes
 from ..semver import parse_semver
 
 log = logging.getLogger("hpx")
@@ -38,11 +40,22 @@ log = logging.getLogger("hpx")
 #   3. Local checkout: pip install -e /path/to/helia-aot
 #
 # We don't manage downloads/caches like we do for heliaRT — pip already
-# does that better. We just enforce the qualified version range at runtime so
-# a user with an unqualified install gets a clear error instead of a confusing
+# does that better. We just enforce the recorded version range at runtime so
+# a user with an unrecorded install gets a clear error instead of a confusing
 # build failure (e.g. missing ModuleType.nsx).
-HELIAAOT_MIN_VERSION = "0.23.0"
-HELIAAOT_MAX_VERSION_EXCLUSIVE = "0.26.0"
+
+
+def _recorded_range(records: Iterable[RuntimeRecord]) -> tuple[str, str]:
+    """The oldest heliaAOT record's version and the minor after the newest."""
+    versions = sorted(parse_semver(r.version) for r in records if r.name == "helia-aot")
+    if not versions:
+        raise ConfigError("heliaPROFILER ships no heliaAOT runtime record")
+    if (0, 0, 0) in versions:
+        raise ConfigError("heliaAOT runtime records need major.minor.patch versions")
+    return "{}.{}.{}".format(*versions[0]), f"{versions[-1][0]}.{versions[-1][1] + 1}.0"
+
+
+HELIAAOT_MIN_VERSION, HELIAAOT_MAX_VERSION_EXCLUSIVE = _recorded_range(runtimes())
 
 _DEFAULT_PREFIX = "hpx"
 _DEFAULT_MODULE_NAME = "hpx_model"
@@ -492,20 +505,13 @@ def _write_attributes_header(aot_module_dir: Path, prefix: str) -> Path:
     return header_path
 
 
-def _check_helia_aot_version(config: ProfileConfig | None = None) -> str:
-    """Verify the installed ``helia-aot`` package satisfies the qualified range.
+def _check_helia_aot_version() -> str:
+    """Verify the installed ``helia-aot`` package is within the recorded range.
 
     Raises ``EngineError`` with installation guidance if the package is
-    missing, older than the minimum version, or at/above the exclusive
-    maximum version. When the baseline sets an explicit range policy for
-    ``helia-aot`` (either bound), it is used standalone — a bound the
-    baseline leaves unset is treated as unbounded, not backfilled from
-    ``HELIAAOT_MIN_VERSION`` / ``HELIAAOT_MAX_VERSION_EXCLUSIVE``, since a
-    single-sided baseline range is intentionally allowed (see
-    ``_parse_baseline()``). The local constants are the fallback only when
-    no baseline is resolved at all, or the baseline governs ``helia-aot``
-    some other way (pinned ``version`` or ``governed_by_modules``). Logs
-    the detected version on success so it shows up in run logs.
+    missing, older than ``HELIAAOT_MIN_VERSION``, or at/above
+    ``HELIAAOT_MAX_VERSION_EXCLUSIVE``. Logs the detected version on success
+    so it shows up in run logs.
     """
     from importlib.metadata import PackageNotFoundError
     from importlib.metadata import version as _pkg_version
@@ -526,64 +532,36 @@ def _check_helia_aot_version(config: ProfileConfig | None = None) -> str:
         ) from exc
 
     actual = parse_semver(installed)
-    minimum = parse_semver(HELIAAOT_MIN_VERSION)
-    maximum: tuple[int, int, int] | None = parse_semver(HELIAAOT_MAX_VERSION_EXCLUSIVE)
-    if config is not None and config.compatibility is not None:
-        policy = config.compatibility.baseline.engine("helia-aot")
-        if policy.min_version is not None or policy.max_version_exclusive is not None:
-            # Falling back to the local constant for an unset baseline bound
-            # could silently re-bound the baseline's floor with an unrelated
-            # ceiling, rejecting every version instead of leaving it open.
-            minimum = (
-                parse_semver(policy.min_version) if policy.min_version is not None else (0, 0, 0)
-            )
-            maximum = (
-                parse_semver(policy.max_version_exclusive)
-                if policy.max_version_exclusive is not None
-                else None
-            )
-    minimum_str = f"{minimum[0]}.{minimum[1]}.{minimum[2]}"
-    maximum_str = f"{maximum[0]}.{maximum[1]}.{maximum[2]}" if maximum is not None else "unbounded"
-    # Log messages below use minimum_display/maximum_display (not the bare
-    # *_str values) so an unset max_version_exclusive renders as "<unbounded"
-    # rather than the malformed "<vunbounded" a hard-coded "v" prefix gives.
-    minimum_display = f"v{minimum_str}"
-    maximum_display = "unbounded" if maximum is None else f"v{maximum_str}"
+    minimum, maximum = HELIAAOT_MIN_VERSION, HELIAAOT_MAX_VERSION_EXCLUSIVE
     if actual == (0, 0, 0):
         log.warning(
-            "Could not parse helia-aot version %r — skipping qualified-range "
+            "Could not parse helia-aot version %r — skipping the recorded-range "
             "check (supported: >=%s, <%s).",
             installed,
-            minimum_display,
-            maximum_display,
+            minimum,
+            maximum,
         )
         return installed
 
-    if actual < minimum:
-        ceiling = "" if maximum is None else f",<{maximum_str}"
+    if actual < parse_semver(minimum):
         raise EngineError(
-            f"helia-aot v{installed} is below the minimum supported version (v{minimum_str}).",
+            f"helia-aot v{installed} is below the minimum supported version (v{minimum}).",
             hint=(
-                f"Upgrade with: pip install -U 'helia-aot>={minimum_str}{ceiling}'\n"
+                f"Upgrade with: pip install -U 'helia-aot>={minimum},<{maximum}'\n"
                 "or pin a specific newer version / fork / local checkout."
             ),
         )
 
-    if maximum is not None and actual >= maximum:
+    if actual >= parse_semver(maximum):
         raise EngineError(
-            f"helia-aot v{installed} is outside the qualified policy "
-            f"(supported: >={minimum_str}, <{maximum_str})",
+            f"helia-aot v{installed} is outside the recorded range "
+            f"(supported: >={minimum}, <{maximum})",
             hint=(
-                f"Install a qualified helia-aot >={minimum_str},<{maximum_str} release "
+                f"Install a recorded helia-aot >={minimum},<{maximum} release "
                 "or use an explicit development setup."
             ),
         )
 
-    log.debug(
-        "Using helia-aot v%s (qualified range: >=%s, <%s).",
-        installed,
-        minimum_display,
-        maximum_display,
-    )
+    log.debug("Using helia-aot v%s (recorded range: >=%s, <%s).", installed, minimum, maximum)
 
     return installed

@@ -36,6 +36,7 @@ from .fixture_target import FIXTURE_CLOCK_PROFILE, FixtureTarget, supported_fixt
 from .pipeline import PipelineContext, PipelineRunner, Stage, serialize_config
 from .placement import ArenaRole, Placement
 from .results.models import MemoryPlan, ToolchainInfo
+from .runtime_records import RuntimeQualification, qualification, runtimes
 
 
 class FixtureTimingScope(StrEnum):
@@ -120,28 +121,44 @@ class FixtureCapability(StrEnum):
     UNSUPPORTED = "unsupported"
 
 
-#: Fixture support per engine and IO dtype. ``qualified`` has an exact device
-#: pass; ``supported`` builds but has none yet; ``unsupported`` is refused.
-FIXTURE_CAPABILITIES: dict[EngineType, dict[str, FixtureCapability]] = {
-    EngineType.TFLM: {
-        FixtureDType.INT8: FixtureCapability.QUALIFIED,
-        FixtureDType.INT16: FixtureCapability.SUPPORTED,
-        FixtureDType.FLOAT32: FixtureCapability.SUPPORTED,
-        FixtureDType.FLOAT16: FixtureCapability.UNSUPPORTED,
-    },
-    EngineType.HELIA_AOT: {
-        FixtureDType.INT8: FixtureCapability.QUALIFIED,
-        FixtureDType.INT16: FixtureCapability.SUPPORTED,
-        FixtureDType.FLOAT16: FixtureCapability.SUPPORTED,
-        FixtureDType.FLOAT32: FixtureCapability.SUPPORTED,
-    },
-    EngineType.HELIA_RT: {
-        FixtureDType.INT8: FixtureCapability.SUPPORTED,
-        FixtureDType.INT16: FixtureCapability.SUPPORTED,
-        FixtureDType.FLOAT16: FixtureCapability.SUPPORTED,
-        FixtureDType.FLOAT32: FixtureCapability.SUPPORTED,
-    },
+#: The precision each fixture IO dtype stands for in the runtime records.
+_DTYPE_PRECISION = {
+    FixtureDType.INT8: "a8w8",
+    FixtureDType.INT16: "a16w8",
+    FixtureDType.FLOAT16: "fp16",
+    FixtureDType.FLOAT32: "fp32",
 }
+
+
+def _record_capability(engine: EngineType, dtype: FixtureDType) -> FixtureCapability:
+    board, precision = supported_fixture_target().board, _DTYPE_PRECISION[dtype]
+    answers = [
+        qualification(
+            record.name,
+            record.version,
+            board=board,
+            clock=FIXTURE_CLOCK_PROFILE,
+            precision=precision,
+        )
+        for record in runtimes()
+        if record.name == engine.value
+    ]
+    if any(answer.state is RuntimeQualification.QUALIFIED for answer in answers):
+        return FixtureCapability.QUALIFIED
+    default = next(answer for answer in answers if answer.record and answer.record.default)
+    return FixtureCapability(default.state.value)
+
+
+#: Fixture support per engine and IO dtype on the fixture target, from the
+#: runtime records: ``qualified`` when any of the engine's versions has a
+#: device pass, else what its default record says; ``supported`` builds but
+#: has no device pass yet; ``unsupported`` is refused.
+FIXTURE_CAPABILITIES: dict[EngineType, dict[str, FixtureCapability]] = {
+    engine: {dtype: _record_capability(engine, dtype) for dtype in FixtureDType}
+    for engine in (EngineType.TFLM, EngineType.HELIA_AOT, EngineType.HELIA_RT)
+}
+
+
 #: Engines that link a prepared runtime archive: (manifest stack, required backend).
 PREPARED_RUNTIME_ENGINES = {
     EngineType.TFLM: ("upstream", FixtureBackend.CMSIS_NN),

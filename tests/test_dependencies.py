@@ -363,7 +363,7 @@ def test_exact_dependency_provenance_serialization(
     assert serialized["workspace"]["baseline_id"] == "hpx-neuralspotx-0.8.1-2026-09"
     assert (
         serialized["workspace"]["baseline_fingerprint"]
-        == "b825c5c218bd8bd3a21c2c18e9d02ad62b9acbc40c12fb8a79ffc31fa272683f"
+        == "7afc237195efd15cacb2690a42fb0dd09460b0870b81b8e1e73d1459b5041322"
     )
     assert serialized["lock"]["mode"] == "reused"
     assert serialized["qualification"] == "development-overrides"
@@ -810,6 +810,24 @@ def test_provider_override_does_not_exempt_unrelated_baseline_project(
     monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
     with pytest.raises(VersionError, match="qualified baseline pins"):
         prepare_locked_dependencies(ctx)
+
+
+def test_executorch_source_override_exempts_the_nsx_executorch_project(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # An engine source override redirects the engine's own project, so its lock
+    # entry may leave the baseline pin; the project is the runtime record's repo.
+    checkout = tmp_path / "nsx-executorch"
+    checkout.mkdir()
+    ctx = _context(
+        tmp_path,
+        engine_type="executorch",
+        model_name="model.pte",
+        engine_config={"source_path": str(checkout)},
+    )
+    _write_valid_lock(ctx, project="nsx-executorch", commit="d" * 40)
+    monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
+    prepare_locked_dependencies(ctx)
 
 
 def test_provider_override_does_not_exempt_unselected_provider(

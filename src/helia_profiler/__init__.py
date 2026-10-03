@@ -101,6 +101,15 @@ from .results import (
     SupportBundleSection,
     load_result_manifest,
 )
+from .runtime_records import (
+    Qualification,
+    QualifiedTarget,
+    RuntimeQualification,
+    RuntimeRecord,
+    RuntimeSource,
+    qualification,
+    runtimes,
+)
 from .session import Session
 from .target.lifecycle import ResetStrategy
 from .target.probe.jlink import JLinkProbe, JLinkProbeMatch
@@ -119,6 +128,13 @@ __all__ = [
     "CompatibilityResolution",
     "QualificationState",
     "load_compatibility_baseline",
+    "Qualification",
+    "QualifiedTarget",
+    "RuntimeQualification",
+    "RuntimeRecord",
+    "RuntimeSource",
+    "qualification",
+    "runtimes",
     "ModelConfig",
     "EngineConfig",
     "EngineType",
@@ -260,6 +276,13 @@ _STABLE_API = {
 }
 
 _EXPERIMENTAL_API = {
+    "Qualification",
+    "QualifiedTarget",
+    "RuntimeQualification",
+    "RuntimeRecord",
+    "RuntimeSource",
+    "qualification",
+    "runtimes",
     "MeasurementScope",
     "ObservationMode",
     "PowerIntegrity",

@@ -24,33 +24,30 @@ The current baseline is `hpx-neuralspotx-0.8.1-2026-09`:
 | `ns-cmsis-nn` | `5f3fed9f…cb8` (`v7.39.2`, hpx-declared, see below) |
 | `nsx-executorch` | `5514ac1e…b48e` |
 | `nsx-sensors` | `c219a2bc…3e25` (`v0.3.0`, peeled) |
-| heliaRT | `1.21.3`, commit `dc8533ab…f5f` (min supported `1.16.0`, from `HELIART_MIN_VERSION` in code, not a baseline-JSON field) |
-| heliaAOT | `min_version=0.23.0`, `max_version_exclusive=0.26.0` |
-| tflm | governed by the `nsx-tflite-micro` and `arm-cmsis-nn` module refs above; `nsx-tflite-micro` builds TFLM from the `helia-rt-source` project, which the baseline does not list and the neuralSPOT-X 0.8.1 registry lock fixes at `7c1b162c` (helia-rt v1.17.0) |
-| executorch | `0.1.0`, module ref `5514ac1e…b48e` (a checkout's `version.txt` is verified against the baseline) |
+| heliaRT | `1.21.3`, commit `dc8533ab…f5f`, from the runtime record (min supported `1.16.0`, from `HELIART_MIN_VERSION` in code) |
+| heliaAOT | runtime records `0.23.0`, `0.24.0`, `0.25.0`; accepted range `>=0.23.0,<0.26.0` |
+| tflm | profile path: governed by the `nsx-tflite-micro` and `arm-cmsis-nn` module refs above (the `tflm` runtime record describes the fixed fixture's prepared upstream archive instead); `nsx-tflite-micro` builds TFLM from the `helia-rt-source` project, which the baseline does not list and the neuralSPOT-X 0.8.1 registry lock fixes at `7c1b162c` (helia-rt v1.17.0) |
+| executorch | `0.1.0`, commit `5514ac1e…b48e`, from the runtime record (a checkout's `version.txt` and commit are verified against it) |
 
 Every baseline project and module ref is immutable by policy: only a full
 40-character Git object ID is accepted. Newly promoted annotated tags are
-verified and peeled before being recorded. Each engine entry is typed: a pinned
-`version`/`ref`
-(heliaRT), a `min_version`/`max_version_exclusive` semver range (heliaAOT),
-or `governed_by_modules: true` when an engine has no version of its own and
-is fully qualified by its NSX module refs (stock TFLM).
+verified and peeled before being recorded.
 
-heliaRT's `version`/`ref` in the baseline mirror the canonical
-`HELIART_VERSION`/`HELIART_RELEASE_TAG` constants in
-`engines/helia_rt/artifacts.py` (see `AGENTS.md`) for reporting purposes
-only; a test asserts they never drift apart. Runtime resolution of the
-default heliaRT source continues to read those constants directly; the
-baseline does not drive ordinary heliaRT version/ref resolution.
+Engine versions are not part of the baseline. Each runtime version hpx
+builds has a runtime record,
+`src/helia_profiler/data/runtimes/<name>/<version>.json` (listed by
+`hpx runtimes list`): its source commit, the precisions it supports and the
+targets it is qualified on. The default heliaRT version and source
+commit (`HELIART_VERSION`, `HELIART_SOURCE_COMMIT` in
+`engines/helia_rt/artifacts.py`) and the ExecuTorch version and commit come
+from each engine's default record. The baseline's `helia-rt` and
+`nsx-executorch` project refs must equal those commits; a test checks it.
 
-heliaAOT is different: it is a separately pip-installed package, so HPX
-cannot select its version; it can only validate the one already installed.
-`engines/helia_aot/compile._check_helia_aot_version()` reads the baseline's
-`min_version`/`max_version_exclusive` policy for `helia-aot` (falling back to
-local `HELIAAOT_MIN_VERSION`/`HELIAAOT_MAX_VERSION_EXCLUSIVE` constants only
-when no resolved baseline is available) and raises a clear `EngineError` if
-the installed package is outside that qualified range.
+heliaAOT is a separately pip-installed package, so HPX cannot select its
+version; it can only validate the one already installed.
+`engines/helia_aot/compile._check_helia_aot_version()` accepts versions from
+the oldest heliaAOT record to the minor after the newest, and raises a clear
+`EngineError` outside that range.
 
 ## Qualification states
 

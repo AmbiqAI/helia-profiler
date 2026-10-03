@@ -13,8 +13,8 @@ Choose the section for your engine. Each describes its dependencies, configurati
 
 [heliaRT](https://github.com/AmbiqAI/helia-rt) is Ambiq's TFLM fork with
 three kernel backends: reference, CMSIS-NN and the Ambiq-tuned HELIA
-kernels. hpx ships pinned to heliaRT v1.21.3 (`HELIART_VERSION` in
-`engines/helia_rt/artifacts.py`) and enforces a minimum of v1.16.0.
+kernels. hpx ships pinned to heliaRT v1.21.3, its default runtime record
+(`hpx runtimes show helia-rt`), and enforces a minimum of v1.16.0.
 
 The generated firmware derives its operator resolver from model analysis
 (`resolver_ops: auto`) and enables the resource-variable runtime when the
@@ -82,9 +82,9 @@ engine:
 
 heliaAOT is a Python package that runs at build time, so pip owns its
 version. The `aot` extra requires `helia-aot>=0.23.0,<0.26.0`
-(`pyproject.toml`); hpx enforces the same minimum at engine load
-(`HELIAAOT_MIN_VERSION`) and `hpx doctor` reports whether the engine is
-available.
+(`pyproject.toml`); hpx enforces the same range at engine load, from its
+heliaAOT runtime records (`hpx runtimes list`), and `hpx doctor` reports
+whether the engine is available.
 
 ```bash
 pip install 'helia-profiler[aot]'                                  # a compatible release

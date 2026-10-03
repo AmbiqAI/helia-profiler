@@ -7,7 +7,7 @@
   "language": "python",
   "modules": [
     {
-      "description": "The entry points of the heliaPROFILER Python API: one call, one session, and the progress stream they report through.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`\n\nGenerated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.\n\n**Re-exports**\n\n| Name | Source |\n| --- | --- |\n| [ProfileConfig][helia_profiler.ProfileConfig] | `helia_profiler.ProfileConfig` |\n| [ModelConfig][helia_profiler.ModelConfig] | `helia_profiler.ModelConfig` |\n| [EngineConfig][helia_profiler.EngineConfig] | `helia_profiler.EngineConfig` |\n| [TargetConfig][helia_profiler.TargetConfig] | `helia_profiler.TargetConfig` |\n| [ProfilingConfig][helia_profiler.ProfilingConfig] | `helia_profiler.ProfilingConfig` |\n| [OutputConfig][helia_profiler.OutputConfig] | `helia_profiler.OutputConfig` |\n| [BuildConfig][helia_profiler.BuildConfig] | `helia_profiler.BuildConfig` |\n| [HeartbeatConfig][helia_profiler.HeartbeatConfig] | `helia_profiler.HeartbeatConfig` |\n| [TimeoutsConfig][helia_profiler.TimeoutsConfig] | `helia_profiler.TimeoutsConfig` |\n| [ClockSelection][helia_profiler.ClockSelection] | `helia_profiler.ClockSelection` |\n| [OutputFormat][helia_profiler.OutputFormat] | `helia_profiler.OutputFormat` |\n| [PowerConfig][helia_profiler.PowerConfig] | `helia_profiler.PowerConfig` |\n| [EngineType][helia_profiler.EngineType] | `helia_profiler.EngineType` |\n| [Toolchain][helia_profiler.Toolchain] | `helia_profiler.Toolchain` |\n| [Transport][helia_profiler.Transport] | `helia_profiler.Transport` |\n| [Placement][helia_profiler.Placement] | `helia_profiler.Placement` |\n| [ResetStrategy][helia_profiler.ResetStrategy] | `helia_profiler.ResetStrategy` |\n| [CompatibilityBaseline][helia_profiler.CompatibilityBaseline] | `helia_profiler.CompatibilityBaseline` |\n| [CompatibilityResolution][helia_profiler.CompatibilityResolution] | `helia_profiler.CompatibilityResolution` |\n| [QualificationState][helia_profiler.QualificationState] | `helia_profiler.QualificationState` |\n| [load_compatibility_baseline][helia_profiler.load_compatibility_baseline] | `helia_profiler.load_compatibility_baseline` |\n| [DependencyLockProvenance][helia_profiler.DependencyLockProvenance] | `helia_profiler.DependencyLockProvenance` |\n| [read_dependency_lock_provenance][helia_profiler.read_dependency_lock_provenance] | `helia_profiler.read_dependency_lock_provenance` |\n| [ProfileResult][helia_profiler.ProfileResult] | `helia_profiler.ProfileResult` |\n| [PmuResult][helia_profiler.PmuResult] | `helia_profiler.PmuResult` |\n| [PresetResult][helia_profiler.PresetResult] | `helia_profiler.PresetResult` |\n| [LayerResult][helia_profiler.LayerResult] | `helia_profiler.LayerResult` |\n| [FirmwareMeta][helia_profiler.FirmwareMeta] | `helia_profiler.FirmwareMeta` |\n| [RunMetadata][helia_profiler.RunMetadata] | `helia_profiler.RunMetadata` |\n| [ResultManifest][helia_profiler.ResultManifest] | `helia_profiler.ResultManifest` |\n| [ResultArtifact][helia_profiler.ResultArtifact] | `helia_profiler.ResultArtifact` |\n| [ResultIssue][helia_profiler.ResultIssue] | `helia_profiler.ResultIssue` |\n| [ResultValidity][helia_profiler.ResultValidity] | `helia_profiler.ResultValidity` |\n| [RunStatus][helia_profiler.RunStatus] | `helia_profiler.RunStatus` |\n| [load_result_manifest][helia_profiler.load_result_manifest] | `helia_profiler.load_result_manifest` |\n| [PowerMode][helia_profiler.PowerMode] | `helia_profiler.PowerMode` |\n| [PowerResult][helia_profiler.PowerResult] | `helia_profiler.PowerResult` |\n| [PowerObservation][helia_profiler.PowerObservation] | `helia_profiler.PowerObservation` |\n| [PowerTerminalRecord][helia_profiler.PowerTerminalRecord] | `helia_profiler.PowerTerminalRecord` |\n| [OnDevicePowerSummary][helia_profiler.OnDevicePowerSummary] | `helia_profiler.OnDevicePowerSummary` |\n| [PowerMetadata][helia_profiler.PowerMetadata] | `helia_profiler.PowerMetadata` |\n| [MeasurementScope][helia_profiler.MeasurementScope] | `helia_profiler.MeasurementScope` |\n| [ObservationMode][helia_profiler.ObservationMode] | `helia_profiler.ObservationMode` |\n| [PowerIntegrity][helia_profiler.PowerIntegrity] | `helia_profiler.PowerIntegrity` |\n| [CompareResult][helia_profiler.CompareResult] | `helia_profiler.CompareResult` |\n| [assess_comparability][helia_profiler.assess_comparability] | `helia_profiler.assess_comparability` |\n| [ComparabilityAssessment][helia_profiler.ComparabilityAssessment] | `helia_profiler.ComparabilityAssessment` |\n| [ComparabilityIssue][helia_profiler.ComparabilityIssue] | `helia_profiler.ComparabilityIssue` |\n| [ComparabilitySeverity][helia_profiler.ComparabilitySeverity] | `helia_profiler.ComparabilitySeverity` |\n| [ComparisonProfile][helia_profiler.ComparisonProfile] | `helia_profiler.ComparisonProfile` |\n| [evaluate_comparison_profile][helia_profiler.evaluate_comparison_profile] | `helia_profiler.evaluate_comparison_profile` |\n| [ComparisonVerdict][helia_profiler.ComparisonVerdict] | `helia_profiler.ComparisonVerdict` |\n| [MetricPolicy][helia_profiler.MetricPolicy] | `helia_profiler.MetricPolicy` |\n| [MetricDirection][helia_profiler.MetricDirection] | `helia_profiler.MetricDirection` |\n| [MetricVerdict][helia_profiler.MetricVerdict] | `helia_profiler.MetricVerdict` |\n| [MissingMetricPolicy][helia_profiler.MissingMetricPolicy] | `helia_profiler.MissingMetricPolicy` |\n| [VerdictStatus][helia_profiler.VerdictStatus] | `helia_profiler.VerdictStatus` |\n| [evaluate_run][helia_profiler.evaluate_run] | `helia_profiler.evaluate_run` |\n| [RunEvaluation][helia_profiler.RunEvaluation] | `helia_profiler.RunEvaluation` |\n| [ModelAnalysis][helia_profiler.ModelAnalysis] | `helia_profiler.ModelAnalysis` |\n| [SupportBundleOptions][helia_profiler.SupportBundleOptions] | `helia_profiler.SupportBundleOptions` |\n| [collect_support_bundle][helia_profiler.collect_support_bundle] | `helia_profiler.collect_support_bundle` |\n| [write_support_bundle][helia_profiler.write_support_bundle] | `helia_profiler.write_support_bundle` |\n| [verify_support_bundle][helia_profiler.verify_support_bundle] | `helia_profiler.verify_support_bundle` |\n| [SupportBundleManifest][helia_profiler.SupportBundleManifest] | `helia_profiler.SupportBundleManifest` |\n| [SupportBundleSection][helia_profiler.SupportBundleSection] | `helia_profiler.SupportBundleSection` |\n| [HpxError][helia_profiler.HpxError] | `helia_profiler.HpxError` |\n| [ConfigError][helia_profiler.ConfigError] | `helia_profiler.ConfigError` |\n| [PlatformError][helia_profiler.PlatformError] | `helia_profiler.PlatformError` |\n| [EngineError][helia_profiler.EngineError] | `helia_profiler.EngineError` |\n| [FirmwareError][helia_profiler.FirmwareError] | `helia_profiler.FirmwareError` |\n| [BuildError][helia_profiler.BuildError] | `helia_profiler.BuildError` |\n| [DependencyError][helia_profiler.DependencyError] | `helia_profiler.DependencyError` |\n| [VersionError][helia_profiler.VersionError] | `helia_profiler.VersionError` |\n| [LockError][helia_profiler.LockError] | `helia_profiler.LockError` |\n| [NetworkError][helia_profiler.NetworkError] | `helia_profiler.NetworkError` |\n| [CaptureError][helia_profiler.CaptureError] | `helia_profiler.CaptureError` |\n| [DeterministicCaptureError][helia_profiler.DeterministicCaptureError] | `helia_profiler.DeterministicCaptureError` |\n| [PowerError][helia_profiler.PowerError] | `helia_profiler.PowerError` |\n| [ReportError][helia_profiler.ReportError] | `helia_profiler.ReportError` |",
+      "description": "The entry points of the heliaPROFILER Python API: one call, one session, and the progress stream they report through.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `stable`\n\nGenerated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.\n\n**Re-exports**\n\n| Name | Source |\n| --- | --- |\n| [ProfileConfig][helia_profiler.ProfileConfig] | `helia_profiler.ProfileConfig` |\n| [ModelConfig][helia_profiler.ModelConfig] | `helia_profiler.ModelConfig` |\n| [EngineConfig][helia_profiler.EngineConfig] | `helia_profiler.EngineConfig` |\n| [TargetConfig][helia_profiler.TargetConfig] | `helia_profiler.TargetConfig` |\n| [ProfilingConfig][helia_profiler.ProfilingConfig] | `helia_profiler.ProfilingConfig` |\n| [OutputConfig][helia_profiler.OutputConfig] | `helia_profiler.OutputConfig` |\n| [BuildConfig][helia_profiler.BuildConfig] | `helia_profiler.BuildConfig` |\n| [HeartbeatConfig][helia_profiler.HeartbeatConfig] | `helia_profiler.HeartbeatConfig` |\n| [TimeoutsConfig][helia_profiler.TimeoutsConfig] | `helia_profiler.TimeoutsConfig` |\n| [ClockSelection][helia_profiler.ClockSelection] | `helia_profiler.ClockSelection` |\n| [OutputFormat][helia_profiler.OutputFormat] | `helia_profiler.OutputFormat` |\n| [PowerConfig][helia_profiler.PowerConfig] | `helia_profiler.PowerConfig` |\n| [EngineType][helia_profiler.EngineType] | `helia_profiler.EngineType` |\n| [Toolchain][helia_profiler.Toolchain] | `helia_profiler.Toolchain` |\n| [Transport][helia_profiler.Transport] | `helia_profiler.Transport` |\n| [Placement][helia_profiler.Placement] | `helia_profiler.Placement` |\n| [ResetStrategy][helia_profiler.ResetStrategy] | `helia_profiler.ResetStrategy` |\n| [CompatibilityBaseline][helia_profiler.CompatibilityBaseline] | `helia_profiler.CompatibilityBaseline` |\n| [CompatibilityResolution][helia_profiler.CompatibilityResolution] | `helia_profiler.CompatibilityResolution` |\n| [QualificationState][helia_profiler.QualificationState] | `helia_profiler.QualificationState` |\n| [load_compatibility_baseline][helia_profiler.load_compatibility_baseline] | `helia_profiler.load_compatibility_baseline` |\n| [DependencyLockProvenance][helia_profiler.DependencyLockProvenance] | `helia_profiler.DependencyLockProvenance` |\n| [read_dependency_lock_provenance][helia_profiler.read_dependency_lock_provenance] | `helia_profiler.read_dependency_lock_provenance` |\n| [qualification][helia_profiler.qualification] | `helia_profiler.qualification` |\n| [Qualification][helia_profiler.Qualification] | `helia_profiler.Qualification` |\n| [RuntimeQualification][helia_profiler.RuntimeQualification] | `helia_profiler.RuntimeQualification` |\n| [runtimes][helia_profiler.runtimes] | `helia_profiler.runtimes` |\n| [RuntimeRecord][helia_profiler.RuntimeRecord] | `helia_profiler.RuntimeRecord` |\n| [RuntimeSource][helia_profiler.RuntimeSource] | `helia_profiler.RuntimeSource` |\n| [QualifiedTarget][helia_profiler.QualifiedTarget] | `helia_profiler.QualifiedTarget` |\n| [ProfileResult][helia_profiler.ProfileResult] | `helia_profiler.ProfileResult` |\n| [PmuResult][helia_profiler.PmuResult] | `helia_profiler.PmuResult` |\n| [PresetResult][helia_profiler.PresetResult] | `helia_profiler.PresetResult` |\n| [LayerResult][helia_profiler.LayerResult] | `helia_profiler.LayerResult` |\n| [FirmwareMeta][helia_profiler.FirmwareMeta] | `helia_profiler.FirmwareMeta` |\n| [RunMetadata][helia_profiler.RunMetadata] | `helia_profiler.RunMetadata` |\n| [ResultManifest][helia_profiler.ResultManifest] | `helia_profiler.ResultManifest` |\n| [ResultArtifact][helia_profiler.ResultArtifact] | `helia_profiler.ResultArtifact` |\n| [ResultIssue][helia_profiler.ResultIssue] | `helia_profiler.ResultIssue` |\n| [ResultValidity][helia_profiler.ResultValidity] | `helia_profiler.ResultValidity` |\n| [RunStatus][helia_profiler.RunStatus] | `helia_profiler.RunStatus` |\n| [load_result_manifest][helia_profiler.load_result_manifest] | `helia_profiler.load_result_manifest` |\n| [PowerMode][helia_profiler.PowerMode] | `helia_profiler.PowerMode` |\n| [PowerResult][helia_profiler.PowerResult] | `helia_profiler.PowerResult` |\n| [PowerObservation][helia_profiler.PowerObservation] | `helia_profiler.PowerObservation` |\n| [PowerTerminalRecord][helia_profiler.PowerTerminalRecord] | `helia_profiler.PowerTerminalRecord` |\n| [OnDevicePowerSummary][helia_profiler.OnDevicePowerSummary] | `helia_profiler.OnDevicePowerSummary` |\n| [PowerMetadata][helia_profiler.PowerMetadata] | `helia_profiler.PowerMetadata` |\n| [MeasurementScope][helia_profiler.MeasurementScope] | `helia_profiler.MeasurementScope` |\n| [ObservationMode][helia_profiler.ObservationMode] | `helia_profiler.ObservationMode` |\n| [PowerIntegrity][helia_profiler.PowerIntegrity] | `helia_profiler.PowerIntegrity` |\n| [CompareResult][helia_profiler.CompareResult] | `helia_profiler.CompareResult` |\n| [assess_comparability][helia_profiler.assess_comparability] | `helia_profiler.assess_comparability` |\n| [ComparabilityAssessment][helia_profiler.ComparabilityAssessment] | `helia_profiler.ComparabilityAssessment` |\n| [ComparabilityIssue][helia_profiler.ComparabilityIssue] | `helia_profiler.ComparabilityIssue` |\n| [ComparabilitySeverity][helia_profiler.ComparabilitySeverity] | `helia_profiler.ComparabilitySeverity` |\n| [ComparisonProfile][helia_profiler.ComparisonProfile] | `helia_profiler.ComparisonProfile` |\n| [evaluate_comparison_profile][helia_profiler.evaluate_comparison_profile] | `helia_profiler.evaluate_comparison_profile` |\n| [ComparisonVerdict][helia_profiler.ComparisonVerdict] | `helia_profiler.ComparisonVerdict` |\n| [MetricPolicy][helia_profiler.MetricPolicy] | `helia_profiler.MetricPolicy` |\n| [MetricDirection][helia_profiler.MetricDirection] | `helia_profiler.MetricDirection` |\n| [MetricVerdict][helia_profiler.MetricVerdict] | `helia_profiler.MetricVerdict` |\n| [MissingMetricPolicy][helia_profiler.MissingMetricPolicy] | `helia_profiler.MissingMetricPolicy` |\n| [VerdictStatus][helia_profiler.VerdictStatus] | `helia_profiler.VerdictStatus` |\n| [evaluate_run][helia_profiler.evaluate_run] | `helia_profiler.evaluate_run` |\n| [RunEvaluation][helia_profiler.RunEvaluation] | `helia_profiler.RunEvaluation` |\n| [ModelAnalysis][helia_profiler.ModelAnalysis] | `helia_profiler.ModelAnalysis` |\n| [SupportBundleOptions][helia_profiler.SupportBundleOptions] | `helia_profiler.SupportBundleOptions` |\n| [collect_support_bundle][helia_profiler.collect_support_bundle] | `helia_profiler.collect_support_bundle` |\n| [write_support_bundle][helia_profiler.write_support_bundle] | `helia_profiler.write_support_bundle` |\n| [verify_support_bundle][helia_profiler.verify_support_bundle] | `helia_profiler.verify_support_bundle` |\n| [SupportBundleManifest][helia_profiler.SupportBundleManifest] | `helia_profiler.SupportBundleManifest` |\n| [SupportBundleSection][helia_profiler.SupportBundleSection] | `helia_profiler.SupportBundleSection` |\n| [HpxError][helia_profiler.HpxError] | `helia_profiler.HpxError` |\n| [ConfigError][helia_profiler.ConfigError] | `helia_profiler.ConfigError` |\n| [PlatformError][helia_profiler.PlatformError] | `helia_profiler.PlatformError` |\n| [EngineError][helia_profiler.EngineError] | `helia_profiler.EngineError` |\n| [FirmwareError][helia_profiler.FirmwareError] | `helia_profiler.FirmwareError` |\n| [BuildError][helia_profiler.BuildError] | `helia_profiler.BuildError` |\n| [DependencyError][helia_profiler.DependencyError] | `helia_profiler.DependencyError` |\n| [VersionError][helia_profiler.VersionError] | `helia_profiler.VersionError` |\n| [LockError][helia_profiler.LockError] | `helia_profiler.LockError` |\n| [NetworkError][helia_profiler.NetworkError] | `helia_profiler.NetworkError` |\n| [CaptureError][helia_profiler.CaptureError] | `helia_profiler.CaptureError` |\n| [DeterministicCaptureError][helia_profiler.DeterministicCaptureError] | `helia_profiler.DeterministicCaptureError` |\n| [PowerError][helia_profiler.PowerError] | `helia_profiler.PowerError` |\n| [ReportError][helia_profiler.ReportError] | `helia_profiler.ReportError` |",
       "name": "helia_profiler",
       "path": "helia_profiler",
       "submodules": [
@@ -2140,9 +2140,9 @@
                   "returns": [],
                   "signature": "QUALIFIED = 'qualified'",
                   "source": {
-                    "line": 47,
+                    "line": 46,
                     "path": "src/helia_profiler/deps/compatibility.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L47"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L46"
                   },
                   "summary": ""
                 },
@@ -2159,9 +2159,9 @@
                   "returns": [],
                   "signature": "QUALIFIED_WITH_ENGINE_OVERRIDE = 'qualified-with-engine-override'",
                   "source": {
-                    "line": 48,
+                    "line": 47,
                     "path": "src/helia_profiler/deps/compatibility.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L48"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L47"
                   },
                   "summary": ""
                 },
@@ -2178,9 +2178,9 @@
                   "returns": [],
                   "signature": "DEVELOPMENT_OVERRIDES = 'development-overrides'",
                   "source": {
-                    "line": 49,
+                    "line": 48,
                     "path": "src/helia_profiler/deps/compatibility.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L49"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L48"
                   },
                   "summary": ""
                 }
@@ -2191,9 +2191,9 @@
               "returns": [],
               "signature": "QualificationState()",
               "source": {
-                "line": 44,
+                "line": 43,
                 "path": "src/helia_profiler/deps/compatibility.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L44"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L43"
               },
               "summary": "Compatibility state of a resolved profiling configuration."
             },
@@ -2217,9 +2217,9 @@
                   "returns": [],
                   "signature": "schema: str",
                   "source": {
-                    "line": 93,
+                    "line": 73,
                     "path": "src/helia_profiler/deps/compatibility.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L93"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L73"
                   },
                   "summary": ""
                 },
@@ -2236,9 +2236,9 @@
                   "returns": [],
                   "signature": "schema_version: int",
                   "source": {
-                    "line": 94,
+                    "line": 74,
                     "path": "src/helia_profiler/deps/compatibility.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L94"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L74"
                   },
                   "summary": ""
                 },
@@ -2255,9 +2255,9 @@
                   "returns": [],
                   "signature": "baseline_id: str",
                   "source": {
-                    "line": 95,
+                    "line": 75,
                     "path": "src/helia_profiler/deps/compatibility.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L95"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L75"
                   },
                   "summary": ""
                 },
@@ -2274,9 +2274,9 @@
                   "returns": [],
                   "signature": "neuralspotx_package: str",
                   "source": {
-                    "line": 96,
+                    "line": 76,
                     "path": "src/helia_profiler/deps/compatibility.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L96"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L76"
                   },
                   "summary": ""
                 },
@@ -2293,9 +2293,9 @@
                   "returns": [],
                   "signature": "neuralspotx_version: str",
                   "source": {
-                    "line": 97,
+                    "line": 77,
                     "path": "src/helia_profiler/deps/compatibility.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L97"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L77"
                   },
                   "summary": ""
                 },
@@ -2312,9 +2312,9 @@
                   "returns": [],
                   "signature": "neuralspotx_sha256: str",
                   "source": {
-                    "line": 98,
+                    "line": 78,
                     "path": "src/helia_profiler/deps/compatibility.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L98"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L78"
                   },
                   "summary": ""
                 },
@@ -2331,9 +2331,9 @@
                   "returns": [],
                   "signature": "projects: tuple[CompatibilityProject, ...]",
                   "source": {
-                    "line": 99,
+                    "line": 79,
                     "path": "src/helia_profiler/deps/compatibility.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L99"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L79"
                   },
                   "summary": ""
                 },
@@ -2350,28 +2350,9 @@
                   "returns": [],
                   "signature": "modules: tuple[CompatibilityModule, ...]",
                   "source": {
-                    "line": 100,
+                    "line": 80,
                     "path": "src/helia_profiler/deps/compatibility.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L100"
-                  },
-                  "summary": ""
-                },
-                {
-                  "description": "",
-                  "examples": [],
-                  "id": "helia_profiler.CompatibilityBaseline.engines",
-                  "kind": "attribute",
-                  "language": "python",
-                  "members": [],
-                  "name": "engines",
-                  "params": [],
-                  "raises": [],
-                  "returns": [],
-                  "signature": "engines: tuple[CompatibilityEngine, ...]",
-                  "source": {
-                    "line": 101,
-                    "path": "src/helia_profiler/deps/compatibility.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L101"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L80"
                   },
                   "summary": ""
                 },
@@ -2388,9 +2369,9 @@
                   "returns": [],
                   "signature": "fingerprint: str",
                   "source": {
-                    "line": 131,
+                    "line": 101,
                     "path": "src/helia_profiler/deps/compatibility.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L131"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L101"
                   },
                   "summary": "Return the canonical SHA-256 identity reserved for Stage 5."
                 },
@@ -2407,9 +2388,9 @@
                   "returns": [],
                   "signature": "project(name: str) -> CompatibilityProject",
                   "source": {
-                    "line": 103,
+                    "line": 82,
                     "path": "src/helia_profiler/deps/compatibility.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L103"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L82"
                   },
                   "summary": ""
                 },
@@ -2426,28 +2407,9 @@
                   "returns": [],
                   "signature": "module(name: str) -> CompatibilityModule",
                   "source": {
-                    "line": 112,
+                    "line": 91,
                     "path": "src/helia_profiler/deps/compatibility.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L112"
-                  },
-                  "summary": ""
-                },
-                {
-                  "description": "",
-                  "examples": [],
-                  "id": "helia_profiler.CompatibilityBaseline.engine",
-                  "kind": "method",
-                  "language": "python",
-                  "members": [],
-                  "name": "engine",
-                  "params": [],
-                  "raises": [],
-                  "returns": [],
-                  "signature": "engine(name: str) -> CompatibilityEngine",
-                  "source": {
-                    "line": 121,
-                    "path": "src/helia_profiler/deps/compatibility.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L121"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L91"
                   },
                   "summary": ""
                 },
@@ -2464,9 +2426,9 @@
                   "returns": [],
                   "signature": "to_dict() -> dict[str, Any]",
                   "source": {
-                    "line": 137,
+                    "line": 107,
                     "path": "src/helia_profiler/deps/compatibility.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L137"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L107"
                   },
                   "summary": "Return a stable JSON-safe representation for reports and Stage 5."
                 }
@@ -2475,13 +2437,147 @@
               "params": [],
               "raises": [],
               "returns": [],
-              "signature": "CompatibilityBaseline(\n    schema: str,\n    schema_version: int,\n    baseline_id: str,\n    neuralspotx_package: str,\n    neuralspotx_version: str,\n    neuralspotx_sha256: str,\n    projects: tuple[CompatibilityProject, ...],\n    modules: tuple[CompatibilityModule, ...],\n    engines: tuple[CompatibilityEngine, ...],\n) -> None",
+              "signature": "CompatibilityBaseline(\n    schema: str,\n    schema_version: int,\n    baseline_id: str,\n    neuralspotx_package: str,\n    neuralspotx_version: str,\n    neuralspotx_sha256: str,\n    projects: tuple[CompatibilityProject, ...],\n    modules: tuple[CompatibilityModule, ...],\n) -> None",
               "source": {
-                "line": 89,
+                "line": 69,
                 "path": "src/helia_profiler/deps/compatibility.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L89"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L69"
               },
               "summary": "Validated, immutable baseline loaded from HPX package data."
+            },
+            {
+              "description": "`dataclass`\n\nResolved baseline plus explicit override classification.\n\n**API tier:** `stable`",
+              "examples": [],
+              "id": "helia_profiler.CompatibilityResolution",
+              "kind": "class",
+              "language": "python",
+              "members": [
+                {
+                  "description": "",
+                  "examples": [],
+                  "id": "helia_profiler.CompatibilityResolution.baseline",
+                  "kind": "attribute",
+                  "language": "python",
+                  "members": [],
+                  "name": "baseline",
+                  "params": [],
+                  "raises": [],
+                  "returns": [],
+                  "signature": "baseline: CompatibilityBaseline",
+                  "source": {
+                    "line": 132,
+                    "path": "src/helia_profiler/deps/compatibility.py",
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L132"
+                  },
+                  "summary": ""
+                },
+                {
+                  "description": "",
+                  "examples": [],
+                  "id": "helia_profiler.CompatibilityResolution.qualification",
+                  "kind": "attribute",
+                  "language": "python",
+                  "members": [],
+                  "name": "qualification",
+                  "params": [],
+                  "raises": [],
+                  "returns": [],
+                  "signature": "qualification: QualificationState",
+                  "source": {
+                    "line": 133,
+                    "path": "src/helia_profiler/deps/compatibility.py",
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L133"
+                  },
+                  "summary": ""
+                },
+                {
+                  "description": "",
+                  "examples": [],
+                  "id": "helia_profiler.CompatibilityResolution.module_overrides",
+                  "kind": "attribute",
+                  "language": "python",
+                  "members": [],
+                  "name": "module_overrides",
+                  "params": [],
+                  "raises": [],
+                  "returns": [],
+                  "signature": "module_overrides: tuple[str, ...] = ()",
+                  "source": {
+                    "line": 144,
+                    "path": "src/helia_profiler/deps/compatibility.py",
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L144"
+                  },
+                  "summary": ""
+                },
+                {
+                  "description": "",
+                  "examples": [],
+                  "id": "helia_profiler.CompatibilityResolution.engine_overrides",
+                  "kind": "attribute",
+                  "language": "python",
+                  "members": [],
+                  "name": "engine_overrides",
+                  "params": [],
+                  "raises": [],
+                  "returns": [],
+                  "signature": "engine_overrides: tuple[str, ...] = ()",
+                  "source": {
+                    "line": 145,
+                    "path": "src/helia_profiler/deps/compatibility.py",
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L145"
+                  },
+                  "summary": ""
+                },
+                {
+                  "description": "",
+                  "examples": [],
+                  "id": "helia_profiler.CompatibilityResolution.fingerprint",
+                  "kind": "attribute",
+                  "language": "python",
+                  "members": [],
+                  "name": "fingerprint",
+                  "params": [],
+                  "raises": [],
+                  "returns": [],
+                  "signature": "fingerprint: str",
+                  "source": {
+                    "line": 148,
+                    "path": "src/helia_profiler/deps/compatibility.py",
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L148"
+                  },
+                  "summary": ""
+                },
+                {
+                  "description": "Return structured result provenance without lossy enum conversion.",
+                  "examples": [],
+                  "id": "helia_profiler.CompatibilityResolution.to_dict",
+                  "kind": "method",
+                  "language": "python",
+                  "members": [],
+                  "name": "to_dict",
+                  "params": [],
+                  "raises": [],
+                  "returns": [],
+                  "signature": "to_dict() -> dict[str, Any]",
+                  "source": {
+                    "line": 151,
+                    "path": "src/helia_profiler/deps/compatibility.py",
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L151"
+                  },
+                  "summary": "Return structured result provenance without lossy enum conversion."
+                }
+              ],
+              "name": "CompatibilityResolution",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "CompatibilityResolution(\n    baseline: CompatibilityBaseline,\n    qualification: QualificationState,\n    module_overrides: tuple[str, ...] = (),\n    engine_overrides: tuple[str, ...] = (),\n) -> None",
+              "source": {
+                "line": 128,
+                "path": "src/helia_profiler/deps/compatibility.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L128"
+              },
+              "summary": "Resolved baseline plus explicit override classification."
             },
             {
               "description": "`dataclass`\n\nRead-only lock provenance surface for later diagnostics collectors.\n\n**API tier:** `experimental`",
@@ -2713,140 +2809,6 @@
               "summary": "Read-only lock provenance surface for later diagnostics collectors."
             },
             {
-              "description": "`dataclass`\n\nResolved baseline plus explicit override classification.\n\n**API tier:** `stable`",
-              "examples": [],
-              "id": "helia_profiler.CompatibilityResolution",
-              "kind": "class",
-              "language": "python",
-              "members": [
-                {
-                  "description": "",
-                  "examples": [],
-                  "id": "helia_profiler.CompatibilityResolution.baseline",
-                  "kind": "attribute",
-                  "language": "python",
-                  "members": [],
-                  "name": "baseline",
-                  "params": [],
-                  "raises": [],
-                  "returns": [],
-                  "signature": "baseline: CompatibilityBaseline",
-                  "source": {
-                    "line": 176,
-                    "path": "src/helia_profiler/deps/compatibility.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L176"
-                  },
-                  "summary": ""
-                },
-                {
-                  "description": "",
-                  "examples": [],
-                  "id": "helia_profiler.CompatibilityResolution.qualification",
-                  "kind": "attribute",
-                  "language": "python",
-                  "members": [],
-                  "name": "qualification",
-                  "params": [],
-                  "raises": [],
-                  "returns": [],
-                  "signature": "qualification: QualificationState",
-                  "source": {
-                    "line": 177,
-                    "path": "src/helia_profiler/deps/compatibility.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L177"
-                  },
-                  "summary": ""
-                },
-                {
-                  "description": "",
-                  "examples": [],
-                  "id": "helia_profiler.CompatibilityResolution.module_overrides",
-                  "kind": "attribute",
-                  "language": "python",
-                  "members": [],
-                  "name": "module_overrides",
-                  "params": [],
-                  "raises": [],
-                  "returns": [],
-                  "signature": "module_overrides: tuple[str, ...] = ()",
-                  "source": {
-                    "line": 188,
-                    "path": "src/helia_profiler/deps/compatibility.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L188"
-                  },
-                  "summary": ""
-                },
-                {
-                  "description": "",
-                  "examples": [],
-                  "id": "helia_profiler.CompatibilityResolution.engine_overrides",
-                  "kind": "attribute",
-                  "language": "python",
-                  "members": [],
-                  "name": "engine_overrides",
-                  "params": [],
-                  "raises": [],
-                  "returns": [],
-                  "signature": "engine_overrides: tuple[str, ...] = ()",
-                  "source": {
-                    "line": 189,
-                    "path": "src/helia_profiler/deps/compatibility.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L189"
-                  },
-                  "summary": ""
-                },
-                {
-                  "description": "",
-                  "examples": [],
-                  "id": "helia_profiler.CompatibilityResolution.fingerprint",
-                  "kind": "attribute",
-                  "language": "python",
-                  "members": [],
-                  "name": "fingerprint",
-                  "params": [],
-                  "raises": [],
-                  "returns": [],
-                  "signature": "fingerprint: str",
-                  "source": {
-                    "line": 192,
-                    "path": "src/helia_profiler/deps/compatibility.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L192"
-                  },
-                  "summary": ""
-                },
-                {
-                  "description": "Return structured result provenance without lossy enum conversion.",
-                  "examples": [],
-                  "id": "helia_profiler.CompatibilityResolution.to_dict",
-                  "kind": "method",
-                  "language": "python",
-                  "members": [],
-                  "name": "to_dict",
-                  "params": [],
-                  "raises": [],
-                  "returns": [],
-                  "signature": "to_dict() -> dict[str, Any]",
-                  "source": {
-                    "line": 195,
-                    "path": "src/helia_profiler/deps/compatibility.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L195"
-                  },
-                  "summary": "Return structured result provenance without lossy enum conversion."
-                }
-              ],
-              "name": "CompatibilityResolution",
-              "params": [],
-              "raises": [],
-              "returns": [],
-              "signature": "CompatibilityResolution(\n    baseline: CompatibilityBaseline,\n    qualification: QualificationState,\n    module_overrides: tuple[str, ...] = (),\n    engine_overrides: tuple[str, ...] = (),\n) -> None",
-              "source": {
-                "line": 172,
-                "path": "src/helia_profiler/deps/compatibility.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L172"
-              },
-              "summary": "Resolved baseline plus explicit override classification."
-            },
-            {
               "description": "Load and strictly validate an HPX compatibility baseline.\n\n**API tier:** `stable`",
               "examples": [],
               "id": "helia_profiler.load_compatibility_baseline",
@@ -2859,9 +2821,9 @@
               "returns": [],
               "signature": "load_compatibility_baseline(path: Path | None = None) -> CompatibilityBaseline",
               "source": {
-                "line": 206,
+                "line": 162,
                 "path": "src/helia_profiler/deps/compatibility.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L206"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/compatibility.py#L162"
               },
               "summary": "Load and strictly validate an HPX compatibility baseline."
             },
@@ -2878,9 +2840,9 @@
               "returns": [],
               "signature": "read_dependency_lock_provenance(app_or_workspace_path: str | Path) -> DependencyLockProvenance",
               "source": {
-                "line": 524,
+                "line": 525,
                 "path": "src/helia_profiler/deps/dependencies.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/dependencies.py#L524"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/dependencies.py#L525"
               },
               "summary": "Read typed lock provenance without mutating an app or workspace."
             }
@@ -9729,6 +9691,514 @@
                 "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L595"
               },
               "summary": "Complete profiling result — the public return type of hpx.profile()."
+            }
+          ]
+        },
+        {
+          "description": "The runtime versions this heliaPROFILER records, and whether each is qualified for a precision on a board and clock.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.",
+          "name": "runtime_records",
+          "path": "helia_profiler.runtime_records",
+          "submodules": [],
+          "summary": "The runtime versions this heliaPROFILER records, and whether each is qualified for a precision on a board and clock.",
+          "symbols": [
+            {
+              "description": "What heliaPROFILER says about one runtime version, precision and target.\n\n**API tier:** `experimental`",
+              "examples": [],
+              "id": "helia_profiler.RuntimeQualification",
+              "kind": "class",
+              "language": "python",
+              "members": [
+                {
+                  "description": "",
+                  "examples": [],
+                  "id": "helia_profiler.RuntimeQualification.QUALIFIED",
+                  "kind": "constant",
+                  "language": "python",
+                  "members": [],
+                  "name": "QUALIFIED",
+                  "params": [],
+                  "raises": [],
+                  "returns": [],
+                  "signature": "QUALIFIED = 'qualified'",
+                  "source": {
+                    "line": 35,
+                    "path": "src/helia_profiler/runtime_records.py",
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime_records.py#L35"
+                  },
+                  "summary": ""
+                },
+                {
+                  "description": "",
+                  "examples": [],
+                  "id": "helia_profiler.RuntimeQualification.SUPPORTED",
+                  "kind": "constant",
+                  "language": "python",
+                  "members": [],
+                  "name": "SUPPORTED",
+                  "params": [],
+                  "raises": [],
+                  "returns": [],
+                  "signature": "SUPPORTED = 'supported'",
+                  "source": {
+                    "line": 36,
+                    "path": "src/helia_profiler/runtime_records.py",
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime_records.py#L36"
+                  },
+                  "summary": ""
+                },
+                {
+                  "description": "",
+                  "examples": [],
+                  "id": "helia_profiler.RuntimeQualification.UNSUPPORTED",
+                  "kind": "constant",
+                  "language": "python",
+                  "members": [],
+                  "name": "UNSUPPORTED",
+                  "params": [],
+                  "raises": [],
+                  "returns": [],
+                  "signature": "UNSUPPORTED = 'unsupported'",
+                  "source": {
+                    "line": 37,
+                    "path": "src/helia_profiler/runtime_records.py",
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime_records.py#L37"
+                  },
+                  "summary": ""
+                }
+              ],
+              "name": "RuntimeQualification",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "RuntimeQualification()",
+              "source": {
+                "line": 32,
+                "path": "src/helia_profiler/runtime_records.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime_records.py#L32"
+              },
+              "summary": "What heliaPROFILER says about one runtime version, precision and target."
+            },
+            {
+              "description": "`dataclass`\n\nThe repository and commit a runtime version is built from.\n\n**API tier:** `experimental`",
+              "examples": [],
+              "id": "helia_profiler.RuntimeSource",
+              "kind": "class",
+              "language": "python",
+              "members": [
+                {
+                  "description": "",
+                  "examples": [],
+                  "id": "helia_profiler.RuntimeSource.repo",
+                  "kind": "attribute",
+                  "language": "python",
+                  "members": [],
+                  "name": "repo",
+                  "params": [],
+                  "raises": [],
+                  "returns": [],
+                  "signature": "repo: str",
+                  "source": {
+                    "line": 44,
+                    "path": "src/helia_profiler/runtime_records.py",
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime_records.py#L44"
+                  },
+                  "summary": ""
+                },
+                {
+                  "description": "",
+                  "examples": [],
+                  "id": "helia_profiler.RuntimeSource.commit",
+                  "kind": "attribute",
+                  "language": "python",
+                  "members": [],
+                  "name": "commit",
+                  "params": [],
+                  "raises": [],
+                  "returns": [],
+                  "signature": "commit: str",
+                  "source": {
+                    "line": 45,
+                    "path": "src/helia_profiler/runtime_records.py",
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime_records.py#L45"
+                  },
+                  "summary": ""
+                }
+              ],
+              "name": "RuntimeSource",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "RuntimeSource(repo: str, commit: str) -> None",
+              "source": {
+                "line": 40,
+                "path": "src/helia_profiler/runtime_records.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime_records.py#L40"
+              },
+              "summary": "The repository and commit a runtime version is built from."
+            },
+            {
+              "description": "`dataclass`\n\nA board class and clock the runtime is qualified on, and why.\n\n**API tier:** `experimental`",
+              "examples": [],
+              "id": "helia_profiler.QualifiedTarget",
+              "kind": "class",
+              "language": "python",
+              "members": [
+                {
+                  "description": "",
+                  "examples": [],
+                  "id": "helia_profiler.QualifiedTarget.board",
+                  "kind": "attribute",
+                  "language": "python",
+                  "members": [],
+                  "name": "board",
+                  "params": [],
+                  "raises": [],
+                  "returns": [],
+                  "signature": "board: str",
+                  "source": {
+                    "line": 52,
+                    "path": "src/helia_profiler/runtime_records.py",
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime_records.py#L52"
+                  },
+                  "summary": ""
+                },
+                {
+                  "description": "",
+                  "examples": [],
+                  "id": "helia_profiler.QualifiedTarget.clock",
+                  "kind": "attribute",
+                  "language": "python",
+                  "members": [],
+                  "name": "clock",
+                  "params": [],
+                  "raises": [],
+                  "returns": [],
+                  "signature": "clock: str",
+                  "source": {
+                    "line": 53,
+                    "path": "src/helia_profiler/runtime_records.py",
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime_records.py#L53"
+                  },
+                  "summary": ""
+                },
+                {
+                  "description": "",
+                  "examples": [],
+                  "id": "helia_profiler.QualifiedTarget.precisions",
+                  "kind": "attribute",
+                  "language": "python",
+                  "members": [],
+                  "name": "precisions",
+                  "params": [],
+                  "raises": [],
+                  "returns": [],
+                  "signature": "precisions: tuple[str, ...]",
+                  "source": {
+                    "line": 54,
+                    "path": "src/helia_profiler/runtime_records.py",
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime_records.py#L54"
+                  },
+                  "summary": ""
+                },
+                {
+                  "description": "",
+                  "examples": [],
+                  "id": "helia_profiler.QualifiedTarget.basis",
+                  "kind": "attribute",
+                  "language": "python",
+                  "members": [],
+                  "name": "basis",
+                  "params": [],
+                  "raises": [],
+                  "returns": [],
+                  "signature": "basis: str",
+                  "source": {
+                    "line": 55,
+                    "path": "src/helia_profiler/runtime_records.py",
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime_records.py#L55"
+                  },
+                  "summary": ""
+                },
+                {
+                  "description": "",
+                  "examples": [],
+                  "id": "helia_profiler.QualifiedTarget.trace",
+                  "kind": "attribute",
+                  "language": "python",
+                  "members": [],
+                  "name": "trace",
+                  "params": [],
+                  "raises": [],
+                  "returns": [],
+                  "signature": "trace: str",
+                  "source": {
+                    "line": 56,
+                    "path": "src/helia_profiler/runtime_records.py",
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime_records.py#L56"
+                  },
+                  "summary": ""
+                }
+              ],
+              "name": "QualifiedTarget",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "QualifiedTarget(board: str, clock: str, precisions: tuple[str, ...], basis: str, trace: str) -> None",
+              "source": {
+                "line": 48,
+                "path": "src/helia_profiler/runtime_records.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime_records.py#L48"
+              },
+              "summary": "A board class and clock the runtime is qualified on, and why."
+            },
+            {
+              "description": "`dataclass`\n\nOne runtime version: its source, supported precisions and qualified targets.\n\n**API tier:** `experimental`",
+              "examples": [],
+              "id": "helia_profiler.RuntimeRecord",
+              "kind": "class",
+              "language": "python",
+              "members": [
+                {
+                  "description": "",
+                  "examples": [],
+                  "id": "helia_profiler.RuntimeRecord.name",
+                  "kind": "attribute",
+                  "language": "python",
+                  "members": [],
+                  "name": "name",
+                  "params": [],
+                  "raises": [],
+                  "returns": [],
+                  "signature": "name: str",
+                  "source": {
+                    "line": 63,
+                    "path": "src/helia_profiler/runtime_records.py",
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime_records.py#L63"
+                  },
+                  "summary": ""
+                },
+                {
+                  "description": "",
+                  "examples": [],
+                  "id": "helia_profiler.RuntimeRecord.version",
+                  "kind": "attribute",
+                  "language": "python",
+                  "members": [],
+                  "name": "version",
+                  "params": [],
+                  "raises": [],
+                  "returns": [],
+                  "signature": "version: str",
+                  "source": {
+                    "line": 64,
+                    "path": "src/helia_profiler/runtime_records.py",
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime_records.py#L64"
+                  },
+                  "summary": ""
+                },
+                {
+                  "description": "",
+                  "examples": [],
+                  "id": "helia_profiler.RuntimeRecord.default",
+                  "kind": "attribute",
+                  "language": "python",
+                  "members": [],
+                  "name": "default",
+                  "params": [],
+                  "raises": [],
+                  "returns": [],
+                  "signature": "default: bool",
+                  "source": {
+                    "line": 65,
+                    "path": "src/helia_profiler/runtime_records.py",
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime_records.py#L65"
+                  },
+                  "summary": ""
+                },
+                {
+                  "description": "",
+                  "examples": [],
+                  "id": "helia_profiler.RuntimeRecord.source",
+                  "kind": "attribute",
+                  "language": "python",
+                  "members": [],
+                  "name": "source",
+                  "params": [],
+                  "raises": [],
+                  "returns": [],
+                  "signature": "source: RuntimeSource",
+                  "source": {
+                    "line": 66,
+                    "path": "src/helia_profiler/runtime_records.py",
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime_records.py#L66"
+                  },
+                  "summary": ""
+                },
+                {
+                  "description": "",
+                  "examples": [],
+                  "id": "helia_profiler.RuntimeRecord.precisions",
+                  "kind": "attribute",
+                  "language": "python",
+                  "members": [],
+                  "name": "precisions",
+                  "params": [],
+                  "raises": [],
+                  "returns": [],
+                  "signature": "precisions: Mapping[str, str | None]",
+                  "source": {
+                    "line": 68,
+                    "path": "src/helia_profiler/runtime_records.py",
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime_records.py#L68"
+                  },
+                  "summary": ""
+                },
+                {
+                  "description": "",
+                  "examples": [],
+                  "id": "helia_profiler.RuntimeRecord.qualified",
+                  "kind": "attribute",
+                  "language": "python",
+                  "members": [],
+                  "name": "qualified",
+                  "params": [],
+                  "raises": [],
+                  "returns": [],
+                  "signature": "qualified: tuple[QualifiedTarget, ...]",
+                  "source": {
+                    "line": 69,
+                    "path": "src/helia_profiler/runtime_records.py",
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime_records.py#L69"
+                  },
+                  "summary": ""
+                }
+              ],
+              "name": "RuntimeRecord",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "RuntimeRecord(\n    name: str,\n    version: str,\n    default: bool,\n    source: RuntimeSource,\n    precisions: Mapping[str, str | None],\n    qualified: tuple[QualifiedTarget, ...],\n) -> None",
+              "source": {
+                "line": 59,
+                "path": "src/helia_profiler/runtime_records.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime_records.py#L59"
+              },
+              "summary": "One runtime version: its source, supported precisions and qualified targets."
+            },
+            {
+              "description": "`dataclass`\n\nThe answer for one runtime version, precision and target, with the record it came from.\n\n**API tier:** `experimental`",
+              "examples": [],
+              "id": "helia_profiler.Qualification",
+              "kind": "class",
+              "language": "python",
+              "members": [
+                {
+                  "description": "",
+                  "examples": [],
+                  "id": "helia_profiler.Qualification.state",
+                  "kind": "attribute",
+                  "language": "python",
+                  "members": [],
+                  "name": "state",
+                  "params": [],
+                  "raises": [],
+                  "returns": [],
+                  "signature": "state: RuntimeQualification",
+                  "source": {
+                    "line": 76,
+                    "path": "src/helia_profiler/runtime_records.py",
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime_records.py#L76"
+                  },
+                  "summary": ""
+                },
+                {
+                  "description": "",
+                  "examples": [],
+                  "id": "helia_profiler.Qualification.reason",
+                  "kind": "attribute",
+                  "language": "python",
+                  "members": [],
+                  "name": "reason",
+                  "params": [],
+                  "raises": [],
+                  "returns": [],
+                  "signature": "reason: str | None",
+                  "source": {
+                    "line": 77,
+                    "path": "src/helia_profiler/runtime_records.py",
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime_records.py#L77"
+                  },
+                  "summary": ""
+                },
+                {
+                  "description": "",
+                  "examples": [],
+                  "id": "helia_profiler.Qualification.record",
+                  "kind": "attribute",
+                  "language": "python",
+                  "members": [],
+                  "name": "record",
+                  "params": [],
+                  "raises": [],
+                  "returns": [],
+                  "signature": "record: RuntimeRecord | None",
+                  "source": {
+                    "line": 78,
+                    "path": "src/helia_profiler/runtime_records.py",
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime_records.py#L78"
+                  },
+                  "summary": ""
+                }
+              ],
+              "name": "Qualification",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "Qualification(state: RuntimeQualification, reason: str | None, record: RuntimeRecord | None) -> None",
+              "source": {
+                "line": 72,
+                "path": "src/helia_profiler/runtime_records.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime_records.py#L72"
+              },
+              "summary": "The answer for one runtime version, precision and target, with the record it came from."
+            },
+            {
+              "description": "`cached`\n\nEvery runtime record shipped with this heliaPROFILER, by name then version.\n\n**API tier:** `experimental`",
+              "examples": [],
+              "id": "helia_profiler.runtimes",
+              "kind": "function",
+              "language": "python",
+              "members": [],
+              "name": "runtimes",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "runtimes() -> tuple[RuntimeRecord, ...]",
+              "source": {
+                "line": 81,
+                "path": "src/helia_profiler/runtime_records.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime_records.py#L81"
+              },
+              "summary": "Every runtime record shipped with this heliaPROFILER, by name then version."
+            },
+            {
+              "description": "Whether ``name`` at ``version`` is qualified for ``precision`` on ``board`` at ``clock``.\n\nA version without a record, or a precision its record does not declare,\nis unsupported here, even when an engine's own version check would build\nit: this heliaPROFILER makes no claim about it.\n\n**API tier:** `experimental`",
+              "examples": [],
+              "id": "helia_profiler.qualification",
+              "kind": "function",
+              "language": "python",
+              "members": [],
+              "name": "qualification",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "qualification(name: str, version: str | None = None, *, board: str, clock: str, precision: str) -> Qualification",
+              "source": {
+                "line": 127,
+                "path": "src/helia_profiler/runtime_records.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime_records.py#L127"
+              },
+              "summary": "Whether name at version is qualified for precision on board at clock."
             }
           ]
         },

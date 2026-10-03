@@ -1,0 +1,29 @@
+{
+  "schema": "helia-profiler/runtime@1",
+  "name": "tflm",
+  "version": "85638f0",
+  "default": true,
+  "source": {
+    "repo": "tensorflow/tflite-micro",
+    "commit": "85638f0bf1048ba0698787c60fa3da0c98b01088"
+  },
+  "precisions": {
+    "fp32": "supported",
+    "fp16": {
+      "unsupported": "Upstream TFLM refuses any model with a FLOAT16 tensor"
+    },
+    "a8w8": "supported",
+    "a16w8": "supported"
+  },
+  "qualified": [
+    {
+      "board": "apollo510_evb",
+      "clock": "lp",
+      "precisions": [
+        "a8w8"
+      ],
+      "basis": "Exact device pass with one input and one output tensor, carried from the fixed-fixture capability table. This record is the fixed fixture's prepared upstream archive; the profile path builds TFLM from the baseline's NSX modules.",
+      "trace": "helia-profiler #397 (4cf71e4c), with the prepared upstream archive built from tflite-micro 85638f0 and Arm CMSIS-NN 4ab83cc."
+    }
+  ]
+}

@@ -60,6 +60,19 @@
       ]
     },
     {
+      "path": "helia_profiler.runtime_records",
+      "summary": "The runtime versions this heliaPROFILER records, and whether each is qualified for a precision on a board and clock.",
+      "members": [
+        "qualification",
+        "Qualification",
+        "RuntimeQualification",
+        "runtimes",
+        "RuntimeRecord",
+        "RuntimeSource",
+        "QualifiedTarget"
+      ]
+    },
+    {
       "path": "helia_profiler.results",
       "summary": "What a profiling run produces: the run result, its per-layer and PMU detail, and the firmware and run metadata that say how it was measured.",
       "members": [

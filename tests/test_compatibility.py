@@ -48,10 +48,6 @@ def test_default_baseline_has_exact_qualified_refs(tmp_path: Path) -> None:
     assert baseline.module("arm-cmsis-nn").ref == "6d21a6f821fb72541173a6c4d05d83329fa74f7c"
     assert baseline.project("ns-cmsis-nn").ref == "5f3fed9f21a57390cc7f00f77a37db8f5f110cb8"
     assert baseline.project("nsx-executorch").ref == "5514ac1ea8439b3fe615d180bf68c75a9dabb48e"
-    assert baseline.engine("executorch").ref == "5514ac1ea8439b3fe615d180bf68c75a9dabb48e"
-    assert baseline.engine("helia-rt").ref == "dc8533abe0ec7e01c251a067ce54c60f54237f5f"
-    assert baseline.engine("helia-aot").min_version == "0.23.0"
-    assert baseline.engine("helia-aot").max_version_exclusive == "0.26.0"
     assert len(baseline.fingerprint) == 64
 
 
@@ -88,11 +84,6 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "nsx-helia-rt": "dc8533abe0ec7e01c251a067ce54c60f54237f5f",
         "nsx-sensors": "c219a2bc98c62f96819fae20ab6c8911fcea3e25",
     }
-    assert baseline.engine("helia-rt").version == "1.21.3"
-    assert baseline.engine("helia-aot").min_version == "0.23.0"
-    assert baseline.engine("helia-aot").max_version_exclusive == "0.26.0"
-    assert baseline.engine("tflm").governed_by_modules
-    assert baseline.engine("executorch").version == "0.1.0"
 
 
 def test_only_full_commit_refs_are_accepted(tmp_path: Path) -> None:
@@ -140,14 +131,11 @@ def test_aot_extra_and_lock_match_the_qualified_helia_aot_range() -> None:
     from helia_profiler.engines.semver import parse_semver
 
     repo_root = Path(__file__).resolve().parent.parent
-    aot = load_compatibility_baseline().engine("helia-aot")
-    assert aot.min_version is not None and aot.max_version_exclusive is not None
-    specifier = f">={aot.min_version},<{aot.max_version_exclusive}"
-    # The constants are the policy when no baseline is resolved.
-    assert (aot_compile.HELIAAOT_MIN_VERSION, aot_compile.HELIAAOT_MAX_VERSION_EXCLUSIVE) == (
-        aot.min_version,
-        aot.max_version_exclusive,
-    )
+    # The range runs from the oldest helia-aot runtime record to the minor after the newest.
+    minimum = aot_compile.HELIAAOT_MIN_VERSION
+    maximum = aot_compile.HELIAAOT_MAX_VERSION_EXCLUSIVE
+    assert (minimum, maximum) == ("0.23.0", "0.26.0")
+    specifier = f">={minimum},<{maximum}"
 
     with (repo_root / "pyproject.toml").open("rb") as stream:
         extra = tomllib.load(stream)["project"]["optional-dependencies"]["aot"]
@@ -163,19 +151,25 @@ def test_aot_extra_and_lock_match_the_qualified_helia_aot_range() -> None:
     )
     assert locked["specifier"] == specifier
     version = next(package for package in packages if package["name"] == "helia-aot")["version"]
-    assert parse_semver(aot.min_version) <= parse_semver(version)
-    assert parse_semver(version) < parse_semver(aot.max_version_exclusive)
+    assert parse_semver(minimum) <= parse_semver(version) < parse_semver(maximum)
 
 
 def test_helia_rt_and_core_pins_agree_across_the_baseline() -> None:
     # heliaRT, heliaAOT and the shared ns-cmsis-nn core are qualified as one
-    # set: every place the baseline names heliaRT or the core carries one ref.
+    # set: every place the baseline names heliaRT or the core carries one ref,
+    # and each engine-owned project carries its default runtime record's commit.
     from helia_profiler.engines.helia_rt.artifacts import HELIART_SOURCE_COMMIT, HELIART_VERSION
+    from helia_profiler.runtime_records import runtime
 
     baseline = load_compatibility_baseline()
-    helia_rt = baseline.engine("helia-rt")
-    assert (helia_rt.version, helia_rt.ref) == (HELIART_VERSION, HELIART_SOURCE_COMMIT)
+    helia_rt = runtime("helia-rt")
+    assert helia_rt is not None
+    assert (helia_rt.version, helia_rt.source.commit) == (HELIART_VERSION, HELIART_SOURCE_COMMIT)
     assert baseline.project("helia-rt").ref == HELIART_SOURCE_COMMIT
+    executorch = runtime("executorch")
+    assert executorch is not None
+    assert baseline.project("nsx-executorch").ref == executorch.source.commit
+    assert baseline.module("nsx-executorch").ref == executorch.source.commit
     assert baseline.module("nsx-helia-rt").ref == HELIART_SOURCE_COMMIT
     core = baseline.project("ns-cmsis-nn").ref
     assert baseline.module("nsx-cmsis-nn").ref == core
@@ -418,68 +412,6 @@ def test_malformed_or_unsupported_baseline_fails_clearly(tmp_path: Path) -> None
     with pytest.raises(ConfigError, match="full 40-character commit SHA"):
         load_compatibility_baseline(trailing_newline_ref)
 
-    inverted_range = tmp_path / "inverted-range.json"
-    baseline = load_compatibility_baseline().to_dict()
-    baseline["engines"]["helia-aot"] = {
-        "min_version": "0.20.0",
-        "max_version_exclusive": "0.18.0",
-    }
-    inverted_range.write_text(json.dumps(baseline))
-    with pytest.raises(ConfigError, match="inverted version range"):
-        load_compatibility_baseline(inverted_range)
-
-    malformed_min_version = tmp_path / "malformed-min-version.json"
-    baseline = load_compatibility_baseline().to_dict()
-    baseline["engines"]["helia-aot"] = {"min_version": "not-semver"}
-    malformed_min_version.write_text(json.dumps(baseline))
-    with pytest.raises(ConfigError, match="major.minor.patch"):
-        load_compatibility_baseline(malformed_min_version)
-
-    malformed_max_version = tmp_path / "malformed-max-version.json"
-    baseline = load_compatibility_baseline().to_dict()
-    baseline["engines"]["helia-aot"] = {"max_version_exclusive": "not-semver"}
-    malformed_max_version.write_text(json.dumps(baseline))
-    with pytest.raises(ConfigError, match="major.minor.patch"):
-        load_compatibility_baseline(malformed_max_version)
-
-    no_policy_mode = tmp_path / "no-policy-mode.json"
-    baseline = load_compatibility_baseline().to_dict()
-    baseline["engines"]["helia-aot"] = {}
-    no_policy_mode.write_text(json.dumps(baseline))
-    with pytest.raises(ConfigError, match="needs a version"):
-        load_compatibility_baseline(no_policy_mode)
-
-    ambiguous_policy_mode = tmp_path / "ambiguous-policy-mode.json"
-    baseline = load_compatibility_baseline().to_dict()
-    baseline["engines"]["helia-aot"] = {"version": "0.18.0", "min_version": "0.18.0"}
-    ambiguous_policy_mode.write_text(json.dumps(baseline))
-    with pytest.raises(ConfigError, match="more than one policy mode"):
-        load_compatibility_baseline(ambiguous_policy_mode)
-
-    version_without_ref = tmp_path / "version-without-ref.json"
-    baseline = load_compatibility_baseline().to_dict()
-    baseline["engines"]["helia-rt"] = {"version": "1.16.0"}
-    version_without_ref.write_text(json.dumps(baseline))
-    with pytest.raises(ConfigError, match="sets a pinned version but no ref"):
-        load_compatibility_baseline(version_without_ref)
-
-    malformed_pinned_version = tmp_path / "malformed-pinned-version.json"
-    baseline = load_compatibility_baseline().to_dict()
-    baseline["engines"]["helia-rt"] = {"version": "not-semver", "ref": "a" * 40}
-    malformed_pinned_version.write_text(json.dumps(baseline))
-    with pytest.raises(ConfigError, match="major.minor.patch"):
-        load_compatibility_baseline(malformed_pinned_version)
-
-    ambiguous_governed_and_range = tmp_path / "ambiguous-governed-and-range.json"
-    baseline = load_compatibility_baseline().to_dict()
-    baseline["engines"]["tflm"] = {
-        "governed_by_modules": True,
-        "min_version": "0.1.0",
-    }
-    ambiguous_governed_and_range.write_text(json.dumps(baseline))
-    with pytest.raises(ConfigError, match="more than one policy mode"):
-        load_compatibility_baseline(ambiguous_governed_and_range)
-
 
 def test_result_metadata_serializes_qualification_provenance(tmp_path: Path) -> None:
     config = _config(tmp_path)
@@ -495,21 +427,17 @@ def test_result_metadata_serializes_qualification_provenance(tmp_path: Path) -> 
     json.dumps(metadata)
 
 
-def test_helia_aot_version_check_uses_baseline_policy(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_helia_aot_version_check_uses_the_recorded_range(monkeypatch: pytest.MonkeyPatch) -> None:
     from helia_profiler.engines.helia_aot import compile as aot_compile
     from helia_profiler.errors import EngineError
-
-    config = _config(tmp_path)
 
     def _fake_version(name: str) -> str:
         assert name == "helia-aot"
         return "0.23.4"
 
     monkeypatch.setattr("importlib.metadata.version", _fake_version)
-    # Within the baseline-qualified range [0.23.0, 0.26.0) -> no error.
-    assert aot_compile._check_helia_aot_version(config) == "0.23.4"
+    # Within the recorded range [0.23.0, 0.26.0) -> no error.
+    assert aot_compile._check_helia_aot_version() == "0.23.4"
 
     def _fake_version_too_old(name: str) -> str:
         return "0.22.9"
@@ -518,26 +446,20 @@ def test_helia_aot_version_check_uses_baseline_policy(
     with pytest.raises(
         EngineError, match=r"below the minimum supported version \(v0\.23\.0\)"
     ) as excinfo:
-        aot_compile._check_helia_aot_version(config)
-    # The upgrade command stays inside the qualified range.
+        aot_compile._check_helia_aot_version()
+    # The upgrade command stays inside the recorded range.
     assert "'helia-aot>=0.23.0,<0.26.0'" in (excinfo.value.hint or "")
 
     def _fake_version_too_new(name: str) -> str:
         return "0.26.0"
 
     monkeypatch.setattr("importlib.metadata.version", _fake_version_too_new)
-    with pytest.raises(EngineError, match=r"outside the qualified policy"):
-        aot_compile._check_helia_aot_version(config)
-
-    # Without a config (or without a resolved compatibility), the local
-    # HELIAAOT_MIN_VERSION / HELIAAOT_MAX_VERSION_EXCLUSIVE constants remain
-    # the fallback policy.
-    monkeypatch.setattr("importlib.metadata.version", _fake_version)
-    assert aot_compile._check_helia_aot_version(None) == "0.23.4"
+    with pytest.raises(EngineError, match=r"outside the recorded range"):
+        aot_compile._check_helia_aot_version()
 
 
 def test_helia_aot_unparseable_version_warns_full_range(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
+    monkeypatch: pytest.MonkeyPatch, caplog
 ) -> None:
     # An unparseable installed version skips the *entire* qualified-range
     # check (both min and max), not just the floor — the warning must say
@@ -546,14 +468,12 @@ def test_helia_aot_unparseable_version_warns_full_range(
 
     from helia_profiler.engines.helia_aot import compile as aot_compile
 
-    config = _config(tmp_path)
-
     def _fake_version(name: str) -> str:
         return "not-a-version"
 
     monkeypatch.setattr("importlib.metadata.version", _fake_version)
     with caplog.at_level(logging.WARNING):
-        result = aot_compile._check_helia_aot_version(config)
+        result = aot_compile._check_helia_aot_version()
 
     assert result == "not-a-version"
     messages = [rec.message for rec in caplog.records]
@@ -562,7 +482,7 @@ def test_helia_aot_unparseable_version_warns_full_range(
 
 
 def test_helia_aot_success_debug_log_only_after_max_check(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
+    monkeypatch: pytest.MonkeyPatch, caplog
 ) -> None:
     # The "Using helia-aot vX" debug log must only fire once the version has
     # cleared *both* the min and max bound — logging success before the max
@@ -572,15 +492,13 @@ def test_helia_aot_success_debug_log_only_after_max_check(
     from helia_profiler.engines.helia_aot import compile as aot_compile
     from helia_profiler.errors import EngineError
 
-    config = _config(tmp_path)
-
     def _fake_version_too_new(name: str) -> str:
         return "0.26.0"
 
     monkeypatch.setattr("importlib.metadata.version", _fake_version_too_new)
     with caplog.at_level(logging.DEBUG):
-        with pytest.raises(EngineError, match=r"outside the qualified policy"):
-            aot_compile._check_helia_aot_version(config)
+        with pytest.raises(EngineError, match=r"outside the recorded range"):
+            aot_compile._check_helia_aot_version()
 
     assert not any("Using helia-aot" in rec.message for rec in caplog.records)
 
@@ -590,124 +508,9 @@ def test_helia_aot_success_debug_log_only_after_max_check(
     monkeypatch.setattr("importlib.metadata.version", _fake_version_ok)
     caplog.clear()
     with caplog.at_level(logging.DEBUG):
-        aot_compile._check_helia_aot_version(config)
+        aot_compile._check_helia_aot_version()
 
     assert any("Using helia-aot" in rec.message for rec in caplog.records)
-
-
-def test_helia_aot_single_sided_baseline_range_is_not_backfilled_from_constants(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog
-) -> None:
-    # A baseline may legally set only one side of the helia-aot range (see
-    # _parse_baseline()'s per-bound validation). The unset side must be
-    # treated as unbounded, not silently backfilled from the unrelated
-    # HELIAAOT_MIN_VERSION / HELIAAOT_MAX_VERSION_EXCLUSIVE constants — a
-    # baseline min_version above the local max constant (or vice versa)
-    # would otherwise reject every installed version.
-    import logging
-    from dataclasses import replace
-    from types import SimpleNamespace
-    from typing import cast
-
-    from helia_profiler.config import ProfileConfig
-    from helia_profiler.engines.helia_aot import compile as aot_compile
-    from helia_profiler.errors import EngineError
-
-    config = _config(tmp_path)
-    assert config.compatibility is not None
-    baseline = config.compatibility.baseline
-    aot_engine = baseline.engine("helia-aot")
-
-    # _check_helia_aot_version() only reads config.compatibility.baseline, so
-    # a lightweight stand-in avoids ProfileConfig's init=False `compatibility`
-    # field (which dataclasses.replace() cannot target directly).
-    def _config_with_baseline(new_baseline: object) -> ProfileConfig:
-        return cast(
-            "ProfileConfig",
-            SimpleNamespace(compatibility=SimpleNamespace(baseline=new_baseline)),
-        )
-
-    # min_version only, at HELIAAOT_MAX_VERSION_EXCLUSIVE (0.26.0) — an
-    # installed version above that local constant must still pass, since the
-    # baseline leaves the ceiling unbounded.
-    min_only_engine = replace(aot_engine, min_version="0.26.0", max_version_exclusive=None)
-    min_only_engines = tuple(
-        min_only_engine if engine.name == "helia-aot" else engine for engine in baseline.engines
-    )
-    min_only_baseline = replace(baseline, engines=min_only_engines)
-    min_only_config = _config_with_baseline(min_only_baseline)
-
-    def _fake_version_high(name: str) -> str:
-        return "5.0.0"
-
-    monkeypatch.setattr("importlib.metadata.version", _fake_version_high)
-    with caplog.at_level(logging.DEBUG):
-        assert aot_compile._check_helia_aot_version(min_only_config) == "5.0.0"
-    # The unbounded ceiling must render as "unbounded", never as the
-    # malformed "<vunbounded" a hard-coded "v" prefix would produce.
-    messages = [rec.message for rec in caplog.records]
-    assert any("<unbounded" in message for message in messages)
-    assert not any("vunbounded" in message for message in messages)
-
-    def _fake_version_below_baseline_min(name: str) -> str:
-        return "0.23.5"
-
-    monkeypatch.setattr("importlib.metadata.version", _fake_version_below_baseline_min)
-    with pytest.raises(EngineError, match=r"below the minimum supported version \(v0\.26\.0\)"):
-        aot_compile._check_helia_aot_version(min_only_config)
-
-    # max_version_exclusive only, well below HELIAAOT_MIN_VERSION —
-    # an installed version below that local constant must still pass, since
-    # the baseline leaves the floor unbounded.
-    max_only_engine = replace(aot_engine, min_version=None, max_version_exclusive="0.5.0")
-    max_only_engines = tuple(
-        max_only_engine if engine.name == "helia-aot" else engine for engine in baseline.engines
-    )
-    max_only_baseline = replace(baseline, engines=max_only_engines)
-    max_only_config = _config_with_baseline(max_only_baseline)
-
-    def _fake_version_low(name: str) -> str:
-        return "0.1.0"
-
-    monkeypatch.setattr("importlib.metadata.version", _fake_version_low)
-    assert aot_compile._check_helia_aot_version(max_only_config) == "0.1.0"
-
-    def _fake_version_above_baseline_max(name: str) -> str:
-        return "0.5.0"
-
-    monkeypatch.setattr("importlib.metadata.version", _fake_version_above_baseline_max)
-    with pytest.raises(EngineError, match=r"outside the qualified policy"):
-        aot_compile._check_helia_aot_version(max_only_config)
-
-    # An unparseable installed version with a single-sided baseline must also
-    # render the unbounded side cleanly in the skip-check warning.
-    def _fake_version_unparseable(name: str) -> str:
-        return "not-a-version"
-
-    monkeypatch.setattr("importlib.metadata.version", _fake_version_unparseable)
-    caplog.clear()
-    with caplog.at_level(logging.WARNING):
-        aot_compile._check_helia_aot_version(min_only_config)
-    messages = [rec.message for rec in caplog.records]
-    assert any("<unbounded" in message for message in messages)
-    assert not any("vunbounded" in message for message in messages)
-
-
-def test_baseline_helia_rt_entry_matches_canonical_artifacts_constants() -> None:
-    # engines/helia_rt/artifacts.py is the single canonical source for the
-    # default heliaRT version/ref (see AGENTS.md: "bump ``HELIART_VERSION``
-    # in ``artifacts.py`` to adopt a release"). The baseline only mirrors these values for
-    # reporting/classification; it must never drift from them, and runtime
-    # resolution must keep consulting the constants directly, not the
-    # baseline (see engines/helia_rt/adapter.py and artifacts.py).
-    from helia_profiler.engines.helia_rt.artifacts import (
-        HELIART_SOURCE_COMMIT,
-        HELIART_VERSION,
-    )
-
-    engine = load_compatibility_baseline().engine("helia-rt")
-    assert engine.version == HELIART_VERSION
-    assert engine.ref == HELIART_SOURCE_COMMIT
 
 
 def test_engine_owned_module_names_match_canonical_constants() -> None:
