@@ -88,6 +88,67 @@ GROUPS: dict[str, list[str]] = {}
 for _ctr in _COUNTERS.values():
     GROUPS.setdefault(_ctr.group, []).append(_ctr.name)
 
+# Ethos-U85 diagnostic events: per-port traffic and stall attribution. They are
+# selectable by name (an explicit ``ethos_npu:`` list) but are registered after
+# GROUPS is built, so ``ethos_npu: all`` keeps meaning the nine events above and
+# its pass count and CSV columns do not change.
+_ETHOS_NPU_EXTENDED_EVENTS: tuple[tuple[str, str], ...] = (
+    ("ETHOSU_PMU_SRAM0_RD_DATA_BEAT_RECEIVED", "SRAM port 0 read data beats"),
+    ("ETHOSU_PMU_SRAM1_RD_DATA_BEAT_RECEIVED", "SRAM port 1 read data beats"),
+    ("ETHOSU_PMU_SRAM0_WR_DATA_BEAT_WRITTEN", "SRAM port 0 write data beats"),
+    ("ETHOSU_PMU_SRAM1_WR_DATA_BEAT_WRITTEN", "SRAM port 1 write data beats"),
+    ("ETHOSU_PMU_SRAM0_RD_TRANS_ACCEPTED", "SRAM port 0 read transactions accepted"),
+    ("ETHOSU_PMU_SRAM1_RD_TRANS_ACCEPTED", "SRAM port 1 read transactions accepted"),
+    ("ETHOSU_PMU_SRAM0_WR_TRANS_ACCEPTED", "SRAM port 0 write transactions accepted"),
+    ("ETHOSU_PMU_SRAM1_WR_TRANS_ACCEPTED", "SRAM port 1 write transactions accepted"),
+    ("ETHOSU_PMU_EXT0_RD_DATA_BEAT_RECEIVED", "External port 0 read data beats"),
+    ("ETHOSU_PMU_EXT1_RD_DATA_BEAT_RECEIVED", "External port 1 read data beats"),
+    ("ETHOSU_PMU_EXT0_RD_TRANS_ACCEPTED", "External port 0 read transactions accepted"),
+    ("ETHOSU_PMU_EXT1_RD_TRANS_ACCEPTED", "External port 1 read transactions accepted"),
+    (
+        "ETHOSU_PMU_SRAM_RD_STALL_LIMIT",
+        "Cycles SRAM reads were stalled by the outstanding-transaction limit",
+    ),
+    (
+        "ETHOSU_PMU_SRAM_RD_TRAN_REQ_STALLED",
+        "Cycles an SRAM read request was stalled (ARVALID && !ARREADY)",
+    ),
+    (
+        "ETHOSU_PMU_SRAM_WR_STALL_LIMIT",
+        "Cycles SRAM writes were stalled by the outstanding-transaction limit",
+    ),
+    (
+        "ETHOSU_PMU_SRAM_WR_TRAN_REQ_STALLED",
+        "Cycles an SRAM write request was stalled (AWVALID && !AWREADY)",
+    ),
+    (
+        "ETHOSU_PMU_SRAM_WR_DATA_BEAT_STALLED",
+        "Cycles an SRAM write data beat was stalled (WVALID && !WREADY)",
+    ),
+    (
+        "ETHOSU_PMU_EXT_RD_STALL_LIMIT",
+        "Cycles external reads were stalled by the outstanding-transaction limit",
+    ),
+    (
+        "ETHOSU_PMU_EXT_RD_TRAN_REQ_STALLED",
+        "Cycles an external read request was stalled (ARVALID && !ARREADY)",
+    ),
+    ("ETHOSU_PMU_MAC_STALLED_BY_IB", "Cycles the MAC was stalled waiting for the input buffer"),
+    (
+        "ETHOSU_PMU_AO_STALLED_BY_OB",
+        "Cycles the activation output was stalled by the output buffer",
+    ),
+    ("ETHOSU_PMU_WD_STALLED", "Cycles the weight decoder was stalled"),
+)
+
+#: Counters selectable by name only, per group; never part of ``"all"``.
+EXTENDED_COUNTERS: dict[str, list[str]] = {"ethos_npu": []}
+for _name, _desc in _ETHOS_NPU_EXTENDED_EVENTS:
+    if _name in _COUNTERS:
+        raise RuntimeError(f"Duplicate PMU counter '{_name}' in the extended Ethos-U catalogue")
+    _COUNTERS[_name] = PmuCounter(name=_name, event_id=0, group="ethos_npu", description=_desc)
+    EXTENDED_COUNTERS["ethos_npu"].append(_name)
+
 #: Curated "default" set per group — the most useful counters for typical ML
 #: workloads.  Designed to fit in a single pass (≤ 4 counters each).
 DEFAULT_COUNTERS: dict[str, list[str]] = {
@@ -153,7 +214,7 @@ def get_counter(name: str) -> PmuCounter:
 
 def list_counters(group: str | None = None) -> list[PmuCounter]:
     if group is not None:
-        names = GROUPS.get(group, [])
+        names = GROUPS.get(group, []) + EXTENDED_COUNTERS.get(group, [])
         return [_COUNTERS[n] for n in names]
     return list(_COUNTERS.values())
 
@@ -203,7 +264,8 @@ def resolve_counters(
 
     *selection* maps group name → one of:
       - ``"default"`` — curated default set for that group.
-      - ``"all"``     — every counter in the group.
+      - ``"all"``     — every counter in the group, except the name-only
+        diagnostic ones in ``EXTENDED_COUNTERS``.
       - ``["name1", "name2", …]`` — explicit counter names.
 
     Counters are returned in group order, then declaration order within
