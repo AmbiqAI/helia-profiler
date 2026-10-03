@@ -260,7 +260,9 @@ def _reference_stall_factor(ctx: PipelineContext) -> float:
         clean_infer_count=meta.clean_infer_count,
         ref_cycles=meta.clean_ref_cycles,
     )
-    if stall is None or stall.affected_iters == 0:
+    if stall is None or stall.affected_iters == 0 or stall.counts_are_inconsistent:
+        # An inconsistent report (more affected iterations than ran) is not
+        # evidence of a long window.
         return 1.0
     understatement = min(stall.understatement_lower_bound, _MAX_STALL_UNDERSTATEMENT)
     return 1.0 / (1.0 - understatement)

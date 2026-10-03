@@ -3254,6 +3254,25 @@ class TestCapturePowerWrapper:
         # The duration check still compares against the planned window.
         assert called["clean_infer_avg_us"] == 1_000_000
 
+    def test_inconsistent_stall_report_does_not_stretch(self, tmp_path: Path):
+        # More affected iterations than the window ran is a corrupt report, not
+        # evidence of a long window; it must not take the 10x cap.
+        from helia_profiler.capture import _reference_stall_factor
+        from helia_profiler.config import load_config
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.results import FirmwareMeta, PmuResult
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(None, {"model": {"path": str(model)}, "engine": {"type": "helia-rt"}})
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        set_profile_result(
+            ctx,
+            PmuResult(meta=FirmwareMeta(clean_infer_count=4, clean_stalled_iters=9), layers=[]),
+        )
+
+        assert _reference_stall_factor(ctx) == 1.0
+
     def test_stalled_profile_does_not_stretch_a_busy_loop_spin(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):

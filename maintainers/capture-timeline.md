@@ -152,7 +152,9 @@ raised:
 stalled clean-window reference reads `a` low, which sizes `N` too high, so the
 real window runs longer than `W`. When the profile window stalled, `L` and the
 warm-up term use `a` stretched by `1/(1 - u)`, where `u` is the stall's
-understatement lower bound, capped at 0.9 [D]. The C-E5 duration check still
+understatement lower bound, capped at 0.9 [D]. A stall report with an unknown
+total gives `u = 0` and an inconsistent one (more affected iterations than
+ran) is ignored, so neither stretches. The C-E5 duration check still
 compares against the planned `W`.
 
 ## 4. Published intervals
