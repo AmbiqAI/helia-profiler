@@ -88,20 +88,20 @@ shared USB CDC.
 `DEFAULT_POWER_MIN_WINDOW_MS`) is not a window. The poller resets and waits for
 the next rise.
 
-The minimum is the only filter on a qualifying pulse, and it is not tied to
-the phase on every edge source:
-- the snapshot poller ignores edges until the phase is `go_signaled`;
+When the planned window is known, the minimum rises to the shortest window
+the plan accepts: `W − max(a/2 if N>1, 2/stats_rate_hz, W·max(tol, 0.15))`,
+the mirror of `L`. The raised minimum applies to every edge source:
+- the snapshot poller ignores edges until the phase is `go_signaled`, and in
+  FR that phase starts as soon as the reset call returns;
 - on JS220/JS320 the GPI stream is enabled before the reset and is not
-  phase-gated, so any complete high interval of at least the minimum anywhere
-  in the capture is a candidate, and the last one wins.
+  phase-gated, and the last qualifying high interval wins.
 
-In FR the phase is `go_signaled` as soon as the reset call returns, so a
-sync-line high of at least the minimum during boot is accepted by the poller
-as the window and ends the capture early. A reset-time pulse of 3.33 s on
-GPIO 29 was observed on an Apollo510 EVB [M] (§11). Nothing rejects such an
-interval at capture time; only the C-E5 warning and, for dedicated firmware,
-the terminal arbitration (C-I2) can catch it afterwards. Open: candidate
-(§9).
+So a sync-line high during reset or boot that is shorter than the plan
+accepts is not taken as the window by either source. A reset-time pulse of
+3.33 s on GPIO 29 was observed on an Apollo510 EVB [M] (§11). With no known
+window, the fixed minimum is the only filter, and only the C-E5 warning and,
+for dedicated firmware, the terminal arbitration (C-I2) can catch a wrong
+interval afterwards.
 
 **C-S3.** With shared firmware over USB CDC in LS, S5 waits for DTR while the
 host waits for READY (S8) before asserting DTR (S9), so that combination
@@ -314,8 +314,9 @@ candidates for the capture follow-up PR:
 - `no_stats_window` for a sub-1 s pulse;
 - `stimer_dead` and a late GO get the wiring or lock-step hint;
 - timeline records the bench needs are not published (§10);
-- a sync-line high of at least the minimum during reset or boot is accepted as
-  the window (C-S2, §11);
+- a sync-line high of at least the minimum during reset or boot was accepted
+  as the window; with a known plan the minimum is now the plan's shortest
+  accepted window (C-S2, #302);
 - the current range is never restored on teardown. A capture sets `auto` at
   start and only a power-cycle reset writes `off`; that reset now restores
   `auto` on every exit from its off window, an interrupt included (#302).

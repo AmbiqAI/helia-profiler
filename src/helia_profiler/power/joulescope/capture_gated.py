@@ -23,6 +23,7 @@ from ..diagnostics import (
     GateTransitionTiming,
     classify_gate_failure,
     longest_accepted_window_s,
+    shortest_accepted_window_s,
 )
 from ..metadata import MeasurementScope, ObservationMode, PowerIntegrity, PowerMetadata
 from .device import (
@@ -176,6 +177,31 @@ def capture_gated(
         raise PowerError(
             "Joulescope gated capture supports exactly one high window (min_high_windows=1)."
         )
+
+    # With a planned window, a qualifying gate must also be plausibly that
+    # window. A sync-line high during reset or boot can outlast the fixed
+    # minimum, and on JS220/JS320 the GPI stream is not phase-gated, so the
+    # floor applies to the poller and the stream selection alike (contract C-S2).
+    if (
+        clean_infer_count is not None
+        and clean_infer_count > 0
+        and clean_infer_avg_us is not None
+        and clean_infer_avg_us > 0
+    ):
+        plausible_floor_s = shortest_accepted_window_s(
+            clean_infer_count=clean_infer_count,
+            clean_infer_avg_us=clean_infer_avg_us,
+            stats_rate_hz=stats_rate_hz,
+            relative_tolerance=gate_relative_tolerance,
+        )
+        if plausible_floor_s > minimum_gate_s:
+            log.debug(
+                "Minimum qualifying gate raised from %.3fs to %.3fs, the shortest "
+                "window the plan accepts",
+                minimum_gate_s,
+                plausible_floor_s,
+            )
+            minimum_gate_s = plausible_floor_s
 
     try:
         from pyjoulescope_driver import time64

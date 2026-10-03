@@ -5420,3 +5420,98 @@ class TestJoulescopePowerCycleRestoresSupply:
         driver.power_cycle(off_time_s=0.5, settle_time_s=0.0)
 
         assert [value for _topic, value in publishes] == ["off", "auto"]
+
+
+class TestImplausibleGateRejection:
+    """A sync-line high far shorter than the planned window is not the window.
+
+    On an Apollo510 EVB the sync line read high for 3.33 s during the reset
+    and flash sequence, against a ~5 s planned window; with only the 1.0 s
+    minimum gate, a capture took it as the window (capture timeline contract
+    C-S2). Scaled here: a 10 x 1 ms plan, a 2 ms minimum gate, and a 7 ms
+    boot-time high with no real window after it.
+    """
+
+    class _FakeDriver:
+        def __init__(self, high_ms: int) -> None:
+            self.high_ms = high_ms
+            self._subs: dict[str, object] = {}
+
+        def publish(self, _topic, _value, **_kwargs) -> None:
+            pass
+
+        def subscribe(self, topic, _flags, callback) -> None:
+            self._subs[topic] = callback
+
+        def unsubscribe(self, topic, _callback) -> None:
+            self._subs.pop(topic, None)
+
+        def _cb(self, fragment: str):
+            return next((cb for topic, cb in self._subs.items() if fragment in topic), None)
+
+        def emit_timeline(self) -> None:
+            import numpy as np
+
+            ms = _SECOND // 1000
+            stats_cb = self._cb("/s/stats/")
+            gpi_cb = self._cb("/s/gpi/0/!data")
+            assert stats_cb is not None and gpi_cb is not None
+            for i in range(40):
+                stats_cb(
+                    "u/js320/test/s/stats/value",
+                    TestGatedStatsProcessing._packet(i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12),
+                )
+            levels = [0] * 2 + [1] * self.high_ms + [0] * (38 - self.high_ms)
+            gpi_cb(
+                "u/js320/test/s/gpi/0/!data",
+                {
+                    "data": np.asarray(levels, dtype=np.uint8),
+                    "sample_rate": 1000,
+                    "decimate_factor": 1,
+                    "sample_id": 0,
+                    "utc": 0,
+                },
+            )
+
+    def _capture(self, monkeypatch, high_ms: int):
+        from helia_profiler.power.joulescope import capture_gated as module
+        from helia_profiler.power.joulescope.driver import JoulescopeDriver
+
+        fake = self._FakeDriver(high_ms)
+        _install_fake_capture_clock(monkeypatch)
+        monkeypatch.setattr(module, "_open_device", lambda _serial: (fake, "u/js320/test", "js320"))
+        monkeypatch.setattr(module, "_close_device", lambda *_a, **_k: None)
+        calls = {"n": 0}
+
+        def _scripted_gpi(_driver, _path):
+            # The snapshot poller sees the same high, 1 ms per poll.
+            calls["n"] += 1
+            return 1 if 3 <= calls["n"] < 3 + high_ms else 0
+
+        monkeypatch.setattr(module, "_read_gpi_snapshot", _scripted_gpi)
+        return module.capture_gated(
+            JoulescopeDriver(),
+            duration_s=0.2,
+            io_voltage=1.8,
+            sync_input_index=0,
+            stats_rate_hz=1000,
+            minimum_gate_s=0.002,
+            poll_interval_s=0.001,
+            clean_infer_count=10,
+            clean_infer_avg_us=1000,
+            gate_relative_tolerance=0.10,
+            lockstep=False,
+            on_started=lambda _wait=None: fake.emit_timeline(),
+        )
+
+    def test_boot_time_high_shorter_than_the_plan_is_not_the_window(self, monkeypatch):
+        result = self._capture(monkeypatch, high_ms=7)
+
+        assert result.gated_windows == []
+        assert result.metadata.integrity == "degraded"
+
+    def test_in_band_window_is_still_accepted(self, monkeypatch):
+        result = self._capture(monkeypatch, high_ms=10)
+
+        assert len(result.gated_windows) == 1
+        assert result.gated_windows[0].duration_s == pytest.approx(0.010, rel=1e-6)
