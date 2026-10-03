@@ -27,7 +27,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from ..config import CleanWindowProbe, Transport
+from ..config import CleanWindowProbe, PowerFirmware, Transport
 from ..engines import EngineType, get_adapter
 from ..engines.base import PsramWeightsSource
 from ..errors import ConfigError
@@ -435,6 +435,23 @@ def _check_transport_support(cfg) -> None:
             hint=(
                 "Apollo3/3P has no compatible nsx-ambiq-usb module — use "
                 "transport=uart, swo, or rtt instead."
+            ),
+        )
+    if (
+        cfg.power.enabled
+        and cfg.power.firmware is PowerFirmware.SHARED
+        and cfg.power.lockstep_resolved
+    ):
+        # The shared USB CDC binary blocks for DTR before it can raise READY,
+        # and the lock-step host opens the port only after READY, so this
+        # combination can only time out (capture timeline contract C-S3).
+        raise ConfigError(
+            "Shared power firmware over USB CDC cannot run in lock-step: the "
+            "firmware waits for the host to open its port before raising READY, "
+            "and the host waits for READY before opening the port.",
+            hint=(
+                "Set power.lockstep: false, use power.firmware: dedicated, or "
+                "choose another transport."
             ),
         )
 

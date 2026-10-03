@@ -104,10 +104,10 @@ the terminal arbitration (C-I2) can catch it afterwards. Open: candidate
 (§9).
 
 **C-S3.** With shared firmware over USB CDC in LS, S5 waits for DTR while the
-host waits for READY (S8) before asserting DTR (S9). As written, that
-combination cannot complete. It is not reproduced on hardware and is not
-rejected at preflight. Open: #302 (folded in from #373, closed as not planned
-on 2026-09-26).
+host waits for READY (S8) before asserting DTR (S9), so that combination
+cannot complete. Preflight rejects it (shared firmware, USB CDC, lock-step
+resolved true) and names the alternatives: free-running, dedicated firmware
+or another transport. Not reproduced on hardware.
 
 ## 3. Host wait bounds
 
@@ -308,7 +308,7 @@ simply times out.
 | #302 follow-up 3: busy_loop warm-up not budgeted (FR) | C-W1, C-W2 | open |
 | #302 follow-up 4: stalled reference | C-W4, C-H1 | open. The contract fixes the direction: the window runs longer. |
 | #302 stage-hint follow-up | C-E2, C-H1 | open |
-| #302 (from #373): shared USB CDC with lock-step | C-S3 | open, unconfirmed. #373 was closed as not planned and folded into #302, which also carries the #370 rename of the window-clock context key `elapsed_us`. |
+| #302 (from #373): shared USB CDC with lock-step | C-S3 | resolved: rejected at preflight. #373 was closed as not planned and folded into #302. |
 | #374: live definitions only | none | outside the timeline (render hygiene) |
 | #376: guarded test harness | all clauses | open. Each clause needs a guarded test, and several capture tests cannot yet run under the guard. |
 
