@@ -405,6 +405,41 @@ class TestPreflightConfig:
                 PreflightStage().run(ctx)
         assert "lockstep: false" in (excinfo.value.hint or "")
 
+    def test_dedicated_usb_cdc_lockstep_is_accepted(self, tmp_path: Path):
+        # The dedicated power binary has no USB stack, so lock-step over a
+        # USB CDC profile transport is fine.
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "target": {"transport": "usb_cdc"},
+                "power": {
+                    "enabled": True,
+                    "firmware": "dedicated",
+                    "state_gpio_pin": 30,
+                    "go_gpio_pin": 31,
+                    "lockstep": True,
+                },
+            },
+        )
+        with patch("shutil.which", side_effect=_all_tools_present):
+            PreflightStage().run(ctx)
+
+    def test_shared_usb_cdc_without_power_is_accepted(self, tmp_path: Path):
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "target": {"transport": "usb_cdc"},
+                "power": {
+                    "enabled": False,
+                    "firmware": "shared",
+                    "state_gpio_pin": 30,
+                    "go_gpio_pin": 31,
+                },
+            },
+        )
+        with patch("shutil.which", side_effect=_all_tools_present):
+            PreflightStage().run(ctx)
+
     def test_shared_usb_cdc_free_running_is_accepted(self, tmp_path: Path):
         ctx = self._shared_usb_cdc_power(tmp_path, lockstep=False)
         with patch("shutil.which", side_effect=_all_tools_present):

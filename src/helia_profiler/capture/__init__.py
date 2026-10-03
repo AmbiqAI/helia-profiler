@@ -374,13 +374,14 @@ def capture_power(
         sync = _make_sync_controller(ctx, driver)
         probe = ctx.config.profiling.clean_window_probe
         relative_tolerance = gate_relative_tolerance_for(probe)
-        # The fixed count was sized from a reference that a stalled profile
-        # window reads low, so the window can run longer than planned: wait
-        # for the window the stall implies (contract C-W4). The duration check
-        # below still compares against the planned reference.
+        # A counted window's fixed count was sized from a reference that a
+        # stalled profile window reads low, so the window can run longer than
+        # planned: wait for the window the stall implies (contract C-W4). A
+        # busy_loop reference is the calibrated spin, which no stall shortens.
+        # The duration check below still compares against the planned reference.
         bound_avg_us = (
             math.ceil(clean_avg_us * _reference_stall_factor(ctx))
-            if clean_avg_us and plan.reference_inference_us
+            if clean_avg_us and plan.reference_inference_us and probe_runs_inferences(probe)
             else clean_avg_us
         )
         longest_window_s = (

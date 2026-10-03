@@ -71,7 +71,7 @@ fields in new runs:
 
 | Field | Type | Unit | What it measures |
 |---|---|---|---|
-| `schema`, `schema_version` | string, int | none | `hpx.run-summary`, version 10 |
+| `schema`, `schema_version` | string, int | none | `hpx.run-summary`, version 11 |
 | `engine` | string | none | the engine that ran |
 | `layers` | int | count | operators in the profiled graph |
 | `total_cycles` | number | CPU cycles | the sum of the per-layer instrumented cycle counts (`report/summary.py`), so it includes the per-layer counter reads; the clean window is `latency.device_clean_infer_avg_cycles` |
