@@ -26,7 +26,7 @@ The current baseline is `hpx-neuralspotx-0.8.1-2026-09`:
 | `nsx-sensors` | `c219a2bc…3e25` (`v0.3.0`, peeled) |
 | heliaRT | `1.21.3`, commit `dc8533ab…f5f` (min supported `1.16.0`, from `HELIART_MIN_VERSION` in code, not a baseline-JSON field) |
 | heliaAOT | `min_version=0.23.0`, `max_version_exclusive=0.26.0` |
-| tflm | governed entirely by the `nsx-tflite-micro` / `arm-cmsis-nn` module refs above |
+| tflm | governed by the `nsx-tflite-micro` and `arm-cmsis-nn` module refs above; `nsx-tflite-micro` builds TFLM from the `helia-rt-source` project, which the baseline does not list and the neuralSPOT-X 0.8.1 registry lock fixes at `7c1b162c` (helia-rt v1.17.0) |
 | executorch | `0.1.0`, module ref `5514ac1e…b48e` (a checkout's `version.txt` is verified against the baseline) |
 
 Every baseline project and module ref is immutable by policy: only a full
@@ -243,9 +243,10 @@ The released helia-aot 0.23.0 and 0.24.0 each convert and build the same ten
 models listed above against v7.38.1 through HPX's firmware build with ATfE
 for Apollo510. heliaRT 1.21.2 builds from source against v7.38.1 with ATfE
 for the int8 keyword-spotting model and the fp32 and fp16 sleep-staging
-models. ExecuTorch's `ns` backend and TFLM with the `ns` kernels use the same
-core and are not separately verified here. No device run covered v7.38.1
-when that revision was made.
+models. ExecuTorch's `ns` backend uses the same core and is not separately
+verified here; HPX's TFLM engine offers only the reference and `cmsis_nn`
+backends, so it does not use this core. No device run covered v7.38.1 when
+that revision was made.
 
 heliaRT 1.21.3 (`dc8533ab…f5f`) and `ns-cmsis-nn v7.39.2` (`5f3fed9f…cb8`)
 then replace 1.21.2 and v7.38.1; heliaAOT's range is unchanged and the
@@ -263,8 +264,9 @@ generated module needs. heliaAOT 0.23.0 and 0.24.0 stay inside the range but
 were not re-verified against v7.39.2. The TFLM engine is unaffected: its
 `nsx-tflite-micro` module (`7afcf2b4…333`) builds TFLM from the
 `helia-rt-source` project, which this baseline does not list; the
-neuralSPOT-X 0.8.1 registry fixes it at `7c1b162c` (helia-rt v1.17.0). ExecuTorch's `ns` backend builds against the same ns-cmsis-nn core
-and is not separately verified here.
+neuralSPOT-X 0.8.1 registry fixes it at `7c1b162c` (helia-rt v1.17.0).
+ExecuTorch's `ns` backend builds against the same ns-cmsis-nn core and is
+not separately verified here.
 
 **Verified.** For int8 keyword spotting, `hpx analyze` and `hpx doctor`
 succeed on each of heliaAOT, heliaRT and TFLM.
