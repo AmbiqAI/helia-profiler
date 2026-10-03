@@ -72,6 +72,20 @@
       ]
     },
     {
+      "label": "runtimes",
+      "collapsed": true,
+      "items": [
+        {
+          "label": "Overview",
+          "slug": "reference/api/helia_profiler/runtimes"
+        },
+        {
+          "label": "runtimes",
+          "slug": "reference/api/helia_profiler/runtimes/runtimes"
+        }
+      ]
+    },
+    {
       "label": "vocab",
       "slug": "reference/api/helia_profiler/vocab"
     }

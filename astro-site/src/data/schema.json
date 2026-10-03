@@ -522,7 +522,7 @@
           "name": "compatibility_baseline",
           "pythonType": "CompatibilityBaseline",
           "required": false,
-          "default": "CompatibilityBaseline(schema='hpx.compatibility-baseline', schema_version=1, baseline_id='hpx-neuralspotx-0.8.1-2026-09', neuralspotx_package='neuralspotx', neuralspotx_version='0.8.1', neuralspotx_sha256='7aac6f1b2e89ebf41dfe087c7588e0db11d65e8a11cac2cda03f6d7c510a9094', projects=(CompatibilityProject(name='neuralspotx', url='https://github.com/AmbiqAI/neuralspotx.git', ref='2dbe12a2799fd8c3df85f1a103b0adca340c901f'), CompatibilityProject(name='nsx-ambiq-sdk', url='https://github.com/AmbiqAI/nsx-ambiq-sdk.git', ref='aefce2ca858795e783c76726ebe7d14d9d4bde7c'), CompatibilityProject(name='nsx-ethos-u-driver', url='https://github.com/AmbiqAI/nsx-ethos-u-driver.git', ref='f0f99bb124b22486ef55694c76567008680cb5a8'), CompatibilityProject(name='nsx-pmu-armv8m', url='https://github.com/AmbiqAI/nsx-pmu-armv8m.git', ref='5725c065a0c3603132f1064ee2684d1fa8587c88'), CompatibilityProject(name='nsx-tflite-micro', url='https://github.com/AmbiqAI/nsx-tflite-micro.git', ref='7afcf2b4170e039caf4c49f91e2c45d5869be333'), CompatibilityProject(name='arm-cmsis-nn', url='https://github.com/AmbiqAI/arm-cmsis-nn.git', ref='6d21a6f821fb72541173a6c4d05d83329fa74f7c'), CompatibilityProject(name='ns-cmsis-nn', url='https://github.com/AmbiqAI/ns-cmsis-nn.git', ref='5f3fed9f21a57390cc7f00f77a37db8f5f110cb8'), CompatibilityProject(name='nsx-executorch', url='https://github.com/AmbiqAI/nsx-executorch.git', ref='5514ac1ea8439b3fe615d180bf68c75a9dabb48e'), CompatibilityProject(name='helia-rt', url='https://github.com/AmbiqAI/helia-rt.git', ref='dc8533abe0ec7e01c251a067ce54c60f54237f5f'), CompatibilityProject(name='nsx-sensors', url='https://github.com/AmbiqAI/nsx-sensors.git', ref='c219a2bc98c62f96819fae20ab6c8911fcea3e25')), modules=(CompatibilityModule(name='nsx-ambiq-bsp', project='nsx-ambiq-sdk', ref='aefce2ca858795e783c76726ebe7d14d9d4bde7c'), CompatibilityModule(name='nsx-npu', project='nsx-ambiq-sdk', ref='aefce2ca858795e783c76726ebe7d14d9d4bde7c'), CompatibilityModule(name='nsx-pmu-armv8m', project='nsx-pmu-armv8m', ref='5725c065a0c3603132f1064ee2684d1fa8587c88'), CompatibilityModule(name='nsx-tflite-micro', project='nsx-tflite-micro', ref='7afcf2b4170e039caf4c49f91e2c45d5869be333'), CompatibilityModule(name='arm-cmsis-nn', project='arm-cmsis-nn', ref='6d21a6f821fb72541173a6c4d05d83329fa74f7c'), CompatibilityModule(name='nsx-cmsis-nn', project='ns-cmsis-nn', ref='5f3fed9f21a57390cc7f00f77a37db8f5f110cb8'), CompatibilityModule(name='nsx-executorch', project='nsx-executorch', ref='5514ac1ea8439b3fe615d180bf68c75a9dabb48e'), CompatibilityModule(name='nsx-helia-rt', project='helia-rt', ref='dc8533abe0ec7e01c251a067ce54c60f54237f5f'), CompatibilityModule(name='nsx-sensors', project='nsx-sensors', ref='c219a2bc98c62f96819fae20ab6c8911fcea3e25')), engines=(CompatibilityEngine(name='helia-rt', version='1.21.3', ref='dc8533abe0ec7e01c251a067ce54c60f54237f5f', min_version=None, max_version_exclusive=None, governed_by_modules=False), CompatibilityEngine(name='helia-aot', version=None, ref=None, min_version='0.23.0', max_version_exclusive='0.26.0', governed_by_modules=False), CompatibilityEngine(name='tflm', version=None, ref=None, min_version=None, max_version_exclusive=None, governed_by_modules=True), CompatibilityEngine(name='executorch', version='0.1.0', ref='5514ac1ea8439b3fe615d180bf68c75a9dabb48e', min_version=None, max_version_exclusive=None, governed_by_modules=False)))",
+          "default": "CompatibilityBaseline(schema='hpx.compatibility-baseline', schema_version=1, baseline_id='hpx-neuralspotx-0.8.1-2026-09', neuralspotx_package='neuralspotx', neuralspotx_version='0.8.1', neuralspotx_sha256='7aac6f1b2e89ebf41dfe087c7588e0db11d65e8a11cac2cda03f6d7c510a9094', projects=(CompatibilityProject(name='neuralspotx', url='https://github.com/AmbiqAI/neuralspotx.git', ref='2dbe12a2799fd8c3df85f1a103b0adca340c901f'), CompatibilityProject(name='nsx-ambiq-sdk', url='https://github.com/AmbiqAI/nsx-ambiq-sdk.git', ref='aefce2ca858795e783c76726ebe7d14d9d4bde7c'), CompatibilityProject(name='nsx-ethos-u-driver', url='https://github.com/AmbiqAI/nsx-ethos-u-driver.git', ref='f0f99bb124b22486ef55694c76567008680cb5a8'), CompatibilityProject(name='nsx-pmu-armv8m', url='https://github.com/AmbiqAI/nsx-pmu-armv8m.git', ref='5725c065a0c3603132f1064ee2684d1fa8587c88'), CompatibilityProject(name='nsx-tflite-micro', url='https://github.com/AmbiqAI/nsx-tflite-micro.git', ref='7afcf2b4170e039caf4c49f91e2c45d5869be333'), CompatibilityProject(name='arm-cmsis-nn', url='https://github.com/AmbiqAI/arm-cmsis-nn.git', ref='6d21a6f821fb72541173a6c4d05d83329fa74f7c'), CompatibilityProject(name='ns-cmsis-nn', url='https://github.com/AmbiqAI/ns-cmsis-nn.git', ref='5f3fed9f21a57390cc7f00f77a37db8f5f110cb8'), CompatibilityProject(name='nsx-executorch', url='https://github.com/AmbiqAI/nsx-executorch.git', ref='5514ac1ea8439b3fe615d180bf68c75a9dabb48e'), CompatibilityProject(name='helia-rt', url='https://github.com/AmbiqAI/helia-rt.git', ref='dc8533abe0ec7e01c251a067ce54c60f54237f5f'), CompatibilityProject(name='nsx-sensors', url='https://github.com/AmbiqAI/nsx-sensors.git', ref='c219a2bc98c62f96819fae20ab6c8911fcea3e25')), modules=(CompatibilityModule(name='nsx-ambiq-bsp', project='nsx-ambiq-sdk', ref='aefce2ca858795e783c76726ebe7d14d9d4bde7c'), CompatibilityModule(name='nsx-npu', project='nsx-ambiq-sdk', ref='aefce2ca858795e783c76726ebe7d14d9d4bde7c'), CompatibilityModule(name='nsx-pmu-armv8m', project='nsx-pmu-armv8m', ref='5725c065a0c3603132f1064ee2684d1fa8587c88'), CompatibilityModule(name='nsx-tflite-micro', project='nsx-tflite-micro', ref='7afcf2b4170e039caf4c49f91e2c45d5869be333'), CompatibilityModule(name='arm-cmsis-nn', project='arm-cmsis-nn', ref='6d21a6f821fb72541173a6c4d05d83329fa74f7c'), CompatibilityModule(name='nsx-cmsis-nn', project='ns-cmsis-nn', ref='5f3fed9f21a57390cc7f00f77a37db8f5f110cb8'), CompatibilityModule(name='nsx-executorch', project='nsx-executorch', ref='5514ac1ea8439b3fe615d180bf68c75a9dabb48e'), CompatibilityModule(name='nsx-helia-rt', project='helia-rt', ref='dc8533abe0ec7e01c251a067ce54c60f54237f5f'), CompatibilityModule(name='nsx-sensors', project='nsx-sensors', ref='c219a2bc98c62f96819fae20ab6c8911fcea3e25')))",
           "defaultFromFactory": true
         },
         {
@@ -1172,13 +1172,6 @@
           },
           "title": "Modules",
           "type": "array"
-        },
-        "engines": {
-          "items": {
-            "$ref": "#/$defs/CompatibilityEngine"
-          },
-          "title": "Engines",
-          "type": "array"
         }
       },
       "required": [
@@ -1189,77 +1182,9 @@
         "neuralspotx_version",
         "neuralspotx_sha256",
         "projects",
-        "modules",
-        "engines"
+        "modules"
       ],
       "title": "CompatibilityBaseline",
-      "type": "object"
-    },
-    "CompatibilityEngine": {
-      "description": "Engine version policy and default source reference.\n\nExactly one of ``version``, ``min_version``, or ``governed_by_modules``\nmust be set: a pinned engine release, a semver floor/ceiling policy, or a\nmarker that the engine's qualification is fully carried by its NSX\nmodule refs (e.g. stock TFLM, pinned via ``nsx-tflite-micro`` /\n``arm-cmsis-nn``).",
-      "properties": {
-        "name": {
-          "title": "Name",
-          "type": "string"
-        },
-        "version": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Version"
-        },
-        "ref": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Ref"
-        },
-        "min_version": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Min Version"
-        },
-        "max_version_exclusive": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Max Version Exclusive"
-        },
-        "governed_by_modules": {
-          "default": false,
-          "title": "Governed By Modules",
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "name"
-      ],
-      "title": "CompatibilityEngine",
       "type": "object"
     },
     "CompatibilityModule": {

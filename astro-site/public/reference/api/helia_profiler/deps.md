@@ -20,7 +20,7 @@ Compatibility state of a resolved profiling configuration.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/deps/compatibility.py:44`
+Source: `src/helia_profiler/deps/compatibility.py:43`
 
 ### helia_profiler.QualificationState.QUALIFIED
 
@@ -30,7 +30,7 @@ Source: `src/helia_profiler/deps/compatibility.py:44`
 QUALIFIED = 'qualified'
 ```
 
-Source: `src/helia_profiler/deps/compatibility.py:47`
+Source: `src/helia_profiler/deps/compatibility.py:46`
 
 ### helia_profiler.QualificationState.QUALIFIED_WITH_ENGINE_OVERRIDE
 
@@ -40,7 +40,7 @@ Source: `src/helia_profiler/deps/compatibility.py:47`
 QUALIFIED_WITH_ENGINE_OVERRIDE = 'qualified-with-engine-override'
 ```
 
-Source: `src/helia_profiler/deps/compatibility.py:48`
+Source: `src/helia_profiler/deps/compatibility.py:47`
 
 ### helia_profiler.QualificationState.DEVELOPMENT_OVERRIDES
 
@@ -50,7 +50,7 @@ Source: `src/helia_profiler/deps/compatibility.py:48`
 DEVELOPMENT_OVERRIDES = 'development-overrides'
 ```
 
-Source: `src/helia_profiler/deps/compatibility.py:49`
+Source: `src/helia_profiler/deps/compatibility.py:48`
 
 ## helia_profiler.CompatibilityBaseline
 
@@ -66,7 +66,6 @@ CompatibilityBaseline(
     neuralspotx_sha256: str,
     projects: tuple[CompatibilityProject, ...],
     modules: tuple[CompatibilityModule, ...],
-    engines: tuple[CompatibilityEngine, ...],
 ) -> None
 ```
 
@@ -76,7 +75,7 @@ Validated, immutable baseline loaded from HPX package data.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/deps/compatibility.py:89`
+Source: `src/helia_profiler/deps/compatibility.py:69`
 
 ### helia_profiler.CompatibilityBaseline.schema
 
@@ -86,7 +85,7 @@ Source: `src/helia_profiler/deps/compatibility.py:89`
 schema: str
 ```
 
-Source: `src/helia_profiler/deps/compatibility.py:93`
+Source: `src/helia_profiler/deps/compatibility.py:73`
 
 ### helia_profiler.CompatibilityBaseline.schema_version
 
@@ -96,7 +95,7 @@ Source: `src/helia_profiler/deps/compatibility.py:93`
 schema_version: int
 ```
 
-Source: `src/helia_profiler/deps/compatibility.py:94`
+Source: `src/helia_profiler/deps/compatibility.py:74`
 
 ### helia_profiler.CompatibilityBaseline.baseline_id
 
@@ -106,7 +105,7 @@ Source: `src/helia_profiler/deps/compatibility.py:94`
 baseline_id: str
 ```
 
-Source: `src/helia_profiler/deps/compatibility.py:95`
+Source: `src/helia_profiler/deps/compatibility.py:75`
 
 ### helia_profiler.CompatibilityBaseline.neuralspotx_package
 
@@ -116,7 +115,7 @@ Source: `src/helia_profiler/deps/compatibility.py:95`
 neuralspotx_package: str
 ```
 
-Source: `src/helia_profiler/deps/compatibility.py:96`
+Source: `src/helia_profiler/deps/compatibility.py:76`
 
 ### helia_profiler.CompatibilityBaseline.neuralspotx_version
 
@@ -126,7 +125,7 @@ Source: `src/helia_profiler/deps/compatibility.py:96`
 neuralspotx_version: str
 ```
 
-Source: `src/helia_profiler/deps/compatibility.py:97`
+Source: `src/helia_profiler/deps/compatibility.py:77`
 
 ### helia_profiler.CompatibilityBaseline.neuralspotx_sha256
 
@@ -136,7 +135,7 @@ Source: `src/helia_profiler/deps/compatibility.py:97`
 neuralspotx_sha256: str
 ```
 
-Source: `src/helia_profiler/deps/compatibility.py:98`
+Source: `src/helia_profiler/deps/compatibility.py:78`
 
 ### helia_profiler.CompatibilityBaseline.projects
 
@@ -146,7 +145,7 @@ Source: `src/helia_profiler/deps/compatibility.py:98`
 projects: tuple[CompatibilityProject, ...]
 ```
 
-Source: `src/helia_profiler/deps/compatibility.py:99`
+Source: `src/helia_profiler/deps/compatibility.py:79`
 
 ### helia_profiler.CompatibilityBaseline.modules
 
@@ -156,17 +155,7 @@ Source: `src/helia_profiler/deps/compatibility.py:99`
 modules: tuple[CompatibilityModule, ...]
 ```
 
-Source: `src/helia_profiler/deps/compatibility.py:100`
-
-### helia_profiler.CompatibilityBaseline.engines
-
-`attribute` · `python`
-
-```python
-engines: tuple[CompatibilityEngine, ...]
-```
-
-Source: `src/helia_profiler/deps/compatibility.py:101`
+Source: `src/helia_profiler/deps/compatibility.py:80`
 
 ### helia_profiler.CompatibilityBaseline.fingerprint
 
@@ -178,7 +167,7 @@ fingerprint: str
 
 Return the canonical SHA-256 identity reserved for Stage 5.
 
-Source: `src/helia_profiler/deps/compatibility.py:131`
+Source: `src/helia_profiler/deps/compatibility.py:101`
 
 ### helia_profiler.CompatibilityBaseline.project
 
@@ -188,7 +177,7 @@ Source: `src/helia_profiler/deps/compatibility.py:131`
 project(name: str) -> CompatibilityProject
 ```
 
-Source: `src/helia_profiler/deps/compatibility.py:103`
+Source: `src/helia_profiler/deps/compatibility.py:82`
 
 ### helia_profiler.CompatibilityBaseline.module
 
@@ -198,17 +187,7 @@ Source: `src/helia_profiler/deps/compatibility.py:103`
 module(name: str) -> CompatibilityModule
 ```
 
-Source: `src/helia_profiler/deps/compatibility.py:112`
-
-### helia_profiler.CompatibilityBaseline.engine
-
-`method` · `python`
-
-```python
-engine(name: str) -> CompatibilityEngine
-```
-
-Source: `src/helia_profiler/deps/compatibility.py:121`
+Source: `src/helia_profiler/deps/compatibility.py:91`
 
 ### helia_profiler.CompatibilityBaseline.to_dict
 
@@ -220,7 +199,90 @@ to_dict() -> dict[str, Any]
 
 Return a stable JSON-safe representation for reports and Stage 5.
 
-Source: `src/helia_profiler/deps/compatibility.py:137`
+Source: `src/helia_profiler/deps/compatibility.py:107`
+
+## helia_profiler.CompatibilityResolution
+
+`class` · `python`
+
+```python
+CompatibilityResolution(
+    baseline: CompatibilityBaseline,
+    qualification: QualificationState,
+    module_overrides: tuple[str, ...] = (),
+    engine_overrides: tuple[str, ...] = (),
+) -> None
+```
+
+`dataclass`
+
+Resolved baseline plus explicit override classification.
+
+**API tier:** `stable`
+
+Source: `src/helia_profiler/deps/compatibility.py:128`
+
+### helia_profiler.CompatibilityResolution.baseline
+
+`attribute` · `python`
+
+```python
+baseline: CompatibilityBaseline
+```
+
+Source: `src/helia_profiler/deps/compatibility.py:132`
+
+### helia_profiler.CompatibilityResolution.qualification
+
+`attribute` · `python`
+
+```python
+qualification: QualificationState
+```
+
+Source: `src/helia_profiler/deps/compatibility.py:133`
+
+### helia_profiler.CompatibilityResolution.module_overrides
+
+`attribute` · `python`
+
+```python
+module_overrides: tuple[str, ...] = ()
+```
+
+Source: `src/helia_profiler/deps/compatibility.py:144`
+
+### helia_profiler.CompatibilityResolution.engine_overrides
+
+`attribute` · `python`
+
+```python
+engine_overrides: tuple[str, ...] = ()
+```
+
+Source: `src/helia_profiler/deps/compatibility.py:145`
+
+### helia_profiler.CompatibilityResolution.fingerprint
+
+`attribute` · `python`
+
+```python
+fingerprint: str
+```
+
+Source: `src/helia_profiler/deps/compatibility.py:148`
+
+### helia_profiler.CompatibilityResolution.to_dict
+
+`method` · `python`
+
+```python
+to_dict() -> dict[str, Any]
+```
+
+Return structured result provenance without lossy enum conversion.
+
+Source: `src/helia_profiler/deps/compatibility.py:151`
 
 ## helia_profiler.DependencyLockProvenance
 
@@ -360,89 +422,6 @@ update_requested: bool
 
 Source: `src/helia_profiler/results/dependencies.py:142`
 
-## helia_profiler.CompatibilityResolution
-
-`class` · `python`
-
-```python
-CompatibilityResolution(
-    baseline: CompatibilityBaseline,
-    qualification: QualificationState,
-    module_overrides: tuple[str, ...] = (),
-    engine_overrides: tuple[str, ...] = (),
-) -> None
-```
-
-`dataclass`
-
-Resolved baseline plus explicit override classification.
-
-**API tier:** `stable`
-
-Source: `src/helia_profiler/deps/compatibility.py:172`
-
-### helia_profiler.CompatibilityResolution.baseline
-
-`attribute` · `python`
-
-```python
-baseline: CompatibilityBaseline
-```
-
-Source: `src/helia_profiler/deps/compatibility.py:176`
-
-### helia_profiler.CompatibilityResolution.qualification
-
-`attribute` · `python`
-
-```python
-qualification: QualificationState
-```
-
-Source: `src/helia_profiler/deps/compatibility.py:177`
-
-### helia_profiler.CompatibilityResolution.module_overrides
-
-`attribute` · `python`
-
-```python
-module_overrides: tuple[str, ...] = ()
-```
-
-Source: `src/helia_profiler/deps/compatibility.py:188`
-
-### helia_profiler.CompatibilityResolution.engine_overrides
-
-`attribute` · `python`
-
-```python
-engine_overrides: tuple[str, ...] = ()
-```
-
-Source: `src/helia_profiler/deps/compatibility.py:189`
-
-### helia_profiler.CompatibilityResolution.fingerprint
-
-`attribute` · `python`
-
-```python
-fingerprint: str
-```
-
-Source: `src/helia_profiler/deps/compatibility.py:192`
-
-### helia_profiler.CompatibilityResolution.to_dict
-
-`method` · `python`
-
-```python
-to_dict() -> dict[str, Any]
-```
-
-Return structured result provenance without lossy enum conversion.
-
-Source: `src/helia_profiler/deps/compatibility.py:195`
-
 ## helia_profiler.load_compatibility_baseline
 
 `function` · `python`
@@ -455,7 +434,7 @@ Load and strictly validate an HPX compatibility baseline.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/deps/compatibility.py:206`
+Source: `src/helia_profiler/deps/compatibility.py:162`
 
 ## helia_profiler.read_dependency_lock_provenance
 
@@ -474,4 +453,4 @@ recorded run state before a surface is returned.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/deps/dependencies.py:524`
+Source: `src/helia_profiler/deps/dependencies.py:525`

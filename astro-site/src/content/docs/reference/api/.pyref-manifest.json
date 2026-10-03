@@ -14,6 +14,8 @@
     "helia_profiler/power/metadata/index.mdx",
     "helia_profiler/results/index.mdx",
     "helia_profiler/results/manifest/index.mdx",
+    "helia_profiler/runtimes/index.mdx",
+    "helia_profiler/runtimes/runtimes/index.mdx",
     "helia_profiler/vocab/index.mdx"
   ],
   "public": [
@@ -30,6 +32,8 @@
     "reference/api/helia_profiler/power/metadata.json",
     "reference/api/helia_profiler/results.json",
     "reference/api/helia_profiler/results/manifest.json",
+    "reference/api/helia_profiler/runtimes.json",
+    "reference/api/helia_profiler/runtimes/runtimes.json",
     "reference/api/helia_profiler/vocab.json",
     "reference/api/llms-full.txt",
     "reference/api/llms.txt",

@@ -9,7 +9,7 @@
     "pydantic": "2.13.4"
   },
   "counts": {
-    "leaf_commands": 14,
+    "leaf_commands": 16,
     "leaf_command_names": [
       "analyze",
       "boards",
@@ -23,18 +23,21 @@
       "probes list",
       "probes match",
       "profile",
+      "runtimes list",
+      "runtimes show",
       "target reset",
       "validate"
     ],
-    "groups": 5,
+    "groups": 6,
     "group_names": [
       "hpx",
       "cache",
       "ports",
       "probes",
+      "runtimes",
       "target"
     ],
-    "top_level_entries": 12,
+    "top_level_entries": 13,
     "epilogs": 6,
     "epilog_commands": [
       "analyze",
@@ -45,7 +48,7 @@
       "validate"
     ],
     "options": 102,
-    "arguments": 4,
+    "arguments": 6,
     "options_with_panel": 42,
     "panel_names": [
       "PMU profiling",
@@ -2595,6 +2598,123 @@
           "output",
           "power measurement",
           "target hardware"
+        ]
+      },
+      {
+        "path": [
+          "runtimes"
+        ],
+        "name": "runtimes",
+        "kind": "group",
+        "usage": "hpx runtimes COMMAND [ARGS]...",
+        "short_help": "Show the runtime versions this hpx records and their qualification",
+        "help": "Show the runtime versions this hpx records and their qualification",
+        "epilog": null,
+        "deprecated": false,
+        "hidden": false,
+        "source": {
+          "path": "src/helia_profiler/cli/app.py",
+          "line": 708
+        },
+        "arguments": [],
+        "options": [],
+        "panels": [],
+        "commands": [
+          {
+            "path": [
+              "runtimes",
+              "list"
+            ],
+            "name": "list",
+            "kind": "command",
+            "usage": "hpx runtimes list",
+            "short_help": "List every runtime record",
+            "help": "List every runtime record",
+            "epilog": null,
+            "deprecated": false,
+            "hidden": false,
+            "source": {
+              "path": "src/helia_profiler/cli/app.py",
+              "line": 715
+            },
+            "arguments": [],
+            "options": [],
+            "panels": []
+          },
+          {
+            "path": [
+              "runtimes",
+              "show"
+            ],
+            "name": "show",
+            "kind": "command",
+            "usage": "hpx runtimes show NAME [VERSION]",
+            "short_help": "Print one runtime record (the default when VERSION is omitted)",
+            "help": "Print one runtime record (the default when VERSION is omitted)",
+            "epilog": null,
+            "deprecated": false,
+            "hidden": false,
+            "source": {
+              "path": "src/helia_profiler/cli/app.py",
+              "line": 722
+            },
+            "arguments": [
+              {
+                "name": "name",
+                "kind": "argument",
+                "declaration": "name",
+                "opts": [
+                  "name"
+                ],
+                "aliases": [],
+                "secondary_opts": [],
+                "metavar": null,
+                "type": {
+                  "name": "text",
+                  "class": "StringParamType"
+                },
+                "python_type": "str",
+                "default": null,
+                "required": true,
+                "help": "Runtime name, e.g. helia-rt",
+                "panel": null,
+                "is_flag": false,
+                "multiple": false,
+                "count": false,
+                "nargs": 1,
+                "hidden": false,
+                "envvar": []
+              },
+              {
+                "name": "version",
+                "kind": "argument",
+                "declaration": "version",
+                "opts": [
+                  "version"
+                ],
+                "aliases": [],
+                "secondary_opts": [],
+                "metavar": null,
+                "type": {
+                  "name": "text",
+                  "class": "StringParamType"
+                },
+                "python_type": "Optional[str]",
+                "default": null,
+                "required": false,
+                "help": "Runtime version",
+                "panel": null,
+                "is_flag": false,
+                "multiple": false,
+                "count": false,
+                "nargs": 1,
+                "hidden": false,
+                "envvar": []
+              }
+            ],
+            "options": [],
+            "panels": []
+          }
         ]
       },
       {
