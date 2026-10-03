@@ -159,7 +159,7 @@ def test_helia_rt_and_core_pins_agree_across_the_baseline() -> None:
     # set: every place the baseline names heliaRT or the core carries one ref,
     # and each engine-owned project carries its default runtime record's commit.
     from helia_profiler.engines.helia_rt.artifacts import HELIART_SOURCE_COMMIT, HELIART_VERSION
-    from helia_profiler.runtimes import runtime
+    from helia_profiler.runtime_records import runtime
 
     baseline = load_compatibility_baseline()
     helia_rt = runtime("helia-rt")

@@ -15,16 +15,17 @@ from __future__ import annotations
 import copy
 import logging
 import re
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
 import jinja2
 
 from ...config import DEFAULT_ARENA_SIZE_BYTES, ProfileConfig
-from ...errors import EngineError
+from ...errors import ConfigError, EngineError
 from ...placement import Placement, resolve_fastest_fit_placement
 from ...platform import SocDef, get_soc_for_board
-from ...runtimes import runtimes
+from ...runtime_records import RuntimeRecord, runtimes
 from ..semver import parse_semver
 
 log = logging.getLogger("hpx")
@@ -41,11 +42,18 @@ log = logging.getLogger("hpx")
 # We don't manage downloads/caches like we do for heliaRT — pip already
 # does that better. We just enforce the recorded version range at runtime so
 # a user with an unrecorded install gets a clear error instead of a confusing
-# build failure (e.g. missing ModuleType.nsx). The range runs from the oldest
-# helia-aot runtime record to the minor after the newest.
-_AOT_VERSIONS = sorted(parse_semver(r.version) for r in runtimes() if r.name == "helia-aot")
-HELIAAOT_MIN_VERSION = "{}.{}.{}".format(*_AOT_VERSIONS[0])
-HELIAAOT_MAX_VERSION_EXCLUSIVE = f"{_AOT_VERSIONS[-1][0]}.{_AOT_VERSIONS[-1][1] + 1}.0"
+# build failure (e.g. missing ModuleType.nsx).
+
+
+def _recorded_range(records: Iterable[RuntimeRecord]) -> tuple[str, str]:
+    """The oldest heliaAOT record's version and the minor after the newest."""
+    versions = sorted(parse_semver(r.version) for r in records if r.name == "helia-aot")
+    if not versions or (0, 0, 0) in versions:
+        raise ConfigError("heliaAOT runtime records need major.minor.patch versions")
+    return "{}.{}.{}".format(*versions[0]), f"{versions[-1][0]}.{versions[-1][1] + 1}.0"
+
+
+HELIAAOT_MIN_VERSION, HELIAAOT_MAX_VERSION_EXCLUSIVE = _recorded_range(runtimes())
 
 _DEFAULT_PREFIX = "hpx"
 _DEFAULT_MODULE_NAME = "hpx_model"

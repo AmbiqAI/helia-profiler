@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +14,7 @@ from helia_profiler.cli.app import app
 from helia_profiler.engines import EngineType
 from helia_profiler.errors import ConfigError
 from helia_profiler.platform import build_platform_registry
-from helia_profiler.runtimes import (
+from helia_profiler.runtime_records import (
     RuntimeQualification,
     load_runtime_records,
     qualification,
@@ -96,10 +97,11 @@ def test_shipped_records_keep_the_fixture_capability_table() -> None:
 @pytest.mark.parametrize(
     ("name", "version", "precision", "board", "state", "reason"),
     [
-        ("helia-aot", "0.25.0", "a8w8", "apollo510_evb", "qualified", None),
-        ("helia-aot", None, "a8w8", "apollo510_evb", "qualified", None),
-        ("helia-aot", "0.25.0", "a16w8", "apollo510_evb", "supported", "not qualified for a16w8"),
-        ("helia-aot", "0.25.0", "a8w8", "apollo4p_evb", "supported", "on apollo4p_evb at lp"),
+        ("helia-aot", "0.23.0", "a8w8", "apollo510_evb", "qualified", None),
+        ("tflm", None, "a8w8", "apollo510_evb", "qualified", None),
+        ("helia-aot", None, "a8w8", "apollo510_evb", "supported", "0.25.0 is not qualified"),
+        ("helia-aot", "0.23.0", "a16w8", "apollo510_evb", "supported", "not qualified for a16w8"),
+        ("helia-aot", "0.23.0", "a8w8", "apollo4p_evb", "supported", "on apollo4p_evb at lp"),
         ("tflm", None, "fp16", "apollo510_evb", "unsupported", "refuses any model with a FLOAT16"),
         ("helia-rt", None, "a8w4", "apollo510_evb", "unsupported", "does not declare a8w4"),
         ("helia-aot", "0.25.1", "a8w8", "apollo510_evb", "unsupported", "No runtime record"),
@@ -115,6 +117,19 @@ def test_qualification_answers_from_the_records(
         assert answer.reason is None
     else:
         assert answer.reason is not None and reason in answer.reason
+
+
+def test_qualification_is_per_clock() -> None:
+    answer = qualification("tflm", board="apollo510_evb", clock="hp", precision="a8w8")
+    assert answer.state is RuntimeQualification.SUPPORTED
+    assert answer.reason is not None and "at hp" in answer.reason
+
+
+def test_an_omitted_version_means_the_default_record() -> None:
+    default = runtime("helia-aot")
+    assert default is not None and (default.version, default.default) == ("0.25.0", True)
+    assert runtime("helia-aot", "0.23.0") is not None
+    assert runtime("helia-aot", "0.23.0") is not default
 
 
 def test_qualification_refuses_a_precision_outside_the_vocabulary() -> None:
@@ -177,6 +192,31 @@ def test_malformed_records_are_refused(
         load_runtime_records(_write(tmp_path, _record(**changes)))
 
 
+def test_stray_files_are_ignored_and_duplicate_keys_refused(tmp_path: Path) -> None:
+    root = _write(tmp_path, _record())
+    (root / ".DS_Store").write_bytes(b"\0")
+    (root / "helia-rt" / "notes.txt").write_text("not a record", encoding="utf-8")
+    assert [record.version for record in load_runtime_records(root)] == ["1.0.0"]
+
+    path = root / "helia-rt" / "1.0.0.json"
+    path.write_text(path.read_text(encoding="utf-8")[:-1] + ', "default": false}', encoding="utf-8")
+    with pytest.raises(ConfigError, match="duplicate keys \\['default'\\]"):
+        load_runtime_records(root)
+
+
+def test_the_helia_aot_range_spans_the_records() -> None:
+    from helia_profiler.engines.helia_aot.compile import _recorded_range
+
+    records = load_runtime_records(Path(__file__).parents[1] / "src/helia_profiler/data/runtimes")
+    assert _recorded_range(records) == ("0.23.0", "0.26.0")
+    newest = [r for r in records if (r.name, r.version) == ("helia-aot", "0.25.0")]
+    assert _recorded_range([replace(newest[0], version="1.2.3")]) == ("1.2.3", "1.3.0")
+    with pytest.raises(ConfigError, match="major.minor.patch"):
+        _recorded_range([replace(newest[0], version="next")])
+    with pytest.raises(ConfigError, match="major.minor.patch"):
+        _recorded_range([])
+
+
 def test_a_record_must_live_at_its_name_and_version(tmp_path: Path) -> None:
     path = tmp_path / "helia-rt" / "1.0.1.json"
     path.parent.mkdir()
@@ -200,9 +240,10 @@ def test_runtimes_cli_lists_and_shows_records() -> None:
     runner = CliRunner()
     listed = runner.invoke(app, ["runtimes", "list"])
     assert listed.exit_code == 0, listed.output
-    assert "helia-aot   0.25.0   default AmbiqAI/helia-aot@3e45ef8f  apollo510_evb/lp: a8w8" in (
+    assert "helia-aot   0.23.0           AmbiqAI/helia-aot@d75c96eb  apollo510_evb/lp: a8w8" in (
         listed.output
     )
+    assert "helia-aot   0.25.0   default AmbiqAI/helia-aot@3e45ef8f  -" in listed.output
 
     shown = runner.invoke(app, ["runtimes", "show", "helia-rt"])
     assert shown.exit_code == 0, shown.output

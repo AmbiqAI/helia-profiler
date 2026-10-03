@@ -12,7 +12,7 @@ from typing import Any
 from ..config import ProfileConfig
 from ..errors import EngineError
 from ..results import NsxModuleRef
-from ..runtimes import RuntimeRecord, runtime
+from ..runtime_records import RuntimeRecord, runtime
 from . import EngineType
 from .base import ExecutorchArtifacts, PsramWeightsSource, SingleArenaPlacementMixin
 from .cmsis_nn import arm_cmsis_nn_module_ref, cmsis_nn_module_ref

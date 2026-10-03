@@ -32,7 +32,7 @@ from ..results.dependencies import (
     DependencyWorkspace,
 )
 from ..results.serde import sha256_file
-from ..runtimes import runtimes
+from ..runtime_records import runtimes
 from . import nsx as nsx_cli
 from .compatibility import (
     CMSIS_NN_PROVIDER_MODULES,

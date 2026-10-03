@@ -27,7 +27,7 @@ from helia_profiler.engines.helia_rt.artifacts import (
     HELIART_MIN_VERSION,
     HELIART_VERSION,
 )
-from helia_profiler.runtimes import runtimes
+from helia_profiler.runtime_records import runtimes
 
 _REPO = Path(__file__).resolve().parents[1]
 _DOC = (

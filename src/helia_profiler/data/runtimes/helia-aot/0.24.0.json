@@ -13,15 +13,5 @@
     "a8w8": "supported",
     "a16w8": "supported"
   },
-  "qualified": [
-    {
-      "board": "apollo510_evb",
-      "clock": "lp",
-      "precisions": [
-        "a8w8"
-      ],
-      "basis": "Exact device pass with one input and one output tensor, carried from the fixed-fixture capability table.",
-      "trace": "helia-profiler 0.1.6"
-    }
-  ]
+  "qualified": []
 }

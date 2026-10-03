@@ -6,7 +6,7 @@ import importlib.resources
 
 import typer
 
-from ..runtimes import runtime, runtimes
+from ..runtime_records import runtime, runtimes
 
 
 def _cmd_runtimes_list() -> None:

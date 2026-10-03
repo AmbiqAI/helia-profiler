@@ -83,12 +83,14 @@ def runtimes() -> tuple[RuntimeRecord, ...]:
 def load_runtime_records(root: Traversable) -> tuple[RuntimeRecord, ...]:
     """Load and check every ``<name>/<version>.json`` record under ``root``."""
     records = []
-    for directory in sorted(root.iterdir(), key=lambda entry: entry.name):
-        for entry in sorted(directory.iterdir(), key=lambda entry: entry.name):
+    directories = [entry for entry in root.iterdir() if entry.is_dir()]
+    for directory in sorted(directories, key=lambda entry: entry.name):
+        files = [entry for entry in directory.iterdir() if entry.name.endswith(".json")]
+        for entry in sorted(files, key=lambda entry: entry.name):
             location = f"runtimes/{directory.name}/{entry.name}"
             try:
-                raw = json.loads(entry.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError) as exc:
+                raw = json.loads(entry.read_text(encoding="utf-8"), object_pairs_hook=_unique_keys)
+            except (OSError, ValueError) as exc:
                 raise ConfigError(f"Cannot read runtime record {location}: {exc}") from exc
             record = _parse_record(raw, location)
             if f"{record.name}/{record.version}.json" != f"{directory.name}/{entry.name}":
@@ -121,8 +123,8 @@ def qualification(
 ) -> Qualification:
     """Whether ``name`` at ``version`` is qualified for ``precision`` on ``board`` at ``clock``.
 
-    A version without a record is unsupported: this heliaPROFILER makes no
-    claim about it.
+    A version without a record is unsupported here, even one an engine's own
+    version check would build: this heliaPROFILER makes no claim about it.
     """
     if precision not in PRECISIONS:
         raise ValueError(
@@ -201,6 +203,13 @@ def _parse_record(raw: Any, location: str) -> RuntimeRecord:
         precisions=declared,
         qualified=tuple(qualified),
     )
+
+
+def _unique_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    keys = [key for key, _ in pairs]
+    if len(keys) != len(set(keys)):
+        raise ValueError(f"duplicate keys {sorted({k for k in keys if keys.count(k) > 1})}")
+    return dict(pairs)
 
 
 def _object(value: Any, fields: frozenset[str], owner: str) -> dict[str, Any]:

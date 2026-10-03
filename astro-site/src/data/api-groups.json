@@ -60,7 +60,7 @@
       ]
     },
     {
-      "path": "helia_profiler.runtimes",
+      "path": "helia_profiler.runtime_records",
       "summary": "The runtime versions this heliaPROFILER records, and whether each is qualified for a precision on a board and clock.",
       "members": [
         "qualification",
