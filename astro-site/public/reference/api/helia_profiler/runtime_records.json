@@ -494,7 +494,7 @@
           "summary": "Every runtime record shipped with this heliaPROFILER, by name then version."
         },
         {
-          "description": "Whether ``name`` at ``version`` is qualified for ``precision`` on ``board`` at ``clock``.\n\n``board`` and ``clock`` must be a registered board and one of its CPU clock\nprofiles, and ``precision`` one of :data:`PRECISIONS`; anything else raises\n``ValueError``.\n\nA version without a record, or a precision its record does not declare,\nis unsupported here, even when an engine's own version check would build\nit: this heliaPROFILER makes no claim about it.\n\n**API tier:** `experimental`",
+          "description": "Whether ``name`` at ``version`` is qualified for ``precision`` on ``board`` at ``clock``.\n\n``board`` and ``clock`` must be a built-in board and one of its CPU clock\nprofiles (records qualify built-in boards only, so a ``target.custom_boards``\nname is refused too), and ``precision`` one of :data:`PRECISIONS`; anything\nelse raises ``ValueError``, the precision first.\n\nA version without a record, or a precision its record does not declare,\nis unsupported here, even when an engine's own version check would build\nit: this heliaPROFILER makes no claim about it.\n\n**API tier:** `experimental`",
           "examples": [],
           "id": "helia_profiler.qualification",
           "kind": "function",

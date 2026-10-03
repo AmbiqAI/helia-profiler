@@ -309,9 +309,10 @@ qualification(name: str, version: str | None = None, *, board: str, clock: str, 
 
 Whether ``name`` at ``version`` is qualified for ``precision`` on ``board`` at ``clock``.
 
-``board`` and ``clock`` must be a registered board and one of its CPU clock
-profiles, and ``precision`` one of :data:`PRECISIONS`; anything else raises
-``ValueError``.
+``board`` and ``clock`` must be a built-in board and one of its CPU clock
+profiles (records qualify built-in boards only, so a ``target.custom_boards``
+name is refused too), and ``precision`` one of :data:`PRECISIONS`; anything
+else raises ``ValueError``, the precision first.
 
 A version without a record, or a precision its record does not declare,
 is unsupported here, even when an engine's own version check would build
