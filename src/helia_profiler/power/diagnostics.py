@@ -272,6 +272,24 @@ def longest_accepted_window_s(
     return gate.expected_s + gate.tolerance_s
 
 
+def shortest_accepted_window_s(
+    *,
+    clean_infer_count: int,
+    clean_infer_avg_us: int,
+    stats_rate_hz: int,
+    relative_tolerance: float,
+) -> float:
+    """Shortest gate the duration check, or cross-boot drift, still accepts (mirrors the longest)."""
+    gate = assess_gate_duration(
+        measured_s=0.0,
+        clean_infer_count=clean_infer_count,
+        clean_infer_avg_us=clean_infer_avg_us,
+        stats_rate_hz=stats_rate_hz,
+        relative_tolerance=max(relative_tolerance, DRIFT_PLAUSIBLE_RATIO_DEVIATION),
+    )
+    return gate.expected_s - gate.tolerance_s
+
+
 def gate_fall_wait_s(
     configured_s: float,
     *,
@@ -974,4 +992,5 @@ __all__ = [
     "gated_window_reference_s",
     "lockstep_ready_wait_s",
     "longest_accepted_window_s",
+    "shortest_accepted_window_s",
 ]

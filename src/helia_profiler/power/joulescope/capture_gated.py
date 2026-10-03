@@ -44,8 +44,12 @@ from .stats import (
     _fullrate_sample_span,
     _fullrate_streams_contiguous,
     _map_poll_samples_to_packet_time,
+    _plan_gate_floor_s,
+    _plan_ranked_candidates,
     _process_gated_stats,
+    _segment_gpi_windows,
     _segment_streamed_gpi,
+    _select_streamed_window,
     _streamed_gpi_timebase,
     _summary_to_dict,
     _whole_summary_from_stats,
@@ -176,6 +180,24 @@ def capture_gated(
         raise PowerError(
             "Joulescope gated capture supports exactly one high window (min_high_windows=1)."
         )
+
+    # With a planned window, the gate the capture stops on and selects must
+    # also be plausibly that window. A sync-line high during reset or boot can
+    # outlast the fixed minimum, and on JS220/JS320 the GPI stream is not
+    # phase-gated (contract C-S2). The plan floor only ranks candidates: when
+    # no high reaches it, the last high that clears the fixed minimum is kept,
+    # so a real window short of the plan still yields a (warned) result.
+    plan_floor_s = _plan_gate_floor_s(
+        minimum_gate_s=minimum_gate_s,
+        clean_infer_count=clean_infer_count,
+        clean_infer_avg_us=clean_infer_avg_us,
+        stats_rate_hz=stats_rate_hz,
+        relative_tolerance=gate_relative_tolerance,
+    )
+    below_plan_highs = 0
+    # Edges of the last high the plan rejected, published if it is the one kept.
+    below_plan_rise_at: float | None = None
+    below_plan_fall_at: float | None = None
 
     try:
         from pyjoulescope_driver import time64
@@ -320,7 +342,8 @@ def capture_gated(
         nonlocal first_high_at, first_low_after_high_at, short_pulse_first_s
         nonlocal saw_any_gate_rise, saw_any_gate_fall
         nonlocal gpi_sample_sequence, latest_gpi_value, short_pulse_last_s
-        nonlocal short_pulses_ignored, windows_done, gpi_poll_failures
+        nonlocal short_pulses_ignored, windows_done, gpi_poll_failures, below_plan_highs
+        nonlocal below_plan_rise_at, below_plan_fall_at
         prev_level = 0
         high_seen = False
         high_phase = "unknown"
@@ -392,10 +415,22 @@ def capture_gated(
                     high_duration_s = (
                         time.monotonic() - first_high_at if first_high_at is not None else 0.0
                     )
-                    if high_duration_s >= minimum_gate_s:
+                    if high_duration_s >= plan_floor_s:
                         windows_done += 1
                         if windows_done >= min_high_windows and complete_at is None:
                             complete_at = time.monotonic()
+                    elif high_duration_s >= minimum_gate_s:
+                        # Too short for the plan: keep waiting for the real
+                        # window, but keep this high as the fallback candidate.
+                        below_plan_highs += 1
+                        below_plan_rise_at = first_high_at
+                        below_plan_fall_at = first_low_after_high_at
+                        log.debug(
+                            "GPIO-high of %.6fs is short of the plan; waiting", high_duration_s
+                        )
+                        first_high_at = None
+                        first_low_after_high_at = None
+                        high_seen = False
                     else:
                         short_pulses_ignored += 1
                         short_pulse_phases[high_phase] = short_pulse_phases.get(high_phase, 0) + 1
@@ -526,41 +561,28 @@ def capture_gated(
         # snapshot-poll segmentation stays authoritative otherwise — including
         # the degraded no-usable-window path, whose classification must keep
         # seeing exactly what the poller saw.
+        # A high open at the stop is the window the bound cut short: with a plan,
+        # no shorter high stands in for it and it degrades as no_gate_fall.
+        open_high = (
+            first_high_at is not None
+            and first_low_after_high_at is None
+            and time.monotonic() - first_high_at >= minimum_gate_s
+        )
+        allow_fallback = not (open_high and plan_floor_s > minimum_gate_s)
+        fall_seen = saw_any_gate_fall and allow_fallback
         streamed_gate_windows: list[tuple[float, float]] | None = None
         raw_streamed: list[tuple[float, float]] = []
         gate_edge_source = "gpi_snapshot_poll"
         if gpi_stream_enabled and gpi_stream_frames:
             raw_streamed = _segment_streamed_gpi(gpi_stream_frames)
-            qualifying = [
-                (rise, fall)
-                for rise, fall in raw_streamed
-                if (fall - rise) / time64.SECOND >= minimum_gate_s
-            ]
-            if qualifying:
-                # The firmware asserts the gate exactly once per run, as the
-                # LAST thing the sync line does before the device parks and
-                # the capture early-stops.  Any earlier qualifying stretch is
-                # the undriven line coupling to pre-window device activity,
-                # which a duration floor alone cannot reject.  Sub-minimum
-                # segments before OR after are noise pulses; the raw list
-                # goes to diagnostics unfiltered.
-                streamed_gate_windows = [qualifying[-1]]
+            streamed_gate_windows = _select_streamed_window(
+                raw_streamed,
+                minimum_gate_s=minimum_gate_s,
+                plan_floor_s=plan_floor_s,
+                allow_fallback=allow_fallback,
+            )
+            if streamed_gate_windows is not None:
                 gate_edge_source = "gpi_stream"
-                if len(qualifying) > 1:
-                    log.info(
-                        "GPI stream saw %d qualifying gate segments; using the "
-                        "final one (the firmware window) and attributing the "
-                        "earlier %d to pre-window line coupling",
-                        len(qualifying),
-                        len(qualifying) - 1,
-                    )
-            elif raw_streamed:
-                log.warning(
-                    "GPI stream saw %d gate segment(s) but none reached the "
-                    "%.3fs minimum; gate edges fall back to snapshot polling",
-                    len(raw_streamed),
-                    minimum_gate_s,
-                )
 
         if use_device_time_axis and streamed_gate_windows is None:
             aligned_poll_samples = _map_poll_samples_to_packet_time(
@@ -568,6 +590,20 @@ def capture_gated(
                 poll_samples=poll_samples,
                 minimum_window_s=minimum_gate_s,
             )
+
+        selected_windows = streamed_gate_windows
+        if selected_windows is None and plan_floor_s > minimum_gate_s:
+            # The poll samples can hold a high the plan rejected as well as the
+            # real window: select by the stream's rule instead of summing both.
+            polled = _plan_ranked_candidates(
+                _segment_gpi_windows(aligned_poll_samples),
+                minimum_gate_s=minimum_gate_s,
+                plan_floor_s=plan_floor_s,
+                allow_fallback=allow_fallback,
+            )
+            # An empty override forces the degraded path when an open window
+            # withheld the fallback; otherwise no candidate keeps the legacy one.
+            selected_windows = polled[-1:] if polled or not allow_fallback else None
 
         dump_dir = os.environ.get("HPX_GATE_DEBUG_DUMP")
         if dump_dir:
@@ -628,7 +664,7 @@ def capture_gated(
             packets=packets,
             poll_samples=aligned_poll_samples,
             prefer_device_time=use_device_time_axis,
-            windows_override=streamed_gate_windows,
+            windows_override=selected_windows,
             gate_edge_source=gate_edge_source,
             stream_segment_count=len(raw_streamed) if gpi_stream_enabled else None,
         )
@@ -636,9 +672,11 @@ def capture_gated(
             gating_diagnostics["fullrate_xcheck_unavailable_reason"] = "stream_setup_failed"
         if gpi_poll_failures:
             gating_diagnostics["gpi_poll_failures"] = gpi_poll_failures
+        if below_plan_highs:
+            gating_diagnostics["below_plan_highs"] = below_plan_highs
         if gate_edge_source == "gpi_snapshot_poll":
             gating_diagnostics["poll_edge_uncertainty_s"] = _poll_edge_uncertainty_s(
-                poll_reads, minimum_window_s=minimum_gate_s
+                poll_reads, minimum_window_s=minimum_gate_s, plan_floor_s=plan_floor_s
             )
 
         # How the streamed-GPI time base was derived (#249). Both gate edges
@@ -660,7 +698,7 @@ def capture_gated(
             io_voltage=io_voltage,
             prefer_device_time=use_device_time_axis,
             minimum_window_s=minimum_gate_s,
-            windows_override=streamed_gate_windows,
+            windows_override=selected_windows,
         )
         if not windows:
             if fr_requested:
@@ -692,7 +730,7 @@ def capture_gated(
             rise_due_s = BOOT_SETTLE_S + pre_window_s if lockstep is False else None
             failure = classify_gate_failure(
                 saw_gate_rise=saw_any_gate_rise,
-                saw_gate_fall=saw_any_gate_fall,
+                saw_gate_fall=fall_seen,
                 duration_s=duration_s,
                 lockstep=lockstep,
                 lockstep_wiring_available=lockstep_wiring_available,
@@ -717,7 +755,7 @@ def capture_gated(
                 duration_s=duration_s,
                 captured_s=captured_s,
                 saw_gate_rise=saw_any_gate_rise,
-                saw_gate_fall=saw_any_gate_fall,
+                saw_gate_fall=fall_seen,
                 short_pulses_ignored=short_pulses_ignored,
                 gating_diagnostics=gating_diagnostics,
                 lockstep=lockstep,
@@ -812,6 +850,10 @@ def capture_gated(
                 "first_rise_s": round(short_pulse_first_s or 0.0, 6),
                 "last_rise_s": round(short_pulse_last_s or 0.0, 6),
             }
+        if first_high_at is None and below_plan_rise_at is not None:
+            # No high reached the plan, so the fallback kept the last shorter
+            # one: report its edges.
+            first_high_at, first_low_after_high_at = below_plan_rise_at, below_plan_fall_at
         gate_timing = GateTransitionTiming(
             capture_to_gate_rise_s=(
                 round(first_high_at - capture_start, 6) if first_high_at is not None else None
@@ -854,7 +896,7 @@ def capture_gated(
                     volt_chunks=fr_volt,
                     anchors=fr_anchors,
                     poll_samples=aligned_poll_samples,
-                    windows_override=streamed_gate_windows,
+                    windows_override=selected_windows,
                 )
                 if contiguous and anchors_complete
                 else None

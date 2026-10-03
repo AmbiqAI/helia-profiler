@@ -88,20 +88,25 @@ shared USB CDC.
 `DEFAULT_POWER_MIN_WINDOW_MS`) is not a window. The poller resets and waits for
 the next rise.
 
-The minimum is the only filter on a qualifying pulse, and it is not tied to
-the phase on every edge source:
-- the snapshot poller ignores edges until the phase is `go_signaled`;
-- on JS220/JS320 the GPI stream is enabled before the reset and is not
-  phase-gated, so any complete high interval of at least the minimum anywhere
-  in the capture is a candidate, and the last one wins.
+When the planned window is known, gates are also ranked against the shortest
+window the plan accepts, `W − max(a/2 if N>1, 2/stats_rate_hz,
+W·max(tol, 0.15))`, the mirror of `L`:
+- the snapshot poller ends the capture early only on a high that reaches it;
+  a shorter high past the minimum resets the poller, which keeps waiting;
+- the window chosen from the GPI stream (JS220/JS320, not phase-gated) or from
+  the poll samples is the last high that reaches it;
+- if no high reaches it, the capture runs to its bound and the last high past
+  the fixed minimum is kept, for the C-E5 duration check (which still uses the
+  fixed minimum) to judge; a high still open at the bound is not replaced by a
+  shorter one but degrades as `no_gate_fall`;
+- the poll-edge uncertainty counts only the kept window's edges.
 
-In FR the phase is `go_signaled` as soon as the reset call returns, so a
-sync-line high of at least the minimum during boot is accepted by the poller
-as the window and ends the capture early. A reset-time pulse of 3.33 s on
-GPIO 29 was observed on an Apollo510 EVB [M] (§11). Nothing rejects such an
-interval at capture time; only the C-E5 warning and, for dedicated firmware,
-the terminal arbitration (C-I2) can catch it afterwards. Open: candidate
-(§9).
+So a sync-line high during reset or boot that is shorter than the plan accepts
+neither ends the capture nor displaces the real window. A reset-time pulse of
+3.33 s on GPIO 29 was observed on an Apollo510 EVB [M] (§11). A boot-time high
+at least as long as the plan accepts, or any high when no window is known, is
+still only caught afterwards, by the C-E5 warning and, for dedicated firmware,
+the terminal arbitration (C-I2).
 
 **C-S3.** With shared firmware over USB CDC in LS, S5 waits for DTR while the
 host waits for READY (S8) before asserting DTR (S9), so that combination
@@ -314,11 +319,12 @@ candidates for the capture follow-up PR:
 - `no_stats_window` for a sub-1 s pulse;
 - `stimer_dead` and a late GO get the wiring or lock-step hint;
 - timeline records the bench needs are not published (§10);
-- a sync-line high of at least the minimum during reset or boot is accepted as
-  the window (C-S2, §11);
+- a sync-line high of at least the minimum during reset or boot was accepted
+  as the window; with a known plan, gates are now ranked against the plan's
+  shortest accepted window (C-S2, #302);
 - the current range is never restored on teardown. A capture sets `auto` at
-  start; only a power-cycle reset writes `off`, and an interruption in its off
-  window leaves the target unpowered until the next run (§11).
+  start and only a power-cycle reset writes `off`; that reset now restores
+  `auto` on every exit from its off window, an interrupt included (#302).
 
 ## 10. Bench acceptance
 

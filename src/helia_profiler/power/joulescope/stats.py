@@ -14,6 +14,7 @@ from typing import Any
 
 from ...errors import PowerError
 from ..base import GatedPowerWindow, PowerSample, PowerSummary
+from ..diagnostics import shortest_accepted_window_s as _shortest_accepted_window_s
 from .device import _extract_scalar
 
 log = logging.getLogger("hpx")
@@ -772,3 +773,103 @@ def _summary_to_dict(summary: PowerSummary) -> dict[str, float | int]:
         "duration_s": summary.duration_s,
         "sample_count": summary.sample_count,
     }
+
+
+def _plan_ranked_candidates(
+    segments: list[tuple[float, float]] | list[tuple[int, int]],
+    *,
+    minimum_gate_s: float,
+    plan_floor_s: float,
+    allow_fallback: bool = True,
+) -> list:
+    """Gate candidates in time order: those the plan accepts, else those past the minimum.
+
+    The caller takes the last one. When no segment reaches the plan floor, the
+    fixed minimum still admits a real window short of the plan, and the gate
+    duration check judges it.
+    """
+    from pyjoulescope_driver import time64
+
+    def at_least(floor_s: float) -> list:
+        return [(rise, fall) for rise, fall in segments if (fall - rise) / time64.SECOND >= floor_s]
+
+    planned = at_least(plan_floor_s)
+    if planned or plan_floor_s <= minimum_gate_s or not allow_fallback:
+        return planned
+    fallback = at_least(minimum_gate_s)
+    if fallback:
+        log.warning(
+            "No GPIO-high reached the %.3fs the plan accepts; using the last high "
+            "past the %.3fs minimum, which the gate duration check will judge",
+            plan_floor_s,
+            minimum_gate_s,
+        )
+    return fallback
+
+
+def _plan_gate_floor_s(
+    *,
+    minimum_gate_s: float,
+    clean_infer_count: int | None,
+    clean_infer_avg_us: int | None,
+    stats_rate_hz: int,
+    relative_tolerance: float,
+) -> float:
+    """The gate length a capture ranks candidates against: the plan's shortest, else the minimum."""
+    if (
+        not clean_infer_count
+        or clean_infer_count <= 0
+        or not clean_infer_avg_us
+        or clean_infer_avg_us <= 0
+    ):
+        return minimum_gate_s
+    return max(
+        minimum_gate_s,
+        _shortest_accepted_window_s(
+            clean_infer_count=clean_infer_count,
+            clean_infer_avg_us=clean_infer_avg_us,
+            stats_rate_hz=stats_rate_hz,
+            relative_tolerance=relative_tolerance,
+        ),
+    )
+
+
+def _select_streamed_window(
+    raw_streamed: list[tuple[float, float]],
+    *,
+    minimum_gate_s: float,
+    plan_floor_s: float,
+    allow_fallback: bool,
+) -> list[tuple[float, float]] | None:
+    """The streamed gate window, or None when the stream has no qualifying one.
+
+    The firmware asserts the gate exactly once per run, as the LAST thing the
+    sync line does before the device parks and the capture early-stops. Any
+    earlier qualifying stretch is the undriven line coupling to pre-window
+    device activity, which a duration floor alone cannot reject. Sub-minimum
+    segments before OR after are noise pulses; the raw list goes to diagnostics
+    unfiltered.
+    """
+    qualifying = _plan_ranked_candidates(
+        raw_streamed,
+        minimum_gate_s=minimum_gate_s,
+        plan_floor_s=plan_floor_s,
+        allow_fallback=allow_fallback,
+    )
+    if qualifying:
+        if len(qualifying) > 1:
+            log.info(
+                "GPI stream saw %d qualifying gate segments; using the final one "
+                "(the firmware window) and attributing the earlier %d to pre-window "
+                "line coupling",
+                len(qualifying),
+                len(qualifying) - 1,
+            )
+        return [qualifying[-1]]
+    if raw_streamed:
+        log.warning(
+            "GPI stream saw %d gate segment(s) but none qualified as the gate window; "
+            "gate edges fall back to snapshot polling",
+            len(raw_streamed),
+        )
+    return None

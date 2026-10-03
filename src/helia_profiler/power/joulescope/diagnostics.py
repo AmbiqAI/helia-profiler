@@ -18,23 +18,37 @@ from .stats import _gated_mask_axis, _segment_gpi_windows, _stats_arrays
 
 
 def _poll_edge_uncertainty_s(
-    reads: list[tuple[int, int, int]], *, minimum_window_s: float = 0.0
+    reads: list[tuple[int, int, int]],
+    *,
+    minimum_window_s: float = 0.0,
+    plan_floor_s: float | None = None,
 ) -> float:
+    """Edge read brackets of the polled gate window(s).
+
+    With a plan floor above the minimum, only the window the capture selects
+    counts (the last high reaching the floor, else the last past the minimum);
+    a high it passed over must not widen the tolerance of the window it kept.
+    """
     from pyjoulescope_driver import time64
 
     rise: int | None = None
     rise_bound = 0
-    total = 0
+    highs: list[tuple[float, int]] = []
     for previous, current in zip(reads, reads[1:]):
         _, end, level = current
         if level and not previous[2]:
             rise = end
             rise_bound = end - previous[0]
         elif not level and previous[2] and rise is not None:
-            if (end - rise) / time64.SECOND >= minimum_window_s:
-                total += rise_bound + end - previous[0]
+            duration_s = (end - rise) / time64.SECOND
+            if duration_s >= minimum_window_s:
+                highs.append((duration_s, rise_bound + end - previous[0]))
             rise = None
-    return total / time64.SECOND
+    if plan_floor_s is None or plan_floor_s <= minimum_window_s:
+        return sum(bound for _, bound in highs) / time64.SECOND
+    planned = [bound for duration_s, bound in highs if duration_s >= plan_floor_s]
+    chosen = planned or [bound for _, bound in highs]
+    return chosen[-1] / time64.SECOND if chosen else 0.0
 
 
 def _with_gpi_poll_failures(failure: GateFailure, poll_failures: int) -> GateFailure:
