@@ -469,7 +469,10 @@ def _validate(config: ProfileConfig, fixture: FixedFixture | TypedFixture) -> No
         config.target.board != supported_fixture_target().board
         or config.target.clock.cpu != FIXTURE_CLOCK_PROFILE
     ):
-        raise ConfigError("Fixed fixture supports Apollo510 EVB LP clock only")
+        raise ConfigError(
+            f"Fixed fixture supports {supported_fixture_target().board} "
+            f"at the {FIXTURE_CLOCK_PROFILE} clock only"
+        )
     if (
         config.model.arena_location != Placement.SRAM
         or config.model.weights_location != Placement.MRAM

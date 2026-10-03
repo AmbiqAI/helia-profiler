@@ -504,3 +504,17 @@ def test_heliaaot_region_outside_sram_or_mram_is_refused_at_render(tmp_path):
     region = ArenaRegion(0, "scratch", 4096, 16, ArenaRole.SCRATCH, "tcm", Placement.TCM)
     with pytest.raises(ConfigError, match="SRAM/MRAM AOT regions only"):
         render(tmp_path, typed(tmp_path), EngineType.HELIA_AOT, regions=(region,))
+
+
+@pytest.mark.parametrize(("board", "clock"), [("apollo510_evb", "hp"), ("apollo4p_evb", "lp")])
+def test_fixture_refuses_any_board_or_clock_but_the_fixture_target(
+    tmp_path, monkeypatch, board, clock
+):
+    f = typed(tmp_path)
+    monkeypatch.setattr(
+        "helia_profiler._fixture_build.PipelineRunner", lambda *_: pytest.fail("pipeline reached")
+    )
+    c = config_for(tmp_path, f)
+    target = replace(c.target, board=board, clock=ClockSelection(cpu=clock))
+    with pytest.raises(ConfigError, match="supports apollo510_evb at the lp clock only"):
+        build_fixed_fixture(replace(c, target=target), f, method=METHOD, runtime=runtime(tmp_path))

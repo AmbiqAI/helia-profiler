@@ -136,6 +136,8 @@ def test_an_omitted_version_means_the_default_record() -> None:
 def test_qualification_refuses_a_precision_outside_the_vocabulary() -> None:
     with pytest.raises(ValueError, match="Unknown precision 'int8'"):
         qualification("tflm", board="apollo510_evb", clock="lp", precision="int8")
+    with pytest.raises(ValueError, match="Unknown precision 'int8'"):
+        qualification("tflm", board="nonexistent", clock="xp", precision="int8")
 
 
 @pytest.mark.parametrize(
