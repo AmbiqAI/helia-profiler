@@ -12,7 +12,7 @@ the Joulescope JS220/JS320 path. It states:
 Where the code does not yet meet a clause, the clause says so and names the
 open item that resolves it.
 
-Every number carries a provenance mark:
+Every number below carries a provenance mark:
 
 - **[M]** measured on hardware, with the source named;
 - **[E]** an estimate reasoned from other constants or from how the code
@@ -42,7 +42,10 @@ A bench run turns [E] and [U] into [M], or revises the number.
 - `capture/__init__.py` (`capture_power`, `_release`);
 - `power/joulescope/capture_gated.py` (`capture_gated`);
 - `power/diagnostics.py`;
-- `power/joulescope/sync.py`;
+- `power/joulescope/sync.py`, `power/sync.py`;
+- `power/joulescope/device.py`, `power/joulescope/diagnostics.py`;
+- `stages/capture_power.py`, `stages/collect_power_terminal.py`;
+- `capture/power_terminal.py`, `results/artifacts.py` (`PowerRunPlan.planned_window_s`);
 - `target/lifecycle.py`.
 
 **Firmware code:**
@@ -58,19 +61,19 @@ A bench run turns [E] and [U] into [M], or revises the number.
 | S2 | Arm: drive GO low | host | yes | no-op |
 | S3 | Start capture: open the instrument, start the stats and GPI streams, start the GPI poller | host | yes | yes |
 | S4 | Reset the target per `power.reset_strategy` | host | yes | yes |
-| S5 | Boot and init: system, clocks, INA228 (when configured), engine pre-start, model init. Shared USB CDC firmware first blocks until the host asserts DTR. | firmware | yes | yes |
+| S5 | Boot and init: system, clocks, INA228 (when configured), engine pre-start, model init. Shared firmware also runs the core clock probe (STIMER-windowed builds: a STIMER settle plus 3 passes of about 17 ms, about 0.07 s warm and up to about 1.05 s cold) and, for shared RTT on DWT-timed builds, a clean-window attach wait of up to 1 s [D] (about 4.9 times a 204 ms gap observed on an Apollo4 Blue Plus, `_clean_window_attach_wait.j2`). Shared USB CDC firmware first blocks until the host asserts DTR. | firmware | yes | yes |
 | S6 | Warm-up: dedicated, `max(1, profiling.warmup)` inferences; shared, at least 3 for counted probes | firmware | yes | yes |
 | S7 | READY: state line high | firmware | yes | no-op |
 | S8 | Host qualifies READY: 0.5 s grace [U], then 3 consecutive high GPI samples [U], within `R` | host | yes | none |
-| S9 | Shared USB CDC only: open the port with DTR asserted (0.5 s floor, then polls up to 15 s [U]) | host | after S8 | after S4 |
-| S10 | GO high. The capture phase is set to `go_signaled` first, so an early gate edge is not discarded. | host | yes | phase only |
+| S9 | Shared USB CDC only: open the port with DTR asserted (0.5 s floor, then polls up to 15 s [U]; a pinned `target.usb_port` skips both, and without a known marker the scan polls every 0.5 s) | host | after S8 | after S4 |
+| S10 | GO high. The capture phase is set to `go_signaled` first, so the snapshot poller does not discard an early gate edge. | host | yes | phase only |
 | S11 | Firmware waits for GO: up to about 3 s [U], then continues without it | firmware | yes | no-op |
 | S12 | Pre-window setup: reset inputs; busy_loop calibration (includes a STIMER settle); STIMER settle; INA228 arm | firmware | yes | yes |
 | S13 | Gate rise; the host drops GO on seeing it | both | yes | rise only |
 | S14 | Measured window: `N` inferences, or the busy_loop spin | firmware | yes | yes |
 | S15 | Gate fall | firmware | yes | yes |
 | S16 | Early stop 0.15 s [U] after a qualifying fall; teardown (poller join 1.0 s [U]) | host | yes | yes |
-| S17 | Dedicated only: power terminal record, then park. Over RTT it is written once; over UART, SWO and USB it is re-emitted every 250 ms. | firmware | yes | yes |
+| S17 | Dedicated only: power terminal record, then park. Over RTT it is written once; over UART, SWO and USB it is re-emitted every 250 ms [U]. | firmware | yes | yes |
 | S18 | Dedicated only: host collects the terminal record | host | yes | yes |
 
 When the driver cannot gate, or no inference count is known, the capture falls
@@ -85,22 +88,38 @@ shared USB CDC.
 `DEFAULT_POWER_MIN_WINDOW_MS`) is not a window. The poller resets and waits for
 the next rise.
 
+The minimum is the only filter on a qualifying pulse, and it is not tied to
+the phase on every edge source:
+- the snapshot poller ignores edges until the phase is `go_signaled`;
+- on JS220/JS320 the GPI stream is enabled before the reset and is not
+  phase-gated, so any complete high interval of at least the minimum anywhere
+  in the capture is a candidate, and the last one wins.
+
+In FR the phase is `go_signaled` as soon as the reset call returns, so a
+sync-line high of at least the minimum during boot is accepted by the poller
+as the window and ends the capture early. A reset-time pulse of 3.33 s on
+GPIO 29 was observed on an Apollo510 EVB [M] (§11). Nothing rejects such an
+interval at capture time; only the C-E5 warning and, for dedicated firmware,
+the terminal arbitration (C-I2) can catch it afterwards. Open: candidate
+(§9).
+
 **C-S3.** With shared firmware over USB CDC in LS, S5 waits for DTR while the
 host waits for READY (S8) before asserting DTR (S9). As written, that
 combination cannot complete. It is not reproduced on hardware and is not
-rejected at preflight. Open: #373.
+rejected at preflight. Open: #302 (folded in from #373, closed as not planned
+on 2026-09-26).
 
 ## 3. Host wait bounds
 
 | Bound | Formula | Starts |
 | --- | --- | --- |
-| `D` (auto) | Dedicated, any probe: `8.0 + W + 6.0`. Shared, any probe: `8.0 + profiled run + clean run + 6.0`. Capped at 30 s; 30 s when there is no estimate. | n/a |
+| `D` (auto) | Dedicated, any probe: `8.0 + W + 6.0`. Shared, any probe: `8.0 + profiled run + clean run + 6.0`. Capped at 30 s; 30 s when there is no estimate. An estimate exists only when the PMU result carries cycles, and the dedicated branch needs both `N` and `a`; it is used only when `power.duration_s` is unset and the estimate is below the configured bound. | n/a |
 | `F`, LS | `max(D, L + 2.0)` | GO |
 | `F`, FR | `max(D, L + 2.0 + 8.0 + P)` | reset return |
 | `F`, window unknown | `D` | as above |
 | `R` (LS) | `max(D, 8.0 + P + 2.0)` | after the 0.5 s grace |
 | `rise_due` (classification only) | FR: `8.0 + P`; LS: none | reset return |
-| Terminal collect | `max(2, min(10, F/10))` | after capture |
+| Terminal collect [U] | `max(2, min(10, F/10))` | after capture |
 
 **C-W1.** `F` must cover everything the firmware does between the start of the
 wait and the gate fall:
@@ -110,18 +129,18 @@ wait and the gate fall:
 For counted probes this holds if the 8 s boot allowance and the 2 s headroom
 hold. Both are [E].
 
-It does not yet hold for busy_loop, for two different reasons:
-- **FR:** the host budgets `P = 0` while the firmware still runs warm-up
-  inferences before the window.
-- **LS:** busy_loop calibration and a second STIMER settle run after GO (S12).
-  Each settle can take up to 1 s cold [D], and both must fit in the 2 s
-  headroom.
+It does not yet hold for busy_loop in FR: the host budgets `P = 0` while the
+firmware still runs warm-up inferences before the window. Open: #302
+follow-up 3.
 
-Open: #302 follow-up 3.
+In LS, busy_loop calibration and a second STIMER settle run after GO (S12),
+each up to 1 s cold [D]. For busy_loop `L` is `1.25·W`, so `F` leaves
+`0.25·W + 2` s beyond `W`, which covers both settles; C-W1 holds there.
 
-**C-W2.** `R` must cover S5 to S7, which is boot, init and warm-up. It depends
+**C-W2.** `R` must cover S5 to S7, which is boot, init and warm-up (and, for
+shared firmware, the core clock probe and any attach wait in S5). It depends
 on the same [E] allowance. For busy_loop it lacks the warm-up term, for the
-same reason as the FR half of C-W1.
+same reason as C-W1 in FR.
 
 **C-W3.** A configured `D` above the derived minimum is kept. A lower one is
 raised:
@@ -146,18 +165,21 @@ corrected text).
 | INA228 accumulation (dedicated with INA228) | from after the accumulator reset to just before the register reads | the reads, which latch a few I2C transactions later | `power.on_device_summary.duration_us` |
 | Firmware whole window (dedicated) | from after the STIMER settle to after the INA228 reads: setup, gate and reads | settle, calibration, warm-up, READY/GO | `power.terminal.elapsed_us` |
 | Instrument gate | sum of stats-packet durations whose time falls within the chosen rise and fall. Edges come from the GPI stream, taking the last qualifying segment, with snapshot polling as the fallback. | anything outside the gate. Packet-quantized: about 1 ms at 1 kHz. | `summary.json` `power.capture_duration_s` and `profile_results.json` `power.duration_s`, for a valid gated result only (C-I3) |
-| Capture window | host monotonic, from after the instrument is opened to the result | nothing: includes reset, READY, GO, the wait and teardown | `power.capture_window_s` |
-| Gate bound | the value of `F` | n/a | `observation_deadline_s` (`profile_results.json`) |
-| READY wait | host time from after the grace to READY qualified | reset and grace | `power.sync.ready_wait_s` |
-| Reset | duration of the reset primitive and any power cycle | n/a | `power.target_lifecycle.timings_s` |
-| Edge timing (successful gated result only) | host monotonic: capture start to rise, capture start to fall, and wait start (C-S1) to rise | n/a | `power.sync_timing_s`: `capture_to_gate_rise_s`, `capture_to_gate_fall_s`, `go_release_to_gate_rise_s` |
+| Capture window | host monotonic, from after the instrument is opened to the result | nothing: includes reset, READY, GO, the wait and teardown | `power.capture_window_s` (`summary.json`) |
+| Gate bound | the value of `F` | n/a | `power.observation.observation_deadline_s` (`profile_results.json` only) |
+| READY wait | host time from after the grace to READY qualified | reset and grace | `power.sync.ready_wait_s` (`summary.json`) |
+| Reset | duration of the reset primitive and any power cycle | n/a | `power.target_lifecycle.timings_s` (`summary.json`; keys `reset`, `power_cycle`) |
+| Edge timing (successful gated result only) | host monotonic: capture start to rise, capture start to fall, and wait start (C-S1) to rise | n/a | `power.sync_timing_s` (`summary.json`): `capture_to_gate_rise_s`, `capture_to_gate_fall_s`, `go_release_to_gate_rise_s` |
 
 **C-I1.** Dedicated firmware: `gate ≤ accumulation ≤ whole window`. The
 terminal parser enforces all three orderings.
 
-**C-I2.** The instrument gate and the firmware gate agree within 1 % plus
-absolute slack (`EXTERNAL_WINDOW_CLOCK_TOLERANCE`) [D]. The margin is set
-above the disagreements recorded in #142, #181 and #195. Validity arbitration
+**C-I2.** The instrument gate and the firmware gate agree within 1 %
+(`EXTERNAL_WINDOW_CLOCK_TOLERANCE`) [D] or an absolute slack, whichever is
+larger (`tolerance_s = max(reference·0.01, slack)`). The slack
+(`external_observer_slack_s`) is `2/stats_rate_hz` plus the larger of two poll
+intervals and, for snapshot edges, the measured poll uncertainty. The margin is
+set above the disagreements recorded in #142, #181 and #195. Validity arbitration
 decides which reading stands.
 
 **C-I3.** `summary.json` `power.capture_duration_s` is the instrument gate
@@ -200,12 +222,14 @@ surfaces next.
 Validity arbitration decides the run's status.
 
 **C-E6.** Terminal errors surface after a successful or degraded capture:
-- status not ok;
-- `stimer_dead`;
-- incomplete record;
-- gate not lowered;
-- zero energy;
-- reversed wiring.
+- requested count differs from the host plan;
+- status not ok (with the `stimer_dead` hint when that is the cause);
+- no record, or a malformed or incomplete record;
+- gate not lowered.
+
+Zero energy, reversed wiring and accumulator overflow are terminal errors only
+in internal mode (INA228) and do not apply to the external path this contract
+covers.
 
 How a firmware failure surfaces depends on the mode:
 
@@ -213,7 +237,7 @@ How a firmware failure surfaces depends on the mode:
 | --- | --- | --- |
 | Init or model failure before READY (dedicated) | READY timeout after `R`. The firmware drops the state line and parks, and the terminal record holding the cause is never collected. | Degraded `no_gate_rise` after `F`, then the terminal error |
 | `stimer_dead` before the gate | Degraded `no_gate_rise` with the wiring hint after `F`, then the terminal error | Degraded `no_gate_rise` after `F`: the lock-step-suspect hint if lock-step wiring is configured, otherwise the wiring hint. Then the terminal error. |
-| GO later than the firmware's ~3 s GO wait | The firmware free-runs, and a rise before `go_signaled` is discarded, giving `no_gate_rise` | n/a |
+| GO later than the firmware's ~3 s GO wait | The firmware free-runs. The snapshot poller discards a rise before `go_signaled`; on JS110 that gives `no_gate_rise`. On JS220/JS320 the GPI stream can still select the window: a valid `gpi_stream` result with no early stop and no edge timing published. | n/a |
 
 ## 6. Hint claims
 
@@ -221,9 +245,15 @@ How a firmware failure surfaces depends on the mode:
 a single cause only when its inputs rule out the others, and it says "likely"
 when it ranks them.
 
+Every `no_gate_rise`, `no_stats_window` and `no_gate_fall` hint gains a
+poll-failure suffix when GPI snapshot reads failed during the capture
+(`power.gating_diagnostics.gpi_poll_failures` > 0). The READY-timeout hint
+does not: a failed read does not advance the READY sample count, so the wait
+simply times out.
+
 | Hint | Claims | Meets C-H1 | Missing cause and item |
 | --- | --- | --- | --- |
-| READY timeout | wiring, reset strategy, firmware not parked at the sync wait | no | A dedicated init failure (the terminal is not collected), and the #373 ordering. Candidate for the capture follow-up PR. |
+| READY timeout | wiring, reset strategy, firmware not parked at the sync wait | no | A dedicated init failure (the terminal is not collected), the shared USB CDC ordering (C-S3, #302), and failed GPI reads. Candidate for the capture follow-up PR. |
 | Stage wrapper | the instrument is not connected | no | The step that actually failed, for probe and CDC errors. #302 stage-hint follow-up. |
 | `no_gate_rise`, bound exhausted | the bound likely ended before the window was due | yes | FR only. Reachable only when the window is unknown, because a known window makes FR `F` at least `L + 10 + P`, which exceeds `rise_due`. |
 | `no_gate_rise`, lock-step suspect | the likeliest cause is a free-running window racing the poller, with wiring as the fallback | no | Firmware that never reached the window (init failure, `stimer_dead`). Candidate. |
@@ -239,7 +269,7 @@ when it ranks them.
 | Gate wait starts | after GO | after the reset returns (after the DTR open for shared USB CDC) |
 | `F` | `max(D, L + 2)` | `max(D, L + 2 + 8 + P)` |
 | READY wait | `R` | none |
-| Reset race | edges before `go_signaled` are discarded; the firmware is parked at GO | the firmware runs from reset. A window already high when the phase switches is missed, and a slow reset primitive narrows the margin (#114). |
+| Reset race | the snapshot poller discards edges before `go_signaled`, and the firmware is parked at GO; the JS220/JS320 GPI stream is not phase-gated (C-S2) | the firmware runs from reset. A window already high when the phase switches is missed by the poller, and a slow reset primitive narrows the margin (#114). A boot-time high of at least the minimum is accepted (C-S2). |
 | Init failure surfaces as | READY timeout | degraded capture, then the terminal error |
 | `go_release_to_gate_rise_s` | GO to rise | wait start to rise |
 
@@ -247,13 +277,13 @@ when it ranks them.
 
 | Constant | Value | Mark | Evidence |
 | --- | --- | --- | --- |
-| `BOOT_SETTLE_S` | 8.0 s | E | Raised from 4.0 in #23 with the comment "reset/SBL/firmware init allowance"; no measurement cited |
-| `FALL_WAIT_HEADROOM_S` | 2.0 s | E | Reasoned from other constants in #367 |
+| `BOOT_SETTLE_S` | 8.0 s | E | Raised from 4.0 in #23 (a5991054) as a reset, bootloader and init allowance; no measurement cited. Current comment: `power/diagnostics.py` "Reset, secondary bootloader and firmware init before the clean window can start." |
+| `FALL_WAIT_HEADROOM_S` | 2.0 s | U | Introduced in #367; no derivation recorded there |
 | Stage estimate margin | 6.0 s | U | |
 | Warm-up reps floor (host) | 3 | E | Mirrors the shared firmware's floor; dedicated firmware uses `max(1, warmup)` |
 | GPI poll sleep | 0.004 s | U | |
 | Post-fall guard | 0.15 s | U | |
-| Reset grace (LS) | 0.5 s | U | |
+| Reset grace (LS), `_LOCKSTEP_RESET_GRACE_S` | 0.5 s | U | |
 | READY qualification | 3 samples | U | |
 | GPI read timeout | 0.5 s | U | |
 | Poller join | 1.0 s | U | |
@@ -265,7 +295,7 @@ when it ranks them.
 | Counted window tolerance | 0.10 | U | |
 | busy_loop window tolerance | 0.25 | E | Reasoned from the calibration band |
 | STIMER settle deadline; band 245..410 ticks | 1 s | D | Set at about 1.5 times a 400–650 ms cold transient measured on an Apollo4 Blue Plus (#124); not measured on Apollo5 |
-| Instrument/firmware gate agreement | 1 % | D | Set above the disagreements recorded in #142, #181 and #195 |
+| Instrument/firmware gate agreement | 1 % | D | Set above the disagreements recorded in #142, #181 and #195. Bench [M] (§11): 150 JS320 gates against firmware DWT-cycle windows agreed within 0.02 % to 0.09 %, from standalone firmware rather than the hpx terminal |
 | JLinkExe timeout | 15 s | U | |
 | SWPOI reset script sleeps | 2 × 1 s | U | |
 | Power-cycle off / settle | 0.5 / 2.0 s | U | |
@@ -275,19 +305,24 @@ when it ranks them.
 
 | Item | Clauses | Status under this contract |
 | --- | --- | --- |
-| #302 follow-up 3: busy_loop warm-up and setup not budgeted | C-W1, C-W2 | open |
+| #302 follow-up 3: busy_loop warm-up not budgeted (FR) | C-W1, C-W2 | open |
 | #302 follow-up 4: stalled reference | C-W4, C-H1 | open. The contract fixes the direction: the window runs longer. |
 | #302 stage-hint follow-up | C-E2, C-H1 | open |
-| #373: shared USB CDC with lock-step | C-S3 | open, unconfirmed |
+| #302 (from #373): shared USB CDC with lock-step | C-S3 | open, unconfirmed. #373 was closed as not planned and folded into #302, which also carries the #370 rename of the window-clock context key `elapsed_us`. |
 | #374: live definitions only | none | outside the timeline (render hygiene) |
 | #376: guarded test harness | all clauses | open. Each clause needs a guarded test, and several capture tests cannot yet run under the guard. |
 
-**Found while writing this contract, not covered by an open item.** These are
+**Not covered by an open item.** These are
 candidates for the capture follow-up PR:
 - a READY timeout hides a dedicated init failure;
 - `no_stats_window` for a sub-1 s pulse;
 - `stimer_dead` and a late GO get the wiring or lock-step hint;
-- timeline records the bench needs are not published (§10).
+- timeline records the bench needs are not published (§10);
+- a sync-line high of at least the minimum during reset or boot is accepted as
+  the window (C-S2, §11);
+- the current range is never restored on teardown. A capture sets `auto` at
+  start; only a power-cycle reset writes `off`, and an interruption in its off
+  window leaves the target unpowered until the next run (§11).
 
 ## 10. Bench acceptance
 
@@ -298,13 +333,14 @@ the source is the result; otherwise the source is named.
 | --- | --- |
 | Resolved mode (dedicated or shared, LS or FR, probe) | the run configuration and `power.sync` |
 | `D` | the explicit `power.duration_s`, or the auto estimate recomputed from §3. The raise log line gives `D` and `F` when `F > D`. |
-| `F` | `observation_deadline_s` |
+| `F` | `power.observation.observation_deadline_s` (`profile_results.json`) |
 | `R` | recomputed from §3; it appears in the READY-timeout hint only on failure |
-| Reset duration | `power.target_lifecycle.timings_s` |
-| READY qualified | `power.sync.ready_wait_s` (after the 0.5 s grace) |
-| Gate rise and fall | `power.sync_timing_s` on a successful result. On a degraded result, only the DEBUG "gate-race timeline" log lines give the detection times. |
+| Reset duration | `power.target_lifecycle.timings_s` (`summary.json`) |
+| READY qualified | `power.sync.ready_wait_s` (`summary.json`, after the 0.5 s grace) |
+| Gate rise and fall | `power.sync_timing_s` (`summary.json`) on a successful result. On a degraded result, only the DEBUG "gate-race timeline" log lines give the detection times. |
 | Firmware and instrument intervals | §4 fields |
 | Error or `gate_failure` | classification, message and hint, verbatim |
+| GPI read failures | `power.gating_diagnostics.gpi_poll_failures` (`summary.json`, absent when 0) |
 
 **Not published:** absolute times for reset return, READY qualified and GO,
 and `D`, `R` and edge timing on a degraded result. The bench derives what it
@@ -315,9 +351,24 @@ check.
 
 | Measurement | How derived | Checks |
 | --- | --- | --- |
-| Reset to READY | reset duration plus the 0.5 s grace plus `ready_wait_s` | the 8 s boot allowance; C-W2 |
+| Reset to READY | reset duration (`reset`, plus `power_cycle` when used) plus the 0.5 s grace plus `ready_wait_s` | the 8 s boot allowance; C-W2 |
 | GO to rise | `go_release_to_gate_rise_s` in LS | the 2 s headroom; C-W1 LS |
 | Wait start to rise | `go_release_to_gate_rise_s` in FR | `8 + P`; C-W1 FR |
 
 A clause passes when every case meets it with the measured numbers, which then
 replace the [E] marks above.
+
+## 11. Bench observations
+
+Apollo510 EVB with a JS320 on the MCU rail, 2026-10-02 and 2026-10-03.
+These runs used standalone firmware and host scripts that call
+`capture_gated` directly, not `hpx profile`. They bear on the clauses named,
+but they do not exercise the hpx reset, READY/GO or terminal paths.
+
+| Observation | Bears on | Mark |
+| --- | --- | --- |
+| 150 GPIO-gated windows of 3.9 to 5.1 s: the instrument gate exceeded the firmware's own DWT-cycle window by 0.018 % to 0.085 % (mean 0.057 %), with no outlier. | C-I2 | M |
+| After a flash and reset, GPIO 29 read high for 3.33 s, ending about 4 s after the flash returned. A capture armed at that moment took it as the first window, which shifted every later window by one; a check against the firmware's window index caught it. | C-S2, §9 | M |
+| `capture_gated` returns one window per capture (`min_high_windows` must be 1). Twelve back-to-back windows 2 s apart were captured by re-arming it after each fall. | §2 | M |
+| The JS320 current range was found `off` (no current at the MCU rail; J-Link attach timed out) after a host process holding the instrument was killed. The capture path never writes `off`, so the kill alone does not explain it; the instrument's own state is the likelier cause and is not established. Setting `auto` restored the rail. | §9 (range not restored) | M (state), U (cause) |
+| A second `pyjoulescope_driver.Driver` in a process where `capture_gated` already initialised the shared driver fails with `IN_USE`. | §2 S3 | M |
