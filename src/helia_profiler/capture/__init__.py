@@ -15,12 +15,14 @@ Supports the following transports for reading profiling data from the target:
 from __future__ import annotations
 
 import logging
+import math
 import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from ..config import DEFAULT_POWER_DURATION_S
 from ..errors import CaptureError, PowerError
+from ..power.clean_window import assess_clean_window_stall
 from ..power.diagnostics import (
     CLEAN_WINDOW_WARMUP_REPS,
     SyncHandshakeMetadata,
@@ -242,6 +244,28 @@ def _make_sync_controller(ctx: PipelineContext, driver: PowerDriver) -> SyncCont
     return make_controller(wiring)
 
 
+#: Cap on the stalled-reference stretch: a reference read 90% low or worse
+#: still bounds the wait at ten planned windows rather than an unbounded one.
+_MAX_STALL_UNDERSTATEMENT = 0.9
+
+
+def _reference_stall_factor(ctx: PipelineContext) -> float:
+    """How much longer a fixed-count window can run when its reference stalled."""
+    if ctx.pmu_result is None:
+        return 1.0
+    meta = ctx.pmu_result.meta
+    stall = assess_clean_window_stall(
+        stalled_iters=meta.clean_stalled_iters,
+        partial_iters=meta.clean_partial_iters,
+        clean_infer_count=meta.clean_infer_count,
+        ref_cycles=meta.clean_ref_cycles,
+    )
+    if stall is None or stall.affected_iters == 0:
+        return 1.0
+    understatement = min(stall.understatement_lower_bound, _MAX_STALL_UNDERSTATEMENT)
+    return 1.0 / (1.0 - understatement)
+
+
 def _profiled_inference_s(ctx: PipelineContext) -> float | None:
     """One inference at the run's CPU clock, from the profiled PMU cycles."""
     pmu = ctx.pmu_result
@@ -350,14 +374,23 @@ def capture_power(
         sync = _make_sync_controller(ctx, driver)
         probe = ctx.config.profiling.clean_window_probe
         relative_tolerance = gate_relative_tolerance_for(probe)
+        # The fixed count was sized from a reference that a stalled profile
+        # window reads low, so the window can run longer than planned: wait
+        # for the window the stall implies (contract C-W4). The duration check
+        # below still compares against the planned reference.
+        bound_avg_us = (
+            math.ceil(clean_avg_us * _reference_stall_factor(ctx))
+            if clean_avg_us and plan.reference_inference_us
+            else clean_avg_us
+        )
         longest_window_s = (
             longest_accepted_window_s(
                 clean_infer_count=clean_count,
-                clean_infer_avg_us=clean_avg_us,
+                clean_infer_avg_us=bound_avg_us,
                 stats_rate_hz=ctx.config.power.stats_rate_hz,
                 relative_tolerance=relative_tolerance,
             )
-            if clean_count and clean_avg_us
+            if clean_count and bound_avg_us
             else None
         )
         # The firmware runs real warm-up inferences before the window for every
@@ -365,8 +398,8 @@ def capture_power(
         # is the whole spin, so its warm-up is priced from the profiled
         # per-inference cycles instead.
         warm_inference_s = (
-            clean_avg_us / 1e6
-            if clean_avg_us and probe_runs_inferences(probe)
+            bound_avg_us / 1e6
+            if bound_avg_us and probe_runs_inferences(probe)
             else _profiled_inference_s(ctx)
         )
         warmup_s = (

@@ -148,12 +148,12 @@ raised:
 
 `D` never changes the window the firmware runs.
 
-**C-W4.** `F` must also cover a window that runs longer than planned, up to
-`L`. A stalled clean-window reference reads `a` low, which sizes `N` too high,
-so the real window runs longer than `W` and can pass `L`. The planning
-docstring and warning in `stages/plan_power.py` say the opposite: that the
-window comes out short. Open: #302 follow-up 4 (stall-aware sizing and
-corrected text).
+**C-W4.** `F` must also cover a window that runs longer than planned. A
+stalled clean-window reference reads `a` low, which sizes `N` too high, so the
+real window runs longer than `W`. When the profile window stalled, `L` and the
+warm-up term use `a` stretched by `1/(1 - u)`, where `u` is the stall's
+understatement lower bound, capped at 0.9 [D]. The C-E5 duration check still
+compares against the planned `W`.
 
 ## 4. Published intervals
 
@@ -254,7 +254,7 @@ simply times out.
 | `no_gate_rise`, wiring | wiring, the wait state or reset | no | `stimer_dead`, and a GO later than the firmware's GO wait. Candidate. |
 | `no_stats_window` | host timestamps did not overlap the stats timeline | no | The only pulse was shorter than the 1.0 s minimum (C-S2). Candidate. |
 | `no_gate_fall` | a hang when high longer than `L`; a bound too short when shorter | yes | |
-| Stalled reference warning | the window will be short | no | The window runs long (C-W4). #302 follow-up 4. |
+| Stalled reference warning | the fixed count will run longer than the planned window | yes | |
 
 ## 7. Lock-step and free-running
 
@@ -300,7 +300,7 @@ simply times out.
 | Item | Clauses | Status under this contract |
 | --- | --- | --- |
 | #302 follow-up 3: busy_loop warm-up not budgeted (FR) | C-W1, C-W2 | resolved: `P` prices busy_loop warm-up from the profiled cycles |
-| #302 follow-up 4: stalled reference | C-W4, C-H1 | open. The contract fixes the direction: the window runs longer. |
+| #302 follow-up 4: stalled reference | C-W4, C-H1 | resolved: the fall wait stretches by the stall's understatement bound, and the planner text says the window runs long |
 | #302 stage-hint follow-up | C-E2, C-H1 | resolved: heliaPROFILER errors pass through the capture stage unchanged |
 | #302 (from #373): shared USB CDC with lock-step | C-S3 | resolved: rejected at preflight. #373 was closed as not planned and folded into #302. |
 | #374: live definitions only | none | outside the timeline (render hygiene) |
