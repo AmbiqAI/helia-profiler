@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 
 from ..config import DEFAULT_POWER_DURATION_S, WindowMode
-from ..errors import PowerError
+from ..errors import HpxError, PowerError
 from ..pipeline import PipelineContext
 from ..power.base import PowerDriver, PowerMode
 from ..power.diagnostics import (
@@ -196,7 +196,9 @@ class CapturePowerStage:
                 duration_override_s=capture_duration,
                 prepare_target=_prepare_target,
             )
-        except PowerError:
+        except HpxError:
+            # PowerError, and the probe or USB CDC CaptureError from a failed
+            # reset or port open, already name what failed and what to check.
             raise
         except Exception as exc:
             raise PowerError(

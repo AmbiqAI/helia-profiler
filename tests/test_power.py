@@ -2286,6 +2286,64 @@ class TestCapturePowerStage:
         assert ctx.power_run.observation.integrity == "degraded"
         assert ctx.power_result is degraded
 
+    @staticmethod
+    def _shared_power_ctx(tmp_path: Path):
+        from helia_profiler.config import load_config
+        from helia_profiler.pipeline import PipelineContext
+
+        model = tmp_path / "model.tflite"
+        model.write_bytes(b"\x00")
+        config = load_config(
+            None,
+            {
+                "model": {"path": str(model)},
+                "engine": {"type": "helia-rt"},
+                "power": {"enabled": True, "firmware": "shared"},
+            },
+        )
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        ctx.publish_power_plan(PowerRunPlan(firmware_mode="shared"))
+        return ctx
+
+    def test_probe_error_keeps_its_own_hint(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        # A J-Link reset or USB CDC failure already says what failed and what to
+        # check; wrapping it in "check the instrument" sent users to the wrong
+        # device (capture timeline contract C-E2).
+        from helia_profiler.errors import CaptureError
+        from helia_profiler.stages.capture_power import CapturePowerStage
+
+        ctx = self._shared_power_ctx(tmp_path)
+
+        def fail(*_args, **_kwargs):
+            raise CaptureError("J-Link reset failed", hint="Check the J-Link probe.")
+
+        monkeypatch.setattr("helia_profiler.capture.capture_power", fail)
+
+        with pytest.raises(CaptureError) as excinfo:
+            CapturePowerStage().run(ctx)
+
+        assert str(excinfo.value).startswith("J-Link reset failed")
+        assert excinfo.value.hint == "Check the J-Link probe."
+
+    def test_unexpected_error_names_the_instrument(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from helia_profiler.stages.capture_power import CapturePowerStage
+
+        ctx = self._shared_power_ctx(tmp_path)
+
+        def fail(*_args, **_kwargs):
+            raise RuntimeError("usb transfer stalled")
+
+        monkeypatch.setattr("helia_profiler.capture.capture_power", fail)
+
+        with pytest.raises(
+            PowerError, match="Power capture failed: usb transfer stalled"
+        ) as excinfo:
+            CapturePowerStage().run(ctx)
+
+        assert "joulescope" in (excinfo.value.hint or "")
+
     def test_busy_loop_progress_message_says_pass_not_inference(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):

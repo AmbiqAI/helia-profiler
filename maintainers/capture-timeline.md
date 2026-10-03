@@ -200,14 +200,10 @@ what they mean.
   any error the capture would otherwise raise;
 - a replaced capture error is hidden as context.
 
-**C-E2.** The capture stage passes a `PowerError` through unchanged. It wraps
-any other exception in a `PowerError` whose hint names the instrument. For
-errors from the reset probe or the USB CDC port, this clause is not met:
-- a J-Link reset failure or a CDC port failure surfaces with the hint "Check
-  that the joulescope is connected and powered on. Mode: external.";
-- the correct hint is kept only in the cause.
-
-Open: the #302 stage-hint follow-up.
+**C-E2.** The capture stage passes any heliaPROFILER error through unchanged:
+a `PowerError`, and the `CaptureError` from a failed J-Link reset or USB CDC
+port open, keep their own message and hint. It wraps any other exception in a
+`PowerError` whose hint names the instrument.
 
 **C-E3.** No usable window, but stats packets arrived: the capture returns a
 degraded result carrying a `gate_failure` classification, with no
@@ -254,7 +250,7 @@ simply times out.
 | Hint | Claims | Meets C-H1 | Missing cause and item |
 | --- | --- | --- | --- |
 | READY timeout | wiring, reset strategy, firmware not parked at the sync wait | no | A dedicated init failure (the terminal is not collected), the shared USB CDC ordering (C-S3, #302), and failed GPI reads. Candidate for the capture follow-up PR. |
-| Stage wrapper | the instrument is not connected | no | The step that actually failed, for probe and CDC errors. #302 stage-hint follow-up. |
+| Stage wrapper | the instrument is not connected, for an exception that is not a heliaPROFILER error | yes | Probe and CDC errors keep their own hint (C-E2). |
 | `no_gate_rise`, bound exhausted | the bound likely ended before the window was due | yes | FR only. Reachable only when the window is unknown, because a known window makes FR `F` at least `L + 10 + P`, which exceeds `rise_due`. |
 | `no_gate_rise`, lock-step suspect | the likeliest cause is a free-running window racing the poller, with wiring as the fallback | no | Firmware that never reached the window (init failure, `stimer_dead`). Candidate. |
 | `no_gate_rise`, wiring | wiring, the wait state or reset | no | `stimer_dead`, and a GO later than the firmware's GO wait. Candidate. |
@@ -307,7 +303,7 @@ simply times out.
 | --- | --- | --- |
 | #302 follow-up 3: busy_loop warm-up not budgeted (FR) | C-W1, C-W2 | open |
 | #302 follow-up 4: stalled reference | C-W4, C-H1 | open. The contract fixes the direction: the window runs longer. |
-| #302 stage-hint follow-up | C-E2, C-H1 | open |
+| #302 stage-hint follow-up | C-E2, C-H1 | resolved: heliaPROFILER errors pass through the capture stage unchanged |
 | #302 (from #373): shared USB CDC with lock-step | C-S3 | resolved: rejected at preflight. #373 was closed as not planned and folded into #302. |
 | #374: live definitions only | none | outside the timeline (render hygiene) |
 | #376: guarded test harness | all clauses | open. Each clause needs a guarded test, and several capture tests cannot yet run under the guard. |
