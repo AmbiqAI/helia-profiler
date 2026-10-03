@@ -279,11 +279,7 @@ def shortest_accepted_window_s(
     stats_rate_hz: int,
     relative_tolerance: float,
 ) -> float:
-    """Shortest gate the duration check, or cross-boot drift, still accepts.
-
-    The mirror of :func:`longest_accepted_window_s`. A gate shorter than this is
-    not the planned window, however long it is in absolute terms.
-    """
+    """Shortest gate the duration check, or cross-boot drift, still accepts (mirrors the longest)."""
     gate = assess_gate_duration(
         measured_s=0.0,
         clean_infer_count=clean_infer_count,

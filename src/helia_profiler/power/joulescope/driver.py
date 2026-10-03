@@ -196,15 +196,26 @@ class JoulescopeDriver:
         topic, off_value, on_value = _POWER_CYCLE[family]
 
         try:
-            driver.publish(f"{device_path}/{topic}", off_value)
-            log.info("Target power OFF")
             try:
+                driver.publish(f"{device_path}/{topic}", off_value)
+                log.info("Target power OFF")
                 time.sleep(off_time_s)
-            finally:
+            except BaseException:
                 # Restore the supply on every exit from the off window, an
                 # interrupt included: nothing else puts the range back, so an
                 # early exit here left the target unpowered until the next run.
-                driver.publish(f"{device_path}/{topic}", on_value)
+                # A failed restore is logged so the original exception, often
+                # the user's Ctrl-C, is what propagates.
+                try:
+                    driver.publish(f"{device_path}/{topic}", on_value)
+                except Exception:
+                    log.warning(
+                        "Could not restore the target supply after an interrupted "
+                        "power cycle; set the Joulescope current range to auto",
+                        exc_info=True,
+                    )
+                raise
+            driver.publish(f"{device_path}/{topic}", on_value)
             log.info("Target power ON — waiting %.1fs for boot", settle_time_s)
             time.sleep(settle_time_s)
         except PowerError:

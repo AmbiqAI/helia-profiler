@@ -14,6 +14,7 @@ from typing import Any
 
 from ...errors import PowerError
 from ..base import GatedPowerWindow, PowerSample, PowerSummary
+from ..diagnostics import shortest_accepted_window_s as _shortest_accepted_window_s
 from .device import _extract_scalar
 
 log = logging.getLogger("hpx")
@@ -772,3 +773,61 @@ def _summary_to_dict(summary: PowerSummary) -> dict[str, float | int]:
         "duration_s": summary.duration_s,
         "sample_count": summary.sample_count,
     }
+
+
+def _plan_ranked_candidates(
+    segments: list[tuple[float, float]] | list[tuple[int, int]],
+    *,
+    minimum_gate_s: float,
+    plan_floor_s: float,
+) -> list:
+    """Gate candidates in time order: those the plan accepts, else those past the minimum.
+
+    The caller takes the last one. When no segment reaches the plan floor, the
+    fixed minimum still admits a real window short of the plan, and the gate
+    duration check judges it.
+    """
+    from pyjoulescope_driver import time64
+
+    def at_least(floor_s: float) -> list:
+        return [(rise, fall) for rise, fall in segments if (fall - rise) / time64.SECOND >= floor_s]
+
+    planned = at_least(plan_floor_s)
+    if planned or plan_floor_s <= minimum_gate_s:
+        return planned
+    fallback = at_least(minimum_gate_s)
+    if fallback:
+        log.warning(
+            "No GPIO-high reached the %.3fs the plan accepts; using the last high "
+            "past the %.3fs minimum, which the gate duration check will judge",
+            plan_floor_s,
+            minimum_gate_s,
+        )
+    return fallback
+
+
+def _plan_gate_floor_s(
+    *,
+    minimum_gate_s: float,
+    clean_infer_count: int | None,
+    clean_infer_avg_us: int | None,
+    stats_rate_hz: int,
+    relative_tolerance: float,
+) -> float:
+    """The gate length a capture ranks candidates against: the plan's shortest, else the minimum."""
+    if (
+        not clean_infer_count
+        or clean_infer_count <= 0
+        or not clean_infer_avg_us
+        or clean_infer_avg_us <= 0
+    ):
+        return minimum_gate_s
+    return max(
+        minimum_gate_s,
+        _shortest_accepted_window_s(
+            clean_infer_count=clean_infer_count,
+            clean_infer_avg_us=clean_infer_avg_us,
+            stats_rate_hz=stats_rate_hz,
+            relative_tolerance=relative_tolerance,
+        ),
+    )

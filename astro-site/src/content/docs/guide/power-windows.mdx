@@ -94,6 +94,13 @@ passes edge extraction but its packet-integral duration is still under
 the floor, `power.gate_below_minimum` (error) invalidates the run. Either
 way the run completes and writes its bundle.
 
+When the planned window is known, the capture also ranks gates against it.
+A GPIO-high shorter than the plan accepts (the planned window less the same
+allowance as the duration check, at least 15%), such as the sync line held
+high during reset or boot, does not end the capture and is not chosen while
+a longer high exists. If no high reaches that length, the last high past
+the 1 s minimum is kept and the duration check below judges it.
+
 For a model whose inference takes a few milliseconds, widen the window so
 gate-edge jitter becomes negligible as a fraction of the total:
 

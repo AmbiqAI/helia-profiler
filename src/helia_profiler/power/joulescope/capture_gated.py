@@ -23,7 +23,6 @@ from ..diagnostics import (
     GateTransitionTiming,
     classify_gate_failure,
     longest_accepted_window_s,
-    shortest_accepted_window_s,
 )
 from ..metadata import MeasurementScope, ObservationMode, PowerIntegrity, PowerMetadata
 from .device import (
@@ -45,7 +44,10 @@ from .stats import (
     _fullrate_sample_span,
     _fullrate_streams_contiguous,
     _map_poll_samples_to_packet_time,
+    _plan_gate_floor_s,
+    _plan_ranked_candidates,
     _process_gated_stats,
+    _segment_gpi_windows,
     _segment_streamed_gpi,
     _streamed_gpi_timebase,
     _summary_to_dict,
@@ -178,30 +180,20 @@ def capture_gated(
             "Joulescope gated capture supports exactly one high window (min_high_windows=1)."
         )
 
-    # With a planned window, a qualifying gate must also be plausibly that
-    # window. A sync-line high during reset or boot can outlast the fixed
-    # minimum, and on JS220/JS320 the GPI stream is not phase-gated, so the
-    # floor applies to the poller and the stream selection alike (contract C-S2).
-    if (
-        clean_infer_count is not None
-        and clean_infer_count > 0
-        and clean_infer_avg_us is not None
-        and clean_infer_avg_us > 0
-    ):
-        plausible_floor_s = shortest_accepted_window_s(
-            clean_infer_count=clean_infer_count,
-            clean_infer_avg_us=clean_infer_avg_us,
-            stats_rate_hz=stats_rate_hz,
-            relative_tolerance=gate_relative_tolerance,
-        )
-        if plausible_floor_s > minimum_gate_s:
-            log.debug(
-                "Minimum qualifying gate raised from %.3fs to %.3fs, the shortest "
-                "window the plan accepts",
-                minimum_gate_s,
-                plausible_floor_s,
-            )
-            minimum_gate_s = plausible_floor_s
+    # With a planned window, the gate the capture stops on and selects must
+    # also be plausibly that window. A sync-line high during reset or boot can
+    # outlast the fixed minimum, and on JS220/JS320 the GPI stream is not
+    # phase-gated (contract C-S2). The plan floor only ranks candidates: when
+    # no high reaches it, the last high that clears the fixed minimum is kept,
+    # so a real window short of the plan still yields a (warned) result.
+    plan_floor_s = _plan_gate_floor_s(
+        minimum_gate_s=minimum_gate_s,
+        clean_infer_count=clean_infer_count,
+        clean_infer_avg_us=clean_infer_avg_us,
+        stats_rate_hz=stats_rate_hz,
+        relative_tolerance=gate_relative_tolerance,
+    )
+    below_plan_highs = 0
 
     try:
         from pyjoulescope_driver import time64
@@ -346,7 +338,7 @@ def capture_gated(
         nonlocal first_high_at, first_low_after_high_at, short_pulse_first_s
         nonlocal saw_any_gate_rise, saw_any_gate_fall
         nonlocal gpi_sample_sequence, latest_gpi_value, short_pulse_last_s
-        nonlocal short_pulses_ignored, windows_done, gpi_poll_failures
+        nonlocal short_pulses_ignored, windows_done, gpi_poll_failures, below_plan_highs
         prev_level = 0
         high_seen = False
         high_phase = "unknown"
@@ -418,10 +410,23 @@ def capture_gated(
                     high_duration_s = (
                         time.monotonic() - first_high_at if first_high_at is not None else 0.0
                     )
-                    if high_duration_s >= minimum_gate_s:
+                    if high_duration_s >= plan_floor_s:
                         windows_done += 1
                         if windows_done >= min_high_windows and complete_at is None:
                             complete_at = time.monotonic()
+                    elif high_duration_s >= minimum_gate_s:
+                        # Too short for the plan: keep waiting for the real
+                        # window, but keep this high as the fallback candidate.
+                        below_plan_highs += 1
+                        log.debug(
+                            "GPIO-high of %.6fs is shorter than the %.3fs the plan "
+                            "accepts; waiting for the planned window",
+                            high_duration_s,
+                            plan_floor_s,
+                        )
+                        first_high_at = None
+                        first_low_after_high_at = None
+                        high_seen = False
                     else:
                         short_pulses_ignored += 1
                         short_pulse_phases[high_phase] = short_pulse_phases.get(high_phase, 0) + 1
@@ -557,11 +562,9 @@ def capture_gated(
         gate_edge_source = "gpi_snapshot_poll"
         if gpi_stream_enabled and gpi_stream_frames:
             raw_streamed = _segment_streamed_gpi(gpi_stream_frames)
-            qualifying = [
-                (rise, fall)
-                for rise, fall in raw_streamed
-                if (fall - rise) / time64.SECOND >= minimum_gate_s
-            ]
+            qualifying = _plan_ranked_candidates(
+                raw_streamed, minimum_gate_s=minimum_gate_s, plan_floor_s=plan_floor_s
+            )
             if qualifying:
                 # The firmware asserts the gate exactly once per run, as the
                 # LAST thing the sync line does before the device parks and
@@ -680,13 +683,24 @@ def capture_gated(
         if counter_rate is not None:
             gating_diagnostics["instrument_time_map"] = counter_rate
 
+        selected_windows = streamed_gate_windows
+        if selected_windows is None and plan_floor_s > minimum_gate_s:
+            # The poller no longer stops on a high the plan rejects, so the
+            # poll samples can hold that high and the real window: select one
+            # by the same rule as the stream instead of summing both.
+            polled = _plan_ranked_candidates(
+                _segment_gpi_windows(aligned_poll_samples),
+                minimum_gate_s=minimum_gate_s,
+                plan_floor_s=plan_floor_s,
+            )
+            selected_windows = polled[-1:] if polled else None
         windows, gated_summary = _process_gated_stats(
             packets=packets,
             poll_samples=aligned_poll_samples,
             io_voltage=io_voltage,
             prefer_device_time=use_device_time_axis,
             minimum_window_s=minimum_gate_s,
-            windows_override=streamed_gate_windows,
+            windows_override=selected_windows,
         )
         if not windows:
             if fr_requested:
