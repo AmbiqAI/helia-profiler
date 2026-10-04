@@ -18,6 +18,7 @@ from helia_profiler.fixture_runtime import FixtureFile
 from helia_profiler.fixture_stage import FixtureStage
 from helia_profiler.fixture_target import supported_fixture_target
 from helia_profiler.power.base import PowerResult, PowerSummary
+from helia_profiler.power.metadata import MeasurementScope, PowerIntegrity, PowerMetadata
 
 _SINKS = {
     "deployment_status": 4,
@@ -897,7 +898,10 @@ _GATED_SINKS = {
     "deployment_timing": 28,
     "deployment_gate_ticks": 4,
 }
-_POWER = PowerResult(PowerSummary(0.002, 0.0036, 0.004, 0.0072, 2.0, 2000))
+_POWER = PowerResult(
+    PowerSummary(0.002, 0.0036, 0.004, 0.0072, 2.0, 2000),
+    metadata=PowerMetadata(measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW),
+)
 
 
 @pytest.fixture
@@ -975,6 +979,7 @@ def test_the_gated_window_is_captured_around_the_reset(gated) -> None:
     assert result.state == "success", result.error
     assert result.power is _POWER
     assert result.gate_seconds == 2.0
+    assert result.power.metadata.integrity == PowerIntegrity.VALID
     (_, kwargs), after = events[0], events[1:]
     assert after[0] == "reset"
     assert not any(isinstance(e, tuple) and e[0] == "sleep" and e[1] >= 1 for e in after)

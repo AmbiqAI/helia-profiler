@@ -527,8 +527,9 @@ def _capture_gated_window(
     """One gated MCU-rail window over the timed loop; ``reset`` starts the run once armed."""
     from .config import DEFAULT_POWER_MIN_WINDOW_MS
     from .power.joulescope.driver import JoulescopeDriver
+    from .power.metadata import ObservationMode, classify_observation
 
-    return JoulescopeDriver().capture_gated(
+    power = JoulescopeDriver().capture_gated(
         duration_s=request.settle_seconds,
         io_voltage=energy.io_voltage,
         sync_input_index=energy.gate_input_index,
@@ -538,3 +539,13 @@ def _capture_gated_window(
         on_started=lambda *_: reset(),
         lockstep=False,
     )
+    # The same observation classification the profile path publishes.
+    mode, integrity, rise, fall, bound_s = classify_observation(power.metadata)
+    power.metadata.set_observation(
+        observation_mode=ObservationMode(mode),
+        integrity=integrity,
+        gate_rise_observed=rise,
+        gate_fall_observed=fall,
+        observation_deadline_s=bound_s if bound_s is not None else request.settle_seconds,
+    )
+    return power

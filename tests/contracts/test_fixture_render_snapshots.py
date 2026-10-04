@@ -72,7 +72,9 @@ def test_the_energy_gate_brackets_exactly_the_timed_loop(scope):
     timed = body.index("for (unsigned i = 0; i < 17; ++i)")
     begin, end = body.index("hpx_sync_window_begin();"), body.index("hpx_sync_window_end();")
     status = body.index("if (invocation_status != 0)")
-    assert body.index("hpx_sync_init();") < warmup < begin < timed < end < status
+    assert warmup < begin < timed < end < status
+    main = text[text.index("int main()") :]
+    assert main.index("hpx_sync_init();") < main.index("infer_fixture()")
     assert body.index("const uint32_t gate_t0 = hpx_stimer_ticks();") < begin
     assert end < body.index("deployment_gate_ticks = hpx_stimer_ticks() - gate_t0;") < status
     assert "hpx_sync_wait_go();" not in body and "kSyncLockstep     = false" in text

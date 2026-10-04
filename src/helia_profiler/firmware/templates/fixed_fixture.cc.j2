@@ -92,9 +92,6 @@ static int infer_fixture() {
     hpx_fixture_memory_snapshot(3, interpreter.arena_used_bytes());
 {% endif %}
     if (!hpx_stimer_init()) return {{ fixture_status.stimer }};
-{%- if fixture_gate_pin is not none %}
-    hpx_sync_init();
-{%- endif %}
     for (unsigned i = 0; i < {{ fixture_warmups }}; ++i) {
 {%- for io in fixture_inputs %}
         std::memcpy({{ io.pointer }}, {{ io.buffer }}, sizeof({{ io.buffer }}));
@@ -171,6 +168,9 @@ int main() {
 {% with power_only=true, perf_mode_symbol="NSX_PERF_LOW", perf_mode_mhz=96 %}{% include "_system_config.j2" %}{% endwith %}
     int32_t status = nsx_system_init(&sys_cfg);
     if (status == 0) {
+{%- if fixture_gate_pin is not none %}
+        hpx_sync_init();  // drive the gate low before anything else runs
+{%- endif %}
         SystemCoreClock = 96000000U;
         am_hal_pwrctrl_sram_memcfg_t sram = {};
         sram.eSRAMCfg = AM_HAL_PWRCTRL_SRAM_3M;
