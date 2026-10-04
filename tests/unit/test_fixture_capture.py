@@ -871,3 +871,17 @@ def test_elf_inspection_admits_two_mib_and_keeps_the_mram_bound(tmp_path):
     elf, image, sizes = image_files(tmp_path / "over", binary=b"\x02" * (2 * _MIB + 4))
     with pytest.raises(ValueError, match="image outside bounded application MRAM"):
         inspect_elf(elf.read(), image.read(), 0x410000, sizes)
+
+
+def test_fixture_target_facts_come_from_the_platform():
+    from helia_profiler.fixture_image import DTCM, MRAM
+    from helia_profiler.fixture_target import FIXTURE_CLOCK_PROFILE
+    from helia_profiler.platform import get_soc_for_board
+
+    target = supported_fixture_target()
+    soc = get_soc_for_board(target.board)
+    speed = soc.cpu_clock.speed(FIXTURE_CLOCK_PROFILE)
+    assert speed is not None and capture.FIXTURE_CPU_HZ == speed.mhz * 1_000_000 == 96_000_000
+    assert MRAM == (0x00410000, 0x00800000)
+    assert DTCM == (0x20000000, 0x2007C000)
+    assert target.load_address == MRAM[0]

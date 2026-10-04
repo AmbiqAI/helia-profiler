@@ -14,7 +14,7 @@ from ._fixture_build import FixtureTimingScope
 from .fixture_image import DTCM, MAX_ELF, MAX_IMAGE, digest, inspect_elf, require
 from .fixture_runtime import FixtureFile
 from .fixture_stage import FixtureStage
-from .fixture_target import FixtureTarget
+from .fixture_target import FixtureTarget, fixture_cpu_hz
 from .target.probe.flash import flash_binary
 from .target.probe.jlink import (
     attached_session,
@@ -39,7 +39,7 @@ class FixtureCaptureGuard(Protocol):
 
 
 #: Core clock, STIMER rate and STIMER settle window the qualified fixture reports.
-FIXTURE_CPU_HZ = 96_000_000
+FIXTURE_CPU_HZ = fixture_cpu_hz()
 FIXTURE_TIMER_HZ = 32768
 FIXTURE_SETTLE_TICKS = (245, 410)
 _STATUS_POISON = struct.unpack("<i", bytes([0xA5]) * 4)[0]
