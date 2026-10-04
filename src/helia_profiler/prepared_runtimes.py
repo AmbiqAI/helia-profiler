@@ -380,7 +380,7 @@ def _stop(process: subprocess.Popen[str], *, group: bool) -> None:
 
 
 def _signal_group(process: subprocess.Popen[str], sig: int) -> bool:
-    """Signal the step's process group; False once it is gone or holds only zombies."""
+    """Signal the step's process group; False once it is gone (or, on macOS, holds only zombies)."""
     try:
         os.killpg(process.pid, sig)
     except OSError:  # ESRCH, or EPERM where only zombies remain

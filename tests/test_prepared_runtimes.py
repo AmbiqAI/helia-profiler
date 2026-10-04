@@ -553,9 +553,10 @@ def _spawning_step(tmp_path: Path, *, detach: bool = False) -> tuple[list[str], 
     pid_file = tmp_path / "child.pid"
     script = tmp_path / "spawn.py"
     script.write_text(
-        "import subprocess, time\n"
+        "import os, subprocess, time\n"
         f"child = subprocess.Popen(['sleep', '30'], start_new_session={detach})\n"
-        f"open({str(pid_file)!r}, 'w').write(str(child.pid))\n"
+        f"open({str(pid_file)!r} + '.tmp', 'w').write(str(child.pid))\n"
+        f"os.replace({str(pid_file)!r} + '.tmp', {str(pid_file)!r})\n"
         "time.sleep(30)\n"
     )
     return [sys.executable, str(script)], pid_file
@@ -601,7 +602,8 @@ def _trapping_step(tmp_path: Path, on_term: str) -> tuple[list[str], Path]:
     script.write_text(
         "import os, signal, sys, time\n"
         f"signal.signal(signal.SIGTERM, {on_term})\n"
-        f"open({str(pid_file)!r}, 'w').write(str(os.getpid()))\n"
+        f"open({str(pid_file)!r} + '.tmp', 'w').write(str(os.getpid()))\n"
+        f"os.replace({str(pid_file)!r} + '.tmp', {str(pid_file)!r})\n"
         "time.sleep(30)\n"
     )
     return [sys.executable, str(script)], pid_file
