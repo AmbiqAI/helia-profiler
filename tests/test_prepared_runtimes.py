@@ -279,7 +279,8 @@ def test_a_prepare_removes_leftovers_of_an_interrupted_replace(cache: Path) -> N
 _TFLM = runtime("tflm")
 assert _TFLM is not None and _TFLM.kernels is not None
 TFLM, TFLM_KERNELS = _TFLM, _TFLM.kernels
-# A make dry run: download notes, a line shlex cannot split, then one C++ and one C unit.
+# A make dry run: download notes and a non-compile line shlex cannot split, which must be
+# skipped unparsed, then one C++ and one C unit.
 TFLM_LISTING = """\
 tensorflow/lite/micro/tools/make/downloads/cmsis_nn already exists, skipping the download.
 echo "ends with a backslash \\
@@ -315,7 +316,7 @@ def tflm_build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[list[str
     )
     calls: list[list[str]] = []
 
-    def run(argv: list[str], cwd: Path) -> str:
+    def run(argv: list[str], cwd: Path, timeout_s: float) -> str:
         calls.append(argv)
         if argv[0] == "make":
             return TFLM_LISTING
@@ -379,6 +380,22 @@ def test_a_tflm_tree_pinning_other_kernels_is_refused(tflm_build, tmp_path, monk
     assert not (tmp_path / "cache" / "runtimes").exists()
 
 
+def test_a_relative_atfe_root_names_absolute_tools(tflm_build, tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ATFE_ROOT", "atfe")
+    prepare_runtime("tflm")
+    assert tflm_build[1][0] == str(tmp_path / "atfe" / "bin" / "clang++")
+    assert tflm_build[-1][0] == str(tmp_path / "atfe" / "bin" / "llvm-ar")
+
+
+@pytest.mark.parametrize("line", ["clang++ -c", "clang++ -c x.cc", 'clang "unterminated -c x.cc'])
+def test_an_unparseable_compile_line_is_refused_cleanly(tflm_build, monkeypatch, line) -> None:
+    monkeypatch.setattr(prepared_runtimes, "_run", lambda argv, cwd, timeout_s: line + "\n")
+    result = CliRunner().invoke(app, ["runtimes", "prepare", "tflm"])
+    assert result.exit_code == 1
+    assert "Cannot prepare tflm 85638f0" in result.output and "Traceback" not in result.output
+
+
 def test_preparing_tflm_needs_atfe_root(tflm_build, monkeypatch) -> None:
     monkeypatch.delenv("ATFE_ROOT")
     with pytest.raises(ConfigError, match="needs ATFE_ROOT") as exc:
@@ -394,7 +411,7 @@ def test_preparing_tflm_names_missing_host_tools(tflm_build, monkeypatch) -> Non
 
 
 def test_an_empty_tflm_source_list_is_refused(tflm_build, monkeypatch) -> None:
-    monkeypatch.setattr(prepared_runtimes, "_run", lambda argv, cwd: "make: Nothing to be done\n")
+    monkeypatch.setattr(prepared_runtimes, "_run", lambda argv, cwd, timeout_s: "make: Nothing\n")
     with pytest.raises(ConfigError, match="listed no translation units"):
         prepare_runtime("tflm")
 
@@ -402,7 +419,7 @@ def test_an_empty_tflm_source_list_is_refused(tflm_build, monkeypatch) -> None:
 def test_a_failed_tflm_compile_leaves_nothing_behind_and_no_traceback(
     tflm_build, tmp_path, monkeypatch
 ) -> None:
-    def run(argv: list[str], cwd: Path) -> str:
+    def run(argv: list[str], cwd: Path, timeout_s: float) -> str:
         if argv[0] == "make":
             return TFLM_LISTING
         raise ConfigError("Preparing tflm failed at tensorflow/lite/micro/micro_log.cc (exit 1)")
@@ -420,8 +437,24 @@ def test_a_failed_build_step_names_the_source_exit_and_stderr(tmp_path: Path) ->
     script.write_text("import sys\nsys.stderr.write('first\\nerror: boom\\n')\nsys.exit(3)\n")
     argv = [sys.executable, str(script), "-c", "tensorflow/lite/micro/x.cc", "-o", "x.o"]
     with pytest.raises(ConfigError, match=r"at tensorflow/lite/micro/x\.cc \(exit 3\)") as exc:
-        prepared_runtimes._run(argv, tmp_path)
+        prepared_runtimes._run(argv, tmp_path, 60)
     assert str(exc.value).endswith("first\nerror: boom")
+
+
+def test_build_steps_see_only_the_allowed_environment(tmp_path, monkeypatch) -> None:
+    for name, value in {"ARM_NN_ENABLE_F16": "1", "CPATH": "/x", "MAKEFLAGS": "-j9"}.items():
+        monkeypatch.setenv(name, value)
+    script = tmp_path / "env.py"
+    script.write_text("import json, os\nprint(json.dumps(sorted(os.environ)))\n")
+    seen = json.loads(prepared_runtimes._run([sys.executable, str(script)], tmp_path, 60))
+    assert "PATH" in seen
+    assert set(seen) <= set(prepared_runtimes._TFLM_ENV) | {"LC_CTYPE", "__CF_USER_TEXT_ENCODING"}
+
+
+def test_a_build_step_that_hangs_is_stopped(tmp_path: Path) -> None:
+    argv = [sys.executable, "-c", "import time; time.sleep(30)"]
+    with pytest.raises(ConfigError, match="timed out at .* after 0.5 s"):
+        prepared_runtimes._run(argv, tmp_path, 0.5)
 
 
 def _tarball(entries: dict[str, tuple[bytes, int]]) -> bytes:

@@ -50,6 +50,7 @@ ALLOWED = {
         "prepared_runtimes.py",
         "ATFE_ROOT",
     ): "prepare only; fixtures pin the prepared archive by hash",
+    ("prepared_runtimes.py", "<name>"): "prepare's allowlisted build-step environment",
     (
         "power/joulescope/capture_gated.py",
         "HPX_POWER_FULLRATE_XCHECK",

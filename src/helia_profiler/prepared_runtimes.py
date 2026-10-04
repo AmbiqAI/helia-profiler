@@ -67,6 +67,22 @@ _TFLM_CMSIS_NN_PIN = re.compile(r'^ZIP_PREFIX_NN="([0-9a-f]{40})"', re.M)
 #: Upstream optimization flags dropped from every translation unit, and the ones added.
 _TFLM_DROPPED_FLAGS = ("-O", "-ffp-mode=")
 _TFLM_ADDED_FLAGS = ("--config=newlib.cfg", "-O3", "-ffast-math", "-fshort-enums", "-DNDEBUG")
+#: The only environment build steps see: TFLM's make takes its variables from the
+#: environment and clang its include paths, so anything else could change the archive.
+_TFLM_ENV = (
+    "PATH",
+    "HOME",
+    "TMPDIR",
+    "TEMP",
+    "TMP",
+    "SYSTEMROOT",
+    "http_proxy",
+    "https_proxy",
+    "no_proxy",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "NO_PROXY",
+)
 #: Host tools TFLM's make and its download scripts need.
 _TFLM_HOST_TOOLS = ("make", "bash")
 _TFLM_HEADER_DIRS = ("tensorflow", "signal", "third_party")
@@ -129,7 +145,10 @@ def prepare_runtime(
     record, kernels = _prepared_record(name, version)
     fetch, stage = _PREPARERS[record.name]
     with tempfile.TemporaryDirectory(prefix=f"hpx-{record.name}-") as work:
-        source = fetch(record, kernels, Path(work), api_s, asset_s)
+        try:
+            source = fetch(record, kernels, Path(work), api_s, asset_s)
+        except (OSError, ValueError, IndexError) as exc:
+            raise ConfigError(f"Cannot prepare {record.name} {record.version}: {exc}") from exc
         directory = prepared_directory(record)
         directory.parent.mkdir(parents=True, exist_ok=True)
         for leftover in directory.parent.glob(f".{directory.name}-old-*"):
@@ -229,7 +248,7 @@ def _fetch_tflm(
             hint="Set ATFE_ROOT to an Arm Toolchain for Embedded installation (see hpx doctor).",
         )
     cc, cxx, ar = (
-        resolve_toolchain_executable(Toolchain.ATFE, tool)
+        os.path.abspath(resolve_toolchain_executable(Toolchain.ATFE, tool))
         for tool in ("clang", "clang++", "llvm-ar")
     )
     tree = _download_tree(record.source, work / "tflite-micro", asset_s)
@@ -240,7 +259,8 @@ def _fetch_tflm(
             f"tflite-micro {record.source.commit[:8]} pins CMSIS-NN {pinned}, "
             f"not the record's {kernels.commit}"
         )
-    listing = _run(["make", "-n", "-f", _TFLM_MAKEFILE, *_TFLM_MAKE_SELECTION, "microlite"], tree)
+    make = ["make", "-n", "-f", _TFLM_MAKEFILE, *_TFLM_MAKE_SELECTION, "microlite"]
+    listing = _run(make, tree, asset_s)
     objects = work / "objects"
     objects.mkdir()
     commands = []
@@ -262,14 +282,16 @@ def _fetch_tflm(
     if not commands:
         raise ConfigError("TFLM's make dry run listed no translation units")
     with ThreadPoolExecutor(max_workers=os.cpu_count()) as pool:
-        for _ in pool.map(lambda argv: _run(argv, tree), commands):
+        for _ in pool.map(lambda argv: _run(argv, tree, asset_s), commands):
             pass
     archive = [command[command.index("-o") + 1] for command in commands]
-    _run([ar, "rcsD", str(work / "runtime.a"), *archive], tree)
+    _run([ar, "rcsD", str(work / "runtime.a"), *archive], tree, asset_s)
     return tree
 
 
 def _download_tree(source: RuntimeSource, tree: Path, timeout_s: float) -> Path:
+    if not hasattr(tarfile, "data_filter"):
+        raise ConfigError("Preparing tflm needs a Python whose tarfile has extraction filters")
     url = f"https://github.com/{source.repo}/archive/{source.commit}.tar.gz"
     try:
         with urlopen(url, timeout=timeout_s) as response:
@@ -285,14 +307,19 @@ def _download_tree(source: RuntimeSource, tree: Path, timeout_s: float) -> Path:
     return tree
 
 
-def _run(argv: list[str], cwd: Path) -> str:
+def _run(argv: list[str], cwd: Path, timeout_s: float) -> str:
     """Run a build step in ``cwd`` and return its stdout, or raise naming the step."""
+    step = argv[argv.index("-c") + 1] if "-c" in argv[:-1] else " ".join(argv[:2])
+    env = {name: os.environ[name] for name in _TFLM_ENV if name in os.environ}
     try:
-        result = subprocess.run(argv, cwd=cwd, capture_output=True, text=True, check=False)
+        result = subprocess.run(
+            argv, cwd=cwd, env=env, capture_output=True, text=True, check=False, timeout=timeout_s
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ConfigError(f"Preparing tflm timed out at {step} after {timeout_s:g} s") from exc
     except OSError as exc:
         raise ConfigError(f"Cannot run {argv[0]}: {exc}") from exc
     if result.returncode != 0:
-        step = argv[argv.index("-c") + 1] if "-c" in argv else " ".join(argv[:2])
         tail = "\n".join(result.stderr.strip().splitlines()[-20:])
         raise ConfigError(f"Preparing tflm failed at {step} (exit {result.returncode}):\n{tail}")
     return result.stdout
