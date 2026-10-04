@@ -22,6 +22,7 @@ from .errors import ConfigError
 from .fixture_runtime import PreparedUpstreamRuntime
 from .fixture_target import FIXTURE_CLOCK_PROFILE, FixtureTarget, supported_fixture_target
 from .placement import Placement
+from .prepared_runtimes import prepared_runtime
 
 #: Backends the prepared-runtime engines require; heliaAOT takes none.
 _ENGINE_BACKENDS = {
@@ -86,7 +87,8 @@ class FixtureBuildRequest:
 
     The installed profiler and engine are not part of the request: the source
     closure pins the profiler, and ``FixtureBuild.engine_source`` records the
-    engine package.
+    engine package. A heliaRT request without ``runtime`` uses the archive
+    ``hpx runtimes prepare helia-rt`` built from the default helia-rt record.
     """
 
     fixture: FixedFixture | TypedFixture
@@ -113,6 +115,8 @@ class FixtureBuildRequest:
             )
         if self.aot is not None and self.engine is not EngineType.HELIA_AOT:
             raise ConfigError("heliaAOT options apply to heliaAOT fixtures only")
+        if self.runtime is None and self.engine is EngineType.HELIA_RT:
+            object.__setattr__(self, "runtime", prepared_runtime(self.engine.value).runtime)
         try:
             self.target.verify()
         except ValueError as exc:

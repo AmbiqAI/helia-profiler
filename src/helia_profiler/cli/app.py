@@ -729,6 +729,18 @@ def runtimes_show_command(
     _cmd_runtimes_show(name, version)
 
 
+@runtimes_app.command(
+    "prepare", help="Build a runtime's prepared archive into the hpx cache (helia-rt)"
+)
+def runtimes_prepare_command(
+    name: Annotated[str, typer.Argument(help="Runtime name, e.g. helia-rt")],
+    version: Annotated[Optional[str], typer.Argument(help="Runtime version")] = None,
+) -> None:
+    from .runtimes_cmd import _cmd_runtimes_prepare
+
+    _cmd_runtimes_prepare(name, version)
+
+
 app.add_typer(runtimes_app, name="runtimes")
 
 

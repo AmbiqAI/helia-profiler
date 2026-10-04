@@ -7,6 +7,13 @@
     "repo": "AmbiqAI/helia-rt",
     "commit": "dc8533abe0ec7e01c251a067ce54c60f54237f5f"
   },
+  "kernels": {
+    "repo": "AmbiqAI/ns-cmsis-nn",
+    "commit": "5f3fed9f21a57390cc7f00f77a37db8f5f110cb8"
+  },
+  "archive": {
+    "sha256": "7df6c2f7129b919a4d09da555b14bc8f2b4ec560537ce885467f4cdeedb6c688"
+  },
   "precisions": {
     "fp32": "supported",
     "fp16": "supported",

@@ -181,6 +181,7 @@ power/joulescope/stats.py
 power/joulescope/sync.py
 power/metadata.py
 power/sync.py
+prepared_runtimes.py
 profiler.py
 report/__init__.py
 report/aot.py

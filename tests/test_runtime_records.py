@@ -153,6 +153,15 @@ def test_qualification_refuses_an_unregistered_target(board: str, clock: str, me
         qualification("tflm", board=board, clock=clock, precision="a8w8")
 
 
+def test_a_prepared_runtime_record_carries_kernels_and_archive(tmp_path: Path) -> None:
+    kernels = {"repo": "AmbiqAI/ns-cmsis-nn", "commit": "b" * 40}
+    root = _write(tmp_path, _record(kernels=kernels, archive={"sha256": "c" * 64}))
+    (record,) = load_runtime_records(root)
+    assert record.kernels is not None
+    assert (record.kernels.repo, record.kernels.commit) == ("AmbiqAI/ns-cmsis-nn", "b" * 40)
+    assert record.archive_sha256 == "c" * 64
+
+
 def test_records_load_from_a_directory(tmp_path: Path) -> None:
     root = _write(tmp_path, _record(), _record(version="1.1.0", default=False))
     records = load_runtime_records(root)
@@ -171,6 +180,21 @@ def test_records_load_from_a_directory(tmp_path: Path) -> None:
         ({"precisions": {"a8w8": "partial"}}, "a8w8 must be an object"),
         ({"precisions": {"a8w8": {"unsupported": ""}}}, "reason must be a non-empty string"),
         ({"qualified": {}}, "qualified must be a list"),
+        ({"kernels": {"repo": "AmbiqAI/ns-cmsis-nn", "commit": _COMMIT}}, "exactly"),
+        (
+            {
+                "kernels": {"repo": "AmbiqAI/ns-cmsis-nn", "commit": _COMMIT},
+                "archive": {"sha256": "x"},
+            },
+            "archive sha256 must be 64 hex",
+        ),
+        (
+            {
+                "kernels": {"repo": "AmbiqAI/ns-cmsis-nn", "commit": "v7"},
+                "archive": {"sha256": "a" * 64},
+            },
+            "kernels commit must be a 40-hex commit",
+        ),
         (
             {
                 "qualified": [

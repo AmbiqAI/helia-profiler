@@ -25,6 +25,8 @@ RUNTIME_SCHEMA = "helia-profiler/runtime@1"
 #: The precision vocabulary shared with helia-model-zoo and helia-benchmark.
 PRECISIONS = ("fp32", "fp16", "a8w8", "a16w8", "a8w4")
 _FIELDS = frozenset({"schema", "name", "version", "default", "source", "precisions", "qualified"})
+#: Present only for runtimes linked as a prepared archive.
+_ARCHIVE_FIELDS = frozenset({"kernels", "archive"})
 _QUALIFIED_FIELDS = frozenset({"board", "clock", "precisions", "basis", "trace"})
 _COMMIT = re.compile(r"[0-9a-f]{40}")
 _SUPPORTED = "supported"
@@ -68,6 +70,9 @@ class RuntimeRecord:
     #: Declared precisions: ``None`` when supported, else the reason it is not.
     precisions: Mapping[str, str | None]
     qualified: tuple[QualifiedTarget, ...]
+    #: The kernel library a prepared archive is built with, and the archive's sha256.
+    kernels: RuntimeSource | None = None
+    archive_sha256: str | None = None
 
 
 @dataclass(frozen=True)
@@ -171,14 +176,21 @@ def qualification(
 
 
 def _parse_record(raw: Any, location: str) -> RuntimeRecord:
-    record = _object(raw, _FIELDS, location)
+    fields = _FIELDS | (
+        _ARCHIVE_FIELDS if isinstance(raw, dict) and "archive" in raw else frozenset()
+    )
+    record = _object(raw, fields, location)
     if record["schema"] != RUNTIME_SCHEMA:
         raise ConfigError(f"Runtime record {location} has schema {record['schema']!r}")
     if not isinstance(record["default"], bool):
         raise ConfigError(f"Runtime record {location} default must be true or false")
-    source = _object(record["source"], frozenset({"repo", "commit"}), f"{location} source")
-    if not _COMMIT.fullmatch(_text(source["commit"], f"{location} source commit")):
-        raise ConfigError(f"Runtime record {location} source commit must be a 40-hex commit")
+    source = _source(record["source"], f"{location} source")
+    kernels = _source(record["kernels"], f"{location} kernels") if "kernels" in record else None
+    archive = None
+    if "archive" in record:
+        archive = _object(record["archive"], frozenset({"sha256"}), f"{location} archive")["sha256"]
+        if not isinstance(archive, str) or not re.fullmatch(r"[0-9a-f]{64}", archive):
+            raise ConfigError(f"Runtime record {location} archive sha256 must be 64 hex")
     precisions = record["precisions"]
     if not isinstance(precisions, dict):
         raise ConfigError(f"Runtime record {location} precisions must be an object")
@@ -217,10 +229,19 @@ def _parse_record(raw: Any, location: str) -> RuntimeRecord:
         name=_text(record["name"], f"{location} name"),
         version=_text(record["version"], f"{location} version"),
         default=record["default"],
-        source=RuntimeSource(_text(source["repo"], f"{location} source repo"), source["commit"]),
+        source=source,
         precisions=declared,
         qualified=tuple(qualified),
+        kernels=kernels,
+        archive_sha256=archive,
     )
+
+
+def _source(value: Any, owner: str) -> RuntimeSource:
+    source = _object(value, frozenset({"repo", "commit"}), owner)
+    if not _COMMIT.fullmatch(_text(source["commit"], f"{owner} commit")):
+        raise ConfigError(f"Runtime record {owner} commit must be a 40-hex commit")
+    return RuntimeSource(_text(source["repo"], f"{owner} repo"), source["commit"])
 
 
 def _unique_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
