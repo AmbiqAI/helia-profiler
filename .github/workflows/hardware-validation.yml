@@ -129,6 +129,9 @@ env:
   HPX_VALIDATION_REPEAT: ${{ inputs.repeat || '1' }}
   HPX_VALIDATION_TIMEOUT: ${{ inputs.timeout || '900' }}
 
+permissions:
+  contents: read
+
 jobs:
   plan:
     runs-on: ubuntu-latest

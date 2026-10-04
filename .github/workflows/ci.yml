@@ -11,6 +11,9 @@ defaults:
   run:
     shell: bash
 
+permissions:
+  contents: read
+
 jobs:
   # ---------------------------------------------------------------
   # Type check — runs once on Linux. ruff runs in the pre-commit job, at
