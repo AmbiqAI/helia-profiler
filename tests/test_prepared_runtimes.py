@@ -266,3 +266,11 @@ def test_a_helia_rt_record_without_an_archive_is_refused(monkeypatch) -> None:
     )
     with pytest.raises(ConfigError, match="record pins no prepared archive"):
         prepare_runtime("helia-rt")
+
+
+def test_a_prepare_removes_leftovers_of_an_interrupted_replace(cache: Path) -> None:
+    first = prepare_runtime("helia-rt")
+    leftover = first.directory.parent / ".1.21.3-old-abcd1234" / "install"
+    leftover.mkdir(parents=True)
+    prepare_runtime("helia-rt")
+    assert sorted(p.name for p in first.directory.parent.iterdir()) == ["1.21.3"]
