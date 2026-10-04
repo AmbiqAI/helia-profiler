@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 from dataclasses import replace
 from pathlib import Path
@@ -249,7 +250,8 @@ def test_a_failed_swap_restores_the_previous_install(cache: Path, monkeypatch) -
     monkeypatch.setattr(Path, "rename", real_rename)
     assert marker.read_text() == "previous install"
     assert sorted(p.name for p in first.directory.parent.iterdir()) == ["1.21.3"]
-    assert oct(first.directory.stat().st_mode & 0o777) in ("0o755", "0o775")
+    if os.name == "posix":  # Windows reports no POSIX permission bits
+        assert oct(first.directory.stat().st_mode & 0o777) in ("0o755", "0o775")
 
 
 def test_a_damaged_prepared_install_names_the_prepare_command(cache: Path) -> None:
