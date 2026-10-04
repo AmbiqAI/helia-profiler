@@ -22,6 +22,23 @@ List every runtime record
 
 Defined in `src/helia_profiler/cli/app.py` line 715.
 
+## hpx runtimes prepare
+
+```bash
+hpx runtimes prepare NAME [VERSION]
+```
+
+Build a runtime's prepared archive into the hpx cache (helia-rt)
+
+Defined in `src/helia_profiler/cli/app.py` line 732.
+
+### Arguments
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `name` | `str` |  | Runtime name, e.g. helia-rt Required. |
+| `version` | `Optional[str]` |  | Runtime version |
+
 ## hpx runtimes show
 
 ```bash
