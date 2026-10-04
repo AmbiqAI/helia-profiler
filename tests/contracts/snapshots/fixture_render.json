@@ -32,7 +32,7 @@
     "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382"
   },
   "tcn|helia-aot|invoke_only|energy_gate": {
-    "fixed_fixture.cc": "126c626fabeb9d2e30eafd0c3f21e8ecad60a0b654a425e0648d799003bcf7bd",
+    "fixed_fixture.cc": "86ac0738d165f07e21bf7237235a7072fa0366c13b56302f00d6316739315b6f",
     "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382"
   },
   "tcn|helia-aot|restore_and_invoke": {
@@ -40,7 +40,7 @@
     "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382"
   },
   "tcn|helia-aot|restore_and_invoke|energy_gate": {
-    "fixed_fixture.cc": "831de93ef538df5df175a6d9efd4ba05cfd214d94244d1467a038475c213dcef",
+    "fixed_fixture.cc": "21f46c6cc31afa825dfda755c9d2ad88543ea525b4a2aa8e0bd541c9b1b61325",
     "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382"
   },
   "tcn|helia-rt|invoke_only": {
@@ -49,7 +49,7 @@
     "fixed_fixture_memory.h": "baf938dba9148e9f25fd8245952b2f4fadcddf92a1ba33a133c26ac1477b1526"
   },
   "tcn|helia-rt|invoke_only|energy_gate": {
-    "fixed_fixture.cc": "77b0990a526efae797c118ee4ff75be6e5a6f88cfd20cee8c87de5367f6b22e2",
+    "fixed_fixture.cc": "7a98d9de8f535f3e3668bb4bb486d3668025804905943f4a32e41c274220286a",
     "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382",
     "fixed_fixture_memory.h": "baf938dba9148e9f25fd8245952b2f4fadcddf92a1ba33a133c26ac1477b1526"
   },
@@ -59,7 +59,7 @@
     "fixed_fixture_memory.h": "baf938dba9148e9f25fd8245952b2f4fadcddf92a1ba33a133c26ac1477b1526"
   },
   "tcn|helia-rt|restore_and_invoke|energy_gate": {
-    "fixed_fixture.cc": "60a7fd8d26297d4b00ad71d2e267c1bc54c7d6aeb4ae77ca83d406b59486f4fe",
+    "fixed_fixture.cc": "987d894c1fa3e9c86f5944b2ce42bffed43d1c2d4efa6cdc19a3d410ee78e70f",
     "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382",
     "fixed_fixture_memory.h": "baf938dba9148e9f25fd8245952b2f4fadcddf92a1ba33a133c26ac1477b1526"
   },
@@ -69,7 +69,7 @@
     "fixed_fixture_memory.h": "baf938dba9148e9f25fd8245952b2f4fadcddf92a1ba33a133c26ac1477b1526"
   },
   "tcn|tflm|invoke_only|energy_gate": {
-    "fixed_fixture.cc": "77b0990a526efae797c118ee4ff75be6e5a6f88cfd20cee8c87de5367f6b22e2",
+    "fixed_fixture.cc": "7a98d9de8f535f3e3668bb4bb486d3668025804905943f4a32e41c274220286a",
     "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382",
     "fixed_fixture_memory.h": "baf938dba9148e9f25fd8245952b2f4fadcddf92a1ba33a133c26ac1477b1526"
   },
@@ -79,7 +79,7 @@
     "fixed_fixture_memory.h": "baf938dba9148e9f25fd8245952b2f4fadcddf92a1ba33a133c26ac1477b1526"
   },
   "tcn|tflm|restore_and_invoke|energy_gate": {
-    "fixed_fixture.cc": "60a7fd8d26297d4b00ad71d2e267c1bc54c7d6aeb4ae77ca83d406b59486f4fe",
+    "fixed_fixture.cc": "987d894c1fa3e9c86f5944b2ce42bffed43d1c2d4efa6cdc19a3d410ee78e70f",
     "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382",
     "fixed_fixture_memory.h": "baf938dba9148e9f25fd8245952b2f4fadcddf92a1ba33a133c26ac1477b1526"
   },

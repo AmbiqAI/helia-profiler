@@ -101,6 +101,7 @@ class FixtureCaptureRequest:
     arena_capacity: int | None = None
     #: Caller-predicted firmware run time after reset; the host stays detached for
     #: ``max(1 s, expected_duration_s * 1.25)``, bounded by ``settle_seconds``, before polling.
+    #: With ``energy``, the run before the gate rises is this less ``expected_window_s``.
     expected_duration_s: float | None = None
     #: Sizes of outputs after the first, in model order (typed fixtures).
     extra_output_sizes: tuple[int, ...] = ()
@@ -247,6 +248,10 @@ def capture_fixture(
         and math.isfinite(energy.expected_window_s)
         and energy.calls <= FIXTURE_MAX_ITERATIONS
         and _MIN_GATE_S <= energy.expected_window_s
+        and (
+            request.expected_duration_s is None
+            or request.expected_duration_s >= energy.expected_window_s
+        )
         and request.settle_seconds
         >= gate_fall_wait_s(
             0.0,
@@ -275,7 +280,7 @@ def capture_fixture(
     outputs: tuple[FixtureFile, ...] = ()
     status = crc = None
     timing = memory = None
-    power = gate_seconds = None
+    power = gate_seconds = missing = None
 
     def pin(name: str, value: bytes) -> FixtureFile:
         path = directory / name
@@ -460,9 +465,9 @@ def capture_fixture(
                         device=request.device, jlink_serial=request.jlink_serial
                     ),
                 )
-            except _GatedWindowMissing as missing:
-                power = missing.power
-                raise
+            except _GatedWindowMissing as exc:
+                # A firmware fault before the gate also leaves no window; its status speaks first.
+                power, missing = exc.power, exc
             detached = time.monotonic() - started
         with attach() as session:
             guard.check(require_free=False, remaining_s=10)
@@ -477,6 +482,8 @@ def capture_fixture(
         status = struct.unpack("<i", values["deployment_status"])[0]
         crc = struct.unpack("<I", values["deployment_checksum"])[0]
         require(status == 0, _failed_stage(status))
+        if missing is not None:
+            raise missing
         timing_words = struct.unpack("<7I", values["deployment_timing"])
         observed_scope = {
             1: FixtureTimingScope.INVOKE_ONLY,

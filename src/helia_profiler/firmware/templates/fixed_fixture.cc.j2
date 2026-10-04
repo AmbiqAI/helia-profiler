@@ -169,7 +169,7 @@ int main() {
     int32_t status = nsx_system_init(&sys_cfg);
     if (status == 0) {
 {%- if fixture_gate_pin is not none %}
-        hpx_sync_init();  // drive the gate low before anything else runs
+        hpx_sync_init();  // drive the gate low before the fixture starts
 {%- endif %}
         SystemCoreClock = 96000000U;
         am_hal_pwrctrl_sram_memcfg_t sram = {};

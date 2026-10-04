@@ -1058,6 +1058,25 @@ def test_a_window_the_instrument_did_not_gate_fails_but_keeps_what_it_saw(gated)
     result = capture.capture_fixture(request, guard=Guard())
     assert result.state == "failure" and "No valid gated window" in (result.error or "")
     assert result.power is state["power"] and result.timing is None
+    assert result.status == 0
+
+
+def test_a_firmware_failure_before_the_gate_names_the_stage_not_the_instrument(gated) -> None:
+    request, terminal, events, state = gated
+    terminal[0x20000000] = struct.pack("<i", int(FixtureStage.INVOKE))
+    state["power"] = _power(MeasurementScope.FREE_FORM_CAPTURE)
+    result = capture.capture_fixture(request, guard=Guard())
+    assert result.error == capture._failed_stage(int(FixtureStage.INVOKE))
+    assert result.status == int(FixtureStage.INVOKE) and result.power is state["power"]
+    assert "attach" in events[events.index("window closed") :]
+
+
+def test_a_gated_build_without_an_energy_capture_is_refused(gated) -> None:
+    request, _, events, _ = gated
+    result = capture.capture_fixture(replace(request, energy=None), guard=Guard())
+    assert result.state == "failure"
+    assert result.error == "undeclared fixture sink deployment_gate_ticks"
+    assert "reset" not in events
 
 
 def test_a_gate_shorter_than_the_timed_loop_is_refused(gated) -> None:
@@ -1084,6 +1103,9 @@ def test_the_predicted_warm_up_counts_towards_the_settle_time(gated) -> None:
     request, _, events, _ = gated
     with pytest.raises(ValueError, match="Invalid energy capture"):
         capture.capture_fixture(replace(request, expected_duration_s=28.0), guard=Guard())
+    with pytest.raises(ValueError, match="Invalid energy capture"):
+        # a predicted run shorter than the window it contains
+        capture.capture_fixture(replace(request, expected_duration_s=1.5), guard=Guard())
     assert events == []
     result = capture.capture_fixture(replace(request, expected_duration_s=5.0), guard=Guard())
     kwargs = next(e[1] for e in events if isinstance(e, tuple) and e[0] == "capture")

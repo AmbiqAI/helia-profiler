@@ -309,9 +309,13 @@ usual. The timed loop must last at least the instrument's one-second minimum gat
 `expected_window_s` below it is refused before the device is touched, so size the
 iterations to reach it, and predict it from a latency run: the instrument plans its
 accepted gate from that prediction. `settle_seconds` must hold boot, warm-up and the
-window (warm-up is the predicted run, `expected_duration_s`, less the window), by the same rule the profile path's free-running gated capture uses
-(`gate_fall_wait_s` without lock-step); a shorter settle is refused up front. A capture whose window the instrument did not gate fails,
-and so does a gate shorter than the firmware's timed span. The gate covers the
+window, by the same rule the profile path's free-running gated capture uses
+(`gate_fall_wait_s` without lock-step); a shorter settle is refused up front. Warm-up
+is the predicted run, `expected_duration_s`, less the window; without a prediction
+it counts as none, and a predicted run shorter than the window is refused. A capture
+whose window the instrument did not gate fails, and so does a gate shorter than the
+firmware's timed span. A firmware failure before the gate also leaves no window; the
+capture still reads the firmware's status and reports the failed stage. The gate covers the
 whole timed loop, including the input restores that `invoke_only` latency
 excludes, so energy per inference always counts one restore and one invoke. The
 result carries the `PowerResult` and `gate_seconds`. The caller binds them into a
