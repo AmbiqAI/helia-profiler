@@ -89,13 +89,14 @@ session: when it times out or is interrupted it is stopped with every process it
 started, TERM first so TFLM's download scripts remove their temporary files, then
 KILL. Compiles stay in hpx's process group, so an interrupt reaches them directly,
 and a compile that times out is killed. The schema-1 manifest pins the `.h` closure
-of `tensorflow/`, `signal/` and `third_party/`. Preparing needs bash, GNU make and
+of `tensorflow/`, `signal/` and `third_party/`. Preparing needs bash, GNU make 3.82 or
+later (TFLM's Makefile refuses older ones, such as macOS's 3.81) and
 the tools TFLM's download scripts call (among them wget, curl, unzip, patch, md5sum
 and python3). Prepare checks only for make and bash; a missing script tool fails
 the dry run with TFLM's own message. The record's archive was built with GNU make
 4.3. GNU make 3.82 through 4.2 do not sort wildcard results, so their source order
 may differ; the archive then differs from the record, which prepare reports.
-Windows hosts cannot prepare TFLM.
+Preparing TFLM is not supported on Windows hosts.
 
 heliaRT (`engine.type: helia-rt`, backend `helia`) also links a
 `PreparedUpstreamRuntime`, whose manifest uses schema 2:

@@ -13,6 +13,7 @@ import tarfile
 import time
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from typer.testing import CliRunner
@@ -564,7 +565,10 @@ def _times_out_once_written(path: Path, error: BaseException | None = None):
     """A ``Popen.communicate`` that raises once the step has written ``path``."""
 
     def communicate(self, *args, **kwargs):
+        deadline = time.monotonic() + 10
         while not path.exists():
+            if time.monotonic() > deadline or self.poll() is not None:
+                raise AssertionError(f"the step never wrote {path}")
             time.sleep(0.05)
         raise error or subprocess.TimeoutExpired(self.args, 1)
 
@@ -619,9 +623,44 @@ def test_a_stopped_group_step_is_asked_to_terminate_first(tmp_path, monkeypatch)
 def test_a_group_step_that_ignores_terminate_is_killed(tmp_path, monkeypatch) -> None:
     argv, pid_file = _trapping_step(tmp_path, "signal.SIG_IGN")
     monkeypatch.setattr(subprocess.Popen, "communicate", _times_out_once_written(pid_file))
+    started = time.monotonic()
     with pytest.raises(ConfigError, match="timed out"):
         prepared_runtimes._run(argv, tmp_path, 60, group=True)
+    assert time.monotonic() - started < 10  # killed after the grace period, not at its own exit
     _assert_stopped(int(pid_file.read_text()))
+
+
+@posix_only
+def test_a_second_interrupt_during_the_grace_period_still_kills(tmp_path, monkeypatch) -> None:
+    argv, pid_file = _trapping_step(tmp_path, "signal.SIG_IGN")
+    monkeypatch.setattr(subprocess.Popen, "communicate", _times_out_once_written(pid_file))
+
+    def interrupted(seconds: float) -> None:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(
+        prepared_runtimes, "time", SimpleNamespace(monotonic=time.monotonic, sleep=interrupted)
+    )
+    with pytest.raises(KeyboardInterrupt):
+        prepared_runtimes._run(argv, tmp_path, 60, group=True)
+    _assert_stopped(int(pid_file.read_text()))
+
+
+@posix_only
+def test_a_group_of_only_zombies_still_reports_the_timeout(tmp_path, monkeypatch) -> None:
+    killpg = os.killpg
+
+    def macos_killpg(pgid: int, sig: int) -> None:
+        try:
+            killpg(pgid, sig)
+        except ProcessLookupError:
+            raise PermissionError(1, "Operation not permitted") from None
+
+    monkeypatch.setattr(prepared_runtimes.os, "killpg", macos_killpg)
+    argv, pid_file = _trapping_step(tmp_path, "lambda *_: sys.exit(1)")
+    monkeypatch.setattr(subprocess.Popen, "communicate", _times_out_once_written(pid_file))
+    with pytest.raises(ConfigError, match="timed out"):
+        prepared_runtimes._run(argv, tmp_path, 60, group=True)
 
 
 @posix_only
@@ -629,17 +668,21 @@ def test_a_detached_grandchild_does_not_hold_the_timeout(tmp_path, monkeypatch) 
     argv, pid_file = _spawning_step(tmp_path, detach=True)
     monkeypatch.setattr(subprocess.Popen, "communicate", _times_out_once_written(pid_file))
     started = time.monotonic()
-    with pytest.raises(ConfigError, match="timed out"):
-        prepared_runtimes._run(argv, tmp_path, 60, group=True)
-    assert time.monotonic() - started < 10
-    os.kill(int(pid_file.read_text()), 9)
+    try:
+        with pytest.raises(ConfigError, match="timed out"):
+            prepared_runtimes._run(argv, tmp_path, 60, group=True)
+        assert time.monotonic() - started < 10
+    finally:
+        os.kill(int(pid_file.read_text()), 9)
 
 
 @posix_only
 def test_a_build_step_that_hangs_is_stopped(tmp_path: Path) -> None:
     argv = [sys.executable, "-c", "import time; time.sleep(30)"]
+    started = time.monotonic()
     with pytest.raises(ConfigError, match="timed out at .* after 0.5 s"):
         prepared_runtimes._run(argv, tmp_path, 0.5)
+    assert time.monotonic() - started < 5  # killed, not waited for
 
 
 def _tarball(entries: dict[str, tuple[bytes, int]]) -> bytes:

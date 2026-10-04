@@ -7,7 +7,6 @@ cache under ``runtimes/<name>/<version>/``.
 
 from __future__ import annotations
 
-import contextlib
 import hashlib
 import io
 import json
@@ -361,22 +360,32 @@ def _run(argv: list[str], cwd: Path, timeout_s: float, *, group: bool = False) -
 
 def _stop(process: subprocess.Popen[str], *, group: bool) -> None:
     """Stop a build step; a group step gets TERM first, so download scripts can clean up."""
-    if group and os.name == "posix":
-        with contextlib.suppress(ProcessLookupError):
-            os.killpg(process.pid, signal.SIGTERM)
+    posix_group = group and os.name == "posix"
+    try:
+        if posix_group and _signal_group(process, signal.SIGTERM):
             deadline = time.monotonic() + 2
-            while time.monotonic() < deadline:
+            while time.monotonic() < deadline and _signal_group(process, 0):
                 process.poll()
-                os.killpg(process.pid, 0)
                 time.sleep(0.05)
-            os.killpg(process.pid, signal.SIGKILL)
-    else:
-        process.kill()
-    process.wait()
-    # Not read: a grandchild that left the group may still hold them open.
-    for pipe in (process.stdout, process.stderr):
-        if pipe is not None:
-            pipe.close()
+    finally:
+        if posix_group:
+            _signal_group(process, signal.SIGKILL)
+        else:
+            process.kill()
+        process.wait()
+        # Not read: a grandchild that left the group may still hold them open.
+        for pipe in (process.stdout, process.stderr):
+            if pipe is not None:
+                pipe.close()
+
+
+def _signal_group(process: subprocess.Popen[str], sig: int) -> bool:
+    """Signal the step's process group; False once it is gone or holds only zombies."""
+    try:
+        os.killpg(process.pid, sig)
+    except OSError:  # ESRCH, or EPERM where only zombies remain
+        return False
+    return True
 
 
 def _stage_tflm(record: RuntimeRecord, kernels: RuntimeSource, tree: Path, staging: Path) -> None:
