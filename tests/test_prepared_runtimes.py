@@ -526,6 +526,16 @@ def test_a_truncated_tflm_download_is_refused_cleanly(tmp_path, monkeypatch) -> 
         prepared_runtimes._download_tree(TFLM.source, tmp_path / "tflite-micro", 5)
 
 
+def test_a_tflm_tarball_cut_short_without_an_http_error_is_refused(tmp_path, monkeypatch) -> None:
+    root = f"tflite-micro-{TFLM.source.commit}"
+    data = _tarball({f"{root}/x.h": (bytes(range(256)) * 64, 0o644)})
+    monkeypatch.setattr(
+        prepared_runtimes, "urlopen", lambda url, timeout: io.BytesIO(data[: len(data) // 2])
+    )
+    with pytest.raises(ConfigError, match="Cannot download"):
+        prepared_runtimes._download_tree(TFLM.source, tmp_path / "tflite-micro", 5)
+
+
 def test_preparing_tflm_is_refused_on_windows(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "cache"))
     monkeypatch.setattr(prepared_runtimes.sys, "platform", "win32")

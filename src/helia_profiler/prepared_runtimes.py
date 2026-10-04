@@ -20,6 +20,7 @@ import sys
 import tarfile
 import tempfile
 import time
+import zlib
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -323,7 +324,15 @@ def _download_tree(source: RuntimeSource, tree: Path, timeout_s: float) -> Path:
             if len(roots) != 1:
                 raise ValueError(f"{url} does not unpack to one directory")
             tar.extractall(tree.parent, filter="data")
-    except (OSError, URLError, HTTPException, ValueError, tarfile.TarError) as exc:
+    except (
+        OSError,
+        URLError,
+        HTTPException,
+        EOFError,
+        zlib.error,
+        ValueError,
+        tarfile.TarError,
+    ) as exc:
         raise ConfigError(f"Cannot download {url}: {exc}") from exc
     (tree.parent / roots.pop()).rename(tree)
     return tree
