@@ -82,7 +82,7 @@ class Image:
 
 
 _BYTE_SINK = re.compile(r"deployment_output(_[1-9][0-9]*)?")
-#: Sinks only typed fixtures emit; an image carrying one the caller did not declare is refused.
+#: Sinks only some builds emit; an image carrying one the caller did not declare is refused.
 _TYPED_SINK = re.compile(
     r"deployment_output_[1-9][0-9]*|deployment_arena_scan|deployment_gate_ticks"
 )
