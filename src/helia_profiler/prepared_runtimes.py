@@ -19,6 +19,7 @@ import signal
 import subprocess
 import tarfile
 import tempfile
+import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -149,6 +150,7 @@ def prepare_runtime(
     """Build the prepared archive for a runtime record into the hpx cache."""
     record, kernels = _prepared_record(name, version)
     fetch, stage = _PREPARERS[record.name]
+    # A download process that detached from its stopped group may still be writing here.
     with tempfile.TemporaryDirectory(
         prefix=f"hpx-{record.name}-", ignore_cleanup_errors=True
     ) as work:
@@ -258,8 +260,9 @@ def _fetch_tflm(
         os.path.abspath(resolve_toolchain_executable(Toolchain.ATFE, tool))
         for tool in ("clang", "clang++", "llvm-ar")
     )
-    if not Path(cc).is_file():
-        raise ConfigError(f"ATFE_ROOT has no {cc}")
+    missing = [tool for tool in (cc, cxx, ar) if not Path(tool).is_file()]
+    if missing:
+        raise ConfigError(f"ATFE_ROOT has no {', '.join(missing)}")
     tree = _download_tree(record.source, work / "tflite-micro", asset_s)
     pin = _TFLM_CMSIS_NN_PIN.search(_read(tree / _TFLM_CMSIS_NN_SCRIPT))
     if pin is None or pin.group(1) != kernels.commit:
@@ -269,7 +272,7 @@ def _fetch_tflm(
             f"not the record's {kernels.commit}"
         )
     make = ["make", "-n", "-f", _TFLM_MAKEFILE, *_TFLM_MAKE_SELECTION, "microlite"]
-    listing = _run(make, tree, asset_s)
+    listing = _run(make, tree, asset_s, group=True)
     objects = work / "objects"
     objects.mkdir()
     commands = []
@@ -321,12 +324,16 @@ def _download_tree(source: RuntimeSource, tree: Path, timeout_s: float) -> Path:
     return tree
 
 
-def _run(argv: list[str], cwd: Path, timeout_s: float) -> str:
-    """Run a build step in ``cwd`` and return its stdout, or raise naming the step."""
+def _run(argv: list[str], cwd: Path, timeout_s: float, *, group: bool = False) -> str:
+    """Run a build step in ``cwd`` and return its stdout, or raise naming the step.
+
+    A ``group`` step (make, whose download scripts start their own processes) runs in
+    its own session and is stopped with everything it started; other steps stay in
+    hpx's process group, so a terminal interrupt reaches them directly.
+    """
     step = argv[argv.index("-c") + 1] if "-c" in argv[:-1] else " ".join(argv[:2])
     env = {name: os.environ[name] for name in _TFLM_ENV if name in os.environ}
     try:
-        # Its own session, so a timeout also stops make's download and compiler children.
         process = subprocess.Popen(
             argv,
             cwd=cwd,
@@ -335,24 +342,41 @@ def _run(argv: list[str], cwd: Path, timeout_s: float) -> str:
             stderr=subprocess.PIPE,
             text=True,
             errors="replace",
-            start_new_session=True,
+            start_new_session=group,
         )
     except OSError as exc:
         raise ConfigError(f"Cannot run {argv[0]}: {exc}") from exc
     try:
         stdout, stderr = process.communicate(timeout=timeout_s)
-    except subprocess.TimeoutExpired as exc:
-        if os.name == "posix":
-            with contextlib.suppress(ProcessLookupError):
-                os.killpg(process.pid, signal.SIGKILL)
-        else:
-            process.kill()
-        process.communicate()
-        raise ConfigError(f"Preparing tflm timed out at {step} after {timeout_s:g} s") from exc
+    except BaseException as exc:
+        _stop(process, group=group)
+        if isinstance(exc, subprocess.TimeoutExpired):
+            raise ConfigError(f"Preparing tflm timed out at {step} after {timeout_s:g} s") from exc
+        raise
     if process.returncode != 0:
         tail = "\n".join(stderr.strip().splitlines()[-20:])
         raise ConfigError(f"Preparing tflm failed at {step} (exit {process.returncode}):\n{tail}")
     return stdout
+
+
+def _stop(process: subprocess.Popen[str], *, group: bool) -> None:
+    """Stop a build step; a group step gets TERM first, so download scripts can clean up."""
+    if group and os.name == "posix":
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(process.pid, signal.SIGTERM)
+            deadline = time.monotonic() + 2
+            while time.monotonic() < deadline:
+                process.poll()
+                os.killpg(process.pid, 0)
+                time.sleep(0.05)
+            os.killpg(process.pid, signal.SIGKILL)
+    else:
+        process.kill()
+    process.wait()
+    # Not read: a grandchild that left the group may still hold them open.
+    for pipe in (process.stdout, process.stderr):
+        if pipe is not None:
+            pipe.close()
 
 
 def _stage_tflm(record: RuntimeRecord, kernels: RuntimeSource, tree: Path, staging: Path) -> None:

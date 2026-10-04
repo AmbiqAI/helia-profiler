@@ -84,12 +84,18 @@ TFLM's `-O*` and `-ffp-mode` flags with `-O3 -ffast-math -fshort-enums
 embeds no host path and two prepares give the same bytes. The objects are
 archived in source-list order. Make and every compile see only `PATH`, `HOME`,
 `TMPDIR` and the proxy and CA-certificate variables, so the caller's environment
-cannot change the selection or the flags. Each step stops, with its children, at
-the download timeout. The schema-1 manifest pins the `.h` closure of
-`tensorflow/`, `signal/` and `third_party/`. Preparing needs GNU make 3.82 or later,
-bash, and the POSIX tools TFLM's download scripts call (among them wget, unzip,
-md5sum and python3). Prepare checks only for make and bash; a missing script tool
-fails the dry run with TFLM's own message. Windows hosts cannot prepare TFLM.
+cannot change the selection or the flags. The make dry run runs in its own
+session: when it times out or is interrupted it is stopped with every process it
+started, TERM first so TFLM's download scripts remove their temporary files, then
+KILL. Compiles stay in hpx's process group, so an interrupt reaches them directly,
+and a compile that times out is killed. The schema-1 manifest pins the `.h` closure
+of `tensorflow/`, `signal/` and `third_party/`. Preparing needs bash, GNU make and
+the tools TFLM's download scripts call (among them wget, curl, unzip, patch, md5sum
+and python3). Prepare checks only for make and bash; a missing script tool fails
+the dry run with TFLM's own message. The record's archive was built with GNU make
+4.3. GNU make 3.82 through 4.2 do not sort wildcard results, so their source order
+may differ; the archive then differs from the record, which prepare reports.
+Windows hosts cannot prepare TFLM.
 
 heliaRT (`engine.type: helia-rt`, backend `helia`) also links a
 `PreparedUpstreamRuntime`, whose manifest uses schema 2:

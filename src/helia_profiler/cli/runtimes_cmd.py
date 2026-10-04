@@ -1,4 +1,4 @@
-"""Implementation of the ``hpx runtimes`` command (list/show)."""
+"""Implementation of the ``hpx runtimes`` command (list, show, prepare)."""
 
 from __future__ import annotations
 

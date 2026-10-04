@@ -7,6 +7,7 @@ import io
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tarfile
 import time
@@ -277,6 +278,9 @@ def test_a_prepare_removes_leftovers_of_an_interrupted_replace(cache: Path) -> N
     assert sorted(p.name for p in first.directory.parent.iterdir()) == ["1.21.3"]
 
 
+#: Build steps run as POSIX process groups; TFLM is prepared on POSIX hosts only.
+posix_only = pytest.mark.skipif(os.name != "posix", reason="TFLM is prepared on POSIX hosts")
+
 _TFLM = runtime("tflm")
 assert _TFLM is not None and _TFLM.kernels is not None
 TFLM, TFLM_KERNELS = _TFLM, _TFLM.kernels
@@ -312,14 +316,15 @@ def tflm_build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[list[str
     monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "cache"))
     monkeypatch.setenv("ATFE_ROOT", str(tmp_path / "atfe"))
     (tmp_path / "atfe" / "bin").mkdir(parents=True)
-    (tmp_path / "atfe" / "bin" / "clang").write_text("")
+    for tool in ("clang", "clang++", "llvm-ar"):
+        (tmp_path / "atfe" / "bin" / tool).write_text("")
     monkeypatch.setattr(prepared_runtimes.shutil, "which", lambda tool: f"/usr/bin/{tool}")
     monkeypatch.setattr(
         prepared_runtimes, "_download_tree", lambda source, tree, timeout_s: _tflm_tree(tree)
     )
     calls: list[list[str]] = []
 
-    def run(argv: list[str], cwd: Path, timeout_s: float) -> str:
+    def run(argv: list[str], cwd: Path, timeout_s: float, *, group: bool = False) -> str:
         calls.append(argv)
         if argv[0] == "make":
             return TFLM_LISTING
@@ -377,7 +382,9 @@ def test_a_tflm_tree_pinning_other_kernels_is_refused(tflm_build, tmp_path, monk
     monkeypatch.setattr(
         prepared_runtimes, "_download_tree", lambda s, tree, t: _tflm_tree(tree, pin=other)
     )
-    with pytest.raises(ConfigError, match=f"pins CMSIS-NN {other}, not the record's 4ab83cc3"):
+    with pytest.raises(
+        ConfigError, match=f"pins CMSIS-NN {other}, not the record's {TFLM_KERNELS.commit[:8]}"
+    ):
         prepare_runtime("tflm")
     assert tflm_build == []
     assert not (tmp_path / "cache" / "runtimes").exists()
@@ -393,7 +400,7 @@ def test_a_relative_atfe_root_names_absolute_tools(tflm_build, tmp_path, monkeyp
 
 @pytest.mark.parametrize("line", ["clang++ -c", "clang++ -c x.cc", 'clang "unterminated -c x.cc'])
 def test_an_unparseable_compile_line_is_refused_cleanly(tflm_build, monkeypatch, line) -> None:
-    monkeypatch.setattr(prepared_runtimes, "_run", lambda argv, cwd, timeout_s: line + "\n")
+    monkeypatch.setattr(prepared_runtimes, "_run", lambda argv, cwd, timeout_s, **_: line + "\n")
     result = CliRunner().invoke(app, ["runtimes", "prepare", "tflm"])
     assert result.exit_code == 1
     assert "Cannot read TFLM's make dry-run line" in result.output
@@ -416,7 +423,9 @@ def test_preparing_tflm_names_missing_host_tools(tflm_build, monkeypatch) -> Non
 
 
 def test_an_empty_tflm_source_list_is_refused(tflm_build, monkeypatch) -> None:
-    monkeypatch.setattr(prepared_runtimes, "_run", lambda argv, cwd, timeout_s: "make: Nothing\n")
+    monkeypatch.setattr(
+        prepared_runtimes, "_run", lambda argv, cwd, timeout_s, **_: "make: Nothing\n"
+    )
     with pytest.raises(ConfigError, match="listed no translation units"):
         prepare_runtime("tflm")
 
@@ -424,7 +433,7 @@ def test_an_empty_tflm_source_list_is_refused(tflm_build, monkeypatch) -> None:
 def test_a_failed_tflm_compile_leaves_nothing_behind_and_no_traceback(
     tflm_build, tmp_path, monkeypatch
 ) -> None:
-    def run(argv: list[str], cwd: Path, timeout_s: float) -> str:
+    def run(argv: list[str], cwd: Path, timeout_s: float, *, group: bool = False) -> str:
         if argv[0] == "make":
             return TFLM_LISTING
         raise ConfigError("Preparing tflm failed at tensorflow/lite/micro/micro_log.cc (exit 1)")
@@ -437,6 +446,7 @@ def test_a_failed_tflm_compile_leaves_nothing_behind_and_no_traceback(
     assert not (tmp_path / "cache" / "runtimes").exists()
 
 
+@posix_only
 def test_a_failed_build_step_names_the_source_exit_and_stderr(tmp_path: Path) -> None:
     script = tmp_path / "fail.py"
     script.write_text("import sys\nsys.stderr.write('first\\nerror: boom\\n')\nsys.exit(3)\n")
@@ -446,6 +456,7 @@ def test_a_failed_build_step_names_the_source_exit_and_stderr(tmp_path: Path) ->
     assert str(exc.value).endswith("first\nerror: boom")
 
 
+@posix_only
 def test_build_steps_see_only_the_allowed_environment(tmp_path, monkeypatch) -> None:
     for name, value in {"ARM_NN_ENABLE_F16": "1", "CPATH": "/x", "MAKEFLAGS": "-j9"}.items():
         monkeypatch.setenv(name, value)
@@ -456,15 +467,17 @@ def test_build_steps_see_only_the_allowed_environment(tmp_path, monkeypatch) -> 
     assert set(seen) <= set(prepared_runtimes._TFLM_ENV) | {"LC_CTYPE", "__CF_USER_TEXT_ENCODING"}
 
 
+@posix_only
 def test_build_steps_keep_the_download_proxy_and_ca_settings(tmp_path, monkeypatch) -> None:
-    for name in ("SSL_CERT_FILE", "CURL_CA_BUNDLE", "https_proxy"):
+    for name in ("SSL_CERT_FILE", "SSL_CERT_DIR", "CURL_CA_BUNDLE", "https_proxy"):
         monkeypatch.setenv(name, "/etc/site")
     script = tmp_path / "env.py"
     script.write_text("import json, os\nprint(json.dumps(sorted(os.environ)))\n")
     seen = json.loads(prepared_runtimes._run([sys.executable, str(script)], tmp_path, 60))
-    assert {"SSL_CERT_FILE", "CURL_CA_BUNDLE", "https_proxy"} <= set(seen)
+    assert {"SSL_CERT_FILE", "SSL_CERT_DIR", "CURL_CA_BUNDLE", "https_proxy"} <= set(seen)
 
 
+@posix_only
 def test_undecodable_build_output_still_reports_the_failure(tmp_path: Path) -> None:
     script = tmp_path / "bytes.py"
     script.write_text("import sys\nsys.stderr.buffer.write(b'bad \\xff byte')\nsys.exit(2)\n")
@@ -472,40 +485,31 @@ def test_undecodable_build_output_still_reports_the_failure(tmp_path: Path) -> N
         prepared_runtimes._run([sys.executable, str(script)], tmp_path, 60)
 
 
-@pytest.mark.skipif(os.name != "posix", reason="process groups are POSIX")
-def test_a_timed_out_build_step_stops_its_children(tmp_path: Path) -> None:
-    script = tmp_path / "spawn.py"
-    pid_file = tmp_path / "child.pid"
-    script.write_text(
-        "import subprocess, sys, time\n"
-        "child = subprocess.Popen(['sleep', '30'])\n"
-        f"open({str(pid_file)!r}, 'w').write(str(child.pid))\n"
-        "time.sleep(30)\n"
-    )
+@posix_only
+def test_a_timed_out_group_step_stops_its_children(tmp_path, monkeypatch) -> None:
+    argv, pid_file = _spawning_step(tmp_path)
+    monkeypatch.setattr(subprocess.Popen, "communicate", _times_out_once_written(pid_file))
     with pytest.raises(ConfigError, match="timed out"):
-        prepared_runtimes._run([sys.executable, str(script)], tmp_path, 2)
-    child = int(pid_file.read_text())
-    deadline = time.monotonic() + 5
-    while time.monotonic() < deadline:
-        try:
-            os.kill(child, 0)
-        except ProcessLookupError:
-            return
-        time.sleep(0.05)
-    pytest.fail(f"child {child} outlived the timeout")
+        prepared_runtimes._run(argv, tmp_path, 60, group=True)
+    _assert_stopped(int(pid_file.read_text()))
 
 
-def test_every_tflm_build_step_takes_the_download_timeout(tflm_build, monkeypatch) -> None:
+def test_every_tflm_build_step_takes_the_download_timeout_and_only_make_is_a_group(
+    tflm_build, monkeypatch
+) -> None:
     timeouts: list[float] = []
+    groups: list[bool] = []
     fake = prepared_runtimes._run
 
-    def run(argv: list[str], cwd: Path, timeout_s: float) -> str:
+    def run(argv: list[str], cwd: Path, timeout_s: float, *, group: bool = False) -> str:
         timeouts.append(timeout_s)
+        groups.append(group)
         return fake(argv, cwd, timeout_s)
 
     monkeypatch.setattr(prepared_runtimes, "_run", run)
     prepare_runtime("tflm", asset_s=7)
     assert timeouts == [7, 7, 7, 7]
+    assert groups == [True, False, False, False]  # only make starts processes of its own
 
 
 def test_a_python_without_tar_filters_is_refused(tmp_path, monkeypatch) -> None:
@@ -514,17 +518,124 @@ def test_a_python_without_tar_filters_is_refused(tmp_path, monkeypatch) -> None:
         prepared_runtimes._download_tree(TFLM.source, tmp_path / "tflite-micro", 5)
 
 
-def test_an_atfe_root_without_clang_is_refused_before_downloading(
-    tflm_build, tmp_path, monkeypatch
-):
-    monkeypatch.setenv("ATFE_ROOT", str(tmp_path / "empty"))
+@pytest.mark.parametrize("tool", ["clang", "clang++", "llvm-ar"])
+def test_an_atfe_root_missing_a_tool_is_refused_before_downloading(
+    tflm_build, tmp_path, monkeypatch, tool
+) -> None:
+    (tmp_path / "atfe" / "bin" / tool).unlink()
     monkeypatch.setattr(
         prepared_runtimes, "_download_tree", lambda *_: pytest.fail("downloaded first")
     )
-    with pytest.raises(ConfigError, match="ATFE_ROOT has no"):
+    with pytest.raises(ConfigError) as exc:
         prepare_runtime("tflm")
+    assert str(exc.value) == f"ATFE_ROOT has no {tmp_path / 'atfe' / 'bin' / tool}"
 
 
+def _assert_stopped(pid: int) -> None:
+    """Wait for ``pid`` to exit; a zombie nobody has reaped yet counts as stopped."""
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return
+        stat = Path(f"/proc/{pid}/stat")
+        if stat.exists() and stat.read_text().rsplit(")", 1)[1].split()[0] == "Z":
+            return
+        time.sleep(0.05)
+    os.kill(pid, 9)
+    pytest.fail(f"process {pid} outlived its build step")
+
+
+def _spawning_step(tmp_path: Path, *, detach: bool = False) -> tuple[list[str], Path]:
+    """A step that starts a ``sleep`` child, records its pid, then sleeps."""
+    pid_file = tmp_path / "child.pid"
+    script = tmp_path / "spawn.py"
+    script.write_text(
+        "import subprocess, time\n"
+        f"child = subprocess.Popen(['sleep', '30'], start_new_session={detach})\n"
+        f"open({str(pid_file)!r}, 'w').write(str(child.pid))\n"
+        "time.sleep(30)\n"
+    )
+    return [sys.executable, str(script)], pid_file
+
+
+def _times_out_once_written(path: Path, error: BaseException | None = None):
+    """A ``Popen.communicate`` that raises once the step has written ``path``."""
+
+    def communicate(self, *args, **kwargs):
+        while not path.exists():
+            time.sleep(0.05)
+        raise error or subprocess.TimeoutExpired(self.args, 1)
+
+    return communicate
+
+
+@posix_only
+def test_an_interrupted_group_step_stops_its_children(tmp_path, monkeypatch) -> None:
+    argv, pid_file = _spawning_step(tmp_path)
+    monkeypatch.setattr(
+        subprocess.Popen, "communicate", _times_out_once_written(pid_file, KeyboardInterrupt())
+    )
+    with pytest.raises(KeyboardInterrupt):
+        prepared_runtimes._run(argv, tmp_path, 60, group=True)
+    _assert_stopped(int(pid_file.read_text()))
+
+
+@posix_only
+@pytest.mark.parametrize("group", [True, False])
+def test_only_a_group_step_leaves_hpx_s_process_group(tmp_path, group) -> None:
+    argv = [sys.executable, "-c", "import os; print(os.getpgid(0))"]
+    leader = int(prepared_runtimes._run(argv, tmp_path, 60, group=group))
+    assert (leader != os.getpgid(0)) is group
+
+
+def _trapping_step(tmp_path: Path, on_term: str) -> tuple[list[str], Path]:
+    """A step that handles TERM with ``on_term``, records its pid, then sleeps."""
+    pid_file = tmp_path / "step.pid"
+    script = tmp_path / "trap.py"
+    script.write_text(
+        "import os, signal, sys, time\n"
+        f"signal.signal(signal.SIGTERM, {on_term})\n"
+        f"open({str(pid_file)!r}, 'w').write(str(os.getpid()))\n"
+        "time.sleep(30)\n"
+    )
+    return [sys.executable, str(script)], pid_file
+
+
+@posix_only
+def test_a_stopped_group_step_is_asked_to_terminate_first(tmp_path, monkeypatch) -> None:
+    marker = tmp_path / "cleaned"
+    argv, pid_file = _trapping_step(
+        tmp_path, f"lambda *_: (open({str(marker)!r}, 'w'), sys.exit(1))"
+    )
+    monkeypatch.setattr(subprocess.Popen, "communicate", _times_out_once_written(pid_file))
+    with pytest.raises(ConfigError, match="timed out"):
+        prepared_runtimes._run(argv, tmp_path, 60, group=True)
+    assert marker.exists()
+
+
+@posix_only
+def test_a_group_step_that_ignores_terminate_is_killed(tmp_path, monkeypatch) -> None:
+    argv, pid_file = _trapping_step(tmp_path, "signal.SIG_IGN")
+    monkeypatch.setattr(subprocess.Popen, "communicate", _times_out_once_written(pid_file))
+    with pytest.raises(ConfigError, match="timed out"):
+        prepared_runtimes._run(argv, tmp_path, 60, group=True)
+    _assert_stopped(int(pid_file.read_text()))
+
+
+@posix_only
+def test_a_detached_grandchild_does_not_hold_the_timeout(tmp_path, monkeypatch) -> None:
+    argv, pid_file = _spawning_step(tmp_path, detach=True)
+    monkeypatch.setattr(subprocess.Popen, "communicate", _times_out_once_written(pid_file))
+    started = time.monotonic()
+    with pytest.raises(ConfigError, match="timed out"):
+        prepared_runtimes._run(argv, tmp_path, 60, group=True)
+    assert time.monotonic() - started < 10
+    os.kill(int(pid_file.read_text()), 9)
+
+
+@posix_only
 def test_a_build_step_that_hangs_is_stopped(tmp_path: Path) -> None:
     argv = [sys.executable, "-c", "import time; time.sleep(30)"]
     with pytest.raises(ConfigError, match="timed out at .* after 0.5 s"):
