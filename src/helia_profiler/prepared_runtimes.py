@@ -11,6 +11,7 @@ import hashlib
 import json
 import re
 import shutil
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -18,8 +19,8 @@ from .errors import ConfigError
 from .fixture_runtime import FixtureFile, PreparedUpstreamRuntime
 from .runtime_records import RuntimeRecord, RuntimeSource, runtime
 
-#: The heliaRT release library a fixture links: Cortex-M55, ATfE, release with logs.
-_HELIA_RT_LIBRARY = "lib/libhelia-rt-cm55-atfe-release-with-logs.a"
+#: The heliaRT build a fixture links: its ATfE release-with-logs library for the fixture core.
+_HELIA_RT_VARIANT = "release-with-logs"
 #: Release directories whose headers form the pinned header closure.
 _HELIA_RT_HEADER_DIRS = ("tensorflow", "third_party", "signal")
 _HELIA_RT_INCLUDE_DIRS = (
@@ -86,20 +87,39 @@ def prepare_runtime(
         raise ConfigError(
             f"The helia-rt v{record.version} release was not built from {record.source.commit}"
         )
+    missing = [top for top in _HELIA_RT_HEADER_DIRS if not (dist / top).is_dir()]
+    if missing:
+        raise ConfigError(f"The helia-rt v{record.version} release has no {', '.join(missing)}/")
     directory = prepared_directory(record)
-    staging = directory.with_name(directory.name + ".partial")
-    shutil.rmtree(staging, ignore_errors=True)
+    directory.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=f".{directory.name}-", dir=directory.parent))
+    try:
+        _stage(record, kernels, dist, staging)
+        _load(record, staging).runtime.verify()
+        _install(staging, directory)
+    except (OSError, ValueError) as exc:
+        raise ConfigError(f"Cannot prepare {record.name} {record.version}: {exc}") from exc
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+    return _load(record, directory)
+
+
+def _stage(record: RuntimeRecord, kernels: RuntimeSource, dist: Path, staging: Path) -> None:
+    from .engines.helia_rt.artifacts import _core_tag, _library_name, _toolchain_tag
+    from .fixture_target import FIXTURE_BOARD
+
     include = staging / "include"
     headers = {}
     for top in _HELIA_RT_HEADER_DIRS:
         for path in sorted((dist / top).rglob("*.h")):
-            name_ = path.relative_to(dist).as_posix()
-            target = include / name_
+            name = path.relative_to(dist).as_posix()
+            target = include / name
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(path, target)
-            headers[name_] = _sha256(target)
+            headers[name] = _sha256(target)
+    library = _library_name(_core_tag(FIXTURE_BOARD), _toolchain_tag("atfe"), _HELIA_RT_VARIANT)
     archive = staging / "runtime.a"
-    shutil.copyfile(dist / _HELIA_RT_LIBRARY, archive)
+    shutil.copyfile(dist / "lib" / library, archive)
     manifest = {
         "schema_version": 2,
         "stack": "helia-rt",
@@ -122,11 +142,17 @@ def prepare_runtime(
     (staging / "provider-manifest.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    prepared = _load(record, staging)
-    prepared.runtime.verify()
-    shutil.rmtree(directory, ignore_errors=True)
+
+
+def _install(staging: Path, directory: Path) -> None:
+    """Swap ``staging`` in for ``directory``; a reader sees the old or the new install, never neither."""
+    retired = None
+    if directory.exists():
+        retired = Path(tempfile.mkdtemp(prefix=f".{directory.name}-old-", dir=directory.parent))
+        directory.rename(retired / "install")
     staging.rename(directory)
-    return _load(record, directory)
+    if retired is not None:
+        shutil.rmtree(retired, ignore_errors=True)
 
 
 def prepared_runtime(name: str, version: str | None = None) -> PreparedArchive:
@@ -143,7 +169,13 @@ def prepared_runtime(name: str, version: str | None = None) -> PreparedArchive:
 
 def _load(record: RuntimeRecord, directory: Path) -> PreparedArchive:
     manifest = directory / "provider-manifest.json"
-    archive_sha256 = json.loads(manifest.read_text(encoding="utf-8"))["archive_sha256"]
+    try:
+        archive_sha256 = json.loads(manifest.read_text(encoding="utf-8"))["archive_sha256"]
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        raise ConfigError(
+            f"Prepared runtime manifest {manifest} is unreadable: {exc}",
+            hint=f"Run: hpx runtimes prepare {record.name} {record.version}",
+        ) from exc
     return PreparedArchive(
         record,
         directory,

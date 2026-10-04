@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from dataclasses import replace
 from pathlib import Path
 
@@ -171,3 +172,61 @@ def test_runtimes_prepare_cli_reports_the_archive(cache: Path) -> None:
     refused = CliRunner().invoke(app, ["runtimes", "prepare", "tflm"])
     assert refused.exit_code == 1
     assert "helia-rt only, not tflm" in refused.output
+
+
+def _fetch(monkeypatch, dist: Path) -> None:
+    monkeypatch.setattr(
+        "helia_profiler.engines.helia_rt.download._fetch_github_release",
+        lambda *_a, **_k: (dist, "1.21.3"),
+    )
+
+
+def test_a_failed_prepare_leaves_nothing_behind_and_no_traceback(tmp_path, monkeypatch) -> None:
+    cache = tmp_path / "cache"
+    monkeypatch.setenv("HPX_CACHE_DIR", str(cache))
+    dist = _dist(tmp_path / "dist")
+    (dist / "lib" / "libhelia-rt-cm55-atfe-release-with-logs.a").unlink()
+    _fetch(monkeypatch, dist)
+    result = CliRunner().invoke(app, ["runtimes", "prepare", "helia-rt"])
+    assert result.exit_code == 1
+    assert "Cannot prepare helia-rt 1.21.3" in result.output and "Traceback" not in result.output
+    assert list((cache / "runtimes" / "helia-rt").iterdir()) == []
+
+
+def test_a_release_without_a_header_directory_is_refused(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "cache"))
+    dist = _dist(tmp_path / "dist")
+    shutil.rmtree(dist / "signal")
+    _fetch(monkeypatch, dist)
+    with pytest.raises(ConfigError, match="release has no signal/"):
+        prepare_runtime("helia-rt")
+
+
+def test_re_preparing_replaces_the_install_without_leftovers(cache: Path) -> None:
+    first = prepare_runtime("helia-rt")
+    (first.directory / "stale.txt").write_text("from the first install")
+    second = prepare_runtime("helia-rt")
+    assert second.directory == first.directory and not (second.directory / "stale.txt").exists()
+    assert sorted(p.name for p in second.directory.parent.iterdir()) == ["1.21.3"]
+    assert second.runtime.manifest.sha256 == first.runtime.manifest.sha256
+
+
+def test_a_malformed_prepared_manifest_names_the_prepare_command(cache: Path) -> None:
+    prepared = prepare_runtime("helia-rt")
+    (prepared.directory / "provider-manifest.json").write_text("{}")
+    with pytest.raises(ConfigError, match="unreadable") as exc:
+        prepared_runtime("helia-rt")
+    assert "hpx runtimes prepare helia-rt 1.21.3" in (exc.value.hint or "")
+
+
+def test_an_explicit_runtime_is_kept_and_identity_covers_the_runtime(cache, tmp_path) -> None:
+    prepared = prepare_runtime("helia-rt")
+    resolved = _request(tmp_path / "a", EngineType.HELIA_RT)
+    explicit = replace(resolved, runtime=prepared.runtime)
+    assert explicit.runtime is prepared.runtime
+    assert explicit.intent_identity == resolved.intent_identity
+    (prepared.directory / "provider-manifest.json").write_text(
+        (prepared.directory / "provider-manifest.json").read_text() + " "
+    )
+    changed = _request(tmp_path / "b", EngineType.HELIA_RT)
+    assert changed.intent_identity != resolved.intent_identity

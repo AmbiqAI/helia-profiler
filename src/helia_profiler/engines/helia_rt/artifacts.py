@@ -104,6 +104,11 @@ def _toolchain_tag(toolchain: str) -> str:
     return get_toolchain_spec(toolchain).heliart_tag
 
 
+def _library_name(core: str, toolchain_tag: str, variant: str) -> str:
+    """The release's library for a core, toolchain tag and build variant."""
+    return f"libhelia-rt-{core}-{toolchain_tag}-{variant}.a"
+
+
 def _verify_prebuilt_archive(
     dist_path: Path,
     *,
@@ -115,7 +120,7 @@ def _verify_prebuilt_archive(
 ) -> None:
     """Fail fast if the required ``.a`` is missing from the distribution."""
     core = _core_tag(board, registry=registry, override=core_override)
-    name = f"libhelia-rt-{core}-{toolchain_tag}-{variant}.a"
+    name = _library_name(core, toolchain_tag, variant)
     if not (dist_path / "lib" / name).is_file():
         available = sorted(p.name for p in (dist_path / "lib").glob("*.a"))
         raise EngineError(

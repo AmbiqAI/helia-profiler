@@ -80,6 +80,15 @@ heliaRT (`engine.type: helia-rt`, backend `helia`) also links a
 - `build.kernel_dir: helia`;
 - `build.consumer_defines`, which must include `TF_LITE_STATIC_MEMORY`.
 
+A heliaRT `FixtureBuildRequest` that names no runtime uses the archive
+`hpx runtimes prepare helia-rt` built from the default helia-rt runtime record.
+Prepare takes the Cortex-M55 ATfE release-with-logs library and the `.h` closure
+of `tensorflow/`, `third_party/` and `signal/` from the helia-rt release the
+record pins. It refuses a release whose `MANIFEST.txt` names another commit, and
+writes the manifest's providers, ABI and defines itself, so they record what
+hpx built rather than a caller's claim. An archive whose bytes differ from the
+record's sha256 is reported, not refused.
+
 The archive is staged as the local module `hpx-heliart-runtime` and aliased to
 `nsx::helia_rt`. Its declared defines apply to every consumer; schema 1 keeps the
 fixed upstream defines. It replaces the registry `nsx-helia-rt` and

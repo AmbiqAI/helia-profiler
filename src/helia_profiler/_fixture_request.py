@@ -115,8 +115,6 @@ class FixtureBuildRequest:
             )
         if self.aot is not None and self.engine is not EngineType.HELIA_AOT:
             raise ConfigError("heliaAOT options apply to heliaAOT fixtures only")
-        if self.runtime is None and self.engine is EngineType.HELIA_RT:
-            object.__setattr__(self, "runtime", prepared_runtime(self.engine.value).runtime)
         try:
             self.target.verify()
         except ValueError as exc:
@@ -126,6 +124,8 @@ class FixtureBuildRequest:
                 f"Fixture placement not qualified: arena {self.placement.arena.value}, "
                 f"weights {self.placement.weights.value}"
             )
+        if self.runtime is None and self.engine is EngineType.HELIA_RT:
+            object.__setattr__(self, "runtime", prepared_runtime(self.engine.value).runtime)
 
     @property
     def intent_identity(self) -> str:
