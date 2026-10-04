@@ -166,6 +166,8 @@ def test_helia_rt_and_core_pins_agree_across_the_baseline() -> None:
     assert helia_rt is not None
     assert (helia_rt.version, helia_rt.source.commit) == (HELIART_VERSION, HELIART_SOURCE_COMMIT)
     assert baseline.project("helia-rt").ref == HELIART_SOURCE_COMMIT
+    assert helia_rt.kernels is not None
+    assert helia_rt.kernels.commit == baseline.project("ns-cmsis-nn").ref
     executorch = runtime("executorch")
     assert executorch is not None
     assert baseline.project("nsx-executorch").ref == executorch.source.commit
