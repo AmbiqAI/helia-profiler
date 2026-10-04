@@ -73,6 +73,8 @@ def test_the_energy_gate_brackets_exactly_the_timed_loop(scope):
     begin, end = body.index("hpx_sync_window_begin();"), body.index("hpx_sync_window_end();")
     status = body.index("if (invocation_status != 0)")
     assert warmup < begin < timed < end < status
+    loop_body = body[timed : body.index("\n    }\n", timed)]
+    assert "hpx_sync_window" not in loop_body, "the gate must bracket the loop, not sit inside it"
     main = text[text.index("int main()") :]
     assert main.index("hpx_sync_init();") < main.index("infer_fixture()")
     assert body.index("const uint32_t gate_t0 = hpx_stimer_ticks();") < begin

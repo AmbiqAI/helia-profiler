@@ -18,6 +18,7 @@ from .fixture_runtime import FixtureFile
 from .fixture_stage import FixtureStage
 from .fixture_target import FixtureTarget, fixture_cpu_hz
 from .power.base import PowerResult
+from .power.diagnostics import gate_fall_wait_s
 from .target.probe.flash import flash_binary
 from .target.probe.jlink import (
     attached_session,
@@ -241,11 +242,15 @@ def capture_fixture(
         and energy.calls > 0
         and type(energy.expected_window_s) in (int, float)
         and math.isfinite(energy.expected_window_s)
-        and _MIN_GATE_S <= energy.expected_window_s <= request.settle_seconds
+        and energy.calls <= 100000
+        and _MIN_GATE_S <= energy.expected_window_s
+        and request.settle_seconds
+        >= gate_fall_wait_s(0.0, longest_window_s=energy.expected_window_s, lockstep=False)
         and isinstance(energy.instrument_serial, str)
-        and bool(energy.instrument_serial.strip())
+        and bool(energy.instrument_serial)
+        and energy.instrument_serial == energy.instrument_serial.strip()
         and type(energy.gate_input_index) is int
-        and energy.gate_input_index >= 0
+        and 0 <= energy.gate_input_index < 8
         and type(energy.io_voltage) in (int, float)
         and 0 < energy.io_voltage <= 5,
         "Invalid energy capture",

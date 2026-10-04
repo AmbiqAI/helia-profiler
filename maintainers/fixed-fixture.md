@@ -302,7 +302,11 @@ before it resets the target, so the window cannot be missed, and keeps the probe
 detached until the window has closed; read-back and terminal checks then run as
 usual. The timed loop must last at least the instrument's one-second minimum gate:
 `expected_window_s` below it is refused before the device is touched, so size the
-iterations to reach it. A capture whose window the instrument did not gate fails,
+iterations to reach it, and predict it from a latency run: the instrument plans its
+accepted gate from that prediction. `settle_seconds` must hold boot, warm-up and the
+window, by the same rule the profile path's free-running gated capture uses
+(`gate_fall_wait_s` without lock-step); a shorter settle is refused up front. These
+fields are fixture API 1.2. A capture whose window the instrument did not gate fails,
 and so does a gate shorter than the firmware's timed span. The gate covers the
 whole timed loop, including the input restores that `invoke_only` latency
 excludes, so energy per inference always counts one restore and one invoke. The

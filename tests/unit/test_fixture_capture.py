@@ -945,8 +945,11 @@ def gated(tmp_path, monkeypatch):
         def memory_write8(self, address, values):
             memory[address] = bytes(values)
 
+    events = []
+
     @contextmanager
     def attach(**kwargs):
+        events.append("attach")
         yield Session()
 
     terminal = {
@@ -956,7 +959,6 @@ def gated(tmp_path, monkeypatch):
         0x2000000C: struct.pack("<7I", 50, 10, 2, 32768, 300, 96000000, 1),
         0x20000028: struct.pack("<I", 65536),
     }
-    events = []
 
     def reset(**kwargs):
         events.append("reset")
@@ -972,6 +974,7 @@ def gated(tmp_path, monkeypatch):
         def capture_gated(self, **kwargs):
             events.append(("capture", kwargs))
             kwargs["on_started"]()
+            events.append("window closed")
             return state["power"]
 
     monkeypatch.setattr(capture, "attached_session", attach)
@@ -990,13 +993,17 @@ def test_the_gated_window_is_captured_around_the_reset(gated) -> None:
     assert result.power is state["power"]
     assert result.gate_seconds == 2.0
     assert result.power.metadata.integrity == PowerIntegrity.VALID
-    assert events[0] == ("driver", "JS320-1")
-    (_, kwargs), after = events[1], events[2:]
+    window = events.index("window closed")
+    capture_at = next(i for i, e in enumerate(events) if isinstance(e, tuple) and e[0] == "capture")
+    assert events[capture_at - 1] == ("driver", "JS320-1")
+    assert "attach" not in events[capture_at:window], "probe attached during the window"
+    (_, kwargs), after = events[capture_at], events[capture_at + 1 :]
     assert after[0] == "reset"
     assert not any(isinstance(e, tuple) and e[0] == "sleep" and e[1] >= 1 for e in after)
     assert kwargs["sync_input_index"] == 0 and kwargs["io_voltage"] == 1.8
     assert kwargs["clean_infer_count"] == 10 and kwargs["clean_infer_avg_us"] == 200000
     assert kwargs["lockstep"] is False and kwargs["duration_s"] == request.settle_seconds
+    assert kwargs["minimum_gate_s"] == 1.0
     receipt = json.loads((request.evidence_dir / "receipt.json").read_text())
     assert receipt["gate_seconds"] == 2.0 and receipt["power"]["summary"]["energy_j"] == 0.0072
 
@@ -1077,7 +1084,11 @@ def _energy(**changes: object) -> capture.FixtureEnergyCapture:
         _energy(expected_window_s=0.999),
         _energy(expected_window_s=31.0),
         _energy(instrument_serial=" "),
+        _energy(instrument_serial=" JS320-1"),
+        _energy(expected_window_s=25.0),  # settle cannot hold boot, warm-up and the window
+        _energy(calls=100001),
         _energy(gate_input_index=-1),
+        _energy(gate_input_index=8),
         _energy(io_voltage=0.0),
     ],
 )

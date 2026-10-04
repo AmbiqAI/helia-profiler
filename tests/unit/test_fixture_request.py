@@ -422,3 +422,40 @@ def test_only_a_gated_fixture_or_gated_power_capture_drives_the_gate_pin(tmp_pat
         ctx = PipelineContext(config=config, work_dir=tmp_path)
         ctx.fixture = cast(Any, fixture)
         assert drives_gate_pin(ctx) is expected
+
+
+@pytest.mark.parametrize("gate", [False, True])
+def test_the_gate_selects_includes_and_links_gpio_together(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, gate: bool
+) -> None:
+    """Module selection, the firmware include and the CMake link follow one rule."""
+    pytest.importorskip("helia_aot")
+    pytest.importorskip("ai_edge_litert")
+    from helia_profiler.fixture_analysis import analyze_typed_fixture_model
+
+    monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "cache"))
+    model = _pin(
+        tmp_path / "tiny_cnn.tflite", (PACKAGE / "data" / "models" / "tiny_cnn.tflite").read_bytes()
+    )
+    analysis = analyze_typed_fixture_model(model.path)
+    fixture = TypedFixture(
+        model,
+        tuple(
+            FixtureIO(t, _pin(tmp_path / f"in{i}.bin", bytes(t.size_bytes)))
+            for i, t in enumerate(analysis.inputs)
+        ),
+        tuple(
+            FixtureIO(t, _pin(tmp_path / f"out{i}.bin", bytes(t.size_bytes)))
+            for i, t in enumerate(analysis.outputs)
+        ),
+    )
+    build = build_fixture(
+        replace(_request(tmp_path), fixture=fixture, energy_gate=gate), compile=False
+    )
+    modules = (build.app_dir / "nsx.yml").read_text(encoding="utf-8")
+    cmake = (build.app_dir / "CMakeLists.txt").read_text(encoding="utf-8")
+    main = (build.app_dir / "src" / "main.cc").read_text(encoding="utf-8")
+    assert build.energy_gate is gate
+    assert ("- name: nsx-gpio" in modules) is gate  # selected, not merely in the registry
+    assert ("nsx::gpio" in cmake) is gate
+    assert ('#include "nsx_gpio.h"' in main) is gate
