@@ -898,10 +898,13 @@ _GATED_SINKS = {
     "deployment_timing": 28,
     "deployment_gate_ticks": 4,
 }
-_POWER = PowerResult(
-    PowerSummary(0.002, 0.0036, 0.004, 0.0072, 2.0, 2000),
-    metadata=PowerMetadata(measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW),
-)
+
+
+def _power(scope: MeasurementScope = MeasurementScope.GPIO_GATED_CLEAN_WINDOW) -> PowerResult:
+    return PowerResult(
+        PowerSummary(0.002, 0.0036, 0.004, 0.0072, 2.0, 2000),
+        metadata=PowerMetadata(measurement_scope=scope),
+    )
 
 
 @pytest.fixture
@@ -918,7 +921,9 @@ def gated(tmp_path, monkeypatch):
         30.0,
         FixtureTimingScope.INVOKE_ONLY,
         supported_fixture_target(),
-        energy=capture.FixtureEnergyCapture(calls=10, expected_window_s=2.0),
+        energy=capture.FixtureEnergyCapture(
+            calls=10, expected_window_s=2.0, instrument_serial="JS320-1"
+        ),
     )
     memory = {0x410000: image.read(), 0xE000ED00: struct.pack("<I", 0xD22 << 4)}
     core = {"halted": False}
@@ -958,11 +963,16 @@ def gated(tmp_path, monkeypatch):
         memory.update(terminal)
         core["halted"] = False
 
+    state = {"power": _power()}
+
     class Driver:
+        def __init__(self, *, serial=None):
+            events.append(("driver", serial))
+
         def capture_gated(self, **kwargs):
             events.append(("capture", kwargs))
             kwargs["on_started"]()
-            return _POWER
+            return state["power"]
 
     monkeypatch.setattr(capture, "attached_session", attach)
     monkeypatch.setattr(capture, "flash_binary", lambda **kwargs: None)
@@ -970,17 +980,18 @@ def gated(tmp_path, monkeypatch):
     monkeypatch.setattr(capture, "list_connected_probes", lambda: [SimpleNamespace(serial="123")])
     monkeypatch.setattr(capture.time, "sleep", lambda s: events.append(("sleep", s)))
     monkeypatch.setattr("helia_profiler.power.joulescope.driver.JoulescopeDriver", Driver)
-    return request, terminal, events
+    return request, terminal, events, state
 
 
 def test_the_gated_window_is_captured_around_the_reset(gated) -> None:
-    request, _, events = gated
+    request, _, events, state = gated
     result = capture.capture_fixture(request, guard=Guard())
     assert result.state == "success", result.error
-    assert result.power is _POWER
+    assert result.power is state["power"]
     assert result.gate_seconds == 2.0
     assert result.power.metadata.integrity == PowerIntegrity.VALID
-    (_, kwargs), after = events[0], events[1:]
+    assert events[0] == ("driver", "JS320-1")
+    (_, kwargs), after = events[1], events[2:]
     assert after[0] == "reset"
     assert not any(isinstance(e, tuple) and e[0] == "sleep" and e[1] >= 1 for e in after)
     assert kwargs["sync_input_index"] == 0 and kwargs["io_voltage"] == 1.8
@@ -991,7 +1002,7 @@ def test_the_gated_window_is_captured_around_the_reset(gated) -> None:
 
 
 def test_a_build_without_a_gate_is_refused(tmp_path, gated) -> None:
-    request, _, events = gated
+    request, _, events, state = gated
     (tmp_path / "plain").mkdir()
     elf, image, _ = image_files(
         tmp_path / "plain", {k: v for k, v in _GATED_SINKS.items() if k != "deployment_gate_ticks"}
@@ -1004,24 +1015,27 @@ def test_a_build_without_a_gate_is_refused(tmp_path, gated) -> None:
 
 
 def test_the_calls_must_match_the_firmware_run(gated) -> None:
-    request, _, _ = gated
+    request, _, _, state = gated
     energy = replace(request.energy, calls=11, expected_window_s=2.2)
     result = capture.capture_fixture(replace(request, energy=energy), guard=Guard())
     assert result.state == "failure" and "Energy calls differ" in (result.error or "")
-    assert result.power is _POWER
+    assert result.power is state["power"]
 
 
 def test_an_empty_gate_terminal_is_refused(gated) -> None:
-    request, terminal, _ = gated
+    request, terminal, _, _ = gated
     terminal[0x20000028] = struct.pack("<I", 0)
     result = capture.capture_fixture(request, guard=Guard())
     assert result.state == "failure" and "Invalid gate timing terminal" in (result.error or "")
 
 
 def test_an_instrument_failure_is_recorded(gated, monkeypatch) -> None:
-    request, _, _ = gated
+    request, _, _, state = gated
 
     class Broken:
+        def __init__(self, *, serial=None):
+            pass
+
         def capture_gated(self, **kwargs):
             raise RuntimeError("no gate edge")
 
@@ -1031,18 +1045,44 @@ def test_an_instrument_failure_is_recorded(gated, monkeypatch) -> None:
     assert json.loads((request.evidence_dir / "receipt.json").read_text())["state"] == "failure"
 
 
+def test_a_window_the_instrument_did_not_gate_fails_but_keeps_what_it_saw(gated) -> None:
+    request, _, _, state = gated
+    state["power"] = _power(MeasurementScope.FREE_FORM_CAPTURE)
+    result = capture.capture_fixture(request, guard=Guard())
+    assert result.state == "failure" and "No valid gated window" in (result.error or "")
+    assert result.power is state["power"] and result.timing is None
+
+
+def test_a_gate_shorter_than_the_timed_loop_is_refused(gated) -> None:
+    request, terminal, _, _ = gated
+    terminal[0x20000028] = struct.pack("<I", 49)  # the timed loop took 50 ticks
+    result = capture.capture_fixture(request, guard=Guard())
+    assert result.state == "failure" and "Gate does not cover the timed loop" in (
+        result.error or ""
+    )
+
+
+def _energy(**changes: object) -> capture.FixtureEnergyCapture:
+    return replace(
+        capture.FixtureEnergyCapture(calls=10, expected_window_s=1.0, instrument_serial="JS320-1"),
+        **changes,
+    )
+
+
 @pytest.mark.parametrize(
     "energy",
     [
-        capture.FixtureEnergyCapture(calls=0, expected_window_s=1.0),
-        capture.FixtureEnergyCapture(calls=10, expected_window_s=0.0),
-        capture.FixtureEnergyCapture(calls=10, expected_window_s=31.0),
-        capture.FixtureEnergyCapture(calls=10, expected_window_s=1.0, gate_input_index=-1),
-        capture.FixtureEnergyCapture(calls=10, expected_window_s=1.0, io_voltage=0.0),
+        _energy(calls=0),
+        _energy(expected_window_s=0.0),
+        _energy(expected_window_s=0.999),
+        _energy(expected_window_s=31.0),
+        _energy(instrument_serial=" "),
+        _energy(gate_input_index=-1),
+        _energy(io_voltage=0.0),
     ],
 )
 def test_an_invalid_energy_request_is_refused_before_the_device(gated, energy) -> None:
-    request, _, events = gated
+    request, _, events, _ = gated
     with pytest.raises(ValueError, match="Invalid energy capture"):
         capture.capture_fixture(replace(request, energy=energy), guard=Guard())
     assert events == []

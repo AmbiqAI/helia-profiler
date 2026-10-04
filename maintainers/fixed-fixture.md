@@ -297,9 +297,15 @@ A `FixtureBuildRequest` with `energy_gate` renders firmware that drives the boar
 gate pin (the profiler's sync pin: one wire, no lock-step) high for exactly the timed
 loop, and records the gate's own STIMER span in `deployment_gate_ticks`. Without it
 the firmware is byte-identical to a build that predates the option. A
-`FixtureCaptureRequest` with `energy` arms the Joulescope gated capture before it
-resets the target, so the window cannot be missed, and keeps the probe detached
-until the window has closed; read-back and terminal checks then run as usual. The
+`FixtureCaptureRequest` with `energy` arms the named Joulescope (`instrument_serial`)
+before it resets the target, so the window cannot be missed, and keeps the probe
+detached until the window has closed; read-back and terminal checks then run as
+usual. The timed loop must last at least the instrument's one-second minimum gate:
+`expected_window_s` below it is refused before the device is touched, so size the
+iterations to reach it. A capture whose window the instrument did not gate fails,
+and so does a gate shorter than the firmware's timed span. The gate covers the
+whole timed loop, including the input restores that `invoke_only` latency
+excludes, so energy per inference always counts one restore and one invoke. The
 result carries the `PowerResult` and `gate_seconds`. The caller binds them into a
 `FixtureEnergyWindow` with the build identity, `completed_calls` equal to the build's
 iterations and `firmware_duration_s` equal to `gate_seconds`.

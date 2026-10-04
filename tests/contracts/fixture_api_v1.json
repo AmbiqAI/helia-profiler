@@ -623,6 +623,11 @@
           "<required>"
         ],
         [
+          "instrument_serial",
+          "str",
+          "<required>"
+        ],
+        [
           "gate_input_index",
           "int",
           "0"

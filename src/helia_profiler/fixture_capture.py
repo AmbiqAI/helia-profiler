@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Protocol
 
 from ._fixture_build import FixtureTimingScope
+from .config import DEFAULT_POWER_MIN_WINDOW_MS
 from .fixture_image import DTCM, MAX_ELF, MAX_IMAGE, digest, inspect_elf, require
 from .fixture_runtime import FixtureFile
 from .fixture_stage import FixtureStage
@@ -51,6 +52,16 @@ _POLL_INTERVAL_S = 0.25
 _EXPECTED_MARGIN = 1.25
 _MEMORY_MAGIC = (0x4D454D31, 1)
 _FAILED_STAGES = {int(stage): stage.description for stage in FixtureStage}
+#: The shortest gate the instrument accepts as the window (the profile path's minimum).
+_MIN_GATE_S = DEFAULT_POWER_MIN_WINDOW_MS / 1000.0
+
+
+class _GatedWindowMissing(ValueError):
+    """A gated capture that measured no valid window; the result still keeps what it saw."""
+
+    def __init__(self, power: PowerResult, message: str) -> None:
+        super().__init__(message)
+        self.power = power
 
 
 @dataclass(frozen=True)
@@ -58,11 +69,14 @@ class FixtureEnergyCapture:
     """A gated MCU-rail energy window over the timed loop of a build made with ``energy_gate``.
 
     ``calls`` is the build's iteration count and ``expected_window_s`` the predicted
-    length of the timed loop; together they plan the gate the instrument accepts.
+    length of the timed loop, at least the instrument's one-second minimum gate; together
+    they plan the gate the instrument accepts. ``instrument_serial`` names the Joulescope
+    wired to this board's rail.
     """
 
     calls: int
     expected_window_s: float
+    instrument_serial: str
     gate_input_index: int = 0
     io_voltage: float = 1.8
 
@@ -227,7 +241,9 @@ def capture_fixture(
         and energy.calls > 0
         and type(energy.expected_window_s) in (int, float)
         and math.isfinite(energy.expected_window_s)
-        and 0 < energy.expected_window_s <= request.settle_seconds
+        and _MIN_GATE_S <= energy.expected_window_s <= request.settle_seconds
+        and isinstance(energy.instrument_serial, str)
+        and bool(energy.instrument_serial.strip())
         and type(energy.gate_input_index) is int
         and energy.gate_input_index >= 0
         and type(energy.io_voltage) in (int, float)
@@ -423,13 +439,17 @@ def capture_fixture(
             started = time.monotonic()
             # The instrument is armed before the reset, so it cannot miss the gate; the
             # probe stays detached until the window has closed.
-            power = _capture_gated_window(
-                request,
-                energy,
-                reset=lambda: reset_target(
-                    device=request.device, jlink_serial=request.jlink_serial
-                ),
-            )
+            try:
+                power = _capture_gated_window(
+                    request,
+                    energy,
+                    reset=lambda: reset_target(
+                        device=request.device, jlink_serial=request.jlink_serial
+                    ),
+                )
+            except _GatedWindowMissing as missing:
+                power = missing.power
+                raise
             detached = time.monotonic() - started
         with attach() as session:
             guard.check(require_free=False, remaining_s=10)
@@ -474,6 +494,7 @@ def capture_fixture(
         if energy is not None:
             (gate_ticks,) = struct.unpack("<I", values["deployment_gate_ticks"])
             require(0 < gate_ticks < 60 * timing.timer_hz, "Invalid gate timing terminal")
+            require(gate_ticks >= timing.ticks, "Gate does not cover the timed loop")
             require(timing.iterations == energy.calls, "Energy calls differ from the firmware run")
             gate_seconds = gate_ticks / timing.timer_hz
         arena_scan = ()
@@ -525,17 +546,16 @@ def _capture_gated_window(
     request: FixtureCaptureRequest, energy: FixtureEnergyCapture, *, reset: Callable[[], None]
 ) -> PowerResult:
     """One gated MCU-rail window over the timed loop; ``reset`` starts the run once armed."""
-    from .config import DEFAULT_POWER_MIN_WINDOW_MS
     from .power.joulescope.driver import JoulescopeDriver
-    from .power.metadata import ObservationMode, classify_observation
+    from .power.metadata import ObservationMode, PowerIntegrity, classify_observation
 
-    power = JoulescopeDriver().capture_gated(
+    power = JoulescopeDriver(serial=energy.instrument_serial).capture_gated(
         duration_s=request.settle_seconds,
         io_voltage=energy.io_voltage,
         sync_input_index=energy.gate_input_index,
         clean_infer_count=energy.calls,
         clean_infer_avg_us=max(1, round(energy.expected_window_s / energy.calls * 1e6)),
-        minimum_gate_s=DEFAULT_POWER_MIN_WINDOW_MS / 1000.0,
+        minimum_gate_s=_MIN_GATE_S,
         on_started=lambda *_: reset(),
         lockstep=False,
     )
@@ -548,4 +568,9 @@ def _capture_gated_window(
         gate_fall_observed=fall,
         observation_deadline_s=bound_s if bound_s is not None else request.settle_seconds,
     )
+    metadata = power.metadata
+    if metadata.integrity != PowerIntegrity.VALID or metadata.gate_failure is not None:
+        raise _GatedWindowMissing(
+            power, f"No valid gated window: {metadata.gate_failure or metadata.integrity}"
+        )
     return power
