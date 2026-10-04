@@ -9,6 +9,7 @@ import os
 import shutil
 import sys
 import tarfile
+import time
 from dataclasses import replace
 from pathlib import Path
 
@@ -310,6 +311,8 @@ def tflm_build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[list[str
     """Prepare tflm with the download and every build step faked; returns the build argvs."""
     monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "cache"))
     monkeypatch.setenv("ATFE_ROOT", str(tmp_path / "atfe"))
+    (tmp_path / "atfe" / "bin").mkdir(parents=True)
+    (tmp_path / "atfe" / "bin" / "clang").write_text("")
     monkeypatch.setattr(prepared_runtimes.shutil, "which", lambda tool: f"/usr/bin/{tool}")
     monkeypatch.setattr(
         prepared_runtimes, "_download_tree", lambda source, tree, timeout_s: _tflm_tree(tree)
@@ -382,7 +385,7 @@ def test_a_tflm_tree_pinning_other_kernels_is_refused(tflm_build, tmp_path, monk
 
 def test_a_relative_atfe_root_names_absolute_tools(tflm_build, tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("ATFE_ROOT", "atfe")
+    monkeypatch.setenv("ATFE_ROOT", "atfe")  # the fixture's tmp_path/atfe
     prepare_runtime("tflm")
     assert tflm_build[1][0] == str(tmp_path / "atfe" / "bin" / "clang++")
     assert tflm_build[-1][0] == str(tmp_path / "atfe" / "bin" / "llvm-ar")
@@ -393,7 +396,9 @@ def test_an_unparseable_compile_line_is_refused_cleanly(tflm_build, monkeypatch,
     monkeypatch.setattr(prepared_runtimes, "_run", lambda argv, cwd, timeout_s: line + "\n")
     result = CliRunner().invoke(app, ["runtimes", "prepare", "tflm"])
     assert result.exit_code == 1
-    assert "Cannot prepare tflm 85638f0" in result.output and "Traceback" not in result.output
+    assert "Cannot read TFLM's make dry-run line" in result.output
+    assert "".join(line.split()) in "".join(result.output.split())
+    assert "Traceback" not in result.output
 
 
 def test_preparing_tflm_needs_atfe_root(tflm_build, monkeypatch) -> None:
@@ -449,6 +454,75 @@ def test_build_steps_see_only_the_allowed_environment(tmp_path, monkeypatch) -> 
     seen = json.loads(prepared_runtimes._run([sys.executable, str(script)], tmp_path, 60))
     assert "PATH" in seen
     assert set(seen) <= set(prepared_runtimes._TFLM_ENV) | {"LC_CTYPE", "__CF_USER_TEXT_ENCODING"}
+
+
+def test_build_steps_keep_the_download_proxy_and_ca_settings(tmp_path, monkeypatch) -> None:
+    for name in ("SSL_CERT_FILE", "CURL_CA_BUNDLE", "https_proxy"):
+        monkeypatch.setenv(name, "/etc/site")
+    script = tmp_path / "env.py"
+    script.write_text("import json, os\nprint(json.dumps(sorted(os.environ)))\n")
+    seen = json.loads(prepared_runtimes._run([sys.executable, str(script)], tmp_path, 60))
+    assert {"SSL_CERT_FILE", "CURL_CA_BUNDLE", "https_proxy"} <= set(seen)
+
+
+def test_undecodable_build_output_still_reports_the_failure(tmp_path: Path) -> None:
+    script = tmp_path / "bytes.py"
+    script.write_text("import sys\nsys.stderr.buffer.write(b'bad \\xff byte')\nsys.exit(2)\n")
+    with pytest.raises(ConfigError, match="exit 2"):
+        prepared_runtimes._run([sys.executable, str(script)], tmp_path, 60)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="process groups are POSIX")
+def test_a_timed_out_build_step_stops_its_children(tmp_path: Path) -> None:
+    script = tmp_path / "spawn.py"
+    pid_file = tmp_path / "child.pid"
+    script.write_text(
+        "import subprocess, sys, time\n"
+        "child = subprocess.Popen(['sleep', '30'])\n"
+        f"open({str(pid_file)!r}, 'w').write(str(child.pid))\n"
+        "time.sleep(30)\n"
+    )
+    with pytest.raises(ConfigError, match="timed out"):
+        prepared_runtimes._run([sys.executable, str(script)], tmp_path, 2)
+    child = int(pid_file.read_text())
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        try:
+            os.kill(child, 0)
+        except ProcessLookupError:
+            return
+        time.sleep(0.05)
+    pytest.fail(f"child {child} outlived the timeout")
+
+
+def test_every_tflm_build_step_takes_the_download_timeout(tflm_build, monkeypatch) -> None:
+    timeouts: list[float] = []
+    fake = prepared_runtimes._run
+
+    def run(argv: list[str], cwd: Path, timeout_s: float) -> str:
+        timeouts.append(timeout_s)
+        return fake(argv, cwd, timeout_s)
+
+    monkeypatch.setattr(prepared_runtimes, "_run", run)
+    prepare_runtime("tflm", asset_s=7)
+    assert timeouts == [7, 7, 7, 7]
+
+
+def test_a_python_without_tar_filters_is_refused(tmp_path, monkeypatch) -> None:
+    monkeypatch.delattr(tarfile, "data_filter")
+    with pytest.raises(ConfigError, match="extraction filters"):
+        prepared_runtimes._download_tree(TFLM.source, tmp_path / "tflite-micro", 5)
+
+
+def test_an_atfe_root_without_clang_is_refused_before_downloading(
+    tflm_build, tmp_path, monkeypatch
+):
+    monkeypatch.setenv("ATFE_ROOT", str(tmp_path / "empty"))
+    monkeypatch.setattr(
+        prepared_runtimes, "_download_tree", lambda *_: pytest.fail("downloaded first")
+    )
+    with pytest.raises(ConfigError, match="ATFE_ROOT has no"):
+        prepare_runtime("tflm")
 
 
 def test_a_build_step_that_hangs_is_stopped(tmp_path: Path) -> None:

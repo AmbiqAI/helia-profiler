@@ -7,6 +7,7 @@ cache under ``runtimes/<name>/<version>/``.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import io
 import json
@@ -14,6 +15,7 @@ import os
 import re
 import shlex
 import shutil
+import signal
 import subprocess
 import tarfile
 import tempfile
@@ -69,13 +71,16 @@ _TFLM_DROPPED_FLAGS = ("-O", "-ffp-mode=")
 _TFLM_ADDED_FLAGS = ("--config=newlib.cfg", "-O3", "-ffast-math", "-fshort-enums", "-DNDEBUG")
 #: The only environment build steps see: TFLM's make takes its variables from the
 #: environment and clang its include paths, so anything else could change the archive.
+#: The download scripts keep the proxy and CA settings.
 _TFLM_ENV = (
     "PATH",
     "HOME",
     "TMPDIR",
-    "TEMP",
-    "TMP",
-    "SYSTEMROOT",
+    "SSL_CERT_FILE",
+    "SSL_CERT_DIR",
+    "CURL_CA_BUNDLE",
+    "all_proxy",
+    "ALL_PROXY",
     "http_proxy",
     "https_proxy",
     "no_proxy",
@@ -144,7 +149,9 @@ def prepare_runtime(
     """Build the prepared archive for a runtime record into the hpx cache."""
     record, kernels = _prepared_record(name, version)
     fetch, stage = _PREPARERS[record.name]
-    with tempfile.TemporaryDirectory(prefix=f"hpx-{record.name}-") as work:
+    with tempfile.TemporaryDirectory(
+        prefix=f"hpx-{record.name}-", ignore_cleanup_errors=True
+    ) as work:
         try:
             source = fetch(record, kernels, Path(work), api_s, asset_s)
         except (OSError, ValueError, IndexError) as exc:
@@ -251,6 +258,8 @@ def _fetch_tflm(
         os.path.abspath(resolve_toolchain_executable(Toolchain.ATFE, tool))
         for tool in ("clang", "clang++", "llvm-ar")
     )
+    if not Path(cc).is_file():
+        raise ConfigError(f"ATFE_ROOT has no {cc}")
     tree = _download_tree(record.source, work / "tflite-micro", asset_s)
     pin = _TFLM_CMSIS_NN_PIN.search(_read(tree / _TFLM_CMSIS_NN_SCRIPT))
     if pin is None or pin.group(1) != kernels.commit:
@@ -267,11 +276,16 @@ def _fetch_tflm(
     for line in listing.splitlines():
         if not line.startswith(("clang ", "clang++ ")):
             continue
-        args = shlex.split(line)
-        if "-c" not in args:
-            continue
-        source = Path(args[args.index("-c") + 1])
-        args[args.index("-o") + 1] = str(objects / f"{len(commands):03}-{source.stem}.o")
+        try:
+            args = shlex.split(line)
+            if "-c" not in args:
+                continue
+            source = Path(args[args.index("-c") + 1])
+            args[args.index("-o") + 1] = str(objects / f"{len(commands):03}-{source.stem}.o")
+        except (ValueError, IndexError) as exc:
+            raise ConfigError(
+                f"Cannot read TFLM's make dry-run line ({exc}): {line[:200]}"
+            ) from exc
         flags = [
             "--target=arm-none-eabi" if arg.startswith("--target=") else arg
             for arg in args[1:]
@@ -312,17 +326,33 @@ def _run(argv: list[str], cwd: Path, timeout_s: float) -> str:
     step = argv[argv.index("-c") + 1] if "-c" in argv[:-1] else " ".join(argv[:2])
     env = {name: os.environ[name] for name in _TFLM_ENV if name in os.environ}
     try:
-        result = subprocess.run(
-            argv, cwd=cwd, env=env, capture_output=True, text=True, check=False, timeout=timeout_s
+        # Its own session, so a timeout also stops make's download and compiler children.
+        process = subprocess.Popen(
+            argv,
+            cwd=cwd,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            errors="replace",
+            start_new_session=True,
         )
-    except subprocess.TimeoutExpired as exc:
-        raise ConfigError(f"Preparing tflm timed out at {step} after {timeout_s:g} s") from exc
     except OSError as exc:
         raise ConfigError(f"Cannot run {argv[0]}: {exc}") from exc
-    if result.returncode != 0:
-        tail = "\n".join(result.stderr.strip().splitlines()[-20:])
-        raise ConfigError(f"Preparing tflm failed at {step} (exit {result.returncode}):\n{tail}")
-    return result.stdout
+    try:
+        stdout, stderr = process.communicate(timeout=timeout_s)
+    except subprocess.TimeoutExpired as exc:
+        if os.name == "posix":
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(process.pid, signal.SIGKILL)
+        else:
+            process.kill()
+        process.communicate()
+        raise ConfigError(f"Preparing tflm timed out at {step} after {timeout_s:g} s") from exc
+    if process.returncode != 0:
+        tail = "\n".join(stderr.strip().splitlines()[-20:])
+        raise ConfigError(f"Preparing tflm failed at {step} (exit {process.returncode}):\n{tail}")
+    return stdout
 
 
 def _stage_tflm(record: RuntimeRecord, kernels: RuntimeSource, tree: Path, staging: Path) -> None:

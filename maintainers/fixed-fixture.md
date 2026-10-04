@@ -83,11 +83,12 @@ TFLM's `-O*` and `-ffp-mode` flags with `-O3 -ffast-math -fshort-enums
 -DNDEBUG` and the newlib configuration. Sources stay relative, so the archive
 embeds no host path and two prepares give the same bytes. The objects are
 archived in source-list order. Make and every compile see only `PATH`, `HOME`,
-the temporary-directory and proxy variables, so the caller's environment cannot
-change the selection or the flags. The schema-1 manifest pins the `.h` closure of
+`TMPDIR` and the proxy and CA-certificate variables, so the caller's environment
+cannot change the selection or the flags. Each step stops, with its children, at
+the download timeout. The schema-1 manifest pins the `.h` closure of
 `tensorflow/`, `signal/` and `third_party/`. Preparing needs GNU make 3.82 or later,
-bash and the tools TFLM's download scripts call (wget, curl, unzip, tar, patch,
-md5sum, python3); prepare checks only for make and bash, and a missing script tool
+bash, and the POSIX tools TFLM's download scripts call (among them wget, unzip,
+md5sum and python3). Prepare checks only for make and bash; a missing script tool
 fails the dry run with TFLM's own message. Windows hosts cannot prepare TFLM.
 
 heliaRT (`engine.type: helia-rt`, backend `helia`) also links a
