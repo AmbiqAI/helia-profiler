@@ -188,7 +188,8 @@ the request. Failed attempts retain available raw bytes.
 The optional versioned 32-byte memory terminal reports normal TFLM allocator
 use after I/O access, warmups and measured calls, outside the timed interval.
 AOT planned regions are not allocator observations. Neither value is a transient
-peak or minimum capacity. Stack/heap peaks and energy are unavailable here.
+peak or minimum capacity. Stack/heap peaks are unavailable here; energy is the
+optional gated capture described below.
 
 The pre-link plan includes fixture output, status, checksum, timing, timer state,
 and the TFLM memory terminal in the default data region, plus the fixed input in
@@ -291,7 +292,17 @@ accepts one complete valid GPIO window and a matching finite firmware interval;
 free-running/degraded captures cannot become per-inference energy. Poll-based
 edges require bounded uncertainty. Energy covers the stated powered domain with
 no idle subtraction. Missing captures have null values and `not_captured`, not zero.
-This normalization layer does not add a gated firmware mode or acquire an instrument.
+
+A `FixtureBuildRequest` with `energy_gate` renders firmware that drives the board's
+gate pin (the profiler's sync pin: one wire, no lock-step) high for exactly the timed
+loop, and records the gate's own STIMER span in `deployment_gate_ticks`. Without it
+the firmware is byte-identical to a build that predates the option. A
+`FixtureCaptureRequest` with `energy` arms the Joulescope gated capture before it
+resets the target, so the window cannot be missed, and keeps the probe detached
+until the window has closed; read-back and terminal checks then run as usual. The
+result carries the `PowerResult` and `gate_seconds`. The caller binds them into a
+`FixtureEnergyWindow` with the build identity, `completed_calls` equal to the build's
+iterations and `firmware_duration_s` equal to `gate_seconds`.
 
 Build receipts also expose `planned_memory` from the existing memory-plan stage,
 with `planned_memory_reason` when unavailable. This is a compiler/configuration

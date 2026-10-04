@@ -62,3 +62,23 @@ def test_fixture_render_matches_snapshot(kind, engine, scope, gate):
 
 def test_snapshot_file_has_no_stale_cases():
     assert set(_SNAPSHOTS) == {_key(*case) for case in _CASES}
+
+
+@pytest.mark.parametrize("scope", FIXTURE_SCOPES)
+def test_the_energy_gate_brackets_exactly_the_timed_loop(scope):
+    text, _ = render_fixture("tcn", "tflm", scope, energy_gate=True)
+    body = text[text.index("static int infer_fixture()") :]
+    warmup = body.index("for (unsigned i = 0; i < 3; ++i)")
+    timed = body.index("for (unsigned i = 0; i < 17; ++i)")
+    begin, end = body.index("hpx_sync_window_begin();"), body.index("hpx_sync_window_end();")
+    status = body.index("if (invocation_status != 0)")
+    assert body.index("hpx_sync_init();") < warmup < begin < timed < end < status
+    assert body.index("const uint32_t gate_t0 = hpx_stimer_ticks();") < begin
+    assert end < body.index("deployment_gate_ticks = hpx_stimer_ticks() - gate_t0;") < status
+    assert "hpx_sync_wait_go();" not in body and "kSyncLockstep     = false" in text
+    assert "volatile uint32_t deployment_gate_ticks;" in text and '#include "nsx_gpio.h"' in text
+
+
+def test_a_fixture_without_the_gate_drives_no_gpio():
+    text, _ = render_fixture("tcn", "helia-aot")
+    assert "hpx_sync" not in text and "nsx_gpio" not in text and "deployment_gate_ticks" not in text

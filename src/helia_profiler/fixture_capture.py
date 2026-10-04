@@ -6,6 +6,7 @@ import json
 import math
 import struct
 import time
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Protocol
@@ -15,6 +16,7 @@ from .fixture_image import DTCM, MAX_ELF, MAX_IMAGE, digest, inspect_elf, requir
 from .fixture_runtime import FixtureFile
 from .fixture_stage import FixtureStage
 from .fixture_target import FixtureTarget, fixture_cpu_hz
+from .power.base import PowerResult
 from .target.probe.flash import flash_binary
 from .target.probe.jlink import (
     attached_session,
@@ -52,6 +54,20 @@ _FAILED_STAGES = {int(stage): stage.description for stage in FixtureStage}
 
 
 @dataclass(frozen=True)
+class FixtureEnergyCapture:
+    """A gated MCU-rail energy window over the timed loop of a build made with ``energy_gate``.
+
+    ``calls`` is the build's iteration count and ``expected_window_s`` the predicted
+    length of the timed loop; together they plan the gate the instrument accepts.
+    """
+
+    calls: int
+    expected_window_s: float
+    gate_input_index: int = 0
+    io_voltage: float = 1.8
+
+
+@dataclass(frozen=True)
 class FixtureCaptureRequest:
     """One bounded capture; ``settle_seconds`` is the maximum wait for completion."""
 
@@ -73,6 +89,8 @@ class FixtureCaptureRequest:
     extra_output_sizes: tuple[int, ...] = ()
     #: Byte size of each heliaAOT scratch arena the build scans, in ``FixtureBuild.aot_arena_scan`` order.
     arena_scan_sizes: tuple[int, ...] = ()
+    #: Capture the gated energy window instead of waiting detached after the reset.
+    energy: FixtureEnergyCapture | None = None
 
 
 @dataclass(frozen=True)
@@ -110,6 +128,10 @@ class FixtureCaptureResult:
     #: Per scanned scratch arena: (bytes no longer holding the paint, highest such offset + 1).
     #: Both are lower bounds: a kernel may write the paint value itself.
     arena_scan: tuple[tuple[int, int], ...] = ()
+    #: The gated window the instrument measured, when energy was requested.
+    power: PowerResult | None = None
+    #: The firmware's own STIMER measure of the gate-high span, in seconds.
+    gate_seconds: float | None = None
 
 
 def _atomic_json(path: Path, value: object) -> None:
@@ -198,6 +220,20 @@ def capture_fixture(
         and 0 < request.expected_duration_s <= request.settle_seconds,
         "Invalid expected duration",
     )
+    energy = request.energy
+    require(
+        energy is None
+        or type(energy.calls) is int
+        and energy.calls > 0
+        and type(energy.expected_window_s) in (int, float)
+        and math.isfinite(energy.expected_window_s)
+        and 0 < energy.expected_window_s <= request.settle_seconds
+        and type(energy.gate_input_index) is int
+        and energy.gate_input_index >= 0
+        and type(energy.io_voltage) in (int, float)
+        and 0 < energy.io_voltage <= 5,
+        "Invalid energy capture",
+    )
     require(isinstance(request.timing_scope, FixtureTimingScope), "Explicit timing scope required")
     require(isinstance(request.target, FixtureTarget), "Explicit typed fixture target required")
     request.target.verify()
@@ -210,6 +246,7 @@ def capture_fixture(
     outputs: tuple[FixtureFile, ...] = ()
     status = crc = None
     timing = memory = None
+    power = gate_seconds = None
 
     def pin(name: str, value: bytes) -> FixtureFile:
         path = directory / name
@@ -248,6 +285,8 @@ def capture_fixture(
             sizes["deployment_memory"] = 32
         if request.arena_scan_sizes:
             sizes["deployment_arena_scan"] = 8 * len(request.arena_scan_sizes)
+        if energy is not None:
+            sizes["deployment_gate_ticks"] = 4
         image = inspect_elf(request.elf.read(), request.image.read(), request.load_address, sizes)
         pin(
             "identity.json",
@@ -371,14 +410,27 @@ def capture_fixture(
             )
 
         guard.check(require_free=True, remaining_s=request.settle_seconds + 120)
-        reset_target(device=request.device, jlink_serial=request.jlink_serial)
-        started = time.monotonic()
-        # Stay detached through the secure bootloader and, when predicted, the whole run.
-        detached = min(
-            max(_FIRST_POLL_S, (request.expected_duration_s or 0.0) * _EXPECTED_MARGIN),
-            request.settle_seconds,
-        )
-        time.sleep(detached)
+        if energy is None:
+            reset_target(device=request.device, jlink_serial=request.jlink_serial)
+            started = time.monotonic()
+            # Stay detached through the secure bootloader and, when predicted, the whole run.
+            detached = min(
+                max(_FIRST_POLL_S, (request.expected_duration_s or 0.0) * _EXPECTED_MARGIN),
+                request.settle_seconds,
+            )
+            time.sleep(detached)
+        else:
+            started = time.monotonic()
+            # The instrument is armed before the reset, so it cannot miss the gate; the
+            # probe stays detached until the window has closed.
+            power = _capture_gated_window(
+                request,
+                energy,
+                reset=lambda: reset_target(
+                    device=request.device, jlink_serial=request.jlink_serial
+                ),
+            )
+            detached = time.monotonic() - started
         with attach() as session:
             guard.check(require_free=False, remaining_s=10)
             await_completion(session, started, resume_if_halted(session), detached)
@@ -419,6 +471,11 @@ def capture_fixture(
         )
         if request.arena_capacity is not None:
             memory = _memory(values["deployment_memory"], request.arena_capacity)
+        if energy is not None:
+            (gate_ticks,) = struct.unpack("<I", values["deployment_gate_ticks"])
+            require(0 < gate_ticks < 60 * timing.timer_hz, "Invalid gate timing terminal")
+            require(timing.iterations == energy.calls, "Energy calls differ from the firmware run")
+            gate_seconds = gate_ticks / timing.timer_hz
         arena_scan = ()
         if request.arena_scan_sizes:
             words = struct.unpack(
@@ -443,6 +500,8 @@ def capture_fixture(
             tuple(artifacts),
             outputs=outputs,
             arena_scan=arena_scan,
+            power=power,
+            gate_seconds=gate_seconds,
         )
     except Exception as exc:
         result = FixtureCaptureResult(
@@ -456,6 +515,26 @@ def capture_fixture(
             tuple(artifacts),
             str(exc),
             outputs=outputs,
+            power=power,
         )
     _atomic_json(directory / "receipt.json", asdict(result))
     return result
+
+
+def _capture_gated_window(
+    request: FixtureCaptureRequest, energy: FixtureEnergyCapture, *, reset: Callable[[], None]
+) -> PowerResult:
+    """One gated MCU-rail window over the timed loop; ``reset`` starts the run once armed."""
+    from .config import DEFAULT_POWER_MIN_WINDOW_MS
+    from .power.joulescope.driver import JoulescopeDriver
+
+    return JoulescopeDriver().capture_gated(
+        duration_s=request.settle_seconds,
+        io_voltage=energy.io_voltage,
+        sync_input_index=energy.gate_input_index,
+        clean_infer_count=energy.calls,
+        clean_infer_avg_us=max(1, round(energy.expected_window_s / energy.calls * 1e6)),
+        minimum_gate_s=DEFAULT_POWER_MIN_WINDOW_MS / 1000.0,
+        on_started=lambda *_: reset(),
+        lockstep=False,
+    )

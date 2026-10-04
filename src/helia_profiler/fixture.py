@@ -49,6 +49,7 @@ from .fixture_capture import (
     FixtureCaptureGuard,
     FixtureCaptureRequest,
     FixtureCaptureResult,
+    FixtureEnergyCapture,
     FixtureMemory,
     FixtureTiming,
     capture_fixture,
@@ -74,7 +75,7 @@ from .hostenv.elf_inventory import ElfSection, LoadSegment, SectionInventory, se
 from .placement import Placement
 from .results.models import ToolchainInfo
 
-FIXTURE_API_VERSION: Final[tuple[int, int]] = (1, 1)
+FIXTURE_API_VERSION: Final[tuple[int, int]] = (1, 2)
 
 __all__ = [
     "FIXTURE_API_VERSION",
@@ -96,6 +97,7 @@ __all__ = [
     "HeliaAotOptions",
     "FixedFixture",
     "FixtureCaptureRequest",
+    "FixtureEnergyCapture",
     "FixtureFile",
     "FixtureIO",
     "FixtureMethod",

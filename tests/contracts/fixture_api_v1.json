@@ -1,7 +1,7 @@
 {
   "api_version": [
     1,
-    1
+    2
   ],
   "surface": {
     "ElfSection": {
@@ -306,6 +306,11 @@
           "engine_source",
           "EngineSource | None",
           "None"
+        ],
+        [
+          "energy_gate",
+          "bool",
+          "False"
         ]
       ],
       "frozen": true,
@@ -377,6 +382,11 @@
         ],
         [
           "observe_aot_arenas",
+          "bool",
+          "False"
+        ],
+        [
+          "energy_gate",
           "bool",
           "False"
         ]
@@ -505,6 +515,11 @@
           "arena_scan_sizes",
           "tuple[int, ...]",
           "()"
+        ],
+        [
+          "energy",
+          "FixtureEnergyCapture | None",
+          "None"
         ]
       ],
       "frozen": true,
@@ -568,6 +583,16 @@
           "arena_scan",
           "tuple[tuple[int, int], ...]",
           "()"
+        ],
+        [
+          "power",
+          "PowerResult | None",
+          "None"
+        ],
+        [
+          "gate_seconds",
+          "float | None",
+          "None"
         ]
       ],
       "frozen": true,
@@ -584,6 +609,34 @@
         "INT16": "int16",
         "INT8": "int8"
       }
+    },
+    "FixtureEnergyCapture": {
+      "fields": [
+        [
+          "calls",
+          "int",
+          "<required>"
+        ],
+        [
+          "expected_window_s",
+          "float",
+          "<required>"
+        ],
+        [
+          "gate_input_index",
+          "int",
+          "0"
+        ],
+        [
+          "io_voltage",
+          "float",
+          "1.8"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
     },
     "FixtureEnergyWindow": {
       "fields": [

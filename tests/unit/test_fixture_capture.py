@@ -17,6 +17,7 @@ from helia_profiler.fixture_image import Sink, inspect_elf
 from helia_profiler.fixture_runtime import FixtureFile
 from helia_profiler.fixture_stage import FixtureStage
 from helia_profiler.fixture_target import supported_fixture_target
+from helia_profiler.power.base import PowerResult, PowerSummary
 
 _SINKS = {
     "deployment_status": 4,
@@ -885,3 +886,158 @@ def test_fixture_target_facts_come_from_the_platform():
     assert MRAM == (0x00410000, 0x00800000)
     assert DTCM == (0x20000000, 0x2007C000)
     assert target.load_address == MRAM[0]
+
+
+# --- energy: one gated window over the timed loop ---
+
+_GATED_SINKS = {
+    "deployment_status": 4,
+    "deployment_output": 3,
+    "deployment_checksum": 4,
+    "deployment_timing": 28,
+    "deployment_gate_ticks": 4,
+}
+_POWER = PowerResult(PowerSummary(0.002, 0.0036, 0.004, 0.0072, 2.0, 2000))
+
+
+@pytest.fixture
+def gated(tmp_path, monkeypatch):
+    elf, image, _ = image_files(tmp_path, _GATED_SINKS)
+    request = capture.FixtureCaptureRequest(
+        elf,
+        image,
+        0x410000,
+        3,
+        "AP510NFA-CBR",
+        "123",
+        tmp_path / "evidence",
+        30.0,
+        FixtureTimingScope.INVOKE_ONLY,
+        supported_fixture_target(),
+        energy=capture.FixtureEnergyCapture(calls=10, expected_window_s=2.0),
+    )
+    memory = {0x410000: image.read(), 0xE000ED00: struct.pack("<I", 0xD22 << 4)}
+    core = {"halted": False}
+
+    class Session:
+        def halt(self):
+            core["halted"] = True
+
+        def halted(self):
+            return core["halted"]
+
+        def restart(self):
+            core["halted"] = False
+
+        def memory_read8(self, address, count):
+            base = next(b for b in memory if b <= address < b + len(memory[b]))
+            return memory[base][address - base : address - base + count]
+
+        def memory_write8(self, address, values):
+            memory[address] = bytes(values)
+
+    @contextmanager
+    def attach(**kwargs):
+        yield Session()
+
+    terminal = {
+        0x20000000: struct.pack("<i", 0),
+        0x20000004: bytes([1, 2, 3]),
+        0x20000008: struct.pack("<I", 1026),
+        0x2000000C: struct.pack("<7I", 50, 10, 2, 32768, 300, 96000000, 1),
+        0x20000028: struct.pack("<I", 65536),
+    }
+    events = []
+
+    def reset(**kwargs):
+        events.append("reset")
+        memory.update(terminal)
+        core["halted"] = False
+
+    class Driver:
+        def capture_gated(self, **kwargs):
+            events.append(("capture", kwargs))
+            kwargs["on_started"]()
+            return _POWER
+
+    monkeypatch.setattr(capture, "attached_session", attach)
+    monkeypatch.setattr(capture, "flash_binary", lambda **kwargs: None)
+    monkeypatch.setattr(capture, "reset_target", reset)
+    monkeypatch.setattr(capture, "list_connected_probes", lambda: [SimpleNamespace(serial="123")])
+    monkeypatch.setattr(capture.time, "sleep", lambda s: events.append(("sleep", s)))
+    monkeypatch.setattr("helia_profiler.power.joulescope.driver.JoulescopeDriver", Driver)
+    return request, terminal, events
+
+
+def test_the_gated_window_is_captured_around_the_reset(gated) -> None:
+    request, _, events = gated
+    result = capture.capture_fixture(request, guard=Guard())
+    assert result.state == "success", result.error
+    assert result.power is _POWER
+    assert result.gate_seconds == 2.0
+    (_, kwargs), after = events[0], events[1:]
+    assert after[0] == "reset"
+    assert not any(isinstance(e, tuple) and e[0] == "sleep" and e[1] >= 1 for e in after)
+    assert kwargs["sync_input_index"] == 0 and kwargs["io_voltage"] == 1.8
+    assert kwargs["clean_infer_count"] == 10 and kwargs["clean_infer_avg_us"] == 200000
+    assert kwargs["lockstep"] is False and kwargs["duration_s"] == request.settle_seconds
+    receipt = json.loads((request.evidence_dir / "receipt.json").read_text())
+    assert receipt["gate_seconds"] == 2.0 and receipt["power"]["summary"]["energy_j"] == 0.0072
+
+
+def test_a_build_without_a_gate_is_refused(tmp_path, gated) -> None:
+    request, _, events = gated
+    (tmp_path / "plain").mkdir()
+    elf, image, _ = image_files(
+        tmp_path / "plain", {k: v for k, v in _GATED_SINKS.items() if k != "deployment_gate_ticks"}
+    )
+    result = capture.capture_fixture(replace(request, elf=elf, image=image), guard=Guard())
+    assert result.state == "failure" and "missing or duplicate exact sink symbol" in (
+        result.error or ""
+    )
+    assert not [e for e in events if isinstance(e, tuple) and e[0] == "capture"]
+
+
+def test_the_calls_must_match_the_firmware_run(gated) -> None:
+    request, _, _ = gated
+    energy = replace(request.energy, calls=11, expected_window_s=2.2)
+    result = capture.capture_fixture(replace(request, energy=energy), guard=Guard())
+    assert result.state == "failure" and "Energy calls differ" in (result.error or "")
+    assert result.power is _POWER
+
+
+def test_an_empty_gate_terminal_is_refused(gated) -> None:
+    request, terminal, _ = gated
+    terminal[0x20000028] = struct.pack("<I", 0)
+    result = capture.capture_fixture(request, guard=Guard())
+    assert result.state == "failure" and "Invalid gate timing terminal" in (result.error or "")
+
+
+def test_an_instrument_failure_is_recorded(gated, monkeypatch) -> None:
+    request, _, _ = gated
+
+    class Broken:
+        def capture_gated(self, **kwargs):
+            raise RuntimeError("no gate edge")
+
+    monkeypatch.setattr("helia_profiler.power.joulescope.driver.JoulescopeDriver", Broken)
+    result = capture.capture_fixture(request, guard=Guard())
+    assert result.state == "failure" and "no gate edge" in (result.error or "")
+    assert json.loads((request.evidence_dir / "receipt.json").read_text())["state"] == "failure"
+
+
+@pytest.mark.parametrize(
+    "energy",
+    [
+        capture.FixtureEnergyCapture(calls=0, expected_window_s=1.0),
+        capture.FixtureEnergyCapture(calls=10, expected_window_s=0.0),
+        capture.FixtureEnergyCapture(calls=10, expected_window_s=31.0),
+        capture.FixtureEnergyCapture(calls=10, expected_window_s=1.0, gate_input_index=-1),
+        capture.FixtureEnergyCapture(calls=10, expected_window_s=1.0, io_voltage=0.0),
+    ],
+)
+def test_an_invalid_energy_request_is_refused_before_the_device(gated, energy) -> None:
+    request, _, events = gated
+    with pytest.raises(ValueError, match="Invalid energy capture"):
+        capture.capture_fixture(replace(request, energy=energy), guard=Guard())
+    assert events == []

@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import replace
+from dataclasses import asdict, replace
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 
@@ -81,6 +83,7 @@ def test_intent_identity_ignores_where_files_and_work_live(tmp_path: Path) -> No
         {"aot": HeliaAotOptions(convert_args_json='{"memory": {"planner": "greedy"}}')},
         {"aot": HeliaAotOptions(cmsis_nn_requantize_inline_asm=False)},
         {"observe_aot_arenas": True},
+        {"energy_gate": True},
     ],
 )
 def test_intent_identity_moves_with_every_build_input(
@@ -383,3 +386,39 @@ def test_a_foreign_work_directory_keeps_its_heliaaot_outputs(
     with pytest.raises(ConfigError, match="different fixture"):
         build_fixture(request, compile=False)
     assert kept.path.exists()
+
+
+def test_a_request_without_the_energy_gate_keeps_its_identity(tmp_path: Path) -> None:
+    request = _request(tmp_path)
+    intent = {
+        "fixture": request.fixture.identity,
+        "method": request.method.timing_scope.value,
+        "engine": request.engine.value,
+        "backend": request.backend.value if request.backend else None,
+        "arena_size": request.arena_size,
+        "iterations": request.iterations,
+        "warmup": request.warmup,
+        "placement": [request.placement.arena.value, request.placement.weights.value],
+        "target": asdict(request.target),
+        "runtime": None,
+        "aot": asdict(request.aot or HeliaAotOptions()),
+        "observe_aot_arenas": False,
+    }
+    expected = hashlib.sha256(json.dumps(intent, sort_keys=True).encode()).hexdigest()
+    assert request.intent_identity == expected
+
+
+def test_only_a_gated_fixture_or_gated_power_capture_drives_the_gate_pin(tmp_path: Path) -> None:
+    from helia_profiler.firmware.context import drives_gate_pin
+    from helia_profiler.pipeline import PipelineContext
+
+    config = _request(tmp_path).to_config()
+    assert not config.power.gated_external_capture
+    for fixture, expected in (
+        (None, False),
+        (SimpleNamespace(energy_gate=False), False),
+        (SimpleNamespace(energy_gate=True), True),
+    ):
+        ctx = PipelineContext(config=config, work_dir=tmp_path)
+        ctx.fixture = cast(Any, fixture)
+        assert drives_gate_pin(ctx) is expected
