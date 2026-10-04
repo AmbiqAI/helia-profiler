@@ -730,7 +730,7 @@ def runtimes_show_command(
 
 
 @runtimes_app.command(
-    "prepare", help="Build a runtime's prepared archive into the hpx cache (helia-rt)"
+    "prepare", help="Build a runtime's prepared archive into the hpx cache (helia-rt, tflm)"
 )
 def runtimes_prepare_command(
     name: Annotated[str, typer.Argument(help="Runtime name, e.g. helia-rt")],

@@ -47,6 +47,11 @@ ALLOWED = {
     ("hostenv/doctor.py", "ATFE_ROOT"): "doctor report only",
     ("hostenv/toolchains.py", "ATFE_ROOT"): "toolchain root; recorded in ToolchainInfo",
     (
+        "prepared_runtimes.py",
+        "ATFE_ROOT",
+    ): "prepare only; fixtures pin the prepared archive by hash",
+    ("prepared_runtimes.py", "<name>"): "prepare's allowlisted build-step environment",
+    (
         "power/joulescope/capture_gated.py",
         "HPX_POWER_FULLRATE_XCHECK",
     ): "power capture; fixtures refuse power",

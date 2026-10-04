@@ -87,8 +87,8 @@ class FixtureBuildRequest:
 
     The installed profiler and engine are not part of the request: the source
     closure pins the profiler, and ``FixtureBuild.engine_source`` records the
-    engine package. A heliaRT request without ``runtime`` uses the archive
-    ``hpx runtimes prepare helia-rt`` built from the default helia-rt record.
+    engine package. A TFLM or heliaRT request without ``runtime`` uses the
+    archive ``hpx runtimes prepare`` built from the engine's default record.
     """
 
     fixture: FixedFixture | TypedFixture
@@ -124,7 +124,7 @@ class FixtureBuildRequest:
                 f"Fixture placement not qualified: arena {self.placement.arena.value}, "
                 f"weights {self.placement.weights.value}"
             )
-        if self.runtime is None and self.engine is EngineType.HELIA_RT:
+        if self.runtime is None and self.engine in (EngineType.TFLM, EngineType.HELIA_RT):
             object.__setattr__(self, "runtime", prepared_runtime(self.engine.value).runtime)
 
     @property

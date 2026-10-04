@@ -7,6 +7,13 @@
     "repo": "tensorflow/tflite-micro",
     "commit": "85638f0bf1048ba0698787c60fa3da0c98b01088"
   },
+  "kernels": {
+    "repo": "ARM-software/CMSIS-NN",
+    "commit": "4ab83cc3cc98fb85ed6dafb55e8ca02f1628dcae"
+  },
+  "archive": {
+    "sha256": "4a8ce0efc83afaa6f8811a461dda6bf8ba2c3495993045bd29273af75da8bd3c"
+  },
   "precisions": {
     "fp32": "supported",
     "fp16": {

@@ -63,14 +63,40 @@ also binds ELF/image, dependency lock, link map, generated source hashes and
 recorded toolchain provenance. Render-only results have no build identity. Reusing a work directory with
 different intent fails. Historical measurements retain their original methods.
 
-TFLM requires explicit `PreparedUpstreamRuntime`: a pinned archive, header root
+TFLM links a `PreparedUpstreamRuntime`: a pinned archive, header root
 and manifest. Strict typed ingress validates provider URL/revision declarations, declared ABI,
 include directories and all header hashes. Archive hashing and regular-archive
 magic rejection do not verify member format, ARM attributes or ABI compatibility.
-The caller must independently audit the provider archive build/source/ABI record
-before supplying it; manifest fields are assertions, not independent ABI evidence. Copies recheck hashes and path
+A caller that supplies its own archive must independently audit its
+build/source/ABI record; manifest fields are assertions, not independent ABI evidence. Copies recheck hashes and path
 containment. Provider source identities remain manifest-declared; retain the
 corresponding audited source/build record.
+
+A TFLM `FixtureBuildRequest` that names no runtime uses the archive
+`hpx runtimes prepare tflm` built from the default tflm runtime record. Prepare
+downloads the tflite-micro source at the record's commit and runs TFLM's own
+make dry run for `cortex_m_generic`/`cortex-m55` with CMSIS-NN kernels. The dry
+run fetches TFLM's pinned third-party sources and lists the translation units.
+Prepare refuses a tree whose CMSIS-NN download pin is not the record's `kernels`
+commit. It compiles each unit from the tree with ATfE (`ATFE_ROOT`), replacing
+TFLM's `-O*` and `-ffp-mode` flags with `-O3 -ffast-math -fshort-enums
+-DNDEBUG` and the newlib configuration. Sources stay relative, so the archive
+embeds no host path and two prepares give the same bytes. The objects are
+archived in source-list order. Make and every compile see only `PATH`, `HOME`,
+`TMPDIR` and the proxy and CA-certificate variables, so the caller's environment
+cannot change the selection or the flags. The make dry run runs in its own
+session: when it times out or is interrupted it is stopped with every process it
+started, TERM first so TFLM's download scripts remove their temporary files, then
+KILL. Compiles stay in hpx's process group, so an interrupt reaches them directly,
+and a compile that times out is killed. The schema-1 manifest pins the `.h` closure
+of `tensorflow/`, `signal/` and `third_party/`. Preparing needs bash, GNU make 3.82 or
+later (TFLM's Makefile refuses older ones, such as macOS's 3.81) and
+the tools TFLM's download scripts call (among them wget, curl, unzip, patch, md5sum
+and python3). Prepare checks only for make and bash; a missing script tool fails
+the dry run with TFLM's own message. The record's archive was built with GNU make
+4.3. GNU make 3.82 through 4.2 do not sort wildcard results, so their source order
+may differ; the archive then differs from the record, which prepare reports.
+Preparing TFLM is refused on Windows hosts.
 
 heliaRT (`engine.type: helia-rt`, backend `helia`) also links a
 `PreparedUpstreamRuntime`, whose manifest uses schema 2:
