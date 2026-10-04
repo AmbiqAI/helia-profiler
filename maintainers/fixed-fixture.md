@@ -63,7 +63,7 @@ also binds ELF/image, dependency lock, link map, generated source hashes and
 recorded toolchain provenance. Render-only results have no build identity. Reusing a work directory with
 different intent fails. Historical measurements retain their original methods.
 
-TFLM requires explicit `PreparedUpstreamRuntime`: a pinned archive, header root
+TFLM links a `PreparedUpstreamRuntime`: a pinned archive, header root
 and manifest. Strict typed ingress validates provider URL/revision declarations, declared ABI,
 include directories and all header hashes. Archive hashing and regular-archive
 magic rejection do not verify member format, ARM attributes or ABI compatibility.
@@ -71,6 +71,20 @@ The caller must independently audit the provider archive build/source/ABI record
 before supplying it; manifest fields are assertions, not independent ABI evidence. Copies recheck hashes and path
 containment. Provider source identities remain manifest-declared; retain the
 corresponding audited source/build record.
+
+A TFLM `FixtureBuildRequest` that names no runtime uses the archive
+`hpx runtimes prepare tflm` built from the default tflm runtime record. Prepare
+downloads the tflite-micro source at the record's commit and runs TFLM's own
+make dry run for `cortex_m_generic`/`cortex-m55` with CMSIS-NN kernels. The dry
+run fetches TFLM's pinned third-party sources and lists the translation units.
+Prepare refuses a tree whose CMSIS-NN download pin is not the record's `kernels`
+commit. It compiles each unit from the tree with ATfE (`ATFE_ROOT`), replacing
+TFLM's `-O*` and `-ffp-mode` flags with `-O3 -ffast-math -fshort-enums
+-DNDEBUG` and the newlib configuration. Sources stay relative, so the archive
+embeds no host path and two prepares give the same bytes. The objects are
+archived in source-list order. The schema-1 manifest pins the `.h` closure of
+`tensorflow/`, `signal/` and `third_party/`. Preparing needs GNU make, bash and
+the tools TFLM's download scripts call, so it runs on Linux or macOS hosts.
 
 heliaRT (`engine.type: helia-rt`, backend `helia`) also links a
 `PreparedUpstreamRuntime`, whose manifest uses schema 2:

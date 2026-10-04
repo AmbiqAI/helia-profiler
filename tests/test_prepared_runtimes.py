@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import os
 import shutil
+import sys
+import tarfile
 from dataclasses import replace
 from pathlib import Path
 
@@ -102,8 +105,8 @@ def test_prepare_refuses_a_release_built_from_another_commit(tmp_path, monkeypat
 @pytest.mark.parametrize(
     ("name", "version", "message"),
     [
-        ("tflm", None, "helia-rt only, not tflm"),
-        ("helia-aot", None, "helia-rt only, not helia-aot"),
+        ("helia-aot", None, "no archive for helia-aot"),
+        ("executorch", None, "no archive for executorch"),
         ("helia-rt", "9.9.9", "No runtime record for helia-rt 9.9.9"),
     ],
 )
@@ -159,20 +162,15 @@ def test_a_helia_rt_request_without_a_prepared_runtime_is_refused(tmp_path, monk
         _request(tmp_path, EngineType.HELIA_RT)
 
 
-def test_a_tflm_request_still_takes_an_explicit_runtime(tmp_path, monkeypatch) -> None:
-    monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "cache"))
-    assert _request(tmp_path, EngineType.TFLM).runtime is None
-
-
 def test_runtimes_prepare_cli_reports_the_archive(cache: Path) -> None:
     result = CliRunner().invoke(app, ["runtimes", "prepare", "helia-rt"])
     assert result.exit_code == 0, result.output
     assert f"Prepared helia-rt 1.21.3 in {prepared_directory(RECORD)}" in result.output
     assert "differs from the record's 7df6c2f7" in result.output
 
-    refused = CliRunner().invoke(app, ["runtimes", "prepare", "tflm"])
+    refused = CliRunner().invoke(app, ["runtimes", "prepare", "helia-aot"])
     assert refused.exit_code == 1
-    assert "helia-rt only, not tflm" in refused.output
+    assert "no archive for helia-aot" in refused.output
 
 
 def _fetch(monkeypatch, dist: Path) -> None:
@@ -276,3 +274,205 @@ def test_a_prepare_removes_leftovers_of_an_interrupted_replace(cache: Path) -> N
     leftover.mkdir(parents=True)
     prepare_runtime("helia-rt")
     assert sorted(p.name for p in first.directory.parent.iterdir()) == ["1.21.3"]
+
+
+_TFLM = runtime("tflm")
+assert _TFLM is not None and _TFLM.kernels is not None
+TFLM, TFLM_KERNELS = _TFLM, _TFLM.kernels
+# A make dry run: download notes, a line shlex cannot split, then one C++ and one C unit.
+TFLM_LISTING = """\
+tensorflow/lite/micro/tools/make/downloads/cmsis_nn already exists, skipping the download.
+echo "ends with a backslash \\
+mkdir -p gen/obj/core/tensorflow/lite/micro/
+clang++ -fno-rtti -Oz -ffp-mode=full --target=arm-arm-none-eabi -mcpu=cortex-m55 -I. \
+-c tensorflow/lite/micro/micro_log.cc -o gen/obj/core/micro_log.o
+clang -O2 -std=c17 --target=arm-arm-none-eabi -mcpu=cortex-m55 \
+-c tensorflow/lite/micro/tools/make/downloads/cmsis_nn/Source/arm_nn.c -o gen/obj/arm_nn.o
+"""
+
+
+def _tflm_tree(tree: Path, *, pin: str = TFLM_KERNELS.commit) -> Path:
+    for include in prepared_runtimes._TFLM_INCLUDE_DIRS:
+        (tree / include).mkdir(parents=True, exist_ok=True)
+        (tree / include / "api.h").write_text(f"// {include}\n")
+    (tree / "signal/src").mkdir(parents=True)
+    (tree / "signal/src/fft.h").write_text("// fft\n")
+    (tree / "tensorflow/lite/micro/micro_log.cc").write_text("// a source, not a header\n")
+    script = tree / prepared_runtimes._TFLM_CMSIS_NN_SCRIPT
+    script.parent.mkdir(parents=True, exist_ok=True)
+    script.write_text(f'ZIP_PREFIX_NN="{pin}"\n')
+    return tree
+
+
+@pytest.fixture
+def tflm_build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
+    """Prepare tflm with the download and every build step faked; returns the build argvs."""
+    monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "cache"))
+    monkeypatch.setenv("ATFE_ROOT", str(tmp_path / "atfe"))
+    monkeypatch.setattr(prepared_runtimes.shutil, "which", lambda tool: f"/usr/bin/{tool}")
+    monkeypatch.setattr(
+        prepared_runtimes, "_download_tree", lambda source, tree, timeout_s: _tflm_tree(tree)
+    )
+    calls: list[list[str]] = []
+
+    def run(argv: list[str], cwd: Path) -> str:
+        calls.append(argv)
+        if argv[0] == "make":
+            return TFLM_LISTING
+        if "-c" in argv:
+            source = argv[argv.index("-c") + 1]
+            Path(argv[argv.index("-o") + 1]).write_bytes(f"object of {source};".encode())
+            return ""
+        members = b"".join(Path(member).read_bytes() for member in argv[3:])
+        Path(argv[2]).write_bytes(b"!<arch>\n" + members)
+        return ""
+
+    monkeypatch.setattr(prepared_runtimes, "_run", run)
+    return calls
+
+
+def test_prepare_tflm_compiles_tflm_s_source_list_with_the_recorded_flags(
+    tflm_build: list[list[str]], tmp_path: Path
+) -> None:
+    prepared = prepare_runtime("tflm")
+    assert prepared.directory == tmp_path / "cache" / "runtimes" / "tflm" / "85638f0"
+    make, *compiles, archive = tflm_build
+    selection = prepared_runtimes._TFLM_MAKE_SELECTION
+    assert make == ["make", "-n", "-f", prepared_runtimes._TFLM_MAKEFILE, *selection, "microlite"]
+    atfe = tmp_path / "atfe" / "bin"
+    assert [argv[0] for argv in compiles] == [str(atfe / "clang++"), str(atfe / "clang")]
+    for argv in compiles:
+        added = len(prepared_runtimes._TFLM_ADDED_FLAGS)
+        assert tuple(argv[1 : 1 + added]) == prepared_runtimes._TFLM_ADDED_FLAGS
+        assert argv[1 + added].startswith("-ffile-prefix-map=") and argv[1 + added].endswith("=.")
+        assert [a for a in argv if a.startswith(("-O", "-ffp-mode="))] == ["-O3"]
+        assert "--target=arm-none-eabi" in argv and "--target=arm-arm-none-eabi" not in argv
+    assert [argv[argv.index("-c") + 1] for argv in compiles] == [
+        "tensorflow/lite/micro/micro_log.cc",
+        "tensorflow/lite/micro/tools/make/downloads/cmsis_nn/Source/arm_nn.c",
+    ]
+    assert archive[:2] == [str(atfe / "llvm-ar"), "rcsD"]
+    assert [Path(member).name for member in archive[3:]] == ["000-micro_log.o", "001-arm_nn.o"]
+    assert prepared.runtime.archive.read() == (
+        b"!<arch>\nobject of tensorflow/lite/micro/micro_log.cc;"
+        b"object of tensorflow/lite/micro/tools/make/downloads/cmsis_nn/Source/arm_nn.c;"
+    )
+    verified = prepared.runtime.verify()
+    assert (verified.record.schema_version, verified.record.stack) == (1, "upstream")
+    providers = {p.name: p.revision for p in verified.record.providers}
+    assert providers == {"tflite-micro": TFLM.source.commit, "cmsis-nn": TFLM_KERNELS.commit}
+    assert verified.record.include_dirs == prepared_runtimes._TFLM_INCLUDE_DIRS
+    headers = {h.name for h in verified.record.headers}
+    assert "signal/src/fft.h" in headers and "api.h" not in headers
+    assert "tensorflow/lite/micro/tools/make/downloads/cmsis_nn/Include/api.h" in headers
+    assert all(name.endswith(".h") for name in headers)
+
+
+def test_a_tflm_tree_pinning_other_kernels_is_refused(tflm_build, tmp_path, monkeypatch) -> None:
+    other = "0123456789abcdef0123456789abcdef01234567"
+    monkeypatch.setattr(
+        prepared_runtimes, "_download_tree", lambda s, tree, t: _tflm_tree(tree, pin=other)
+    )
+    with pytest.raises(ConfigError, match=f"pins CMSIS-NN {other}, not the record's 4ab83cc3"):
+        prepare_runtime("tflm")
+    assert tflm_build == []
+    assert not (tmp_path / "cache" / "runtimes").exists()
+
+
+def test_preparing_tflm_needs_atfe_root(tflm_build, monkeypatch) -> None:
+    monkeypatch.delenv("ATFE_ROOT")
+    with pytest.raises(ConfigError, match="needs ATFE_ROOT") as exc:
+        prepare_runtime("tflm")
+    assert "ATFE_ROOT" in (exc.value.hint or "")
+    assert tflm_build == []
+
+
+def test_preparing_tflm_names_missing_host_tools(tflm_build, monkeypatch) -> None:
+    monkeypatch.setattr(prepared_runtimes.shutil, "which", lambda tool: None)
+    with pytest.raises(ConfigError, match="needs make and bash on PATH"):
+        prepare_runtime("tflm")
+
+
+def test_an_empty_tflm_source_list_is_refused(tflm_build, monkeypatch) -> None:
+    monkeypatch.setattr(prepared_runtimes, "_run", lambda argv, cwd: "make: Nothing to be done\n")
+    with pytest.raises(ConfigError, match="listed no translation units"):
+        prepare_runtime("tflm")
+
+
+def test_a_failed_tflm_compile_leaves_nothing_behind_and_no_traceback(
+    tflm_build, tmp_path, monkeypatch
+) -> None:
+    def run(argv: list[str], cwd: Path) -> str:
+        if argv[0] == "make":
+            return TFLM_LISTING
+        raise ConfigError("Preparing tflm failed at tensorflow/lite/micro/micro_log.cc (exit 1)")
+
+    monkeypatch.setattr(prepared_runtimes, "_run", run)
+    result = CliRunner().invoke(app, ["runtimes", "prepare", "tflm"])
+    assert result.exit_code == 1
+    assert "failed at tensorflow/lite/micro/micro_log.cc" in result.output
+    assert "Traceback" not in result.output
+    assert not (tmp_path / "cache" / "runtimes").exists()
+
+
+def test_a_failed_build_step_names_the_source_exit_and_stderr(tmp_path: Path) -> None:
+    script = tmp_path / "fail.py"
+    script.write_text("import sys\nsys.stderr.write('first\\nerror: boom\\n')\nsys.exit(3)\n")
+    argv = [sys.executable, str(script), "-c", "tensorflow/lite/micro/x.cc", "-o", "x.o"]
+    with pytest.raises(ConfigError, match=r"at tensorflow/lite/micro/x\.cc \(exit 3\)") as exc:
+        prepared_runtimes._run(argv, tmp_path)
+    assert str(exc.value).endswith("first\nerror: boom")
+
+
+def _tarball(entries: dict[str, tuple[bytes, int]]) -> bytes:
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w:gz") as tar:
+        for name, (data, mode) in entries.items():
+            info = tarfile.TarInfo(name)
+            info.size, info.mode = len(data), mode
+            tar.addfile(info, io.BytesIO(data))
+    return buffer.getvalue()
+
+
+def test_the_tflm_tree_is_the_tarball_at_the_record_commit(tmp_path, monkeypatch) -> None:
+    root = f"tflite-micro-{TFLM.source.commit}"
+    data = _tarball({f"{root}/x.h": (b"// x\n", 0o644), f"{root}/get.sh": (b"#!/bin/sh\n", 0o755)})
+    urls: list[str] = []
+    monkeypatch.setattr(
+        prepared_runtimes, "urlopen", lambda url, timeout: urls.append(url) or io.BytesIO(data)
+    )
+    tree = prepared_runtimes._download_tree(TFLM.source, tmp_path / "tflite-micro", 5)
+    assert urls == [
+        f"https://github.com/tensorflow/tflite-micro/archive/{TFLM.source.commit}.tar.gz"
+    ]
+    assert tree == tmp_path / "tflite-micro" and (tree / "x.h").read_text() == "// x\n"
+    if os.name == "posix":  # TFLM's make runs its download scripts directly
+        assert (tree / "get.sh").stat().st_mode & 0o100
+
+
+@pytest.mark.parametrize(
+    ("entries", "message"),
+    [
+        ({"a/x.h": (b"", 0o644), "b/y.h": (b"", 0o644)}, "does not unpack to one directory"),
+        ({"../escape.h": (b"", 0o644)}, "Cannot download"),
+    ],
+)
+def test_a_tflm_tarball_that_is_not_one_tree_is_refused(tmp_path, monkeypatch, entries, message):
+    data = _tarball(entries)
+    monkeypatch.setattr(prepared_runtimes, "urlopen", lambda url, timeout: io.BytesIO(data))
+    with pytest.raises(ConfigError, match=message):
+        prepared_runtimes._download_tree(TFLM.source, tmp_path / "tflite-micro", 5)
+
+
+def test_a_tflm_request_uses_the_prepared_runtime(tflm_build, tmp_path: Path) -> None:
+    prepared = prepare_runtime("tflm")
+    assert _request(tmp_path, EngineType.TFLM).runtime == prepared.runtime
+
+
+def test_a_tflm_request_without_a_prepared_runtime_names_the_prepare_command(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "cache"))
+    with pytest.raises(ConfigError, match="No prepared tflm 85638f0 runtime") as exc:
+        _request(tmp_path, EngineType.TFLM)
+    assert "hpx runtimes prepare tflm 85638f0" in (exc.value.hint or "")
