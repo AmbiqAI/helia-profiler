@@ -250,3 +250,19 @@ def test_a_failed_swap_restores_the_previous_install(cache: Path, monkeypatch) -
     assert marker.read_text() == "previous install"
     assert sorted(p.name for p in first.directory.parent.iterdir()) == ["1.21.3"]
     assert oct(first.directory.stat().st_mode & 0o777) in ("0o755", "0o775")
+
+
+def test_a_damaged_prepared_install_names_the_prepare_command(cache: Path) -> None:
+    prepared = prepare_runtime("helia-rt")
+    (prepared.directory / "include" / "signal" / "fft.h").unlink()
+    with pytest.raises(ConfigError, match="is damaged") as exc:
+        prepared_runtime("helia-rt")
+    assert "hpx runtimes prepare helia-rt 1.21.3" in (exc.value.hint or "")
+
+
+def test_a_helia_rt_record_without_an_archive_is_refused(monkeypatch) -> None:
+    monkeypatch.setattr(
+        prepared_runtimes, "runtime", lambda *_: replace(RECORD, archive_sha256=None, kernels=None)
+    )
+    with pytest.raises(ConfigError, match="record pins no prepared archive"):
+        prepare_runtime("helia-rt")

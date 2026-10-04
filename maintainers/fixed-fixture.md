@@ -84,10 +84,12 @@ A heliaRT `FixtureBuildRequest` that names no runtime uses the archive
 `hpx runtimes prepare helia-rt` built from the default helia-rt runtime record.
 Prepare takes the Cortex-M55 ATfE release-with-logs library and the `.h` closure
 of `tensorflow/`, `third_party/` and `signal/` from the helia-rt release the
-record pins. It refuses a release whose `MANIFEST.txt` names another commit, and
-writes the manifest's providers, ABI and defines itself, so they record what
-hpx built rather than a caller's claim. An archive whose bytes differ from the
-record's sha256 is reported, not refused.
+record pins. It refuses a release whose `MANIFEST.txt` names another commit. It
+writes the manifest's providers from the record: the helia-rt commit is checked
+against the release, and the ns-cmsis-nn commit is the one that helia-rt
+release builds with, which a test keeps equal to the baseline's ns-cmsis-nn pin.
+The ABI and defines are those of the Cortex-M55 ATfE library prepare selects. An
+archive whose bytes differ from the record's sha256 is reported, not refused.
 
 The archive is staged as the local module `hpx-heliart-runtime` and aliased to
 `nsx::helia_rt`. Its declared defines apply to every consumer; schema 1 keeps the

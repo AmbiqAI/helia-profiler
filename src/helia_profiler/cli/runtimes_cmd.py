@@ -37,15 +37,12 @@ def _cmd_runtimes_show(name: str, version: str | None) -> None:
 
 
 def _cmd_runtimes_prepare(name: str, version: str | None) -> None:
-    from ..config import DEFAULT_DOWNLOAD_API_S, DEFAULT_DOWNLOAD_ASSET_S
     from ..console import HpxConsole
     from ..errors import HpxError
     from ..prepared_runtimes import prepare_runtime
 
     try:
-        prepared = prepare_runtime(
-            name, version, api_s=DEFAULT_DOWNLOAD_API_S, asset_s=DEFAULT_DOWNLOAD_ASSET_S
-        )
+        prepared = prepare_runtime(name, version)
     except HpxError as exc:
         HpxConsole(verbosity=1).print_error(exc)
         raise typer.Exit(1) from exc

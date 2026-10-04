@@ -15,6 +15,7 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from .config import DEFAULT_DOWNLOAD_API_S, DEFAULT_DOWNLOAD_ASSET_S
 from .errors import ConfigError
 from .fixture_runtime import FixtureFile, PreparedUpstreamRuntime
 from .runtime_records import RuntimeRecord, RuntimeSource, runtime
@@ -67,13 +68,19 @@ def _prepared_record(name: str, version: str | None) -> tuple[RuntimeRecord, Run
     if record is None:
         label = f"{name} {version}" if version is not None else name
         raise ConfigError(f"No runtime record for {label}")
-    if record.name != "helia-rt" or record.archive_sha256 is None or record.kernels is None:
+    if record.name != "helia-rt":
         raise ConfigError(f"hpx prepares archives for helia-rt only, not {record.name}")
+    if record.archive_sha256 is None or record.kernels is None:
+        raise ConfigError(f"The {record.name} {record.version} record pins no prepared archive")
     return record, record.kernels
 
 
 def prepare_runtime(
-    name: str, version: str | None = None, *, api_s: float = 30, asset_s: float = 300
+    name: str,
+    version: str | None = None,
+    *,
+    api_s: float = DEFAULT_DOWNLOAD_API_S,
+    asset_s: float = DEFAULT_DOWNLOAD_ASSET_S,
 ) -> PreparedArchive:
     """Build the prepared archive for a runtime record into the hpx cache."""
     from .engines.helia_rt.download import _fetch_github_release
@@ -177,7 +184,15 @@ def prepared_runtime(name: str, version: str | None = None) -> PreparedArchive:
             f"No prepared {record.name} {record.version} runtime in {directory}",
             hint=f"Run: hpx runtimes prepare {record.name} {record.version}",
         )
-    return _load(record, directory)
+    prepared = _load(record, directory)
+    try:
+        prepared.runtime.verify()
+    except (OSError, ValueError) as exc:
+        raise ConfigError(
+            f"Prepared {record.name} {record.version} runtime in {directory} is damaged: {exc}",
+            hint=f"Run: hpx runtimes prepare {record.name} {record.version}",
+        ) from exc
+    return prepared
 
 
 def _load(record: RuntimeRecord, directory: Path) -> PreparedArchive:
