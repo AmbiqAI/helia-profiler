@@ -11,7 +11,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Protocol
 
-from ._fixture_build import FixtureTimingScope
+from ._fixture_build import FIXTURE_MAX_ITERATIONS, FixtureTimingScope
 from .config import DEFAULT_POWER_MIN_WINDOW_MS
 from .fixture_image import DTCM, MAX_ELF, MAX_IMAGE, digest, inspect_elf, require
 from .fixture_runtime import FixtureFile
@@ -55,6 +55,8 @@ _MEMORY_MAGIC = (0x4D454D31, 1)
 _FAILED_STAGES = {int(stage): stage.description for stage in FixtureStage}
 #: The shortest gate the instrument accepts as the window (the profile path's minimum).
 _MIN_GATE_S = DEFAULT_POWER_MIN_WINDOW_MS / 1000.0
+#: Inputs addressable in the instrument's GPI bitfield, so the gate's bit shift stays in range.
+_GATE_INPUTS = 8
 
 
 class _GatedWindowMissing(ValueError):
@@ -236,21 +238,27 @@ def capture_fixture(
         "Invalid expected duration",
     )
     energy = request.energy
+    require(energy is None or isinstance(energy, FixtureEnergyCapture), "Invalid energy capture")
     require(
         energy is None
         or type(energy.calls) is int
         and energy.calls > 0
         and type(energy.expected_window_s) in (int, float)
         and math.isfinite(energy.expected_window_s)
-        and energy.calls <= 100000
+        and energy.calls <= FIXTURE_MAX_ITERATIONS
         and _MIN_GATE_S <= energy.expected_window_s
         and request.settle_seconds
-        >= gate_fall_wait_s(0.0, longest_window_s=energy.expected_window_s, lockstep=False)
+        >= gate_fall_wait_s(
+            0.0,
+            longest_window_s=energy.expected_window_s,
+            lockstep=False,
+            pre_window_s=_pre_window_s(request, energy),
+        )
         and isinstance(energy.instrument_serial, str)
         and bool(energy.instrument_serial)
         and energy.instrument_serial == energy.instrument_serial.strip()
         and type(energy.gate_input_index) is int
-        and 0 <= energy.gate_input_index < 8
+        and 0 <= energy.gate_input_index < _GATE_INPUTS
         and type(energy.io_voltage) in (int, float)
         and 0 < energy.io_voltage <= 5,
         "Invalid energy capture",
@@ -563,6 +571,7 @@ def _capture_gated_window(
         minimum_gate_s=_MIN_GATE_S,
         on_started=lambda *_: reset(),
         lockstep=False,
+        pre_window_s=_pre_window_s(request, energy),
     )
     # The same observation classification the profile path publishes.
     mode, integrity, rise, fall, bound_s = classify_observation(power.metadata)
@@ -575,7 +584,16 @@ def _capture_gated_window(
     )
     metadata = power.metadata
     if metadata.integrity != PowerIntegrity.VALID or metadata.gate_failure is not None:
-        raise _GatedWindowMissing(
-            power, f"No valid gated window: {metadata.gate_failure or metadata.integrity}"
+        reason = (
+            metadata.gate_failure.message
+            if metadata.gate_failure is not None
+            else f"integrity {metadata.integrity}"
         )
+        raise _GatedWindowMissing(power, f"No valid gated window: {reason}")
     return power
+
+
+def _pre_window_s(request: FixtureCaptureRequest, energy: FixtureEnergyCapture) -> float:
+    """The predicted run before the gate rises: the whole predicted run less the window."""
+    total = request.expected_duration_s or energy.expected_window_s
+    return max(0.0, total - energy.expected_window_s)

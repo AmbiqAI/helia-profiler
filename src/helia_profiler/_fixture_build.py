@@ -78,6 +78,10 @@ class FixtureMethod:
             raise ValueError("Explicit FixtureTimingScope required")
 
 
+#: The most timed calls a fixture runs.
+FIXTURE_MAX_ITERATIONS = 100000
+
+
 @dataclass(frozen=True)
 class FixtureRenderSpec:
     fixture: FixedFixture | TypedFixture
@@ -488,7 +492,10 @@ def _validate(config: ProfileConfig, fixture: FixedFixture | TypedFixture) -> No
         raise ConfigError("Fixture build cannot enable power or instrument operations")
     if config.work_dir is None or config.clean:
         raise ConfigError("Fixture build requires an explicit preserved work directory")
-    if not 0 <= config.profiling.warmup <= 10000 or not 1 <= config.profiling.iterations <= 100000:
+    if (
+        not 0 <= config.profiling.warmup <= 10000
+        or not 1 <= config.profiling.iterations <= FIXTURE_MAX_ITERATIONS
+    ):
         raise ConfigError("Fixture requires bounded configured warmup and iteration counts")
 
 

@@ -80,127 +80,144 @@ class _HwCase:
     #: engines whose build also compiles the standalone profiler TU
     extra_profiler_tu: bool = False
     fixture_kind: str | None = None
+    fixture_energy_gate: bool = False
 
 
 _MATRIX: tuple[_HwCase, ...] = (
-    _HwCase(
-        "510-rt-profile",
-        "apollo510_evb-arm-none-eabi-gcc-helia-rt",
-        "apollo510_evb",
-        "apollo510",
-        "helia-rt",
-        "hpx_profiler",
-        extra_profiler_tu=True,
-    ),
-    _HwCase(
-        "510-rt-power",
-        "apollo510_evb-arm-none-eabi-gcc-helia-rt",
-        "apollo510_evb",
-        "apollo510",
-        "helia-rt",
-        "hpx_profiler_power",
-        power_only=True,
-    ),
-    _HwCase(
-        "510-rt-power-busy",
-        "apollo510_evb-arm-none-eabi-gcc-helia-rt",
-        "apollo510_evb",
-        "apollo510",
-        "helia-rt",
-        "hpx_profiler_power",
-        power_only=True,
-        probe="busy_loop",
-    ),
-    _HwCase(
-        "510-tflm-profile",
-        "apollo510_evb-arm-none-eabi-gcc-tflm",
-        "apollo510_evb",
-        "apollo510",
-        "tflm",
-        "hpx_profiler",
-        extra_profiler_tu=True,
-    ),
-    _HwCase(
-        "510-tflm-power",
-        "apollo510_evb-arm-none-eabi-gcc-tflm",
-        "apollo510_evb",
-        "apollo510",
-        "tflm",
-        "hpx_profiler_power",
-        power_only=True,
-    ),
-    _HwCase(
-        "510-aot-profile",
-        "apollo510_evb-arm-none-eabi-gcc-helia-aot",
-        "apollo510_evb",
-        "apollo510",
-        "helia-aot",
-        "hpx_profiler",
-    ),
-    _HwCase(
-        "510-aot-profile-busy",
-        "apollo510_evb-arm-none-eabi-gcc-helia-aot",
-        "apollo510_evb",
-        "apollo510",
-        "helia-aot",
-        "hpx_profiler",
-        probe="busy_loop",
-    ),
-    _HwCase(
-        "510-et-profile",
-        "apollo510_evb-arm-none-eabi-gcc-executorch",
-        "apollo510_evb",
-        "apollo510",
-        "executorch",
-        "hpx_profiler",
-    ),
-    _HwCase(
-        "510-et-profile-busy",
-        "apollo510_evb-arm-none-eabi-gcc-executorch",
-        "apollo510_evb",
-        "apollo510",
-        "executorch",
-        "hpx_profiler",
-        probe="busy_loop",
-    ),
-    _HwCase(
-        "330-rt-profile",
-        "apollo330mP_evb-arm-none-eabi-gcc-helia-rt",
-        "apollo330mP_evb",
-        "apollo330P",
-        "helia-rt",
-        "hpx_profiler",
-        extra_profiler_tu=True,
-    ),
-    _HwCase(
-        "330-tflm-power",
-        "apollo330mP_evb-arm-none-eabi-gcc-tflm",
-        "apollo330mP_evb",
-        "apollo330P",
-        "tflm",
-        "hpx_profiler_power",
-        power_only=True,
-    ),
-    _HwCase(
-        "330-aot-profile",
-        "apollo330mP_evb-arm-none-eabi-gcc-helia-aot",
-        "apollo330mP_evb",
-        "apollo330P",
-        "helia-aot",
-        "hpx_profiler",
-    ),
-) + tuple(
-    _HwCase(
-        f"510-{engine}-fixture-{kind}",
-        f"apollo510_evb-arm-none-eabi-gcc-{engine}",
-        "apollo510_evb",
-        "apollo510",
-        engine,
-        "hpx_profiler",
-        fixture_kind=kind,
+    (
+        _HwCase(
+            "510-rt-profile",
+            "apollo510_evb-arm-none-eabi-gcc-helia-rt",
+            "apollo510_evb",
+            "apollo510",
+            "helia-rt",
+            "hpx_profiler",
+            extra_profiler_tu=True,
+        ),
+        _HwCase(
+            "510-rt-power",
+            "apollo510_evb-arm-none-eabi-gcc-helia-rt",
+            "apollo510_evb",
+            "apollo510",
+            "helia-rt",
+            "hpx_profiler_power",
+            power_only=True,
+        ),
+        _HwCase(
+            "510-rt-power-busy",
+            "apollo510_evb-arm-none-eabi-gcc-helia-rt",
+            "apollo510_evb",
+            "apollo510",
+            "helia-rt",
+            "hpx_profiler_power",
+            power_only=True,
+            probe="busy_loop",
+        ),
+        _HwCase(
+            "510-tflm-profile",
+            "apollo510_evb-arm-none-eabi-gcc-tflm",
+            "apollo510_evb",
+            "apollo510",
+            "tflm",
+            "hpx_profiler",
+            extra_profiler_tu=True,
+        ),
+        _HwCase(
+            "510-tflm-power",
+            "apollo510_evb-arm-none-eabi-gcc-tflm",
+            "apollo510_evb",
+            "apollo510",
+            "tflm",
+            "hpx_profiler_power",
+            power_only=True,
+        ),
+        _HwCase(
+            "510-aot-profile",
+            "apollo510_evb-arm-none-eabi-gcc-helia-aot",
+            "apollo510_evb",
+            "apollo510",
+            "helia-aot",
+            "hpx_profiler",
+        ),
+        _HwCase(
+            "510-aot-profile-busy",
+            "apollo510_evb-arm-none-eabi-gcc-helia-aot",
+            "apollo510_evb",
+            "apollo510",
+            "helia-aot",
+            "hpx_profiler",
+            probe="busy_loop",
+        ),
+        _HwCase(
+            "510-et-profile",
+            "apollo510_evb-arm-none-eabi-gcc-executorch",
+            "apollo510_evb",
+            "apollo510",
+            "executorch",
+            "hpx_profiler",
+        ),
+        _HwCase(
+            "510-et-profile-busy",
+            "apollo510_evb-arm-none-eabi-gcc-executorch",
+            "apollo510_evb",
+            "apollo510",
+            "executorch",
+            "hpx_profiler",
+            probe="busy_loop",
+        ),
+        _HwCase(
+            "330-rt-profile",
+            "apollo330mP_evb-arm-none-eabi-gcc-helia-rt",
+            "apollo330mP_evb",
+            "apollo330P",
+            "helia-rt",
+            "hpx_profiler",
+            extra_profiler_tu=True,
+        ),
+        _HwCase(
+            "330-tflm-power",
+            "apollo330mP_evb-arm-none-eabi-gcc-tflm",
+            "apollo330mP_evb",
+            "apollo330P",
+            "tflm",
+            "hpx_profiler_power",
+            power_only=True,
+        ),
+        _HwCase(
+            "330-aot-profile",
+            "apollo330mP_evb-arm-none-eabi-gcc-helia-aot",
+            "apollo330mP_evb",
+            "apollo330P",
+            "helia-aot",
+            "hpx_profiler",
+        ),
     )
-    for kind in FIXTURE_KINDS
-    for engine in FIXTURE_ENGINES
+    + tuple(
+        _HwCase(
+            f"510-{engine}-fixture-{kind}",
+            f"apollo510_evb-arm-none-eabi-gcc-{engine}",
+            "apollo510_evb",
+            "apollo510",
+            engine,
+            "hpx_profiler",
+            fixture_kind=kind,
+        )
+        for kind in FIXTURE_KINDS
+        for engine in FIXTURE_ENGINES
+    )
+    + tuple(
+        _HwCase(
+            f"510-{engine}-fixture-tcn-gated",
+            f"apollo510_evb-arm-none-eabi-gcc-{engine}",
+            "apollo510_evb",
+            "apollo510",
+            engine,
+            "hpx_profiler",
+            fixture_kind="tcn",
+            fixture_energy_gate=True,
+        )
+        for engine in FIXTURE_ENGINES
+    )
 )
 
 
@@ -399,7 +416,10 @@ def _prepare_case(case: _HwCase, workspace: _Workspace, tmp_path: Path) -> tuple
             overrides = {"aot_prefix": prefix}
     if case.fixture_kind:
         text, headers = render_fixture(
-            case.fixture_kind, case.engine, aot_prefix=overrides.get("aot_prefix", "fake")
+            case.fixture_kind,
+            case.engine,
+            aot_prefix=overrides.get("aot_prefix", "fake"),
+            energy_gate=case.fixture_energy_gate,
         )
         for name, content in headers.items():
             (scratch / name).write_text(content, encoding="utf-8")
@@ -602,6 +622,9 @@ def test_matrix_covers_every_engine_family():
         "510-helia-rt-fixture-tcn",
         "510-helia-rt-fixture-kws",
         "510-helia-rt-fixture-typed",
+        "510-tflm-fixture-tcn-gated",
+        "510-helia-aot-fixture-tcn-gated",
+        "510-helia-rt-fixture-tcn-gated",
     }, "the Tier-2 leg set changed — deliberate? update this pin with the reason"
 
 

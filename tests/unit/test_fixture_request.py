@@ -409,6 +409,7 @@ def test_a_request_without_the_energy_gate_keeps_its_identity(tmp_path: Path) ->
 
 
 def test_only_a_gated_fixture_or_gated_power_capture_drives_the_gate_pin(tmp_path: Path) -> None:
+    from helia_profiler.config.power import PowerMode
     from helia_profiler.firmware.context import drives_gate_pin
     from helia_profiler.pipeline import PipelineContext
 
@@ -422,6 +423,11 @@ def test_only_a_gated_fixture_or_gated_power_capture_drives_the_gate_pin(tmp_pat
         ctx = PipelineContext(config=config, work_dir=tmp_path)
         ctx.fixture = cast(Any, fixture)
         assert drives_gate_pin(ctx) is expected
+    gated_power = replace(
+        config, power=replace(config.power, enabled=True, mode=PowerMode.EXTERNAL)
+    )
+    assert gated_power.power.gated_external_capture
+    assert drives_gate_pin(PipelineContext(config=gated_power, work_dir=tmp_path)) is True
 
 
 @pytest.mark.parametrize("gate", [False, True])

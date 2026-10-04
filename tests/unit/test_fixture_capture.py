@@ -1003,7 +1003,7 @@ def test_the_gated_window_is_captured_around_the_reset(gated) -> None:
     assert kwargs["sync_input_index"] == 0 and kwargs["io_voltage"] == 1.8
     assert kwargs["clean_infer_count"] == 10 and kwargs["clean_infer_avg_us"] == 200000
     assert kwargs["lockstep"] is False and kwargs["duration_s"] == request.settle_seconds
-    assert kwargs["minimum_gate_s"] == 1.0
+    assert kwargs["minimum_gate_s"] == 1.0 and kwargs["pre_window_s"] == 0.0
     receipt = json.loads((request.evidence_dir / "receipt.json").read_text())
     assert receipt["gate_seconds"] == 2.0 and receipt["power"]["summary"]["energy_j"] == 0.0072
 
@@ -1067,6 +1067,34 @@ def test_a_gate_shorter_than_the_timed_loop_is_refused(gated) -> None:
     assert result.state == "failure" and "Gate does not cover the timed loop" in (
         result.error or ""
     )
+
+
+def test_an_instrument_gate_failure_names_its_message(gated) -> None:
+    from helia_profiler.power.diagnostics import GateFailure, GateFailureKind
+
+    request, _, _, state = gated
+    state["power"].metadata.gate_failure = GateFailure(
+        GateFailureKind.NO_GATE_FALL, "gate never fell", "check wiring"
+    )
+    result = capture.capture_fixture(request, guard=Guard())
+    assert result.error == "No valid gated window: gate never fell"
+
+
+def test_the_predicted_warm_up_counts_towards_the_settle_time(gated) -> None:
+    request, _, events, _ = gated
+    with pytest.raises(ValueError, match="Invalid energy capture"):
+        capture.capture_fixture(replace(request, expected_duration_s=28.0), guard=Guard())
+    assert events == []
+    result = capture.capture_fixture(replace(request, expected_duration_s=5.0), guard=Guard())
+    kwargs = next(e[1] for e in events if isinstance(e, tuple) and e[0] == "capture")
+    assert result.state == "success" and kwargs["pre_window_s"] == 3.0
+
+
+def test_an_energy_request_of_the_wrong_type_is_refused(gated) -> None:
+    request, _, events, _ = gated
+    with pytest.raises(ValueError, match="Invalid energy capture"):
+        capture.capture_fixture(replace(request, energy=SimpleNamespace(calls=10)), guard=Guard())
+    assert events == []
 
 
 def _energy(**changes: object) -> capture.FixtureEnergyCapture:
