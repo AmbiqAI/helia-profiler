@@ -230,3 +230,23 @@ def test_an_explicit_runtime_is_kept_and_identity_covers_the_runtime(cache, tmp_
     )
     changed = _request(tmp_path / "b", EngineType.HELIA_RT)
     assert changed.intent_identity != resolved.intent_identity
+
+
+def test_a_failed_swap_restores_the_previous_install(cache: Path, monkeypatch) -> None:
+    first = prepare_runtime("helia-rt")
+    marker = first.directory / "marker.txt"
+    marker.write_text("previous install")
+    real_rename = Path.rename
+
+    def failing_rename(self: Path, target):
+        if self.name.startswith(".1.21.3-") and "-old-" not in self.name:
+            raise OSError("injected rename failure")
+        return real_rename(self, target)
+
+    monkeypatch.setattr(Path, "rename", failing_rename)
+    with pytest.raises(ConfigError, match="injected rename failure"):
+        prepare_runtime("helia-rt")
+    monkeypatch.setattr(Path, "rename", real_rename)
+    assert marker.read_text() == "previous install"
+    assert sorted(p.name for p in first.directory.parent.iterdir()) == ["1.21.3"]
+    assert oct(first.directory.stat().st_mode & 0o777) in ("0o755", "0o775")

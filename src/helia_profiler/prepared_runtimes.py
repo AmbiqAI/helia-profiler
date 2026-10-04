@@ -92,7 +92,10 @@ def prepare_runtime(
         raise ConfigError(f"The helia-rt v{record.version} release has no {', '.join(missing)}/")
     directory = prepared_directory(record)
     directory.parent.mkdir(parents=True, exist_ok=True)
+    for leftover in directory.parent.glob(f".{directory.name}-old-*"):
+        shutil.rmtree(leftover, ignore_errors=True)
     staging = Path(tempfile.mkdtemp(prefix=f".{directory.name}-", dir=directory.parent))
+    staging.chmod(0o755)
     try:
         _stage(record, kernels, dist, staging)
         _load(record, staging).runtime.verify()
@@ -145,12 +148,22 @@ def _stage(record: RuntimeRecord, kernels: RuntimeSource, dist: Path, staging: P
 
 
 def _install(staging: Path, directory: Path) -> None:
-    """Swap ``staging`` in for ``directory``; a reader sees the old or the new install, never neither."""
+    """Replace ``directory`` with ``staging``, restoring the previous install if the move fails.
+
+    Two renames, not one atomic swap: a build that reads the cache between them
+    finds no prepared runtime and is told to prepare again.
+    """
     retired = None
     if directory.exists():
         retired = Path(tempfile.mkdtemp(prefix=f".{directory.name}-old-", dir=directory.parent))
         directory.rename(retired / "install")
-    staging.rename(directory)
+    try:
+        staging.rename(directory)
+    except BaseException:
+        if retired is not None:
+            (retired / "install").rename(directory)
+            shutil.rmtree(retired, ignore_errors=True)
+        raise
     if retired is not None:
         shutil.rmtree(retired, ignore_errors=True)
 
