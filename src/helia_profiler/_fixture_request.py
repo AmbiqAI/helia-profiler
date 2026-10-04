@@ -104,6 +104,8 @@ class FixtureBuildRequest:
     runtime: PreparedUpstreamRuntime | None = None
     aot: HeliaAotOptions | None = None
     observe_aot_arenas: bool = False
+    #: Drive the board's gate pin around the timed loop so a gated capture can measure its energy.
+    energy_gate: bool = False
 
     def __post_init__(self) -> None:
         if self.engine not in _ENGINE_BACKENDS:
@@ -145,6 +147,8 @@ class FixtureBuildRequest:
             if self.engine is EngineType.HELIA_AOT
             else None,
             "observe_aot_arenas": self.observe_aot_arenas,
+            # Absent unless set, so requests without a gate keep their identity.
+            **({"energy_gate": True} if self.energy_gate else {}),
         }
         return hashlib.sha256(json.dumps(intent, sort_keys=True).encode()).hexdigest()
 
@@ -185,5 +189,6 @@ def build_fixture(request: FixtureBuildRequest, *, compile: bool = True) -> Fixt
         runtime=request.runtime,
         compile=compile,
         observe_aot_arenas=request.observe_aot_arenas,
+        energy_gate=request.energy_gate,
         intent_identity=request.intent_identity,
     )

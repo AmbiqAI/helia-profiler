@@ -9,6 +9,11 @@
 #include "nsx_mem.h"
 #include "am_hal_pwrctrl.h"
 #include "fixed_fixture_clock.h"
+{%- if fixture_gate_pin is not none %}
+#include "nsx_gpio.h"
+{% with power_sync_enabled=true, lockstep=false, sync_gpio_pin=fixture_gate_pin %}{% include "_gpio_sync.j2" %}{% endwith %}
+volatile uint32_t deployment_gate_ticks;
+{%- endif %}
 {% if fixture_aot %}
 #include "{{ aot_prefix }}_model.h"
 #include "{{ aot_prefix }}_common.h"
@@ -87,6 +92,9 @@ static int infer_fixture() {
     hpx_fixture_memory_snapshot(3, interpreter.arena_used_bytes());
 {% endif %}
     if (!hpx_stimer_init()) return {{ fixture_status.stimer }};
+{%- if fixture_gate_pin is not none %}
+    hpx_sync_init();
+{%- endif %}
     for (unsigned i = 0; i < {{ fixture_warmups }}; ++i) {
 {%- for io in fixture_inputs %}
         std::memcpy({{ io.pointer }}, {{ io.buffer }}, sizeof({{ io.buffer }}));
@@ -98,6 +106,10 @@ static int infer_fixture() {
 {% endif %}
     int32_t invocation_status = 0;
     uint32_t ticks = 0;
+{%- if fixture_gate_pin is not none %}
+    const uint32_t gate_t0 = hpx_stimer_ticks();
+    hpx_sync_window_begin();
+{%- endif %}
 {% if fixture_timing_scope == 'restore_and_invoke' %}
     const uint32_t t0 = hpx_stimer_ticks();
 {% endif %}
@@ -116,6 +128,10 @@ static int infer_fixture() {
 {% if fixture_timing_scope == 'restore_and_invoke' %}
     ticks = hpx_stimer_ticks() - t0;
 {% endif %}
+{%- if fixture_gate_pin is not none %}
+    hpx_sync_window_end();
+    deployment_gate_ticks = hpx_stimer_ticks() - gate_t0;
+{%- endif %}
     if (invocation_status != 0) return {{ fixture_status.invoke }};
     if (!ticks || ticks >= 60U*HPX_STIMER_HZ) return {{ fixture_status.timing_bound }};
 {% if not fixture_aot %}

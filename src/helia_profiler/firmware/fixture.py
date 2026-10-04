@@ -103,6 +103,7 @@ def fixture_template_vars(ctx: PipelineContext, regions: list[ArenaRegion]) -> d
         ]
         if spec.observe_aot_arenas
         else [],
+        "fixture_gate_pin": ctx.config.power.sync_gpio_pin if spec.energy_gate else None,
     }
 
 

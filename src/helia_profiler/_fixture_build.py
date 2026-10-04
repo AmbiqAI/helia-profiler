@@ -85,6 +85,8 @@ class FixtureRenderSpec:
     model: FixtureModelAnalysis | TypedFixtureModelAnalysis
     #: Paint heliaAOT scratch arenas and report touched bytes after the run.
     observe_aot_arenas: bool = False
+    #: Drive the board's gate pin high for exactly the timed loop (MCU-rail energy window).
+    energy_gate: bool = False
 
 
 @dataclass(frozen=True)
@@ -346,6 +348,8 @@ class FixtureBuild:
     aot_outputs: tuple[FixtureFile, ...] = ()
     #: The engine package that generated the model code, when one did.
     engine_source: EngineSource | None = None
+    #: The firmware drives the board's gate pin around the timed loop.
+    energy_gate: bool = False
 
 
 @dataclass(frozen=True)
@@ -511,6 +515,7 @@ def build_fixed_fixture(
     runtime: PreparedUpstreamRuntime | None = None,
     compile: bool = True,
     observe_aot_arenas: bool = False,
+    energy_gate: bool = False,
 ) -> FixtureBuild:
     """Render or compile one fixed fixture through profiler's host-only stages."""
     return _build(
@@ -520,6 +525,7 @@ def build_fixed_fixture(
         runtime=runtime,
         compile=compile,
         observe_aot_arenas=observe_aot_arenas,
+        energy_gate=energy_gate,
     )
 
 
@@ -531,6 +537,7 @@ def _build(
     runtime: PreparedUpstreamRuntime | None,
     compile: bool,
     observe_aot_arenas: bool,
+    energy_gate: bool = False,
     intent_identity: str | None = None,
 ) -> FixtureBuild:
     if not isinstance(method, FixtureMethod):
@@ -578,6 +585,8 @@ def _build(
     }
     if observe_aot_arenas:
         identity["observe_aot_arenas"] = True
+    if energy_gate:
+        identity["energy_gate"] = True
 
     # PipelineRunner holds its normal workspace lock; its first stage binds
     # this directory before any generated source can overwrite older intent.
@@ -617,7 +626,9 @@ def _build(
     if verified_runtime is not None:
         stages.append(_PreparedRuntimeStage(verified_runtime))
     stages += [
-        _BindFixtureStage(FixtureRenderSpec(fixture, method, model, observe_aot_arenas)),
+        _BindFixtureStage(
+            FixtureRenderSpec(fixture, method, model, observe_aot_arenas, energy_gate)
+        ),
         PlanMemoryStage(),
         GenerateFirmwareStage(),
     ]
@@ -735,4 +746,5 @@ def _build(
         if isinstance(ctx.engine_artifacts, HeliaAotArtifacts)
         else (),
         engine_source=_engine_source(config.engine.type),
+        energy_gate=energy_gate,
     )

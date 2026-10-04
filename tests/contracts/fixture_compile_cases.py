@@ -36,8 +36,19 @@ FIXTURE_ENGINES = ("tflm", "helia-rt", "helia-aot")
 FIXTURE_SCOPES = ("restore_and_invoke", "invoke_only")
 
 
+#: Gated renders (energy gate on) are snapshotted and compiled for the TCN kind on every engine and scope.
+FIXTURE_GATED_CASES = tuple(
+    ("tcn", engine, scope, True) for engine in FIXTURE_ENGINES for scope in FIXTURE_SCOPES
+)
+
+
 def render_fixture(
-    kind: str, engine: str, scope: str = "restore_and_invoke", *, aot_prefix: str = "fake"
+    kind: str,
+    engine: str,
+    scope: str = "restore_and_invoke",
+    *,
+    aot_prefix: str = "fake",
+    energy_gate: bool = False,
 ) -> tuple[str, dict[str, str]]:
     """Render production fixture sources from representative tensor metadata."""
     if kind == "typed":
@@ -83,6 +94,7 @@ def render_fixture(
             FixtureModelAnalysis(
                 inp, out, ModelAnalysis([], 0, 0, 0), ResolverPlan("auto", registrations)
             ),
+            energy_gate=energy_gate,
         )
         values = fixture_template_vars(ctx, [])
         text = _jinja_env.get_template("fixed_fixture.cc.j2").render(

@@ -96,6 +96,7 @@ from helia_profiler.firmware.op_resolver import _ALL_REGISTRATIONS  # noqa: E402
 
 from .fixture_compile_cases import (  # noqa: E402
     FIXTURE_ENGINES,
+    FIXTURE_GATED_CASES,
     FIXTURE_KINDS,
     FIXTURE_SCOPES,
     render_fixture,
@@ -340,6 +341,16 @@ def _build_cases() -> list[_CompileCase]:
                         headers=headers,
                     )
                 )
+    for kind, engine, scope, _ in FIXTURE_GATED_CASES:
+        text, headers = render_fixture(kind, engine, scope, energy_gate=True)
+        cases.append(
+            _CompileCase(
+                case_id=f"fixture:{kind}|{engine}|{scope}|energy_gate",
+                text=text,
+                vars=_common_kwargs("apollo510", "rtt"),
+                headers=headers,
+            )
+        )
     return cases
 
 
@@ -672,6 +683,10 @@ def test_compile_matrix_covers_fixture_render_arms():
     assert {case.case_id for case in _build_cases() if case.case_id.startswith("fixture:")} == {
         f"fixture:{kind}|{engine}|{scope}"
         for kind in ("tcn", "kws", "typed")
+        for engine in ("tflm", "helia-rt", "helia-aot")
+        for scope in ("restore_and_invoke", "invoke_only")
+    } | {
+        f"fixture:tcn|{engine}|{scope}|energy_gate"
         for engine in ("tflm", "helia-rt", "helia-aot")
         for scope in ("restore_and_invoke", "invoke_only")
     }

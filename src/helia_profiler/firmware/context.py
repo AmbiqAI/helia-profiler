@@ -26,6 +26,13 @@ if TYPE_CHECKING:
     from ..pipeline import PipelineContext
 
 
+def drives_gate_pin(ctx: "PipelineContext") -> bool:
+    """Whether the firmware drives the board's gate pin: a gated power capture or a fixture energy gate."""
+    return ctx.config.power.gated_external_capture or (
+        ctx.fixture is not None and ctx.fixture.energy_gate
+    )
+
+
 @dataclass(frozen=True)
 class PmuPassContext:
     name: str
@@ -260,7 +267,7 @@ class FirmwareRenderContext:
         arena_region = ctx.arena_region or Placement.TCM
         weights_region = ctx.weights_region or Placement.MRAM
         aot_arena_regions = tuple(arena_regions or ())
-        power_sync_enabled = config.power.gated_external_capture
+        power_sync_enabled = drives_gate_pin(ctx)
         clock = ctx.run_metadata.platform
         if clock is None:
             # A sub-field of the (non-optional) run_metadata, so no
