@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import http.client
 import io
 import json
 import os
@@ -314,6 +315,8 @@ def _tflm_tree(tree: Path, *, pin: str = TFLM_KERNELS.commit) -> Path:
 @pytest.fixture
 def tflm_build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
     """Prepare tflm with the download and every build step faked; returns the build argvs."""
+    if sys.platform == "win32":
+        pytest.skip("TFLM is prepared on POSIX hosts")
     monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "cache"))
     monkeypatch.setenv("ATFE_ROOT", str(tmp_path / "atfe"))
     (tmp_path / "atfe" / "bin").mkdir(parents=True)
@@ -511,6 +514,27 @@ def test_every_tflm_build_step_takes_the_download_timeout_and_only_make_is_a_gro
     prepare_runtime("tflm", asset_s=7)
     assert timeouts == [7, 7, 7, 7]
     assert groups == [True, False, False, False]  # only make starts processes of its own
+
+
+def test_a_truncated_tflm_download_is_refused_cleanly(tmp_path, monkeypatch) -> None:
+    class Truncated(io.BytesIO):
+        def read(self, *args):
+            raise http.client.IncompleteRead(b"partial", 1000)
+
+    monkeypatch.setattr(prepared_runtimes, "urlopen", lambda url, timeout: Truncated())
+    with pytest.raises(ConfigError, match="Cannot download .*IncompleteRead"):
+        prepared_runtimes._download_tree(TFLM.source, tmp_path / "tflite-micro", 5)
+
+
+def test_preparing_tflm_is_refused_on_windows(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "cache"))
+    monkeypatch.setattr(prepared_runtimes.sys, "platform", "win32")
+    monkeypatch.setattr(
+        prepared_runtimes, "_download_tree", lambda *_: pytest.fail("downloaded on Windows")
+    )
+    with pytest.raises(ConfigError, match="not supported on Windows"):
+        prepare_runtime("tflm")
+    assert not (tmp_path / "cache" / "runtimes").exists()
 
 
 def test_a_python_without_tar_filters_is_refused(tmp_path, monkeypatch) -> None:

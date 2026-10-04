@@ -96,7 +96,7 @@ and python3). Prepare checks only for make and bash; a missing script tool fails
 the dry run with TFLM's own message. The record's archive was built with GNU make
 4.3. GNU make 3.82 through 4.2 do not sort wildcard results, so their source order
 may differ; the archive then differs from the record, which prepare reports.
-Preparing TFLM is not supported on Windows hosts.
+Prepare refuses Windows hosts.
 
 heliaRT (`engine.type: helia-rt`, backend `helia`) also links a
 `PreparedUpstreamRuntime`, whose manifest uses schema 2:

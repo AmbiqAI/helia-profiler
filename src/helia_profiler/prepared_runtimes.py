@@ -16,12 +16,14 @@ import shlex
 import shutil
 import signal
 import subprocess
+import sys
 import tarfile
 import tempfile
 import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from http.client import HTTPException
 from pathlib import Path
 from urllib.error import URLError
 from urllib.request import urlopen
@@ -247,6 +249,10 @@ def _fetch_tflm(
     from .hostenv.toolchains import resolve_toolchain_executable
     from .vocab import Toolchain
 
+    if sys.platform == "win32":
+        raise ConfigError(
+            "Preparing tflm is not supported on Windows; prepare it on Linux or macOS"
+        )
     missing = [tool for tool in _TFLM_HOST_TOOLS if shutil.which(tool) is None]
     if missing:
         raise ConfigError(f"Preparing tflm needs {' and '.join(missing)} on PATH")
@@ -317,7 +323,7 @@ def _download_tree(source: RuntimeSource, tree: Path, timeout_s: float) -> Path:
             if len(roots) != 1:
                 raise ValueError(f"{url} does not unpack to one directory")
             tar.extractall(tree.parent, filter="data")
-    except (OSError, URLError, ValueError, tarfile.TarError) as exc:
+    except (OSError, URLError, HTTPException, ValueError, tarfile.TarError) as exc:
         raise ConfigError(f"Cannot download {url}: {exc}") from exc
     (tree.parent / roots.pop()).rename(tree)
     return tree
