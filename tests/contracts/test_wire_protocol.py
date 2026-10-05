@@ -1121,12 +1121,12 @@ def test_the_est_ms_gap_is_told_once_and_is_true_of_the_firmware():
 
 
 def test_power_renders_measure_nothing_pre_window():
-    """The power arm is the template's FIRST branch of the warmup as well as
-    the announce — EST_MS_GAP's structural claim. The announce half is pinned
+    """A power render takes the bare warmup and the zero announce in both
+    window modes — EST_MS_GAP's structural claim. The announce half is pinned
     by the est_ms census above; this pins the warmup half, which a mutation
-    probe in the #171 showed was otherwise unguarded: re-ordering the
-    arms so auto+power fell back into the auto arm's measurement left the
-    whole suite green, because the snapshot matrices render fixed-only.
+    probe in the #171 showed was otherwise unguarded: letting auto+power fall
+    into the measured warmup left the whole suite green, because the
+    snapshot matrices render fixed-only.
 
     ``dwt_init();`` never renders in a power render at all — the boot call
     is gated off power builds too (#161: DWT has no power-render consumer,

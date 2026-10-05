@@ -245,7 +245,7 @@ DRIFT_NOTE_MIN_RATIO_DEVIATION = 0.05
 BOOT_SETTLE_S = 8.0
 
 #: Uninstrumented warm reps before the clean window: auto mode always runs 3
-#: and every fixed-mode measuring arm floors ``profiling.warmup`` at 3 (#164,
+#: and every measured fixed-mode warm-up floors ``profiling.warmup`` at 3 (#164,
 #: #170).
 CLEAN_WINDOW_WARMUP_REPS = 3
 

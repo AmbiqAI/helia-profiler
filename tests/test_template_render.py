@@ -72,6 +72,7 @@ def _render_tflm(
     window_mode: str = "fixed",
     clean_window_probe: str = "infer",
     clean_iters: int = 3,
+    clean_warmup: int = 1,
     power_only: bool = False,
     # Only read for power_only renders (SocCapabilities.power_window_timer).
     # Power binaries always time their window with STIMER, and the template
@@ -100,7 +101,7 @@ def _render_tflm(
         resource_variable_count=resource_variable_count,
         iterations=3,
         warmup=1,
-        clean_warmup=1,
+        clean_warmup=clean_warmup,
         clean_iters=clean_iters,
         power_only=power_only,
         power_window_timer=power_window_timer,
@@ -150,6 +151,7 @@ def _render_aot(
     window_mode: str = "fixed",
     clean_window_probe: str = "infer",
     clean_iters: int = 3,
+    clean_warmup: int = 1,
     power_only: bool = False,
     # See _render_tflm.
     power_window_timer: str = "stimer",
@@ -171,7 +173,7 @@ def _render_aot(
         has_ethos_u=has_ethos_u,
         iterations=3,
         warmup=1,
-        clean_warmup=1,
+        clean_warmup=clean_warmup,
         clean_iters=clean_iters,
         power_only=power_only,
         power_window_timer=power_window_timer,
@@ -693,6 +695,34 @@ class TestMainAotCcRender:
             assert out.index("hpx_sync_ready();") < out.index("hpx_sync_wait_go();")
             assert out.index("hpx_sync_ready();") > out.index("clean_warm_cyc")
 
+    @pytest.mark.parametrize(
+        ("window", "clean_warmup", "count"),
+        [
+            ({"window_mode": "auto"}, 5, "3"),  # auto measures exactly 3
+            ({"window_mode": "auto", "clean_window_timer": "stimer"}, 5, "3"),
+            ({"window_mode": "auto", "clean_window_probe": "busy_loop"}, 2, "3"),
+            (
+                {
+                    "window_mode": "auto",
+                    "clean_window_timer": "stimer",
+                    "clean_window_probe": "busy_loop",
+                },
+                2,
+                "3",
+            ),
+            ({"window_mode": "fixed"}, 5, "5"),  # fixed measures max(warm-up, 3)
+            ({"window_mode": "fixed"}, 2, "3"),
+            ({"clean_window_timer": "stimer"}, 2, "3"),  # STIMER-timed infer window, measured
+            ({"clean_window_timer": "stimer", "clean_window_probe": "busy_loop"}, 2, "2"),  # bare
+            ({"power_only": True}, 2, "2"),  # power warms without measuring or a floor
+        ],
+    )
+    def test_warm_up_count_per_window(self, window, clean_warmup, count):
+        for render in (_render_tflm, _render_aot):
+            out = render(transport="rtt", clean_warmup=clean_warmup, **window)
+            # The first warm-up loop is the clean window's; the profiled pass has its own later.
+            assert re.findall(r"for \(int w = 0; w < (\d+); w\+\+\)", out)[0] == count
+
     def test_power_only_fixed_count_override(self):
         for render in (_render_tflm, _render_aot):
             out = render(
@@ -702,7 +732,7 @@ class TestMainAotCcRender:
                 clean_iters=2247,
             )
             assert "const int clean_iters_n = 2247;" in out
-            # Power renders take the first template arm and measure NOTHING
+            # Power renders take the bare warm-up and measure NOTHING
             # pre-window (#170) — no adaptive sizing, no DWT warm bracket,
             # and no DWT window whose stall floor would need declaring: power
             # binaries time their window with STIMER only.
