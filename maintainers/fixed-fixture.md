@@ -5,7 +5,7 @@
 Consumers import only the names in `helia_profiler.fixture.__all__`; the other
 `fixture_*` modules and `_fixture_build` are internal. `FIXTURE_API_VERSION` is
 `(major, minor)`: minor grows with additions, major with removals or changed
-semantics, and `tests/contracts/fixture_api_v1.json` records the surface.
+semantics, and `tests/contracts/fixture_api_v<major>.json` records the surface.
 `source_closure()` hashes every shipped file named in `fixture_closure.txt`
 (everything except the example models) and returns one digest; a consumer
 recomputes it from the installed files instead of trusting the call.
@@ -26,6 +26,12 @@ left in the work directory), and `FixtureBuild.engine_source` records the
 engine package version and, for a VCS install, its commit.
 `fixture_capabilities()` reports the qualified targets and each engine's IO
 dtype status.
+
+API 2.0 removes the fixture's energy path: `FixtureEnergyWindow`, the `energy`
+argument of `summarize_fixture_measurements` and the energy fields of
+`FixtureMeasurements` (schema 2). The fixture measures latency, outputs and
+memory; energy comes from the dedicated power firmware (`hpx profile --power`),
+which owns the power floor, the reset policy and the gated window.
 
 Fixture builds take pinned inputs only. `build_fixed_fixture` refuses any
 module, engine or CMSIS-NN override the compatibility classifier reports,
@@ -188,7 +194,7 @@ the request. Failed attempts retain available raw bytes.
 The optional versioned 32-byte memory terminal reports normal TFLM allocator
 use after I/O access, warmups and measured calls, outside the timed interval.
 AOT planned regions are not allocator observations. Neither value is a transient
-peak or minimum capacity. Stack/heap peaks and energy are unavailable here.
+peak or minimum capacity. Stack/heap peaks are unavailable here.
 
 The pre-link plan includes fixture output, status, checksum, timing, timer state,
 and the TFLM memory terminal in the default data region, plus the fixed input in
@@ -282,16 +288,6 @@ ELF/image and successful raw capture identity to the compiled build receipt. It
 checks the captured iteration/warmup counts and timing scope. It reports current
 allocator snapshots by phase, never a transient peak or tested minimum. Numerical
 acceptance remains with the consumer. Both stale and wrong maps are rejected.
-
-Optional `FixtureEnergyWindow` is an internal producer-verified association of an
-existing `PowerResult` with the exact compiled image and completed firmware count.
-Construct it only after image/terminal validation through the existing gated
-capture protocol and independent electrical setup/ownership checks. The summary
-accepts one complete valid GPIO window and a matching finite firmware interval;
-free-running/degraded captures cannot become per-inference energy. Poll-based
-edges require bounded uncertainty. Energy covers the stated powered domain with
-no idle subtraction. Missing captures have null values and `not_captured`, not zero.
-This normalization layer does not add a gated firmware mode or acquire an instrument.
 
 Build receipts also expose `planned_memory` from the existing memory-plan stage,
 with `planned_memory_reason` when unavailable. This is a compiler/configuration

@@ -1,7 +1,7 @@
 {
   "api_version": [
-    1,
-    1
+    2,
+    0
   ],
   "surface": {
     "ElfSection": {
@@ -585,49 +585,6 @@
         "INT8": "int8"
       }
     },
-    "FixtureEnergyWindow": {
-      "fields": [
-        [
-          "build_identity",
-          "str",
-          "<required>"
-        ],
-        [
-          "power",
-          "PowerResult",
-          "<required>"
-        ],
-        [
-          "completed_calls",
-          "int",
-          "<required>"
-        ],
-        [
-          "firmware_duration_s",
-          "float",
-          "<required>"
-        ],
-        [
-          "measured_domain",
-          "str",
-          "<required>"
-        ],
-        [
-          "instrument_serial",
-          "str",
-          "<required>"
-        ],
-        [
-          "evidence",
-          "tuple[FixtureFile, ...]",
-          "<required>"
-        ]
-      ],
-      "frozen": true,
-      "kind": "dataclass",
-      "methods": {},
-      "properties": []
-    },
     "FixtureFile": {
       "fields": [
         [
@@ -814,31 +771,6 @@
         [
           "footprint",
           "FixtureFootprint",
-          "<required>"
-        ],
-        [
-          "energy_j",
-          "FixtureMetric",
-          "<required>"
-        ],
-        [
-          "energy_per_inference_j",
-          "FixtureMetric",
-          "<required>"
-        ],
-        [
-          "energy_domain",
-          "str | None",
-          "<required>"
-        ],
-        [
-          "instrument_serial",
-          "str | None",
-          "<required>"
-        ],
-        [
-          "idle_subtracted",
-          "bool",
           "<required>"
         ],
         [
@@ -1573,7 +1505,7 @@
     },
     "summarize_fixture_measurements": {
       "kind": "function",
-      "signature": "(build: 'FixtureBuild', capture: 'FixtureCaptureResult', footprint: 'FixtureFootprint', *, energy: 'FixtureEnergyWindow | None' = None) -> 'FixtureMeasurements'"
+      "signature": "(build: 'FixtureBuild', capture: 'FixtureCaptureResult', footprint: 'FixtureFootprint') -> 'FixtureMeasurements'"
     },
     "supported_fixture_target": {
       "kind": "function",

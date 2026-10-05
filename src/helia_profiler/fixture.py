@@ -2,7 +2,7 @@
 
 Only the names in ``__all__`` are the contract. ``FIXTURE_API_VERSION`` is
 ``(major, minor)``: minor grows with additive changes, major with removals or
-changed semantics. ``tests/contracts/fixture_api_v1.json`` records the surface.
+changed semantics. ``tests/contracts/fixture_api_v<major>.json`` records the surface.
 """
 
 from __future__ import annotations
@@ -55,7 +55,6 @@ from .fixture_capture import (
 )
 from .fixture_metrics import FixtureFootprint, FixtureMetric, inspect_fixture_footprint
 from .fixture_observation import (
-    FixtureEnergyWindow,
     FixtureMeasurements,
     summarize_fixture_measurements,
 )
@@ -74,7 +73,7 @@ from .hostenv.elf_inventory import ElfSection, LoadSegment, SectionInventory, se
 from .placement import Placement
 from .results.models import ToolchainInfo
 
-FIXTURE_API_VERSION: Final[tuple[int, int]] = (1, 1)
+FIXTURE_API_VERSION: Final[tuple[int, int]] = (2, 0)
 
 __all__ = [
     "FIXTURE_API_VERSION",
@@ -130,7 +129,6 @@ __all__ = [
     "VerifiedPreparedRuntime",
     "FixtureBuild",
     "FixtureCaptureResult",
-    "FixtureEnergyWindow",
     "FixtureFootprint",
     "FixtureMeasurements",
     "FixtureMemory",

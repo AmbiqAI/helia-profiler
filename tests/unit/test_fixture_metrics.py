@@ -1,7 +1,8 @@
 """Fixture measurements reject incomplete attribution and stale observation bindings."""
 
+import inspect
 import json
-from dataclasses import replace
+from dataclasses import fields, replace
 from hashlib import sha256
 
 import pytest
@@ -10,7 +11,7 @@ from helia_profiler import fixture_metrics as metrics
 from helia_profiler.engines import EngineType
 from helia_profiler.fixture import FixtureBuild, FixtureTimingScope
 from helia_profiler.fixture_capture import FixtureCaptureResult, FixtureMemory, FixtureTiming
-from helia_profiler.fixture_observation import FixtureEnergyWindow, summarize_fixture_measurements
+from helia_profiler.fixture_observation import FixtureMeasurements, summarize_fixture_measurements
 from helia_profiler.fixture_runtime import FixtureFile
 from helia_profiler.fixture_target import supported_fixture_target
 from helia_profiler.hostenv.elf_inventory import (
@@ -19,8 +20,6 @@ from helia_profiler.hostenv.elf_inventory import (
     SectionInventory,
     SymbolEntry,
 )
-from helia_profiler.power.base import GatedPowerWindow, PowerResult, PowerSummary
-from helia_profiler.power.metadata import MeasurementScope, PowerIntegrity, PowerMetadata
 
 
 @pytest.fixture
@@ -108,7 +107,13 @@ def test_footprint_separates_reservation_occupancy_and_attribution(rig):
     assert result.latency_s.value == 0.1
     assert result.arena_capacity_bytes.value == 100
     assert result.arena_used_after_invoke_bytes.value == 80
-    assert result.energy_per_inference_j.value is None
+    assert result.schema_version == 2
+
+
+def test_the_fixture_reports_no_energy():
+    # Energy comes from the dedicated power firmware, never from the fixture.
+    assert not [f for f in fields(FixtureMeasurements) if "energy" in f.name]
+    assert "energy" not in inspect.signature(summarize_fixture_measurements).parameters
 
 
 @pytest.mark.parametrize("case", ["partial", "outside", "straddles"])
@@ -144,50 +149,6 @@ def test_observation_binding_rejects_wrong_variant(rig, bad):
         build = replace(build, built=False, build_identity=None)
     with pytest.raises(ValueError):
         summarize_fixture_measurements(build, capture, footprint)
-
-
-def power_window(build, capture):
-    metadata = PowerMetadata(
-        gating_method="gpi_stream+host_stats_integral",
-        measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW,
-        integrity=PowerIntegrity.VALID,
-        window_count=1,
-        gate_rise_observed=True,
-        gate_fall_observed=True,
-    )
-    power = PowerResult(
-        PowerSummary(0.1, 0.3, 0.2, 0.3, 1.0, 100),
-        gated_windows=[GatedPowerWindow(0, 1, 1, 0.1, 0.3, 0.1, 0.3, 0.2, 100)],
-        metadata=metadata,
-    )
-    return FixtureEnergyWindow(
-        build.build_identity,
-        power,
-        10,
-        1.0,
-        "confirmed whole board",
-        "js320-25qg",
-        capture.artifacts,
-    )
-
-
-def test_gated_energy_and_invalid_windows(rig):
-    args, _, build, capture = rig
-    footprint = metrics.inspect_fixture_footprint(**args)
-    energy = power_window(build, capture)
-    result = summarize_fixture_measurements(build, capture, footprint, energy=energy)
-    assert result.energy_j.value == 0.3 and result.energy_per_inference_j.value == 0.03
-    assert result.idle_subtracted is False
-    for bad in [
-        replace(energy, completed_calls=9),
-        replace(energy, build_identity="old"),
-        replace(energy, firmware_duration_s=2),
-        replace(energy, measured_domain=""),
-        replace(energy, power=replace(energy.power, gated_windows=[])),
-        replace(energy, power=replace(energy.power, metadata=PowerMetadata())),
-    ]:
-        with pytest.raises(ValueError):
-            summarize_fixture_measurements(build, capture, footprint, energy=bad)
 
 
 @pytest.mark.parametrize(
