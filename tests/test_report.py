@@ -1875,3 +1875,32 @@ def test_missing_counter_still_publishes(tmp_path: Path):
     assert (tmp_path / "run" / "result_manifest.json").is_file()
     with open(tmp_path / "run" / "detailed" / "profile_basic_cpu.csv", newline="") as f:
         assert "ARM_PMU_CPU_CYCLES" in next(csv.reader(f))
+
+
+def test_per_inference_figures_come_from_one_writer():
+    from helia_profiler.report.summary import _write_per_inference
+
+    power: dict[str, object] = {}
+    _write_per_inference(power, 0.5, 100)
+    _write_per_inference(power, 0.25, 50, prefix="active_window_estimated_")
+    _write_per_inference(power, 0.0, 10, prefix="zero_")
+    assert power == {
+        "energy_per_inference_j": 0.005,
+        "inferences_per_joule": 200.0,
+        "active_window_estimated_energy_per_inference_j": 0.005,
+        "active_window_estimated_inferences_per_joule": 200.0,
+        "zero_energy_per_inference_j": 0.0,
+    }
+
+
+def test_the_active_window_estimate_writes_its_own_per_inference_keys(tmp_path: Path):
+    ctx = _gated_power_ctx(tmp_path, clean_infer_count=0, clean_infer_avg_us=0, duration_s=1.0)
+    assert ctx.power_result is not None and ctx.pmu_result is not None
+    ctx.power_result.metadata.measurement_scope = MeasurementScope.WHOLE_CAPTURE_WINDOW
+    object.__setattr__(ctx.pmu_result.meta, "profiled_infer_count", 200)
+    object.__setattr__(ctx.pmu_result.meta, "profiled_infer_total_us", 18_000_000)
+    power = json.loads(_write_summary(ctx, tmp_path).read_text())["power"]
+    assert "energy_per_inference_j" not in power and "inferences_per_joule" not in power
+    per_inference = power["active_window_estimated_energy_per_inference_j"]
+    assert per_inference == round(power["active_window_estimated_energy_j"] / 200, 9)
+    assert power["active_window_estimated_inferences_per_joule"] == round(1.0 / per_inference, 6)

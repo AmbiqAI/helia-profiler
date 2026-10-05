@@ -1400,3 +1400,21 @@ def test_system_clock_is_described_as_assumed():
     spec = WIRE_REGISTRY[WireKey.SYSTEM_CLOCK_HZ.wire]
     assert "Ground-truth" not in spec.description
     assert "host" in spec.description
+
+
+def test_the_stimer_rate_and_settle_band_come_from_the_wire_constants():
+    from helia_profiler.fixture_capture import FIXTURE_SETTLE_TICKS, FIXTURE_TIMER_HZ
+    from helia_profiler.wire import STIMER_HZ, STIMER_SETTLE_TICKS
+
+    source = (
+        Path(__file__).resolve().parents[2]
+        / "src/helia_profiler/firmware/templates/_stimer_init.j2"
+    ).read_text(encoding="utf-8")
+    for name in ("HPX_STIMER_HZ", "HPX_STIMER_SETTLE_MIN_TICKS", "HPX_STIMER_SETTLE_MAX_TICKS"):
+        assert not re.search(rf"#define {name}\s+\d", source), f"{name} is a literal again"
+    rendered = _jinja_env.get_template("_stimer_init.j2").render()
+    assert f"#define HPX_STIMER_HZ {STIMER_HZ}U" in rendered
+    low, high = STIMER_SETTLE_TICKS
+    assert re.search(rf"#define HPX_STIMER_SETTLE_MIN_TICKS\s+{low}U", rendered)
+    assert re.search(rf"#define HPX_STIMER_SETTLE_MAX_TICKS\s+{high}U", rendered)
+    assert (FIXTURE_TIMER_HZ, FIXTURE_SETTLE_TICKS) == (STIMER_HZ, STIMER_SETTLE_TICKS)

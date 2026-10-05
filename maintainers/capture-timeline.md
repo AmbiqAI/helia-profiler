@@ -295,7 +295,7 @@ simply times out.
 | Drift plausibility | 0.15 | D | Set above up to about 12 % observed on a cold AP510 first run after idle (#181) |
 | Counted window tolerance | 0.10 | U | |
 | busy_loop window tolerance | 0.25 | E | Reasoned from the calibration band |
-| STIMER settle deadline; band 245..410 ticks | 1 s | D | Set at about 1.5 times a 400–650 ms cold transient measured on an Apollo4 Blue Plus (#124); not measured on Apollo5 |
+| STIMER settle deadline; band `wire.STIMER_SETTLE_TICKS` (245..410 ticks) | 1 s | D | Set at about 1.5 times a 400–650 ms cold transient measured on an Apollo4 Blue Plus (#124); not measured on Apollo5 |
 | Instrument/firmware gate agreement | 1 % | D | Set above the disagreements recorded in #142, #181 and #195. Bench [M] (§11): 150 JS320 gates against firmware DWT-cycle windows agreed within 0.02 % to 0.09 %, from standalone firmware rather than the hpx terminal |
 | JLinkExe timeout | 15 s | U | |
 | SWPOI reset script sleeps | 2 × 1 s | U | |

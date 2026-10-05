@@ -43,6 +43,16 @@ def _power_errors(evaluation: RunEvaluation) -> list[str]:
     )
 
 
+def _write_per_inference(
+    power: dict[str, Any], energy_j: float, count: int, *, prefix: str = ""
+) -> None:
+    """Write energy per inference and inferences per joule; the one place either is computed."""
+    per_inference = energy_j / count
+    power[f"{prefix}energy_per_inference_j"] = round(per_inference, 9)
+    if per_inference > 0:
+        power[f"{prefix}inferences_per_joule"] = round(1.0 / per_inference, 6)
+
+
 def _write_summary(
     ctx: PipelineContext,
     output_dir: Path,
@@ -307,13 +317,7 @@ def _write_summary(
                                     integrity.expected_s,
                                     integrity.ratio,
                                 )
-                            energy_per_infer = ps.energy_j / effective_count
-                            summary["power"]["energy_per_inference_j"] = round(energy_per_infer, 9)
-                            if energy_per_infer > 0:
-                                summary["power"]["inferences_per_joule"] = round(
-                                    1.0 / energy_per_infer,
-                                    6,
-                                )
+                            _write_per_inference(summary["power"], ps.energy_j, effective_count)
                 elif meta.clean_infer_avg_cycles is not None or meta.clean_infer_avg_us is not None:
                     # clean_infer_count > 0 with a zero/missing avg cycle figure
                     # means the DWT clean-window read was corrupted (a
@@ -337,10 +341,7 @@ def _write_summary(
             count = window_inference_count(ctx)
             suppressed = arbitration is not None and arbitration.suppress_per_inference
             if probe_ran_inferences and not suppressed and not power_errors and count:
-                energy_per_infer = ps.energy_j / count
-                summary["power"]["energy_per_inference_j"] = round(energy_per_infer, 9)
-                if energy_per_infer > 0:
-                    summary["power"]["inferences_per_joule"] = round(1.0 / energy_per_infer, 6)
+                _write_per_inference(summary["power"], ps.energy_j, count)
         elif (
             probe_ran_inferences
             and measurement_scope != "free_form_capture"
@@ -358,16 +359,12 @@ def _write_summary(
                 "not instrument-GPIO-gated"
             )
             if meta.profiled_infer_count and meta.profiled_infer_count > 0:
-                energy_per_infer = (ps.avg_power_w * active_duration_s) / meta.profiled_infer_count
-                summary["power"]["active_window_estimated_energy_per_inference_j"] = round(
-                    energy_per_infer,
-                    9,
+                _write_per_inference(
+                    summary["power"],
+                    ps.avg_power_w * active_duration_s,
+                    meta.profiled_infer_count,
+                    prefix="active_window_estimated_",
                 )
-                if energy_per_infer > 0:
-                    summary["power"]["active_window_estimated_inferences_per_joule"] = round(
-                        1.0 / energy_per_infer,
-                        6,
-                    )
 
     if ctx.run_metadata.timing is not None:
         timing = {}

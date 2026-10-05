@@ -17,7 +17,7 @@
    releases the counter from reset).
 #}
 // STIMER cycle-independent wall clock for the clean/power window.
-#define HPX_STIMER_HZ 32768U
+#define HPX_STIMER_HZ {{ stimer_hz }}U
 
 // Settle-and-verify budget.  AM_HAL_STIMER_CFG_CLEAR drops the XT request and
 // the crystal restarts (Apollo4 datasheet 6.4: "the XT is only enabled when an
@@ -43,11 +43,11 @@
 // so a single-probe accept has a blind band just above the ceiling where a
 // still-ramping crystal squeaks through; and consecutive readings DISAGREEING
 // is exactly the unsettled signature that made the #124 sweep trustworthy.
-// Two probes make the ramp show itself.  Band is 245..410 ticks around the
+// Two probes make the ramp show itself.  Band is {{ stimer_settle_ticks[0] }}..{{ stimer_settle_ticks[1] }} ticks around the
 // 327.68 nominal (-25.2% / +25.1%; integer tick bounds, so not exactly 25).
 #define HPX_STIMER_SETTLE_PROBE_US   10000U   // 10 ms -> 327.68 ticks nominal
-#define HPX_STIMER_SETTLE_MIN_TICKS  245U     // ~-25%: rejects a stopped/slow XT
-#define HPX_STIMER_SETTLE_MAX_TICKS  410U     // ~+25%: rejects transient overshoot
+#define HPX_STIMER_SETTLE_MIN_TICKS  {{ stimer_settle_ticks[0] }}U     // ~-25%: rejects a stopped/slow XT
+#define HPX_STIMER_SETTLE_MAX_TICKS  {{ stimer_settle_ticks[1] }}U     // ~+25%: rejects transient overshoot
 #define HPX_STIMER_SETTLE_MAX_US     1000000U // 1 s deadline, ~1.5x the measured worst case
 
 // Returns 1 when two consecutive probes landed in band (crystal settled and
@@ -101,7 +101,7 @@ static inline uint32_t hpx_stimer_ticks(void) {
     return am_hal_stimer_counter_get();
 }
 
-// ticks -> microseconds.  32768 ticks/s -> us = ticks * 1,000,000 / 32768.
+// ticks -> microseconds.  {{ stimer_hz }} ticks/s -> us = ticks * 1,000,000 / {{ stimer_hz }}.
 static inline uint64_t hpx_stimer_ticks_to_us(uint64_t ticks) {
     return (ticks * 1000000ULL) / (uint64_t)HPX_STIMER_HZ;
 }
