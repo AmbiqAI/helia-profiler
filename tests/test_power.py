@@ -2817,7 +2817,7 @@ class TestEstimateCaptureDuration:
         # profiled pass: 1 * (1 + 300) = 301 inferences.
         # clean pass (fixed): max(1, 300) iterations + max(3, 1) warmups
         # = 303 inferences — the warmup floors at 3 because the fixed+STIMER
-        # firmware arm floors its measured warmup there (#164), and for
+        # firmware floors its measured warmup there (#164), and for
         # DWT-timed fixed builds the overestimate only adds headroom.
         # total = 604 inferences * 1 ms/inference = 0.604 s.
         expected = BOOT_SETTLE_S + 0.604 + _SAFETY_MARGIN_S

@@ -370,61 +370,62 @@ int main(void) {
 {% if not use_stimer_window -%}
 {% include "_clean_window_rate_probe.j2" %}
 {%- endif -%}
-{% if power_only | default(false) %}
-{#- Dedicated power binary, either window mode: warm the engine and MEASURE
-   NOTHING — no dwt_init re-assert, no DWT bracket, no adaptive sizing.  The
-   FLASHED power image always renders with window_mode pinned to "fixed"
-   (render_power_source); the initial main_power.cc render is compiled with
-   the config's window mode but never flashed.  Making power the FIRST arm
-   keeps the property structural for both: the auto arm below cannot leak a
-   pre-window DWT read into any power render — on AP4 power the debug domain
-   is already off at boot, so that read would be frozen garbage (#170).  The
-   emitted text is byte-identical to the bare fixed arm this replaces, plus
-   the zeroed stall-floor declaration below for DWT-windowed renders. #}
+{%- set auto_window = window_mode | default("fixed") == "auto" and not power_only | default(false) %}
+{%- set measure_warm = not power_only | default(false) and (auto_window or not use_stimer_window or not busy_loop_probe) %}
+{%- set track_min_warm = measure_warm and not use_stimer_window %}
+{%- if not measure_warm %}
+{#- Nothing measures the warm cost here, so the warm-up is bare: the dedicated
+   power binary, and the STIMER-timed fixed busy_loop window, whose length is
+   the calibrated spin, not an inference count.  A power render is never an
+   auto window, whatever the config's window mode: the FLASHED power image is
+   pinned to "fixed" by render_power_source, but the first main_power.cc render
+   takes the config's mode and is still compiled.  Excluding power from both
+   auto_window and measure_warm keeps any pre-window DWT read out of every
+   power render; on AP4 power the debug domain is already off at boot, so that
+   read would be frozen garbage. #}
         // Warm caches / branch predictor / MRAM prefetch (uninstrumented).
         for (int w = 0; w < {{ clean_warmup | default(1) }}; w++) {
 {{ self.engine_reset_inputs_warm() }}
             {{ self.engine_invoke() }}
         }
-        const int clean_iters_n = {{ clean_iters | default(1) }};
-{% elif window_mode | default("fixed") == "auto" %}
-        // Adaptive clean-window sizing.  Warm caches / branch predictor / MRAM
-        // prefetch (uninstrumented) and capture the warm per-inference cycle
-        // cost, then choose how many gated iterations to run so the window
-        // fills ~{{ window_target_ms }} ms of wall-time, clamped to
-        // [{{ window_min }}, {{ window_max }}].  Short models run more
-        // iterations and big models fewer, giving a consistent window for
-        // reliable external power gating.  The host divides the gated energy by
-        // the reported HPX_CLEAN_INFER_COUNT.
-        //
-        // Robustness: a debugger attaching over SWD (notably the J-Link RTT
-        // background engine) can reset/reconfigure DEMCR/DWT *after* our boot
-        // dwt_init() runs, transiently freezing DWT->CYCCNT during an early
-        // warmup iteration.  A frozen counter yields a near-zero cycle reading,
-        // which would size the window to window_max (thousands of iterations →
-        // minutes of silence that trip the host capture heartbeat).  The reset
-        // is a single one-shot event during attach, so we re-assert the counter,
-        // warm several times, and take the MAX reading: a transient freeze only
-        // ever makes a reading too *low*, so the maximum rejects it.  If the
-        // counter never advances at all we fall back to window_min.
+{%- else %}
+        // Warm caches / branch predictor / MRAM prefetch (uninstrumented) and
+        // MEASURE the warm per-inference cost.  It sizes the auto window, sets
+        // the in-window stall floor on a DWT-timed window, and feeds the
+        // est_ms announce below except on a busy_loop window.  A debugger
+        // attaching over SWD (notably the J-Link RTT background engine) can
+        // reset/reconfigure DEMCR/DWT after the boot dwt_init() and
+        // transiently freeze DWT->CYCCNT, so an auto or STIMER-timed window
+        // re-asserts the counter first, and every measured case keeps the MAX
+        // of at least 3 readings: a freeze or stall only ever reads low, so
+        // the maximum rejects it.  If the counter never advances, the auto
+        // window falls back to its minimum and est_ms to 0.
+{%- if auto_window or use_stimer_window %}
         dwt_init();
+{%- endif %}
         uint32_t clean_warm_cyc = 0U;
-{%- if not use_stimer_window %}
+{%- if track_min_warm %}
         uint32_t clean_warm_min_cyc = 0U;
 {%- endif %}
-        for (int w = 0; w < 3; w++) {
+        for (int w = 0; w < {{ 3 if auto_window else [clean_warmup | default(1), 3] | max }}; w++) {
 {# Indentation lives INSIDE the reset-inputs blocks (unlike engine_invoke) because an engine whose override is multi-line must indent every line. #}{% if not restore_clean_inputs | default(false) %}{% block engine_reset_inputs_warm %}{% endblock %}{% endif %}
             uint32_t wt0 = DWT->CYCCNT;
 {% if restore_clean_inputs | default(false) %}{{ self.engine_reset_inputs_warm() }}{% endif %}
-            {# One statement reused at seven call sites across two indent levels, so the base writes the indent and the block holds the bare call; the other six sites call it back through self.engine_invoke(). #}{% block engine_invoke %}{% endblock %}
+            {# One statement reused at several call sites across two indent levels, so the base writes the indent and the block holds the bare call; the other sites call it back through self.engine_invoke(). #}{% block engine_invoke %}{% endblock %}
             uint32_t wc = (uint32_t)(DWT->CYCCNT - wt0);
             if (wc > clean_warm_cyc) clean_warm_cyc = wc;
-{%- if not use_stimer_window %}
+{%- if track_min_warm %}
             if (wc > 0U && (clean_warm_min_cyc == 0U || wc < clean_warm_min_cyc)) {
                 clean_warm_min_cyc = wc;
             }
 {%- endif %}
         }
+{%- endif %}
+{%- if auto_window %}
+        // Adaptive clean-window sizing: run enough gated iterations to fill
+        // ~{{ window_target_ms }} ms of wall-time, clamped to
+        // [{{ window_min }}, {{ window_max }}].  The host divides the gated
+        // energy by the reported HPX_CLEAN_INFER_COUNT.
         int clean_iters_n = {{ window_min }};
         if (clean_warm_cyc > 0U) {
             const uint64_t target_cyc =
@@ -435,115 +436,30 @@ int main(void) {
             clean_iters_n = (int)n;
         }
 {% else %}
-        // Warm caches / branch predictor / MRAM prefetch (uninstrumented).
-{%- if not use_stimer_window %}
-        // The warm cost is MEASURED here as well as primed: it is the
-        // reference the in-window stall check compares against (#121).  Taking
-        // the MAX rejects a warm iteration that itself lost time to a stalled
-        // counter, since a stall only ever reads low.  The auto path above
-        // already measures this for its own window sizing.  Like the auto and
-        // STIMER arms, the loop floors at 3 iterations so MAX has more than
-        // one sample to reject against even when clean_warmup is lower (#170).
-        uint32_t clean_warm_cyc = 0U;
-        uint32_t clean_warm_min_cyc = 0U;
-        for (int w = 0; w < {{ [clean_warmup | default(1), 3] | max }}; w++) {
-{% if not restore_clean_inputs | default(false) %}{{ self.engine_reset_inputs_warm() }}{% endif %}
-            uint32_t wt0 = DWT->CYCCNT;
-{% if restore_clean_inputs | default(false) %}{{ self.engine_reset_inputs_warm() }}{% endif %}
-            {{ self.engine_invoke() }}
-            uint32_t wc = (uint32_t)(DWT->CYCCNT - wt0);
-            if (wc > clean_warm_cyc) clean_warm_cyc = wc;
-            if (wc > 0U && (clean_warm_min_cyc == 0U || wc < clean_warm_min_cyc)) {
-                clean_warm_min_cyc = wc;
-            }
-        }
-{%- elif not busy_loop_probe %}
-        // STIMER-timed fixed window, profile binary, default infer probe: the
-        // in-window clock is STIMER, but the debug domain is still up HERE —
-        // it is gated only inside the window — so DWT can measure the warm
-        // cost purely to feed the est_ms announce below (#164).  Re-assert
-        // the counter first: a debugger attaching over SWD can reset
-        // DEMCR/DWT after the boot dwt_init() and transiently freeze
-        // DWT->CYCCNT (see the auto path above).  MAX rejects a frozen-low
-        // reading — which needs more than one sample to reject against, so
-        // the loop floors at the auto path's 3 even when clean_warmup is
-        // lower.  If the counter never advances at all, est_ms degrades to 0
-        // and the host keeps its normal heartbeat behaviour — never worse
-        // than no estimate.  The busy_loop probe takes the bare arm below:
-        // its window runs a calibrated busy loop sized to window_target_ms,
-        // not clean_iters inferences, so an inference-derived estimate would
-        // describe nothing that window runs — its announce emits the target
-        // itself instead (#170).
-        dwt_init();
-        uint32_t clean_warm_cyc = 0U;
-        for (int w = 0; w < {{ [clean_warmup | default(1), 3] | max }}; w++) {
-{% if not restore_clean_inputs | default(false) %}{{ self.engine_reset_inputs_warm() }}{% endif %}
-            uint32_t wt0 = DWT->CYCCNT;
-{% if restore_clean_inputs | default(false) %}{{ self.engine_reset_inputs_warm() }}{% endif %}
-            {{ self.engine_invoke() }}
-            uint32_t wc = (uint32_t)(DWT->CYCCNT - wt0);
-            if (wc > clean_warm_cyc) clean_warm_cyc = wc;
-        }
-{%- else %}
-        for (int w = 0; w < {{ clean_warmup | default(1) }}; w++) {
-{{ self.engine_reset_inputs_warm() }}
-            {{ self.engine_invoke() }}
-        }
-{%- endif %}
         const int clean_iters_n = {{ clean_iters | default(1) }};
 {% endif %}
         // Announce the upcoming silent clean (power) window so the host can
-{%- if busy_loop_probe and not power_only | default(false) %}
-        // widen its capture deadline for the blackout.  This window is a
-        // calibrated busy loop, so firmware reports state + the compile-time
-        // target the loop is sized to fill.  The host owns the actual
-        // timeout policy.
-{%- else %}
-        // widen its capture deadline for the blackout.  Firmware only reports
-        // state + the one runtime scalar the host cannot know a priori — how
-        // long a single inference takes — folded into est_ms (iters * warm
-        // cycles / clock).  The host owns the actual timeout policy.
-{%- endif %}
+        // widen its capture deadline for the blackout.  The host owns the
+        // actual timeout policy.
 {% if power_only | default(false) %}
         // Fixed window: no runtime warm measurement, so est_ms=0 — the host
         // already knows the iteration count from its own settings.
         hpx_printf("HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=0\n",
                    clean_iters_n);
 {% elif busy_loop_probe %}
-        // Busy-loop probe, either window mode: the gated window runs a
-        // calibrated busy loop sized to fill window_target_ms
-        // (_busy_loop_calibration.j2) — the iteration count drives nothing
-        // inside it, so the target itself is the only honest duration
-        // statement and is emitted as a compile-time constant (#170).  A
-        // measured inference estimate here described a window that runs no
-        // inferences, wrong in both directions.  iters=1 for the same
-        // reason: the window completes exactly one busy pass
-        // (clean_count = 1), and on a lossy transport that drops
-        // HPX_CLEAN_INFER_COUNT the host's iters fallback feeds the
-        // gate-duration check — announcing the planned count would make
-        // that check compute N x spin_us and kill a healthy run with a
-        // duration-mismatch PowerError.
-        //
-        // This announce was clean_iters_n's only busy-path consumer, so
-        // read it explicitly or -Wall flags every busy profile render.
+        // The busy_loop window runs one calibrated spin sized to
+        // window_target_ms (_busy_loop_calibration.j2), so the target is the
+        // only honest duration and iters=1 is the count the window completes.
+        // On a lossy transport that drops HPX_CLEAN_INFER_COUNT the host falls
+        // back to this iters for its gate-duration check, so announcing the
+        // planned count would fail a healthy run.  Read clean_iters_n
+        // explicitly: this announce is its only busy-path consumer, and
+        // -Wall flags it otherwise.
         (void)clean_iters_n;
         hpx_printf("HPX_HEARTBEAT phase=clean_window_begin iters=1 est_ms={{ window_target_ms }}\n");
-{% elif window_mode | default("fixed") == "auto" %}
-        uint64_t clean_est_ms = 0;
-        if (SystemCoreClock >= 1000U) {
-            clean_est_ms = ((uint64_t)clean_iters_n * (uint64_t)clean_warm_cyc)
-                           / ((uint64_t)SystemCoreClock / 1000ULL);
-        }
-        hpx_printf("HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=%llu\n",
-                   clean_iters_n, (unsigned long long)clean_est_ms);
 {% else %}
-{%- if not use_stimer_window %}
-        // Fixed window on a DWT-timed build: the warmup above measures the
-        // per-inference cost for the stall floor, so the blackout estimate is
-        // derivable here too.  Emitting it lets the host widen its capture
-        // deadline (transport/protocol.py: window_budget_s) instead of
-        // falling back to the flat heartbeat timeout, which a long fixed
-        // window can outlast.
+        // est_ms = iterations x the measured warm cycles / clock: the one
+        // runtime scalar the host cannot know beforehand.
         uint64_t clean_est_ms = 0;
         if (SystemCoreClock >= 1000U) {
             clean_est_ms = ((uint64_t)clean_iters_n * (uint64_t)clean_warm_cyc)
@@ -551,20 +467,6 @@ int main(void) {
         }
         hpx_printf("HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=%llu\n",
                    clean_iters_n, (unsigned long long)clean_est_ms);
-{%- else %}
-        // Fixed window on a STIMER-timed profile build (infer probe): the
-        // warmup above measures the per-inference cost solely for this
-        // estimate (#164), so it is emitted the same way — the host widens
-        // its capture deadline instead of falling back to the flat heartbeat
-        // timeout, which a long fixed window can outlast.
-        uint64_t clean_est_ms = 0;
-        if (SystemCoreClock >= 1000U) {
-            clean_est_ms = ((uint64_t)clean_iters_n * (uint64_t)clean_warm_cyc)
-                           / ((uint64_t)SystemCoreClock / 1000ULL);
-        }
-        hpx_printf("HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=%llu\n",
-                   clean_iters_n, (unsigned long long)clean_est_ms);
-{%- endif %}
 {% endif %}
 {%- if not use_stimer_window %}
         uint64_t clean_cycles = 0;
