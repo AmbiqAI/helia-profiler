@@ -7,16 +7,20 @@ from typing import Any, cast
 
 import jinja2
 
-from ..wire import POWER_TERMINAL_VERSION
+from ..wire import POWER_TERMINAL_VERSION, STIMER_HZ, STIMER_SETTLE_TICKS
 
 _jinja_env = jinja2.Environment(
     loader=jinja2.PackageLoader("helia_profiler.firmware", "templates"),
     keep_trailing_newline=True,
     undefined=jinja2.StrictUndefined,
 )
-# The envelope version the host parser accepts, so the firmware cannot drift
-# from it. jinja2 types ``globals`` as its own builtin helpers only.
-cast("dict[str, Any]", _jinja_env.globals)["power_terminal_version"] = POWER_TERMINAL_VERSION
+# Wire facts the host checks, so the firmware cannot drift from them. jinja2
+# types ``globals`` as its own builtin helpers only.
+cast("dict[str, Any]", _jinja_env.globals).update(
+    power_terminal_version=POWER_TERMINAL_VERSION,
+    stimer_hz=STIMER_HZ,
+    stimer_settle_ticks=STIMER_SETTLE_TICKS,
+)
 
 
 def _write_text(path: Path, text: str) -> None:

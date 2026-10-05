@@ -22,6 +22,7 @@ from .target.probe.jlink import (
     reset_target,
     resume_if_halted,
 )
+from .wire import STIMER_HZ, STIMER_SETTLE_TICKS
 
 
 class FixtureCaptureGuard(Protocol):
@@ -40,8 +41,8 @@ class FixtureCaptureGuard(Protocol):
 
 #: Core clock, STIMER rate and STIMER settle window the qualified fixture reports.
 FIXTURE_CPU_HZ = fixture_cpu_hz()
-FIXTURE_TIMER_HZ = 32768
-FIXTURE_SETTLE_TICKS = (245, 410)
+FIXTURE_TIMER_HZ = STIMER_HZ
+FIXTURE_SETTLE_TICKS = STIMER_SETTLE_TICKS
 _STATUS_POISON = struct.unpack("<i", bytes([0xA5]) * 4)[0]
 _STATUS_RUNNING = -1
 _FIRST_POLL_S = 1.0

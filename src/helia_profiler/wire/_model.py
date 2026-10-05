@@ -43,6 +43,13 @@ POWER_TERMINAL_END_SENTINEL = "--- HPX_POWER_TERMINAL_END ---"
 #: Version of the power terminal envelope (``HPX_POWER_TERMINAL_VERSION``).
 POWER_TERMINAL_VERSION = 2
 
+#: STIMER rate the window clock runs at (``HPX_STIMER_HZ``).
+STIMER_HZ = 32768
+
+#: Ticks a 10 ms settle probe must read for the crystal to count as settled
+#: (``HPX_STIMER_SETTLE_MIN_TICKS``/``_MAX_TICKS``; about +/-25 % of 327.68).
+STIMER_SETTLE_TICKS = (245, 410)
+
 #: Liveness line the firmware prints before the start header — once on RTT, as
 #: a 40-line sync preamble on SWO/UART, never on USB CDC (which polls DTR).
 HPX_READY_LINE = "HPX_READY"
