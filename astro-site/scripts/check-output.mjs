@@ -147,8 +147,7 @@ check(
   `Home does not say ${stableBoards} boards are on the stable channel, which is what the registry counts.`,
 );
 
-/* Section shape: five in the top navigation, a scoped sidebar on four of
- * them, and Home with the marker that takes the pane's column back. */
+/* Documentation sections retain scoped sidebars; Home uses only the section dropdown. */
 const SECTIONS = [
   ["Home", ""],
   ["Getting started", "getting-started/"],
@@ -156,7 +155,6 @@ const SECTIONS = [
   ["Examples", "examples/"],
   ["Reference", "reference/"],
 ];
-const MOBILE_ONLY = 'data-helia-sidebar-layout="mobile-only"';
 for (const [label, segment] of SECTIONS) {
   const file = path.join(dist, segment, "index.html");
   if (
@@ -168,21 +166,23 @@ for (const [label, segment] of SECTIONS) {
     continue;
   }
   const html = read(file);
-  check(
-    html.includes(`data-helia-sidebar-heading>${label}`),
-    `Section "${label}" landing page does not name its sidebar.`,
-  );
-  const homeless = html.includes(MOBILE_ONLY);
-  check(
-    label === "Home" ? homeless : !homeless,
-    label === "Home"
-      ? "Home renders a sidebar at desktop width."
-      : `Section "${label}" has no sidebar of its own.`,
-  );
+  if (label === "Home") {
+    check(!html.includes('id="starlight__sidebar"'), "Home renders a sidebar.");
+    check(!/<button\b[^>]*data-helia-sidebar-toggle/.test(html), "Home renders a sidebar toggle.");
+    check(!/<html\b[^>]*data-has-toc/.test(html), "Home renders a table of contents.");
+  } else {
+    check(
+      html.includes(`data-helia-sidebar-heading>${label}`),
+      `Section "${label}" landing page does not name its sidebar.`,
+    );
+    check(html.includes('id="starlight__sidebar"'), `Section "${label}" has no sidebar of its own.`);
+  }
   const sectionMenu = html.match(/<nav\b[^>]*aria-label="Choose section"[^>]*>([\s\S]*?)<\/nav>/)?.[1] ?? "";
+  const sectionLinks = [...sectionMenu.matchAll(/<a\b[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)]
+    .map(([, href, content]) => ({ href, label: content.replace(/<[^>]*>/g, "").trim() }));
   for (const [other, destination] of SECTIONS) {
     check(
-      sectionMenu.includes(`href="${base}${destination}"`) && sectionMenu.includes(`>${other}</a>`),
+      sectionLinks.some((link) => link.href === `${base}${destination}` && link.label === other),
       `Section "${label}" landing page does not link to "${other}".`,
     );
   }
