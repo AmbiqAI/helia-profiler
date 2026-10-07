@@ -186,6 +186,7 @@ export default defineConfig({
             ],
             tagline: 'Part of the Ambiq HELIA AI platform',
             logo: 'ambiq',
+            logoLightTone: 'blue',
           },
         }),
       ],
