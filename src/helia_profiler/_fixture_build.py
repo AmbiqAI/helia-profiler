@@ -56,6 +56,7 @@ class FixtureDType(StrEnum):
 
     INT8 = "int8"
     INT16 = "int16"
+    INT32 = "int32"
     FLOAT16 = "float16"
     FLOAT32 = "float32"
 
@@ -131,6 +132,9 @@ _DTYPE_PRECISION = {
 
 
 def _record_capability(engine: EngineType, dtype: FixtureDType) -> FixtureCapability:
+    if dtype is FixtureDType.INT32:
+        # Plain INT32 inputs are index payloads, not a qualified compute precision.
+        return FixtureCapability.SUPPORTED
     board, precision = supported_fixture_target().board, _DTYPE_PRECISION[dtype]
     answers = [
         qualification(
@@ -150,7 +154,8 @@ def _record_capability(engine: EngineType, dtype: FixtureDType) -> FixtureCapabi
 
 
 #: Fixture support per engine and IO dtype on the fixture target, from the
-#: runtime records: ``qualified`` when any of the engine's versions has a
+#: runtime records, except plain INT32 index inputs, which are supported only.
+#: ``qualified`` when any of the engine's versions has a
 #: device pass, else what its default record says; ``supported`` builds but
 #: has no device pass yet; ``unsupported`` is refused.
 FIXTURE_CAPABILITIES: dict[EngineType, dict[str, FixtureCapability]] = {
@@ -281,6 +286,8 @@ def _check_typed_fixture(
         or tuple(io.tensor for io in fixture.outputs) != model.outputs
     ):
         raise ConfigError("Fixture tensor declarations differ from analyzed model")
+    if any(t.dtype == "int32" for t in model.outputs):
+        raise ConfigError("INT32 fixture support is input-only")
     if model.output_bytes > FIXTURE_READBACK_BUDGET:
         raise ConfigError(
             f"Fixture outputs total {model.output_bytes} B, above the "
@@ -293,7 +300,7 @@ def _check_typed_fixture(
     # Device passes so far cover one input and one output with per-tensor
     # quantization, which the firmware also checks on the device.
     single_io = len(model.inputs) == len(model.outputs) == 1 and not any(
-        isinstance(t.quantization, PerAxisQuantization) for t in tensors
+        t.dtype == "int32" or isinstance(t.quantization, PerAxisQuantization) for t in tensors
     )
 
     def status(dtype: str) -> FixtureCapability:

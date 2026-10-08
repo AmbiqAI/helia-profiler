@@ -17,6 +17,7 @@ from .render import _jinja_env, _write_text
 _TFLITE_TYPES = {
     "int8": ("kTfLiteInt8", "int8"),
     "int16": ("kTfLiteInt16", "i16"),
+    "int32": ("kTfLiteInt32", "i32"),
     "float16": ("kTfLiteFloat16", "f16"),
     "float32": ("kTfLiteFloat32", "f"),
 }

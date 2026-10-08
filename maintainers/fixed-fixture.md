@@ -33,6 +33,13 @@ argument of `summarize_fixture_measurements` and the energy fields of
 memory; energy comes from the dedicated power firmware (`hpx profile --power`),
 which owns the power floor, the reset policy and the gated window.
 
+API 3.0 admits unquantized signed INT32 inputs, such as token indices, through
+the typed fixture path. Inputs retain their exact bytes and TfLite INT32 type.
+INT32 outputs remain unsupported. These input payloads are supported but not
+device-qualified, and do not introduce an INT32 neural compute precision.
+Complete Invoke status and every output byte still gate capture; the 128 KiB
+output readback limit, timing methods and role/state restrictions are unchanged.
+
 Fixture builds take pinned inputs only. `build_fixed_fixture` refuses any
 module, engine or CMSIS-NN override the compatibility classifier reports,
 plus `SEGGER_RTT_PATH`, `target.segger_rtt_path`, the variables CMake and
