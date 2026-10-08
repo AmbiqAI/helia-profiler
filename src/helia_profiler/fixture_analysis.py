@@ -269,6 +269,15 @@ def analyze_typed_fixture_model(path: Path) -> TypedFixtureModelAnalysis:
             else:
                 if scales or (dtype == "int32" and quant is not None and quant.ZeroPointLength()):
                     raise ValueError("Unquantized fixture IO carries quantization")
+                if (
+                    dtype == "int32"
+                    and quant is not None
+                    and (
+                        quant.DetailsType() != schema.QuantizationDetails.NONE
+                        or quant.Details() is not None
+                    )
+                ):
+                    raise ValueError("INT32 fixture IO carries unsupported quantization details")
                 quantization = None
             name = raw.Name()
             return FixtureTensor(

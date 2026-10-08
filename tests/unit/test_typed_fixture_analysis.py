@@ -218,3 +218,42 @@ def test_int32_indices_reject_quantization(tmp_path, scales):
     )
     with pytest.raises(ValueError, match="carries quantization"):
         analyze_typed_fixture_model(path)
+
+
+@pytest.mark.parametrize(
+    "metadata",
+    ["absent", "empty", "minmax", "custom", "custom_empty", "unknown", "hidden", "tag_only"],
+)
+def test_plain_int32_serialized_quantization_details(tmp_path, metadata):
+    def change(model, graph):
+        if metadata == "absent":
+            return
+        quant = s.QuantizationParametersT()
+        if metadata == "minmax":
+            quant.min, quant.max = [-1.0], [1.0]
+        if metadata in {"custom", "custom_empty", "unknown", "hidden"}:
+            quant.detailsType = {
+                "custom": s.QuantizationDetails.CustomQuantization,
+                "custom_empty": s.QuantizationDetails.CustomQuantization,
+                "unknown": 127,
+                "hidden": s.QuantizationDetails.NONE,
+            }[metadata]
+            quant.details = s.CustomQuantizationT()
+            quant.details.custom = [] if metadata == "custom_empty" else [1, 2, 3]
+        if metadata == "tag_only":
+            quant.detailsType = 127
+        graph.tensors[0].quantization = quant
+
+    path = typed_model(
+        tmp_path,
+        [("tokens", "int32", (1, 256), None, None)],
+        [("scores", "int8", (1, 4), [0.5], [0])],
+        change=change,
+    )
+    parsed = s.Model.GetRootAsModel(path.read_bytes(), 0).Subgraphs(0).Tensors(0).Quantization()
+    if metadata in {"custom", "custom_empty", "unknown", "hidden", "tag_only"}:
+        assert parsed.DetailsType() != s.QuantizationDetails.NONE or parsed.Details() is not None
+        with pytest.raises(ValueError, match="unsupported quantization details"):
+            analyze_typed_fixture_model(path)
+    else:
+        assert analyze_typed_fixture_model(path).inputs[0].quantization is None

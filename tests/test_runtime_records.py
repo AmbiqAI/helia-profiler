@@ -77,18 +77,21 @@ def test_shipped_records_keep_the_fixture_capability_table() -> None:
         "tflm": {
             "int8": "qualified",
             "int16": "supported",
+            "int32": "supported",
             "float16": "unsupported",
             "float32": "supported",
         },
         "helia-aot": {
             "int8": "qualified",
             "int16": "supported",
+            "int32": "supported",
             "float16": "supported",
             "float32": "supported",
         },
         "helia-rt": {
             "int8": "supported",
             "int16": "supported",
+            "int32": "supported",
             "float16": "supported",
             "float32": "supported",
         },

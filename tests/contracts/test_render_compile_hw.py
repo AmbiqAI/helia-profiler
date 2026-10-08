@@ -848,3 +848,10 @@ def test_fixture_real_toolchain_preparation_renders_current_sources(tmp_path, ca
             encoding="utf-8"
         )
         assert (scratch / "model_data.h").read_text(encoding="utf-8") == "// model data\n"
+
+    if case.fixture_kind == "typed":
+        assert "int main(" in text
+        assert "static const uint8_t fixed_input_2[]" in text
+        assert "std::memcpy(input_data_2, fixed_input_2, sizeof(fixed_input_2))" in text
+        if case.engine != "helia-aot":
+            assert "kTfLiteInt32" in text and "data.i32" in text

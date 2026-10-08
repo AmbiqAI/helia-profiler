@@ -96,6 +96,7 @@ def render_fixture(
 _TYPED_INPUTS = (
     FixtureTensor("signal", 0, "int16", (1, 16), PerTensorQuantization(0.0009765625, 0)),
     FixtureTensor("gain", 1, "float32", (1, 1), None),
+    FixtureTensor("tokens", 2, "int32", (1, 256), None),
 )
 _TYPED_OUTPUTS = (
     FixtureTensor("label", 3, "int8", (1, 4), PerTensorQuantization(0.00390625, -128)),
@@ -104,7 +105,7 @@ _TYPED_OUTPUTS = (
 
 
 def _render_typed(engine: str, scope: str, *, aot_prefix: str) -> tuple[str, dict[str, str]]:
-    """Render a two-input, two-output mixed-dtype fixture; heliaAOT also scans its scratch arena."""
+    """Render mixed-dtype inputs and outputs; heliaAOT also scans its scratch arena."""
     aot = EngineType(engine) is EngineType.HELIA_AOT
     with TemporaryDirectory() as temporary:
         directory = Path(temporary)
