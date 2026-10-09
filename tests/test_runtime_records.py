@@ -251,7 +251,7 @@ def test_the_helia_aot_range_spans_the_records() -> None:
     from helia_profiler.engines.helia_aot.compile import _recorded_range
 
     records = load_runtime_records(Path(__file__).parents[1] / "src/helia_profiler/data/runtimes")
-    assert _recorded_range(records) == ("0.23.0", "0.26.0")
+    assert _recorded_range(records) == ("0.23.0", "0.27.0")
     newest = [r for r in records if (r.name, r.version) == ("helia-aot", "0.25.0")]
     assert _recorded_range([replace(newest[0], version="1.2.3")]) == ("1.2.3", "1.3.0")
     with pytest.raises(ConfigError, match="major.minor.patch"):
@@ -295,3 +295,16 @@ def test_runtimes_cli_lists_and_shows_records() -> None:
     missing = runner.invoke(app, ["runtimes", "show", "helia-rt", "9.9.9"])
     assert missing.exit_code == 1
     assert "No runtime record for helia-rt 9.9.9." in missing.output
+
+
+def test_explicit_released_aot_record_does_not_inherit_qualification():
+    record = runtime("helia-aot", "0.26.0")
+    assert record is not None
+    assert record.source.commit == "ea5cd6c0b97150857cfcbe6019205efd2d00489e"
+    assert not record.default and not record.qualified
+    assert (
+        qualification(
+            "helia-aot", "0.26.0", board="apollo510_evb", clock="lp", precision="a8w8"
+        ).state
+        == RuntimeQualification.SUPPORTED
+    )

@@ -125,8 +125,8 @@ def test_convert_arguments_must_be_a_json_object(text: str) -> None:
             },
             "heliaAOT fixtures only",
         ),
-        ({"placement": FixturePlacement(arena=Placement.TCM)}, "placement not qualified"),
-        ({"placement": FixturePlacement(weights=Placement.TCM)}, "placement not qualified"),
+        ({"placement": FixturePlacement(arena=Placement.TCM)}, "placement requires"),
+        ({"placement": FixturePlacement(weights=Placement.TCM)}, "placement requires"),
         ({"engine": EngineType.EXECUTORCH}, "no fixed-fixture build"),
     ],
 )

@@ -46,6 +46,7 @@ data/runtimes/executorch/0.1.0.json
 data/runtimes/helia-aot/0.23.0.json
 data/runtimes/helia-aot/0.24.0.json
 data/runtimes/helia-aot/0.25.0.json
+data/runtimes/helia-aot/0.26.0.json
 data/runtimes/helia-rt/1.21.3.json
 data/runtimes/tflm/85638f0.json
 data/session_intent.schema.v1.json

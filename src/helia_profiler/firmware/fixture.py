@@ -11,7 +11,7 @@ from ..fixture import TypedFixture
 from ..fixture_analysis import PerTensorQuantization
 from ..fixture_stage import FixtureStage
 from ..pipeline import PipelineContext
-from ..placement import ArenaRole
+from ..placement import ArenaRole, Placement
 from .render import _jinja_env, _write_text
 
 _TFLITE_TYPES = {
@@ -77,13 +77,23 @@ def fixture_template_vars(ctx: PipelineContext, regions: list[ArenaRegion]) -> d
         and not ctx.engine_artifacts.aot_allocate_arenas
     ):
         raise ConfigError("External AOT arenas are not qualified for fixed fixtures")
-    if any(r.placement not in ("sram", "mram") for r in regions):
-        raise ConfigError("Fixture supports SRAM/MRAM AOT regions only")
+    if any(r.placement not in (Placement.SRAM, Placement.MRAM, Placement.TCM) for r in regions):
+        raise ConfigError("Fixture supports SRAM, MRAM or TCM AOT regions only")
     if any(
         r.placement == "mram" and (not r.blob_filename or r.role is not ArenaRole.CONSTANT)
         for r in regions
     ):
         raise ConfigError("Writable AOT region cannot use MRAM fixture placement")
+    for region in regions:
+        requested = (
+            ctx.config.model.weights_location
+            if region.role is ArenaRole.CONSTANT
+            else ctx.config.model.arena_location
+        )
+        if region.placement != requested:
+            raise ConfigError("AOT region placement differs from fixture request")
+        if requested is Placement.TCM and region.memory != "dtcm":
+            raise ConfigError("TCM fixture requires DTCM runtime regions")
     return {
         "fixture_status": {stage.name.lower(): int(stage) for stage in FixtureStage},
         "fixture_inputs": _fixture_io(spec, inputs=True),
@@ -97,6 +107,7 @@ def fixture_template_vars(ctx: PipelineContext, regions: list[ArenaRegion]) -> d
         "fixture_warmups": ctx.config.profiling.warmup,
         "fixture_timing_scope": spec.method.timing_scope.value,
         "fixture_arena_size": ctx.config.model.arena_size,
+        "fixture_arena_placement": ctx.config.model.arena_location.value,
         "fixture_scan_arenas": [
             {"region_id": r.region_id, "size": r.size}
             for r in regions

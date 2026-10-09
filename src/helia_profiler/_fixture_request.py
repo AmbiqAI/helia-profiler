@@ -15,6 +15,7 @@ from ._fixture_build import (
     FixtureMethod,
     TypedFixture,
     _build,
+    _validate_fixture_placement,
 )
 from .config import ProfileConfig, load_config
 from .engines import EngineType
@@ -119,11 +120,7 @@ class FixtureBuildRequest:
             self.target.verify()
         except ValueError as exc:
             raise ConfigError(str(exc)) from exc
-        if self.placement != FixturePlacement():
-            raise ConfigError(
-                f"Fixture placement not qualified: arena {self.placement.arena.value}, "
-                f"weights {self.placement.weights.value}"
-            )
+        _validate_fixture_placement(self.placement.arena, self.placement.weights)
         if self.runtime is None and self.engine in (EngineType.TFLM, EngineType.HELIA_RT):
             object.__setattr__(self, "runtime", prepared_runtime(self.engine.value).runtime)
 
