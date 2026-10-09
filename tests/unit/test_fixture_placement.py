@@ -108,3 +108,29 @@ def test_aot_region_drift_is_rejected(tmp_path, fault):
         region = replace(region, placement=Placement.MRAM, memory="mram")
     with pytest.raises(ConfigError):
         fixture_template_vars(ctx, [region])
+
+
+@pytest.mark.parametrize("placement,memory", [(Placement.SRAM, "dtcm"), (Placement.TCM, "sram")])
+@pytest.mark.parametrize("role", [ArenaRole.SCRATCH, ArenaRole.PERSISTENT, ArenaRole.CONSTANT])
+def test_aot_physical_bank_cannot_be_hidden_by_logical_override(tmp_path, placement, memory, role):
+    fixture = typed(tmp_path)
+    config = config_for(tmp_path, fixture, EngineType.HELIA_AOT)
+    weights = Placement.MRAM if placement is Placement.SRAM else Placement.TCM
+    config = replace(
+        config, model=replace(config.model, arena_location=placement, weights_location=weights)
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ctx.fixture = FixtureRenderSpec(fixture, METHOD, analysis_of(fixture))
+    reported = weights if role is ArenaRole.CONSTANT else placement
+    region = ArenaRegion(
+        0,
+        "region",
+        4096,
+        16,
+        role,
+        memory,
+        reported,
+        "weights.bin" if role is ArenaRole.CONSTANT else None,
+    )
+    with pytest.raises(ConfigError, match="physical memory differs"):
+        fixture_template_vars(ctx, [region])

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .._fixture_build import _validate_fixture_placement
 from ..engines import EngineType
 from ..engines.base import ArenaRegion, HeliaAotArtifacts
 from ..errors import ConfigError
@@ -72,6 +73,7 @@ def fixture_template_vars(ctx: PipelineContext, regions: list[ArenaRegion]) -> d
     if spec is None:
         raise ConfigError("Fixture render specification missing")
     spec.fixture.verify()
+    _validate_fixture_placement(ctx.config.model.arena_location, ctx.config.model.weights_location)
     if (
         isinstance(ctx.engine_artifacts, HeliaAotArtifacts)
         and not ctx.engine_artifacts.aot_allocate_arenas
@@ -92,8 +94,13 @@ def fixture_template_vars(ctx: PipelineContext, regions: list[ArenaRegion]) -> d
         )
         if region.placement != requested:
             raise ConfigError("AOT region placement differs from fixture request")
-        if requested is Placement.TCM and region.memory != "dtcm":
-            raise ConfigError("TCM fixture requires DTCM runtime regions")
+        banks = {
+            Placement.SRAM: ("sram", "dram"),
+            Placement.MRAM: ("mram",),
+            Placement.TCM: ("dtcm",),
+        }
+        if region.memory not in banks[requested]:
+            raise ConfigError("AOT physical memory differs from fixture request")
     return {
         "fixture_status": {stage.name.lower(): int(stage) for stage in FixtureStage},
         "fixture_inputs": _fixture_io(spec, inputs=True),
