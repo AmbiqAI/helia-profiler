@@ -35,7 +35,7 @@ class Int8Tensor:
 
 
 #: Fixture IO dtypes and their element width in bytes.
-FIXTURE_DTYPE_BYTES = {"int8": 1, "int16": 2, "float16": 2, "float32": 4}
+FIXTURE_DTYPE_BYTES = {"int8": 1, "int16": 2, "int32": 4, "float16": 2, "float32": 4}
 _ZERO_POINT_RANGE = {"int8": (-128, 127), "int16": (-32768, 32767)}
 
 
@@ -91,7 +91,7 @@ class FixtureTensor:
             if any(type(zp) is not int or not low <= zp <= high for zp in zero_points):
                 raise ValueError(f"{self.dtype} zero point out of range")
         elif quant is not None:
-            raise ValueError("Float fixture tensors carry no quantization")
+            raise ValueError("Unquantized fixture tensors carry no quantization")
 
     @property
     def size_bytes(self) -> int:
@@ -242,6 +242,7 @@ def analyze_typed_fixture_model(path: Path) -> TypedFixtureModelAnalysis:
         dtypes = {
             schema.TensorType.INT8: "int8",
             schema.TensorType.INT16: "int16",
+            schema.TensorType.INT32: "int32",
             schema.TensorType.FLOAT16: "float16",
             schema.TensorType.FLOAT32: "float32",
         }
@@ -266,8 +267,17 @@ def analyze_typed_fixture_model(path: Path) -> TypedFixtureModelAnalysis:
                     )
                 )
             else:
-                if scales:
-                    raise ValueError("Float fixture IO carries quantization")
+                if scales or (dtype == "int32" and quant is not None and quant.ZeroPointLength()):
+                    raise ValueError("Unquantized fixture IO carries quantization")
+                if (
+                    dtype == "int32"
+                    and quant is not None
+                    and (
+                        quant.DetailsType() != schema.QuantizationDetails.NONE
+                        or quant.Details() is not None
+                    )
+                ):
+                    raise ValueError("INT32 fixture IO carries unsupported quantization details")
                 quantization = None
             name = raw.Name()
             return FixtureTensor(

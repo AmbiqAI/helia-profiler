@@ -885,3 +885,36 @@ def test_fixture_target_facts_come_from_the_platform():
     assert MRAM == (0x00410000, 0x00800000)
     assert DTCM == (0x20000000, 0x2007C000)
     assert target.load_address == MRAM[0]
+
+
+@pytest.mark.parametrize("fault", ["none", "truncated", "invoke"])
+def test_complete_64k_output_and_invoke_status(rig, tmp_path, fault):
+    request, memory, terminal, _, _, guard = rig
+    sizes = {**_SINKS, "deployment_output": 65536}
+    elf, image, _ = image_files(tmp_path, sizes)
+    request = replace(request, elf=elf, image=image, output_size=65536)
+    inspected = inspect_elf(elf.read(), image.read(), 0x410000, sizes)
+    sinks = {s.name: s for s in inspected.sinks}
+    raw = bytes(range(256)) * 256
+    checksum = 0
+    for byte in raw:
+        checksum = (checksum * 31 + byte) & 0xFFFFFFFF
+    terminal.clear()
+    terminal.update(
+        {
+            sinks["deployment_status"].address: struct.pack("<i", -7 if fault == "invoke" else 0),
+            sinks["deployment_output"].address: raw[:-1] if fault == "truncated" else raw,
+            sinks["deployment_checksum"].address: struct.pack("<I", checksum),
+            sinks["deployment_timing"].address: struct.pack(
+                "<7I", 50, 10, 2, 32768, 300, 96000000, 1
+            ),
+        }
+    )
+    result = capture.capture_fixture(request, guard=guard)
+    assert result.state == ("success" if fault == "none" else "failure")
+    if fault != "truncated":
+        assert result.output is not None and result.output.read() == raw
+    if fault == "truncated":
+        assert result.error == "Short target read"
+    if fault == "invoke":
+        assert result.error is not None and "invoke" in result.error

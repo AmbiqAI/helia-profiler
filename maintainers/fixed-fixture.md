@@ -33,6 +33,15 @@ argument of `summarize_fixture_measurements` and the energy fields of
 memory; energy comes from the dedicated power firmware (`hpx profile --power`),
 which owns the power floor, the reset policy and the gated window.
 
+API 3.0 admits unquantized signed INT32 inputs, such as token indices, through
+the typed fixture path. Inputs retain their exact bytes and TfLite INT32 type.
+INT32 outputs remain unsupported. These input payloads are supported but not
+device-qualified, and do not introduce an INT32 neural compute precision.
+Complete Invoke status and every output byte still gate capture; the 128 KiB
+output readback limit, timing methods and role/state restrictions are unchanged.
+The API 3.0 bump follows the compatibility guard for additions to the exported
+capability constant; existing request fields and dtype statuses are preserved.
+
 Fixture builds take pinned inputs only. `build_fixed_fixture` refuses any
 module, engine or CMSIS-NN override the compatibility classifier reports,
 plus `SEGGER_RTT_PATH`, `target.segger_rtt_path`, the variables CMake and
@@ -215,13 +224,15 @@ dependency-workspace requirements.
 static, stateless, single-subgraph model. Each `FixtureIO` pairs a
 `FixtureTensor(name, index, dtype, shape, quantization)` with the pinned bytes of
 that tensor: fixed input bytes, or the expected output. Inputs carry a role
-(`signal` or `aux`); outputs are `signal`. Dtypes are `int8`, `int16`, `float16`
-and `float32`. Integer tensors need `PerTensorQuantization` or
-`PerAxisQuantization`; float tensors carry none.
+(`signal` or `aux`); outputs are `signal`. Dtypes are `int8`, `int16`, `int32`,
+`float16` and `float32`. INT8/INT16 tensors need `PerTensorQuantization` or
+`PerAxisQuantization`; float tensors carry none. INT32 is input-only and plain:
+it carries no quantization. Active affine, custom or unsupported quantization details are
+refused; empty metadata and informational min/max do not quantize the input.
 `analyze_typed_fixture_model` reads the same declarations from the flatbuffer,
 and the build refuses any difference in name, index, order, dtype, shape or
 quantization. Every IO tensor must be named in the flatbuffer and have at least
-one dimension; unnamed or scalar (rank-0) IO is refused. An IO tensor with a
+one dimension; unnamed or scalar (rank-0) IO is refused. An INT8/INT16 IO tensor with a
 single scale and zero point is read as per-tensor, even when its quantized axis
 has extent 1, so declare it with `PerTensorQuantization`. A `FixedFixture` keeps
 its single-INT8 rules and renders exactly as before.
@@ -230,19 +241,22 @@ its single-INT8 rules and renders exactly as before.
 (`FixtureDType`), read from the runtime records on the fixture target (int8
 is `a8w8`, int16 `a16w8`, float16 `fp16`, float32 `fp32`). An entry is
 `qualified` when any of the engine's versions has a device pass; the records
-say which. Otherwise it is what the engine's default record says. No heliaRT
+say which. Otherwise it is what the engine's default record says. Plain INT32
+inputs are the supported-only interface exception: they have no compute precision
+record and do not establish model/operator or provider-kernel support. No heliaRT
 entry is qualified until a device pass. The table uses these statuses:
 
 - `qualified` means an exact device pass;
-- `supported` means it builds but has no device pass yet;
+- `supported` admits the IO contract but has no device pass; model/operator and
+  provider/build compatibility remain separate gates;
 - `unsupported` is refused.
 
 The upstream TFLM runtime also refuses any model with a FLOAT16 tensor, including
 weights behind DEQUANTIZE. `FixtureBuild.capabilities` records the status of
 every IO dtype the build uses. A device pass so far covers one input and one
 output with per-tensor quantization. A typed fixture with more tensors, or with
-per-axis IO quantization (checked on the host only), reports `supported`, not
-`qualified`.
+per-axis IO quantization (checked on the host only), or with plain INT32 inputs,
+reports `supported`, not `qualified` for every otherwise-qualified IO dtype.
 
 Firmware restores every input before each warmup and measured call. It checks
 each tensor's byte extent, and on TFLM also its type, shape and per-tensor

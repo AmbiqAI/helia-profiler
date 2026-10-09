@@ -669,9 +669,19 @@ def test_fixture_gate_rejects_missing_output_storage(tmp_path, engine):
 
 
 def test_compile_matrix_covers_fixture_render_arms():
-    assert {case.case_id for case in _build_cases() if case.case_id.startswith("fixture:")} == {
+    cases = [case for case in _build_cases() if case.case_id.startswith("fixture:")]
+    assert {case.case_id for case in cases} == {
         f"fixture:{kind}|{engine}|{scope}"
         for kind in ("tcn", "kws", "typed")
         for engine in ("tflm", "helia-rt", "helia-aot")
         for scope in ("restore_and_invoke", "invoke_only")
     }
+
+    for case in cases:
+        if not case.case_id.startswith("fixture:typed|"):
+            continue
+        assert "int main(" in case.text
+        assert "static const uint8_t fixed_input_2[]" in case.text
+        assert "std::memcpy(input_data_2, fixed_input_2, sizeof(fixed_input_2))" in case.text
+        if "|helia-aot|" not in case.case_id:
+            assert "kTfLiteInt32" in case.text and "data.i32" in case.text

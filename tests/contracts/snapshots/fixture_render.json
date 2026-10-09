@@ -56,30 +56,30 @@
     "fixed_fixture_memory.h": "baf938dba9148e9f25fd8245952b2f4fadcddf92a1ba33a133c26ac1477b1526"
   },
   "typed|helia-aot|invoke_only": {
-    "fixed_fixture.cc": "1c6ac75374ea20ab67c5b594972a4d6ef7dfe30dc09ab3ed5b72273a671fcc18",
+    "fixed_fixture.cc": "301e4a80ced0d8233ecc4c67c236a3e8e478a61c32fab74ceccc282c17b672b3",
     "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382"
   },
   "typed|helia-aot|restore_and_invoke": {
-    "fixed_fixture.cc": "ed70b955e35c1868ef3e479fc9ffaff0c7a9eb9e20307fb15f967a69e64a9c7f",
+    "fixed_fixture.cc": "ef1946544430ba9ecfaa3a0524c26888fb66b1636a4852c65c950d0d547a6f89",
     "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382"
   },
   "typed|helia-rt|invoke_only": {
-    "fixed_fixture.cc": "6606679abc35cf5efaaced386849199c5511ec5794d84e1ec584e1daaf88af22",
+    "fixed_fixture.cc": "46bfda21c526d97fc451fe9b79e1e47d9ac595b3f625e6825a0f7577b257e53e",
     "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382",
     "fixed_fixture_memory.h": "baf938dba9148e9f25fd8245952b2f4fadcddf92a1ba33a133c26ac1477b1526"
   },
   "typed|helia-rt|restore_and_invoke": {
-    "fixed_fixture.cc": "c92beb02e4721ad0d90a45b7b380700cefa06879f97f5885e04e0d2c5831d30c",
+    "fixed_fixture.cc": "8f2cc2cf009db7074b008842e55903232ef24a7b96caa10ffd4c133d0c4a8a89",
     "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382",
     "fixed_fixture_memory.h": "baf938dba9148e9f25fd8245952b2f4fadcddf92a1ba33a133c26ac1477b1526"
   },
   "typed|tflm|invoke_only": {
-    "fixed_fixture.cc": "6606679abc35cf5efaaced386849199c5511ec5794d84e1ec584e1daaf88af22",
+    "fixed_fixture.cc": "46bfda21c526d97fc451fe9b79e1e47d9ac595b3f625e6825a0f7577b257e53e",
     "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382",
     "fixed_fixture_memory.h": "baf938dba9148e9f25fd8245952b2f4fadcddf92a1ba33a133c26ac1477b1526"
   },
   "typed|tflm|restore_and_invoke": {
-    "fixed_fixture.cc": "c92beb02e4721ad0d90a45b7b380700cefa06879f97f5885e04e0d2c5831d30c",
+    "fixed_fixture.cc": "8f2cc2cf009db7074b008842e55903232ef24a7b96caa10ffd4c133d0c4a8a89",
     "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382",
     "fixed_fixture_memory.h": "baf938dba9148e9f25fd8245952b2f4fadcddf92a1ba33a133c26ac1477b1526"
   }

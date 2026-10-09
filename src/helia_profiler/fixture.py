@@ -73,7 +73,7 @@ from .hostenv.elf_inventory import ElfSection, LoadSegment, SectionInventory, se
 from .placement import Placement
 from .results.models import ToolchainInfo
 
-FIXTURE_API_VERSION: Final[tuple[int, int]] = (2, 0)
+FIXTURE_API_VERSION: Final[tuple[int, int]] = (3, 0)
 
 __all__ = [
     "FIXTURE_API_VERSION",

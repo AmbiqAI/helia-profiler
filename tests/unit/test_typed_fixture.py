@@ -181,7 +181,7 @@ def test_identity_is_path_free_and_covers_every_declaration(tmp_path):
 def test_capability_table_covers_every_fixture_engine_and_dtype():
     assert set(FIXTURE_CAPABILITIES) == {EngineType.TFLM, EngineType.HELIA_RT, EngineType.HELIA_AOT}
     for table in FIXTURE_CAPABILITIES.values():
-        assert set(table) == {"int8", "int16", "float16", "float32"}
+        assert set(table) == {"int8", "int16", "int32", "float16", "float32"}
     assert FIXTURE_CAPABILITIES[EngineType.TFLM]["int8"] is FixtureCapability.QUALIFIED
     assert FIXTURE_CAPABILITIES[EngineType.HELIA_AOT]["int8"] is FixtureCapability.QUALIFIED
     assert FIXTURE_CAPABILITIES[EngineType.TFLM]["float16"] is FixtureCapability.UNSUPPORTED
@@ -518,3 +518,179 @@ def test_fixture_refuses_any_board_or_clock_but_the_fixture_target(
     target = replace(c.target, board=board, clock=ClockSelection(cpu=clock))
     with pytest.raises(ConfigError, match="supports apollo510_evb at the lp clock only"):
         build_fixed_fixture(replace(c, target=target), f, method=METHOD, runtime=runtime(tmp_path))
+
+
+TOKENS = FixtureTensor("tokens", 0, "int32", (1, 256), None)
+SCORES = FixtureTensor(
+    "scores", 1, "int8", (1, 256, 256), PerTensorQuantization(0.05708871781826019, -12)
+)
+
+
+@pytest.mark.parametrize("engine", list(FIXTURE_CAPABILITIES))
+def test_int32_input_is_supported_without_device_qualification(tmp_path, engine):
+    f = typed(tmp_path, inputs=(TOKENS,), outputs=(SCORES,))
+    f.verify()
+    assert _check_typed_fixture(f, analysis_of(f), engine) == (
+        ("int32", FixtureCapability.SUPPORTED),
+        ("int8", FixtureCapability.SUPPORTED),
+    )
+    assert f.inputs[0].tensor.size_bytes == 1024
+    assert f.outputs[0].tensor.size_bytes == 65536 < FIXTURE_READBACK_BUDGET
+
+
+def test_int32_render_preserves_signed_payload_and_complete_output(tmp_path):
+    import struct
+
+    values = (-2147483648, -1, 0, 2147483647) * 64
+    raw = struct.pack("<256i", *values)
+    f = typed(tmp_path, inputs=(TOKENS,), outputs=(SCORES,))
+    f = replace(f, inputs=(replace(f.inputs[0], data=pin(tmp_path, "signed.bin", raw)),))
+    f.verify()
+    ctx = PipelineContext(config=config_for(tmp_path, f), work_dir=tmp_path)
+    ctx.fixture = FixtureRenderSpec(f, METHOD, analysis_of(f))
+    variables = fixture_template_vars(ctx, [])
+    inputs, outputs = variables["fixture_inputs"], variables["fixture_outputs"]
+    assert isinstance(inputs, list) and isinstance(outputs, list)
+    entry = inputs[0]
+    assert bytes(map(int, entry["initializer"].split(","))) == raw
+    assert struct.unpack("<256i", raw) == values
+    assert (entry["tflite_type"], entry["member"], entry["size"]) == ("kTfLiteInt32", "i32", 1024)
+    assert outputs[0]["size"] == 65536
+
+
+@pytest.mark.parametrize("fault", ["dtype", "input_extent", "output_extent", "int32_output"])
+def test_int32_contract_rejects_wrong_type_and_incomplete_tensors(tmp_path, fault):
+    f = typed(tmp_path, inputs=(TOKENS,), outputs=(SCORES,))
+    model = analysis_of(f)
+    if fault == "dtype":
+        f = replace(f, inputs=(replace(f.inputs[0], tensor=replace(TOKENS, dtype="float32")),))
+        with pytest.raises(ConfigError, match="declarations differ"):
+            _check_typed_fixture(f, model, EngineType.TFLM)
+    elif fault == "int32_output":
+        f = typed(tmp_path, inputs=(TOKENS,), outputs=(TOKENS,))
+        with pytest.raises(ConfigError, match="input-only"):
+            _check_typed_fixture(f, analysis_of(f), EngineType.TFLM)
+    else:
+        direction = "inputs" if fault == "input_extent" else "outputs"
+        io = getattr(f, direction)[0]
+        f = replace(
+            f,
+            **{
+                direction: (
+                    replace(io, data=pin(tmp_path, "short.bin", bytes(io.tensor.size_bytes - 1))),
+                )
+            },
+        )
+        with pytest.raises(ValueError, match="byte extent"):
+            f.verify()
+
+
+def test_int32_emitted_control_checks_bytes_status_and_full_output(tmp_path):
+    """Execute the emitted orchestration with a byte-checking host backend stub."""
+    import shutil
+    import struct
+    import subprocess
+    from pathlib import Path
+
+    compiler = shutil.which("g++")
+    if compiler is None:
+        pytest.skip("host C++ compiler required")
+    values = (-2147483648, -1, 0, 2147483647) * 64
+    raw = struct.pack("<256i", *values)
+    f = typed(tmp_path, inputs=(TOKENS,), outputs=(SCORES,))
+    f = replace(f, inputs=(replace(f.inputs[0], data=pin(tmp_path, "signed.bin", raw)),))
+    config = config_for(tmp_path, f)
+    config = replace(config, profiling=ProfilingConfig(iterations=2, warmup=0))
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ctx.fixture = FixtureRenderSpec(f, METHOD, analysis_of(f))
+    rendered = _jinja_env.get_template("fixed_fixture.cc.j2").render(
+        **fixture_template_vars(ctx, [])
+    )
+    # The actual inference function is tested; target boot and idle stay outside this host control.
+    body = rendered[
+        rendered.index("static const uint8_t fixed_input") : rendered.index("\nint main()")
+    ]
+    prelude = r"""
+#include <cstdint>
+#include <cstring>
+#include <cstdlib>
+#include "hpx_stub_tflm_common.h"
+#define NSX_MEM_SRAM_BSS
+#define TFLITE_SCHEMA_VERSION 3
+static int fault, calls;
+static int32_t input_data_stub[256];
+static int8_t output_data_stub[65536];
+static const int32_t expected[] = { EXPECTED_VALUES };
+static TfLiteIntArray input_dims = {2, {1,256}};
+static TfLiteIntArray output_dims = {3, {1,256,256}};
+static TfLiteTensor input_stub = {kTfLiteInt32, &input_dims, {0,0}, 1024, {.i32=input_data_stub}};
+static TfLiteTensor output_stub = {kTfLiteInt8, &output_dims, {0.05708871781826019f,-12}, 65536, {.int8=output_data_stub}};
+static const uint8_t model_data[] = {0};
+namespace tflite {
+struct List { int index; int size() const {return 1;} int Get(int) const {return index;} };
+struct Graph { List in{0},out{1}; const List* inputs() const {return &in;} const List* outputs() const {return &out;} };
+struct Graphs { Graph graph; int size() const {return 1;} const Graph* Get(int) const {return &graph;} };
+struct Model { Graphs graphs; int version() const {return 3;} const Graphs* subgraphs() const {return &graphs;} };
+static Model model;
+const Model* GetModel(const uint8_t*) {return &model;}
+template<int N> struct MicroMutableOpResolver { int AddFullyConnected() {return kTfLiteOk;} };
+struct MicroInterpreter {
+ template<class R> MicroInterpreter(const Model*, R&, uint8_t*, size_t) {}
+ int AllocateTensors() {return kTfLiteOk;}
+ TfLiteTensor* input(int) {if(fault==1) input_stub.type=kTfLiteFloat32; if(fault==2) --input_stub.bytes; return &input_stub;}
+ TfLiteTensor* output(int) {if(fault==3) --output_stub.bytes; return &output_stub;}
+ size_t arena_used_bytes() {return 64;}
+ int Invoke() {
+  ++calls;
+  if(std::memcmp(input_data_stub,expected,sizeof(expected))) return kTfLiteError;
+  std::memset(output_data_stub,7,sizeof(output_data_stub));
+  std::memset(input_data_stub,0,sizeof(input_data_stub));
+  return fault==4 ? kTfLiteError : kTfLiteOk;
+ }
+};
+}
+constexpr unsigned HPX_STIMER_HZ=1000000;
+static uint32_t SystemCoreClock=96000000,g_hpx_stimer_last_ticks;
+bool hpx_stimer_init() {return true;}
+uint32_t hpx_stimer_ticks() {return ++g_hpx_stimer_last_ticks;}
+void hpx_fixture_memory_init(size_t) {}
+void hpx_fixture_memory_snapshot(unsigned,size_t) {}
+void hpx_fixture_memory_finish() {}
+""".replace("EXPECTED_VALUES", ",".join(map(str, values)))
+    trailer = r"""
+int main(int argc,char**argv) {
+ fault=argc>1 ? std::atoi(argv[1]) : 0;
+ int result=infer_fixture();
+ int wanted=fault==4 ? -7 : fault ? -6 : 0;
+ if(result!=wanted) return 10;
+ if(fault==0) {
+  if(calls!=2 || sizeof(deployment_output)!=65536) return 11;
+  for(auto byte:deployment_output) if(byte!=7) return 12;
+ } else if(fault<4 && calls) return 13;
+ return 0;
+}
+"""
+    stub_dir = Path(__file__).parents[1] / "fixtures" / "compile_stubs"
+    variants = {
+        "original": body,
+        "missing_restore": body.replace(
+            "std::memcpy(input_data, fixed_input, sizeof(fixed_input));", ""
+        ),
+        "discarded_status": body.replace("if (invocation_status != 0) return -7;", ""),
+    }
+    for name, source in variants.items():
+        assert name == "original" or source != body
+        path = tmp_path / (name + ".cc")
+        executable = tmp_path / name
+        path.write_text(prelude + source + trailer)
+        compiled = subprocess.run(
+            [compiler, "-std=gnu++17", "-I", str(stub_dir), str(path), "-o", str(executable)],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert compiled.returncode == 0, compiled.stderr
+        faults = range(5) if name == "original" else [0 if name == "missing_restore" else 4]
+        for fault in faults:
+            result = subprocess.run([str(executable), str(fault)], timeout=5)
+            assert (result.returncode == 0) == (name == "original")

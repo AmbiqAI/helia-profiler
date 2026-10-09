@@ -1,6 +1,6 @@
 {
   "api_version": [
-    2,
+    3,
     0
   ],
   "surface": {
@@ -110,18 +110,21 @@
           "float16": "supported",
           "float32": "supported",
           "int16": "supported",
+          "int32": "supported",
           "int8": "qualified"
         },
         "helia-rt": {
           "float16": "supported",
           "float32": "supported",
           "int16": "supported",
+          "int32": "supported",
           "int8": "supported"
         },
         "tflm": {
           "float16": "unsupported",
           "float32": "supported",
           "int16": "supported",
+          "int32": "supported",
           "int8": "qualified"
         }
       }
@@ -582,6 +585,7 @@
         "FLOAT16": "float16",
         "FLOAT32": "float32",
         "INT16": "int16",
+        "INT32": "int32",
         "INT8": "int8"
       }
     },
