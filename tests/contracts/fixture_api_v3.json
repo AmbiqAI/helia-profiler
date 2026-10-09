@@ -1,7 +1,7 @@
 {
   "api_version": [
     3,
-    0
+    1
   ],
   "surface": {
     "ElfSection": {
@@ -1449,6 +1449,42 @@
         "identity"
       ]
     },
+    "TypedFixtureModelAnalysis": {
+      "fields": [
+        [
+          "inputs",
+          "tuple[FixtureTensor, ...]",
+          "<required>"
+        ],
+        [
+          "outputs",
+          "tuple[FixtureTensor, ...]",
+          "<required>"
+        ],
+        [
+          "has_float16",
+          "bool",
+          "<required>"
+        ],
+        [
+          "analysis",
+          "ModelAnalysis",
+          "<required>"
+        ],
+        [
+          "resolver",
+          "ResolverPlan",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": [
+        "input_bytes",
+        "output_bytes"
+      ]
+    },
     "VerifiedPreparedRuntime": {
       "fields": [
         [
@@ -1478,6 +1514,10 @@
         "header_path": "(self, name: 'str') -> 'Path'"
       },
       "properties": []
+    },
+    "analyze_typed_fixture_model": {
+      "kind": "function",
+      "signature": "(path: 'Path') -> 'TypedFixtureModelAnalysis'"
     },
     "build_fixed_fixture": {
       "kind": "function",

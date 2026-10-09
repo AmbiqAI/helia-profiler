@@ -44,6 +44,8 @@ from .fixture_analysis import (
     Int8Tensor,
     PerAxisQuantization,
     PerTensorQuantization,
+    TypedFixtureModelAnalysis,
+    analyze_typed_fixture_model,
 )
 from .fixture_capture import (
     FixtureCaptureGuard,
@@ -73,7 +75,7 @@ from .hostenv.elf_inventory import ElfSection, LoadSegment, SectionInventory, se
 from .placement import Placement
 from .results.models import ToolchainInfo
 
-FIXTURE_API_VERSION: Final[tuple[int, int]] = (3, 0)
+FIXTURE_API_VERSION: Final[tuple[int, int]] = (3, 1)
 
 __all__ = [
     "FIXTURE_API_VERSION",
@@ -108,6 +110,7 @@ __all__ = [
     # Caller-supplied authority
     "FixtureCaptureGuard",
     # Operations
+    "analyze_typed_fixture_model",
     "build_fixture",
     "fixture_capabilities",
     "build_fixed_fixture",
@@ -131,6 +134,7 @@ __all__ = [
     "FixtureCaptureResult",
     "FixtureFootprint",
     "FixtureMeasurements",
+    "TypedFixtureModelAnalysis",
     "FixtureMemory",
     "FixtureMetric",
     "FixtureTiming",

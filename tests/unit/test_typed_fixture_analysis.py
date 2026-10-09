@@ -4,13 +4,13 @@ from pathlib import Path
 
 import pytest
 
-from helia_profiler.fixture_analysis import (
+from helia_profiler.fixture import (
     FixtureTensor,
     PerAxisQuantization,
     PerTensorQuantization,
-    analyze_fixture_model,
     analyze_typed_fixture_model,
 )
+from helia_profiler.fixture_analysis import analyze_fixture_model
 
 s = pytest.importorskip("ai_edge_litert.schema_py_generated")
 flatbuffers = pytest.importorskip("flatbuffers")

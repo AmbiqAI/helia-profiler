@@ -221,6 +221,8 @@ def test_version_is_a_major_minor_pair() -> None:
     ("module", "name"),
     [
         ("helia_profiler.fixture_analysis", "FixtureTensor"),
+        ("helia_profiler.fixture_analysis", "TypedFixtureModelAnalysis"),
+        ("helia_profiler.fixture_analysis", "analyze_typed_fixture_model"),
         ("helia_profiler.fixture_capture", "capture_fixture"),
         ("helia_profiler.fixture_capture", "FixtureCaptureRequest"),
         ("helia_profiler.fixture_capture", "FixtureTarget"),
