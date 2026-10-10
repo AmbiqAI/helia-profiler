@@ -733,9 +733,9 @@
           "returns": [],
           "signature": "read_dependency_lock_provenance(app_or_workspace_path: str | Path) -> DependencyLockProvenance",
           "source": {
-            "line": 525,
+            "line": 526,
             "path": "src/helia_profiler/deps/dependencies.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/dependencies.py#L525"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/dependencies.py#L526"
           },
           "summary": "Read typed lock provenance without mutating an app or workspace."
         }

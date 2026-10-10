@@ -168,6 +168,12 @@ def test_host_only_stage_selection_and_source_receipt(
                 "targets:\n  apollo510_evb:\n    modules:\n      hpx-upstream-runtime: {}\n"
                 + lock_suffix
             )
+            snapshot = tmp_path / "run-locks" / str(len(calls)) / "nsx.lock"
+            snapshot.parent.mkdir(parents=True, exist_ok=True)
+            snapshot.write_bytes((app / "nsx.lock").read_bytes())
+            snapshot.with_name("hpx-dependencies.json").write_text(
+                json.dumps({"lock": {"mode": "resolved" if len(calls) == 2 else "reused"}})
+            )
             return SimpleNamespace(
                 memory_plan=MemoryPlan(engine=engine),
                 engine_artifacts=(
@@ -179,6 +185,7 @@ def test_host_only_stage_selection_and_source_receipt(
                     toolchain=ToolchainInfo(compiler="atfe", compiler_version=compiler_version)
                 ),
                 resolved_firmware_dir=app,
+                dependency_lock_path=snapshot,
                 profile_run=SimpleNamespace(firmware=SimpleNamespace(binary_path=binary)),
             )
 
@@ -205,22 +212,42 @@ def test_host_only_stage_selection_and_source_receipt(
     assert r.binary.read() == b"elf"
     assert calls[-1][-1] == "build_firmware"
     assert r.build_identity is not None and r.build_identity != r.intent_identity
+    assert r.dependency_lock is not None
+    assert r.dependency_lock.path.parent.parent == tmp_path / "run-locks"
+    original_lock = r.dependency_lock.read()
+    assert r.dependency_state is not None
+    original_state = r.dependency_state.read()
+    assert json.loads(original_state)["lock"]["mode"] == "resolved"
     original_identity = r.build_identity
+    reused = build_fixed_fixture(c, f, method=METHOD, runtime=selected_runtime)
+    assert reused.dependency_lock is not None
+    assert reused.binary == r.binary and reused.dependency_lock.sha256 == r.dependency_lock.sha256
+    assert reused.build_identity != original_identity
+    assert r.dependency_state.read() == original_state
+    reused_identity = reused.build_identity
     elf_bytes = b"different-elf"
     changed = build_fixed_fixture(c, f, method=METHOD, runtime=selected_runtime)
     assert changed.intent_identity == r.intent_identity
-    assert changed.build_identity != original_identity
+    assert changed.build_identity != reused_identity
+    assert r.dependency_lock.read() == original_lock
+    assert r.dependency_state.read() == original_state
+    assert changed.dependency_state is not None
+    assert json.loads(changed.dependency_state.read())["lock"]["mode"] == "reused"
     elf_bytes = b"elf"
     compiler_version = "different-compiler"
     changed = build_fixed_fixture(c, f, method=METHOD, runtime=selected_runtime)
     assert changed.intent_identity == r.intent_identity
-    assert changed.build_identity != original_identity
+    assert changed.build_identity != reused_identity
     compiler_version = "qualified-compiler"
     lock_suffix = "# different resolved dependency graph\n"
     changed = build_fixed_fixture(c, f, method=METHOD, runtime=selected_runtime)
     assert changed.intent_identity == r.intent_identity
-    assert changed.build_identity != original_identity
+    assert changed.build_identity != reused_identity
+    assert r.dependency_lock.read() == original_lock
     assert r.target.board == "apollo510_evb"
+    r.dependency_state.path.write_text('{"lock": {"mode": "updated"}}')
+    with pytest.raises(ValueError, match="hash"):
+        r.dependency_state.read()
 
     with pytest.raises(Exception, match="different fixture"):
         build_fixed_fixture(
@@ -442,11 +469,13 @@ def test_build_refuses_a_flat_image_capture_cannot_flash(tmp_path, monkeypatch, 
             binary.with_suffix(".bin").write_bytes(bytes(size))
             binary.with_suffix(".map").write_text("map")
             (app / "nsx.lock").write_text("lock")
+            (app / "hpx-dependencies.json").write_text("{}")
             return SimpleNamespace(
                 memory_plan=MemoryPlan(engine=config.engine.type),
                 engine_artifacts=None,
                 run_metadata=RunMetadata(toolchain=ToolchainInfo("atfe", "22.1.0")),
                 resolved_firmware_dir=app,
+                dependency_lock_path=app / "nsx.lock",
                 profile_run=SimpleNamespace(firmware=SimpleNamespace(binary_path=binary)),
             )
 

@@ -309,6 +309,7 @@ def _runner(tmp_path, rt, calls, *, lock_modules, map_lines):
             (module / "provider-manifest.json").write_bytes(rt.manifest.read())
             modules = "".join(f"      {name}: {{}}\n" for name in lock_modules)
             (app / "nsx.lock").write_text("targets:\n  apollo510_evb:\n    modules:\n" + modules)
+            (app / "hpx-dependencies.json").write_text("{}")
             return SimpleNamespace(
                 memory_plan=MemoryPlan(engine=config.engine.type),
                 engine_artifacts=None,
@@ -316,6 +317,7 @@ def _runner(tmp_path, rt, calls, *, lock_modules, map_lines):
                     toolchain=ToolchainInfo(compiler="atfe", compiler_version="22.1.0")
                 ),
                 resolved_firmware_dir=app,
+                dependency_lock_path=app / "nsx.lock",
                 profile_run=SimpleNamespace(firmware=SimpleNamespace(binary_path=binary)),
             )
 
@@ -471,11 +473,13 @@ def test_upstream_build_still_refuses_a_heliart_module(tmp_path, monkeypatch):
                 "targets:\n  apollo510_evb:\n    modules:\n"
                 "      hpx-upstream-runtime: {}\n      hpx-heliart-runtime: {}\n"
             )
+            (app / "hpx-dependencies.json").write_text("{}")
             return SimpleNamespace(
                 memory_plan=MemoryPlan(engine=config.engine.type),
                 engine_artifacts=None,
                 run_metadata=RunMetadata(toolchain=ToolchainInfo("atfe", "22.1.0")),
                 resolved_firmware_dir=app,
+                dependency_lock_path=app / "nsx.lock",
                 profile_run=SimpleNamespace(firmware=SimpleNamespace(binary_path=binary)),
             )
 

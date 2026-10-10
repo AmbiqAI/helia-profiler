@@ -1,7 +1,7 @@
 {
   "api_version": [
     3,
-    1
+    2
   ],
   "surface": {
     "ElfSection": {
@@ -308,6 +308,11 @@
         [
           "engine_source",
           "EngineSource | None",
+          "None"
+        ],
+        [
+          "dependency_state",
+          "FixtureFile | None",
           "None"
         ]
       ],
