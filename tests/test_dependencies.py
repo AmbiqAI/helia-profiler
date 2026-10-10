@@ -174,6 +174,43 @@ def test_ordinary_reuse_is_byte_stable_and_never_locks(
     assert provenance.lock.frozen_sync is True
 
 
+def test_receipt_provenance_survives_workspace_reuse(tmp_path, monkeypatch):
+    from helia_profiler.fixture import FixtureFile
+
+    ctx = _context(tmp_path)
+    monkeypatch.setattr(
+        "helia_profiler.deps.dependencies.nsx_cli.lock",
+        lambda *_a, **_kw: _write_valid_lock(ctx),
+    )
+    monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
+    ctx.run_metadata.run_id = "first"
+    prepare_locked_dependencies(ctx)
+    first_lock = ctx.dependency_lock_path
+    assert first_lock is not None
+    first_state = first_lock.with_name("hpx-dependencies.json")
+    first_bytes = first_state.read_bytes()
+    pinned = FixtureFile(first_state, hashlib.sha256(first_bytes).hexdigest())
+    assert read_dependency_lock_provenance(first_lock).lock_mode is DependencyLockMode.RESOLVED
+
+    ctx.run_metadata.run_id = "second"
+    prepare_locked_dependencies(ctx)
+    second_lock = ctx.dependency_lock_path
+    assert second_lock is not None and second_lock != first_lock
+    assert pinned.read() == first_bytes
+    assert read_dependency_lock_provenance(first_lock).lock_mode is DependencyLockMode.RESOLVED
+    assert read_dependency_lock_provenance(second_lock).lock_mode is DependencyLockMode.REUSED
+    assert (
+        read_dependency_lock_provenance(ctx.resolved_firmware_dir).lock_mode
+        is DependencyLockMode.REUSED
+    )
+
+    first_state.write_text("{}")
+    with pytest.raises(ValueError, match="hash"):
+        pinned.read()
+    with pytest.raises(LockError):
+        read_dependency_lock_provenance(first_lock)
+
+
 def test_online_reuse_repairs_partial_materialization_without_relocking(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

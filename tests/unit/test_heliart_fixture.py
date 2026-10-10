@@ -316,6 +316,7 @@ def _runner(tmp_path, rt, calls, *, lock_modules, map_lines):
                     toolchain=ToolchainInfo(compiler="atfe", compiler_version="22.1.0")
                 ),
                 resolved_firmware_dir=app,
+                dependency_lock_path=app / "nsx.lock",
                 profile_run=SimpleNamespace(firmware=SimpleNamespace(binary_path=binary)),
             )
 
@@ -476,6 +477,7 @@ def test_upstream_build_still_refuses_a_heliart_module(tmp_path, monkeypatch):
                 engine_artifacts=None,
                 run_metadata=RunMetadata(toolchain=ToolchainInfo("atfe", "22.1.0")),
                 resolved_firmware_dir=app,
+                dependency_lock_path=app / "nsx.lock",
                 profile_run=SimpleNamespace(firmware=SimpleNamespace(binary_path=binary)),
             )
 

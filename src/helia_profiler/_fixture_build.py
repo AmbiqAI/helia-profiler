@@ -653,17 +653,19 @@ def _build(
     if binary is not None:
         flat_binary = pin(binary.path.with_suffix(".bin"))
         link_map = pin(binary.path.with_suffix(".map"))
-        dependency_lock = pin(app / "nsx.lock")
+        if ctx.dependency_lock_path is None:
+            raise ConfigError("Compiled fixture requires its dependency snapshot")
+        dependency_lock = pin(ctx.dependency_lock_path)
     if binary is not None and runtime is not None and verified_runtime is not None:
         import yaml
 
+        assert dependency_lock is not None
         stack = verified_runtime.record.stack
         name = PREPARED_RUNTIME_MODULES[stack][0]
         others = _PREPARED_MODULES - {name}
         module = app / "modules" / name
         FixtureFile(module / "runtime.a", runtime.archive.sha256).read()
         FixtureFile(module / "provider-manifest.json", runtime.manifest.sha256).read()
-        dependency_lock = pin(app / "nsx.lock")
         modules = yaml.safe_load(dependency_lock.read())["targets"][config.target.board]["modules"]
         if name not in modules or any(m in others or _RUNTIME_PROVIDER.search(m) for m in modules):
             raise ConfigError("Unexpected runtime provider in resolved dependency lock")

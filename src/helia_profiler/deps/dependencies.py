@@ -517,6 +517,7 @@ def prepare_locked_dependencies(ctx: PipelineContext) -> DependencyProvenance:
     run_key = ctx.run_metadata.run_id or uuid.uuid4().hex
     snapshot = ctx.work_dir / "run-locks" / run_key / "nsx.lock"
     _atomic_copy(app_dir / "nsx.lock", snapshot)
+    _atomic_copy(app_dir / _DEPENDENCY_STATE, snapshot.with_name(_DEPENDENCY_STATE))
     ctx.dependency_lock_path = snapshot
     ctx.run_metadata.dependencies = provenance
     return provenance

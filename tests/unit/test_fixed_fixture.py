@@ -168,6 +168,9 @@ def test_host_only_stage_selection_and_source_receipt(
                 "targets:\n  apollo510_evb:\n    modules:\n      hpx-upstream-runtime: {}\n"
                 + lock_suffix
             )
+            snapshot = tmp_path / "run-locks" / str(len(calls)) / "nsx.lock"
+            snapshot.parent.mkdir(parents=True, exist_ok=True)
+            snapshot.write_bytes((app / "nsx.lock").read_bytes())
             return SimpleNamespace(
                 memory_plan=MemoryPlan(engine=engine),
                 engine_artifacts=(
@@ -179,6 +182,7 @@ def test_host_only_stage_selection_and_source_receipt(
                     toolchain=ToolchainInfo(compiler="atfe", compiler_version=compiler_version)
                 ),
                 resolved_firmware_dir=app,
+                dependency_lock_path=snapshot,
                 profile_run=SimpleNamespace(firmware=SimpleNamespace(binary_path=binary)),
             )
 
@@ -205,11 +209,15 @@ def test_host_only_stage_selection_and_source_receipt(
     assert r.binary.read() == b"elf"
     assert calls[-1][-1] == "build_firmware"
     assert r.build_identity is not None and r.build_identity != r.intent_identity
+    assert r.dependency_lock is not None
+    assert r.dependency_lock.path.parent.parent == tmp_path / "run-locks"
+    original_lock = r.dependency_lock.read()
     original_identity = r.build_identity
     elf_bytes = b"different-elf"
     changed = build_fixed_fixture(c, f, method=METHOD, runtime=selected_runtime)
     assert changed.intent_identity == r.intent_identity
     assert changed.build_identity != original_identity
+    assert r.dependency_lock.read() == original_lock
     elf_bytes = b"elf"
     compiler_version = "different-compiler"
     changed = build_fixed_fixture(c, f, method=METHOD, runtime=selected_runtime)
@@ -220,6 +228,7 @@ def test_host_only_stage_selection_and_source_receipt(
     changed = build_fixed_fixture(c, f, method=METHOD, runtime=selected_runtime)
     assert changed.intent_identity == r.intent_identity
     assert changed.build_identity != original_identity
+    assert r.dependency_lock.read() == original_lock
     assert r.target.board == "apollo510_evb"
 
     with pytest.raises(Exception, match="different fixture"):
@@ -447,6 +456,7 @@ def test_build_refuses_a_flat_image_capture_cannot_flash(tmp_path, monkeypatch, 
                 engine_artifacts=None,
                 run_metadata=RunMetadata(toolchain=ToolchainInfo("atfe", "22.1.0")),
                 resolved_firmware_dir=app,
+                dependency_lock_path=app / "nsx.lock",
                 profile_run=SimpleNamespace(firmware=SimpleNamespace(binary_path=binary)),
             )
 
