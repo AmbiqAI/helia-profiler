@@ -23,7 +23,7 @@
 static const uint8_t {{ io.buffer }}[] = { {{ io.initializer }} };
 {%- endfor %}
 {% if not fixture_aot %}
-NSX_MEM_SRAM_BSS alignas(16) static uint8_t arena[{{ fixture_arena_size }}];
+{{ "NSX_MEM_FAST_BSS" if fixture_arena_placement == "tcm" else "NSX_MEM_SRAM_BSS" }} alignas(16) static uint8_t arena[{{ fixture_arena_size }}];
 {% endif %}
 volatile int32_t deployment_status = -1;
 {%- for io in fixture_outputs %}

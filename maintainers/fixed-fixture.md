@@ -1,5 +1,69 @@
 # Fixed-input fixture measurements
 
+## Portable station setup
+
+Use an exact producer revision that the station can obtain. For a published
+revision, install its normal Git URL. Before publication, a checksum-pinned Git
+bundle or wheel is a staged development handoff, not an obtainable release.
+Verify the asset hash against the handoff before cloning, and keep its source revision and status
+in the result provenance. Do not substitute a shared checkout or `PYTHONPATH`
+for an installation.
+
+For a staged bundle, verify and clone it into an explicit station directory:
+
+```sh
+git clone --branch "$HPX_PRODUCER_REF" "$HPX_PRODUCER_BUNDLE" "$HPX_PRODUCER_SOURCE"
+git -C "$HPX_PRODUCER_SOURCE" bundle verify "$HPX_PRODUCER_BUNDLE"
+```
+
+Bundle verification runs inside the cloned repository; it cannot run in an
+empty non-repository station directory. Use absolute source and bundle paths.
+
+Set `HPX_STATION_PYTHON` to the station environment's Python,
+`HPX_PRODUCER_REPOSITORY` to the published Git URL or the cloned source's
+properly encoded `file:` URI, and the revision and compiler version to the
+handoff's exact pins. Install through the normal package manager:
+
+```sh
+uv pip install --python "$HPX_STATION_PYTHON" \
+  "helia-profiler[aot,analysis] @ git+$HPX_PRODUCER_REPOSITORY@$HPX_PRODUCER_COMMIT" \
+  "helia-aot==$HPX_AOT_VERSION"
+```
+
+The explicit compiler constraint matters: the producer's supported version
+range is not an exact experiment pin. Record installed versions and the normal
+VCS `direct_url.json` commit. A wheel instead needs its own asset hash and
+source provenance; it does not have Git-installed commit metadata. Keep the
+installed public API version and `source_closure().digest` with those records.
+
+Set `HPX_STATION_HPX` to that same environment's installed `hpx` executable
+(`bin/hpx` on Linux/macOS, `Scripts/hpx.exe` on Windows). Installing with
+`uv pip --python` does not activate that environment or select a bare `hpx`
+command on PATH.
+
+Prepare the Micro provider using this explicit executable and a new, explicit
+`HPX_CACHE_DIR`, with `ATFE_ROOT` pointing to the station's toolchain:
+
+```sh
+"$HPX_STATION_HPX" runtimes prepare tflm "$HPX_TFLM_VERSION"
+"$HPX_STATION_HPX" runtimes show tflm "$HPX_TFLM_VERSION"
+```
+
+The version is positional. This command fetches the pinned sources and builds
+into the normal cache; no private prepared archive is needed. Keep the reported
+archive hash, whether it matches the runtime record, the provider manifest and
+header hashes. A match is a reproducibility result, not independent inspection
+of every archive member or acceptance of a model's execution. The setup below
+lists the host tools and supported platforms.
+
+Use the normal public `FixtureBuildRequest` with `runtime=None` to consume that
+prepared cache, or supply a verified `PreparedUpstreamRuntime` explicitly.
+The consumer owns its normal source recipes, build receipts and reporting.
+Inspect the actual linked image/map and placement against the target's bounds
+before capture; an arena reservation alone does not establish linked fit or a
+runtime peak. Close every native batch before serial device operations, using
+the caller's existing current-board guard and exclusive lock.
+
 ## Public API
 
 Consumers import only the names in `helia_profiler.fixture.__all__`; the other

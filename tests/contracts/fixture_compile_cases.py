@@ -21,6 +21,7 @@ from helia_profiler.engines.base import ArenaRegion
 from helia_profiler.firmware.fixture import fixture_template_vars, write_fixture_headers
 from helia_profiler.firmware.op_resolver import ResolverPlan
 from helia_profiler.firmware.render import _jinja_env
+from helia_profiler.fixture import FixturePlacement
 from helia_profiler.fixture_analysis import (
     FixtureModelAnalysis,
     FixtureTensor,
@@ -37,11 +38,16 @@ FIXTURE_SCOPES = ("restore_and_invoke", "invoke_only")
 
 
 def render_fixture(
-    kind: str, engine: str, scope: str = "restore_and_invoke", *, aot_prefix: str = "fake"
+    kind: str,
+    engine: str,
+    scope: str = "restore_and_invoke",
+    *,
+    aot_prefix: str = "fake",
+    placement: FixturePlacement = FixturePlacement(),
 ) -> tuple[str, dict[str, str]]:
     """Render production fixture sources from representative tensor metadata."""
     if kind == "typed":
-        return _render_typed(engine, scope, aot_prefix=aot_prefix)
+        return _render_typed(engine, scope, aot_prefix=aot_prefix, placement=placement)
     if kind == "tcn":
         inp = Int8Tensor((1, 240, 14), 0.007843011990189552, -1, 0)
         out = Int8Tensor((1, 240, 2), 0.003640471724793315, -31, 72)
@@ -70,7 +76,12 @@ def render_fixture(
             config=load_config(
                 None,
                 {
-                    "model": {"path": str(fixture.model.path), "arena_size": 262144},
+                    "model": {
+                        "path": str(fixture.model.path),
+                        "arena_size": 262144,
+                        "arena_location": placement.arena.value,
+                        "weights_location": placement.weights.value,
+                    },
                     "engine": {"type": EngineType(engine).value},
                     "profiling": {"iterations": 17, "warmup": 3},
                 },
@@ -104,7 +115,9 @@ _TYPED_OUTPUTS = (
 )
 
 
-def _render_typed(engine: str, scope: str, *, aot_prefix: str) -> tuple[str, dict[str, str]]:
+def _render_typed(
+    engine: str, scope: str, *, aot_prefix: str, placement: FixturePlacement
+) -> tuple[str, dict[str, str]]:
     """Render mixed-dtype inputs and outputs; heliaAOT also scans its scratch arena."""
     aot = EngineType(engine) is EngineType.HELIA_AOT
     with TemporaryDirectory() as temporary:
@@ -131,7 +144,12 @@ def _render_typed(engine: str, scope: str, *, aot_prefix: str) -> tuple[str, dic
             config=load_config(
                 None,
                 {
-                    "model": {"path": str(fixture.model.path), "arena_size": 262144},
+                    "model": {
+                        "path": str(fixture.model.path),
+                        "arena_size": 262144,
+                        "arena_location": placement.arena.value,
+                        "weights_location": placement.weights.value,
+                    },
                     "engine": {"type": EngineType(engine).value},
                     "profiling": {"iterations": 17, "warmup": 3},
                 },
@@ -158,8 +176,8 @@ def _render_typed(engine: str, scope: str, *, aot_prefix: str) -> tuple[str, dic
                     4096,
                     16,
                     ArenaRole.SCRATCH,
-                    "sram",
-                    Placement.SRAM,
+                    "dtcm" if placement.arena is Placement.TCM else "sram",
+                    placement.arena,
                 ),
                 ArenaRegion(
                     1,
@@ -167,8 +185,8 @@ def _render_typed(engine: str, scope: str, *, aot_prefix: str) -> tuple[str, dic
                     256,
                     16,
                     ArenaRole.PERSISTENT,
-                    "sram",
-                    Placement.SRAM,
+                    "dtcm" if placement.arena is Placement.TCM else "sram",
+                    placement.arena,
                 ),
             ]
             if aot

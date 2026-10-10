@@ -463,6 +463,15 @@ def _refuse_overrides(config: ProfileConfig) -> None:
         )
 
 
+def _validate_fixture_placement(arena: Placement | None, weights: Placement | None) -> None:
+    """Accept only explicit paired placements supported by the fixture renderer."""
+    if (arena, weights) not in (
+        (Placement.SRAM, Placement.MRAM),
+        (Placement.TCM, Placement.TCM),
+    ):
+        raise ConfigError("Fixture placement requires SRAM/MRAM or TCM/TCM")
+
+
 def _validate(config: ProfileConfig, fixture: FixedFixture | TypedFixture) -> None:
     fixture.verify()
     _refuse_overrides(config)
@@ -480,11 +489,7 @@ def _validate(config: ProfileConfig, fixture: FixedFixture | TypedFixture) -> No
             f"Fixed fixture supports {supported_fixture_target().board} "
             f"at the {FIXTURE_CLOCK_PROFILE} clock only"
         )
-    if (
-        config.model.arena_location != Placement.SRAM
-        or config.model.weights_location != Placement.MRAM
-    ):
-        raise ConfigError("Fixed fixture requires explicit SRAM arena and MRAM model")
+    _validate_fixture_placement(config.model.arena_location, config.model.weights_location)
     if config.model.arena_size is None or not 0 < config.model.arena_size <= 3 * 1024 * 1024:
         raise ConfigError("Explicit bounded arena capacity required")
     if config.power.enabled or config.target.ensure_board_powered:
