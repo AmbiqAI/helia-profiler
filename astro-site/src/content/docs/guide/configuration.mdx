@@ -148,8 +148,24 @@ hpx profile --config hpx.yml --board apollo510b_evb --iterations 50 --output-dir
   neuralSPOT-X lock, sync, configure or flash.
 - `none` (also `off` or `false`) disables it; an explicit tool name or path
   is required and fails the build if not found.
-- `HPX_COMPILER_LAUNCHER` overrides the field; `--compiler-launcher` and
-  `--no-compiler-launcher` override both.
+- `--compiler-launcher` and `--no-compiler-launcher` override the field.
+  `HPX_COMPILER_LAUNCHER` takes precedence over both the field and these flags.
+
+On Unix, sccache starts its server through a temporary Unix socket. If it
+reports `path must be shorter than SUN_LEN`, choose a short, writable temporary
+directory that you own and set `TMPDIR` before starting HPX or the benchmark
+command:
+
+```bash
+mkdir -p /absolute/short/owned/tmp
+export TMPDIR=/absolute/short/owned/tmp
+```
+
+Child tools inherit this setting; build workspaces, caches and result directories
+remain configured independently. Changing only `SCCACHE_DIR` or the server's
+TCP port does not shorten the [startup socket path](https://github.com/mozilla/sccache/blob/v0.16.0/src/commands.rs#L84-L103).
+If compiler caching is unnecessary, `HPX_COMPILER_LAUNCHER=none` disables the
+launcher through the existing configuration route.
 
 #### Timeouts
 
