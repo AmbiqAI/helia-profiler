@@ -309,6 +309,7 @@ def _runner(tmp_path, rt, calls, *, lock_modules, map_lines):
             (module / "provider-manifest.json").write_bytes(rt.manifest.read())
             modules = "".join(f"      {name}: {{}}\n" for name in lock_modules)
             (app / "nsx.lock").write_text("targets:\n  apollo510_evb:\n    modules:\n" + modules)
+            (app / "hpx-dependencies.json").write_text("{}")
             return SimpleNamespace(
                 memory_plan=MemoryPlan(engine=config.engine.type),
                 engine_artifacts=None,
@@ -472,6 +473,7 @@ def test_upstream_build_still_refuses_a_heliart_module(tmp_path, monkeypatch):
                 "targets:\n  apollo510_evb:\n    modules:\n"
                 "      hpx-upstream-runtime: {}\n      hpx-heliart-runtime: {}\n"
             )
+            (app / "hpx-dependencies.json").write_text("{}")
             return SimpleNamespace(
                 memory_plan=MemoryPlan(engine=config.engine.type),
                 engine_artifacts=None,

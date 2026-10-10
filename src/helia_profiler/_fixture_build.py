@@ -353,6 +353,8 @@ class FixtureBuild:
     aot_outputs: tuple[FixtureFile, ...] = ()
     #: The engine package that generated the model code, when one did.
     engine_source: EngineSource | None = None
+    #: Exact dependency state retained beside the per-build lock snapshot.
+    dependency_state: FixtureFile | None = None
 
 
 @dataclass(frozen=True)
@@ -649,13 +651,14 @@ def _build(
         if ctx.profile_run is not None and compile
         else None
     )
-    flat_binary = dependency_lock = link_map = None
+    flat_binary = dependency_lock = dependency_state = link_map = None
     if binary is not None:
         flat_binary = pin(binary.path.with_suffix(".bin"))
         link_map = pin(binary.path.with_suffix(".map"))
         if ctx.dependency_lock_path is None:
             raise ConfigError("Compiled fixture requires its dependency snapshot")
         dependency_lock = pin(ctx.dependency_lock_path)
+        dependency_state = pin(ctx.dependency_lock_path.with_name("hpx-dependencies.json"))
     if binary is not None and runtime is not None and verified_runtime is not None:
         import yaml
 
@@ -694,6 +697,7 @@ def _build(
                     "elf": binary.sha256,
                     "image": flat_binary.sha256 if flat_binary else None,
                     "lock": dependency_lock.sha256 if dependency_lock else None,
+                    "dependency_state": dependency_state.sha256 if dependency_state else None,
                     "map": link_map.sha256 if link_map else None,
                     "sources": [(source.path.name, source.sha256) for source in sources],
                     "toolchain": asdict(toolchain) if toolchain else None,
@@ -749,4 +753,5 @@ def _build(
         if isinstance(ctx.engine_artifacts, HeliaAotArtifacts)
         else (),
         engine_source=_engine_source(config.engine.type),
+        dependency_state=dependency_state,
     )
