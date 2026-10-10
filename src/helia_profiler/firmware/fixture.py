@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 from .._fixture_build import _validate_fixture_placement
 from ..engines import EngineType
@@ -114,7 +115,7 @@ def fixture_template_vars(ctx: PipelineContext, regions: list[ArenaRegion]) -> d
         "fixture_warmups": ctx.config.profiling.warmup,
         "fixture_timing_scope": spec.method.timing_scope.value,
         "fixture_arena_size": ctx.config.model.arena_size,
-        "fixture_arena_placement": ctx.config.model.arena_location.value,
+        "fixture_arena_placement": cast(Placement, ctx.config.model.arena_location).value,
         "fixture_scan_arenas": [
             {"region_id": r.region_id, "size": r.size}
             for r in regions
