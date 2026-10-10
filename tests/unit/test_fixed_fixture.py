@@ -224,10 +224,11 @@ def test_host_only_stage_selection_and_source_receipt(
     assert reused.binary == r.binary and reused.dependency_lock.sha256 == r.dependency_lock.sha256
     assert reused.build_identity != original_identity
     assert r.dependency_state.read() == original_state
+    reused_identity = reused.build_identity
     elf_bytes = b"different-elf"
     changed = build_fixed_fixture(c, f, method=METHOD, runtime=selected_runtime)
     assert changed.intent_identity == r.intent_identity
-    assert changed.build_identity != original_identity
+    assert changed.build_identity != reused_identity
     assert r.dependency_lock.read() == original_lock
     assert r.dependency_state.read() == original_state
     assert changed.dependency_state is not None
@@ -236,12 +237,12 @@ def test_host_only_stage_selection_and_source_receipt(
     compiler_version = "different-compiler"
     changed = build_fixed_fixture(c, f, method=METHOD, runtime=selected_runtime)
     assert changed.intent_identity == r.intent_identity
-    assert changed.build_identity != original_identity
+    assert changed.build_identity != reused_identity
     compiler_version = "qualified-compiler"
     lock_suffix = "# different resolved dependency graph\n"
     changed = build_fixed_fixture(c, f, method=METHOD, runtime=selected_runtime)
     assert changed.intent_identity == r.intent_identity
-    assert changed.build_identity != original_identity
+    assert changed.build_identity != reused_identity
     assert r.dependency_lock.read() == original_lock
     assert r.target.board == "apollo510_evb"
     r.dependency_state.path.write_text('{"lock": {"mode": "updated"}}')
