@@ -288,6 +288,10 @@
             LD_LIBRARY_PATH = lib.optionalString c.isLinux (lib.makeLibraryPath c.runtimeLibraries);
             shellHook = ''
               unset PYTHONPATH
+              # mkShell points CC and CXX at the host compiler. hpx never uses
+              # it, and fixture builds reject both variables because they accept
+              # pinned toolchain inputs only.
+              unset CC CXX
               export REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
             '';
           };
