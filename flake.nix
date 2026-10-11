@@ -18,11 +18,12 @@
       inputs.pyproject-nix.follows = "pyproject-nix";
       inputs.uv2nix.follows = "uv2nix";
     };
-    # The heliaAOT source the environment uses: the PyPI sdist of 0.25.0, the
-    # release in uv.lock. Its version must have a runtime record in
+    # The heliaAOT selection: the PyPI sdist of the release in uv.lock, whose
+    # locked wheel is then installed. checks.helia-aot-default keeps this URL
+    # equal to uv.lock's. The selected version must have a runtime record in
     # src/helia_profiler/data/runtimes/helia-aot/. Select another recorded
     # release, or a Git revision of the private AmbiqAI/helia-aot repository, with
-    # --override-input (see the Nix setup guide).
+    # --override-input (see the Nix environment guide, getting-started/nix).
     helia-aot = {
       url = "https://files.pythonhosted.org/packages/57/45/cddc80a6eeb59ea11d6dd57057eb97bd7f5e106cbf84e06c1615e683b510/helia_aot-0.25.0.tar.gz";
       flake = false;
@@ -116,13 +117,17 @@
           ];
           identities = builtins.toJSON {
             flake = {
-              rev = self.rev or self.dirtyRev or "unknown";
-              nixpkgs = nixpkgs.rev;
+              # Under --override-input Nix drops the revision; narHash remains.
+              rev = self.rev or self.dirtyRev or null;
+              narHash = self.narHash or null;
+              nixpkgs = nixpkgs.rev or nixpkgs.narHash or null;
             };
             helia-aot = {
               inherit (heliaAot) version lockedVersion;
               inherit (heliaAot) commit;
               input-rev = heliaAot.rev;
+              input-narHash = heliaAot.narHash;
+              verified-by = heliaAot.verifiedBy;
               built-from = if heliaAot.fromLockedWheel then "uv.lock wheel" else "helia-aot flake input source";
             };
             compatibility = {
@@ -131,6 +136,7 @@
               ns-cmsis-nn = {
                 ref = compat.baselineRef;
                 version = compat.baselineVersion;
+                mapped = compat.baselineMapped;
                 required = compat.requiredNsCmsisNn;
               };
               projects = lib.mapAttrs (_: project: project.ref) baseline.projects;
@@ -308,15 +314,14 @@
           # The compatibility rule table, checked against fixed cases: whether
           # nix/compat.nix accepts a heliaAOT version against a baseline
           # ns-cmsis-nn commit.
-          accepts =
+          probe =
             version: ref:
-            (builtins.tryEval
-              (import ./nix/compat.nix {
-                inherit lib;
-                heliaAot = { inherit version; };
-                baseline.projects.ns-cmsis-nn.ref = ref;
-              }).requiredNsCmsisNn
-            ).success;
+            import ./nix/compat.nix {
+              inherit lib;
+              heliaAot = { inherit version; };
+              baseline.projects.ns-cmsis-nn.ref = ref;
+            };
+          accepts = version: ref: (builtins.tryEval (probe version ref).requiredNsCmsisNn).success;
           v7_39_2 = "5f3fed9f21a57390cc7f00f77a37db8f5f110cb8";
           v7_44_1 = "063fdd35fc398e44edf3f32f8f95b3d101803874";
           compatCases = {
@@ -327,12 +332,37 @@
             "0.28.0 rejected on v7.39.2" = !accepts "0.28.0" v7_39_2;
             "0.28.0 rejected on v7.44.1" = !accepts "0.28.0" v7_44_1;
             "1.0.0 rejected on v7.44.1" = !accepts "1.0.0" v7_44_1;
-            "unmapped baseline commit rejected" = !accepts "0.26.0" "0000000000000000000000000000000000000000";
+            "unmapped baseline commit reported, not blocking" =
+              accepts "0.26.0" "0000000000000000000000000000000000000000"
+              && !(probe "0.26.0" "0000000000000000000000000000000000000000").baselineMapped;
             "release older than every rule rejected" = !accepts "0.22.0" v7_39_2;
           };
           failedCompatCases = lib.attrNames (lib.filterAttrs (_: ok: !ok) compatCases);
+          heliaAotDefault = (lib.importJSON ./flake.lock).nodes.helia-aot.original.url;
+          uvLockSdist =
+            (lib.findFirst (
+              p: p.name == "helia-aot"
+            ) (throw "uv.lock has no helia-aot entry") (lib.importTOML ./uv.lock).package).sdist.url;
         in
         {
+          # The real baseline commit is mapped to a release in nix/compat.nix.
+          compat-baseline =
+            assert lib.assertMsg compat.baselineMapped compat.unmappedMessage;
+            c.pkgs.runCommand "helia-profiler-nix-compat-baseline" { } ''
+              ${c.pkgs.coreutils}/bin/touch "$out"
+            '';
+          # The default helia-aot input (flake.nix) is the uv.lock release's sdist.
+          helia-aot-default =
+            assert lib.assertMsg (heliaAotDefault == uvLockSdist) ''
+              The default helia-aot input in flake.nix is
+                ${heliaAotDefault}
+              but uv.lock locks
+                ${uvLockSdist}
+              Set the input URL in flake.nix to the uv.lock sdist URL and run nix flake lock.
+            '';
+            c.pkgs.runCommand "helia-profiler-nix-helia-aot-default" { } ''
+              ${c.pkgs.coreutils}/bin/touch "$out"
+            '';
           compat-rules =
             assert lib.assertMsg (
               failedCompatCases == [ ]

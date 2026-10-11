@@ -19,7 +19,7 @@ def first_line(*command: str) -> str | None:
         return None
     try:
         out = subprocess.run(command, capture_output=True, text=True, timeout=30, check=False)
-    except OSError:
+    except (OSError, subprocess.TimeoutExpired):
         return None
     text = (out.stdout or out.stderr).strip()
     return text.splitlines()[0] if text else None

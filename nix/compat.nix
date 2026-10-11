@@ -5,7 +5,9 @@
 # profiler's compatibility baseline and from nix/*.nix, and stay as they are.
 # Selecting a newer heliaAOT therefore does not bring a newer ns-cmsis-nn. This
 # file states which ns-cmsis-nn each heliaAOT release needs and stops
-# evaluation when the baseline is older.
+# evaluation when the baseline is older. A baseline commit missing from
+# nsCmsisNnReleases does not block the environment: it is reported, and the
+# compat-baseline check fails until the commit is mapped.
 {
   lib,
   baseline,
@@ -13,9 +15,7 @@
 }:
 let
   # Minimum ns-cmsis-nn per heliaAOT release, newest rule first. A heliaAOT
-  # release uses the first rule whose `from` it has reached. Releases 0.23-0.26
-  # were qualified against the v7.39.2 baseline. 0.27 routes default kernels
-  # that need up to 7.43.0. 0.28 and later need 7.44.2 (heliaAOT v1 floor).
+  # release uses the first rule whose `from` it has reached.
   floors = [
     {
       from = "0.28.0";
@@ -40,24 +40,28 @@ let
   };
 
   baselineRef = baseline.projects.ns-cmsis-nn.ref;
-  baselineVersion =
-    nsCmsisNnReleases.${baselineRef} or (throw ''
-      The compatibility baseline pins ns-cmsis-nn ${baselineRef}, which nix/compat.nix
-      does not map to a release. Add it to nsCmsisNnReleases.
-    '');
+  baselineVersion = nsCmsisNnReleases.${baselineRef} or null;
+  unmappedMessage = "The compatibility baseline pins ns-cmsis-nn ${baselineRef}, which nix/compat.nix does not map to a release; add it to nsCmsisNnReleases.";
 
   rule = lib.findFirst (r: lib.versionAtLeast heliaAot.version r.from) (throw ''
     heliaAOT ${heliaAot.version} is older than every rule in nix/compat.nix.
   '') floors;
 in
-assert lib.assertMsg (lib.versionAtLeast baselineVersion rule.nsCmsisNn) ''
-  heliaAOT ${heliaAot.version} needs ns-cmsis-nn ${rule.nsCmsisNn} or newer, but the
-  profiler's compatibility baseline pins ns-cmsis-nn ${baselineVersion} (${baselineRef}).
-  Selecting heliaAOT does not move the baseline. Update
-  src/helia_profiler/data/compatibility-baseline-v1.json (and requalify the
-  runtimes that share it) before selecting this release.
-'';
+assert lib.assertMsg (baselineVersion == null || lib.versionAtLeast baselineVersion rule.nsCmsisNn)
+  ''
+    heliaAOT ${heliaAot.version} needs ns-cmsis-nn ${rule.nsCmsisNn} or newer, but the
+    profiler's compatibility baseline pins ns-cmsis-nn ${baselineVersion} (${baselineRef}).
+    Selecting heliaAOT does not move the baseline. Update
+    src/helia_profiler/data/compatibility-baseline-v1.json (and requalify the
+    runtimes that share it) before selecting this release.
+  '';
 {
-  inherit baselineRef baselineVersion floors;
+  inherit baselineRef floors unmappedMessage;
+  baselineMapped = baselineVersion != null;
+  baselineVersion =
+    if baselineVersion == null then
+      builtins.trace "warning: ${unmappedMessage}" "unmapped"
+    else
+      baselineVersion;
   requiredNsCmsisNn = rule.nsCmsisNn;
 }
