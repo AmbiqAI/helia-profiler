@@ -79,7 +79,11 @@ assert lib.assertMsg (rev == null || rev == record.source.commit) ''
   commit = record.source.commit;
   narHash = src.narHash or null;
   # How the selection was matched to its runtime record.
-  verifiedBy = if rev != null then "git commit" else "version (PyPI sdist; see narHash)";
+  verifiedBy =
+    if rev != null then
+      "git commit"
+    else
+      "version only (non-Git input; compare input-narHash with flake.lock)";
   inherit (record) version;
 
   # Python package-set overlay. A no-op when the locked wheel is selected.
