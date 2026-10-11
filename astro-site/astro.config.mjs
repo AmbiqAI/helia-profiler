@@ -57,6 +57,7 @@ export default defineConfig({
               sidebar: [
                 { label: 'Overview', slug: 'getting-started' },
                 { label: 'Install', slug: 'getting-started/install' },
+                { label: 'Nix environment', slug: 'getting-started/nix' },
                 { label: 'Hardware prerequisites', slug: 'getting-started/hardware-prerequisites' },
                 { label: 'Validate your setup', slug: 'getting-started/validate-your-setup' },
                 { label: 'First profile', slug: 'getting-started/first-profile' },

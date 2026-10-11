@@ -1,0 +1,122 @@
+---
+title: "Nix environment"
+description: "Reproduce the pinned hpx environment with the repository flake, choose and pin the heliaAOT release it uses, record what resolved, and know what Nix cannot provide."
+---
+
+The repository flake builds one environment from pinned inputs. Two engineers who enter it from the same commit of `flake.lock` get the same Python packages, heliaAOT release, compilers and J-Link software. This page covers entering it, choosing the heliaAOT release, recording what resolved, and what you still provide yourself.
+
+uv, Ruff, ty and pytest remain the Python workflow inside the environment. The flake builds the Python environment from `uv.lock`, so the uv path and the Nix path use the same package versions.
+
+## Enter the environment
+
+Install [Determinate Nix](https://determinate.systems/install/), which enables flakes. With another Nix install, add `--extra-experimental-features 'nix-command flakes'` to each `nix` command below, or enable both features in your Nix configuration.
+
+```bash
+git clone https://github.com/AmbiqAI/helia-profiler.git && cd helia-profiler
+nix develop
+hpx doctor
+```
+
+`nix develop .#contrib` adds pre-commit for contributors. `nix run .#verify-isolation` checks that no tool leaks in from your host profile.
+
+## What the flake pins
+
+| Item | Pinned by | Version in this commit |
+|---|---|---|
+| nixpkgs, Python, CMake, Ninja, uv | `flake.lock` (nixpkgs) | Python 3.12, CMake 4.3, Ninja 1.13, uv 0.11 |
+| Python packages | `uv.lock` | for example neuralspotx 0.8.1, ai-edge-litert 2.2.0 |
+| heliaAOT | the `helia-aot` flake input, recorded in `flake.lock` | 0.25.0 |
+| Arm GNU Toolchain | `flake.lock` (nixpkgs `gcc-arm-embedded`) | 15.2.Rel1 |
+| Arm Toolchain for Embedded (ATfE) | `nix/atfe.nix` | 22.1.0 |
+| SEGGER J-Link software | `nix/jlink.nix` | 9.62 |
+| ns-cmsis-nn (CORE), NSX SDK and modules, LiteRT Micro, heliaRT | `src/helia_profiler/data/compatibility-baseline-v1.json` | ns-cmsis-nn v7.39.2 and the other refs listed there |
+
+The last row is not chosen by the flake. hpx fetches those modules at the pinned commits when it builds firmware, through the same baseline on every install path. Selecting a different heliaAOT release does not move any of them.
+
+## Choose the heliaAOT release
+
+The `helia-aot` input selects the heliaAOT source. By default it is the PyPI source distribution of the release in `uv.lock`, so the default environment needs no credentials. The flake accepts a selection only if the profiler supports that release, which means a runtime record exists under `src/helia_profiler/data/runtimes/helia-aot/`. That is the same check `hpx` makes before compiling with heliaAOT, applied earlier.
+
+**A recorded release, from PyPI.** Copy the release's `.tar.gz` source URL from its PyPI page:
+
+```bash
+nix develop --override-input helia-aot \
+  https://files.pythonhosted.org/packages/1d/bf/af443412002a96935133c387a24068b9f609aef9b7d8a98c51027b66825f/helia_aot-0.26.0.tar.gz
+```
+
+**A Git revision.** heliaAOT's repository is private, so this needs SSH access to `AmbiqAI/helia-aot`. The revision must be the commit in the matching runtime record (`source.commit`):
+
+```bash
+nix develop --override-input helia-aot \
+  'git+ssh://git@github.com/AmbiqAI/helia-aot?rev=ea5cd6c0b97150857cfcbe6019205efd2d00489e'
+```
+
+`--override-input` lasts for one command. To pin a selection for everyone, write it into `flake.lock` and commit the result:
+
+```bash
+nix flake lock --override-input helia-aot <url-or-git-revision>
+```
+
+`flake.lock` records the URL and content hash of a PyPI selection, or the revision and content hash of a Git selection.
+
+When the selection is the release in `uv.lock`, the environment uses the locked wheel. Any other recorded release is built from the selected source against the dependency versions in `uv.lock`. If that release needs dependencies the lock does not provide, the build fails rather than resolving different versions.
+
+The flake refuses these selections at evaluation, before anything is built:
+
+| Selection | Why |
+|---|---|
+| A version with no runtime record | `hpx` would refuse it at compile time. |
+| A Git revision that is not the commit its runtime record names | It is not the release the profiler was qualified with. |
+| A release whose ns-cmsis-nn requirement is newer than the baseline | See the compatibility table below. |
+
+### Support a new heliaAOT release
+
+A release becomes selectable once the profiler supports it. That takes one change outside the flake:
+
+1. Add `src/helia_profiler/data/runtimes/helia-aot/<version>.json`, with `source.commit` set to the release commit.
+2. Widen the `aot` extra in `pyproject.toml` and run `uv lock`.
+3. Update `src/helia_profiler/fixture_closure.txt`.
+4. Requalify, and bump the compatibility baseline if the release needs a newer ns-cmsis-nn.
+
+## Compatibility
+
+Each heliaAOT release needs a minimum ns-cmsis-nn. The flake checks the selected release against the ns-cmsis-nn version in the compatibility baseline. The rules live in `nix/compat.nix`, and `nix flake check` tests them.
+
+| heliaAOT | Minimum ns-cmsis-nn | Baseline in this commit |
+|---|---|---|
+| 0.23.0 to 0.26.x | 7.39.2 | v7.39.2: supported |
+| 0.27.x | 7.43.0 | v7.39.2: refused until the baseline moves |
+| 0.28.0 and later, including 1.0 | 7.44.2 | v7.39.2: refused until the baseline moves |
+
+Moving the baseline changes the ns-cmsis-nn that heliaAOT, heliaRT and ExecuTorch builds share. The runtimes that use it are requalified before it moves.
+
+## Record what resolved
+
+```bash
+nix run .#identities > identities.json
+```
+
+The output is JSON. It records:
+- the flake revision and the nixpkgs revision;
+- the heliaAOT version, its record commit and whether it came from the `uv.lock` wheel or the selected source;
+- the compatibility baseline refs, including ns-cmsis-nn and its required minimum;
+- the compiler and J-Link versions;
+- the versions installed in the Python environment.
+
+Add `--override-input` to report a different selection. Keep the file with any results you capture.
+
+## What Nix cannot provide
+
+- **J-Link licence terms.** The flake downloads the SEGGER J-Link software under SEGGER's terms of use. Using it means accepting them.
+- **USB and probe access.** On Linux, install the udev rules for J-Link and Joulescope with `nix run .#install-udev-rules` (see [Linux USB permissions](../install/#5-linux-usb-permissions)). Windows needs WSL2 with `usbipd-win`, and macOS needs no rules. The probe, the board and the Joulescope are physical prerequisites.
+- **Credentials.** The default environment and PyPI selections need none. A heliaAOT Git selection needs SSH access to `AmbiqAI/helia-aot`. Any other private repository your configuration names needs the matching access.
+- **Network access at build time.** `hpx` fetches NSX modules, including ns-cmsis-nn, at their pinned commits when it first builds firmware. It caches them, so later builds reuse them.
+
+## Caches and outputs
+
+| Location | Contents | Safe cleanup |
+|---|---|---|
+| `/nix/store` | Everything the flake builds or downloads | `nix store gc` removes only paths nothing references. On a shared machine, agree on it with the other users first. |
+| `~/.cache/nix` | Nix fetcher and evaluation caches | Safe to delete; Nix refetches. |
+| `$HPX_CACHE_DIR`, else `$XDG_CACHE_HOME/helia-profiler`, else `~/.cache/helia-profiler` | Firmware workspaces and engine downloads | `hpx cache info` shows it; `hpx cache purge` empties it, together with the NSX module cache. |
+| The run's output directory | Firmware, logs and results | Delete it when you no longer need the results. |
