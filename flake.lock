@@ -1,5 +1,18 @@
 {
   "nodes": {
+    "helia-aot": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1790957045,
+        "narHash": "sha256-JNrFWGVfNqBArbEWqowAY9I4/vwlgtXgBEtgPI4eD3Q=",
+        "type": "tarball",
+        "url": "https://files.pythonhosted.org/packages/57/45/cddc80a6eeb59ea11d6dd57057eb97bd7f5e106cbf84e06c1615e683b510/helia_aot-0.25.0.tar.gz"
+      },
+      "original": {
+        "type": "tarball",
+        "url": "https://files.pythonhosted.org/packages/57/45/cddc80a6eeb59ea11d6dd57057eb97bd7f5e106cbf84e06c1615e683b510/helia_aot-0.25.0.tar.gz"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1785090369,
@@ -64,6 +77,7 @@
     },
     "root": {
       "inputs": {
+        "helia-aot": "helia-aot",
         "nixpkgs": "nixpkgs",
         "pyproject-build-systems": "pyproject-build-systems",
         "pyproject-nix": "pyproject-nix",

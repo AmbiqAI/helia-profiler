@@ -18,14 +18,26 @@
       inputs.pyproject-nix.follows = "pyproject-nix";
       inputs.uv2nix.follows = "uv2nix";
     };
+    # The heliaAOT selection: the PyPI sdist of the release in uv.lock, whose
+    # locked wheel is then installed. checks.helia-aot-default keeps this URL
+    # equal to uv.lock's. The selected version must have a runtime record in
+    # src/helia_profiler/data/runtimes/helia-aot/. Select another recorded
+    # release, or a Git revision of the private AmbiqAI/helia-aot repository, with
+    # --override-input (see the Nix environment guide, getting-started/nix).
+    helia-aot = {
+      url = "https://files.pythonhosted.org/packages/57/45/cddc80a6eeb59ea11d6dd57057eb97bd7f5e106cbf84e06c1615e683b510/helia_aot-0.25.0.tar.gz";
+      flake = false;
+    };
   };
 
   outputs =
     {
+      self,
       nixpkgs,
       pyproject-nix,
       uv2nix,
       pyproject-build-systems,
+      helia-aot,
       ...
     }:
     let
@@ -39,6 +51,15 @@
       workspace = uv2nix.lib.workspace.loadWorkspace { workspaceRoot = ./.; };
       pythonOverlay = workspace.mkPyprojectOverlay { sourcePreference = "wheel"; };
       editableOverlay = workspace.mkEditablePyprojectOverlay { root = "$REPO_ROOT"; };
+
+      heliaAot = import ./nix/helia-aot.nix {
+        inherit lib pyproject-nix;
+        src = helia-aot;
+        runtimeRecords = ./src/helia_profiler/data/runtimes/helia-aot;
+        uvLock = ./uv.lock;
+      };
+      baseline = lib.importJSON ./src/helia_profiler/data/compatibility-baseline-v1.json;
+      compat = import ./nix/compat.nix { inherit lib baseline heliaAot; };
 
       mkPkgs =
         system:
@@ -61,6 +82,9 @@
               pyproject-build-systems.overlays.wheel
               pythonOverlay
               (import ./nix/python-overrides.nix { inherit pkgs; })
+              # Evaluating the compatibility rules first stops an incompatible
+              # heliaAOT selection before anything is built.
+              (builtins.seq compat.requiredNsCmsisNn heliaAot.overlay)
             ]
           );
 
@@ -91,6 +115,51 @@
             atfe
             jlink
           ];
+          identities = builtins.toJSON {
+            flake = {
+              # Under --override-input Nix drops the revision; narHash remains.
+              rev = self.rev or self.dirtyRev or null;
+              narHash = self.narHash or null;
+              nixpkgs = nixpkgs.rev or nixpkgs.narHash or null;
+            };
+            helia-aot = {
+              inherit (heliaAot) version lockedVersion;
+              inherit (heliaAot) commit;
+              input-rev = heliaAot.rev;
+              input-narHash = heliaAot.narHash;
+              verified-by = heliaAot.verifiedBy;
+              built-from = if heliaAot.fromLockedWheel then "uv.lock wheel" else "helia-aot flake input source";
+            };
+            compatibility = {
+              inherit (baseline) baseline_id;
+              neuralspotx = baseline.neuralspotx.version;
+              ns-cmsis-nn = {
+                ref = compat.baselineRef;
+                version = compat.baselineVersion;
+                mapped = compat.baselineMapped;
+                required = compat.requiredNsCmsisNn;
+              };
+              projects = lib.mapAttrs (_: project: project.ref) baseline.projects;
+            };
+            toolchains = {
+              arm-gnu = pkgs.gcc-arm-embedded.version;
+              atfe = atfe.version;
+              jlink = jlink.version;
+            };
+          };
+          identitiesApp = pkgs.writeShellApplication {
+            name = "hpx-nix-identities";
+            runtimeInputs = [
+              runtimeEnv
+              pkgs.uv
+            ]
+            ++ nativeTools;
+            text = ''
+              export ATFE_ROOT="${atfe}"
+              export HPX_NIX_IDENTITIES=${lib.escapeShellArg identities}
+              exec python ${./nix/scripts/identities.py}
+            '';
+          };
           hpx = pkgs.symlinkJoin {
             name = "helia-profiler-with-tools";
             paths = [ runtimeEnv ];
@@ -110,6 +179,7 @@
           inherit
             atfe
             hpx
+            identitiesApp
             jlink
             jlinkLibrary
             nativeTools
@@ -169,6 +239,11 @@
             program = "${c.hpx}/bin/hpx";
             meta.description = "Run the packaged heliaPROFILER CLI";
           };
+          identities = {
+            type = "app";
+            program = "${c.identitiesApp}/bin/hpx-nix-identities";
+            meta.description = "Print the resolved heliaAOT, provider, toolchain and flake identities as JSON";
+          };
           verify-isolation = {
             type = "app";
             program = "${verifyIsolation}/bin/hpx-verify-isolation";
@@ -219,6 +294,10 @@
             LD_LIBRARY_PATH = lib.optionalString c.isLinux (lib.makeLibraryPath c.runtimeLibraries);
             shellHook = ''
               unset PYTHONPATH
+              # mkShell points CC and CXX at the host compiler. hpx never uses
+              # it, and fixture builds reject both variables because they accept
+              # pinned toolchain inputs only.
+              unset CC CXX
               export REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
             '';
           };
@@ -232,13 +311,71 @@
         system:
         let
           c = components.${system};
+          # The compatibility rule table, checked against fixed cases: whether
+          # nix/compat.nix accepts a heliaAOT version against a baseline
+          # ns-cmsis-nn commit.
+          probe =
+            version: ref:
+            import ./nix/compat.nix {
+              inherit lib;
+              heliaAot = { inherit version; };
+              baseline.projects.ns-cmsis-nn.ref = ref;
+            };
+          accepts = version: ref: (builtins.tryEval (probe version ref).requiredNsCmsisNn).success;
+          v7_39_2 = "5f3fed9f21a57390cc7f00f77a37db8f5f110cb8";
+          v7_44_1 = "063fdd35fc398e44edf3f32f8f95b3d101803874";
+          compatCases = {
+            "0.25.0 on v7.39.2" = accepts "0.25.0" v7_39_2;
+            "0.26.0 on v7.39.2" = accepts "0.26.0" v7_39_2;
+            "0.27.0 rejected on v7.39.2" = !accepts "0.27.0" v7_39_2;
+            "0.27.0 on v7.44.1" = accepts "0.27.0" v7_44_1;
+            "0.28.0 rejected on v7.39.2" = !accepts "0.28.0" v7_39_2;
+            "0.28.0 rejected on v7.44.1" = !accepts "0.28.0" v7_44_1;
+            "1.0.0 rejected on v7.44.1" = !accepts "1.0.0" v7_44_1;
+            "unmapped baseline commit reported, not blocking" =
+              accepts "0.26.0" "0000000000000000000000000000000000000000"
+              && !(probe "0.26.0" "0000000000000000000000000000000000000000").baselineMapped;
+            "release older than every rule rejected" = !accepts "0.22.0" v7_39_2;
+          };
+          failedCompatCases = lib.attrNames (lib.filterAttrs (_: ok: !ok) compatCases);
+          heliaAotDefault = (lib.importJSON ./flake.lock).nodes.helia-aot.original.url;
+          uvLockSdist =
+            (lib.findFirst (
+              p: p.name == "helia-aot"
+            ) (throw "uv.lock has no helia-aot entry") (lib.importTOML ./uv.lock).package).sdist.url;
         in
         {
+          # The real baseline commit is mapped to a release in nix/compat.nix.
+          compat-baseline =
+            assert lib.assertMsg compat.baselineMapped compat.unmappedMessage;
+            c.pkgs.runCommand "helia-profiler-nix-compat-baseline" { } ''
+              ${c.pkgs.coreutils}/bin/touch "$out"
+            '';
+          # The default helia-aot input (flake.nix) is the uv.lock release's sdist.
+          helia-aot-default =
+            assert lib.assertMsg (heliaAotDefault == uvLockSdist) ''
+              The default helia-aot input in flake.nix is
+                ${heliaAotDefault}
+              but uv.lock locks
+                ${uvLockSdist}
+              Set the input URL in flake.nix to the uv.lock sdist URL and run nix flake lock.
+            '';
+            c.pkgs.runCommand "helia-profiler-nix-helia-aot-default" { } ''
+              ${c.pkgs.coreutils}/bin/touch "$out"
+            '';
+          compat-rules =
+            assert lib.assertMsg (
+              failedCompatCases == [ ]
+            ) "nix/compat.nix cases failed: ${lib.concatStringsSep ", " failedCompatCases}";
+            c.pkgs.runCommand "helia-profiler-nix-compat-rules" { } ''
+              ${c.pkgs.coreutils}/bin/touch "$out"
+            '';
           smoke = c.pkgs.runCommand "helia-profiler-nix-smoke" { } ''
             export PATH="${
               lib.makeBinPath (
                 [
                   c.hpx
+                  c.identitiesApp
                   c.runtimeEnv
                 ]
                 ++ c.nativeTools
@@ -251,6 +388,8 @@
             ''}
             hpx --help >/dev/null
             python -c "import helia_aot, helia_profiler, pyjoulescope_driver"
+            python -c 'import importlib.metadata as m, sys; v = m.version("helia-aot"); sys.exit(0 if v == "${heliaAot.version}" else "helia-aot " + v + " installed, ${heliaAot.version} selected")'
+            hpx-nix-identities > /dev/null
             command -v arm-none-eabi-gcc >/dev/null
             command -v cmake >/dev/null
             command -v ninja >/dev/null
