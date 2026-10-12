@@ -671,9 +671,8 @@ def test_compile_matrix_covers_fixture_render_arms():
     cases = [case for case in _build_cases() if case.case_id.startswith("fixture:")]
     assert {case.case_id for case in cases} == {
         f"fixture:{kind}|{engine}|{scope}"
-        for kind in ("tcn", "kws", "typed")
-        for engine in ("tflm", "helia-rt", "helia-aot")
-        for scope in ("restore_and_invoke", "invoke_only")
+        for kind, engine in FIXTURE_KIND_ENGINES
+        for scope in FIXTURE_SCOPES
     }
 
     for case in cases:
