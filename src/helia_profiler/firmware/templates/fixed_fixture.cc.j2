@@ -16,6 +16,10 @@
 #include "fixed_fixture_memory.h"
 #include "model_data.h"
 #include "tensorflow/lite/micro/micro_interpreter.h"
+{% if fixture_resource_variables %}
+#include "tensorflow/lite/micro/micro_allocator.h"
+#include "tensorflow/lite/micro/micro_resource_variable.h"
+{% endif %}
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/schema/schema_generated.h"
 {% endif %}
@@ -59,10 +63,18 @@ static int infer_fixture() {
     if (resolver.{{ registration }} != kTfLiteOk) return {{ fixture_status.resolver }};
 {% endfor %}
     const auto *model = tflite::GetModel(model_data);
-    if (model->version() != TFLITE_SCHEMA_VERSION || model->subgraphs()->size() != 1) return {{ fixture_status.model_schema }};
+    if (model->version() != TFLITE_SCHEMA_VERSION || model->subgraphs()->size() != {{ fixture_subgraph_count }}) return {{ fixture_status.model_schema }};
     const auto *graph = model->subgraphs()->Get(0);
     if (graph->inputs()->size() != {{ fixture_inputs | length }} || graph->outputs()->size() != {{ fixture_outputs | length }}) return {{ fixture_status.io_contract }};
+{% if fixture_resource_variables %}
+    auto *allocator = tflite::MicroAllocator::Create(arena, sizeof(arena));
+    if (!allocator) return {{ fixture_status.arena }};
+    auto *resources = tflite::MicroResourceVariables::Create(allocator, {{ fixture_resource_variables }});
+    if (!resources) return {{ fixture_status.arena }};
+    tflite::MicroInterpreter interpreter(model, resolver, allocator, resources);
+{% else %}
     tflite::MicroInterpreter interpreter(model, resolver, arena, sizeof(arena));
+{% endif %}
     if (interpreter.AllocateTensors() != kTfLiteOk) return {{ fixture_status.arena }};
 {%- for kind, records in [('input', fixture_inputs), ('output', fixture_outputs)] %}{%- for io in records %}
     auto *{{ io.tensor }} = interpreter.{{ kind }}({{ io.position }});

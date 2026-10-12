@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .engines import EngineType
 from .firmware.op_resolver import ResolverPlan, build_fixture_resolver_plan
 from .modelcost import model_analysis
 from .modelcost.model_analysis import ModelAnalysis
@@ -104,6 +105,10 @@ class FixtureModelAnalysis:
     output_tensor: Int8Tensor
     analysis: ModelAnalysis
     resolver: ResolverPlan
+    has_internal_state: bool = False
+    has_initializer: bool = False
+    subgraph_count: int = 1
+    resource_variable_count: int = 0
 
     @property
     def input_bytes(self) -> int:
@@ -122,6 +127,10 @@ class TypedFixtureModelAnalysis:
     has_float16: bool
     analysis: ModelAnalysis
     resolver: ResolverPlan
+    has_internal_state: bool = False
+    has_initializer: bool = False
+    subgraph_count: int = 1
+    resource_variable_count: int = 0
 
     @property
     def input_bytes(self) -> int:
@@ -147,8 +156,8 @@ def _io_tensor(graph: Any, index: int, int8_type: int) -> Int8Tensor:
     )
 
 
-def _read_fixture_graph(path: Path, *, single_io: bool, finish):
-    """Validate a static single-subgraph model, then hand the graph to ``finish``."""
+def _read_fixture_graph(path: Path, *, single_io: bool, finish, engine: EngineType | None = None):
+    """Validate the container and selected public IO before engine admission."""
     schema = model_analysis._schema
     if schema is None:
         raise ValueError("Fixture model analysis requires ai-edge-litert (the analysis extra)")
@@ -159,61 +168,87 @@ def _read_fixture_graph(path: Path, *, single_io: bool, finish):
         model = schema.Model.GetRootAs(data, 0)
         if model.Version() != 3:
             raise ValueError("Unsupported fixture model schema version")
-        if model.SubgraphsLength() != 1:
+        if model.SubgraphsLength() < 1:
+            raise ValueError("Fixture model requires at least one subgraph")
+        if engine is None and model.SubgraphsLength() != 1:
             raise ValueError("Fixture model requires exactly one subgraph")
         graph = model.Subgraphs(0)
         if single_io and (graph.InputsLength() != 1 or graph.OutputsLength() != 1):
             raise ValueError("Fixture model requires exactly one input and one output")
         if not single_io and (graph.InputsLength() < 1 or graph.OutputsLength() < 1):
             raise ValueError("Fixture model requires at least one input and one output")
-        for index in range(graph.TensorsLength()):
-            tensor = graph.Tensors(index)
-            if tensor.IsVariable() or tensor.Type() in (
-                schema.TensorType.RESOURCE,
-                schema.TensorType.VARIANT,
-            ):
-                raise ValueError("Variable or stateful fixture tensors are unsupported")
-            shape = tuple(tensor.Shape(i) for i in range(tensor.ShapeLength()))
-            signature = tuple(
-                tensor.ShapeSignature(i) for i in range(tensor.ShapeSignatureLength())
-            )
-            # Fixed fixtures never resize tensors. A symbolic batch declaration
-            # may describe the concrete stored batch-one allocation.
-            fixed_batch_signature = bool(shape) and shape[0] == 1 and signature == (-1, *shape[1:])
-            if any(n <= 0 for n in shape) or (
-                signature and signature != shape and not fixed_batch_signature
-            ):
-                raise ValueError("Dynamic fixture tensor shapes are unsupported")
-            if tensor.Buffer() >= model.BuffersLength():
-                raise ValueError("Invalid fixture tensor buffer index")
-            buffer = model.Buffers(tensor.Buffer())
-            if buffer.DataLength():
-                buffer.Data(buffer.DataLength() - 1)
-        for index in [graph.Inputs(i) for i in range(graph.InputsLength())] + [
-            graph.Outputs(i) for i in range(graph.OutputsLength())
-        ]:
-            if not 0 <= index < graph.TensorsLength():
-                raise ValueError("Invalid fixture input/output tensor index")
-        for index in range(graph.OperatorsLength()):
-            op = graph.Operators(index)
-            if not 0 <= op.OpcodeIndex() < model.OperatorCodesLength():
-                raise ValueError("Invalid fixture operator code index")
-            for position in range(op.MutatingVariableInputsLength()):
-                if op.MutatingVariableInputs(position):
-                    raise ValueError("Stateful fixture operators are unsupported")
-            for getter, length, optional in (
-                (op.Inputs, op.InputsLength(), True),
-                (op.Outputs, op.OutputsLength(), False),
-                (op.Intermediates, op.IntermediatesLength(), True),
-            ):
-                for position in range(length):
-                    value = getter(position)
-                    if not (0 <= value < graph.TensorsLength() or (optional and value == -1)):
-                        raise ValueError("Invalid fixture operator tensor index")
+        has_internal_state = False
+        has_initializer = False
+        resource_variable_count = 0
+        operator_names: set[str] = set()
+        for subgraph in range(model.SubgraphsLength()):
+            current = model.Subgraphs(subgraph)
+            io_indices = [current.Inputs(i) for i in range(current.InputsLength())] + [
+                current.Outputs(i) for i in range(current.OutputsLength())
+            ]
+            for index in io_indices:
+                if not 0 <= index < current.TensorsLength():
+                    raise ValueError("Invalid fixture input/output tensor index")
+            for index in range(current.TensorsLength()):
+                tensor = current.Tensors(index)
+                stateful = tensor.IsVariable() or tensor.Type() in (
+                    schema.TensorType.RESOURCE,
+                    schema.TensorType.VARIANT,
+                )
+                has_internal_state |= stateful
+                if engine is None and stateful:
+                    raise ValueError("Variable or stateful fixture tensors are unsupported")
+                shape = tuple(tensor.Shape(i) for i in range(tensor.ShapeLength()))
+                signature = tuple(
+                    tensor.ShapeSignature(i) for i in range(tensor.ShapeSignatureLength())
+                )
+                fixed_batch_signature = (
+                    bool(shape) and shape[0] == 1 and signature == (-1, *shape[1:])
+                )
+                if (engine is None or (subgraph == 0 and index in io_indices)) and (
+                    any(n <= 0 for n in shape)
+                    or (signature and signature != shape and not fixed_batch_signature)
+                ):
+                    raise ValueError("Dynamic fixture tensor shapes are unsupported")
+                if tensor.Buffer() >= model.BuffersLength():
+                    raise ValueError("Invalid fixture tensor buffer index")
+                buffer = model.Buffers(tensor.Buffer())
+                if buffer.DataLength():
+                    buffer.Data(buffer.DataLength() - 1)
+            for index in range(current.OperatorsLength()):
+                op = current.Operators(index)
+                if not 0 <= op.OpcodeIndex() < model.OperatorCodesLength():
+                    raise ValueError("Invalid fixture operator code index")
+                code = model.OperatorCodes(op.OpcodeIndex())
+                builtin = code.BuiltinCode() or code.DeprecatedBuiltinCode()
+                operator_names.add(model_analysis._op_name(builtin))
+                has_initializer |= builtin == schema.BuiltinOperator.CALL_ONCE
+                resource_variable_count += builtin == schema.BuiltinOperator.VAR_HANDLE
+                for position in range(op.MutatingVariableInputsLength()):
+                    if op.MutatingVariableInputs(position):
+                        has_internal_state = True
+                        if engine is None:
+                            raise ValueError("Stateful fixture operators are unsupported")
+                for getter, length, optional in (
+                    (op.Inputs, op.InputsLength(), True),
+                    (op.Outputs, op.OutputsLength(), False),
+                    (op.Intermediates, op.IntermediatesLength(), True),
+                ):
+                    for position in range(length):
+                        value = getter(position)
+                        if not (0 <= value < current.TensorsLength() or (optional and value == -1)):
+                            raise ValueError("Invalid fixture operator tensor index")
+        facts = (
+            has_internal_state or has_initializer,
+            has_initializer,
+            model.SubgraphsLength(),
+            resource_variable_count,
+            tuple(sorted(operator_names)),
+        )
         analysis = model_analysis.analyze_model(path)
         if analysis is None:
             raise ValueError("Fixture model analysis unavailable")
-        return finish(schema, graph, analysis)
+        return finish(schema, graph, analysis, facts)
     except ValueError:
         raise
     except (IndexError, TypeError, AttributeError, OverflowError, RuntimeError) as exc:
@@ -223,22 +258,24 @@ def _read_fixture_graph(path: Path, *, single_io: bool, finish):
         raise ValueError(f"Malformed fixture model flatbuffer: {exc}") from exc
 
 
-def analyze_fixture_model(path: Path) -> FixtureModelAnalysis:
+def analyze_fixture_model(path: Path, *, _engine: EngineType | None = None) -> FixtureModelAnalysis:
     """Read a static single-subgraph model without running an interpreter."""
 
-    def finish(schema, graph, analysis):
+    def finish(schema, graph, analysis, facts):
         input_tensor = _io_tensor(graph, graph.Inputs(0), schema.TensorType.INT8)
         output_tensor = _io_tensor(graph, graph.Outputs(0), schema.TensorType.INT8)
-        resolver = build_fixture_resolver_plan(analysis)
-        return FixtureModelAnalysis(input_tensor, output_tensor, analysis, resolver)
+        resolver = _engine_resolver(analysis, _engine, facts)
+        return FixtureModelAnalysis(input_tensor, output_tensor, analysis, resolver, *facts[:4])
 
-    return _read_fixture_graph(path, single_io=True, finish=finish)
+    return _read_fixture_graph(path, single_io=True, finish=finish, engine=_engine)
 
 
-def analyze_typed_fixture_model(path: Path) -> TypedFixtureModelAnalysis:
+def _analyze_typed_fixture_model(
+    path: Path, engine: EngineType | None
+) -> TypedFixtureModelAnalysis:
     """Read every input and output of a static single-subgraph model with its dtype."""
 
-    def finish(schema, graph, analysis):
+    def finish(schema, graph, analysis, facts):
         dtypes = {
             schema.TensorType.INT8: "int8",
             schema.TensorType.INT16: "int16",
@@ -296,7 +333,32 @@ def analyze_typed_fixture_model(path: Path) -> TypedFixtureModelAnalysis:
                 for i in range(graph.TensorsLength())
             ),
             analysis,
-            build_fixture_resolver_plan(analysis),
+            _engine_resolver(analysis, engine, facts),
+            *facts[:4],
         )
 
-    return _read_fixture_graph(path, single_io=False, finish=finish)
+    return _read_fixture_graph(path, single_io=False, finish=finish, engine=engine)
+
+
+def _engine_resolver(analysis: ModelAnalysis, engine: EngineType | None, facts) -> ResolverPlan:
+    if engine is EngineType.HELIA_AOT:
+        return ResolverPlan(mode="engine", registrations=())
+    if engine is EngineType.HELIA_RT and (facts[0] or facts[2] != 1):
+        raise ValueError("helia-rt fixture resource/multiple-subgraph integration is unavailable")
+    return build_fixture_resolver_plan(
+        analysis, allow_state=engine is EngineType.TFLM, additional_ops=facts[4]
+    )
+
+
+def analyze_typed_fixture_model(path: Path) -> TypedFixtureModelAnalysis:
+    """Read a model through the legacy stateless fixture admission contract."""
+    return _analyze_typed_fixture_model(path, None)
+
+
+def analyze_typed_fixture_model_for_engine(
+    path: Path, *, engine: EngineType
+) -> TypedFixtureModelAnalysis:
+    """Validate selected public IO and delegate internal compatibility to the engine."""
+    if engine not in (EngineType.HELIA_AOT, EngineType.TFLM, EngineType.HELIA_RT):
+        raise ValueError("Explicit supported fixture engine required")
+    return _analyze_typed_fixture_model(path, engine)

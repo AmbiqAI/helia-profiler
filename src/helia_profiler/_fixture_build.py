@@ -23,7 +23,7 @@ from .fixture_analysis import (
     PerAxisQuantization,
     TypedFixtureModelAnalysis,
     analyze_fixture_model,
-    analyze_typed_fixture_model,
+    analyze_typed_fixture_model_for_engine,
 )
 from .fixture_image import MAX_IMAGE, MRAM, bounded
 from .fixture_runtime import (
@@ -42,6 +42,12 @@ from .runtime_records import RuntimeQualification, qualification, runtimes
 class FixtureTimingScope(StrEnum):
     INVOKE_ONLY = "invoke_only"
     RESTORE_AND_INVOKE = "restore_and_invoke"
+
+
+class FixtureStatePolicy(StrEnum):
+    """Internal state behavior; input restoration is independent of this policy."""
+
+    CARRY = "carry"
 
 
 class FixtureRole(StrEnum):
@@ -70,13 +76,21 @@ class FixtureBackend(StrEnum):
 
 @dataclass(frozen=True)
 class FixtureMethod:
-    """Select whether fixed-input restoration is included in the timed interval."""
+    """Select input-restoration timing and declare internal-state carry explicitly.
+
+    Carry initializes the engine once, then retains internal state through
+    warmups and measurements. Fixed external inputs are still restored each
+    invocation; no internal reset or source-initializer equivalence is implied.
+    """
 
     timing_scope: FixtureTimingScope
+    state_policy: FixtureStatePolicy | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.timing_scope, FixtureTimingScope):
             raise ValueError("Explicit FixtureTimingScope required")
+        if self.state_policy is not None and not isinstance(self.state_policy, FixtureStatePolicy):
+            raise ValueError("Explicit FixtureStatePolicy required")
 
 
 @dataclass(frozen=True)
@@ -277,6 +291,13 @@ class TypedFixture:
         ).hexdigest()
 
 
+def _validate_state_policy(model, engine: EngineType, method: FixtureMethod) -> None:
+    if model.has_internal_state and method.state_policy is not FixtureStatePolicy.CARRY:
+        raise ConfigError(
+            "Internal-state fixtures require explicit carry policy; inputs restore separately"
+        )
+
+
 def _check_typed_fixture(
     fixture: TypedFixture, model: TypedFixtureModelAnalysis, engine: EngineType
 ) -> tuple[tuple[str, FixtureCapability], ...]:
@@ -355,6 +376,8 @@ class FixtureBuild:
     engine_source: EngineSource | None = None
     #: Exact dependency state retained beside the per-build lock snapshot.
     dependency_state: FixtureFile | None = None
+    state_policy: FixtureStatePolicy | None = None
+    source_initializer_present: bool = False
 
 
 @dataclass(frozen=True)
@@ -552,16 +575,19 @@ def _build(
     _validate(config, fixture)
     model: FixtureModelAnalysis | TypedFixtureModelAnalysis
     if isinstance(fixture, TypedFixture):
-        model = analyze_typed_fixture_model(fixture.model.path)
+        model = analyze_typed_fixture_model_for_engine(
+            fixture.model.path, engine=config.engine.type
+        )
         capabilities = _check_typed_fixture(fixture, model, config.engine.type)
     else:
-        model = analyze_fixture_model(fixture.model.path)
+        model = analyze_fixture_model(fixture.model.path, _engine=config.engine.type)
         if (fixture.input_tensor, fixture.output_tensor) != (
             model.input_tensor,
             model.output_tensor,
         ):
             raise ConfigError("Fixture tensor declarations differ from analyzed model")
         capabilities = (("int8", FIXTURE_CAPABILITIES[config.engine.type]["int8"]),)
+    _validate_state_policy(model, config.engine.type, method)
     if config.engine.type in PREPARED_RUNTIME_ENGINES:
         stack, backend = PREPARED_RUNTIME_ENGINES[config.engine.type]
         if runtime is None or config.engine.backend != backend:
@@ -590,6 +616,8 @@ def _build(
             json.dumps(serialize_config(config), sort_keys=True).encode()
         ).hexdigest(),
     }
+    if method.state_policy is not None:
+        identity["state_policy"] = method.state_policy.value
     if observe_aot_arenas:
         identity["observe_aot_arenas"] = True
 
@@ -754,4 +782,6 @@ def _build(
         else (),
         engine_source=_engine_source(config.engine.type),
         dependency_state=dependency_state,
+        state_policy=method.state_policy,
+        source_initializer_present=model.has_initializer,
     )

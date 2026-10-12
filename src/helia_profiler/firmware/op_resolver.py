@@ -191,9 +191,14 @@ def build_resolver_plan(
     )
 
 
-def build_fixture_resolver_plan(model_analysis: ModelAnalysis) -> ResolverPlan:
+def build_fixture_resolver_plan(
+    model_analysis: ModelAnalysis,
+    *,
+    allow_state: bool = False,
+    additional_ops: tuple[str, ...] = (),
+) -> ResolverPlan:
     """Register only supported stateless operators present in a fixture model."""
-    names = {layer.op for layer in model_analysis.layers}
+    names = {layer.op for layer in model_analysis.layers} | set(additional_ops)
     stateful = {
         "ASSIGN_VARIABLE",
         "READ_VARIABLE",
@@ -202,7 +207,9 @@ def build_fixture_resolver_plan(model_analysis: ModelAnalysis) -> ResolverPlan:
         "SVDF",
         "UNIDIRECTIONAL_SEQUENCE_LSTM",
     }
-    unsupported = sorted(names - _ALL_BY_NAME.keys() | (names & stateful))
+    unsupported = sorted(
+        names - _ALL_BY_NAME.keys() | (names & stateful if not allow_state else set())
+    )
     if unsupported:
         raise ValueError(f"Unsupported fixture operators: {', '.join(unsupported)}")
     return ResolverPlan(

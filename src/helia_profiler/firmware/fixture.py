@@ -108,6 +108,8 @@ def fixture_template_vars(ctx: PipelineContext, regions: list[ArenaRegion]) -> d
         "fixture_outputs": _fixture_io(spec, inputs=False),
         "fixture_aot": ctx.config.engine.type is EngineType.HELIA_AOT,
         "fixture_resolver": spec.model.resolver,
+        "fixture_subgraph_count": spec.model.subgraph_count,
+        "fixture_resource_variables": spec.model.resource_variable_count,
         "fixture_registrations": tuple(
             x.removeprefix("r.").removesuffix(";") for x in spec.model.resolver.registrations
         ),

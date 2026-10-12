@@ -1,7 +1,7 @@
 {
   "api_version": [
     3,
-    2
+    3
   ],
   "surface": {
     "ElfSection": {
@@ -314,6 +314,16 @@
           "dependency_state",
           "FixtureFile | None",
           "None"
+        ],
+        [
+          "state_policy",
+          "FixtureStatePolicy | None",
+          "None"
+        ],
+        [
+          "source_initializer_present",
+          "bool",
+          "False"
         ]
       ],
       "frozen": true,
@@ -827,6 +837,11 @@
           "timing_scope",
           "FixtureTimingScope",
           "<required>"
+        ],
+        [
+          "state_policy",
+          "FixtureStatePolicy | None",
+          "None"
         ]
       ],
       "frozen": true,
@@ -900,6 +915,13 @@
         "SRAM_CONFIG": -2,
         "STIMER": -8,
         "TIMING_BOUND": -9
+      }
+    },
+    "FixtureStatePolicy": {
+      "base": "str",
+      "kind": "enum",
+      "members": {
+        "CARRY": "carry"
       }
     },
     "FixtureTarget": {
@@ -1480,6 +1502,26 @@
           "resolver",
           "ResolverPlan",
           "<required>"
+        ],
+        [
+          "has_internal_state",
+          "bool",
+          "False"
+        ],
+        [
+          "has_initializer",
+          "bool",
+          "False"
+        ],
+        [
+          "subgraph_count",
+          "int",
+          "1"
+        ],
+        [
+          "resource_variable_count",
+          "int",
+          "0"
         ]
       ],
       "frozen": true,
@@ -1523,6 +1565,10 @@
     "analyze_typed_fixture_model": {
       "kind": "function",
       "signature": "(path: 'Path') -> 'TypedFixtureModelAnalysis'"
+    },
+    "analyze_typed_fixture_model_for_engine": {
+      "kind": "function",
+      "signature": "(path: 'Path', *, engine: 'EngineType') -> 'TypedFixtureModelAnalysis'"
     },
     "build_fixed_fixture": {
       "kind": "function",
