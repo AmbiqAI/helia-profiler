@@ -74,10 +74,13 @@ def analyzed(f, ops=("CONV_2D", "RESHAPE")):
     )
 
 
-def mock_analysis(monkeypatch, f):
-    monkeypatch.setattr(
-        "helia_profiler._fixture_build.analyze_fixture_model", lambda _, **kwargs: analyzed(f)
-    )
+def mock_analysis(monkeypatch, f, engine):
+    def analyze(path, *, _engine):
+        assert path == f.model.path
+        assert _engine is engine
+        return analyzed(f)
+
+    monkeypatch.setattr("helia_profiler._fixture_build.analyze_fixture_model", analyze)
 
 
 def runtime(tmp_path):
@@ -132,7 +135,7 @@ def test_host_only_stage_selection_and_source_receipt(
 ):
     c, f = fixture(tmp_path)
     rt = runtime(tmp_path)
-    mock_analysis(monkeypatch, f)
+    mock_analysis(monkeypatch, f, engine)
     c = replace(c, engine=EngineConfig(type=engine, backend="cmsis_nn"))
     selected_runtime = rt if engine is EngineType.TFLM else None
     calls = []
@@ -175,6 +178,7 @@ def test_host_only_stage_selection_and_source_receipt(
                 json.dumps({"lock": {"mode": "resolved" if len(calls) == 2 else "reused"}})
             )
             return SimpleNamespace(
+                config=config,
                 memory_plan=MemoryPlan(engine=engine),
                 engine_artifacts=(
                     SimpleNamespace(memory_plan=MemoryPlan(engine=engine))
@@ -258,6 +262,7 @@ def test_host_only_stage_selection_and_source_receipt(
         )
 
     assert r.engine is engine
+    assert r.psram_weights is None
     assert (r.runtime_manifest is not None) == (engine is EngineType.TFLM)
     for altered_config, altered_method in (
         (c, FixtureMethod(FixtureTimingScope.INVOKE_ONLY)),
@@ -443,7 +448,9 @@ def test_external_aot_arena_mode_rejected(tmp_path):
         helia_aot_version="test",
         aot_allocate_arenas=False,
     )
-    with pytest.raises(Exception, match="External AOT arenas"):
+    from helia_profiler.errors import ConfigError
+
+    with pytest.raises(ConfigError, match="external AOT binding currently requires PSRAM"):
         fixture_template_vars(ctx, [])
 
 
@@ -455,7 +462,7 @@ def test_build_refuses_a_flat_image_capture_cannot_flash(tmp_path, monkeypatch, 
     from helia_profiler.errors import ConfigError
 
     c, f = fixture(tmp_path)
-    mock_analysis(monkeypatch, f)
+    mock_analysis(monkeypatch, f, EngineType.HELIA_AOT)
     c = replace(c, engine=EngineConfig(type=EngineType.HELIA_AOT))
 
     class Runner:
@@ -473,6 +480,7 @@ def test_build_refuses_a_flat_image_capture_cannot_flash(tmp_path, monkeypatch, 
             (app / "nsx.lock").write_text("lock")
             (app / "hpx-dependencies.json").write_text("{}")
             return SimpleNamespace(
+                config=config,
                 memory_plan=MemoryPlan(engine=config.engine.type),
                 engine_artifacts=None,
                 run_metadata=RunMetadata(toolchain=ToolchainInfo("atfe", "22.1.0")),

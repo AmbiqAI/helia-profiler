@@ -288,6 +288,7 @@ def _runner(tmp_path, calls, regions=()):
             (app / "src").mkdir(parents=True, exist_ok=True)
             (app / "src" / "main.cc").write_text("main")
             return SimpleNamespace(
+                config=config,
                 memory_plan=MemoryPlan(engine=config.engine.type),
                 engine_artifacts=HeliaAotArtifacts(
                     engine_header="m.h",

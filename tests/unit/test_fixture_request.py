@@ -125,8 +125,8 @@ def test_convert_arguments_must_be_a_json_object(text: str) -> None:
             },
             "heliaAOT fixtures only",
         ),
-        ({"placement": FixturePlacement(arena=Placement.TCM)}, "placement requires"),
-        ({"placement": FixturePlacement(weights=Placement.TCM)}, "placement requires"),
+        ({"placement": FixturePlacement(arena=Placement.MRAM)}, "writable static SRAM or DTCM"),
+        ({"placement": FixturePlacement(arena=Placement.PSRAM)}, "writable static SRAM or DTCM"),
         ({"engine": EngineType.EXECUTORCH}, "no fixed-fixture build"),
     ],
 )
@@ -135,6 +135,41 @@ def test_requests_outside_the_qualified_contract_are_refused(
 ) -> None:
     with pytest.raises(ConfigError, match=message):
         _request(tmp_path, **changes)
+
+
+@pytest.mark.parametrize("engine", [EngineType.HELIA_AOT, EngineType.TFLM])
+@pytest.mark.parametrize(
+    "placement",
+    [
+        FixturePlacement(arena=Placement.TCM),
+        FixturePlacement(weights=Placement.TCM),
+        FixturePlacement(arena=Placement.TCM, weights=Placement.PSRAM),
+    ],
+)
+def test_requests_forward_independent_supported_banks(tmp_path, engine, placement):
+    changes = {"engine": engine, "placement": placement}
+    if engine is EngineType.TFLM:
+        changes.update(
+            backend=FixtureBackend.CMSIS_NN,
+            runtime=_runtime(tmp_path / "runtime", b"{}"),
+        )
+    request = _request(tmp_path, **changes)
+    config = request.to_config()
+    assert request.placement == placement
+    assert config.engine.type is engine
+    assert config.model.arena_location is placement.arena
+    assert config.model.weights_location is placement.weights
+    assert request.intent_identity != replace(request, placement=FixturePlacement()).intent_identity
+
+
+def test_requests_refuse_psram_weights_without_an_implemented_loader(tmp_path):
+    with pytest.raises(ConfigError, match="Self-loading PSRAM fixtures"):
+        _request(
+            tmp_path,
+            engine=EngineType.HELIA_RT,
+            backend=FixtureBackend.HELIA,
+            placement=FixturePlacement(weights=Placement.PSRAM),
+        )
 
 
 def test_request_config_carries_every_setting(tmp_path: Path) -> None:

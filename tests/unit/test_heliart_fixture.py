@@ -290,6 +290,15 @@ def _config(tmp_path, f, engine=EngineType.HELIA_RT, backend="helia"):
     )
 
 
+def _mock_analysis(monkeypatch, f, analysis, engine=EngineType.HELIA_RT):
+    def analyze(path, *, _engine):
+        assert path == f.model.path
+        assert _engine is engine
+        return analysis
+
+    monkeypatch.setattr("helia_profiler._fixture_build.analyze_fixture_model", analyze)
+
+
 def _runner(tmp_path, rt, calls, *, lock_modules, map_lines):
     class Runner:
         def __init__(self, stages):
@@ -311,6 +320,7 @@ def _runner(tmp_path, rt, calls, *, lock_modules, map_lines):
             (app / "nsx.lock").write_text("targets:\n  apollo510_evb:\n    modules:\n" + modules)
             (app / "hpx-dependencies.json").write_text("{}")
             return SimpleNamespace(
+                config=config,
                 memory_plan=MemoryPlan(engine=config.engine.type),
                 engine_artifacts=None,
                 run_metadata=RunMetadata(
@@ -332,7 +342,7 @@ def test_heliart_build_links_and_proves_the_prepared_archive(tmp_path, monkeypat
     f, analysis = _fixture(tmp_path)
     rt = runtime(tmp_path / "rt")
     calls = []
-    monkeypatch.setattr("helia_profiler._fixture_build.analyze_fixture_model", lambda _: analysis)
+    _mock_analysis(monkeypatch, f, analysis)
     monkeypatch.setattr(
         "helia_profiler._fixture_build.PipelineRunner",
         _runner(tmp_path, rt, calls, lock_modules=GOOD_LOCK, map_lines=GOOD_MAP),
@@ -375,7 +385,7 @@ def test_heliart_build_refuses_any_other_runtime_provider(
 ):
     f, analysis = _fixture(tmp_path)
     rt = runtime(tmp_path / "rt")
-    monkeypatch.setattr("helia_profiler._fixture_build.analyze_fixture_model", lambda _: analysis)
+    _mock_analysis(monkeypatch, f, analysis)
     monkeypatch.setattr(
         "helia_profiler._fixture_build.PipelineRunner",
         _runner(tmp_path, rt, [], lock_modules=lock, map_lines=map_lines),
@@ -413,7 +423,7 @@ def test_heliart_proof_reads_inputs_below_the_app_not_above_it(
     ]
     if extra:
         lines.append(f"{root}/{extra}")
-    monkeypatch.setattr("helia_profiler._fixture_build.analyze_fixture_model", lambda _: analysis)
+    _mock_analysis(monkeypatch, f, analysis)
     monkeypatch.setattr(
         "helia_profiler._fixture_build.PipelineRunner",
         _runner(work, rt, [], lock_modules=GOOD_LOCK, map_lines=lines),
@@ -440,7 +450,7 @@ def test_engine_and_prepared_stack_must_agree(
     tmp_path, monkeypatch, engine, backend, schema, match
 ):
     f, analysis = _fixture(tmp_path)
-    monkeypatch.setattr("helia_profiler._fixture_build.analyze_fixture_model", lambda _: analysis)
+    _mock_analysis(monkeypatch, f, analysis, engine)
     monkeypatch.setattr(
         "helia_profiler._fixture_build.PipelineRunner", lambda *_: pytest.fail("pipeline reached")
     )
@@ -452,7 +462,7 @@ def test_engine_and_prepared_stack_must_agree(
 def test_upstream_build_still_refuses_a_heliart_module(tmp_path, monkeypatch):
     f, analysis = _fixture(tmp_path)
     rt = runtime(tmp_path / "rt", schema=1)
-    monkeypatch.setattr("helia_profiler._fixture_build.analyze_fixture_model", lambda _: analysis)
+    _mock_analysis(monkeypatch, f, analysis, EngineType.TFLM)
 
     class Runner:
         def __init__(self, stages):
@@ -475,6 +485,7 @@ def test_upstream_build_still_refuses_a_heliart_module(tmp_path, monkeypatch):
             )
             (app / "hpx-dependencies.json").write_text("{}")
             return SimpleNamespace(
+                config=config,
                 memory_plan=MemoryPlan(engine=config.engine.type),
                 engine_artifacts=None,
                 run_metadata=RunMetadata(toolchain=ToolchainInfo("atfe", "22.1.0")),
