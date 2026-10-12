@@ -96,7 +96,7 @@ from helia_profiler.firmware.op_resolver import _ALL_REGISTRATIONS  # noqa: E402
 
 from .fixture_compile_cases import (  # noqa: E402
     FIXTURE_ENGINES,
-    FIXTURE_KINDS,
+    FIXTURE_KIND_ENGINES,
     FIXTURE_SCOPES,
     render_fixture,
 )
@@ -328,18 +328,17 @@ def _build_cases() -> list[_CompileCase]:
             )
         )
 
-    for kind in FIXTURE_KINDS:
-        for engine in FIXTURE_ENGINES:
-            for scope in FIXTURE_SCOPES:
-                text, headers = render_fixture(kind, engine, scope)
-                cases.append(
-                    _CompileCase(
-                        case_id=f"fixture:{kind}|{engine}|{scope}",
-                        text=text,
-                        vars=_common_kwargs("apollo510", "rtt"),
-                        headers=headers,
-                    )
+    for kind, engine in FIXTURE_KIND_ENGINES:
+        for scope in FIXTURE_SCOPES:
+            text, headers = render_fixture(kind, engine, scope)
+            cases.append(
+                _CompileCase(
+                    case_id=f"fixture:{kind}|{engine}|{scope}",
+                    text=text,
+                    vars=_common_kwargs("apollo510", "rtt"),
+                    headers=headers,
                 )
+            )
     return cases
 
 

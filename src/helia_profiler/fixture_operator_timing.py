@@ -65,6 +65,8 @@ def _identity_reason(
     profile: ProfileResult,
     allow_runtime: bool,
 ) -> str | None:
+    if build.state_policy is not None:
+        return "state_policy_not_bound_by_profile"
     meta = profile.metadata
     snapshot = meta.config_snapshot or {}
     model = snapshot.get("model") or {}

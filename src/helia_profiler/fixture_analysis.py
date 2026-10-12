@@ -8,7 +8,11 @@ from pathlib import Path
 from typing import Any
 
 from .engines import EngineType
-from .firmware.op_resolver import ResolverPlan, build_fixture_resolver_plan
+from .firmware.op_resolver import (
+    FIXTURE_STATEFUL_OPERATORS,
+    ResolverPlan,
+    build_fixture_resolver_plan,
+)
 from .modelcost import model_analysis
 from .modelcost.model_analysis import ModelAnalysis
 
@@ -109,6 +113,7 @@ class FixtureModelAnalysis:
     has_initializer: bool = False
     subgraph_count: int = 1
     resource_variable_count: int = 0
+    has_float16: bool = False
 
     @property
     def input_bytes(self) -> int:
@@ -179,6 +184,7 @@ def _read_fixture_graph(path: Path, *, single_io: bool, finish, engine: EngineTy
             raise ValueError("Fixture model requires at least one input and one output")
         has_internal_state = False
         has_initializer = False
+        has_float16 = False
         resource_variable_count = 0
         operator_names: set[str] = set()
         for subgraph in range(model.SubgraphsLength()):
@@ -196,6 +202,7 @@ def _read_fixture_graph(path: Path, *, single_io: bool, finish, engine: EngineTy
                     schema.TensorType.VARIANT,
                 )
                 has_internal_state |= stateful
+                has_float16 |= tensor.Type() == schema.TensorType.FLOAT16
                 if engine is None and stateful:
                     raise ValueError("Variable or stateful fixture tensors are unsupported")
                 shape = tuple(tensor.Shape(i) for i in range(tensor.ShapeLength()))
@@ -221,7 +228,9 @@ def _read_fixture_graph(path: Path, *, single_io: bool, finish, engine: EngineTy
                     raise ValueError("Invalid fixture operator code index")
                 code = model.OperatorCodes(op.OpcodeIndex())
                 builtin = code.BuiltinCode() or code.DeprecatedBuiltinCode()
-                operator_names.add(model_analysis._op_name(builtin))
+                name = model_analysis._op_name(builtin)
+                operator_names.add(name)
+                has_internal_state |= name in FIXTURE_STATEFUL_OPERATORS
                 has_initializer |= builtin == schema.BuiltinOperator.CALL_ONCE
                 resource_variable_count += builtin == schema.BuiltinOperator.VAR_HANDLE
                 for position in range(op.MutatingVariableInputsLength()):
@@ -244,6 +253,7 @@ def _read_fixture_graph(path: Path, *, single_io: bool, finish, engine: EngineTy
             model.SubgraphsLength(),
             resource_variable_count,
             tuple(sorted(operator_names)),
+            has_float16,
         )
         analysis = model_analysis.analyze_model(path)
         if analysis is None:
@@ -265,7 +275,17 @@ def analyze_fixture_model(path: Path, *, _engine: EngineType | None = None) -> F
         input_tensor = _io_tensor(graph, graph.Inputs(0), schema.TensorType.INT8)
         output_tensor = _io_tensor(graph, graph.Outputs(0), schema.TensorType.INT8)
         resolver = _engine_resolver(analysis, _engine, facts)
-        return FixtureModelAnalysis(input_tensor, output_tensor, analysis, resolver, *facts[:4])
+        return FixtureModelAnalysis(
+            input_tensor,
+            output_tensor,
+            analysis,
+            resolver,
+            has_internal_state=facts[0],
+            has_initializer=facts[1],
+            subgraph_count=facts[2],
+            resource_variable_count=facts[3],
+            has_float16=facts[5],
+        )
 
     return _read_fixture_graph(path, single_io=True, finish=finish, engine=_engine)
 
@@ -328,13 +348,13 @@ def _analyze_typed_fixture_model(
         return TypedFixtureModelAnalysis(
             tuple(tensor(graph.Inputs(i)) for i in range(graph.InputsLength())),
             tuple(tensor(graph.Outputs(i)) for i in range(graph.OutputsLength())),
-            any(
-                graph.Tensors(i).Type() == schema.TensorType.FLOAT16
-                for i in range(graph.TensorsLength())
-            ),
+            facts[5],
             analysis,
             _engine_resolver(analysis, engine, facts),
-            *facts[:4],
+            has_internal_state=facts[0],
+            has_initializer=facts[1],
+            subgraph_count=facts[2],
+            resource_variable_count=facts[3],
         )
 
     return _read_fixture_graph(path, single_io=False, finish=finish, engine=engine)
@@ -359,6 +379,10 @@ def analyze_typed_fixture_model_for_engine(
     path: Path, *, engine: EngineType
 ) -> TypedFixtureModelAnalysis:
     """Validate selected public IO and delegate internal compatibility to the engine."""
-    if engine not in (EngineType.HELIA_AOT, EngineType.TFLM, EngineType.HELIA_RT):
+    if not isinstance(engine, EngineType) or engine not in (
+        EngineType.HELIA_AOT,
+        EngineType.TFLM,
+        EngineType.HELIA_RT,
+    ):
         raise ValueError("Explicit supported fixture engine required")
     return _analyze_typed_fixture_model(path, engine)

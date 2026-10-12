@@ -11,6 +11,7 @@ from helia_profiler._fixture_build import (
     FixtureMethod,
     FixtureRenderSpec,
     FixtureRole,
+    FixtureStatePolicy,
     FixtureTimingScope,
     Int8Tensor,
     TypedFixture,
@@ -35,6 +36,9 @@ from helia_profiler.placement import ArenaRole, Placement
 FIXTURE_KINDS = ("tcn", "kws", "typed")
 FIXTURE_ENGINES = ("tflm", "helia-rt", "helia-aot")
 FIXTURE_SCOPES = ("restore_and_invoke", "invoke_only")
+FIXTURE_KIND_ENGINES = tuple(
+    (kind, engine) for kind in FIXTURE_KINDS for engine in FIXTURE_ENGINES
+) + (("resource", "tflm"), ("resource", "helia-aot"))
 
 
 def render_fixture(
@@ -46,8 +50,10 @@ def render_fixture(
     placement: FixturePlacement = FixturePlacement(),
 ) -> tuple[str, dict[str, str]]:
     """Render production fixture sources from representative tensor metadata."""
-    if kind == "typed":
-        return _render_typed(engine, scope, aot_prefix=aot_prefix, placement=placement)
+    if kind in ("typed", "resource"):
+        return _render_typed(
+            engine, scope, aot_prefix=aot_prefix, placement=placement, resource=kind == "resource"
+        )
     if kind == "tcn":
         inp = Int8Tensor((1, 240, 14), 0.007843011990189552, -1, 0)
         out = Int8Tensor((1, 240, 2), 0.003640471724793315, -31, 72)
@@ -116,7 +122,7 @@ _TYPED_OUTPUTS = (
 
 
 def _render_typed(
-    engine: str, scope: str, *, aot_prefix: str, placement: FixturePlacement
+    engine: str, scope: str, *, aot_prefix: str, placement: FixturePlacement, resource: bool = False
 ) -> tuple[str, dict[str, str]]:
     """Render mixed-dtype inputs and outputs; heliaAOT also scans its scratch arena."""
     aot = EngineType(engine) is EngineType.HELIA_AOT
@@ -158,13 +164,31 @@ def _render_typed(
         )
         ctx.fixture = FixtureRenderSpec(
             fixture,
-            FixtureMethod(FixtureTimingScope(scope)),
+            FixtureMethod(
+                FixtureTimingScope(scope), FixtureStatePolicy.CARRY if resource else None
+            ),
             TypedFixtureModelAnalysis(
                 _TYPED_INPUTS,
                 _TYPED_OUTPUTS,
                 False,
                 ModelAnalysis([], 0, 0, 0),
-                ResolverPlan("auto", ("r.AddFullyConnected();", "r.AddSoftmax();")),
+                ResolverPlan(
+                    "auto",
+                    (
+                        "r.AddFullyConnected();",
+                        "r.AddSoftmax();",
+                        "r.AddVarHandle();",
+                        "r.AddCallOnce();",
+                        "r.AddReadVariable();",
+                        "r.AddAssignVariable();",
+                    )
+                    if resource
+                    else ("r.AddFullyConnected();", "r.AddSoftmax();"),
+                ),
+                has_internal_state=resource,
+                has_initializer=resource,
+                subgraph_count=2 if resource else 1,
+                resource_variable_count=20 if resource else 0,
             ),
             observe_aot_arenas=aot,
         )

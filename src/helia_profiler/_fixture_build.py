@@ -291,7 +291,13 @@ class TypedFixture:
         ).hexdigest()
 
 
+def _validate_engine_dtype(model, engine: EngineType) -> None:
+    if engine is EngineType.TFLM and model.has_float16:
+        raise ConfigError("The upstream TFLM runtime has no float16 support")
+
+
 def _validate_state_policy(model, engine: EngineType, method: FixtureMethod) -> None:
+    _validate_engine_dtype(model, engine)
     if model.has_internal_state and method.state_policy is not FixtureStatePolicy.CARRY:
         raise ConfigError(
             "Internal-state fixtures require explicit carry policy; inputs restore separately"
@@ -314,8 +320,7 @@ def _check_typed_fixture(
             f"Fixture outputs total {model.output_bytes} B, above the "
             f"{FIXTURE_READBACK_BUDGET} B readback budget"
         )
-    if engine is EngineType.TFLM and model.has_float16:
-        raise ConfigError("The upstream TFLM runtime has no float16 support")
+    _validate_engine_dtype(model, engine)
     table = FIXTURE_CAPABILITIES[engine]
     tensors = (*model.inputs, *model.outputs)
     # Device passes so far cover one input and one output with per-tensor

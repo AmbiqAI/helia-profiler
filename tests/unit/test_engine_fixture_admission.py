@@ -9,6 +9,7 @@ from test_typed_fixture_analysis import typed_model
 
 from helia_profiler import fixture as api
 from helia_profiler._fixture_build import _check_typed_fixture, _validate_state_policy
+from helia_profiler.errors import ConfigError
 from helia_profiler.fixture_analysis import analyze_fixture_model
 
 F32 = ("x", "float32", (1, 4), None, None)
@@ -94,7 +95,7 @@ def test_internal_state_requires_typed_policy_and_initializer_is_not_assumed(tmp
     assert model.has_internal_state
     with pytest.raises(ValueError, match="FixtureStatePolicy"):
         api.FixtureMethod(api.FixtureTimingScope.INVOKE_ONLY, cast(Any, "carry"))
-    with pytest.raises(Exception, match="explicit carry"):
+    with pytest.raises(ConfigError, match="explicit carry"):
         _validate_state_policy(
             model, api.EngineType.HELIA_AOT, api.FixtureMethod(api.FixtureTimingScope.INVOKE_ONLY)
         )
@@ -140,13 +141,13 @@ def test_output_transport_and_dtype_limits_remain(tmp_path):
         tuple(api.FixtureIO(t, file) for t in model.inputs),
         tuple(api.FixtureIO(t, file) for t in model.outputs),
     )
-    with pytest.raises(Exception, match="readback budget"):
+    with pytest.raises(ConfigError, match="readback budget"):
         _check_typed_fixture(fixture, model, api.EngineType.HELIA_AOT)
     mismatch = replace(
         fixture,
         outputs=(replace(fixture.outputs[0], tensor=replace(model.outputs[0], shape=(1, 4))),),
     )
-    with pytest.raises(Exception, match="declarations differ"):
+    with pytest.raises(ConfigError, match="declarations differ"):
         _check_typed_fixture(mismatch, model, api.EngineType.HELIA_AOT)
 
 
@@ -312,3 +313,68 @@ def test_resource_renderer_allocates_once_and_keeps_full_model(tmp_path):
     assert text.index("interpreter.AllocateTensors()") < text.index("for (unsigned i = 0;")
     assert "graph->inputs()->Get(0) != 0" in text
     assert "graph->outputs()->Get(0) != 1" in text
+
+
+@pytest.mark.parametrize("engine", [api.EngineType.HELIA_AOT, api.EngineType.TFLM])
+def test_stateful_operator_needs_carry_without_tensor_flags(tmp_path, engine):
+    from test_typed_fixture_analysis import s
+
+    def change(model, graph):
+        model.operatorCodes[0].builtinCode = s.BuiltinOperator.SVDF
+        model.operatorCodes[0].deprecatedBuiltinCode = s.BuiltinOperator.SVDF
+
+    path = typed_model(tmp_path, [F32], [Y32], change=change)
+    actual = api.analyze_typed_fixture_model_for_engine(path, engine=engine)
+    assert actual.has_internal_state
+    with pytest.raises(ConfigError, match="explicit carry"):
+        _validate_state_policy(
+            actual, engine, api.FixtureMethod(api.FixtureTimingScope.INVOKE_ONLY)
+        )
+
+
+def test_auxiliary_float16_is_part_of_micro_capability(tmp_path):
+    from test_typed_fixture_analysis import _tensor, s
+
+    def change(model, graph):
+        aux = s.SubGraphT()
+        aux.tensors = [_tensor("half", "float16", (1, 4), None, None)]
+        aux.inputs = []
+        aux.outputs = []
+        aux.operators = []
+        model.subgraphs.append(aux)
+
+    path = typed_model(tmp_path, [F32], [Y32], change=change)
+    actual = api.analyze_typed_fixture_model_for_engine(path, engine=api.EngineType.TFLM)
+    assert actual.has_float16
+    from helia_profiler.fixture_runtime import FixtureFile
+
+    file = FixtureFile(Path("unused"), "0" * 64)
+    fixture = api.TypedFixture(
+        file,
+        tuple(api.FixtureIO(t, file) for t in actual.inputs),
+        tuple(api.FixtureIO(t, file) for t in actual.outputs),
+    )
+    with pytest.raises(ConfigError, match="float16"):
+        _check_typed_fixture(fixture, actual, api.EngineType.TFLM)
+
+
+def test_carry_operator_attribution_is_refused_without_state_binding(tmp_path):
+    from test_fixture_operator_timing import KWS_SHA, build_for, fixture_for, profile
+
+    from helia_profiler.fixture_operator_timing import bind_operator_timing
+
+    fixture = fixture_for(KWS_SHA, tmp_path)
+    build = replace(
+        build_for(api.EngineType.HELIA_AOT, fixture), state_policy=api.FixtureStatePolicy.CARRY
+    )
+    actual = bind_operator_timing(build, fixture, profile("kws_aot"))
+    assert not actual.accepted
+    assert actual.reason == "state_policy_not_bound_by_profile"
+    assert actual.operators is None
+
+
+def test_engine_selection_is_a_typed_closed_set(tmp_path):
+    with pytest.raises(ValueError, match="Explicit supported fixture engine"):
+        api.analyze_typed_fixture_model_for_engine(
+            tmp_path / "unread", engine=cast(Any, "helia-aot")
+        )

@@ -15,15 +15,12 @@ from pathlib import Path
 
 import pytest
 
-from .fixture_compile_cases import FIXTURE_ENGINES, FIXTURE_KINDS, FIXTURE_SCOPES, render_fixture
+from .fixture_compile_cases import FIXTURE_KIND_ENGINES, FIXTURE_SCOPES, render_fixture
 
 _SNAPSHOT_PATH = Path(__file__).parent / "snapshots" / "fixture_render.json"
 _UPDATE = os.environ.get("HPX_UPDATE_SNAPSHOTS") == "1"
 _CASES = [
-    (kind, engine, scope)
-    for kind in FIXTURE_KINDS
-    for engine in FIXTURE_ENGINES
-    for scope in FIXTURE_SCOPES
+    (kind, engine, scope) for kind, engine in FIXTURE_KIND_ENGINES for scope in FIXTURE_SCOPES
 ]
 
 

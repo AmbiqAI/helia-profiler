@@ -58,7 +58,7 @@ from tests.contracts.test_firmware_render_snapshots import (
     _render,
 )
 
-from .fixture_compile_cases import FIXTURE_ENGINES, FIXTURE_KINDS, render_fixture
+from .fixture_compile_cases import FIXTURE_KIND_ENGINES, render_fixture
 
 # The matrix (D3) — one row per (workspace leg, target, render arm).
 # rtt-only: power/busy arms are rtt-only and transport variation is Tier 1's
@@ -199,8 +199,7 @@ _MATRIX: tuple[_HwCase, ...] = (
         "hpx_profiler",
         fixture_kind=kind,
     )
-    for kind in FIXTURE_KINDS
-    for engine in FIXTURE_ENGINES
+    for kind, engine in FIXTURE_KIND_ENGINES
 )
 
 
