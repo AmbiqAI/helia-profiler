@@ -395,6 +395,9 @@ typedef struct {
     void *user_data;
     fake_io_buffer_t inputs[4];
     fake_io_buffer_t outputs[4];
+    void **arena_buffers;
+    size_t *arena_sizes;
+    int8_t **tensor_ptrs;
 } fake_model_context_t;
 
 typedef int32_t fake_arena_region_t;
@@ -403,6 +406,10 @@ extern const void * const fake_arena_buffers[4];
 
 static const int fake_num_inputs = 1;
 static const int fake_num_outputs = 1;
+static const int fake_num_arena_buffers = 3;
+static const int fake_num_tensors = 1;
+typedef struct { uint32_t region; uint32_t offset; uint32_t size; } fake_tensor_descriptor_t;
+static const fake_tensor_descriptor_t fake_tensor_descriptors[1] = {{2, 0, 4}};
 
 static inline int32_t fake_model_init(fake_model_context_t *ctx) { (void)ctx; return 0; }
 static inline int32_t fake_model_run(fake_model_context_t *ctx) { (void)ctx; return 0; }

@@ -836,7 +836,9 @@ def test_fixture_real_toolchain_preparation_renders_current_sources(tmp_path, ca
     scratch, tus = _prepare_case(case, workspace, tmp_path)
     assert tus == [scratch / "main.cc"]
     text = tus[0].read_text(encoding="utf-8")
-    size = {"tcn": 480, "kws": 12, "typed": 4, "resource": 4}[case.fixture_kind]
+    size = {"tcn": 480, "kws": 12, "typed": 4, "resource": 4, "psram": 4, "psram-resource": 4}[
+        case.fixture_kind
+    ]
     assert f"deployment_output[{size}]" in text
     assert "hpx_stimer_init" in (scratch / "fixed_fixture_clock.h").read_text(encoding="utf-8")
     if case.engine == "helia-aot":
@@ -848,7 +850,7 @@ def test_fixture_real_toolchain_preparation_renders_current_sources(tmp_path, ca
         )
         assert (scratch / "model_data.h").read_text(encoding="utf-8") == "// model data\n"
 
-    if case.fixture_kind in ("typed", "resource"):
+    if case.fixture_kind in ("typed", "resource", "psram", "psram-resource"):
         assert "int main(" in text
         assert "static const uint8_t fixed_input_2[]" in text
         assert "std::memcpy(input_data_2, fixed_input_2, sizeof(fixed_input_2))" in text

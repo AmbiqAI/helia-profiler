@@ -18,7 +18,7 @@ from helia_profiler._fixture_build import (
 )
 from helia_profiler.config import load_config
 from helia_profiler.engines import EngineType
-from helia_profiler.engines.base import ArenaRegion
+from helia_profiler.engines.base import ArenaRegion, HeliaAotArtifacts
 from helia_profiler.firmware.fixture import fixture_template_vars, write_fixture_headers
 from helia_profiler.firmware.op_resolver import ResolverPlan
 from helia_profiler.firmware.render import _jinja_env
@@ -32,13 +32,18 @@ from helia_profiler.fixture_analysis import (
 from helia_profiler.modelcost import ModelAnalysis
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.placement import ArenaRole, Placement
+from helia_profiler.results.models import NsxModuleRef
 
 FIXTURE_KINDS = ("tcn", "kws", "typed")
 FIXTURE_ENGINES = ("tflm", "helia-rt", "helia-aot")
 FIXTURE_SCOPES = ("restore_and_invoke", "invoke_only")
 FIXTURE_KIND_ENGINES = tuple(
     (kind, engine) for kind in FIXTURE_KINDS for engine in FIXTURE_ENGINES
-) + (("resource", "tflm"), ("resource", "helia-aot"))
+) + tuple(
+    (kind, engine)
+    for kind in ("resource", "psram", "psram-resource")
+    for engine in ("tflm", "helia-aot")
+)
 
 
 def render_fixture(
@@ -50,9 +55,15 @@ def render_fixture(
     placement: FixturePlacement = FixturePlacement(),
 ) -> tuple[str, dict[str, str]]:
     """Render production fixture sources from representative tensor metadata."""
-    if kind in ("typed", "resource"):
+    if kind in ("typed", "resource", "psram", "psram-resource"):
+        if kind.startswith("psram"):
+            placement = FixturePlacement(Placement.SRAM, Placement.PSRAM)
         return _render_typed(
-            engine, scope, aot_prefix=aot_prefix, placement=placement, resource=kind == "resource"
+            engine,
+            scope,
+            aot_prefix=aot_prefix,
+            placement=placement,
+            resource=kind in ("resource", "psram-resource"),
         )
     if kind == "tcn":
         inp = Int8Tensor((1, 240, 14), 0.007843011990189552, -1, 0)
@@ -216,10 +227,44 @@ def _render_typed(
             if aot
             else []
         )
+        if aot and placement.weights is Placement.PSRAM:
+            (directory / "constant.bin").write_bytes(b"abcd")
+            regions.append(
+                ArenaRegion(
+                    2,
+                    "constant",
+                    4,
+                    16,
+                    ArenaRole.CONSTANT,
+                    "psram",
+                    Placement.PSRAM,
+                    "constant.bin",
+                )
+            )
+            ctx.engine_artifacts = HeliaAotArtifacts(
+                engine_header=f"{aot_prefix}_model.h",
+                aot_prefix=aot_prefix,
+                aot_module_name="fake",
+                aot_cmake_target="nsx::fake",
+                helia_aot_version="test",
+                aot_allocate_arenas=False,
+                aot_arena_regions=regions,
+                extra_modules=[NsxModuleRef("fake", directory)],
+            )
         values = fixture_template_vars(ctx, regions)
         text = _jinja_env.get_template("fixed_fixture.cc.j2").render(
-            **values, aot_prefix=aot_prefix, allocate_arenas=True, arena_regions=[]
+            **values,
+            aot_prefix=aot_prefix,
+            allocate_arenas=placement.weights is not Placement.PSRAM,
+            arena_regions=regions if placement.weights is Placement.PSRAM else [],
+            psram_clock_hz=ctx.config.target.psram.clock_hz,
         )
         write_fixture_headers(directory, ctx)
         headers = {p.name: p.read_text(encoding="utf-8") for p in directory.glob("*.h")}
+        if aot and placement.weights is Placement.PSRAM:
+            from helia_profiler.firmware.headers import _blob_to_header
+
+            headers["hpx_const_blob_2.h"] = _blob_to_header(
+                directory / "constant.bin", "hpx_const_blob_2"
+            )
     return text, headers

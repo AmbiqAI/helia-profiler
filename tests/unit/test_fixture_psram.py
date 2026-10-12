@@ -187,7 +187,7 @@ def test_psram_production_render_uses_active_consumer(tmp_path, engine):
     )
     assert source.index("if (!hpx_psram_start())") < source.index("if (!hpx_stimer_init())")
     assert "nsx_psram_write(offset, source, size)" in source
-    assert "size > hpx_psram_info.size_bytes - offset" in source
+    assert "size > hpx_psram_size - offset" in source
     if engine is EngineType.HELIA_AOT:
         assert source.index("fake_bind_arena") < source.index("fake_model_init")
         assert "model_ctx.arena_buffers[1] != hpx_arena_buf_1" in source
@@ -227,6 +227,10 @@ def test_psram_aot_fake_pipeline_derives_setting_before_prepare(tmp_path, monkey
     from helia_profiler.firmware.fixture import fixture_template_vars
 
     ctx, regions = render_context(tmp_path, EngineType.HELIA_AOT)
+    ctx.config = replace(
+        ctx.config,
+        engine=replace(ctx.config.engine, config={"aot_args": {"memory": {"planner": "greedy"}}}),
+    )
     monkeypatch.setattr(
         builder, "analyze_typed_fixture_model_for_engine", lambda *a, **kw: ctx.fixture.model
     )
@@ -239,6 +243,7 @@ def test_psram_aot_fake_pipeline_derives_setting_before_prepare(tmp_path, monkey
         def run(self, config):
             observed.append(config)
             assert config.engine.config["aot_args"]["memory"]["allocate_arenas"] is False
+            assert config.engine.config["aot_args"]["memory"]["planner"] == "greedy"
             # Fake artifacts only: no stage, converter, compiler or driver runs.
             ctx.config = config
             fixture_template_vars(ctx, regions)
@@ -263,6 +268,126 @@ def test_psram_aot_fake_pipeline_derives_setting_before_prepare(tmp_path, monkey
     assert result.psram_weights.image_sha256 is None
     assert result.binary is None and not result.built
     assert observed[0].model.weights_location is Placement.PSRAM
+
+
+@pytest.mark.parametrize("fixture_enabled", [False, True])
+def test_psram_micro_production_generator_stages_only_fixture_model(tmp_path, fixture_enabled):
+    import re
+
+    from helia_profiler.firmware import generate_app
+    from helia_profiler.results.dependencies import ContentDigest, DependencyWorkspace
+    from helia_profiler.stages.resolve_platform import ResolvePlatformStage
+
+    ctx, _ = render_context(tmp_path, EngineType.TFLM)
+    ctx.config = replace(ctx.config, build=replace(ctx.config.build, compiler_launcher="none"))
+    ResolvePlatformStage().run(ctx)
+    ctx.arena_region, ctx.weights_region = Placement.SRAM, Placement.PSRAM
+    ctx.dependency_workspace = DependencyWorkspace(
+        1, "fake", "fake", "fake", ContentDigest("sha256", "0" * 64), {}, tmp_path / "deps"
+    )
+    if not fixture_enabled:
+        ctx.fixture = None
+    # Real generation with fake prepared metadata: no dependency preparation,
+    # pipeline, model parser, compiler or session runs.
+    app = generate_app(ctx)
+    header = app / "src/model_data.h"
+    assert header.exists() is fixture_enabled
+    if fixture_enabled:
+        text = header.read_text()
+        assert bytes(int(x, 16) for x in re.findall(r"0x([0-9a-f]{2})", text)) == b"model"
+        assert "Placement: mram" in text and "static const unsigned char model_data[]" in text
+        assert "tflite::GetModel(active_model_data)" in (app / "src/main.cc").read_text()
+
+
+def test_psram_aot_oversized_blob_refuses_before_read(tmp_path, monkeypatch):
+    from helia_profiler.firmware.fixture import fixture_template_vars
+
+    ctx, regions = render_context(tmp_path, EngineType.HELIA_AOT)
+    regions[1] = replace(regions[1], size=64 * 1024 * 1024 + 1)
+    original_open = type(tmp_path).open
+
+    def reject_blob(path, *args, **kwargs):
+        if path.name == "weights.bin":
+            pytest.fail("oversized blob read")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(type(tmp_path), "open", reject_blob)
+    with pytest.raises(ConfigError, match="bounded region"):
+        fixture_template_vars(ctx, regions)
+
+
+@pytest.mark.parametrize("engine", [EngineType.HELIA_AOT, EngineType.TFLM])
+def test_psram_memory_plan_books_staging_and_terminal(tmp_path, engine):
+    from helia_profiler.results import MemoryPlan
+    from helia_profiler.stages.plan_memory import PlanMemoryStage, _add_hpx_owned_consumers
+    from helia_profiler.stages.resolve_platform import ResolvePlatformStage
+
+    ctx, _ = render_context(tmp_path, engine)
+    ResolvePlatformStage().run(ctx)
+    ctx.arena_region, ctx.weights_region = Placement.SRAM, Placement.PSRAM
+    plan = (
+        MemoryPlan(engine=engine)
+        if engine is EngineType.HELIA_AOT
+        else PlanMemoryStage()._synthesise_plan(ctx)
+    )
+    plan = _add_hpx_owned_consumers(plan, ctx)
+    entries = {c.name: c for r in plan.regions for c in r.consumers}
+    assert entries["fixture_psram_terminal"].size == 48
+    assert entries["fixture_psram_state"].size == 12
+    staging = (
+        "mram_constant_source_1" if engine is EngineType.HELIA_AOT else "fixture_model_staging"
+    )
+    assert entries[staging].size == (4 if engine is EngineType.HELIA_AOT else 5)
+    assert _add_hpx_owned_consumers(plan, ctx) == plan
+
+
+def test_psram_aot_memory_plan_reuses_source_staging(tmp_path):
+    from helia_profiler.results import ConsumerKind, MemoryConsumer, MemoryPlan, MemoryRegionUsage
+    from helia_profiler.stages.plan_memory import _add_hpx_owned_consumers
+    from helia_profiler.stages.resolve_platform import ResolvePlatformStage
+
+    ctx, _ = render_context(tmp_path, EngineType.HELIA_AOT)
+    ResolvePlatformStage().run(ctx)
+    ctx.arena_region, ctx.weights_region = Placement.SRAM, Placement.PSRAM
+    plan = MemoryPlan(
+        engine=EngineType.HELIA_AOT,
+        regions=(
+            MemoryRegionUsage(
+                region=MemoryRegion.MRAM,
+                capacity=0,
+                used=4,
+                consumers=(
+                    MemoryConsumer(
+                        name="mram_constant_source_1",
+                        size=4,
+                        kind=ConsumerKind.WEIGHTS,
+                        symbol="engine_source",
+                    ),
+                ),
+            ),
+        ),
+    )
+    updated = _add_hpx_owned_consumers(plan, ctx)
+    mram = updated.region(MemoryRegion.MRAM)
+    assert mram is not None
+    staged = [c for c in mram.consumers if c.name == "mram_constant_source_1"]
+    assert len(staged) == 1 and staged[0].size == 4 and staged[0].symbol == "hpx_const_blob_1"
+
+
+@pytest.mark.parametrize("engine", ["helia-aot", "tflm"])
+@pytest.mark.parametrize("kind", ["psram", "psram-resource"])
+@pytest.mark.parametrize("scope", ["restore_and_invoke", "invoke_only"])
+def test_psram_shared_compile_cases_render_without_compiler(engine, kind, scope):
+    from tests.contracts.fixture_compile_cases import FIXTURE_KIND_ENGINES, render_fixture
+
+    assert (kind, engine) in FIXTURE_KIND_ENGINES
+    source, headers = render_fixture(kind, engine, scope)
+    assert "nsx_psram_init(&config)" in source
+    assert "deployment_psram_weights[12]" in source
+    if engine == "helia-aot":
+        assert "fake_bind_arena" in source and "hpx_const_blob_2.h" in headers
+    else:
+        assert "tflite::GetModel(active_model_data)" in source
 
 
 def test_psram_capture_rejects_unbound_descriptor_before_any_session(tmp_path, monkeypatch):

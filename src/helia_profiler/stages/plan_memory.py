@@ -33,6 +33,7 @@ because of the runtime upload handshake.
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 
 from ..config import DEFAULT_ARENA_SIZE_BYTES, Transport
 from ..engines import EngineType
@@ -154,6 +155,8 @@ class PlanMemoryStage:
                 model_bytes,
                 "weights",
             )
+            if ctx.fixture is not None and weight_phys is MemoryRegion.PSRAM:
+                add(MemoryRegion.MRAM, "fixture_model_staging", model_bytes, "weights")
 
         if engine_type is EngineType.EXECUTORCH and isinstance(artifacts, ExecutorchArtifacts):
             # The generated ExecuTorch runner owns several explicit buffers in
@@ -472,6 +475,64 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
         if engine_type is not EngineType.HELIA_AOT:
             sizes["fixture_memory"] = 8 * 4
         artifacts = ctx.engine_artifacts
+        if ctx.weights_region is Placement.PSRAM:
+            from ..firmware.fixture import fixture_psram_payloads
+
+            regions = (
+                artifacts.aot_arena_regions if isinstance(artifacts, HeliaAotArtifacts) else []
+            )
+            payloads = fixture_psram_payloads(ctx, regions)
+            sizes["fixture_psram_terminal"] = 4 * (8 + 4 * len(payloads))
+            # Three uint32_t statics: base, capacity and next allocation offset.
+            sizes["fixture_psram_state"] = 12
+            if isinstance(artifacts, HeliaAotArtifacts):
+                mram = plan.region(MemoryRegion.MRAM)
+                existing = {c.name: c for c in mram.consumers} if mram else {}
+                offset = padding = 0
+                for payload in payloads:
+                    alignment = (-offset) % 64
+                    padding += alignment
+                    offset += alignment + payload.size
+                    name = f"mram_constant_source_{payload.region_id}"
+                    if name in existing and existing[name].size != payload.size:
+                        raise PlatformError("AOT PSRAM staging plan differs from pinned payload")
+                    if name in existing:
+                        plan = replace(
+                            plan,
+                            regions=tuple(
+                                replace(
+                                    r,
+                                    consumers=tuple(
+                                        replace(c, symbol=f"hpx_const_blob_{payload.region_id}")
+                                        if c.name == name
+                                        else c
+                                        for c in r.consumers
+                                    ),
+                                )
+                                if r.region is MemoryRegion.MRAM
+                                else r
+                                for r in plan.regions
+                            ),
+                        )
+                    additions.append(
+                        (
+                            MemoryRegion.MRAM,
+                            MemoryConsumer(
+                                name=name,
+                                size=payload.size,
+                                kind=ConsumerKind.WEIGHTS,
+                                symbol=f"hpx_const_blob_{payload.region_id}",
+                            ),
+                        )
+                    )
+                additions.append(
+                    (
+                        MemoryRegion.PSRAM,
+                        MemoryConsumer(
+                            name="fixture_psram_padding", size=padding, kind=ConsumerKind.OTHER
+                        ),
+                    )
+                )
         if fixture.observe_aot_arenas and isinstance(artifacts, HeliaAotArtifacts):
             scanned = [r for r in artifacts.aot_arena_regions if r.role is ArenaRole.SCRATCH]
             if scanned:

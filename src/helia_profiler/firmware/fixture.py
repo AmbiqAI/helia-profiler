@@ -196,7 +196,10 @@ def fixture_psram_payloads(
             blob = (module / region.blob_filename).resolve()
             if not blob.is_relative_to(module.resolve()):
                 raise ConfigError("PSRAM constant blob is outside the generated module")
-            data = blob.read_bytes()
+            if not 0 < region.size <= 64 * 1024 * 1024 or blob.stat().st_size != region.size:
+                raise ConfigError("PSRAM AOT blob size differs from bounded region")
+            with blob.open("rb") as stream:
+                data = stream.read(region.size + 1)
             if (
                 len(data) != region.size
                 or region.alignment <= 0

@@ -409,8 +409,9 @@ def generate_app(ctx: PipelineContext) -> Path:
             )
     else:
         # TFLM / heliaRT: embed model as byte array, use TFLM profiler.
-        if weights_region != "psram":
-            model_header = _model_to_header(config.model.path, weights_region)
+        if weights_region != "psram" or ctx.fixture is not None:
+            staging_region = Placement.MRAM if weights_region is Placement.PSRAM else weights_region
+            model_header = _model_to_header(config.model.path, staging_region)
             _write_text(src_dir / "model_data.h", model_header)
 
         _write_text(

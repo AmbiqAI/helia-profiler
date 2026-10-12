@@ -627,11 +627,14 @@ def _build(
         config.engine.type is EngineType.HELIA_AOT
         and config.model.weights_location is Placement.PSRAM
     ):
+        aot_args = dict(config.engine.config.get("aot_args", {}))
+        memory_args = dict(aot_args.get("memory", {}))
+        aot_args["memory"] = {**memory_args, "allocate_arenas": False}
         config = replace(
             config,
             engine=replace(
                 config.engine,
-                config={**config.engine.config, "aot_args": {"memory": {"allocate_arenas": False}}},
+                config={**config.engine.config, "aot_args": aot_args},
             ),
         )
     root.mkdir(parents=True, exist_ok=True)

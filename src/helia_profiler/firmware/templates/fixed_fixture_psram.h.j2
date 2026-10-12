@@ -1,7 +1,8 @@
 #include "nsx_psram.h"
 
 volatile uint32_t deployment_psram_weights[{{ 8 + 4 * (fixture_psram_payloads | length) }}];
-static nsx_psram_info_t hpx_psram_info = {};
+static uint32_t hpx_psram_base = 0;
+static uint32_t hpx_psram_size = 0;
 static uint32_t hpx_psram_offset = 0;
 
 static uint32_t hpx_psram_checksum(const volatile uint8_t *data, uint32_t size) {
@@ -11,6 +12,7 @@ static uint32_t hpx_psram_checksum(const volatile uint8_t *data, uint32_t size) 
 }
 
 static bool hpx_psram_start() {
+    nsx_psram_info_t hpx_psram_info = {};
     deployment_psram_weights[0] = UINT32_C(0x50535231);
     deployment_psram_weights[1] = 1;
     deployment_psram_weights[7] = {{ fixture_psram_payloads | length }};
@@ -28,6 +30,8 @@ static bool hpx_psram_start() {
     deployment_psram_weights[4] = hpx_psram_info.size_bytes;
     deployment_psram_weights[5] = hpx_psram_info.configured_clock_hz;
     deployment_psram_weights[6] = hpx_psram_info.xip_enabled ? 1U : 0U;
+    hpx_psram_base = hpx_psram_info.base_address;
+    hpx_psram_size = hpx_psram_info.size_bytes;
     return status == 0 && hpx_psram_info.state == NSX_PSRAM_STATE_READY &&
            hpx_psram_info.xip_enabled && (hpx_psram_info.capabilities & NSX_PSRAM_CAP_XIP) &&
            hpx_psram_info.base_address == {{ fixture_psram_base }}U &&
@@ -41,11 +45,11 @@ static bool hpx_psram_load(unsigned slot, uint32_t region, const uint8_t *source
     if (slot >= {{ fixture_psram_payloads | length }}U || !source || !active || !size ||
         hpx_psram_offset > UINT32_MAX - 63U) return false;
     uint32_t offset = (hpx_psram_offset + 63U) & ~UINT32_C(63);
-    if (offset > hpx_psram_info.size_bytes || size > hpx_psram_info.size_bytes - offset)
+    if (offset > hpx_psram_size || size > hpx_psram_size - offset)
         return false;
     if (nsx_psram_write(offset, source, size) != 0) return false;
     SCB_InvalidateDCache();
-    const auto *destination = reinterpret_cast<const uint8_t *>(hpx_psram_info.base_address + offset);
+    const auto *destination = reinterpret_cast<const uint8_t *>(hpx_psram_base + offset);
     uint32_t checksum = hpx_psram_checksum(destination, size);
     if (checksum != expected || hpx_psram_checksum(source, size) != expected) return false;
     deployment_psram_weights[8 + 4*slot] = region;

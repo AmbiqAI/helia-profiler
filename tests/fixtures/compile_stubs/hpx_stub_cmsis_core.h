@@ -51,6 +51,8 @@ static inline void SCB_CleanDCache_by_Addr(volatile void *addr, int32_t dsize) {
     (void)addr;
     (void)dsize;
 }
+static inline void SCB_CleanInvalidateDCache(void) {}
+static inline void SCB_InvalidateDCache(void) {}
 
 // --- Armv8-M PMU (M55 parts only; guarded by the per-part header) --------
 #if defined(HPX_STUB_HAS_ARMV8M_PMU)
