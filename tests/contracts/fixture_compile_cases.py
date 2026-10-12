@@ -41,7 +41,7 @@ FIXTURE_KIND_ENGINES = tuple(
     (kind, engine) for kind in FIXTURE_KINDS for engine in FIXTURE_ENGINES
 ) + tuple(
     (kind, engine)
-    for kind in ("resource", "psram", "psram-resource")
+    for kind in ("resource", "psram", "psram-resource", "psram-tcm", "psram-tcm-resource")
     for engine in ("tflm", "helia-aot")
 )
 
@@ -55,15 +55,17 @@ def render_fixture(
     placement: FixturePlacement = FixturePlacement(),
 ) -> tuple[str, dict[str, str]]:
     """Render production fixture sources from representative tensor metadata."""
-    if kind in ("typed", "resource", "psram", "psram-resource"):
+    if kind in ("typed", "resource", "psram", "psram-resource", "psram-tcm", "psram-tcm-resource"):
         if kind.startswith("psram"):
-            placement = FixturePlacement(Placement.SRAM, Placement.PSRAM)
+            placement = FixturePlacement(
+                Placement.TCM if "tcm" in kind else Placement.SRAM, Placement.PSRAM
+            )
         return _render_typed(
             engine,
             scope,
             aot_prefix=aot_prefix,
             placement=placement,
-            resource=kind in ("resource", "psram-resource"),
+            resource=kind.endswith("resource"),
         )
     if kind == "tcn":
         inp = Int8Tensor((1, 240, 14), 0.007843011990189552, -1, 0)

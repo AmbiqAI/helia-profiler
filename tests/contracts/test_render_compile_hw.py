@@ -607,6 +607,10 @@ def test_matrix_covers_every_engine_family():
         "510-helia-aot-fixture-psram",
         "510-tflm-fixture-psram-resource",
         "510-helia-aot-fixture-psram-resource",
+        "510-tflm-fixture-psram-tcm",
+        "510-helia-aot-fixture-psram-tcm",
+        "510-tflm-fixture-psram-tcm-resource",
+        "510-helia-aot-fixture-psram-tcm-resource",
     }, "the Tier-2 leg set changed — deliberate? update this pin with the reason"
 
 
@@ -842,9 +846,16 @@ def test_fixture_real_toolchain_preparation_renders_current_sources(tmp_path, ca
     scratch, tus = _prepare_case(case, workspace, tmp_path)
     assert tus == [scratch / "main.cc"]
     text = tus[0].read_text(encoding="utf-8")
-    size = {"tcn": 480, "kws": 12, "typed": 4, "resource": 4, "psram": 4, "psram-resource": 4}[
-        case.fixture_kind
-    ]
+    size = {
+        "tcn": 480,
+        "kws": 12,
+        "typed": 4,
+        "resource": 4,
+        "psram": 4,
+        "psram-resource": 4,
+        "psram-tcm": 4,
+        "psram-tcm-resource": 4,
+    }[case.fixture_kind]
     assert f"deployment_output[{size}]" in text
     assert "hpx_stimer_init" in (scratch / "fixed_fixture_clock.h").read_text(encoding="utf-8")
     if case.engine == "helia-aot":
@@ -856,7 +867,7 @@ def test_fixture_real_toolchain_preparation_renders_current_sources(tmp_path, ca
         )
         assert (scratch / "model_data.h").read_text(encoding="utf-8") == "// model data\n"
 
-    if case.fixture_kind in ("typed", "resource", "psram", "psram-resource"):
+    if case.fixture_kind in ("typed", "resource") or case.fixture_kind.startswith("psram"):
         assert "int main(" in text
         assert "static const uint8_t fixed_input_2[]" in text
         assert "std::memcpy(input_data_2, fixed_input_2, sizeof(fixed_input_2))" in text

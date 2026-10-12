@@ -9,6 +9,7 @@ import pytest
 from helia_profiler.errors import ConfigError
 from helia_profiler.fixture import (
     EngineType,
+    FixtureBackend,
     FixtureBuildRequest,
     FixtureFile,
     FixtureIO,
@@ -18,6 +19,7 @@ from helia_profiler.fixture import (
     FixtureTimingScope,
     PerTensorQuantization,
     Placement,
+    PreparedUpstreamRuntime,
     TypedFixture,
 )
 from helia_profiler.fixture_image import ContractError
@@ -176,11 +178,17 @@ def render_context(tmp_path, engine):
 
 
 @pytest.mark.parametrize("engine", [EngineType.HELIA_AOT, EngineType.TFLM])
-def test_psram_production_render_uses_active_consumer(tmp_path, engine):
+@pytest.mark.parametrize("arena", [Placement.SRAM, Placement.TCM])
+def test_psram_production_render_uses_active_consumer(tmp_path, engine, arena):
     from helia_profiler.firmware.fixture import fixture_template_vars
     from helia_profiler.firmware.render import _jinja_env
 
     ctx, regions = render_context(tmp_path, engine)
+    ctx.config = replace(ctx.config, model=replace(ctx.config.model, arena_location=arena))
+    if regions:
+        regions[0] = replace(
+            regions[0], placement=arena, memory="dtcm" if arena is Placement.TCM else "sram"
+        )
     values = fixture_template_vars(ctx, regions)
     source = _jinja_env.get_template("fixed_fixture.cc.j2").render(
         **values, psram_clock_hz=96000000, aot_prefix="fake", arena_regions=regions
@@ -192,7 +200,8 @@ def test_psram_production_render_uses_active_consumer(tmp_path, engine):
         assert source.index("fake_bind_arena") < source.index("fake_model_init")
         assert "model_ctx.arena_buffers[1] != hpx_arena_buf_1" in source
         assert "model_ctx.tensor_ptrs[i] != reinterpret_cast<const int8_t *>" in source
-        assert "NSX_MEM_SRAM_BSS alignas(16) static uint8_t hpx_arena_buf_storage_0[32]" in source
+        macro = "NSX_MEM_FAST_BSS" if arena is Placement.TCM else "NSX_MEM_SRAM_BSS"
+        assert f"{macro} alignas(16) static uint8_t hpx_arena_buf_storage_0[32]" in source
     else:
         assert source.index("hpx_psram_load(0") < source.index(
             "tflite::GetModel(active_model_data)"
@@ -375,7 +384,7 @@ def test_psram_aot_memory_plan_reuses_source_staging(tmp_path):
 
 
 @pytest.mark.parametrize("engine", ["helia-aot", "tflm"])
-@pytest.mark.parametrize("kind", ["psram", "psram-resource"])
+@pytest.mark.parametrize("kind", ["psram", "psram-resource", "psram-tcm", "psram-tcm-resource"])
 @pytest.mark.parametrize("scope", ["restore_and_invoke", "invoke_only"])
 def test_psram_shared_compile_cases_render_without_compiler(engine, kind, scope):
     from tests.contracts.fixture_compile_cases import FIXTURE_KIND_ENGINES, render_fixture
@@ -452,13 +461,47 @@ def test_psram_other_placements_still_refuse(tmp_path, engine):
 
     for arena, weights in [
         (Placement.PSRAM, Placement.PSRAM),
-        (Placement.TCM, Placement.PSRAM),
-        (Placement.SRAM, Placement.TCM),
+        (Placement.MRAM, Placement.MRAM),
+        (None, Placement.MRAM),
     ]:
         with pytest.raises(ConfigError):
             _validate_fixture_placement(arena, weights, engine)
     with pytest.raises(ConfigError):
         _validate_fixture_placement(Placement.SRAM, Placement.PSRAM, EngineType.HELIA_RT)
+
+
+@pytest.mark.parametrize("engine", [EngineType.HELIA_AOT, EngineType.TFLM])
+@pytest.mark.parametrize(
+    "arena,weights",
+    [
+        (Placement.TCM, Placement.MRAM),
+        (Placement.TCM, Placement.SRAM),
+        (Placement.SRAM, Placement.TCM),
+        (Placement.SRAM, Placement.SRAM),
+        (Placement.TCM, Placement.PSRAM),
+    ],
+)
+def test_fixture_bank_choices_are_not_recipe_pairs(tmp_path, engine, arena, weights):
+    from helia_profiler._fixture_build import _validate_fixture_placement
+
+    f = fixture(tmp_path)
+    # Supplying fake provider metadata prevents implicit provider discovery.
+    runtime = PreparedUpstreamRuntime(f.model, tmp_path, f.model)
+    request = FixtureBuildRequest(
+        f,
+        FixtureMethod(FixtureTimingScope.INVOKE_ONLY),
+        tmp_path / "work",
+        engine,
+        32768,
+        100,
+        5,
+        backend=FixtureBackend.CMSIS_NN if engine is EngineType.TFLM else None,
+        runtime=runtime if engine is EngineType.TFLM else None,
+        placement=FixturePlacement(arena, weights),
+    )
+    _validate_fixture_placement(arena, weights, engine)
+    assert request.to_config().model.arena_location is arena
+    assert request.to_config().model.weights_location is weights
 
 
 @pytest.fixture

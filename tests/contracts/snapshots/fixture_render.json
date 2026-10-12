@@ -47,6 +47,46 @@
     "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382",
     "fixed_fixture_memory.h": "baf938dba9148e9f25fd8245952b2f4fadcddf92a1ba33a133c26ac1477b1526"
   },
+  "psram-tcm-resource|helia-aot|invoke_only": {
+    "fixed_fixture.cc": "e03ca20d44f02505efd64d4507204726394447e1512446e8b3f0b4151d7c836e",
+    "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382",
+    "hpx_const_blob_2.h": "b6e2475da82f8f455996fa562963829a84003954f1aa75f72ad73bd9ce35775e"
+  },
+  "psram-tcm-resource|helia-aot|restore_and_invoke": {
+    "fixed_fixture.cc": "8d7f4fb39a6a26e1a1d8211137a94d2afc56d6f1ecb49d7d510597aa96b4865f",
+    "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382",
+    "hpx_const_blob_2.h": "b6e2475da82f8f455996fa562963829a84003954f1aa75f72ad73bd9ce35775e"
+  },
+  "psram-tcm-resource|tflm|invoke_only": {
+    "fixed_fixture.cc": "652ac6b1f83883a29ca23c092cdf4a16e61e4258ae02c9f35a2f9abc900bef86",
+    "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382",
+    "fixed_fixture_memory.h": "baf938dba9148e9f25fd8245952b2f4fadcddf92a1ba33a133c26ac1477b1526"
+  },
+  "psram-tcm-resource|tflm|restore_and_invoke": {
+    "fixed_fixture.cc": "c5152c2b2d74c9c7beec689c70727af667a0fb75146619fb3d3cf5274eb66069",
+    "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382",
+    "fixed_fixture_memory.h": "baf938dba9148e9f25fd8245952b2f4fadcddf92a1ba33a133c26ac1477b1526"
+  },
+  "psram-tcm|helia-aot|invoke_only": {
+    "fixed_fixture.cc": "e03ca20d44f02505efd64d4507204726394447e1512446e8b3f0b4151d7c836e",
+    "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382",
+    "hpx_const_blob_2.h": "b6e2475da82f8f455996fa562963829a84003954f1aa75f72ad73bd9ce35775e"
+  },
+  "psram-tcm|helia-aot|restore_and_invoke": {
+    "fixed_fixture.cc": "8d7f4fb39a6a26e1a1d8211137a94d2afc56d6f1ecb49d7d510597aa96b4865f",
+    "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382",
+    "hpx_const_blob_2.h": "b6e2475da82f8f455996fa562963829a84003954f1aa75f72ad73bd9ce35775e"
+  },
+  "psram-tcm|tflm|invoke_only": {
+    "fixed_fixture.cc": "a4c97108fd0470cdb649d3b798362bdc429fbf383cdb7a8a9e661683f1f11484",
+    "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382",
+    "fixed_fixture_memory.h": "baf938dba9148e9f25fd8245952b2f4fadcddf92a1ba33a133c26ac1477b1526"
+  },
+  "psram-tcm|tflm|restore_and_invoke": {
+    "fixed_fixture.cc": "5a1987c29263614c215913216044462285c403ab3b52c31c4c830a4425260986",
+    "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382",
+    "fixed_fixture_memory.h": "baf938dba9148e9f25fd8245952b2f4fadcddf92a1ba33a133c26ac1477b1526"
+  },
   "psram|helia-aot|invoke_only": {
     "fixed_fixture.cc": "670fe816563758408ff440368233dcb7750669677c42dfe8a26e449ece4950d0",
     "fixed_fixture_clock.h": "e3145443e3eaa26609a0e8696a69d43c904bdb4f8b261687193f5ebf68706382",

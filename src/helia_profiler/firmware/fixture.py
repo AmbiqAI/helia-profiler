@@ -86,12 +86,12 @@ def fixture_template_vars(ctx: PipelineContext, regions: list[ArenaRegion]) -> d
         and not ctx.engine_artifacts.aot_allocate_arenas
         and not psram
     ):
-        raise ConfigError("External AOT arenas are not qualified for fixed fixtures")
+        raise ConfigError("Fixture external AOT binding currently requires PSRAM weight backing")
     if any(
         r.placement not in (Placement.SRAM, Placement.MRAM, Placement.TCM, Placement.PSRAM)
         for r in regions
     ):
-        raise ConfigError("Fixture supports SRAM, MRAM or TCM AOT regions only")
+        raise ConfigError("Fixture AOT region has no implemented SRAM/MRAM/DTCM/PSRAM backing")
     if any(
         r.placement == "mram" and (not r.blob_filename or r.role is not ArenaRole.CONSTANT)
         for r in regions

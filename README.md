@@ -183,7 +183,7 @@ Apache-2.0
 
 ### Fixed-fixture PSRAM weights
 
-The fixture API supports SRAM working memory with PSRAM weights for heliaAOT
+The fixture API supports SRAM or DTCM working memory with PSRAM weights for heliaAOT
 and upstream LiteRT Micro on Apollo510 EVB. AOT uses externally bound arenas;
 Micro constructs its interpreter from the PSRAM flatbuffer. Both load complete
 weights once from MRAM staging before model initialization and timing. MRAM
@@ -197,4 +197,8 @@ terminal and verifies ready/XIP status, active ranges and payload checksums.
 A linker map alone cannot establish runtime PSRAM placement. A build rendered
 without compilation has an unbound descriptor and cannot authorize capture.
 This additive interface is fixture API 3.4; it does not include a streaming or
-numerical qualification claim. Other unsupported placement pairs remain refused.
+numerical qualification claim. Placement validation uses the canonical target
+bank extents and implemented backing paths rather than benchmark recipe pairs.
+Static working arenas currently use SRAM or DTCM; dynamic PSRAM working arenas,
+other fixture reset targets, and NOR/RRAM loader declarations are separate
+adapter gaps. External AOT fixture binding currently requires PSRAM weights.

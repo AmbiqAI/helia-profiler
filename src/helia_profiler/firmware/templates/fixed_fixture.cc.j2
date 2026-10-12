@@ -65,7 +65,7 @@ static int infer_fixture() {
 {% endif %}
 {% endfor %}
 {% else %}
-    NSX_MEM_SRAM_BSS alignas({{ region.alignment }}) static uint8_t hpx_arena_buf_storage_{{ region.region_id }}[{{ region.size }}];
+    {{ "NSX_MEM_FAST_BSS" if region.placement == "tcm" else "NSX_MEM_SRAM_BSS" }} alignas({{ region.alignment }}) static uint8_t hpx_arena_buf_storage_{{ region.region_id }}[{{ region.size }}];
     auto *hpx_arena_buf_{{ region.region_id }} = hpx_arena_buf_storage_{{ region.region_id }};
 {% endif %}
     if ({{ aot_prefix }}_bind_arena(({{ aot_prefix }}_arena_region_t){{ region.region_id }},
