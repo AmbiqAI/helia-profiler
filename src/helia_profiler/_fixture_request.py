@@ -120,7 +120,7 @@ class FixtureBuildRequest:
             self.target.verify()
         except ValueError as exc:
             raise ConfigError(str(exc)) from exc
-        _validate_fixture_placement(self.placement.arena, self.placement.weights)
+        _validate_fixture_placement(self.placement.arena, self.placement.weights, self.engine)
         if self.runtime is None and self.engine in (EngineType.TFLM, EngineType.HELIA_RT):
             object.__setattr__(self, "runtime", prepared_runtime(self.engine.value).runtime)
 

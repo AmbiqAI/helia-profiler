@@ -23,6 +23,14 @@
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/schema/schema_generated.h"
 {% endif %}
+{% if fixture_psram | default(false) %}
+{% include "fixed_fixture_psram.h.j2" %}
+{% if fixture_aot %}
+{% for region in arena_regions if region.blob_filename %}
+#include "hpx_const_blob_{{ region.region_id }}.h"
+{% endfor %}
+{% endif %}
+{% endif %}
 {% for io in fixture_inputs %}
 static const uint8_t {{ io.buffer }}[] = { {{ io.initializer }} };
 {%- endfor %}
@@ -40,9 +48,48 @@ volatile uint32_t deployment_arena_scan[{{ 2 * (fixture_scan_arenas | length) }}
 {%- endif %}
 
 static int infer_fixture() {
+{% if fixture_psram | default(false) %}
+    if (!hpx_psram_start()) return {{ fixture_status.psram }};
+{% endif %}
 {% if fixture_aot %}
+{% if fixture_psram | default(false) %}
+    if ({{ aot_prefix }}_num_arena_buffers != {{ arena_regions | length }}) return {{ fixture_status.psram }};
+{% for region in arena_regions %}
+{% if region.role == 'constant' %}
+    const uint8_t *hpx_arena_buf_{{ region.region_id }} = nullptr;
+{% for payload in fixture_psram_payloads %}
+{% if payload.region_id == region.region_id %}
+    if (!hpx_psram_load({{ loop.index0 }}, {{ region.region_id }},
+                         hpx_const_blob_{{ region.region_id }}, {{ payload.size }}U,
+                         {{ payload.checksum }}U, &hpx_arena_buf_{{ region.region_id }})) return {{ fixture_status.psram }};
+{% endif %}
+{% endfor %}
+{% else %}
+    NSX_MEM_SRAM_BSS alignas({{ region.alignment }}) static uint8_t hpx_arena_buf_storage_{{ region.region_id }}[{{ region.size }}];
+    auto *hpx_arena_buf_{{ region.region_id }} = hpx_arena_buf_storage_{{ region.region_id }};
+{% endif %}
+    if ({{ aot_prefix }}_bind_arena(({{ aot_prefix }}_arena_region_t){{ region.region_id }},
+            const_cast<uint8_t *>(hpx_arena_buf_{{ region.region_id }}), {{ region.size }}) != 0) return {{ fixture_status.psram }};
+{% endfor %}
+{% endif %}
     {{ aot_prefix }}_model_context_t model_ctx = {};
     if ({{ aot_prefix }}_model_init(&model_ctx) != 0) return {{ fixture_status.arena }};
+{% if fixture_psram | default(false) %}
+    if (!model_ctx.arena_buffers || !model_ctx.arena_sizes) return {{ fixture_status.psram }};
+{% for payload in fixture_psram_payloads %}
+    if (model_ctx.arena_buffers[{{ payload.region_id }}] != hpx_arena_buf_{{ payload.region_id }} ||
+        model_ctx.arena_sizes[{{ payload.region_id }}] != {{ payload.size }}) return {{ fixture_status.psram }};
+{% endfor %}
+    for (unsigned i = 0; i < {{ aot_prefix }}_num_tensors; ++i) {
+        const auto &descriptor = {{ aot_prefix }}_tensor_descriptors[i];
+{% for payload in fixture_psram_payloads %}
+        if (descriptor.region == {{ payload.region_id }}) {
+            if (descriptor.offset > {{ payload.size }}U || descriptor.size > {{ payload.size }}U - descriptor.offset ||
+                model_ctx.tensor_ptrs[i] != reinterpret_cast<const int8_t *>(hpx_arena_buf_{{ payload.region_id }} + descriptor.offset)) return {{ fixture_status.psram }};
+        }
+{% endfor %}
+    }
+{% endif %}
     if ({{ aot_prefix }}_num_inputs != {{ fixture_inputs | length }} || {{ aot_prefix }}_num_outputs != {{ fixture_outputs | length }} ||
         {% for io in fixture_inputs %}model_ctx.inputs[{{ io.position }}].size != {{ io.size }} || {% endfor %}{% for io in fixture_outputs %}model_ctx.outputs[{{ io.position }}].size != {{ io.size }} ||{% endfor %}
         {% for io in fixture_inputs %}!model_ctx.inputs[{{ io.position }}].data || {% endfor %}{% for io in fixture_outputs %}!model_ctx.outputs[{{ io.position }}].data{{ " ||" if not loop.last }}{% endfor %}) return {{ fixture_status.io_contract }};
@@ -62,7 +109,18 @@ static int infer_fixture() {
 {% for registration in fixture_registrations %}
     if (resolver.{{ registration }} != kTfLiteOk) return {{ fixture_status.resolver }};
 {% endfor %}
+{% if fixture_psram | default(false) %}
+    const uint8_t *active_model_data = nullptr;
+    if (!hpx_psram_load(0, 0, model_data, {{ fixture_psram_payloads[0].size }}U,
+                         {{ fixture_psram_payloads[0].checksum }}U, &active_model_data)) return {{ fixture_status.psram }};
+    uint32_t model_root_offset = 0;
+    std::memcpy(&model_root_offset, active_model_data, sizeof(model_root_offset));
+    if (model_root_offset < sizeof(model_root_offset) || model_root_offset > {{ fixture_psram_payloads[0].size }}U - sizeof(model_root_offset)) return {{ fixture_status.psram }};
+    const auto *model = tflite::GetModel(active_model_data);
+    if (reinterpret_cast<const uint8_t *>(model) != active_model_data + model_root_offset) return {{ fixture_status.psram }};
+{% else %}
     const auto *model = tflite::GetModel(model_data);
+{% endif %}
     if (model->version() != TFLITE_SCHEMA_VERSION || model->subgraphs()->size() != {{ fixture_subgraph_count }}) return {{ fixture_status.model_schema }};
     const auto *graph = model->subgraphs()->Get(0);
     if (graph->inputs()->size() != {{ fixture_inputs | length }} || graph->outputs()->size() != {{ fixture_outputs | length }}) return {{ fixture_status.io_contract }};

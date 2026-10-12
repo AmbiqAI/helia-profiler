@@ -1,7 +1,7 @@
 {
   "api_version": [
     3,
-    3
+    4
   ],
   "surface": {
     "ElfSection": {
@@ -324,6 +324,11 @@
           "source_initializer_present",
           "bool",
           "False"
+        ],
+        [
+          "psram_weights",
+          "FixturePsramWeights | None",
+          "None"
         ]
       ],
       "frozen": true,
@@ -523,6 +528,11 @@
           "arena_scan_sizes",
           "tuple[int, ...]",
           "()"
+        ],
+        [
+          "psram_weights",
+          "FixturePsramWeights | None",
+          "None"
         ]
       ],
       "frozen": true,
@@ -586,6 +596,11 @@
           "arena_scan",
           "tuple[tuple[int, int], ...]",
           "()"
+        ],
+        [
+          "psram_weights",
+          "FixturePsramObservation | None",
+          "None"
         ]
       ],
       "frozen": true,
@@ -895,6 +910,82 @@
       "methods": {},
       "properties": []
     },
+    "FixturePsramObservation": {
+      "fields": [
+        [
+          "base_address",
+          "int",
+          "<required>"
+        ],
+        [
+          "size_bytes",
+          "int",
+          "<required>"
+        ],
+        [
+          "clock_hz",
+          "int",
+          "<required>"
+        ],
+        [
+          "active_addresses",
+          "tuple[int, ...]",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "FixturePsramPayload": {
+      "fields": [
+        [
+          "region_id",
+          "int",
+          "<required>"
+        ],
+        [
+          "size",
+          "int",
+          "<required>"
+        ],
+        [
+          "checksum",
+          "int",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "FixturePsramWeights": {
+      "fields": [
+        [
+          "payloads",
+          "tuple[FixturePsramPayload, ...]",
+          "<required>"
+        ],
+        [
+          "image_sha256",
+          "str | None",
+          "None"
+        ],
+        [
+          "clock_hz",
+          "int",
+          "96000000"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": [
+        "sink_size"
+      ]
+    },
     "FixtureRole": {
       "base": "str",
       "kind": "enum",
@@ -911,6 +1002,7 @@
         "INVOKE": -7,
         "IO_CONTRACT": -6,
         "MODEL_SCHEMA": -4,
+        "PSRAM": -10,
         "RESOLVER": -3,
         "SRAM_CONFIG": -2,
         "STIMER": -8,

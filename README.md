@@ -180,3 +180,21 @@ before a first change, whether you are a person or an agent.
 ## License
 
 Apache-2.0
+
+### Fixed-fixture PSRAM weights
+
+The fixture API supports SRAM working memory with PSRAM weights for heliaAOT
+and upstream LiteRT Micro on Apollo510 EVB. AOT uses externally bound arenas;
+Micro constructs its interpreter from the PSRAM flatbuffer. Both load complete
+weights once from MRAM staging before model initialization and timing. MRAM
+staging remains part of the firmware image. Internal state policy and input
+restoration are unchanged.
+
+Pass the compiled build's `psram_weights` descriptor to
+`FixtureCaptureRequest.psram_weights`. The descriptor binds expected payloads
+and PSRAM clock to the exact image. Capture requires the bounded placement
+terminal and verifies ready/XIP status, active ranges and payload checksums.
+A linker map alone cannot establish runtime PSRAM placement. A build rendered
+without compilation has an unbound descriptor and cannot authorize capture.
+This additive interface is fixture API 3.4; it does not include a streaming or
+numerical qualification claim. Other unsupported placement pairs remain refused.

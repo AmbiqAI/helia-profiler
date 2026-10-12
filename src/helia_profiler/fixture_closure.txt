@@ -127,6 +127,7 @@ firmware/templates/_usb_config.j2
 firmware/templates/_usb_timer.j2
 firmware/templates/fixed_fixture.cc.j2
 firmware/templates/fixed_fixture_memory.h.j2
+firmware/templates/fixed_fixture_psram.h.j2
 firmware/templates/hpx_pmu_profiler.cc.j2
 firmware/templates/hpx_pmu_profiler.h.j2
 firmware/templates/main.cc.j2
@@ -142,6 +143,7 @@ fixture_image.py
 fixture_metrics.py
 fixture_observation.py
 fixture_operator_timing.py
+fixture_psram.py
 fixture_runtime.py
 fixture_stage.py
 fixture_target.py

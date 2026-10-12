@@ -12,6 +12,7 @@ from typing import Protocol
 
 from ._fixture_build import FixtureTimingScope
 from .fixture_image import DTCM, MAX_ELF, MAX_IMAGE, digest, inspect_elf, require
+from .fixture_psram import FixturePsramObservation, FixturePsramWeights, decode_psram_weights
 from .fixture_runtime import FixtureFile
 from .fixture_stage import FixtureStage
 from .fixture_target import FixtureTarget, fixture_cpu_hz
@@ -74,6 +75,8 @@ class FixtureCaptureRequest:
     extra_output_sizes: tuple[int, ...] = ()
     #: Byte size of each heliaAOT scratch arena the build scans, in ``FixtureBuild.aot_arena_scan`` order.
     arena_scan_sizes: tuple[int, ...] = ()
+    #: Compiled build placement descriptor; required when the image emits a PSRAM terminal.
+    psram_weights: FixturePsramWeights | None = None
 
 
 @dataclass(frozen=True)
@@ -111,6 +114,7 @@ class FixtureCaptureResult:
     #: Per scanned scratch arena: (bytes no longer holding the paint, highest such offset + 1).
     #: Both are lower bounds: a kernel may write the paint value itself.
     arena_scan: tuple[tuple[int, int], ...] = ()
+    psram_weights: FixturePsramObservation | None = None
 
 
 def _atomic_json(path: Path, value: object) -> None:
@@ -157,6 +161,12 @@ def capture_fixture(
     request: FixtureCaptureRequest, *, guard: FixtureCaptureGuard
 ) -> FixtureCaptureResult:
     """Capture one bounded raw terminal snapshot and persist every attempted operation."""
+    require(
+        request.psram_weights is None
+        or isinstance(request.psram_weights, FixturePsramWeights)
+        and request.psram_weights.image_sha256 == request.image.sha256,
+        "PSRAM expectation is not bound to the capture image",
+    )
     require(isinstance(request.extra_output_sizes, tuple), "Invalid output extent")
     output_sizes = (request.output_size, *request.extra_output_sizes)
     require(
@@ -249,6 +259,8 @@ def capture_fixture(
             sizes["deployment_memory"] = 32
         if request.arena_scan_sizes:
             sizes["deployment_arena_scan"] = 8 * len(request.arena_scan_sizes)
+        if request.psram_weights is not None:
+            sizes["deployment_psram_weights"] = request.psram_weights.sink_size
         image = inspect_elf(request.elf.read(), request.image.read(), request.load_address, sizes)
         pin(
             "identity.json",
@@ -444,6 +456,11 @@ def capture_fixture(
             tuple(artifacts),
             outputs=outputs,
             arena_scan=arena_scan,
+            psram_weights=decode_psram_weights(
+                values["deployment_psram_weights"], request.psram_weights
+            )
+            if request.psram_weights is not None
+            else None,
         )
     except Exception as exc:
         result = FixtureCaptureResult(

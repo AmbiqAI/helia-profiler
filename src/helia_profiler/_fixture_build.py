@@ -6,7 +6,7 @@ import hashlib
 import json
 import os
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from enum import StrEnum
 from pathlib import Path, PurePath
 
@@ -26,6 +26,7 @@ from .fixture_analysis import (
     analyze_typed_fixture_model_for_engine,
 )
 from .fixture_image import MAX_IMAGE, MRAM, bounded
+from .fixture_psram import FixturePsramWeights
 from .fixture_runtime import (
     PREPARED_RUNTIME_MODULES,
     FixtureFile,
@@ -383,6 +384,8 @@ class FixtureBuild:
     dependency_state: FixtureFile | None = None
     state_policy: FixtureStatePolicy | None = None
     source_initializer_present: bool = False
+    #: Image-bound PSRAM constants/model expectations, absent on other placements.
+    psram_weights: FixturePsramWeights | None = None
 
 
 @dataclass(frozen=True)
@@ -493,8 +496,14 @@ def _refuse_overrides(config: ProfileConfig) -> None:
         )
 
 
-def _validate_fixture_placement(arena: Placement | None, weights: Placement | None) -> None:
+def _validate_fixture_placement(
+    arena: Placement | None, weights: Placement | None, engine: EngineType | None = None
+) -> None:
     """Accept only explicit paired placements supported by the fixture renderer."""
+    if (arena, weights) == (Placement.SRAM, Placement.PSRAM):
+        if engine not in (EngineType.HELIA_AOT, EngineType.TFLM):
+            raise ConfigError("PSRAM fixture weights require helia-AOT or upstream TFLM")
+        return
     if (arena, weights) not in (
         (Placement.SRAM, Placement.MRAM),
         (Placement.TCM, Placement.TCM),
@@ -519,7 +528,9 @@ def _validate(config: ProfileConfig, fixture: FixedFixture | TypedFixture) -> No
             f"Fixed fixture supports {supported_fixture_target().board} "
             f"at the {FIXTURE_CLOCK_PROFILE} clock only"
         )
-    _validate_fixture_placement(config.model.arena_location, config.model.weights_location)
+    _validate_fixture_placement(
+        config.model.arena_location, config.model.weights_location, config.engine.type
+    )
     if config.model.arena_size is None or not 0 < config.model.arena_size <= 3 * 1024 * 1024:
         raise ConfigError("Explicit bounded arena capacity required")
     if config.power.enabled or config.target.ensure_board_powered:
@@ -611,6 +622,18 @@ def _build(
     if config.work_dir is None:
         raise ConfigError("Explicit work directory required")
     root = config.work_dir.resolve()
+    # Placement owns this fixed converter setting; callers cannot supply engine overrides.
+    if (
+        config.engine.type is EngineType.HELIA_AOT
+        and config.model.weights_location is Placement.PSRAM
+    ):
+        config = replace(
+            config,
+            engine=replace(
+                config.engine,
+                config={**config.engine.config, "aot_args": {"memory": {"allocate_arenas": False}}},
+            ),
+        )
     root.mkdir(parents=True, exist_ok=True)
     identity_path = root / "fixed-fixture-identity.json"
     identity = {
@@ -787,6 +810,23 @@ def _build(
         else (),
         engine_source=_engine_source(config.engine.type),
         dependency_state=dependency_state,
+        psram_weights=_psram_weights(ctx, flat_binary),
         state_policy=method.state_policy,
         source_initializer_present=model.has_initializer,
+    )
+
+
+def _psram_weights(ctx: PipelineContext, image: FixtureFile | None) -> FixturePsramWeights | None:
+    if ctx.config.model.weights_location is not Placement.PSRAM:
+        return None
+    from .firmware.fixture import fixture_psram_payloads
+
+    regions = (
+        ctx.engine_artifacts.aot_arena_regions
+        if isinstance(ctx.engine_artifacts, HeliaAotArtifacts)
+        else []
+    )
+    payloads = fixture_psram_payloads(ctx, regions)
+    return FixturePsramWeights(
+        payloads, image.sha256 if image else None, ctx.config.target.psram.clock_hz
     )

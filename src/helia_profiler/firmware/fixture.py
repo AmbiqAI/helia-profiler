@@ -11,9 +11,12 @@ from ..engines.base import ArenaRegion, HeliaAotArtifacts
 from ..errors import ConfigError
 from ..fixture import TypedFixture
 from ..fixture_analysis import PerTensorQuantization
+from ..fixture_psram import MAX_PSRAM_PAYLOADS, FixturePsramPayload, payload_checksum
 from ..fixture_stage import FixtureStage
+from ..fixture_target import fixture_app_region
 from ..pipeline import PipelineContext
 from ..placement import ArenaRole, Placement
+from ..platform.memory_map import MemoryRegion
 from .render import _jinja_env, _write_text
 
 _TFLITE_TYPES = {
@@ -74,13 +77,20 @@ def fixture_template_vars(ctx: PipelineContext, regions: list[ArenaRegion]) -> d
     if spec is None:
         raise ConfigError("Fixture render specification missing")
     spec.fixture.verify()
-    _validate_fixture_placement(ctx.config.model.arena_location, ctx.config.model.weights_location)
+    _validate_fixture_placement(
+        ctx.config.model.arena_location, ctx.config.model.weights_location, ctx.config.engine.type
+    )
+    psram = ctx.config.model.weights_location is Placement.PSRAM
     if (
         isinstance(ctx.engine_artifacts, HeliaAotArtifacts)
         and not ctx.engine_artifacts.aot_allocate_arenas
+        and not psram
     ):
         raise ConfigError("External AOT arenas are not qualified for fixed fixtures")
-    if any(r.placement not in (Placement.SRAM, Placement.MRAM, Placement.TCM) for r in regions):
+    if any(
+        r.placement not in (Placement.SRAM, Placement.MRAM, Placement.TCM, Placement.PSRAM)
+        for r in regions
+    ):
         raise ConfigError("Fixture supports SRAM, MRAM or TCM AOT regions only")
     if any(
         r.placement == "mram" and (not r.blob_filename or r.role is not ArenaRole.CONSTANT)
@@ -99,10 +109,15 @@ def fixture_template_vars(ctx: PipelineContext, regions: list[ArenaRegion]) -> d
             Placement.SRAM: ("sram", "dram"),
             Placement.MRAM: ("mram",),
             Placement.TCM: ("dtcm",),
+            Placement.PSRAM: ("psram",),
         }
         if region.memory not in banks[requested]:
             raise ConfigError("AOT physical memory differs from fixture request")
+    payloads = fixture_psram_payloads(ctx, regions) if psram else ()
     return {
+        "fixture_psram": psram,
+        "fixture_psram_base": fixture_app_region(MemoryRegion.PSRAM)[0] if psram else None,
+        "fixture_psram_payloads": payloads,
         "fixture_status": {stage.name.lower(): int(stage) for stage in FixtureStage},
         "fixture_inputs": _fixture_io(spec, inputs=True),
         "fixture_outputs": _fixture_io(spec, inputs=False),
@@ -139,3 +154,64 @@ def write_fixture_headers(directory: Path, ctx: PipelineContext) -> None:
         '#pragma once\n#include "apollo510.h"\n#include "nsx_core.h"\n#include "am_hal_status.h"\n#include "am_hal_stimer.h"\n'
         + _jinja_env.get_template("_stimer_init.j2").render(),
     )
+
+
+def fixture_psram_payloads(
+    ctx: PipelineContext, regions: list[ArenaRegion]
+) -> tuple[FixturePsramPayload, ...]:
+    """Validate the complete backing payloads the PSRAM fixture must load."""
+    if ctx.fixture is None:
+        raise ConfigError("PSRAM fixture render specification missing")
+    artifacts = ctx.engine_artifacts
+    if isinstance(artifacts, HeliaAotArtifacts):
+        if artifacts.aot_allocate_arenas:
+            raise ConfigError("PSRAM fixture requires external AOT arenas")
+        module = next(
+            (m.path for m in artifacts.extra_modules if m.name == artifacts.aot_module_name), None
+        )
+        if module is None:
+            raise ConfigError("PSRAM AOT constant module missing")
+        if (
+            not regions
+            or len(regions) > 256
+            or {r.region_id for r in regions} != set(range(len(regions)))
+            or any(
+                type(r.region_id) is not int
+                or type(r.size) is not int
+                or r.size <= 0
+                or type(r.alignment) is not int
+                or r.alignment <= 0
+                or r.alignment > 64
+                or r.alignment & (r.alignment - 1)
+                for r in regions
+            )
+        ):
+            raise ConfigError("Invalid PSRAM AOT region table")
+        payloads = []
+        for region in regions:
+            if region.role is not ArenaRole.CONSTANT:
+                continue
+            if region.placement is not Placement.PSRAM or not region.blob_filename:
+                raise ConfigError("PSRAM AOT constant requires a complete sidecar blob")
+            blob = (module / region.blob_filename).resolve()
+            if not blob.is_relative_to(module.resolve()):
+                raise ConfigError("PSRAM constant blob is outside the generated module")
+            data = blob.read_bytes()
+            if (
+                len(data) != region.size
+                or region.alignment <= 0
+                or region.alignment > 64
+                or region.alignment & (region.alignment - 1)
+            ):
+                raise ConfigError("PSRAM AOT blob size or alignment differs from region")
+            payloads.append(
+                FixturePsramPayload(region.region_id, len(data), payload_checksum(data))
+            )
+    else:
+        data = ctx.fixture.fixture.model.read()
+        if len(data) < 4:
+            raise ConfigError("PSRAM model backing is truncated")
+        payloads = [FixturePsramPayload(0, len(data), payload_checksum(data))]
+    if not 0 < len(payloads) <= MAX_PSRAM_PAYLOADS:
+        raise ConfigError("Invalid PSRAM constant payload count")
+    return tuple(payloads)
