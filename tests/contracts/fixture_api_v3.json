@@ -1,7 +1,7 @@
 {
   "api_version": [
     3,
-    4
+    5
   ],
   "surface": {
     "ElfSection": {
@@ -328,6 +328,16 @@
         [
           "psram_weights",
           "FixturePsramWeights | None",
+          "None"
+        ],
+        [
+          "arena_location",
+          "Placement | None",
+          "None"
+        ],
+        [
+          "weights_location",
+          "Placement | None",
           "None"
         ]
       ],

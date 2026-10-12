@@ -273,6 +273,8 @@ def test_psram_aot_fake_pipeline_derives_setting_before_prepare(tmp_path, monkey
     result = builder.build_fixed_fixture(
         ctx.config, ctx.fixture.fixture, method=ctx.fixture.method, compile=False
     )
+    assert result.arena_location is Placement.SRAM
+    assert result.weights_location is Placement.PSRAM
     assert result.psram_weights is not None
     assert result.psram_weights.payloads == (FixturePsramPayload(1, 4, payload_checksum(b"abcd")),)
     assert result.psram_weights.image_sha256 is None

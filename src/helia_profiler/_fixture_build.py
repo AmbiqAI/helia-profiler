@@ -391,6 +391,9 @@ class FixtureBuild:
     source_initializer_present: bool = False
     #: Image-bound PSRAM constants/model expectations, absent on other placements.
     psram_weights: FixturePsramWeights | None = None
+    #: Effective configured banks; legacy receipts without these cannot bind operator timing.
+    arena_location: Placement | None = None
+    weights_location: Placement | None = None
 
 
 @dataclass(frozen=True)
@@ -824,6 +827,8 @@ def _build(
         engine_source=_engine_source(config.engine.type),
         dependency_state=dependency_state,
         psram_weights=_psram_weights(ctx, flat_binary),
+        arena_location=config.model.arena_location,
+        weights_location=config.model.weights_location,
         state_policy=method.state_policy,
         source_initializer_present=model.has_initializer,
     )

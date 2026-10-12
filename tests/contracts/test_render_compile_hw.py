@@ -864,7 +864,8 @@ def test_fixture_real_toolchain_preparation_renders_current_sources(tmp_path, ca
     assert f"deployment_output[{size}]" in text
     assert "hpx_stimer_init" in (scratch / "fixed_fixture_clock.h").read_text(encoding="utf-8")
     if case.engine == "helia-aot":
-        assert '#include "warm_model.h"' in text
+        model_header = "fake" if case.fixture_kind.startswith("psram") else "warm"
+        assert f'#include "{model_header}_model.h"' in text
         assert not (scratch / "fixed_fixture_memory.h").exists()
     else:
         assert "deployment_memory[8]" in (scratch / "fixed_fixture_memory.h").read_text(
