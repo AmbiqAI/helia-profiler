@@ -202,3 +202,6 @@ bank extents and implemented backing paths rather than benchmark recipe pairs.
 Static working arenas currently use SRAM or DTCM; dynamic PSRAM working arenas,
 other fixture reset targets, and NOR/RRAM loader declarations are separate
 adapter gaps. External AOT fixture binding currently requires PSRAM weights.
+Ordinary profile operator timings cannot be bound to PSRAM fixture builds: their
+active payload, external arena layout and loader configuration are not recorded
+by that profile binding.

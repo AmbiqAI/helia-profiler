@@ -98,6 +98,7 @@ from .fixture_compile_cases import (  # noqa: E402
     FIXTURE_ENGINES,
     FIXTURE_KIND_ENGINES,
     FIXTURE_SCOPES,
+    aot_model_stub,
     render_fixture,
 )
 
@@ -371,56 +372,6 @@ static const unsigned int model_data_len = 1;
 # model API is fake_model.h/fake_common.h.  Declares exactly the model API
 # symbols main_aot.cc.j2 references, including the external-arena binding
 # the census arena variants call.
-_AOT_MODEL_STUB = """\
-// hpx compile-check generated AOT engine-header stand-in (#187)
-#pragma once
-#include <stddef.h>
-#include <stdint.h>
-
-typedef enum {
-    fake_op_state_run_started = 0,
-    fake_op_state_run_finished,
-} fake_operator_state_t;
-
-typedef void (*fake_operator_callback_t)(
-    int32_t op, fake_operator_state_t state, int32_t status, void *user_data);
-
-typedef struct {
-    void *data;
-    size_t size;
-} fake_io_buffer_t;
-
-typedef struct {
-    fake_operator_callback_t callback;
-    void *user_data;
-    fake_io_buffer_t inputs[4];
-    fake_io_buffer_t outputs[4];
-    void **arena_buffers;
-    size_t *arena_sizes;
-    int8_t **tensor_ptrs;
-} fake_model_context_t;
-
-typedef int32_t fake_arena_region_t;
-
-extern const void * const fake_arena_buffers[4];
-
-static const int fake_num_inputs = 1;
-static const int fake_num_outputs = 1;
-static const int fake_num_arena_buffers = 3;
-static const int fake_num_tensors = 1;
-typedef struct { uint32_t region; uint32_t offset; uint32_t size; } fake_tensor_descriptor_t;
-static const fake_tensor_descriptor_t fake_tensor_descriptors[1] = {{2, 0, 4}};
-
-static inline int32_t fake_model_init(fake_model_context_t *ctx) { (void)ctx; return 0; }
-static inline int32_t fake_model_run(fake_model_context_t *ctx) { (void)ctx; return 0; }
-static inline int32_t fake_bind_arena(fake_arena_region_t region, uint8_t *buf, size_t size) {
-    (void)region;
-    (void)buf;
-    (void)size;
-    return 0;
-}
-"""
-
 _AOT_COMMON_STUB = """\
 // hpx compile-check generated AOT engine-header stand-in (#187)
 #pragma once
@@ -488,7 +439,9 @@ def _prepare_case_dir(case: _CompileCase, base: Path) -> Path:
     if '#include "model_data.h"' in case.text:
         (case_dir / "model_data.h").write_text(_MODEL_DATA_STUB)
     if '#include "fake_model.h"' in case.text:
-        (case_dir / "fake_model.h").write_text(_AOT_MODEL_STUB)
+        (case_dir / "fake_model.h").write_text(
+            aot_model_stub(external_arenas="deployment_psram_weights" in case.text)
+        )
         (case_dir / "fake_common.h").write_text(_AOT_COMMON_STUB)
     for region_id in set(_CONST_BLOB_INCLUDE.findall(case.text)):
         (case_dir / f"hpx_const_blob_{region_id}.h").write_text(_const_blob_stub(region_id))

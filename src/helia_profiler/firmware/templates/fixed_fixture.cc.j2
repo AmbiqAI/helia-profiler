@@ -101,7 +101,7 @@ static int infer_fixture() {
 {%- endfor %}
     auto invoke = [&]() { return {{ aot_prefix }}_model_run(&model_ctx); };
 {%- for arena in fixture_scan_arenas %}
-    std::memset(const_cast<void *>({{ aot_prefix }}_arena_buffers[{{ arena.region_id }}]), 0xA5, {{ arena.size }});
+    std::memset(const_cast<void *>({% if fixture_psram | default(false) %}model_ctx.arena_buffers{% else %}{{ aot_prefix }}_arena_buffers{% endif %}[{{ arena.region_id }}]), 0xA5, {{ arena.size }});
 {%- endfor %}
 {% else %}
     hpx_fixture_memory_init(sizeof(arena));
@@ -194,7 +194,7 @@ static int infer_fixture() {
 {% endif %}
 {%- for arena in fixture_scan_arenas %}
     {
-        const auto *scan = static_cast<const uint8_t *>({{ aot_prefix }}_arena_buffers[{{ arena.region_id }}]);
+        const auto *scan = static_cast<const uint8_t *>({% if fixture_psram | default(false) %}model_ctx.arena_buffers{% else %}{{ aot_prefix }}_arena_buffers{% endif %}[{{ arena.region_id }}]);
         uint32_t touched = 0, high_water = 0;
         for (uint32_t i = 0; i < {{ arena.size }}U; ++i) {
             if (scan[i] != 0xA5U) {

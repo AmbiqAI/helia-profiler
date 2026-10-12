@@ -270,3 +270,61 @@ def _render_typed(
                 directory / "constant.bin", "hpx_const_blob_2"
             )
     return text, headers
+
+
+_AOT_MODEL_STUB = """\
+// hpx compile-check generated AOT engine-header stand-in (#187)
+#pragma once
+#include <stddef.h>
+#include <stdint.h>
+
+typedef enum {
+    fake_op_state_run_started = 0,
+    fake_op_state_run_finished,
+} fake_operator_state_t;
+
+typedef void (*fake_operator_callback_t)(
+    int32_t op, fake_operator_state_t state, int32_t status, void *user_data);
+
+typedef struct {
+    void *data;
+    size_t size;
+} fake_io_buffer_t;
+
+typedef struct {
+    fake_operator_callback_t callback;
+    void *user_data;
+    fake_io_buffer_t inputs[4];
+    fake_io_buffer_t outputs[4];
+    void **arena_buffers;
+    size_t *arena_sizes;
+    int8_t **tensor_ptrs;
+} fake_model_context_t;
+
+typedef int32_t fake_arena_region_t;
+
+extern const void * const fake_arena_buffers[4];
+
+static const int fake_num_inputs = 1;
+static const int fake_num_outputs = 1;
+static const int fake_num_arena_buffers = 3;
+static const int fake_num_tensors = 1;
+typedef struct { uint32_t region; uint32_t offset; uint32_t size; } fake_tensor_descriptor_t;
+static const fake_tensor_descriptor_t fake_tensor_descriptors[1] = {{2, 0, 4}};
+
+static inline int32_t fake_model_init(fake_model_context_t *ctx) { (void)ctx; return 0; }
+static inline int32_t fake_model_run(fake_model_context_t *ctx) { (void)ctx; return 0; }
+static inline int32_t fake_bind_arena(fake_arena_region_t region, uint8_t *buf, size_t size) {
+    (void)region;
+    (void)buf;
+    (void)size;
+    return 0;
+}
+"""
+
+
+def aot_model_stub(*, external_arenas: bool) -> str:
+    """Mode-correct generated API stand-in shared by the compile gates."""
+    if external_arenas:
+        return _AOT_MODEL_STUB.replace("extern const void * const fake_arena_buffers[4];", "")
+    return _AOT_MODEL_STUB

@@ -65,6 +65,8 @@ def _identity_reason(
     profile: ProfileResult,
     allow_runtime: bool,
 ) -> str | None:
+    if build.psram_weights is not None:
+        return "psram_placement_not_bound_by_profile"
     if build.state_policy is not None:
         return "state_policy_not_bound_by_profile"
     meta = profile.metadata
@@ -123,6 +125,8 @@ def bind_operator_timing(
     TFLM and heliaRT fixtures link a prepared runtime archive that ``hpx profile``
     does not use, so its per-layer data describe a different runtime build;
     ``allow_runtime_difference`` accepts that and labels the record.
+    PSRAM builds are refused because an ordinary profile does not bind their
+    active payload, external arena layout, or loader configuration.
     """
     engine = profile.metadata.engine
     runtime_stack = (

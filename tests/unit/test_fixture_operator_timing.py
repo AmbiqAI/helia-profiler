@@ -341,3 +341,21 @@ def test_heliart_fixture_binds_only_to_a_helia_backend_profile(tmp_path, backend
     if reason is None:
         assert labelled.accepted
         assert labelled.runtime_stack == "profile_baseline_differs_from_fixture_runtime"
+
+
+@pytest.mark.parametrize("profile_weights", ["mram", "psram"])
+def test_psram_build_cannot_inherit_ordinary_profile_timing(tmp_path, profile_weights):
+    from helia_profiler.fixture_psram import FixturePsramPayload, FixturePsramWeights
+
+    fixture = fixture_for(KWS_SHA, tmp_path)
+    build = replace(
+        build_for(EngineType.HELIA_AOT, fixture),
+        psram_weights=FixturePsramWeights((FixturePsramPayload(0, 4, 2987074),)),
+    )
+    run = profile("kws_aot")
+    snapshot = dict(run.metadata.config_snapshot)
+    snapshot["model"] = {**snapshot["model"], "weights_location": profile_weights}
+    run = replace(run, metadata=replace(run.metadata, config_snapshot=snapshot))
+    result = bind_operator_timing(build, fixture, run)
+    assert not result.accepted
+    assert result.reason == "psram_placement_not_bound_by_profile"

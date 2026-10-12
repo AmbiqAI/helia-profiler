@@ -58,7 +58,7 @@ from tests.contracts.test_firmware_render_snapshots import (
     _render,
 )
 
-from .fixture_compile_cases import FIXTURE_KIND_ENGINES, render_fixture
+from .fixture_compile_cases import FIXTURE_KIND_ENGINES, aot_model_stub, render_fixture
 
 # The matrix (D3) — one row per (workspace leg, target, render arm).
 # rtt-only: power/busy arms are rtt-only and transport variation is Tier 1's
@@ -390,7 +390,7 @@ def _prepare_case(case: _HwCase, workspace: _Workspace, tmp_path: Path) -> tuple
     scratch = tmp_path / case.case_id
     scratch.mkdir()
     overrides = {}
-    if case.engine == "helia-aot":
+    if case.engine == "helia-aot" and not (case.fixture_kind or "").startswith("psram"):
         # The workspace's generated model module carries its real prefix;
         # render against it so the include resolves to the real header.
         prefix = _aot_prefix_in(workspace.app_dir)
@@ -402,6 +402,11 @@ def _prepare_case(case: _HwCase, workspace: _Workspace, tmp_path: Path) -> tuple
         )
         for name, content in headers.items():
             (scratch / name).write_text(content, encoding="utf-8")
+        if case.engine == "helia-aot" and case.fixture_kind.startswith("psram"):
+            # Keep real vendor headers/flags, but use a mode-correct model API
+            # rather than an unrelated cached model with internal arenas.
+            (scratch / "fake_model.h").write_text(aot_model_stub(external_arenas=True))
+            (scratch / "fake_common.h").write_text("#pragma once\n")
     else:
         text = _render(
             case.soc,

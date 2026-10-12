@@ -3,6 +3,7 @@
 import hashlib
 import struct
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
@@ -525,3 +526,42 @@ def test_existing_fixture_placements_keep_original_render(engine, placement):
     else:
         assert "fake_model_init(&model_ctx)" in source
         assert "fake_bind_arena" not in source
+
+
+@pytest.mark.parametrize("kind", ["psram", "psram-resource", "psram-tcm", "psram-tcm-resource"])
+@pytest.mark.parametrize("scope", ["invoke_only", "restore_and_invoke"])
+def test_psram_observation_uses_bound_context_table(kind, scope):
+    from tests.contracts.fixture_compile_cases import aot_model_stub, render_fixture
+
+    source, _ = render_fixture(kind, "helia-aot", scope)
+    assert "model_ctx.arena_buffers[0]" in source
+    assert "fake_arena_buffers" not in source
+    assert "fake_arena_buffers" not in aot_model_stub(external_arenas=True)
+    assert "fake_arena_buffers" in aot_model_stub(external_arenas=False)
+
+
+@pytest.mark.parametrize("kind", ["psram", "psram-resource", "psram-tcm", "psram-tcm-resource"])
+def test_psram_compile_preparation_does_not_use_internal_cached_api(tmp_path, kind):
+    from tests.contracts.test_render_compile_hw import _HwCase, _prepare_case, _Workspace
+
+    app = tmp_path / "cached"
+    (app / "src").mkdir(parents=True)
+    (app / "src/warm_model.h").write_text("extern void *warm_arena_buffers[4];\n")
+    case = _HwCase(
+        "external-" + kind,
+        "cached",
+        "apollo510_evb",
+        "apollo510",
+        "helia-aot",
+        "hpx_profiler",
+        fixture_kind=kind,
+    )
+    scratch, tus = _prepare_case(
+        case, _Workspace(app, app / "build", Path("/compiler"), ""), tmp_path
+    )
+    source = tus[0].read_text()
+    assert '#include "fake_model.h"' in source
+    assert "warm_" not in source
+    header = (scratch / "fake_model.h").read_text()
+    assert "fake_bind_arena" in header
+    assert "fake_arena_buffers" not in header
