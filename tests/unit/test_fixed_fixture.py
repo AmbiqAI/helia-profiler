@@ -76,7 +76,7 @@ def analyzed(f, ops=("CONV_2D", "RESHAPE")):
 
 def mock_analysis(monkeypatch, f):
     monkeypatch.setattr(
-        "helia_profiler._fixture_build.analyze_fixture_model", lambda _: analyzed(f)
+        "helia_profiler._fixture_build.analyze_fixture_model", lambda _, **kwargs: analyzed(f)
     )
 
 
@@ -337,7 +337,9 @@ def test_render_derives_extents_ops_counts_and_scope(tmp_path, kind, scope):
 def test_declaration_mismatch_stops_before_pipeline(tmp_path, monkeypatch):
     c, f = fixture(tmp_path)
     model = analyzed(f)
-    monkeypatch.setattr("helia_profiler._fixture_build.analyze_fixture_model", lambda _: model)
+    monkeypatch.setattr(
+        "helia_profiler._fixture_build.analyze_fixture_model", lambda _, **kwargs: model
+    )
     wrong = replace(f, input_tensor=replace(f.input_tensor, scale=0.5))
     with pytest.raises(Exception, match="declarations differ"):
         build_fixed_fixture(c, wrong, method=METHOD, runtime=runtime(tmp_path))
