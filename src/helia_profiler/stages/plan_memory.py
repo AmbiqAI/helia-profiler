@@ -33,7 +33,6 @@ because of the runtime upload handshake.
 from __future__ import annotations
 
 import logging
-from dataclasses import replace
 
 from ..config import DEFAULT_ARENA_SIZE_BYTES, Transport
 from ..engines import EngineType
@@ -496,29 +495,11 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
                     name = f"mram_constant_source_{payload.region_id}"
                     if name in existing and existing[name].size != payload.size:
                         raise PlatformError("AOT PSRAM staging plan differs from pinned payload")
-                    if name in existing:
-                        plan = replace(
-                            plan,
-                            regions=tuple(
-                                replace(
-                                    r,
-                                    consumers=tuple(
-                                        replace(c, symbol=f"hpx_const_blob_{payload.region_id}")
-                                        if c.name == name
-                                        else c
-                                        for c in r.consumers
-                                    ),
-                                )
-                                if r.region is MemoryRegion.MRAM
-                                else r
-                                for r in plan.regions
-                            ),
-                        )
                     additions.append(
                         (
                             MemoryRegion.MRAM,
                             MemoryConsumer(
-                                name=name,
+                                name=f"fixture_aot_constant_staging_{payload.region_id}",
                                 size=payload.size,
                                 kind=ConsumerKind.WEIGHTS,
                                 symbol=f"hpx_const_blob_{payload.region_id}",

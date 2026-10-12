@@ -230,7 +230,8 @@ def test_psram_aot_render_refuses_inconsistent_artifacts(tmp_path, fault):
         fixture_template_vars(ctx, regions)
 
 
-def test_psram_aot_fake_pipeline_derives_setting_before_prepare(tmp_path, monkeypatch):
+@pytest.mark.parametrize("memory_args", [{"planner": "greedy"}, None])
+def test_psram_aot_fake_pipeline_derives_setting_before_prepare(tmp_path, monkeypatch, memory_args):
     from types import SimpleNamespace
 
     from helia_profiler import _fixture_build as builder
@@ -239,7 +240,7 @@ def test_psram_aot_fake_pipeline_derives_setting_before_prepare(tmp_path, monkey
     ctx, regions = render_context(tmp_path, EngineType.HELIA_AOT)
     ctx.config = replace(
         ctx.config,
-        engine=replace(ctx.config.engine, config={"aot_args": {"memory": {"planner": "greedy"}}}),
+        engine=replace(ctx.config.engine, config={"aot_args": {"memory": memory_args}}),
     )
     monkeypatch.setattr(
         builder, "analyze_typed_fixture_model_for_engine", lambda *a, **kw: ctx.fixture.model
@@ -253,7 +254,10 @@ def test_psram_aot_fake_pipeline_derives_setting_before_prepare(tmp_path, monkey
         def run(self, config):
             observed.append(config)
             assert config.engine.config["aot_args"]["memory"]["allocate_arenas"] is False
-            assert config.engine.config["aot_args"]["memory"]["planner"] == "greedy"
+            if memory_args is not None:
+                assert config.engine.config["aot_args"]["memory"]["planner"] == "greedy"
+            else:
+                assert config.engine.config["aot_args"]["memory"] == {"allocate_arenas": False}
             # Fake artifacts only: no stage, converter, compiler or driver runs.
             ctx.config = config
             fixture_template_vars(ctx, regions)
@@ -347,13 +351,15 @@ def test_psram_memory_plan_books_staging_and_terminal(tmp_path, engine):
     assert entries["fixture_psram_terminal"].size == 48
     assert entries["fixture_psram_state"].size == 12
     staging = (
-        "mram_constant_source_1" if engine is EngineType.HELIA_AOT else "fixture_model_staging"
+        "fixture_aot_constant_staging_1"
+        if engine is EngineType.HELIA_AOT
+        else "fixture_model_staging"
     )
     assert entries[staging].size == (4 if engine is EngineType.HELIA_AOT else 5)
     assert _add_hpx_owned_consumers(plan, ctx) == plan
 
 
-def test_psram_aot_memory_plan_reuses_source_staging(tmp_path):
+def test_psram_aot_memory_plan_counts_both_source_arrays(tmp_path):
     from helia_profiler.results import ConsumerKind, MemoryConsumer, MemoryPlan, MemoryRegionUsage
     from helia_profiler.stages.plan_memory import _add_hpx_owned_consumers
     from helia_profiler.stages.resolve_platform import ResolvePlatformStage
@@ -383,7 +389,12 @@ def test_psram_aot_memory_plan_reuses_source_staging(tmp_path):
     mram = updated.region(MemoryRegion.MRAM)
     assert mram is not None
     staged = [c for c in mram.consumers if c.name == "mram_constant_source_1"]
-    assert len(staged) == 1 and staged[0].size == 4 and staged[0].symbol == "hpx_const_blob_1"
+    assert len(staged) == 1 and staged[0].size == 4 and staged[0].symbol == "engine_source"
+    fixture_source = [c for c in mram.consumers if c.name == "fixture_aot_constant_staging_1"]
+    assert len(fixture_source) == 1
+    assert fixture_source[0].size == 4 and fixture_source[0].symbol == "hpx_const_blob_1"
+    assert sum(c.size for c in mram.consumers if c.kind is ConsumerKind.WEIGHTS) == 8
+    assert _add_hpx_owned_consumers(updated, ctx) == updated
 
 
 @pytest.mark.parametrize("engine", ["helia-aot", "tflm"])

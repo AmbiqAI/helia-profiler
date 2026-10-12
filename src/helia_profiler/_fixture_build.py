@@ -641,7 +641,8 @@ def _build(
         and config.model.weights_location is Placement.PSRAM
     ):
         aot_args = dict(config.engine.config.get("aot_args", {}))
-        memory_args = dict(aot_args.get("memory", {}))
+        memory_value = aot_args.get("memory")
+        memory_args = {} if memory_value is None else dict(memory_value)
         aot_args["memory"] = {**memory_args, "allocate_arenas": False}
         config = replace(
             config,

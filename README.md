@@ -196,7 +196,7 @@ and PSRAM clock to the exact image. Capture requires the bounded placement
 terminal and verifies ready/XIP status, active ranges and payload checksums.
 A linker map alone cannot establish runtime PSRAM placement. A build rendered
 without compilation has an unbound descriptor and cannot authorize capture.
-This additive interface is fixture API 3.4; it does not include a streaming or
+This additive interface is fixture API 3.5; it does not include a streaming or
 numerical qualification claim. Placement validation uses the canonical target
 bank extents and implemented backing paths rather than benchmark recipe pairs.
 Static working arenas currently use SRAM or DTCM; dynamic PSRAM working arenas,
