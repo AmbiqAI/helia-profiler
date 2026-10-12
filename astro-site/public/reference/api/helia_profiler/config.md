@@ -938,7 +938,7 @@ Source: `src/helia_profiler/config/__init__.py:654`
 `attribute` · `python`
 
 ```python
-compatibility_baseline: CompatibilityBaseline = field(default_factory=load_compatibility_baseline, init=False, repr=False)
+compatibility_baseline: CompatibilityBaseline = field(default_factory=load_compatibility_baseline, repr=False)
 ```
 
 Source: `src/helia_profiler/config/__init__.py:657`
@@ -951,7 +951,7 @@ Source: `src/helia_profiler/config/__init__.py:657`
 compatibility: CompatibilityResolution | None = field(default=None, init=False, repr=False, compare=False)
 ```
 
-Source: `src/helia_profiler/config/__init__.py:662`
+Source: `src/helia_profiler/config/__init__.py:661`
 
 ### helia_profiler.ProfileConfig.frozen
 
@@ -961,7 +961,7 @@ Source: `src/helia_profiler/config/__init__.py:662`
 frozen: bool = False
 ```
 
-Source: `src/helia_profiler/config/__init__.py:668`
+Source: `src/helia_profiler/config/__init__.py:667`
 
 ### helia_profiler.ProfileConfig.work_dir
 
@@ -971,7 +971,7 @@ Source: `src/helia_profiler/config/__init__.py:668`
 work_dir: Path | None = None
 ```
 
-Source: `src/helia_profiler/config/__init__.py:669`
+Source: `src/helia_profiler/config/__init__.py:668`
 
 ### helia_profiler.ProfileConfig.clean
 
@@ -981,7 +981,7 @@ Source: `src/helia_profiler/config/__init__.py:669`
 clean: bool = False
 ```
 
-Source: `src/helia_profiler/config/__init__.py:670`
+Source: `src/helia_profiler/config/__init__.py:669`
 
 ### helia_profiler.ProfileConfig.verbose
 
@@ -991,7 +991,7 @@ Source: `src/helia_profiler/config/__init__.py:670`
 verbose: int = 0
 ```
 
-Source: `src/helia_profiler/config/__init__.py:671`
+Source: `src/helia_profiler/config/__init__.py:670`
 
 ### helia_profiler.ProfileConfig.effective_window_target_ms
 
@@ -1009,4 +1009,4 @@ derived property rather than a helper each caller re-implements,
 because the rule spans two config sections and every caller (firmware
 render, power planner) must agree on the same effective value (#136).
 
-Source: `src/helia_profiler/config/__init__.py:699`
+Source: `src/helia_profiler/config/__init__.py:698`

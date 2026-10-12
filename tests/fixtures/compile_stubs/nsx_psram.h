@@ -12,6 +12,7 @@
 #include "nsx_core.h"
 
 extern const nsx_core_api_t nsx_psram_current_version;
+enum { NSX_PSRAM_STATE_READY = 1, NSX_PSRAM_CAP_XIP = 1U << 1 };
 
 typedef struct {
     const nsx_core_api_t *api;
@@ -45,7 +46,7 @@ static inline uint32_t nsx_psram_default_config(nsx_psram_config_t *cfg) {
     return 0U;
 }
 
-static inline uint32_t nsx_psram_init(nsx_psram_config_t *cfg) {
+static inline uint32_t nsx_psram_init(const nsx_psram_config_t *cfg) {
     (void)cfg;
     return 0U;
 }
@@ -55,7 +56,7 @@ static inline uint32_t nsx_psram_get_info(nsx_psram_info_t *info) {
     return 0U;
 }
 
-static inline uint32_t nsx_psram_write(uint32_t offset, const void *src, size_t len) {
+static inline uint32_t nsx_psram_write(uint32_t offset, const void *src, uint32_t len) {
     (void)offset;
     (void)src;
     (void)len;

@@ -73,8 +73,7 @@ def test_complete_fixture_render_uses_requested_regions(tmp_path, engine, placem
 @pytest.mark.parametrize(
     "arena,weights",
     [
-        (Placement.TCM, Placement.MRAM),
-        (Placement.SRAM, Placement.TCM),
+        (Placement.MRAM, Placement.MRAM),
         (Placement.PSRAM, Placement.MRAM),
         (None, Placement.MRAM),
     ],
@@ -82,10 +81,10 @@ def test_complete_fixture_render_uses_requested_regions(tmp_path, engine, placem
 def test_other_placement_pairs_stop_before_pipeline(tmp_path, arena, weights):
     fixture = typed(tmp_path)
     config = config_for(tmp_path, fixture)
-    config = replace(
-        config, model=replace(config.model, arena_location=arena, weights_location=weights)
-    )
-    with pytest.raises(ConfigError, match="placement"):
+    with pytest.raises(ConfigError, match="arena_location|placement"):
+        config = replace(
+            config, model=replace(config.model, arena_location=arena, weights_location=weights)
+        )
         _validate(config, fixture)
 
 

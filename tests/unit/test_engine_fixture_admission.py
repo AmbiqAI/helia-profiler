@@ -1,0 +1,380 @@
+"""Engine admission uses metadata only; no interpreter, compiler or model execution."""
+
+from dataclasses import replace
+from pathlib import Path
+from typing import Any, cast
+
+import pytest
+from test_typed_fixture_analysis import typed_model
+
+from helia_profiler import fixture as api
+from helia_profiler._fixture_build import _check_typed_fixture, _validate_state_policy
+from helia_profiler.errors import ConfigError
+from helia_profiler.fixture_analysis import analyze_fixture_model
+
+F32 = ("x", "float32", (1, 4), None, None)
+Y32 = ("y", "float32", (1, 4), None, None)
+
+
+def test_internal_symbolic_shapes_are_engine_owned(tmp_path):
+    def change(model, graph):
+        graph.tensors[2].shapeSignature = [1, -1]
+
+    path = typed_model(
+        tmp_path, [F32], [Y32], extra=[("internal", "float32", (1, 4), None, None)], change=change
+    )
+    with pytest.raises(ValueError, match="Dynamic"):
+        api.analyze_typed_fixture_model(path)
+    for engine in (api.EngineType.HELIA_AOT, api.EngineType.TFLM):
+        actual = api.analyze_typed_fixture_model_for_engine(path, engine=engine)
+        assert actual.inputs[0].shape == (1, 4)
+        assert actual.output_bytes == 16
+
+
+@pytest.mark.parametrize("engine", [api.EngineType.HELIA_AOT, api.EngineType.TFLM])
+@pytest.mark.parametrize(
+    "mutation,match",
+    [
+        (lambda m, g: setattr(g.tensors[0], "shapeSignature", [1, -1]), "Dynamic"),
+        (lambda m, g: setattr(g.tensors[1], "shape", [1, 0]), "Dynamic"),
+        (lambda m, g: setattr(g, "inputs", [99]), "tensor index"),
+        (lambda m, g: setattr(g.operators[0], "outputs", [99]), "tensor index"),
+        (lambda m, g: setattr(g.tensors[2], "buffer", 99), "buffer index"),
+        (lambda m, g: setattr(g.operators[0], "opcodeIndex", 99), "code index"),
+    ],
+)
+def test_common_hostile_io_and_container_checks_remain(tmp_path, engine, mutation, match):
+    path = typed_model(
+        tmp_path, [F32], [Y32], extra=[("internal", "float32", (1, 4), None, None)], change=mutation
+    )
+    with pytest.raises(ValueError, match=match):
+        api.analyze_typed_fixture_model_for_engine(path, engine=engine)
+
+
+def test_auxiliary_subgraph_stays_in_original_model_and_is_validated(tmp_path):
+    def change(model, graph):
+        model.subgraphs = [graph, graph]
+
+    path = typed_model(tmp_path, [F32], [Y32], change=change)
+    before = path.read_bytes()
+    actual = api.analyze_typed_fixture_model_for_engine(path, engine=api.EngineType.HELIA_AOT)
+    assert actual.input_bytes == 16
+    assert actual.resolver.registrations == ()
+    assert path.read_bytes() == before
+    micro = api.analyze_typed_fixture_model_for_engine(path, engine=api.EngineType.TFLM)
+    assert micro.subgraph_count == 2
+    assert micro.resolver.registrations == ("r.AddAdd();",)
+
+
+def test_aot_is_not_gated_by_micro_registration(tmp_path):
+    from test_typed_fixture_analysis import s
+
+    def change(model, graph):
+        model.operatorCodes[0].builtinCode = s.BuiltinOperator.GELU
+        model.operatorCodes[0].deprecatedBuiltinCode = 127
+
+    path = typed_model(tmp_path, [F32], [Y32], change=change)
+    assert (
+        api.analyze_typed_fixture_model_for_engine(
+            path, engine=api.EngineType.HELIA_AOT
+        ).resolver.registrations
+        == ()
+    )
+    with pytest.raises(ValueError, match="Unsupported fixture operators: GELU"):
+        api.analyze_typed_fixture_model_for_engine(path, engine=api.EngineType.TFLM)
+
+
+def test_internal_state_requires_typed_policy_and_initializer_is_not_assumed(tmp_path):
+    def change(model, graph):
+        graph.tensors[2].isVariable = True
+
+    path = typed_model(
+        tmp_path, [F32], [Y32], extra=[("state", "float32", (1, 4), None, None)], change=change
+    )
+    model = api.analyze_typed_fixture_model_for_engine(path, engine=api.EngineType.HELIA_AOT)
+    assert model.has_internal_state
+    with pytest.raises(ValueError, match="FixtureStatePolicy"):
+        api.FixtureMethod(api.FixtureTimingScope.INVOKE_ONLY, cast(Any, "carry"))
+    with pytest.raises(ConfigError, match="explicit carry"):
+        _validate_state_policy(
+            model, api.EngineType.HELIA_AOT, api.FixtureMethod(api.FixtureTimingScope.INVOKE_ONLY)
+        )
+    carry = api.FixtureMethod(api.FixtureTimingScope.INVOKE_ONLY, api.FixtureStatePolicy.CARRY)
+    _validate_state_policy(model, api.EngineType.HELIA_AOT, carry)
+    _validate_state_policy(replace(model, has_initializer=True), api.EngineType.HELIA_AOT, carry)
+
+
+def test_state_policy_binds_request_identity_without_changing_legacy(tmp_path):
+    from helia_profiler.fixture_runtime import FixtureFile
+
+    t = api.FixtureTensor("x", 0, "float32", (1, 4), None)
+    file = FixtureFile(Path("unused"), "0" * 64)
+    fixture = api.TypedFixture(
+        file, (api.FixtureIO(t, file),), (api.FixtureIO(replace(t, name="y", index=1), file),)
+    )
+    request = api.FixtureBuildRequest(
+        fixture,
+        api.FixtureMethod(api.FixtureTimingScope.INVOKE_ONLY),
+        tmp_path,
+        api.EngineType.HELIA_AOT,
+        32768,
+        100,
+        5,
+    )
+    same = replace(request, method=api.FixtureMethod(api.FixtureTimingScope.INVOKE_ONLY, None))
+    carry = replace(
+        request,
+        method=api.FixtureMethod(api.FixtureTimingScope.INVOKE_ONLY, api.FixtureStatePolicy.CARRY),
+    )
+    assert request.intent_identity == same.intent_identity
+    assert request.intent_identity != carry.intent_identity
+
+
+def test_output_transport_and_dtype_limits_remain(tmp_path):
+    path = typed_model(tmp_path, [F32], [("y", "float32", (1, 40000), None, None)])
+    model = api.analyze_typed_fixture_model_for_engine(path, engine=api.EngineType.HELIA_AOT)
+    from helia_profiler.fixture_runtime import FixtureFile
+
+    file = FixtureFile(Path("unused"), "0" * 64)
+    fixture = api.TypedFixture(
+        file,
+        tuple(api.FixtureIO(t, file) for t in model.inputs),
+        tuple(api.FixtureIO(t, file) for t in model.outputs),
+    )
+    with pytest.raises(ConfigError, match="readback budget"):
+        _check_typed_fixture(fixture, model, api.EngineType.HELIA_AOT)
+    mismatch = replace(
+        fixture,
+        outputs=(replace(fixture.outputs[0], tensor=replace(model.outputs[0], shape=(1, 4))),),
+    )
+    with pytest.raises(ConfigError, match="declarations differ"):
+        _check_typed_fixture(mismatch, model, api.EngineType.HELIA_AOT)
+
+
+def test_legacy_single_int8_build_analysis_also_selects_engine(tmp_path):
+    from test_fixture_analysis import model_file, s
+
+    path = model_file(tmp_path, op=s.BuiltinOperator.GELU)
+    assert (
+        analyze_fixture_model(path, _engine=api.EngineType.HELIA_AOT).resolver.registrations == ()
+    )
+    with pytest.raises(ValueError, match="GELU"):
+        analyze_fixture_model(path)
+
+
+def test_real_build_entry_selects_engine_before_pipeline(tmp_path, monkeypatch):
+    import hashlib
+
+    from test_typed_fixture_analysis import s
+
+    from helia_profiler import _fixture_build as build
+    from helia_profiler.config import load_config
+    from helia_profiler.fixture_runtime import FixtureFile
+
+    def gelu(model, graph):
+        model.operatorCodes[0].builtinCode = s.BuiltinOperator.GELU
+        model.operatorCodes[0].deprecatedBuiltinCode = 127
+
+    path = typed_model(tmp_path, [F32], [Y32], change=gelu)
+
+    def pin(p):
+        return FixtureFile(p, hashlib.sha256(p.read_bytes()).hexdigest())
+
+    data = tmp_path / "io.bin"
+    data.write_bytes(bytes(16))
+    analyzed = api.analyze_typed_fixture_model_for_engine(path, engine=api.EngineType.HELIA_AOT)
+    fixture = api.TypedFixture(
+        pin(path),
+        tuple(api.FixtureIO(t, pin(data)) for t in analyzed.inputs),
+        tuple(api.FixtureIO(t, pin(data)) for t in analyzed.outputs),
+    )
+    config = load_config(
+        None,
+        {
+            "model": {
+                "path": str(path),
+                "arena_size": 32768,
+                "arena_location": "sram",
+                "weights_location": "mram",
+            },
+            "engine": {"type": "helia-aot"},
+            "target": {"board": "apollo510_evb", "toolchain": "atfe", "clock": {"cpu": "lp"}},
+            "work_dir": str(tmp_path / "native"),
+        },
+    )
+    # Isolate installed dependency classification; the engine pipeline must never execute.
+    monkeypatch.setattr(build, "_refuse_overrides", lambda config: None)
+
+    class ReachedPipeline(Exception):
+        pass
+
+    def stop(self, config):
+        raise ReachedPipeline
+
+    monkeypatch.setattr(build.PipelineRunner, "run", stop)
+    with pytest.raises(ReachedPipeline):
+        api.build_fixed_fixture(
+            config,
+            fixture,
+            method=api.FixtureMethod(api.FixtureTimingScope.INVOKE_ONLY),
+            compile=False,
+        )
+
+
+@pytest.mark.parametrize("engine", [api.EngineType.HELIA_AOT, api.EngineType.TFLM])
+def test_selected_engine_still_checks_quantized_public_io(tmp_path, engine):
+    path = typed_model(tmp_path, [("x", "int16", (1, 4), None, None)], [Y32])
+    with pytest.raises(ValueError, match="requires quantization"):
+        api.analyze_typed_fixture_model_for_engine(path, engine=engine)
+
+
+def test_resource_resolver_covers_initializer_subgraph(tmp_path):
+    from test_typed_fixture_analysis import s
+
+    def change(model, graph):
+        code = s.OperatorCodeT()
+        code.builtinCode = s.BuiltinOperator.VAR_HANDLE
+        code.deprecatedBuiltinCode = 127
+        model.operatorCodes.append(code)
+        aux = s.SubGraphT()
+        aux.tensors = []
+        op = s.OperatorT()
+        op.opcodeIndex = 1
+        op.inputs = []
+        op.outputs = []
+        aux.operators = [op]
+        aux.inputs = []
+        aux.outputs = []
+        model.subgraphs.append(aux)
+
+    path = typed_model(tmp_path, [F32], [Y32], change=change)
+    actual = api.analyze_typed_fixture_model_for_engine(path, engine=api.EngineType.TFLM)
+    assert actual.subgraph_count == 2
+    assert actual.resource_variable_count == 1
+    assert "r.AddVarHandle();" in actual.resolver.registrations
+    assert "r.AddAdd();" in actual.resolver.registrations
+
+
+def test_resource_renderer_allocates_once_and_keeps_full_model(tmp_path):
+    import hashlib
+
+    from helia_profiler._fixture_build import FixtureRenderSpec
+    from helia_profiler.config import load_config
+    from helia_profiler.firmware.fixture import fixture_template_vars
+    from helia_profiler.firmware.render import _jinja_env
+    from helia_profiler.fixture_runtime import FixtureFile
+    from helia_profiler.pipeline import PipelineContext
+
+    path = typed_model(tmp_path, [F32], [Y32])
+    model = api.analyze_typed_fixture_model_for_engine(path, engine=api.EngineType.TFLM)
+    model = replace(
+        model,
+        has_internal_state=True,
+        has_initializer=True,
+        subgraph_count=2,
+        resource_variable_count=20,
+    )
+    data = tmp_path / "io.bin"
+    data.write_bytes(bytes(16))
+
+    def pin(p):
+        return FixtureFile(p, hashlib.sha256(p.read_bytes()).hexdigest())
+
+    fixture = api.TypedFixture(
+        pin(path),
+        tuple(api.FixtureIO(t, pin(data)) for t in model.inputs),
+        tuple(api.FixtureIO(t, pin(data)) for t in model.outputs),
+    )
+    config = load_config(
+        None,
+        {
+            "model": {
+                "path": str(path),
+                "arena_size": 1048576,
+                "arena_location": "sram",
+                "weights_location": "mram",
+            },
+            "engine": {"type": "tflm", "backend": "cmsis_nn"},
+            "profiling": {"iterations": 100, "warmup": 5},
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ctx.fixture = FixtureRenderSpec(
+        fixture,
+        api.FixtureMethod(api.FixtureTimingScope.INVOKE_ONLY, api.FixtureStatePolicy.CARRY),
+        model,
+    )
+    text = _jinja_env.get_template("fixed_fixture.cc.j2").render(**fixture_template_vars(ctx, []))
+    assert "model->subgraphs()->size() != 2" in text
+    assert "MicroResourceVariables::Create(allocator, 20)" in text
+    assert "MicroInterpreter interpreter(model, resolver, allocator, resources)" in text
+    assert text.count("interpreter.AllocateTensors()") == 1
+    assert "ResetAll" not in text and "interpreter.Reset" not in text
+    assert text.index("interpreter.AllocateTensors()") < text.index("for (unsigned i = 0;")
+    assert "graph->inputs()->Get(0) != 0" in text
+    assert "graph->outputs()->Get(0) != 1" in text
+
+
+@pytest.mark.parametrize("engine", [api.EngineType.HELIA_AOT, api.EngineType.TFLM])
+def test_stateful_operator_needs_carry_without_tensor_flags(tmp_path, engine):
+    from test_typed_fixture_analysis import s
+
+    def change(model, graph):
+        model.operatorCodes[0].builtinCode = s.BuiltinOperator.SVDF
+        model.operatorCodes[0].deprecatedBuiltinCode = s.BuiltinOperator.SVDF
+
+    path = typed_model(tmp_path, [F32], [Y32], change=change)
+    actual = api.analyze_typed_fixture_model_for_engine(path, engine=engine)
+    assert actual.has_internal_state
+    with pytest.raises(ConfigError, match="explicit carry"):
+        _validate_state_policy(
+            actual, engine, api.FixtureMethod(api.FixtureTimingScope.INVOKE_ONLY)
+        )
+
+
+def test_auxiliary_float16_is_part_of_micro_capability(tmp_path):
+    from test_typed_fixture_analysis import _tensor, s
+
+    def change(model, graph):
+        aux = s.SubGraphT()
+        aux.tensors = [_tensor("half", "float16", (1, 4), None, None)]
+        aux.inputs = []
+        aux.outputs = []
+        aux.operators = []
+        model.subgraphs.append(aux)
+
+    path = typed_model(tmp_path, [F32], [Y32], change=change)
+    actual = api.analyze_typed_fixture_model_for_engine(path, engine=api.EngineType.TFLM)
+    assert actual.has_float16
+    from helia_profiler.fixture_runtime import FixtureFile
+
+    file = FixtureFile(Path("unused"), "0" * 64)
+    fixture = api.TypedFixture(
+        file,
+        tuple(api.FixtureIO(t, file) for t in actual.inputs),
+        tuple(api.FixtureIO(t, file) for t in actual.outputs),
+    )
+    with pytest.raises(ConfigError, match="float16"):
+        _check_typed_fixture(fixture, actual, api.EngineType.TFLM)
+
+
+def test_carry_operator_attribution_is_refused_without_state_binding(tmp_path):
+    from test_fixture_operator_timing import KWS_SHA, build_for, fixture_for, profile
+
+    from helia_profiler.fixture_operator_timing import bind_operator_timing
+
+    fixture = fixture_for(KWS_SHA, tmp_path)
+    build = replace(
+        build_for(api.EngineType.HELIA_AOT, fixture), state_policy=api.FixtureStatePolicy.CARRY
+    )
+    actual = bind_operator_timing(build, fixture, profile("kws_aot"))
+    assert not actual.accepted
+    assert actual.reason == "state_policy_not_bound_by_profile"
+    assert actual.operators is None
+
+
+def test_engine_selection_is_a_typed_closed_set(tmp_path):
+    with pytest.raises(ValueError, match="Explicit supported fixture engine"):
+        api.analyze_typed_fixture_model_for_engine(
+            tmp_path / "unread", engine=cast(Any, "helia-aot")
+        )

@@ -58,7 +58,7 @@ from tests.contracts.test_firmware_render_snapshots import (
     _render,
 )
 
-from .fixture_compile_cases import FIXTURE_ENGINES, FIXTURE_KINDS, render_fixture
+from .fixture_compile_cases import FIXTURE_KIND_ENGINES, aot_model_stub, render_fixture
 
 # The matrix (D3) — one row per (workspace leg, target, render arm).
 # rtt-only: power/busy arms are rtt-only and transport variation is Tier 1's
@@ -199,8 +199,7 @@ _MATRIX: tuple[_HwCase, ...] = (
         "hpx_profiler",
         fixture_kind=kind,
     )
-    for kind in FIXTURE_KINDS
-    for engine in FIXTURE_ENGINES
+    for kind, engine in FIXTURE_KIND_ENGINES
 )
 
 
@@ -391,7 +390,7 @@ def _prepare_case(case: _HwCase, workspace: _Workspace, tmp_path: Path) -> tuple
     scratch = tmp_path / case.case_id
     scratch.mkdir()
     overrides = {}
-    if case.engine == "helia-aot":
+    if case.engine == "helia-aot" and not (case.fixture_kind or "").startswith("psram"):
         # The workspace's generated model module carries its real prefix;
         # render against it so the include resolves to the real header.
         prefix = _aot_prefix_in(workspace.app_dir)
@@ -403,6 +402,11 @@ def _prepare_case(case: _HwCase, workspace: _Workspace, tmp_path: Path) -> tuple
         )
         for name, content in headers.items():
             (scratch / name).write_text(content, encoding="utf-8")
+        if case.engine == "helia-aot" and case.fixture_kind.startswith("psram"):
+            # Keep real vendor headers/flags, but use a mode-correct model API
+            # rather than an unrelated cached model with internal arenas.
+            (scratch / "fake_model.h").write_text(aot_model_stub(external_arenas=True))
+            (scratch / "fake_common.h").write_text("#pragma once\n")
     else:
         text = _render(
             case.soc,
@@ -602,6 +606,16 @@ def test_matrix_covers_every_engine_family():
         "510-helia-rt-fixture-tcn",
         "510-helia-rt-fixture-kws",
         "510-helia-rt-fixture-typed",
+        "510-tflm-fixture-resource",
+        "510-helia-aot-fixture-resource",
+        "510-tflm-fixture-psram",
+        "510-helia-aot-fixture-psram",
+        "510-tflm-fixture-psram-resource",
+        "510-helia-aot-fixture-psram-resource",
+        "510-tflm-fixture-psram-tcm",
+        "510-helia-aot-fixture-psram-tcm",
+        "510-tflm-fixture-psram-tcm-resource",
+        "510-helia-aot-fixture-psram-tcm-resource",
     }, "the Tier-2 leg set changed — deliberate? update this pin with the reason"
 
 
@@ -837,11 +851,21 @@ def test_fixture_real_toolchain_preparation_renders_current_sources(tmp_path, ca
     scratch, tus = _prepare_case(case, workspace, tmp_path)
     assert tus == [scratch / "main.cc"]
     text = tus[0].read_text(encoding="utf-8")
-    size = {"tcn": 480, "kws": 12, "typed": 4}[case.fixture_kind]
+    size = {
+        "tcn": 480,
+        "kws": 12,
+        "typed": 4,
+        "resource": 4,
+        "psram": 4,
+        "psram-resource": 4,
+        "psram-tcm": 4,
+        "psram-tcm-resource": 4,
+    }[case.fixture_kind]
     assert f"deployment_output[{size}]" in text
     assert "hpx_stimer_init" in (scratch / "fixed_fixture_clock.h").read_text(encoding="utf-8")
     if case.engine == "helia-aot":
-        assert '#include "warm_model.h"' in text
+        model_header = "fake" if case.fixture_kind.startswith("psram") else "warm"
+        assert f'#include "{model_header}_model.h"' in text
         assert not (scratch / "fixed_fixture_memory.h").exists()
     else:
         assert "deployment_memory[8]" in (scratch / "fixed_fixture_memory.h").read_text(
@@ -849,7 +873,7 @@ def test_fixture_real_toolchain_preparation_renders_current_sources(tmp_path, ca
         )
         assert (scratch / "model_data.h").read_text(encoding="utf-8") == "// model data\n"
 
-    if case.fixture_kind == "typed":
+    if case.fixture_kind in ("typed", "resource") or case.fixture_kind.startswith("psram"):
         assert "int main(" in text
         assert "static const uint8_t fixed_input_2[]" in text
         assert "std::memcpy(input_data_2, fixed_input_2, sizeof(fixed_input_2))" in text

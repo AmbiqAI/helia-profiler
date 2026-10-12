@@ -6,7 +6,7 @@ import hashlib
 import json
 import os
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from enum import StrEnum
 from pathlib import Path, PurePath
 
@@ -23,16 +23,22 @@ from .fixture_analysis import (
     PerAxisQuantization,
     TypedFixtureModelAnalysis,
     analyze_fixture_model,
-    analyze_typed_fixture_model,
+    analyze_typed_fixture_model_for_engine,
 )
 from .fixture_image import MAX_IMAGE, MRAM, bounded
+from .fixture_psram import FixturePsramWeights
 from .fixture_runtime import (
     PREPARED_RUNTIME_MODULES,
     FixtureFile,
     PreparedUpstreamRuntime,
     _PreparedRuntimeStage,
 )
-from .fixture_target import FIXTURE_CLOCK_PROFILE, FixtureTarget, supported_fixture_target
+from .fixture_target import (
+    FIXTURE_CLOCK_PROFILE,
+    FixtureTarget,
+    fixture_app_region,
+    supported_fixture_target,
+)
 from .pipeline import PipelineContext, PipelineRunner, Stage, serialize_config
 from .placement import ArenaRole, Placement
 from .results.models import MemoryPlan, ToolchainInfo
@@ -42,6 +48,12 @@ from .runtime_records import RuntimeQualification, qualification, runtimes
 class FixtureTimingScope(StrEnum):
     INVOKE_ONLY = "invoke_only"
     RESTORE_AND_INVOKE = "restore_and_invoke"
+
+
+class FixtureStatePolicy(StrEnum):
+    """Internal state behavior; input restoration is independent of this policy."""
+
+    CARRY = "carry"
 
 
 class FixtureRole(StrEnum):
@@ -70,13 +82,21 @@ class FixtureBackend(StrEnum):
 
 @dataclass(frozen=True)
 class FixtureMethod:
-    """Select whether fixed-input restoration is included in the timed interval."""
+    """Select input-restoration timing and declare internal-state carry explicitly.
+
+    Carry initializes the engine once, then retains internal state through
+    warmups and measurements. Fixed external inputs are still restored each
+    invocation; no internal reset or source-initializer equivalence is implied.
+    """
 
     timing_scope: FixtureTimingScope
+    state_policy: FixtureStatePolicy | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.timing_scope, FixtureTimingScope):
             raise ValueError("Explicit FixtureTimingScope required")
+        if self.state_policy is not None and not isinstance(self.state_policy, FixtureStatePolicy):
+            raise ValueError("Explicit FixtureStatePolicy required")
 
 
 @dataclass(frozen=True)
@@ -277,6 +297,19 @@ class TypedFixture:
         ).hexdigest()
 
 
+def _validate_engine_dtype(model, engine: EngineType) -> None:
+    if engine is EngineType.TFLM and model.has_float16:
+        raise ConfigError("The upstream TFLM runtime has no float16 support")
+
+
+def _validate_state_policy(model, engine: EngineType, method: FixtureMethod) -> None:
+    _validate_engine_dtype(model, engine)
+    if model.has_internal_state and method.state_policy is not FixtureStatePolicy.CARRY:
+        raise ConfigError(
+            "Internal-state fixtures require explicit carry policy; inputs restore separately"
+        )
+
+
 def _check_typed_fixture(
     fixture: TypedFixture, model: TypedFixtureModelAnalysis, engine: EngineType
 ) -> tuple[tuple[str, FixtureCapability], ...]:
@@ -293,8 +326,7 @@ def _check_typed_fixture(
             f"Fixture outputs total {model.output_bytes} B, above the "
             f"{FIXTURE_READBACK_BUDGET} B readback budget"
         )
-    if engine is EngineType.TFLM and model.has_float16:
-        raise ConfigError("The upstream TFLM runtime has no float16 support")
+    _validate_engine_dtype(model, engine)
     table = FIXTURE_CAPABILITIES[engine]
     tensors = (*model.inputs, *model.outputs)
     # Device passes so far cover one input and one output with per-tensor
@@ -355,6 +387,13 @@ class FixtureBuild:
     engine_source: EngineSource | None = None
     #: Exact dependency state retained beside the per-build lock snapshot.
     dependency_state: FixtureFile | None = None
+    state_policy: FixtureStatePolicy | None = None
+    source_initializer_present: bool = False
+    #: Image-bound PSRAM constants/model expectations, absent on other placements.
+    psram_weights: FixturePsramWeights | None = None
+    #: Effective configured banks; legacy receipts without these cannot bind operator timing.
+    arena_location: Placement | None = None
+    weights_location: Placement | None = None
 
 
 @dataclass(frozen=True)
@@ -465,13 +504,24 @@ def _refuse_overrides(config: ProfileConfig) -> None:
         )
 
 
-def _validate_fixture_placement(arena: Placement | None, weights: Placement | None) -> None:
-    """Accept only explicit paired placements supported by the fixture renderer."""
-    if (arena, weights) not in (
-        (Placement.SRAM, Placement.MRAM),
-        (Placement.TCM, Placement.TCM),
-    ):
-        raise ConfigError("Fixture placement requires SRAM/MRAM or TCM/TCM")
+def _validate_fixture_placement(
+    arena: Placement | None, weights: Placement | None, engine: EngineType | None = None
+) -> None:
+    """Validate the fixture's implemented static arenas and weight backing."""
+    if arena not in (Placement.SRAM, Placement.TCM):
+        raise ConfigError("Fixture arena placement requires writable static SRAM or DTCM")
+    if not isinstance(weights, Placement):
+        raise ConfigError("Explicit fixture weight backing required")
+    for placement in (arena, weights):
+        try:
+            start, end = fixture_app_region(placement.region)
+        except ValueError as exc:
+            raise ConfigError("Fixture target has no selected memory bank") from exc
+        if start >= end:
+            raise ConfigError("Fixture target memory bank has no usable capacity")
+    if weights is Placement.PSRAM:
+        if engine not in (EngineType.HELIA_AOT, EngineType.TFLM):
+            raise ConfigError("Self-loading PSRAM fixtures implement helia-AOT or upstream TFLM")
 
 
 def _validate(config: ProfileConfig, fixture: FixedFixture | TypedFixture) -> None:
@@ -491,7 +541,9 @@ def _validate(config: ProfileConfig, fixture: FixedFixture | TypedFixture) -> No
             f"Fixed fixture supports {supported_fixture_target().board} "
             f"at the {FIXTURE_CLOCK_PROFILE} clock only"
         )
-    _validate_fixture_placement(config.model.arena_location, config.model.weights_location)
+    _validate_fixture_placement(
+        config.model.arena_location, config.model.weights_location, config.engine.type
+    )
     if config.model.arena_size is None or not 0 < config.model.arena_size <= 3 * 1024 * 1024:
         raise ConfigError("Explicit bounded arena capacity required")
     if config.power.enabled or config.target.ensure_board_powered:
@@ -552,16 +604,19 @@ def _build(
     _validate(config, fixture)
     model: FixtureModelAnalysis | TypedFixtureModelAnalysis
     if isinstance(fixture, TypedFixture):
-        model = analyze_typed_fixture_model(fixture.model.path)
+        model = analyze_typed_fixture_model_for_engine(
+            fixture.model.path, engine=config.engine.type
+        )
         capabilities = _check_typed_fixture(fixture, model, config.engine.type)
     else:
-        model = analyze_fixture_model(fixture.model.path)
+        model = analyze_fixture_model(fixture.model.path, _engine=config.engine.type)
         if (fixture.input_tensor, fixture.output_tensor) != (
             model.input_tensor,
             model.output_tensor,
         ):
             raise ConfigError("Fixture tensor declarations differ from analyzed model")
         capabilities = (("int8", FIXTURE_CAPABILITIES[config.engine.type]["int8"]),)
+    _validate_state_policy(model, config.engine.type, method)
     if config.engine.type in PREPARED_RUNTIME_ENGINES:
         stack, backend = PREPARED_RUNTIME_ENGINES[config.engine.type]
         if runtime is None or config.engine.backend != backend:
@@ -580,6 +635,22 @@ def _build(
     if config.work_dir is None:
         raise ConfigError("Explicit work directory required")
     root = config.work_dir.resolve()
+    # Placement owns this fixed converter setting; callers cannot supply engine overrides.
+    if (
+        config.engine.type is EngineType.HELIA_AOT
+        and config.model.weights_location is Placement.PSRAM
+    ):
+        aot_args = dict(config.engine.config.get("aot_args", {}))
+        memory_value = aot_args.get("memory")
+        memory_args = {} if memory_value is None else dict(memory_value)
+        aot_args["memory"] = {**memory_args, "allocate_arenas": False}
+        config = replace(
+            config,
+            engine=replace(
+                config.engine,
+                config={**config.engine.config, "aot_args": aot_args},
+            ),
+        )
     root.mkdir(parents=True, exist_ok=True)
     identity_path = root / "fixed-fixture-identity.json"
     identity = {
@@ -590,6 +661,8 @@ def _build(
             json.dumps(serialize_config(config), sort_keys=True).encode()
         ).hexdigest(),
     }
+    if method.state_policy is not None:
+        identity["state_policy"] = method.state_policy.value
     if observe_aot_arenas:
         identity["observe_aot_arenas"] = True
 
@@ -754,4 +827,25 @@ def _build(
         else (),
         engine_source=_engine_source(config.engine.type),
         dependency_state=dependency_state,
+        psram_weights=_psram_weights(ctx, flat_binary),
+        arena_location=config.model.arena_location,
+        weights_location=config.model.weights_location,
+        state_policy=method.state_policy,
+        source_initializer_present=model.has_initializer,
+    )
+
+
+def _psram_weights(ctx: PipelineContext, image: FixtureFile | None) -> FixturePsramWeights | None:
+    if ctx.config.model.weights_location is not Placement.PSRAM:
+        return None
+    from .firmware.fixture import fixture_psram_payloads
+
+    regions = (
+        ctx.engine_artifacts.aot_arena_regions
+        if isinstance(ctx.engine_artifacts, HeliaAotArtifacts)
+        else []
+    )
+    payloads = fixture_psram_payloads(ctx, regions)
+    return FixturePsramWeights(
+        payloads, image.sha256 if image else None, ctx.config.target.psram.clock_hz
     )

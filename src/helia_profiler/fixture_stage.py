@@ -16,6 +16,7 @@ class FixtureStage(IntEnum):
     INVOKE = -7
     STIMER = -8
     TIMING_BOUND = -9
+    PSRAM = -10
 
     @property
     def description(self) -> str:
@@ -31,4 +32,5 @@ _STAGE_DESCRIPTIONS = {
     FixtureStage.INVOKE: "inference invoke",
     FixtureStage.STIMER: "STIMER start",
     FixtureStage.TIMING_BOUND: "timing bound",
+    FixtureStage.PSRAM: "PSRAM initialization, loading or active placement",
 }

@@ -1542,7 +1542,7 @@
               "params": [],
               "raises": [],
               "returns": [],
-              "signature": "compatibility_baseline: CompatibilityBaseline = field(default_factory=load_compatibility_baseline, init=False, repr=False)",
+              "signature": "compatibility_baseline: CompatibilityBaseline = field(default_factory=load_compatibility_baseline, repr=False)",
               "source": {
                 "line": 657,
                 "path": "src/helia_profiler/config/__init__.py",
@@ -1563,9 +1563,9 @@
               "returns": [],
               "signature": "compatibility: CompatibilityResolution | None = field(default=None, init=False, repr=False, compare=False)",
               "source": {
-                "line": 662,
+                "line": 661,
                 "path": "src/helia_profiler/config/__init__.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/__init__.py#L662"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/__init__.py#L661"
               },
               "summary": ""
             },
@@ -1582,9 +1582,9 @@
               "returns": [],
               "signature": "frozen: bool = False",
               "source": {
-                "line": 668,
+                "line": 667,
                 "path": "src/helia_profiler/config/__init__.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/__init__.py#L668"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/__init__.py#L667"
               },
               "summary": ""
             },
@@ -1601,9 +1601,9 @@
               "returns": [],
               "signature": "work_dir: Path | None = None",
               "source": {
-                "line": 669,
+                "line": 668,
                 "path": "src/helia_profiler/config/__init__.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/__init__.py#L669"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/__init__.py#L668"
               },
               "summary": ""
             },
@@ -1620,9 +1620,9 @@
               "returns": [],
               "signature": "clean: bool = False",
               "source": {
-                "line": 670,
+                "line": 669,
                 "path": "src/helia_profiler/config/__init__.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/__init__.py#L670"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/__init__.py#L669"
               },
               "summary": ""
             },
@@ -1639,9 +1639,9 @@
               "returns": [],
               "signature": "verbose: int = 0",
               "source": {
-                "line": 671,
+                "line": 670,
                 "path": "src/helia_profiler/config/__init__.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/__init__.py#L671"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/__init__.py#L670"
               },
               "summary": ""
             },
@@ -1658,9 +1658,9 @@
               "returns": [],
               "signature": "effective_window_target_ms: int",
               "source": {
-                "line": 699,
+                "line": 698,
                 "path": "src/helia_profiler/config/__init__.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/__init__.py#L699"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/__init__.py#L698"
               },
               "summary": "The clean-window target the firmware is actually built with."
             }

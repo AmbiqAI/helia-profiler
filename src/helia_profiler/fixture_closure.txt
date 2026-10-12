@@ -47,6 +47,7 @@ data/runtimes/helia-aot/0.23.0.json
 data/runtimes/helia-aot/0.24.0.json
 data/runtimes/helia-aot/0.25.0.json
 data/runtimes/helia-aot/0.26.0.json
+data/runtimes/helia-aot/0.27.0.json
 data/runtimes/helia-rt/1.21.3.json
 data/runtimes/tflm/85638f0.json
 data/session_intent.schema.v1.json
@@ -126,6 +127,7 @@ firmware/templates/_usb_config.j2
 firmware/templates/_usb_timer.j2
 firmware/templates/fixed_fixture.cc.j2
 firmware/templates/fixed_fixture_memory.h.j2
+firmware/templates/fixed_fixture_psram.h.j2
 firmware/templates/hpx_pmu_profiler.cc.j2
 firmware/templates/hpx_pmu_profiler.h.j2
 firmware/templates/main.cc.j2
@@ -141,6 +143,7 @@ fixture_image.py
 fixture_metrics.py
 fixture_observation.py
 fixture_operator_timing.py
+fixture_psram.py
 fixture_runtime.py
 fixture_stage.py
 fixture_target.py

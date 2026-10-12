@@ -18,6 +18,7 @@ from helia_profiler.fixture_analysis import FixtureTensor, Int8Tensor, PerTensor
 from helia_profiler.fixture_operator_timing import bind_operator_timing
 from helia_profiler.fixture_runtime import FixtureFile
 from helia_profiler.fixture_target import supported_fixture_target
+from helia_profiler.placement import Placement
 from helia_profiler.results.models import (
     EngineInfo,
     FirmwareMeta,
@@ -116,6 +117,8 @@ def build_for(
         "intent",
         supported_fixture_target(),
         ATFE,
+        arena_location=Placement.SRAM,
+        weights_location=Placement.MRAM,
     )
 
 
@@ -341,3 +344,60 @@ def test_heliart_fixture_binds_only_to_a_helia_backend_profile(tmp_path, backend
     if reason is None:
         assert labelled.accepted
         assert labelled.runtime_stack == "profile_baseline_differs_from_fixture_runtime"
+
+
+@pytest.mark.parametrize("profile_weights", ["mram", "psram"])
+def test_psram_build_cannot_inherit_ordinary_profile_timing(tmp_path, profile_weights):
+    from helia_profiler.fixture_psram import FixturePsramPayload, FixturePsramWeights
+
+    fixture = fixture_for(KWS_SHA, tmp_path)
+    build = replace(
+        build_for(EngineType.HELIA_AOT, fixture),
+        psram_weights=FixturePsramWeights((FixturePsramPayload(0, 4, 2987074),)),
+    )
+    run = profile("kws_aot")
+    snapshot = dict(run.metadata.config_snapshot)
+    snapshot["model"] = {**snapshot["model"], "weights_location": profile_weights}
+    run = replace(run, metadata=replace(run.metadata, config_snapshot=snapshot))
+    result = bind_operator_timing(build, fixture, run)
+    assert not result.accepted
+    assert result.reason == "psram_placement_not_bound_by_profile"
+
+
+@pytest.mark.parametrize(
+    "arena,weights",
+    [
+        (Placement.TCM, Placement.MRAM),
+        (Placement.SRAM, Placement.SRAM),
+        (Placement.TCM, Placement.SRAM),
+    ],
+)
+@pytest.mark.parametrize("same", [False, True])
+def test_operator_timing_compares_effective_build_banks(tmp_path, arena, weights, same):
+    fixture = fixture_for(KWS_SHA, tmp_path)
+    build = replace(
+        build_for(EngineType.HELIA_AOT, fixture), arena_location=arena, weights_location=weights
+    )
+    run = profile("kws_aot")
+    if same:
+        snapshot = dict(run.metadata.config_snapshot)
+        snapshot["model"] = {
+            **snapshot["model"],
+            "arena_location": arena.value,
+            "weights_location": weights.value,
+        }
+        run = replace(run, metadata=replace(run.metadata, config_snapshot=snapshot))
+    result = bind_operator_timing(build, fixture, run)
+    assert result.accepted is same
+    assert result.reason == (None if same else "placement_mismatch")
+
+
+def test_legacy_build_without_banks_cannot_inherit_profile_placement(tmp_path):
+    fixture = fixture_for(KWS_SHA, tmp_path)
+    build = replace(
+        build_for(EngineType.HELIA_AOT, fixture), arena_location=None, weights_location=None
+    )
+    assert (
+        bind_operator_timing(build, fixture, profile("kws_aot")).reason
+        == "build_placement_unrecorded"
+    )

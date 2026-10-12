@@ -11,8 +11,6 @@ from .fixture_capture import FIXTURE_CPU_HZ
 from .fixture_target import FIXTURE_CLOCK_PROFILE
 from .results.models import DEVICE_CLOCK_TOLERANCE, ProfileResult
 
-#: Clock and placement every fixed fixture is built for (see ``fixture._validate``).
-FIXTURE_PLACEMENT = {"arena_location": "sram", "weights_location": "mram"}
 FIXTURE_TFLM_BACKEND = "cmsis_nn"
 #: Layer-sum agreement with the uninstrumented clean window, in percent of clean.
 AGREEMENT_PCT = 1.0
@@ -65,6 +63,12 @@ def _identity_reason(
     profile: ProfileResult,
     allow_runtime: bool,
 ) -> str | None:
+    if build.psram_weights is not None:
+        return "psram_placement_not_bound_by_profile"
+    if build.arena_location is None or build.weights_location is None:
+        return "build_placement_unrecorded"
+    if build.state_policy is not None:
+        return "state_policy_not_bound_by_profile"
     meta = profile.metadata
     snapshot = meta.config_snapshot or {}
     model = snapshot.get("model") or {}
@@ -100,7 +104,10 @@ def _identity_reason(
     measured = profile.pmu.meta.measured_clock_hz
     if measured and abs(measured - FIXTURE_CPU_HZ) > DEVICE_CLOCK_TOLERANCE * FIXTURE_CPU_HZ:
         return "measured_clock_mismatch"
-    if any(model.get(key) != value for key, value in FIXTURE_PLACEMENT.items()):
+    if (model.get("arena_location"), model.get("weights_location")) != (
+        build.arena_location.value,
+        build.weights_location.value,
+    ):
         return "placement_mismatch"
     if build.runtime_manifest is not None and not allow_runtime:
         return "runtime_stack_mismatch"
@@ -121,6 +128,8 @@ def bind_operator_timing(
     TFLM and heliaRT fixtures link a prepared runtime archive that ``hpx profile``
     does not use, so its per-layer data describe a different runtime build;
     ``allow_runtime_difference`` accepts that and labels the record.
+    PSRAM builds are refused because an ordinary profile does not bind their
+    active payload, external arena layout, or loader configuration.
     """
     engine = profile.metadata.engine
     runtime_stack = (

@@ -21,6 +21,7 @@ from ._fixture_build import (
     FixtureIO,
     FixtureMethod,
     FixtureRole,
+    FixtureStatePolicy,
     FixtureTimingScope,
     TypedFixture,
     build_fixed_fixture,
@@ -46,6 +47,7 @@ from .fixture_analysis import (
     PerTensorQuantization,
     TypedFixtureModelAnalysis,
     analyze_typed_fixture_model,
+    analyze_typed_fixture_model_for_engine,
 )
 from .fixture_capture import (
     FixtureCaptureGuard,
@@ -60,6 +62,7 @@ from .fixture_observation import (
     FixtureMeasurements,
     summarize_fixture_measurements,
 )
+from .fixture_psram import FixturePsramObservation, FixturePsramPayload, FixturePsramWeights
 from .fixture_runtime import (
     FixtureFile,
     PreparedUpstreamRuntime,
@@ -75,7 +78,7 @@ from .hostenv.elf_inventory import ElfSection, LoadSegment, SectionInventory, se
 from .placement import Placement
 from .results.models import ToolchainInfo
 
-FIXTURE_API_VERSION: Final[tuple[int, int]] = (3, 2)
+FIXTURE_API_VERSION: Final[tuple[int, int]] = (3, 5)
 
 __all__ = [
     "FIXTURE_API_VERSION",
@@ -90,6 +93,7 @@ __all__ = [
     "FixtureRole",
     "FixtureStage",
     "FixtureTimingScope",
+    "FixtureStatePolicy",
     "Placement",
     # Inputs
     "FixtureBuildRequest",
@@ -111,6 +115,7 @@ __all__ = [
     "FixtureCaptureGuard",
     # Operations
     "analyze_typed_fixture_model",
+    "analyze_typed_fixture_model_for_engine",
     "build_fixture",
     "fixture_capabilities",
     "build_fixed_fixture",
@@ -138,6 +143,9 @@ __all__ = [
     "FixtureMemory",
     "FixtureMetric",
     "FixtureTiming",
+    "FixturePsramWeights",
+    "FixturePsramPayload",
+    "FixturePsramObservation",
     "ElfSection",
     "LoadSegment",
     "SectionInventory",

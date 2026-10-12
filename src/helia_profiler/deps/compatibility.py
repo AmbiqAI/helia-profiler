@@ -298,7 +298,7 @@ def resolve_compatibility(
         if os.environ.get(variable):
             engines.add(f"env.{variable}")
 
-    if modules:
+    if modules or baseline.fingerprint != load_compatibility_baseline().fingerprint:
         qualification = QualificationState.DEVELOPMENT_OVERRIDES
     elif engines:
         qualification = QualificationState.QUALIFIED_WITH_ENGINE_OVERRIDE

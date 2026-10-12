@@ -652,11 +652,10 @@ class ProfileConfig:
     timeouts: TimeoutsConfig = field(default_factory=TimeoutsConfig)
     build: BuildConfig = field(default_factory=BuildConfig)
     platform_registry: PlatformRegistry = field(default_factory=build_platform_registry)
-    # These fields are resolved once from HPX package data and are not
-    # user-configurable.  The nested dataclasses are immutable.
+    # Python callers may supply an immutable baseline; YAML/CLI keys remain
+    # reserved. Qualification is resolved once from the actual selected pins.
     compatibility_baseline: CompatibilityBaseline = field(
         default_factory=load_compatibility_baseline,
-        init=False,
         repr=False,
     )
     compatibility: CompatibilityResolution | None = field(
