@@ -72,6 +72,7 @@ def test_regenerate_from_readonly_sources(tmp_path: Path, existing_readonly: boo
 
 
 @pytest.mark.parametrize("link_type", ["symlink", "hardlink"])
+@pytest.mark.parametrize("cross_file", [False, True])
 @pytest.mark.parametrize(
     "aliased",
     [
@@ -82,7 +83,7 @@ def test_regenerate_from_readonly_sources(tmp_path: Path, existing_readonly: boo
     ],
 )
 def test_destination_alias_does_not_modify_source(
-    tmp_path: Path, link_type: str, aliased: str
+    tmp_path: Path, link_type: str, cross_file: bool, aliased: str
 ) -> None:
     source = tmp_path / "source"
     app = tmp_path / "app"
@@ -101,15 +102,18 @@ def test_destination_alias_does_not_modify_source(
         before = [((source / name).read_bytes(), (source / name).stat().st_mode) for name in paths]
         dest = app / "rtt" / aliased.removeprefix("RTT/")
         dest.parent.mkdir(parents=True, exist_ok=True)
+        link_source = source / ("RTT/SEGGER_RTT.h" if cross_file else aliased)
+        if cross_file and aliased == "RTT/SEGGER_RTT.h":
+            link_source = source / "RTT/SEGGER_RTT.c"
         try:
             if link_type == "symlink":
-                dest.symlink_to(source / aliased)
+                dest.symlink_to(link_source)
             else:
-                dest.hardlink_to(source / aliased)
+                dest.hardlink_to(link_source)
         except (OSError, NotImplementedError) as error:
             pytest.skip(f"{link_type} unavailable: {error}")
 
-        with pytest.raises(FirmwareError, match="same file"):
+        with pytest.raises(FirmwareError):
             _copy_segger_rtt(app, source)
 
         assert [
@@ -119,4 +123,21 @@ def test_destination_alias_does_not_modify_source(
         for name in paths:
             path = source / name
             if path.exists():
+                path.chmod(0o644)
+
+
+def test_fresh_copies_are_writable_with_restrictive_umask(tmp_path: Path) -> None:
+    app = tmp_path / "app"
+    (app / "rtt" / "Config").mkdir(parents=True)
+    previous = os.umask(0o222)
+    try:
+        _copy_segger_rtt(app, _bundled_segger_rtt_dir())
+        files = [path for path in (app / "rtt").rglob("*") if path.is_file()]
+        assert len(files) == 4
+        assert all(path.stat().st_mode & S_IWUSR for path in files)
+        _copy_segger_rtt(app, _bundled_segger_rtt_dir())
+    finally:
+        os.umask(previous)
+        for path in (app / "rtt").rglob("*"):
+            if path.is_file():
                 path.chmod(0o644)

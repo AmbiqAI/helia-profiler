@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from stat import S_IWUSR
+from stat import S_ISREG, S_IWUSR
 
 from ..errors import FirmwareError
 from .render import _write_text
@@ -74,13 +74,15 @@ def _is_segger_rtt_root(path: Path) -> bool:
     )
 
 
-def _make_writable(path: Path, source: Path) -> None:
-    if path.exists():
-        if source.exists() and path.samefile(source):
-            raise FirmwareError(f"RTT source and destination are the same file: {path}")
-        mode = path.stat().st_mode
-        if not mode & S_IWUSR:
-            path.chmod(mode | S_IWUSR)
+def _make_writable(path: Path) -> None:
+    try:
+        info = path.lstat()
+    except FileNotFoundError:
+        return
+    if not S_ISREG(info.st_mode) or info.st_nlink > 1:
+        raise FirmwareError(f"RTT destination must be an independent regular file: {path}")
+    if not info.st_mode & S_IWUSR:
+        path.chmod(info.st_mode | S_IWUSR)
 
 
 def _copy_segger_rtt(dest_dir: Path, configured_path: Path | None = None) -> None:
@@ -97,9 +99,10 @@ def _copy_segger_rtt(dest_dir: Path, configured_path: Path | None = None) -> Non
             dest = rtt_dest / name
             data = src.read_bytes()
             # Package data can be immutable; app-local copies must stay writable.
-            _make_writable(dest, src)
+            _make_writable(dest)
             if not dest.exists() or dest.read_bytes() != data:
                 dest.write_bytes(data)
+            _make_writable(dest)
 
     # RTT buffer placement is cache-coherency sensitive on the Cortex-M55 parts.
     #
@@ -188,7 +191,8 @@ def _copy_segger_rtt(dest_dir: Path, configured_path: Path | None = None) -> Non
     # Content-compare before writing (see render._write_text): regeneration
     # into a cached workspace must not bump this header's mtime, or every
     # translation unit that includes it recompiles on every run.
-    _make_writable(conf_dest, conf_src)
+    _make_writable(conf_dest)
     _write_text(conf_dest, conf_text)
+    _make_writable(conf_dest)
 
     log.info("Copied SEGGER RTT source from %s", rtt_root)
