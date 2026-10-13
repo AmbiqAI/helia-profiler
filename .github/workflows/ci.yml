@@ -15,6 +15,20 @@ permissions:
   contents: read
 
 jobs:
+  nix-evaluation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+
+      - name: Evaluate locked flake on all supported systems
+        run: >-
+          nix --extra-experimental-features 'nix-command flakes'
+          flake check --no-build --all-systems --no-write-lock-file
+
   # ---------------------------------------------------------------
   # Type check — runs once on Linux. ruff runs in the pre-commit job, at
   # the version uv.lock resolves.
@@ -243,12 +257,13 @@ jobs:
   # ---------------------------------------------------------------
   lint-and-test:
     if: always()
-    needs: [typecheck, unit-tests, analysis-tests, pre-commit, package]
+    needs: [nix-evaluation, typecheck, unit-tests, analysis-tests, pre-commit, package]
     runs-on: ubuntu-latest
     steps:
       - name: Decide status
         run: |
-          if [[ "${{ needs.typecheck.result }}" != "success" ]] ||
+          if [[ "${{ needs.nix-evaluation.result }}" != "success" ]] ||
+             [[ "${{ needs.typecheck.result }}" != "success" ]] ||
              [[ "${{ needs.unit-tests.result }}" != "success" ]] ||
              [[ "${{ needs.analysis-tests.result }}" != "success" ]] ||
              [[ "${{ needs.pre-commit.result }}" != "success" ]] ||
