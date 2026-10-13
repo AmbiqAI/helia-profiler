@@ -255,3 +255,33 @@ def test_psram_record_retains_image_payload_and_capture_facts(tmp_path, engine):
     wrong = replace(wrong, build_identity=compiled_fixture_identity(wrong))
     with pytest.raises(ValueError, match="exact compiled image"):
         verify_fixture_build(wrong)
+
+
+def test_power_build_identity_roundtrip_and_original_record_readback(tmp_path):
+    from helia_profiler.fixture import FixturePowerSync
+
+    original = _build(tmp_path)
+    roots = {"run": tmp_path}
+    old = json.loads(dump_fixture_build(original, roots=roots))
+    assert "power_sync" not in old["build"]
+    old["fixture_api"] = [5, 0]
+    assert load_fixture_build(json.dumps(old), roots=roots) == original
+    wired = replace(
+        original,
+        timing_scope=FixtureTimingScope.RESTORE_AND_INVOKE,
+        power_sync=FixturePowerSync(29, 36, 14),
+    )
+    wired = replace(wired, build_identity=compiled_fixture_identity(wired))
+    assert wired.build_identity != original.build_identity
+    record = dump_fixture_build(wired, roots=roots)
+    loaded = load_fixture_build(record, roots=roots)
+    assert loaded == wired
+    capture = fixture_capture_request(
+        loaded, jlink_serial="123", evidence_dir=tmp_path / "raw", settle_seconds=30
+    )
+    assert capture.power_sync == wired.power_sync
+    assert capture.rail_power is None  # Station authority/configuration is supplied at capture.
+    altered = json.loads(record)
+    altered["build"]["power_sync"]["sync_gpio_pin"] = 28
+    with pytest.raises(ValueError):
+        load_fixture_build(json.dumps(altered), roots=roots)

@@ -495,3 +495,56 @@ def test_build_refuses_a_flat_image_capture_cannot_flash(tmp_path, monkeypatch, 
     else:
         r = build_fixed_fixture(c, f, method=METHOD)
         assert r.flat_binary is not None and r.flat_binary.path.stat().st_size == size
+
+
+@pytest.mark.parametrize("sink_size", [None, 16, 20])
+def test_power_build_validates_linked_terminal_before_returning_receipt(
+    tmp_path, monkeypatch, sink_size
+):
+    from helia_profiler.fixture import FixturePowerSync
+    from tests.unit.test_fixture_capture import image_files
+
+    c, f = fixture(tmp_path)
+    mock_analysis(monkeypatch, f, EngineType.HELIA_AOT)
+    c = replace(c, engine=EngineConfig(type=EngineType.HELIA_AOT))
+    sinks = {
+        "deployment_status": 4,
+        "deployment_output": f.output_tensor.size,
+        "deployment_checksum": 4,
+        "deployment_timing": 28,
+    }
+    if sink_size is not None:
+        sinks["deployment_power"] = sink_size
+    elf, flat, _ = image_files(tmp_path, sinks)
+
+    class Runner:
+        def __init__(self, stages):
+            pass
+
+        def run(self, config):
+            app = tmp_path / "app"
+            (app / "src").mkdir(parents=True)
+            binary = app / "hpx_profiler"
+            binary.write_bytes(elf.read())
+            binary.with_suffix(".bin").write_bytes(flat.read())
+            binary.with_suffix(".map").write_text("map")
+            (app / "nsx.lock").write_text("lock")
+            (app / "hpx-dependencies.json").write_text("{}")
+            return SimpleNamespace(
+                config=config,
+                memory_plan=MemoryPlan(engine=config.engine.type),
+                engine_artifacts=None,
+                run_metadata=RunMetadata(toolchain=ToolchainInfo("atfe", "22.1.0")),
+                resolved_firmware_dir=app,
+                dependency_lock_path=app / "nsx.lock",
+                profile_run=SimpleNamespace(firmware=SimpleNamespace(binary_path=binary)),
+            )
+
+    monkeypatch.setattr("helia_profiler._fixture_build.PipelineRunner", Runner)
+    method = replace(METHOD, power_sync=FixturePowerSync(29, 36, 14))
+    if sink_size != 20:
+        with pytest.raises(ValueError, match="sink symbol|sink size"):
+            build_fixed_fixture(c, f, method=method)
+    else:
+        result = build_fixed_fixture(c, f, method=method)
+        assert result.built and result.power_sync == method.power_sync

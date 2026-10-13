@@ -8,10 +8,26 @@ import struct
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, cast
 
 from ._fixture_build import FixtureTimingScope
-from .fixture_image import DTCM, MAX_ELF, MAX_IMAGE, digest, inspect_elf, require
+from .fixture_image import (
+    DTCM,
+    MAX_ELF,
+    MAX_IMAGE,
+    digest,
+    fixture_sink_sizes,
+    inspect_elf,
+    require,
+)
+from .fixture_power import (
+    FixturePowerGuard,
+    FixturePowerSync,
+    FixtureRailEnergy,
+    FixtureRailPowerRequest,
+    fixture_rail_energy,
+    observe_fixture_power,
+)
 from .fixture_psram import FixturePsramObservation, FixturePsramWeights, decode_psram_weights
 from .fixture_runtime import FixtureFile
 from .fixture_stage import FixtureStage
@@ -77,6 +93,8 @@ class FixtureCaptureRequest:
     arena_scan_sizes: tuple[int, ...] = ()
     #: Compiled build placement descriptor; required when the image emits a PSRAM terminal.
     psram_weights: FixturePsramWeights | None = None
+    power_sync: FixturePowerSync | None = None
+    rail_power: FixtureRailPowerRequest | None = None
 
 
 @dataclass(frozen=True)
@@ -115,6 +133,7 @@ class FixtureCaptureResult:
     #: Both are lower bounds: a kernel may write the paint value itself.
     arena_scan: tuple[tuple[int, int], ...] = ()
     psram_weights: FixturePsramObservation | None = None
+    rail_energy: FixtureRailEnergy | None = None
 
 
 def _atomic_json(path: Path, value: object) -> None:
@@ -157,6 +176,18 @@ def _failed_stage(status: int) -> str:
     return f"Firmware failed at {stage} (status {status})"
 
 
+def _power_json_value(value):
+    # Driver packets can contain NumPy scalar/array values; preserve their
+    # numeric contents rather than formatting them as strings.
+    import numpy as np
+
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, np.generic):
+        return value.item()
+    raise TypeError(f"Non-numeric power packet value: {type(value).__name__}")
+
+
 def capture_fixture(
     request: FixtureCaptureRequest, *, guard: FixtureCaptureGuard
 ) -> FixtureCaptureResult:
@@ -166,6 +197,20 @@ def capture_fixture(
         or isinstance(request.psram_weights, FixturePsramWeights)
         and request.psram_weights.image_sha256 == request.image.sha256,
         "PSRAM expectation is not bound to the capture image",
+    )
+    require(
+        (request.power_sync is None) == (request.rail_power is None)
+        and (
+            request.rail_power is None
+            or (
+                isinstance(request.rail_power, FixtureRailPowerRequest)
+                and isinstance(request.power_sync, FixturePowerSync)
+                and request.rail_power.firmware_wiring() == request.power_sync
+                and request.timing_scope is FixtureTimingScope.RESTORE_AND_INVOKE
+                and callable(getattr(guard, "verify_power_device", None))
+            )
+        ),
+        "Explicit power-capable method, matching wiring and station power authority required",
     )
     require(isinstance(request.extra_output_sizes, tuple), "Invalid output extent")
     output_sizes = (request.output_size, *request.extra_output_sizes)
@@ -221,6 +266,7 @@ def capture_fixture(
     outputs: tuple[FixtureFile, ...] = ()
     status = crc = None
     timing = memory = None
+    rail_observation = rail_raw = None
 
     def pin(name: str, value: bytes) -> FixtureFile:
         path = directory / name
@@ -249,18 +295,13 @@ def capture_fixture(
     try:
         require(52 <= request.elf.path.stat().st_size <= MAX_ELF, "ELF size")
         require(0 < request.image.path.stat().st_size <= MAX_IMAGE, "Image size")
-        sizes = {
-            "deployment_status": 4,
-            **dict(zip(output_names, output_sizes)),
-            "deployment_checksum": 4,
-            "deployment_timing": 28,
-        }
-        if request.arena_capacity is not None:
-            sizes["deployment_memory"] = 32
-        if request.arena_scan_sizes:
-            sizes["deployment_arena_scan"] = 8 * len(request.arena_scan_sizes)
-        if request.psram_weights is not None:
-            sizes["deployment_psram_weights"] = request.psram_weights.sink_size
+        sizes = fixture_sink_sizes(
+            output_sizes,
+            power=request.power_sync is not None,
+            memory=request.arena_capacity is not None,
+            arena_count=len(request.arena_scan_sizes),
+            psram_size=request.psram_weights.sink_size if request.psram_weights else 0,
+        )
         image = inspect_elf(request.elf.read(), request.image.read(), request.load_address, sizes)
         pin(
             "identity.json",
@@ -282,6 +323,10 @@ def capture_fixture(
         # Flash the verified private copy so source mutation cannot select another image.
         flash_image = pin("image.bin", image.binary)
         guard.verify_target(target=request.target, jlink_serial=request.jlink_serial)
+        if request.rail_power is not None:
+            cast(FixturePowerGuard, guard).verify_power_device(
+                serial=request.rail_power.serial, rail=request.rail_power.rail
+            )
         guard.check(require_free=True, remaining_s=360)
         require(
             sum(str(p.serial) == request.jlink_serial for p in list_connected_probes()) == 1,
@@ -384,14 +429,37 @@ def capture_fixture(
             )
 
         guard.check(require_free=True, remaining_s=request.settle_seconds + 120)
-        reset_target(device=request.device, jlink_serial=request.jlink_serial)
         started = time.monotonic()
-        # Stay detached through the secure bootloader and, when predicted, the whole run.
-        detached = min(
-            max(_FIRST_POLL_S, (request.expected_duration_s or 0.0) * _EXPECTED_MARGIN),
-            request.settle_seconds,
-        )
-        time.sleep(detached)
+        if request.rail_power is not None:
+            rail_observation = observe_fixture_power(
+                request,
+                cast(FixturePowerGuard, guard),
+                lambda: reset_target(device=request.device, jlink_serial=request.jlink_serial),
+            )
+            rail_raw = pin(
+                "rail-power.json",
+                (
+                    json.dumps(
+                        {
+                            "image_sha256": digest(image.binary),
+                            "request": asdict(request.rail_power),
+                            "observation": asdict(rail_observation),
+                        },
+                        default=_power_json_value,
+                        sort_keys=True,
+                    )
+                    + "\n"
+                ).encode(),
+            )
+            detached = time.monotonic() - started
+        else:
+            reset_target(device=request.device, jlink_serial=request.jlink_serial)
+            # Stay detached through boot and, when predicted, the whole run.
+            detached = min(
+                max(_FIRST_POLL_S, (request.expected_duration_s or 0.0) * _EXPECTED_MARGIN),
+                request.settle_seconds,
+            )
+            time.sleep(detached)
         with attach() as session:
             guard.check(require_free=False, remaining_s=10)
             await_completion(session, started, resume_if_halted(session), detached)
@@ -418,6 +486,19 @@ def capture_fixture(
             observed_scope is request.timing_scope,
             "Timing scope differs from verified firmware terminal",
         )
+        if request.power_sync is not None:
+            wiring = request.power_sync
+            require(
+                struct.unpack("<5I", values["deployment_power"])
+                == (
+                    0x50575231,
+                    1,
+                    wiring.sync_gpio_pin,
+                    wiring.state_gpio_pin,
+                    wiring.go_gpio_pin,
+                ),
+                "Power firmware wiring terminal differs from request",
+            )
         computed = 0
         for byte in b"".join(values[name] for name in output_names):
             computed = (computed * 31 + byte) & 0xFFFFFFFF
@@ -456,6 +537,11 @@ def capture_fixture(
             tuple(artifacts),
             outputs=outputs,
             arena_scan=arena_scan,
+            rail_energy=fixture_rail_energy(rail_observation, request.rail_power, timing, rail_raw)
+            if rail_observation is not None
+            and request.rail_power is not None
+            and rail_raw is not None
+            else None,
             psram_weights=decode_psram_weights(
                 values["deployment_psram_weights"], request.psram_weights
             )

@@ -918,3 +918,59 @@ def test_complete_64k_output_and_invoke_status(rig, tmp_path, fault):
         assert result.error == "Short target read"
     if fault == "invoke":
         assert result.error is not None and "invoke" in result.error
+
+
+def test_power_capture_preserves_full_terminal_and_instrument_evidence(rig, tmp_path, monkeypatch):
+    from test_fixture_power import measured
+    from test_fixture_power import request as power_request
+
+    request, memory, terminal, writes, flashes, guard = rig
+    elf, image, _ = image_files(tmp_path, {**_SINKS, "deployment_power": 20})
+    request = replace(
+        request,
+        elf=elf,
+        image=image,
+        timing_scope=FixtureTimingScope.RESTORE_AND_INVOKE,
+        power_sync=power_request().firmware_wiring(),
+        rail_power=power_request(),
+    )
+    terminal[0x2000000C] = struct.pack("<7I", 50, 10, 2, 32768, 300, 96000000, 2)
+    terminal[0x20000028] = struct.pack("<5I", 0x50575231, 1, 29, 36, 14)
+    ownership = []
+    monkeypatch.setattr(
+        guard, "verify_power_device", lambda **kw: ownership.append(kw), raising=False
+    )
+
+    def observe(req, same_guard, reset):
+        assert same_guard is guard and ownership
+        reset()
+        return measured()
+
+    monkeypatch.setattr(capture, "observe_fixture_power", observe)
+    result = capture.capture_fixture(request, guard=guard)
+    assert result.state == "success", result.error
+    assert result.output is not None
+    assert result.rail_energy is not None
+    assert result.output.read() == bytes([1, 2, 3])
+    assert result.rail_energy.energy_j == 0.02
+    assert result.rail_energy.iterations == 10
+    assert result.rail_energy.raw in result.artifacts
+    assert len(flashes) == 1
+    raw = json.loads(result.rail_energy.raw.read())
+    assert raw["image_sha256"] == image.sha256
+    assert raw["observation"]["gated_windows"][0]["energy_j"] == 0.02
+
+
+def test_power_authority_is_required_before_any_device_operation(rig):
+    from test_fixture_power import request as power_request
+
+    request, memory, terminal, writes, flashes, guard = rig
+    request = replace(
+        request,
+        timing_scope=FixtureTimingScope.RESTORE_AND_INVOKE,
+        power_sync=power_request().firmware_wiring(),
+        rail_power=power_request(),
+    )
+    with pytest.raises(ValueError, match="power authority"):
+        capture.capture_fixture(request, guard=guard)
+    assert not flashes and not writes

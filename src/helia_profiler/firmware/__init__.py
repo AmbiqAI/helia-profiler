@@ -38,7 +38,7 @@ from .build import (
     nsx_toolchain,
     rtt_buffer_size_up,
 )
-from .context import FirmwareRenderContext
+from .context import FirmwareRenderContext, SyncContext
 
 # NB: measured_power_fingerprint below looks unused
 # in this module but is LIVE re-export surface — report/manifest.py,
@@ -96,7 +96,7 @@ def generate_app(ctx: PipelineContext) -> Path:
     config = ctx.config
     weights_region = ctx.weights_region or Placement.MRAM
     arena_region = ctx.arena_region or Placement.TCM
-    power_sync_enabled = config.power.gated_external_capture
+    power_sync_enabled = SyncContext.from_pipeline_context(ctx).power_sync_enabled
     # Dedicated power binary (hpx_profiler_power): rendered/built only when
     # power capture is actually requested AND the dedicated firmware mode is
     # selected, so non-power runs (and "shared"-mode power runs, which reuse

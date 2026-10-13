@@ -1,7 +1,7 @@
 {
   "api_version": [
     5,
-    0
+    1
   ],
   "surface": {
     "ElfSection": {
@@ -374,6 +374,11 @@
           "timer_hz",
           "int | None",
           "None"
+        ],
+        [
+          "power_sync",
+          "FixturePowerSync | None",
+          "None"
         ]
       ],
       "frozen": true,
@@ -578,6 +583,16 @@
           "psram_weights",
           "FixturePsramWeights | None",
           "None"
+        ],
+        [
+          "power_sync",
+          "FixturePowerSync | None",
+          "None"
+        ],
+        [
+          "rail_power",
+          "FixtureRailPowerRequest | None",
+          "None"
         ]
       ],
       "frozen": true,
@@ -645,6 +660,11 @@
         [
           "psram_weights",
           "FixturePsramObservation | None",
+          "None"
+        ],
+        [
+          "rail_energy",
+          "FixtureRailEnergy | None",
           "None"
         ]
       ],
@@ -856,6 +876,11 @@
           "evidence",
           "tuple[FixtureFile, ...]",
           "<required>"
+        ],
+        [
+          "rail_energy",
+          "FixtureRailEnergy | None",
+          "None"
         ]
       ],
       "frozen": true,
@@ -901,6 +926,11 @@
         [
           "state_policy",
           "FixtureStatePolicy | None",
+          "None"
+        ],
+        [
+          "power_sync",
+          "FixturePowerSync | None",
           "None"
         ]
       ],
@@ -1031,6 +1061,36 @@
       "methods": {},
       "properties": []
     },
+    "FixturePowerGuard": {
+      "kind": "protocol",
+      "methods": {
+        "check": "(self, *, require_free: 'bool', remaining_s: 'float') -> 'None'",
+        "verify_power_device": "(self, *, serial: 'str', rail: 'str') -> 'None'"
+      }
+    },
+    "FixturePowerSync": {
+      "fields": [
+        [
+          "sync_gpio_pin",
+          "int",
+          "<required>"
+        ],
+        [
+          "state_gpio_pin",
+          "int",
+          "<required>"
+        ],
+        [
+          "go_gpio_pin",
+          "int",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
     "FixturePsramObservation": {
       "fields": [
         [
@@ -1106,6 +1166,129 @@
       "properties": [
         "sink_size"
       ]
+    },
+    "FixtureRailEnergy": {
+      "fields": [
+        [
+          "iterations",
+          "int",
+          "<required>"
+        ],
+        [
+          "scope",
+          "str",
+          "<required>"
+        ],
+        [
+          "rail",
+          "str",
+          "<required>"
+        ],
+        [
+          "instrument_serial",
+          "str",
+          "<required>"
+        ],
+        [
+          "subtraction",
+          "str",
+          "<required>"
+        ],
+        [
+          "duration_s",
+          "float",
+          "<required>"
+        ],
+        [
+          "mean_power_w",
+          "float",
+          "<required>"
+        ],
+        [
+          "mean_current_a",
+          "float",
+          "<required>"
+        ],
+        [
+          "energy_j",
+          "float",
+          "<required>"
+        ],
+        [
+          "energy_per_iteration_j",
+          "float",
+          "<required>"
+        ],
+        [
+          "raw",
+          "FixtureFile",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "FixtureRailPowerRequest": {
+      "fields": [
+        [
+          "serial",
+          "str",
+          "<required>"
+        ],
+        [
+          "rail",
+          "str",
+          "<required>"
+        ],
+        [
+          "io_voltage",
+          "float",
+          "<required>"
+        ],
+        [
+          "sync_gpio_pin",
+          "int",
+          "<required>"
+        ],
+        [
+          "state_gpio_pin",
+          "int",
+          "<required>"
+        ],
+        [
+          "go_gpio_pin",
+          "int",
+          "<required>"
+        ],
+        [
+          "sync_input_index",
+          "int",
+          "0"
+        ],
+        [
+          "state_input_index",
+          "int",
+          "1"
+        ],
+        [
+          "go_output_index",
+          "int",
+          "0"
+        ],
+        [
+          "stats_rate_hz",
+          "int",
+          "1000"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {
+        "firmware_wiring": "(self) -> 'FixturePowerSync'"
+      },
+      "properties": []
     },
     "FixtureRole": {
       "base": "str",

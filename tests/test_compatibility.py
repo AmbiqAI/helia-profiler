@@ -134,7 +134,7 @@ def test_aot_extra_and_lock_match_the_recorded_helia_aot_range() -> None:
     # The range runs from the oldest helia-aot runtime record to the minor after the newest.
     minimum = aot_compile.HELIAAOT_MIN_VERSION
     maximum = aot_compile.HELIAAOT_MAX_VERSION_EXCLUSIVE
-    assert (minimum, maximum) == ("0.23.0", "0.28.0")
+    assert (minimum, maximum) == ("0.23.0", "0.30.0")
     specifier = f">={minimum},<{maximum}"
 
     with (repo_root / "pyproject.toml").open("rb") as stream:
@@ -444,6 +444,8 @@ def test_helia_aot_version_check_uses_the_recorded_range(monkeypatch: pytest.Mon
     assert aot_compile._check_helia_aot_version() == "0.26.0"
     monkeypatch.setattr("importlib.metadata.version", lambda _: "0.27.0")
     assert aot_compile._check_helia_aot_version() == "0.27.0"
+    monkeypatch.setattr("importlib.metadata.version", lambda _: "0.29.0")
+    assert aot_compile._check_helia_aot_version() == "0.29.0"
 
     def _fake_version_too_old(name: str) -> str:
         return "0.22.9"
@@ -454,10 +456,10 @@ def test_helia_aot_version_check_uses_the_recorded_range(monkeypatch: pytest.Mon
     ) as excinfo:
         aot_compile._check_helia_aot_version()
     # The upgrade command stays inside the recorded range.
-    assert "'helia-aot>=0.23.0,<0.28.0'" in (excinfo.value.hint or "")
+    assert "'helia-aot>=0.23.0,<0.30.0'" in (excinfo.value.hint or "")
 
     def _fake_version_too_new(name: str) -> str:
-        return "0.28.0"
+        return "0.30.0"
 
     monkeypatch.setattr("importlib.metadata.version", _fake_version_too_new)
     with pytest.raises(EngineError, match=r"outside the recorded range"):
@@ -483,7 +485,7 @@ def test_helia_aot_unparseable_version_warns_full_range(
 
     assert result == "not-a-version"
     messages = [rec.message for rec in caplog.records]
-    assert any("0.23.0" in message and "0.28.0" in message for message in messages)
+    assert any("0.23.0" in message and "0.30.0" in message for message in messages)
     assert not any("floor" in message for message in messages)
 
 
@@ -499,7 +501,7 @@ def test_helia_aot_success_debug_log_only_after_max_check(
     from helia_profiler.errors import EngineError
 
     def _fake_version_too_new(name: str) -> str:
-        return "0.28.0"
+        return "0.30.0"
 
     monkeypatch.setattr("importlib.metadata.version", _fake_version_too_new)
     with caplog.at_level(logging.DEBUG):

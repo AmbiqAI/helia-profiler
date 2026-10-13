@@ -49,6 +49,20 @@ class SyncContext:
     state_gpio_pin: int
     go_gpio_pin: int
 
+    @classmethod
+    def from_pipeline_context(cls, ctx: "PipelineContext") -> "SyncContext":
+        wiring = ctx.fixture.method.power_sync if ctx.fixture is not None else None
+        if wiring is not None:
+            return cls(True, wiring.sync_gpio_pin, True, wiring.state_gpio_pin, wiring.go_gpio_pin)
+        power = ctx.config.power
+        return cls(
+            power.gated_external_capture,
+            power.sync_gpio_pin,
+            resolve_power_lockstep(ctx),
+            power.state_gpio_pin,
+            power.go_gpio_pin,
+        )
+
 
 @dataclass(frozen=True)
 class PowerMonitorContext:
@@ -260,7 +274,6 @@ class FirmwareRenderContext:
         arena_region = ctx.arena_region or Placement.TCM
         weights_region = ctx.weights_region or Placement.MRAM
         aot_arena_regions = tuple(arena_regions or ())
-        power_sync_enabled = config.power.gated_external_capture
         clock = ctx.run_metadata.platform
         if clock is None:
             # A sub-field of the (non-optional) run_metadata, so no
@@ -338,13 +351,7 @@ class FirmwareRenderContext:
         transport = config.target.transport
         printf_linkage = "static " if engine_type is EngineType.HELIA_AOT else ""
         return cls(
-            sync=SyncContext(
-                power_sync_enabled=power_sync_enabled,
-                sync_gpio_pin=config.power.sync_gpio_pin,
-                lockstep=resolve_power_lockstep(ctx),
-                state_gpio_pin=config.power.state_gpio_pin,
-                go_gpio_pin=config.power.go_gpio_pin,
-            ),
+            sync=SyncContext.from_pipeline_context(ctx),
             transport=TransportContext(
                 transport=transport,
                 usb_serial_marker=usb_marker_serial(ctx.effective_jlink_serial),

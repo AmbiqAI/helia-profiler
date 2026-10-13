@@ -78,15 +78,18 @@ def _gated_stats_diagnostics(
     windows_override: list[tuple[float, float]] | None = None,
     gate_edge_source: str = "gpi_snapshot_poll",
     stream_segment_count: int | None = None,
+    counter_origin: tuple[int, int] | None = None,
 ) -> dict[str, Any]:
     import numpy as np
 
-    a = _stats_arrays(packets)
+    a = _stats_arrays(packets, counter_origin=counter_origin)
     windows = (
         windows_override if windows_override is not None else _segment_gpi_windows(poll_samples)
     )
     mask_axis, axis_name = _gated_mask_axis(a, prefer_device_time=prefer_device_time)
 
+    if counter_origin is not None:
+        axis_name = "device_sample_counter_relative_time64"
     diagnostics: dict[str, Any] = {
         "mask_time_axis": axis_name,
         "gate_edge_source": gate_edge_source,
@@ -128,7 +131,7 @@ def _gated_stats_diagnostics(
 
     selected_mask = np.zeros(mask_axis.shape, dtype=bool)
     for rise, fall in windows:
-        selected_mask |= (mask_axis >= rise) & (mask_axis <= fall)
+        selected_mask |= (mask_axis >= rise) & (mask_axis < fall)
 
     selected = a["cur_avg"][selected_mask]
     rejected = a["cur_avg"][~selected_mask]

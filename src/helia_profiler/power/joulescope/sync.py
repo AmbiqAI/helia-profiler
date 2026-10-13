@@ -78,6 +78,8 @@ class JoulescopeSyncController:
         return DeviceState.UNKNOWN
 
     def release(self) -> None:
+        if self._driver is None:
+            return
         try:
             self._write_go(False)
         except Exception:  # pragma: no cover - defensive

@@ -28,6 +28,7 @@ from ._fixture_build import (
 )
 from .engines import EngineType
 from .fixture_analysis import FixtureTensor, PerAxisQuantization, PerTensorQuantization
+from .fixture_power import FixturePowerSync
 from .fixture_psram import FixturePsramPayload, FixturePsramWeights
 from .fixture_runtime import FixtureFile
 from .fixture_target import (
@@ -117,7 +118,9 @@ def _read_json(value):
 def _payload(build: FixtureBuild, *, file, path) -> dict:
     """The single build schema, with different path encodings for identity/storage."""
     result = asdict(build)
-    _object(result, _FIELDS)
+    if result["power_sync"] is None:
+        del result["power_sync"]
+    _object(result, _FIELDS | ({"power_sync"} if build.power_sync is not None else set()))
     result["app_dir"] = path(build.app_dir)
     for name in _FILE_FIELDS:
         value = getattr(build, name)
@@ -181,6 +184,11 @@ def verify_fixture_build(build: FixtureBuild) -> None:
         raise ValueError("Explicit fixture engine and timing scope required")
     if build.state_policy is not None and not isinstance(build.state_policy, FixtureStatePolicy):
         raise ValueError("Invalid fixture state policy")
+    if build.power_sync is not None and (
+        not isinstance(build.power_sync, FixturePowerSync)
+        or build.timing_scope is not FixtureTimingScope.RESTORE_AND_INVOKE
+    ):
+        raise ValueError("Invalid power-capable fixture method")
     if type(build.source_initializer_present) is not bool:
         raise ValueError("Invalid source initializer fact")
     validate_fixture_placement(build.arena_location, build.weights_location, build.engine)
@@ -422,10 +430,17 @@ def load_fixture_build(record: str | bytes, *, roots: Mapping[str, Path]) -> Fix
     if (
         type(outer["schema_version"]) is not int
         or outer["schema_version"] != 1
-        or _json(outer["fixture_api"]) != _json(FIXTURE_API_VERSION)
+        or _json(outer["fixture_api"]) not in (_json((5, 0)), _json(FIXTURE_API_VERSION))
     ):
         raise ValueError("Unsupported fixture build record/API version")
-    value = dict(_object(outer["build"], _FIELDS))
+    power_fields = (
+        {"power_sync"}
+        if isinstance(outer["build"], dict) and "power_sync" in outer["build"]
+        else set()
+    )
+    if power_fields and _json(outer["fixture_api"]) == _json((5, 0)):
+        raise ValueError("Power firmware requires its declared API version")
+    value = dict(_object(outer["build"], _FIELDS | power_fields))
     try:
         value["app_dir"] = mapping.decode(value["app_dir"])
         for name in _FILE_FIELDS:
@@ -473,6 +488,10 @@ def load_fixture_build(record: str | bytes, *, roots: Mapping[str, Path]) -> Fix
                 ),
                 psram["image_sha256"],
                 psram["clock_hz"],
+            )
+        if "power_sync" in value:
+            value["power_sync"] = FixturePowerSync(
+                **_object(value["power_sync"], ("sync_gpio_pin", "state_gpio_pin", "go_gpio_pin"))
             )
         result = FixtureBuild(**value)
         verify_fixture_build(result)
@@ -526,4 +545,5 @@ def fixture_capture_request(
         extra_output_sizes=tuple(t.size_bytes for t in build.output_tensors[1:]),
         arena_scan_sizes=tuple(size for _, size in build.aot_arena_scan),
         psram_weights=build.psram_weights,
+        power_sync=build.power_sync,
     )

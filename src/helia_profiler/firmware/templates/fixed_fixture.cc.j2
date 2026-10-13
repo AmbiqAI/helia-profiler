@@ -8,6 +8,11 @@
 #include "nsx_core.h"
 #include "nsx_mem.h"
 #include "am_hal_pwrctrl.h"
+{%- if fixture_power_sync | default(none) %}
+#include "nsx_gpio.h"
+{% with power_sync_enabled=true, lockstep=true, sync_gpio_pin=fixture_power_sync.sync_gpio_pin, state_gpio_pin=fixture_power_sync.state_gpio_pin, go_gpio_pin=fixture_power_sync.go_gpio_pin %}{% include "_gpio_sync.j2" %}{% endwith %}
+volatile uint32_t deployment_power[5];
+{% endif %}
 #include "fixed_fixture_clock.h"
 {% if fixture_aot %}
 #include "{{ aot_prefix }}_model.h"
@@ -166,6 +171,12 @@ static int infer_fixture() {
 {% if not fixture_aot %}
     hpx_fixture_memory_snapshot(4, interpreter.arena_used_bytes());
 {% endif %}
+{%- if fixture_power_sync | default(none) %}
+    hpx_sync_init();
+    hpx_sync_ready();
+    hpx_sync_wait_go();
+    hpx_sync_window_begin();
+{% endif %}
     int32_t invocation_status = 0;
     uint32_t ticks = 0;
 {% if fixture_timing_scope == 'restore_and_invoke' %}
@@ -185,6 +196,9 @@ static int infer_fixture() {
     }
 {% if fixture_timing_scope == 'restore_and_invoke' %}
     ticks = hpx_stimer_ticks() - t0;
+{% endif %}
+{%- if fixture_power_sync | default(none) %}
+    hpx_sync_window_end();
 {% endif %}
     if (invocation_status != 0) return {{ fixture_status.invoke }};
     if (!ticks || ticks >= 60U*HPX_STIMER_HZ) return {{ fixture_status.timing_bound }};
@@ -222,6 +236,13 @@ static int infer_fixture() {
 }
 
 int main() {
+{%- if fixture_power_sync | default(none) %}
+    deployment_power[0] = 0x50575231U;
+    deployment_power[1] = 1U;
+    deployment_power[2] = {{ fixture_power_sync.sync_gpio_pin }}U;
+    deployment_power[3] = {{ fixture_power_sync.state_gpio_pin }}U;
+    deployment_power[4] = {{ fixture_power_sync.go_gpio_pin }}U;
+{%- endif %}
 {% with power_only=true, perf_mode_symbol="NSX_PERF_LOW", perf_mode_mhz=96 %}{% include "_system_config.j2" %}{% endwith %}
     int32_t status = nsx_system_init(&sys_cfg);
     if (status == 0) {

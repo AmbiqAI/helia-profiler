@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 from ...errors import PowerError
 from ..base import PowerResult
+from ..counter_gate import PackedGateRecorder, counter_gate_trace
 from ..diagnostics import (
     BOOT_SETTLE_S,
     GATE_EDGE_POLL_INTERVAL_S,
@@ -38,19 +39,15 @@ from .diagnostics import (
     _poll_edge_uncertainty_s,
     _with_gpi_poll_failures,
 )
+from .fullrate import FullRateRecorder
 from .stats import (
     _counter_rate_ratio,
-    _fullrate_energy_over_windows,
-    _fullrate_sample_span,
-    _fullrate_streams_contiguous,
     _map_poll_samples_to_packet_time,
     _plan_gate_floor_s,
     _plan_ranked_candidates,
     _process_gated_stats,
     _segment_gpi_windows,
-    _segment_streamed_gpi,
     _select_streamed_window,
-    _streamed_gpi_timebase,
     _summary_to_dict,
     _whole_summary_from_stats,
 )
@@ -104,6 +101,7 @@ def _degraded_observation_result(
     whole_summary = _whole_summary_from_stats(packets)
     return PowerResult(
         summary=whole_summary,
+        statistics=packets,
         metadata=PowerMetadata(
             driver=f"joulescope-{family}",
             device=device_path,
@@ -242,12 +240,14 @@ def capture_gated(
         consecutive = 0
         with gpi_condition:
             observed_sequence = gpi_sample_sequence
-            while time.monotonic() < deadline:
+            while not stop.is_set() and time.monotonic() < deadline:
                 remaining = deadline - time.monotonic()
                 if not gpi_condition.wait_for(
-                    lambda: gpi_sample_sequence > observed_sequence,
+                    lambda: stop.is_set() or gpi_sample_sequence > observed_sequence,
                     timeout=max(0.0, remaining),
                 ):
+                    return False
+                if stop.is_set():
                     return False
                 observed_sequence = gpi_sample_sequence
                 if latest_gpi_value is not None and bool(latest_gpi_value & bit_mask) is high:
@@ -271,26 +271,13 @@ def capture_gated(
     # as the edge fallback, but its poll cadence plus callback latency can
     # merge a pre-window coupling pulse into the true rise (or hold a fall)
     # under host load.  A streamed edge cannot be merged this way.
-    gpi_stream_frames: list[dict[str, Any]] = []
+    gate_recorder = PackedGateRecorder(
+        sync_input_index, min(128 * 1024 * 1024, int(duration_s * 2_100_000) + 1048576)
+    )
+    gpi_stream_frames = gate_recorder.frames
 
     def _on_gpi_data(_topic: str, value: Any) -> None:
-        try:
-            import numpy as np
-
-            data = np.asarray(value["data"])
-            decimate = max(1, int(value.get("decimate_factor", 1) or 1))
-            rate = float(value["sample_rate"]) / decimate
-            sample_id = value.get("sample_id")
-            gpi_stream_frames.append(
-                {
-                    "utc": int(value["utc"]),
-                    "rate": rate,
-                    "sample_id": (int(sample_id) // decimate if sample_id is not None else None),
-                    "data": data.copy(),
-                }
-            )
-        except Exception:  # never let a malformed frame kill the capture
-            log.debug("Discarding malformed GPI stream frame", exc_info=True)
+        gate_recorder.append(value, word_aligned=family in ("js220", "js320"))
 
     # Opt-in full-rate cross-check (AutoDeploy-equivalent reference method).
     # Set HPX_POWER_FULLRATE_XCHECK=1 to also stream raw s/i + s/v at the
@@ -298,45 +285,22 @@ def capture_gated(
     # logged alongside the 1 kHz stats-sum for direct comparison.
     fr_requested = os.environ.get("HPX_POWER_FULLRATE_XCHECK") == "1"
     fr_xcheck = fr_requested
-    fr_subscriptions: list[tuple[str, Any]] = []
-    fr_cur: list[Any] = []
-    fr_volt: list[Any] = []
-    fr_anchors: list[tuple[int, int, float]] = []
-    fr_n = [0]
-    fr_cur_spans: list[tuple[int, int, float] | None] = []
-    fr_volt_spans: list[tuple[int, int, float] | None] = []
+    fullrate = FullRateRecorder(driver, device_path)
 
-    def _on_fr_current(_topic: str, value: Any) -> None:
-        import numpy as np
+    callback_errors: list[Exception] = []
 
-        data = np.asarray(value["data"], dtype=np.float32)
-        sr = value["sample_rate"] / max(1, value.get("decimate_factor", 1))
-        utc = value.get("utc")
-        if utc is not None:
-            fr_anchors.append((fr_n[0], int(utc), float(sr)))
-        fr_cur.append(data.copy())
-        fr_cur_spans.append(_fullrate_sample_span(value, len(data)))
-        fr_n[0] += len(data)
+    def _abort_callback(exc: Exception) -> None:
+        callback_errors.append(exc)
+        stop.set()
+        with gpi_condition:
+            gpi_condition.notify_all()
 
-    def _on_fr_voltage(_topic: str, value: Any) -> None:
-        import numpy as np
-
-        data = np.asarray(value["data"], dtype=np.float32)
-        fr_volt.append(data.copy())
-        fr_volt_spans.append(_fullrate_sample_span(value, len(data)))
-
-    def _stop_fullrate_streams() -> None:
-        for channel in ("i", "v"):
-            try:
-                driver.publish(f"{device_path}/s/{channel}/ctrl", 0, timeout=0)
-            except Exception:
-                log.debug("Failed to stop full-rate %s stream", channel, exc_info=True)
-        for topic, callback in list(fr_subscriptions):
-            try:
-                driver.unsubscribe(topic, callback)
-                fr_subscriptions.remove((topic, callback))
-            except Exception:
-                log.debug("Failed to unsubscribe full-rate stream", exc_info=True)
+    def _phase() -> str | None:
+        try:
+            return phase_getter() if phase_getter is not None else "go_signaled"
+        except Exception as exc:
+            _abort_callback(exc)
+            return None
 
     def _poller() -> None:
         nonlocal first_high_at, first_low_after_high_at, short_pulse_first_s
@@ -349,6 +313,8 @@ def capture_gated(
         high_phase = "unknown"
         complete_at: float | None = None
         while not stop.is_set():
+            if _phase() is None:
+                return
             gpi_value: int | None = None
             try:
                 read_start = _host_monotonic_time64(time64)
@@ -359,7 +325,9 @@ def capture_gated(
                     gpi_sample_sequence += 1
                     gpi_condition.notify_all()
                 level = 1 if (int(gpi_value) & bit) else 0
-                phase = phase_getter() if phase_getter is not None else "go_signaled"
+                phase = _phase()
+                if phase is None:
+                    return
                 if phase != "go_signaled":
                     # Flash/reset pin levels are not protocol events. Keep the
                     # latest bitfield for READY qualification, but establish a
@@ -405,8 +373,9 @@ def capture_gated(
                                     "gate-race timeline: on_gate_rise (GO drop) done t=%.3f",
                                     time.time(),
                                 )
-                            except Exception:
-                                log.warning("on_gate_rise hook failed", exc_info=True)
+                            except Exception as exc:
+                                _abort_callback(exc)
+                                return
                 elif prev_level and not level and high_seen:
                     saw_any_gate_fall = True
                     if first_low_after_high_at is None:
@@ -474,6 +443,13 @@ def capture_gated(
     wait_ended_at: float | None = None
     hook_error: Exception | None = None
     try:
+        if family in ("js220", "js320"):
+            mode = driver.query(f"{device_path}/s/gpi/+/dwnN/mode")
+            gate_recorder.sample_mode = {0: "off", 2: "first", "off": "off", "first": "first"}.get(
+                mode
+            )
+            if gate_recorder.sample_mode is None:
+                raise PowerError("GPI decimation mode does not preserve sampled gate levels")
         try:
             driver.publish(f"{device_path}/{cycle_topic}", on_value)
         except Exception:
@@ -498,18 +474,7 @@ def capture_gated(
                     exc_info=True,
                 )
         if fr_xcheck:
-            try:
-                for channel, callback in (("i", _on_fr_current), ("v", _on_fr_voltage)):
-                    topic = f"{device_path}/s/{channel}/!data"
-                    fr_subscriptions.append((topic, callback))
-                    driver.subscribe(topic, ["pub"], callback)
-                driver.publish(f"{device_path}/s/i/ctrl", 1, timeout=0)
-                driver.publish(f"{device_path}/s/v/ctrl", 1, timeout=0)
-                log.info("Joulescope full-rate energy cross-check enabled (s/i + s/v streaming)")
-            except Exception:
-                log.warning("Failed to enable full-rate cross-check streaming", exc_info=True)
-                fr_xcheck = False
-                _stop_fullrate_streams()
+            fr_xcheck = fullrate.start()
         try:
             thread = threading.Thread(target=_poller, daemon=True)
             thread.start()
@@ -551,7 +516,11 @@ def capture_gated(
                 except Exception:
                     pass
             if fr_requested:
-                _stop_fullrate_streams()
+                fullrate.stop()
+
+        if callback_errors:
+            hook_error = callback_errors[0]
+            raise hook_error
 
         aligned_poll_samples = poll_samples
         use_device_time_axis = family in ("js220", "js320")
@@ -573,16 +542,46 @@ def capture_gated(
         streamed_gate_windows: list[tuple[float, float]] | None = None
         raw_streamed: list[tuple[float, float]] = []
         gate_edge_source = "gpi_snapshot_poll"
-        if gpi_stream_enabled and gpi_stream_frames:
-            raw_streamed = _segment_streamed_gpi(gpi_stream_frames)
-            streamed_gate_windows = _select_streamed_window(
-                raw_streamed,
-                minimum_gate_s=minimum_gate_s,
-                plan_floor_s=plan_floor_s,
-                allow_fallback=allow_fallback,
-            )
-            if streamed_gate_windows is not None:
-                gate_edge_source = "gpi_stream"
+        counter_origin = None
+        counter_trace = None
+        counter_evidence = []
+        if gpi_stream_enabled:
+            try:
+                if gate_recorder.error:
+                    raise ValueError(gate_recorder.error)
+                # These sensors supply statistics and all signal sample IDs
+                # from the same native counter. Do not infer another origin via UTC.
+                if family not in ("js220", "js320"):
+                    raise ValueError("Shared GPI/statistics counter contract unavailable")
+                counter_trace = counter_gate_trace(
+                    gpi_stream_frames, packets, channel=sync_input_index
+                )
+                counter_origin = (counter_trace.origin, counter_trace.rate)
+                raw_streamed = [
+                    (
+                        (a - counter_trace.origin) * time64.SECOND / counter_trace.rate,
+                        (b - counter_trace.origin) * time64.SECOND / counter_trace.rate,
+                    )
+                    for a, b in counter_trace.windows
+                ]
+                streamed_gate_windows = _select_streamed_window(
+                    raw_streamed,
+                    minimum_gate_s=minimum_gate_s,
+                    plan_floor_s=plan_floor_s,
+                    allow_fallback=allow_fallback,
+                )
+                if streamed_gate_windows is None:
+                    raise ValueError("No complete qualifying packed GPI gate")
+                for pair in streamed_gate_windows:
+                    i = raw_streamed.index(pair)
+                    counter_evidence.append(
+                        counter_trace.window_evidence(*counter_trace.windows[i])
+                    )
+                gate_edge_source = "gpi_stream_sample_counter"
+            except (KeyError, TypeError, ValueError, OverflowError) as exc:
+                gate_recorder.error = str(exc)
+                counter_origin = None
+                streamed_gate_windows = []
 
         if use_device_time_axis and streamed_gate_windows is None:
             aligned_poll_samples = _map_poll_samples_to_packet_time(
@@ -644,9 +643,9 @@ def capture_gated(
                             "gpi_stream_frames_meta": [
                                 {
                                     "utc": f["utc"],
-                                    "rate": f["rate"],
+                                    "rate": f["sample_rate"],
                                     "sample_id": f.get("sample_id"),
-                                    "n": int(len(f["data"])),
+                                    "n": f["element_count"],
                                 }
                                 for f in gpi_stream_frames
                             ],
@@ -667,6 +666,7 @@ def capture_gated(
             windows_override=selected_windows,
             gate_edge_source=gate_edge_source,
             stream_segment_count=len(raw_streamed) if gpi_stream_enabled else None,
+            counter_origin=counter_origin,
         )
         if fr_requested and not fr_xcheck:
             gating_diagnostics["fullrate_xcheck_unavailable_reason"] = "stream_setup_failed"
@@ -679,14 +679,11 @@ def capture_gated(
                 poll_reads, minimum_window_s=minimum_gate_s, plan_floor_s=plan_floor_s
             )
 
-        # How the streamed-GPI time base was derived (#249). Both gate edges
-        # are placed with a per-sample spacing inferred from frame timestamps,
-        # so when a window disagrees with the firmware clock this says whether
-        # that inference is the reason. Diagnostic only. Attached to the one
-        # dict both the degraded and the successful path publish.
-        stream_timebase = _streamed_gpi_timebase(gpi_stream_frames) if gpi_stream_enabled else None
-        if stream_timebase is not None:
-            gating_diagnostics["gpi_stream_timebase"] = stream_timebase
+        gating_diagnostics["packed_gpi_retained_bytes"] = gate_recorder.retained_bytes
+        gating_diagnostics["packed_gpi_error"] = gate_recorder.error
+        gating_diagnostics["counter_gate_evidence"] = counter_evidence
+        if counter_trace is not None:
+            gating_diagnostics["counter_clock_mapping"] = counter_trace.clock_diagnostics
         # The filter that scales utc, read straight from the packets (#249).
         counter_rate = _counter_rate_ratio(packets)
         if counter_rate is not None:
@@ -699,6 +696,7 @@ def capture_gated(
             prefer_device_time=use_device_time_axis,
             minimum_window_s=minimum_gate_s,
             windows_override=selected_windows,
+            counter_origin=counter_origin,
         )
         if not windows:
             if fr_requested:
@@ -775,7 +773,14 @@ def capture_gated(
                 result.summary.duration_s,
                 failure.hint,
             )
-            return result
+            return replace(
+                result,
+                gate_frames=gpi_stream_frames,
+                gate_stream_error=gate_recorder.error,
+                gate_samples=aligned_poll_samples,
+                statistics_timebase_hz=int(time64.SECOND),
+                statistics_device_time=use_device_time_axis,
+            )
         if short_pulses_ignored:
             log.warning(
                 "Ignored %d GPIO-high pulse(s) shorter than the %.3fs minimum "
@@ -878,29 +883,13 @@ def capture_gated(
                 gate_integrity, relative_tolerance=gate_relative_tolerance
             )
         if fr_xcheck:
-            contiguous = _fullrate_streams_contiguous(fr_cur_spans, fr_volt_spans)
-            if not contiguous:
-                gating_diagnostics["fullrate_xcheck_unavailable_reason"] = (
-                    "noncontiguous_or_unaligned_source_samples"
-                )
-            anchors_complete = len(fr_anchors) == len(fr_cur) and all(
-                nxt[1] > cur[1] for cur, nxt in zip(fr_anchors, fr_anchors[1:])
+            fr, reason = fullrate.integrate(
+                poll_samples=aligned_poll_samples,
+                windows=selected_windows,
+                counter_origin=counter_origin,
             )
-            if contiguous and not anchors_complete:
-                gating_diagnostics["fullrate_xcheck_unavailable_reason"] = (
-                    "incomplete_or_nonmonotonic_utc_anchors"
-                )
-            fr = (
-                _fullrate_energy_over_windows(
-                    cur_chunks=fr_cur,
-                    volt_chunks=fr_volt,
-                    anchors=fr_anchors,
-                    poll_samples=aligned_poll_samples,
-                    windows_override=selected_windows,
-                )
-                if contiguous and anchors_complete
-                else None
-            )
+            if reason is not None:
+                gating_diagnostics["fullrate_xcheck_unavailable_reason"] = reason
             if fr:
                 metadata.fullrate_xcheck = fr
                 stats_energy_per = gated_summary.energy_j / len(windows) if windows else 0.0
@@ -926,8 +915,8 @@ def capture_gated(
                 log.warning(
                     "Full-rate cross-check requested but produced no result "
                     "(chunks=%d, anchors=%d)",
-                    len(fr_cur),
-                    len(fr_anchors),
+                    len(fullrate.current),
+                    len(fullrate.anchors),
                 )
         if packets:
             whole_summary = _whole_summary_from_stats(packets)
@@ -975,6 +964,14 @@ def capture_gated(
             summary=gated_summary,
             gated_windows=windows,
             metadata=metadata,
+            statistics=packets,
+            gate_samples=aligned_poll_samples,
+            statistics_timebase_hz=int(time64.SECOND),
+            statistics_device_time=use_device_time_axis,
+            gate_frames=gpi_stream_frames,
+            gate_stream_error=gate_recorder.error,
+            counter_gate_evidence=counter_evidence,
+            counter_domain="joulescope_sensor_sample_id" if counter_evidence else None,
         )
     except PowerError:
         raise
