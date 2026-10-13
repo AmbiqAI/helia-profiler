@@ -296,3 +296,23 @@ def test_partial_trace_never_divides_by_full_iteration_count(tmp_path, defect):
         power.fixture_rail_energy(
             observation, request(), timing, FixtureFile(path, sha256(path.read_bytes()).hexdigest())
         )
+
+
+def test_unrelated_large_packet_cannot_license_missing_gate_tail():
+    observation = measured()
+    observation.statistics = observation.statistics[:2]
+    observation.statistics[0]["time"] = {
+        "samples": {"value": [0, 1000000]},
+        "sample_freq": {"value": 1000000},
+        "utc": {"value": [0, 1000000000]},
+    }
+    observation.statistics[1]["time"] = {
+        "samples": {"value": [1000000, 1001000]},
+        "sample_freq": {"value": 1000000},
+        "utc": {"value": [1000000000, 1001000000]},
+    }
+    observation.gated_windows[0] = replace(
+        observation.gated_windows[0], start_s=0.5, end_s=1.0, duration_s=0.001, sample_count=1
+    )
+    with pytest.raises(ValueError, match="endpoints"):
+        power._validate_trace_coverage(observation)

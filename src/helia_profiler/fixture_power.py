@@ -300,10 +300,11 @@ def _validate_trace_coverage(observation: PowerResult) -> None:
         if start > covered_end:
             raise ValueError("Timestamp coverage unavailable: interior UTC gap")
         covered_end = max(covered_end, end)
-    # Midpoint admission can omit at most one packet at either edge. This is
-    # the instrument's actual integration granularity, not a caller tolerance.
-    margin = max(duration for _, duration in rows)
-    if (rows[0][0] - origin) / hz - margin > window.start_s or (
-        rows[-1][0] - origin
-    ) / hz + margin < window.end_s:
-        raise ValueError("Trace does not cover the measured gate")
+    # Only the intersecting edge packets bound midpoint uncertainty. An
+    # unrelated long packet outside the gate must not license missing coverage.
+    first_start, first_end = intersecting[0]
+    last_start, last_end = intersecting[-1]
+    if first_start - gate_start > first_end - first_start or (
+        gate_end - covered_end > last_end - last_start
+    ):
+        raise ValueError("Trace does not cover the measured gate endpoints")
