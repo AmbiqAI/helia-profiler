@@ -244,6 +244,13 @@ def _settings_relation(left: object, right: object) -> str:
         if left.keys() != right.keys() or "unknown" in relations:
             return "unknown"
         return "same"
+    if isinstance(left, list) and isinstance(right, list):
+        relations = [_settings_relation(a, b) for a, b in zip(left, right)]
+        if "different" in relations:
+            return "different"
+        if len(left) != len(right) or "unknown" in relations:
+            return "unknown"
+        return "same"
     return "same" if type(left) is type(right) and left == right else "different"
 
 

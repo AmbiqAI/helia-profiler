@@ -767,3 +767,47 @@ def test_different_config_file_digest_needs_effective_settings_evidence(tmp_path
     }
     build = pin_state(build, record)
     assert bind_operator_timing(build, fixture, run).runtime_stack == "unknown"
+
+
+@pytest.mark.parametrize(
+    "left,right,relation",
+    [
+        (
+            [{"type": "scratch", "attributes": {}}],
+            [{"type": "scratch", "attributes": {"memory": "sram"}}],
+            "unknown",
+        ),
+        ([True], [1], "different"),
+        (
+            [{"type": "scratch", "attributes": {"memory": "sram"}}],
+            [{"type": "scratch", "attributes": {"memory": "tcm"}}],
+            "different",
+        ),
+        (
+            [{"type": "scratch", "attributes": {"memory": "sram"}}],
+            [{"type": "scratch", "attributes": {"memory": "sram"}}],
+            "same",
+        ),
+        ([], [{"type": "scratch"}], "unknown"),
+    ],
+)
+def test_list_settings_compare_nested_facts_without_defaults_or_coercion(
+    tmp_path, left, right, relation
+):
+    build, fixture, run = evidenced_pair(tmp_path)
+    record = json.loads(json.dumps(run.metadata.dependencies.to_dict()))
+    record["workspace"]["inputs"]["engine"]["config"] = {"aot_args": {"memory": {"tensors": left}}}
+    build = pin_state(build, record)
+    deps = run.metadata.dependencies
+    inputs = json.loads(json.dumps(deps.workspace.inputs))
+    inputs["engine"]["config"] = {"aot_args": {"memory": {"tensors": right}}}
+    run = replace(
+        run,
+        metadata=replace(
+            run.metadata,
+            dependencies=replace(deps, workspace=replace(deps.workspace, inputs=inputs)),
+        ),
+    )
+    result = bind_operator_timing(build, fixture, run)
+    assert result.runtime_stack == relation
+    assert result.accepted is (relation == "same")
