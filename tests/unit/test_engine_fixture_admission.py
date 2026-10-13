@@ -332,7 +332,7 @@ def test_stateful_operator_needs_carry_without_tensor_flags(tmp_path, engine):
         )
 
 
-def test_auxiliary_float16_is_part_of_micro_capability(tmp_path):
+def test_auxiliary_float16_is_metadata_not_public_io_capability(tmp_path):
     from test_typed_fixture_analysis import _tensor, s
 
     def change(model, graph):
@@ -354,8 +354,57 @@ def test_auxiliary_float16_is_part_of_micro_capability(tmp_path):
         tuple(api.FixtureIO(t, file) for t in actual.inputs),
         tuple(api.FixtureIO(t, file) for t in actual.outputs),
     )
-    with pytest.raises(ConfigError, match="float16"):
-        _check_typed_fixture(fixture, actual, api.EngineType.TFLM)
+    assert _check_typed_fixture(fixture, actual, api.EngineType.TFLM) == (
+        ("float32", api.FixtureCapability.SUPPORTED),
+    )
+
+
+@pytest.mark.parametrize("engine", [api.EngineType.TFLM, api.EngineType.HELIA_AOT])
+def test_connected_half_storage_keeps_source_and_supported_public_io(tmp_path, engine):
+    from test_typed_fixture_analysis import s
+
+    def dequantize(model, graph):
+        code = s.OperatorCodeT()
+        code.builtinCode = s.BuiltinOperator.DEQUANTIZE
+        code.deprecatedBuiltinCode = code.builtinCode
+        model.operatorCodes.append(code)
+        constant = s.BufferT()
+        constant.data = bytes(8)
+        model.buffers.append(constant)
+        graph.tensors[2].buffer = 1
+        op = s.OperatorT()
+        op.opcodeIndex = 1
+        op.inputs = [2]
+        op.outputs = [3]
+        graph.operators[0].inputs = [0, 3]
+        graph.operators.insert(0, op)
+
+    path = typed_model(
+        tmp_path,
+        [F32],
+        [Y32],
+        extra=[
+            ("half", "float16", (1, 4), None, None),
+            ("expanded", "float32", (1, 4), None, None),
+        ],
+        change=dequantize,
+    )
+    before = path.read_bytes()
+    model = api.analyze_typed_fixture_model_for_engine(path, engine=engine)
+    assert model.has_float16 and model.input_bytes == model.output_bytes == 16
+    file = api.FixtureFile(Path("unused"), "0" * 64)
+    fixture = api.TypedFixture(
+        file,
+        tuple(api.FixtureIO(t, file) for t in model.inputs),
+        tuple(api.FixtureIO(t, file) for t in model.outputs),
+    )
+    assert _check_typed_fixture(fixture, model, engine) == (
+        ("float32", api.FixtureCapability.SUPPORTED),
+    )
+    assert path.read_bytes() == before
+    assert model.resolver.registrations == (
+        ("r.AddAdd();", "r.AddDequantize();") if engine is api.EngineType.TFLM else ()
+    )
 
 
 def test_carry_operator_attribution_is_refused_without_state_binding(tmp_path):

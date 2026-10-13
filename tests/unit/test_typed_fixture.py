@@ -254,11 +254,29 @@ def test_readback_budget_is_inclusive_and_counts_every_output(tmp_path):
         _check_typed_fixture(spills, analysis_of(spills), EngineType.HELIA_AOT)
 
 
-def test_float16_is_refused_on_tflm_even_behind_float32_io(tmp_path):
+def test_internal_float16_does_not_veto_supported_public_io(tmp_path):
     f = typed(tmp_path)
-    with pytest.raises(ConfigError, match="float16"):
-        _check_typed_fixture(f, analysis_of(f, has_float16=True), EngineType.TFLM)
-    _check_typed_fixture(f, analysis_of(f, has_float16=True), EngineType.HELIA_AOT)
+    for engine in (EngineType.TFLM, EngineType.HELIA_AOT):
+        assert _check_typed_fixture(f, analysis_of(f, has_float16=True), engine) == (
+            ("float32", FixtureCapability.SUPPORTED),
+            ("int16", FixtureCapability.SUPPORTED),
+            ("int8", FixtureCapability.SUPPORTED),
+        )
+
+
+@pytest.mark.parametrize("side", ["input", "output"])
+def test_public_float16_io_still_stops_before_pipeline(tmp_path, monkeypatch, side):
+    half = FixtureTensor("half", 0, "float16", (1, 4), None)
+    f = typed(tmp_path, **{"inputs" if side == "input" else "outputs": (half,)})
+    monkeypatch.setattr(
+        "helia_profiler._fixture_build.analyze_typed_fixture_model_for_engine",
+        lambda _, **kwargs: analysis_of(f, has_float16=True),
+    )
+    monkeypatch.setattr(
+        "helia_profiler._fixture_build.PipelineRunner", lambda *_: pytest.fail("pipeline reached")
+    )
+    with pytest.raises(ConfigError, match="do not support float16 IO"):
+        build_fixed_fixture(config_for(tmp_path, f), f, method=METHOD, runtime=runtime(tmp_path))
 
 
 def test_unsupported_io_dtype_is_refused(tmp_path, monkeypatch):
@@ -414,17 +432,36 @@ def test_arena_observation_is_heliaaot_only(tmp_path, monkeypatch):
         )
 
 
-def test_typed_mismatch_or_float16_on_tflm_stops_before_pipeline(tmp_path, monkeypatch):
+def test_internal_float16_reaches_selected_engine_and_preserves_failure(tmp_path, monkeypatch):
+    from helia_profiler.errors import EngineError
+
     f = typed(tmp_path)
-    monkeypatch.setattr(
-        "helia_profiler._fixture_build.PipelineRunner", lambda *_: pytest.fail("pipeline reached")
-    )
     monkeypatch.setattr(
         "helia_profiler._fixture_build.analyze_typed_fixture_model_for_engine",
         lambda _, **kwargs: analysis_of(f, has_float16=True),
     )
-    with pytest.raises(ConfigError, match="float16"):
+    error = EngineError("Selected runtime rejected the internal kernel dtype")
+    calls = []
+
+    class Runner:
+        def __init__(self, stages):
+            pass
+
+        def run(self, config):
+            calls.append(config.engine.type)
+            raise error
+
+    monkeypatch.setattr("helia_profiler._fixture_build.PipelineRunner", Runner)
+    with pytest.raises(EngineError) as caught:
         build_fixed_fixture(config_for(tmp_path, f), f, method=METHOD, runtime=runtime(tmp_path))
+    assert caught.value is error and calls == [EngineType.TFLM]
+
+
+def test_typed_mismatch_stops_before_pipeline(tmp_path, monkeypatch):
+    f = typed(tmp_path)
+    monkeypatch.setattr(
+        "helia_profiler._fixture_build.PipelineRunner", lambda *_: pytest.fail("pipeline reached")
+    )
     monkeypatch.setattr(
         "helia_profiler._fixture_build.analyze_typed_fixture_model_for_engine",
         lambda _, **kwargs: analysis_of(typed(tmp_path / "other", outputs=(LABEL,))),
