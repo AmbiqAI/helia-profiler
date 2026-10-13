@@ -230,11 +230,73 @@ def test_public_observation_distinguishes_attribution_from_invalid_data(tmp_path
     assert facts.attribution_reason == "toolchain_unrecorded"
 
 
+def test_valid_cross_engine_provenance_is_a_difference_not_corruption(tmp_path):
+    _, fixture, run = evidenced_pair(tmp_path)
+    build = build_for(EngineType.TFLM, fixture)
+    facts = observe_operator_timing(build, fixture, run)
+    assert facts.reason is None and facts.operators is not None
+    assert facts.attribution_reason == "engine_mismatch"
+    assert facts.runtime_stack == "different"
+    deps = run.metadata.dependencies
+    inputs = {"engine": {**deps.workspace.inputs["engine"], "type": "tflm"}}
+    corrupt = replace(deps, workspace=replace(deps.workspace, inputs=inputs))
+    inconsistent = replace(run, metadata=replace(run.metadata, dependencies=corrupt))
+    refused = observe_operator_timing(build, fixture, inconsistent)
+    assert refused.reason == "runtime_provenance_unverified" and refused.operators is None
+
+
+def test_legacy_attribution_failure_preserves_null_numeric_fields(tmp_path):
+    from dataclasses import asdict
+
+    fixture = fixture_for(KWS_SHA, tmp_path)
+    legacy = approximate_timing(
+        build_for(EngineType.HELIA_AOT, fixture),
+        fixture,
+        profile("kws_aot", model_sha256="1" * 64),
+    )
+    assert asdict(legacy) == {
+        "build_identity": "build-identity",
+        "operators": None,
+        "reason": "model_mismatch",
+        "layer_cycles_sum": None,
+        "clean_cycles": None,
+        "unattributed_cycles": None,
+        "agreement_pct": None,
+        "tolerance_pct": None,
+        "runtime_stack": "unknown",
+        "engine_version": "0.22.0",
+    }
+
+
+@pytest.mark.parametrize("cycles", [True, "1", 10**400])
+def test_public_observation_refuses_malformed_layer_numbers(tmp_path, cycles):
+    fixture = fixture_for(KWS_SHA, tmp_path)
+    run = profile("kws_aot")
+    layers = [replace(layer, cycles=cycles) for layer in run.pmu.layers]
+    run = replace(
+        run,
+        pmu=replace(run.pmu, layers=layers, meta=replace(run.pmu.meta, clean_infer_avg_cycles=13)),
+    )
+    facts = observe_operator_timing(build_for(EngineType.HELIA_AOT, fixture), fixture, run)
+    assert facts.reason == "layer_cycles_unavailable" and facts.operators is None
+
+
+def test_public_observation_refuses_unrepresentable_clean_count(tmp_path):
+    fixture = fixture_for(KWS_SHA, tmp_path)
+    run = profile("kws_aot", clean_infer_avg_cycles=10**400)
+    facts = observe_operator_timing(build_for(EngineType.HELIA_AOT, fixture), fixture, run)
+    assert facts.reason == "clean_window_unavailable" and facts.operators is None
+
+
 def test_public_observation_never_waives_tampered_provenance(tmp_path):
     build, fixture, run = evidenced_pair(tmp_path)
     build.dependency_state.path.write_text("{}")
     facts = observe_operator_timing(build, fixture, run)
     assert facts.reason == "runtime_provenance_unverified" and facts.operators is None
+    legacy = approximate_timing(build, fixture, run)
+    assert legacy.reason == facts.reason and legacy.operators is None
+    assert legacy.clean_cycles == run.pmu.meta.clean_infer_avg_cycles
+    assert legacy.agreement_pct == facts.agreement_pct and legacy.tolerance_pct == 1
 
 
 @pytest.mark.parametrize("condition", ["overflow", "busy_loop", "nonfinite_sum", "zero_sum"])

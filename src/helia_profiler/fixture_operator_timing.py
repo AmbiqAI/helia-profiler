@@ -296,7 +296,9 @@ def _effective_modules(entries: list[dict]) -> list[dict]:
 
 def _runtime_identity(build: FixtureBuild, profile: ProfileResult) -> tuple[str, str | None]:
     """Compare available facts; an absent fact never supplies equality evidence."""
-    different = False
+    different = (
+        profile.metadata.engine is not None and profile.metadata.engine.type != build.engine.value
+    )
     source = asdict(build.engine_source) if build.engine_source is not None else None
     engine = profile.metadata.engine
     if source and engine and engine.version and source["version"] != engine.version:
@@ -320,8 +322,15 @@ def _runtime_identity(build: FixtureBuild, profile: ProfileResult) -> tuple[str,
     except (OSError, ValueError, TypeError, AttributeError, RecursionError):
         return "unknown", "runtime_provenance_unverified"
     complete = True
-    for snapshot in (inputs, other_inputs):
-        if "type" in snapshot and snapshot["type"] != build.engine.value:
+    for snapshot, expected_engine in (
+        (inputs, build.engine.value),
+        (other_inputs, engine.type if engine else None),
+    ):
+        if (
+            "type" in snapshot
+            and expected_engine is not None
+            and snapshot["type"] != expected_engine
+        ):
             return "unknown", "runtime_provenance_unverified"
     for key in _ENGINE_SETTINGS:
         if key not in inputs or key not in other_inputs:
@@ -424,8 +433,6 @@ def observe_operator_timing(
             **values,
         )
 
-    if provenance_error is not None:
-        return result(provenance_error)
     snapshot = profile.metadata.config_snapshot or {}
     if (snapshot.get("profiling") or {}).get("clean_window_probe") != "infer":
         return result("clean_window_not_inference")
@@ -436,11 +443,23 @@ def observe_operator_timing(
         return result("counter_overflow")
     cycles: list[float] = []
     for layer in layers:
-        if layer.cycles is None or not math.isfinite(layer.cycles) or layer.cycles < 0:
+        if isinstance(layer.cycles, bool) or not isinstance(layer.cycles, (int, float)):
             return result("layer_cycles_unavailable")
-        cycles.append(float(layer.cycles))
+        try:
+            value = float(layer.cycles)
+        except (OverflowError, TypeError, ValueError):
+            return result("layer_cycles_unavailable")
+        if not math.isfinite(value) or value < 0:
+            return result("layer_cycles_unavailable")
+        cycles.append(value)
     clean = profile.pmu.meta.clean_infer_avg_cycles
     if not isinstance(clean, int) or isinstance(clean, bool) or clean <= 0:
+        return result("clean_window_unavailable")
+    try:
+        finite_clean = math.isfinite(float(clean))
+    except OverflowError:
+        finite_clean = False
+    if not finite_clean:
         return result("clean_window_unavailable")
     total = sum(cycles)
     if not math.isfinite(total):
@@ -454,6 +473,8 @@ def observe_operator_timing(
         unattributed_cycles=clean - total,
         agreement_pct=agreement,
     )
+    if provenance_error is not None:
+        return result(provenance_error, **values)
     operators = tuple(
         OperatorTiming(
             layer.id, layer.op, layer.source_index, value, value / total if total else 0.0
@@ -478,10 +499,17 @@ def bind_operator_timing(
     it is not the supported measurement path.
     """
     facts = observe_operator_timing(build, fixture, profile)
+    if facts.attribution_reason is not None:
+        return FixtureOperatorTiming(
+            build.build_identity,
+            None,
+            facts.attribution_reason,
+            runtime_stack=facts.runtime_stack,
+            engine_version=facts.engine_version,
+        )
     tolerance = None
-    reason = facts.attribution_reason or facts.reason
-    if reason is None:
-        assert facts.clean_cycles is not None and facts.agreement_pct is not None
+    reason = facts.reason
+    if facts.clean_cycles is not None and facts.agreement_pct is not None:
         tolerance = (
             SHORT_AGREEMENT_PCT
             if facts.clean_cycles / FIXTURE_CPU_HZ < SHORT_INFERENCE_S
@@ -489,7 +517,7 @@ def bind_operator_timing(
         )
         if abs(facts.agreement_pct) > tolerance:
             reason = "layer_sum_disagrees_with_clean_window"
-        elif facts.runtime_stack != "same" and not allow_runtime_difference:
+        elif reason is None and facts.runtime_stack != "same" and not allow_runtime_difference:
             reason = (
                 "runtime_stack_mismatch"
                 if facts.runtime_stack == "different"
