@@ -474,7 +474,21 @@ def load_fixture_build(record: str | bytes, *, roots: Mapping[str, Path]) -> Fix
             )
         result = FixtureBuild(**value)
         verify_fixture_build(result)
-        if _json(_payload(result, file=mapping.file, path=mapping.encode)) != _json(outer["build"]):
+        # Caller roots may add aliases or narrower directories after the record
+        # was written. Decode already checked containment and canonical relative
+        # paths; compare field types using the same resolved path representation.
+        received = dict(outer["build"])
+        received["app_dir"] = mapping.encode(result.app_dir)
+        for name in _FILE_FIELDS:
+            item = getattr(result, name)
+            received[name] = mapping.file(item) if item is not None else None
+        for name in _FILES_FIELDS:
+            received[name] = [mapping.file(item) for item in getattr(result, name)]
+        received["inputs"] = [
+            {**io, "data": mapping.file(parsed.data)}
+            for io, parsed in zip(received["inputs"], result.inputs, strict=True)
+        ]
+        if _json(_payload(result, file=mapping.file, path=mapping.encode)) != _json(received):
             raise ValueError("Noncanonical fixture build field types/paths")
         return result
     except (TypeError, KeyError, AttributeError) as exc:

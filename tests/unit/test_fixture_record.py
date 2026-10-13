@@ -85,6 +85,23 @@ def _build(root):
     return replace(build, build_identity=compiled_fixture_identity(build))
 
 
+@pytest.mark.parametrize("extra_root", ["alias", "nested", "parent"])
+def test_record_load_accepts_additional_caller_roots(tmp_path, extra_root):
+    root = tmp_path / "run"
+    build = _build(root)
+    record = dump_fixture_build(build, roots={"suite": root})
+    extra = {"alias": root, "nested": root / "app", "parent": tmp_path}[extra_root]
+    roots = {"suite": root, "evidence": extra}
+
+    actual = load_fixture_build(record, roots=roots)
+
+    assert actual == build
+    assert dump_fixture_build(actual, roots={"suite": root}) == record
+    build.flat_binary.path.write_bytes(b"changed image")
+    with pytest.raises(ValueError):
+        load_fixture_build(record, roots=roots)
+
+
 def test_full_state_record_round_trip_and_relocation(tmp_path):
     root = tmp_path / "original"
     build = _build(root)
