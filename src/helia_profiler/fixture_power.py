@@ -114,12 +114,16 @@ def observe_fixture_power(
     failures: list[Exception] = []
 
     def check() -> None:
-        try:
-            with phase_lock:
-                guard.check(require_free=phase != "resetting", remaining_s=90)
-        except Exception as exc:
-            failures.append(exc)
-            raise
+        with phase_lock:
+            require_free = phase != "resetting"
+            try:
+                guard.check(require_free=require_free, remaining_s=90)
+            except Exception as exc:
+                failure = ValueError(
+                    f"Power guard refused in {phase} (require_free={require_free}): {exc}"
+                )
+                failures.append(failure)
+                raise failure from exc
 
     def started(wait_gpi) -> None:
         nonlocal phase

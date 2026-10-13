@@ -318,7 +318,7 @@ def test_unrelated_large_packet_cannot_license_missing_gate_tail():
         power._validate_trace_coverage(observation)
 
 
-@pytest.mark.parametrize("fault", [None, "expired", "foreign", "reset"])
+@pytest.mark.parametrize("fault", [None, "expired", "reassigned", "foreign", "reset", "cancelled"])
 def test_owned_reset_interleaving_preserves_authority_and_detached_checks(monkeypatch, fault):
     events = []
     resetting = False
@@ -331,8 +331,8 @@ def test_owned_reset_interleaving_preserves_authority_and_detached_checks(monkey
 
         def check(self, *, require_free, remaining_s):
             events.append((resetting, reset_done, require_free))
-            if resetting and fault == "expired":
-                raise ValueError("expired during owned reset")
+            if resetting and fault in ("expired", "reassigned"):
+                raise ValueError(f"{fault} during owned reset")
             if require_free and resetting:
                 raise ValueError("own reset holds probe")
             if require_free and reset_done and fault == "foreign":
@@ -376,6 +376,8 @@ def test_owned_reset_interleaving_preserves_authority_and_detached_checks(monkey
             callback()
             if fault == "reset":
                 raise ValueError("reset failed")
+            if fault == "cancelled":
+                raise KeyboardInterrupt("cancelled reset")
         finally:
             resetting = False
             reset_done = True
@@ -385,8 +387,14 @@ def test_owned_reset_interleaving_preserves_authority_and_detached_checks(monkey
         rail_power=request(), power_sync=request().firmware_wiring(), settle_seconds=30
     )
     if fault:
-        with pytest.raises(ValueError, match=fault):
+        with pytest.raises(
+            KeyboardInterrupt if fault == "cancelled" else ValueError, match=fault
+        ) as caught:
             power.observe_fixture_power(value, Guard(), reset)
+        if fault in ("expired", "reassigned"):
+            assert "resetting (require_free=False)" in str(caught.value)
+        if fault == "foreign":
+            assert "arming (require_free=True)" in str(caught.value)
         assert "go" not in events
     else:
         assert power.observe_fixture_power(value, Guard(), reset).summary.energy_j == 0.02
