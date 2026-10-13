@@ -431,6 +431,8 @@ def load_fixture_build(record: str | bytes, *, roots: Mapping[str, Path]) -> Fix
         for name in _FILE_FIELDS:
             value[name] = mapping.read_file(value[name])
         for name in _FILES_FIELDS:
+            if not isinstance(value[name], list):
+                raise ValueError("Fixture file collections require JSON arrays")
             value[name] = tuple(mapping.required_file(f) for f in value[name])
         value["inputs"] = tuple(
             FixtureIO(

@@ -102,6 +102,15 @@ def test_record_load_accepts_additional_caller_roots(tmp_path, extra_root):
         load_fixture_build(record, roots=roots)
 
 
+@pytest.mark.parametrize("field", ["outputs", "aot_outputs"])
+@pytest.mark.parametrize("malformed", [{}, ""])
+def test_record_file_collections_require_json_arrays(tmp_path, field, malformed):
+    record = json.loads(dump_fixture_build(_build(tmp_path), roots={"run": tmp_path}))
+    record["build"][field] = malformed
+    with pytest.raises(ValueError):
+        load_fixture_build(json.dumps(record), roots={"run": tmp_path})
+
+
 def test_full_state_record_round_trip_and_relocation(tmp_path):
     root = tmp_path / "original"
     build = _build(root)
