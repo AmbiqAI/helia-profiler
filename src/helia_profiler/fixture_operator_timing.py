@@ -6,6 +6,7 @@ import json
 import math
 import re
 from dataclasses import asdict, dataclass
+from itertools import combinations
 
 from ._fixture_build import FixedFixture, FixtureBuild, TypedFixture
 from .engines import EngineType
@@ -128,29 +129,33 @@ _ENGINE_SETTINGS = (
     "resolved_version",
     "toolchain_tag",
     "cmake_vars",
+    "extra_modules",
 )
-_PROVIDER = re.compile(r"helia-rt|tflite-micro|cmsis-nn")
 
 
 def _providers(record: dict) -> dict[str, tuple] | None:
-    modules = record.get("modules")
-    if not isinstance(modules, list):
+    if "modules" not in record:
         return None
+    modules = record["modules"]
+    if not isinstance(modules, list):
+        raise ValueError("Invalid modules collection")
     providers = {}
     for module in modules:
-        if not isinstance(module, dict):
-            raise ValueError("Invalid provider module")
-        name = module.get("name")
-        if not isinstance(name, str) or not _PROVIDER.search(name):
-            continue
-        digest = module.get("content_hash")
         if (
-            name in providers
-            or not isinstance(digest, dict)
-            or digest.get("algorithm") != "sha256"
-            or not isinstance(digest.get("value"), str)
-            or not re.fullmatch(r"[0-9a-f]{64}", digest["value"])
+            not isinstance(module, dict)
+            or not all(
+                isinstance(module.get(key), str) and module[key]
+                for key in ("name", "project", "kind")
+            )
+            or any(
+                key not in module or (module[key] is not None and not isinstance(module[key], str))
+                for key in ("url", "peeled_commit")
+            )
         ):
+            raise ValueError("Invalid provider module")
+        name = module["name"]
+        digest = module.get("content_hash")
+        if name in providers or not _valid_digest(digest):
             raise ValueError("Invalid provider identity")
         providers[name] = (
             module.get("project"),
@@ -163,6 +168,70 @@ def _providers(record: dict) -> dict[str, tuple] | None:
     return providers or None
 
 
+def _valid_digest(value: object) -> bool:
+    return (
+        isinstance(value, dict)
+        and value.get("algorithm") == "sha256"
+        and isinstance(value.get("value"), str)
+        and re.fullmatch(r"[0-9a-f]{64}", value["value"]) is not None
+    )
+
+
+def _engine_inputs(record: dict) -> dict:
+    value = record
+    for key in ("workspace", "inputs", "engine"):
+        value = value.get(key, {})
+        if not isinstance(value, dict):
+            raise ValueError("Invalid engine input snapshot")
+    for key in ("config", "cmake_vars"):
+        if key in value and not isinstance(value[key], dict):
+            raise ValueError("Invalid engine settings")
+    if "cmake_vars" in value and not all(
+        isinstance(k, str) and isinstance(v, str) for k, v in value["cmake_vars"].items()
+    ):
+        raise ValueError("Invalid compiler definitions")
+    if "extra_modules" in value and not isinstance(value["extra_modules"], list):
+        raise ValueError("Invalid extra modules")
+    for entry in value.get("extra_modules", []):
+        if (
+            not isinstance(entry, dict)
+            or not isinstance(entry.get("name"), str)
+            or not entry["name"]
+        ):
+            raise ValueError("Invalid extra module identity")
+        if (
+            type(entry.get("local")) is not bool
+            or any(
+                key not in entry or (entry[key] is not None and not isinstance(entry[key], str))
+                for key in ("project", "ref", "version")
+            )
+            or (entry["local"] and not _valid_digest(entry.get("content_hash")))
+        ):
+            raise ValueError("Invalid extra module source")
+    for key in (
+        "type",
+        "backend",
+        "resolved_backend",
+        "resolved_variant",
+        "resolved_version",
+        "toolchain_tag",
+    ):
+        if key in value and value[key] is not None and not isinstance(value[key], str):
+            raise ValueError("Invalid engine setting")
+    if value.get("config_path_hash") is not None and not _valid_digest(value["config_path_hash"]):
+        raise ValueError("Invalid engine config digest")
+    source = value.get("source")
+    if source is not None and (
+        not isinstance(source, dict)
+        or any(
+            key in source and source[key] is not None and not isinstance(source[key], str)
+            for key in ("package", "version", "commit")
+        )
+    ):
+        raise ValueError("Invalid engine source")
+    return value
+
+
 def _runtime_identity(build: FixtureBuild, profile: ProfileResult) -> tuple[str, str | None]:
     """Compare available facts; an absent fact never supplies equality evidence."""
     different = False
@@ -170,53 +239,49 @@ def _runtime_identity(build: FixtureBuild, profile: ProfileResult) -> tuple[str,
     engine = profile.metadata.engine
     if source and engine and engine.version and source["version"] != engine.version:
         different = True
-    if build.dependency_state is None:
-        return ("different" if different else "unknown"), None
     try:
-        record = json.loads(build.dependency_state.read(), object_pairs_hook=_unique_object)
+        # Validate every provided pin before taking any missing-evidence path.
+        if build.runtime_manifest is not None:
+            build.runtime_manifest.read()
+        record = (
+            {}
+            if build.dependency_state is None
+            else json.loads(build.dependency_state.read(), object_pairs_hook=_unique_object)
+        )
         if not isinstance(record, dict):
             raise ValueError("Expected dependency state object")
-        if profile.metadata.dependencies is None:
-            return ("different" if different else "unknown"), None
-        other = profile.metadata.dependencies.to_dict()
-        inputs = record.get("workspace", {}).get("inputs", {}).get("engine", {})
-        other_inputs = other.get("workspace", {}).get("inputs", {}).get("engine", {})
-        if not isinstance(inputs, dict) or not isinstance(other_inputs, dict):
-            raise ValueError("Expected engine inputs object")
-    except (OSError, ValueError, TypeError, AttributeError):
+        other = (
+            {} if profile.metadata.dependencies is None else profile.metadata.dependencies.to_dict()
+        )
+        inputs, other_inputs = _engine_inputs(record), _engine_inputs(other)
+        providers, other_providers = _providers(record), _providers(other)
+    except (OSError, ValueError, TypeError, AttributeError, RecursionError):
         return "unknown", "runtime_provenance_unverified"
-    for snapshot in (inputs, other_inputs):
-        for key in ("config", "cmake_vars"):
-            if key in snapshot and not isinstance(snapshot[key], dict):
-                return "unknown", "runtime_provenance_unverified"
-        for key in (
-            "type",
-            "backend",
-            "resolved_backend",
-            "resolved_variant",
-            "resolved_version",
-            "toolchain_tag",
-        ):
-            if key in snapshot and snapshot[key] is not None and not isinstance(snapshot[key], str):
-                return "unknown", "runtime_provenance_unverified"
-        if "source" in snapshot and snapshot["source"] is not None:
-            value = snapshot["source"]
-            if not isinstance(value, dict) or any(
-                field in value and value[field] is not None and not isinstance(value[field], str)
-                for field in ("package", "version", "commit")
-            ):
-                return "unknown", "runtime_provenance_unverified"
     complete = True
-    if inputs.get("type") != build.engine.value or other_inputs.get("type") != build.engine.value:
-        return "unknown", "runtime_provenance_unverified"
+    for snapshot in (inputs, other_inputs):
+        if "type" in snapshot and snapshot["type"] != build.engine.value:
+            return "unknown", "runtime_provenance_unverified"
     for key in _ENGINE_SETTINGS:
         if key not in inputs or key not in other_inputs:
             complete = False
+        elif key == "cmake_vars":
+            left, right = dict(inputs[key]), dict(other_inputs[key])
+            # Generated attribute-header paths are workspace locations, not
+            # effective compiler settings. No content binding is recorded for
+            # these individual paths, so differing locations remain unknown.
+            for name in set(left) | set(right):
+                if name.endswith("_ATTRIBUTES_HEADER"):
+                    if left.get(name) != right.get(name):
+                        complete = False
+                    left.pop(name, None)
+                    right.pop(name, None)
+            if left != right:
+                different = True
         elif inputs[key] != other_inputs[key]:
             different = True
     sources = (source, inputs.get("source"), other_inputs.get("source"))
     if build.engine is EngineType.HELIA_AOT:
-        for left, right in zip(sources, sources[1:]):
+        for left, right in combinations(sources, 2):
             if isinstance(left, dict) and isinstance(right, dict):
                 for key in ("package", "version", "commit"):
                     if left.get(key) and right.get(key) and left[key] != right[key]:
@@ -242,19 +307,11 @@ def _runtime_identity(build: FixtureBuild, profile: ProfileResult) -> tuple[str,
         # Prepared archives have ABI/build settings not recorded by an ordinary
         # profile. Matching provider revisions alone cannot bind that archive.
         complete = False
-    try:
-        providers, other_providers = _providers(record), _providers(other)
-    except ValueError:
-        return "unknown", "runtime_provenance_unverified"
     if providers is None or other_providers is None:
         complete = False
     elif providers != other_providers:
         different = True
     if build.runtime_manifest is not None:
-        try:
-            build.runtime_manifest.read()
-        except (OSError, ValueError):
-            return "unknown", "runtime_provenance_unverified"
         complete = False
     return ("different" if different else "same" if complete else "unknown"), None
 
@@ -271,14 +328,18 @@ def bind_operator_timing(
     Default attribution requires fully recorded matching runtime identity.
     ``allow_runtime_difference`` retains approximate observations for different
     or unknown runtimes with that explicit label; it does not waive malformed
-    or hash-invalid provenance, placement, model, counter or agreement checks.
+    dependency metadata or hash-invalid supplied files, placement, model,
+    counter or agreement checks.
     Prepared-archive build settings are not recorded by an ordinary profile,
     so matching provider revisions alone leave its archive identity unknown.
     PSRAM builds are refused because an ordinary profile does not bind their
     active payload, external arena layout, or loader configuration.
     """
     engine = profile.metadata.engine
-    runtime_stack, provenance_error = _runtime_identity(build, profile)
+    try:
+        runtime_stack, provenance_error = _runtime_identity(build, profile)
+    except RecursionError:
+        runtime_stack, provenance_error = "unknown", "runtime_provenance_unverified"
 
     def result(reason: str | None, **values) -> FixtureOperatorTiming:
         return FixtureOperatorTiming(

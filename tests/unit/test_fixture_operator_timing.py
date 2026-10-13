@@ -464,6 +464,7 @@ def evidenced_pair(tmp_path):
             "resolved_version": None,
             "toolchain_tag": None,
             "cmake_vars": {},
+            "extra_modules": [],
             "source": asdict(source),
         }
     }
@@ -580,3 +581,131 @@ def test_differing_fact_is_not_hidden_by_another_missing_fact(tmp_path):
         ),
     )
     assert bind_operator_timing(build, fixture, run).runtime_stack == "different"
+
+
+def pin_state(build, record):
+    import hashlib
+
+    path = build.dependency_state.path
+    path.write_text(json.dumps(record))
+    return replace(
+        build, dependency_state=FixtureFile(path, hashlib.sha256(path.read_bytes()).hexdigest())
+    )
+
+
+@pytest.mark.parametrize("missing", ["state", "profile", "both"])
+@pytest.mark.parametrize("damage", ["tampered", "absent"])
+def test_present_archive_pin_is_checked_before_missing_facts(tmp_path, missing, damage):
+    import hashlib
+
+    build, fixture, run = evidenced_pair(tmp_path)
+    path = tmp_path / "archive-manifest.json"
+    path.write_text("{}")
+    build = replace(
+        build, runtime_manifest=FixtureFile(path, hashlib.sha256(path.read_bytes()).hexdigest())
+    )
+    if missing in ("state", "both"):
+        build = replace(build, dependency_state=None)
+    if missing in ("profile", "both"):
+        run = replace(run, metadata=replace(run.metadata, dependencies=None))
+    path.unlink() if damage == "absent" else path.write_text("changed")
+    result = bind_operator_timing(build, fixture, run, allow_runtime_difference=True)
+    assert not result.accepted and result.reason == "runtime_provenance_unverified"
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("modules", {}),
+        ("modules", [123]),
+        ("modules", [{"name": "ns-cmsis-nn"}]),
+        ("extra_modules", [{"name": "nsx-npu", "local": True}]),
+        ("config_path_hash", 123),
+        ("config_path_hash", {"algorithm": "sha256", "value": "bad"}),
+        ("cmake_vars", {"ARM_MATH_DSP": []}),
+        ("extra_modules", {}),
+    ],
+)
+@pytest.mark.parametrize("missing_profile", [False, True])
+def test_invalid_present_fields_are_never_allowed(tmp_path, field, value, missing_profile):
+    build, fixture, run = evidenced_pair(tmp_path)
+    record = json.loads(json.dumps(run.metadata.dependencies.to_dict()))
+    target = record if field == "modules" else record["workspace"]["inputs"]["engine"]
+    target[field] = value
+    build = pin_state(build, record)
+    if missing_profile:
+        run = replace(run, metadata=replace(run.metadata, dependencies=None))
+    result = bind_operator_timing(build, fixture, run, allow_runtime_difference=True)
+    assert result.reason == "runtime_provenance_unverified" and not result.accepted
+
+
+@pytest.mark.parametrize("missing_state", [False, True])
+def test_known_commit_difference_survives_missing_snapshot_source(tmp_path, missing_state):
+    build, fixture, run = evidenced_pair(tmp_path)
+    build = replace(build, engine_source=replace(build.engine_source, commit="d" * 40))
+    record = json.loads(json.dumps(run.metadata.dependencies.to_dict()))
+    del record["workspace"]["inputs"]["engine"]["source"]
+    build = replace(build, dependency_state=None) if missing_state else pin_state(build, record)
+    result = bind_operator_timing(build, fixture, run, allow_runtime_difference=True)
+    assert result.accepted and result.runtime_stack == "different"
+
+
+def test_generated_header_location_is_not_a_runtime_difference(tmp_path):
+    build, fixture, run = evidenced_pair(tmp_path)
+    record = json.loads(json.dumps(run.metadata.dependencies.to_dict()))
+    record["workspace"]["inputs"]["engine"]["cmake_vars"] = {
+        "NETWORK_ATTRIBUTES_HEADER": "/build-one/network.h",
+    }
+    build = pin_state(build, record)
+    deps = run.metadata.dependencies
+    inputs = json.loads(json.dumps(deps.workspace.inputs))
+    inputs["engine"]["cmake_vars"] = {"NETWORK_ATTRIBUTES_HEADER": "/build-two/network.h"}
+    run = replace(
+        run,
+        metadata=replace(
+            run.metadata,
+            dependencies=replace(deps, workspace=replace(deps.workspace, inputs=inputs)),
+        ),
+    )
+    result = bind_operator_timing(build, fixture, run)
+    # The individual generated-header content is not bound by these snapshots.
+    assert not result.accepted and result.runtime_stack == "unknown"
+
+
+@pytest.mark.parametrize("extra", [False, True])
+def test_every_recorded_engine_module_participates(tmp_path, extra):
+    build, fixture, run = evidenced_pair(tmp_path)
+    deps = run.metadata.dependencies
+    if extra:
+        record = json.loads(json.dumps(deps.to_dict()))
+        record["workspace"]["inputs"]["engine"]["extra_modules"] = [
+            {
+                "name": "nsx-npu",
+                "local": True,
+                "project": "nsx-npu",
+                "ref": None,
+                "version": None,
+                "content_hash": {"algorithm": "sha256", "value": "d" * 64},
+            }
+        ]
+        build = pin_state(build, record)
+    else:
+        modules = (*deps.modules, replace(deps.modules[0], name="nsx-npu", project="nsx-npu"))
+        run = replace(
+            run, metadata=replace(run.metadata, dependencies=replace(deps, modules=modules))
+        )
+    result = bind_operator_timing(build, fixture, run)
+    assert not result.accepted and result.runtime_stack == "different"
+
+
+def test_deeply_nested_pinned_json_is_a_refusal(tmp_path):
+    import hashlib
+
+    build, fixture, run = evidenced_pair(tmp_path)
+    path = build.dependency_state.path
+    path.write_text('{"config":' + "[" * 1100 + "0" + "]" * 1100 + "}")
+    build = replace(
+        build, dependency_state=FixtureFile(path, hashlib.sha256(path.read_bytes()).hexdigest())
+    )
+    result = bind_operator_timing(build, fixture, run, allow_runtime_difference=True)
+    assert not result.accepted and result.reason == "runtime_provenance_unverified"
