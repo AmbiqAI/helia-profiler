@@ -145,10 +145,19 @@ def test_fresh_copies_are_writable_with_restrictive_umask(tmp_path: Path) -> Non
 
 
 @pytest.mark.parametrize("directory", ["rtt", "rtt/Config"])
-def test_directory_alias_does_not_modify_source(tmp_path: Path, directory: str) -> None:
+@pytest.mark.parametrize("other_source_directory", [False, True])
+def test_directory_alias_does_not_modify_source(
+    tmp_path: Path, directory: str, other_source_directory: bool
+) -> None:
     source = tmp_path / "source"
     app = tmp_path / "app"
     shutil.copytree(_bundled_segger_rtt_dir(), source)
+    linked_directory = source / ("RTT" if directory == "rtt" else "Config")
+    if other_source_directory:
+        linked_directory = source / "Other"
+        linked_directory.mkdir()
+        name = "SEGGER_RTT.c" if directory == "rtt" else "SEGGER_RTT_Conf.h"
+        (linked_directory / name).write_bytes(b"// unrelated source file\n")
     files = [path for path in source.rglob("*") if path.is_file()]
     try:
         for path in files:
@@ -157,9 +166,7 @@ def test_directory_alias_does_not_modify_source(tmp_path: Path, directory: str) 
         dest = app / directory
         dest.parent.mkdir(parents=True, exist_ok=True)
         try:
-            dest.symlink_to(
-                source / ("RTT" if directory == "rtt" else "Config"), target_is_directory=True
-            )
+            dest.symlink_to(linked_directory, target_is_directory=True)
         except (OSError, NotImplementedError) as error:
             pytest.skip(f"directory symlink unavailable: {error}")
         with pytest.raises(FirmwareError):
@@ -168,3 +175,24 @@ def test_directory_alias_does_not_modify_source(tmp_path: Path, directory: str) 
     finally:
         for path in files:
             path.chmod(0o644)
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="named pipes unavailable")
+def test_source_pipe_is_rejected_before_reading(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source"
+    shutil.copytree(_bundled_segger_rtt_dir(), source)
+    header = source / "RTT" / "SEGGER_RTT_ConfDefaults.h"
+    header.chmod(0o644)
+    header.unlink()
+    os.mkfifo(header)
+    read_bytes = Path.read_bytes
+
+    def guarded_read(path: Path) -> bytes:
+        assert path != header, "a source pipe must not be opened for a blocking read"
+        return read_bytes(path)
+
+    monkeypatch.setattr(Path, "read_bytes", guarded_read)
+    with pytest.raises(FirmwareError, match="regular file"):
+        _copy_segger_rtt(tmp_path / "app", source)

@@ -93,6 +93,10 @@ def _copy_segger_rtt(dest_dir: Path, configured_path: Path | None = None) -> Non
     """Copy SEGGER RTT source files into *dest_dir*/rtt/."""
     rtt_root = find_segger_rtt_dir(configured_path)
     rtt_dest = dest_dir / "rtt"
+    config_dest = rtt_dest / "Config"
+    for directory in (rtt_dest, config_dest):
+        if directory.resolve().is_relative_to(rtt_root):
+            raise FirmwareError(f"RTT destination must be outside its source tree: {directory}")
     rtt_dest.mkdir(parents=True, exist_ok=True)
     rtt_sources = tuple(
         rtt_root / "RTT" / name
@@ -105,6 +109,8 @@ def _copy_segger_rtt(dest_dir: Path, configured_path: Path | None = None) -> Non
     # which in turn includes Config/SEGGER_RTT_Conf.h.
     for src in rtt_sources:
         if src.exists():
+            if not src.is_file():
+                raise FirmwareError(f"RTT source must be a regular file: {src}")
             dest = rtt_dest / src.name
             data = src.read_bytes()
             # Package data can be immutable; app-local copies must stay writable.
@@ -157,7 +163,6 @@ def _copy_segger_rtt(dest_dir: Path, configured_path: Path | None = None) -> Non
     # definition so the buffers land in shared SRAM on parts that have a
     # dedicated .sram_bss region (NSX_MEM__HAS_SRAM_BSS); on simpler parts the
     # macro stays undefined and SEGGER falls back to the default .bss region.
-    config_dest = rtt_dest / "Config"
     config_dest.mkdir(parents=True, exist_ok=True)
     conf_dest = config_dest / "SEGGER_RTT_Conf.h"
     if conf_src.exists():
