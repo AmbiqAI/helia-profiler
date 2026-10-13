@@ -252,7 +252,16 @@ def test_numeric_instrument_packets_are_serialized_without_waveform_fabrication(
 
 
 @pytest.mark.parametrize(
-    "defect", ["missing", "duplicate", "timestamp", "gate_coverage", "nonmonotonic"]
+    "defect",
+    [
+        "missing",
+        "duplicate",
+        "timestamp",
+        "gate_coverage",
+        "nonmonotonic",
+        "interior_gap",
+        "host_axis",
+    ],
 )
 def test_partial_trace_never_divides_by_full_iteration_count(tmp_path, defect):
     observation = measured()
@@ -262,6 +271,18 @@ def test_partial_trace_never_divides_by_full_iteration_count(tmp_path, defect):
         observation.statistics.insert(2500, observation.statistics[2500])
     if defect == "nonmonotonic":
         observation.statistics[2500]["time"]["utc"]["value"] = [100000000000, 100001000000]
+    if defect == "interior_gap":
+        # Keep counters, packet count and integrated duration intact while
+        # introducing an ordered UTC gap that endpoint checks cannot detect.
+        for packet in observation.statistics[2500:]:
+            packet["time"]["utc"]["value"] = [
+                value + 9000000000 for value in packet["time"]["utc"]["value"]
+            ]
+        observation.gated_windows[0] = replace(observation.gated_windows[0], end_s=13.9995)
+    if defect == "host_axis":
+        observation = replace(observation, statistics_device_time=False)
+        for i, packet in enumerate(observation.statistics):
+            packet["_host_time64"] = i * 1000000 + 500000
     if defect == "timestamp":
         observation.statistics[0].pop("time")
     if defect == "gate_coverage":

@@ -246,6 +246,7 @@ def _validate_trace_coverage(observation: PowerResult) -> None:
         raise ValueError("Missing instrument timestamp scale")
     previous_end = rate = previous_u0 = previous_u1 = previous_axis = None
     rows = []
+    utc_intervals = []
     for packet in observation.statistics:
         try:
             t = packet["time"]
@@ -268,6 +269,7 @@ def _validate_trace_coverage(observation: PowerResult) -> None:
             previous_axis, previous_u0, previous_u1 = axis, u0, u1
             duration = (last - first) / frequency
             rows.append((axis, duration))
+            utc_intervals.append((u0, u1))
         except (KeyError, TypeError, ValueError, OverflowError) as exc:
             raise ValueError("Incomplete or discontinuous instrument statistics") from exc
     origin = min(axis for axis, _ in rows)
@@ -282,6 +284,22 @@ def _validate_trace_coverage(observation: PowerResult) -> None:
     total = sum(duration for _, duration in selected)
     if not math.isclose(total, window.duration_s, rel_tol=1e-9, abs_tol=1e-9):
         raise ValueError("Trace/window duration mismatch")
+    if not observation.statistics_device_time:
+        raise ValueError("Timestamp coverage unavailable on the host-arrival axis")
+    # Counter continuity cannot prove UTC coverage when the fitted time map
+    # changes. Require the actual interval union to cover the gate interior;
+    # overlap cannot compensate for an unsupported gap. Do not invent a clock
+    # tolerance. A changing map that leaves a gap is explicitly unavailable.
+    gate_start = origin + window.start_s * hz
+    gate_end = origin + window.end_s * hz
+    intersecting = [(a, b) for a, b in utc_intervals if b > gate_start and a < gate_end]
+    if not intersecting:
+        raise ValueError("Timestamp coverage unavailable for the measured gate")
+    covered_end = intersecting[0][1]
+    for start, end in intersecting[1:]:
+        if start > covered_end:
+            raise ValueError("Timestamp coverage unavailable: interior UTC gap")
+        covered_end = max(covered_end, end)
     # Midpoint admission can omit at most one packet at either edge. This is
     # the instrument's actual integration granularity, not a caller tolerance.
     margin = max(duration for _, duration in rows)
