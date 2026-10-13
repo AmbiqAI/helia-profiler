@@ -52,7 +52,7 @@ Defined in `src/helia_profiler/cli/app.py` line 89.
 | `--arena-size` | `Optional[int]` |  | Tensor arena size in bytes |
 | `--arena-location` | `tcm \| sram \| psram` |  | Tensor arena placement. helia-rt: places the single runtime tensor arena. helia-aot: use engine.config.aot_args.memory.tensors instead. Omit to let the engine and memory planner choose. |
 | `--weights-location` | `tcm \| sram \| mram \| psram` |  | Model weights placement. helia-rt: places the model flatbuffer (psram requires J-Link upload via the RTT transport). helia-aot: use engine.config.aot_args.memory.tensors instead. Omit to let the engine and memory planner choose. |
-| `--core-override` | `cm4 \| cm55` |  | Force heliaRT to use a specific core library variant (e.g. cm4 to disable MVE kernels on an M55 board). |
+| `--core-override` | `cm4 \| cm55` |  | Select the core library in an explicit heliaRT prebuilt distribution. Unsupported for registry and local source builds. |
 
 ### output
 

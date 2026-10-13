@@ -1597,7 +1597,7 @@
             "python_type": "Optional[str]",
             "default": null,
             "required": false,
-            "help": "Force heliaRT to use a specific core library variant (e.g. cm4 to disable MVE kernels on an M55 board).",
+            "help": "Select the core library in an explicit heliaRT prebuilt distribution. Unsupported for registry and local source builds.",
             "panel": "engine",
             "is_flag": false,
             "multiple": false,
