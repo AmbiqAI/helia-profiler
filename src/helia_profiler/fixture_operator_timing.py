@@ -1,4 +1,4 @@
-"""Bind approximate per-operator timing from a profile run to a fixed-fixture build."""
+"""Observe per-operator timing and its relation to a fixed-fixture build."""
 
 from __future__ import annotations
 
@@ -32,6 +32,31 @@ class OperatorTiming:
     source_index: int | None
     cycles: float
     share: float
+
+
+@dataclass(frozen=True)
+class FixtureOperatorTimingFacts:
+    """Observed sibling-image cycles, with no comparison acceptance verdict.
+
+    ``reason`` reports unusable counters or invalid supplied provenance.
+    ``attribution_reason`` records why these observations cannot be attributed
+    to the supplied fixture build; valid observed cycles remain available.
+    ``runtime_stack`` is the recorded same/different/unknown relation, not
+    qualification. Consumers choose comparison eligibility and tolerances.
+    These cycles never become the fixture image's measured latency.
+    """
+
+    build_identity: str | None
+    operators: tuple[OperatorTiming, ...] | None
+    reason: str | None
+    attribution_reason: str | None
+    runtime_stack: str
+    engine_version: str | None
+    cpu_hz: int | None
+    layer_cycles_sum: float | None = None
+    clean_cycles: int | None = None
+    unattributed_cycles: float | None = None
+    agreement_pct: float | None = None
 
 
 @dataclass(frozen=True)
@@ -367,24 +392,17 @@ def _runtime_identity(build: FixtureBuild, profile: ProfileResult) -> tuple[str,
     return ("different" if different else "same" if complete else "unknown"), None
 
 
-def bind_operator_timing(
+def observe_operator_timing(
     build: FixtureBuild,
     fixture: FixedFixture | TypedFixture,
     profile: ProfileResult,
-    *,
-    allow_runtime_difference: bool = False,
-) -> FixtureOperatorTiming:
-    """Attribute a profile run's per-layer cycles to ``build`` when they describe it.
+) -> FixtureOperatorTimingFacts:
+    """Read measured cycles and provenance without benchmark policy.
 
-    Default attribution requires fully recorded matching runtime identity.
-    ``allow_runtime_difference`` retains approximate observations for different
-    or unknown runtimes with that explicit label; it does not waive malformed
-    dependency metadata or hash-invalid supplied files, placement, model,
-    counter or agreement checks.
-    Prepared-archive build settings are not recorded by an ordinary profile,
-    so matching provider revisions alone leave its archive identity unknown.
-    PSRAM builds are refused because an ordinary profile does not bind their
-    active payload, external arena layout, or loader configuration.
+    Valid observations remain available when runtime identity is unknown or
+    different, attribution is unavailable, or the layer sum differs from the
+    clean window. Invalid supplied provenance and unusable counters refuse.
+    No firmware, provider or device operation is performed.
     """
     engine = profile.metadata.engine
     try:
@@ -392,19 +410,25 @@ def bind_operator_timing(
     except RecursionError:
         runtime_stack, provenance_error = "unknown", "runtime_provenance_unverified"
 
-    def result(reason: str | None, **values) -> FixtureOperatorTiming:
-        return FixtureOperatorTiming(
+    attribution = _identity_reason(build, fixture, profile)
+
+    def result(reason: str | None, **values) -> FixtureOperatorTimingFacts:
+        return FixtureOperatorTimingFacts(
             build.build_identity,
             values.pop("operators", None),
             reason,
+            attribution,
             runtime_stack=runtime_stack,
             engine_version=engine.version if engine else None,
+            cpu_hz=profile.pmu.meta.system_clock_hz,
             **values,
         )
 
-    reason = _identity_reason(build, fixture, profile)
-    if reason is not None:
-        return result(reason)
+    if provenance_error is not None:
+        return result(provenance_error)
+    snapshot = profile.metadata.config_snapshot or {}
+    if (snapshot.get("profiling") or {}).get("clean_window_probe") != "infer":
+        return result("clean_window_not_inference")
     layers = profile.pmu.layers
     if not layers:
         return result("per_layer_unavailable")
@@ -419,26 +443,67 @@ def bind_operator_timing(
     if not isinstance(clean, int) or isinstance(clean, bool) or clean <= 0:
         return result("clean_window_unavailable")
     total = sum(cycles)
+    if not math.isfinite(total):
+        return result("layer_cycles_unavailable")
     agreement = 100.0 * (total - clean) / clean
-    tolerance = SHORT_AGREEMENT_PCT if clean / FIXTURE_CPU_HZ < SHORT_INFERENCE_S else AGREEMENT_PCT
+    if not math.isfinite(agreement):
+        return result("layer_cycles_unavailable")
     values = dict(
         layer_cycles_sum=total,
         clean_cycles=clean,
         unattributed_cycles=clean - total,
         agreement_pct=agreement,
-        tolerance_pct=tolerance,
     )
-    if abs(agreement) > tolerance:
-        return result("layer_sum_disagrees_with_clean_window", **values)
-    if provenance_error is not None:
-        return result(provenance_error, **values)
-    if runtime_stack != "same" and not allow_runtime_difference:
-        return result(
-            "runtime_stack_mismatch" if runtime_stack == "different" else "runtime_stack_unknown",
-            **values,
-        )
     operators = tuple(
-        OperatorTiming(layer.id, layer.op, layer.source_index, value, value / total)
+        OperatorTiming(
+            layer.id, layer.op, layer.source_index, value, value / total if total else 0.0
+        )
         for layer, value in zip(layers, cycles, strict=True)
     )
     return result(None, operators=operators, **values)
+
+
+def bind_operator_timing(
+    build: FixtureBuild,
+    fixture: FixedFixture | TypedFixture,
+    profile: ProfileResult,
+    *,
+    allow_runtime_difference: bool = False,
+) -> FixtureOperatorTiming:
+    """Deprecated compatibility attribution with the legacy agreement policy.
+
+    Use public ``observe_operator_timing`` for measurement facts and apply
+    comparison policy in the consumer. This wrapper retains the previous
+    agreement tolerances and explicit runtime allowance for external callers;
+    it is not the supported measurement path.
+    """
+    facts = observe_operator_timing(build, fixture, profile)
+    tolerance = None
+    reason = facts.attribution_reason or facts.reason
+    if reason is None:
+        assert facts.clean_cycles is not None and facts.agreement_pct is not None
+        tolerance = (
+            SHORT_AGREEMENT_PCT
+            if facts.clean_cycles / FIXTURE_CPU_HZ < SHORT_INFERENCE_S
+            else AGREEMENT_PCT
+        )
+        if abs(facts.agreement_pct) > tolerance:
+            reason = "layer_sum_disagrees_with_clean_window"
+        elif facts.runtime_stack != "same" and not allow_runtime_difference:
+            reason = (
+                "runtime_stack_mismatch"
+                if facts.runtime_stack == "different"
+                else "runtime_stack_unknown"
+            )
+    return FixtureOperatorTiming(
+        build_identity=facts.build_identity,
+        operators=facts.operators if reason is None else None,
+        reason=reason,
+        layer_cycles_sum=facts.layer_cycles_sum,
+        clean_cycles=facts.clean_cycles,
+        unattributed_cycles=facts.unattributed_cycles,
+        agreement_pct=facts.agreement_pct,
+        tolerance_pct=tolerance,
+        runtime_stack=facts.runtime_stack,
+        engine_version=facts.engine_version,
+    )

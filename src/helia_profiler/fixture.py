@@ -62,6 +62,11 @@ from .fixture_observation import (
     FixtureMeasurements,
     summarize_fixture_measurements,
 )
+from .fixture_operator_timing import (
+    FixtureOperatorTimingFacts,
+    OperatorTiming,
+    observe_operator_timing,
+)
 from .fixture_psram import FixturePsramObservation, FixturePsramPayload, FixturePsramWeights
 from .fixture_runtime import (
     FixtureFile,
@@ -78,7 +83,7 @@ from .hostenv.elf_inventory import ElfSection, LoadSegment, SectionInventory, se
 from .placement import Placement
 from .results.models import ToolchainInfo
 
-FIXTURE_API_VERSION: Final[tuple[int, int]] = (4, 0)
+FIXTURE_API_VERSION: Final[tuple[int, int]] = (4, 1)
 
 __all__ = [
     "FIXTURE_API_VERSION",
@@ -121,6 +126,7 @@ __all__ = [
     "build_fixed_fixture",
     "capture_fixture",
     "inspect_fixture_footprint",
+    "observe_operator_timing",
     "section_inventory",
     "source_closure",
     "summarize_fixture_measurements",
@@ -139,6 +145,8 @@ __all__ = [
     "FixtureCaptureResult",
     "FixtureFootprint",
     "FixtureMeasurements",
+    "FixtureOperatorTimingFacts",
+    "OperatorTiming",
     "TypedFixtureModelAnalysis",
     "FixtureMemory",
     "FixtureMetric",
