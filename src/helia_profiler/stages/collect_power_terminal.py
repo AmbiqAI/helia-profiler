@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from ..errors import PowerError
 from ..pipeline import PipelineContext
 from ..power.base import PowerMode, PowerResult, PowerSummary
+from ..power.clean_window import reference_stall_factor
 from ..power.diagnostics import (
     FROZEN_WINDOW_CLOCK_HINT,
     assess_run_window_clock,
@@ -87,6 +88,14 @@ class CollectPowerTerminalStage:
             if planned_s is None:
                 planned_s = 5.0
             timeout_s = max(5.0, min(30.0, planned_s * 2.0 + 5.0))
+            if (
+                internal_mode
+                and plan.planned_window_s is not None
+                and probe_runs_inferences(clean_window_probe)
+            ):
+                factor = reference_stall_factor(ctx)
+                if factor > 1.0:
+                    timeout_s = max(timeout_s, planned_s * 2.0 * factor + 5.0)
         ctx.report_progress("Collecting post-GATE firmware diagnostics", eta_s=timeout_s)
         collector = get_power_terminal_transport(ctx.config.target.transport)
         envelope = collector.collect(ctx, timeout_s=timeout_s)

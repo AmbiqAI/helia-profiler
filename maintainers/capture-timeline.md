@@ -162,6 +162,11 @@ total gives `u = 0` and an inconsistent one (more affected iterations than
 ran) is ignored, so neither stretches. The C-E5 duration check still
 compares against the planned `W`.
 
+Internal dedicated terminal collection uses the same capped factor `f`. For a
+known inference plan with `f > 1`, its deadline is
+`max(legacy, 2 * W * f + 5)` seconds. Unknown or inconsistent evidence and busy-loop
+plans keep the legacy deadline; the external post-observation wait is unchanged.
+
 ## 4. Published intervals
 
 | Interval | Brackets | Excludes | Published as |
