@@ -6,7 +6,8 @@ from stat import S_IWUSR
 
 import pytest
 
-from helia_profiler.firmware.segger import _copy_segger_rtt
+from helia_profiler.errors import FirmwareError
+from helia_profiler.firmware.segger import _bundled_segger_rtt_dir, _copy_segger_rtt
 
 
 @pytest.mark.parametrize("existing_readonly", [False, True])
@@ -66,5 +67,56 @@ def test_regenerate_from_readonly_sources(tmp_path: Path, existing_readonly: boo
             assert b"// upstream change\n" in path.read_bytes()
     finally:
         for path in sources + destinations:
+            if path.exists():
+                path.chmod(0o644)
+
+
+@pytest.mark.parametrize("link_type", ["symlink", "hardlink"])
+@pytest.mark.parametrize(
+    "aliased",
+    [
+        "RTT/SEGGER_RTT.c",
+        "RTT/SEGGER_RTT.h",
+        "RTT/SEGGER_RTT_ConfDefaults.h",
+        "Config/SEGGER_RTT_Conf.h",
+    ],
+)
+def test_destination_alias_does_not_modify_source(
+    tmp_path: Path, link_type: str, aliased: str
+) -> None:
+    source = tmp_path / "source"
+    app = tmp_path / "app"
+    paths = [
+        "RTT/SEGGER_RTT.c",
+        "RTT/SEGGER_RTT.h",
+        "RTT/SEGGER_RTT_ConfDefaults.h",
+        "Config/SEGGER_RTT_Conf.h",
+    ]
+    try:
+        for name in paths:
+            path = source / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes((_bundled_segger_rtt_dir() / name).read_bytes())
+            path.chmod(0o444)
+        before = [((source / name).read_bytes(), (source / name).stat().st_mode) for name in paths]
+        dest = app / "rtt" / aliased.removeprefix("RTT/")
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            if link_type == "symlink":
+                dest.symlink_to(source / aliased)
+            else:
+                dest.hardlink_to(source / aliased)
+        except (OSError, NotImplementedError) as error:
+            pytest.skip(f"{link_type} unavailable: {error}")
+
+        with pytest.raises(FirmwareError, match="same file"):
+            _copy_segger_rtt(app, source)
+
+        assert [
+            ((source / name).read_bytes(), (source / name).stat().st_mode) for name in paths
+        ] == before
+    finally:
+        for name in paths:
+            path = source / name
             if path.exists():
                 path.chmod(0o644)

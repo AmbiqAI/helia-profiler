@@ -74,8 +74,10 @@ def _is_segger_rtt_root(path: Path) -> bool:
     )
 
 
-def _make_writable(path: Path) -> None:
+def _make_writable(path: Path, source: Path) -> None:
     if path.exists():
+        if source.exists() and path.samefile(source):
+            raise FirmwareError(f"RTT source and destination are the same file: {path}")
         mode = path.stat().st_mode
         if not mode & S_IWUSR:
             path.chmod(mode | S_IWUSR)
@@ -95,7 +97,7 @@ def _copy_segger_rtt(dest_dir: Path, configured_path: Path | None = None) -> Non
             dest = rtt_dest / name
             data = src.read_bytes()
             # Package data can be immutable; app-local copies must stay writable.
-            _make_writable(dest)
+            _make_writable(dest, src)
             if not dest.exists() or dest.read_bytes() != data:
                 dest.write_bytes(data)
 
@@ -186,7 +188,7 @@ def _copy_segger_rtt(dest_dir: Path, configured_path: Path | None = None) -> Non
     # Content-compare before writing (see render._write_text): regeneration
     # into a cached workspace must not bump this header's mtime, or every
     # translation unit that includes it recompiles on every run.
-    _make_writable(conf_dest)
+    _make_writable(conf_dest, conf_src)
     _write_text(conf_dest, conf_text)
 
     log.info("Copied SEGGER RTT source from %s", rtt_root)
