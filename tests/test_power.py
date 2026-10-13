@@ -476,8 +476,54 @@ def _SPAN(u0: int, u1: int) -> int:
     return round((u1 - u0) / _SECOND * _FREQ)
 
 
+_GATE_COUNTER_ORIGIN = 13_043_307_280_000  # Aligned to one delivered 1 ms sample.
+
+
+class _GateDriverMetadata:
+    def query(self, topic):
+        assert topic.endswith("/s/gpi/+/dwnN/mode"), topic
+        return 2  # Native driver's 'first' decimation mode.
+
+
+def _packed_gpi_frame(levels, start_ms, *, step=16_000):
+    import numpy as np
+
+    counter = _GATE_COUNTER_ORIGIN + start_ms * 16_000
+    utc = round(start_ms * _SECOND / 1000)
+    return {
+        "data": np.packbits(np.asarray(levels, dtype=np.uint8), bitorder="little"),
+        "element_count": len(levels),
+        "field_id": 5,
+        "index": 0,
+        "sample_rate": 16_000_000,
+        "decimate_factor": step,
+        "sample_id": counter,
+        "utc": utc,
+        "time_map": {
+            "offset_counter": counter,
+            "offset_time": utc,
+            "counter_rate": _COUNTER_RATE,
+        },
+    }
+
+
 class TestGatedStatsProcessing:
     """Host-side integration of on-device stat packets into gated windows."""
+
+    @staticmethod
+    def _millisecond_packet(index):
+        packet = TestGatedStatsProcessing._packet(
+            round(index * _SECOND / 1000),
+            round((index + 1) * _SECOND / 1000),
+            0.0001,
+            0.00018,
+            0.12,
+        )
+        first = _GATE_COUNTER_ORIGIN + index * 16_000
+        packet["time"]["samples"]["value"] = [first, first + 16_000]
+        packet["time"]["delta"]["value"] = 0.001
+        packet["time"]["time_map"]["offset_counter"] = first
+        return packet
 
     @staticmethod
     def _packet(u0: int, u1: int, cur_int: float, pwr_int: float, cur_max: float):
@@ -1025,10 +1071,7 @@ class TestStreamedGpiSegmentation:
         from helia_profiler.power.joulescope.stats import _process_gated_stats
 
         ms = _SECOND // 1000
-        packets = [
-            TestGatedStatsProcessing._packet(i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12)
-            for i in range(30)
-        ]
+        packets = [TestGatedStatsProcessing._millisecond_packet(i) for i in range(30)]
         # The poll segmentation observed a merged rise 10 ms early (coupling
         # pulse + stalled poll); the streamed edges carry the true window.
         poll_samples = [(0, 0), (5 * ms, 1), (25 * ms, 0)]
@@ -1052,10 +1095,7 @@ class TestStreamedGpiSegmentation:
         )
 
         ms = _SECOND // 1000
-        packets = [
-            TestGatedStatsProcessing._packet(i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12)
-            for i in range(10)
-        ]
+        packets = [TestGatedStatsProcessing._millisecond_packet(i) for i in range(10)]
 
         poll_diag = _gated_stats_diagnostics(
             packets=packets,
@@ -1086,7 +1126,7 @@ class TestStreamedGateSelection:
     coupling stretch and the real window on the GPI stream.
     """
 
-    class _FakeStreamingDriver:
+    class _FakeStreamingDriver(_GateDriverMetadata):
         def __init__(self, *, fullrate_case="continuous") -> None:
             self.fullrate_case = fullrate_case
             self.controls = []
@@ -1132,45 +1172,29 @@ class TestStreamedGateSelection:
             for i in range(40):
                 stats_cb(
                     "u/js320/test/s/stats/value",
-                    TestGatedStatsProcessing._packet(i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12),
+                    TestGatedStatsProcessing._millisecond_packet(i),
                 )
-            gpi_cb(
-                "u/js320/test/s/gpi/0/!data",
-                {
-                    "data": [],
-                    "sample_rate": 1000,
-                    "utc": 0,
-                },
-            )
             # GPI stream at 1 kHz: a 12 ms coupling stretch (qualifying!),
             # a 5 ms low gap, then the 10 ms real window, then low.
             levels = [0] * 2 + [1] * 12 + [0] * 5 + [1] * 10 + [0] * 5
-            gpi_cb(
-                "u/js320/test/s/gpi/0/!data",
-                {
-                    "data": np.asarray(levels, dtype=np.uint8),
-                    "sample_rate": 1000,
-                    "decimate_factor": 1,
-                    "sample_id": 0,
-                    "utc": 0,
-                },
-            )
+            gpi_cb("u/js320/test/s/gpi/0/!data", _packed_gpi_frame(levels, 0))
 
             for channel, level in (("i", 0.0001), ("v", 1.8)):
                 callback = self._cb(f"/s/{channel}/!data")
                 if callback is None:
                     continue
                 for start in (0, 20):
-                    sample_id = start
+                    sample_id = _GATE_COUNTER_ORIGIN + start * 16_000
                     if self.fullrate_case == f"gap_{channel}" and start == 20:
-                        sample_id += 1
+                        sample_id += 16_000
                     if self.fullrate_case == "unaligned" and channel == "v":
-                        sample_id += 1
+                        sample_id += 16_000
                     frame = {
                         "data": np.full(20, level, dtype=np.float32),
-                        "sample_rate": 2000
+                        "sample_rate": 32_000_000
                         if self.fullrate_case == "rate_change" and start
-                        else 1000,
+                        else 16_000_000,
+                        "decimate_factor": 16_000,
                         "sample_id": sample_id,
                         "utc": start * ms,
                     }
@@ -1182,6 +1206,7 @@ class TestStreamedGateSelection:
                         frame["utc"] = 0
                     if self.fullrate_case == "outside_gate":
                         frame["utc"] += 100 * ms
+                        frame["sample_id"] += 100 * 16_000
                     callback(f"u/js320/test/s/{channel}/!data", frame)
 
     @pytest.mark.parametrize(
@@ -1244,7 +1269,7 @@ class TestStreamedGateSelection:
         # The snapshot gate completed, so the capture stopped before its 1 s bound.
         assert clock.elapsed_s < 1.0
         ms = _SECOND // 1000
-        assert result.metadata.gating_method == "gpi_stream+host_stats_integral"
+        assert result.metadata.gating_method == "gpi_stream_sample_counter+host_stats_integral"
         assert len(result.gated_windows) == 1
         window = result.gated_windows[0]
         # The 10 ms real window (19..29 ms), NOT the 12 ms coupling stretch
@@ -1252,29 +1277,28 @@ class TestStreamedGateSelection:
         assert window.duration_s == pytest.approx(0.010, rel=1e-6)
         diagnostics = result.metadata.gating_diagnostics
         assert diagnostics is not None
-        assert diagnostics["gate_edge_source"] == "gpi_stream"
+        assert diagnostics["gate_edge_source"] == "gpi_stream_sample_counter"
         assert "poll_edge_uncertainty_s" not in diagnostics
         assert diagnostics["stream_segment_count"] == 2
-        # #249: both time-base records must reach the PUBLISHED dict, which is
-        # the object metadata carries -- not whatever was built along the way.
-        assert "gpi_stream_timebase" in diagnostics
-        assert diagnostics["gpi_stream_timebase"]["dropped_or_empty_frames"] == 1
-        assert diagnostics["gpi_stream_timebase"]["frame_count"] == 1
+        # Original packed evidence and fitted-clock diagnostics both survive.
+        assert diagnostics["packed_gpi_retained_bytes"] > 0
+        assert diagnostics["packed_gpi_error"] is None
+        assert len(result.gate_frames) == 1
+        assert result.gate_frames[0]["element_count"] == 34
         time_map = diagnostics["instrument_time_map"]
         assert "utc_over_counter_rate" not in time_map
         assert time_map["utc_over_counter_rate_min"] == pytest.approx(1.009469, rel=1e-4)
         assert time_map["utc_over_counter_rate_max"] == pytest.approx(1.009469, rel=1e-4)
         assert time_map["packets_with_time_map"] == time_map["packets_total"]
-        if fullrate_case == "continuous":
+        if fullrate_case in ("continuous", "missing_utc", "duplicate_utc"):
+            # Shared native counters need no fitted UTC anchors.
             assert result.metadata.fullrate_xcheck is not None
             assert result.metadata.fullrate_xcheck["duration_s"] == 0.010
             assert "fullrate_xcheck_unavailable_reason" not in diagnostics
         else:
             assert result.metadata.fullrate_xcheck is None
             expected_reason = "noncontiguous_or_unaligned_source_samples"
-            if fullrate_case in ("missing_utc", "duplicate_utc"):
-                expected_reason = "incomplete_or_nonmonotonic_utc_anchors"
-            elif fullrate_case == "outside_gate":
+            if fullrate_case == "outside_gate":
                 expected_reason = "no_integrable_gate_samples"
             elif fullrate_case.startswith("setup_"):
                 expected_reason = "stream_setup_failed"
@@ -1354,17 +1378,20 @@ class TestMissedGateWarningNamesTheFix:
     helper returns.
     """
 
-    class _FakeJoulescopeDriver:
+    class _FakeJoulescopeDriver(_GateDriverMetadata):
         """Minimal pyjoulescope_driver.Driver stand-in for the gated path."""
 
-        def __init__(self, *, empty_frames=False) -> None:
+        def __init__(self, *, empty_frames=False, stream=True) -> None:
             self.empty_frames = empty_frames
+            self.stream = stream
             self._subs: dict[str, object] = {}
 
         def publish(self, _topic, _value, **_kwargs) -> None:
             pass
 
         def subscribe(self, topic, _flags, callback) -> None:
+            if not self.stream and "/s/gpi/" in topic:
+                raise RuntimeError("GPI stream unavailable")
             self._subs[topic] = callback
 
         def unsubscribe(self, _topic, _callback) -> None:
@@ -1386,11 +1413,10 @@ class TestMissedGateWarningNamesTheFix:
 
         def emit_packets(self, count: int) -> None:
             assert self._stats_cb is not None, "subscribe() was never called"
-            ms = _SECOND // 1000
             for i in range(count):
                 self._stats_cb(
                     "u/js320/test/s/stats/value",
-                    TestGatedStatsProcessing._packet(i * ms, (i + 1) * ms, 0.0001, 0.00018, 0.12),
+                    TestGatedStatsProcessing._millisecond_packet(i),
                 )
             # GPI frames that never go high, matching this scenario's missed
             # gate. Without them the degraded path has no stream to characterise
@@ -1398,22 +1424,11 @@ class TestMissedGateWarningNamesTheFix:
             gpi = self._gpi_cb
             if gpi is None:
                 return
-            import numpy as np
-
             per_frame = 0 if self.empty_frames else 8
             if self.empty_frames == "silent":
                 return
             for i in range(count):
-                gpi(
-                    "u/js320/test/s/gpi/0/!data",
-                    {
-                        "utc": i * ms,
-                        "sample_rate": 16_000_000.0,
-                        "decimate_factor": 16,
-                        "sample_id": i * per_frame * 16,
-                        "data": np.zeros(per_frame, dtype=np.uint8),
-                    },
-                )
+                gpi("u/js320/test/s/gpi/0/!data", _packed_gpi_frame([0] * per_frame, i, step=2000))
 
     def _run_capture(
         self,
@@ -1695,13 +1710,17 @@ class TestMissedGateWarningNamesTheFix:
         assert result.metadata.integrity == "degraded"
         diagnostics = result.metadata.gating_diagnostics
         assert diagnostics is not None
-        assert "gpi_stream_timebase" in diagnostics
-        stream = diagnostics["gpi_stream_timebase"]
-        assert stream["frame_count"] == (0 if empty_frames else 10)
+        assert len(result.gate_frames) == (0 if empty_frames else 10)
+        assert diagnostics["packed_gpi_error"] is not None
         if empty_frames == "silent":
-            assert stream == {"frame_count": 0}
+            assert diagnostics["packed_gpi_retained_bytes"] == 0
+            assert "Missing original gate/statistics evidence" in diagnostics["packed_gpi_error"]
+        elif empty_frames:
+            assert diagnostics["packed_gpi_retained_bytes"] == 0
+            assert "empty frame" in diagnostics["packed_gpi_error"]
         else:
-            assert stream["dropped_or_empty_frames"] == (10 if empty_frames else 0)
+            assert diagnostics["packed_gpi_retained_bytes"] > 0
+            assert "No complete qualifying packed GPI gate" in diagnostics["packed_gpi_error"]
         time_map = diagnostics["instrument_time_map"]
         assert "utc_over_counter_rate" not in time_map
         assert time_map["utc_over_counter_rate_min"] == pytest.approx(1.009469, rel=1e-4)
@@ -1868,7 +1887,7 @@ class TestGatedCaptureContracts:
         from helia_profiler.power.joulescope import capture_gated as module
         from helia_profiler.power.joulescope.driver import JoulescopeDriver
 
-        fake = TestMissedGateWarningNamesTheFix._FakeJoulescopeDriver()
+        fake = TestMissedGateWarningNamesTheFix._FakeJoulescopeDriver(stream=False)
         monkeypatch.setattr(module, "_open_device", lambda _serial: (fake, "u/js220/test", "js220"))
         monkeypatch.setattr(module, "_close_device", lambda *_args: None)
         reads = 0
@@ -5465,7 +5484,7 @@ class TestImplausibleGateRejection:
     early stop really does cut the stream short, as it does live.
     """
 
-    class _LiveInstrument:
+    class _LiveInstrument(_GateDriverMetadata):
         def __init__(self, highs: list[tuple[int, int]], *, stream: bool = True) -> None:
             self.highs = highs  # (start_ms, length_ms) of each sync-line high
             self.stream = stream  # False: no GPI stream, edges come from polling
@@ -5491,27 +5510,15 @@ class TestImplausibleGateRejection:
 
         def poll(self) -> int:
             """One millisecond of instrument output, then the snapshot level."""
-            import numpy as np
-
-            ms = _SECOND // 1000
             t = self.now_ms
             stats_cb, gpi_cb = self._cb("/s/stats/"), self._cb("/s/gpi/0/!data")
             if stats_cb is not None:
                 stats_cb(
                     "u/js320/test/s/stats/value",
-                    TestGatedStatsProcessing._packet(t * ms, (t + 1) * ms, 0.0001, 0.00018, 0.12),
+                    TestGatedStatsProcessing._millisecond_packet(t),
                 )
             if gpi_cb is not None:
-                gpi_cb(
-                    "u/js320/test/s/gpi/0/!data",
-                    {
-                        "data": np.asarray([self.level(t)], dtype=np.uint8),
-                        "sample_rate": 1000,
-                        "decimate_factor": 1,
-                        "sample_id": t,
-                        "utc": t * ms,
-                    },
-                )
+                gpi_cb("u/js320/test/s/gpi/0/!data", _packed_gpi_frame([self.level(t)], t))
             self.now_ms += 1
             return self.level(t)
 

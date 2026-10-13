@@ -39,11 +39,9 @@ from .diagnostics import (
     _poll_edge_uncertainty_s,
     _with_gpi_poll_failures,
 )
+from .fullrate import FullRateRecorder
 from .stats import (
     _counter_rate_ratio,
-    _fullrate_energy_over_windows,
-    _fullrate_sample_span,
-    _fullrate_streams_contiguous,
     _map_poll_samples_to_packet_time,
     _plan_gate_floor_s,
     _plan_ranked_candidates,
@@ -287,45 +285,7 @@ def capture_gated(
     # logged alongside the 1 kHz stats-sum for direct comparison.
     fr_requested = os.environ.get("HPX_POWER_FULLRATE_XCHECK") == "1"
     fr_xcheck = fr_requested
-    fr_subscriptions: list[tuple[str, Any]] = []
-    fr_cur: list[Any] = []
-    fr_volt: list[Any] = []
-    fr_anchors: list[tuple[int, int, float]] = []
-    fr_n = [0]
-    fr_cur_spans: list[tuple[int, int, float] | None] = []
-    fr_volt_spans: list[tuple[int, int, float] | None] = []
-
-    def _on_fr_current(_topic: str, value: Any) -> None:
-        import numpy as np
-
-        data = np.asarray(value["data"], dtype=np.float32)
-        sr = value["sample_rate"] / max(1, value.get("decimate_factor", 1))
-        utc = value.get("utc")
-        if utc is not None:
-            fr_anchors.append((fr_n[0], int(utc), float(sr)))
-        fr_cur.append(data.copy())
-        fr_cur_spans.append(_fullrate_sample_span(value, len(data)))
-        fr_n[0] += len(data)
-
-    def _on_fr_voltage(_topic: str, value: Any) -> None:
-        import numpy as np
-
-        data = np.asarray(value["data"], dtype=np.float32)
-        fr_volt.append(data.copy())
-        fr_volt_spans.append(_fullrate_sample_span(value, len(data)))
-
-    def _stop_fullrate_streams() -> None:
-        for channel in ("i", "v"):
-            try:
-                driver.publish(f"{device_path}/s/{channel}/ctrl", 0, timeout=0)
-            except Exception:
-                log.debug("Failed to stop full-rate %s stream", channel, exc_info=True)
-        for topic, callback in list(fr_subscriptions):
-            try:
-                driver.unsubscribe(topic, callback)
-                fr_subscriptions.remove((topic, callback))
-            except Exception:
-                log.debug("Failed to unsubscribe full-rate stream", exc_info=True)
+    fullrate = FullRateRecorder(driver, device_path)
 
     callback_errors: list[Exception] = []
 
@@ -514,18 +474,7 @@ def capture_gated(
                     exc_info=True,
                 )
         if fr_xcheck:
-            try:
-                for channel, callback in (("i", _on_fr_current), ("v", _on_fr_voltage)):
-                    topic = f"{device_path}/s/{channel}/!data"
-                    fr_subscriptions.append((topic, callback))
-                    driver.subscribe(topic, ["pub"], callback)
-                driver.publish(f"{device_path}/s/i/ctrl", 1, timeout=0)
-                driver.publish(f"{device_path}/s/v/ctrl", 1, timeout=0)
-                log.info("Joulescope full-rate energy cross-check enabled (s/i + s/v streaming)")
-            except Exception:
-                log.warning("Failed to enable full-rate cross-check streaming", exc_info=True)
-                fr_xcheck = False
-                _stop_fullrate_streams()
+            fr_xcheck = fullrate.start()
         try:
             thread = threading.Thread(target=_poller, daemon=True)
             thread.start()
@@ -567,7 +516,7 @@ def capture_gated(
                 except Exception:
                     pass
             if fr_requested:
-                _stop_fullrate_streams()
+                fullrate.stop()
 
         if callback_errors:
             hook_error = callback_errors[0]
@@ -934,33 +883,13 @@ def capture_gated(
                 gate_integrity, relative_tolerance=gate_relative_tolerance
             )
         if fr_xcheck:
-            contiguous = _fullrate_streams_contiguous(fr_cur_spans, fr_volt_spans)
-            if not contiguous:
-                gating_diagnostics["fullrate_xcheck_unavailable_reason"] = (
-                    "noncontiguous_or_unaligned_source_samples"
-                )
-            anchors_complete = counter_origin is not None or (
-                len(fr_anchors) == len(fr_cur)
-                and all(nxt[1] > cur[1] for cur, nxt in zip(fr_anchors, fr_anchors[1:]))
+            fr, reason = fullrate.integrate(
+                poll_samples=aligned_poll_samples,
+                windows=selected_windows,
+                counter_origin=counter_origin,
             )
-            if contiguous and not anchors_complete:
-                gating_diagnostics["fullrate_xcheck_unavailable_reason"] = (
-                    "incomplete_or_nonmonotonic_utc_anchors"
-                )
-            fr = (
-                _fullrate_energy_over_windows(
-                    cur_chunks=fr_cur,
-                    volt_chunks=fr_volt,
-                    anchors=fr_anchors,
-                    poll_samples=aligned_poll_samples,
-                    windows_override=selected_windows,
-                    counter_axis=(*counter_origin, fr_cur_spans[0][0], fr_cur_spans[0][2])
-                    if counter_origin is not None and fr_cur_spans[0] is not None
-                    else None,
-                )
-                if contiguous and anchors_complete
-                else None
-            )
+            if reason is not None:
+                gating_diagnostics["fullrate_xcheck_unavailable_reason"] = reason
             if fr:
                 metadata.fullrate_xcheck = fr
                 stats_energy_per = gated_summary.energy_j / len(windows) if windows else 0.0
@@ -986,8 +915,8 @@ def capture_gated(
                 log.warning(
                     "Full-rate cross-check requested but produced no result "
                     "(chunks=%d, anchors=%d)",
-                    len(fr_cur),
-                    len(fr_anchors),
+                    len(fullrate.current),
+                    len(fullrate.anchors),
                 )
         if packets:
             whole_summary = _whole_summary_from_stats(packets)

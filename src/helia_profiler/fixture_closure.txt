@@ -185,6 +185,7 @@ power/joulescope/capture_gated.py
 power/joulescope/device.py
 power/joulescope/diagnostics.py
 power/joulescope/driver.py
+power/joulescope/fullrate.py
 power/joulescope/stats.py
 power/joulescope/sync.py
 power/metadata.py

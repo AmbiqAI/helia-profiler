@@ -118,8 +118,14 @@ def _window(packets, *, bounds=None):
     docstring is explicit that `summary.duration_s` only looks like a harmless
     stand-in. Assert the side that is read.
     """
-    mid = [0.5 * sum(float(v) for v in p["time"]["utc"]["value"]) for p in packets]
-    windows = [bounds] if bounds else [(min(mid) - 1, max(mid) + 1)]
+    # Use actual packet extents. At this absolute time64 magnitude, a float
+    # ULP is 64 ticks: midpoint + 1 rounds back to the midpoint and the
+    # half-open window correctly excludes the last packet.
+    windows = (
+        [bounds]
+        if bounds
+        else [(packets[0]["time"]["utc"]["value"][0], packets[-1]["time"]["utc"]["value"][1])]
+    )
     gated, summary = _process_gated_stats(
         packets=packets,
         poll_samples=[],
@@ -601,3 +607,20 @@ def test_host_poll_coverage_uses_packet_duration_on_the_host_axis(utc_scale, mar
     else:
         with pytest.raises(PowerError, match="do not cover"):
             _map_poll_samples_to_packet_time(packets=packets, poll_samples=polls)
+
+
+@pytest.mark.parametrize(
+    "lo,hi,count", [(0.0, 3.0, 3), (0.25, 1.75, 2), (0.5, 1.5, 1), (1.5, 2.5, 1)]
+)
+def test_packet_edges_select_whole_integrals_by_half_open_midpoint(lo, hi, count):
+    packets = [_packet(index=i, counter_rate=NAMEPLATE) for i in range(3)]
+    # Keep these exact half-packet edges representable; the full-window tests
+    # above separately exercise the large absolute epoch and its float ULP.
+    width = 2_147_484
+    for i, packet in enumerate(packets):
+        packet["time"]["utc"]["value"] = [i * width, (i + 1) * width]
+    window = _window(packets, bounds=(lo * width, hi * width))
+    # Independent oracle: each 2 ms packet contributes its entire integral;
+    # overlap does not prorate it, and an exact upper midpoint is excluded.
+    assert window.duration_s == pytest.approx(count * 0.002, rel=1e-12)
+    assert window.energy_j == pytest.approx(count * 0.004 * 1.8 * 0.002, rel=1e-12)
