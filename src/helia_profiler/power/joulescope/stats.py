@@ -394,6 +394,7 @@ def _fullrate_energy_over_windows(
     anchors: list[tuple[int, int, float]],
     poll_samples: list[tuple[int, int]],
     windows_override: list[tuple[float, float]] | None = None,
+    counter_axis: tuple[int, int, int, float] | None = None,
 ) -> dict[str, Any] | None:
     """Uses a signed rectangular sum, ``sum(I * V) / sample_rate``, rather than
     the packet-rectified integrals used for the primary gated measurement.
@@ -404,7 +405,7 @@ def _fullrate_energy_over_windows(
     import numpy as np
     from pyjoulescope_driver import time64
 
-    if not cur_chunks or not anchors:
+    if not cur_chunks or (not anchors and counter_axis is None):
         return None
 
     cur = np.concatenate(cur_chunks)
@@ -415,33 +416,44 @@ def _fullrate_energy_over_windows(
     cur = cur[:n]
     volt = volt[:n] if len(volt) else np.full(n, np.nan, np.float32)
 
-    idx = np.asarray([a[0] for a in anchors], dtype=np.float64)
-    utc = np.asarray([a[1] for a in anchors], dtype=np.float64)
-    sr = float(anchors[-1][2])
-    if sr <= 0:
-        return None
-    # Ticks per sample ON THE EDGES' OWN AXIS (#249). The window edges come from
-    # GPI polls mapped to the driver's fitted utc, so placing samples at the
-    # nameplate rate instead selects a span wrong by the fit's error. Consecutive
-    # anchors carry both a sample index and a utc, so they give the conversion
-    # directly; the nameplate rate is the fallback when there is only one.
-    positions = np.arange(n, dtype=np.float64)
-    if idx.size >= 2 and np.all(np.diff(idx) > 0) and np.all(np.diff(utc) > 0):
-        # Piecewise between adjacent anchors, not a single endpoint slope: the
-        # fit can move during a capture, and a capture-wide slope would then
-        # misplace every sample in between -- the same error in a different
-        # place. np.interp extrapolates flat past the ends, so carry the local
-        # edge slopes out to the tails by hand.
-        sample_utc = np.interp(positions, idx, utc)
-        head, tail = positions < idx[0], positions > idx[-1]
-        if head.any():
-            first = (utc[1] - utc[0]) / (idx[1] - idx[0])
-            sample_utc[head] = utc[0] + (positions[head] - idx[0]) * first
-        if tail.any():
-            last = (utc[-1] - utc[-2]) / (idx[-1] - idx[-2])
-            sample_utc[tail] = utc[-1] + (positions[tail] - idx[-1]) * last
+    if counter_axis is not None:
+        from fractions import Fraction
+
+        origin, native_rate, first_sample, sr = counter_axis
+        if not math.isfinite(sr) or sr <= 0:
+            return None
+        # Subtract the exact counter origins before conversion to float. Full-rate
+        # stream continuity/alignment is checked by the caller; no clock fit here.
+        offset = float(Fraction(first_sample) - Fraction(origin) * Fraction(sr) / native_rate)
+        sample_utc = (np.arange(n, dtype=np.float64) + offset) * time64.SECOND / sr
     else:
-        sample_utc = utc[0] + (positions - idx[0]) * (time64.SECOND / sr)
+        idx = np.asarray([a[0] for a in anchors], dtype=np.float64)
+        utc = np.asarray([a[1] for a in anchors], dtype=np.float64)
+        sr = float(anchors[-1][2])
+        if sr <= 0:
+            return None
+        # Ticks per sample ON THE EDGES' OWN AXIS (#249). The window edges come from
+        # GPI polls mapped to the driver's fitted utc, so placing samples at the
+        # nameplate rate instead selects a span wrong by the fit's error. Consecutive
+        # anchors carry both a sample index and a utc, so they give the conversion
+        # directly; the nameplate rate is the fallback when there is only one.
+        positions = np.arange(n, dtype=np.float64)
+        if idx.size >= 2 and np.all(np.diff(idx) > 0) and np.all(np.diff(utc) > 0):
+            # Piecewise between adjacent anchors, not a single endpoint slope: the
+            # fit can move during a capture, and a capture-wide slope would then
+            # misplace every sample in between -- the same error in a different
+            # place. np.interp extrapolates flat past the ends, so carry the local
+            # edge slopes out to the tails by hand.
+            sample_utc = np.interp(positions, idx, utc)
+            head, tail = positions < idx[0], positions > idx[-1]
+            if head.any():
+                first = (utc[1] - utc[0]) / (idx[1] - idx[0])
+                sample_utc[head] = utc[0] + (positions[head] - idx[0]) * first
+            if tail.any():
+                last = (utc[-1] - utc[-2]) / (idx[-1] - idx[-2])
+                sample_utc[tail] = utc[-1] + (positions[tail] - idx[-1]) * last
+        else:
+            sample_utc = utc[0] + (positions - idx[0]) * (time64.SECOND / sr)
 
     windows = (
         windows_override if windows_override is not None else _segment_gpi_windows(poll_samples)

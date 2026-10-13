@@ -255,7 +255,7 @@ def _validate_trace_coverage(observation: PowerResult) -> None:
     """Reconstruct the retained gate and verify the exact selected packet integral."""
     from .power.counter_gate import counter_gate_trace
 
-    if observation.gate_stream_error or observation.counter_domain != "js320_sensor_sample_id":
+    if observation.gate_stream_error or observation.counter_domain != "joulescope_sensor_sample_id":
         raise ValueError("Missing or invalid shared-counter gate evidence")
     if len(observation.counter_gate_evidence) != 1 or not observation.statistics_device_time:
         raise ValueError("Missing selected counter gate")

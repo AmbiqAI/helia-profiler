@@ -967,75 +967,59 @@ class TestGatedStatsProcessing:
 
 
 class TestStreamedGpiSegmentation:
-    """Instrument-clock gate edges from ``s/gpi/N/!data`` stream frames.
-
-    These edges live on the same time64 axis as the stat-packet midpoints, so
-    they need no host-time mapping and cannot be distorted by GPI snapshot
-    poll cadence or callback latency, which once let a pre-window coupling
-    pulse merge into the true rise across a stalled poll gap.
-    """
+    """Packed gate edges remain separate on the native sample counter."""
 
     @staticmethod
-    def _frame(utc: int, rate: float, levels: list[int]):
+    def _trace(chunks):
         import numpy as np
 
-        return {"utc": utc, "rate": rate, "data": np.asarray(levels, dtype=np.uint8)}
+        from helia_profiler.power.counter_gate import PackedGateRecorder, counter_gate_trace
+
+        recorder = PackedGateRecorder(0, 100000, sample_mode="first")
+        clock = {"offset_counter": 0, "offset_time": 0, "counter_rate": 1000}
+        first = 0
+        for levels in chunks:
+            recorder.append(
+                {
+                    "sample_id": first,
+                    "sample_rate": 1000,
+                    "decimate_factor": 1,
+                    "field_id": 5,
+                    "index": 0,
+                    "utc": first * 1000,
+                    "time_map": clock,
+                    "data": np.packbits(levels, bitorder="little"),
+                    "element_count": len(levels),
+                }
+            )
+            first += len(levels)
+        assert recorder.error is None
+        packets = [
+            {
+                "time": {
+                    "samples": {"value": [i, i + 1]},
+                    "sample_freq": {"value": 1000},
+                    "utc": {"value": [i * 1000, (i + 1) * 1000]},
+                    "time_map": clock,
+                }
+            }
+            for i in range(first)
+        ]
+        return counter_gate_trace(recorder.frames, packets, channel=0)
 
     def test_segments_window_across_frame_boundary(self):
-        from helia_profiler.power.joulescope.stats import _segment_streamed_gpi
-
-        ms = _SECOND // 1000
-        # 1 kHz stream: frame 1 rises at sample 2; frame 2 falls at sample 3.
-        frames = [
-            self._frame(0, 1000.0, [0, 0, 1, 1, 1]),
-            self._frame(5 * ms, 1000.0, [1, 1, 1, 0, 0]),
-        ]
-
-        windows = _segment_streamed_gpi(frames)
-
-        assert len(windows) == 1
-        rise, fall = windows[0]
-        assert rise == pytest.approx(2 * ms)
-        assert fall == pytest.approx(8 * ms)
+        trace = self._trace(([0, 0, 1, 1, 1], [1, 1, 1, 0, 0]))
+        assert trace.windows == ((2, 8),)
 
     def test_capture_starting_high_yields_no_leading_window(self):
-        from helia_profiler.power.joulescope.stats import _segment_streamed_gpi
-
-        ms = _SECOND // 1000
-        # High at stream start: that rise was never observed, so no window may
-        # be timed from it — mirrors _segment_gpi_windows' rejection.
-        frames = [self._frame(0, 1000.0, [1, 1, 0, 0, 1, 1, 0])]
-
-        windows = _segment_streamed_gpi(frames)
-
-        assert len(windows) == 1
-        rise, fall = windows[0]
-        assert rise == pytest.approx(4 * ms)
-        assert fall == pytest.approx(6 * ms)
+        assert self._trace(([1, 1, 0, 0, 1, 1, 0],)).windows == ((4, 6),)
 
     def test_trailing_high_without_fall_is_dropped(self):
-        from helia_profiler.power.joulescope.stats import _segment_streamed_gpi
-
-        frames = [self._frame(0, 1000.0, [0, 0, 1, 1, 1])]
-
-        assert _segment_streamed_gpi(frames) == []
+        assert self._trace(([0, 0, 1, 1, 1],)).windows == ()
 
     def test_coupling_pulse_stays_separate_from_window(self):
-        from helia_profiler.power.joulescope.stats import _segment_streamed_gpi
-
-        ms = _SECOND // 1000
-        # A short pre-window pulse, a real low gap, then the window: the gap
-        # is resolved at sample resolution, so the pulse can never merge into
-        # the window the way a slow snapshot poll can merge them.
         levels = [0] + [1] * 6 + [0] * 27 + [1] * 60 + [0]
-        frames = [self._frame(0, 1000.0, levels)]
-
-        windows = _segment_streamed_gpi(frames)
-
-        assert len(windows) == 2
-        pulse, window = windows
-        assert (pulse[1] - pulse[0]) == pytest.approx(6 * ms)
-        assert (window[1] - window[0]) == pytest.approx(60 * ms)
+        assert self._trace((levels,)).windows == ((1, 7), (34, 94))
 
     def test_process_gated_stats_prefers_streamed_windows(self):
         from helia_profiler.power.joulescope.stats import _process_gated_stats

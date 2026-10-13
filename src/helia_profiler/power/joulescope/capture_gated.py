@@ -279,7 +279,7 @@ def capture_gated(
     gpi_stream_frames = gate_recorder.frames
 
     def _on_gpi_data(_topic: str, value: Any) -> None:
-        gate_recorder.append(value, word_aligned=family == "js320")
+        gate_recorder.append(value, word_aligned=family in ("js220", "js320"))
 
     # Opt-in full-rate cross-check (AutoDeploy-equivalent reference method).
     # Set HPX_POWER_FULLRATE_XCHECK=1 to also stream raw s/i + s/v at the
@@ -483,6 +483,13 @@ def capture_gated(
     wait_ended_at: float | None = None
     hook_error: Exception | None = None
     try:
+        if family in ("js220", "js320"):
+            mode = driver.query(f"{device_path}/s/gpi/+/dwnN/mode")
+            gate_recorder.sample_mode = {0: "off", 2: "first", "off": "off", "first": "first"}.get(
+                mode
+            )
+            if gate_recorder.sample_mode is None:
+                raise PowerError("GPI decimation mode does not preserve sampled gate levels")
         try:
             driver.publish(f"{device_path}/{cycle_topic}", on_value)
         except Exception:
@@ -494,13 +501,6 @@ def capture_gated(
         gpi_stream_enabled = False
         gpi_data_topic = f"{device_path}/s/gpi/{sync_input_index}/!data"
         gpi_ctrl_topic = f"{device_path}/s/gpi/{sync_input_index}/ctrl"
-        if family == "js320":
-            mode = driver.query(f"{device_path}/s/gpi/+/dwnN/mode")
-            gate_recorder.sample_mode = {0: "off", 2: "first", "off": "off", "first": "first"}.get(
-                mode
-            )
-            if gate_recorder.sample_mode is None:
-                raise PowerError("GPI decimation mode does not preserve sampled gate levels")
         if family in ("js220", "js320"):
             try:
                 driver.subscribe(gpi_data_topic, "pub", _on_gpi_data)
@@ -600,9 +600,9 @@ def capture_gated(
             try:
                 if gate_recorder.error:
                     raise ValueError(gate_recorder.error)
-                # The JS320 sensor supplies statistics and all signal sample IDs
+                # These sensors supply statistics and all signal sample IDs
                 # from the same native counter. Do not infer another origin via UTC.
-                if family != "js320":
+                if family not in ("js220", "js320"):
                     raise ValueError("Shared GPI/statistics counter contract unavailable")
                 counter_trace = counter_gate_trace(
                     gpi_stream_frames, packets, channel=sync_input_index
@@ -735,11 +735,6 @@ def capture_gated(
         gating_diagnostics["counter_gate_evidence"] = counter_evidence
         if counter_trace is not None:
             gating_diagnostics["counter_clock_mapping"] = counter_trace.clock_diagnostics
-        if fr_xcheck and counter_origin is not None:
-            # The optional legacy full-rate cross-check uses fitted UTC anchors.
-            # Do not apply counter-domain windows to that different axis.
-            fr_xcheck = False
-            gating_diagnostics["fullrate_xcheck_unavailable_reason"] = "counter_domain_not_bound"
         # The filter that scales utc, read straight from the packets (#249).
         counter_rate = _counter_rate_ratio(packets)
         if counter_rate is not None:
@@ -944,8 +939,9 @@ def capture_gated(
                 gating_diagnostics["fullrate_xcheck_unavailable_reason"] = (
                     "noncontiguous_or_unaligned_source_samples"
                 )
-            anchors_complete = len(fr_anchors) == len(fr_cur) and all(
-                nxt[1] > cur[1] for cur, nxt in zip(fr_anchors, fr_anchors[1:])
+            anchors_complete = counter_origin is not None or (
+                len(fr_anchors) == len(fr_cur)
+                and all(nxt[1] > cur[1] for cur, nxt in zip(fr_anchors, fr_anchors[1:]))
             )
             if contiguous and not anchors_complete:
                 gating_diagnostics["fullrate_xcheck_unavailable_reason"] = (
@@ -958,6 +954,9 @@ def capture_gated(
                     anchors=fr_anchors,
                     poll_samples=aligned_poll_samples,
                     windows_override=selected_windows,
+                    counter_axis=(*counter_origin, fr_cur_spans[0][0], fr_cur_spans[0][2])
+                    if counter_origin is not None and fr_cur_spans[0] is not None
+                    else None,
                 )
                 if contiguous and anchors_complete
                 else None
@@ -1043,7 +1042,7 @@ def capture_gated(
             gate_frames=gpi_stream_frames,
             gate_stream_error=gate_recorder.error,
             counter_gate_evidence=counter_evidence,
-            counter_domain="js320_sensor_sample_id" if counter_evidence else None,
+            counter_domain="joulescope_sensor_sample_id" if counter_evidence else None,
         )
     except PowerError:
         raise

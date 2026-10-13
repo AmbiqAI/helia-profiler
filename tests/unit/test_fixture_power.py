@@ -87,7 +87,7 @@ def measured():
     return replace(
         observation,
         gate_frames=recorder.frames,
-        counter_domain="js320_sensor_sample_id",
+        counter_domain="joulescope_sensor_sample_id",
         counter_gate_evidence=[trace.window_evidence(1000, 5001000)],
     )
 

@@ -67,7 +67,7 @@ class PackedGateRecorder:
             }
             count = value.get("element_count")
             if count is None:
-                # JS320 GPI USB payloads are complete u32 words (32 UINT1 samples).
+                # JS220/JS320 GPI USB payloads are complete u32 words (32 UINT1 samples).
                 # The Python binding omits element_count. Never infer tail padding
                 # for a stream whose native packet contract does not establish it.
                 if not word_aligned or size % 4:
