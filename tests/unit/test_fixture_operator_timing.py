@@ -16,7 +16,6 @@ from helia_profiler.fixture import (
     observe_operator_timing,
 )
 from helia_profiler.fixture_analysis import FixtureTensor, Int8Tensor, PerTensorQuantization
-from helia_profiler.fixture_operator_timing import bind_operator_timing
 from helia_profiler.fixture_runtime import FixtureFile
 from helia_profiler.fixture_target import supported_fixture_target
 from helia_profiler.placement import Placement
@@ -130,64 +129,20 @@ def build_for(
     )
 
 
-def approximate_timing(build, fixture, run, **kwargs):
-    return bind_operator_timing(build, fixture, run, allow_runtime_difference=True)
-
-
 def test_real_aot_capture_binds_within_one_percent(tmp_path):
     fixture = fixture_for(KWS_SHA, tmp_path)
-    result = approximate_timing(
+    result = observe_operator_timing(
         build_for(EngineType.HELIA_AOT, fixture),
         fixture,
         profile("kws_aot"),
     )
-    assert result.accepted and result.reason is None
+    assert (result.reason is None and result.attribution_reason is None) and result.reason is None
     assert result.operators is not None and len(result.operators) == 13
     assert result.operators[0].op == "CONV_2D:0" and result.operators[0].source_index == 0
     assert sum(op.share for op in result.operators) == pytest.approx(1.0)
     assert result.agreement_pct == pytest.approx(0.0959, abs=1e-3)
-    assert result.tolerance_pct == 1.0
     assert result.unattributed_cycles == pytest.approx(1955904 - 1957780, abs=1)
     assert result.engine_version == "0.22.0" and result.runtime_stack == "unknown"
-
-
-def test_tflm_prepared_runtime_needs_explicit_label(tmp_path):
-    fixture, run = fixture_for(KWS_SHA, tmp_path), profile("kws_tflm")
-    build = build_for(EngineType.TFLM, fixture, prepared_runtime=True)
-    refused = bind_operator_timing(build, fixture, run)
-    assert refused.operators is None and refused.reason == "runtime_stack_unknown"
-    labelled = approximate_timing(build, fixture, run, allow_runtime_difference=True)
-    assert labelled.accepted and labelled.agreement_pct == pytest.approx(0.458, abs=1e-3)
-    assert labelled.runtime_stack == "unknown"
-
-
-def test_short_inference_uses_two_percent(tmp_path):
-    raw = PROFILES["ad_aot_short"]
-    run = profile(
-        "ad_aot_short",
-        board="apollo510_evb",
-        engine={"type": "helia-aot", "version": "0.23.0"},
-        config={**raw["config"], "model": {"arena_location": "sram", "weights_location": "mram"}},
-    )
-    fixture = fixture_for(raw["model_sha256"], tmp_path)
-    result = approximate_timing(build_for(EngineType.HELIA_AOT, fixture), fixture, run)
-    assert result.accepted, result.reason
-    assert result.agreement_pct is not None and 1.0 < result.agreement_pct < 2.0
-    assert result.tolerance_pct == 2.0
-
-
-def test_long_inference_outside_one_percent_is_refused(tmp_path):
-    raw = PROFILES["kws_aot"]
-    layers = [dict(layer, cycles=layer["cycles"] * 1.012) for layer in raw["layers"]]
-    fixture = fixture_for(KWS_SHA, tmp_path)
-    result = approximate_timing(
-        build_for(EngineType.HELIA_AOT, fixture),
-        fixture,
-        profile("kws_aot", layers=layers),
-    )
-    assert result.operators is None
-    assert result.reason == "layer_sum_disagrees_with_clean_window"
-    assert result.agreement_pct == pytest.approx(1.297, abs=0.01)
 
 
 def test_public_observation_preserves_disagreement_without_acceptance(tmp_path):
@@ -195,8 +150,6 @@ def test_public_observation_preserves_disagreement_without_acceptance(tmp_path):
     fixture = fixture_for(KWS_SHA, tmp_path)
     build = build_for(EngineType.HELIA_AOT, fixture)
     run = profile("kws_aot", layers=layers)
-    legacy = approximate_timing(build, fixture, run)
-    assert legacy.reason == "layer_sum_disagrees_with_clean_window" and legacy.operators is None
     facts = observe_operator_timing(build, fixture, run)
     assert facts.reason is None and facts.attribution_reason is None
     assert facts.operators is not None and len(facts.operators) == len(layers)
@@ -245,29 +198,6 @@ def test_valid_cross_engine_provenance_is_a_difference_not_corruption(tmp_path):
     assert refused.reason == "runtime_provenance_unverified" and refused.operators is None
 
 
-def test_legacy_attribution_failure_preserves_null_numeric_fields(tmp_path):
-    from dataclasses import asdict
-
-    fixture = fixture_for(KWS_SHA, tmp_path)
-    legacy = approximate_timing(
-        build_for(EngineType.HELIA_AOT, fixture),
-        fixture,
-        profile("kws_aot", model_sha256="1" * 64),
-    )
-    assert asdict(legacy) == {
-        "build_identity": "build-identity",
-        "operators": None,
-        "reason": "model_mismatch",
-        "layer_cycles_sum": None,
-        "clean_cycles": None,
-        "unattributed_cycles": None,
-        "agreement_pct": None,
-        "tolerance_pct": None,
-        "runtime_stack": "unknown",
-        "engine_version": "0.22.0",
-    }
-
-
 @pytest.mark.parametrize("cycles", [True, "1", 10**400])
 def test_public_observation_refuses_malformed_layer_numbers(tmp_path, cycles):
     fixture = fixture_for(KWS_SHA, tmp_path)
@@ -293,10 +223,7 @@ def test_public_observation_never_waives_tampered_provenance(tmp_path):
     build.dependency_state.path.write_text("{}")
     facts = observe_operator_timing(build, fixture, run)
     assert facts.reason == "runtime_provenance_unverified" and facts.operators is None
-    legacy = approximate_timing(build, fixture, run)
-    assert legacy.reason == facts.reason and legacy.operators is None
-    assert legacy.clean_cycles == run.pmu.meta.clean_infer_avg_cycles
-    assert legacy.agreement_pct == facts.agreement_pct and legacy.tolerance_pct == 1
+    assert facts.clean_cycles == run.pmu.meta.clean_infer_avg_cycles
 
 
 @pytest.mark.parametrize("condition", ["overflow", "busy_loop", "nonfinite_sum", "zero_sum"])
@@ -335,7 +262,7 @@ def test_busy_loop_clean_window_is_refused(tmp_path):
         config={**raw["config"], "model": {"arena_location": "sram", "weights_location": "mram"}},
     )
     fixture = fixture_for(raw["model_sha256"], tmp_path)
-    result = approximate_timing(build_for(EngineType.HELIA_AOT, fixture), fixture, run)
+    result = observe_operator_timing(build_for(EngineType.HELIA_AOT, fixture), fixture, run)
     assert result.operators is None and result.reason == "clean_window_not_inference"
 
 
@@ -372,24 +299,24 @@ def test_identity_or_counter_mismatch_is_null_with_reason(tmp_path, override, re
     if "config" in override:
         override["config"]["profiling"] = {"clean_window_probe": "infer"}
     fixture = fixture_for(KWS_SHA, tmp_path)
-    result = approximate_timing(
+    result = observe_operator_timing(
         build_for(EngineType.HELIA_AOT, fixture),
         fixture,
         profile("kws_aot", **override),
     )
-    assert result.operators is None and not result.accepted
-    assert result.reason == reason
+    assert (result.reason or result.attribution_reason) == reason
+    assert (result.operators is None) is (result.reason is not None)
 
 
 @pytest.mark.parametrize("measured", [None, 0, 96_000_000, 91_200_000, 100_800_000])
 def test_measured_clock_absent_zero_or_within_tolerance_still_binds(tmp_path, measured):
     fixture = fixture_for(KWS_SHA, tmp_path)
-    result = approximate_timing(
+    result = observe_operator_timing(
         build_for(EngineType.HELIA_AOT, fixture),
         fixture,
         profile("kws_aot", measured_clock_hz=measured),
     )
-    assert result.accepted, result.reason
+    assert result.reason is None and result.attribution_reason is None, result.reason
 
 
 def test_measured_clock_shares_the_capture_tolerance(tmp_path, monkeypatch):
@@ -401,19 +328,19 @@ def test_measured_clock_shares_the_capture_tolerance(tmp_path, monkeypatch):
     # The check reads the shared constant, not a copy of its value.
     monkeypatch.setattr(fixture_operator_timing, "DEVICE_CLOCK_TOLERANCE", 0.25)
     fixture = fixture_for(KWS_SHA, tmp_path)
-    result = approximate_timing(
+    result = observe_operator_timing(
         build_for(EngineType.HELIA_AOT, fixture),
         fixture,
         profile("kws_aot", measured_clock_hz=110_000_000),
     )
-    assert result.accepted, result.reason
+    assert result.reason is None and result.attribution_reason is None, result.reason
 
 
 def test_layer_overflow_is_refused(tmp_path):
     layers = [dict(layer) for layer in PROFILES["kws_aot"]["layers"]]
     layers[3]["overflow"] = True
     fixture = fixture_for(KWS_SHA, tmp_path)
-    result = approximate_timing(
+    result = observe_operator_timing(
         build_for(EngineType.HELIA_AOT, fixture),
         fixture,
         profile("kws_aot", layers=layers),
@@ -424,15 +351,17 @@ def test_layer_overflow_is_refused(tmp_path):
 def test_fixture_toolchain_unrecorded_is_refused(tmp_path):
     fixture = fixture_for(KWS_SHA, tmp_path)
     build = replace(build_for(EngineType.HELIA_AOT, fixture), toolchain=None)
-    result = approximate_timing(build, fixture, profile("kws_aot"))
-    assert result.reason == "toolchain_unrecorded"
+    result = observe_operator_timing(build, fixture, profile("kws_aot"))
+    assert result.attribution_reason == "toolchain_unrecorded"
 
 
 def test_fixture_other_than_the_build_is_refused(tmp_path):
     fixture = fixture_for(KWS_SHA, tmp_path)
     other = replace(fixture, output_tensor=Int8Tensor((1, 12), 0.00390625, -127, 1))
-    result = approximate_timing(build_for(EngineType.HELIA_AOT, other), fixture, profile("kws_aot"))
-    assert result.reason == "fixture_mismatch" and result.operators is None
+    result = observe_operator_timing(
+        build_for(EngineType.HELIA_AOT, other), fixture, profile("kws_aot")
+    )
+    assert result.attribution_reason == "fixture_mismatch" and result.operators is not None
 
 
 def test_tflm_backend_other_than_cmsis_nn_is_refused(tmp_path):
@@ -440,15 +369,15 @@ def test_tflm_backend_other_than_cmsis_nn_is_refused(tmp_path):
     raw = PROFILES["kws_tflm"]
     run = profile("kws_tflm", config={**raw["config"], "engine": {"backend": "reference"}})
     build = build_for(EngineType.TFLM, fixture, prepared_runtime=True)
-    result = approximate_timing(build, fixture, run, allow_runtime_difference=True)
-    assert result.reason == "backend_mismatch" and result.operators is None
+    result = observe_operator_timing(build, fixture, run)
+    assert result.attribution_reason == "backend_mismatch" and result.operators is not None
 
 
 def test_non_finite_layer_cycles_are_refused(tmp_path):
     layers = [dict(layer) for layer in PROFILES["kws_aot"]["layers"]]
     layers[2]["cycles"] = float("nan")
     fixture = fixture_for(KWS_SHA, tmp_path)
-    result = approximate_timing(
+    result = observe_operator_timing(
         build_for(EngineType.HELIA_AOT, fixture), fixture, profile("kws_aot", layers=layers)
     )
     assert result.reason == "layer_cycles_unavailable" and result.operators is None
@@ -457,13 +386,20 @@ def test_non_finite_layer_cycles_are_refused(tmp_path):
 def test_typed_fixture_binds_only_to_its_own_build(tmp_path):
     fixture = typed_fixture_for(KWS_SHA, tmp_path)
     build = build_for(EngineType.HELIA_AOT, fixture)
-    result = approximate_timing(build, fixture, profile("kws_aot"))
-    assert result.accepted and result.operators is not None and len(result.operators) == 13
+    result = observe_operator_timing(build, fixture, profile("kws_aot"))
+    assert (
+        (result.reason is None and result.attribution_reason is None)
+        and result.operators is not None
+        and len(result.operators) == 13
+    )
     renamed = typed_fixture_for(KWS_SHA, tmp_path, output_name="logits")
-    refused = approximate_timing(build, renamed, profile("kws_aot"))
-    assert refused.operators is None and refused.reason == "fixture_mismatch"
+    refused = observe_operator_timing(build, renamed, profile("kws_aot"))
+    assert refused.operators is not None and refused.attribution_reason == "fixture_mismatch"
     legacy = fixture_for(KWS_SHA, tmp_path)
-    assert approximate_timing(build, legacy, profile("kws_aot")).reason == "fixture_mismatch"
+    assert (
+        observe_operator_timing(build, legacy, profile("kws_aot")).attribution_reason
+        == "fixture_mismatch"
+    )
 
 
 @pytest.mark.parametrize(
@@ -484,11 +420,11 @@ def test_heliart_fixture_binds_only_to_a_helia_backend_profile(tmp_path, backend
         config={**raw["config"], "engine": {"backend": backend}},
     )
     build = build_for(EngineType.HELIA_RT, fixture, prepared_runtime=True)
-    assert bind_operator_timing(build, fixture, run).reason == (reason or "runtime_stack_unknown")
-    labelled = approximate_timing(build, fixture, run, allow_runtime_difference=True)
-    assert labelled.reason == reason
+    assert observe_operator_timing(build, fixture, run).attribution_reason == reason
+    labelled = observe_operator_timing(build, fixture, run)
+    assert labelled.attribution_reason == reason
     if reason is None:
-        assert labelled.accepted
+        assert labelled.reason is None and labelled.attribution_reason is None
         assert labelled.runtime_stack == "unknown"
 
 
@@ -505,9 +441,9 @@ def test_psram_build_cannot_inherit_ordinary_profile_timing(tmp_path, profile_we
     snapshot = dict(run.metadata.config_snapshot)
     snapshot["model"] = {**snapshot["model"], "weights_location": profile_weights}
     run = replace(run, metadata=replace(run.metadata, config_snapshot=snapshot))
-    result = approximate_timing(build, fixture, run)
-    assert not result.accepted
-    assert result.reason == "psram_placement_not_bound_by_profile"
+    result = observe_operator_timing(build, fixture, run)
+    assert not (result.reason is None and result.attribution_reason is None)
+    assert result.attribution_reason == "psram_placement_not_bound_by_profile"
 
 
 @pytest.mark.parametrize(
@@ -533,9 +469,9 @@ def test_operator_timing_compares_effective_build_banks(tmp_path, arena, weights
             "weights_location": weights.value,
         }
         run = replace(run, metadata=replace(run.metadata, config_snapshot=snapshot))
-    result = approximate_timing(build, fixture, run)
-    assert result.accepted is same
-    assert result.reason == (None if same else "placement_mismatch")
+    result = observe_operator_timing(build, fixture, run)
+    assert (result.reason is None and result.attribution_reason is None) is same
+    assert result.attribution_reason == (None if same else "placement_mismatch")
 
 
 def test_legacy_build_without_banks_cannot_inherit_profile_placement(tmp_path):
@@ -544,7 +480,7 @@ def test_legacy_build_without_banks_cannot_inherit_profile_placement(tmp_path):
         build_for(EngineType.HELIA_AOT, fixture), arena_location=None, weights_location=None
     )
     assert (
-        approximate_timing(build, fixture, profile("kws_aot")).reason
+        observe_operator_timing(build, fixture, profile("kws_aot")).attribution_reason
         == "build_placement_unrecorded"
     )
 
@@ -557,18 +493,18 @@ def test_recorded_engine_version_difference_is_not_same_runtime(tmp_path):
         build_for(EngineType.HELIA_AOT, fixture),
         engine_source=EngineSource("helia-aot", "0.23.0", "1" * 40),
     )
-    result = bind_operator_timing(build, fixture, profile("kws_aot"))
+    result = observe_operator_timing(build, fixture, profile("kws_aot"))
     assert result.runtime_stack == "different"
-    assert not result.accepted
+    assert result.reason is None and result.operators is not None
 
 
 def test_missing_engine_identity_is_unknown_not_same(tmp_path):
     fixture = fixture_for(KWS_SHA, tmp_path)
-    result = bind_operator_timing(
+    result = observe_operator_timing(
         build_for(EngineType.HELIA_AOT, fixture), fixture, profile("kws_aot")
     )
     assert result.runtime_stack == "unknown"
-    assert not result.accepted
+    assert result.reason is None and result.operators is not None
 
 
 def evidenced_pair(tmp_path):
@@ -638,8 +574,10 @@ def evidenced_pair(tmp_path):
 
 def test_fully_evidenced_identity_matches_without_guessing(tmp_path):
     build, fixture, run = evidenced_pair(tmp_path)
-    result = bind_operator_timing(build, fixture, run)
-    assert result.accepted and result.runtime_stack == "same"
+    result = observe_operator_timing(build, fixture, run)
+    assert (
+        result.reason is None and result.attribution_reason is None
+    ) and result.runtime_stack == "same"
     assert result.operators is not None and len(result.operators) == 13
 
 
@@ -657,10 +595,16 @@ def test_same_package_version_with_different_runtime_facts_is_different(tmp_path
         modules = (replace(modules[0], peeled_commit="d" * 40),)
     deps = replace(deps, workspace=replace(deps.workspace, inputs=inputs), modules=modules)
     run = replace(run, metadata=replace(run.metadata, dependencies=deps))
-    refused = bind_operator_timing(build, fixture, run)
-    assert not refused.accepted and refused.runtime_stack == "different"
-    labelled = bind_operator_timing(build, fixture, run, allow_runtime_difference=True)
-    assert labelled.accepted and labelled.runtime_stack == "different"
+    refused = observe_operator_timing(build, fixture, run)
+    assert (
+        refused.reason is None
+        and refused.operators is not None
+        and refused.runtime_stack == "different"
+    )
+    labelled = observe_operator_timing(build, fixture, run)
+    assert (
+        labelled.reason is None and labelled.attribution_reason is None
+    ) and labelled.runtime_stack == "different"
 
 
 @pytest.mark.parametrize("missing", ["source", "config", "config_path_hash", "modules"])
@@ -676,10 +620,12 @@ def test_missing_runtime_facts_remain_unknown(tmp_path, missing):
         modules=() if missing == "modules" else deps.modules,
     )
     run = replace(run, metadata=replace(run.metadata, dependencies=deps))
-    result = bind_operator_timing(build, fixture, run)
-    assert result.runtime_stack == "unknown" and result.reason == "runtime_stack_unknown"
-    labelled = bind_operator_timing(build, fixture, run, allow_runtime_difference=True)
-    assert labelled.accepted and labelled.runtime_stack == "unknown"
+    result = observe_operator_timing(build, fixture, run)
+    assert result.runtime_stack == "unknown" and result.reason is None
+    labelled = observe_operator_timing(build, fixture, run)
+    assert (
+        labelled.reason is None and labelled.attribution_reason is None
+    ) and labelled.runtime_stack == "unknown"
 
 
 @pytest.mark.parametrize("damage", ["tampered", "absent", "nonobject", "duplicate"])
@@ -700,8 +646,10 @@ def test_explicit_allowance_never_waives_provenance_integrity(tmp_path, damage, 
         )
     if missing_profile:
         run = replace(run, metadata=replace(run.metadata, dependencies=None))
-    result = bind_operator_timing(build, fixture, run, allow_runtime_difference=True)
-    assert result.reason == "runtime_provenance_unverified" and not result.accepted
+    result = observe_operator_timing(build, fixture, run)
+    assert result.reason == "runtime_provenance_unverified" and not (
+        result.reason is None and result.attribution_reason is None
+    )
 
 
 def test_differing_fact_is_not_hidden_by_another_missing_fact(tmp_path):
@@ -717,7 +665,7 @@ def test_differing_fact_is_not_hidden_by_another_missing_fact(tmp_path):
             dependencies=replace(deps, workspace=replace(deps.workspace, inputs=inputs)),
         ),
     )
-    assert bind_operator_timing(build, fixture, run).runtime_stack == "different"
+    assert observe_operator_timing(build, fixture, run).runtime_stack == "different"
 
 
 def pin_state(build, record):
@@ -746,8 +694,11 @@ def test_present_archive_pin_is_checked_before_missing_facts(tmp_path, missing, 
     if missing in ("profile", "both"):
         run = replace(run, metadata=replace(run.metadata, dependencies=None))
     path.unlink() if damage == "absent" else path.write_text("changed")
-    result = bind_operator_timing(build, fixture, run, allow_runtime_difference=True)
-    assert not result.accepted and result.reason == "runtime_provenance_unverified"
+    result = observe_operator_timing(build, fixture, run)
+    assert (
+        not (result.reason is None and result.attribution_reason is None)
+        and result.reason == "runtime_provenance_unverified"
+    )
 
 
 @pytest.mark.parametrize(
@@ -772,8 +723,10 @@ def test_invalid_present_fields_are_never_allowed(tmp_path, field, value, missin
     build = pin_state(build, record)
     if missing_profile:
         run = replace(run, metadata=replace(run.metadata, dependencies=None))
-    result = bind_operator_timing(build, fixture, run, allow_runtime_difference=True)
-    assert result.reason == "runtime_provenance_unverified" and not result.accepted
+    result = observe_operator_timing(build, fixture, run)
+    assert result.reason == "runtime_provenance_unverified" and not (
+        result.reason is None and result.attribution_reason is None
+    )
 
 
 @pytest.mark.parametrize("missing_state", [False, True])
@@ -783,8 +736,10 @@ def test_known_commit_difference_survives_missing_snapshot_source(tmp_path, miss
     record = json.loads(json.dumps(run.metadata.dependencies.to_dict()))
     del record["workspace"]["inputs"]["engine"]["source"]
     build = replace(build, dependency_state=None) if missing_state else pin_state(build, record)
-    result = bind_operator_timing(build, fixture, run, allow_runtime_difference=True)
-    assert result.accepted and result.runtime_stack == "different"
+    result = observe_operator_timing(build, fixture, run)
+    assert (
+        result.reason is None and result.attribution_reason is None
+    ) and result.runtime_stack == "different"
 
 
 def test_generated_header_location_is_not_a_runtime_difference(tmp_path):
@@ -804,9 +759,11 @@ def test_generated_header_location_is_not_a_runtime_difference(tmp_path):
             dependencies=replace(deps, workspace=replace(deps.workspace, inputs=inputs)),
         ),
     )
-    result = bind_operator_timing(build, fixture, run)
+    result = observe_operator_timing(build, fixture, run)
     # The individual generated-header content is not bound by these snapshots.
-    assert not result.accepted and result.runtime_stack == "unknown"
+    assert (
+        result.reason is None and result.operators is not None and result.runtime_stack == "unknown"
+    )
 
 
 @pytest.mark.parametrize("extra", [False, True])
@@ -831,8 +788,12 @@ def test_every_recorded_engine_module_participates(tmp_path, extra):
         run = replace(
             run, metadata=replace(run.metadata, dependencies=replace(deps, modules=modules))
         )
-    result = bind_operator_timing(build, fixture, run)
-    assert not result.accepted and result.runtime_stack == "different"
+    result = observe_operator_timing(build, fixture, run)
+    assert (
+        result.reason is None
+        and result.operators is not None
+        and result.runtime_stack == "different"
+    )
 
 
 def test_pinned_json_parser_recursion_is_a_refusal(tmp_path, monkeypatch):
@@ -844,20 +805,21 @@ def test_pinned_json_parser_recursion_is_a_refusal(tmp_path, monkeypatch):
     pinned_bytes = build.dependency_state.read()
     parse = Mock(side_effect=RecursionError)
     monkeypatch.setattr(fixture_operator_timing.json, "loads", parse)
-    result = bind_operator_timing(build, fixture, run, allow_runtime_difference=True)
+    result = observe_operator_timing(build, fixture, run)
     parse.assert_called_once()
     assert parse.call_args.args == (pinned_bytes,)
-    assert not result.accepted and result.reason == "runtime_provenance_unverified"
+    assert (
+        not (result.reason is None and result.attribution_reason is None)
+        and result.reason == "runtime_provenance_unverified"
+    )
 
 
-@pytest.mark.parametrize("allow", [False, True])
-def test_parseable_incomplete_state_remains_unknown(tmp_path, allow):
+def test_parseable_incomplete_state_remains_unknown(tmp_path):
     build, fixture, run = evidenced_pair(tmp_path)
     build = pin_state(build, {"workspace": {"inputs": {}}})
-    result = bind_operator_timing(build, fixture, run, allow_runtime_difference=allow)
+    result = observe_operator_timing(build, fixture, run)
     assert result.runtime_stack == "unknown"
-    assert result.accepted is allow
-    assert result.reason == (None if allow else "runtime_stack_unknown")
+    assert result.reason is None and result.operators is not None
 
 
 @pytest.mark.parametrize(
@@ -868,8 +830,10 @@ def test_requested_source_spelling_is_not_resolved_identity(tmp_path, selector):
     record = json.loads(json.dumps(run.metadata.dependencies.to_dict()))
     record["workspace"]["inputs"]["engine"]["config"][selector] = "requested/tag"
     build = pin_state(build, record)
-    result = bind_operator_timing(build, fixture, run)
-    assert result.accepted and result.runtime_stack == "same"
+    result = observe_operator_timing(build, fixture, run)
+    assert (
+        result.reason is None and result.attribution_reason is None
+    ) and result.runtime_stack == "same"
 
 
 @pytest.mark.parametrize("key", ["ref", "version"])
@@ -895,8 +859,10 @@ def test_requested_module_spelling_is_not_resolved_identity(tmp_path, key):
             dependencies=replace(deps, workspace=replace(deps.workspace, inputs=inputs)),
         ),
     )
-    result = bind_operator_timing(build, fixture, run)
-    assert result.accepted and result.runtime_stack == "same"
+    result = observe_operator_timing(build, fixture, run)
+    assert (
+        result.reason is None and result.attribution_reason is None
+    ) and result.runtime_stack == "same"
 
 
 def test_missing_setting_does_not_infer_its_default(tmp_path):
@@ -904,7 +870,7 @@ def test_missing_setting_does_not_infer_its_default(tmp_path):
     record = json.loads(json.dumps(run.metadata.dependencies.to_dict()))
     del record["workspace"]["inputs"]["engine"]["config"]["aot_args"]["optimize"]
     build = pin_state(build, record)
-    assert bind_operator_timing(build, fixture, run).runtime_stack == "unknown"
+    assert observe_operator_timing(build, fixture, run).runtime_stack == "unknown"
 
 
 def test_different_config_file_digest_needs_effective_settings_evidence(tmp_path):
@@ -915,7 +881,7 @@ def test_different_config_file_digest_needs_effective_settings_evidence(tmp_path
         "value": "d" * 64,
     }
     build = pin_state(build, record)
-    assert bind_operator_timing(build, fixture, run).runtime_stack == "unknown"
+    assert observe_operator_timing(build, fixture, run).runtime_stack == "unknown"
 
 
 @pytest.mark.parametrize(
@@ -959,6 +925,6 @@ def test_list_settings_compare_nested_facts_without_defaults_or_coercion(
             dependencies=replace(deps, workspace=replace(deps.workspace, inputs=inputs)),
         ),
     )
-    result = bind_operator_timing(build, fixture, run)
+    result = observe_operator_timing(build, fixture, run)
     assert result.runtime_stack == relation
-    assert result.accepted is (relation == "same")
+    assert result.reason is None and result.operators is not None

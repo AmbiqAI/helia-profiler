@@ -5,7 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, ClassVar, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, ClassVar, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from ..fixture_runtime import VerifiedPreparedRuntime
 
 from ..config import ProfileConfig
 from ..placement import ArenaRole, Placement
@@ -276,6 +279,17 @@ class ExecutorchArtifacts(EngineArtifacts):
     executorch_io_region: str | None = None
 
     _PINNED_ENGINE_TYPE: ClassVar[EngineType | None] = EngineType.EXECUTORCH
+
+
+@runtime_checkable
+class PreparedRuntimeAdapter(Protocol):
+    """An interpreter adapter that can consume an explicit verified archive."""
+
+    prepared_runtime_contract: tuple[str, str]
+
+    def prepare_runtime(
+        self, config: ProfileConfig, work_dir: Path, runtime: VerifiedPreparedRuntime
+    ) -> EngineArtifacts: ...
 
 
 @runtime_checkable

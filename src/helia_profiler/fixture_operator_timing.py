@@ -17,10 +17,6 @@ from .fixture_target import FIXTURE_CLOCK_PROFILE
 from .results.models import DEVICE_CLOCK_TOLERANCE, ProfileResult
 
 FIXTURE_TFLM_BACKEND = "cmsis_nn"
-#: Layer-sum agreement with the uninstrumented clean window, in percent of clean.
-AGREEMENT_PCT = 1.0
-SHORT_AGREEMENT_PCT = 2.0
-SHORT_INFERENCE_S = 0.002
 
 
 @dataclass(frozen=True)
@@ -57,35 +53,6 @@ class FixtureOperatorTimingFacts:
     clean_cycles: int | None = None
     unattributed_cycles: float | None = None
     agreement_pct: float | None = None
-
-
-@dataclass(frozen=True)
-class FixtureOperatorTiming:
-    """Per-operator timing attributed to a fixture build, or null with a reason.
-
-    ``operators`` is set only when every identity check and the agreement rule
-    pass. Cycles come from a separate PMU-instrumented image; they are
-    approximate shares of the fixture's work, not its measured latency.
-    ``runtime_stack`` compares recorded compiler source, runtime providers and
-    engine settings: same, different or unknown. Older records can lack these
-    facts. ``engine_version`` is the observed profile package version; it is
-    not source identity or qualification evidence.
-    """
-
-    build_identity: str | None
-    operators: tuple[OperatorTiming, ...] | None
-    reason: str | None
-    layer_cycles_sum: float | None = None
-    clean_cycles: int | None = None
-    unattributed_cycles: float | None = None
-    agreement_pct: float | None = None
-    tolerance_pct: float | None = None
-    runtime_stack: str = "unknown"
-    engine_version: str | None = None
-
-    @property
-    def accepted(self) -> bool:
-        return self.reason is None
 
 
 def _identity_reason(
@@ -482,56 +449,3 @@ def observe_operator_timing(
         for layer, value in zip(layers, cycles, strict=True)
     )
     return result(None, operators=operators, **values)
-
-
-def bind_operator_timing(
-    build: FixtureBuild,
-    fixture: FixedFixture | TypedFixture,
-    profile: ProfileResult,
-    *,
-    allow_runtime_difference: bool = False,
-) -> FixtureOperatorTiming:
-    """Deprecated compatibility attribution with the legacy agreement policy.
-
-    Use public ``observe_operator_timing`` for measurement facts and apply
-    comparison policy in the consumer. This wrapper retains the previous
-    agreement tolerances and explicit runtime allowance for external callers;
-    it is not the supported measurement path.
-    """
-    facts = observe_operator_timing(build, fixture, profile)
-    if facts.attribution_reason is not None:
-        return FixtureOperatorTiming(
-            build.build_identity,
-            None,
-            facts.attribution_reason,
-            runtime_stack=facts.runtime_stack,
-            engine_version=facts.engine_version,
-        )
-    tolerance = None
-    reason = facts.reason
-    if facts.clean_cycles is not None and facts.agreement_pct is not None:
-        tolerance = (
-            SHORT_AGREEMENT_PCT
-            if facts.clean_cycles / FIXTURE_CPU_HZ < SHORT_INFERENCE_S
-            else AGREEMENT_PCT
-        )
-        if abs(facts.agreement_pct) > tolerance:
-            reason = "layer_sum_disagrees_with_clean_window"
-        elif reason is None and facts.runtime_stack != "same" and not allow_runtime_difference:
-            reason = (
-                "runtime_stack_mismatch"
-                if facts.runtime_stack == "different"
-                else "runtime_stack_unknown"
-            )
-    return FixtureOperatorTiming(
-        build_identity=facts.build_identity,
-        operators=facts.operators if reason is None else None,
-        reason=reason,
-        layer_cycles_sum=facts.layer_cycles_sum,
-        clean_cycles=facts.clean_cycles,
-        unattributed_cycles=facts.unattributed_cycles,
-        agreement_pct=facts.agreement_pct,
-        tolerance_pct=tolerance,
-        runtime_stack=facts.runtime_stack,
-        engine_version=facts.engine_version,
-    )

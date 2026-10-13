@@ -29,12 +29,11 @@ from helia_profiler.engines.base import HeliaRtArtifacts
 from helia_profiler.errors import ConfigError
 from helia_profiler.firmware.op_resolver import build_fixture_resolver_plan
 from helia_profiler.fixture_analysis import FixtureModelAnalysis
-from helia_profiler.fixture_runtime import _PreparedRuntimeStage
 from helia_profiler.modelcost.model_analysis import LayerOps, ModelAnalysis
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.placement import Placement
-from helia_profiler.results import NsxModuleRef
-from helia_profiler.results.models import EngineInfo, MemoryPlan, RunMetadata, ToolchainInfo
+from helia_profiler.results.models import MemoryPlan, RunMetadata, ToolchainInfo
+from helia_profiler.stages.prepare_engine import PrepareEngineStage
 from helia_profiler.vocab import Toolchain
 
 METHOD = FixtureMethod(FixtureTimingScope.RESTORE_AND_INVOKE)
@@ -188,21 +187,13 @@ def _stage(tmp_path, rt):
     ctx = PipelineContext(
         config=_config(tmp_path, _fixture(tmp_path)[0]), work_dir=tmp_path / "work"
     )
-    ctx.engine_artifacts = HeliaRtArtifacts(
-        engine_type=EngineType.HELIA_RT,
-        extra_modules=[
-            NsxModuleRef(name="nsx-helia-rt", path=tmp_path, local=False),
-            NsxModuleRef(name="nsx-cmsis-nn", path=tmp_path, local=False),
-        ],
-        cmake_vars={"HELIA_RT_VARIANT": "release"},
-        engine_header="tensorflow/lite/micro/micro_interpreter.h",
-        engine_backend="helia",
-        heliart_version="1.21.2",
-        heliart_variant="release",
-        heliart_toolchain_tag="atfe",
-    )
-    ctx.run_metadata.engine = EngineInfo(type="helia-rt", version="1.21.0", backend="helia")
-    stage = _PreparedRuntimeStage(rt.verify())
+    if rt.verify().record.stack == "upstream":
+        from dataclasses import replace
+
+        ctx.config = replace(
+            ctx.config, engine=EngineConfig(type=EngineType.TFLM, backend="cmsis_nn")
+        )
+    stage = PrepareEngineStage(runtime=rt.verify())
     stage.run(ctx)
     return stage, ctx
 
@@ -211,7 +202,7 @@ def test_upstream_staging_is_unchanged(tmp_path):
     rt = runtime(tmp_path / "rt", schema=1)
     stage, ctx = _stage(tmp_path, rt)
     module = tmp_path / "work" / "prepared-upstream-runtime" / rt.manifest.sha256
-    assert stage.name == "prepare_upstream_runtime"
+    assert stage.name == "prepare_engine"
     assert (module / "CMakeLists.txt").read_text() == (
         "add_library(hpx_upstream_runtime STATIC IMPORTED GLOBAL)\n"
         'set_target_properties(hpx_upstream_runtime PROPERTIES IMPORTED_LOCATION "${CMAKE_CURRENT_LIST_DIR}/runtime.a")\n'
@@ -227,14 +218,14 @@ def test_upstream_staging_is_unchanged(tmp_path):
         "depends:\n  required: [nsx-core, nsx-soc-hal]\n"
     )
     assert [m.name for m in ctx.engine_artifacts.extra_modules] == ["hpx-upstream-runtime"]
-    assert ctx.run_metadata.engine is not None and ctx.run_metadata.engine.version == "1.21.0"
+    assert ctx.run_metadata.engine is not None and ctx.run_metadata.engine.version is None
 
 
-def test_heliart_staging_replaces_the_engine_modules_with_the_archive(tmp_path):
+def test_heliart_preparation_selects_only_the_supplied_archive(tmp_path):
     rt = runtime(tmp_path / "rt")
     stage, ctx = _stage(tmp_path, rt)
     module = tmp_path / "work" / "prepared-heliart-runtime" / rt.manifest.sha256
-    assert stage.name == "prepare_heliart_runtime"
+    assert stage.name == "prepare_engine"
     cmake = (module / "CMakeLists.txt").read_text()
     assert "add_library(hpx_heliart_runtime STATIC IMPORTED GLOBAL)" in cmake
     assert (
@@ -348,11 +339,10 @@ def test_heliart_build_links_and_proves_the_prepared_archive(tmp_path, monkeypat
         _runner(tmp_path, rt, calls, lock_modules=GOOD_LOCK, map_lines=GOOD_MAP),
     )
     r = build_fixed_fixture(_config(tmp_path, f), f, method=METHOD, runtime=rt)
-    assert calls[-1][:5] == [
+    assert calls[-1][:4] == [
         "bind_fixed_fixture",
         "resolve_platform",
         "prepare_engine",
-        "prepare_heliart_runtime",
         "bind_fixture_render",
     ]
     assert r.built and r.engine is EngineType.HELIA_RT

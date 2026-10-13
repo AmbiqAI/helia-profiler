@@ -5,12 +5,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
-
-from .engines.base import HeliaRtArtifacts
-from .errors import ConfigError
-from .pipeline import PipelineContext
 
 
 @dataclass(frozen=True)
@@ -238,69 +234,37 @@ PREPARED_RUNTIME_MODULES = {
 }
 
 
-class _PreparedRuntimeStage:
-    def __init__(self, runtime: VerifiedPreparedRuntime):
-        self.runtime = runtime
-        self.name = (
-            "prepare_upstream_runtime"
-            if runtime.record.stack == "upstream"
-            else "prepare_heliart_runtime"
-        )
+def prepare_runtime_module(runtime: VerifiedPreparedRuntime, work_dir: Path):
+    """Stage exactly the selected verified archive; the engine adapter owns its artifacts."""
+    from .results import NsxModuleRef
 
-    def should_skip(self, ctx: PipelineContext) -> bool:
-        return False
-
-    def run(self, ctx: PipelineContext) -> None:
-        from .results import NsxModuleRef
-
-        data = self.runtime.record
-        module_name, library, alias = PREPARED_RUNTIME_MODULES[data.stack]
-        module = (
-            ctx.work_dir
-            / ("prepared-" + module_name.removeprefix("hpx-"))
-            / self.runtime.manifest.sha256
-        )
-        module.mkdir(parents=True, exist_ok=True)
-        (module / "runtime.a").write_bytes(self.runtime.archive.read())
-        for header in data.headers:
-            name, digest = header.name, header.sha256
-            target = module / "include" / name
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(FixtureFile(self.runtime.header_path(name), digest).read())
-        (module / "provider-manifest.json").write_bytes(self.runtime.manifest.read())
-        (module / "nsx-module.yaml").write_text(
-            f"schema_version: 1\nmodule:\n  name: {module_name}\n  type: runtime\n  version: '0.1.0'\n"
-            "support:\n  ambiqsuite: true\n  zephyr: false\n"
-            f"build:\n  cmake:\n    targets: [{alias}]\n"
-            "depends:\n  required: [nsx-core, nsx-soc-hal]\n",
-            encoding="utf-8",
-        )
-        includes = "\n".join(
-            '  "${CMAKE_CURRENT_LIST_DIR}/include/' + name + '"' for name in data.include_dirs
-        )
-        (module / "CMakeLists.txt").write_text(
-            f"add_library({library} STATIC IMPORTED GLOBAL)\n"
-            f'set_target_properties({library} PROPERTIES IMPORTED_LOCATION "${{CMAKE_CURRENT_LIST_DIR}}/runtime.a")\n'
-            f"target_include_directories({library} INTERFACE\n" + includes + "\n)\n"
-            f"target_compile_definitions({library} INTERFACE {' '.join(data.consumer_defines)})\n"
-            f"add_library({alias} ALIAS {library})\n",
-            encoding="utf-8",
-        )
-        if ctx.engine_artifacts is None:
-            raise ConfigError("Engine preparation did not produce artifacts")
-        ctx.engine_artifacts = replace(
-            ctx.engine_artifacts,
-            extra_modules=[NsxModuleRef(name=module_name, path=module, local=True)],
-            cmake_vars={},
-        )
-        artifacts = ctx.engine_artifacts
-        if data.stack == "helia-rt" and isinstance(artifacts, HeliaRtArtifacts):
-            # The adapter named its own release; record the archive actually linked.
-            revision = next(p.revision for p in data.providers if p.name == "helia-rt")
-            ctx.engine_artifacts = replace(
-                artifacts, heliart_version=f"prepared:{revision}", heliart_variant="prepared"
-            )
-            if ctx.run_metadata.engine is not None:
-                ctx.run_metadata.engine = replace(
-                    ctx.run_metadata.engine, version=f"prepared:{revision}"
-                )
+    data = runtime.record
+    module_name, library, alias = PREPARED_RUNTIME_MODULES[data.stack]
+    module = work_dir / ("prepared-" + module_name.removeprefix("hpx-")) / runtime.manifest.sha256
+    module.mkdir(parents=True, exist_ok=True)
+    (module / "runtime.a").write_bytes(runtime.archive.read())
+    for header in data.headers:
+        name, digest = header.name, header.sha256
+        target = module / "include" / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(FixtureFile(runtime.header_path(name), digest).read())
+    (module / "provider-manifest.json").write_bytes(runtime.manifest.read())
+    (module / "nsx-module.yaml").write_text(
+        f"schema_version: 1\nmodule:\n  name: {module_name}\n  type: runtime\n  version: '0.1.0'\n"
+        "support:\n  ambiqsuite: true\n  zephyr: false\n"
+        f"build:\n  cmake:\n    targets: [{alias}]\n"
+        "depends:\n  required: [nsx-core, nsx-soc-hal]\n",
+        encoding="utf-8",
+    )
+    includes = "\n".join(
+        '  "${CMAKE_CURRENT_LIST_DIR}/include/' + name + '"' for name in data.include_dirs
+    )
+    (module / "CMakeLists.txt").write_text(
+        f"add_library({library} STATIC IMPORTED GLOBAL)\n"
+        f'set_target_properties({library} PROPERTIES IMPORTED_LOCATION "${{CMAKE_CURRENT_LIST_DIR}}/runtime.a")\n'
+        f"target_include_directories({library} INTERFACE\n" + includes + "\n)\n"
+        f"target_compile_definitions({library} INTERFACE {' '.join(data.consumer_defines)})\n"
+        f"add_library({alias} ALIAS {library})\n",
+        encoding="utf-8",
+    )
+    return NsxModuleRef(name=module_name, path=module, local=True)

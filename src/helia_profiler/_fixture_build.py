@@ -12,14 +12,15 @@ from pathlib import Path, PurePath
 
 from .config import ProfileConfig
 from .deps.compatibility import resolve_compatibility
-from .engines import EngineType
-from .engines.base import HeliaAotArtifacts
+from .engines import EngineType, get_adapter
+from .engines.base import HeliaAotArtifacts, PreparedRuntimeAdapter
 from .errors import ConfigError
 from .firmware.launcher import _DISABLED_LAUNCHER_VALUES
 from .fixture_analysis import (
     FixtureModelAnalysis,
     FixtureTensor,
     Int8Tensor,
+    PerTensorQuantization,
     TypedFixtureModelAnalysis,
     analyze_fixture_model,
     analyze_typed_fixture_model_for_engine,
@@ -30,18 +31,19 @@ from .fixture_runtime import (
     PREPARED_RUNTIME_MODULES,
     FixtureFile,
     PreparedUpstreamRuntime,
-    _PreparedRuntimeStage,
 )
 from .fixture_target import (
     FIXTURE_CLOCK_PROFILE,
     FixtureTarget,
-    fixture_app_region,
+    fixture_cpu_hz,
     supported_fixture_target,
+    validate_fixture_placement,
 )
 from .pipeline import PipelineContext, PipelineRunner, Stage, serialize_config
 from .placement import ArenaRole, Placement
 from .results.models import MemoryPlan, ToolchainInfo
 from .runtime_records import RuntimeQualification, qualification
+from .wire import STIMER_HZ
 
 
 class FixtureTimingScope(StrEnum):
@@ -178,11 +180,6 @@ FIXTURE_CAPABILITIES: dict[EngineType, dict[str, FixtureCapability]] = {
 }
 
 
-#: Engines that link a prepared runtime archive: (manifest stack, required backend).
-PREPARED_RUNTIME_ENGINES = {
-    EngineType.TFLM: ("upstream", FixtureBackend.CMSIS_NN),
-    EngineType.HELIA_RT: ("helia-rt", FixtureBackend.HELIA),
-}
 #: Runtime providers a prepared-runtime build must not also resolve or link:
 #: any module whose name carries one of these, and the other prepared stacks.
 _RUNTIME_PROVIDER = re.compile(r"helia-rt|tflite-micro|cmsis-nn")
@@ -257,35 +254,53 @@ class FixtureIO:
 
 
 @dataclass(frozen=True)
+class FixtureOutput:
+    """One complete output declaration, without a reference answer."""
+
+    tensor: FixtureTensor
+
+
+@dataclass(frozen=True)
 class TypedFixture:
-    """Fixed inputs and expected outputs for every IO tensor of a model."""
+    """Fixed input bytes and complete ordered outputs for a model.
+
+    Outputs are descriptors, or legacy ``FixtureIO`` references. Reference
+    bytes are not needed for measurement; legacy identities remain unchanged.
+    """
 
     model: FixtureFile
     inputs: tuple[FixtureIO, ...]
-    outputs: tuple[FixtureIO, ...]
+    outputs: tuple[FixtureIO, ...] | tuple[FixtureOutput, ...]
 
     def verify(self) -> None:
         self.model.read()
         if not self.inputs or not self.outputs:
             raise ValueError("Typed fixture requires inputs and outputs")
+        if not (
+            all(isinstance(io, FixtureIO) for io in self.outputs)
+            or all(isinstance(io, FixtureOutput) for io in self.outputs)
+        ):
+            raise ValueError("Mixed reference and descriptor outputs are not supported")
         if any(io.role not in _FIXTURE_ROLES for io in self.inputs) or any(
-            io.role != FixtureRole.SIGNAL for io in self.outputs
+            isinstance(io, FixtureIO) and io.role != FixtureRole.SIGNAL for io in self.outputs
         ):
             raise ValueError("Invalid fixture tensor role")
         for io in (*self.inputs, *self.outputs):
-            if len(io.data.read()) != io.tensor.size_bytes:
+            if isinstance(io, FixtureIO) and len(io.data.read()) != io.tensor.size_bytes:
                 raise ValueError(f"Fixture tensor {io.tensor.name} byte extent mismatch")
 
     @property
-    def expected(self) -> FixtureFile:
-        return self.outputs[0].data
+    def expected(self) -> FixtureFile | None:
+        first = self.outputs[0]
+        return first.data if isinstance(first, FixtureIO) else None
 
     @property
     def identity(self) -> str:
         value = asdict(self)
         value["model"].pop("path")
         for io in (*value["inputs"], *value["outputs"]):
-            io["data"].pop("path")
+            if "data" in io:
+                io["data"].pop("path")
         return hashlib.sha256(
             json.dumps(value, sort_keys=True, allow_nan=False).encode()
         ).hexdigest()
@@ -307,15 +322,22 @@ def _check_typed_fixture(
         or tuple(io.tensor for io in fixture.outputs) != model.outputs
     ):
         raise ConfigError("Fixture tensor declarations differ from analyzed model")
-    if any(t.dtype == "int32" for t in model.outputs):
+    return _io_capabilities(model.inputs, model.outputs, engine)
+
+
+def _io_capabilities(
+    inputs: tuple[FixtureTensor, ...], outputs: tuple[FixtureTensor, ...], engine: EngineType
+):
+    if any(t.dtype == "int32" for t in outputs):
         raise ConfigError("INT32 fixture support is input-only")
-    if model.output_bytes > FIXTURE_READBACK_BUDGET:
+    output_bytes = sum(t.size_bytes for t in outputs)
+    if output_bytes > FIXTURE_READBACK_BUDGET:
         raise ConfigError(
-            f"Fixture outputs total {model.output_bytes} B, above the "
+            f"Fixture outputs total {output_bytes} B, above the "
             f"{FIXTURE_READBACK_BUDGET} B readback budget"
         )
     table = FIXTURE_CAPABILITIES[engine]
-    tensors = (*model.inputs, *model.outputs)
+    tensors = (*inputs, *outputs)
     capabilities = tuple(sorted({(t.dtype, table[t.dtype]) for t in tensors}))
     unsupported = [
         dtype for dtype, status in capabilities if status is FixtureCapability.UNSUPPORTED
@@ -331,7 +353,7 @@ class FixtureBuild:
     app_dir: Path
     binary: FixtureFile | None
     generated_sources: tuple[FixtureFile, ...]
-    expected: FixtureFile
+    expected: FixtureFile | None
     built: bool
     runtime_manifest: FixtureFile | None
     flat_binary: FixtureFile | None
@@ -370,6 +392,14 @@ class FixtureBuild:
     #: Effective configured banks; legacy receipts without these cannot bind operator timing.
     arena_location: Placement | None = None
     weights_location: Placement | None = None
+    #: Complete measurement inputs and outputs; required by persisted builds.
+    model: FixtureFile | None = None
+    inputs: tuple[FixtureIO, ...] = ()
+    output_tensors: tuple[FixtureTensor, ...] = ()
+    arena_capacity: int | None = None
+    clock_profile: str | None = None
+    cpu_hz: int | None = None
+    timer_hz: int | None = None
 
 
 @dataclass(frozen=True)
@@ -469,26 +499,6 @@ def _refuse_overrides(config: ProfileConfig) -> None:
         )
 
 
-def _validate_fixture_placement(
-    arena: Placement | None, weights: Placement | None, engine: EngineType | None = None
-) -> None:
-    """Validate the fixture's implemented static arenas and weight backing."""
-    if arena not in (Placement.SRAM, Placement.TCM):
-        raise ConfigError("Fixture arena placement requires writable static SRAM or DTCM")
-    if not isinstance(weights, Placement):
-        raise ConfigError("Explicit fixture weight backing required")
-    for placement in (arena, weights):
-        try:
-            start, end = fixture_app_region(placement.region)
-        except ValueError as exc:
-            raise ConfigError("Fixture target has no selected memory bank") from exc
-        if start >= end:
-            raise ConfigError("Fixture target memory bank has no usable capacity")
-    if weights is Placement.PSRAM:
-        if engine not in (EngineType.HELIA_AOT, EngineType.TFLM):
-            raise ConfigError("Self-loading PSRAM fixtures implement helia-AOT or upstream TFLM")
-
-
 def _validate(config: ProfileConfig, fixture: FixedFixture | TypedFixture) -> None:
     fixture.verify()
     _refuse_overrides(config)
@@ -506,7 +516,7 @@ def _validate(config: ProfileConfig, fixture: FixedFixture | TypedFixture) -> No
             f"Fixed fixture supports {supported_fixture_target().board} "
             f"at the {FIXTURE_CLOCK_PROFILE} clock only"
         )
-    _validate_fixture_placement(
+    validate_fixture_placement(
         config.model.arena_location, config.model.weights_location, config.engine.type
     )
     if config.model.arena_size is None or not 0 < config.model.arena_size <= 3 * 1024 * 1024:
@@ -582,8 +592,9 @@ def _build(
             raise ConfigError("Fixture tensor declarations differ from analyzed model")
         capabilities = (("int8", FIXTURE_CAPABILITIES[config.engine.type]["int8"]),)
     _validate_state_policy(model, config.engine.type, method)
-    if config.engine.type in PREPARED_RUNTIME_ENGINES:
-        stack, backend = PREPARED_RUNTIME_ENGINES[config.engine.type]
+    adapter = get_adapter(config.engine.type)
+    if isinstance(adapter, PreparedRuntimeAdapter):
+        stack, backend = adapter.prepared_runtime_contract
         if runtime is None or config.engine.backend != backend:
             raise ConfigError(f"Explicit {stack} prepared runtime and {backend} backend required")
         verified_runtime = runtime.verify()
@@ -664,10 +675,8 @@ def _build(
     stages: list[Stage] = [
         IdentityStage(),
         ResolvePlatformStage(),
-        PrepareEngineStage(),
+        PrepareEngineStage(runtime=verified_runtime),
     ]
-    if verified_runtime is not None:
-        stages.append(_PreparedRuntimeStage(verified_runtime))
     stages += [
         _BindFixtureStage(
             FixtureRenderSpec(
@@ -733,29 +742,13 @@ def _build(
     toolchain = ctx.run_metadata.toolchain if compile else None
     if compile and (toolchain is None or not toolchain.compiler_version):
         raise ConfigError("Compiled fixture requires recorded toolchain provenance")
-    artifact_identity = None
-    if binary is not None:
-        artifact_identity = hashlib.sha256(
-            json.dumps(
-                {
-                    "intent": intent_identity,
-                    "elf": binary.sha256,
-                    "image": flat_binary.sha256 if flat_binary else None,
-                    "lock": dependency_lock.sha256 if dependency_lock else None,
-                    "dependency_state": dependency_state.sha256 if dependency_state else None,
-                    "map": link_map.sha256 if link_map else None,
-                    "sources": [(source.path.name, source.sha256) for source in sources],
-                    "toolchain": asdict(toolchain) if toolchain else None,
-                },
-                sort_keys=True,
-            ).encode()
-        ).hexdigest()
     planned_memory = ctx.memory_plan
     if config.engine.type is EngineType.HELIA_AOT and (
         ctx.engine_artifacts is None or ctx.engine_artifacts.memory_plan is None
     ):
         planned_memory = None
-    return FixtureBuild(
+    inputs, output_tensors = _measurement_io(fixture)
+    result = FixtureBuild(
         fixture_identity=fixture.identity,
         app_dir=app,
         binary=binary,
@@ -768,7 +761,7 @@ def _build(
         link_map=link_map,
         timing_scope=method.timing_scope,
         engine=config.engine.type,
-        build_identity=artifact_identity,
+        build_identity=None,
         iterations=config.profiling.iterations,
         warmups=config.profiling.warmup,
         intent_identity=intent_identity,
@@ -781,7 +774,7 @@ def _build(
         planned_memory_reason=None
         if planned_memory is not None
         else "producer_plan_unavailable_or_unsupported_mapping",
-        outputs=tuple(io.data for io in fixture.outputs)
+        outputs=tuple(io.data for io in fixture.outputs if isinstance(io, FixtureIO))
         if isinstance(fixture, TypedFixture)
         else (fixture.expected,),
         capabilities=capabilities,
@@ -804,6 +797,37 @@ def _build(
         weights_location=config.model.weights_location,
         state_policy=method.state_policy,
         source_initializer_present=model.has_initializer,
+        model=fixture.model,
+        inputs=inputs,
+        output_tensors=output_tensors,
+        arena_capacity=config.model.arena_size,
+        clock_profile=FIXTURE_CLOCK_PROFILE,
+        cpu_hz=fixture_cpu_hz(),
+        timer_hz=STIMER_HZ,
+    )
+    if binary is not None:
+        from ._fixture_record import compiled_fixture_identity
+
+        result = replace(result, build_identity=compiled_fixture_identity(result))
+    return result
+
+
+def _measurement_io(fixture: FixedFixture | TypedFixture):
+    if isinstance(fixture, TypedFixture):
+        return fixture.inputs, tuple(io.tensor for io in fixture.outputs)
+
+    def tensor(value: Int8Tensor, name: str) -> FixtureTensor:
+        return FixtureTensor(
+            name,
+            value.tensor_index,
+            "int8",
+            value.shape,
+            PerTensorQuantization(value.scale, value.zero_point),
+        )
+
+    return (
+        (FixtureIO(tensor(fixture.input_tensor, "input"), fixture.input),),
+        (tensor(fixture.output_tensor, "output"),),
     )
 
 

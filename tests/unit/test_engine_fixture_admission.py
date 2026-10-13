@@ -410,16 +410,16 @@ def test_connected_half_storage_keeps_source_and_supported_public_io(tmp_path, e
 def test_carry_operator_attribution_is_refused_without_state_binding(tmp_path):
     from test_fixture_operator_timing import KWS_SHA, build_for, fixture_for, profile
 
-    from helia_profiler.fixture_operator_timing import bind_operator_timing
+    from helia_profiler.fixture_operator_timing import observe_operator_timing
 
     fixture = fixture_for(KWS_SHA, tmp_path)
     build = replace(
         build_for(api.EngineType.HELIA_AOT, fixture), state_policy=api.FixtureStatePolicy.CARRY
     )
-    actual = bind_operator_timing(build, fixture, profile("kws_aot"))
-    assert not actual.accepted
-    assert actual.reason == "state_policy_not_bound_by_profile"
-    assert actual.operators is None
+    actual = observe_operator_timing(build, fixture, profile("kws_aot"))
+    assert actual.attribution_reason == "state_policy_not_bound_by_profile"
+    assert actual.reason is None
+    assert actual.operators is not None
 
 
 def test_engine_selection_is_a_typed_closed_set(tmp_path):

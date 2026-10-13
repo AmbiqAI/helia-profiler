@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from ..engines import get_adapter
+from ..engines.base import PreparedRuntimeAdapter
 from ..errors import EngineError
 from ..pipeline import PipelineContext
 from ..results import EngineInfo
@@ -13,6 +14,9 @@ log = logging.getLogger("hpx")
 
 
 class PrepareEngineStage:
+    def __init__(self, *, runtime=None):
+        self.runtime = runtime
+
     @property
     def name(self) -> str:
         return "prepare_engine"
@@ -35,7 +39,12 @@ class PrepareEngineStage:
         log.info("Engine: %s", adapter.name)
 
         try:
-            artifacts = adapter.prepare(ctx.config, ctx.work_dir)
+            if self.runtime is None:
+                artifacts = adapter.prepare(ctx.config, ctx.work_dir)
+            elif isinstance(adapter, PreparedRuntimeAdapter):
+                artifacts = adapter.prepare_runtime(ctx.config, ctx.work_dir, self.runtime)
+            else:
+                raise EngineError(f"{adapter.name} cannot consume a prepared runtime")
         except EngineError:
             raise
         except Exception as exc:

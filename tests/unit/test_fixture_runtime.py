@@ -6,14 +6,12 @@ from hashlib import sha256
 
 import pytest
 
-from helia_profiler.config import ModelConfig, ProfileConfig
 from helia_profiler.fixture_runtime import (
     FixtureFile,
     PreparedUpstreamRuntime,
     RuntimeManifest,
-    _PreparedRuntimeStage,
+    prepare_runtime_module,
 )
-from helia_profiler.pipeline import PipelineContext
 
 
 def runtime(tmp_path, mutate=None):
@@ -79,12 +77,7 @@ def test_stage_rechecks_content_after_ingress(tmp_path, name):
     verified = runtime(tmp_path).verify()
     (tmp_path / name).write_bytes(b"changed")
     with pytest.raises(ValueError, match="hash mismatch"):
-        _PreparedRuntimeStage(verified).run(
-            PipelineContext(
-                config=ProfileConfig(model=ModelConfig(path=tmp_path / "model.tflite")),
-                work_dir=tmp_path / "work",
-            )
-        )
+        prepare_runtime_module(verified, tmp_path / "work")
 
 
 def test_stage_rechecks_header_containment(tmp_path):
@@ -95,12 +88,7 @@ def test_stage_rechecks_header_containment(tmp_path):
     header.unlink()
     header.symlink_to(outside)
     with pytest.raises(ValueError, match="escapes"):
-        _PreparedRuntimeStage(verified).run(
-            PipelineContext(
-                config=ProfileConfig(model=ModelConfig(path=tmp_path / "model.tflite")),
-                work_dir=tmp_path / "work",
-            )
-        )
+        prepare_runtime_module(verified, tmp_path / "work")
 
 
 def test_duplicate_manifest_keys_rejected(tmp_path):

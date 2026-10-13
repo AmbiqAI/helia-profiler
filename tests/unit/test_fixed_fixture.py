@@ -205,7 +205,6 @@ def test_host_only_stage_selection_and_source_receipt(
         "bind_fixed_fixture",
         "resolve_platform",
         "prepare_engine",
-        *(["prepare_upstream_runtime"] if engine is EngineType.TFLM else []),
         "bind_fixture_render",
         "plan_memory",
         "generate_firmware",

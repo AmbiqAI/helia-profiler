@@ -1,7 +1,7 @@
 {
   "api_version": [
-    4,
-    1
+    5,
+    0
   ],
   "surface": {
     "ElfSection": {
@@ -202,7 +202,7 @@
         ],
         [
           "expected",
-          "FixtureFile",
+          "FixtureFile | None",
           "<required>"
         ],
         [
@@ -338,6 +338,41 @@
         [
           "weights_location",
           "Placement | None",
+          "None"
+        ],
+        [
+          "model",
+          "FixtureFile | None",
+          "None"
+        ],
+        [
+          "inputs",
+          "tuple[FixtureIO, ...]",
+          "()"
+        ],
+        [
+          "output_tensors",
+          "tuple[FixtureTensor, ...]",
+          "()"
+        ],
+        [
+          "arena_capacity",
+          "int | None",
+          "None"
+        ],
+        [
+          "clock_profile",
+          "str | None",
+          "None"
+        ],
+        [
+          "cpu_hz",
+          "int | None",
+          "None"
+        ],
+        [
+          "timer_hz",
+          "int | None",
           "None"
         ]
       ],
@@ -958,6 +993,19 @@
           "agreement_pct",
           "float | None",
           "None"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "FixtureOutput": {
+      "fields": [
+        [
+          "tensor",
+          "FixtureTensor",
+          "<required>"
         ]
       ],
       "frozen": true,
@@ -1660,7 +1708,7 @@
         ],
         [
           "outputs",
-          "tuple[FixtureIO, ...]",
+          "tuple[FixtureIO, ...] | tuple[FixtureOutput, ...]",
           "<required>"
         ]
       ],
@@ -1780,13 +1828,25 @@
       "kind": "function",
       "signature": "(request: 'FixtureCaptureRequest', *, guard: 'FixtureCaptureGuard') -> 'FixtureCaptureResult'"
     },
+    "dump_fixture_build": {
+      "kind": "function",
+      "signature": "(build: 'FixtureBuild', *, roots: 'Mapping[str, Path]') -> 'str'"
+    },
     "fixture_capabilities": {
       "kind": "function",
       "signature": "() -> 'FixtureCapabilities'"
     },
+    "fixture_capture_request": {
+      "kind": "function",
+      "signature": "(build: 'FixtureBuild', *, jlink_serial: 'str', evidence_dir: 'Path', settle_seconds: 'float', expected_duration_s: 'float | None' = None) -> 'FixtureCaptureRequest'"
+    },
     "inspect_fixture_footprint": {
       "kind": "function",
       "signature": "(*, elf: 'FixtureFile', image: 'FixtureFile', link_map: 'FixtureFile', target: 'FixtureTarget', toolchain: 'str') -> 'FixtureFootprint'"
+    },
+    "load_fixture_build": {
+      "kind": "function",
+      "signature": "(record: 'str | bytes', *, roots: 'Mapping[str, Path]') -> 'FixtureBuild'"
     },
     "observe_operator_timing": {
       "kind": "function",
@@ -1807,6 +1867,10 @@
     "supported_fixture_target": {
       "kind": "function",
       "signature": "() -> helia_profiler.fixture_target.FixtureTarget"
+    },
+    "verify_fixture_build": {
+      "kind": "function",
+      "signature": "(build: 'FixtureBuild') -> 'None'"
     }
   }
 }
