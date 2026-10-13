@@ -489,7 +489,7 @@ def _packed_gpi_frame(levels, start_ms, *, step=16_000):
     import numpy as np
 
     counter = _GATE_COUNTER_ORIGIN + start_ms * 16_000
-    utc = round(start_ms * _SECOND / 1000)
+    utc = round(start_ms * 16_000 * _SECOND / _COUNTER_RATE)
     return {
         "data": np.packbits(np.asarray(levels, dtype=np.uint8), bitorder="little"),
         "element_count": len(levels),
@@ -500,8 +500,8 @@ def _packed_gpi_frame(levels, start_ms, *, step=16_000):
         "sample_id": counter,
         "utc": utc,
         "time_map": {
-            "offset_counter": counter,
-            "offset_time": utc,
+            "offset_counter": _GATE_COUNTER_ORIGIN,
+            "offset_time": 0,
             "counter_rate": _COUNTER_RATE,
         },
     }
@@ -513,8 +513,8 @@ class TestGatedStatsProcessing:
     @staticmethod
     def _millisecond_packet(index):
         packet = TestGatedStatsProcessing._packet(
-            round(index * _SECOND / 1000),
-            round((index + 1) * _SECOND / 1000),
+            round(index * 16_000 * _SECOND / _COUNTER_RATE),
+            round((index + 1) * 16_000 * _SECOND / _COUNTER_RATE),
             0.0001,
             0.00018,
             0.12,
@@ -522,7 +522,9 @@ class TestGatedStatsProcessing:
         first = _GATE_COUNTER_ORIGIN + index * 16_000
         packet["time"]["samples"]["value"] = [first, first + 16_000]
         packet["time"]["delta"]["value"] = 0.001
-        packet["time"]["time_map"]["offset_counter"] = first
+        packet["time"]["time_map"].update(offset_counter=_GATE_COUNTER_ORIGIN, offset_time=0)
+        packet["signals"]["current"]["avg"]["value"] = 0.0001 / 0.001
+        packet["signals"]["power"]["avg"]["value"] = 0.00018 / 0.001
         return packet
 
     @staticmethod
@@ -1196,7 +1198,7 @@ class TestStreamedGateSelection:
                         else 16_000_000,
                         "decimate_factor": 16_000,
                         "sample_id": sample_id,
-                        "utc": start * ms,
+                        "utc": round(start * 16_000 * _SECOND / _COUNTER_RATE),
                     }
                     if self.fullrate_case == "missing_id":
                         del frame["sample_id"]

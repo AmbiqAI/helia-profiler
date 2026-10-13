@@ -5,8 +5,6 @@ import pytest
 
 from helia_profiler.power.joulescope.fullrate import FullRateRecorder
 
-from ._time64_metadata import time64_metadata as time64_metadata
-
 
 class MemoryDriver:
     def __init__(self, failure=None):
