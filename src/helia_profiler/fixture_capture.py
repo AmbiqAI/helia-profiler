@@ -11,7 +11,15 @@ from pathlib import Path
 from typing import Protocol, cast
 
 from ._fixture_build import FixtureTimingScope
-from .fixture_image import DTCM, MAX_ELF, MAX_IMAGE, digest, inspect_elf, require
+from .fixture_image import (
+    DTCM,
+    MAX_ELF,
+    MAX_IMAGE,
+    digest,
+    fixture_sink_sizes,
+    inspect_elf,
+    require,
+)
 from .fixture_power import (
     FixturePowerGuard,
     FixturePowerSync,
@@ -287,20 +295,13 @@ def capture_fixture(
     try:
         require(52 <= request.elf.path.stat().st_size <= MAX_ELF, "ELF size")
         require(0 < request.image.path.stat().st_size <= MAX_IMAGE, "Image size")
-        sizes = {
-            "deployment_status": 4,
-            **dict(zip(output_names, output_sizes)),
-            "deployment_checksum": 4,
-            "deployment_timing": 28,
-        }
-        if request.power_sync is not None:
-            sizes["deployment_power"] = 20
-        if request.arena_capacity is not None:
-            sizes["deployment_memory"] = 32
-        if request.arena_scan_sizes:
-            sizes["deployment_arena_scan"] = 8 * len(request.arena_scan_sizes)
-        if request.psram_weights is not None:
-            sizes["deployment_psram_weights"] = request.psram_weights.sink_size
+        sizes = fixture_sink_sizes(
+            output_sizes,
+            power=request.power_sync is not None,
+            memory=request.arena_capacity is not None,
+            arena_count=len(request.arena_scan_sizes),
+            psram_size=request.psram_weights.sink_size if request.psram_weights else 0,
+        )
         image = inspect_elf(request.elf.read(), request.image.read(), request.load_address, sizes)
         pin(
             "identity.json",

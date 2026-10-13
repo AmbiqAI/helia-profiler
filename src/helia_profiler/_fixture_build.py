@@ -25,7 +25,7 @@ from .fixture_analysis import (
     analyze_fixture_model,
     analyze_typed_fixture_model_for_engine,
 )
-from .fixture_image import MAX_IMAGE, MRAM, bounded
+from .fixture_image import MAX_IMAGE, MRAM, bounded, fixture_sink_sizes, inspect_elf
 from .fixture_power import FixturePowerSync
 from .fixture_psram import FixturePsramWeights
 from .fixture_runtime import (
@@ -819,6 +819,20 @@ def _build(
     if binary is not None:
         from ._fixture_record import compiled_fixture_identity
 
+        if result.power_sync is not None:
+            assert flat_binary is not None
+            inspect_elf(
+                binary.read(),
+                flat_binary.read(),
+                result.target.load_address,
+                fixture_sink_sizes(
+                    tuple(tensor.size_bytes for tensor in result.output_tensors),
+                    power=True,
+                    memory=result.engine is not EngineType.HELIA_AOT,
+                    arena_count=len(result.aot_arena_scan),
+                    psram_size=result.psram_weights.sink_size if result.psram_weights else 0,
+                ),
+            )
         result = replace(result, build_identity=compiled_fixture_identity(result))
     return result
 

@@ -88,6 +88,34 @@ _TYPED_SINK = re.compile(
 )
 
 
+def fixture_sink_sizes(
+    output_sizes: tuple[int, ...],
+    *,
+    power: bool,
+    memory: bool,
+    arena_count: int,
+    psram_size: int,
+) -> dict[str, int]:
+    sizes = {
+        "deployment_status": 4,
+        **{
+            "deployment_output" if index == 0 else f"deployment_output_{index}": size
+            for index, size in enumerate(output_sizes)
+        },
+        "deployment_checksum": 4,
+        "deployment_timing": 28,
+    }
+    if power:
+        sizes["deployment_power"] = 20
+    if memory:
+        sizes["deployment_memory"] = 32
+    if arena_count:
+        sizes["deployment_arena_scan"] = 8 * arena_count
+    if psram_size:
+        sizes["deployment_psram_weights"] = psram_size
+    return sizes
+
+
 def inspect_elf(data: bytes, binary: bytes, load_address: int, sizes: dict[str, int]) -> Image:
     require(
         load_address == supported_fixture_target().load_address,
