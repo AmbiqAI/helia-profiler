@@ -144,6 +144,8 @@ class FixtureBuildRequest:
             else None,
             "observe_aot_arenas": self.observe_aot_arenas,
         }
+        if self.method.power_sync is not None:
+            intent["power_sync"] = asdict(self.method.power_sync)
         if self.method.state_policy is not None:
             intent["state_policy"] = self.method.state_policy.value
         return hashlib.sha256(json.dumps(intent, sort_keys=True).encode()).hexdigest()

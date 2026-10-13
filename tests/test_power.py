@@ -1919,6 +1919,8 @@ class TestGatedCaptureContracts:
             guard_s=0,
         )
         assert result.gated_windows
+        assert result.statistics and result.gate_samples
+        assert result.statistics[0]["signals"]["power"]["integral"]["value"] == 0.00018
         assert result.metadata.gating_method == "gpi_snapshot_poll+host_stats_integral"
         diagnostics = result.metadata.gating_diagnostics
         assert diagnostics is not None

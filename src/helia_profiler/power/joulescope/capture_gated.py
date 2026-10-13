@@ -104,6 +104,7 @@ def _degraded_observation_result(
     whole_summary = _whole_summary_from_stats(packets)
     return PowerResult(
         summary=whole_summary,
+        statistics=packets,
         metadata=PowerMetadata(
             driver=f"joulescope-{family}",
             device=device_path,
@@ -975,6 +976,8 @@ def capture_gated(
             summary=gated_summary,
             gated_windows=windows,
             metadata=metadata,
+            statistics=packets,
+            gate_samples=aligned_poll_samples,
         )
     except PowerError:
         raise

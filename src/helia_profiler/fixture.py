@@ -74,6 +74,12 @@ from .fixture_operator_timing import (
     OperatorTiming,
     observe_operator_timing,
 )
+from .fixture_power import (
+    FixturePowerGuard,
+    FixturePowerSync,
+    FixtureRailEnergy,
+    FixtureRailPowerRequest,
+)
 from .fixture_psram import FixturePsramObservation, FixturePsramPayload, FixturePsramWeights
 from .fixture_runtime import (
     FixtureFile,
@@ -90,7 +96,7 @@ from .hostenv.elf_inventory import ElfSection, LoadSegment, SectionInventory, se
 from .placement import Placement
 from .results.models import ToolchainInfo
 
-FIXTURE_API_VERSION: Final[tuple[int, int]] = (5, 0)
+FIXTURE_API_VERSION: Final[tuple[int, int]] = (5, 1)
 
 __all__ = [
     "FIXTURE_API_VERSION",
@@ -126,6 +132,10 @@ __all__ = [
     "TypedFixture",
     # Caller-supplied authority
     "FixtureCaptureGuard",
+    "FixturePowerGuard",
+    "FixturePowerSync",
+    "FixtureRailPowerRequest",
+    "FixtureRailEnergy",
     # Operations
     "analyze_typed_fixture_model",
     "analyze_typed_fixture_model_for_engine",

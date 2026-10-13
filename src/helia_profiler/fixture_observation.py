@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from ._fixture_build import FixtureBuild
 from .fixture_capture import FixtureCaptureResult
 from .fixture_metrics import FixtureFootprint, FixtureMetric
+from .fixture_power import FixtureRailEnergy
 from .fixture_runtime import FixtureFile
 
 
@@ -22,6 +23,7 @@ class FixtureMeasurements:
     arena_used_after_invoke_bytes: FixtureMetric
     footprint: FixtureFootprint
     evidence: tuple[FixtureFile, ...]
+    rail_energy: FixtureRailEnergy | None = None
 
 
 def summarize_fixture_measurements(
@@ -75,6 +77,13 @@ def summarize_fixture_measurements(
     build.binary.read()
     build.flat_binary.read()
     capture.output.read()
+    if (build.power_sync is None) != (capture.rail_energy is None):
+        raise ValueError("Capture energy differs from compiled observation method")
+    if capture.rail_energy is not None:
+        energy = capture.rail_energy
+        if energy.iterations != build.iterations or energy.raw not in capture.artifacts:
+            raise ValueError("Energy count/evidence differs from compiled capture")
+        energy.raw.read()
     memory = capture.memory
     if memory is None:
         capacity = after_io = warmup = invoke = FixtureMetric(
@@ -105,4 +114,5 @@ def summarize_fixture_measurements(
         invoke,
         footprint,
         capture.artifacts,
+        capture.rail_energy,
     )

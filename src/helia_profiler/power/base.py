@@ -84,6 +84,10 @@ class PowerResult:
     samples: list[PowerSample] = field(default_factory=list)
     gated_windows: list[GatedPowerWindow] = field(default_factory=list)
     metadata: PowerMetadata = field(default_factory=PowerMetadata)
+    # Original instrument statistics and aligned gate observations. These retain
+    # actual voltage/current and integral/time metadata, not a reconstructed waveform.
+    statistics: list[dict[str, Any]] = field(default_factory=list)
+    gate_samples: list[tuple[int, int]] = field(default_factory=list)
 
 
 @runtime_checkable

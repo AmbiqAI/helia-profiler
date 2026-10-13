@@ -118,6 +118,7 @@ def fixture_template_vars(ctx: PipelineContext, regions: list[ArenaRegion]) -> d
             raise ConfigError("AOT physical memory differs from fixture request")
     payloads = fixture_psram_payloads(ctx, regions) if psram else ()
     return {
+        "fixture_power_sync": spec.method.power_sync,
         "fixture_psram": psram,
         "fixture_psram_base": fixture_app_region(MemoryRegion.PSRAM)[0] if psram else None,
         "fixture_psram_payloads": payloads,

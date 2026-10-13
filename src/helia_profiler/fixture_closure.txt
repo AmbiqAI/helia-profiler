@@ -144,6 +144,7 @@ fixture_image.py
 fixture_metrics.py
 fixture_observation.py
 fixture_operator_timing.py
+fixture_power.py
 fixture_psram.py
 fixture_runtime.py
 fixture_stage.py
