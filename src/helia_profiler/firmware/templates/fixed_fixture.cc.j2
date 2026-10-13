@@ -222,10 +222,10 @@ static int infer_fixture() {
 }
 
 int main() {
-{% with power_only=true, perf_mode_symbol="NSX_PERF_LOW", perf_mode_mhz=96 %}{% include "_system_config.j2" %}{% endwith %}
+{% with power_only=true, perf_mode_symbol="NSX_PERF_LOW", perf_mode_mhz=fixture_cpu_hz // 1000000 %}{% include "_system_config.j2" %}{% endwith %}
     int32_t status = nsx_system_init(&sys_cfg);
     if (status == 0) {
-        SystemCoreClock = 96000000U;
+        SystemCoreClock = {{ fixture_cpu_hz }}U;
         am_hal_pwrctrl_sram_memcfg_t sram = {};
         sram.eSRAMCfg = AM_HAL_PWRCTRL_SRAM_3M;
         sram.eActiveWithMCU = AM_HAL_PWRCTRL_SRAM_3M;

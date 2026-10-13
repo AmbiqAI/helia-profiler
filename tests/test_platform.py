@@ -55,10 +55,10 @@ def test_apollo3p_evb_resolves_to_cortex_m4():
     assert soc.memory.psram_kb == 8192
 
 
-def test_apollo4p_evb_exposes_board_psram_capacity():
+def test_apollo4p_evb_has_no_populated_psram():
     soc = get_soc_for_board("apollo4p_evb")
     assert soc.family is SocFamily.AP4
-    assert soc.memory.psram_kb == 32768
+    assert soc.memory.psram_kb == 0
 
 
 def test_apollo510_family_uses_shared_cmsis_header():
