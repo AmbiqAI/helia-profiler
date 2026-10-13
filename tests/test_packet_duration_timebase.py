@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-from pyjoulescope_driver import time64
 
 from helia_profiler.power.joulescope.stats import (
     _counter_rate_ratio,
@@ -11,6 +10,9 @@ from helia_profiler.power.joulescope.stats import (
     _packets_without_counter_span,
     _process_gated_stats,
 )
+
+from ._time64_metadata import time64
+from ._time64_metadata import time64_metadata as time64_metadata
 
 NAMEPLATE = 16_000_000.0
 #: A non-round fitted rate close to, but distinct from, nameplate.

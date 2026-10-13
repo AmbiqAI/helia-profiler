@@ -10,9 +10,11 @@ what it saw.
 from __future__ import annotations
 
 import pytest
-from pyjoulescope_driver import time64
 
 from helia_profiler.power.joulescope.stats import _streamed_gpi_timebase
+
+from ._time64_metadata import time64
+from ._time64_metadata import time64_metadata as time64_metadata
 
 
 def _frames(spacings_per_sample: list[float], samples: int = 8, rate: float = 2_000_000.0):
