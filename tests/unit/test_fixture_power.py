@@ -300,7 +300,7 @@ def test_partial_trace_never_divides_by_full_iteration_count(tmp_path, defect):
 
 def test_unrelated_large_packet_cannot_license_missing_gate_tail():
     observation = measured()
-    observation.statistics = observation.statistics[:2]
+    observation = replace(observation, statistics=observation.statistics[:2])
     observation.statistics[0]["time"] = {
         "samples": {"value": [0, 1000000]},
         "sample_freq": {"value": 1000000},
