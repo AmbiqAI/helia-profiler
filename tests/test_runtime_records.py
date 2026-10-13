@@ -75,14 +75,14 @@ def test_shipped_records_keep_the_fixture_capability_table() -> None:
     }
     assert table == {
         "tflm": {
-            "int8": "qualified",
+            "int8": "supported",
             "int16": "supported",
             "int32": "supported",
             "float16": "unsupported",
             "float32": "supported",
         },
         "helia-aot": {
-            "int8": "qualified",
+            "int8": "supported",
             "int16": "supported",
             "int32": "supported",
             "float16": "supported",
@@ -96,6 +96,28 @@ def test_shipped_records_keep_the_fixture_capability_table() -> None:
             "float32": "supported",
         },
     }
+
+
+def test_generic_fixture_io_support_does_not_inherit_release_qualification() -> None:
+    from helia_profiler.fixture import EngineType, FixtureCapability, fixture_capabilities
+
+    for version in ("0.23.0", None, "0.26.0"):
+        answer = qualification(
+            "helia-aot", version, board="apollo510_evb", clock="lp", precision="a8w8"
+        )
+        expected = (
+            RuntimeQualification.QUALIFIED
+            if version == "0.23.0"
+            else RuntimeQualification.SUPPORTED
+        )
+        assert answer.state is expected
+        assert answer.record is not None and answer.record.source.commit
+    capability = next(
+        value
+        for value in fixture_capabilities().engines
+        if value.engine is EngineType.HELIA_AOT and value.dtype == "int8"
+    )
+    assert capability.capability is FixtureCapability.SUPPORTED
 
 
 @pytest.mark.parametrize(

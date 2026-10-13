@@ -20,7 +20,6 @@ from .fixture_analysis import (
     FixtureModelAnalysis,
     FixtureTensor,
     Int8Tensor,
-    PerAxisQuantization,
     TypedFixtureModelAnalysis,
     analyze_fixture_model,
     analyze_typed_fixture_model_for_engine,
@@ -42,7 +41,7 @@ from .fixture_target import (
 from .pipeline import PipelineContext, PipelineRunner, Stage, serialize_config
 from .placement import ArenaRole, Placement
 from .results.models import MemoryPlan, ToolchainInfo
-from .runtime_records import RuntimeQualification, qualification, runtimes
+from .runtime_records import RuntimeQualification, qualification
 
 
 class FixtureTimingScope(StrEnum):
@@ -156,28 +155,23 @@ def _record_capability(engine: EngineType, dtype: FixtureDType) -> FixtureCapabi
         # Plain INT32 inputs are index payloads, not a qualified compute precision.
         return FixtureCapability.SUPPORTED
     board, precision = supported_fixture_target().board, _DTYPE_PRECISION[dtype]
-    answers = [
-        qualification(
-            record.name,
-            record.version,
-            board=board,
-            clock=FIXTURE_CLOCK_PROFILE,
-            precision=precision,
-        )
-        for record in runtimes()
-        if record.name == engine.value
-    ]
-    if any(answer.state is RuntimeQualification.QUALIFIED for answer in answers):
-        return FixtureCapability.QUALIFIED
-    default = next(answer for answer in answers if answer.record and answer.record.default)
-    return FixtureCapability(default.state.value)
+    answer = qualification(
+        engine.value, None, board=board, clock=FIXTURE_CLOCK_PROFILE, precision=precision
+    )
+    # A device pass belongs to an exact release/target/compute precision, not
+    # every model whose interface uses this dtype.
+    return (
+        FixtureCapability.UNSUPPORTED
+        if answer.state is RuntimeQualification.UNSUPPORTED
+        else FixtureCapability.SUPPORTED
+    )
 
 
 #: Fixture support per engine and IO dtype on the fixture target, from the
 #: runtime records, except plain INT32 index inputs, which are supported only.
-#: ``qualified`` when any of the engine's versions has a
-#: device pass, else what its default record says; ``supported`` builds but
-#: has no device pass yet; ``unsupported`` is refused.
+#: Generic IO support never grants release or model qualification. Exact
+#: qualification evidence remains available through runtime_records.qualification.
+#: The default record's unsupported IO remains refused.
 FIXTURE_CAPABILITIES: dict[EngineType, dict[str, FixtureCapability]] = {
     engine: {dtype: _record_capability(engine, dtype) for dtype in FixtureDType}
     for engine in (EngineType.TFLM, EngineType.HELIA_AOT, EngineType.HELIA_RT)
@@ -329,18 +323,7 @@ def _check_typed_fixture(
     _validate_engine_dtype(model, engine)
     table = FIXTURE_CAPABILITIES[engine]
     tensors = (*model.inputs, *model.outputs)
-    # Device passes so far cover one input and one output with per-tensor
-    # quantization, which the firmware also checks on the device.
-    single_io = len(model.inputs) == len(model.outputs) == 1 and not any(
-        t.dtype == "int32" or isinstance(t.quantization, PerAxisQuantization) for t in tensors
-    )
-
-    def status(dtype: str) -> FixtureCapability:
-        if table[dtype] is FixtureCapability.QUALIFIED and not single_io:
-            return FixtureCapability.SUPPORTED
-        return table[dtype]
-
-    capabilities = tuple(sorted({(t.dtype, status(t.dtype)) for t in tensors}))
+    capabilities = tuple(sorted({(t.dtype, table[t.dtype]) for t in tensors}))
     unsupported = [
         dtype for dtype, status in capabilities if status is FixtureCapability.UNSUPPORTED
     ]
@@ -408,21 +391,10 @@ class EngineSource:
 def _engine_source(engine: EngineType) -> EngineSource | None:
     if engine is not EngineType.HELIA_AOT:
         return None
-    from importlib import metadata
+    from .results.dependencies import installed_aot_source
 
-    try:
-        distribution = metadata.distribution("helia-aot")
-    except metadata.PackageNotFoundError:
-        return None
-    commit = None
-    try:
-        direct_url = json.loads(distribution.read_text("direct_url.json") or "{}")
-    except json.JSONDecodeError:
-        direct_url = {}
-    if isinstance(direct_url, dict) and isinstance(direct_url.get("vcs_info"), dict):
-        found = direct_url["vcs_info"].get("commit_id")
-        commit = found if isinstance(found, str) else None
-    return EngineSource("helia-aot", distribution.version, commit)
+    source = installed_aot_source()
+    return EngineSource(**source) if source is not None else None
 
 
 def _aot_output_names(prefix: str) -> tuple[str, str]:

@@ -182,8 +182,8 @@ def test_capability_table_covers_every_fixture_engine_and_dtype():
     assert set(FIXTURE_CAPABILITIES) == {EngineType.TFLM, EngineType.HELIA_RT, EngineType.HELIA_AOT}
     for table in FIXTURE_CAPABILITIES.values():
         assert set(table) == {"int8", "int16", "int32", "float16", "float32"}
-    assert FIXTURE_CAPABILITIES[EngineType.TFLM]["int8"] is FixtureCapability.QUALIFIED
-    assert FIXTURE_CAPABILITIES[EngineType.HELIA_AOT]["int8"] is FixtureCapability.QUALIFIED
+    assert FIXTURE_CAPABILITIES[EngineType.TFLM]["int8"] is FixtureCapability.SUPPORTED
+    assert FIXTURE_CAPABILITIES[EngineType.HELIA_AOT]["int8"] is FixtureCapability.SUPPORTED
     assert FIXTURE_CAPABILITIES[EngineType.TFLM]["float16"] is FixtureCapability.UNSUPPORTED
     # No heliaRT fixture has a device pass yet.
     assert set(FIXTURE_CAPABILITIES[EngineType.HELIA_RT].values()) == {FixtureCapability.SUPPORTED}
@@ -192,7 +192,7 @@ def test_capability_table_covers_every_fixture_engine_and_dtype():
 @pytest.mark.parametrize("engine", [EngineType.TFLM, EngineType.HELIA_AOT])
 def test_check_returns_capabilities_of_the_dtypes_used(tmp_path, engine):
     f = typed(tmp_path)
-    # int8 is qualified per engine, but only for one input and one output.
+    # IO support is independent of any exact release qualification.
     assert _check_typed_fixture(f, analysis_of(f), engine) == (
         ("float32", FixtureCapability.SUPPORTED),
         ("int16", FixtureCapability.SUPPORTED),
@@ -200,7 +200,7 @@ def test_check_returns_capabilities_of_the_dtypes_used(tmp_path, engine):
     )
     single = typed(tmp_path / "single", inputs=(replace(LABEL, index=0),), outputs=(LABEL,))
     assert _check_typed_fixture(single, analysis_of(single), engine) == (
-        ("int8", FixtureCapability.QUALIFIED),
+        ("int8", FixtureCapability.SUPPORTED),
     )
 
 
@@ -392,7 +392,7 @@ def test_single_int8_intent_identity_is_unchanged_by_the_scan_option(tmp_path, m
         == hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
     )
     assert r.outputs == (f.expected,)
-    assert r.capabilities == (("int8", FixtureCapability.QUALIFIED),)
+    assert r.capabilities == (("int8", FixtureCapability.SUPPORTED),)
 
 
 def test_arena_observation_is_heliaaot_only(tmp_path, monkeypatch):

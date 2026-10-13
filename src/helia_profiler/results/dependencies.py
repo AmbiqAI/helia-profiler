@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 from ..deps.compatibility import QualificationState
 
@@ -140,3 +140,29 @@ class DependencyLockProvenance:
     workspace_fingerprint: str
     lock_mode: DependencyLockMode
     update_requested: bool
+
+
+class InstalledAotSource(TypedDict):
+    package: str
+    version: str
+    commit: str | None
+
+
+def installed_aot_source() -> InstalledAotSource | None:
+    """Observed installed compiler identity; never resolve a requested ref."""
+    import json
+    from importlib import metadata
+
+    try:
+        distribution = metadata.distribution("helia-aot")
+    except metadata.PackageNotFoundError:
+        return None
+    commit = None
+    try:
+        direct_url = json.loads(distribution.read_text("direct_url.json") or "{}")
+    except (json.JSONDecodeError, OSError, UnicodeError):
+        direct_url = {}
+    if isinstance(direct_url, dict) and isinstance(direct_url.get("vcs_info"), dict):
+        found = direct_url["vcs_info"].get("commit_id")
+        commit = found if isinstance(found, str) and found else None
+    return {"package": "helia-aot", "version": distribution.version, "commit": commit}
