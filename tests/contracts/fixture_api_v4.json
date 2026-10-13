@@ -1,0 +1,1712 @@
+{
+  "api_version": [
+    4,
+    0
+  ],
+  "surface": {
+    "ElfSection": {
+      "fields": [
+        [
+          "name",
+          "str",
+          "<required>"
+        ],
+        [
+          "address",
+          "int",
+          "<required>"
+        ],
+        [
+          "size",
+          "int",
+          "<required>"
+        ],
+        [
+          "nobits",
+          "bool",
+          "<required>"
+        ],
+        [
+          "allocated",
+          "bool",
+          "<required>"
+        ],
+        [
+          "index",
+          "int",
+          "-1"
+        ],
+        [
+          "linker_reserved",
+          "bool",
+          "False"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "EngineDTypeCapability": {
+      "fields": [
+        [
+          "engine",
+          "EngineType",
+          "<required>"
+        ],
+        [
+          "dtype",
+          "FixtureDType",
+          "<required>"
+        ],
+        [
+          "capability",
+          "FixtureCapability",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "EngineSource": {
+      "fields": [
+        [
+          "package",
+          "str",
+          "<required>"
+        ],
+        [
+          "version",
+          "str",
+          "<required>"
+        ],
+        [
+          "commit",
+          "str | None",
+          "None"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "EngineType": {
+      "base": "str",
+      "kind": "enum",
+      "members": {
+        "EXECUTORCH": "executorch",
+        "HELIA_AOT": "helia-aot",
+        "HELIA_RT": "helia-rt",
+        "TFLM": "tflm"
+      }
+    },
+    "FIXTURE_CAPABILITIES": {
+      "kind": "constant",
+      "value": {
+        "helia-aot": {
+          "float16": "supported",
+          "float32": "supported",
+          "int16": "supported",
+          "int32": "supported",
+          "int8": "supported"
+        },
+        "helia-rt": {
+          "float16": "supported",
+          "float32": "supported",
+          "int16": "supported",
+          "int32": "supported",
+          "int8": "supported"
+        },
+        "tflm": {
+          "float16": "unsupported",
+          "float32": "supported",
+          "int16": "supported",
+          "int32": "supported",
+          "int8": "supported"
+        }
+      }
+    },
+    "FIXTURE_READBACK_BUDGET": {
+      "kind": "constant",
+      "value": 131072
+    },
+    "FixedFixture": {
+      "fields": [
+        [
+          "model",
+          "FixtureFile",
+          "<required>"
+        ],
+        [
+          "input",
+          "FixtureFile",
+          "<required>"
+        ],
+        [
+          "expected",
+          "FixtureFile",
+          "<required>"
+        ],
+        [
+          "input_tensor",
+          "Int8Tensor",
+          "<required>"
+        ],
+        [
+          "output_tensor",
+          "Int8Tensor",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {
+        "verify": "(self) -> 'None'"
+      },
+      "properties": [
+        "identity"
+      ]
+    },
+    "FixtureBackend": {
+      "base": "str",
+      "kind": "enum",
+      "members": {
+        "CMSIS_NN": "cmsis_nn",
+        "HELIA": "helia"
+      }
+    },
+    "FixtureBuild": {
+      "fields": [
+        [
+          "fixture_identity",
+          "str",
+          "<required>"
+        ],
+        [
+          "app_dir",
+          "Path",
+          "<required>"
+        ],
+        [
+          "binary",
+          "FixtureFile | None",
+          "<required>"
+        ],
+        [
+          "generated_sources",
+          "tuple[FixtureFile, ...]",
+          "<required>"
+        ],
+        [
+          "expected",
+          "FixtureFile",
+          "<required>"
+        ],
+        [
+          "built",
+          "bool",
+          "<required>"
+        ],
+        [
+          "runtime_manifest",
+          "FixtureFile | None",
+          "<required>"
+        ],
+        [
+          "flat_binary",
+          "FixtureFile | None",
+          "<required>"
+        ],
+        [
+          "dependency_lock",
+          "FixtureFile | None",
+          "<required>"
+        ],
+        [
+          "link_map",
+          "FixtureFile | None",
+          "<required>"
+        ],
+        [
+          "timing_scope",
+          "FixtureTimingScope",
+          "<required>"
+        ],
+        [
+          "engine",
+          "EngineType",
+          "<required>"
+        ],
+        [
+          "build_identity",
+          "str | None",
+          "<required>"
+        ],
+        [
+          "iterations",
+          "int",
+          "<required>"
+        ],
+        [
+          "warmups",
+          "int",
+          "<required>"
+        ],
+        [
+          "intent_identity",
+          "str",
+          "<required>"
+        ],
+        [
+          "target",
+          "FixtureTarget",
+          "<required>"
+        ],
+        [
+          "toolchain",
+          "ToolchainInfo | None",
+          "<required>"
+        ],
+        [
+          "provider_provenance",
+          "str",
+          "'manifest-declared; independently audit the pinned build/source record'"
+        ],
+        [
+          "planned_memory",
+          "MemoryPlan | None",
+          "None"
+        ],
+        [
+          "planned_memory_reason",
+          "str | None",
+          "'not_recorded'"
+        ],
+        [
+          "outputs",
+          "tuple[FixtureFile, ...]",
+          "()"
+        ],
+        [
+          "capabilities",
+          "tuple[tuple[str, FixtureCapability], ...]",
+          "()"
+        ],
+        [
+          "aot_arena_scan",
+          "tuple[tuple[int, int], ...]",
+          "()"
+        ],
+        [
+          "aot_outputs",
+          "tuple[FixtureFile, ...]",
+          "()"
+        ],
+        [
+          "engine_source",
+          "EngineSource | None",
+          "None"
+        ],
+        [
+          "dependency_state",
+          "FixtureFile | None",
+          "None"
+        ],
+        [
+          "state_policy",
+          "FixtureStatePolicy | None",
+          "None"
+        ],
+        [
+          "source_initializer_present",
+          "bool",
+          "False"
+        ],
+        [
+          "psram_weights",
+          "FixturePsramWeights | None",
+          "None"
+        ],
+        [
+          "arena_location",
+          "Placement | None",
+          "None"
+        ],
+        [
+          "weights_location",
+          "Placement | None",
+          "None"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "FixtureBuildRequest": {
+      "fields": [
+        [
+          "fixture",
+          "FixedFixture | TypedFixture",
+          "<required>"
+        ],
+        [
+          "method",
+          "FixtureMethod",
+          "<required>"
+        ],
+        [
+          "work_dir",
+          "Path",
+          "<required>"
+        ],
+        [
+          "engine",
+          "EngineType",
+          "<required>"
+        ],
+        [
+          "arena_size",
+          "int",
+          "<required>"
+        ],
+        [
+          "iterations",
+          "int",
+          "<required>"
+        ],
+        [
+          "warmup",
+          "int",
+          "<required>"
+        ],
+        [
+          "backend",
+          "FixtureBackend | None",
+          "None"
+        ],
+        [
+          "placement",
+          "FixturePlacement",
+          "<factory>"
+        ],
+        [
+          "target",
+          "FixtureTarget",
+          "<factory>"
+        ],
+        [
+          "runtime",
+          "PreparedUpstreamRuntime | None",
+          "None"
+        ],
+        [
+          "aot",
+          "HeliaAotOptions | None",
+          "None"
+        ],
+        [
+          "observe_aot_arenas",
+          "bool",
+          "False"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {
+        "to_config": "(self) -> 'ProfileConfig'"
+      },
+      "properties": [
+        "intent_identity"
+      ]
+    },
+    "FixtureCapabilities": {
+      "fields": [
+        [
+          "api_version",
+          "tuple[int, int]",
+          "<required>"
+        ],
+        [
+          "targets",
+          "tuple[QualifiedFixtureTarget, ...]",
+          "<required>"
+        ],
+        [
+          "engines",
+          "tuple[EngineDTypeCapability, ...]",
+          "<required>"
+        ],
+        [
+          "readback_budget",
+          "int",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "FixtureCapability": {
+      "base": "str",
+      "kind": "enum",
+      "members": {
+        "QUALIFIED": "qualified",
+        "SUPPORTED": "supported",
+        "UNSUPPORTED": "unsupported"
+      }
+    },
+    "FixtureCaptureGuard": {
+      "kind": "protocol",
+      "methods": {
+        "check": "(self, *, require_free: 'bool', remaining_s: 'float') -> 'None'",
+        "verify_target": "(self, *, target: 'FixtureTarget', jlink_serial: 'str') -> 'None'"
+      }
+    },
+    "FixtureCaptureRequest": {
+      "fields": [
+        [
+          "elf",
+          "FixtureFile",
+          "<required>"
+        ],
+        [
+          "image",
+          "FixtureFile",
+          "<required>"
+        ],
+        [
+          "load_address",
+          "int",
+          "<required>"
+        ],
+        [
+          "output_size",
+          "int",
+          "<required>"
+        ],
+        [
+          "device",
+          "str",
+          "<required>"
+        ],
+        [
+          "jlink_serial",
+          "str",
+          "<required>"
+        ],
+        [
+          "evidence_dir",
+          "Path",
+          "<required>"
+        ],
+        [
+          "settle_seconds",
+          "float",
+          "<required>"
+        ],
+        [
+          "timing_scope",
+          "FixtureTimingScope",
+          "<required>"
+        ],
+        [
+          "target",
+          "FixtureTarget",
+          "<required>"
+        ],
+        [
+          "arena_capacity",
+          "int | None",
+          "None"
+        ],
+        [
+          "expected_duration_s",
+          "float | None",
+          "None"
+        ],
+        [
+          "extra_output_sizes",
+          "tuple[int, ...]",
+          "()"
+        ],
+        [
+          "arena_scan_sizes",
+          "tuple[int, ...]",
+          "()"
+        ],
+        [
+          "psram_weights",
+          "FixturePsramWeights | None",
+          "None"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "FixtureCaptureResult": {
+      "fields": [
+        [
+          "state",
+          "str",
+          "<required>"
+        ],
+        [
+          "timing_scope",
+          "FixtureTimingScope",
+          "<required>"
+        ],
+        [
+          "output",
+          "FixtureFile | None",
+          "None"
+        ],
+        [
+          "status",
+          "int | None",
+          "None"
+        ],
+        [
+          "checksum",
+          "int | None",
+          "None"
+        ],
+        [
+          "timing",
+          "FixtureTiming | None",
+          "None"
+        ],
+        [
+          "memory",
+          "FixtureMemory | None",
+          "None"
+        ],
+        [
+          "artifacts",
+          "tuple[FixtureFile, ...]",
+          "()"
+        ],
+        [
+          "error",
+          "str | None",
+          "None"
+        ],
+        [
+          "outputs",
+          "tuple[FixtureFile, ...]",
+          "()"
+        ],
+        [
+          "arena_scan",
+          "tuple[tuple[int, int], ...]",
+          "()"
+        ],
+        [
+          "psram_weights",
+          "FixturePsramObservation | None",
+          "None"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "FixtureDType": {
+      "base": "str",
+      "kind": "enum",
+      "members": {
+        "FLOAT16": "float16",
+        "FLOAT32": "float32",
+        "INT16": "int16",
+        "INT32": "int32",
+        "INT8": "int8"
+      }
+    },
+    "FixtureFile": {
+      "fields": [
+        [
+          "path",
+          "Path",
+          "<required>"
+        ],
+        [
+          "sha256",
+          "str",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {
+        "read": "(self) -> 'bytes'"
+      },
+      "properties": []
+    },
+    "FixtureFootprint": {
+      "fields": [
+        [
+          "elf",
+          "FixtureFile",
+          "<required>"
+        ],
+        [
+          "image",
+          "FixtureFile",
+          "<required>"
+        ],
+        [
+          "link_map",
+          "FixtureFile",
+          "<required>"
+        ],
+        [
+          "elf_file_bytes",
+          "FixtureMetric",
+          "<required>"
+        ],
+        [
+          "flat_image_bytes",
+          "FixtureMetric",
+          "<required>"
+        ],
+        [
+          "load_image_bytes",
+          "FixtureMetric",
+          "<required>"
+        ],
+        [
+          "linked_ram_bytes",
+          "FixtureMetric",
+          "<required>"
+        ],
+        [
+          "static_ram_bytes",
+          "FixtureMetric",
+          "<required>"
+        ],
+        [
+          "stack_reserved_bytes",
+          "FixtureMetric",
+          "<required>"
+        ],
+        [
+          "heap_reserved_bytes",
+          "FixtureMetric",
+          "<required>"
+        ],
+        [
+          "code_bytes",
+          "FixtureMetric",
+          "<required>"
+        ],
+        [
+          "model_weights_bytes",
+          "FixtureMetric",
+          "<required>"
+        ],
+        [
+          "kernel_code_bytes",
+          "FixtureMetric",
+          "<required>"
+        ],
+        [
+          "runtime_code_bytes",
+          "FixtureMetric",
+          "<required>"
+        ],
+        [
+          "stack_peak_bytes",
+          "FixtureMetric",
+          "<required>"
+        ],
+        [
+          "heap_peak_bytes",
+          "FixtureMetric",
+          "<required>"
+        ],
+        [
+          "linked_symbols",
+          "tuple[LinkedSymbol, ...]",
+          "<required>"
+        ],
+        [
+          "symbol_inventory_reason",
+          "str | None",
+          "<required>"
+        ],
+        [
+          "linked_kernel_symbols",
+          "tuple[LinkedSymbol, ...]",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "FixtureIO": {
+      "fields": [
+        [
+          "tensor",
+          "FixtureTensor",
+          "<required>"
+        ],
+        [
+          "data",
+          "FixtureFile",
+          "<required>"
+        ],
+        [
+          "role",
+          "FixtureRole",
+          "<FixtureRole.SIGNAL: 'signal'>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "FixtureMeasurements": {
+      "fields": [
+        [
+          "schema_version",
+          "int",
+          "<required>"
+        ],
+        [
+          "build_identity",
+          "str",
+          "<required>"
+        ],
+        [
+          "latency_s",
+          "FixtureMetric",
+          "<required>"
+        ],
+        [
+          "arena_capacity_bytes",
+          "FixtureMetric",
+          "<required>"
+        ],
+        [
+          "arena_used_after_io_bytes",
+          "FixtureMetric",
+          "<required>"
+        ],
+        [
+          "arena_used_after_warmup_bytes",
+          "FixtureMetric",
+          "<required>"
+        ],
+        [
+          "arena_used_after_invoke_bytes",
+          "FixtureMetric",
+          "<required>"
+        ],
+        [
+          "footprint",
+          "FixtureFootprint",
+          "<required>"
+        ],
+        [
+          "evidence",
+          "tuple[FixtureFile, ...]",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "FixtureMemory": {
+      "fields": [
+        [
+          "capacity",
+          "int",
+          "<required>"
+        ],
+        [
+          "after_io_access",
+          "int",
+          "<required>"
+        ],
+        [
+          "after_warmup",
+          "int",
+          "<required>"
+        ],
+        [
+          "after_invoke",
+          "int",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "FixtureMethod": {
+      "fields": [
+        [
+          "timing_scope",
+          "FixtureTimingScope",
+          "<required>"
+        ],
+        [
+          "state_policy",
+          "FixtureStatePolicy | None",
+          "None"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "FixtureMetric": {
+      "fields": [
+        [
+          "value",
+          "int | float | None",
+          "<required>"
+        ],
+        [
+          "unit",
+          "str",
+          "<required>"
+        ],
+        [
+          "basis",
+          "str",
+          "<required>"
+        ],
+        [
+          "reason",
+          "str | None",
+          "None"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "FixturePlacement": {
+      "fields": [
+        [
+          "arena",
+          "Placement",
+          "<Placement.SRAM: 'sram'>"
+        ],
+        [
+          "weights",
+          "Placement",
+          "<Placement.MRAM: 'mram'>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "FixturePsramObservation": {
+      "fields": [
+        [
+          "base_address",
+          "int",
+          "<required>"
+        ],
+        [
+          "size_bytes",
+          "int",
+          "<required>"
+        ],
+        [
+          "clock_hz",
+          "int",
+          "<required>"
+        ],
+        [
+          "active_addresses",
+          "tuple[int, ...]",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "FixturePsramPayload": {
+      "fields": [
+        [
+          "region_id",
+          "int",
+          "<required>"
+        ],
+        [
+          "size",
+          "int",
+          "<required>"
+        ],
+        [
+          "checksum",
+          "int",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "FixturePsramWeights": {
+      "fields": [
+        [
+          "payloads",
+          "tuple[FixturePsramPayload, ...]",
+          "<required>"
+        ],
+        [
+          "image_sha256",
+          "str | None",
+          "None"
+        ],
+        [
+          "clock_hz",
+          "int",
+          "96000000"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": [
+        "sink_size"
+      ]
+    },
+    "FixtureRole": {
+      "base": "str",
+      "kind": "enum",
+      "members": {
+        "AUX": "aux",
+        "SIGNAL": "signal"
+      }
+    },
+    "FixtureStage": {
+      "base": "int",
+      "kind": "enum",
+      "members": {
+        "ARENA": -5,
+        "INVOKE": -7,
+        "IO_CONTRACT": -6,
+        "MODEL_SCHEMA": -4,
+        "PSRAM": -10,
+        "RESOLVER": -3,
+        "SRAM_CONFIG": -2,
+        "STIMER": -8,
+        "TIMING_BOUND": -9
+      }
+    },
+    "FixtureStatePolicy": {
+      "base": "str",
+      "kind": "enum",
+      "members": {
+        "CARRY": "carry"
+      }
+    },
+    "FixtureTarget": {
+      "fields": [
+        [
+          "board",
+          "<class 'str'>",
+          "<required>"
+        ],
+        [
+          "device",
+          "<class 'str'>",
+          "<required>"
+        ],
+        [
+          "load_address",
+          "<class 'int'>",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {
+        "verify": "(self) -> None"
+      },
+      "properties": []
+    },
+    "FixtureTensor": {
+      "fields": [
+        [
+          "name",
+          "str",
+          "<required>"
+        ],
+        [
+          "index",
+          "int",
+          "<required>"
+        ],
+        [
+          "dtype",
+          "str",
+          "<required>"
+        ],
+        [
+          "shape",
+          "tuple[int, ...]",
+          "<required>"
+        ],
+        [
+          "quantization",
+          "PerTensorQuantization | PerAxisQuantization | None",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": [
+        "size_bytes"
+      ]
+    },
+    "FixtureTiming": {
+      "fields": [
+        [
+          "ticks",
+          "int",
+          "<required>"
+        ],
+        [
+          "iterations",
+          "int",
+          "<required>"
+        ],
+        [
+          "warmups",
+          "int",
+          "<required>"
+        ],
+        [
+          "timer_hz",
+          "int",
+          "<required>"
+        ],
+        [
+          "settle_ticks",
+          "int",
+          "<required>"
+        ],
+        [
+          "cpu_hz",
+          "int",
+          "<required>"
+        ],
+        [
+          "timing_scope",
+          "FixtureTimingScope",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "FixtureTimingScope": {
+      "base": "str",
+      "kind": "enum",
+      "members": {
+        "INVOKE_ONLY": "invoke_only",
+        "RESTORE_AND_INVOKE": "restore_and_invoke"
+      }
+    },
+    "HeliaAotOptions": {
+      "fields": [
+        [
+          "prefix",
+          "str | None",
+          "None"
+        ],
+        [
+          "module_name",
+          "str | None",
+          "None"
+        ],
+        [
+          "linker_profile",
+          "str | None",
+          "None"
+        ],
+        [
+          "platform_name",
+          "str | None",
+          "None"
+        ],
+        [
+          "cmsis_nn_requantize_inline_asm",
+          "bool",
+          "True"
+        ],
+        [
+          "convert_args_json",
+          "str",
+          "'{}'"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {
+        "engine_config": "(self) -> 'dict[str, Any]'"
+      },
+      "properties": []
+    },
+    "Int8Tensor": {
+      "fields": [
+        [
+          "shape",
+          "tuple[int, ...]",
+          "<required>"
+        ],
+        [
+          "scale",
+          "float",
+          "<required>"
+        ],
+        [
+          "zero_point",
+          "int",
+          "<required>"
+        ],
+        [
+          "tensor_index",
+          "int",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": [
+        "size"
+      ]
+    },
+    "LoadSegment": {
+      "fields": [
+        [
+          "virtual_address",
+          "int",
+          "<required>"
+        ],
+        [
+          "physical_address",
+          "int",
+          "<required>"
+        ],
+        [
+          "file_size",
+          "int",
+          "<required>"
+        ],
+        [
+          "memory_size",
+          "int",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "PerAxisQuantization": {
+      "fields": [
+        [
+          "axis",
+          "int",
+          "<required>"
+        ],
+        [
+          "scales",
+          "tuple[float, ...]",
+          "<required>"
+        ],
+        [
+          "zero_points",
+          "tuple[int, ...]",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "PerTensorQuantization": {
+      "fields": [
+        [
+          "scale",
+          "float",
+          "<required>"
+        ],
+        [
+          "zero_point",
+          "int",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "Placement": {
+      "base": "str",
+      "kind": "enum",
+      "members": {
+        "MRAM": "mram",
+        "PSRAM": "psram",
+        "SRAM": "sram",
+        "TCM": "tcm"
+      }
+    },
+    "PreparedRuntimeManifest": {
+      "fields": [
+        [
+          "schema_version",
+          "int",
+          "<required>"
+        ],
+        [
+          "archive_sha256",
+          "str",
+          "<required>"
+        ],
+        [
+          "providers",
+          "tuple[RuntimeProvider, ...]",
+          "<required>"
+        ],
+        [
+          "abi",
+          "RuntimeABI",
+          "<required>"
+        ],
+        [
+          "headers",
+          "tuple[RuntimeHeader, ...]",
+          "<required>"
+        ],
+        [
+          "include_dirs",
+          "tuple[str, ...]",
+          "<required>"
+        ],
+        [
+          "stack",
+          "str",
+          "'upstream'"
+        ],
+        [
+          "consumer_defines",
+          "tuple[str, ...]",
+          "('TF_LITE_STATIC_MEMORY', 'CMSIS_NN', 'ARM_NN_ENABLE_F16=0', 'ARM_NN_ENABLE_F32=0')"
+        ],
+        [
+          "kernel_dir",
+          "str | None",
+          "None"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "PreparedUpstreamRuntime": {
+      "fields": [
+        [
+          "archive",
+          "FixtureFile",
+          "<required>"
+        ],
+        [
+          "header_root",
+          "Path",
+          "<required>"
+        ],
+        [
+          "manifest",
+          "FixtureFile",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {
+        "verify": "(self) -> 'VerifiedPreparedRuntime'"
+      },
+      "properties": []
+    },
+    "QualifiedFixtureTarget": {
+      "fields": [
+        [
+          "board",
+          "str",
+          "<required>"
+        ],
+        [
+          "clock_profile",
+          "str",
+          "<required>"
+        ],
+        [
+          "cpu_hz",
+          "int",
+          "<required>"
+        ],
+        [
+          "device",
+          "str",
+          "<required>"
+        ],
+        [
+          "load_address",
+          "int",
+          "<required>"
+        ],
+        [
+          "timer_hz",
+          "int",
+          "<required>"
+        ],
+        [
+          "image_limit",
+          "int",
+          "<required>"
+        ],
+        [
+          "settle_ticks",
+          "tuple[int, int]",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "RuntimeABI": {
+      "fields": [
+        [
+          "toolchain",
+          "str",
+          "<required>"
+        ],
+        [
+          "cpu",
+          "str",
+          "<required>"
+        ],
+        [
+          "float_abi",
+          "str",
+          "<required>"
+        ],
+        [
+          "short_enums",
+          "bool",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "RuntimeHeader": {
+      "fields": [
+        [
+          "name",
+          "str",
+          "<required>"
+        ],
+        [
+          "sha256",
+          "str",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "RuntimeProvider": {
+      "fields": [
+        [
+          "name",
+          "str",
+          "<required>"
+        ],
+        [
+          "url",
+          "str",
+          "<required>"
+        ],
+        [
+          "revision",
+          "str",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "SectionInventory": {
+      "fields": [
+        [
+          "sections",
+          "tuple[ElfSection, ...]",
+          "<required>"
+        ],
+        [
+          "segments",
+          "tuple[LoadSegment, ...]",
+          "()"
+        ],
+        [
+          "unparsed_rows",
+          "int",
+          "0"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "SourceClosure": {
+      "fields": [
+        [
+          "api_version",
+          "tuple[int, int]",
+          "<required>"
+        ],
+        [
+          "files",
+          "tuple[tuple[str, str], ...]",
+          "<required>"
+        ],
+        [
+          "digest",
+          "str",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "ToolchainInfo": {
+      "fields": [
+        [
+          "compiler",
+          "str",
+          "''"
+        ],
+        [
+          "compiler_version",
+          "str",
+          "''"
+        ],
+        [
+          "cmake_version",
+          "str",
+          "''"
+        ]
+      ],
+      "frozen": false,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "TypedFixture": {
+      "fields": [
+        [
+          "model",
+          "FixtureFile",
+          "<required>"
+        ],
+        [
+          "inputs",
+          "tuple[FixtureIO, ...]",
+          "<required>"
+        ],
+        [
+          "outputs",
+          "tuple[FixtureIO, ...]",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {
+        "verify": "(self) -> 'None'"
+      },
+      "properties": [
+        "expected",
+        "identity"
+      ]
+    },
+    "TypedFixtureModelAnalysis": {
+      "fields": [
+        [
+          "inputs",
+          "tuple[FixtureTensor, ...]",
+          "<required>"
+        ],
+        [
+          "outputs",
+          "tuple[FixtureTensor, ...]",
+          "<required>"
+        ],
+        [
+          "has_float16",
+          "bool",
+          "<required>"
+        ],
+        [
+          "analysis",
+          "ModelAnalysis",
+          "<required>"
+        ],
+        [
+          "resolver",
+          "ResolverPlan",
+          "<required>"
+        ],
+        [
+          "has_internal_state",
+          "bool",
+          "False"
+        ],
+        [
+          "has_initializer",
+          "bool",
+          "False"
+        ],
+        [
+          "subgraph_count",
+          "int",
+          "1"
+        ],
+        [
+          "resource_variable_count",
+          "int",
+          "0"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": [
+        "input_bytes",
+        "output_bytes"
+      ]
+    },
+    "VerifiedPreparedRuntime": {
+      "fields": [
+        [
+          "archive",
+          "FixtureFile",
+          "<required>"
+        ],
+        [
+          "header_root",
+          "Path",
+          "<required>"
+        ],
+        [
+          "manifest",
+          "FixtureFile",
+          "<required>"
+        ],
+        [
+          "record",
+          "RuntimeManifest",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {
+        "header_path": "(self, name: 'str') -> 'Path'"
+      },
+      "properties": []
+    },
+    "analyze_typed_fixture_model": {
+      "kind": "function",
+      "signature": "(path: 'Path') -> 'TypedFixtureModelAnalysis'"
+    },
+    "analyze_typed_fixture_model_for_engine": {
+      "kind": "function",
+      "signature": "(path: 'Path', *, engine: 'EngineType') -> 'TypedFixtureModelAnalysis'"
+    },
+    "build_fixed_fixture": {
+      "kind": "function",
+      "signature": "(config: 'ProfileConfig', fixture: 'FixedFixture | TypedFixture', *, method: 'FixtureMethod', runtime: 'PreparedUpstreamRuntime | None' = None, compile: 'bool' = True, observe_aot_arenas: 'bool' = False) -> 'FixtureBuild'"
+    },
+    "build_fixture": {
+      "kind": "function",
+      "signature": "(request: 'FixtureBuildRequest', *, compile: 'bool' = True) -> 'FixtureBuild'"
+    },
+    "capture_fixture": {
+      "kind": "function",
+      "signature": "(request: 'FixtureCaptureRequest', *, guard: 'FixtureCaptureGuard') -> 'FixtureCaptureResult'"
+    },
+    "fixture_capabilities": {
+      "kind": "function",
+      "signature": "() -> 'FixtureCapabilities'"
+    },
+    "inspect_fixture_footprint": {
+      "kind": "function",
+      "signature": "(*, elf: 'FixtureFile', image: 'FixtureFile', link_map: 'FixtureFile', target: 'FixtureTarget', toolchain: 'str') -> 'FixtureFootprint'"
+    },
+    "section_inventory": {
+      "kind": "function",
+      "signature": "(binary_path: 'Path', toolchain: 'str', *, timeout_s: 'int' = 30) -> 'SectionInventory | None'"
+    },
+    "source_closure": {
+      "kind": "function",
+      "signature": "(root: 'Path | None' = None) -> 'SourceClosure'"
+    },
+    "summarize_fixture_measurements": {
+      "kind": "function",
+      "signature": "(build: 'FixtureBuild', capture: 'FixtureCaptureResult', footprint: 'FixtureFootprint') -> 'FixtureMeasurements'"
+    },
+    "supported_fixture_target": {
+      "kind": "function",
+      "signature": "() -> helia_profiler.fixture_target.FixtureTarget"
+    }
+  }
+}

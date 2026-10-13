@@ -301,26 +301,25 @@ single scale and zero point is read as per-tensor, even when its quantized axis
 has extent 1, so declare it with `PerTensorQuantization`. A `FixedFixture` keeps
 its single-INT8 rules and renders exactly as before.
 
-`FIXTURE_CAPABILITIES` is the producer's declaration per engine and IO dtype
-(`FixtureDType`), read from the runtime records on the fixture target (int8
-is `a8w8`, int16 `a16w8`, float16 `fp16`, float32 `fp32`). An entry is
-`qualified` when any of the engine's versions has a device pass; the records
-say which. Otherwise it is what the engine's default record says. Plain INT32
-inputs are the supported-only interface exception: they have no compute precision
-record and do not establish model/operator or provider-kernel support. No heliaRT
-entry is qualified until a device pass. The table uses these statuses:
+`FIXTURE_CAPABILITIES` declares generic engine/IO support on the fixture
+target using the default runtime record's unsupported precision restrictions.
+It reports `supported` or `unsupported`, never qualification inherited from
+another release. IO dtype does not prove a model's compute precision, operator
+support, numerical acceptance or device qualification. Plain INT32 inputs remain
+supported index payloads; INT32 outputs remain refused.
 
-- `qualified` means an exact device pass;
-- `supported` admits the IO contract but has no device pass; model/operator and
-  provider/build compatibility remain separate gates;
-- `unsupported` is refused.
+Query `runtime_records.qualification(name, version, board=..., clock=...,
+precision=...)` for exact release evidence, including its source and basis.
+Historical qualification records and the `QUALIFIED` enum remain readable.
+Supported but unqualified execution remains available. The upstream TFLM runtime
+still refuses any model with a FLOAT16 tensor, including weights behind
+DEQUANTIZE. `FixtureBuild.capabilities` records each IO dtype's support status.
 
-The upstream TFLM runtime also refuses any model with a FLOAT16 tensor, including
-weights behind DEQUANTIZE. `FixtureBuild.capabilities` records the status of
-every IO dtype the build uses. A device pass so far covers one input and one
-output with per-tensor quantization. A typed fixture with more tensors, or with
-per-axis IO quantization (checked on the host only), or with plain INT32 inputs,
-reports `supported`, not `qualified` for every otherwise-qualified IO dtype.
+API 4.0 changes the exported capability constant's values, as required by the
+existing public-surface version policy. This narrow reporting correction keeps
+request and receipt shapes, execution guards and placement support unchanged;
+it does not incorporate the separate registry API work. Pinned API 3.x consumers
+must explicitly adopt the corrected reporting contract.
 
 Firmware restores every input before each warmup and measured call. It checks
 each tensor's byte extent, and on TFLM also its type, shape and per-tensor
@@ -384,8 +383,17 @@ from and the model hash, engine, TFLM `cmsis_nn` or heliaRT `helia` backend, com
 LP 96 MHz clock and SRAM/MRAM placement match, the core clock measured on the
 device (when the run recorded one) is within 5 % of 96 MHz, every layer has finite cycles, no
 counter overflowed, the clean window ran inferences, and the per-layer sum agrees
-with the clean-window cycles within 1 % (2 % below 2 ms). The prepared runtime of a TFLM or heliaRT
-fixture is not selectable by `hpx profile`; `allow_runtime_difference=True` accepts the
-baseline stack and labels the record. The fixture build records no engine
-version or AOT code-generation options, so neither is compared; the record
-carries the profile's engine version.
+with the clean-window cycles within 1 % (2 % below 2 ms). Runtime identity is `same`, `different` or `unknown`, comparing actually recorded
+engine version/source, provider identities and engine-input settings. The pinned
+per-build dependency state is hash-verified before its engine-input snapshot is
+read. New AOT snapshots record the observed installed package and VCS commit;
+wheel installs without a commit and older missing source/settings remain unknown.
+Requested refs, package versions and opaque intent hashes are not source proof.
+
+Default attribution requires fully evidenced matching identity. The existing
+`allow_runtime_difference=True` permits approximate observations explicitly
+labeled different or unknown, without waiving provenance hashes or the other
+identity, counter and agreement checks. Prepared TFLM/heliaRT archive settings
+are not recorded by an ordinary profile, so matching source revisions alone
+cannot establish the same archive build. The helper is internal, outside the
+public fixture facade. Historical raw records remain unchanged.

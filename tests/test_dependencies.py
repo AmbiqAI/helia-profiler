@@ -911,3 +911,36 @@ def test_empty_engine_source_override_is_not_digested(
 
     _, overrides = _override_inputs(ctx)
     assert [o for o in overrides if o.scope == "engine"] == []
+
+
+def test_workspace_records_observed_aot_install_identity(tmp_path, monkeypatch):
+    from helia_profiler.results.dependencies import installed_aot_source
+
+    class Distribution:
+        version = "0.25.0"
+
+        def read_text(self, name):
+            assert name == "direct_url.json"
+            return json.dumps({"vcs_info": {"commit_id": "a" * 40}})
+
+    monkeypatch.setattr("importlib.metadata.distribution", lambda name: Distribution())
+    ctx = _context(tmp_path, engine_type="helia-aot")
+    first = ctx.dependency_workspace
+    assert first is not None
+    assert (
+        first.inputs["engine"]["source"]
+        == installed_aot_source()
+        == {
+            "package": "helia-aot",
+            "version": "0.25.0",
+            "commit": "a" * 40,
+        }
+    )
+    # Installed source, not just package version, participates in the workspace key.
+    monkeypatch.setattr(
+        Distribution,
+        "read_text",
+        lambda self, name: json.dumps({"vcs_info": {"commit_id": "b" * 40}}),
+    )
+    second = create_workspace(ctx)
+    assert first.fingerprint != second.fingerprint

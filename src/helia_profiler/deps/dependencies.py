@@ -30,6 +30,7 @@ from ..results.dependencies import (
     DependencyProvenance,
     DependencyRequest,
     DependencyWorkspace,
+    installed_aot_source,
 )
 from ..results.serde import sha256_file
 from ..runtime_records import runtimes
@@ -336,6 +337,11 @@ def create_workspace(ctx: PipelineContext) -> DependencyWorkspace:
             },
             "engine": {
                 "type": ctx.config.engine.type,
+                **(
+                    {"source": installed_aot_source()}
+                    if ctx.config.engine.type == "helia-aot"
+                    else {}
+                ),
                 "backend": ctx.config.engine.backend,
                 "config": ctx.config.engine.config,
                 "config_path_hash": (
