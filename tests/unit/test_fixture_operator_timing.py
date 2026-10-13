@@ -788,7 +788,9 @@ def test_different_config_file_digest_needs_effective_settings_evidence(tmp_path
             [{"type": "scratch", "attributes": {"memory": "sram"}}],
             "same",
         ),
-        ([], [{"type": "scratch"}], "unknown"),
+        ([], [{"type": "scratch"}], "different"),
+        ([{"type": "scratch"}], [], "different"),
+        ([{}], [{"type": "scratch"}, {}], "different"),
     ],
 )
 def test_list_settings_compare_nested_facts_without_defaults_or_coercion(
