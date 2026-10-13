@@ -698,17 +698,29 @@ def test_every_recorded_engine_module_participates(tmp_path, extra):
     assert not result.accepted and result.runtime_stack == "different"
 
 
-def test_deeply_nested_pinned_json_is_a_refusal(tmp_path):
-    import hashlib
+def test_pinned_json_parser_recursion_is_a_refusal(tmp_path, monkeypatch):
+    from unittest.mock import Mock
+
+    from helia_profiler import fixture_operator_timing
 
     build, fixture, run = evidenced_pair(tmp_path)
-    path = build.dependency_state.path
-    path.write_text('{"config":' + "[" * 1100 + "0" + "]" * 1100 + "}")
-    build = replace(
-        build, dependency_state=FixtureFile(path, hashlib.sha256(path.read_bytes()).hexdigest())
-    )
+    pinned_bytes = build.dependency_state.read()
+    parse = Mock(side_effect=RecursionError)
+    monkeypatch.setattr(fixture_operator_timing.json, "loads", parse)
     result = bind_operator_timing(build, fixture, run, allow_runtime_difference=True)
+    parse.assert_called_once()
+    assert parse.call_args.args == (pinned_bytes,)
     assert not result.accepted and result.reason == "runtime_provenance_unverified"
+
+
+@pytest.mark.parametrize("allow", [False, True])
+def test_parseable_incomplete_state_remains_unknown(tmp_path, allow):
+    build, fixture, run = evidenced_pair(tmp_path)
+    build = pin_state(build, {"workspace": {"inputs": {}}})
+    result = bind_operator_timing(build, fixture, run, allow_runtime_difference=allow)
+    assert result.runtime_stack == "unknown"
+    assert result.accepted is allow
+    assert result.reason == (None if allow else "runtime_stack_unknown")
 
 
 @pytest.mark.parametrize(
