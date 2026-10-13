@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import logging
 import os
-import shutil
 from pathlib import Path
+from stat import S_IWUSR
 
 from ..errors import FirmwareError
 from .render import _write_text
@@ -74,6 +74,13 @@ def _is_segger_rtt_root(path: Path) -> bool:
     )
 
 
+def _make_writable(path: Path) -> None:
+    if path.exists():
+        mode = path.stat().st_mode
+        if not mode & S_IWUSR:
+            path.chmod(mode | S_IWUSR)
+
+
 def _copy_segger_rtt(dest_dir: Path, configured_path: Path | None = None) -> None:
     """Copy SEGGER RTT source files into *dest_dir*/rtt/."""
     rtt_root = find_segger_rtt_dir(configured_path)
@@ -85,7 +92,12 @@ def _copy_segger_rtt(dest_dir: Path, configured_path: Path | None = None) -> Non
     for name in ("SEGGER_RTT.c", "SEGGER_RTT.h", "SEGGER_RTT_ConfDefaults.h"):
         src = rtt_root / "RTT" / name
         if src.exists():
-            shutil.copy2(src, rtt_dest / name)
+            dest = rtt_dest / name
+            data = src.read_bytes()
+            # Package data can be immutable; app-local copies must stay writable.
+            _make_writable(dest)
+            if not dest.exists() or dest.read_bytes() != data:
+                dest.write_bytes(data)
 
     # RTT buffer placement is cache-coherency sensitive on the Cortex-M55 parts.
     #
@@ -174,6 +186,7 @@ def _copy_segger_rtt(dest_dir: Path, configured_path: Path | None = None) -> Non
     # Content-compare before writing (see render._write_text): regeneration
     # into a cached workspace must not bump this header's mtime, or every
     # translation unit that includes it recompiles on every run.
+    _make_writable(conf_dest)
     _write_text(conf_dest, conf_text)
 
     log.info("Copied SEGGER RTT source from %s", rtt_root)
