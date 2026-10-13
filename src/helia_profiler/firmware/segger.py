@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import logging
 import os
-import shutil
 from pathlib import Path
+from stat import S_ISREG, S_IWUSR
 
 from ..errors import FirmwareError
 from .render import _write_text
@@ -74,18 +74,50 @@ def _is_segger_rtt_root(path: Path) -> bool:
     )
 
 
+def _make_writable(path: Path, sources: tuple[Path, ...]) -> None:
+    try:
+        info = path.lstat()
+    except FileNotFoundError:
+        return
+    if (
+        not S_ISREG(info.st_mode)
+        or info.st_nlink > 1
+        or any(source.exists() and path.samefile(source) for source in sources)
+    ):
+        raise FirmwareError(f"RTT destination must be an independent regular file: {path}")
+    if not info.st_mode & S_IWUSR:
+        path.chmod(info.st_mode | S_IWUSR)
+
+
 def _copy_segger_rtt(dest_dir: Path, configured_path: Path | None = None) -> None:
     """Copy SEGGER RTT source files into *dest_dir*/rtt/."""
     rtt_root = find_segger_rtt_dir(configured_path)
     rtt_dest = dest_dir / "rtt"
+    config_dest = rtt_dest / "Config"
+    for directory in (rtt_dest, config_dest):
+        if directory.resolve().is_relative_to(rtt_root):
+            raise FirmwareError(f"RTT destination must be outside its source tree: {directory}")
     rtt_dest.mkdir(parents=True, exist_ok=True)
+    rtt_sources = tuple(
+        rtt_root / "RTT" / name
+        for name in ("SEGGER_RTT.c", "SEGGER_RTT.h", "SEGGER_RTT_ConfDefaults.h")
+    )
+    conf_src = rtt_root / "Config" / "SEGGER_RTT_Conf.h"
+    sources = (*rtt_sources, conf_src)
 
     # RTT source + headers. SEGGER_RTT.h includes SEGGER_RTT_ConfDefaults.h,
     # which in turn includes Config/SEGGER_RTT_Conf.h.
-    for name in ("SEGGER_RTT.c", "SEGGER_RTT.h", "SEGGER_RTT_ConfDefaults.h"):
-        src = rtt_root / "RTT" / name
+    for src in rtt_sources:
         if src.exists():
-            shutil.copy2(src, rtt_dest / name)
+            if not src.is_file():
+                raise FirmwareError(f"RTT source must be a regular file: {src}")
+            dest = rtt_dest / src.name
+            data = src.read_bytes()
+            # Package data can be immutable; app-local copies must stay writable.
+            _make_writable(dest, sources)
+            if not dest.exists() or dest.read_bytes() != data:
+                dest.write_bytes(data)
+            _make_writable(dest, sources)
 
     # RTT buffer placement is cache-coherency sensitive on the Cortex-M55 parts.
     #
@@ -131,10 +163,8 @@ def _copy_segger_rtt(dest_dir: Path, configured_path: Path | None = None) -> Non
     # definition so the buffers land in shared SRAM on parts that have a
     # dedicated .sram_bss region (NSX_MEM__HAS_SRAM_BSS); on simpler parts the
     # macro stays undefined and SEGGER falls back to the default .bss region.
-    config_dest = rtt_dest / "Config"
     config_dest.mkdir(parents=True, exist_ok=True)
     conf_dest = config_dest / "SEGGER_RTT_Conf.h"
-    conf_src = rtt_root / "Config" / "SEGGER_RTT_Conf.h"
     if conf_src.exists():
         conf_text = conf_src.read_text(encoding="utf-8")
     elif conf_dest.exists():
@@ -174,6 +204,8 @@ def _copy_segger_rtt(dest_dir: Path, configured_path: Path | None = None) -> Non
     # Content-compare before writing (see render._write_text): regeneration
     # into a cached workspace must not bump this header's mtime, or every
     # translation unit that includes it recompiles on every run.
+    _make_writable(conf_dest, sources)
     _write_text(conf_dest, conf_text)
+    _make_writable(conf_dest, sources)
 
     log.info("Copied SEGGER RTT source from %s", rtt_root)
