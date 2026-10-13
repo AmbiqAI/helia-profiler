@@ -311,9 +311,12 @@ supported index payloads; INT32 outputs remain refused.
 Query `runtime_records.qualification(name, version, board=..., clock=...,
 precision=...)` for exact release evidence, including its source and basis.
 Historical qualification records and the `QUALIFIED` enum remain readable.
-Supported but unqualified execution remains available. The upstream TFLM runtime
-still refuses any model with a FLOAT16 tensor, including weights behind
-DEQUANTIZE. `FixtureBuild.capabilities` records each IO dtype's support status.
+Supported but unqualified execution remains available. Internal FLOAT16 tensors,
+including weights behind DEQUANTIZE, are recorded model facts, not a blanket
+fixture veto. The selected engine and its actual provider decide kernel support;
+their failures propagate without conversion or fallback. Public FLOAT16 IO remains
+unsupported on TFLM. `FixtureBuild.capabilities` records public IO dtype support,
+not internal compute or kernel qualification.
 
 API 4.0 changes the exported capability constant's values, as required by the
 existing public-surface version policy. This narrow reporting correction keeps
