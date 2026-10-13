@@ -149,6 +149,23 @@ def test_resealed_record_does_not_hide_mismatched_state_lock(tmp_path):
         verify_fixture_build(changed)
 
 
+def test_float_target_address_is_rejected_even_with_matching_identity(tmp_path):
+    build = _build(tmp_path)
+    record = json.loads(dump_fixture_build(build, roots={"run": tmp_path}))
+    changed = replace(
+        build, target=replace(build.target, load_address=float(build.target.load_address))
+    )
+    changed = replace(changed, build_identity=compiled_fixture_identity(changed))
+    record["build"]["target"]["load_address"] = changed.target.load_address
+    record["build"]["build_identity"] = changed.build_identity
+    with pytest.raises(ValueError, match="Integer fixture load address"):
+        load_fixture_build(json.dumps(record), roots={"run": tmp_path})
+    with pytest.raises(ValueError, match="Integer fixture load address"):
+        fixture_capture_request(
+            changed, jlink_serial="caller", evidence_dir=tmp_path / "raw", settle_seconds=30
+        )
+
+
 @pytest.mark.parametrize(
     "mutation", ["duplicate", "nan", "unknown", "traversal", "bool_count", "old_api"]
 )

@@ -22,6 +22,8 @@ class FixtureTarget:
     load_address: int
 
     def verify(self) -> None:
+        if type(self.load_address) is not int:
+            raise ValueError("Integer fixture load address required")
         if self != supported_fixture_target():
             raise ValueError("Unsupported fixture target declaration")
 
