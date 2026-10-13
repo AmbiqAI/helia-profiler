@@ -12,7 +12,7 @@ from ..fixture import TypedFixture
 from ..fixture_analysis import PerTensorQuantization
 from ..fixture_psram import MAX_PSRAM_PAYLOADS, FixturePsramPayload, payload_checksum
 from ..fixture_stage import FixtureStage
-from ..fixture_target import fixture_app_region, validate_fixture_placement
+from ..fixture_target import fixture_app_region, fixture_cpu_hz, validate_fixture_placement
 from ..pipeline import PipelineContext
 from ..placement import ArenaRole, Placement
 from ..platform.memory_map import MemoryRegion
@@ -118,6 +118,7 @@ def fixture_template_vars(ctx: PipelineContext, regions: list[ArenaRegion]) -> d
             raise ConfigError("AOT physical memory differs from fixture request")
     payloads = fixture_psram_payloads(ctx, regions) if psram else ()
     return {
+        "fixture_cpu_hz": fixture_cpu_hz(),
         "fixture_psram": psram,
         "fixture_psram_base": fixture_app_region(MemoryRegion.PSRAM)[0] if psram else None,
         "fixture_psram_payloads": payloads,
