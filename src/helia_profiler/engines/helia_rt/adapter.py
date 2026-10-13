@@ -18,7 +18,12 @@ from ...errors import EngineError
 from ...results import NsxModuleRef
 from .. import TFLM_ENGINE_HEADER, EngineType
 from ..base import HeliaRtArtifacts, PsramWeightsSource, SingleArenaPlacementMixin
-from ..cmsis_nn import cmsis_nn_cmake_vars, cmsis_nn_module_ref
+from ..cmsis_nn import (
+    CMSIS_NN_MODULE,
+    cmsis_nn_cmake_vars,
+    cmsis_nn_module_ref,
+    resolve_cmsis_nn_selector,
+)
 from ..ethos_u import nsx_npu_module_ref
 from .artifacts import (
     HELIART_MODULE,
@@ -160,6 +165,15 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
         # release). When none of these are set, hpx defaults to resolving
         # nsx-helia-rt from the NSX registry (NSX clones it from GitHub).
         use_local = source_path is not None or bool(dist_path_cfg) or bool(source_cfg)
+
+        if use_local and source_path is None:
+            selected = resolve_cmsis_nn_selector(config, CMSIS_NN_MODULE)
+            if selected is not None:
+                raise EngineError(
+                    f"heliaRT prebuilt distributions cannot apply {selected.selector}; "
+                    "CMSIS-NN is already compiled into the archive.",
+                    hint="Remove the CMSIS-NN override or use a registry/source build.",
+                )
 
         extra_modules: list[NsxModuleRef] = []
         cmake_vars: dict[str, str] = {}

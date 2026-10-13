@@ -343,6 +343,77 @@ class TestHeliaRTAdapter:
         assert artifacts.engine_backend == "vendor-custom"
         assert config.engine.config["vendor_option"] is True
 
+    @pytest.mark.parametrize("dist_option", ["dist_path", "HELIART_DIST_PATH", "source"])
+    @pytest.mark.parametrize("selector", ["cmsis_nn_path", "cmsis_nn_ref", "CMSIS_NN_PATH"])
+    def test_prebuilt_rejects_ineffective_cmsis_nn_override_before_resolution(
+        self,
+        tmp_path: Path,
+        fake_dist: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        dist_option: str,
+        selector: str,
+    ):
+        options: dict[str, object] = {}
+        if dist_option == "HELIART_DIST_PATH":
+            monkeypatch.setenv(dist_option, str(fake_dist))
+        elif dist_option == "source":
+            options[dist_option] = {"repo": "vendor/helia-rt", "ref": "custom-release"}
+        else:
+            options[dist_option] = str(fake_dist)
+        requested = "custom-ref" if selector == "cmsis_nn_ref" else str(tmp_path / "nn")
+        if selector == "CMSIS_NN_PATH":
+            monkeypatch.setenv(selector, requested)
+            diagnostic = "env.CMSIS_NN_PATH"
+        else:
+            options[selector] = requested
+            diagnostic = f"engine.config.{selector}"
+        config = _make_config(tmp_path, {"config": options})
+
+        def unexpected_resolution(_config):
+            pytest.fail("prebuilt resolution must not run for an ineffective CMSIS-NN override")
+
+        monkeypatch.setattr(
+            "helia_profiler.engines.helia_rt.adapter._resolve_distribution",
+            unexpected_resolution,
+        )
+        work_dir = tmp_path / "work"
+        with pytest.raises(EngineError, match="prebuilt.*cannot apply") as excinfo:
+            HeliaRTAdapter().prepare(config, work_dir)
+        assert diagnostic in str(excinfo.value)
+        assert "registry/source build" in (excinfo.value.hint or "")
+        assert not work_dir.exists()
+
+    @pytest.mark.parametrize("route", ["registry", "source"])
+    @pytest.mark.parametrize("selector", ["cmsis_nn_path", "cmsis_nn_ref", "CMSIS_NN_PATH"])
+    def test_source_routes_apply_cmsis_nn_selectors(
+        self,
+        tmp_path: Path,
+        fake_source_tree: Path,
+        fake_dist: Path,
+        fake_cmsis_nn: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        route: str,
+        selector: str,
+    ):
+        options: dict[str, object] = {}
+        if route == "source":
+            options.update(source_path=str(fake_source_tree), dist_path=str(fake_dist))
+        requested = "custom-ref" if selector == "cmsis_nn_ref" else str(fake_cmsis_nn)
+        if selector == "CMSIS_NN_PATH":
+            monkeypatch.setenv(selector, requested)
+        else:
+            options[selector] = requested
+        config = _make_config(tmp_path, {"config": options})
+        artifacts = HeliaRTAdapter().prepare(config, tmp_path / "work")
+        module = next(m for m in artifacts.extra_modules if m.name == "nsx-cmsis-nn")
+        if selector == "cmsis_nn_ref":
+            assert module.ref == requested
+            assert not module.local
+        else:
+            assert module.local
+            assert module.path is not None
+            assert (module.path / "Source" / "stub.c").is_file()
+
     def test_registry_helia_rt_uses_explicit_cmsis_nn_checkout(
         self,
         tmp_path: Path,

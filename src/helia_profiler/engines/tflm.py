@@ -48,6 +48,11 @@ class TFLMAdapter(SingleArenaPlacementMixin):
 
     def prepare(self, config: ProfileConfig, work_dir: Path) -> TflmArtifacts:
         """Resolve the reference or upstream-CMSIS-NN TFLM NSX modules."""
+        if config.engine.config_path is not None:
+            raise EngineError(
+                "TFLM does not read engine.config_path",
+                hint="Remove engine.config_path; select the TFLM backend with engine.backend.",
+            )
         del work_dir
 
         backend = config.engine.backend or "reference"
