@@ -55,6 +55,8 @@ def analyze_for_engine(
 
     import tempfile
 
+    from ..engines.helia_aot.compile import aot_platform_for_board
+
     try:
         from helia_aot.cli.defines import ConvertArgs
         from helia_aot.converter import AotConverter
@@ -69,7 +71,7 @@ def analyze_for_engine(
         convert_args = ConvertArgs(
             model={"path": str(path)},
             module={"path": tmp, "type": ModuleType.nsx.value},
-            platform={"name": board},
+            platform={"name": aot_platform_for_board(board) or board},
         )
         try:
             context = AotConverter(config=convert_args).convert()

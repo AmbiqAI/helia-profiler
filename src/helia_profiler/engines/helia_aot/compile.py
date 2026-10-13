@@ -74,12 +74,13 @@ _BOARD_TO_AOT_PLATFORM: dict[str, str] = {
     "apollo4l_evb": "apollo4l_evb",
     "apollo4l_blue_evb": "apollo4l_blue_evb",
     "apollo510_evb": "apollo510_evb",
-    "apollo510b_evb": "apollo510_evb",  # same SoC family / memory layout
+    "apollo510b_evb": "apollo510b_evb",
     "atomiq110_fpga_turbo": "atomiq110",  # Atomiq110 FPGA (M55 + Ethos-U85-256)
     "apollo5b_evb": "apollo510_evb",
-    "apollo330mP_evb": "apollo510_evb",  # Cortex-M55, AP5 family
-    "apollo510dL_evb": "apollo510_evb",  # Cortex-M55, AP5 family (as apollo330mP_evb)
+    "apollo330mP_evb": "apollo330mp_evb",
+    "apollo510dL_evb": "apollo510l_evb",
 }
+_LEGACY_AOT_ALIASES = frozenset({"apollo5b_evb", "atomiq110_fpga_turbo"})
 
 # Expected memory-placement macro suffixes emitted by heliaAOT's
 # MemoryType.to_qualifiers().  Used to validate pragma consistency.
@@ -99,6 +100,20 @@ _EXPECTED_PRAGMA_SUFFIXES = (
 )
 
 
+def aot_platform_for_board(board: str) -> str | None:
+    """Return the mapped AOT target, warning for legacy compatibility aliases."""
+    aot_platform = _BOARD_TO_AOT_PLATFORM.get(board)
+    if board in _LEGACY_AOT_ALIASES:
+        log.warning(
+            "Board '%s' has no exact heliaAOT platform — using '%s'. "
+            "Memory sizes and capabilities may differ.  "
+            "Set engine.config.platform_name to override.",
+            board,
+            aot_platform,
+        )
+    return aot_platform
+
+
 def _resolve_aot_platform(config: ProfileConfig) -> str:
     """Map the profiler's target board to a heliaAOT platform name.
 
@@ -113,22 +128,13 @@ def _resolve_aot_platform(config: ProfileConfig) -> str:
         return str(explicit)
 
     board = config.target.board
-    aot_platform = _BOARD_TO_AOT_PLATFORM.get(board)
+    aot_platform = aot_platform_for_board(board)
 
     if aot_platform is None:
         known = ", ".join(sorted(_BOARD_TO_AOT_PLATFORM))
         raise EngineError(
             f"No heliaAOT platform mapping for board '{board}'",
             hint=(f"Set engine.config.platform_name explicitly, or use a supported board: {known}"),
-        )
-
-    if aot_platform != board:
-        log.warning(
-            "Board '%s' has no exact heliaAOT platform — using '%s'. "
-            "Memory sizes and capabilities may differ.  "
-            "Set engine.config.platform_name to override.",
-            board,
-            aot_platform,
         )
 
     return aot_platform
