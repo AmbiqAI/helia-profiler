@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING
 
 from ..config import DEFAULT_POWER_DURATION_S
 from ..errors import CaptureError, PowerError
-from ..power.clean_window import assess_clean_window_stall
+from ..power.clean_window import reference_stall_factor as _reference_stall_factor
 from ..power.diagnostics import (
     CLEAN_WINDOW_WARMUP_REPS,
     SyncHandshakeMetadata,
@@ -242,30 +242,6 @@ def _make_sync_controller(ctx: PipelineContext, driver: PowerDriver) -> SyncCont
         go_output_index=ctx.config.power.go_output_index,
     )
     return make_controller(wiring)
-
-
-#: Cap on the stalled-reference stretch: a reference read 90% low or worse
-#: still bounds the wait at ten planned windows rather than an unbounded one.
-_MAX_STALL_UNDERSTATEMENT = 0.9
-
-
-def _reference_stall_factor(ctx: PipelineContext) -> float:
-    """How much longer a fixed-count window can run when its reference stalled."""
-    if ctx.pmu_result is None:
-        return 1.0
-    meta = ctx.pmu_result.meta
-    stall = assess_clean_window_stall(
-        stalled_iters=meta.clean_stalled_iters,
-        partial_iters=meta.clean_partial_iters,
-        clean_infer_count=meta.clean_infer_count,
-        ref_cycles=meta.clean_ref_cycles,
-    )
-    if stall is None or stall.affected_iters == 0 or stall.counts_are_inconsistent:
-        # An inconsistent report (more affected iterations than ran) is not
-        # evidence of a long window.
-        return 1.0
-    understatement = min(stall.understatement_lower_bound, _MAX_STALL_UNDERSTATEMENT)
-    return 1.0 / (1.0 - understatement)
 
 
 def _profiled_inference_s(ctx: PipelineContext) -> float | None:

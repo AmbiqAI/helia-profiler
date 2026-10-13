@@ -183,6 +183,23 @@ def assess_clean_window_stall(
     )
 
 
+def reference_stall_factor(ctx: PipelineContext) -> float:
+    """Stretch a stalled fixed-count reference by at most ten planned windows."""
+    if ctx.pmu_result is None:
+        return 1.0
+    meta = ctx.pmu_result.meta
+    stall = assess_clean_window_stall(
+        stalled_iters=meta.clean_stalled_iters,
+        partial_iters=meta.clean_partial_iters,
+        clean_infer_count=meta.clean_infer_count,
+        ref_cycles=meta.clean_ref_cycles,
+    )
+    if stall is None or stall.affected_iters == 0 or stall.counts_are_inconsistent:
+        return 1.0
+    understatement = min(stall.understatement_lower_bound, 0.9)
+    return 1.0 / (1.0 - understatement)
+
+
 #: Fraction of the expected DWT rate below which the counter is judged broken.
 #: The probe times a known nsx_delay_us() interval, so the expected reading is
 #: SystemCoreClock * probe_us / 1e6 exactly -- no model behaviour enters it.

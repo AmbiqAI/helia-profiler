@@ -30,6 +30,7 @@ from helia_profiler.results import (
 from helia_profiler.stages.collect_power_terminal import CollectPowerTerminalStage
 from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 from helia_profiler.wire import POWER_TERMINAL_VERSION
+from tests.pipeline_context_helpers import set_profile_result
 
 
 def _gated_window(duration_s: float) -> GatedPowerWindow:
@@ -53,7 +54,7 @@ def _make_ctx(
     transport: str = "rtt",
     internal: bool = False,
     inference_count: int = 5,
-    reference_inference_us: int = 1000,
+    reference_inference_us: int | None = 1000,
     count_source: Literal[
         "firmware_auto", "configured", "profile_guided", "probe_window"
     ] = "configured",
@@ -170,6 +171,107 @@ class _FakeTerminalTransport:
     def collect(self, ctx: PipelineContext, *, timeout_s: float) -> PowerTerminalEnvelope:
         del ctx, timeout_s
         return self.envelope
+
+
+@pytest.mark.parametrize(
+    "counts,internal,probe,reference,expected",
+    [
+        (None, True, "infer", 2_000_000, 25.0),
+        ((0, 0, 5), True, "infer", 2_000_000, 25.0),
+        ((4, 0, None), True, "infer", 2_000_000, 25.0),
+        ((4, 0, 3), True, "infer", 2_000_000, 25.0),
+        ((4, 0, 5), True, "infer", 2_000_000, 105.0),
+        ((4, 0, 5), True, "infer", None, 15.0),
+        ((4, 0, 5), True, "busy_loop", 2_000_000, 25.0),
+        ((4, 0, 5), False, "infer", 2_000_000, 2.0),
+        ((0, 4, 5), True, "infer", 2_000_000, 215 / 3),
+        ((5, 0, 5), True, "infer", 2_000_000, 205.0),
+    ],
+)
+def test_internal_deadline_controls(
+    tmp_path, monkeypatch, counts, internal, probe, reference, expected
+):
+    from helia_profiler.capture import _reference_stall_factor
+    from helia_profiler.power.clean_window import reference_stall_factor
+    from helia_profiler.results import FirmwareMeta, PmuResult
+
+    assert _reference_stall_factor is reference_stall_factor
+    ctx = _make_ctx(
+        tmp_path, internal=internal, clean_window_probe=probe, reference_inference_us=reference
+    )
+    if counts is not None:
+        fields = dict(
+            zip(("clean_stalled_iters", "clean_partial_iters", "clean_infer_count"), counts)
+        )
+        set_profile_result(ctx, PmuResult(meta=FirmwareMeta(**fields)))
+
+    class Collector:
+        def collect(self, ctx, *, timeout_s):
+            assert timeout_s == pytest.approx(expected)
+            raise PowerError("selected deadline")
+
+    monkeypatch.setattr(
+        "helia_profiler.capture.terminal_transport.get_power_terminal_transport",
+        lambda transport: Collector(),
+    )
+    with pytest.raises(PowerError, match="selected deadline"):
+        CollectPowerTerminalStage().run(ctx)
+
+
+@pytest.mark.parametrize("arrival_s", [50.0, None])
+def test_internal_deadline_waits_for_late_terminal(tmp_path, monkeypatch, arrival_s):
+    from helia_profiler.capture import power_terminal
+    from helia_profiler.results import FirmwareMeta, PmuResult
+
+    ctx = _make_ctx(tmp_path, internal=True, reference_inference_us=2_000_000)
+    set_profile_result(
+        ctx, PmuResult(meta=FirmwareMeta(clean_infer_count=5, clean_stalled_iters=4))
+    )
+    now = [0.0]
+    closed = []
+    frame = (
+        "--- HPX_POWER_TERMINAL_START ---\n"
+        f"HPX_POWER_TERMINAL_VERSION={POWER_TERMINAL_VERSION}\n"
+        "HPX_POWER_STATUS=ok\nHPX_POWER_REQUESTED_COUNT=5\nHPX_POWER_COMPLETED_COUNT=5\n"
+        "HPX_POWER_ELAPSED_US=10000000\nHPX_POWER_GATE_ELAPSED_US=10000000\n"
+        "HPX_POWER_FINAL_PHASE=complete\nHPX_POWER_ERROR_CODE=0\nHPX_POWER_GATE_ASSERTED=1\n"
+        "HPX_POWER_GATE_LOWERED=1\n"
+        "HPX_POWER_MEASUREMENT_SOURCE=ina228\nHPX_POWER_MEASUREMENT_SCOPE=fixed_n_inference\n"
+        "HPX_POWER_ENERGY_NJ=1000000\nHPX_POWER_MEASUREMENT_DURATION_US=10000000\n"
+        "HPX_POWER_MEASUREMENT_COUNT=5\nHPX_POWER_MEASUREMENT_OVERFLOW=0\n"
+        "HPX_POWER_CHARGE_NC=1000000\n--- HPX_POWER_TERMINAL_END ---\n"
+    ).encode()
+    monkeypatch.setattr(power_terminal.time, "monotonic", lambda: now[0])
+
+    def advance(seconds):
+        now[0] += seconds
+
+    monkeypatch.setattr(power_terminal.time, "sleep", advance)
+
+    class Collector:
+        def collect(self, ctx, *, timeout_s):
+            try:
+                return power_terminal.collect_power_terminal_envelope_from_chunks(
+                    lambda: frame if arrival_s is not None and now[0] >= arrival_s else b"",
+                    timeout_s=timeout_s,
+                    poll_interval_s=1.0,
+                )
+            finally:
+                closed.append(True)
+
+    monkeypatch.setattr(
+        "helia_profiler.capture.terminal_transport.get_power_terminal_transport",
+        lambda transport: Collector(),
+    )
+    if arrival_s is None:
+        with pytest.raises(PowerError, match="No power terminal"):
+            CollectPowerTerminalStage().run(ctx)
+        assert 105.0 <= now[0] <= 106.0
+    else:
+        CollectPowerTerminalStage().run(ctx)
+        assert ctx.power_result is not None
+        assert now[0] == 50.0
+    assert closed == [True]
 
 
 def test_collect_stage_publishes_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
