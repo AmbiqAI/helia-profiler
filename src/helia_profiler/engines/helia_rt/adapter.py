@@ -102,6 +102,11 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
         return PsramWeightsSource.HOST_UPLOAD
 
     def prepare(self, config: ProfileConfig, work_dir: Path) -> HeliaRtArtifacts:
+        if config.engine.config_path is not None:
+            raise EngineError(
+                "heliaRT does not read engine.config_path",
+                hint="Set supported heliaRT options inline in engine.config instead.",
+            )
         backend = config.engine.backend or "helia"
         variant = config.engine.config.get("variant", "release-with-logs")
         core_override = config.engine.config.get("core_override")
@@ -141,11 +146,13 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
         extra_modules: list[NsxModuleRef] = []
         cmake_vars: dict[str, str] = {}
 
-        if core_override and (source_path is not None or not use_local):
-            log.warning(
-                "heliaRT source build ignores core_override=%s "
-                "(SoC family drives kernel selection)",
-                core_override,
+        if core_override is not None and (source_path is not None or not use_local):
+            raise EngineError(
+                "heliaRT core_override requires a prebuilt distribution",
+                hint=(
+                    "Use engine.config.dist_path or engine.config.source for a prebuilt "
+                    "release, or remove core_override for a registry/source build."
+                ),
             )
 
         if not use_local:

@@ -38,6 +38,7 @@ compile heliaRT with the selected toolchain instead.
 
 | Key | Default | Meaning |
 |---|---|---|
+| `core_override` | from the board | Select `cm4` or `cm55` in an explicit prebuilt distribution; rejected for registry and local source builds. |
 | `variant` | `release-with-logs` | `debug` or `release-with-logs` (keeps SWO printf). `release` disables per-op profiling and is rejected. |
 | `resolver_ops` | `auto` | `auto` registers the builtins the model uses; `all` keeps the broad fixed allowlist. |
 | `source_path` | registry module | Local heliaRT source checkout. |
@@ -234,6 +235,10 @@ compares this with heliaAOT's per-tensor placement.
 
 ## Source-build requirements
 
-Registry and local-source heliaRT builds use the selected toolchain and variant. They ignore `core_override` because the target SoC selects the kernels. An Ethos-U source checkout must expose `NSX_HELIA_RT_ENABLE_ETHOSU`; HPX rejects checkouts without it before building.
+Registry and local-source heliaRT builds use the selected toolchain and variant.
+They reject `core_override`; it selects a library only in an explicit prebuilt
+distribution. heliaRT also rejects `engine.config_path`, which it does not read;
+set supported options inline in `engine.config`. An Ethos-U source checkout must
+expose `NSX_HELIA_RT_ENABLE_ETHOSU`; HPX rejects checkouts without it before building.
 
 The compatibility baseline pins ns-cmsis-nn at or above the heliaAOT generated module minimum. Individual float operators can require a higher version. See [Compatibility baseline](../../reference/compatibility-baseline/).

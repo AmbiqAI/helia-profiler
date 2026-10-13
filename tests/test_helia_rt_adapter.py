@@ -237,20 +237,111 @@ class TestHeliaRTAdapter:
         with pytest.raises(EngineError, match="strips per-op profiling"):
             HeliaRTAdapter().prepare(config, tmp_path)
 
-    def test_registry_warns_on_core_override(
+    def test_registry_rejects_core_override(
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        caplog: pytest.LogCaptureFixture,
     ):
         monkeypatch.delenv("HELIART_DIST_PATH", raising=False)
         monkeypatch.delenv("HELIART_SOURCE_PATH", raising=False)
         config = _make_config(tmp_path, {"config": {"core_override": "cm4"}})
 
-        with caplog.at_level("WARNING", logger="hpx"):
-            HeliaRTAdapter().prepare(config, tmp_path)
+        work_dir = tmp_path / "work"
+        with pytest.raises(EngineError, match="core_override.*prebuilt"):
+            HeliaRTAdapter().prepare(config, work_dir)
 
-        assert "ignores core_override=cm4" in caplog.text
+        assert not work_dir.exists()
+
+    @pytest.mark.parametrize("route", ["registry", "source", "prebuilt"])
+    def test_rejects_unread_config_file_before_resolution(
+        self,
+        tmp_path: Path,
+        fake_source_tree: Path,
+        fake_dist: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        route: str,
+    ):
+        config_file = tmp_path / "engine.yml"
+        config_file.write_text("variant: debug\n", encoding="utf-8")
+        options = {"source_path": str(fake_source_tree)} if route == "source" else {}
+        if route == "prebuilt":
+            options["dist_path"] = str(fake_dist)
+        config = _make_config(tmp_path, {"config_path": str(config_file), "config": options})
+
+        def unexpected_resolution(_config):
+            pytest.fail("engine resolution must not run for an unread config file")
+
+        monkeypatch.setattr(
+            "helia_profiler.engines.helia_rt.adapter._resolve_source_path",
+            unexpected_resolution,
+        )
+        work_dir = tmp_path / "work"
+        with pytest.raises(EngineError, match="config_path"):
+            HeliaRTAdapter().prepare(config, work_dir)
+        assert not work_dir.exists()
+
+    @pytest.mark.parametrize("source_option", ["source_path", "HELIART_SOURCE_PATH"])
+    def test_source_rejects_core_override_even_with_prebuilt_distribution(
+        self,
+        tmp_path: Path,
+        fake_source_tree: Path,
+        fake_dist: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        source_option: str,
+    ):
+        options = {"dist_path": str(fake_dist), "core_override": "cm4"}
+        if source_option == "source_path":
+            options["source_path"] = str(fake_source_tree)
+        else:
+            monkeypatch.setenv(source_option, str(fake_source_tree))
+        config = _make_config(tmp_path, {"config": options})
+        work_dir = tmp_path / "work"
+        with pytest.raises(EngineError, match="core_override.*prebuilt"):
+            HeliaRTAdapter().prepare(config, work_dir)
+        assert not work_dir.exists()
+
+    @pytest.mark.parametrize("core", ["cm4", "cm55"])
+    @pytest.mark.parametrize("variant", ["debug", "release-with-logs"])
+    @pytest.mark.parametrize("dist_option", ["dist_path", "HELIART_DIST_PATH", "source"])
+    def test_prebuilt_core_and_variant_reach_wrapper(
+        self,
+        tmp_path: Path,
+        fake_dist: Path,
+        core: str,
+        variant: str,
+        monkeypatch: pytest.MonkeyPatch,
+        dist_option: str,
+    ):
+        options: dict[str, object] = {"core_override": core, "variant": variant}
+        if dist_option == "HELIART_DIST_PATH":
+            monkeypatch.setenv(dist_option, str(fake_dist))
+        elif dist_option == "source":
+            options[dist_option] = {"repo": "vendor/helia-rt", "ref": "custom-release"}
+            monkeypatch.setattr(
+                "helia_profiler.engines.helia_rt.adapter._resolve_distribution",
+                lambda _config: (fake_dist, HELIART_VERSION),
+            )
+        else:
+            options[dist_option] = str(fake_dist)
+        config = _make_config(tmp_path, {"config": options})
+        work_dir = tmp_path / "work"
+        artifacts = HeliaRTAdapter().prepare(config, work_dir)
+        cmake = (work_dir / "modules/helia-rt/CMakeLists.txt").read_text(encoding="utf-8")
+        assert f'set(_HELIA_RT_CORE "{core}")' in cmake
+        assert f'HELIA_RT_VARIANT "{variant}"' in cmake
+        assert artifacts.heliart_variant == variant
+
+    def test_custom_backend_and_engine_settings_remain_engine_owned(self, tmp_path: Path):
+        config = _make_config(
+            tmp_path,
+            {
+                "backend": "vendor-custom",
+                "config": {"vendor_option": True},
+            },
+        )
+        artifacts = HeliaRTAdapter().prepare(config, tmp_path / "work")
+        assert artifacts.engine_backend == "vendor-custom"
+        assert config.engine.config["vendor_option"] is True
 
     def test_registry_helia_rt_uses_explicit_cmsis_nn_checkout(
         self,

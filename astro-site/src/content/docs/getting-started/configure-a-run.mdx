@@ -55,8 +55,9 @@ Common settings have CLI flags; engine-specific options and nested settings
 may require YAML. Use the [command reference](../../reference/cli/profile/)
 for available flags and the [configuration reference](../../reference/configuration/)
 for all file keys.
-Unknown keys are an error, not a silent no-op: every configuration model
-sets `extra="forbid"`.
+Unknown fields in typed configuration sections are errors. `engine.config`
+is a freeform mapping owned by the selected engine; see
+[Engine configuration](../../reference/engine-configuration/) for its supported options.
 
 ### 3. Set the fields a first profile touches
 

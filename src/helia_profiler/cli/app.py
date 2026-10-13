@@ -161,8 +161,8 @@ def profile_command(
             "--core-override",
             click_type=_CORE_OVERRIDE_CHOICE,
             help=(
-                "Force heliaRT to use a specific core library variant "
-                "(e.g. cm4 to disable MVE kernels on an M55 board)."
+                "Select the core library in an explicit heliaRT prebuilt distribution. "
+                "Unsupported for registry and local source builds."
             ),
             rich_help_panel=G_ENGINE,
         ),
