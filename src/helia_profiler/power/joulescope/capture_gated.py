@@ -339,6 +339,8 @@ def capture_gated(
             except Exception:
                 log.debug("Failed to unsubscribe full-rate stream", exc_info=True)
 
+    callback_errors: list[Exception] = []
+
     def _poller() -> None:
         nonlocal first_high_at, first_low_after_high_at, short_pulse_first_s
         nonlocal saw_any_gate_rise, saw_any_gate_fall
@@ -350,6 +352,12 @@ def capture_gated(
         high_phase = "unknown"
         complete_at: float | None = None
         while not stop.is_set():
+            try:
+                phase = phase_getter() if phase_getter is not None else "go_signaled"
+            except Exception as exc:
+                callback_errors.append(exc)
+                stop.set()
+                return
             gpi_value: int | None = None
             try:
                 read_start = _host_monotonic_time64(time64)
@@ -360,7 +368,6 @@ def capture_gated(
                     gpi_sample_sequence += 1
                     gpi_condition.notify_all()
                 level = 1 if (int(gpi_value) & bit) else 0
-                phase = phase_getter() if phase_getter is not None else "go_signaled"
                 if phase != "go_signaled":
                     # Flash/reset pin levels are not protocol events. Keep the
                     # latest bitfield for READY qualification, but establish a
@@ -406,8 +413,10 @@ def capture_gated(
                                     "gate-race timeline: on_gate_rise (GO drop) done t=%.3f",
                                     time.time(),
                                 )
-                            except Exception:
-                                log.warning("on_gate_rise hook failed", exc_info=True)
+                            except Exception as exc:
+                                callback_errors.append(exc)
+                                stop.set()
+                                return
                 elif prev_level and not level and high_seen:
                     saw_any_gate_fall = True
                     if first_low_after_high_at is None:
@@ -553,6 +562,10 @@ def capture_gated(
                     pass
             if fr_requested:
                 _stop_fullrate_streams()
+
+        if callback_errors:
+            hook_error = callback_errors[0]
+            raise hook_error
 
         aligned_poll_samples = poll_samples
         use_device_time_axis = family in ("js220", "js320")
@@ -978,6 +991,8 @@ def capture_gated(
             metadata=metadata,
             statistics=packets,
             gate_samples=aligned_poll_samples,
+            statistics_timebase_hz=int(time64.SECOND),
+            statistics_device_time=use_device_time_axis,
         )
     except PowerError:
         raise

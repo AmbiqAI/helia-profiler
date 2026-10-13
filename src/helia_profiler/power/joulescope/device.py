@@ -189,9 +189,9 @@ def _open_device(serial: str | None) -> tuple[Any, str, str]:
         )
 
     if serial is not None:
-        wanted = str(serial).lstrip("0") or "0"
-        matched = [p for p in paths if wanted in p]
-        if not matched:
+        wanted = str(serial)
+        matched = [p for p in paths if p == wanted or p.rsplit("/", 1)[-1] == wanted]
+        if len(matched) != 1:
             raise PowerError(
                 f"Joulescope serial '{serial}' not found among connected devices",
                 hint=f"Connected devices: {', '.join(paths)}. "

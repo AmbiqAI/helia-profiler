@@ -22,7 +22,7 @@ from helia_profiler.engines.base import ArenaRegion, HeliaAotArtifacts
 from helia_profiler.firmware.fixture import fixture_template_vars, write_fixture_headers
 from helia_profiler.firmware.op_resolver import ResolverPlan
 from helia_profiler.firmware.render import _jinja_env
-from helia_profiler.fixture import FixturePlacement
+from helia_profiler.fixture import FixturePlacement, FixturePowerSync
 from helia_profiler.fixture_analysis import (
     FixtureModelAnalysis,
     FixtureTensor,
@@ -41,7 +41,14 @@ FIXTURE_KIND_ENGINES = tuple(
     (kind, engine) for kind in FIXTURE_KINDS for engine in FIXTURE_ENGINES
 ) + tuple(
     (kind, engine)
-    for kind in ("resource", "psram", "psram-resource", "psram-tcm", "psram-tcm-resource")
+    for kind in (
+        "resource",
+        "psram",
+        "psram-resource",
+        "psram-tcm",
+        "psram-tcm-resource",
+        "power-resource",
+    )
     for engine in ("tflm", "helia-aot")
 )
 
@@ -55,7 +62,15 @@ def render_fixture(
     placement: FixturePlacement = FixturePlacement(),
 ) -> tuple[str, dict[str, str]]:
     """Render production fixture sources from representative tensor metadata."""
-    if kind in ("typed", "resource", "psram", "psram-resource", "psram-tcm", "psram-tcm-resource"):
+    if kind in (
+        "typed",
+        "resource",
+        "psram",
+        "psram-resource",
+        "psram-tcm",
+        "psram-tcm-resource",
+        "power-resource",
+    ):
         if kind.startswith("psram"):
             placement = FixturePlacement(
                 Placement.TCM if "tcm" in kind else Placement.SRAM, Placement.PSRAM
@@ -66,6 +81,7 @@ def render_fixture(
             aot_prefix=aot_prefix,
             placement=placement,
             resource=kind.endswith("resource"),
+            power=kind.startswith("power") and scope == "restore_and_invoke",
         )
     if kind == "tcn":
         inp = Int8Tensor((1, 240, 14), 0.007843011990189552, -1, 0)
@@ -135,7 +151,13 @@ _TYPED_OUTPUTS = (
 
 
 def _render_typed(
-    engine: str, scope: str, *, aot_prefix: str, placement: FixturePlacement, resource: bool = False
+    engine: str,
+    scope: str,
+    *,
+    aot_prefix: str,
+    placement: FixturePlacement,
+    resource: bool = False,
+    power: bool = False,
 ) -> tuple[str, dict[str, str]]:
     """Render mixed-dtype inputs and outputs; heliaAOT also scans its scratch arena."""
     aot = EngineType(engine) is EngineType.HELIA_AOT
@@ -178,7 +200,9 @@ def _render_typed(
         ctx.fixture = FixtureRenderSpec(
             fixture,
             FixtureMethod(
-                FixtureTimingScope(scope), FixtureStatePolicy.CARRY if resource else None
+                FixtureTimingScope(scope),
+                FixtureStatePolicy.CARRY if resource else None,
+                FixturePowerSync(29, 36, 14) if power else None,
             ),
             TypedFixtureModelAnalysis(
                 _TYPED_INPUTS,

@@ -88,6 +88,8 @@ class PowerResult:
     # actual voltage/current and integral/time metadata, not a reconstructed waveform.
     statistics: list[dict[str, Any]] = field(default_factory=list)
     gate_samples: list[tuple[int, int]] = field(default_factory=list)
+    statistics_timebase_hz: int | None = None
+    statistics_device_time: bool = False
 
 
 @runtime_checkable

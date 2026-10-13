@@ -166,10 +166,9 @@ class TestJoulescopeSyncControllerRelease:
 
         assert fake_drv.close_calls == 1
         assert "u/js110/004204" not in device_mod._open_refcounts
-        # Idempotent: releasing again re-arms (which re-opens transiently to
-        # write GO) and closes again — balanced, no refcount leak either way.
+        # Idempotent cleanup never acquires a new hardware handle.
         controller.release()
-        assert fake_drv.open_calls == fake_drv.close_calls
+        assert fake_drv.open_calls == fake_drv.close_calls == 1
         assert "u/js110/004204" not in device_mod._open_refcounts
 
     def test_release_does_not_close_device_still_held_by_active_capture(
@@ -218,3 +217,22 @@ class TestJoulescopeSyncControllerRelease:
         controller.release()
         assert fake_drv.close_calls == 1
         assert "u/js320/25QG" not in device_mod._open_refcounts
+
+
+def test_explicit_instrument_serial_never_selects_substring(monkeypatch):
+    from helia_profiler.power.joulescope import device
+
+    fake = _FakeJsDriver("u/js320/9123")
+    monkeypatch.setattr(device, "_get_shared_driver", lambda: fake)
+    with pytest.raises(PowerError, match="not found"):
+        device._open_device("123")
+    assert fake.open_calls == 0 and fake.published == {}
+
+
+def test_unarmed_sync_cleanup_does_not_open_instrument(monkeypatch):
+    from helia_profiler.power.joulescope import sync
+    from helia_profiler.power.sync import SyncWiring
+
+    monkeypatch.setattr(sync, "_open_device", lambda *_: pytest.fail("cleanup opened hardware"))
+    controller = sync.JoulescopeSyncController(serial="25QG", wiring=SyncWiring(True, 0, 1, 0))
+    controller.release()

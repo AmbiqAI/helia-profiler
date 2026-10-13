@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Callable, Protocol
 from .fixture_runtime import FixtureFile
 from .power.base import PowerResult
 from .power.joulescope.driver import JoulescopeDriver
-from .power.metadata import MeasurementScope, PowerIntegrity
+from .power.metadata import MeasurementScope, PowerIntegrity, classify_observation
 from .power.sync import SyncWiring
 
 if TYPE_CHECKING:
@@ -159,6 +159,14 @@ def observe_fixture_power(
         if failures:
             raise failures[0]
         check()
+        mode, integrity, rise, fall, bound = classify_observation(result.metadata)
+        result.metadata.set_observation(
+            observation_mode=mode,
+            integrity=integrity,
+            gate_rise_observed=rise,
+            gate_fall_observed=fall,
+            observation_deadline_s=bound or request.settle_seconds,
+        )
         return result
     finally:
         sync.release()
@@ -208,6 +216,7 @@ def fixture_rail_energy(
         window.avg_power_w * window.duration_s, window.energy_j, rel_tol=1e-9, abs_tol=1e-12
     ):
         raise ValueError("Rail energy/power/duration disagree")
+    _validate_trace_coverage(observation)
     raw.read()
     return FixtureRailEnergy(
         timing.iterations,
@@ -222,3 +231,53 @@ def fixture_rail_energy(
         window.energy_j / timing.iterations,
         raw,
     )
+
+
+def _validate_trace_coverage(observation: PowerResult) -> None:
+    """Require complete counter-contiguous statistics spanning the measured gate.
+
+    Integration remains driver-owned. This verifies retained evidence without
+    replacing the driver's charge/energy calculation or inventing timestamps.
+    """
+    hz = observation.statistics_timebase_hz
+    if type(hz) is not int or hz <= 0:
+        raise ValueError("Missing instrument timestamp scale")
+    previous_end = rate = None
+    rows = []
+    for packet in observation.statistics:
+        try:
+            t = packet["time"]
+            first, last = t["samples"]["value"]
+            frequency = t["sample_freq"]["value"]
+            u0, u1 = t["utc"]["value"]
+            if not all(math.isfinite(v) for v in (first, last, frequency, u0, u1)):
+                raise ValueError
+            if last <= first or frequency <= 0 or u1 <= u0:
+                raise ValueError
+            if previous_end is not None and (first != previous_end or frequency != rate):
+                raise ValueError
+            previous_end, rate = last, frequency
+            axis = (u0 + u1) / 2 if observation.statistics_device_time else packet["_host_time64"]
+            duration = (last - first) / frequency
+            rows.append((axis, duration))
+        except (KeyError, TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("Incomplete or discontinuous instrument statistics") from exc
+    origin = min(axis for axis, _ in rows)
+    window = observation.gated_windows[0]
+    selected = [
+        (axis, duration)
+        for axis, duration in rows
+        if window.start_s <= (axis - origin) / hz <= window.end_s
+    ]
+    if len(selected) != window.sample_count:
+        raise ValueError("Trace/window packet count mismatch")
+    total = sum(duration for _, duration in selected)
+    if not math.isclose(total, window.duration_s, rel_tol=1e-9, abs_tol=1e-9):
+        raise ValueError("Trace/window duration mismatch")
+    # Midpoint admission can omit at most one packet at either edge. This is
+    # the instrument's actual integration granularity, not a caller tolerance.
+    margin = max(duration for _, duration in rows)
+    if (rows[0][0] - origin) / hz - margin > window.start_s or (
+        rows[-1][0] - origin
+    ) / hz + margin < window.end_s:
+        raise ValueError("Trace does not cover the measured gate")

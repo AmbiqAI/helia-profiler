@@ -27,20 +27,32 @@ def request():
 def measured():
     return PowerResult(
         PowerSummary(0.002, 0.004, 0.003, 0.02, 5.0, 5000),
-        gated_windows=[GatedPowerWindow(1.0, 6.0, 5.0, 0.01, 0.02, 0.002, 0.004, 0.003, 5000)],
+        gated_windows=[
+            GatedPowerWindow(-0.0005, 4.9995, 5.0, 0.01, 0.02, 0.002, 0.004, 0.003, 5000)
+        ],
         statistics=[
             {
+                "time": {
+                    "samples": {"value": [i * 1000, (i + 1) * 1000]},
+                    "sample_freq": {"value": 1000000},
+                    "utc": {"value": [i * 1000000, (i + 1) * 1000000]},
+                },
                 "signals": {
-                    name: {key: {"value": value} for key in fields}
+                    name: {
+                        key: {"value": value if key == "avg" else value * 0.001} for key in fields
+                    }
                     for name, fields, value in (
                         ("current", ("avg", "integral"), 0.002),
                         ("voltage", ("avg",), 2.0),
                         ("power", ("avg", "integral"), 0.004),
                     )
-                }
+                },
             }
+            for i in range(5000)
         ],
-        gate_samples=[(1, 1), (6, 0)],
+        gate_samples=[(0, 1), (5000000000, 0)],
+        statistics_timebase_hz=1000000000,
+        statistics_device_time=True,
         metadata=PowerMetadata(
             device="u/js320/25QG",
             stats_rate_hz=1000,
@@ -81,6 +93,9 @@ def test_invalid_instrument_and_wiring_refuse_without_operations(changes):
 def test_existing_driver_has_guarded_lifecycle_and_always_releases(monkeypatch, failure):
     events = []
     observation = measured()
+    observation.metadata.integrity = None
+    observation.metadata.gate_rise_observed = None
+    observation.metadata.gate_fall_observed = None
 
     class Guard:
         def verify_power_device(self, **kw):
@@ -234,3 +249,25 @@ def test_numeric_instrument_packets_are_serialized_without_waveform_fabrication(
     assert saved["voltage"] == pytest.approx(1.8)
     with pytest.raises(TypeError):
         json.dumps({"bad": object()}, default=_power_json_value)
+
+
+@pytest.mark.parametrize("defect", ["missing", "duplicate", "timestamp", "gate_coverage"])
+def test_partial_trace_never_divides_by_full_iteration_count(tmp_path, defect):
+    observation = measured()
+    if defect == "missing":
+        observation.statistics.pop(2500)
+    if defect == "duplicate":
+        observation.statistics.insert(2500, observation.statistics[2500])
+    if defect == "timestamp":
+        observation.statistics[0].pop("time")
+    if defect == "gate_coverage":
+        observation.gated_windows[0] = replace(observation.gated_windows[0], end_s=8.0)
+    path = tmp_path / "raw.json"
+    path.write_bytes(b"saved raw")
+    timing = FixtureTiming(
+        163840, 400, 5, 32768, 300, 96000000, FixtureTimingScope.RESTORE_AND_INVOKE
+    )
+    with pytest.raises(ValueError):
+        power.fixture_rail_energy(
+            observation, request(), timing, FixtureFile(path, sha256(path.read_bytes()).hexdigest())
+        )
