@@ -374,30 +374,33 @@ Unknown runtime or source mappings invalidate the whole AOT plan rather than
 silently dropping allocations. Staged constant source and destination remain
 separate physical consumers; neither is added to enclosing section totals.
 
-`fixture_operator_timing.bind_operator_timing(build, fixture, profile)` attributes
-per-layer cycles from a separate `hpx profile` run of the same model to a fixture
-build. The fixture image has no per-operator hooks, so these are approximate
-shares from a PMU-instrumented sibling image, never the fixture's latency. The
-record is null with a reason unless the fixture is the one the build was made
-from and the model hash, engine, TFLM `cmsis_nn` or heliaRT `helia` backend, compiler version, board,
-LP 96 MHz clock and SRAM/MRAM placement match, the core clock measured on the
-device (when the run recorded one) is within 5 % of 96 MHz, every layer has finite cycles, no
-counter overflowed, the clean window ran inferences, and the per-layer sum agrees
-with the clean-window cycles within 1 % (2 % below 2 ms). Runtime identity is `same`, `different` or `unknown`, comparing actually recorded
-engine version/source, provider identities and engine-input settings. The pinned
-per-build dependency state is hash-verified before its engine-input snapshot is
-read. New AOT snapshots record the observed installed package and VCS commit;
-wheel installs without a commit and older missing source/settings remain unknown.
-Requested refs, package versions and opaque intent hashes are not source proof.
-Dependency selector spellings are excluded from effective settings comparisons;
-resolved module identities still participate. Missing settings and differing
-unparsed config-file digests remain unknown rather than guessed defaults.
-Unreadable optional installation metadata records an unknown commit.
+`fixture.observe_operator_timing(build, fixture, profile)` reads per-operator
+cycles from a separate `hpx profile` image and records their relation to a fixture
+build. These are approximate sibling-image observations, never the fixture's
+latency. The immutable facts carry layer cycles and shares, clean-window cycles,
+signed agreement and unattributed cycles, recorded CPU frequency, runtime identity
+and observed engine version. There is no comparison tolerance or acceptance verdict.
 
-Default attribution requires fully evidenced matching identity. The existing
-`allow_runtime_difference=True` permits approximate observations explicitly
-labeled different or unknown, without waiving provenance hashes or the other
-identity, counter and agreement checks. Prepared TFLM/heliaRT archive settings
-are not recorded by an ordinary profile, so matching source revisions alone
-cannot establish the same archive build. The helper is internal, outside the
-public fixture facade. Historical raw records remain unchanged.
+Invalid supplied provenance, overflowing/nonfinite counters and a clean window
+that did not invoke the model make observations unavailable (`reason`). A missing
+or conflicting model, method, compiler, board, clock or placement binding is an
+`attribution_reason`: valid profile cycles remain visible, but cannot be attributed
+to that fixture build. PSRAM payload/layout and state policy are not bound by an
+ordinary profile. Consumers must preserve these limitations; neither a comparison
+threshold nor an exploratory runtime choice overrides them.
+
+Runtime identity is `same`, `different` or `unknown`, comparing recorded engine
+source, resolved providers and effective settings after verifying pinned provenance.
+Requested refs, package versions and opaque intent hashes are not source proof.
+Missing source/settings, wheel installs without a VCS commit, unparsed config-file
+digests and unrecorded prepared-archive settings remain unknown. Qualification is
+not inferred from any of these facts.
+
+BENCH owns comparison eligibility and layer-sum agreement tolerances. Its policy
+retains the observations and records its verdict separately. The deprecated
+internal `fixture_operator_timing.bind_operator_timing` wrapper temporarily retains
+the previous default same-runtime requirement, explicit runtime allowance and
+1% agreement rule (2% below 2ms) for unknown external callers. Maintained consumers
+use the public facts route. Removal requires an explicit breaking retirement after
+migration notice; repository search does not establish external caller absence.
+Historical raw records and build/capture safety validation are unchanged.

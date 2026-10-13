@@ -13,6 +13,7 @@ from helia_profiler.fixture import (
     FixtureIO,
     FixtureTimingScope,
     TypedFixture,
+    observe_operator_timing,
 )
 from helia_profiler.fixture_analysis import FixtureTensor, Int8Tensor, PerTensorQuantization
 from helia_profiler.fixture_operator_timing import bind_operator_timing
@@ -187,6 +188,142 @@ def test_long_inference_outside_one_percent_is_refused(tmp_path):
     assert result.operators is None
     assert result.reason == "layer_sum_disagrees_with_clean_window"
     assert result.agreement_pct == pytest.approx(1.297, abs=0.01)
+
+
+def test_public_observation_preserves_disagreement_without_acceptance(tmp_path):
+    layers = [dict(layer, cycles=layer["cycles"] * 1.2) for layer in PROFILES["kws_aot"]["layers"]]
+    fixture = fixture_for(KWS_SHA, tmp_path)
+    build = build_for(EngineType.HELIA_AOT, fixture)
+    run = profile("kws_aot", layers=layers)
+    legacy = approximate_timing(build, fixture, run)
+    assert legacy.reason == "layer_sum_disagrees_with_clean_window" and legacy.operators is None
+    facts = observe_operator_timing(build, fixture, run)
+    assert facts.reason is None and facts.attribution_reason is None
+    assert facts.operators is not None and len(facts.operators) == len(layers)
+    expected = sum(layer["cycles"] for layer in layers)
+    assert facts.layer_cycles_sum == expected
+    assert facts.clean_cycles == PROFILES["kws_aot"]["clean_infer_avg_cycles"]
+    assert facts.agreement_pct == pytest.approx(100 * (expected / facts.clean_cycles - 1))
+    assert facts.unattributed_cycles == facts.clean_cycles - expected
+    assert facts.runtime_stack == "unknown" and facts.cpu_hz == 96_000_000
+    assert not hasattr(facts, "accepted") and not hasattr(facts, "tolerance_pct")
+
+
+@pytest.mark.parametrize("relation", ["same", "different", "unknown"])
+def test_public_observation_keeps_runtime_relation_without_eligibility(tmp_path, relation):
+    build, fixture, run = evidenced_pair(tmp_path)
+    if relation == "different":
+        build = replace(build, engine_source=replace(build.engine_source, commit="d" * 40))
+    elif relation == "unknown":
+        build = replace(build, dependency_state=None)
+    facts = observe_operator_timing(build, fixture, run)
+    assert facts.reason is None and facts.operators is not None
+    assert facts.runtime_stack == relation
+    assert facts.attribution_reason is None
+
+
+def test_public_observation_distinguishes_attribution_from_invalid_data(tmp_path):
+    fixture = fixture_for(KWS_SHA, tmp_path)
+    build = replace(build_for(EngineType.HELIA_AOT, fixture), toolchain=None)
+    facts = observe_operator_timing(build, fixture, profile("kws_aot"))
+    assert facts.reason is None and facts.operators is not None
+    assert facts.attribution_reason == "toolchain_unrecorded"
+
+
+def test_valid_cross_engine_provenance_is_a_difference_not_corruption(tmp_path):
+    _, fixture, run = evidenced_pair(tmp_path)
+    build = build_for(EngineType.TFLM, fixture)
+    facts = observe_operator_timing(build, fixture, run)
+    assert facts.reason is None and facts.operators is not None
+    assert facts.attribution_reason == "engine_mismatch"
+    assert facts.runtime_stack == "different"
+    deps = run.metadata.dependencies
+    inputs = {"engine": {**deps.workspace.inputs["engine"], "type": "tflm"}}
+    corrupt = replace(deps, workspace=replace(deps.workspace, inputs=inputs))
+    inconsistent = replace(run, metadata=replace(run.metadata, dependencies=corrupt))
+    refused = observe_operator_timing(build, fixture, inconsistent)
+    assert refused.reason == "runtime_provenance_unverified" and refused.operators is None
+
+
+def test_legacy_attribution_failure_preserves_null_numeric_fields(tmp_path):
+    from dataclasses import asdict
+
+    fixture = fixture_for(KWS_SHA, tmp_path)
+    legacy = approximate_timing(
+        build_for(EngineType.HELIA_AOT, fixture),
+        fixture,
+        profile("kws_aot", model_sha256="1" * 64),
+    )
+    assert asdict(legacy) == {
+        "build_identity": "build-identity",
+        "operators": None,
+        "reason": "model_mismatch",
+        "layer_cycles_sum": None,
+        "clean_cycles": None,
+        "unattributed_cycles": None,
+        "agreement_pct": None,
+        "tolerance_pct": None,
+        "runtime_stack": "unknown",
+        "engine_version": "0.22.0",
+    }
+
+
+@pytest.mark.parametrize("cycles", [True, "1", 10**400])
+def test_public_observation_refuses_malformed_layer_numbers(tmp_path, cycles):
+    fixture = fixture_for(KWS_SHA, tmp_path)
+    run = profile("kws_aot")
+    layers = [replace(layer, cycles=cycles) for layer in run.pmu.layers]
+    run = replace(
+        run,
+        pmu=replace(run.pmu, layers=layers, meta=replace(run.pmu.meta, clean_infer_avg_cycles=13)),
+    )
+    facts = observe_operator_timing(build_for(EngineType.HELIA_AOT, fixture), fixture, run)
+    assert facts.reason == "layer_cycles_unavailable" and facts.operators is None
+
+
+def test_public_observation_refuses_unrepresentable_clean_count(tmp_path):
+    fixture = fixture_for(KWS_SHA, tmp_path)
+    run = profile("kws_aot", clean_infer_avg_cycles=10**400)
+    facts = observe_operator_timing(build_for(EngineType.HELIA_AOT, fixture), fixture, run)
+    assert facts.reason == "clean_window_unavailable" and facts.operators is None
+
+
+def test_public_observation_never_waives_tampered_provenance(tmp_path):
+    build, fixture, run = evidenced_pair(tmp_path)
+    build.dependency_state.path.write_text("{}")
+    facts = observe_operator_timing(build, fixture, run)
+    assert facts.reason == "runtime_provenance_unverified" and facts.operators is None
+    legacy = approximate_timing(build, fixture, run)
+    assert legacy.reason == facts.reason and legacy.operators is None
+    assert legacy.clean_cycles == run.pmu.meta.clean_infer_avg_cycles
+    assert legacy.agreement_pct == facts.agreement_pct and legacy.tolerance_pct == 1
+
+
+@pytest.mark.parametrize("condition", ["overflow", "busy_loop", "nonfinite_sum", "zero_sum"])
+def test_public_observation_counter_boundaries(tmp_path, condition):
+    fixture = fixture_for(KWS_SHA, tmp_path)
+    layers = [dict(layer) for layer in PROFILES["kws_aot"]["layers"]]
+    run = profile("kws_aot")
+    expected = None
+    if condition == "overflow":
+        run = profile("kws_aot", overflow_detected=True)
+        expected = "counter_overflow"
+    elif condition == "busy_loop":
+        run = profile("kws_aot", config={"profiling": {"clean_window_probe": "busy_loop"}})
+        expected = "clean_window_not_inference"
+    else:
+        for layer in layers:
+            layer["cycles"] = 1e308 if condition == "nonfinite_sum" else 0
+        run = profile("kws_aot", layers=layers)
+        if condition == "nonfinite_sum":
+            expected = "layer_cycles_unavailable"
+    facts = observe_operator_timing(build_for(EngineType.HELIA_AOT, fixture), fixture, run)
+    assert facts.reason == expected
+    if expected:
+        assert facts.operators is None
+    else:
+        assert facts.operators is not None and all(op.share == 0 for op in facts.operators)
+        assert facts.agreement_pct == -100
 
 
 def test_busy_loop_clean_window_is_refused(tmp_path):

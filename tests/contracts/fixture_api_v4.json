@@ -1,7 +1,7 @@
 {
   "api_version": [
     4,
-    0
+    1
   ],
   "surface": {
     "ElfSection": {
@@ -902,6 +902,69 @@
       "methods": {},
       "properties": []
     },
+    "FixtureOperatorTimingFacts": {
+      "fields": [
+        [
+          "build_identity",
+          "str | None",
+          "<required>"
+        ],
+        [
+          "operators",
+          "tuple[OperatorTiming, ...] | None",
+          "<required>"
+        ],
+        [
+          "reason",
+          "str | None",
+          "<required>"
+        ],
+        [
+          "attribution_reason",
+          "str | None",
+          "<required>"
+        ],
+        [
+          "runtime_stack",
+          "str",
+          "<required>"
+        ],
+        [
+          "engine_version",
+          "str | None",
+          "<required>"
+        ],
+        [
+          "cpu_hz",
+          "int | None",
+          "<required>"
+        ],
+        [
+          "layer_cycles_sum",
+          "float | None",
+          "None"
+        ],
+        [
+          "clean_cycles",
+          "int | None",
+          "None"
+        ],
+        [
+          "unattributed_cycles",
+          "float | None",
+          "None"
+        ],
+        [
+          "agreement_pct",
+          "float | None",
+          "None"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
     "FixturePlacement": {
       "fields": [
         [
@@ -1227,6 +1290,39 @@
         [
           "memory_size",
           "int",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "OperatorTiming": {
+      "fields": [
+        [
+          "index",
+          "int | str",
+          "<required>"
+        ],
+        [
+          "op",
+          "str",
+          "<required>"
+        ],
+        [
+          "source_index",
+          "int | None",
+          "<required>"
+        ],
+        [
+          "cycles",
+          "float",
+          "<required>"
+        ],
+        [
+          "share",
+          "float",
           "<required>"
         ]
       ],
@@ -1691,6 +1787,10 @@
     "inspect_fixture_footprint": {
       "kind": "function",
       "signature": "(*, elf: 'FixtureFile', image: 'FixtureFile', link_map: 'FixtureFile', target: 'FixtureTarget', toolchain: 'str') -> 'FixtureFootprint'"
+    },
+    "observe_operator_timing": {
+      "kind": "function",
+      "signature": "(build: 'FixtureBuild', fixture: 'FixedFixture | TypedFixture', profile: 'ProfileResult') -> 'FixtureOperatorTimingFacts'"
     },
     "section_inventory": {
       "kind": "function",
