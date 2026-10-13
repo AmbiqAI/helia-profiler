@@ -139,7 +139,7 @@ def test_existing_driver_has_guarded_lifecycle_and_always_releases(monkeypatch, 
 
         def capture_gated(self, **kw):
             events.append("observe")
-            kw["on_started"]()
+            kw["on_started"](lambda *args: events.append("ready") or failure != "ready")
             # The maintained driver logs callback exceptions. The wrapper must
             # still refuse the result if an ongoing guard failed.
             try:
@@ -251,13 +251,17 @@ def test_numeric_instrument_packets_are_serialized_without_waveform_fabrication(
         json.dumps({"bad": object()}, default=_power_json_value)
 
 
-@pytest.mark.parametrize("defect", ["missing", "duplicate", "timestamp", "gate_coverage"])
+@pytest.mark.parametrize(
+    "defect", ["missing", "duplicate", "timestamp", "gate_coverage", "nonmonotonic"]
+)
 def test_partial_trace_never_divides_by_full_iteration_count(tmp_path, defect):
     observation = measured()
     if defect == "missing":
         observation.statistics.pop(2500)
     if defect == "duplicate":
         observation.statistics.insert(2500, observation.statistics[2500])
+    if defect == "nonmonotonic":
+        observation.statistics[2500]["time"]["utc"]["value"] = [100000000000, 100001000000]
     if defect == "timestamp":
         observation.statistics[0].pop("time")
     if defect == "gate_coverage":

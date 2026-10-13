@@ -118,11 +118,13 @@ def observe_fixture_power(
             failures.append(exc)
             raise
 
-    def started(_wait=None) -> None:
+    def started(wait_gpi) -> None:
         nonlocal phase
         check()
         reset()
-        if not sync.wait_ready(timeout_s=min(15.0, request.settle_seconds)):
+        if not wait_gpi(power.state_input_index, True, min(15.0, request.settle_seconds)):
+            if failures:
+                raise failures[0]
             raise ValueError("Power firmware did not signal READY")
         check()
         phase = "go_signaled"
@@ -242,7 +244,7 @@ def _validate_trace_coverage(observation: PowerResult) -> None:
     hz = observation.statistics_timebase_hz
     if type(hz) is not int or hz <= 0:
         raise ValueError("Missing instrument timestamp scale")
-    previous_end = rate = None
+    previous_end = rate = previous_u0 = previous_u1 = previous_axis = None
     rows = []
     for packet in observation.statistics:
         try:
@@ -258,6 +260,12 @@ def _validate_trace_coverage(observation: PowerResult) -> None:
                 raise ValueError
             previous_end, rate = last, frequency
             axis = (u0 + u1) / 2 if observation.statistics_device_time else packet["_host_time64"]
+            if not math.isfinite(axis) or (
+                previous_axis is not None
+                and (axis <= previous_axis or u0 <= previous_u0 or u1 <= previous_u1)
+            ):
+                raise ValueError
+            previous_axis, previous_u0, previous_u1 = axis, u0, u1
             duration = (last - first) / frequency
             rows.append((axis, duration))
         except (KeyError, TypeError, ValueError, OverflowError) as exc:
