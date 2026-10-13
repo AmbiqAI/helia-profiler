@@ -389,6 +389,10 @@ per-build dependency state is hash-verified before its engine-input snapshot is
 read. New AOT snapshots record the observed installed package and VCS commit;
 wheel installs without a commit and older missing source/settings remain unknown.
 Requested refs, package versions and opaque intent hashes are not source proof.
+Dependency selector spellings are excluded from effective settings comparisons;
+resolved module identities still participate. Missing settings and differing
+unparsed config-file digests remain unknown rather than guessed defaults.
+Unreadable optional installation metadata records an unknown commit.
 
 Default attribution requires fully evidenced matching identity. The existing
 `allow_runtime_difference=True` permits approximate observations explicitly

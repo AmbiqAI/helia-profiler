@@ -9,6 +9,7 @@ from dataclasses import asdict, dataclass
 from itertools import combinations
 
 from ._fixture_build import FixedFixture, FixtureBuild, TypedFixture
+from .deps.compatibility import _ENGINE_SOURCE_OVERRIDE_KEYS, _MODULE_SOURCE_OVERRIDE_KEYS
 from .engines import EngineType
 from .fixture_capture import FIXTURE_CPU_HZ
 from .fixture_runtime import _unique_object
@@ -232,6 +233,33 @@ def _engine_inputs(record: dict) -> dict:
     return value
 
 
+def _settings_relation(left: object, right: object) -> str:
+    """Compare recorded settings without guessing an absent key's default."""
+    if isinstance(left, dict) and isinstance(right, dict):
+        relations = [
+            _settings_relation(left[key], right[key]) for key in left.keys() & right.keys()
+        ]
+        if "different" in relations:
+            return "different"
+        if left.keys() != right.keys() or "unknown" in relations:
+            return "unknown"
+        return "same"
+    return "same" if type(left) is type(right) and left == right else "different"
+
+
+def _effective_config(config: dict) -> dict:
+    # Source selectors request dependencies; resolved identities supply proof.
+    selectors = _ENGINE_SOURCE_OVERRIDE_KEYS | _MODULE_SOURCE_OVERRIDE_KEYS
+    return {key: value for key, value in config.items() if key not in selectors}
+
+
+def _effective_modules(entries: list[dict]) -> list[dict]:
+    return [
+        {key: value for key, value in entry.items() if key not in {"ref", "version"}}
+        for entry in entries
+    ]
+
+
 def _runtime_identity(build: FixtureBuild, profile: ProfileResult) -> tuple[str, str | None]:
     """Compare available facts; an absent fact never supplies equality evidence."""
     different = False
@@ -264,6 +292,20 @@ def _runtime_identity(build: FixtureBuild, profile: ProfileResult) -> tuple[str,
     for key in _ENGINE_SETTINGS:
         if key not in inputs or key not in other_inputs:
             complete = False
+        elif key == "config":
+            relation = _settings_relation(
+                _effective_config(inputs[key]), _effective_config(other_inputs[key])
+            )
+            different |= relation == "different"
+            complete &= relation != "unknown"
+        elif key == "extra_modules":
+            if _effective_modules(inputs[key]) != _effective_modules(other_inputs[key]):
+                different = True
+        elif key == "config_path_hash":
+            if inputs[key] != other_inputs[key]:
+                # Differing config-file bytes do not establish differing parsed
+                # settings; the normalized file contents are not recorded here.
+                complete = False
         elif key == "cmake_vars":
             left, right = dict(inputs[key]), dict(other_inputs[key])
             # Generated attribute-header paths are workspace locations, not

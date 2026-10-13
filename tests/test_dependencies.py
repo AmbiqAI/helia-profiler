@@ -944,3 +944,23 @@ def test_workspace_records_observed_aot_install_identity(tmp_path, monkeypatch):
     )
     second = create_workspace(ctx)
     assert first.fingerprint != second.fingerprint
+
+
+@pytest.mark.parametrize(
+    "error", [UnicodeDecodeError("utf8", b"x", 0, 1, "invalid"), OSError("unreadable metadata")]
+)
+def test_optional_aot_metadata_read_failure_remains_unknown(tmp_path, monkeypatch, error):
+    class Distribution:
+        version = "0.25.0"
+
+        def read_text(self, name):
+            raise error
+
+    monkeypatch.setattr("importlib.metadata.distribution", lambda name: Distribution())
+    ctx = _context(tmp_path, engine_type="helia-aot")
+    assert ctx.dependency_workspace is not None
+    assert ctx.dependency_workspace.inputs["engine"]["source"] == {
+        "package": "helia-aot",
+        "version": "0.25.0",
+        "commit": None,
+    }

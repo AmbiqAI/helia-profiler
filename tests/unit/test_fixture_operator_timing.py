@@ -709,3 +709,61 @@ def test_deeply_nested_pinned_json_is_a_refusal(tmp_path):
     )
     result = bind_operator_timing(build, fixture, run, allow_runtime_difference=True)
     assert not result.accepted and result.reason == "runtime_provenance_unverified"
+
+
+@pytest.mark.parametrize(
+    "selector", ["cmsis_nn_ref", "cmsis_nn_path", "source", "source_path", "dist_path"]
+)
+def test_requested_source_spelling_is_not_resolved_identity(tmp_path, selector):
+    build, fixture, run = evidenced_pair(tmp_path)
+    record = json.loads(json.dumps(run.metadata.dependencies.to_dict()))
+    record["workspace"]["inputs"]["engine"]["config"][selector] = "requested/tag"
+    build = pin_state(build, record)
+    result = bind_operator_timing(build, fixture, run)
+    assert result.accepted and result.runtime_stack == "same"
+
+
+@pytest.mark.parametrize("key", ["ref", "version"])
+def test_requested_module_spelling_is_not_resolved_identity(tmp_path, key):
+    build, fixture, run = evidenced_pair(tmp_path)
+    deps = run.metadata.dependencies
+    entry = {
+        "name": "ns-cmsis-nn",
+        "project": "ns-cmsis-nn",
+        "local": False,
+        "ref": "baseline",
+        "version": None,
+    }
+    record = json.loads(json.dumps(deps.to_dict()))
+    record["workspace"]["inputs"]["engine"]["extra_modules"] = [entry]
+    build = pin_state(build, record)
+    inputs = json.loads(json.dumps(deps.workspace.inputs))
+    inputs["engine"]["extra_modules"] = [{**entry, key: "another/request"}]
+    run = replace(
+        run,
+        metadata=replace(
+            run.metadata,
+            dependencies=replace(deps, workspace=replace(deps.workspace, inputs=inputs)),
+        ),
+    )
+    result = bind_operator_timing(build, fixture, run)
+    assert result.accepted and result.runtime_stack == "same"
+
+
+def test_missing_setting_does_not_infer_its_default(tmp_path):
+    build, fixture, run = evidenced_pair(tmp_path)
+    record = json.loads(json.dumps(run.metadata.dependencies.to_dict()))
+    del record["workspace"]["inputs"]["engine"]["config"]["aot_args"]["optimize"]
+    build = pin_state(build, record)
+    assert bind_operator_timing(build, fixture, run).runtime_stack == "unknown"
+
+
+def test_different_config_file_digest_needs_effective_settings_evidence(tmp_path):
+    build, fixture, run = evidenced_pair(tmp_path)
+    record = json.loads(json.dumps(run.metadata.dependencies.to_dict()))
+    record["workspace"]["inputs"]["engine"]["config_path_hash"] = {
+        "algorithm": "sha256",
+        "value": "d" * 64,
+    }
+    build = pin_state(build, record)
+    assert bind_operator_timing(build, fixture, run).runtime_stack == "unknown"

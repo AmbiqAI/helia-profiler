@@ -160,7 +160,7 @@ def installed_aot_source() -> InstalledAotSource | None:
     commit = None
     try:
         direct_url = json.loads(distribution.read_text("direct_url.json") or "{}")
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, OSError, UnicodeError):
         direct_url = {}
     if isinstance(direct_url, dict) and isinstance(direct_url.get("vcs_info"), dict):
         found = direct_url["vcs_info"].get("commit_id")
