@@ -669,7 +669,14 @@ def _build(
     if verified_runtime is not None:
         stages.append(_PreparedRuntimeStage(verified_runtime))
     stages += [
-        _BindFixtureStage(FixtureRenderSpec(fixture, method, model, observe_aot_arenas)),
+        _BindFixtureStage(
+            FixtureRenderSpec(
+                fixture=fixture,
+                method=method,
+                model=model,
+                observe_aot_arenas=observe_aot_arenas,
+            )
+        ),
         PlanMemoryStage(),
         GenerateFirmwareStage(),
     ]
@@ -749,25 +756,25 @@ def _build(
     ):
         planned_memory = None
     return FixtureBuild(
-        fixture.identity,
-        app,
-        binary,
-        sources,
-        fixture.expected,
-        compile,
-        runtime.manifest if runtime else None,
-        flat_binary,
-        dependency_lock,
-        link_map,
-        method.timing_scope,
-        config.engine.type,
-        artifact_identity,
-        config.profiling.iterations,
-        config.profiling.warmup,
-        intent_identity,
-        supported_fixture_target(),
-        toolchain,
-        "manifest-declared; independently audit the pinned build/source record"
+        fixture_identity=fixture.identity,
+        app_dir=app,
+        binary=binary,
+        generated_sources=sources,
+        expected=fixture.expected,
+        built=compile,
+        runtime_manifest=runtime.manifest if runtime else None,
+        flat_binary=flat_binary,
+        dependency_lock=dependency_lock,
+        link_map=link_map,
+        timing_scope=method.timing_scope,
+        engine=config.engine.type,
+        build_identity=artifact_identity,
+        iterations=config.profiling.iterations,
+        warmups=config.profiling.warmup,
+        intent_identity=intent_identity,
+        target=supported_fixture_target(),
+        toolchain=toolchain,
+        provider_provenance="manifest-declared; independently audit the pinned build/source record"
         if runtime
         else "normal AOT engine artifacts and resolved dependency lock",
         planned_memory=planned_memory,
