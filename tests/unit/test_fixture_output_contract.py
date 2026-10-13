@@ -3,6 +3,7 @@
 import hashlib
 import json
 from dataclasses import asdict, replace
+from enum import StrEnum
 from types import SimpleNamespace
 
 import pytest
@@ -11,6 +12,7 @@ from helia_profiler.fixture import (
     FixtureFile,
     FixtureIO,
     FixtureOutput,
+    FixtureRole,
     FixtureTensor,
     PerTensorQuantization,
     TypedFixture,
@@ -88,3 +90,21 @@ def test_reference_removal_does_not_change_rendered_io(tmp_path):
         assert _fixture_io(SimpleNamespace(fixture=descriptors), inputs=inputs) == _fixture_io(
             SimpleNamespace(fixture=referenced), inputs=inputs
         )
+
+
+class ConsumerRole(StrEnum):
+    SIGNAL = "signal"
+
+
+@pytest.mark.parametrize("role", [ConsumerRole.SIGNAL, "signal"])
+def test_build_record_normalizes_valid_caller_role_without_changing_identity(tmp_path, role):
+    from helia_profiler._fixture_build import _measurement_io
+
+    original = _fixture(tmp_path)
+    supplied = replace(original, inputs=(replace(original.inputs[0], role=role),))
+    supplied.verify()
+    assert supplied.identity == original.identity
+    inputs, outputs = _measurement_io(supplied)
+    assert inputs[0].role is FixtureRole.SIGNAL
+    assert inputs[0].data == original.inputs[0].data
+    assert outputs == tuple(io.tensor for io in supplied.outputs)

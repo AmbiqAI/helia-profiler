@@ -814,7 +814,10 @@ def _build(
 
 def _measurement_io(fixture: FixedFixture | TypedFixture):
     if isinstance(fixture, TypedFixture):
-        return fixture.inputs, tuple(io.tensor for io in fixture.outputs)
+        return (
+            tuple(replace(io, role=FixtureRole(io.role)) for io in fixture.inputs),
+            tuple(io.tensor for io in fixture.outputs),
+        )
 
     def tensor(value: Int8Tensor, name: str) -> FixtureTensor:
         return FixtureTensor(
