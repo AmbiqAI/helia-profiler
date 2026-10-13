@@ -949,6 +949,8 @@ def test_power_capture_preserves_full_terminal_and_instrument_evidence(rig, tmp_
     monkeypatch.setattr(capture, "observe_fixture_power", observe)
     result = capture.capture_fixture(request, guard=guard)
     assert result.state == "success", result.error
+    assert result.output is not None
+    assert result.rail_energy is not None
     assert result.output.read() == bytes([1, 2, 3])
     assert result.rail_energy.energy_j == 0.02
     assert result.rail_energy.iterations == 10
