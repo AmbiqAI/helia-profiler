@@ -1,6 +1,6 @@
 name: Documentation site
 
-# The Astro site is built and validated here on every pull request, and the
+# The Astro site is built and validated here on ready pull requests, and the
 # deploy job publishes the tested artifact to GitHub Pages on a release, a
 # docs-only push to main, or a manual dispatch, behind the ordering guard.
 
@@ -9,6 +9,7 @@ on:
   # a change under src/helia_profiler/** can change the site even when nothing
   # under astro-site/ moved.
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches:
       - main
@@ -41,6 +42,7 @@ defaults:
 
 jobs:
   build:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     name: Build and validate the documentation artifact
     runs-on: ubuntu-latest
     timeout-minutes: 20
