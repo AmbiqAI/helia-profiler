@@ -65,7 +65,7 @@ def test_regenerate_from_readonly_sources(tmp_path: Path, existing_readonly: boo
             path.chmod(0o444)
         _copy_segger_rtt(app, source)
         for path in destinations:
-            assert b"// upstream change\n" in path.read_bytes()
+            assert "// upstream change\n" in path.read_text(encoding="utf-8")
     finally:
         for path in sources + destinations:
             if path.exists():
