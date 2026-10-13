@@ -336,7 +336,7 @@ def test_find_segger_rtt_dir_uses_bundled_sources_by_default(
     source = (bundled / "SOURCE.md").read_text()
     assert "V8.58.0" in source
     assert "4d8feab3150f86f37a9d323ddc88d6cdf5673072" in source
-    implementation = (bundled / "RTT" / "SEGGER_RTT.c").read_text()
+    implementation = (bundled / "RTT" / "SEGGER_RTT.c").read_text(encoding="utf-8")
     assert "SEGGER_RTT_PUT_CB_SECTION" in implementation
     assert "SEGGER_RTT_PUT_BUFFER_SECTION" in implementation
 
@@ -696,7 +696,7 @@ class TestGenerateApp:
 
         modules_cmake = (app_dir / "cmake" / "nsx" / "modules.cmake").read_text()
         cmake = (app_dir / "CMakeLists.txt").read_text()
-        profiler_h = (app_dir / "src" / "hpx_pmu_profiler.h").read_text()
+        profiler_h = (app_dir / "src" / "hpx_pmu_profiler.h").read_text(encoding="utf-8")
         assert "nsx-pmu-armv8m" not in modules_cmake
         assert "nsx::pmu_armv8m" not in cmake
         assert "nsx_pmu_utils.h" not in profiler_h
@@ -729,8 +729,8 @@ class TestGenerateApp:
         PrepareEngineStage().run(ctx)
         app_dir = generate_app(ctx)
 
-        main_cc = (app_dir / "src" / "main.cc").read_text()
-        profiler_h = (app_dir / "src" / "hpx_pmu_profiler.h").read_text()
+        main_cc = (app_dir / "src" / "main.cc").read_text(encoding="utf-8")
+        profiler_h = (app_dir / "src" / "hpx_pmu_profiler.h").read_text(encoding="utf-8")
         cmake = (app_dir / "CMakeLists.txt").read_text()
         assert "HPX_START" in main_cc
         assert "HPX_END" in main_cc
@@ -804,7 +804,7 @@ class TestGenerateApp:
         PrepareEngineStage().run(ctx)
         app_dir = generate_app(ctx)
 
-        main_cc = (app_dir / "src" / "main.cc").read_text()
+        main_cc = (app_dir / "src" / "main.cc").read_text(encoding="utf-8")
         assert "kPowerSyncEnabled = false" in main_cc
 
     def test_gpio_sync_enabled_with_power(self, tmp_path: Path, fake_dist: Path):
@@ -827,7 +827,7 @@ class TestGenerateApp:
         PrepareEngineStage().run(ctx)
         app_dir = generate_app(ctx)
 
-        main_cc = (app_dir / "src" / "main.cc").read_text()
+        main_cc = (app_dir / "src" / "main.cc").read_text(encoding="utf-8")
         nsx_yml = (app_dir / "nsx.yml").read_text()
         cmake = (app_dir / "CMakeLists.txt").read_text()
         assert "kPowerSyncEnabled = true" in main_cc
@@ -870,8 +870,8 @@ class TestGenerateApp:
 
         nsx_yml = (app_dir / "nsx.yml").read_text()
         cmake = (app_dir / "CMakeLists.txt").read_text()
-        main_cc = (app_dir / "src" / "main.cc").read_text()
-        main_power_cc = (app_dir / "src" / "main_power.cc").read_text()
+        main_cc = (app_dir / "src" / "main.cc").read_text(encoding="utf-8")
+        main_power_cc = (app_dir / "src" / "main_power.cc").read_text(encoding="utf-8")
         # Module graph: the dedicated power binary reads the monitor over I2C.
         assert "nsx-i2c" in nsx_yml
         assert "nsx-sensors" in nsx_yml
@@ -931,7 +931,7 @@ class TestGenerateApp:
 
         nsx_yml = (app_dir / "nsx.yml").read_text()
         cmake = (app_dir / "CMakeLists.txt").read_text()
-        main_power_cc = (app_dir / "src" / "main_power.cc").read_text()
+        main_power_cc = (app_dir / "src" / "main_power.cc").read_text(encoding="utf-8")
         # Gate 1 — module selection.
         assert "nsx-i2c" in nsx_yml
         assert "nsx-sensors" in nsx_yml
@@ -971,7 +971,7 @@ class TestGenerateApp:
 
         nsx_yml = (app_dir / "nsx.yml").read_text()
         cmake = (app_dir / "CMakeLists.txt").read_text()
-        main_power_cc = (app_dir / "src" / "main_power.cc").read_text()
+        main_power_cc = (app_dir / "src" / "main_power.cc").read_text(encoding="utf-8")
         assert "nsx-sensors" not in nsx_yml
         assert "nsx::sensors" not in cmake
         assert "ina228" not in main_power_cc
@@ -996,7 +996,7 @@ class TestGenerateApp:
         PrepareEngineStage().run(ctx)
         app_dir = generate_app(ctx)
 
-        main_power_cc = (app_dir / "src" / "main_power.cc").read_text()
+        main_power_cc = (app_dir / "src" / "main_power.cc").read_text(encoding="utf-8")
         cmake = (app_dir / "CMakeLists.txt").read_text()
         assert "hpx_profiler_power" in cmake
         assert "add_executable(hpx_profiler_power EXCLUDE_FROM_ALL" in cmake
@@ -1099,8 +1099,8 @@ class TestGenerateApp:
         PrepareEngineStage().run(ctx)
         app_dir = generate_app(ctx)
 
-        main_power_cc = (app_dir / "src" / "main_power.cc").read_text()
-        main_cc = (app_dir / "src" / "main.cc").read_text()
+        main_power_cc = (app_dir / "src" / "main_power.cc").read_text(encoding="utf-8")
+        main_cc = (app_dir / "src" / "main.cc").read_text(encoding="utf-8")
 
         self._assert_window_is_stimer_bracketed(main_power_cc, "main_power.cc")
 
@@ -1181,7 +1181,7 @@ class TestGenerateApp:
         PrepareEngineStage().run(ctx)
         app_dir = generate_app(ctx)
 
-        main_cc = (app_dir / "src" / "main.cc").read_text()
+        main_cc = (app_dir / "src" / "main.cc").read_text(encoding="utf-8")
         cmake = (app_dir / "CMakeLists.txt").read_text()
         assert "#define HPX_CACHE_FLUSH() ((void)nsx_cache_flush())" in main_cc
         assert "#define HPX_CACHE_PUBLISH_WRITES() ((void)nsx_cache_publish_writes())" in main_cc
@@ -1212,7 +1212,7 @@ class TestGenerateApp:
         PrepareEngineStage().run(ctx)
         app_dir = generate_app(ctx)
 
-        main_cc = (app_dir / "src" / "main.cc").read_text()
+        main_cc = (app_dir / "src" / "main.cc").read_text(encoding="utf-8")
         assert "#define HPX_CACHE_FLUSH() ((void)nsx_cache_flush())" in main_cc
         assert "#define HPX_CACHE_PUBLISH_WRITES() ((void)nsx_cache_publish_writes())" in main_cc
         assert "#if NSX_CACHE_HAS_INVALIDATE_OBSERVED" in main_cc
@@ -1268,7 +1268,7 @@ class TestGenerateApp:
         # the generated config header. Cache-coherent Cortex-M55 parts keep the
         # buffers in non-cached TCM (no SEGGER_RTT_SECTION override) so SWD reads
         # stay coherent; cacheless Cortex-M4 parts fall through to .sram_bss.
-        rtt_c = (app_dir / "src" / "rtt" / "SEGGER_RTT.c").read_text()
+        rtt_c = (app_dir / "src" / "rtt" / "SEGGER_RTT.c").read_text(encoding="utf-8")
         assert "SEGGER_RTT_PUT_CB_SECTION(" in rtt_c
         assert "SEGGER_RTT_PUT_BUFFER_SECTION(" in rtt_c
 
@@ -1317,7 +1317,7 @@ class TestGenerateApp:
         PrepareEngineStage().run(ctx)
         app_dir = generate_app(ctx)
 
-        main_cc = (app_dir / "src" / "main.cc").read_text()
+        main_cc = (app_dir / "src" / "main.cc").read_text(encoding="utf-8")
         nsx_yml = yaml.safe_load((app_dir / "nsx.yml").read_text())
         cmake = (app_dir / "CMakeLists.txt").read_text()
         module_names = {module["name"] for module in nsx_yml["modules"]}
@@ -1357,7 +1357,7 @@ class TestGenerateApp:
         PlanMemoryStage().run(ctx)
         app_dir = generate_app(ctx)
 
-        main_cc = (app_dir / "src" / "main.cc").read_text()
+        main_cc = (app_dir / "src" / "main.cc").read_text(encoding="utf-8")
         cmake = (app_dir / "CMakeLists.txt").read_text()
         assert (app_dir / "src" / "model_data.h").exists() is False
         assert "nsx_psram.h" in main_cc
@@ -1750,7 +1750,7 @@ class TestKwsModel:
         model_h = (app_dir / "src" / "model_data.h").read_text()
         assert "model_data_len = 53936" in model_h
 
-        main_cc = (app_dir / "src" / "main.cc").read_text()
+        main_cc = (app_dir / "src" / "main.cc").read_text(encoding="utf-8")
         assert "MicroMutableOpResolver" in main_cc
         assert "get_resolver" in main_cc
 
