@@ -72,7 +72,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   name={"PowerResult"}
   kind={"class"}
   language={"python"}
-  signature={"PowerResult(\n    summary: PowerSummary,\n    samples: list[PowerSample] = list(),\n    gated_windows: list[GatedPowerWindow] = list(),\n    metadata: PowerMetadata = PowerMetadata(),\n) -> None"}
+  signature={"PowerResult(\n    summary: PowerSummary,\n    samples: list[PowerSample] = list(),\n    gated_windows: list[GatedPowerWindow] = list(),\n    metadata: PowerMetadata = PowerMetadata(),\n    statistics: list[dict[str, Any]] = list(),\n    gate_samples: list[tuple[int, int]] = list(),\n    statistics_timebase_hz: int | None = None,\n    statistics_device_time: bool = False,\n    gate_frames: list[dict[str, Any]] = list(),\n    gate_stream_error: str | None = None,\n    counter_gate_evidence: list[dict[str, Any]] = list(),\n    counter_domain: str | None = None,\n) -> None"}
   level={2}
   summary={"Complete result of a power capture."}
   source={{"path":"src/helia_profiler/power/base.py","line":73,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L73"}}
@@ -139,6 +139,118 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"metadata: PowerMetadata = field(default_factory=PowerMetadata)"}
     level={3}
     source={{"path":"src/helia_profiler/power/base.py","line":86,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L86"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerResult.statistics"}
+    name={"statistics"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"statistics: list[dict[str, Any]] = field(default_factory=list)"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/base.py","line":89,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L89"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerResult.gate_samples"}
+    name={"gate_samples"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"gate_samples: list[tuple[int, int]] = field(default_factory=list)"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/base.py","line":90,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L90"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerResult.statistics_timebase_hz"}
+    name={"statistics_timebase_hz"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"statistics_timebase_hz: int | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/base.py","line":91,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L91"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerResult.statistics_device_time"}
+    name={"statistics_device_time"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"statistics_device_time: bool = False"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/base.py","line":92,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L92"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerResult.gate_frames"}
+    name={"gate_frames"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"gate_frames: list[dict[str, Any]] = field(default_factory=list)"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/base.py","line":93,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L93"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerResult.gate_stream_error"}
+    name={"gate_stream_error"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"gate_stream_error: str | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/base.py","line":94,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L94"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerResult.counter_gate_evidence"}
+    name={"counter_gate_evidence"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"counter_gate_evidence: list[dict[str, Any]] = field(default_factory=list)"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/base.py","line":95,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L95"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerResult.counter_domain"}
+    name={"counter_domain"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"counter_domain: str | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/base.py","line":96,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L96"}}
   >
 
 

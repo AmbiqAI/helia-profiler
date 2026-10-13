@@ -3,6 +3,7 @@
 from dataclasses import replace
 from hashlib import sha256
 from types import SimpleNamespace
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
@@ -18,6 +19,10 @@ from helia_profiler.fixture import (
 )
 from helia_profiler.power.base import GatedPowerWindow, PowerResult, PowerSummary
 from helia_profiler.power.metadata import MeasurementScope, PowerIntegrity, PowerMetadata
+
+if TYPE_CHECKING:
+    from helia_profiler.fixture import FixtureCaptureRequest
+    from helia_profiler.pipeline import PipelineContext
 
 
 def request():
@@ -183,10 +188,15 @@ def test_existing_driver_has_guarded_lifecycle_and_always_releases(monkeypatch, 
     )
     if failure:
         with pytest.raises(ValueError):
-            power.observe_fixture_power(r, Guard(), lambda: events.append("reset"))
+            power.observe_fixture_power(
+                cast("FixtureCaptureRequest", r), Guard(), lambda: events.append("reset")
+            )
     else:
         assert (
-            power.observe_fixture_power(r, Guard(), lambda: events.append("reset")) is observation
+            power.observe_fixture_power(
+                cast("FixtureCaptureRequest", r), Guard(), lambda: events.append("reset")
+            )
+            is observation
         )
         assert (
             events.index("observe")
@@ -259,7 +269,7 @@ def test_fixture_gpio_linkage_uses_the_same_render_context_without_power_operati
     ctx = SimpleNamespace(fixture=SimpleNamespace(method=method))
     # No ProfileConfig power driver/rail object exists in this control. Both
     # module selection and project rendering consume this shared context.
-    selected = SyncContext.from_pipeline_context(ctx)
+    selected = SyncContext.from_pipeline_context(cast("PipelineContext", ctx))
     assert selected.power_sync_enabled and selected.lockstep
     assert (selected.sync_gpio_pin, selected.state_gpio_pin, selected.go_gpio_pin) == (29, 36, 14)
 
@@ -418,14 +428,19 @@ def test_owned_reset_interleaving_preserves_authority_and_detached_checks(monkey
         with pytest.raises(
             KeyboardInterrupt if fault == "cancelled" else ValueError, match=fault
         ) as caught:
-            power.observe_fixture_power(value, Guard(), reset)
+            power.observe_fixture_power(cast("FixtureCaptureRequest", value), Guard(), reset)
         if fault in ("expired", "reassigned"):
             assert "resetting (require_free=False)" in str(caught.value)
         if fault == "foreign":
             assert "arming (require_free=True)" in str(caught.value)
         assert "go" not in events
     else:
-        assert power.observe_fixture_power(value, Guard(), reset).summary.energy_j == 0.02
+        assert (
+            power.observe_fixture_power(
+                cast("FixtureCaptureRequest", value), Guard(), reset
+            ).summary.energy_j
+            == 0.02
+        )
         assert (True, False, False) in events
         assert (False, True, True) in events
         assert "go" in events
