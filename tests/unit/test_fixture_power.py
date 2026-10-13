@@ -316,3 +316,81 @@ def test_unrelated_large_packet_cannot_license_missing_gate_tail():
     )
     with pytest.raises(ValueError, match="endpoints"):
         power._validate_trace_coverage(observation)
+
+
+@pytest.mark.parametrize("fault", [None, "expired", "foreign", "reset"])
+def test_owned_reset_interleaving_preserves_authority_and_detached_checks(monkeypatch, fault):
+    events = []
+    resetting = False
+    reset_done = False
+    callback = None
+
+    class Guard:
+        def verify_power_device(self, **kwargs):
+            events.append("verify")
+
+        def check(self, *, require_free, remaining_s):
+            events.append((resetting, reset_done, require_free))
+            if resetting and fault == "expired":
+                raise ValueError("expired during owned reset")
+            if require_free and resetting:
+                raise ValueError("own reset holds probe")
+            if require_free and reset_done and fault == "foreign":
+                raise ValueError("foreign holder after reset")
+
+    class Sync:
+        def arm(self):
+            events.append("arm")
+
+        def signal_go(self):
+            events.append("go")
+
+        def release_go(self):
+            events.append("drop")
+
+        def release(self):
+            events.append("release")
+
+    class Driver:
+        def __init__(self, **kwargs):
+            pass
+
+        def make_sync_controller(self, wiring):
+            return Sync()
+
+        def capture_gated(self, **kwargs):
+            nonlocal callback
+            callback = kwargs["phase_getter"]
+            assert callback() == "arming"
+            kwargs["on_started"](lambda *args: True)
+            assert callback() == "go_signaled"
+            kwargs["on_gate_rise"]()
+            return measured()
+
+    def reset():
+        nonlocal resetting, reset_done
+        resetting = True
+        try:
+            # Deterministic poller callback while the reset child owns the probe.
+            assert callback is not None
+            callback()
+            if fault == "reset":
+                raise ValueError("reset failed")
+        finally:
+            resetting = False
+            reset_done = True
+
+    monkeypatch.setattr(power, "JoulescopeDriver", Driver)
+    value = SimpleNamespace(
+        rail_power=request(), power_sync=request().firmware_wiring(), settle_seconds=30
+    )
+    if fault:
+        with pytest.raises(ValueError, match=fault):
+            power.observe_fixture_power(value, Guard(), reset)
+        assert "go" not in events
+    else:
+        assert power.observe_fixture_power(value, Guard(), reset).summary.energy_j == 0.02
+        assert (True, False, False) in events
+        assert (False, True, True) in events
+        assert "go" in events
+    assert events[-1] == "release"

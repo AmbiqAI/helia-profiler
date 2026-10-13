@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from threading import RLock
 from typing import TYPE_CHECKING, Callable, Protocol
 
 from .fixture_runtime import FixtureFile
@@ -109,19 +110,30 @@ def observe_fixture_power(
         SyncWiring(True, power.sync_input_index, power.state_input_index, power.go_output_index)
     )
     phase = "arming"
+    phase_lock = RLock()
     failures: list[Exception] = []
 
     def check() -> None:
         try:
-            guard.check(require_free=True, remaining_s=90)
+            with phase_lock:
+                guard.check(require_free=phase != "resetting", remaining_s=90)
         except Exception as exc:
             failures.append(exc)
             raise
 
     def started(wait_gpi) -> None:
         nonlocal phase
-        check()
-        reset()
+        # Serialize the free-probe check with entry into our owned reset;
+        # the poller still checks authority while the reset child holds it.
+        with phase_lock:
+            check()
+            phase = "resetting"
+        try:
+            reset()
+        finally:
+            with phase_lock:
+                phase = "arming"
+                check()
         if not wait_gpi(power.state_input_index, True, min(15.0, request.settle_seconds)):
             if failures:
                 raise failures[0]
