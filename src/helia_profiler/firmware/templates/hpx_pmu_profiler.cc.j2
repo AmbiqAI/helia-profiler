@@ -11,6 +11,9 @@ extern void hpx_printf(const char *fmt, ...);
 
 void HpxPmuProfiler::SetCounterNames(const char* const names[], int num_names) {
     int limit = (num_names > kMaxEvents) ? kMaxEvents : num_names;
+    if (limit < 0) {
+        limit = 0;
+    }
     for (int i = 0; i < limit; i++) {
         counter_names_[i] = names[i];
     }

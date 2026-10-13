@@ -145,6 +145,9 @@ static int32_t aot_op_id(int layer_idx) { return layer_idx; }
 {% if has_armv8m_pmu %}
 static void profiler_set_counter_names(const char* const names[], int num_names) {
     int limit = (num_names > kMaxEvents) ? kMaxEvents : num_names;
+    if (limit < 0) {
+        limit = 0;
+    }
     for (int i = 0; i < limit; i++) {
         g_counter_names[i] = names[i];
     }
