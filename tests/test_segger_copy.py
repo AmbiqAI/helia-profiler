@@ -1,6 +1,7 @@
 """App-local RTT sources can be regenerated from immutable package data."""
 
 import os
+import shutil
 from pathlib import Path
 from stat import S_IWUSR
 
@@ -141,3 +142,29 @@ def test_fresh_copies_are_writable_with_restrictive_umask(tmp_path: Path) -> Non
         for path in (app / "rtt").rglob("*"):
             if path.is_file():
                 path.chmod(0o644)
+
+
+@pytest.mark.parametrize("directory", ["rtt", "rtt/Config"])
+def test_directory_alias_does_not_modify_source(tmp_path: Path, directory: str) -> None:
+    source = tmp_path / "source"
+    app = tmp_path / "app"
+    shutil.copytree(_bundled_segger_rtt_dir(), source)
+    files = [path for path in source.rglob("*") if path.is_file()]
+    try:
+        for path in files:
+            path.chmod(0o444)
+        before = [(path.read_bytes(), path.stat().st_mode) for path in files]
+        dest = app / directory
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            dest.symlink_to(
+                source / ("RTT" if directory == "rtt" else "Config"), target_is_directory=True
+            )
+        except (OSError, NotImplementedError) as error:
+            pytest.skip(f"directory symlink unavailable: {error}")
+        with pytest.raises(FirmwareError):
+            _copy_segger_rtt(app, source)
+        assert [(path.read_bytes(), path.stat().st_mode) for path in files] == before
+    finally:
+        for path in files:
+            path.chmod(0o644)
