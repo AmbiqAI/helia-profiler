@@ -252,75 +252,40 @@ def fixture_rail_energy(
 
 
 def _validate_trace_coverage(observation: PowerResult) -> None:
-    """Require complete counter-contiguous statistics spanning the measured gate.
+    """Reconstruct the retained gate and verify the exact selected packet integral."""
+    from .power.counter_gate import counter_gate_trace
 
-    Integration remains driver-owned. This verifies retained evidence without
-    replacing the driver's charge/energy calculation or inventing timestamps.
-    """
-    hz = observation.statistics_timebase_hz
-    if type(hz) is not int or hz <= 0:
-        raise ValueError("Missing instrument timestamp scale")
-    previous_end = rate = previous_u0 = previous_u1 = previous_axis = None
-    rows = []
-    utc_intervals = []
-    for packet in observation.statistics:
-        try:
-            t = packet["time"]
-            first, last = t["samples"]["value"]
-            frequency = t["sample_freq"]["value"]
-            u0, u1 = t["utc"]["value"]
-            if not all(math.isfinite(v) for v in (first, last, frequency, u0, u1)):
-                raise ValueError
-            if last <= first or frequency <= 0 or u1 <= u0:
-                raise ValueError
-            if previous_end is not None and (first != previous_end or frequency != rate):
-                raise ValueError
-            previous_end, rate = last, frequency
-            axis = (u0 + u1) / 2 if observation.statistics_device_time else packet["_host_time64"]
-            if not math.isfinite(axis) or (
-                previous_axis is not None
-                and (axis <= previous_axis or u0 <= previous_u0 or u1 <= previous_u1)
-            ):
-                raise ValueError
-            previous_axis, previous_u0, previous_u1 = axis, u0, u1
-            duration = (last - first) / frequency
-            rows.append((axis, duration))
-            utc_intervals.append((u0, u1))
-        except (KeyError, TypeError, ValueError, OverflowError) as exc:
-            raise ValueError("Incomplete or discontinuous instrument statistics") from exc
-    origin = min(axis for axis, _ in rows)
+    if observation.gate_stream_error or observation.counter_domain != "js320_sensor_sample_id":
+        raise ValueError("Missing or invalid shared-counter gate evidence")
+    if len(observation.counter_gate_evidence) != 1 or not observation.statistics_device_time:
+        raise ValueError("Missing selected counter gate")
+    channel = observation.metadata.sync_input_index
+    if type(channel) is not int:
+        raise ValueError("Missing gate channel")
+    try:
+        trace = counter_gate_trace(observation.gate_frames, observation.statistics, channel=channel)
+        saved = observation.counter_gate_evidence[0]
+        evidence = trace.window_evidence(saved["rise"], saved["fall"])
+    except (KeyError, TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(f"Invalid retained counter coverage: {exc}") from exc
+    if saved != evidence:
+        raise ValueError("Retained gate selection/uncertainty mismatch")
     window = observation.gated_windows[0]
-    selected = [
-        (axis, duration)
-        for axis, duration in rows
-        if window.start_s <= (axis - origin) / hz <= window.end_s
-    ]
-    if len(selected) != window.sample_count:
+    if window.sample_count != evidence["packet_count"]:
         raise ValueError("Trace/window packet count mismatch")
-    total = sum(duration for _, duration in selected)
-    if not math.isclose(total, window.duration_s, rel_tol=1e-9, abs_tol=1e-9):
-        raise ValueError("Trace/window duration mismatch")
-    if not observation.statistics_device_time:
-        raise ValueError("Timestamp coverage unavailable on the host-arrival axis")
-    # Counter continuity cannot prove UTC coverage when the fitted time map
-    # changes. Require the actual interval union to cover the gate interior;
-    # overlap cannot compensate for an unsupported gap. Do not invent a clock
-    # tolerance. A changing map that leaves a gap is explicitly unavailable.
-    gate_start = origin + window.start_s * hz
-    gate_end = origin + window.end_s * hz
-    intersecting = [(a, b) for a, b in utc_intervals if b > gate_start and a < gate_end]
-    if not intersecting:
-        raise ValueError("Timestamp coverage unavailable for the measured gate")
-    covered_end = intersecting[0][1]
-    for start, end in intersecting[1:]:
-        if start > covered_end:
-            raise ValueError("Timestamp coverage unavailable: interior UTC gap")
-        covered_end = max(covered_end, end)
-    # Only the intersecting edge packets bound midpoint uncertainty. An
-    # unrelated long packet outside the gate must not license missing coverage.
-    first_start, first_end = intersecting[0]
-    last_start, last_end = intersecting[-1]
-    if first_start - gate_start > first_end - first_start or (
-        gate_end - covered_end > last_end - last_start
+    selected = observation.statistics[evidence["first_packet"] : evidence["last_packet"] + 1]
+    energy = sum(abs(p["signals"]["power"]["integral"]["value"]) for p in selected)
+    charge = sum(abs(p["signals"]["current"]["integral"]["value"]) for p in selected)
+    origin_mid = sum(trace.intervals[0]) / 2
+    facts = (
+        (window.duration_s, evidence["integrated_duration_s"]),
+        (window.energy_j, energy),
+        (window.charge_c, charge),
+        (window.start_s, (saved["rise"] - origin_mid) / trace.rate),
+        (window.end_s, (saved["fall"] - origin_mid) / trace.rate),
+    )
+    if any(
+        not math.isclose(actual, expected, rel_tol=1e-9, abs_tol=1e-12)
+        for actual, expected in facts
     ):
-        raise ValueError("Trace does not cover the measured gate endpoints")
+        raise ValueError("Trace/window integral, duration or gate identity mismatch")

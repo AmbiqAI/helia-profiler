@@ -180,7 +180,11 @@ def _counter_rate_ratio(packets: list[dict[str, Any]]) -> dict[str, Any] | None:
     }
 
 
-def _stats_arrays(packets: list[dict[str, Any]]) -> dict[str, Any]:
+def _stats_arrays(
+    packets: list[dict[str, Any]],
+    *,
+    counter_origin: tuple[int, int] | None = None,
+) -> dict[str, Any]:
     import numpy as np
     from pyjoulescope_driver import time64
 
@@ -199,7 +203,12 @@ def _stats_arrays(packets: list[dict[str, Any]]) -> dict[str, Any]:
         sig = p.get("signals", {})
         cur = sig.get("current", {})
         pwr = sig.get("power", {})
-        mid.append(0.5 * (u0 + u1))
+        if counter_origin is None:
+            mid.append(0.5 * (u0 + u1))
+        else:
+            origin, rate = counter_origin
+            first, last = t["samples"]["value"]
+            mid.append(((first - origin) + (last - origin)) * 0.5 * second / rate)
         host_time.append(float(host_tick) if host_tick is not None else np.nan)
         dur.append(_packet_duration_ticks(t, u0, u1, second))
         cur_avg.append(_sv(cur.get("avg")))
@@ -342,153 +351,6 @@ def _segment_gpi_windows(poll_samples: list[tuple[int, int]]) -> list[tuple[floa
             windows.append((float(rise), float(falls[fall_index])))
             fall_index += 1
     return windows
-
-
-def _frame_spacings(frames: list[dict[str, Any]]) -> list[float]:
-    """Measure adjacent valid-frame spacing without bridging excluded input."""
-    import numpy as np
-
-    return [
-        (float(nxt["utc"]) - float(cur["utc"])) / int(np.asarray(cur["data"]).size)
-        for cur, nxt in zip(frames, frames[1:])
-        if np.asarray(cur["data"]).size
-        and np.asarray(nxt["data"]).size
-        and math.isfinite(float(cur["rate"]))
-        and math.isfinite(float(nxt["rate"]))
-        and float(cur["rate"]) > 0
-        and float(nxt["rate"]) > 0
-        and float(nxt["utc"]) > float(cur["utc"])
-    ]
-
-
-def _segment_streamed_gpi(
-    frames: list[dict[str, Any]],
-) -> list[tuple[float, float]]:
-    """Segment gate-high windows from device-timestamped GPI stream frames.
-
-    Each frame is ``{"utc": <time64 of first sample>, "rate": <samples/s>,
-    "data": <per-sample levels>}`` as captured from ``s/gpi/N/!data``.  The
-    returned ``(rise, fall)`` pairs are in instrument time64 — the same clock
-    as the stat-packet midpoints — so no host-time mapping is involved and the
-    edges carry sample-period resolution instead of host poll cadence.
-
-    Only complete windows are returned (a trailing high with no observed fall
-    is dropped), mirroring :func:`_segment_gpi_windows`.  A capture that
-    starts high yields no leading window for the same reason that function
-    rejects one: a rise that was never observed cannot be timed.
-    """
-    import numpy as np
-    from pyjoulescope_driver import time64
-
-    usable = [
-        frame
-        for frame in frames
-        if np.asarray(frame["data"]).size
-        and math.isfinite(float(frame["rate"]))
-        and float(frame["rate"]) > 0
-    ]
-    if not usable:
-        return []
-
-    # Use adjacent frame timestamps for the fitted-UTC spacing (helia-profiler#249).
-    spacings = _frame_spacings(frames)
-    if spacings:
-        tick_per_sample = float(np.median(spacings))
-    else:
-        tick_per_sample = time64.SECOND / float(usable[0]["rate"])
-
-    edges: list[tuple[float, int]] = []  # (tick, new_level)
-    prev_level: int | None = None
-    for frame in frames:
-        data = np.asarray(frame["data"])
-        if not data.size or not math.isfinite(float(frame["rate"])) or float(frame["rate"]) <= 0:
-            edges.append((float(frame["utc"]), -1))
-            prev_level = None
-            continue
-        frame_t0 = float(frame["utc"])
-        levels = (data > 0).astype(np.int8)
-        if prev_level is None:
-            prev_level = int(levels[0])
-        # Boundary edge between frames, then intra-frame edges.
-        if int(levels[0]) != prev_level:
-            edges.append((frame_t0, int(levels[0])))
-        idx = np.nonzero(np.diff(levels))[0]
-        for i in idx:
-            edges.append((frame_t0 + (int(i) + 1) * tick_per_sample, int(levels[i + 1])))
-        prev_level = int(levels[-1])
-
-    windows: list[tuple[float, float]] = []
-    rise: float | None = None
-    for tick, level in edges:
-        if level < 0:
-            rise = None
-        elif level and rise is None:
-            rise = tick
-        elif not level and rise is not None:
-            windows.append((rise, tick))
-            rise = None
-    return windows
-
-
-def _streamed_gpi_timebase(frames: list[dict[str, Any]]) -> dict[str, Any]:
-    import numpy as np
-    from pyjoulescope_driver import time64
-
-    usable = [
-        frame
-        for frame in frames
-        if np.asarray(frame["data"]).size
-        and math.isfinite(float(frame["rate"]))
-        and float(frame["rate"]) > 0
-    ]
-    if not usable:
-        return (
-            {"frame_count": 0, "dropped_or_empty_frames": len(frames)}
-            if frames
-            else {"frame_count": 0}
-        )
-
-    spacings = _frame_spacings(frames)
-    sizes = [int(np.asarray(frame["data"]).size) for frame in usable]
-    reported_rate = float(usable[0]["rate"])
-    out: dict[str, Any] = {
-        "frame_count": len(usable),
-        "dropped_or_empty_frames": len(frames) - len(usable),
-        "reported_rate_hz": reported_rate,
-        "sample_count_total": int(sum(sizes)),
-        "frame_sample_count_min": min(sizes),
-        "frame_sample_count_max": max(sizes),
-        "spacing_sample_count": len(spacings),
-    }
-    if not spacings:
-        out["tick_per_sample"] = time64.SECOND / reported_rate
-        out["tick_per_sample_source"] = "reported_rate"
-        return out
-
-    median = float(np.median(spacings))
-    out.update(
-        {
-            "tick_per_sample": median,
-            "tick_per_sample_source": "median_frame_spacing",
-            "implied_rate_hz": time64.SECOND / median if median else None,
-            # Ratio of the rate the instrument claims to the rate its own frame
-            # timestamps imply. The 8:1 decimation shows up here as ~8.
-            "reported_over_implied_rate": (reported_rate * median / time64.SECOND)
-            if median
-            else None,
-            # Spread across the capture. A stable time base gives a tight
-            # band; a wide one means the median -- and therefore both gate
-            # edges -- is an estimate over noisy input.
-            "spacing_min_tick": float(np.min(spacings)),
-            "spacing_max_tick": float(np.max(spacings)),
-            "spacing_p05_tick": float(np.percentile(spacings, 5)),
-            "spacing_p95_tick": float(np.percentile(spacings, 95)),
-            "spacing_relative_spread": (float(np.max(spacings)) - float(np.min(spacings))) / median
-            if median
-            else None,
-        }
-    )
-    return out
 
 
 def _fullrate_sample_span(frame: dict[str, Any], count: int) -> tuple[int, int, float] | None:
@@ -641,6 +503,7 @@ def _process_gated_stats(
     prefer_device_time: bool = False,
     minimum_window_s: float = 0.0,
     windows_override: list[tuple[float, float]] | None = None,
+    counter_origin: tuple[int, int] | None = None,
 ) -> tuple[list[GatedPowerWindow], PowerSummary]:
     """Each packet carries the instrument's full-rate charge/energy integral over a
     ~1 ms sub-window. Select packets by midpoint, retaining packet-scale
@@ -654,7 +517,7 @@ def _process_gated_stats(
 
     del io_voltage  # voltage is folded into the on-device power integral
 
-    a = _stats_arrays(packets)
+    a = _stats_arrays(packets, counter_origin=counter_origin)
     raw_windows = (
         windows_override if windows_override is not None else _segment_gpi_windows(poll_samples)
     )
@@ -678,7 +541,7 @@ def _process_gated_stats(
 
     for rise, fall in windows:
         # Admission uses the selected axis and configured floor; duration sums packet metadata.
-        mask = (mask_axis >= rise) & (mask_axis <= fall)
+        mask = (mask_axis >= rise) & (mask_axis < fall)
         if not bool(mask.any()):
             continue
         duration_s = float(a["dur_ticks"][mask].sum() / time64.SECOND)

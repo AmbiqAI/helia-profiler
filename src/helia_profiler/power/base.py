@@ -48,7 +48,7 @@ class GatedPowerWindow:
     ``median``/``p95``/``p99`` expose the spread and a glitch-robust peak).
     """
 
-    #: Edges use the selected device-UTC or host-time axis. Duration sums packet
+    #: Edges use the selected counter-relative, device-UTC or host-time axis. Duration sums packet
     #: metadata (delta, then sample span, then UTC), not edge differences (#249).
     start_s: float
     end_s: float
@@ -90,6 +90,10 @@ class PowerResult:
     gate_samples: list[tuple[int, int]] = field(default_factory=list)
     statistics_timebase_hz: int | None = None
     statistics_device_time: bool = False
+    gate_frames: list[dict[str, Any]] = field(default_factory=list)
+    gate_stream_error: str | None = None
+    counter_gate_evidence: list[dict[str, Any]] = field(default_factory=list)
+    counter_domain: str | None = None
 
 
 @runtime_checkable

@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 from ...errors import PowerError
 from ..base import PowerResult
+from ..counter_gate import PackedGateRecorder, counter_gate_trace
 from ..diagnostics import (
     BOOT_SETTLE_S,
     GATE_EDGE_POLL_INTERVAL_S,
@@ -48,9 +49,7 @@ from .stats import (
     _plan_ranked_candidates,
     _process_gated_stats,
     _segment_gpi_windows,
-    _segment_streamed_gpi,
     _select_streamed_window,
-    _streamed_gpi_timebase,
     _summary_to_dict,
     _whole_summary_from_stats,
 )
@@ -274,26 +273,13 @@ def capture_gated(
     # as the edge fallback, but its poll cadence plus callback latency can
     # merge a pre-window coupling pulse into the true rise (or hold a fall)
     # under host load.  A streamed edge cannot be merged this way.
-    gpi_stream_frames: list[dict[str, Any]] = []
+    gate_recorder = PackedGateRecorder(
+        sync_input_index, min(128 * 1024 * 1024, int(duration_s * 2_100_000) + 1048576)
+    )
+    gpi_stream_frames = gate_recorder.frames
 
     def _on_gpi_data(_topic: str, value: Any) -> None:
-        try:
-            import numpy as np
-
-            data = np.asarray(value["data"])
-            decimate = max(1, int(value.get("decimate_factor", 1) or 1))
-            rate = float(value["sample_rate"]) / decimate
-            sample_id = value.get("sample_id")
-            gpi_stream_frames.append(
-                {
-                    "utc": int(value["utc"]),
-                    "rate": rate,
-                    "sample_id": (int(sample_id) // decimate if sample_id is not None else None),
-                    "data": data.copy(),
-                }
-            )
-        except Exception:  # never let a malformed frame kill the capture
-            log.debug("Discarding malformed GPI stream frame", exc_info=True)
+        gate_recorder.append(value, word_aligned=family == "js320")
 
     # Opt-in full-rate cross-check (AutoDeploy-equivalent reference method).
     # Set HPX_POWER_FULLRATE_XCHECK=1 to also stream raw s/i + s/v at the
@@ -508,6 +494,13 @@ def capture_gated(
         gpi_stream_enabled = False
         gpi_data_topic = f"{device_path}/s/gpi/{sync_input_index}/!data"
         gpi_ctrl_topic = f"{device_path}/s/gpi/{sync_input_index}/ctrl"
+        if family == "js320":
+            mode = driver.query(f"{device_path}/s/gpi/+/dwnN/mode")
+            gate_recorder.sample_mode = {0: "off", 2: "first", "off": "off", "first": "first"}.get(
+                mode
+            )
+            if gate_recorder.sample_mode is None:
+                raise PowerError("GPI decimation mode does not preserve sampled gate levels")
         if family in ("js220", "js320"):
             try:
                 driver.subscribe(gpi_data_topic, "pub", _on_gpi_data)
@@ -600,16 +593,46 @@ def capture_gated(
         streamed_gate_windows: list[tuple[float, float]] | None = None
         raw_streamed: list[tuple[float, float]] = []
         gate_edge_source = "gpi_snapshot_poll"
-        if gpi_stream_enabled and gpi_stream_frames:
-            raw_streamed = _segment_streamed_gpi(gpi_stream_frames)
-            streamed_gate_windows = _select_streamed_window(
-                raw_streamed,
-                minimum_gate_s=minimum_gate_s,
-                plan_floor_s=plan_floor_s,
-                allow_fallback=allow_fallback,
-            )
-            if streamed_gate_windows is not None:
-                gate_edge_source = "gpi_stream"
+        counter_origin = None
+        counter_trace = None
+        counter_evidence = []
+        if gpi_stream_enabled:
+            try:
+                if gate_recorder.error:
+                    raise ValueError(gate_recorder.error)
+                # The JS320 sensor supplies statistics and all signal sample IDs
+                # from the same native counter. Do not infer another origin via UTC.
+                if family != "js320":
+                    raise ValueError("Shared GPI/statistics counter contract unavailable")
+                counter_trace = counter_gate_trace(
+                    gpi_stream_frames, packets, channel=sync_input_index
+                )
+                counter_origin = (counter_trace.origin, counter_trace.rate)
+                raw_streamed = [
+                    (
+                        (a - counter_trace.origin) * time64.SECOND / counter_trace.rate,
+                        (b - counter_trace.origin) * time64.SECOND / counter_trace.rate,
+                    )
+                    for a, b in counter_trace.windows
+                ]
+                streamed_gate_windows = _select_streamed_window(
+                    raw_streamed,
+                    minimum_gate_s=minimum_gate_s,
+                    plan_floor_s=plan_floor_s,
+                    allow_fallback=allow_fallback,
+                )
+                if streamed_gate_windows is None:
+                    raise ValueError("No complete qualifying packed GPI gate")
+                for pair in streamed_gate_windows:
+                    i = raw_streamed.index(pair)
+                    counter_evidence.append(
+                        counter_trace.window_evidence(*counter_trace.windows[i])
+                    )
+                gate_edge_source = "gpi_stream_sample_counter"
+            except (KeyError, TypeError, ValueError, OverflowError) as exc:
+                gate_recorder.error = str(exc)
+                counter_origin = None
+                streamed_gate_windows = []
 
         if use_device_time_axis and streamed_gate_windows is None:
             aligned_poll_samples = _map_poll_samples_to_packet_time(
@@ -671,9 +694,9 @@ def capture_gated(
                             "gpi_stream_frames_meta": [
                                 {
                                     "utc": f["utc"],
-                                    "rate": f["rate"],
+                                    "rate": f["sample_rate"],
                                     "sample_id": f.get("sample_id"),
-                                    "n": int(len(f["data"])),
+                                    "n": f["element_count"],
                                 }
                                 for f in gpi_stream_frames
                             ],
@@ -694,6 +717,7 @@ def capture_gated(
             windows_override=selected_windows,
             gate_edge_source=gate_edge_source,
             stream_segment_count=len(raw_streamed) if gpi_stream_enabled else None,
+            counter_origin=counter_origin,
         )
         if fr_requested and not fr_xcheck:
             gating_diagnostics["fullrate_xcheck_unavailable_reason"] = "stream_setup_failed"
@@ -706,14 +730,16 @@ def capture_gated(
                 poll_reads, minimum_window_s=minimum_gate_s, plan_floor_s=plan_floor_s
             )
 
-        # How the streamed-GPI time base was derived (#249). Both gate edges
-        # are placed with a per-sample spacing inferred from frame timestamps,
-        # so when a window disagrees with the firmware clock this says whether
-        # that inference is the reason. Diagnostic only. Attached to the one
-        # dict both the degraded and the successful path publish.
-        stream_timebase = _streamed_gpi_timebase(gpi_stream_frames) if gpi_stream_enabled else None
-        if stream_timebase is not None:
-            gating_diagnostics["gpi_stream_timebase"] = stream_timebase
+        gating_diagnostics["packed_gpi_retained_bytes"] = gate_recorder.retained_bytes
+        gating_diagnostics["packed_gpi_error"] = gate_recorder.error
+        gating_diagnostics["counter_gate_evidence"] = counter_evidence
+        if counter_trace is not None:
+            gating_diagnostics["counter_clock_mapping"] = counter_trace.clock_diagnostics
+        if fr_xcheck and counter_origin is not None:
+            # The optional legacy full-rate cross-check uses fitted UTC anchors.
+            # Do not apply counter-domain windows to that different axis.
+            fr_xcheck = False
+            gating_diagnostics["fullrate_xcheck_unavailable_reason"] = "counter_domain_not_bound"
         # The filter that scales utc, read straight from the packets (#249).
         counter_rate = _counter_rate_ratio(packets)
         if counter_rate is not None:
@@ -726,6 +752,7 @@ def capture_gated(
             prefer_device_time=use_device_time_axis,
             minimum_window_s=minimum_gate_s,
             windows_override=selected_windows,
+            counter_origin=counter_origin,
         )
         if not windows:
             if fr_requested:
@@ -802,7 +829,14 @@ def capture_gated(
                 result.summary.duration_s,
                 failure.hint,
             )
-            return result
+            return replace(
+                result,
+                gate_frames=gpi_stream_frames,
+                gate_stream_error=gate_recorder.error,
+                gate_samples=aligned_poll_samples,
+                statistics_timebase_hz=int(time64.SECOND),
+                statistics_device_time=use_device_time_axis,
+            )
         if short_pulses_ignored:
             log.warning(
                 "Ignored %d GPIO-high pulse(s) shorter than the %.3fs minimum "
@@ -1006,6 +1040,10 @@ def capture_gated(
             gate_samples=aligned_poll_samples,
             statistics_timebase_hz=int(time64.SECOND),
             statistics_device_time=use_device_time_axis,
+            gate_frames=gpi_stream_frames,
+            gate_stream_error=gate_recorder.error,
+            counter_gate_evidence=counter_evidence,
+            counter_domain="js320_sensor_sample_id" if counter_evidence else None,
         )
     except PowerError:
         raise

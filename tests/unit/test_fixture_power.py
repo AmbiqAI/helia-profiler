@@ -25,10 +25,14 @@ def request():
 
 
 def measured():
-    return PowerResult(
+    import numpy as np
+
+    from helia_profiler.power.counter_gate import PackedGateRecorder, counter_gate_trace
+
+    observation = PowerResult(
         PowerSummary(0.002, 0.004, 0.003, 0.02, 5.0, 5000),
         gated_windows=[
-            GatedPowerWindow(-0.0005, 4.9995, 5.0, 0.01, 0.02, 0.002, 0.004, 0.003, 5000)
+            GatedPowerWindow(0.0005, 5.0005, 5.0, 0.01, 0.02, 0.002, 0.004, 0.003, 5000)
         ],
         statistics=[
             {
@@ -36,6 +40,7 @@ def measured():
                     "samples": {"value": [i * 1000, (i + 1) * 1000]},
                     "sample_freq": {"value": 1000000},
                     "utc": {"value": [i * 1000000, (i + 1) * 1000000]},
+                    "time_map": {"offset_counter": 0, "offset_time": 0, "counter_rate": 1000000},
                 },
                 "signals": {
                     name: {
@@ -48,7 +53,7 @@ def measured():
                     )
                 },
             }
-            for i in range(5000)
+            for i in range(5002)
         ],
         gate_samples=[(0, 1), (5000000000, 0)],
         statistics_timebase_hz=1000000000,
@@ -56,11 +61,34 @@ def measured():
         metadata=PowerMetadata(
             device="u/js320/25QG",
             stats_rate_hz=1000,
+            sync_input_index=0,
             integrity=PowerIntegrity.VALID,
             measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW,
             gate_rise_observed=True,
             gate_fall_observed=True,
         ),
+    )
+    recorder = PackedGateRecorder(0, 10000, sample_mode="first")
+    recorder.append(
+        {
+            "data": np.packbits([0] + [1] * 5000 + [0], bitorder="little"),
+            "element_count": 5002,
+            "sample_id": 0,
+            "sample_rate": 1000000,
+            "decimate_factor": 1000,
+            "field_id": 5,
+            "index": 0,
+            "utc": 0,
+            "time_map": {"offset_counter": 0, "offset_time": 0, "counter_rate": 1000000},
+        }
+    )
+    assert recorder.error is None
+    trace = counter_gate_trace(recorder.frames, observation.statistics, channel=0)
+    return replace(
+        observation,
+        gate_frames=recorder.frames,
+        counter_domain="js320_sensor_sample_id",
+        counter_gate_evidence=[trace.window_evidence(1000, 5001000)],
     )
 
 
@@ -314,7 +342,7 @@ def test_unrelated_large_packet_cannot_license_missing_gate_tail():
     observation.gated_windows[0] = replace(
         observation.gated_windows[0], start_s=0.5, end_s=1.0, duration_s=0.001, sample_count=1
     )
-    with pytest.raises(ValueError, match="endpoints"):
+    with pytest.raises(ValueError, match="coverage"):
         power._validate_trace_coverage(observation)
 
 
