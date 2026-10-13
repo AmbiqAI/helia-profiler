@@ -14,7 +14,7 @@ engine:
   type: executorch
   backend: arm
   config:
-    # nsx-executorch @ 5514ac1ea8439b3fe615d180bf68c75a9dabb48e (the compatibility-baseline pin)
+    # Runtime source: hpx runtimes show executorch.
     source_path: /path/to/nsx-executorch
     method_arena_size: 65536
     temporary_arena_size: 32768
