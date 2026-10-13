@@ -19,6 +19,19 @@ _SUPPORTED_BACKENDS = frozenset(("reference", "cmsis_nn"))
 class TFLMAdapter(SingleArenaPlacementMixin):
     """Adapter for stock TensorFlow Lite for Microcontrollers."""
 
+    prepared_runtime_contract = ("upstream", "cmsis_nn")
+
+    def prepare_runtime(self, config: ProfileConfig, work_dir: Path, runtime) -> TflmArtifacts:
+        from ..fixture_runtime import prepare_runtime_module
+
+        stack, backend = self.prepared_runtime_contract
+        if runtime.record.stack != stack or config.engine.backend != backend:
+            raise EngineError(f"Prepared TFLM requires {stack}/{backend}")
+        return TflmArtifacts(
+            extra_modules=[prepare_runtime_module(runtime, work_dir)],
+            engine_header=TFLM_ENGINE_HEADER,
+        )
+
     @property
     def name(self) -> str:
         return "Stock TFLM"

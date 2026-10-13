@@ -471,7 +471,7 @@ def test_psram_checksum_matches_independent_literal():
 
 @pytest.mark.parametrize("engine", [EngineType.HELIA_AOT, EngineType.TFLM])
 def test_psram_other_placements_still_refuse(tmp_path, engine):
-    from helia_profiler._fixture_build import _validate_fixture_placement
+    from helia_profiler.fixture_target import validate_fixture_placement
 
     for arena, weights in [
         (Placement.PSRAM, Placement.PSRAM),
@@ -479,9 +479,9 @@ def test_psram_other_placements_still_refuse(tmp_path, engine):
         (None, Placement.MRAM),
     ]:
         with pytest.raises(ConfigError):
-            _validate_fixture_placement(arena, weights, engine)
+            validate_fixture_placement(arena, weights, engine)
     with pytest.raises(ConfigError):
-        _validate_fixture_placement(Placement.SRAM, Placement.PSRAM, EngineType.HELIA_RT)
+        validate_fixture_placement(Placement.SRAM, Placement.PSRAM, EngineType.HELIA_RT)
 
 
 @pytest.mark.parametrize("engine", [EngineType.HELIA_AOT, EngineType.TFLM])
@@ -496,7 +496,7 @@ def test_psram_other_placements_still_refuse(tmp_path, engine):
     ],
 )
 def test_fixture_bank_choices_are_not_recipe_pairs(tmp_path, engine, arena, weights):
-    from helia_profiler._fixture_build import _validate_fixture_placement
+    from helia_profiler.fixture_target import validate_fixture_placement
 
     f = fixture(tmp_path)
     # Supplying fake provider metadata prevents implicit provider discovery.
@@ -513,7 +513,7 @@ def test_fixture_bank_choices_are_not_recipe_pairs(tmp_path, engine, arena, weig
         runtime=runtime if engine is EngineType.TFLM else None,
         placement=FixturePlacement(arena, weights),
     )
-    _validate_fixture_placement(arena, weights, engine)
+    validate_fixture_placement(arena, weights, engine)
     assert request.to_config().model.arena_location is arena
     assert request.to_config().model.weights_location is weights
 

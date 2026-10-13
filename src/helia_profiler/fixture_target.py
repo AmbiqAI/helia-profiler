@@ -2,6 +2,9 @@
 
 from dataclasses import dataclass
 
+from .engines import EngineType
+from .errors import ConfigError
+from .placement import Placement
 from .platform import get_soc_for_board
 from .platform.capabilities import resolve_app_flash_load_addr
 from .platform.memory_map import LinkFamily, MemoryRegion, linked_memory_map
@@ -19,6 +22,8 @@ class FixtureTarget:
     load_address: int
 
     def verify(self) -> None:
+        if type(self.load_address) is not int:
+            raise ValueError("Integer fixture load address required")
         if self != supported_fixture_target():
             raise ValueError("Unsupported fixture target declaration")
 
@@ -50,3 +55,23 @@ def fixture_app_region(region: MemoryRegion) -> tuple[int, int]:
         raise ValueError(f"{FIXTURE_BOARD} has no linked {region} region")
     extent = window.app_window[LinkFamily.GNU]
     return extent.start, extent.end
+
+
+def validate_fixture_placement(
+    arena: Placement | None, weights: Placement | None, engine: EngineType | None = None
+) -> None:
+    """Validate the fixture's implemented static arenas and weight backing."""
+    if arena not in (Placement.SRAM, Placement.TCM):
+        raise ConfigError("Fixture arena placement requires writable static SRAM or DTCM")
+    if not isinstance(weights, Placement):
+        raise ConfigError("Explicit fixture weight backing required")
+    for placement in (arena, weights):
+        try:
+            start, end = fixture_app_region(placement.region)
+        except ValueError as exc:
+            raise ConfigError("Fixture target has no selected memory bank") from exc
+        if start >= end:
+            raise ConfigError("Fixture target memory bank has no usable capacity")
+    if weights is Placement.PSRAM:
+        if engine not in (EngineType.HELIA_AOT, EngineType.TFLM):
+            raise ConfigError("Self-loading PSRAM fixtures implement helia-AOT or upstream TFLM")

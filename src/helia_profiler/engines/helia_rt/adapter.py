@@ -87,6 +87,24 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
     (based on the native module) are used.
     """
 
+    prepared_runtime_contract = ("helia-rt", "helia")
+
+    def prepare_runtime(self, config: ProfileConfig, work_dir: Path, runtime) -> HeliaRtArtifacts:
+        from ...fixture_runtime import prepare_runtime_module
+
+        stack, backend = self.prepared_runtime_contract
+        if runtime.record.stack != stack or config.engine.backend != backend:
+            raise EngineError(f"Prepared heliaRT requires {stack}/{backend}")
+        revision = next(p.revision for p in runtime.record.providers if p.name == "helia-rt")
+        return HeliaRtArtifacts(
+            extra_modules=[prepare_runtime_module(runtime, work_dir)],
+            engine_header=TFLM_ENGINE_HEADER,
+            engine_backend=backend,
+            heliart_version=f"prepared:{revision}",
+            heliart_variant="prepared",
+            heliart_toolchain_tag=runtime.record.abi.toolchain,
+        )
+
     @property
     def name(self) -> str:
         return "heliaRT"

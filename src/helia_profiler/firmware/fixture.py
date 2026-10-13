@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import cast
 
-from .._fixture_build import _validate_fixture_placement
 from ..engines import EngineType
 from ..engines.base import ArenaRegion, HeliaAotArtifacts
 from ..errors import ConfigError
@@ -13,7 +12,7 @@ from ..fixture import TypedFixture
 from ..fixture_analysis import PerTensorQuantization
 from ..fixture_psram import MAX_PSRAM_PAYLOADS, FixturePsramPayload, payload_checksum
 from ..fixture_stage import FixtureStage
-from ..fixture_target import fixture_app_region
+from ..fixture_target import fixture_app_region, validate_fixture_placement
 from ..pipeline import PipelineContext
 from ..placement import ArenaRole, Placement
 from ..platform.memory_map import MemoryRegion
@@ -38,7 +37,7 @@ def _fixture_io(spec, *, inputs: bool) -> list[dict[str, object]]:
                 io.tensor.shape,
                 io.tensor.quantization,
                 io.tensor.size_bytes,
-                io.data,
+                io.data if inputs else None,
             )
             for io in (spec.fixture.inputs if inputs else spec.fixture.outputs)
         ]
@@ -49,6 +48,8 @@ def _fixture_io(spec, *, inputs: bool) -> list[dict[str, object]]:
         entries = [(tensor.tensor_index, "int8", tensor.shape, quant, tensor.size, data)]
     records = []
     for position, (index, dtype, shape, quant, size, data) in enumerate(entries):
+        if inputs and data is None:
+            raise ConfigError("Complete fixture input bytes required")
         suffix = "" if position == 0 else f"_{position}"
         tflite_type, member = _TFLITE_TYPES[dtype]
         per_tensor = quant if isinstance(quant, PerTensorQuantization) else None
@@ -66,7 +67,9 @@ def _fixture_io(spec, *, inputs: bool) -> list[dict[str, object]]:
                 "pointer": ("input_data" if inputs else "output_data") + suffix,
                 "buffer": "fixed_input" + suffix,
                 "sink": "deployment_output" + suffix,
-                "initializer": ",".join(str(b) for b in data.read()) if inputs else None,
+                "initializer": ",".join(str(b) for b in data.read())
+                if inputs and data is not None
+                else None,
             }
         )
     return records
@@ -77,7 +80,7 @@ def fixture_template_vars(ctx: PipelineContext, regions: list[ArenaRegion]) -> d
     if spec is None:
         raise ConfigError("Fixture render specification missing")
     spec.fixture.verify()
-    _validate_fixture_placement(
+    validate_fixture_placement(
         ctx.config.model.arena_location, ctx.config.model.weights_location, ctx.config.engine.type
     )
     psram = ctx.config.model.weights_location is Placement.PSRAM

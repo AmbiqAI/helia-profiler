@@ -20,6 +20,7 @@ from ._fixture_build import (
     FixtureDType,
     FixtureIO,
     FixtureMethod,
+    FixtureOutput,
     FixtureRole,
     FixtureStatePolicy,
     FixtureTimingScope,
@@ -32,6 +33,12 @@ from ._fixture_facts import (
     FixtureCapabilities,
     QualifiedFixtureTarget,
     fixture_capabilities,
+)
+from ._fixture_record import (
+    dump_fixture_build,
+    fixture_capture_request,
+    load_fixture_build,
+    verify_fixture_build,
 )
 from ._fixture_request import (
     FixtureBuildRequest,
@@ -83,7 +90,7 @@ from .hostenv.elf_inventory import ElfSection, LoadSegment, SectionInventory, se
 from .placement import Placement
 from .results.models import ToolchainInfo
 
-FIXTURE_API_VERSION: Final[tuple[int, int]] = (4, 1)
+FIXTURE_API_VERSION: Final[tuple[int, int]] = (5, 0)
 
 __all__ = [
     "FIXTURE_API_VERSION",
@@ -109,6 +116,7 @@ __all__ = [
     "FixtureFile",
     "FixtureIO",
     "FixtureMethod",
+    "FixtureOutput",
     "FixtureTarget",
     "FixtureTensor",
     "Int8Tensor",
@@ -122,6 +130,10 @@ __all__ = [
     "analyze_typed_fixture_model",
     "analyze_typed_fixture_model_for_engine",
     "build_fixture",
+    "dump_fixture_build",
+    "load_fixture_build",
+    "verify_fixture_build",
+    "fixture_capture_request",
     "fixture_capabilities",
     "build_fixed_fixture",
     "capture_fixture",

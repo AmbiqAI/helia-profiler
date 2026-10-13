@@ -66,6 +66,63 @@ the caller's existing current-board guard and exclusive lock.
 
 ## Public API
 
+### API 5.0: measurement descriptors and compiled records
+
+New measurement callers use `TypedFixture(model, inputs, outputs)` with complete
+`FixtureIO` input/state bytes and ordered `FixtureOutput(tensor)` declarations.
+No expected-output file is needed. A numerical experiment may separately retain
+references and thresholds. Legacy `FixedFixture` and all-`FixtureIO` typed outputs
+still validate their reference files and retain their previous fixture identities;
+mixing referenced and descriptor outputs in one fixture is refused.
+
+The producer owns persistence of a completed `FixtureBuild`:
+
+```python
+from helia_profiler.fixture import (
+    dump_fixture_build, load_fixture_build, fixture_capture_request, capture_fixture,
+)
+
+# roots is an explicit mapping of stable names to station directories.
+record = dump_fixture_build(build, roots=roots)
+restored = load_fixture_build(record, roots=relocated_roots)
+request = fixture_capture_request(
+    restored, jlink_serial=serial, evidence_dir=raw_directory, settle_seconds=60,
+)
+result = capture_fixture(request, guard=guard)
+```
+
+`dump_fixture_build` and `load_fixture_build` verify the compiled image, ELF,
+generated sources, map, dependency state/lock, complete inputs and any legacy
+references. The compiled identity includes method/counts/state, target/clocks,
+placement, output descriptors, provider and memory facts. Files use named-root
+relative paths and content hashes. Move roots by changing the caller's root map;
+do not rewrite or reseal the record. Render-only and incomplete historical
+objects cannot be promoted into this compiled record. Retain historical readers
+for historical receipts. The record schema is separate from the public API version.
+
+This proves record integrity, not provenance authenticity, numerical correctness
+or permission. The consumer must independently pin its selected model, inputs,
+specification, producer source, method/state and expected image/record. A rewritten
+self-consistent producer record does not establish the intended experiment.
+`fixture_capture_request` supplies recorded image/output/placement facts only;
+serial, evidence directory, bounded wait and the exact physical guard remain
+caller-owned. Timing, operator-instrumented and rail images remain distinct.
+
+`FixtureBuild.inputs`, `output_tensors`, `model`, `arena_capacity`, `clock_profile`,
+`cpu_hz` and `timer_hz` carry complete producer facts. Existing `timing_scope`,
+`state_policy`, `iterations` and `warmups` retain their meanings. Descriptor-only
+builds have `expected=None` and `outputs=()`. Internal reset remains unsupported;
+explicit carry initializes once and keeps internal state across warmups and samples.
+
+Constructing `FixtureBuildRequest` performs no runtime-cache lookup. When an
+interpreter request omits `runtime`, `build_fixture` looks up the already prepared
+default archive and binds its manifest into the compiled intent; it does not
+download or build a missing provider. Explicit runtime requests retain their
+intent identity. The selected adapter stages that archive directly through the
+ordinary preparation stage. The existing `build_fixed_fixture(ProfileConfig, ...)`
+front door remains supported. This does not implement additional boards, clocks,
+working-arena regions or provider-owned registration generation.
+
 Consumers import only the names in `helia_profiler.fixture.__all__`; the other
 `fixture_*` modules and `_fixture_build` are internal. `FIXTURE_API_VERSION` is
 `(major, minor)`: minor grows with additions, major with removals or changed
@@ -400,10 +457,9 @@ digests and unrecorded prepared-archive settings remain unknown. Qualification i
 not inferred from any of these facts.
 
 BENCH owns comparison eligibility and layer-sum agreement tolerances. Its policy
-retains the observations and records its verdict separately. The deprecated
-internal `fixture_operator_timing.bind_operator_timing` wrapper temporarily retains
-the previous default same-runtime requirement, explicit runtime allowance and
-1% agreement rule (2% below 2ms) for unknown external callers. Maintained consumers
-use the public facts route. Removal requires an explicit breaking retirement after
-migration notice; repository search does not establish external caller absence.
+retains the observations and records its verdict separately. API 5.0 removes the
+private `bind_operator_timing` compatibility wrapper, its acceptance record and
+its threshold constants. Import `observe_operator_timing` from the public facade
+and apply comparison policy in the consumer. The profiler reports facts and
+non-waivable integrity/attribution limitations, not a benchmark acceptance verdict.
 Historical raw records and build/capture safety validation are unchanged.

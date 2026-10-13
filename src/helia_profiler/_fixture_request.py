@@ -4,33 +4,32 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
 from ._fixture_build import (
+    FIXTURE_CAPABILITIES,
     FixedFixture,
     FixtureBackend,
     FixtureBuild,
     FixtureMethod,
     TypedFixture,
     _build,
-    _validate_fixture_placement,
 )
 from .config import ProfileConfig, load_config
-from .engines import EngineType
+from .engines import EngineType, get_adapter
+from .engines.base import PreparedRuntimeAdapter
 from .errors import ConfigError
 from .fixture_runtime import PreparedUpstreamRuntime
-from .fixture_target import FIXTURE_CLOCK_PROFILE, FixtureTarget, supported_fixture_target
+from .fixture_target import (
+    FIXTURE_CLOCK_PROFILE,
+    FixtureTarget,
+    supported_fixture_target,
+    validate_fixture_placement,
+)
 from .placement import Placement
 from .prepared_runtimes import prepared_runtime
-
-#: Backends the prepared-runtime engines require; heliaAOT takes none.
-_ENGINE_BACKENDS = {
-    EngineType.TFLM: FixtureBackend.CMSIS_NN,
-    EngineType.HELIA_RT: FixtureBackend.HELIA,
-    EngineType.HELIA_AOT: None,
-}
 
 
 @dataclass(frozen=True)
@@ -90,6 +89,7 @@ class FixtureBuildRequest:
     closure pins the profiler, and ``FixtureBuild.engine_source`` records the
     engine package. A TFLM or heliaRT request without ``runtime`` uses the
     archive ``hpx runtimes prepare`` built from the engine's default record.
+    This cache lookup happens only at ``build_fixture``, never in construction.
     """
 
     fixture: FixedFixture | TypedFixture
@@ -107,22 +107,23 @@ class FixtureBuildRequest:
     observe_aot_arenas: bool = False
 
     def __post_init__(self) -> None:
-        if self.engine not in _ENGINE_BACKENDS:
+        if self.engine not in FIXTURE_CAPABILITIES:
             raise ConfigError(f"{self.engine.value} has no fixed-fixture build")
-        if self.backend != _ENGINE_BACKENDS[self.engine]:
-            expected = _ENGINE_BACKENDS[self.engine]
-            raise ConfigError(
-                f"{self.engine.value} fixtures use backend {expected.value if expected else 'none'}"
-            )
+        adapter = get_adapter(self.engine)
+        expected = (
+            adapter.prepared_runtime_contract[1]
+            if isinstance(adapter, PreparedRuntimeAdapter)
+            else None
+        )
+        if self.backend != expected:
+            raise ConfigError(f"{self.engine.value} fixtures use backend {expected or 'none'}")
         if self.aot is not None and self.engine is not EngineType.HELIA_AOT:
             raise ConfigError("heliaAOT options apply to heliaAOT fixtures only")
         try:
             self.target.verify()
         except ValueError as exc:
             raise ConfigError(str(exc)) from exc
-        _validate_fixture_placement(self.placement.arena, self.placement.weights, self.engine)
-        if self.runtime is None and self.engine in (EngineType.TFLM, EngineType.HELIA_RT):
-            object.__setattr__(self, "runtime", prepared_runtime(self.engine.value).runtime)
+        validate_fixture_placement(self.placement.arena, self.placement.weights, self.engine)
 
     @property
     def intent_identity(self) -> str:
@@ -176,7 +177,13 @@ class FixtureBuildRequest:
 
 
 def build_fixture(request: FixtureBuildRequest, *, compile: bool = True) -> FixtureBuild:
-    """Render or compile the requested fixture; its intent identity is the request's."""
+    """Resolve the selected cached runtime, then render or compile the request.
+
+    The compiled intent includes the resolved runtime manifest. No archive is
+    downloaded or built implicitly; a missing cache remains an explicit error.
+    """
+    if request.runtime is None and isinstance(get_adapter(request.engine), PreparedRuntimeAdapter):
+        request = replace(request, runtime=prepared_runtime(request.engine.value).runtime)
     return _build(
         request.to_config(),
         request.fixture,
