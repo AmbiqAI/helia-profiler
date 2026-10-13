@@ -161,6 +161,16 @@ def _io_tensor(graph: Any, index: int, int8_type: int) -> Int8Tensor:
     )
 
 
+@dataclass(frozen=True)
+class _FixtureGraphFacts:
+    has_internal_state: bool
+    has_initializer: bool
+    subgraph_count: int
+    resource_variable_count: int
+    operator_names: tuple[str, ...]
+    has_float16: bool
+
+
 def _read_fixture_graph(path: Path, *, single_io: bool, finish, engine: EngineType | None = None):
     """Validate the container and selected public IO before engine admission."""
     schema = model_analysis._schema
@@ -247,15 +257,15 @@ def _read_fixture_graph(path: Path, *, single_io: bool, finish, engine: EngineTy
                         value = getter(position)
                         if not (0 <= value < current.TensorsLength() or (optional and value == -1)):
                             raise ValueError("Invalid fixture operator tensor index")
-        facts = (
-            has_internal_state or has_initializer,
-            has_initializer,
-            model.SubgraphsLength(),
-            resource_variable_count,
-            tuple(sorted(operator_names)),
-            has_float16,
+        facts = _FixtureGraphFacts(
+            has_internal_state=has_internal_state or has_initializer,
+            has_initializer=has_initializer,
+            subgraph_count=model.SubgraphsLength(),
+            resource_variable_count=resource_variable_count,
+            operator_names=tuple(sorted(operator_names)),
+            has_float16=has_float16,
         )
-        analysis = model_analysis.analyze_model(path)
+        analysis = model_analysis._analyze_parsed_model(model)
         if analysis is None:
             raise ValueError("Fixture model analysis unavailable")
         return finish(schema, graph, analysis, facts)
@@ -276,15 +286,15 @@ def analyze_fixture_model(path: Path, *, _engine: EngineType | None = None) -> F
         output_tensor = _io_tensor(graph, graph.Outputs(0), schema.TensorType.INT8)
         resolver = _engine_resolver(analysis, _engine, facts)
         return FixtureModelAnalysis(
-            input_tensor,
-            output_tensor,
-            analysis,
-            resolver,
-            has_internal_state=facts[0],
-            has_initializer=facts[1],
-            subgraph_count=facts[2],
-            resource_variable_count=facts[3],
-            has_float16=facts[5],
+            input_tensor=input_tensor,
+            output_tensor=output_tensor,
+            analysis=analysis,
+            resolver=resolver,
+            has_internal_state=facts.has_internal_state,
+            has_initializer=facts.has_initializer,
+            subgraph_count=facts.subgraph_count,
+            resource_variable_count=facts.resource_variable_count,
+            has_float16=facts.has_float16,
         )
 
     return _read_fixture_graph(path, single_io=True, finish=finish, engine=_engine)
@@ -346,27 +356,29 @@ def _analyze_typed_fixture_model(
             )
 
         return TypedFixtureModelAnalysis(
-            tuple(tensor(graph.Inputs(i)) for i in range(graph.InputsLength())),
-            tuple(tensor(graph.Outputs(i)) for i in range(graph.OutputsLength())),
-            facts[5],
-            analysis,
-            _engine_resolver(analysis, engine, facts),
-            has_internal_state=facts[0],
-            has_initializer=facts[1],
-            subgraph_count=facts[2],
-            resource_variable_count=facts[3],
+            inputs=tuple(tensor(graph.Inputs(i)) for i in range(graph.InputsLength())),
+            outputs=tuple(tensor(graph.Outputs(i)) for i in range(graph.OutputsLength())),
+            has_float16=facts.has_float16,
+            analysis=analysis,
+            resolver=_engine_resolver(analysis, engine, facts),
+            has_internal_state=facts.has_internal_state,
+            has_initializer=facts.has_initializer,
+            subgraph_count=facts.subgraph_count,
+            resource_variable_count=facts.resource_variable_count,
         )
 
     return _read_fixture_graph(path, single_io=False, finish=finish, engine=engine)
 
 
-def _engine_resolver(analysis: ModelAnalysis, engine: EngineType | None, facts) -> ResolverPlan:
+def _engine_resolver(
+    analysis: ModelAnalysis, engine: EngineType | None, facts: _FixtureGraphFacts
+) -> ResolverPlan:
     if engine is EngineType.HELIA_AOT:
         return ResolverPlan(mode="engine", registrations=())
-    if engine is EngineType.HELIA_RT and (facts[0] or facts[2] != 1):
+    if engine is EngineType.HELIA_RT and (facts.has_internal_state or facts.subgraph_count != 1):
         raise ValueError("helia-rt fixture resource/multiple-subgraph integration is unavailable")
     return build_fixture_resolver_plan(
-        analysis, allow_state=engine is EngineType.TFLM, additional_ops=facts[4]
+        analysis, allow_state=engine is EngineType.TFLM, additional_ops=facts.operator_names
     )
 
 

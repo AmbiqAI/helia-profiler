@@ -65,6 +65,41 @@ def test_derives_signature_and_only_used_operator(tmp_path, shape, op, registrat
     assert result.analysis.total_ops == result.output_tensor.size
 
 
+@pytest.mark.parametrize("typed", [False, True])
+def test_io_and_costs_use_one_original_model_snapshot(tmp_path, monkeypatch, typed):
+    from helia_profiler.engines import EngineType
+    from helia_profiler.fixture_analysis import analyze_typed_fixture_model_for_engine
+
+    def names(_, graph):
+        for index, tensor in enumerate(graph.tensors):
+            tensor.name = f"tensor_{index}"
+
+    path = model_file(tmp_path, shape=(1, 4), change=names)
+    other = tmp_path / "replacement"
+    other.mkdir()
+    replacement = model_file(other, shape=(1, 30), change=names).read_bytes()
+    read_bytes = Path.read_bytes
+    reads = []
+
+    def changed_after_read(file):
+        data = read_bytes(file)
+        if file == path:
+            reads.append(file)
+            path.write_bytes(replacement)
+        return data
+
+    monkeypatch.setattr(Path, "read_bytes", changed_after_read)
+    result = (
+        analyze_typed_fixture_model_for_engine(path, engine=EngineType.TFLM)
+        if typed
+        else analyze_fixture_model(path)
+    )
+    assert result.input_bytes == result.output_bytes == 4
+    assert result.analysis.layers[0].output_shapes == [[1, 4]]
+    assert result.analysis.total_ops == 4
+    assert reads == [path]
+
+
 @pytest.mark.parametrize(
     "change,match",
     [

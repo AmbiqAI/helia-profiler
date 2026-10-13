@@ -393,6 +393,13 @@ def analyze_model(model_path: str | Path) -> ModelAnalysis | None:
     path = Path(model_path)
     buf = path.read_bytes()
     model = _schema.Model.GetRootAs(buf, 0)
+    return _analyze_parsed_model(model)
+
+
+def _analyze_parsed_model(model: Any) -> ModelAnalysis | None:
+    """Compute original-model costs from an already parsed LiteRT model."""
+    if _schema is None:
+        return None
 
     if model.SubgraphsLength() == 0:
         log.warning("Model has no subgraphs")
