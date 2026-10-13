@@ -101,8 +101,8 @@ runner contract are described in `maintainers/hardware-ci.md`.
   changing the locked heliaAOT release, update the `helia-aot` input in
   `flake.nix` and refresh its entry in `flake.lock`. When moving the CORE
   baseline commit, update its release mapping in `nix/compat.nix`. Run
-  `nix flake check --no-build --all-systems --no-write-lock-file` after either
-  change; CI evaluates these checks without building packages.
+  `nix flake check --no-build --all-systems --no-update-lock-file --no-write-lock-file`
+  after either change; CI evaluates these checks without building packages.
 - `uv lock` strips the `# x-release-please-version` marker from the
   `helia-profiler` entry in `uv.lock`. Restore it before committing; the
   `package` CI job requires exactly one.

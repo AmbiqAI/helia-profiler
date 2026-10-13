@@ -27,7 +27,7 @@ jobs:
       - name: Evaluate locked flake on all supported systems
         run: >-
           nix --extra-experimental-features 'nix-command flakes'
-          flake check --no-build --all-systems --no-write-lock-file
+          flake check --no-build --all-systems --no-update-lock-file --no-write-lock-file
 
   # ---------------------------------------------------------------
   # Type check — runs once on Linux. ruff runs in the pre-commit job, at
