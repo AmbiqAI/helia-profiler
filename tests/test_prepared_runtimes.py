@@ -15,6 +15,7 @@ import time
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 from typer.testing import CliRunner
@@ -33,6 +34,7 @@ from helia_profiler.fixture import (
     FixtureTimingScope,
     PerTensorQuantization,
     TypedFixture,
+    build_fixture,
 )
 from helia_profiler.prepared_runtimes import prepare_runtime, prepared_directory, prepared_runtime
 from helia_profiler.runtime_records import runtime
@@ -152,18 +154,34 @@ def _request(root: Path, engine: EngineType) -> FixtureBuildRequest:
     )
 
 
-def test_a_helia_rt_request_uses_the_prepared_runtime(cache: Path, tmp_path: Path) -> None:
+@pytest.fixture
+def fixture_builder(monkeypatch: pytest.MonkeyPatch) -> Mock:
+    operation = Mock()
+    monkeypatch.setattr("helia_profiler._fixture_request._build", operation)
+    return operation
+
+
+def test_a_helia_rt_build_uses_the_prepared_runtime(cache, tmp_path, fixture_builder) -> None:
     prepared = prepare_runtime("helia-rt")
     request = _request(tmp_path, EngineType.HELIA_RT)
-    assert request.runtime == prepared.runtime
+    assert request.runtime is None
+    fixture_builder.assert_not_called()
+    build_fixture(request)
+    assert fixture_builder.call_args.kwargs["runtime"] == prepared.runtime
+    assert request.runtime is None
     manifest = json.loads(prepared.runtime.manifest.read())
     assert manifest["archive_sha256"] == hashlib.sha256(ARCHIVE).hexdigest()
 
 
-def test_a_helia_rt_request_without_a_prepared_runtime_is_refused(tmp_path, monkeypatch) -> None:
+def test_a_helia_rt_build_without_a_prepared_runtime_is_refused(
+    tmp_path, monkeypatch, fixture_builder
+) -> None:
     monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "cache"))
+    request = _request(tmp_path, EngineType.HELIA_RT)
+    assert request.runtime is None
     with pytest.raises(ConfigError, match="No prepared helia-rt"):
-        _request(tmp_path, EngineType.HELIA_RT)
+        build_fixture(request)
+    fixture_builder.assert_not_called()
 
 
 def test_runtimes_prepare_cli_reports_the_archive(cache: Path) -> None:
@@ -222,17 +240,31 @@ def test_a_malformed_prepared_manifest_names_the_prepare_command(cache: Path) ->
     assert "hpx runtimes prepare helia-rt 1.21.3" in (exc.value.hint or "")
 
 
-def test_an_explicit_runtime_is_kept_and_identity_covers_the_runtime(cache, tmp_path) -> None:
+def test_an_explicit_runtime_is_kept_and_identity_covers_the_runtime(
+    cache, tmp_path, fixture_builder, monkeypatch
+) -> None:
     prepared = prepare_runtime("helia-rt")
-    resolved = _request(tmp_path / "a", EngineType.HELIA_RT)
-    explicit = replace(resolved, runtime=prepared.runtime)
+    unresolved = _request(tmp_path / "a", EngineType.HELIA_RT)
+    build_fixture(unresolved)
+    resolved_identity = fixture_builder.call_args.kwargs["intent_identity"]
+    explicit = replace(unresolved, runtime=prepared.runtime)
     assert explicit.runtime is prepared.runtime
-    assert explicit.intent_identity == resolved.intent_identity
+    assert explicit.intent_identity == resolved_identity
+    with monkeypatch.context() as patch:
+        lookup = Mock(side_effect=AssertionError("explicit runtime must not read the cache"))
+        patch.setattr("helia_profiler._fixture_request.prepared_runtime", lookup)
+        build_fixture(explicit)
+        lookup.assert_not_called()
+    assert fixture_builder.call_args.kwargs["runtime"] is prepared.runtime
+    assert fixture_builder.call_args.kwargs["intent_identity"] == resolved_identity
     (prepared.directory / "provider-manifest.json").write_text(
         (prepared.directory / "provider-manifest.json").read_text() + " "
     )
     changed = _request(tmp_path / "b", EngineType.HELIA_RT)
-    assert changed.intent_identity != resolved.intent_identity
+    assert changed.intent_identity == unresolved.intent_identity
+    build_fixture(changed)
+    assert fixture_builder.call_args.kwargs["intent_identity"] != resolved_identity
+    assert unresolved.runtime is None and changed.runtime is None
 
 
 def test_a_failed_swap_restores_the_previous_install(cache: Path, monkeypatch) -> None:
@@ -761,15 +793,23 @@ def test_a_tflm_tarball_that_is_not_one_tree_is_refused(tmp_path, monkeypatch, e
         prepared_runtimes._download_tree(TFLM.source, tmp_path / "tflite-micro", 5)
 
 
-def test_a_tflm_request_uses_the_prepared_runtime(tflm_build, tmp_path: Path) -> None:
+def test_a_tflm_build_uses_the_prepared_runtime(tflm_build, tmp_path, fixture_builder) -> None:
     prepared = prepare_runtime("tflm")
-    assert _request(tmp_path, EngineType.TFLM).runtime == prepared.runtime
+    request = _request(tmp_path, EngineType.TFLM)
+    assert request.runtime is None
+    fixture_builder.assert_not_called()
+    build_fixture(request)
+    assert fixture_builder.call_args.kwargs["runtime"] == prepared.runtime
+    assert request.runtime is None
 
 
-def test_a_tflm_request_without_a_prepared_runtime_names_the_prepare_command(
-    tmp_path, monkeypatch
+def test_a_tflm_build_without_a_prepared_runtime_names_the_prepare_command(
+    tmp_path, monkeypatch, fixture_builder
 ) -> None:
     monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "cache"))
+    request = _request(tmp_path, EngineType.TFLM)
+    assert request.runtime is None
     with pytest.raises(ConfigError, match="No prepared tflm 85638f0 runtime") as exc:
-        _request(tmp_path, EngineType.TFLM)
+        build_fixture(request)
+    fixture_builder.assert_not_called()
     assert "hpx runtimes prepare tflm 85638f0" in (exc.value.hint or "")
