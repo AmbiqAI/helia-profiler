@@ -13,22 +13,20 @@ parameters and forwards them as keyword arguments to the matching
 
 from __future__ import annotations
 
+from enum import StrEnum
 from pathlib import Path
 from typing import Annotated, Optional
 
 import click
 import typer
 
-# typer 0.26+ vendors click, so ``click_type`` values must subclass the
-# vendored ParamType — see the matching note in ``app.py``.
-from typer._types import TyperChoice
-
 from ..config import Transport
 from ..engines import EngineType
 
-_ENGINE_CHOICE = TyperChoice([engine.value for engine in EngineType])
-_TRANSPORT_CHOICE = TyperChoice([t.value for t in Transport])
-_TARGET_RESET_KIND_CHOICE = TyperChoice(["debug", "swpoi"])
+
+class _TargetResetKind(StrEnum):
+    DEBUG = "debug"
+    SWPOI = "swpoi"
 
 
 def register(app: typer.Typer) -> None:
@@ -79,18 +77,15 @@ def doctor_command(
         typer.Option("--toolchain", help="Toolchain to check (default: arm-none-eabi-gcc)"),
     ] = None,
     transport: Annotated[
-        Optional[str],
+        Optional[Transport],
         typer.Option(
             "--transport",
-            click_type=_TRANSPORT_CHOICE,
             help="Transport to check (default: rtt)",
         ),
     ] = None,
     engine: Annotated[
-        Optional[str],
-        typer.Option(
-            "--engine", click_type=_ENGINE_CHOICE, help="Engine to check (default: helia-rt)"
-        ),
+        Optional[EngineType],
+        typer.Option("--engine", help="Engine to check (default: helia-rt)"),
     ] = None,
     no_probes: Annotated[
         bool,
@@ -117,8 +112,8 @@ def doctor_command(
         workspace=str(workspace) if workspace is not None else None,
         config=str(config) if config is not None else None,
         toolchain=toolchain,
-        transport=transport,
-        engine=engine,
+        transport=str(transport) if transport is not None else None,
+        engine=str(engine) if engine is not None else None,
         no_probes=no_probes,
         no_ports=no_ports,
         raw_probe_ids=raw_probe_ids,
@@ -230,14 +225,13 @@ def target_reset_command(
         Optional[str], typer.Option("--jlink-serial", help="J-Link probe serial number")
     ] = None,
     kind: Annotated[
-        str,
+        _TargetResetKind,
         typer.Option(
             "--kind",
-            click_type=_TARGET_RESET_KIND_CHOICE,
             help="Reset kind: debug r/g reset (default) or SWPOI reset",
         ),
-    ] = "debug",
+    ] = _TargetResetKind.DEBUG,
 ) -> None:
     from .inspect_cmds import _cmd_target_reset
 
-    _cmd_target_reset(board=board, jlink_serial=jlink_serial, kind=kind)
+    _cmd_target_reset(board=board, jlink_serial=jlink_serial, kind=str(kind))

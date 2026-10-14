@@ -3,7 +3,7 @@
   "kind": "pmu-catalog",
   "generatedFrom": {
     "helia_profiler": "0.1.6",
-    "typer": "0.26.8",
+    "typer": "0.27.3",
     "click": "8.3.3",
     "pydantic": "2.13.4"
   },

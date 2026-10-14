@@ -4,7 +4,7 @@
   "program": "hpx",
   "generatedFrom": {
     "helia_profiler": "0.1.6",
-    "typer": "0.26.8",
+    "typer": "0.27.3",
     "click": "8.3.3",
     "pydantic": "2.13.4"
   },
@@ -74,7 +74,7 @@
     "hidden": false,
     "source": {
       "path": "src/helia_profiler/cli/app.py",
-      "line": 49
+      "line": 45
     },
     "arguments": [],
     "options": [
@@ -121,7 +121,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 537
+          "line": 536
         },
         "arguments": [
           {
@@ -177,7 +177,7 @@
                 "executorch"
               ]
             },
-            "python_type": "Optional[str]",
+            "python_type": "Optional[EngineType]",
             "default": null,
             "required": false,
             "help": "Analyze as this engine would execute it. Default (no flag) uses the raw tflite graph. 'helia-aot' runs AOT compilation and analyzes the transformed graph. 'helia-rt' analyzes the original tflite graph.",
@@ -234,7 +234,7 @@
                 "json"
               ]
             },
-            "python_type": "str",
+            "python_type": "_AnalyzeFormat",
             "default": "table",
             "required": false,
             "help": "Output format (default: table)",
@@ -291,7 +291,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "text",
+              "name": "str",
               "class": "StringParamType"
             },
             "python_type": "str",
@@ -323,7 +323,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/inspect_app.py",
-          "line": 135
+          "line": 130
         },
         "arguments": [],
         "options": [],
@@ -343,7 +343,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 679
+          "line": 676
         },
         "arguments": [],
         "options": [],
@@ -364,7 +364,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 693
+              "line": 690
             },
             "arguments": [],
             "options": [],
@@ -385,7 +385,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 686
+              "line": 683
             },
             "arguments": [],
             "options": [],
@@ -407,7 +407,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 612
+          "line": 609
         },
         "arguments": [
           {
@@ -573,7 +573,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "integer",
+              "name": "int",
               "class": "IntParamType"
             },
             "python_type": "int",
@@ -605,7 +605,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/inspect_app.py",
-          "line": 44
+          "line": 42
         },
         "arguments": [],
         "options": [
@@ -739,7 +739,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "text",
+              "name": "str",
               "class": "StringParamType"
             },
             "python_type": "Optional[str]",
@@ -774,7 +774,7 @@
                 "uart"
               ]
             },
-            "python_type": "Optional[str]",
+            "python_type": "Optional[Transport]",
             "default": null,
             "required": false,
             "help": "Transport to check (default: rtt)",
@@ -806,7 +806,7 @@
                 "executorch"
               ]
             },
-            "python_type": "Optional[str]",
+            "python_type": "Optional[EngineType]",
             "default": null,
             "required": false,
             "help": "Engine to check (default: helia-rt)",
@@ -913,7 +913,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/inspect_app.py",
-          "line": 128
+          "line": 123
         },
         "arguments": [],
         "options": [],
@@ -933,7 +933,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/inspect_app.py",
-          "line": 194
+          "line": 189
         },
         "arguments": [],
         "options": [],
@@ -954,7 +954,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/inspect_app.py",
-              "line": 201
+              "line": 196
             },
             "arguments": [],
             "options": [
@@ -1029,7 +1029,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/validation_app.py",
-          "line": 57
+          "line": 56
         },
         "arguments": [],
         "options": [
@@ -1050,7 +1050,7 @@
                 "joulescope"
               ]
             },
-            "python_type": "str",
+            "python_type": "_PowerOnDriver",
             "default": "joulescope",
             "required": false,
             "help": "Power driver that holds the target rail on (JS110/JS220/JS320 auto-detected)",
@@ -1074,7 +1074,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "text",
+              "name": "str",
               "class": "StringParamType"
             },
             "python_type": "Optional[str]",
@@ -1106,7 +1106,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/inspect_app.py",
-          "line": 147
+          "line": 142
         },
         "arguments": [],
         "options": [],
@@ -1127,7 +1127,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/inspect_app.py",
-              "line": 154
+              "line": 149
             },
             "arguments": [],
             "options": [
@@ -1142,7 +1142,7 @@
                 "secondary_opts": [],
                 "metavar": null,
                 "type": {
-                  "name": "text",
+                  "name": "str",
                   "class": "StringParamType"
                 },
                 "python_type": "Optional[str]",
@@ -1227,7 +1227,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/inspect_app.py",
-              "line": 172
+              "line": 167
             },
             "arguments": [],
             "options": [
@@ -1242,7 +1242,7 @@
                 "secondary_opts": [],
                 "metavar": null,
                 "type": {
-                  "name": "text",
+                  "name": "str",
                   "class": "StringParamType"
                 },
                 "python_type": "str",
@@ -1268,7 +1268,7 @@
                 "secondary_opts": [],
                 "metavar": null,
                 "type": {
-                  "name": "text",
+                  "name": "str",
                   "class": "StringParamType"
                 },
                 "python_type": "Optional[str]",
@@ -1328,7 +1328,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 89
+          "line": 93
         },
         "arguments": [
           {
@@ -1409,7 +1409,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "integer",
+              "name": "int",
               "class": "IntParamType"
             },
             "python_type": "int",
@@ -1444,7 +1444,7 @@
                 "executorch"
               ]
             },
-            "python_type": "Optional[str]",
+            "python_type": "Optional[EngineType]",
             "default": null,
             "required": false,
             "help": "Inference engine (default: helia-rt)",
@@ -1498,7 +1498,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "integer",
+              "name": "int",
               "class": "IntParamType"
             },
             "python_type": "Optional[int]",
@@ -1532,7 +1532,7 @@
                 "psram"
               ]
             },
-            "python_type": "Optional[str]",
+            "python_type": "Optional[helia_profiler.cli.app._ArenaLocation]",
             "default": null,
             "required": false,
             "help": "Tensor arena placement. helia-rt: places the single runtime tensor arena. helia-aot: use engine.config.aot_args.memory.tensors instead. Omit to let the engine and memory planner choose.",
@@ -1564,7 +1564,7 @@
                 "psram"
               ]
             },
-            "python_type": "Optional[str]",
+            "python_type": "Optional[Placement]",
             "default": null,
             "required": false,
             "help": "Model weights placement. helia-rt: places the model flatbuffer (psram requires J-Link upload via the RTT transport). helia-aot: use engine.config.aot_args.memory.tensors instead. Omit to let the engine and memory planner choose.",
@@ -1594,7 +1594,7 @@
                 "cm55"
               ]
             },
-            "python_type": "Optional[str]",
+            "python_type": "Optional[helia_profiler.cli.app._CoreOverride]",
             "default": null,
             "required": false,
             "help": "Select the core library in an explicit heliaRT prebuilt distribution. Unsupported for registry and local source builds.",
@@ -1617,7 +1617,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "text",
+              "name": "str",
               "class": "StringParamType"
             },
             "python_type": "Optional[str]",
@@ -1643,7 +1643,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "text",
+              "name": "str",
               "class": "StringParamType"
             },
             "python_type": "Optional[str]",
@@ -1669,7 +1669,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "text",
+              "name": "str",
               "class": "StringParamType"
             },
             "python_type": "Optional[str]",
@@ -1704,7 +1704,7 @@
                 "uart"
               ]
             },
-            "python_type": "Optional[str]",
+            "python_type": "Optional[Transport]",
             "default": null,
             "required": false,
             "help": "Data transport (default: rtt). RTT is recommended for lossless capture.",
@@ -1727,7 +1727,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "text",
+              "name": "str",
               "class": "StringParamType"
             },
             "python_type": "Optional[str]",
@@ -1753,7 +1753,7 @@
             "secondary_opts": [],
             "metavar": "BYTES",
             "type": {
-              "name": "integer",
+              "name": "int",
               "class": "IntParamType"
             },
             "python_type": "Optional[int]",
@@ -1779,7 +1779,7 @@
             "secondary_opts": [],
             "metavar": "SPEED",
             "type": {
-              "name": "text",
+              "name": "str",
               "class": "StringParamType"
             },
             "python_type": "Optional[str]",
@@ -1883,7 +1883,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "text",
+              "name": "str",
               "class": "StringParamType"
             },
             "python_type": "Optional[str]",
@@ -1909,7 +1909,7 @@
             "secondary_opts": [],
             "metavar": "NAME:KEY=VALUE",
             "type": {
-              "name": "text",
+              "name": "str",
               "class": "StringParamType"
             },
             "python_type": "Optional[list[str]]",
@@ -1935,7 +1935,7 @@
             "secondary_opts": [],
             "metavar": "NAME",
             "type": {
-              "name": "text",
+              "name": "str",
               "class": "StringParamType"
             },
             "python_type": "Optional[str]",
@@ -1987,7 +1987,7 @@
             "secondary_opts": [],
             "metavar": "GROUP:SELECT",
             "type": {
-              "name": "text",
+              "name": "str",
               "class": "StringParamType"
             },
             "python_type": "Optional[list[str]]",
@@ -2041,7 +2041,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "integer",
+              "name": "int",
               "class": "IntParamType"
             },
             "python_type": "Optional[int]",
@@ -2067,7 +2067,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "integer",
+              "name": "int",
               "class": "IntParamType"
             },
             "python_type": "Optional[int]",
@@ -2101,7 +2101,7 @@
                 "trimmed"
               ]
             },
-            "python_type": "Optional[str]",
+            "python_type": "Optional[Aggregation]",
             "default": null,
             "required": false,
             "help": "How per-layer counters are aggregated across iterations (default: median). 'median' rejects corrupted iterations; 'trimmed' drops extremes then means; 'mean' is the raw average.",
@@ -2157,7 +2157,7 @@
                 "joulescope"
               ]
             },
-            "python_type": "Optional[str]",
+            "python_type": "Optional[helia_profiler.cli.app._PowerDriver]",
             "default": null,
             "required": false,
             "help": "Power driver (default: joulescope = auto-detect JS110/JS220/JS320)",
@@ -2187,7 +2187,7 @@
                 "internal"
               ]
             },
-            "python_type": "Optional[str]",
+            "python_type": "Optional[PowerMode]",
             "default": null,
             "required": false,
             "help": "Power mode (default: external)",
@@ -2210,7 +2210,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "integer",
+              "name": "int",
               "class": "IntParamType"
             },
             "python_type": "Optional[int]",
@@ -2243,7 +2243,7 @@
                 "shared"
               ]
             },
-            "python_type": "Optional[str]",
+            "python_type": "Optional[PowerFirmware]",
             "default": null,
             "required": false,
             "help": "Which binary is on target during power capture (default: dedicated). 'dedicated' flashes the transport-free hpx_profiler_power image to avoid SWO/UART/RTT/USB current contamination (measured on AP510 EVBs); 'shared' reuses the already-flashed transport binary.",
@@ -2277,7 +2277,7 @@
                 "debug_reset+swpoi_reset"
               ]
             },
-            "python_type": "Optional[str]",
+            "python_type": "Optional[ResetStrategy]",
             "default": null,
             "required": false,
             "help": "Reset strategy before power capture (default: auto). Use explicit values only for board bring-up or controlled experiments.",
@@ -2300,7 +2300,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "integer",
+              "name": "int",
               "class": "IntParamType"
             },
             "python_type": "Optional[int]",
@@ -2379,7 +2379,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "text",
+              "name": "str",
               "class": "StringParamType"
             },
             "python_type": "Optional[str]",
@@ -2443,7 +2443,7 @@
                 "json"
               ]
             },
-            "python_type": "Optional[str]",
+            "python_type": "Optional[helia_profiler.cli.app._OutputFormat]",
             "default": null,
             "required": false,
             "help": "Output format",
@@ -2615,7 +2615,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 708
+          "line": 705
         },
         "arguments": [],
         "options": [],
@@ -2636,7 +2636,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 715
+              "line": 712
             },
             "arguments": [],
             "options": [],
@@ -2657,7 +2657,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 732
+              "line": 729
             },
             "arguments": [
               {
@@ -2671,7 +2671,7 @@
                 "secondary_opts": [],
                 "metavar": null,
                 "type": {
-                  "name": "text",
+                  "name": "str",
                   "class": "StringParamType"
                 },
                 "python_type": "str",
@@ -2697,7 +2697,7 @@
                 "secondary_opts": [],
                 "metavar": null,
                 "type": {
-                  "name": "text",
+                  "name": "str",
                   "class": "StringParamType"
                 },
                 "python_type": "Optional[str]",
@@ -2731,7 +2731,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 722
+              "line": 719
             },
             "arguments": [
               {
@@ -2745,7 +2745,7 @@
                 "secondary_opts": [],
                 "metavar": null,
                 "type": {
-                  "name": "text",
+                  "name": "str",
                   "class": "StringParamType"
                 },
                 "python_type": "str",
@@ -2771,7 +2771,7 @@
                 "secondary_opts": [],
                 "metavar": null,
                 "type": {
-                  "name": "text",
+                  "name": "str",
                   "class": "StringParamType"
                 },
                 "python_type": "Optional[str]",
@@ -2806,7 +2806,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/inspect_app.py",
-          "line": 219
+          "line": 214
         },
         "arguments": [],
         "options": [],
@@ -2827,7 +2827,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/inspect_app.py",
-              "line": 226
+              "line": 221
             },
             "arguments": [],
             "options": [
@@ -2842,7 +2842,7 @@
                 "secondary_opts": [],
                 "metavar": null,
                 "type": {
-                  "name": "text",
+                  "name": "str",
                   "class": "StringParamType"
                 },
                 "python_type": "str",
@@ -2868,7 +2868,7 @@
                 "secondary_opts": [],
                 "metavar": null,
                 "type": {
-                  "name": "text",
+                  "name": "str",
                   "class": "StringParamType"
                 },
                 "python_type": "Optional[str]",
@@ -2901,7 +2901,7 @@
                     "swpoi"
                   ]
                 },
-                "python_type": "str",
+                "python_type": "_TargetResetKind",
                 "default": "debug",
                 "required": false,
                 "help": "Reset kind: debug r/g reset (default) or SWPOI reset",
@@ -2932,7 +2932,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/validation_app.py",
-          "line": 85
+          "line": 92
         },
         "arguments": [],
         "options": [
@@ -2947,7 +2947,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "text",
+              "name": "str",
               "class": "StringParamType"
             },
             "python_type": "str",
@@ -3004,7 +3004,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "text",
+              "name": "str",
               "class": "StringParamType"
             },
             "python_type": "str",
@@ -3030,7 +3030,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "text",
+              "name": "str",
               "class": "StringParamType"
             },
             "python_type": "str",
@@ -3056,7 +3056,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "integer",
+              "name": "int",
               "class": "IntParamType"
             },
             "python_type": "int",
@@ -3082,7 +3082,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "text",
+              "name": "str",
               "class": "StringParamType"
             },
             "python_type": "str",
@@ -3108,7 +3108,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "text",
+              "name": "str",
               "class": "StringParamType"
             },
             "python_type": "str",
@@ -3134,7 +3134,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "text",
+              "name": "str",
               "class": "StringParamType"
             },
             "python_type": "str",
@@ -3168,7 +3168,7 @@
                 "off"
               ]
             },
-            "python_type": "str",
+            "python_type": "_ValidatePower",
             "default": "off",
             "required": false,
             "help": "Power matrix: off (default) | on (only Joulescope runs) | both.",
@@ -3191,7 +3191,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "text",
+              "name": "str",
               "class": "StringParamType"
             },
             "python_type": "str",
@@ -3217,7 +3217,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "text",
+              "name": "str",
               "class": "StringParamType"
             },
             "python_type": "str",
@@ -3243,7 +3243,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "text",
+              "name": "str",
               "class": "StringParamType"
             },
             "python_type": "str",
@@ -3270,7 +3270,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "text",
+              "name": "str",
               "class": "StringParamType"
             },
             "python_type": "str",
@@ -3296,7 +3296,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "text",
+              "name": "str",
               "class": "StringParamType"
             },
             "python_type": "str",
@@ -3331,7 +3331,7 @@
                 "complete"
               ]
             },
-            "python_type": "Optional[str]",
+            "python_type": "Optional[helia_profiler.cli.validation_app._ValidateSuite]",
             "default": null,
             "required": false,
             "help": "Preset suite. 'smoke' defaults unset axes to models=kws, engines=helia-rt, toolchains=arm-none-eabi-gcc, interfaces=rtt, memories=auto. 'models-rt' and 'models-aot' default unset axes to all MLPerf Tiny models, Apollo510 + Apollo330mP, gcc + atfe, rtt, auto memory, and the selected engine. 'complete' runs the same axes for helia-rt, helia-aot, TFLM/CMSIS-NN, and both ExecuTorch CMSIS-NN providers. Explicit axis flags always win.",
@@ -3354,7 +3354,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "text",
+              "name": "str",
               "class": "StringParamType"
             },
             "python_type": "str",
@@ -3380,7 +3380,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "text",
+              "name": "str",
               "class": "StringParamType"
             },
             "python_type": "str",
@@ -3406,7 +3406,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "text",
+              "name": "str",
               "class": "StringParamType"
             },
             "python_type": "str",
@@ -3432,7 +3432,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "integer",
+              "name": "int",
               "class": "IntParamType"
             },
             "python_type": "int",
@@ -3517,7 +3517,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "text",
+              "name": "str",
               "class": "StringParamType"
             },
             "python_type": "str",
@@ -3603,7 +3603,7 @@
             "secondary_opts": [],
             "metavar": null,
             "type": {
-              "name": "integer",
+              "name": "int",
               "class": "IntParamType"
             },
             "python_type": "int",

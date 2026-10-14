@@ -10,7 +10,7 @@ hpx validate [OPTIONS]
 
 Run hardware-in-the-loop validation suite (MLPerf Tiny models)
 
-Defined in `src/helia_profiler/cli/validation_app.py` line 85.
+Defined in `src/helia_profiler/cli/validation_app.py` line 92.
 
 ### Options
 
@@ -76,4 +76,4 @@ Examples:
   hpx validate --suite complete        # RT + AOT + TFLM + ExecuTorch sweep
 ```
 
-Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__` with typer 0.26.8 and click 8.3.3.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__` with typer 0.27.3 and click 8.3.3.

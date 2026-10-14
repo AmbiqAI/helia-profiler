@@ -9,19 +9,15 @@ implementations own behaviour.
 
 from __future__ import annotations
 
+from enum import StrEnum
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated, Any, Optional
 
 import click
 import typer
 
-# typer vendors click, so ``click_type`` values must subclass the vendored
-# ParamType: an external ``click.Choice`` falls through ``convert_type`` to
-# FuncParamType (no choice list in --help). TyperChoice is typer's own class.
-from typer._types import TyperChoice
-
 from .._version import __version__
-from ..config import Aggregation, PowerFirmware, Transport
+from ..config import Aggregation, PowerFirmware, PowerMode, Transport
 from ..engines import EngineType
 from ..placement import Placement
 from ..power import list_drivers
@@ -65,17 +61,25 @@ def _hpx_callback(
         raise typer.Exit(0)
 
 
-_ENGINE_CHOICE = TyperChoice([engine.value for engine in EngineType])
-_ARENA_LOCATION_CHOICE = TyperChoice([p.value for p in Placement if p is not Placement.MRAM])
-_WEIGHTS_LOCATION_CHOICE = TyperChoice([p.value for p in Placement])
-_CORE_OVERRIDE_CHOICE = TyperChoice(["cm4", "cm55"])
-_TRANSPORT_CHOICE = TyperChoice([t.value for t in Transport])
-_AGGREGATION_CHOICE = TyperChoice([a.value for a in Aggregation])
-_POWER_DRIVER_CHOICE = TyperChoice(list_drivers())
-_POWER_MODE_CHOICE = TyperChoice(["external", "internal"])
-_POWER_FIRMWARE_CHOICE = TyperChoice([f.value for f in PowerFirmware])
-_POWER_RESET_STRATEGY_CHOICE = TyperChoice([strategy.value for strategy in ResetStrategy])
-_OUTPUT_FORMAT_CHOICE = TyperChoice(["csv", "json"])
+_ArenaLocation = StrEnum(
+    "_ArenaLocation", {p.name: p.value for p in Placement if p != Placement.MRAM}
+)
+
+
+class _CoreOverride(StrEnum):
+    CM4 = "cm4"
+    CM55 = "cm55"
+
+
+_PowerDriver = StrEnum(
+    "_PowerDriver", {f"DRIVER_{i}": name for i, name in enumerate(list_drivers())}
+)
+
+
+class _OutputFormat(StrEnum):
+    CSV = "csv"
+    JSON = "json"
+
 
 G_ENGINE = "engine"
 G_TARGET = "target hardware"
@@ -108,10 +112,9 @@ def profile_command(
     ] = 0,
     # -- engine --
     engine: Annotated[
-        Optional[str],
+        Optional[EngineType],
         typer.Option(
             "--engine",
-            click_type=_ENGINE_CHOICE,
             help="Inference engine (default: helia-rt)",
             rich_help_panel=G_ENGINE,
         ),
@@ -127,10 +130,9 @@ def profile_command(
         typer.Option("--arena-size", help="Tensor arena size in bytes", rich_help_panel=G_ENGINE),
     ] = None,
     runtime_arena_location: Annotated[
-        Optional[str],
+        Optional[_ArenaLocation],
         typer.Option(
             "--arena-location",
-            click_type=_ARENA_LOCATION_CHOICE,
             help=(
                 "Tensor arena placement. "
                 "helia-rt: places the single runtime tensor arena. "
@@ -141,10 +143,9 @@ def profile_command(
         ),
     ] = None,
     runtime_weights_location: Annotated[
-        Optional[str],
+        Optional[Placement],
         typer.Option(
             "--weights-location",
-            click_type=_WEIGHTS_LOCATION_CHOICE,
             help=(
                 "Model weights placement. "
                 "helia-rt: places the model flatbuffer (psram requires "
@@ -156,10 +157,9 @@ def profile_command(
         ),
     ] = None,
     core_override: Annotated[
-        Optional[str],
+        Optional[_CoreOverride],
         typer.Option(
             "--core-override",
-            click_type=_CORE_OVERRIDE_CHOICE,
             help=(
                 "Select the core library in an explicit heliaRT prebuilt distribution. "
                 "Unsupported for registry and local source builds."
@@ -191,10 +191,9 @@ def profile_command(
         ),
     ] = None,
     transport: Annotated[
-        Optional[str],
+        Optional[Transport],
         typer.Option(
             "--transport",
-            click_type=_TRANSPORT_CHOICE,
             help="Data transport (default: rtt). RTT is recommended for lossless capture.",
             rich_help_panel=G_TARGET,
         ),
@@ -344,10 +343,9 @@ def profile_command(
         typer.Option("--warmup", help="Warmup iterations (default: 5)", rich_help_panel=G_PMU),
     ] = None,
     aggregation: Annotated[
-        Optional[str],
+        Optional[Aggregation],
         typer.Option(
             "--aggregation",
-            click_type=_AGGREGATION_CHOICE,
             help=(
                 "How per-layer counters are aggregated across iterations "
                 "(default: median). 'median' rejects corrupted iterations; "
@@ -361,19 +359,17 @@ def profile_command(
         bool, typer.Option("--power", help="Enable power capture", rich_help_panel=G_POWER)
     ] = False,
     power_driver: Annotated[
-        Optional[str],
+        Optional[_PowerDriver],
         typer.Option(
             "--power-driver",
-            click_type=_POWER_DRIVER_CHOICE,
             help="Power driver (default: joulescope = auto-detect JS110/JS220/JS320)",
             rich_help_panel=G_POWER,
         ),
     ] = None,
     power_mode: Annotated[
-        Optional[str],
+        Optional[PowerMode],
         typer.Option(
             "--power-mode",
-            click_type=_POWER_MODE_CHOICE,
             help="Power mode (default: external)",
             rich_help_panel=G_POWER,
         ),
@@ -391,10 +387,9 @@ def profile_command(
         ),
     ] = None,
     power_firmware: Annotated[
-        Optional[str],
+        Optional[PowerFirmware],
         typer.Option(
             "--power-firmware",
-            click_type=_POWER_FIRMWARE_CHOICE,
             help=(
                 "Which binary is on target during power capture (default: "
                 "dedicated). 'dedicated' flashes the transport-free "
@@ -406,10 +401,9 @@ def profile_command(
         ),
     ] = None,
     power_reset_strategy: Annotated[
-        Optional[str],
+        Optional[ResetStrategy],
         typer.Option(
             "--power-reset-strategy",
-            click_type=_POWER_RESET_STRATEGY_CHOICE,
             help=(
                 "Reset strategy before power capture (default: auto). "
                 "Use explicit values only for board bring-up or controlled experiments."
@@ -471,10 +465,9 @@ def profile_command(
         typer.Option("--output-dir", help="Results output directory", rich_help_panel=G_OUTPUT),
     ] = None,
     output_format: Annotated[
-        Optional[str],
+        Optional[_OutputFormat],
         typer.Option(
             "--output-format",
-            click_type=_OUTPUT_FORMAT_CHOICE,
             help="Output format",
             rich_help_panel=G_OUTPUT,
         ),
@@ -525,13 +518,19 @@ def profile_command(
     # Snapshot the parameter values before any other local bindings exist;
     # every ``hpx profile`` flag forwards to the implementation by name, so
     # the Typer signature above stays the single declaration of the surface.
-    params = dict(locals())
+    params: dict[str, Any] = {
+        name: str(value) if isinstance(value, StrEnum) else value
+        for name, value in locals().items()
+    }
     from .profile_cmd import _cmd_profile
 
     _cmd_profile(**params)
 
 
-_ANALYZE_FORMAT_CHOICE = TyperChoice(["table", "csv", "json"])
+class _AnalyzeFormat(StrEnum):
+    TABLE = "table"
+    CSV = "csv"
+    JSON = "json"
 
 
 @app.command(
@@ -548,10 +547,9 @@ _ANALYZE_FORMAT_CHOICE = TyperChoice(["table", "csv", "json"])
 def analyze_command(
     model: Annotated[Path, typer.Argument(help="Path to .tflite model file")],
     engine: Annotated[
-        Optional[str],
+        Optional[EngineType],
         typer.Option(
             "--engine",
-            click_type=_ENGINE_CHOICE,
             help=(
                 "Analyze as this engine would execute it. "
                 "Default (no flag) uses the raw tflite graph. "
@@ -568,13 +566,12 @@ def analyze_command(
         ),
     ] = False,
     format: Annotated[
-        str,
+        _AnalyzeFormat,
         typer.Option(
             "--format",
-            click_type=_ANALYZE_FORMAT_CHOICE,
             help="Output format (default: table)",
         ),
-    ] = "table",
+    ] = _AnalyzeFormat.TABLE,
     output: Annotated[
         Optional[Path], typer.Option("--output", "-o", help="Write output to file")
     ] = None,
@@ -591,9 +588,9 @@ def analyze_command(
 
     _cmd_analyze(
         model=model,
-        engine=engine,
+        engine=str(engine) if engine is not None else None,
         compare=compare,
-        format=format,
+        format=str(format),
         output=output,
         board=board,
     )
