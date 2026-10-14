@@ -157,6 +157,8 @@ def _write_summary(
         # a zero a reader would take as "does no work".
         opaque = ma.has_ethos_u_op
         analysis_dict: dict[str, Any] = {
+            "engine": ma.engine,
+            "index_space": ma.index_space,
             "total_macs": None if opaque else ma.total_macs,
             "total_ops": None if opaque else ma.total_ops,
             "num_parameters": None if opaque else ma.num_parameters,

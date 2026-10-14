@@ -4,8 +4,8 @@ The contained, extractable heart of "what does this network cost" (#229 D4):
 
 * :mod:`.model_analysis` — per-op MAC/OPS formulas over litert or AIR
   graphs, degrading to ``None`` when the optional readers are absent.
-* :mod:`.layer_attribution` — joins measured layers to analysis layers by
-  ORIGINAL operator index (#218), never by position.
+* :mod:`.layer_attribution` — joins measured layers using the analysis
+  index space (source operator or compiled execution position).
 * :mod:`.softmax_preflight` — the no-extras int8/uint8 softmax scale check,
   built on the dependency-free :mod:`._tflite_reader`.
 

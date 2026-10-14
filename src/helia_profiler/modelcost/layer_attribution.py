@@ -1,30 +1,4 @@
-"""Join measured layers to model-analysis layers by ORIGINAL operator index.
-
-The defect this module exists to prevent (#218): ``model_analysis.layers``
-describes the ORIGINAL tflite graph, while an AOT firmware reports layers by
-their POST-COMPILATION execution position — helia-aot skips operators
-(``VAR_HANDLE``, ``CALL_ONCE``, ...) without renumbering, so the two index
-spaces drift apart at the first skipped op and a positional join attributes
-every later MAC count to the wrong operator, in-range and plausible-looking.
-
-The join key is the original tflite operator index, resolved in order of
-authority:
-
-1. the AOT operator manifest (``idx`` = execution position -> ``id`` =
-   original index), when the run has one;
-2. the integer ``:N`` suffix helia-aot firmware appends to the op label
-   (``"FULLY_CONNECTED:43"``) — the artifact-replay fallback;
-3. for engines whose execution order IS the original graph order (TFLM,
-   helia-rt: plain op labels, no manifest), the layer id itself.
-
-A layer whose source cannot be resolved gets NO attribution — an honest
-dash, never a positional guess (the #206 principle).
-
-CONTAINMENT NOTE: this module is deliberately self-contained — pure
-functions over plain data, siblings only. Together with ``model_analysis``
-it forms the layer-cost core packaged as :mod:`helia_profiler.modelcost`;
-keep pipeline, config, and I/O imports out of it (contract-tested).
-"""
+"""Attribute costs by the analysis index space; retain original IDs as provenance."""
 
 from __future__ import annotations
 
@@ -113,6 +87,11 @@ class LayerAttributor:
         analysis: ModelAnalysis | None,
         aot_op_manifest: Sequence[Any] | None = None,
     ) -> None:
+        self._by_position = (
+            {layer.id: layer for layer in analysis.layers}
+            if analysis is not None and analysis.index_space == "execution"
+            else None
+        )
         self._by_source = _analysis_by_source(analysis) if analysis is not None else {}
         self._source_map = (
             manifest_source_map(aot_op_manifest) if aot_op_manifest is not None else None
@@ -145,7 +124,10 @@ class LayerAttributor:
             # A non-integer suffix (e.g. ExecuTorch "aten::add.out:c3i12")
             # names no tflite operator.
             source = None
-        found = self._by_source.get(source) if source is not None else None
+        if self._by_position is not None:
+            found = self._by_position.get(position) if position is not None else None
+        else:
+            found = self._by_source.get(source) if source is not None else None
         return LayerAttribution(
             source_index=source,
             explicit=explicit,
