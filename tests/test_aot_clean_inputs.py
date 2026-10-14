@@ -34,6 +34,7 @@ def _loop(source: str) -> str:
 
 # Power binaries time their window with STIMER only; the template refuses DWT.
 @pytest.mark.parametrize(("power", "timer"), [(False, "dwt"), (False, "stimer"), (True, "stimer")])
+@pytest.mark.host_integration
 def test_rendered_clean_loop_restores_every_input(tmp_path: Path, timer: str, power: bool):
     compiler = shutil.which("c++")
     if compiler is None:
@@ -202,6 +203,7 @@ def test_power_workload_comparison_preserves_profile_metrics(
 @pytest.mark.parametrize(
     "identity", [None, "aot_raw_zero_refill_included_v1", 123, ["bad"], {"bad": True}]
 )
+@pytest.mark.host_integration
 def test_validation_preserves_measured_workload(tmp_path: Path, monkeypatch, identity):
     from helia_profiler.validation import report, runner
     from helia_profiler.validation.matrix import BOARDS, MODELS, CaseSpec

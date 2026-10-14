@@ -144,6 +144,7 @@ def test_text_file_io_names_its_encoding() -> None:
     assert not offenders, 'text file I/O needs encoding="utf-8":\n  ' + "\n  ".join(offenders)
 
 
+@pytest.mark.host_integration
 def test_wheel_contains_only_canonical_evaluation_modules(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parent.parent
     # Build from a staged copy, never from the real checkout: with

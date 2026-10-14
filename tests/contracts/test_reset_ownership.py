@@ -40,17 +40,11 @@ from .conftest import BOARD_FOR_FAMILY, make_pmu_ctx
 
 
 @pytest.fixture(autouse=True)
-def _fake_pylink_dll(monkeypatch):
-    """Make pylink.JLink construction hermetic.
-
-    The RTT reader constructs ``pylink.JLink()`` before reaching the recorded
-    reset primitive.  The constructor loads the SEGGER J-Link DLL, which
-    exists on hardware benches but not on CI runners — and a contract test
-    must never depend on (or touch) the real DLL either way.  The recorder
-    raises ``_ResetStop`` at the reset primitive, so a permissive mock handle
-    is never exercised beyond construction/attach setup.
-    """
-    monkeypatch.setattr("pylink.JLink", lambda *a, **k: mock.MagicMock())
+def _fake_debug_session(monkeypatch):
+    """Stop at the reset recorder without loading a vendor driver."""
+    monkeypatch.setattr("helia_profiler.transport.rtt.create_debug_memory_session", mock.MagicMock)
+    monkeypatch.setattr("helia_profiler.transport.rtt.open_jlink_with_retry", lambda *a, **k: None)
+    monkeypatch.setattr("helia_profiler.transport.rtt._wipe_rtt_control_blocks", lambda *a, **k: 0)
 
 
 class _ResetStop(CaptureError):

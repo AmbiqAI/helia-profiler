@@ -14,9 +14,11 @@ import re
 import subprocess
 from pathlib import Path
 
-# Importing the render-compile gate reuses its GNU g++ probe and inherits
-# its module-level skip on hosts without one (clang and MinGW rejected).
-from .test_render_compile import _GXX, _STUB_DIR, _render
+import pytest
+
+from .test_render_compile import _STUB_DIR, _gnu_gxx, _render
+
+pytestmark = pytest.mark.host_integration
 
 _PRINT_LAYERS = re.compile(r"^static void print_layers\(void\) \{\n.*?^\}\n", re.M | re.S)
 
@@ -98,10 +100,9 @@ def test_executorch_row_emitter_prints_the_documented_labels(tmp_path: Path):
     source = tmp_path / "emit.cc"
     source.write_text(_HARNESS.replace("@@PRINT_LAYERS@@", match.group(0)), encoding="utf-8")
     binary = tmp_path / "emit"
-    assert _GXX is not None
     compiled = subprocess.run(
         [
-            _GXX,
+            _gnu_gxx(),
             "-std=gnu++17",
             "-Wall",
             "-Werror",

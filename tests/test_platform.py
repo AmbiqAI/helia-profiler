@@ -564,18 +564,6 @@ def test_placement_base_inheritance_chains_through_another_custom_soc():
     assert bases[Placement.MRAM] == 0x22000000
 
 
-def test_a_custom_soc_inherits_the_address_of_the_part_it_is_based_on():
-    """``based_on`` is a statement about a specific, characterised part.
-
-    Unlike a family tag, it names one SoC whose address was checked against
-    NSX's own facts file, so carrying that address across is honouring what
-    the user said rather than guessing from a core tier.
-    """
-    soc = _custom_soc("apollo510_custom", {"based_on": "apollo510"})
-
-    assert soc.capabilities.memory.app_flash_load_addr == 0x00410000
-
-
 def test_based_on_inheritance_carries_a_per_soc_override_not_just_the_family(monkeypatch):
     """Inheritance must take the base's RESOLVED address, not its raw field.
 

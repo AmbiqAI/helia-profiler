@@ -15,9 +15,12 @@ from helia_profiler.firmware import _jinja_env
 from .test_firmware_render_snapshots import _render
 
 _GXX = shutil.which("g++")
-pytestmark = pytest.mark.skipif(
-    sys.platform != "linux" or _GXX is None, reason="requires Linux host g++ with UBSan"
-)
+pytestmark = [
+    pytest.mark.host_integration,
+    pytest.mark.skipif(
+        sys.platform != "linux" or _GXX is None, reason="requires Linux host g++ with UBSan"
+    ),
+]
 
 _DRIVER = r"""
 #include <cassert>

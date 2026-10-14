@@ -10,6 +10,8 @@ import pytest
 
 from helia_profiler.firmware import _jinja_env
 
+pytestmark = pytest.mark.host_integration
+
 _GXX = shutil.which("g++")
 
 _HARNESS = """

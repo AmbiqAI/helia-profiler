@@ -26,6 +26,8 @@ import pytest
 
 from helia_profiler.firmware import _jinja_env
 
+pytestmark = pytest.mark.host_integration
+
 _GXX = shutil.which("g++")
 if _GXX is None:
     pytest.skip("no host g++", allow_module_level=True)

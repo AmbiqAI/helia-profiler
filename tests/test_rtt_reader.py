@@ -25,6 +25,14 @@ from helia_profiler.wire import FirmwareErrorCode
 from tests.pipeline_context_helpers import set_profile_firmware
 
 
+@pytest.fixture(autouse=True)
+def _no_usb_runtime_preload(monkeypatch):
+    """These fake sessions do not need a native USB runtime."""
+    monkeypatch.setattr(
+        "helia_profiler.target.probe.jlink._preload_jlink_linux_usb_runtime", lambda: None
+    )
+
+
 class _FakeJLink:
     def __init__(self, memory: dict[int, bytes]):
         self._memory = memory

@@ -48,6 +48,7 @@ import shutil
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
+from functools import cache
 from pathlib import Path
 
 import pytest
@@ -81,16 +82,19 @@ def _find_gnu_gxx() -> str | None:
     return None
 
 
-_GXX = _find_gnu_gxx()
-if _GXX is None:
-    pytest.skip(
-        "no GNU g++ found (g++/g++-14/g++-13 probed; clang and MinGW rejected)",
-        allow_module_level=True,
-    )
+@cache
+def _gnu_gxx() -> str:
+    compiler = _find_gnu_gxx()
+    if compiler is None:
+        pytest.skip("no GNU g++ found (clang and MinGW rejected)")
+    return compiler
 
-# Imports live BELOW the module-level skip on purpose (noqa: E402): the
-# census import renders its whole scenario matrix at import time, and a host
-# with no GNU g++ should skip before paying for that.
+
+@pytest.fixture(autouse=True, scope="module")
+def _require_gnu_gxx():
+    _gnu_gxx()
+
+
 from helia_profiler.firmware import _jinja_env  # noqa: E402
 from helia_profiler.firmware.op_resolver import _ALL_REGISTRATIONS  # noqa: E402
 
@@ -123,6 +127,8 @@ from .test_firmware_render_snapshots import (  # noqa: E402
     _render,
 )
 from .test_wire_protocol import _MATRIX as _CENSUS_MATRIX  # noqa: E402
+
+pytestmark = pytest.mark.host_integration
 
 _STUB_DIR = Path(__file__).parent.parent / "fixtures" / "compile_stubs"
 
@@ -461,10 +467,9 @@ def _prepare_case_dir(case: _CompileCase, base: Path) -> Path:
 
 
 def _compile(case_dir: Path, part_define: str) -> subprocess.CompletedProcess[str]:
-    assert _GXX is not None  # module-level skip guarantees this
     return subprocess.run(
         [
-            _GXX,
+            _gnu_gxx(),
             "-fsyntax-only",
             "-std=gnu++17",
             "-Wall",

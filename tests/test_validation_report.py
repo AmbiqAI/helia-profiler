@@ -40,6 +40,7 @@ def _case(output_dir: Path) -> CaseResult:
     )
 
 
+@pytest.mark.usefixtures("missing_git_metadata")
 def test_write_validation_reports_includes_manifest_with_relative_paths(
     tmp_path: Path, monkeypatch
 ):
@@ -209,6 +210,7 @@ def test_write_validation_reports_includes_manifest_with_relative_paths(
     assert loaded.summary.passed == 1
 
 
+@pytest.mark.host_integration
 def test_build_manifest_omits_none_metrics_and_tolerates_missing_git(tmp_path: Path):
     result = CaseResult(
         case_id="skipped-case",
@@ -240,6 +242,7 @@ def test_build_manifest_omits_none_metrics_and_tolerates_missing_git(tmp_path: P
     assert report["cases"][0]["resources"] == {}
 
 
+@pytest.mark.usefixtures("missing_git_metadata")
 def test_build_manifest_records_default_branch_source(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv(
         "HPX_SOURCE_REVISIONS_JSON",
@@ -263,6 +266,7 @@ def test_build_manifest_records_default_branch_source(tmp_path: Path, monkeypatc
     }
 
 
+@pytest.mark.usefixtures("missing_git_metadata")
 def test_build_manifest_distinguishes_nightly_and_manual_runs(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("GITHUB_REPOSITORY", "AmbiqAI/helia-profiler")
     monkeypatch.setenv("GITHUB_SERVER_URL", "https://github.com")
@@ -290,6 +294,7 @@ def test_build_manifest_distinguishes_nightly_and_manual_runs(tmp_path: Path, mo
     assert manual["run"]["github"]["event_name"] == "workflow_dispatch"
 
 
+@pytest.mark.usefixtures("missing_git_metadata")
 def test_powered_case_publishes_dashboard_metrics_and_detailed_artifact(tmp_path: Path):
     case_dir = tmp_path / "apollo510-power"
     detail_dir = case_dir / "detailed"
@@ -365,6 +370,7 @@ def test_powered_case_publishes_dashboard_metrics_and_detailed_artifact(tmp_path
         "aot_raw_zero_refill_included_v1",
     ],
 )
+@pytest.mark.usefixtures("missing_git_metadata")
 def test_foreign_validation_workloads_are_normalized_for_display(tmp_path: Path, field, value):
     raw = _case(tmp_path).to_dict()
     raw[field] = value

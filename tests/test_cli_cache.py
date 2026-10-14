@@ -4,10 +4,16 @@ import sys
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
+import pytest
 from typer.testing import CliRunner
 
 from helia_profiler.cli import cache_cmd as cli
 from helia_profiler.cli.app import app
+
+
+@pytest.fixture(autouse=True)
+def _isolated_cache(tmp_path, monkeypatch):
+    monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / ".cache" / "helia-profiler"))
 
 
 def test_cache_purge_removes_workspace_cache(tmp_path: Path, monkeypatch, capsys) -> None:

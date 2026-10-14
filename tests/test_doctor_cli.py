@@ -20,6 +20,8 @@ from helia_profiler.cli.app import app
 from helia_profiler.hostenv.doctor import DoctorCheck, DoctorResult
 from helia_profiler.session import Session
 
+pytestmark = pytest.mark.usefixtures("fake_host_versions", "installed_python_dependencies")
+
 runner = CliRunner()
 
 

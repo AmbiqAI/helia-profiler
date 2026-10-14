@@ -3,31 +3,22 @@
 from __future__ import annotations
 
 import json
-import shutil
 import subprocess
+import sys
 from unittest.mock import patch
 
 import pytest
 
-HPX = shutil.which("hpx")
-
-requires_hpx = pytest.mark.skipif(
-    HPX is None,
-    reason="`hpx` console script not on PATH (install heliaPROFILER first)",
-)
-
 
 def _run_hpx(*args: str) -> subprocess.CompletedProcess:
-    assert HPX is not None  # requires_hpx skips these tests otherwise
     return subprocess.run(
-        [HPX, *args],
+        [sys.executable, "-c", "from helia_profiler.cli import main; main()", *args],
         capture_output=True,
         text=True,
         check=False,
     )
 
 
-@requires_hpx
 class TestValidateList:
     def test_list_default_shows_full_matrix(self):
         proc = _run_hpx("validate", "--list")

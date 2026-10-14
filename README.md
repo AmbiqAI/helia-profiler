@@ -101,7 +101,8 @@ For software-only capture tests or standalone review probes, install the device
 guard **before** importing HPX:
 
 ```bash
-uv run python tools/software_only.py pytest tests/test_power_drivers.py -q
+uv run python tools/software_only.py pytest -m 'not hardware and not compile_hw and not host_integration' -q
+uv run pytest -m 'host_integration and not hardware and not compile_hw' -q
 uv run python tools/software_only.py python /path/to/probe.py
 ```
 
@@ -119,8 +120,17 @@ checkout `src` prefix in `PYTHONPATH`, plus `PYTHONSAFEPATH=1`;
 a `sitecustomize` hook guards children and grandchildren before
 their scripts run. Stripped environments, startup flags that suppress the hook,
 shells, `preexec_fn` callbacks and external commands are rejected. Mock external
-tool calls in these tests. Tests importing vendor helpers such as `pyjoulescope_driver.time64` also
-fail explicitly; this launcher is not a drop-in replacement for the whole suite.
+tool calls in these tests. Pure statistics tests supply timebase metadata without
+loading the vendor package.
+
+`host_integration` identifies tests whose assertions require real host compilers,
+Git, packaging, shell scripts, or interpreter isolation. These still run in the
+ordinary CI suite, separately from hardware tests. Their fixtures use temporary
+files, inert device sentinels and fake external commands where needed; they do
+not contact boards. The guard's own negative controls belong here because they
+must compare guarded and unguarded child interpreters. Compiler discovery happens
+at test setup, so collecting or deselecting these tests does not launch a compiler.
+To inspect either selection, add `--collect-only -q` to its command above.
 
 This is an accidental-access guard for trusted Python tests, not an OS sandbox:
 trusted interpreter startup/site files are assumed, and direct native device I/O
