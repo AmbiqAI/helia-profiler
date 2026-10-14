@@ -946,6 +946,13 @@ def test_power_capture_preserves_full_terminal_and_instrument_evidence(rig, tmp_
         reset()
         return measured()
 
+    from helia_profiler import power
+
+    monkeypatch.setattr(
+        power,
+        "get_driver",
+        lambda name, *, serial: SimpleNamespace(ensure_target_powered=lambda *, required: True),
+    )
     monkeypatch.setattr(capture, "observe_fixture_power", observe)
     result = capture.capture_fixture(request, guard=guard)
     assert result.state == "success", result.error
@@ -1021,6 +1028,13 @@ def test_power_capture_rejects_completion_after_observation(
 
     # Later completion cannot extend samples that have already stopped.
     monkeypatch.setattr(capture.time, "sleep", lambda _: memory.update(terminal))
+    from helia_profiler import power
+
+    monkeypatch.setattr(
+        power,
+        "get_driver",
+        lambda name, *, serial: SimpleNamespace(ensure_target_powered=lambda *, required: True),
+    )
     monkeypatch.setattr(capture, "observe_fixture_power", observe)
     restarts = []
     if halted:
@@ -1052,3 +1066,126 @@ def test_power_capture_rejects_completion_after_observation(
     assert completion["completed"] is False
     assert completion["status"] == unfinished
     assert (request.evidence_dir / "rail-power.json").is_file()
+
+
+@pytest.mark.parametrize("outcome", [True, False, "error"])
+def test_configured_board_power_before_attach(rig, monkeypatch, outcome):
+    from helia_profiler import power
+    from helia_profiler.errors import PowerError
+    from helia_profiler.fixture import FixtureBoardPowerRequest
+
+    request, memory, terminal, writes, flashes, guard = rig
+    request = replace(
+        request, board_power=FixtureBoardPowerRequest("supply", "supply-serial", "MCU")
+    )
+    events = []
+
+    def authority(*, serial, rail):
+        assert (serial, rail) == ("supply-serial", "MCU")
+        events.append("authority")
+
+    guard.verify_power_device = authority
+
+    def make_driver(name, *, serial):
+        assert events == ["authority"]
+        assert (name, serial) == ("supply", "supply-serial")
+        assert not writes and not flashes
+        events.append("driver")
+
+        def ensure(*, required):
+            assert required is True
+            events.append("powered")
+            if outcome == "error":
+                raise PowerError("supply unavailable")
+            return outcome
+
+        return SimpleNamespace(ensure_target_powered=ensure)
+
+    monkeypatch.setattr(power, "get_driver", make_driver)
+    result = capture.capture_fixture(request, guard=guard)
+    assert events == ["authority", "driver", "powered"]
+    if outcome is True:
+        assert result.state == "success", result.error
+        assert len(flashes) == 1
+        assert result.rail_energy is None
+    else:
+        assert result.state != "success"
+        assert not writes and not flashes
+
+
+def test_timing_without_supply_never_resolves_driver(rig, monkeypatch):
+    from helia_profiler import power
+
+    request, memory, terminal, writes, flashes, guard = rig
+    monkeypatch.setattr(power, "get_driver", lambda *a, **k: pytest.fail("unexpected instrument"))
+    result = capture.capture_fixture(request, guard=guard)
+    assert result.state == "success", result.error
+    assert result.rail_energy is None
+
+
+def test_board_power_requires_station_authority_before_hardware(rig, monkeypatch):
+    from helia_profiler import power
+    from helia_profiler.fixture import FixtureBoardPowerRequest
+
+    request, memory, terminal, writes, flashes, guard = rig
+    request = replace(request, board_power=FixtureBoardPowerRequest("supply", "serial", "MCU"))
+    monkeypatch.setattr(power, "get_driver", lambda *a, **k: pytest.fail("unexpected instrument"))
+    with pytest.raises(ValueError, match="power authority"):
+        capture.capture_fixture(request, guard=guard)
+    assert not request.evidence_dir.exists()
+    assert not writes and not flashes
+
+
+@pytest.mark.parametrize(
+    "field,value", [("driver", "other"), ("serial", "other"), ("rail", "other")]
+)
+def test_supply_and_measurement_must_select_same_device(rig, field, value):
+    from test_fixture_power import request as power_request
+
+    from helia_profiler.fixture import FixtureBoardPowerRequest
+
+    request, memory, terminal, writes, flashes, guard = rig
+    guard.verify_power_device = lambda **kw: None
+    supply = replace(FixtureBoardPowerRequest("joulescope", "25QG", "MCU"), **{field: value})
+    request = replace(
+        request,
+        timing_scope=FixtureTimingScope.RESTORE_AND_INVOKE,
+        power_sync=power_request().firmware_wiring(),
+        rail_power=power_request(),
+        board_power=supply,
+    )
+    with pytest.raises(ValueError, match="Supply path differs"):
+        capture.capture_fixture(request, guard=guard)
+    assert not request.evidence_dir.exists() and not writes and not flashes
+
+
+@pytest.mark.parametrize("when", ["authority", "after_supply"])
+def test_supply_authority_failure_stops_before_attachment(rig, monkeypatch, when):
+    from helia_profiler import power
+    from helia_profiler.fixture import FixtureBoardPowerRequest
+
+    request, memory, terminal, writes, flashes, guard = rig
+    request = replace(request, board_power=FixtureBoardPowerRequest("supply", "serial", "MCU"))
+    powered = []
+
+    def verify(**kwargs):
+        if when == "authority":
+            raise ValueError("station refused")
+
+    def check(**kwargs):
+        if powered:
+            raise ValueError("station expired")
+
+    def ensure(**kwargs):
+        powered.append(True)
+        return True
+
+    guard.verify_power_device = verify
+    guard.check = check
+    monkeypatch.setattr(
+        power, "get_driver", lambda *a, **k: SimpleNamespace(ensure_target_powered=ensure)
+    )
+    result = capture.capture_fixture(request, guard=guard)
+    assert result.state == "failure" and "station" in (result.error or "")
+    assert bool(powered) is (when == "after_supply")
+    assert not writes and not flashes

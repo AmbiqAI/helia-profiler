@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 from typer.testing import CliRunner
 
 from helia_profiler.cli.app import app
@@ -64,6 +65,16 @@ def test_shipped_records_name_engines_targets_and_one_default_each() -> None:
         for target in record.qualified:
             clocks = get_soc_for_board(target.board).cpu_clock.speed_names
             assert target.board in boards and target.clock in clocks
+
+
+def test_hardware_workflow_uses_default_executorch_commit() -> None:
+    workflow_path = (
+        Path(__file__).resolve().parents[1] / ".github/workflows/hardware-validation.yml"
+    )
+    workflow = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
+    default = runtime("executorch")
+    assert default is not None
+    assert workflow["env"]["HPX_NSX_EXECUTORCH_REF"] == default.source.commit
 
 
 def test_shipped_records_keep_the_fixture_capability_table() -> None:

@@ -44,6 +44,26 @@ def test_invalid_backend_fails_with_actionable_error(tmp_path: Path):
         TFLMAdapter().prepare(_config(tmp_path, "helia"), tmp_path)
 
 
+@pytest.mark.parametrize("backend", ["reference", "cmsis_nn"])
+def test_unread_config_file_is_rejected_before_preparation(tmp_path: Path, backend: str):
+    config = load_config(
+        None,
+        {
+            "model": {"path": "model.tflite"},
+            "engine": {
+                "type": "tflm",
+                "backend": backend,
+                "config_path": str(tmp_path / "unread.yml"),
+            },
+        },
+    )
+    work_dir = tmp_path / "work"
+    with pytest.raises(EngineError, match="TFLM does not read engine.config_path") as excinfo:
+        TFLMAdapter().prepare(config, work_dir)
+    assert "Remove engine.config_path" in (excinfo.value.hint or "")
+    assert not work_dir.exists()
+
+
 def test_nested_backend_is_rejected_with_top_level_hint(tmp_path: Path):
     model = tmp_path / "model.tflite"
     model.write_bytes(b"\x00")

@@ -10,6 +10,7 @@ import pytest
 from helia_profiler._fixture_build import FIXTURE_CAPABILITIES
 from helia_profiler._fixture_record import compiled_fixture_identity
 from helia_profiler.fixture import (
+    FIXTURE_API_VERSION,
     EngineType,
     FixtureBuild,
     FixtureFile,
@@ -97,7 +98,7 @@ def test_power_protocol_record_preserves_generation(tmp_path, version):
     build = replace(build, build_identity=compiled_fixture_identity(build))
     record = dump_fixture_build(build, roots={"run": tmp_path})
     encoded = json.loads(record)
-    assert encoded["fixture_api"] == [5, 1 if version == 1 else 2]
+    assert encoded["fixture_api"] == ([5, 1] if version == 1 else list(FIXTURE_API_VERSION))
     assert ("protocol_version" in encoded["build"]["power_sync"]) == (version == 2)
     assert load_fixture_build(record, roots={"run": tmp_path}) == build
     altered = json.loads(record)

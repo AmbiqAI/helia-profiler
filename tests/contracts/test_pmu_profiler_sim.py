@@ -204,7 +204,7 @@ _TEMPLATES = Path(__file__).parents[2] / "src" / "helia_profiler" / "firmware" /
     "template", ["hpx_pmu_profiler.cc.j2", "main_aot.cc.j2", "main_executorch.cc.j2"]
 )
 def test_every_engine_reads_layers_through_the_shared_helper(template):
-    source = (_TEMPLATES / template).read_text()
+    source = (_TEMPLATES / template).read_text(encoding="utf-8")
 
     assert '{% include "_pmu_read.j2" %}' in source
     assert "hpx_pmu_read_layer(" in source

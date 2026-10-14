@@ -35,6 +35,21 @@ class FixturePowerSync:
 
 
 @dataclass(frozen=True)
+class FixtureBoardPowerRequest:
+    """Explicit station-owned supply path; enabling it does not request energy measurement."""
+
+    driver: str
+    serial: str
+    rail: str
+
+    def __post_init__(self) -> None:
+        if any(
+            not isinstance(x, str) or not x.strip() for x in (self.driver, self.serial, self.rail)
+        ):
+            raise ValueError("Explicit power driver, instrument serial and supplied rail required")
+
+
+@dataclass(frozen=True)
 class FixtureRailPowerRequest:
     """Station-selected instrument/rail and channels, separate from firmware wiring."""
 

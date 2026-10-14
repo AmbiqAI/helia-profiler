@@ -53,3 +53,14 @@ the host does not shorten its caller-selected bound to a fixed startup ceiling.
 The capture validator still caps each bound at 60 seconds, and ongoing ownership,
 cancellation and measured-window integrity checks remain required. A READY timeout
 does not by itself distinguish initialization failure from slow startup.
+
+API 5.3 adds optional `FixtureCaptureRequest.board_power` for timing through a
+configured supply. `FixtureBoardPowerRequest(driver, serial, rail)` identifies
+that supply; the caller adds it with `dataclasses.replace` after the usual capture
+factory. The station must authorize the selected serial/rail via
+`verify_power_device`, including ongoing ownership checks. The shared power setup
+runs before target attachment and flashing, and failure prevents either operation.
+With no supply and no rail measurement, timing never resolves or opens a power
+driver. Rail measurement uses its already-selected instrument/rail for power
+setup; an explicit supply must match it. This does not add measurement to timing
+or change the build identity. Compilation remains instrument-free.

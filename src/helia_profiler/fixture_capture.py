@@ -21,6 +21,7 @@ from .fixture_image import (
     require,
 )
 from .fixture_power import (
+    FixtureBoardPowerRequest,
     FixturePowerGuard,
     FixturePowerSync,
     FixtureRailEnergy,
@@ -99,6 +100,7 @@ class FixtureCaptureRequest:
     psram_weights: FixturePsramWeights | None = None
     power_sync: FixturePowerSync | None = None
     rail_power: FixtureRailPowerRequest | None = None
+    board_power: FixtureBoardPowerRequest | None = None
 
 
 @dataclass(frozen=True)
@@ -222,6 +224,19 @@ def capture_fixture(
         ),
         "Explicit power-capable method, matching wiring and station power authority required",
     )
+    require(
+        request.board_power is None
+        or isinstance(request.board_power, FixtureBoardPowerRequest)
+        and callable(getattr(guard, "verify_power_device", None)),
+        "Explicit configured supply and station power authority required",
+    )
+    if request.board_power is not None and request.rail_power is not None:
+        require(
+            request.board_power.driver == "joulescope"
+            and request.board_power.serial == request.rail_power.serial
+            and request.board_power.rail == request.rail_power.rail,
+            "Supply path differs from measured instrument/rail",
+        )
     require(isinstance(request.extra_output_sizes, tuple), "Invalid output extent")
     output_sizes = (request.output_size, *request.extra_output_sizes)
     require(
@@ -333,10 +348,20 @@ def capture_fixture(
         # Flash the verified private copy so source mutation cannot select another image.
         flash_image = pin("image.bin", image.binary)
         guard.verify_target(target=request.target, jlink_serial=request.jlink_serial)
-        if request.rail_power is not None:
-            cast(FixturePowerGuard, guard).verify_power_device(
-                serial=request.rail_power.serial, rail=request.rail_power.rail
+        supply = request.board_power
+        if supply is None and request.rail_power is not None:
+            supply = FixtureBoardPowerRequest(
+                "joulescope", request.rail_power.serial, request.rail_power.rail
             )
+        if supply is not None:
+            cast(FixturePowerGuard, guard).verify_power_device(
+                serial=supply.serial, rail=supply.rail
+            )
+            guard.check(require_free=True, remaining_s=360)
+            from .power import ensure_target_powered
+
+            ensure_target_powered(driver_name=supply.driver, serial=supply.serial, required=True)
+            guard.check(require_free=True, remaining_s=360)
         guard.check(require_free=True, remaining_s=360)
         require(
             sum(str(p.serial) == request.jlink_serial for p in list_connected_probes()) == 1,

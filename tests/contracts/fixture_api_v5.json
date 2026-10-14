@@ -1,7 +1,7 @@
 {
   "api_version": [
     5,
-    2
+    3
   ],
   "surface": {
     "ElfSection": {
@@ -223,6 +223,29 @@
         [
           "raw",
           "FixtureFile",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "FixtureBoardPowerRequest": {
+      "fields": [
+        [
+          "driver",
+          "str",
+          "<required>"
+        ],
+        [
+          "serial",
+          "str",
+          "<required>"
+        ],
+        [
+          "rail",
+          "str",
           "<required>"
         ]
       ],
@@ -645,6 +668,11 @@
         [
           "rail_power",
           "FixtureRailPowerRequest | None",
+          "None"
+        ],
+        [
+          "board_power",
+          "FixtureBoardPowerRequest | None",
           "None"
         ]
       ],

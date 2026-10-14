@@ -52,6 +52,7 @@ __all__ = [
     "PowerSample",
     "PowerSummary",
     "get_driver",
+    "ensure_target_powered",
     "list_drivers",
     "register_driver",
     "resolve_driver_class",
@@ -112,3 +113,17 @@ def get_driver(name: str, *, serial: str | None = None) -> PowerDriver:
 def list_drivers() -> list[str]:
     _register_builtins()
     return sorted(_DRIVERS)
+
+
+def ensure_target_powered(*, driver_name: str, serial: str | None, required: bool) -> bool:
+    """Use the configured driver's supply control, with no measurement acquisition."""
+    try:
+        driver = get_driver(driver_name, serial=serial)
+    except PowerError:
+        if required:
+            raise
+        return False
+    powered = driver.ensure_target_powered(required=required)
+    if required and not powered:
+        raise PowerError("Configured driver did not ensure target power")
+    return powered
