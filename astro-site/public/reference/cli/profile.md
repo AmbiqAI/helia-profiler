@@ -10,7 +10,7 @@ hpx profile [OPTIONS] [MODEL]
 
 Profile a model on target hardware
 
-Defined in `src/helia_profiler/cli/app.py` line 89.
+Defined in `src/helia_profiler/cli/app.py` line 93.
 
 ### Arguments
 
@@ -114,4 +114,4 @@ Quick start:
   hpx profile my_model.tflite --engine helia-rt --power -vv
 ```
 
-Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__` with typer 0.26.8 and click 8.3.3.
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__` with typer 0.27.3 and click 8.3.3.
