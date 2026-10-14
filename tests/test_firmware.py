@@ -381,8 +381,9 @@ def _make_ctx(
     *,
     engine: str = "helia-rt",
     board: str = "apollo510_evb",
+    model_name: str = "model.tflite",
 ) -> PipelineContext:
-    model = tmp_path / "model.tflite"
+    model = tmp_path / model_name
     # Minimal valid-looking TFLite flatbuffer (just bytes for testing)
     model.write_bytes(b"\x1c\x00\x00\x00TFL3" + b"\x00" * 100)
     config = load_config(
@@ -569,8 +570,9 @@ class TestModelToHeader:
 
 
 class TestGenerateApp:
-    def test_creates_app_structure(self, tmp_path: Path, fake_dist: Path):
-        ctx = _make_ctx(tmp_path, fake_dist)
+    @pytest.mark.parametrize("model_name", ["model.tflite", "modèle_日本語.tflite"])
+    def test_creates_app_structure(self, tmp_path: Path, fake_dist: Path, model_name: str):
+        ctx = _make_ctx(tmp_path, fake_dist, model_name=model_name)
         ResolvePlatformStage().run(ctx)
         PrepareEngineStage().run(ctx)
         app_dir = generate_app(ctx)
@@ -581,6 +583,8 @@ class TestGenerateApp:
         assert (app_dir / "cmake" / "nsx" / "modules.cmake").exists()
         assert (app_dir / "src" / "main.cc").exists()
         assert (app_dir / "src" / "model_data.h").exists()
+        header = (app_dir / "src" / "model_data.h").read_bytes()
+        assert f"// Source: {model_name}" in header.decode("utf-8")
         assert (app_dir / "src" / "hpx_pmu_profiler.h").exists()
         assert (app_dir / "src" / "hpx_pmu_profiler.cc").exists()
 
