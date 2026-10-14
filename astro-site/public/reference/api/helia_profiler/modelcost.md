@@ -19,6 +19,7 @@ ModelAnalysis(
     total_ops: int,
     num_parameters: int,
     engine: str = 'tflite',
+    index_space: Literal['source', 'execution'] = 'source',
 ) -> None
 ```
 
@@ -84,6 +85,18 @@ Engine/interpreter that produced this analysis ('tflite', 'helia-rt', 'helia-aot
 
 Source: `src/helia_profiler/modelcost/model_analysis.py:174`
 
+### helia_profiler.ModelAnalysis.index_space
+
+`attribute` · `python`
+
+```python
+index_space: Literal['source', 'execution'] = 'source'
+```
+
+Whether layer IDs identify original operators or compiled execution positions.
+
+Source: `src/helia_profiler/modelcost/model_analysis.py:177`
+
 ### helia_profiler.ModelAnalysis.ethos_u_op_count
 
 `attribute` · `python`
@@ -94,7 +107,7 @@ ethos_u_op_count: int
 
 Number of Vela-generated ethos-u custom ops in the graph.
 
-Source: `src/helia_profiler/modelcost/model_analysis.py:182`
+Source: `src/helia_profiler/modelcost/model_analysis.py:185`
 
 ### helia_profiler.ModelAnalysis.has_ethos_u_op
 
@@ -106,7 +119,7 @@ has_ethos_u_op: bool
 
 True when the model was compiled by Vela (contains ethos-u ops).
 
-Source: `src/helia_profiler/modelcost/model_analysis.py:187`
+Source: `src/helia_profiler/modelcost/model_analysis.py:190`
 
 ### helia_profiler.ModelAnalysis.to_dict
 
@@ -118,4 +131,4 @@ to_dict() -> dict[str, Any]
 
 Return the analysis and its layers as plain dicts.
 
-Source: `src/helia_profiler/modelcost/model_analysis.py:177`
+Source: `src/helia_profiler/modelcost/model_analysis.py:180`

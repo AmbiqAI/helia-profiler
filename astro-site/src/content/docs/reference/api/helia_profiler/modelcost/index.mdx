@@ -27,7 +27,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   name={"ModelAnalysis"}
   kind={"class"}
   language={"python"}
-  signature={"ModelAnalysis(\n    layers: list[LayerOps],\n    total_macs: int,\n    total_ops: int,\n    num_parameters: int,\n    engine: str = 'tflite',\n) -> None"}
+  signature={"ModelAnalysis(\n    layers: list[LayerOps],\n    total_macs: int,\n    total_ops: int,\n    num_parameters: int,\n    engine: str = 'tflite',\n    index_space: Literal['source', 'execution'] = 'source',\n) -> None"}
   level={2}
   summary={"Full model analysis result."}
   source={{"path":"src/helia_profiler/modelcost/model_analysis.py","line":165,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L165"}}
@@ -112,6 +112,21 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   </RefSymbol>
 
   <RefSymbol
+    id={"helia_profiler.ModelAnalysis.index_space"}
+    name={"index_space"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"index_space: Literal['source', 'execution'] = 'source'"}
+    level={3}
+    summary={"Whether layer IDs identify original operators or compiled execution positions."}
+    source={{"path":"src/helia_profiler/modelcost/model_analysis.py","line":177,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L177"}}
+  >
+
+    Whether layer IDs identify original operators or compiled execution positions.
+
+  </RefSymbol>
+
+  <RefSymbol
     id={"helia_profiler.ModelAnalysis.ethos_u_op_count"}
     name={"ethos_u_op_count"}
     kind={"attribute"}
@@ -119,7 +134,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"ethos_u_op_count: int"}
     level={3}
     summary={"Number of Vela-generated ethos-u custom ops in the graph."}
-    source={{"path":"src/helia_profiler/modelcost/model_analysis.py","line":182,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L182"}}
+    source={{"path":"src/helia_profiler/modelcost/model_analysis.py","line":185,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L185"}}
   >
 
     Number of Vela-generated ethos-u custom ops in the graph.
@@ -134,7 +149,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"has_ethos_u_op: bool"}
     level={3}
     summary={"True when the model was compiled by Vela (contains ethos-u ops)."}
-    source={{"path":"src/helia_profiler/modelcost/model_analysis.py","line":187,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L187"}}
+    source={{"path":"src/helia_profiler/modelcost/model_analysis.py","line":190,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L190"}}
   >
 
     True when the model was compiled by Vela (contains ethos-u ops).
@@ -149,7 +164,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"to_dict() -> dict[str, Any]"}
     level={3}
     summary={"Return the analysis and its layers as plain dicts."}
-    source={{"path":"src/helia_profiler/modelcost/model_analysis.py","line":177,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L177"}}
+    source={{"path":"src/helia_profiler/modelcost/model_analysis.py","line":180,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L180"}}
   >
 
     Return the analysis and its layers as plain dicts.
