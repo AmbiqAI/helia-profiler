@@ -120,6 +120,16 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
             raise EngineError(f"Prepared heliaRT requires {stack}/{backend}")
         _reject_config_path(config)
         _reject_prebuilt_cmsis_nn_override(config)
+        for option in ("variant", "core_override", "cmsis_nn_requantize_inline_asm"):
+            if option in config.engine.config:
+                raise EngineError(
+                    f"Prepared heliaRT cannot apply engine.config.{option}; "
+                    "the runtime archive is already compiled.",
+                    hint=(
+                        f"Remove engine.config.{option} to use the supplied runtime, "
+                        "or prepare a runtime with the desired build settings."
+                    ),
+                )
         revision = next(p.revision for p in runtime.record.providers if p.name == "helia-rt")
         return HeliaRtArtifacts(
             extra_modules=[prepare_runtime_module(runtime, work_dir)],

@@ -40,6 +40,13 @@ def _make_config(tmp_path: Path, engine_overrides: dict | None = None):
         "cmsis_nn_path",
         "cmsis_nn_ref",
         "CMSIS_NN_PATH",
+        "variant_debug",
+        "variant_release",
+        "variant_bogus",
+        "variant_release-with-logs",
+        "core_override",
+        "requantize_false",
+        "requantize_true",
         "wrong_stack",
         "wrong_backend",
     ],
@@ -53,6 +60,12 @@ def test_prepared_settings_before_staging(
         options[case] = str(tmp_path / "kernels") if case == "cmsis_nn_path" else "frozen-ref"
     elif case == "CMSIS_NN_PATH":
         monkeypatch.setenv(case, str(tmp_path / "kernels"))
+    elif case.startswith("variant_"):
+        options["variant"] = case.removeprefix("variant_")
+    elif case == "core_override":
+        options[case] = "cm4"
+    elif case.startswith("requantize_"):
+        options["cmsis_nn_requantize_inline_asm"] = case == "requantize_true"
     engine = {"backend": "cmsis_nn" if case == "wrong_backend" else "helia", "config": options}
     if case in ("unread_file", "wrong_stack", "wrong_backend"):
         engine["config_path"] = str(tmp_path / "unread.yml")
@@ -84,6 +97,8 @@ def test_prepared_settings_before_staging(
             if case in ("wrong_stack", "wrong_backend")
             else "config_path"
             if case == "unread_file"
+            else next(iter(options))
+            if options
             else case
         )
         with pytest.raises(EngineError, match=message):
