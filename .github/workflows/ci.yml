@@ -5,6 +5,7 @@ on:
     branches:
       - main
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 defaults:
@@ -16,6 +17,7 @@ permissions:
 
 jobs:
   nix-evaluation:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -34,6 +36,7 @@ jobs:
   # the version uv.lock resolves.
   # ---------------------------------------------------------------
   typecheck:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -77,6 +80,7 @@ jobs:
   # Unit tests — run on all three platforms
   # ---------------------------------------------------------------
   unit-tests:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     strategy:
       fail-fast: false
       matrix:
@@ -122,6 +126,7 @@ jobs:
   # environment-independent and the matrix already covers the interpreters.
   # ---------------------------------------------------------------
   analysis-tests:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -194,6 +199,7 @@ jobs:
   # Package — validate the exact wheel/sdist release boundaries
   # ---------------------------------------------------------------
   package:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -262,6 +268,10 @@ jobs:
     steps:
       - name: Decide status
         run: |
+          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.draft }}" == "true" ]]; then
+            [[ "${{ needs.pre-commit.result }}" == "success" ]] || exit 1
+            exit 0
+          fi
           if [[ "${{ needs.nix-evaluation.result }}" != "success" ]] ||
              [[ "${{ needs.typecheck.result }}" != "success" ]] ||
              [[ "${{ needs.unit-tests.result }}" != "success" ]] ||

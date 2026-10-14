@@ -732,6 +732,7 @@ _register_soc(
         rtt_scan_ranges=((0x20000000, 0x7C000),),
         # NSX_SEGGER_DEVICE in cmake/socs/facts/atomiq110.cmake.
         jlink_device="Atomiq110",
+        swo_trace_clock_mhz=48,
         pmu_max_ops=4096,
         # No nsx-ambiq-usb compatibility entry for atomiq110/atomiq110_fpga_turbo
         # (modules/nsx-ambiq-usb/nsx-module.yaml's compatibility.socs list does
