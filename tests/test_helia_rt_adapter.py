@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
@@ -15,6 +17,7 @@ from helia_profiler.engines.helia_rt import (
     _install_nsx_module_source,
 )
 from helia_profiler.errors import EngineError
+from helia_profiler.results import NsxModuleRef
 
 
 def _make_config(tmp_path: Path, engine_overrides: dict | None = None):
@@ -27,6 +30,66 @@ def _make_config(tmp_path: Path, engine_overrides: dict | None = None):
     if engine_overrides:
         base["engine"].update(engine_overrides)
     return load_config(None, base)
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        "valid",
+        "unread_file",
+        "cmsis_nn_path",
+        "cmsis_nn_ref",
+        "CMSIS_NN_PATH",
+        "wrong_stack",
+        "wrong_backend",
+    ],
+)
+def test_prepared_settings_before_staging(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, case: str
+):
+    monkeypatch.delenv("CMSIS_NN_PATH", raising=False)
+    options = {}
+    if case in ("cmsis_nn_path", "cmsis_nn_ref"):
+        options[case] = str(tmp_path / "kernels") if case == "cmsis_nn_path" else "frozen-ref"
+    elif case == "CMSIS_NN_PATH":
+        monkeypatch.setenv(case, str(tmp_path / "kernels"))
+    engine = {"backend": "cmsis_nn" if case == "wrong_backend" else "helia", "config": options}
+    if case in ("unread_file", "wrong_stack", "wrong_backend"):
+        engine["config_path"] = str(tmp_path / "unread.yml")
+    config = _make_config(tmp_path, engine)
+    runtime = SimpleNamespace(
+        record=SimpleNamespace(
+            stack="upstream" if case == "wrong_stack" else "helia-rt",
+            providers=[SimpleNamespace(name="helia-rt", revision="frozen-revision")],
+            abi=SimpleNamespace(toolchain="gcc"),
+        )
+    )
+    module = NsxModuleRef.registry("prepared-helia", "prepared-helia")
+    stage = Mock(return_value=module)
+    monkeypatch.setattr("helia_profiler.fixture_runtime.prepare_runtime_module", stage)
+    work_dir = tmp_path / "work"
+    if case == "valid":
+        artifacts = HeliaRTAdapter().prepare_runtime(config, work_dir, runtime)
+        stage.assert_called_once_with(runtime, work_dir)
+        assert artifacts.extra_modules == [module]
+        assert artifacts.engine_header == "tensorflow/lite/micro/micro_interpreter.h"
+        assert artifacts.engine_backend == "helia"
+        assert artifacts.heliart_variant == "prepared"
+        assert artifacts.heliart_version == "prepared:frozen-revision"
+        assert artifacts.heliart_toolchain_tag == "gcc"
+        assert artifacts.cmake_vars == {}
+    else:
+        message = (
+            "Prepared heliaRT requires"
+            if case in ("wrong_stack", "wrong_backend")
+            else "config_path"
+            if case == "unread_file"
+            else case
+        )
+        with pytest.raises(EngineError, match=message):
+            HeliaRTAdapter().prepare_runtime(config, work_dir, runtime)
+        stage.assert_not_called()
+        assert not work_dir.exists()
 
 
 class TestInstallNsxModule:

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
@@ -8,6 +10,7 @@ from helia_profiler.config import load_config
 from helia_profiler.engines import EngineType
 from helia_profiler.engines.tflm import TFLMAdapter
 from helia_profiler.errors import ConfigError, EngineError
+from helia_profiler.results import NsxModuleRef
 
 
 def _config(tmp_path: Path, backend: str | None = None):
@@ -78,3 +81,32 @@ def test_nested_backend_is_rejected_with_top_level_hint(tmp_path: Path):
                 "engine": {"type": "tflm", "config": {"backend": "cmsis_nn"}},
             },
         )
+
+
+@pytest.mark.parametrize("case", ["valid", "unread_file", "wrong_stack", "wrong_backend"])
+def test_prepared_settings_before_staging(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, case: str
+):
+    engine = {"type": "tflm", "backend": "reference" if case == "wrong_backend" else "cmsis_nn"}
+    if case != "valid":
+        engine["config_path"] = str(tmp_path / "unread.yml")
+    config = load_config(None, {"model": {"path": "model.tflite"}, "engine": engine})
+    runtime = SimpleNamespace(
+        record=SimpleNamespace(stack="helia-rt" if case == "wrong_stack" else "upstream")
+    )
+    module = NsxModuleRef.registry("prepared-upstream", "prepared-upstream")
+    stage = Mock(return_value=module)
+    monkeypatch.setattr("helia_profiler.fixture_runtime.prepare_runtime_module", stage)
+    work_dir = tmp_path / "work"
+    if case == "valid":
+        artifacts = TFLMAdapter().prepare_runtime(config, work_dir, runtime)
+        stage.assert_called_once_with(runtime, work_dir)
+        assert artifacts.extra_modules == [module]
+        assert artifacts.engine_header == "tensorflow/lite/micro/micro_interpreter.h"
+        assert artifacts.cmake_vars == {}
+    else:
+        message = "config_path" if case == "unread_file" else "Prepared TFLM requires"
+        with pytest.raises(EngineError, match=message):
+            TFLMAdapter().prepare_runtime(config, work_dir, runtime)
+        stage.assert_not_called()
+        assert not work_dir.exists()
