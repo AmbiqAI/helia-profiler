@@ -4,6 +4,7 @@ from typing import Any, cast
 from unittest.mock import Mock
 
 import pytest
+from rich.text import Text
 from typer import BadParameter
 from typer.main import get_command
 from typer.testing import CliRunner
@@ -58,7 +59,9 @@ SITES = [
 
 
 @pytest.mark.parametrize("path,name,default", SITES)
-def test_choice_contract(path, name, default):
+def test_choice_contract(monkeypatch, path, name, default):
+    monkeypatch.setenv("COLUMNS", "1000")
+    monkeypatch.setenv("TERM", "xterm")
     command = cast(Any, get_command(app))
     for part in path.split():
         command = command.commands[part]
@@ -75,9 +78,9 @@ def test_choice_contract(path, name, default):
         if len(expected) == 1:
             messages.add(f"{invalid!r} is not {expected[0]!r}.")
         assert str(error.value) in messages
-    result = CliRunner().invoke(app, [*path.split(), "--help"], env={"COLUMNS": "1000"})
+    result = CliRunner().invoke(app, [*path.split(), "--help"])
     assert result.exit_code == 0, result.output
-    help_text = "".join(result.output.split())
+    help_text = "".join(Text.from_ansi(result.output).plain.split())
     assert "|".join(expected) in help_text
 
 
