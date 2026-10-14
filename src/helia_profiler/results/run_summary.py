@@ -306,7 +306,6 @@ class PowerSection:
     capture_window_s: float | None = None
     gating_diagnostics: Mapping[str, Any] | None = None
     window_clock_ceiling: Mapping[str, Any] | None = None
-    negative_current_diagnostic: bool | None = None
     terminal: Mapping[str, Any] | None = None
     on_device_summary: Mapping[str, Any] | None = None
     sync_input_index: int | None = None
@@ -341,6 +340,8 @@ class PowerSection:
     active_window_estimated_energy_per_inference_j: float | None = None
     active_window_estimated_inferences_per_joule: float | None = None
     extras: Mapping[str, Any] = field(default_factory=dict)
+
+    negative_current_diagnostic: bool | None = None
 
     _KNOWN = (
         "avg_current_a",

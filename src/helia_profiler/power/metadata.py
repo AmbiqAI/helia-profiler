@@ -119,8 +119,6 @@ class PowerMetadata:
     measurement_scope: MeasurementScope | str | None = None
     observation_mode: ObservationMode | None = None
     integrity: PowerIntegrity | None = None
-    #: Negative net charge was retained by an explicit diagnostic-only override.
-    negative_current_diagnostic: bool | None = None
     gate_rise_observed: bool | None = None
     gate_fall_observed: bool | None = None
     observation_deadline_s: float | None = None
@@ -145,6 +143,8 @@ class PowerMetadata:
     #: Gate alignment and measured polling uncertainty used by clock agreement.
     gating_diagnostics: dict[str, Any] | None = None
     gated_vs_whole_current_ok: bool | None = None
+    #: Negative net charge was retained by an explicit diagnostic-only override.
+    negative_current_diagnostic: bool | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.measurement_scope, str) and not isinstance(
