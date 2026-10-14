@@ -1610,7 +1610,11 @@ def test_tops_suppressed_for_busy_loop(tmp_path: Path):
     assert "tops" not in ma and "tops_per_watt" not in ma
 
 
-def test_opaque_ethos_u_analysis_publishes_null_not_zero(tmp_path: Path):
+@pytest.mark.parametrize(
+    "op,engine,index_space",
+    [(ETHOS_U_OP_NAME, "tflite", "source"), ("ETHOS_U", "helia-aot", "execution")],
+)
+def test_opaque_ethos_u_analysis_publishes_null_not_zero(tmp_path: Path, op, engine, index_space):
     """A Vela ethos-u custom op is opaque to the analyzer: its MACs, ops and
     folded weights are unknown, not zero. The summary must publish null
     totals and suppress TOPS — a 0.000000 TOPS headline for an NPU would be
@@ -1622,7 +1626,9 @@ def test_opaque_ethos_u_analysis_publishes_null_not_zero(tmp_path: Path):
         duration_s=5.0,
     )
     ctx.model_analysis = ModelAnalysis(
-        layers=[LayerOps(id=0, op=ETHOS_U_OP_NAME)],
+        layers=[LayerOps(id=0, op=op)],
+        engine=engine,
+        index_space=index_space,
         total_macs=0,
         total_ops=0,
         num_parameters=0,

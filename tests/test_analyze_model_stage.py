@@ -71,3 +71,59 @@ def test_unanalyzable_model_without_npu_backend_still_skips(tmp_path: Path, monk
     monkeypatch.setattr(stage_mod, "analyze_model", lambda _path: None)
     stage_mod.AnalyzeModelStage().run(ctx)
     assert ctx.model_analysis is None
+
+
+@pytest.mark.parametrize("source_available", [True, False])
+def test_aot_reuses_compiled_analysis(tmp_path, monkeypatch, source_available):
+    from dataclasses import replace
+
+    from helia_profiler.engines import EngineType
+    from helia_profiler.engines.base import HeliaAotArtifacts
+    from helia_profiler.pipeline import PipelineContext
+    from helia_profiler.stages import analyze_model as stage_mod
+
+    cfg = _cfg(tmp_path)
+    cfg = replace(cfg, engine=replace(cfg.engine, type=EngineType.HELIA_AOT))
+    compiled = ModelAnalysis(
+        layers=[LayerOps(id=0, op="FULLY_CONNECTED", original_id=5, macs=12, ops=24)],
+        total_macs=12,
+        total_ops=24,
+        num_parameters=12,
+        engine="helia-aot",
+        index_space="execution",
+    )
+    ctx = PipelineContext(config=cfg, work_dir=tmp_path)
+    ctx.engine_artifacts = HeliaAotArtifacts(
+        engine_header="model.h",
+        aot_prefix="model",
+        aot_module_name="model",
+        aot_cmake_target="nsx::model",
+        helia_aot_version="0.0.0",
+        compiled_analysis=compiled,
+    )
+    monkeypatch.setattr(stage_mod, "is_available", lambda: source_available)
+    monkeypatch.setattr(stage_mod, "analyze_model", lambda _path: _analysis("MUL", "ADD"))
+    stage = stage_mod.AnalyzeModelStage()
+    assert not stage.should_skip(ctx)
+    stage.run(ctx)
+    assert ctx.model_analysis is compiled
+
+
+def test_aot_compiled_analysis_does_not_bypass_source_backend_check(tmp_path, monkeypatch):
+    from helia_profiler.engines.base import HeliaAotArtifacts
+    from helia_profiler.pipeline import PipelineContext
+    from helia_profiler.stages import analyze_model as stage_mod
+
+    ctx = PipelineContext(config=_cfg(tmp_path), work_dir=tmp_path)
+    ctx.engine_artifacts = HeliaAotArtifacts(
+        engine_header="model.h",
+        aot_prefix="model",
+        aot_module_name="model",
+        aot_cmake_target="nsx::model",
+        helia_aot_version="0.0.0",
+        compiled_analysis=_analysis("CONV_2D"),
+    )
+    monkeypatch.setattr(stage_mod, "is_available", lambda: True)
+    monkeypatch.setattr(stage_mod, "analyze_model", lambda _path: _analysis(ETHOS_U_OP_NAME))
+    with pytest.raises(ConfigError, match="Vela-compiled"):
+        stage_mod.AnalyzeModelStage().run(ctx)

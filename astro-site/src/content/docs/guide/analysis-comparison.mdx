@@ -42,6 +42,12 @@ The report lists per-operator MACs, parameter counts and tensor sizes.
 coverage before a firmware build. The generated
 [`hpx analyze` reference](../../reference/cli/analyze/) lists every option.
 
+AOT profiling reuses analysis of the graph compiled for that run, without a
+second conversion. Per-layer costs follow compiled execution order; original
+operator IDs remain provenance. These estimates can differ from original-model
+counts after fusion or removal of operations. They describe graph arithmetic,
+not hardware instructions.
+
 ### 2. Compare two runs
 
 ```bash

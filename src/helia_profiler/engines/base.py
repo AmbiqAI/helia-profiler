@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from ..fixture_runtime import VerifiedPreparedRuntime
+    from ..modelcost import ModelAnalysis
 
 from ..config import ProfileConfig
 from ..placement import ArenaRole, Placement
@@ -237,6 +238,8 @@ class HeliaAotArtifacts(EngineArtifacts):
     #: table and by the report stage.  ``None`` when the manifest could not
     #: be extracted from the codegen context.
     aot_op_manifest: list[dict[str, Any]] | None = None
+    compiled_analysis: ModelAnalysis | None = None
+    """Analysis of the same transformed graph used to generate the firmware."""
 
     #: heliaAOT's ``engine.backend`` selector (e.g. ``"ethos_u"``), or
     #: ``None`` for the default CMSIS-NN-only codegen path.

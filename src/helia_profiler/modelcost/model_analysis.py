@@ -28,7 +28,7 @@ import math
 import struct
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from helia_aot.air.enums import AirOpType
@@ -174,6 +174,9 @@ class ModelAnalysis:
     engine: str = "tflite"
     """Engine/interpreter that produced this analysis ('tflite', 'helia-rt', 'helia-aot')."""
 
+    index_space: Literal["source", "execution"] = "source"
+    """Whether layer IDs identify original operators or compiled execution positions."""
+
     def to_dict(self) -> dict[str, Any]:
         """Return the analysis and its layers as plain dicts."""
         return asdict(self)
@@ -181,7 +184,7 @@ class ModelAnalysis:
     @property
     def ethos_u_op_count(self) -> int:
         """Number of Vela-generated ethos-u custom ops in the graph."""
-        return sum(1 for layer in self.layers if layer.op == ETHOS_U_OP_NAME)
+        return sum(1 for layer in self.layers if layer.op in (ETHOS_U_OP_NAME, "ETHOS_U"))
 
     @property
     def has_ethos_u_op(self) -> bool:
@@ -718,7 +721,7 @@ def analyze_air_model(air_model: Any) -> ModelAnalysis | None:
                 input_shapes=in_shapes,
                 output_shapes=out_shapes,
                 params=params,
-                original_id=int(op.id),
+                original_id=int(op.id) if str(op.id).isdigit() else None,
             )
         )
 
@@ -731,4 +734,5 @@ def analyze_air_model(air_model: Any) -> ModelAnalysis | None:
         total_ops=total_ops,
         num_parameters=total_params,
         engine="helia-aot",
+        index_space="execution",
     )

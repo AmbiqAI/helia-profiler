@@ -179,12 +179,14 @@ class TestMergedAotArgs:
 class TestPrepareArtifactFlags:
     """``prepare()`` derives its artifact flags from the merged AOT args."""
 
-    def _prepare(self, monkeypatch, tmp_path, config) -> HeliaAotArtifacts:
+    def _prepare(self, monkeypatch, tmp_path, config, model=None) -> HeliaAotArtifacts:
         from helia_profiler.engines.helia_aot import adapter as adapter_mod
 
         def fake_run_aot_compiler(config, output_dir, module_name, *_args):
             (output_dir / module_name).mkdir(parents=True)
-            return object()
+            from types import SimpleNamespace
+
+            return SimpleNamespace(model=model)
 
         monkeypatch.setattr(adapter_mod, "_check_helia_aot_version", lambda: "0.0.0")
         monkeypatch.setattr(adapter_mod, "_resolve_aot_platform", lambda _c: "apollo510_evb")
@@ -220,3 +222,36 @@ class TestPrepareArtifactFlags:
         artifacts = self._prepare(monkeypatch, tmp_path, _aot_cfg({}))
         assert artifacts.aot_allocate_arenas is True
         assert artifacts.aot_user_memory_config is False
+
+    def test_retains_compiled_graph_costs(self, monkeypatch, tmp_path):
+        from types import SimpleNamespace
+
+        from helia_profiler.modelcost import model_analysis
+
+        kinds = SimpleNamespace(CONV_2D="conv", DEPTHWISE_CONV_2D="dw", FULLY_CONNECTED="fc")
+        monkeypatch.setattr(model_analysis, "_AirOpType", kinds)
+        tensors = {
+            "in": SimpleNamespace(shape=[1, 4]),
+            "weights": SimpleNamespace(shape=[3, 4]),
+            "out": SimpleNamespace(shape=[1, 3]),
+        }
+        model = SimpleNamespace(
+            operators=[
+                SimpleNamespace(
+                    id="5",
+                    op_type=kinds.FULLY_CONNECTED,
+                    input_ids=["in", "weights"],
+                    output_ids=["out"],
+                    named_tensors={"weights": "weights"},
+                )
+            ],
+            get_tensor=tensors.get,
+        )
+        artifacts = self._prepare(monkeypatch, tmp_path, _aot_cfg({}), model)
+        analysis = artifacts.compiled_analysis
+        assert analysis is not None
+        assert analysis.index_space == "execution"
+        assert analysis.total_macs == 12
+        assert analysis.total_ops == 24
+        assert analysis.layers[0].id == 0
+        assert analysis.layers[0].original_id == 5

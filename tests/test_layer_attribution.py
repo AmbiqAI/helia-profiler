@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from helia_profiler.modelcost import LayerOps, ModelAnalysis
 from helia_profiler.modelcost.layer_attribution import (
     LayerAttributor,
@@ -371,3 +373,24 @@ class TestConsoleJoin:
         # analysis.layers[1]'s 43,200 here.
         assert "43,200" not in softmax
         assert " 0.5" not in softmax  # 500 cyc / 1000 macs would be the wrong quotient
+
+
+@pytest.mark.parametrize("manifest", [None, [], [{"idx": 0, "id": 7}, {"idx": 1, "id": 7}]])
+def test_compiled_costs_use_positions_not_shared_source_ids(manifest):
+    analysis = ModelAnalysis(
+        layers=[
+            LayerOps(id=0, op="CONV_2D", original_id=7, macs=30, ops=60),
+            LayerOps(id=1, op="CONV_2D", original_id=7, macs=12, ops=24),
+        ],
+        total_macs=42,
+        total_ops=84,
+        num_parameters=0,
+        engine="helia-aot",
+        index_space="execution",
+    )
+    att = LayerAttributor(analysis, manifest)
+    assert att.attribute(0, "CONV_2D:7").macs == 30
+    assert att.attribute(1, "CONV_2D:7").macs == 12
+    assert att.attribute(2, "CONV_2D:7").macs is None
+    assert att.attribute("0", "CONV_2D:7").macs is None
+    assert att.attribute(1, "CONV_2D:7").source_index == (None if manifest == [] else 7)

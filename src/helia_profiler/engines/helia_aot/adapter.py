@@ -18,6 +18,7 @@ from typing import Any
 
 from ...config import ProfileConfig
 from ...errors import ConfigError
+from ...modelcost import analyze_air_model
 from ...placement import ArenaRole, Placement
 from ...results import NsxModuleRef
 from .. import EngineType
@@ -197,6 +198,8 @@ class HeliaAOTAdapter:
         # heliaAOT transforms/fuses ops — the AIR graph may differ
         # significantly from the original TFLite flatbuffer.  The
         # manifest captures what the AOT compiler *actually* emits.
+        air_model = getattr(codegen_ctx, "model", None)
+        compiled_analysis = analyze_air_model(air_model) if air_model is not None else None
         op_manifest = _extract_operator_manifest(codegen_ctx)
         if op_manifest:
             manifest_path = work_dir / "aot_operator_manifest.json"
@@ -256,5 +259,6 @@ class HeliaAOTAdapter:
             aot_user_memory_config=user_memory_config,
             aot_arena_regions=arena_regions,
             aot_op_manifest=op_manifest or None,
+            compiled_analysis=compiled_analysis,
             memory_plan=memory_plan,
         )

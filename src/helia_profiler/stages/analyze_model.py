@@ -1,15 +1,11 @@
-"""Analyze model: extract per-layer OPS/MACs from the tflite flatbuffer.
-
-This stage is **optional** — it silently skips if ``ai-edge-litert`` is not
-installed.  Results are stored in ``ctx.model_analysis`` and merged into the
-report by the generate_report stage.
-"""
+"""Analyze model costs, reusing the compiled graph for AOT profiles."""
 
 from __future__ import annotations
 
 import logging
 
 from ..engines import EngineType
+from ..engines.base import HeliaAotArtifacts
 from ..errors import ConfigError
 from ..modelcost import analyze_model, is_available
 from ..pipeline import PipelineContext
@@ -57,14 +53,24 @@ class AnalyzeModelStage:
         if ctx.config.engine.type is EngineType.EXECUTORCH:
             log.debug("ExecuTorch PTE analysis is not available — skipping model analysis")
             return True
+        if (
+            isinstance(ctx.engine_artifacts, HeliaAotArtifacts)
+            and ctx.engine_artifacts.compiled_analysis is not None
+        ):
+            return False
         if not is_available():
             log.debug("ai-edge-litert not installed — skipping model analysis")
             return True
         return False
 
     def run(self, ctx: PipelineContext) -> None:
-        result = analyze_model(ctx.config.model.path)
-        if result is None:
+        source = analyze_model(ctx.config.model.path) if is_available() else None
+        if source is not None:
+            _check_ethos_u_consistency(ctx.config, source)
+        result = source
+        if isinstance(ctx.engine_artifacts, HeliaAotArtifacts):
+            result = ctx.engine_artifacts.compiled_analysis or source
+        if result is None or (source is None and ctx.config.engine.backend == "ethos_u"):
             # The ethos_u fail-fast gate must not be skippable by a model the
             # analyzer cannot read: an unanalyzable flatbuffer has no
             # Vela-compiled ethos-u op, so nothing would run on the NPU.
@@ -83,7 +89,6 @@ class AnalyzeModelStage:
             return
 
         ctx.model_analysis = result
-        _check_ethos_u_consistency(ctx.config, result)
         log.info(
             "Model analysis: %d layers, %s total MACs, %s total OPS, %d params",
             len(result.layers),
