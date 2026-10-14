@@ -119,6 +119,8 @@ class PowerMetadata:
     measurement_scope: MeasurementScope | str | None = None
     observation_mode: ObservationMode | None = None
     integrity: PowerIntegrity | None = None
+    #: Negative net charge was retained by an explicit diagnostic-only override.
+    negative_current_diagnostic: bool | None = None
     gate_rise_observed: bool | None = None
     gate_fall_observed: bool | None = None
     observation_deadline_s: float | None = None
@@ -189,7 +191,11 @@ class PowerMetadata:
     ) -> None:
         """Enrich metadata with the observation classification at publication."""
         self.observation_mode = observation_mode
-        self.integrity = PowerIntegrity(integrity)
+        self.integrity = (
+            PowerIntegrity.INVALID
+            if self.negative_current_diagnostic
+            else PowerIntegrity(integrity)
+        )
         self.gate_rise_observed = gate_rise_observed
         self.gate_fall_observed = gate_fall_observed
         self.observation_deadline_s = observation_deadline_s
@@ -202,8 +208,9 @@ def classify_observation(
     capture metadata.
 
     The single source for this classification: a gated clean-window scope is
-    a valid ``gpio_gated`` observation; anything else is a degraded
-    ``free_form`` one. Edge observations default to the scope verdict unless
+    a valid ``gpio_gated`` observation unless explicit invalidity or degradation
+    is retained; other scopes are degraded ``free_form`` observations.
+    Edge observations default to the scope verdict unless
     the capture recorded them explicitly.
     """
     # Equality, not identity: the field is mutable and str-typed for the
@@ -212,6 +219,10 @@ def classify_observation(
     gated = metadata.measurement_scope == MeasurementScope.GPIO_GATED_CLEAN_WINDOW
     mode = ObservationMode.GPIO_GATED if gated else ObservationMode.FREE_FORM
     integrity = PowerIntegrity.VALID if gated else PowerIntegrity.DEGRADED
+    if metadata.negative_current_diagnostic or metadata.integrity is PowerIntegrity.INVALID:
+        integrity = PowerIntegrity.INVALID
+    elif metadata.integrity is PowerIntegrity.DEGRADED:
+        integrity = PowerIntegrity.DEGRADED
     rise = metadata.gate_rise_observed if metadata.gate_rise_observed is not None else gated
     fall = metadata.gate_fall_observed if metadata.gate_fall_observed is not None else gated
     return mode, integrity, bool(rise), bool(fall), metadata.capture_safety_bound_s

@@ -13,6 +13,7 @@ of the API contract.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
@@ -61,6 +62,16 @@ class LayerResult:
             derived = source_index_from_op(self.op)
             if derived is not None:
                 object.__setattr__(self, "source_index", derived)
+
+
+def total_layer_cycles(layers: Sequence[LayerResult]) -> float | None:
+    """Return a complete sum; a missing constituent is not a measured zero."""
+    total = 0.0
+    for layer in layers:
+        if layer.cycles is None:
+            return None
+        total += layer.cycles
+    return total
 
 
 @dataclass(frozen=True)
@@ -614,8 +625,8 @@ class ProfileResult:
         return self.pmu.layers
 
     @property
-    def total_cycles(self) -> float:
-        return sum(layer.cycles or 0 for layer in self.pmu.layers)
+    def total_cycles(self) -> float | None:
+        return total_layer_cycles(self.pmu.layers)
 
     @property
     def layer_count(self) -> int:

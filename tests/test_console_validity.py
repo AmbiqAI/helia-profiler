@@ -59,6 +59,30 @@ def test_valid_run_renders_one_quiet_line(tmp_path: Path) -> None:
     assert "hint" not in text
 
 
+def test_missing_cycles_are_unavailable_in_console(tmp_path: Path) -> None:
+    from helia_profiler.console.results import print_results
+    from helia_profiler.results import LayerResult
+
+    ctx = _ctx(tmp_path)
+    set_profile_result(
+        ctx,
+        PmuResult(
+            meta=FirmwareMeta(),
+            layers=[LayerResult(0, "MISSING"), LayerResult(1, "KNOWN", cycles=500)],
+        ),
+    )
+    console = HpxConsole(verbosity=0)
+    recorder = Console(record=True, highlight=False, width=200)
+    console._console = recorder
+    print_results(console, ctx)
+    text = recorder.export_text()
+    assert "unavailable (missing layer cycles)" in text
+    missing_row = next(line for line in text.splitlines() if "MISSING" in line)
+    known_row = next(line for line in text.splitlines() if "KNOWN" in line)
+    assert "—" in missing_row
+    assert "100.0%" not in known_row
+
+
 def test_degraded_run_lists_warning_codes_and_messages(tmp_path: Path) -> None:
     ctx = _ctx(tmp_path)
     ctx.run_evaluation = RunEvaluation(

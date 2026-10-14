@@ -39,7 +39,7 @@ _MVE_STALL = "ARM_PMU_MVE_STALL"
 _INST_RETIRED = "ARM_PMU_INST_RETIRED"
 
 
-def _format_mve_cells(counters: dict[str, float], cycles: float) -> list[str]:
+def _format_mve_cells(counters: dict[str, float], cycles: float | None) -> list[str]:
     mve_inst = to_float(counters.get(_MVE_INST))
     inst = to_float(counters.get(_INST_RETIRED))
     mve_mac = to_float(counters.get(_MVE_INT_MAC))
@@ -329,7 +329,9 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
     )
     console._console.print()
 
-    total_cycles = sum(l.cycles or 0 for l in layers)
+    from ..results.models import total_layer_cycles
+
+    total_cycles = total_layer_cycles(layers)
 
     overview = Table(
         show_header=False,
@@ -351,14 +353,19 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
         overview.add_row("Board", ctx.board.name)
 
     overview.add_row("Layers", str(len(layers)))
-    overview.add_row("Total cycles", f"[bold cyan]{total_cycles:,.0f}[/bold cyan]")
+    overview.add_row(
+        "Total cycles",
+        f"[bold cyan]{total_cycles:,.0f}[/bold cyan]"
+        if total_cycles is not None
+        else "unavailable (missing layer cycles)",
+    )
 
     # Clean end-to-end cycles (no per-layer instrumentation), with the
     # delta vs the per-layer sum; clean input preparation can also contribute.
     clean_cycles = meta.clean_infer_avg_cycles
     if clean_cycles:
         delta_txt = ""
-        if total_cycles > 0:
+        if total_cycles is not None and total_cycles > 0:
             delta_pct = (clean_cycles - total_cycles) / total_cycles * 100.0
             delta_txt = f"  [dim]({delta_pct:+.1f}% vs per-layer sum)[/dim]"
         overview.add_row(
@@ -377,7 +384,7 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
         else:
             overview.add_row("Total MACs", f"{ma.total_macs:,}")
             overview.add_row("Total OPS", f"{ma.total_ops:,}")
-            if ma.total_macs > 0 and total_cycles > 0:
+            if ma.total_macs > 0 and total_cycles is not None and total_cycles > 0:
                 cpm = total_cycles / ma.total_macs
                 overview.add_row("Cycles/MAC", f"{cpm:.2f}")
             overview.add_row("Parameters", f"{ma.num_parameters:,}")
@@ -438,12 +445,12 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
         attributor = LayerAttributor(ctx.model_analysis, manifest)
 
     for i, layer in enumerate(top_n, 1):
-        cyc = layer.cycles or 0
-        pct = cyc / total_cycles * 100 if total_cycles else 0
+        cyc = layer.cycles
+        pct = cyc / total_cycles * 100 if cyc is not None and total_cycles else None
 
-        if pct >= 20:
+        if pct is not None and pct >= 20:
             pct_style = "bold red"
-        elif pct >= 10:
+        elif pct is not None and pct >= 10:
             pct_style = "yellow"
         else:
             pct_style = "dim"
@@ -453,8 +460,8 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
         row_vals = [
             str(i),
             str(layer.op),
-            f"{cyc:,.0f}",
-            f"[{pct_style}]{pct:.1f}%[/{pct_style}]",
+            f"{cyc:,.0f}" if cyc is not None else "—",
+            f"[{pct_style}]{pct:.1f}%[/{pct_style}]" if pct is not None else "—",
         ]
         if attributor is not None:
             lm = attributor.attribute(layer.id, layer.op, layer.source_index).macs

@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 from ..errors import ReportError
 from ..modelcost.layer_attribution import LayerAttribution, LayerAttributor
 from ..results import LayerResult
+from ..results.models import total_layer_cycles
 from ..results.serde import write_dict_csv
 
 if TYPE_CHECKING:
@@ -72,7 +73,7 @@ def _write_csv(
         raise ReportError("No layer data to write.")
 
     out_path = output_dir / "profile_results.csv"
-    total_cycles = sum(layer.cycles or 0 for layer in layers)
+    total_cycles = total_layer_cycles(layers)
     attributor = LayerAttributor(analysis, aot_op_manifest)
     rows = [
         _layer_to_flat_dict(
@@ -106,7 +107,7 @@ def _write_preset_csv(
     if not layers:
         return out_path
 
-    total_cycles = sum(layer.cycles or 0 for layer in layers)
+    total_cycles = total_layer_cycles(layers)
     rows = [_layer_to_flat_dict(layer, total_cycles=total_cycles) for layer in layers]
     fieldnames = _union_fieldnames(rows)
 

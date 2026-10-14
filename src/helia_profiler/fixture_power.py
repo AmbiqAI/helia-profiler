@@ -238,6 +238,8 @@ def fixture_rail_energy(
         or not observation.gate_samples
         or len(observation.gated_windows) != 1
         or meta.integrity != PowerIntegrity.VALID
+        or meta.negative_current_diagnostic
+        or observation.summary.negative_current_diagnostic
         or meta.measurement_scope != MeasurementScope.GPIO_GATED_CLEAN_WINDOW
         or meta.gate_rise_observed is not True
         or meta.gate_fall_observed is not True

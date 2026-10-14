@@ -9,7 +9,8 @@ This is the primary entry point for library users::
         engine=EngineConfig(type=EngineType.HELIA_RT),
     )
     result = profile(config)
-    print(f"{result.total_cycles:,.0f} total cycles across {result.layer_count} layers")
+    if result.total_cycles is not None:
+        print(f"{result.total_cycles:,.0f} total cycles across {result.layer_count} layers")
 
 The CLI (``hpx profile``) runs the same pipeline through
 :func:`helia_profiler.profiler.run_profile`, which this function also calls.

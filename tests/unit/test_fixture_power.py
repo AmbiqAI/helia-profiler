@@ -124,6 +124,46 @@ def measured():
     )
 
 
+def test_negative_current_diagnostic_cannot_be_reclassified_as_valid(tmp_path):
+    from helia_profiler.power.metadata import classify_observation
+
+    observation = measured()
+    observation.metadata.negative_current_diagnostic = True
+    mode, integrity, rise, fall, _ = classify_observation(observation.metadata)
+    assert integrity is PowerIntegrity.INVALID
+    observation.metadata.set_observation(
+        observation_mode=mode,
+        integrity=PowerIntegrity.VALID,
+        gate_rise_observed=rise,
+        gate_fall_observed=fall,
+        observation_deadline_s=60,
+    )
+    assert observation.metadata.integrity is PowerIntegrity.INVALID
+    raw_path = tmp_path / "raw.json"
+    raw_path.write_bytes(b"{}")
+    raw = FixtureFile(raw_path, sha256(b"{}").hexdigest())
+    timing = FixtureTiming(100, 100, 5, 32768, 1, 96_000_000, FixtureTimingScope.RESTORE_AND_INVOKE)
+    with pytest.raises(ValueError, match="Incomplete or mismatched"):
+        power.fixture_rail_energy(observation, request(), timing, raw)
+
+
+@pytest.mark.parametrize("diagnostic", [False, True])
+def test_integrator_diagnostic_flag_reaches_public_observation(diagnostic):
+    from helia_profiler.power.metadata import classify_observation
+
+    observation = measured()
+    result = replace(
+        observation,
+        summary=replace(observation.summary, negative_current_diagnostic=diagnostic),
+    )
+    assert result.statistics is observation.statistics
+    assert result.gate_frames is observation.gate_frames
+    assert result.summary.energy_j == observation.summary.energy_j
+    assert classify_observation(result.metadata)[1] is (
+        PowerIntegrity.INVALID if diagnostic else PowerIntegrity.VALID
+    )
+
+
 def test_power_method_is_explicit_and_timing_only_default_is_unchanged():
     assert FixtureMethod(FixtureTimingScope.INVOKE_ONLY).power_sync is None
     wiring = FixturePowerSync(29, 36, 14)

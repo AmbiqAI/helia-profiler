@@ -648,6 +648,21 @@ class TestGatedStatsProcessing:
         assert len(windows) == 1
         assert summary.avg_current_a == pytest.approx(0.1, rel=1e-6)
 
+        # Magnitudes are retained, but can never be promoted to a valid
+        # observation by the ordinary or fixture capture publishers.
+        from helia_profiler.power.metadata import classify_observation
+
+        assert summary.negative_current_diagnostic is True
+        result = PowerResult(
+            summary,
+            gated_windows=windows,
+            metadata=PowerMetadata(measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW),
+            statistics=packets,
+        )
+        assert result.statistics is packets
+        assert result.metadata.negative_current_diagnostic is True
+        assert classify_observation(result.metadata)[1] is PowerIntegrity.INVALID
+
     def test_alternating_signed_packets_are_rectified_before_summing(self):
         from helia_profiler.power.joulescope.stats import _process_gated_stats
 

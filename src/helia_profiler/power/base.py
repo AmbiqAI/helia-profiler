@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, Protocol, runtime_checkable
 
-from .metadata import PowerMetadata
+from .metadata import PowerIntegrity, PowerMetadata
 
 
 class PowerMode(StrEnum):
@@ -35,6 +35,8 @@ class PowerSummary:
     energy_j: float
     duration_s: float
     sample_count: int
+    #: Magnitudes were retained despite the integrator's negative-charge failure.
+    negative_current_diagnostic: bool = False
 
 
 @dataclass(frozen=True)
@@ -96,6 +98,11 @@ class PowerResult:
     counter_domain: str | None = None
     state_frames: list[dict[str, Any]] = field(default_factory=list)
     state_stream_error: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.summary.negative_current_diagnostic or self.metadata.negative_current_diagnostic:
+            self.metadata.negative_current_diagnostic = True
+            self.metadata.integrity = PowerIntegrity.INVALID
 
 
 @runtime_checkable

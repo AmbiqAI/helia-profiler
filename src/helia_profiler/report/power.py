@@ -15,6 +15,15 @@ if TYPE_CHECKING:
 log = logging.getLogger("hpx")
 
 
+def _power_detail_fields(summary: PowerSummary) -> dict[str, Any]:
+    fields = asdict(summary)
+    # Preserve the established shape for ordinary observations; diagnostic
+    # magnitudes must carry their explicit disqualification in detailed output.
+    if not summary.negative_current_diagnostic:
+        fields.pop("negative_current_diagnostic")
+    return fields
+
+
 def _power_summary_to_dict(summary: PowerSummary) -> dict[str, Any]:
     """``summary.json``'s published power keys.
 
@@ -58,7 +67,7 @@ def _write_power_csv(power: PowerResult, output_dir: Path) -> Path:
     with open(out_path, "w", encoding="utf-8", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["scope", "metric", "value"])
-        for key, value in asdict(summary).items():
+        for key, value in _power_detail_fields(summary).items():
             writer.writerow([scope, key, value])
 
         for i, w in enumerate(power.gated_windows):

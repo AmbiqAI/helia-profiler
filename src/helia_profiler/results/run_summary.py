@@ -306,6 +306,7 @@ class PowerSection:
     capture_window_s: float | None = None
     gating_diagnostics: Mapping[str, Any] | None = None
     window_clock_ceiling: Mapping[str, Any] | None = None
+    negative_current_diagnostic: bool | None = None
     terminal: Mapping[str, Any] | None = None
     on_device_summary: Mapping[str, Any] | None = None
     sync_input_index: int | None = None
@@ -360,6 +361,7 @@ class PowerSection:
         "capture_window_s",
         "gating_diagnostics",
         "window_clock_ceiling",
+        "negative_current_diagnostic",
         "terminal",
         "on_device_summary",
         "sync_input_index",
@@ -492,9 +494,9 @@ class RunSummary:
 
     engine: str
     layers: int
-    #: A float (sum of per-layer cycle floats), carried verbatim; use
-    #: :attr:`total_cycles_int` for a rounded reading.
-    total_cycles: float
+    #: Complete sum of per-layer cycles, or None when any layer is missing.
+    #: Use :attr:`total_cycles_int` for a rounded reading.
+    total_cycles: float | None
     overflow_detected: bool
     validity: str | None = None
     issues: tuple[Mapping[str, Any], ...] = ()
@@ -587,7 +589,7 @@ class RunSummary:
         return cls(
             engine=str(data.get("engine", "")),
             layers=to_int(data.get("layers")) or 0,
-            total_cycles=data.get("total_cycles") or 0,
+            total_cycles=data.get("total_cycles"),
             overflow_detected=bool(data.get("overflow_detected", False)),
             validity=(str(data["validity"]) if data.get("validity") is not None else None),
             issues=_tuple_of_mappings(data.get("issues")),

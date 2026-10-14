@@ -605,7 +605,10 @@ def _process_gated_stats(
     # held high during the window, see power.sync.release_go).  Refuse to
     # launder it: fail loudly with the physical causes.  The 10% threshold
     # ignores noise-dominated near-zero windows on idle targets.
-    if total_signed_charge < 0 and abs(total_signed_charge) > 0.1 * total_charge:
+    negative_current_diagnostic = (
+        total_signed_charge < 0 and abs(total_signed_charge) > 0.1 * total_charge
+    )
+    if negative_current_diagnostic:
         if os.environ.get("HPX_POWER_ALLOW_NEGATIVE") != "1":
             raise PowerError(
                 f"Gated window current is net NEGATIVE "
@@ -635,6 +638,7 @@ def _process_gated_stats(
         energy_j=total_energy,
         duration_s=total_duration,
         sample_count=total_samples,
+        negative_current_diagnostic=negative_current_diagnostic,
     )
     return gated_windows, summary
 
