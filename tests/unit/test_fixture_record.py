@@ -85,6 +85,27 @@ def _build(root):
     return replace(build, build_identity=compiled_fixture_identity(build))
 
 
+@pytest.mark.parametrize("version", [1, 2])
+def test_power_protocol_record_preserves_generation(tmp_path, version):
+    from helia_profiler.fixture import FixturePowerSync
+
+    build = replace(
+        _build(tmp_path),
+        timing_scope=FixtureTimingScope.RESTORE_AND_INVOKE,
+        power_sync=FixturePowerSync(29, 36, 14, protocol_version=version),
+    )
+    build = replace(build, build_identity=compiled_fixture_identity(build))
+    record = dump_fixture_build(build, roots={"run": tmp_path})
+    encoded = json.loads(record)
+    assert encoded["fixture_api"] == [5, 1 if version == 1 else 2]
+    assert ("protocol_version" in encoded["build"]["power_sync"]) == (version == 2)
+    assert load_fixture_build(record, roots={"run": tmp_path}) == build
+    altered = json.loads(record)
+    altered["build"]["power_sync"]["protocol_version"] = 1 if version == 2 else 2
+    with pytest.raises(ValueError):
+        load_fixture_build(json.dumps(altered), roots={"run": tmp_path})
+
+
 @pytest.mark.parametrize("extra_root", ["alias", "nested", "parent"])
 def test_record_load_accepts_additional_caller_roots(tmp_path, extra_root):
     root = tmp_path / "run"

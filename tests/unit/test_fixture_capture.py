@@ -935,7 +935,7 @@ def test_power_capture_preserves_full_terminal_and_instrument_evidence(rig, tmp_
         rail_power=power_request(),
     )
     terminal[0x2000000C] = struct.pack("<7I", 50, 10, 2, 32768, 300, 96000000, 2)
-    terminal[0x20000028] = struct.pack("<5I", 0x50575231, 1, 29, 36, 14)
+    terminal[0x20000028] = struct.pack("<5I", 0x50575231, 2, 29, 36, 14)
     ownership = []
     monkeypatch.setattr(
         guard, "verify_power_device", lambda **kw: ownership.append(kw), raising=False
@@ -974,3 +974,81 @@ def test_power_authority_is_required_before_any_device_operation(rig):
     with pytest.raises(ValueError, match="power authority"):
         capture.capture_fixture(request, guard=guard)
     assert not flashes and not writes
+
+
+def test_legacy_power_image_refuses_before_device(rig):
+    from test_fixture_power import request as power_request
+
+    request, _, _, writes, flashes, guard = rig
+    request = replace(
+        request,
+        timing_scope=FixtureTimingScope.RESTORE_AND_INVOKE,
+        power_sync=replace(power_request().firmware_wiring(), protocol_version=1),
+        rail_power=power_request(),
+    )
+    with pytest.raises(ValueError, match="protocol 2"):
+        capture.capture_fixture(request, guard=guard)
+    assert not writes and not flashes and not guard.calls
+
+
+@pytest.mark.parametrize("unfinished", [capture._STATUS_RUNNING, capture._STATUS_POISON])
+@pytest.mark.parametrize("halted", [False, True])
+def test_power_capture_rejects_completion_after_observation(
+    rig, tmp_path, monkeypatch, unfinished, halted
+):
+    from test_fixture_power import measured
+    from test_fixture_power import request as power_request
+
+    request, memory, terminal, _, flashes, guard = rig
+    elf, image, _ = image_files(tmp_path, {**_SINKS, "deployment_power": 20})
+    request = replace(
+        request,
+        elf=elf,
+        image=image,
+        settle_seconds=60,
+        timing_scope=FixtureTimingScope.RESTORE_AND_INVOKE,
+        power_sync=power_request().firmware_wiring(),
+        rail_power=power_request(),
+    )
+    terminal[0x2000000C] = struct.pack("<7I", 50, 10, 2, 32768, 300, 96000000, 2)
+    terminal[0x20000028] = struct.pack("<5I", 0x50575231, 2, 29, 36, 14)
+    monkeypatch.setattr(guard, "verify_power_device", lambda **kw: None, raising=False)
+
+    def observe(req, same_guard, reset):
+        reset()
+        memory[0x20000000] = struct.pack("<i", unfinished)
+        return measured()
+
+    # Later completion cannot extend samples that have already stopped.
+    monkeypatch.setattr(capture.time, "sleep", lambda _: memory.update(terminal))
+    monkeypatch.setattr(capture, "observe_fixture_power", observe)
+    restarts = []
+    if halted:
+        original_attach = capture.attached_session
+        attaches = 0
+
+        @contextmanager
+        def attach(**kwargs):
+            nonlocal attaches
+            attaches += 1
+            with original_attach(**kwargs) as session:
+                if attaches == 3:
+                    monkeypatch.setattr(session, "halted", lambda: True)
+                    monkeypatch.setattr(session, "restart", lambda: restarts.append(True))
+                yield session
+
+        monkeypatch.setattr(capture, "attached_session", attach)
+    result = capture.capture_fixture(request, guard=guard)
+    assert result.state == "failure"
+    assert (
+        result.error is not None
+        and "Power observation ended before firmware completion" in result.error
+    )
+    assert result.rail_energy is None
+    assert not restarts
+    assert len(flashes) == 1
+    completion = json.loads((request.evidence_dir / "completion.json").read_text())
+    assert completion["polls"] == 1
+    assert completion["completed"] is False
+    assert completion["status"] == unfinished
+    assert (request.evidence_dir / "rail-power.json").is_file()

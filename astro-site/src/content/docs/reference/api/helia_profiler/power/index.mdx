@@ -72,7 +72,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   name={"PowerResult"}
   kind={"class"}
   language={"python"}
-  signature={"PowerResult(\n    summary: PowerSummary,\n    samples: list[PowerSample] = list(),\n    gated_windows: list[GatedPowerWindow] = list(),\n    metadata: PowerMetadata = PowerMetadata(),\n    statistics: list[dict[str, Any]] = list(),\n    gate_samples: list[tuple[int, int]] = list(),\n    statistics_timebase_hz: int | None = None,\n    statistics_device_time: bool = False,\n    gate_frames: list[dict[str, Any]] = list(),\n    gate_stream_error: str | None = None,\n    counter_gate_evidence: list[dict[str, Any]] = list(),\n    counter_domain: str | None = None,\n) -> None"}
+  signature={"PowerResult(\n    summary: PowerSummary,\n    samples: list[PowerSample] = list(),\n    gated_windows: list[GatedPowerWindow] = list(),\n    metadata: PowerMetadata = PowerMetadata(),\n    statistics: list[dict[str, Any]] = list(),\n    gate_samples: list[tuple[int, int]] = list(),\n    statistics_timebase_hz: int | None = None,\n    statistics_device_time: bool = False,\n    gate_frames: list[dict[str, Any]] = list(),\n    gate_stream_error: str | None = None,\n    counter_gate_evidence: list[dict[str, Any]] = list(),\n    counter_domain: str | None = None,\n    state_frames: list[dict[str, Any]] = list(),\n    state_stream_error: str | None = None,\n) -> None"}
   level={2}
   summary={"Complete result of a power capture."}
   source={{"path":"src/helia_profiler/power/base.py","line":73,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L73"}}
@@ -251,6 +251,34 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"counter_domain: str | None = None"}
     level={3}
     source={{"path":"src/helia_profiler/power/base.py","line":96,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L96"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerResult.state_frames"}
+    name={"state_frames"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"state_frames: list[dict[str, Any]] = field(default_factory=list)"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/base.py","line":97,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L97"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PowerResult.state_stream_error"}
+    name={"state_stream_error"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"state_stream_error: str | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/power/base.py","line":98,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L98"}}
   >
 
 

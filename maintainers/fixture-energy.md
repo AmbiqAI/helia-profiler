@@ -8,6 +8,32 @@ The firmware initializes once, executes the selected warmups, signals READY, wai
 
 One capture records one gated window through the maintained Joulescope driver. `FixtureCaptureResult.rail_energy` and `FixtureMeasurements.rail_energy` contain the instrument serial, rail, actual measured iterations, seconds, watts, amperes, joules and joules per iteration, plus a hash-pinned raw record. Scope is gross rail restore-and-invoke, subtraction is none. The raw record preserves instrument statistics (actual current/voltage/power and integrals/time metadata), aligned GPIO observations and existing integration diagnostics. These statistics are not a full-rate waveform. Driver integrity, gate edges, trace completeness, successful target count and exact image readback are required. Energy never comes from target latency.
 
+API 5.2 adds `FixturePowerSync.protocol_version` (default 2) and
+`rail_energy.completion`, a `FixtureBatchCompletion` containing
+protocol version 2, the sensor counter rate and READY, GO-acknowledgement,
+gate-rise, gate-fall and DONE sample IDs, bound to the same raw artifact.
+The record loader retains legacy 5.1 wiring as protocol 1 without changing its
+identity; a new build or rail capture refuses that legacy protocol before any
+operation. New captures require protocol 2 and this completion evidence. A historical `completion=None` does not
+claim protocol-v2 completion and must not be upgraded by inferring it from timing.
+
+Protocol 2 configures idle GPIO levels after system initialization and before
+model initialization or warmups. State goes high for READY, low after GO, then
+high for DONE only after the successful terminal is published. The measured
+restore-and-invoke gate and loop are unchanged; DONE is outside that gate.
+A missed GO returns a power-handshake failure instead of free-running.
+The shared driver retains both packed input streams and waits for DONE before
+stopping. One optional initial high-to-low reset transition establishes idle;
+thereafter only the complete READY/acknowledgement/gate/DONE sequence is valid.
+Fragmentation, missing transitions, stream gaps, uncovered DONE, and a selected
+gate different from that sequence refuse energy. All observed edges remain in
+the raw artifact. No forecast or independent clock tolerance establishes completion.
+
+Power readback never resumes a halted target or waits for a later completion
+after sampling has stopped. Protocol-v1 images cannot supply protocol-v2
+evidence: rebuild instrumented firmware and retain the original image and result
+identities. Timing-only completion polling is unchanged.
+
 Experiment counts, repeat aggregation, comparison thresholds, calibration acceptance and rail coverage belong to the caller. Instrument GPIO reference voltage is not a substitute for measured rail voltage. No battery or whole-application energy claim follows from a rail measurement.
 
 The runtime catalog also admits non-default AOT 0.29.0 from its exact release commit. Its empty qualification list makes no target qualification claim. The published compiler requires CORE 7.44.2; an explicitly loaded task compatibility baseline records that tuple as development overrides when it differs from the unchanged package default. Package range admission, generated firmware fit, physical execution and numerical correctness remain distinct.

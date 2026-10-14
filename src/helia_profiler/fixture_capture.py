@@ -199,6 +199,12 @@ def capture_fixture(
         "PSRAM expectation is not bound to the capture image",
     )
     require(
+        request.power_sync is None
+        or isinstance(request.power_sync, FixturePowerSync)
+        and request.power_sync.protocol_version == 2,
+        "Power capture requires protocol 2 firmware with DONE; rebuild the instrumented image",
+    )
+    require(
         (request.power_sync is None) == (request.rail_power is None)
         and (
             request.rail_power is None
@@ -389,7 +395,7 @@ def capture_fixture(
         sinks = {sink.name: sink for sink in image.sinks}
 
         def await_completion(session, started: float, resumed: bool, detached: float) -> None:
-            """Poll the running target's status sink until it leaves both sentinels."""
+            """Wait for timing completion; power samples cannot be extended by waiting."""
             polls = 0
             while True:
                 polls += 1
@@ -397,7 +403,7 @@ def capture_fixture(
                 live = struct.unpack("<i", raw)[0]
                 elapsed = time.monotonic() - started
                 completed = live not in (_STATUS_POISON, _STATUS_RUNNING)
-                if completed or elapsed >= request.settle_seconds:
+                if completed or request.rail_power is not None or elapsed >= request.settle_seconds:
                     break
                 time.sleep(min(_POLL_INTERVAL_S, request.settle_seconds - elapsed))
             live_memory = None
@@ -421,6 +427,11 @@ def capture_fixture(
                     )
                     + "\n"
                 ).encode(),
+            )
+            require(
+                request.rail_power is None or completed,
+                "Power observation ended before firmware completion; "
+                "the retained samples do not establish full-batch energy",
             )
             require(
                 completed,
@@ -462,7 +473,8 @@ def capture_fixture(
             time.sleep(detached)
         with attach() as session:
             guard.check(require_free=False, remaining_s=10)
-            await_completion(session, started, resume_if_halted(session), detached)
+            resumed = resume_if_halted(session) if request.rail_power is None else False
+            await_completion(session, started, resumed, detached)
             halt(session)
             verify(session)
             values = snapshot(session, suffix="")
@@ -492,7 +504,7 @@ def capture_fixture(
                 struct.unpack("<5I", values["deployment_power"])
                 == (
                     0x50575231,
-                    1,
+                    2,
                     wiring.sync_gpio_pin,
                     wiring.state_gpio_pin,
                     wiring.go_gpio_pin,

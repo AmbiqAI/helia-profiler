@@ -75,6 +75,7 @@ from .fixture_operator_timing import (
     observe_operator_timing,
 )
 from .fixture_power import (
+    FixtureBatchCompletion,
     FixturePowerGuard,
     FixturePowerSync,
     FixtureRailEnergy,
@@ -96,7 +97,7 @@ from .hostenv.elf_inventory import ElfSection, LoadSegment, SectionInventory, se
 from .placement import Placement
 from .results.models import ToolchainInfo
 
-FIXTURE_API_VERSION: Final[tuple[int, int]] = (5, 1)
+FIXTURE_API_VERSION: Final[tuple[int, int]] = (5, 2)
 
 __all__ = [
     "FIXTURE_API_VERSION",
@@ -136,6 +137,7 @@ __all__ = [
     "FixturePowerSync",
     "FixtureRailPowerRequest",
     "FixtureRailEnergy",
+    "FixtureBatchCompletion",
     # Operations
     "analyze_typed_fixture_model",
     "analyze_typed_fixture_model_for_engine",

@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 from ...errors import PowerError
 from ..base import PowerResult
+from ..completion import GatedCompletion
 from ..counter_gate import PackedGateRecorder, counter_gate_trace
 from ..diagnostics import (
     BOOT_SETTLE_S,
@@ -153,6 +154,7 @@ def capture_gated(
     lockstep: bool | None = None,
     lockstep_wiring_available: bool = False,
     pre_window_s: float = 0.0,
+    require_done_state: bool = False,
     **kwargs: Any,
 ) -> PowerResult:
     """Capture GPIO-gated power using on-device-integrated host stats.
@@ -168,6 +170,9 @@ def capture_gated(
 
     Only one clean window is supported. After its falling edge and a
     ``guard_s`` settle, capture stops; ``duration_s`` bounds the wait for it.
+    With ``require_done_state``, a GO acknowledgement and post-gate DONE
+    on the state input are also required before stopping. Both input streams
+    are retained for counter-domain protocol validation by the caller.
     An exception from ``on_started`` ends the capture at once and propagates
     unchanged. ``pre_window_s`` is the warm-up the target runs between boot
     and the window when lock-step is off.
@@ -233,6 +238,8 @@ def capture_gated(
     latest_gpi_value: int | None = None
     gpi_sample_sequence = 0
     gpi_poll_failures = 0
+    completion = GatedCompletion()
+    early_stopped = False
 
     def _wait_gpi_state(index: int, high: bool, timeout_s: float) -> bool:
         bit_mask = 1 << index
@@ -250,7 +257,18 @@ def capture_gated(
                 if stop.is_set():
                     return False
                 observed_sequence = gpi_sample_sequence
-                if latest_gpi_value is not None and bool(latest_gpi_value & bit_mask) is high:
+                ready_gate_low = (
+                    not require_done_state
+                    or index != state_input_index
+                    or not high
+                    or latest_gpi_value is not None
+                    and not (latest_gpi_value & bit)
+                )
+                if (
+                    latest_gpi_value is not None
+                    and bool(latest_gpi_value & bit_mask) is high
+                    and ready_gate_low
+                ):
                     consecutive += 1
                     if consecutive >= 3:
                         return True
@@ -275,9 +293,13 @@ def capture_gated(
         sync_input_index, min(128 * 1024 * 1024, int(duration_s * 2_100_000) + 1048576)
     )
     gpi_stream_frames = gate_recorder.frames
+    state_recorder = PackedGateRecorder(state_input_index, gate_recorder.max_bytes)
 
     def _on_gpi_data(_topic: str, value: Any) -> None:
         gate_recorder.append(value, word_aligned=family in ("js220", "js320"))
+
+    def _on_state_data(_topic: str, value: Any) -> None:
+        state_recorder.append(value, word_aligned=family in ("js220", "js320"))
 
     # Opt-in full-rate cross-check (AutoDeploy-equivalent reference method).
     # Set HPX_POWER_FULLRATE_XCHECK=1 to also stream raw s/i + s/v at the
@@ -308,6 +330,7 @@ def capture_gated(
         nonlocal gpi_sample_sequence, latest_gpi_value, short_pulse_last_s
         nonlocal short_pulses_ignored, windows_done, gpi_poll_failures, below_plan_highs
         nonlocal below_plan_rise_at, below_plan_fall_at
+        nonlocal early_stopped
         prev_level = 0
         high_seen = False
         high_phase = "unknown"
@@ -328,6 +351,11 @@ def capture_gated(
                 phase = _phase()
                 if phase is None:
                     return
+                done = completion.observe(
+                    state_high=bool(gpi_value & (1 << state_input_index)),
+                    gate_high=bool(level),
+                    go_signaled=phase == "go_signaled",
+                )
                 if phase != "go_signaled":
                     # Flash/reset pin levels are not protocol events. Keep the
                     # latest bitfield for READY qualification, but establish a
@@ -386,7 +414,11 @@ def capture_gated(
                     )
                     if high_duration_s >= plan_floor_s:
                         windows_done += 1
-                        if windows_done >= min_high_windows and complete_at is None:
+                        if (
+                            not require_done_state
+                            and windows_done >= min_high_windows
+                            and complete_at is None
+                        ):
                             complete_at = time.monotonic()
                     elif high_duration_s >= minimum_gate_s:
                         # Too short for the plan: keep waiting for the real
@@ -422,6 +454,8 @@ def capture_gated(
                         first_low_after_high_at = None
                         high_seen = False
                 prev_level = level
+                if require_done_state and done and complete_at is None:
+                    complete_at = time.monotonic()
             except Exception:
                 if gpi_value is not None:
                     log.debug("GPI poller iteration failed", exc_info=True)
@@ -435,6 +469,7 @@ def capture_gated(
             # Early-stop once we have the gated window(s) plus a settle guard
             # so the trailing stat packets covering the window arrive.
             if complete_at is not None and (time.monotonic() - complete_at) >= guard_s:
+                early_stopped = True
                 stop.set()
                 break
             time.sleep(poll_interval_s)
@@ -442,6 +477,9 @@ def capture_gated(
     capture_start = time.monotonic()
     wait_ended_at: float | None = None
     hook_error: Exception | None = None
+    state_subscribed = False
+    state_data_topic = f"{device_path}/s/gpi/{state_input_index}/!data"
+    state_ctrl_topic = f"{device_path}/s/gpi/{state_input_index}/ctrl"
     try:
         if family in ("js220", "js320"):
             mode = driver.query(f"{device_path}/s/gpi/+/dwnN/mode")
@@ -450,6 +488,7 @@ def capture_gated(
             )
             if gate_recorder.sample_mode is None:
                 raise PowerError("GPI decimation mode does not preserve sampled gate levels")
+            state_recorder.sample_mode = gate_recorder.sample_mode
         try:
             driver.publish(f"{device_path}/{cycle_topic}", on_value)
         except Exception:
@@ -459,14 +498,22 @@ def capture_gated(
         driver.publish(f"{device_path}/{sctrl_topic}", 1)
         driver.subscribe(f"{device_path}/{sval_topic}", "pub", _on_stats)
         gpi_stream_enabled = False
+        gpi_subscribed = False
         gpi_data_topic = f"{device_path}/s/gpi/{sync_input_index}/!data"
         gpi_ctrl_topic = f"{device_path}/s/gpi/{sync_input_index}/ctrl"
         if family in ("js220", "js320"):
             try:
                 driver.subscribe(gpi_data_topic, "pub", _on_gpi_data)
+                gpi_subscribed = True
                 driver.publish(gpi_ctrl_topic, 1)
                 gpi_stream_enabled = True
+                if require_done_state:
+                    driver.subscribe(state_data_topic, "pub", _on_state_data)
+                    state_subscribed = True
+                    driver.publish(state_ctrl_topic, 1)
             except Exception:
+                if require_done_state:
+                    state_recorder.error = "Required state stream could not be enabled"
                 log.warning(
                     "GPI edge streaming unavailable on %s; gate edges fall "
                     "back to snapshot polling",
@@ -506,13 +553,22 @@ def capture_gated(
                 driver.unsubscribe(f"{device_path}/{sval_topic}", _on_stats)
             except Exception:
                 pass
-            if gpi_stream_enabled:
+            if gpi_subscribed:
                 try:
                     driver.publish(gpi_ctrl_topic, 0)
                 except Exception:
                     pass
                 try:
                     driver.unsubscribe(gpi_data_topic, _on_gpi_data)
+                except Exception:
+                    pass
+            if state_subscribed:
+                try:
+                    driver.publish(state_ctrl_topic, 0)
+                except Exception:
+                    pass
+                try:
+                    driver.unsubscribe(state_data_topic, _on_state_data)
                 except Exception:
                     pass
             if fr_requested:
@@ -780,6 +836,8 @@ def capture_gated(
                 gate_samples=aligned_poll_samples,
                 statistics_timebase_hz=int(time64.SECOND),
                 statistics_device_time=use_device_time_axis,
+                state_frames=state_recorder.frames,
+                state_stream_error=state_recorder.error,
             )
         if short_pulses_ignored:
             log.warning(
@@ -844,7 +902,7 @@ def capture_gated(
             window_count=len(windows),
             gpi_poll_count=len(poll_samples),
             stat_packets=len(packets),
-            early_stopped=windows_done >= min_high_windows,
+            early_stopped=early_stopped,
             capture_window_s=round(captured_s, 4),
             capture_safety_bound_s=duration_s,
             short_gate_pulses_ignored=short_pulses_ignored,
@@ -964,6 +1022,8 @@ def capture_gated(
             summary=gated_summary,
             gated_windows=windows,
             metadata=metadata,
+            state_frames=state_recorder.frames,
+            state_stream_error=state_recorder.error,
             statistics=packets,
             gate_samples=aligned_poll_samples,
             statistics_timebase_hz=int(time64.SECOND),

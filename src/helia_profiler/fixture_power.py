@@ -24,11 +24,14 @@ class FixturePowerSync:
     sync_gpio_pin: int
     state_gpio_pin: int
     go_gpio_pin: int
+    protocol_version: int = 2
 
     def __post_init__(self) -> None:
         pins = (self.sync_gpio_pin, self.state_gpio_pin, self.go_gpio_pin)
         if any(type(p) is not int or not 0 <= p <= 255 for p in pins) or len(set(pins)) != 3:
             raise ValueError("Three distinct GPIO numbers required")
+        if type(self.protocol_version) is not int or self.protocol_version not in (1, 2):
+            raise ValueError("Unsupported fixture power protocol")
 
 
 @dataclass(frozen=True)
@@ -80,6 +83,21 @@ class FixturePowerGuard(Protocol):
 
 
 @dataclass(frozen=True)
+class FixtureBatchCompletion:
+    """Observed protocol-v2 transitions on the instrument's native sample counter."""
+
+    protocol_version: int
+    counter_domain: str
+    sample_rate: int
+    ready_sample: int
+    go_ack_sample: int
+    gate_rise_sample: int
+    gate_fall_sample: int
+    done_sample: int
+    raw: FixtureFile
+
+
+@dataclass(frozen=True)
 class FixtureRailEnergy:
     iterations: int
     scope: str
@@ -92,6 +110,7 @@ class FixtureRailEnergy:
     energy_j: float
     energy_per_iteration_j: float
     raw: FixtureFile
+    completion: FixtureBatchCompletion | None = None
 
 
 def observe_fixture_power(
@@ -173,6 +192,7 @@ def observe_fixture_power(
             phase_getter=current_phase,
             lockstep=True,
             lockstep_wiring_available=True,
+            require_done_state=True,
         )
         if failures:
             raise failures[0]
@@ -235,6 +255,7 @@ def fixture_rail_energy(
     ):
         raise ValueError("Rail energy/power/duration disagree")
     _validate_trace_coverage(observation)
+    completion = _batch_completion(observation, request, raw)
     raw.read()
     return FixtureRailEnergy(
         timing.iterations,
@@ -248,6 +269,59 @@ def fixture_rail_energy(
         window.energy_j,
         window.energy_j / timing.iterations,
         raw,
+        completion,
+    )
+
+
+def _batch_completion(
+    observation: PowerResult, request: FixtureRailPowerRequest, raw: FixtureFile
+) -> FixtureBatchCompletion:
+    from .power.counter_gate import CounterGateTrace, counter_gate_trace
+
+    if observation.state_stream_error:
+        raise ValueError("Invalid completion state stream")
+    gate = counter_gate_trace(
+        observation.gate_frames, observation.statistics, channel=request.sync_input_index
+    )
+
+    def after_idle(trace: CounterGateTrace) -> tuple[int, tuple[tuple[int, int], ...]]:
+        edges = trace.edges
+        if trace.initial_level:
+            if not edges or edges[0][1] != 0:
+                raise ValueError("Missing fresh idle before completion protocol")
+            return edges[0][0], edges[1:]
+        return trace.first_counter, edges
+
+    gate_idle, gate_edges = after_idle(gate)
+    if [level for _, level in gate_edges] != [1, 0] or gate.final_level != 0:
+        raise ValueError("Incomplete or fragmented batch gate")
+    state = counter_gate_trace(
+        observation.state_frames, observation.statistics, channel=request.state_input_index
+    )
+    state_idle, state_edges = after_idle(state)
+    if (
+        gate.rate != state.rate
+        or [level for _, level in state_edges] != [1, 0, 1]
+        or state.final_level != 1
+    ):
+        raise ValueError("Incomplete or fragmented READY/GO/gate/DONE sequence")
+    ready, ack, done = (counter for counter, _ in state_edges)
+    rise, fall = (counter for counter, _ in gate_edges)
+    if not (
+        max(gate_idle, state_idle)
+        < ready
+        < ack
+        <= rise
+        < fall
+        <= done
+        < min(gate.end_counter, state.end_counter, gate.intervals[-1][1])
+    ):
+        raise ValueError("Completion protocol order or sample coverage mismatch")
+    selected = observation.counter_gate_evidence
+    if len(selected) != 1 or (selected[0]["rise"], selected[0]["fall"]) != (rise, fall):
+        raise ValueError("Energy interval differs from completed batch gate")
+    return FixtureBatchCompletion(
+        2, "joulescope_sensor_sample_id", gate.rate, ready, ack, rise, fall, done, raw
     )
 
 

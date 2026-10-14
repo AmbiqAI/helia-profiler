@@ -584,6 +584,8 @@ def _build(
 ) -> FixtureBuild:
     if not isinstance(method, FixtureMethod):
         raise ConfigError("Explicit FixtureMethod required")
+    if method.power_sync is not None and method.power_sync.protocol_version != 2:
+        raise ConfigError("New power firmware requires completion protocol 2")
     _validate(config, fixture)
     model: FixtureModelAnalysis | TypedFixtureModelAnalysis
     if isinstance(fixture, TypedFixture):

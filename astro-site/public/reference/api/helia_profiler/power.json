@@ -305,13 +305,51 @@
                 "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L96"
               },
               "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.PowerResult.state_frames",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "state_frames",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "state_frames: list[dict[str, Any]] = field(default_factory=list)",
+              "source": {
+                "line": 97,
+                "path": "src/helia_profiler/power/base.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L97"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.PowerResult.state_stream_error",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "state_stream_error",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "state_stream_error: str | None = None",
+              "source": {
+                "line": 98,
+                "path": "src/helia_profiler/power/base.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/base.py#L98"
+              },
+              "summary": ""
             }
           ],
           "name": "PowerResult",
           "params": [],
           "raises": [],
           "returns": [],
-          "signature": "PowerResult(\n    summary: PowerSummary,\n    samples: list[PowerSample] = list(),\n    gated_windows: list[GatedPowerWindow] = list(),\n    metadata: PowerMetadata = PowerMetadata(),\n    statistics: list[dict[str, Any]] = list(),\n    gate_samples: list[tuple[int, int]] = list(),\n    statistics_timebase_hz: int | None = None,\n    statistics_device_time: bool = False,\n    gate_frames: list[dict[str, Any]] = list(),\n    gate_stream_error: str | None = None,\n    counter_gate_evidence: list[dict[str, Any]] = list(),\n    counter_domain: str | None = None,\n) -> None",
+          "signature": "PowerResult(\n    summary: PowerSummary,\n    samples: list[PowerSample] = list(),\n    gated_windows: list[GatedPowerWindow] = list(),\n    metadata: PowerMetadata = PowerMetadata(),\n    statistics: list[dict[str, Any]] = list(),\n    gate_samples: list[tuple[int, int]] = list(),\n    statistics_timebase_hz: int | None = None,\n    statistics_device_time: bool = False,\n    gate_frames: list[dict[str, Any]] = list(),\n    gate_stream_error: str | None = None,\n    counter_gate_evidence: list[dict[str, Any]] = list(),\n    counter_domain: str | None = None,\n    state_frames: list[dict[str, Any]] = list(),\n    state_stream_error: str | None = None,\n) -> None",
           "source": {
             "line": 73,
             "path": "src/helia_profiler/power/base.py",

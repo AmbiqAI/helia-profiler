@@ -60,6 +60,8 @@ PowerResult(
     gate_stream_error: str | None = None,
     counter_gate_evidence: list[dict[str, Any]] = list(),
     counter_domain: str | None = None,
+    state_frames: list[dict[str, Any]] = list(),
+    state_stream_error: str | None = None,
 ) -> None
 ```
 
@@ -195,6 +197,26 @@ counter_domain: str | None = None
 ```
 
 Source: `src/helia_profiler/power/base.py:96`
+
+### helia_profiler.PowerResult.state_frames
+
+`attribute` · `python`
+
+```python
+state_frames: list[dict[str, Any]] = field(default_factory=list)
+```
+
+Source: `src/helia_profiler/power/base.py:97`
+
+### helia_profiler.PowerResult.state_stream_error
+
+`attribute` · `python`
+
+```python
+state_stream_error: str | None = None
+```
+
+Source: `src/helia_profiler/power/base.py:98`
 
 ## helia_profiler.PowerObservation
 

@@ -94,6 +94,8 @@ class PowerResult:
     gate_stream_error: str | None = None
     counter_gate_evidence: list[dict[str, Any]] = field(default_factory=list)
     counter_domain: str | None = None
+    state_frames: list[dict[str, Any]] = field(default_factory=list)
+    state_stream_error: str | None = None
 
 
 @runtime_checkable

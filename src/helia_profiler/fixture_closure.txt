@@ -177,6 +177,7 @@ platform/soc.py
 power/__init__.py
 power/base.py
 power/clean_window.py
+power/completion.py
 power/counter_gate.py
 power/diagnostics.py
 power/ina228_driver.py

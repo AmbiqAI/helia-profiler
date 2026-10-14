@@ -125,6 +125,11 @@ class CounterGateTrace:
     edge_resolution: int
     intervals: tuple[tuple[int, int], ...]
     clock_diagnostics: dict[str, Any]
+    edges: tuple[tuple[int, int], ...]
+    initial_level: int
+    final_level: int
+    first_counter: int
+    end_counter: int
 
     def window_evidence(self, rise: int, fall: int) -> dict[str, Any]:
         if (rise, fall) not in self.windows:
@@ -175,6 +180,8 @@ def counter_gate_trace(
         raise ValueError("Missing original gate/statistics evidence")
     previous_end = previous_level = rise = rate = increment = None
     windows: list[tuple[int, int]] = []
+    transitions: list[tuple[int, int]] = []
+    initial_level = first_counter = None
     for frame in frames:
         raw = _validate_frame(frame, channel)
         first, step, frequency = frame["sample_id"], frame["decimate_factor"], frame["sample_rate"]
@@ -186,11 +193,14 @@ def counter_gate_trace(
         levels = np.unpackbits(np.frombuffer(raw, dtype=np.uint8), bitorder="little")[
             : frame["element_count"]
         ]
+        if initial_level is None:
+            initial_level, first_counter = int(levels[0]), first
         edges = np.flatnonzero(levels[1:] != levels[:-1]) + 1
         if previous_level is not None and int(levels[0]) != previous_level:
             edges = np.concatenate(([0], edges))
         for index in edges:
             counter = first + int(index) * step
+            transitions.append((counter, int(levels[index])))
             if levels[index]:
                 rise = counter
             elif rise is not None:
@@ -198,8 +208,16 @@ def counter_gate_trace(
                 rise = None
         previous_level = int(levels[-1])
         previous_end = first + len(levels) * step
-    if rate is None or increment is None:
+    if (
+        rate is None
+        or increment is None
+        or initial_level is None
+        or first_counter is None
+        or previous_end is None
+        or previous_level is None
+    ):
         raise ValueError("Missing GPI counter contract")
+    stream_end, final_level = previous_end, previous_level
     intervals = []
     previous_end = previous_utc = previous_map = None
     jumps, map_changes = [], 0
@@ -239,4 +257,9 @@ def counter_gate_trace(
             "duration_authority": "sample_counter/sample_rate",
             "clock_calibration": "not_assessed",
         },
+        tuple(transitions),
+        int(initial_level),
+        int(final_level),
+        int(first_counter),
+        int(stream_end),
     )

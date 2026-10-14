@@ -29,6 +29,32 @@ def request():
     return FixtureRailPowerRequest("25QG", "MCU", 1.8, 29, 36, 14)
 
 
+def state_frames(edges=((250, 1), (500, 0), (5001500, 1))):
+    import numpy as np
+
+    from helia_profiler.power.counter_gate import PackedGateRecorder
+
+    levels = np.zeros(20008, dtype=np.uint8)
+    for counter, level in edges:
+        levels[counter // 250 :] = level
+    recorder = PackedGateRecorder(1, 10000, sample_mode="first")
+    recorder.append(
+        {
+            "data": np.packbits(levels, bitorder="little"),
+            "element_count": len(levels),
+            "sample_id": 0,
+            "sample_rate": 1000000,
+            "decimate_factor": 250,
+            "field_id": 5,
+            "index": 1,
+            "utc": 0,
+            "time_map": {"offset_counter": 0, "offset_time": 0, "counter_rate": 1000000},
+        }
+    )
+    assert recorder.error is None
+    return recorder.frames
+
+
 def measured():
     import numpy as np
 
@@ -94,6 +120,7 @@ def measured():
         gate_frames=recorder.frames,
         counter_domain="joulescope_sensor_sample_id",
         counter_gate_evidence=[trace.window_evidence(1000, 5001000)],
+        state_frames=state_frames(),
     )
 
 
@@ -258,6 +285,10 @@ def test_integrated_energy_is_measured_and_bound_to_count(tmp_path, fault):
         assert result.energy_per_iteration_j == 0.00005
         assert result.iterations == 400 and result.subtraction == "none"
         assert result.raw == raw
+        assert result.completion is not None
+        assert result.completion.protocol_version == 2
+        assert result.completion.done_sample == 5001500
+        assert result.completion.raw == raw
 
 
 def test_fixture_gpio_linkage_uses_the_same_render_context_without_power_operations():

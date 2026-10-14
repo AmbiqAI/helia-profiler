@@ -120,6 +120,8 @@ def _payload(build: FixtureBuild, *, file, path) -> dict:
     result = asdict(build)
     if result["power_sync"] is None:
         del result["power_sync"]
+    elif build.power_sync is not None and build.power_sync.protocol_version == 1:
+        del result["power_sync"]["protocol_version"]
     _object(result, _FIELDS | ({"power_sync"} if build.power_sync is not None else set()))
     result["app_dir"] = path(build.app_dir)
     for name in _FILE_FIELDS:
@@ -354,7 +356,9 @@ def dump_fixture_build(build: FixtureBuild, *, roots: Mapping[str, Path]) -> str
         _json(
             {
                 "schema_version": 1,
-                "fixture_api": FIXTURE_API_VERSION,
+                "fixture_api": (5, 1)
+                if build.power_sync is not None and build.power_sync.protocol_version == 1
+                else FIXTURE_API_VERSION,
                 "build": _payload(build, file=mapping.file, path=mapping.encode),
             }
         )
@@ -430,7 +434,8 @@ def load_fixture_build(record: str | bytes, *, roots: Mapping[str, Path]) -> Fix
     if (
         type(outer["schema_version"]) is not int
         or outer["schema_version"] != 1
-        or _json(outer["fixture_api"]) not in (_json((5, 0)), _json(FIXTURE_API_VERSION))
+        or _json(outer["fixture_api"])
+        not in (_json((5, 0)), _json((5, 1)), _json(FIXTURE_API_VERSION))
     ):
         raise ValueError("Unsupported fixture build record/API version")
     power_fields = (
@@ -490,8 +495,11 @@ def load_fixture_build(record: str | bytes, *, roots: Mapping[str, Path]) -> Fix
                 psram["clock_hz"],
             )
         if "power_sync" in value:
+            legacy = _json(outer["fixture_api"]) == _json((5, 1))
+            fields = ("sync_gpio_pin", "state_gpio_pin", "go_gpio_pin")
             value["power_sync"] = FixturePowerSync(
-                **_object(value["power_sync"], ("sync_gpio_pin", "state_gpio_pin", "go_gpio_pin"))
+                **_object(value["power_sync"], fields if legacy else (*fields, "protocol_version")),
+                **({"protocol_version": 1} if legacy else {}),
             )
         result = FixtureBuild(**value)
         verify_fixture_build(result)

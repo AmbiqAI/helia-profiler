@@ -1,7 +1,7 @@
 {
   "api_version": [
     5,
-    1
+    2
   ],
   "surface": {
     "ElfSection": {
@@ -177,6 +177,59 @@
         "CMSIS_NN": "cmsis_nn",
         "HELIA": "helia"
       }
+    },
+    "FixtureBatchCompletion": {
+      "fields": [
+        [
+          "protocol_version",
+          "int",
+          "<required>"
+        ],
+        [
+          "counter_domain",
+          "str",
+          "<required>"
+        ],
+        [
+          "sample_rate",
+          "int",
+          "<required>"
+        ],
+        [
+          "ready_sample",
+          "int",
+          "<required>"
+        ],
+        [
+          "go_ack_sample",
+          "int",
+          "<required>"
+        ],
+        [
+          "gate_rise_sample",
+          "int",
+          "<required>"
+        ],
+        [
+          "gate_fall_sample",
+          "int",
+          "<required>"
+        ],
+        [
+          "done_sample",
+          "int",
+          "<required>"
+        ],
+        [
+          "raw",
+          "FixtureFile",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
     },
     "FixtureBuild": {
       "fields": [
@@ -1084,6 +1137,11 @@
           "go_gpio_pin",
           "int",
           "<required>"
+        ],
+        [
+          "protocol_version",
+          "int",
+          "2"
         ]
       ],
       "frozen": true,
@@ -1223,6 +1281,11 @@
           "raw",
           "FixtureFile",
           "<required>"
+        ],
+        [
+          "completion",
+          "FixtureBatchCompletion | None",
+          "None"
         ]
       ],
       "frozen": true,
@@ -1306,6 +1369,7 @@
         "INVOKE": -7,
         "IO_CONTRACT": -6,
         "MODEL_SCHEMA": -4,
+        "POWER_SYNC": -11,
         "PSRAM": -10,
         "RESOLVER": -3,
         "SRAM_CONFIG": -2,
