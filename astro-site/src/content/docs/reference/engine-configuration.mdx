@@ -47,11 +47,36 @@ compile heliaRT with the selected toolchain instead.
 | `cmsis_nn_path`, `cmsis_nn_ref` | baseline ref | A local checkout or exact git ref of ns-cmsis-nn for the source build; mutually exclusive; either stamps `development-overrides` in the result provenance. |
 | `cmsis_nn_requantize_inline_asm` | `true` | Use the inline-assembly requantisation path. |
 
-Source builds declare `nsx-cmsis-nn` at the baseline's qualified ref, enable
-its fp32 kernels always (heliaRT refuses to configure without them)
-and its fp16 kernels only when the model carries FLOAT16 tensors on a
-Cortex-M55. Size `model.arena_size` from the measured `allocated_arena`,
-not from a guess.
+#### Float kernels and precompiled runtimes
+
+Registry and local-source builds declare `nsx-cmsis-nn` and derive its float
+switches from the model. HPX enables `ARM_NN_ENABLE_F32` when the model computes
+in float, or when its tensor types cannot be read. It additionally enables
+`ARM_NN_ENABLE_F16` for FLOAT16 compute on an MVE-capable core. FLOAT16 weights
+with FLOAT32 compute do not by themselves enable FP16 kernels. Integer-only
+models request neither float switch.
+
+These switches select source-build capabilities, not proof that a particular
+operator used an optimized kernel. The runtime's operator dispatch and the
+linked firmware decide that. Inspect the build's link map and disassembly when
+you need evidence of the selected implementation.
+
+Explicit prebuilt distributions and custom release assets already contain their
+kernels. HPX does not rebuild them or forward model-derived float switches;
+float support is determined by the selected archive. `cmsis_nn_path`,
+`cmsis_nn_ref` and `CMSIS_NN_PATH` are rejected on these routes because they
+cannot replace kernels inside that archive. Use the registry or local-source
+route to change the kernel sources.
+
+Prepared runtime records also describe an already-built archive. Prepared
+heliaRT rejects explicit `variant`, `core_override` and
+`cmsis_nn_requantize_inline_asm`, including explicit default or false values,
+as well as the ineffective CMSIS-NN selectors. Choose a suitable prepared
+runtime or build from source instead. Both prepared and ordinary heliaRT/TFLM
+reject `engine.config_path`; these engines do not read that file. Supported
+settings belong inline in `engine.config`.
+
+Size `model.arena_size` from the measured `allocated_arena`.
 
 ### heliaAOT
 
