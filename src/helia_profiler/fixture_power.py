@@ -157,7 +157,7 @@ def observe_fixture_power(
             with phase_lock:
                 phase = "arming"
                 check()
-        if not wait_gpi(power.state_input_index, True, min(15.0, request.settle_seconds)):
+        if not wait_gpi(power.state_input_index, True, request.settle_seconds):
             if failures:
                 raise failures[0]
             raise ValueError("Power firmware did not signal READY")

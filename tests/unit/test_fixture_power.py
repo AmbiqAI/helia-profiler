@@ -149,6 +149,78 @@ def test_invalid_instrument_and_wiring_refuse_without_operations(changes):
         replace(request(), **changes)
 
 
+@pytest.mark.parametrize(
+    ("budget", "ready_at", "succeeds"),
+    [(30, 20, True), (60, 59, True), (10, 20, False), (30, 31, False)],
+)
+def test_ready_honors_requested_budget_without_changing_measurement_bound(
+    monkeypatch, budget, ready_at, succeeds
+):
+    events = []
+    observation = measured()
+
+    class Guard:
+        def verify_power_device(self, **kwargs):
+            pass
+
+        def check(self, **kwargs):
+            events.append("guard")
+
+    class Sync:
+        def arm(self):
+            events.append("arm")
+
+        def signal_go(self):
+            events.append("go")
+
+        def release_go(self):
+            events.append("drop")
+
+        def release(self):
+            events.append("release")
+
+    class Driver:
+        def __init__(self, **kwargs):
+            pass
+
+        def make_sync_controller(self, wiring):
+            return Sync()
+
+        def capture_gated(self, **kwargs):
+            assert kwargs["duration_s"] == budget
+
+            def wait_gpi(index, state, timeout):
+                assert (index, state) == (1, True)
+                events.append(("ready_budget", timeout))
+                kwargs["phase_getter"]()
+                return ready_at <= timeout
+
+            kwargs["on_started"](wait_gpi)
+            kwargs["on_gate_rise"]()
+            return observation
+
+    monkeypatch.setattr(power, "JoulescopeDriver", Driver)
+    value = SimpleNamespace(
+        rail_power=request(), power_sync=request().firmware_wiring(), settle_seconds=budget
+    )
+    if succeeds:
+        assert (
+            power.observe_fixture_power(
+                cast("FixtureCaptureRequest", value), Guard(), lambda: events.append("reset")
+            )
+            is observation
+        )
+        assert events.index("reset") < events.index("go") < events.index("drop")
+    else:
+        with pytest.raises(ValueError, match="did not signal READY"):
+            power.observe_fixture_power(
+                cast("FixtureCaptureRequest", value), Guard(), lambda: events.append("reset")
+            )
+        assert "go" not in events
+    assert ("ready_budget", budget) in events
+    assert events[-1] == "release"
+
+
 @pytest.mark.parametrize("failure", [None, "ownership", "expired", "ready", "drop"])
 def test_existing_driver_has_guarded_lifecycle_and_always_releases(monkeypatch, failure):
     events = []

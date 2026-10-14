@@ -46,3 +46,10 @@ The runtime catalog also admits non-default AOT 0.29.0 from its exact release co
 Trace acceptance reconstructs the original packed UINT1 GPIO frames, including the valid sample count, little-endian bit order, channel, decimation mode/increment and clock metadata. A bounded recorder preserves those bytes; malformed, dropped or overflowed evidence cannot produce accepted energy. The JS220/JS320 adapter establishes the shared native sensor counter from the instrument stream contract, and checks the current level-preserving mode before enabling streams. It does not infer valid padding or a clock origin from frame arrival times.
 
 Statistics must be counter-contiguous at the same native rate and cover both decoded gate-edge brackets. Whole packet integrals are selected by a half-open midpoint rule; no partial integral is invented. The raw evidence records chosen counters, packet indices/count, integrated duration, gate duration and a conservative boundary-duration uncertainty (intersected edge-packet spans plus two gate sample periods). Fitted UTC-map changes and boundary discontinuities remain separate diagnostics rather than rescaling sample duration or hiding missing samples. Host-arrival-only axes remain unavailable for fixture energy acceptance. These checks do not establish calibration, task numerical correctness, or equivalence between a whole reset/boot capture's current and the measured inference gate.
+
+The existing capture request `settle_seconds` bounds startup READY and measured
+completion separately. READY follows initialization and all requested warmups;
+the host does not shorten its caller-selected bound to a fixed startup ceiling.
+The capture validator still caps each bound at 60 seconds, and ongoing ownership,
+cancellation and measured-window integrity checks remain required. A READY timeout
+does not by itself distinguish initialization failure from slow startup.

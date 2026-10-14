@@ -71,7 +71,11 @@ _FAILED_STAGES = {int(stage): stage.description for stage in FixtureStage}
 
 @dataclass(frozen=True)
 class FixtureCaptureRequest:
-    """One bounded capture; ``settle_seconds`` is the maximum wait for completion."""
+    """One bounded capture.
+
+    ``settle_seconds`` bounds each wait for startup READY and measured completion.
+    READY follows firmware initialization and warmups; it precedes the measured gate.
+    """
 
     elf: FixtureFile
     image: FixtureFile
