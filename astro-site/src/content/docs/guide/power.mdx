@@ -144,3 +144,60 @@ steps have captured evidence; they do not provide a validated power benchmark.
 
 Start with [Joulescope setup and wiring](../power-joulescope/) if you have
 the instrument, or [INA228 on the target](../power-ina228/) if you do not.
+
+
+## Fixed-input captures
+
+The public `helia_profiler.fixture` API builds fixed-input firmware without opening
+an instrument. Timing-only captures read the complete output and timing terminal.
+For measured rail energy, build a method with `FixturePowerSync` protocol 2, then
+add a `FixtureRailPowerRequest` to the verified capture request. The firmware
+signals READY after initialization and warmups, acknowledges GO, gates the entire
+restore-and-invoke batch, and signals DONE after publishing its terminal.
+
+The host retains the statistics and both packed GPIO streams. One shared native
+sample-counter transaction identifies the selected gate, its integral and typed
+completion. Missing transitions, stream gaps, multiple eligible transactions or
+incomplete batch evidence cannot yield accepted energy. The caller-selected
+`settle_seconds` bounds startup and completion separately, each at most 60 seconds.
+Independent firmware and sensor clocks remain separate observations; a sample
+boundary uncertainty is not instrument calibration.
+
+### Timing with an instrument in the supply path
+
+API 5.3 lets a timing-only caller explicitly select the supply that must power the
+board. This enables the existing driver power path before attachment or flashing;
+it does not enable energy measurement:
+
+```python
+from dataclasses import replace
+from helia_profiler.fixture import FixtureBoardPowerRequest, capture_fixture, fixture_capture_request
+
+request = fixture_capture_request(
+    build,
+    jlink_serial=station.probe_serial,
+    evidence_dir=output_dir,
+    settle_seconds=60,
+)
+request = replace(
+    request,
+    board_power=FixtureBoardPowerRequest(
+        driver=station.power_driver,
+        serial=station.instrument_serial,
+        rail=station.supplied_rail,
+    ),
+)
+result = capture_fixture(request, guard=station.guard)
+```
+
+Here `build` is the verified compiled fixture and `station` supplies the current
+board and supply identities. The guard must authorize that instrument/rail through
+`verify_power_device` and keep checking exclusive ownership. Supply failure stops
+before target access. Omit `board_power` for an independently powered timing
+station: no power driver is resolved or opened. A rail-energy request uses its
+selected measurement instrument for supply setup; an explicit supply must match.
+
+Results expose gross measured joules, joules per completed iteration, scope,
+instrument identity and retained evidence. Repeats, comparison thresholds and
+calibration acceptance belong to the calling experiment. The typed request and
+result classes are exported by `helia_profiler.fixture`.

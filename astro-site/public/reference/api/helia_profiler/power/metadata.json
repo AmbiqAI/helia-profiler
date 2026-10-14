@@ -955,6 +955,25 @@
               "summary": ""
             },
             {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.PowerMetadata.negative_current_diagnostic",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "negative_current_diagnostic",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "negative_current_diagnostic: bool | None = None",
+              "source": {
+                "line": 147,
+                "path": "src/helia_profiler/power/metadata.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L147"
+              },
+              "summary": ""
+            },
+            {
               "description": "Flat dict view, byte-compatible with the pre-#154 metadata bag.\n\nEmits every non-``None`` field under its historical key; typed\ndiagnostics flatten through their own ``to_metadata()``. ``False``\nis a recorded value and is emitted; ``None`` means \"never set\" and\nis omitted.",
               "examples": [],
               "id": "helia_profiler.PowerMetadata.to_metadata_dict",
@@ -967,9 +986,9 @@
               "returns": [],
               "signature": "to_metadata_dict() -> dict[str, Any]",
               "source": {
-                "line": 162,
+                "line": 164,
                 "path": "src/helia_profiler/power/metadata.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L162"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L164"
               },
               "summary": "Flat dict view, byte-compatible with the pre-#154 metadata bag."
             },
@@ -986,9 +1005,9 @@
               "returns": [],
               "signature": "set_observation(\n    *,\n    observation_mode: ObservationMode,\n    integrity: PowerIntegrity | str,\n    gate_rise_observed: bool,\n    gate_fall_observed: bool,\n    observation_deadline_s: float,\n) -> None",
               "source": {
-                "line": 181,
+                "line": 183,
                 "path": "src/helia_profiler/power/metadata.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L181"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/power/metadata.py#L183"
               },
               "summary": "Enrich metadata with the observation classification at publication."
             }
@@ -997,7 +1016,7 @@
           "params": [],
           "raises": [],
           "returns": [],
-          "signature": "PowerMetadata(\n    driver: str | None = None,\n    device: str | None = None,\n    io_voltage: float | None = None,\n    gating_method: str | None = None,\n    sync_input_index: int | None = None,\n    stats_rate_hz: int | None = None,\n    stats_scnt: int | None = None,\n    window_count: int | None = None,\n    gpi_poll_count: int | None = None,\n    stat_packets: int | None = None,\n    early_stopped: bool | None = None,\n    capture_window_s: float | None = None,\n    capture_safety_bound_s: float | None = None,\n    short_gate_pulses_ignored: int | None = None,\n    clean_infer_count: int | None = None,\n    inference_count: int | None = None,\n    source: str | None = None,\n    measurement_scope: MeasurementScope | str | None = None,\n    observation_mode: ObservationMode | None = None,\n    integrity: PowerIntegrity | None = None,\n    gate_rise_observed: bool | None = None,\n    gate_fall_observed: bool | None = None,\n    observation_deadline_s: float | None = None,\n    power_firmware: str | None = None,\n    power_plan: dict[str, Any] | None = None,\n    sync: SyncHandshakeMetadata | None = None,\n    sync_timing_s: GateTransitionTiming | None = None,\n    gate_failure: GateFailure | None = None,\n    gate_duration_integrity: GateDurationIntegrity | None = None,\n    window_clock_ceiling: WindowClockCeiling | None = None,\n    target_lifecycle: 'TargetLifecyclePlan | None' = None,\n    short_gate_pulse_diagnostics: dict[str, Any] | None = None,\n    whole_capture_summary: dict[str, Any] | None = None,\n    fullrate_xcheck: dict[str, Any] | None = None,\n    gating_diagnostics: dict[str, Any] | None = None,\n    gated_vs_whole_current_ok: bool | None = None,\n) -> None",
+          "signature": "PowerMetadata(\n    driver: str | None = None,\n    device: str | None = None,\n    io_voltage: float | None = None,\n    gating_method: str | None = None,\n    sync_input_index: int | None = None,\n    stats_rate_hz: int | None = None,\n    stats_scnt: int | None = None,\n    window_count: int | None = None,\n    gpi_poll_count: int | None = None,\n    stat_packets: int | None = None,\n    early_stopped: bool | None = None,\n    capture_window_s: float | None = None,\n    capture_safety_bound_s: float | None = None,\n    short_gate_pulses_ignored: int | None = None,\n    clean_infer_count: int | None = None,\n    inference_count: int | None = None,\n    source: str | None = None,\n    measurement_scope: MeasurementScope | str | None = None,\n    observation_mode: ObservationMode | None = None,\n    integrity: PowerIntegrity | None = None,\n    gate_rise_observed: bool | None = None,\n    gate_fall_observed: bool | None = None,\n    observation_deadline_s: float | None = None,\n    power_firmware: str | None = None,\n    power_plan: dict[str, Any] | None = None,\n    sync: SyncHandshakeMetadata | None = None,\n    sync_timing_s: GateTransitionTiming | None = None,\n    gate_failure: GateFailure | None = None,\n    gate_duration_integrity: GateDurationIntegrity | None = None,\n    window_clock_ceiling: WindowClockCeiling | None = None,\n    target_lifecycle: 'TargetLifecyclePlan | None' = None,\n    short_gate_pulse_diagnostics: dict[str, Any] | None = None,\n    whole_capture_summary: dict[str, Any] | None = None,\n    fullrate_xcheck: dict[str, Any] | None = None,\n    gating_diagnostics: dict[str, Any] | None = None,\n    gated_vs_whole_current_ok: bool | None = None,\n    negative_current_diagnostic: bool | None = None,\n) -> None",
           "source": {
             "line": 81,
             "path": "src/helia_profiler/power/metadata.py",

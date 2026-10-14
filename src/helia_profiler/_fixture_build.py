@@ -25,7 +25,8 @@ from .fixture_analysis import (
     analyze_fixture_model,
     analyze_typed_fixture_model_for_engine,
 )
-from .fixture_image import MAX_IMAGE, MRAM, bounded
+from .fixture_image import MAX_IMAGE, MRAM, bounded, fixture_sink_sizes, inspect_elf
+from .fixture_power import FixturePowerSync
 from .fixture_psram import FixturePsramWeights
 from .fixture_runtime import (
     PREPARED_RUNTIME_MODULES,
@@ -92,12 +93,18 @@ class FixtureMethod:
 
     timing_scope: FixtureTimingScope
     state_policy: FixtureStatePolicy | None = None
+    power_sync: FixturePowerSync | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.timing_scope, FixtureTimingScope):
             raise ValueError("Explicit FixtureTimingScope required")
         if self.state_policy is not None and not isinstance(self.state_policy, FixtureStatePolicy):
             raise ValueError("Explicit FixtureStatePolicy required")
+        if self.power_sync is not None and (
+            not isinstance(self.power_sync, FixturePowerSync)
+            or self.timing_scope is not FixtureTimingScope.RESTORE_AND_INVOKE
+        ):
+            raise ValueError("Rail power requires explicit wiring and restore_and_invoke timing")
 
 
 @dataclass(frozen=True)
@@ -400,6 +407,7 @@ class FixtureBuild:
     clock_profile: str | None = None
     cpu_hz: int | None = None
     timer_hz: int | None = None
+    power_sync: FixturePowerSync | None = None
 
 
 @dataclass(frozen=True)
@@ -576,6 +584,8 @@ def _build(
 ) -> FixtureBuild:
     if not isinstance(method, FixtureMethod):
         raise ConfigError("Explicit FixtureMethod required")
+    if method.power_sync is not None and method.power_sync.protocol_version != 2:
+        raise ConfigError("New power firmware requires completion protocol 2")
     _validate(config, fixture)
     model: FixtureModelAnalysis | TypedFixtureModelAnalysis
     if isinstance(fixture, TypedFixture):
@@ -637,6 +647,8 @@ def _build(
             json.dumps(serialize_config(config), sort_keys=True).encode()
         ).hexdigest(),
     }
+    if method.power_sync is not None:
+        identity["power_sync"] = asdict(method.power_sync)
     if method.state_policy is not None:
         identity["state_policy"] = method.state_policy.value
     if observe_aot_arenas:
@@ -804,10 +816,25 @@ def _build(
         clock_profile=FIXTURE_CLOCK_PROFILE,
         cpu_hz=fixture_cpu_hz(),
         timer_hz=STIMER_HZ,
+        power_sync=method.power_sync,
     )
     if binary is not None:
         from ._fixture_record import compiled_fixture_identity
 
+        if result.power_sync is not None:
+            assert flat_binary is not None
+            inspect_elf(
+                binary.read(),
+                flat_binary.read(),
+                result.target.load_address,
+                fixture_sink_sizes(
+                    tuple(tensor.size_bytes for tensor in result.output_tensors),
+                    power=True,
+                    memory=result.engine is not EngineType.HELIA_AOT,
+                    arena_count=len(result.aot_arena_scan),
+                    psram_size=result.psram_weights.sink_size if result.psram_weights else 0,
+                ),
+            )
         result = replace(result, build_identity=compiled_fixture_identity(result))
     return result
 

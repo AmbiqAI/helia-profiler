@@ -52,6 +52,16 @@ PowerResult(
     samples: list[PowerSample] = list(),
     gated_windows: list[GatedPowerWindow] = list(),
     metadata: PowerMetadata = PowerMetadata(),
+    statistics: list[dict[str, Any]] = list(),
+    gate_samples: list[tuple[int, int]] = list(),
+    statistics_timebase_hz: int | None = None,
+    statistics_device_time: bool = False,
+    gate_frames: list[dict[str, Any]] = list(),
+    gate_stream_error: str | None = None,
+    counter_gate_evidence: list[dict[str, Any]] = list(),
+    counter_domain: str | None = None,
+    state_frames: list[dict[str, Any]] = list(),
+    state_stream_error: str | None = None,
 ) -> None
 ```
 
@@ -66,7 +76,7 @@ stages enrich it after capture, like ``RunMetadata``.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/power/base.py:73`
+Source: `src/helia_profiler/power/base.py:75`
 
 ### helia_profiler.PowerResult.summary
 
@@ -76,7 +86,7 @@ Source: `src/helia_profiler/power/base.py:73`
 summary: PowerSummary
 ```
 
-Source: `src/helia_profiler/power/base.py:83`
+Source: `src/helia_profiler/power/base.py:85`
 
 ### helia_profiler.PowerResult.samples
 
@@ -86,7 +96,7 @@ Source: `src/helia_profiler/power/base.py:83`
 samples: list[PowerSample] = field(default_factory=list)
 ```
 
-Source: `src/helia_profiler/power/base.py:84`
+Source: `src/helia_profiler/power/base.py:86`
 
 ### helia_profiler.PowerResult.gated_windows
 
@@ -96,7 +106,7 @@ Source: `src/helia_profiler/power/base.py:84`
 gated_windows: list[GatedPowerWindow] = field(default_factory=list)
 ```
 
-Source: `src/helia_profiler/power/base.py:85`
+Source: `src/helia_profiler/power/base.py:87`
 
 ### helia_profiler.PowerResult.metadata
 
@@ -106,7 +116,107 @@ Source: `src/helia_profiler/power/base.py:85`
 metadata: PowerMetadata = field(default_factory=PowerMetadata)
 ```
 
-Source: `src/helia_profiler/power/base.py:86`
+Source: `src/helia_profiler/power/base.py:88`
+
+### helia_profiler.PowerResult.statistics
+
+`attribute` · `python`
+
+```python
+statistics: list[dict[str, Any]] = field(default_factory=list)
+```
+
+Source: `src/helia_profiler/power/base.py:91`
+
+### helia_profiler.PowerResult.gate_samples
+
+`attribute` · `python`
+
+```python
+gate_samples: list[tuple[int, int]] = field(default_factory=list)
+```
+
+Source: `src/helia_profiler/power/base.py:92`
+
+### helia_profiler.PowerResult.statistics_timebase_hz
+
+`attribute` · `python`
+
+```python
+statistics_timebase_hz: int | None = None
+```
+
+Source: `src/helia_profiler/power/base.py:93`
+
+### helia_profiler.PowerResult.statistics_device_time
+
+`attribute` · `python`
+
+```python
+statistics_device_time: bool = False
+```
+
+Source: `src/helia_profiler/power/base.py:94`
+
+### helia_profiler.PowerResult.gate_frames
+
+`attribute` · `python`
+
+```python
+gate_frames: list[dict[str, Any]] = field(default_factory=list)
+```
+
+Source: `src/helia_profiler/power/base.py:95`
+
+### helia_profiler.PowerResult.gate_stream_error
+
+`attribute` · `python`
+
+```python
+gate_stream_error: str | None = None
+```
+
+Source: `src/helia_profiler/power/base.py:96`
+
+### helia_profiler.PowerResult.counter_gate_evidence
+
+`attribute` · `python`
+
+```python
+counter_gate_evidence: list[dict[str, Any]] = field(default_factory=list)
+```
+
+Source: `src/helia_profiler/power/base.py:97`
+
+### helia_profiler.PowerResult.counter_domain
+
+`attribute` · `python`
+
+```python
+counter_domain: str | None = None
+```
+
+Source: `src/helia_profiler/power/base.py:98`
+
+### helia_profiler.PowerResult.state_frames
+
+`attribute` · `python`
+
+```python
+state_frames: list[dict[str, Any]] = field(default_factory=list)
+```
+
+Source: `src/helia_profiler/power/base.py:99`
+
+### helia_profiler.PowerResult.state_stream_error
+
+`attribute` · `python`
+
+```python
+state_stream_error: str | None = None
+```
+
+Source: `src/helia_profiler/power/base.py:100`
 
 ## helia_profiler.PowerObservation
 

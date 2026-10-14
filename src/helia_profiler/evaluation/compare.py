@@ -13,6 +13,7 @@ from ..errors import ReportError
 from ..modelcost import source_index_from_op
 from ..results import ComparisonDimension, ResultManifest, load_result_manifest
 from ..results.dimensions import DIMENSION_REGISTRY
+from ..results.manifest import RESULT_PUBLICATION_INCOMPLETE
 from ..results.serde import nested_get, to_float, write_dict_csv
 from .comparability import ComparabilityAssessment, assess_comparability, read_dimensions
 from .comparison_profile import (
@@ -237,6 +238,8 @@ def load_run_artifacts(path: Path) -> RunArtifacts:
     run_dir = path.expanduser().resolve()
     if not run_dir.is_dir():
         raise ReportError(f"Compare input is not a directory: {run_dir}")
+    if (run_dir / RESULT_PUBLICATION_INCOMPLETE).exists():
+        raise ReportError(f"Result publication is incomplete: {run_dir}")
 
     declared: set[str] | None = None
     manifest: ResultManifest | None = None

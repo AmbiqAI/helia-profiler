@@ -69,7 +69,9 @@ def _write_summary(
     meta = pmu.meta
     layers = pmu.layers
 
-    total_cycles = sum(layer.cycles or 0 for layer in layers)
+    from ..results.models import total_layer_cycles
+
+    total_cycles = total_layer_cycles(layers)
     sorted_layers = sorted(layers, key=lambda l: l.cycles or 0, reverse=True)
 
     summary: dict[str, Any] = {
@@ -88,8 +90,10 @@ def _write_summary(
     summary["top_layers"] = [
         {
             "op": l.op,
-            "cycles": l.cycles or 0,
-            "pct": round((l.cycles or 0) / total_cycles * 100, 1) if total_cycles else 0,
+            "cycles": l.cycles,
+            "pct": round(l.cycles / total_cycles * 100, 1)
+            if l.cycles is not None and total_cycles
+            else None,
         }
         for l in sorted_layers[:5]
     ]
@@ -157,7 +161,7 @@ def _write_summary(
             "total_ops": None if opaque else ma.total_ops,
             "num_parameters": None if opaque else ma.num_parameters,
         }
-        if not opaque and total_cycles > 0 and ma.total_ops > 0:
+        if not opaque and total_cycles is not None and total_cycles > 0 and ma.total_ops > 0:
             analysis_dict["cycles_per_mac"] = (
                 round(total_cycles / ma.total_macs, 2) if ma.total_macs else None
             )
@@ -195,6 +199,7 @@ def _write_summary(
             "capture_window_s",
             "gating_diagnostics",
             "window_clock_ceiling",
+            "negative_current_diagnostic",
         ):
             if key in power_meta:
                 summary["power"][key] = power_meta[key]
@@ -231,11 +236,16 @@ def _write_summary(
         # derivation families below would fabricate. Same predicate
         # collect_power_terminal and evaluation.validity ask (#125).
         probe_ran_inferences = probe_runs_inferences(ctx.config.profiling.clean_window_probe)
+        diagnostic_current = bool(power_meta.get("negative_current_diagnostic"))
         arbitration = evaluation.gate_arbitration
         power_errors = (
             _power_errors(evaluation) if measurement_scope == "on_device_gated_inference" else []
         )
-        if not probe_ran_inferences:
+        if diagnostic_current:
+            summary["power"]["per_inference_metrics_omitted"] = (
+                "negative-current diagnostic capture"
+            )
+        elif not probe_ran_inferences:
             summary["power"]["per_inference_metrics_omitted"] = (
                 f"clean_window_probe={ctx.config.profiling.clean_window_probe} runs no inferences"
             )
@@ -263,6 +273,7 @@ def _write_summary(
                 summary["power"]["p99_power_w"] = round(gw.p99_power_w, 9)
             if (
                 probe_ran_inferences
+                and not diagnostic_current
                 and meta
                 and meta.clean_infer_count
                 and meta.clean_infer_count > 0
@@ -340,10 +351,17 @@ def _write_summary(
         elif measurement_scope == "on_device_gated_inference":
             count = window_inference_count(ctx)
             suppressed = arbitration is not None and arbitration.suppress_per_inference
-            if probe_ran_inferences and not suppressed and not power_errors and count:
+            if (
+                probe_ran_inferences
+                and not diagnostic_current
+                and not suppressed
+                and not power_errors
+                and count
+            ):
                 _write_per_inference(summary["power"], ps.energy_j, count)
         elif (
             probe_ran_inferences
+            and not diagnostic_current
             and measurement_scope != "free_form_capture"
             and meta
             and meta.profiled_infer_total_us is not None

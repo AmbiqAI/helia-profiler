@@ -27,7 +27,6 @@ from __future__ import annotations
 
 import logging
 
-from ..errors import PowerError
 from ..pipeline import PipelineContext
 
 log = logging.getLogger("hpx")
@@ -46,24 +45,16 @@ class EnsureBoardPoweredStage:
     def run(self, ctx: PipelineContext) -> None:
         cfg = ctx.config
         try:
-            from ..power import get_driver
+            from ..power import ensure_target_powered
         except ImportError as exc:  # pragma: no cover
             log.debug("power module unavailable: %s — skipping.", exc)
             ctx.passthrough_skipped = True
             return
 
-        driver_name = cfg.power.driver or "joulescope"
-
-        try:
-            driver = get_driver(driver_name, serial=cfg.power.serial)
-        except PowerError:
-            if cfg.power.enabled:
-                raise
-            ctx.passthrough_skipped = True
-            return
-
-        # Delegate the full decision matrix to the driver itself; the
-        # pipeline stays driver-agnostic.
-        powered = driver.ensure_target_powered(required=cfg.power.enabled)
+        powered = ensure_target_powered(
+            driver_name=cfg.power.driver or "joulescope",
+            serial=cfg.power.serial,
+            required=cfg.power.enabled,
+        )
         ctx.passthrough_skipped = not powered
         ctx.target_power_ensured = powered

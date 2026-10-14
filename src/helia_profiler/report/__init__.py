@@ -33,6 +33,7 @@ from typing import TYPE_CHECKING, Any
 
 from ..errors import ReportError
 from ..evaluation import evaluate_run
+from ..results.manifest import RESULT_PUBLICATION_INCOMPLETE
 from .aot import _write_aot_manifest, _write_aot_memory_layers
 from .csv_writer import _write_csv, _write_preset_csv
 from .json_writer import _write_json
@@ -75,7 +76,10 @@ def write_report(ctx: PipelineContext) -> list[Path]:
 
     output_dir = ctx.config.output.dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
-    # Invalidate any previous publication before overwriting a reused directory.
+    # Record incompleteness before invalidating the previous manifest or touching
+    # payloads. A failed modern publication must never fall back to legacy input.
+    incomplete = output_dir / RESULT_PUBLICATION_INCOMPLETE
+    incomplete.write_text("Report publication in progress.\n", encoding="utf-8")
     (output_dir / "result_manifest.json").unlink(missing_ok=True)
     paths: list[Path] = []
 
@@ -158,5 +162,6 @@ def write_report(ctx: PipelineContext) -> list[Path]:
 
     # Publication marker: written last so an interrupted report cannot appear complete.
     paths.append(_write_result_manifest(ctx, paths, output_dir, evaluation))
+    incomplete.unlink()
 
     return paths

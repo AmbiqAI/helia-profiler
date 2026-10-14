@@ -128,6 +128,37 @@ def test_all_ignored_metrics_produce_skip():
     assert verdict.metrics[0].status is VerdictStatus.SKIP
 
 
+@pytest.mark.parametrize(
+    ("baseline", "candidate", "expected"),
+    [
+        (None, None, VerdictStatus.FAIL),
+        (None, 96, VerdictStatus.FAIL),
+        (96, None, VerdictStatus.FAIL),
+        (96, 192, VerdictStatus.FAIL),
+        ("", "", VerdictStatus.FAIL),
+        (96, 96, VerdictStatus.PASS),
+    ],
+)
+def test_required_dimensions_need_present_equal_evidence(baseline, candidate, expected):
+    result = replace(
+        _result(MetricDiff("total_cycles", 100, 100, 0, 0, "cycles")),
+        config_rows=[
+            ConfigDiffRow(
+                "CPU", baseline, candidate, "same" if baseline == candidate else "diff", "cpu_clock"
+            )
+        ],
+    )
+    profile = _profile(
+        MetricPolicy(direction=MetricDirection.EQUAL, unit="cycles"),
+        required_dimensions=("cpu_clock",),
+    )
+    verdict = evaluate_comparison_profile(result, profile)
+    assert verdict.status is expected
+    assert verdict.dimension_mismatches == (
+        () if expected is VerdictStatus.PASS else ("cpu_clock",)
+    )
+
+
 def test_profile_identity_is_stable_and_defaults_round_trip():
     data = {
         "schema": "hpx.comparison-profile",

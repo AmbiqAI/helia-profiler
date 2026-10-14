@@ -737,3 +737,39 @@ int main(int argc,char**argv) {
         for fault in faults:
             result = subprocess.run([str(executable), str(fault)], timeout=5)
             assert (result.returncode == 0) == (name == "original")
+
+
+@pytest.mark.parametrize("engine", [EngineType.HELIA_AOT, EngineType.TFLM])
+def test_power_render_gates_full_restore_loop_after_warmups(tmp_path, engine):
+    from helia_profiler.fixture import FixturePowerSync, FixtureStatePolicy
+
+    fixture = typed(tmp_path)
+    config = config_for(tmp_path, fixture, engine)
+    method = FixtureMethod(
+        FixtureTimingScope.RESTORE_AND_INVOKE,
+        FixtureStatePolicy.CARRY,
+        FixturePowerSync(29, 36, 14),
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    _BindFixtureStage(FixtureRenderSpec(fixture, method, analysis_of(fixture))).run(ctx)
+    text = _jinja_env.get_template("fixed_fixture.cc.j2").render(
+        **fixture_template_vars(ctx, []),
+        aot_prefix="m",
+        allocate_arenas=True,
+        arena_regions=[],
+    )
+    warmups = text.index("for (unsigned i = 0; i < " + str(config.profiling.warmup))
+    ready = text.index("    hpx_sync_ready();", warmups)
+    gate = text.index("    hpx_sync_window_begin();", ready)
+    end = text.index("    hpx_sync_window_end();", gate)
+    assert (
+        warmups < ready < gate < text.index("const uint32_t t0 = hpx_stimer_ticks();", gate) < end
+    )
+    for io in ("input_data", "input_data_1"):
+        assert "std::memcpy(" + io in text[gate:end]
+    assert text.index("deployment_output[i] =", end) > end
+    assert "deployment_output_1[i] =" in text[end:]
+    assert text.count("_model_init(&model_ctx)") == (1 if engine is EngineType.HELIA_AOT else 0)
+    main = text.split("int main() {", 1)[1]
+    for index, value in enumerate(("0x50575231", "2", "29", "36", "14")):
+        assert main.index(f"deployment_power[{index}] = {value}U;") < main.index("nsx_system_init")

@@ -201,6 +201,18 @@
       ],
       "disposition": "typed"
     },
+    "negative_current_diagnostic": {
+      "writers": [
+        "power.base.PowerResult.__post_init__"
+      ],
+      "readers": [
+        "power.metadata.classify_observation",
+        "power.metadata.PowerMetadata.set_observation",
+        "fixture_power.fixture_rail_energy",
+        "report.summary._write_summary"
+      ],
+      "disposition": "typed"
+    },
     "observation_deadline_s": {
       "type": "float",
       "writers": [

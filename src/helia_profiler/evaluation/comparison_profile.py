@@ -224,7 +224,10 @@ def evaluate_comparison_profile(
     mismatches = tuple(
         dimension
         for dimension in profile.required_dimensions
-        if dimension not in config_by_key or config_by_key[dimension].status != "same"
+        if dimension not in config_by_key
+        or config_by_key[dimension].baseline in (None, "")
+        or config_by_key[dimension].candidate in (None, "")
+        or config_by_key[dimension].status != "same"
     )
     if mismatches or any(item.status is VerdictStatus.FAIL for item in verdicts):
         status = VerdictStatus.FAIL

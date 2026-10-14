@@ -53,3 +53,33 @@ def test_fixture_render_matches_snapshot(kind, engine, scope):
 
 def test_snapshot_file_has_no_stale_cases():
     assert set(_SNAPSHOTS) == {_key(*case) for case in _CASES}
+
+
+@pytest.mark.parametrize("engine", ["helia-aot", "tflm"])
+def test_power_terminal_written_from_live_main_before_initialization(engine):
+    text, _ = render_fixture("power-resource", engine, "restore_and_invoke")
+    main = text.split("int main() {", 1)[1]
+    initialization = main.index("nsx_system_init")
+    for index, value in enumerate(("0x50575231", "2", "29", "36", "14")):
+        assert main.index(f"deployment_power[{index}] = {value}U;") < initialization
+
+
+@pytest.mark.parametrize("engine", ["helia-aot", "tflm"])
+def test_power_idle_before_model_and_done_after_terminal(engine):
+    text, _ = render_fixture("power-resource", engine, "restore_and_invoke")
+    main = text.split("int main() {", 1)[1]
+    assert (
+        main.index("nsx_system_init")
+        < main.index("hpx_sync_init()")
+        < main.index("infer_fixture()")
+    )
+    assert (
+        main.index("deployment_status = status")
+        < main.index("if (status == 0)", main.index("deployment_status = status"))
+        < main.index("hpx_pin_set(kStateGpioPin, true)")
+    )
+    assert "if (!hpx_sync_wait_go()) return -11;" in text
+    body = text.split("static int infer_fixture() {", 1)[1].split("int main() {", 1)[0]
+    assert "hpx_sync_init()" not in body
+    assert body.index("hpx_sync_window_begin()") < body.index("const uint32_t t0")
+    assert body.index("ticks = hpx_stimer_ticks() - t0") < body.index("hpx_sync_window_end()")

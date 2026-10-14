@@ -14,6 +14,9 @@ from .serde import sha256_file
 
 RESULT_MANIFEST_SCHEMA = "hpx.result-manifest"
 RESULT_MANIFEST_SCHEMA_VERSION = 1
+# A modern writer creates this before touching any published payload and removes
+# it only after the new manifest is complete. Absence of a manifest alone is legacy.
+RESULT_PUBLICATION_INCOMPLETE = ".result-publication-incomplete"
 
 
 class RunStatus(StrEnum):

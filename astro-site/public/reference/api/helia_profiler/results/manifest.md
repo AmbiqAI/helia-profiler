@@ -20,7 +20,7 @@ Publication status of a result bundle.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/results/manifest.py:19`
+Source: `src/helia_profiler/results/manifest.py:22`
 
 ### helia_profiler.RunStatus.COMPLETE
 
@@ -30,7 +30,7 @@ Source: `src/helia_profiler/results/manifest.py:19`
 COMPLETE = 'complete'
 ```
 
-Source: `src/helia_profiler/results/manifest.py:22`
+Source: `src/helia_profiler/results/manifest.py:25`
 
 ### helia_profiler.RunStatus.INCOMPLETE
 
@@ -40,7 +40,7 @@ Source: `src/helia_profiler/results/manifest.py:22`
 INCOMPLETE = 'incomplete'
 ```
 
-Source: `src/helia_profiler/results/manifest.py:23`
+Source: `src/helia_profiler/results/manifest.py:26`
 
 ### helia_profiler.RunStatus.FAILED
 
@@ -50,7 +50,7 @@ Source: `src/helia_profiler/results/manifest.py:23`
 FAILED = 'failed'
 ```
 
-Source: `src/helia_profiler/results/manifest.py:24`
+Source: `src/helia_profiler/results/manifest.py:27`
 
 ## helia_profiler.ResultValidity
 
@@ -64,7 +64,7 @@ Whether measurements in a completed bundle are authoritative.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/results/manifest.py:27`
+Source: `src/helia_profiler/results/manifest.py:30`
 
 ### helia_profiler.ResultValidity.VALID
 
@@ -74,7 +74,7 @@ Source: `src/helia_profiler/results/manifest.py:27`
 VALID = 'valid'
 ```
 
-Source: `src/helia_profiler/results/manifest.py:30`
+Source: `src/helia_profiler/results/manifest.py:33`
 
 ### helia_profiler.ResultValidity.DEGRADED
 
@@ -84,7 +84,7 @@ Source: `src/helia_profiler/results/manifest.py:30`
 DEGRADED = 'degraded'
 ```
 
-Source: `src/helia_profiler/results/manifest.py:31`
+Source: `src/helia_profiler/results/manifest.py:34`
 
 ### helia_profiler.ResultValidity.INVALID
 
@@ -94,7 +94,7 @@ Source: `src/helia_profiler/results/manifest.py:31`
 INVALID = 'invalid'
 ```
 
-Source: `src/helia_profiler/results/manifest.py:32`
+Source: `src/helia_profiler/results/manifest.py:35`
 
 ## helia_profiler.ResultIssue
 
@@ -116,7 +116,7 @@ One stable machine-readable issue with optional open context.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/results/manifest.py:35`
+Source: `src/helia_profiler/results/manifest.py:38`
 
 ### helia_profiler.ResultIssue.code
 
@@ -126,7 +126,7 @@ Source: `src/helia_profiler/results/manifest.py:35`
 code: str
 ```
 
-Source: `src/helia_profiler/results/manifest.py:39`
+Source: `src/helia_profiler/results/manifest.py:42`
 
 ### helia_profiler.ResultIssue.severity
 
@@ -136,7 +136,7 @@ Source: `src/helia_profiler/results/manifest.py:39`
 severity: str
 ```
 
-Source: `src/helia_profiler/results/manifest.py:40`
+Source: `src/helia_profiler/results/manifest.py:43`
 
 ### helia_profiler.ResultIssue.message
 
@@ -146,7 +146,7 @@ Source: `src/helia_profiler/results/manifest.py:40`
 message: str
 ```
 
-Source: `src/helia_profiler/results/manifest.py:41`
+Source: `src/helia_profiler/results/manifest.py:44`
 
 ### helia_profiler.ResultIssue.context
 
@@ -156,7 +156,7 @@ Source: `src/helia_profiler/results/manifest.py:41`
 context: dict[str, Any] = field(default_factory=dict)
 ```
 
-Source: `src/helia_profiler/results/manifest.py:42`
+Source: `src/helia_profiler/results/manifest.py:45`
 
 ### helia_profiler.ResultIssue.extra
 
@@ -166,7 +166,7 @@ Source: `src/helia_profiler/results/manifest.py:42`
 extra: dict[str, Any] = field(default_factory=dict, repr=False)
 ```
 
-Source: `src/helia_profiler/results/manifest.py:43`
+Source: `src/helia_profiler/results/manifest.py:46`
 
 ### helia_profiler.ResultIssue.from_dict
 
@@ -178,7 +178,7 @@ from_dict(data: dict[str, Any]) -> Self
 
 `classmethod`
 
-Source: `src/helia_profiler/results/manifest.py:55`
+Source: `src/helia_profiler/results/manifest.py:58`
 
 ### helia_profiler.ResultIssue.to_dict
 
@@ -188,7 +188,7 @@ Source: `src/helia_profiler/results/manifest.py:55`
 to_dict() -> dict[str, Any]
 ```
 
-Source: `src/helia_profiler/results/manifest.py:59`
+Source: `src/helia_profiler/results/manifest.py:62`
 
 ## helia_profiler.ResultArtifact
 
@@ -216,7 +216,7 @@ One content-addressed file in a result bundle.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/results/manifest.py:63`
+Source: `src/helia_profiler/results/manifest.py:66`
 
 ### helia_profiler.ResultArtifact.path
 
@@ -226,7 +226,7 @@ Source: `src/helia_profiler/results/manifest.py:63`
 path: str
 ```
 
-Source: `src/helia_profiler/results/manifest.py:67`
+Source: `src/helia_profiler/results/manifest.py:70`
 
 ### helia_profiler.ResultArtifact.media_type
 
@@ -236,7 +236,7 @@ Source: `src/helia_profiler/results/manifest.py:67`
 media_type: str
 ```
 
-Source: `src/helia_profiler/results/manifest.py:68`
+Source: `src/helia_profiler/results/manifest.py:71`
 
 ### helia_profiler.ResultArtifact.size_bytes
 
@@ -246,7 +246,7 @@ Source: `src/helia_profiler/results/manifest.py:68`
 size_bytes: int
 ```
 
-Source: `src/helia_profiler/results/manifest.py:69`
+Source: `src/helia_profiler/results/manifest.py:72`
 
 ### helia_profiler.ResultArtifact.sha256
 
@@ -256,7 +256,7 @@ Source: `src/helia_profiler/results/manifest.py:69`
 sha256: str
 ```
 
-Source: `src/helia_profiler/results/manifest.py:70`
+Source: `src/helia_profiler/results/manifest.py:73`
 
 ### helia_profiler.ResultArtifact.role
 
@@ -266,7 +266,7 @@ Source: `src/helia_profiler/results/manifest.py:70`
 role: str | None = None
 ```
 
-Source: `src/helia_profiler/results/manifest.py:71`
+Source: `src/helia_profiler/results/manifest.py:74`
 
 ### helia_profiler.ResultArtifact.name
 
@@ -276,7 +276,7 @@ Source: `src/helia_profiler/results/manifest.py:71`
 name: str | None = None
 ```
 
-Source: `src/helia_profiler/results/manifest.py:72`
+Source: `src/helia_profiler/results/manifest.py:75`
 
 ### helia_profiler.ResultArtifact.schema
 
@@ -286,7 +286,7 @@ Source: `src/helia_profiler/results/manifest.py:72`
 schema: str | None = None
 ```
 
-Source: `src/helia_profiler/results/manifest.py:73`
+Source: `src/helia_profiler/results/manifest.py:76`
 
 ### helia_profiler.ResultArtifact.schema_version
 
@@ -296,7 +296,7 @@ Source: `src/helia_profiler/results/manifest.py:73`
 schema_version: int | None = None
 ```
 
-Source: `src/helia_profiler/results/manifest.py:74`
+Source: `src/helia_profiler/results/manifest.py:77`
 
 ### helia_profiler.ResultArtifact.producer
 
@@ -306,7 +306,7 @@ Source: `src/helia_profiler/results/manifest.py:74`
 producer: str | None = None
 ```
 
-Source: `src/helia_profiler/results/manifest.py:75`
+Source: `src/helia_profiler/results/manifest.py:78`
 
 ### helia_profiler.ResultArtifact.optional
 
@@ -316,7 +316,7 @@ Source: `src/helia_profiler/results/manifest.py:75`
 optional: bool | None = None
 ```
 
-Source: `src/helia_profiler/results/manifest.py:76`
+Source: `src/helia_profiler/results/manifest.py:79`
 
 ### helia_profiler.ResultArtifact.extra
 
@@ -326,7 +326,7 @@ Source: `src/helia_profiler/results/manifest.py:76`
 extra: dict[str, Any] = field(default_factory=dict, repr=False)
 ```
 
-Source: `src/helia_profiler/results/manifest.py:77`
+Source: `src/helia_profiler/results/manifest.py:80`
 
 ### helia_profiler.ResultArtifact.from_dict
 
@@ -338,7 +338,7 @@ from_dict(data: dict[str, Any]) -> Self
 
 `classmethod`
 
-Source: `src/helia_profiler/results/manifest.py:111`
+Source: `src/helia_profiler/results/manifest.py:114`
 
 ### helia_profiler.ResultArtifact.to_dict
 
@@ -348,7 +348,7 @@ Source: `src/helia_profiler/results/manifest.py:111`
 to_dict() -> dict[str, Any]
 ```
 
-Source: `src/helia_profiler/results/manifest.py:115`
+Source: `src/helia_profiler/results/manifest.py:118`
 
 ## helia_profiler.ResultManifest
 
@@ -379,7 +379,7 @@ Stable result envelope with open provenance and extension payloads.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/results/manifest.py:119`
+Source: `src/helia_profiler/results/manifest.py:122`
 
 ### helia_profiler.ResultManifest.schema
 
@@ -389,7 +389,7 @@ Source: `src/helia_profiler/results/manifest.py:119`
 schema: str
 ```
 
-Source: `src/helia_profiler/results/manifest.py:123`
+Source: `src/helia_profiler/results/manifest.py:126`
 
 ### helia_profiler.ResultManifest.schema_version
 
@@ -399,7 +399,7 @@ Source: `src/helia_profiler/results/manifest.py:123`
 schema_version: int
 ```
 
-Source: `src/helia_profiler/results/manifest.py:124`
+Source: `src/helia_profiler/results/manifest.py:127`
 
 ### helia_profiler.ResultManifest.run_id
 
@@ -409,7 +409,7 @@ Source: `src/helia_profiler/results/manifest.py:124`
 run_id: str
 ```
 
-Source: `src/helia_profiler/results/manifest.py:125`
+Source: `src/helia_profiler/results/manifest.py:128`
 
 ### helia_profiler.ResultManifest.timestamp
 
@@ -419,7 +419,7 @@ Source: `src/helia_profiler/results/manifest.py:125`
 timestamp: str
 ```
 
-Source: `src/helia_profiler/results/manifest.py:126`
+Source: `src/helia_profiler/results/manifest.py:129`
 
 ### helia_profiler.ResultManifest.hpx_version
 
@@ -429,7 +429,7 @@ Source: `src/helia_profiler/results/manifest.py:126`
 hpx_version: str
 ```
 
-Source: `src/helia_profiler/results/manifest.py:127`
+Source: `src/helia_profiler/results/manifest.py:130`
 
 ### helia_profiler.ResultManifest.status
 
@@ -439,7 +439,7 @@ Source: `src/helia_profiler/results/manifest.py:127`
 status: RunStatus
 ```
 
-Source: `src/helia_profiler/results/manifest.py:128`
+Source: `src/helia_profiler/results/manifest.py:131`
 
 ### helia_profiler.ResultManifest.validity
 
@@ -449,7 +449,7 @@ Source: `src/helia_profiler/results/manifest.py:128`
 validity: ResultValidity
 ```
 
-Source: `src/helia_profiler/results/manifest.py:129`
+Source: `src/helia_profiler/results/manifest.py:132`
 
 ### helia_profiler.ResultManifest.issues
 
@@ -459,7 +459,7 @@ Source: `src/helia_profiler/results/manifest.py:129`
 issues: tuple[ResultIssue, ...]
 ```
 
-Source: `src/helia_profiler/results/manifest.py:130`
+Source: `src/helia_profiler/results/manifest.py:133`
 
 ### helia_profiler.ResultManifest.provenance
 
@@ -469,7 +469,7 @@ Source: `src/helia_profiler/results/manifest.py:130`
 provenance: dict[str, Any]
 ```
 
-Source: `src/helia_profiler/results/manifest.py:131`
+Source: `src/helia_profiler/results/manifest.py:134`
 
 ### helia_profiler.ResultManifest.comparability
 
@@ -479,7 +479,7 @@ Source: `src/helia_profiler/results/manifest.py:131`
 comparability: dict[str, Any]
 ```
 
-Source: `src/helia_profiler/results/manifest.py:132`
+Source: `src/helia_profiler/results/manifest.py:135`
 
 ### helia_profiler.ResultManifest.artifacts
 
@@ -489,7 +489,7 @@ Source: `src/helia_profiler/results/manifest.py:132`
 artifacts: tuple[ResultArtifact, ...]
 ```
 
-Source: `src/helia_profiler/results/manifest.py:133`
+Source: `src/helia_profiler/results/manifest.py:136`
 
 ### helia_profiler.ResultManifest.bundle_type
 
@@ -499,7 +499,7 @@ Source: `src/helia_profiler/results/manifest.py:133`
 bundle_type: str | None = None
 ```
 
-Source: `src/helia_profiler/results/manifest.py:134`
+Source: `src/helia_profiler/results/manifest.py:137`
 
 ### helia_profiler.ResultManifest.extensions
 
@@ -509,7 +509,7 @@ Source: `src/helia_profiler/results/manifest.py:134`
 extensions: dict[str, Any] = field(default_factory=dict)
 ```
 
-Source: `src/helia_profiler/results/manifest.py:135`
+Source: `src/helia_profiler/results/manifest.py:138`
 
 ### helia_profiler.ResultManifest.extra
 
@@ -519,7 +519,7 @@ Source: `src/helia_profiler/results/manifest.py:135`
 extra: dict[str, Any] = field(default_factory=dict, repr=False)
 ```
 
-Source: `src/helia_profiler/results/manifest.py:136`
+Source: `src/helia_profiler/results/manifest.py:139`
 
 ### helia_profiler.ResultManifest.from_dict
 
@@ -531,7 +531,7 @@ from_dict(data: dict[str, Any]) -> Self
 
 `classmethod`
 
-Source: `src/helia_profiler/results/manifest.py:169`
+Source: `src/helia_profiler/results/manifest.py:172`
 
 ### helia_profiler.ResultManifest.load
 
@@ -545,7 +545,7 @@ load(path: str | Path) -> Self
 
 Load a manifest while preserving unknown fields.
 
-Source: `src/helia_profiler/results/manifest.py:185`
+Source: `src/helia_profiler/results/manifest.py:188`
 
 ### helia_profiler.ResultManifest.to_dict
 
@@ -555,7 +555,7 @@ Source: `src/helia_profiler/results/manifest.py:185`
 to_dict() -> dict[str, Any]
 ```
 
-Source: `src/helia_profiler/results/manifest.py:197`
+Source: `src/helia_profiler/results/manifest.py:200`
 
 ### helia_profiler.ResultManifest.write
 
@@ -567,7 +567,7 @@ write(path: str | Path) -> Path
 
 Write the manifest without discarding unknown fields.
 
-Source: `src/helia_profiler/results/manifest.py:200`
+Source: `src/helia_profiler/results/manifest.py:203`
 
 ### helia_profiler.ResultManifest.verify
 
@@ -579,7 +579,7 @@ verify(bundle_dir: str | Path) -> None
 
 Verify all declared artifact paths, sizes, and SHA-256 digests.
 
-Source: `src/helia_profiler/results/manifest.py:212`
+Source: `src/helia_profiler/results/manifest.py:215`
 
 ## helia_profiler.load_result_manifest
 
@@ -593,4 +593,4 @@ Load a result manifest and optionally verify its sibling artifacts.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/results/manifest.py:244`
+Source: `src/helia_profiler/results/manifest.py:247`

@@ -88,15 +88,18 @@ static inline void hpx_sync_not_ready(void) {
     }
 }
 
-static inline void hpx_sync_wait_go(void) {
+static inline bool hpx_sync_wait_go(void) {
     if constexpr (kSyncLockstep) {
         // Bounded wait: power capture drives GO within ms, but non-power passes
         // (PMU/clean only) have no host on the GO line, so free-run after ~3 s.
         for (uint32_t i = 0; i < 3000U && !hpx_pin_get(kGoGpioPin); i++) {
             nsx_delay_us(1000U);
         }
+        const bool received_go = hpx_pin_get(kGoGpioPin);
         hpx_sync_not_ready();
+        return received_go;
     }
+    return true;
 }
 
 static inline void hpx_sync_window_begin(void) { hpx_pin_set(kSyncGpioPin, true); }
@@ -117,7 +120,7 @@ static inline void hpx_sync_fault(uint32_t code) {
 static inline void hpx_sync_init(void) {}
 static inline void hpx_sync_ready(void) {}
 static inline void hpx_sync_not_ready(void) {}
-static inline void hpx_sync_wait_go(void) {}
+static inline bool hpx_sync_wait_go(void) { return true; }
 static inline void hpx_sync_window_begin(void) {}
 static inline void hpx_sync_window_end(void) {}
 static inline void hpx_sync_fault(uint32_t code) { (void)code; }

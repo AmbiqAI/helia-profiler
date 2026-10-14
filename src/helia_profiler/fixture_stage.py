@@ -17,6 +17,7 @@ class FixtureStage(IntEnum):
     STIMER = -8
     TIMING_BOUND = -9
     PSRAM = -10
+    POWER_SYNC = -11
 
     @property
     def description(self) -> str:
@@ -33,4 +34,5 @@ _STAGE_DESCRIPTIONS = {
     FixtureStage.STIMER: "STIMER start",
     FixtureStage.TIMING_BOUND: "timing bound",
     FixtureStage.PSRAM: "PSRAM initialization, loading or active placement",
+    FixtureStage.POWER_SYNC: "power READY/GO handshake",
 }

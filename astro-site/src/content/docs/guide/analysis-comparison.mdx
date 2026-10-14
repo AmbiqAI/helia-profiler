@@ -53,7 +53,13 @@ hpx compare results/rt results/aot --output-dir results/rt-vs-aot
 hpx first verifies each bundle's manifest (paths, sizes, SHA-256 digests),
 then applies the comparability rules, then prints totals and the largest
 per-layer deltas. `--output-dir` also writes `compare_summary.json` and
-`layer_diff.csv`.
+`layer_diff.csv`. A failed modern publication leaves an incomplete marker and
+cannot be loaded as a legacy bundle. Genuine older bundles without that marker
+remain supported.
+
+If any layer has no valid cycle measurement, the total and cycle percentages
+are unavailable (`null` in the summary), not a partial sum or a measured zero.
+A comparison profile applies its missing-metric policy to that unavailable total.
 
 ### 3. The comparability rules
 
@@ -141,7 +147,9 @@ hpx compare results/baseline results/change --profile regression-profile.json --
 
 Profiles support `smaller`, `larger` and `equal` directions, percentage and
 absolute tolerances, required configuration dimensions, and an explicit
-policy for missing metrics; a failed regression exits non-zero. The
+policy for missing metrics; a failed regression exits non-zero. Required
+dimensions must be present on both sides as well as equal. Two missing values
+do not establish identity. The
 generated [`hpx compare` reference](../../reference/cli/compare/) has the
 full contract. The keys that most often make two runs incomparable are
 the ones this table maps: `model.path`, `engine.type`, `target.board`,
@@ -161,3 +169,9 @@ that suppressed it; with `--output-dir`, `compare_summary.json` and
 [Output files](../output/) for the fields the comparison reads;
 [Parsing outputs](../parsing-outputs/) to script your own comparisons
 against the same JSON.
+
+
+Negative-current diagnostic overrides retain raw traces and magnitude summaries,
+but mark the observation invalid. They cannot produce authoritative fixture rail
+energy or per-inference efficiency. Ordinary positive-current observations keep
+their existing validity and reporting behavior.

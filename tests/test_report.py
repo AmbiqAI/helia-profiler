@@ -1876,6 +1876,90 @@ def test_missing_counter_still_publishes(tmp_path: Path):
     with open(tmp_path / "run" / "detailed" / "profile_basic_cpu.csv", newline="") as f:
         assert "ARM_PMU_CPU_CYCLES" in next(csv.reader(f))
 
+    from helia_profiler.evaluation import (
+        ComparisonProfile,
+        MetricDirection,
+        MetricPolicy,
+        VerdictStatus,
+        compare_runs,
+    )
+    from helia_profiler.results import ProfileResult
+    from helia_profiler.results.run_summary import RunSummary
+
+    summary = json.loads((tmp_path / "run" / "summary.json").read_text())
+    assert summary["total_cycles"] is None
+    assert ProfileResult(pmu).total_cycles is None
+    assert RunSummary.from_dict(summary).total_cycles is None
+    assert RunSummary.from_dict(summary).to_dict()["total_cycles"] is None
+    assert {row["op"]: row["cycles"] for row in summary["top_layers"]} == {
+        "CONV_2D": None,
+        "SOFTMAX": 500,
+    }
+    assert all(row["pct"] is None for row in summary["top_layers"])
+    profile = ComparisonProfile(
+        schema="hpx.comparison-profile",
+        schema_version=1,
+        metrics={"total_cycles": MetricPolicy(direction=MetricDirection.SMALLER, unit="cycles")},
+    )
+    comparison = compare_runs(tmp_path / "run", tmp_path / "run", profile=profile)
+    assert comparison.verdict is not None
+    assert comparison.verdict.status is VerdictStatus.FAIL
+
+
+@pytest.mark.parametrize("new_format", ["csv", "json"])
+@pytest.mark.parametrize("failure_stage", ["summary", "lock"])
+def test_failed_republication_cannot_be_loaded_as_legacy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, new_format, failure_stage
+):
+    from helia_profiler.evaluation.compare import load_run_artifacts
+
+    ctx = _gated_power_ctx(tmp_path, clean_infer_count=100, clean_infer_avg_us=10000, duration_s=1)
+    run = _publish_bundle(ctx, tmp_path / "published")
+    assert load_run_artifacts(run).manifest is not None
+    object.__setattr__(ctx.config.output, "format", new_format)
+    set_profile_result(
+        ctx, PmuResult(meta=FirmwareMeta(), layers=[LayerResult(0, "NEW", cycles=25)])
+    )
+    if failure_stage == "summary":
+
+        def fail(*args, **kwargs):
+            raise ReportError("forced summary failure")
+
+        monkeypatch.setattr("helia_profiler.report._write_summary", fail)
+    else:
+        ctx.dependency_lock_path = None
+    with pytest.raises(ReportError):
+        write_report(ctx)
+    with pytest.raises(ReportError, match="incomplete"):
+        load_run_artifacts(run)
+
+    # A subsequent complete publication clears the incomplete state and selects
+    # only its declared format, even when the old CSV still exists.
+    monkeypatch.undo()
+    _attach_dependency_lock(ctx, tmp_path)
+    write_report(ctx)
+    recovered = load_run_artifacts(run)
+    assert recovered.layers[0]["op"] == "NEW"
+
+
+def test_negative_current_diagnostic_is_invalid_and_has_no_efficiency(tmp_path: Path):
+    from dataclasses import replace
+
+    ctx = _gated_power_ctx(tmp_path, clean_infer_count=100, clean_infer_avg_us=10000, duration_s=1)
+    assert ctx.power_result is not None
+    observation = ctx.power_result
+    # The integrator retains positive magnitudes for diagnosis, but carries the
+    # signed-current failure independently of those magnitudes.
+    observation.metadata.negative_current_diagnostic = True
+    set_power_result(ctx, replace(observation))
+    summary = json.loads(_write_summary(ctx, tmp_path).read_text())
+    assert summary["validity"] == "invalid"
+    assert summary["power"]["integrity"] == "invalid"
+    assert summary["power"]["negative_current_diagnostic"] is True
+    assert "energy_per_inference_j" not in summary["power"]
+    assert "inferences_per_joule" not in summary["power"]
+    assert summary["power"]["energy_j"] == 0.0016
+
 
 def test_per_inference_figures_come_from_one_writer():
     from helia_profiler.report.summary import _write_per_inference

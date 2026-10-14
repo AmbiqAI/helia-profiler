@@ -39,6 +39,7 @@ static inline void NVIC_DisableIRQ(IRQn_Type irq) { (void)irq; }
 // --- Core intrinsics -----------------------------------------------------
 static inline void __NOP(void) {}
 static inline void __WFI(void) {}
+static inline void __DMB(void) {}
 static inline void __DSB(void) {}
 static inline void __ISB(void) {}
 

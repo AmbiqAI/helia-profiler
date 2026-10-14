@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from ..results.models import total_layer_cycles
 from .contracts import PROFILE_RESULTS_SCHEMA, PROFILE_RESULTS_SCHEMA_VERSION
 from .csv_writer import _layer_to_flat_dict
 from .metadata import _firmware_meta_to_dict, _metadata_to_dict
-from .power import _power_run_records
+from .power import _power_detail_fields, _power_run_records
 
 if TYPE_CHECKING:
     from ..power.base import PowerResult
@@ -29,10 +29,8 @@ def _write_json(
     power_run: PowerRun | None = None,
 ) -> Path:
     out_path = output_dir / "profile_results.json"
-    total_cycles = sum(layer.cycles or 0 for layer in pmu.layers)
-    preset_totals = {
-        name: sum(layer.cycles or 0 for layer in pr.layers) for name, pr in pmu.presets.items()
-    }
+    total_cycles = total_layer_cycles(pmu.layers)
+    preset_totals = {name: total_layer_cycles(pr.layers) for name, pr in pmu.presets.items()}
 
     data: dict[str, Any] = {
         "schema": PROFILE_RESULTS_SCHEMA,
@@ -53,7 +51,7 @@ def _write_json(
     }
 
     if power is not None:
-        power_data: dict[str, Any] = asdict(power.summary)
+        power_data = _power_detail_fields(power.summary)
         data["power"] = power_data
         flat_meta = power.metadata.to_metadata_dict()
         observation = {

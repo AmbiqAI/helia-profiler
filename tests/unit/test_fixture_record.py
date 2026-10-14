@@ -10,6 +10,7 @@ import pytest
 from helia_profiler._fixture_build import FIXTURE_CAPABILITIES
 from helia_profiler._fixture_record import compiled_fixture_identity
 from helia_profiler.fixture import (
+    FIXTURE_API_VERSION,
     EngineType,
     FixtureBuild,
     FixtureFile,
@@ -83,6 +84,27 @@ def _build(root):
         timer_hz=32768,
     )
     return replace(build, build_identity=compiled_fixture_identity(build))
+
+
+@pytest.mark.parametrize("version", [1, 2])
+def test_power_protocol_record_preserves_generation(tmp_path, version):
+    from helia_profiler.fixture import FixturePowerSync
+
+    build = replace(
+        _build(tmp_path),
+        timing_scope=FixtureTimingScope.RESTORE_AND_INVOKE,
+        power_sync=FixturePowerSync(29, 36, 14, protocol_version=version),
+    )
+    build = replace(build, build_identity=compiled_fixture_identity(build))
+    record = dump_fixture_build(build, roots={"run": tmp_path})
+    encoded = json.loads(record)
+    assert encoded["fixture_api"] == ([5, 1] if version == 1 else list(FIXTURE_API_VERSION))
+    assert ("protocol_version" in encoded["build"]["power_sync"]) == (version == 2)
+    assert load_fixture_build(record, roots={"run": tmp_path}) == build
+    altered = json.loads(record)
+    altered["build"]["power_sync"]["protocol_version"] = 1 if version == 2 else 2
+    with pytest.raises(ValueError):
+        load_fixture_build(json.dumps(altered), roots={"run": tmp_path})
 
 
 @pytest.mark.parametrize("extra_root", ["alias", "nested", "parent"])
@@ -255,3 +277,56 @@ def test_psram_record_retains_image_payload_and_capture_facts(tmp_path, engine):
     wrong = replace(wrong, build_identity=compiled_fixture_identity(wrong))
     with pytest.raises(ValueError, match="exact compiled image"):
         verify_fixture_build(wrong)
+
+
+def test_power_build_identity_roundtrip_and_original_record_readback(tmp_path):
+    from helia_profiler.fixture import FixturePowerSync
+
+    original = _build(tmp_path)
+    roots = {"run": tmp_path}
+    old = json.loads(dump_fixture_build(original, roots=roots))
+    assert "power_sync" not in old["build"]
+    old["fixture_api"] = [5, 0]
+    assert load_fixture_build(json.dumps(old), roots=roots) == original
+    wired = replace(
+        original,
+        timing_scope=FixtureTimingScope.RESTORE_AND_INVOKE,
+        power_sync=FixturePowerSync(29, 36, 14),
+    )
+    wired = replace(wired, build_identity=compiled_fixture_identity(wired))
+    assert wired.build_identity != original.build_identity
+    record = dump_fixture_build(wired, roots=roots)
+    loaded = load_fixture_build(record, roots=roots)
+    assert loaded == wired
+    capture = fixture_capture_request(
+        loaded, jlink_serial="123", evidence_dir=tmp_path / "raw", settle_seconds=30
+    )
+    assert capture.power_sync == wired.power_sync
+    assert capture.rail_power is None  # Station authority/configuration is supplied at capture.
+    altered = json.loads(record)
+    altered["build"]["power_sync"]["sync_gpio_pin"] = 28
+    with pytest.raises(ValueError):
+        load_fixture_build(json.dumps(altered), roots=roots)
+
+
+@pytest.mark.parametrize("with_power", [False, True])
+def test_saved_api52_record_keeps_identity_and_file_checks(tmp_path, with_power):
+    from helia_profiler.fixture import FixturePowerSync
+
+    build = _build(tmp_path)
+    if with_power:
+        build = replace(
+            build,
+            timing_scope=FixtureTimingScope.RESTORE_AND_INVOKE,
+            power_sync=FixturePowerSync(29, 36, 14),
+        )
+        build = replace(build, build_identity=compiled_fixture_identity(build))
+    saved = json.loads(dump_fixture_build(build, roots={"run": tmp_path}))
+    # API 5.2 and 5.3 have the same compiled record schema and identity inputs.
+    saved["fixture_api"] = [5, 2]
+    encoded = json.dumps(saved)
+    assert load_fixture_build(encoded, roots={"run": tmp_path}) == build
+    assert json.loads(encoded)["fixture_api"] == [5, 2]
+    build.flat_binary.path.write_bytes(b"wrong image")
+    with pytest.raises(ValueError):
+        load_fixture_build(encoded, roots={"run": tmp_path})

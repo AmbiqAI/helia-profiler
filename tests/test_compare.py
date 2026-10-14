@@ -227,6 +227,35 @@ def test_compare_runs_computes_run_and_layer_deltas(tmp_path: Path):
     assert any(row.field == "Toolchain" and row.status == "diff" for row in result.config_rows)
 
 
+def test_required_missing_dimensions_refuse_otherwise_valid_legacy_pair(tmp_path: Path):
+    from helia_profiler.evaluation import VerdictStatus
+
+    paths = [tmp_path / "base", tmp_path / "candidate"]
+    for path in paths:
+        _write_run(path, toolchain="atfe", total_cycles=1000, avg_us=10, layer_cycles=[800, 200])
+        metadata = json.loads((path / "run_metadata.json").read_text())
+        metadata.pop("platform", None)
+        metadata["config"]["target"].pop("board", None)
+        (path / "run_metadata.json").write_text(json.dumps(metadata))
+    policy = MetricPolicy(direction=MetricDirection.EQUAL, unit="cycles")
+    ordinary = ComparisonProfile(
+        schema="hpx.comparison-profile", schema_version=1, metrics={"total_cycles": policy}
+    )
+    ordinary_verdict = compare_runs(*paths, profile=ordinary).verdict
+    assert ordinary_verdict is not None
+    assert ordinary_verdict.status is VerdictStatus.PASS
+    required = ComparisonProfile(
+        schema="hpx.comparison-profile",
+        schema_version=1,
+        metrics={"total_cycles": policy},
+        required_dimensions=("board", "cpu_clock"),
+    )
+    verdict = compare_runs(*paths, profile=required).verdict
+    assert verdict is not None
+    assert verdict.status is VerdictStatus.FAIL
+    assert verdict.dimension_mismatches == ("board", "cpu_clock")
+
+
 def test_compare_loads_json_profile_results(tmp_path: Path):
     baseline = tmp_path / "baseline"
     candidate = tmp_path / "candidate"

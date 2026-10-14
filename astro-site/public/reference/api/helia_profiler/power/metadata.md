@@ -192,6 +192,7 @@ PowerMetadata(
     fullrate_xcheck: dict[str, Any] | None = None,
     gating_diagnostics: dict[str, Any] | None = None,
     gated_vs_whole_current_ok: bool | None = None,
+    negative_current_diagnostic: bool | None = None,
 ) -> None
 ```
 
@@ -568,6 +569,16 @@ gated_vs_whole_current_ok: bool | None = None
 
 Source: `src/helia_profiler/power/metadata.py:145`
 
+### helia_profiler.PowerMetadata.negative_current_diagnostic
+
+`attribute` · `python`
+
+```python
+negative_current_diagnostic: bool | None = None
+```
+
+Source: `src/helia_profiler/power/metadata.py:147`
+
 ### helia_profiler.PowerMetadata.to_metadata_dict
 
 `method` · `python`
@@ -583,7 +594,7 @@ diagnostics flatten through their own ``to_metadata()``. ``False``
 is a recorded value and is emitted; ``None`` means "never set" and
 is omitted.
 
-Source: `src/helia_profiler/power/metadata.py:162`
+Source: `src/helia_profiler/power/metadata.py:164`
 
 ### helia_profiler.PowerMetadata.set_observation
 
@@ -602,4 +613,4 @@ set_observation(
 
 Enrich metadata with the observation classification at publication.
 
-Source: `src/helia_profiler/power/metadata.py:181`
+Source: `src/helia_profiler/power/metadata.py:183`

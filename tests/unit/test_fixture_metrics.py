@@ -108,11 +108,13 @@ def test_footprint_separates_reservation_occupancy_and_attribution(rig):
     assert result.arena_capacity_bytes.value == 100
     assert result.arena_used_after_invoke_bytes.value == 80
     assert result.schema_version == 2
+    assert result.rail_energy is None
 
 
-def test_the_fixture_reports_no_energy():
-    # Energy comes from the dedicated power firmware, never from the fixture.
-    assert not [f for f in fields(FixtureMeasurements) if "energy" in f.name]
+def test_timing_only_fixture_energy_is_unavailable_by_default():
+    energy = [f for f in fields(FixtureMeasurements) if "energy" in f.name]
+    assert [f.name for f in energy] == ["rail_energy"]
+    assert energy[0].default is None
     assert "energy" not in inspect.signature(summarize_fixture_measurements).parameters
 
 

@@ -129,7 +129,7 @@ Raises :class:`HpxError` (or a subclass) on failure.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/api.py:25`
+Source: `src/helia_profiler/api.py:26`
 
 ## helia_profiler.ProgressUpdate
 
