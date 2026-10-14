@@ -9,7 +9,10 @@ import pytest
 
 _SCRIPT = Path(__file__).resolve().parents[1] / "nix/scripts/install-udev-rules.sh"
 _BASH = shutil.which("bash")
-pytestmark = pytest.mark.skipif(os.name == "nt" or not _BASH, reason="Requires a POSIX shell")
+pytestmark = [
+    pytest.mark.host_integration,
+    pytest.mark.skipif(os.name == "nt" or not _BASH, reason="Requires a POSIX shell"),
+]
 
 
 def _run(

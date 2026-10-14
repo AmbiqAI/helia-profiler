@@ -32,7 +32,10 @@ from helia_profiler.results.support_bundle import (
 )
 from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 
-pytestmark = pytest.mark.timeout(30)
+pytestmark = [
+    pytest.mark.usefixtures("fake_host_versions", "installed_python_dependencies"),
+    pytest.mark.timeout(30),
+]
 
 
 # Local copy avoids coupling to test_dependencies.py.

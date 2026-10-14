@@ -27,6 +27,7 @@ from helia_profiler.power.metadata import (
     PowerMetadata,
 )
 from helia_profiler.results import DeploymentRecord, FirmwareArtifact, PowerRunPlan
+from tests._time64_metadata import time64_metadata  # noqa: F401
 from tests.pipeline_context_helpers import (
     publish_power_result,
     set_power_firmware,
@@ -1829,6 +1830,12 @@ class TestJoulescopeUngatedCapture:
 
         def unsubscribe(self, topic, callback):
             pass
+
+    @pytest.fixture(autouse=True)
+    def _host_timestamp(self, monkeypatch):
+        from tests._time64_metadata import time64
+
+        monkeypatch.setattr(time64, "now", lambda: 0, raising=False)
 
     @staticmethod
     def _stats_packet():

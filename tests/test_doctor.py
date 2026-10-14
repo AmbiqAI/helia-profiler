@@ -5,6 +5,8 @@ import shutil
 import sys
 from pathlib import Path
 
+import pytest
+
 from helia_profiler.config import Toolchain, Transport
 from helia_profiler.engines import EngineType
 from helia_profiler.errors import CaptureError, ConfigError
@@ -14,6 +16,8 @@ from helia_profiler.hostenv.doctor import (
     check_versions,
     inspect_environment,
 )
+
+pytestmark = pytest.mark.usefixtures("fake_host_versions", "installed_python_dependencies")
 
 
 def _which_all(name: str) -> str:

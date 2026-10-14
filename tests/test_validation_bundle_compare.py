@@ -16,6 +16,8 @@ from helia_profiler.validation.compare import (
 from helia_profiler.validation.report import write_validation_reports
 from helia_profiler.validation.runner import CaseResult
 
+pytestmark = pytest.mark.usefixtures("missing_git_metadata")
+
 
 def _write_bundle(root: Path, cycles: int, *, attempt: int = 1, repeat_total: int = 1) -> None:
     case_id = "apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto"

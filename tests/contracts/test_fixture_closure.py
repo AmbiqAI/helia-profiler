@@ -68,6 +68,7 @@ def _listed() -> set[str]:
     return set(closure_paths((PACKAGE / CLOSURE_LISTING).read_bytes()))
 
 
+@pytest.mark.host_integration
 def test_listing_is_current() -> None:
     result = subprocess.run(
         [sys.executable, "tools/gen_fixture_closure.py", "--check"],

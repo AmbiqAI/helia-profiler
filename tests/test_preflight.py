@@ -12,6 +12,8 @@ from helia_profiler.errors import CaptureError, ConfigError, EngineError
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.stages.preflight import PreflightStage
 
+pytestmark = pytest.mark.usefixtures("installed_python_dependencies")
+
 # A minimal valid TFLite flatbuffer header is just the 'TFL3' magic in the
 # first 16 bytes.  The stage only sniffs for the magic — it does not parse
 # the full flatbuffer — so this is enough.

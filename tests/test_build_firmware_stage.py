@@ -2,9 +2,18 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from helia_profiler.config import load_config
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.stages.build_firmware import BuildFirmwareStage
+
+
+@pytest.fixture(autouse=True)
+def _no_symbol_inventory(monkeypatch):
+    monkeypatch.setattr(
+        "helia_profiler.stages.build_firmware.symbol_inventory", lambda *a, **kw: None
+    )
 
 
 def test_missing_binary_sections_does_not_fail_successful_build(

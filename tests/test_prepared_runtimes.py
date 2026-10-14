@@ -483,6 +483,7 @@ def test_a_failed_tflm_compile_leaves_nothing_behind_and_no_traceback(
 
 
 @posix_only
+@pytest.mark.host_integration
 def test_a_failed_build_step_names_the_source_exit_and_stderr(tmp_path: Path) -> None:
     script = tmp_path / "fail.py"
     script.write_text("import sys\nsys.stderr.write('first\\nerror: boom\\n')\nsys.exit(3)\n")
@@ -493,6 +494,7 @@ def test_a_failed_build_step_names_the_source_exit_and_stderr(tmp_path: Path) ->
 
 
 @posix_only
+@pytest.mark.host_integration
 def test_build_steps_see_only_the_allowed_environment(tmp_path, monkeypatch) -> None:
     for name, value in {"ARM_NN_ENABLE_F16": "1", "CPATH": "/x", "MAKEFLAGS": "-j9"}.items():
         monkeypatch.setenv(name, value)
@@ -504,6 +506,7 @@ def test_build_steps_see_only_the_allowed_environment(tmp_path, monkeypatch) -> 
 
 
 @posix_only
+@pytest.mark.host_integration
 def test_build_steps_keep_the_download_proxy_and_ca_settings(tmp_path, monkeypatch) -> None:
     for name in ("SSL_CERT_FILE", "SSL_CERT_DIR", "CURL_CA_BUNDLE", "https_proxy"):
         monkeypatch.setenv(name, "/etc/site")
@@ -514,6 +517,7 @@ def test_build_steps_keep_the_download_proxy_and_ca_settings(tmp_path, monkeypat
 
 
 @posix_only
+@pytest.mark.host_integration
 def test_undecodable_build_output_still_reports_the_failure(tmp_path: Path) -> None:
     script = tmp_path / "bytes.py"
     script.write_text("import sys\nsys.stderr.buffer.write(b'bad \\xff byte')\nsys.exit(2)\n")
@@ -522,6 +526,7 @@ def test_undecodable_build_output_still_reports_the_failure(tmp_path: Path) -> N
 
 
 @posix_only
+@pytest.mark.host_integration
 def test_a_timed_out_group_step_stops_its_children(tmp_path, monkeypatch) -> None:
     argv, pid_file = _spawning_step(tmp_path)
     monkeypatch.setattr(subprocess.Popen, "communicate", _times_out_once_written(pid_file))
@@ -643,6 +648,7 @@ def _times_out_once_written(path: Path, error: BaseException | None = None):
 
 
 @posix_only
+@pytest.mark.host_integration
 def test_an_interrupted_group_step_stops_its_children(tmp_path, monkeypatch) -> None:
     argv, pid_file = _spawning_step(tmp_path)
     monkeypatch.setattr(
@@ -655,6 +661,7 @@ def test_an_interrupted_group_step_stops_its_children(tmp_path, monkeypatch) -> 
 
 @posix_only
 @pytest.mark.parametrize("group", [True, False])
+@pytest.mark.host_integration
 def test_only_a_group_step_leaves_hpx_s_process_group(tmp_path, group) -> None:
     argv = [sys.executable, "-c", "import os; print(os.getpgid(0))"]
     leader = int(prepared_runtimes._run(argv, tmp_path, 60, group=group))
@@ -676,6 +683,7 @@ def _trapping_step(tmp_path: Path, on_term: str) -> tuple[list[str], Path]:
 
 
 @posix_only
+@pytest.mark.host_integration
 def test_a_stopped_group_step_is_asked_to_terminate_first(tmp_path, monkeypatch) -> None:
     marker = tmp_path / "cleaned"
     argv, pid_file = _trapping_step(
@@ -688,6 +696,7 @@ def test_a_stopped_group_step_is_asked_to_terminate_first(tmp_path, monkeypatch)
 
 
 @posix_only
+@pytest.mark.host_integration
 def test_a_group_step_that_ignores_terminate_is_killed(tmp_path, monkeypatch) -> None:
     argv, pid_file = _trapping_step(tmp_path, "signal.SIG_IGN")
     monkeypatch.setattr(subprocess.Popen, "communicate", _times_out_once_written(pid_file))
@@ -699,6 +708,7 @@ def test_a_group_step_that_ignores_terminate_is_killed(tmp_path, monkeypatch) ->
 
 
 @posix_only
+@pytest.mark.host_integration
 def test_a_second_interrupt_during_the_grace_period_still_kills(tmp_path, monkeypatch) -> None:
     argv, pid_file = _trapping_step(tmp_path, "signal.SIG_IGN")
     monkeypatch.setattr(subprocess.Popen, "communicate", _times_out_once_written(pid_file))
@@ -715,6 +725,7 @@ def test_a_second_interrupt_during_the_grace_period_still_kills(tmp_path, monkey
 
 
 @posix_only
+@pytest.mark.host_integration
 def test_a_group_of_only_zombies_still_reports_the_timeout(tmp_path, monkeypatch) -> None:
     killpg = os.killpg
 
@@ -732,6 +743,7 @@ def test_a_group_of_only_zombies_still_reports_the_timeout(tmp_path, monkeypatch
 
 
 @posix_only
+@pytest.mark.host_integration
 def test_a_detached_grandchild_does_not_hold_the_timeout(tmp_path, monkeypatch) -> None:
     argv, pid_file = _spawning_step(tmp_path, detach=True)
     monkeypatch.setattr(subprocess.Popen, "communicate", _times_out_once_written(pid_file))
@@ -745,6 +757,7 @@ def test_a_detached_grandchild_does_not_hold_the_timeout(tmp_path, monkeypatch) 
 
 
 @posix_only
+@pytest.mark.host_integration
 def test_a_build_step_that_hangs_is_stopped(tmp_path: Path) -> None:
     argv = [sys.executable, "-c", "import time; time.sleep(30)"]
     started = time.monotonic()

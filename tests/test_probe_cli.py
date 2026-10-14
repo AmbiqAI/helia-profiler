@@ -224,6 +224,9 @@ def test_preload_jlink_linux_usb_runtime_uses_nixos_system_path(tmp_path, monkey
 def test_create_debug_memory_session_falls_back_to_jlinkexe_wrapper_dll(
     tmp_path, monkeypatch
 ) -> None:
+    monkeypatch.setattr(
+        "helia_profiler.target.probe.jlink._preload_jlink_linux_usb_runtime", lambda: None
+    )
     dll_dir = tmp_path / "JLink_V874"
     dll_dir.mkdir()
     if sys.platform.startswith("win"):

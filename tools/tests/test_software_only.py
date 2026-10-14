@@ -9,6 +9,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.host_integration
+
 ROOT = Path(__file__).resolve().parents[2]
 LAUNCHER = ROOT / "tools" / "software_only.py"
 
@@ -284,19 +286,10 @@ def test_pytest_collection_is_guarded(sandbox):
 
 
 def test_fake_normal_and_degraded_capture_paths(sandbox):
-    source = """import sys, types
-from pathlib import Path
-import pytest
-clock = types.ModuleType('pyjoulescope_driver.time64')
-clock.SECOND = 1 << 30
-vendor = types.ModuleType('pyjoulescope_driver')
-vendor.time64 = clock
-sys.modules['pyjoulescope_driver'] = vendor
-sys.modules['pyjoulescope_driver.time64'] = clock
+    source = """import pytest
 raise SystemExit(pytest.main([
-    'tests/test_power.py::TestStreamedGateSelection',
-    'tests/test_power.py::TestMissedGateWarningNamesTheFix',
-    'tests/test_power.py::TestGatedCaptureContracts', '-q',
+    'tests/test_power.py::TestJoulescopeUngatedCapture::test_capture_processes_stats_packet_without_crashing',
+    'tests/test_power.py::TestMissedGateWarningNamesTheFix::test_warning_names_power_lockstep_when_it_is_the_suspect', '-q',
 ]))
 """
     result = run_probe(sandbox, source)

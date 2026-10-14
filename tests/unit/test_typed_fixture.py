@@ -628,6 +628,7 @@ def test_int32_contract_rejects_wrong_type_and_incomplete_tensors(tmp_path, faul
             f.verify()
 
 
+@pytest.mark.host_integration
 def test_int32_emitted_control_checks_bytes_status_and_full_output(tmp_path):
     """Execute the emitted orchestration with a byte-checking host backend stub."""
     import shutil

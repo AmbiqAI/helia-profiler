@@ -75,6 +75,7 @@ def _run_bash(script: str, env: dict[str, str], cwd: Path) -> str:
 @pytest.mark.parametrize("step_name", ["Preview validation cases", "Run hardware validation"])
 @pytest.mark.parametrize("requested_ref", ["", "candidate-branch", "a" * 40])
 @pytest.mark.parametrize("provider", ["ns", "arm", "both"])
+@pytest.mark.host_integration
 def test_ns_cmsis_nn_flag_only_passed_for_explicit_input(
     workflow: dict[Any, Any],
     validate_job: dict[str, Any],
@@ -107,6 +108,7 @@ def test_ns_cmsis_nn_flag_only_passed_for_explicit_input(
 
 
 @pytest.mark.parametrize("has_override", [False, True])
+@pytest.mark.host_integration
 def test_executorch_provenance_with_optional_ns_override(
     workflow: dict[Any, Any],
     validate_job: dict[str, Any],
@@ -165,6 +167,7 @@ git() {
         "B" * 40,
     ],
 )
+@pytest.mark.host_integration
 def test_ns_override_provenance_preserves_the_requested_ref(
     validate_job: dict[str, Any], tmp_path: Path, requested_ref: str
 ) -> None:
@@ -272,6 +275,7 @@ def _fake_bench_agent(tmp_path: Path, body: str) -> dict[str, str]:
     }
 
 
+@pytest.mark.host_integration
 def test_ci_takes_the_board_lock(validate_job: dict[str, Any], tmp_path: Path) -> None:
     names = [step.get("name") for step in validate_job["steps"]]
     lock = _step(validate_job, "Take the board lock")
@@ -343,6 +347,7 @@ def test_artifact_is_uploaded_per_board(validate_job: dict[str, Any]) -> None:
     assert upload["with"]["overwrite"] is True
 
 
+@pytest.mark.host_integration
 def test_preview_fails_when_no_case_is_selected(
     workflow: dict[Any, Any], validate_job: dict[str, Any], tmp_path: Path
 ) -> None:

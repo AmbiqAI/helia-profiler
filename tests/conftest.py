@@ -143,3 +143,25 @@ def fake_cmsis_nn(tmp_path: Path) -> Path:
         'schema_version: 1\nmodule:\n  name: nsx-cmsis-nn\n  version: "7.23.0"\n'
     )
     return nn
+
+
+@pytest.fixture()
+def fake_host_versions(monkeypatch):
+    """Keep unrelated tool versions independent of the developer's machine."""
+    monkeypatch.setattr("helia_profiler.hostenv.toolchain_probe.cmake_version", lambda **kw: "")
+    monkeypatch.setattr(
+        "helia_profiler.hostenv.toolchain_probe.compiler_version", lambda *a, **kw: ""
+    )
+
+
+@pytest.fixture()
+def installed_python_dependencies(monkeypatch):
+    """Model installed packages without importing optional device drivers."""
+    monkeypatch.setattr("helia_profiler.hostenv.doctor.find_spec", lambda name: object())
+
+
+@pytest.fixture()
+def missing_git_metadata(monkeypatch):
+    """Report serialization tests use a directory outside a Git repository."""
+    monkeypatch.setattr("helia_profiler.validation.report._git", lambda *a: None)
+    monkeypatch.setattr("helia_profiler.validation.report._git_dirty", lambda *a: None)
