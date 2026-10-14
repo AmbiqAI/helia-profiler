@@ -125,6 +125,13 @@ hpx profile --config hpx.yml --board apollo510b_evb --iterations 50 --output-dir
 - `build.nsx_modules.<module>.ref` or `.version` overrides that default
   for the owning project; `.path` installs a local checkout for that module
   and bypasses registry resolution for it alone.
+- Engine-owned `nsx-helia-rt` and `nsx-cmsis-nn` sources are selected by
+  `engine.config`, not `build.nsx_modules` or `--nsx-module`. An override
+  targeting one of these engine-provided modules is ignored with a warning.
+  Use `source_path`, `dist_path` or `source` for heliaRT, and
+  `cmsis_nn_path` or `cmsis_nn_ref` for its source-built CMSIS-NN provider.
+  [Engine configuration](../../reference/engine-configuration/) describes
+  which selectors each runtime mode supports.
 - Ordinary profiles reuse a compatible `nsx.lock` byte for byte and run
   `nsx sync --frozen`; a lock is resolved only when missing or structurally
   incompatible. `build.update_dependencies: true` (`--update-dependencies`)

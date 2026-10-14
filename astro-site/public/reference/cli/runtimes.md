@@ -10,7 +10,7 @@ hpx runtimes COMMAND [ARGS]...
 
 Show the runtime versions this hpx records and their qualification
 
-Defined in `src/helia_profiler/cli/app.py` line 705.
+Defined in `src/helia_profiler/cli/app.py` line 706.
 
 ## hpx runtimes list
 
@@ -20,7 +20,7 @@ hpx runtimes list
 
 List every runtime record
 
-Defined in `src/helia_profiler/cli/app.py` line 712.
+Defined in `src/helia_profiler/cli/app.py` line 713.
 
 ## hpx runtimes prepare
 
@@ -30,7 +30,7 @@ hpx runtimes prepare NAME [VERSION]
 
 Build a runtime's prepared archive into the hpx cache (helia-rt, tflm)
 
-Defined in `src/helia_profiler/cli/app.py` line 729.
+Defined in `src/helia_profiler/cli/app.py` line 730.
 
 ### Arguments
 
@@ -47,7 +47,7 @@ hpx runtimes show NAME [VERSION]
 
 Print one runtime record (the default when VERSION is omitted)
 
-Defined in `src/helia_profiler/cli/app.py` line 719.
+Defined in `src/helia_profiler/cli/app.py` line 720.
 
 ### Arguments
 

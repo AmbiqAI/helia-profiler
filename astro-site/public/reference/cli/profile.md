@@ -39,7 +39,7 @@ Defined in `src/helia_profiler/cli/app.py` line 93.
 | `--offline` | `bool` | false | Require exact compatible lock/module reuse without network resolution. |
 | `--update-dependencies` | `bool` | false | Explicitly re-resolve dependency refs and rewrite nsx.lock. |
 | `--nsx-channel` | `Optional[str]` |  | NSX channel for module resolution (default: the board's registered channel). |
-| `--nsx-module` | `Optional[list[str]]` |  | Override an NSX module's source. Repeatable. Keys: path (local dir), ref (git ref/tag), version (pin). Examples: --nsx-module nsx-core:path=/my/nsx-core --nsx-module nsx-cmsis-core:ref=feat/new-cmsis --nsx-module nsx-gpio:version=2.0.0 Repeatable. |
+| `--nsx-module` | `Optional[list[str]]` |  | Override an NSX module's source. Repeatable. Engine-owned nsx-helia-rt/nsx-cmsis-nn use engine.config instead. Keys: path (local dir), ref (git ref/tag), version (pin). Examples: --nsx-module nsx-core:path=/my/nsx-core --nsx-module nsx-cmsis-core:ref=feat/new-cmsis --nsx-module nsx-gpio:version=2.0.0 Repeatable. |
 | `--compiler-launcher` | `Optional[str]` |  | CMake compiler launcher to cache compiles (e.g. sccache, ccache). 'auto' (default) uses sccache/ccache if installed; a name or path requires it to be found. Overrides build.compiler_launcher; the HPX_COMPILER_LAUNCHER env var overrides both. |
 | `--no-compiler-launcher` | `bool` | false | Disable the compiler launcher (equivalent to --compiler-launcher none). |
 

@@ -277,6 +277,7 @@ def profile_command(
             metavar="NAME:KEY=VALUE",
             help=(
                 "Override an NSX module's source. Repeatable. "
+                "Engine-owned nsx-helia-rt/nsx-cmsis-nn use engine.config instead. "
                 "Keys: path (local dir), ref (git ref/tag), version (pin). "
                 "Examples: --nsx-module nsx-core:path=/my/nsx-core "
                 "--nsx-module nsx-cmsis-core:ref=feat/new-cmsis "

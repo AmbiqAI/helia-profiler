@@ -9,6 +9,22 @@ Read the timing numbers correctly. A bundle carries three kinds of time
 and cycle counts with different boundaries; quoting the
 wrong one can lead to a misleading comparison.
 
+## Inputs and output checking
+
+Ordinary `hpx profile` measures execution time and counters; it does not feed
+representative samples, export output tensor values, or compare outputs with a
+reference. The profiling harness initializes input storage with zero bytes:
+heliaRT/TFLM clear the first input tensor, heliaAOT clears every input buffer,
+and ExecuTorch clears its configured input buffer. Zero bytes need not represent
+real-valued zero for a quantized tensor with a nonzero zero point.
+
+Treat these results as timings for that input setup. Data-dependent kernels and
+stateful models can behave differently on application data; clearing input
+buffers is not a promise that the runtime resets internal state between calls.
+For caller-supplied inputs and output readback, use the
+[fixed-input fixture guide](https://github.com/AmbiqAI/helia-profiler/blob/main/maintainers/fixed-fixture.md) rather than inferring numerical
+correctness from a successful profile.
+
 ## Prerequisites
 
 A result bundle and [Output files](../output/) for the field names.

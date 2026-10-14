@@ -121,7 +121,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 536
+          "line": 537
         },
         "arguments": [
           {
@@ -343,7 +343,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 676
+          "line": 677
         },
         "arguments": [],
         "options": [],
@@ -364,7 +364,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 690
+              "line": 691
             },
             "arguments": [],
             "options": [],
@@ -385,7 +385,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 683
+              "line": 684
             },
             "arguments": [],
             "options": [],
@@ -407,7 +407,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 609
+          "line": 610
         },
         "arguments": [
           {
@@ -1915,7 +1915,7 @@
             "python_type": "Optional[list[str]]",
             "default": null,
             "required": false,
-            "help": "Override an NSX module's source. Repeatable. Keys: path (local dir), ref (git ref/tag), version (pin). Examples: --nsx-module nsx-core:path=/my/nsx-core --nsx-module nsx-cmsis-core:ref=feat/new-cmsis --nsx-module nsx-gpio:version=2.0.0",
+            "help": "Override an NSX module's source. Repeatable. Engine-owned nsx-helia-rt/nsx-cmsis-nn use engine.config instead. Keys: path (local dir), ref (git ref/tag), version (pin). Examples: --nsx-module nsx-core:path=/my/nsx-core --nsx-module nsx-cmsis-core:ref=feat/new-cmsis --nsx-module nsx-gpio:version=2.0.0",
             "panel": "build overrides",
             "is_flag": false,
             "multiple": true,
@@ -2615,7 +2615,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 705
+          "line": 706
         },
         "arguments": [],
         "options": [],
@@ -2636,7 +2636,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 712
+              "line": 713
             },
             "arguments": [],
             "options": [],
@@ -2657,7 +2657,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 729
+              "line": 730
             },
             "arguments": [
               {
@@ -2731,7 +2731,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 719
+              "line": 720
             },
             "arguments": [
               {
