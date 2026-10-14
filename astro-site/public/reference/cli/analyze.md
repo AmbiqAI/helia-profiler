@@ -10,7 +10,7 @@ hpx analyze [OPTIONS] MODEL
 
 Analyze model compute/parameter breakdown (no hardware needed)
 
-Defined in `src/helia_profiler/cli/app.py` line 536.
+Defined in `src/helia_profiler/cli/app.py` line 537.
 
 ### Arguments
 
