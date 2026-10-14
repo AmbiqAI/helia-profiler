@@ -6,6 +6,8 @@ import importlib.metadata
 import os
 import re
 import shutil
+import sys
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from importlib.util import find_spec
 from pathlib import Path
@@ -14,6 +16,7 @@ from typing import Any
 from ..config import Toolchain, Transport
 from ..engines import EngineType
 from ..errors import CaptureError, ConfigError
+from ..power.joulescope_compatibility import joulescope_python_hint
 from ..target.probe.jlink import JLINK_COMMANDER, find_jlink_exe
 from .toolchains import get_toolchain_spec, resolve_toolchain_executable
 
@@ -109,6 +112,83 @@ class _DependencySpec:
     hint: str
 
 
+@dataclass(frozen=True)
+class _Environment:
+    python: tuple[int, int]
+    interpreter: str
+    driver: str | None
+    devices: tuple[str, ...] | None
+    launcher: str | None
+    expected_launcher: Path
+    in_venv: bool
+
+
+@dataclass(frozen=True)
+class _EnvironmentCheck:
+    applies: Callable[[_Environment], bool]
+    probe: Callable[[_Environment], DoctorVersionCheck]
+
+
+def _environment(devices: tuple[str, ...] | None = None) -> _Environment:
+    entry = "Scripts/hpx.exe" if os.name == "nt" else "bin/hpx"
+    return _Environment(
+        python=(sys.version_info.major, sys.version_info.minor),
+        interpreter=sys.executable,
+        driver=_package_version("pyjoulescope-driver"),
+        devices=devices,
+        launcher=shutil.which("hpx"),
+        expected_launcher=Path(sys.prefix) / entry,
+        in_venv=sys.prefix != sys.base_prefix,
+    )
+
+
+def _joulescope_check(env: _Environment) -> DoctorVersionCheck:
+    devices = "unknown" if env.devices is None else ", ".join(env.devices) or "none"
+    installed = (
+        f"Python {env.python[0]}.{env.python[1]}; {env.interpreter}; "
+        f"driver {env.driver or 'unknown'}; {devices}"
+    )
+    ok: bool | None = True
+    hint = joulescope_python_hint(env.devices or (), env.python)
+    if hint is not None:
+        ok = False
+    elif env.devices is None or (env.devices and env.driver is None):
+        ok = None
+        hint = "Device or driver metadata is unknown; JS320 compatibility was not determined."
+    return DoctorVersionCheck(
+        "Joulescope environment", "js320_environment", installed, "JS320: Python >= 3.12", ok, hint
+    )
+
+
+def _launcher_check(env: _Environment) -> DoctorVersionCheck:
+    assert env.launcher is not None
+    try:
+        same_entrypoint = Path(env.launcher).samefile(env.expected_launcher)
+    except OSError:
+        same_entrypoint = False
+    return DoctorVersionCheck(
+        "HPX launcher",
+        "hpx_launcher",
+        env.launcher,
+        str(env.expected_launcher),
+        True if same_entrypoint else None,
+        None
+        if same_entrypoint
+        else f"Launcher target not verified. Run {env.expected_launcher} to use this environment.",
+    )
+
+
+_ENVIRONMENT_CHECKS = (
+    _EnvironmentCheck(
+        lambda env: env.driver is not None or env.devices is not None, _joulescope_check
+    ),
+    _EnvironmentCheck(
+        lambda env: env.launcher is not None and env.in_venv and env.expected_launcher.is_file(),
+        _launcher_check,
+    ),
+)
+
+
 def inspect_environment(
     *,
     toolchain: Toolchain = Toolchain.ARM_NONE_EABI_GCC,
@@ -117,13 +197,14 @@ def inspect_environment(
     require_segger_rtt: bool = False,
     segger_rtt_path: Path | None = None,
     include_versions: bool = False,
+    joulescope_devices: tuple[str, ...] | None = None,
 ) -> DoctorResult:
     """Check required and optional host dependencies without printing.
 
     Set *include_versions* to additionally probe installed tool/package
     versions against the HPX compatibility baseline (see
-    :func:`check_versions`). Disabled by default so existing callers keep
-    their current (fast, version-free) behavior.
+    :func:`check_versions`). Tool version probes are disabled by default.
+    Supplied Joulescope families are observed metadata; ``None`` means unobserved.
     """
     results = [
         _inspect_dependency(spec) for spec in _dependency_specs(toolchain, transport, engine)
@@ -152,7 +233,10 @@ def inspect_environment(
                     path=str(resolved_rtt),
                 )
             )
-    versions = check_versions(toolchain=toolchain) if include_versions else ()
+    env = _environment(joulescope_devices)
+    versions = tuple(spec.probe(env) for spec in _ENVIRONMENT_CHECKS if spec.applies(env))
+    if include_versions:
+        versions += check_versions(toolchain=toolchain)
     return DoctorResult(tuple(results), versions)
 
 

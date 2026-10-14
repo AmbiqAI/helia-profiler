@@ -189,6 +189,7 @@ power/joulescope/driver.py
 power/joulescope/fullrate.py
 power/joulescope/stats.py
 power/joulescope/sync.py
+power/joulescope_compatibility.py
 power/metadata.py
 power/sync.py
 prepared_runtimes.py

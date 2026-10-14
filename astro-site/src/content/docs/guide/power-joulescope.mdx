@@ -26,6 +26,11 @@ on Linux the udev rule from [Install](../../getting-started/install/#5-linux-usb
 | Voltage range | see the JS110 User's Guide | ±15 V | ±15 V |
 | GPIO threshold | fixed; `io_voltage` tells hpx how to read it | set by the Vref pin, which must be wired | set by the Vref pin, which must be wired |
 | Lock-step GO command | per-output value | GPO bitmap set and clear | GPO bitmap set and clear |
+| Python | supported HPX versions | supported HPX versions | 3.12 or later |
+
+HPX rejects a selected JS320 with a known unsupported Python environment before
+opening the instrument. Doctor remains hardware-free: unobserved device metadata
+is reported as unknown, rather than a confirmed incompatibility. See [#228](https://github.com/AmbiqAI/helia-profiler/issues/228).
 
 All three use the same `JoulescopeDriver` in hpx and `power.driver:
 joulescope` auto-detects whichever is attached; `power.serial` (or

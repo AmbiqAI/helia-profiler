@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import threading
 import time
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -199,12 +200,29 @@ class TestJoulescopeSyncControllerRelease:
         assert fake_drv.close_calls == 1
         assert "u/js110/004204" not in device_mod._open_refcounts
 
-    def test_js320_uses_bitmap_gpo_commands(self, monkeypatch: pytest.MonkeyPatch):
+    @pytest.mark.parametrize("python_minor", [11, 12])
+    def test_js320_uses_bitmap_gpo_commands(self, monkeypatch: pytest.MonkeyPatch, python_minor):
         from helia_profiler.power.joulescope import device as device_mod
 
+        monkeypatch.setattr(
+            device_mod,
+            "sys",
+            SimpleNamespace(
+                version_info=SimpleNamespace(major=3, minor=python_minor),
+                executable="/test/python",
+            ),
+        )
         device_mod._open_refcounts.clear()
         fake_drv = _FakeJsDriver("u/js320/25QG")
         controller = self._make_controller(monkeypatch, fake_drv)
+
+        if python_minor == 11:
+            with pytest.raises(PowerError, match="JS320 is unsupported"):
+                controller.arm()
+            assert fake_drv.open_calls == 0
+            assert fake_drv.published == {}
+            assert "u/js320/25QG" not in device_mod._open_refcounts
+            return
 
         controller.arm()
         controller.signal_go()

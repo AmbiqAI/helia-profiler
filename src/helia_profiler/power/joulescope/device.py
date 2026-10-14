@@ -10,11 +10,13 @@ protocol.
 from __future__ import annotations
 
 import logging
+import sys
 import threading
 import time
 from typing import Any
 
 from ...errors import PowerError
+from ..joulescope_compatibility import joulescope_python_hint
 
 log = logging.getLogger("hpx")
 
@@ -167,6 +169,16 @@ def _is_device_busy_error(message: str) -> bool:
     )
 
 
+def _check_environment(family: str) -> None:
+    python = (sys.version_info.major, sys.version_info.minor)
+    hint = joulescope_python_hint((family,), python)
+    if hint is not None:
+        raise PowerError(
+            f"{family.upper()} is unsupported with Python {python[0]}.{python[1]} ({sys.executable})",
+            hint=hint,
+        )
+
+
 def _open_device(serial: str | None) -> tuple[Any, str, str]:
     """The caller must release the device with :func:`_close_device` (or ignore
     that step if the device handle should remain open across calls — e.g.
@@ -207,6 +219,7 @@ def _open_device(serial: str | None) -> tuple[Any, str, str]:
         device_path = paths[0]
 
     family = _family_from_path(device_path)
+    _check_environment(family)
 
     with _device_open_lock:
         if _open_refcounts.get(device_path, 0) > 0:

@@ -21,7 +21,8 @@ also needs network access for neuralSPOT-X to fetch its modules.
 
 ### 1. `hpx doctor`: the host tools
 
-Captured on macOS 26.6, 2026-09-21:
+Tool table captured on macOS 26.6, 2026-09-21. The environment diagnostic is
+illustrative; your Python path and driver version will differ:
 
 <AsciiTerminal animated copy="commands" lines={[
   {
@@ -65,6 +66,15 @@ Captured on macOS 26.6, 2026-09-21:
     "text": ""
   },
   {
+    "text": "  Unknown: Joulescope environment: Python 3.12; /path/to/python; driver 2.3.4; unknown"
+  },
+  {
+    "text": "    Device or driver metadata is unknown; JS320 compatibility was not determined."
+  },
+  {
+    "text": ""
+  },
+  {
     "text": "  All required tools found."
   }
 ]} />
@@ -73,7 +83,8 @@ Every required row must show a check mark. A dash marks an optional tool
 (heliaAOT, `armclang`) and is not a failure. If a required row is missing,
 the fix is on [Install](../install/); `hpx doctor` finds tools by the same
 rules hpx uses at build time, so a green table here means the build will
-find them too.
+find them too. `Unknown` device metadata means doctor has not inspected
+attached instruments; it does not invalidate the host-tool check.
 
 ### 2. `hpx boards`: the board registry
 
