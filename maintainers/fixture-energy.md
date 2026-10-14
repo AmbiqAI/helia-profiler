@@ -22,12 +22,17 @@ model initialization or warmups. State goes high for READY, low after GO, then
 high for DONE only after the successful terminal is published. The measured
 restore-and-invoke gate and loop are unchanged; DONE is outside that gate.
 A missed GO returns a power-handshake failure instead of free-running.
-The shared driver retains both packed input streams and waits for DONE before
-stopping. One optional initial high-to-low reset transition establishes idle;
-thereafter only the complete READY/acknowledgement/gate/DONE sequence is valid.
-Fragmentation, missing transitions, stream gaps, uncovered DONE, and a selected
-gate different from that sequence refuse energy. All observed edges remain in
-the raw artifact. No forecast or independent clock tolerance establishes completion.
+The shared driver retains both packed input streams. The same counter-based
+transaction resolver controls stopping, gate integration and typed completion.
+Reset pin activity and abandoned READY pulses with no measured gate remain in
+the raw prefix; they are not themselves measurements. A fresh idle-to-READY
+transition, acknowledgement, one unbroken gate and covered DONE must identify
+exactly one complete transaction. Acknowledged gate fragmentation, multiple
+eligible transactions, transitions after DONE, stream gaps or missing coverage
+refuse energy. Snapshot polling is only a control-plane hint: delayed stream
+callbacks cannot establish completion before their evidence arrives. No host
+command counter is manufactured from callback arrival time. No forecast,
+last-gate preference or independent clock tolerance establishes completion.
 
 Power readback never resumes a halted target or waits for a later completion
 after sampling has stopped. Protocol-v1 images cannot supply protocol-v2

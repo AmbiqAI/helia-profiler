@@ -276,7 +276,8 @@ def fixture_rail_energy(
 def _batch_completion(
     observation: PowerResult, request: FixtureRailPowerRequest, raw: FixtureFile
 ) -> FixtureBatchCompletion:
-    from .power.counter_gate import CounterGateTrace, counter_gate_trace
+    from .power.completion import resolve_counter_completion
+    from .power.counter_gate import counter_gate_trace
 
     if observation.state_stream_error:
         raise ValueError("Invalid completion state stream")
@@ -284,44 +285,24 @@ def _batch_completion(
         observation.gate_frames, observation.statistics, channel=request.sync_input_index
     )
 
-    def after_idle(trace: CounterGateTrace) -> tuple[int, tuple[tuple[int, int], ...]]:
-        edges = trace.edges
-        if trace.initial_level:
-            if not edges or edges[0][1] != 0:
-                raise ValueError("Missing fresh idle before completion protocol")
-            return edges[0][0], edges[1:]
-        return trace.first_counter, edges
-
-    gate_idle, gate_edges = after_idle(gate)
-    if [level for _, level in gate_edges] != [1, 0] or gate.final_level != 0:
-        raise ValueError("Incomplete or fragmented batch gate")
     state = counter_gate_trace(
         observation.state_frames, observation.statistics, channel=request.state_input_index
     )
-    state_idle, state_edges = after_idle(state)
-    if (
-        gate.rate != state.rate
-        or [level for _, level in state_edges] != [1, 0, 1]
-        or state.final_level != 1
-    ):
-        raise ValueError("Incomplete or fragmented READY/GO/gate/DONE sequence")
-    ready, ack, done = (counter for counter, _ in state_edges)
-    rise, fall = (counter for counter, _ in gate_edges)
-    if not (
-        max(gate_idle, state_idle)
-        < ready
-        < ack
-        <= rise
-        < fall
-        <= done
-        < min(gate.end_counter, state.end_counter, gate.intervals[-1][1])
-    ):
-        raise ValueError("Completion protocol order or sample coverage mismatch")
+    completed = resolve_counter_completion(gate, state)
+    rise, fall = completed.rise, completed.fall
     selected = observation.counter_gate_evidence
     if len(selected) != 1 or (selected[0]["rise"], selected[0]["fall"]) != (rise, fall):
         raise ValueError("Energy interval differs from completed batch gate")
     return FixtureBatchCompletion(
-        2, "joulescope_sensor_sample_id", gate.rate, ready, ack, rise, fall, done, raw
+        2,
+        "joulescope_sensor_sample_id",
+        gate.rate,
+        completed.ready,
+        completed.acknowledge,
+        rise,
+        fall,
+        completed.done,
+        raw,
     )
 
 

@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 from ...errors import PowerError
 from ..base import PowerResult
-from ..completion import GatedCompletion
+from ..completion import GatedCompletion, resolve_counter_completion
 from ..counter_gate import PackedGateRecorder, counter_gate_trace
 from ..diagnostics import (
     BOOT_SETTLE_S,
@@ -241,6 +241,18 @@ def capture_gated(
     completion = GatedCompletion()
     early_stopped = False
 
+    def _completed_trace():
+        if gate_recorder.error or state_recorder.error:
+            raise ValueError("Invalid retained completion stream")
+        captured_packets = list(packets)
+        gate = counter_gate_trace(
+            list(gpi_stream_frames), captured_packets, channel=sync_input_index
+        )
+        state = counter_gate_trace(
+            list(state_recorder.frames), captured_packets, channel=state_input_index
+        )
+        return gate, resolve_counter_completion(gate, state)
+
     def _wait_gpi_state(index: int, high: bool, timeout_s: float) -> bool:
         bit_mask = 1 << index
         deadline = time.monotonic() + timeout_s
@@ -454,8 +466,19 @@ def capture_gated(
                         first_low_after_high_at = None
                         high_seen = False
                 prev_level = level
-                if require_done_state and done and complete_at is None:
-                    complete_at = time.monotonic()
+                if require_done_state:
+                    # Snapshot levels only trigger a check. Delayed callbacks,
+                    # a false fall, or a second transaction cannot close capture.
+                    if not done:
+                        complete_at = None
+                    else:
+                        try:
+                            _completed_trace()
+                        except (KeyError, TypeError, ValueError, OverflowError):
+                            complete_at = None
+                        else:
+                            if complete_at is None:
+                                complete_at = time.monotonic()
             except Exception:
                 if gpi_value is not None:
                     log.debug("GPI poller iteration failed", exc_info=True)
@@ -620,12 +643,17 @@ def capture_gated(
                     )
                     for a, b in counter_trace.windows
                 ]
-                streamed_gate_windows = _select_streamed_window(
-                    raw_streamed,
-                    minimum_gate_s=minimum_gate_s,
-                    plan_floor_s=plan_floor_s,
-                    allow_fallback=allow_fallback,
-                )
+                if require_done_state:
+                    counter_trace, completed = _completed_trace()
+                    pair = (completed.rise, completed.fall)
+                    streamed_gate_windows = [raw_streamed[counter_trace.windows.index(pair)]]
+                else:
+                    streamed_gate_windows = _select_streamed_window(
+                        raw_streamed,
+                        minimum_gate_s=minimum_gate_s,
+                        plan_floor_s=plan_floor_s,
+                        allow_fallback=allow_fallback,
+                    )
                 if streamed_gate_windows is None:
                     raise ValueError("No complete qualifying packed GPI gate")
                 for pair in streamed_gate_windows:
