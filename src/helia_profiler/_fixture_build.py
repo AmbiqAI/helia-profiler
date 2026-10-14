@@ -43,7 +43,6 @@ from .fixture_target import (
 from .pipeline import PipelineContext, PipelineRunner, Stage, serialize_config
 from .placement import ArenaRole, Placement
 from .results.models import MemoryPlan, ToolchainInfo
-from .runtime_records import RuntimeQualification, qualification
 from .wire import STIMER_HZ
 
 
@@ -150,42 +149,27 @@ class FixtureCapability(StrEnum):
     UNSUPPORTED = "unsupported"
 
 
-#: The precision each fixture IO dtype stands for in the runtime records.
-_DTYPE_PRECISION = {
-    FixtureDType.INT8: "a8w8",
-    FixtureDType.INT16: "a16w8",
-    FixtureDType.FLOAT16: "fp16",
-    FixtureDType.FLOAT32: "fp32",
+# Public IO types handled by the fixture renderer and each engine integration.
+# These declarations do not describe internal tensor or kernel support.
+_FIXTURE_IO_DTYPES = {
+    EngineType.TFLM: frozenset(
+        {FixtureDType.INT8, FixtureDType.INT16, FixtureDType.INT32, FixtureDType.FLOAT32}
+    ),
+    EngineType.HELIA_AOT: frozenset(FixtureDType),
+    EngineType.HELIA_RT: frozenset(FixtureDType),
 }
 
-
-def _record_capability(engine: EngineType, dtype: FixtureDType) -> FixtureCapability:
-    if dtype is FixtureDType.INT32:
-        # Plain INT32 inputs are index payloads, not a qualified compute precision.
-        return FixtureCapability.SUPPORTED
-    board, precision = supported_fixture_target().board, _DTYPE_PRECISION[dtype]
-    answer = qualification(
-        engine.value, None, board=board, clock=FIXTURE_CLOCK_PROFILE, precision=precision
-    )
-    # A device pass belongs to an exact release/target/compute precision, not
-    # every model whose interface uses this dtype.
-    return (
-        FixtureCapability.UNSUPPORTED
-        if answer.state is RuntimeQualification.UNSUPPORTED
-        else FixtureCapability.SUPPORTED
-    )
-
-
-#: Fixture support per engine and IO dtype on the fixture target, from the
-#: runtime records, except plain INT32 index inputs, which are supported only.
-#: Generic IO support never grants release or model qualification. Exact
-#: qualification evidence remains available through runtime_records.qualification.
-#: The default record's unsupported IO remains refused.
+#: Generic fixture IO support, independent of runtime qualification evidence.
+#: INT32 support is input-only. Selected-engine failures still propagate.
 FIXTURE_CAPABILITIES: dict[EngineType, dict[str, FixtureCapability]] = {
-    engine: {dtype: _record_capability(engine, dtype) for dtype in FixtureDType}
-    for engine in (EngineType.TFLM, EngineType.HELIA_AOT, EngineType.HELIA_RT)
+    engine: {
+        dtype: (
+            FixtureCapability.SUPPORTED if dtype in supported else FixtureCapability.UNSUPPORTED
+        )
+        for dtype in FixtureDType
+    }
+    for engine, supported in _FIXTURE_IO_DTYPES.items()
 }
-
 
 #: Runtime providers a prepared-runtime build must not also resolve or link:
 #: any module whose name carries one of these, and the other prepared stacks.

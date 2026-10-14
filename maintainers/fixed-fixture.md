@@ -145,7 +145,7 @@ pins heliaAOT's `<prefix>_plan.json` and `<prefix>_report.json` when the
 installed heliaAOT writes them (the build first drops any an earlier build
 left in the work directory), and `FixtureBuild.engine_source` records the
 engine package version and, for a VCS install, its commit.
-`fixture_capabilities()` reports the qualified targets and each engine's IO
+`fixture_capabilities()` reports the supported targets and each engine's IO
 dtype status.
 
 API 2.0 removes the fixture's energy path: `FixtureEnergyWindow`, the `energy`
@@ -359,7 +359,8 @@ has extent 1, so declare it with `PerTensorQuantization`. A `FixedFixture` keeps
 its single-INT8 rules and renders exactly as before.
 
 `FIXTURE_CAPABILITIES` declares generic engine/IO support on the fixture
-target using the default runtime record's unsupported precision restrictions.
+target from the fixture integration's explicit IO declarations. Missing or
+unsupported runtime qualification records do not disable fixture execution.
 It reports `supported` or `unsupported`, never qualification inherited from
 another release. IO dtype does not prove a model's compute precision, operator
 support, numerical acceptance or device qualification. Plain INT32 inputs remain
