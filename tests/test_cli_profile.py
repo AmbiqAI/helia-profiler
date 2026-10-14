@@ -108,15 +108,18 @@ def test_profile_cli_owns_console_presentation(monkeypatch) -> None:
 
 
 def test_cli_choice_lists_mirror_the_config_enums():
-    """The --aggregation / --power-firmware Choice lists must derive from the
-    enums, not restate them: a hand-maintained list would let a new member
-    land invisible to the CLI (the drift class the wire-name binding test
-    closes for HPX_ENGINE)."""
-    from helia_profiler.cli.app import _AGGREGATION_CHOICE, _POWER_FIRMWARE_CHOICE
+    """CLI choices expose every member of their configuration enums."""
+    from typing import Any, cast
+
+    from typer.main import get_command
+
+    from helia_profiler.cli.app import app
     from helia_profiler.config import Aggregation, PowerFirmware
 
-    assert set(_AGGREGATION_CHOICE.choices) == {a.value for a in Aggregation}
-    assert set(_POWER_FIRMWARE_CHOICE.choices) == {f.value for f in PowerFirmware}
+    profile = cast(Any, get_command(app)).commands["profile"]
+    options = {param.name: param for param in profile.params}
+    assert set(options["aggregation"].type.choices) == {a.value for a in Aggregation}
+    assert set(options["power_firmware"].type.choices) == {f.value for f in PowerFirmware}
 
 
 def test_profile_signature_matches_override_specs():

@@ -23,7 +23,10 @@ import typer
 from ..config import Transport
 from ..engines import EngineType
 
-_TargetResetKind = StrEnum("_TargetResetKind", ["debug", "swpoi"])
+
+class _TargetResetKind(StrEnum):
+    DEBUG = "debug"
+    SWPOI = "swpoi"
 
 
 def register(app: typer.Typer) -> None:
@@ -227,7 +230,7 @@ def target_reset_command(
             "--kind",
             help="Reset kind: debug r/g reset (default) or SWPOI reset",
         ),
-    ] = _TargetResetKind.debug,
+    ] = _TargetResetKind.DEBUG,
 ) -> None:
     from .inspect_cmds import _cmd_target_reset
 

@@ -64,11 +64,22 @@ def _hpx_callback(
 _ArenaLocation = StrEnum(
     "_ArenaLocation", {p.name: p.value for p in Placement if p != Placement.MRAM}
 )
-_CoreOverride = StrEnum("_CoreOverride", ["cm4", "cm55"])
+
+
+class _CoreOverride(StrEnum):
+    CM4 = "cm4"
+    CM55 = "cm55"
+
+
 _PowerDriver = StrEnum(
     "_PowerDriver", {f"DRIVER_{i}": name for i, name in enumerate(list_drivers())}
 )
-_OutputFormat = StrEnum("_OutputFormat", ["csv", "json"])
+
+
+class _OutputFormat(StrEnum):
+    CSV = "csv"
+    JSON = "json"
+
 
 G_ENGINE = "engine"
 G_TARGET = "target hardware"
@@ -516,7 +527,10 @@ def profile_command(
     _cmd_profile(**params)
 
 
-_AnalyzeFormat = StrEnum("_AnalyzeFormat", ["table", "csv", "json"])
+class _AnalyzeFormat(StrEnum):
+    TABLE = "table"
+    CSV = "csv"
+    JSON = "json"
 
 
 @app.command(
@@ -557,7 +571,7 @@ def analyze_command(
             "--format",
             help="Output format (default: table)",
         ),
-    ] = _AnalyzeFormat.table,
+    ] = _AnalyzeFormat.TABLE,
     output: Annotated[
         Optional[Path], typer.Option("--output", "-o", help="Write output to file")
     ] = None,

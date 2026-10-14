@@ -49,7 +49,8 @@ def register(app: typer.Typer) -> None:
     )(validate_command)
 
 
-_PowerOnDriver = StrEnum("_PowerOnDriver", ["joulescope"])
+class _PowerOnDriver(StrEnum):
+    JOULESCOPE = "joulescope"
 
 
 def power_on_command(
@@ -59,7 +60,7 @@ def power_on_command(
             "--driver",
             help="Power driver that holds the target rail on (JS110/JS220/JS320 auto-detected)",
         ),
-    ] = _PowerOnDriver.joulescope,
+    ] = _PowerOnDriver.JOULESCOPE,
     power_serial: Annotated[
         Optional[str],
         typer.Option(
@@ -75,8 +76,17 @@ def power_on_command(
     _cmd_power_on(str(driver), power_serial=power_serial)
 
 
-_ValidatePower = StrEnum("_ValidatePower", ["both", "on", "off"])
-_ValidateSuite = StrEnum("_ValidateSuite", ["smoke", "models-rt", "models-aot", "complete"])
+class _ValidatePower(StrEnum):
+    BOTH = "both"
+    ON = "on"
+    OFF = "off"
+
+
+class _ValidateSuite(StrEnum):
+    SMOKE = "smoke"
+    MODELS_RT = "models-rt"
+    MODELS_AOT = "models-aot"
+    COMPLETE = "complete"
 
 
 def validate_command(
@@ -148,7 +158,7 @@ def validate_command(
             "--power",
             help="Power matrix: off (default) | on (only Joulescope runs) | both.",
         ),
-    ] = _ValidatePower.off,
+    ] = _ValidatePower.OFF,
     power_boards: Annotated[
         str,
         typer.Option(
