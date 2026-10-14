@@ -287,8 +287,9 @@ do not cover `/dev/tty*`.
 
 ## Expected output
 
-`hpx doctor` prints one row per tool. Captured on macOS 26.6 on 2026-09-21
-with the tools installed as above:
+`hpx doctor` prints one row per tool. The tool table was captured on macOS 26.6
+on 2026-09-21. The environment diagnostic below is illustrative; your Python
+path and driver version will differ:
 
 <AsciiTerminal animated copy="commands" title="Check host tools" lines={[
   {
@@ -332,14 +333,25 @@ with the tools installed as above:
     "text": ""
   },
   {
+    "text": "  Unknown: Joulescope environment: Python 3.12; /path/to/python; driver 2.3.4; unknown"
+  },
+  {
+    "text": "    Device or driver metadata is unknown; JS320 compatibility was not determined."
+  },
+  {
+    "text": ""
+  },
+  {
     "text": "  All required tools found."
   }
 ]} />
 
 A dash in the first column marks an optional tool that was not found
 (heliaAOT, `armclang`); those rows only matter if you use that engine or
-toolchain. `hpx doctor` checks presence, not versions: the minimum versions
-are on [Hardware prerequisites](../hardware-prerequisites/).
+toolchain. The tool table checks presence; minimum versions are on
+[Hardware prerequisites](../hardware-prerequisites/). The environment diagnostic
+uses host metadata. `Unknown` means doctor has not inspected attached
+instruments; it does not mean a required host tool is missing.
 
 ## What next
 
