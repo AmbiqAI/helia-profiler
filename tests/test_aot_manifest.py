@@ -359,7 +359,7 @@ class TestWriteAotMemoryLayers:
         )  # duck-typed ctx stand-in
 
         assert out is not None
-        rows = list(csv.DictReader(open(out)))
+        rows = list(csv.DictReader(open(out, encoding="utf-8")))
         assert rows[0]["layer_id"] == "0"
         assert rows[0]["tensor_role"] == "local"
         assert rows[0]["memory"] == "dtcm"
@@ -392,7 +392,7 @@ class TestWriteAotMemoryLayers:
         )  # duck-typed ctx stand-in
 
         assert out is not None
-        rows = list(csv.DictReader(open(out)))
+        rows = list(csv.DictReader(open(out, encoding="utf-8")))
         assert rows[0]["size"] == "1024"
 
 

@@ -186,7 +186,7 @@ class TestCsvWriterJoin:
         )
         manifest = [{"idx": 0, "id": 0}, {"idx": 1, "id": 5}]  # position 2 absent
         out = _write_csv(pmu, tmp_path, _skewed_analysis(), aot_op_manifest=manifest)
-        rows = list(csv_mod.DictReader(open(out)))
+        rows = list(csv_mod.DictReader(open(out, encoding="utf-8")))
 
         assert [r["source_index"] for r in rows] == ["0", "5", ""]
         assert rows[0]["macs"] == "100000"
@@ -216,7 +216,7 @@ class TestCsvWriterJoin:
             ],
         )
         out = _write_csv(pmu, tmp_path, analysis)
-        rows = list(csv_mod.DictReader(open(out)))
+        rows = list(csv_mod.DictReader(open(out, encoding="utf-8")))
         assert "source_index" not in rows[0]
         assert rows[0]["macs"] == "10"
 

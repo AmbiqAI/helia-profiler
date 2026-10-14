@@ -120,7 +120,7 @@ def _write_aot_memory_layers(
     layer_id: int = 0,
     extra_rows: list[dict] | None = None,
 ) -> None:
-    with open(path / "aot_memory_layers.csv", "w", newline="") as f:
+    with open(path / "aot_memory_layers.csv", "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(
             f,
             fieldnames=[
@@ -169,7 +169,7 @@ def _write_aot_memory_layers(
 
 def _replace_csv_with_json(path: Path) -> None:
     csv_path = path / "profile_results.csv"
-    with open(csv_path, newline="") as stream:
+    with open(csv_path, newline="", encoding="utf-8") as stream:
         layers = [dict(row) for row in csv.DictReader(stream)]
     (path / "profile_results.json").write_text(json.dumps({"layers": layers}))
     csv_path.unlink()
@@ -569,7 +569,7 @@ def test_write_compare_artifacts(tmp_path: Path):
     assert "verdict" not in summary
     assert summary["comparability"]["run_metrics_comparable"] is True
     assert isinstance(summary["comparability"]["issues"], list)
-    with open(tmp_path / "diff" / "layer_diff.csv", newline="") as f:
+    with open(tmp_path / "diff" / "layer_diff.csv", newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
     assert rows[0]["baseline_op"] == "CONV_2D"
     assert rows[0]["delta_cycles"] == "-100.0"
@@ -630,7 +630,7 @@ def test_compare_includes_aot_memory_placement_diffs(tmp_path: Path):
 
     paths = write_compare_artifacts(result, tmp_path / "diff")
     assert {p.name for p in paths} == {"compare_summary.json", "layer_diff.csv"}
-    rows = list(csv.DictReader(open(tmp_path / "diff" / "layer_diff.csv")))
+    rows = list(csv.DictReader(open(tmp_path / "diff" / "layer_diff.csv", encoding="utf-8")))
     assert rows[0]["memory_changed"] == "True"
     assert "staged MRAM to SRAM" in rows[0]["candidate_memory"]
 
@@ -648,9 +648,9 @@ def test_memory_rows_join_on_the_source_index_not_position(tmp_path: Path):
         )
         # Rewrite the profile CSV with an AOT-style skewed layer: execution
         # position 0, ORIGINAL index 5.
-        rows = list(csv.DictReader(open(d / "profile_results.csv")))
+        rows = list(csv.DictReader(open(d / "profile_results.csv", encoding="utf-8")))
         rows[0]["op"] = "CONV_2D:5"
-        with open(d / "profile_results.csv", "w", newline="") as f:
+        with open(d / "profile_results.csv", "w", newline="", encoding="utf-8") as f:
             w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
             w.writeheader()
             w.writerows(rows)
@@ -709,9 +709,9 @@ def test_unresolvable_source_gets_no_memory_rows(tmp_path: Path):
         _write_run(
             d, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800]
         )
-        rows = list(csv.DictReader(open(d / "profile_results.csv")))
+        rows = list(csv.DictReader(open(d / "profile_results.csv", encoding="utf-8")))
         rows[0]["op"] = "OPERATOR_CALL:c3i12"
-        with open(d / "profile_results.csv", "w", newline="") as f:
+        with open(d / "profile_results.csv", "w", newline="", encoding="utf-8") as f:
             w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
             w.writeheader()
             w.writerows(rows)
@@ -750,10 +750,10 @@ def test_recorded_source_index_outranks_the_label_suffix(tmp_path: Path):
         _write_run(
             d, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800]
         )
-        rows = list(csv.DictReader(open(d / "profile_results.csv")))
+        rows = list(csv.DictReader(open(d / "profile_results.csv", encoding="utf-8")))
         rows[0]["op"] = "CONV_2D:5"
         rows[0]["source_index"] = "7"
-        with open(d / "profile_results.csv", "w", newline="") as f:
+        with open(d / "profile_results.csv", "w", newline="", encoding="utf-8") as f:
             w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
             w.writeheader()
             w.writerows(rows)
@@ -786,9 +786,9 @@ def test_zero_join_memory_artifacts_warn(tmp_path: Path):
         _write_run(
             d, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[800]
         )
-        rows = list(csv.DictReader(open(d / "profile_results.csv")))
+        rows = list(csv.DictReader(open(d / "profile_results.csv", encoding="utf-8")))
         rows[0]["op"] = "CONV_2D:5"
-        with open(d / "profile_results.csv", "w", newline="") as f:
+        with open(d / "profile_results.csv", "w", newline="", encoding="utf-8") as f:
             w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
             w.writeheader()
             w.writerows(rows)
@@ -809,9 +809,9 @@ def test_derived_analysis_fields_are_not_counter_diffs(tmp_path: Path):
         _write_run(
             d, toolchain="arm-none-eabi-gcc", total_cycles=1000, avg_us=10, layer_cycles=[cycles]
         )
-        rows = list(csv.DictReader(open(d / "profile_results.csv")))
+        rows = list(csv.DictReader(open(d / "profile_results.csv", encoding="utf-8")))
         rows[0].update({"macs": "1000", "ops": "2000", "cycles_per_mac": "0.8"})
-        with open(d / "profile_results.csv", "w", newline="") as f:
+        with open(d / "profile_results.csv", "w", newline="", encoding="utf-8") as f:
             w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
             w.writeheader()
             w.writerows(rows)

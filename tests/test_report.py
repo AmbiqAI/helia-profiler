@@ -471,20 +471,22 @@ def test_write_run_metadata_includes_target_lifecycle(tmp_path: Path):
     assert metadata["target_lifecycle"] == _LIFECYCLE_PLAN.to_metadata()
 
 
-def test_write_csv_includes_layer_cycle_percentages(tmp_path: Path):
+@pytest.mark.parametrize("op", ["CONV_2D", "convolution_é_日本語"])
+def test_write_csv_includes_layer_cycle_percentages(tmp_path: Path, op: str):
     pmu = PmuResult(
         meta=FirmwareMeta(),
         layers=[
-            LayerResult(id=0, op="CONV_2D", cycles=25.0),
+            LayerResult(id=0, op=op, cycles=25.0),
             LayerResult(id=1, op="DEPTHWISE_CONV_2D", cycles=75.0),
         ],
     )
 
     out_path = _write_csv(pmu, tmp_path)
-    with open(out_path, newline="") as f:
+    with open(out_path, newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
 
     assert rows[0]["cycles_pct"] == "25.0"
+    assert rows[0]["op"] == op
     assert rows[1]["cycles_pct"] == "75.0"
 
 
@@ -1867,13 +1869,15 @@ def test_missing_counter_still_publishes(tmp_path: Path):
     set_profile_result(ctx, pmu)
     _publish_bundle(ctx, tmp_path / "run")
 
-    with open(tmp_path / "run" / "profile_results.csv", newline="") as f:
+    with open(tmp_path / "run" / "profile_results.csv", newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
     assert rows[0]["ARM_PMU_CPU_CYCLES"] == ""
     assert float(rows[1]["ARM_PMU_CPU_CYCLES"]) == 500
     assert (tmp_path / "run" / "summary.json").is_file()
     assert (tmp_path / "run" / "result_manifest.json").is_file()
-    with open(tmp_path / "run" / "detailed" / "profile_basic_cpu.csv", newline="") as f:
+    with open(
+        tmp_path / "run" / "detailed" / "profile_basic_cpu.csv", newline="", encoding="utf-8"
+    ) as f:
         assert "ARM_PMU_CPU_CYCLES" in next(csv.reader(f))
 
     from helia_profiler.evaluation import (
