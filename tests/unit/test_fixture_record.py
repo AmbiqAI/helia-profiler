@@ -307,3 +307,26 @@ def test_power_build_identity_roundtrip_and_original_record_readback(tmp_path):
     altered["build"]["power_sync"]["sync_gpio_pin"] = 28
     with pytest.raises(ValueError):
         load_fixture_build(json.dumps(altered), roots=roots)
+
+
+@pytest.mark.parametrize("with_power", [False, True])
+def test_saved_api52_record_keeps_identity_and_file_checks(tmp_path, with_power):
+    from helia_profiler.fixture import FixturePowerSync
+
+    build = _build(tmp_path)
+    if with_power:
+        build = replace(
+            build,
+            timing_scope=FixtureTimingScope.RESTORE_AND_INVOKE,
+            power_sync=FixturePowerSync(29, 36, 14),
+        )
+        build = replace(build, build_identity=compiled_fixture_identity(build))
+    saved = json.loads(dump_fixture_build(build, roots={"run": tmp_path}))
+    # API 5.2 and 5.3 have the same compiled record schema and identity inputs.
+    saved["fixture_api"] = [5, 2]
+    encoded = json.dumps(saved)
+    assert load_fixture_build(encoded, roots={"run": tmp_path}) == build
+    assert json.loads(encoded)["fixture_api"] == [5, 2]
+    build.flat_binary.path.write_bytes(b"wrong image")
+    with pytest.raises(ValueError):
+        load_fixture_build(encoded, roots={"run": tmp_path})
