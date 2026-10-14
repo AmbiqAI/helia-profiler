@@ -10,11 +10,13 @@ protocol.
 from __future__ import annotations
 
 import logging
+import sys
 import threading
 import time
 from typing import Any
 
 from ...errors import PowerError
+from ..joulescope_compatibility import joulescope_python_hint
 
 log = logging.getLogger("hpx")
 
@@ -168,11 +170,13 @@ def _is_device_busy_error(message: str) -> bool:
 
 
 def _check_environment(family: str) -> None:
-    from ...hostenv.doctor import _check_joulescope_environment
-
-    check = _check_joulescope_environment(family)
-    if check.ok is False:
-        raise PowerError(f"Unsupported Joulescope environment: {check.installed}", hint=check.hint)
+    python = (sys.version_info.major, sys.version_info.minor)
+    hint = joulescope_python_hint((family,), python)
+    if hint is not None:
+        raise PowerError(
+            f"{family.upper()} is unsupported with Python {python[0]}.{python[1]} ({sys.executable})",
+            hint=hint,
+        )
 
 
 def _open_device(serial: str | None) -> tuple[Any, str, str]:

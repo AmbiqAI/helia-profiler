@@ -77,8 +77,8 @@ def print_doctor(
     for check in result.versions:
         if check.ok is not True and check.hint:
             state = "Warning" if check.ok is False else "Unknown"
-            console._console.print(f"  {state}: {check.label}: {check.installed}", highlight=False)
-            console._console.print(f"    {check.hint}", highlight=False)
+            console._console.print(Text(f"  {state}: {check.label}: {check.installed}"))
+            console._console.print(Text(f"    {check.hint}"))
     console._console.print()
 
     if result.ok:

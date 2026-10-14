@@ -16,6 +16,7 @@ from typing import Any
 from ..config import Toolchain, Transport
 from ..engines import EngineType
 from ..errors import CaptureError, ConfigError
+from ..power.joulescope_compatibility import joulescope_python_hint
 from ..target.probe.jlink import JLINK_COMMANDER, find_jlink_exe
 from .toolchains import get_toolchain_spec, resolve_toolchain_executable
 
@@ -131,13 +132,13 @@ class _EnvironmentCheck:
 def _environment(devices: tuple[str, ...] | None = None) -> _Environment:
     entry = "Scripts/hpx.exe" if os.name == "nt" else "bin/hpx"
     return _Environment(
-        (sys.version_info.major, sys.version_info.minor),
-        sys.executable,
-        _package_version("pyjoulescope-driver"),
-        devices,
-        shutil.which("hpx"),
-        Path(sys.prefix) / entry,
-        sys.prefix != sys.base_prefix,
+        python=(sys.version_info.major, sys.version_info.minor),
+        interpreter=sys.executable,
+        driver=_package_version("pyjoulescope-driver"),
+        devices=devices,
+        launcher=shutil.which("hpx"),
+        expected_launcher=Path(sys.prefix) / entry,
+        in_venv=sys.prefix != sys.base_prefix,
     )
 
 
@@ -148,31 +149,32 @@ def _joulescope_check(env: _Environment) -> DoctorVersionCheck:
         f"driver {env.driver or 'unknown'}; {devices}"
     )
     ok: bool | None = True
-    hint = None
-    if env.devices is None or (env.devices and env.driver is None):
+    hint = joulescope_python_hint(env.devices or (), env.python)
+    if hint is not None:
+        ok = False
+    elif env.devices is None or (env.devices and env.driver is None):
         ok = None
         hint = "Device or driver metadata is unknown; JS320 compatibility was not determined."
-    elif "js320" in env.devices and env.python < (3, 12):
-        ok = False
-        hint = (
-            "Run JS320 with Python >= 3.12 in the matching HPX environment. "
-            "JS110 and JS220 remain supported. See helia-profiler#228."
-        )
     return DoctorVersionCheck(
         "Joulescope environment", "js320_environment", installed, "JS320: Python >= 3.12", ok, hint
     )
 
 
-def _shim_check(env: _Environment) -> DoctorVersionCheck:
+def _launcher_check(env: _Environment) -> DoctorVersionCheck:
     assert env.launcher is not None
-    shadowed = Path(env.launcher).parent.name == "shims" and env.expected_launcher.is_file()
+    try:
+        same_entrypoint = Path(env.launcher).samefile(env.expected_launcher)
+    except OSError:
+        same_entrypoint = False
     return DoctorVersionCheck(
         "HPX launcher",
         "hpx_launcher",
         env.launcher,
         str(env.expected_launcher),
-        not shadowed,
-        f"Put {env.expected_launcher.parent} before pyenv shims on PATH." if shadowed else None,
+        True if same_entrypoint else None,
+        None
+        if same_entrypoint
+        else f"Launcher target not verified. Run {env.expected_launcher} to use this environment.",
     )
 
 
@@ -180,12 +182,11 @@ _ENVIRONMENT_CHECKS = (
     _EnvironmentCheck(
         lambda env: env.driver is not None or env.devices is not None, _joulescope_check
     ),
-    _EnvironmentCheck(lambda env: env.launcher is not None and env.in_venv, _shim_check),
+    _EnvironmentCheck(
+        lambda env: env.launcher is not None and env.in_venv and env.expected_launcher.is_file(),
+        _launcher_check,
+    ),
 )
-
-
-def _check_joulescope_environment(family: str) -> DoctorVersionCheck:
-    return _joulescope_check(_environment((family,)))
 
 
 def inspect_environment(
