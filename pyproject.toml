@@ -34,7 +34,7 @@ dependencies = [
     "pyjoulescope-driver>=2.2.12,<2.3.0; python_version < '3.12'",
     "pyjoulescope-driver>=2.3.4,<3; python_version >= '3.12'",
     "pydantic>=2.7,<3",
-    "typer>=0.16,<0.28",
+    "typer>=0.16",
     "click>=8.2",
 ]
 

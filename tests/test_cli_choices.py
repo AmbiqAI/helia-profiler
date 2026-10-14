@@ -69,8 +69,12 @@ def test_choice_contract(path, name, default):
     for value in expected:
         assert param.type.convert(value, param, None) == value
     for invalid in ("not-a-choice", expected[0].upper()):
-        with pytest.raises(BadParameter, match="is not one of"):
+        with pytest.raises(BadParameter) as error:
             param.type.convert(invalid, param, None)
+        messages = {f"{invalid!r} is not one of {', '.join(repr(v) for v in expected)}."}
+        if len(expected) == 1:
+            messages.add(f"{invalid!r} is not {expected[0]!r}.")
+        assert str(error.value) in messages
     result = CliRunner().invoke(app, [*path.split(), "--help"], env={"COLUMNS": "1000"})
     assert result.exit_code == 0, result.output
     help_text = "".join(result.output.split())
