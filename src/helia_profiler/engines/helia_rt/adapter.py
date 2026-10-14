@@ -80,6 +80,24 @@ def _require_ethos_u_source_support(source_path: Path) -> None:
     )
 
 
+def _reject_config_path(config: ProfileConfig) -> None:
+    if config.engine.config_path is not None:
+        raise EngineError(
+            "heliaRT does not read engine.config_path",
+            hint="Set supported heliaRT options inline in engine.config instead.",
+        )
+
+
+def _reject_prebuilt_cmsis_nn_override(config: ProfileConfig) -> None:
+    selected = resolve_cmsis_nn_selector(config, CMSIS_NN_MODULE)
+    if selected is not None:
+        raise EngineError(
+            f"heliaRT prebuilt distributions cannot apply {selected.selector}; "
+            "CMSIS-NN is already compiled into the archive.",
+            hint="Remove the CMSIS-NN override or use a registry/source build.",
+        )
+
+
 class HeliaRTAdapter(SingleArenaPlacementMixin):
     """Adapter for heliaRT — Ambiq's optimized TFLM fork.
 
@@ -100,6 +118,18 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
         stack, backend = self.prepared_runtime_contract
         if runtime.record.stack != stack or config.engine.backend != backend:
             raise EngineError(f"Prepared heliaRT requires {stack}/{backend}")
+        _reject_config_path(config)
+        _reject_prebuilt_cmsis_nn_override(config)
+        for option in ("variant", "core_override", "cmsis_nn_requantize_inline_asm"):
+            if option in config.engine.config:
+                raise EngineError(
+                    f"Prepared heliaRT cannot apply engine.config.{option}; "
+                    "the runtime archive is already compiled.",
+                    hint=(
+                        f"Remove engine.config.{option} to use the supplied runtime, "
+                        "or prepare a runtime with the desired build settings."
+                    ),
+                )
         revision = next(p.revision for p in runtime.record.providers if p.name == "helia-rt")
         return HeliaRtArtifacts(
             extra_modules=[prepare_runtime_module(runtime, work_dir)],
@@ -125,11 +155,7 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
         return PsramWeightsSource.HOST_UPLOAD
 
     def prepare(self, config: ProfileConfig, work_dir: Path) -> HeliaRtArtifacts:
-        if config.engine.config_path is not None:
-            raise EngineError(
-                "heliaRT does not read engine.config_path",
-                hint="Set supported heliaRT options inline in engine.config instead.",
-            )
+        _reject_config_path(config)
         backend = config.engine.backend or "helia"
         variant = config.engine.config.get("variant", "release-with-logs")
         core_override = config.engine.config.get("core_override")
@@ -167,13 +193,7 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
         use_local = source_path is not None or bool(dist_path_cfg) or bool(source_cfg)
 
         if use_local and source_path is None:
-            selected = resolve_cmsis_nn_selector(config, CMSIS_NN_MODULE)
-            if selected is not None:
-                raise EngineError(
-                    f"heliaRT prebuilt distributions cannot apply {selected.selector}; "
-                    "CMSIS-NN is already compiled into the archive.",
-                    hint="Remove the CMSIS-NN override or use a registry/source build.",
-                )
+            _reject_prebuilt_cmsis_nn_override(config)
 
         extra_modules: list[NsxModuleRef] = []
         cmake_vars: dict[str, str] = {}

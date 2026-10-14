@@ -16,6 +16,14 @@ TFLITE_MICRO_PROJECT = "nsx-tflite-micro"
 _SUPPORTED_BACKENDS = frozenset(("reference", "cmsis_nn"))
 
 
+def _reject_config_path(config: ProfileConfig) -> None:
+    if config.engine.config_path is not None:
+        raise EngineError(
+            "TFLM does not read engine.config_path",
+            hint="Remove engine.config_path; select the TFLM backend with engine.backend.",
+        )
+
+
 class TFLMAdapter(SingleArenaPlacementMixin):
     """Adapter for stock TensorFlow Lite for Microcontrollers."""
 
@@ -27,6 +35,7 @@ class TFLMAdapter(SingleArenaPlacementMixin):
         stack, backend = self.prepared_runtime_contract
         if runtime.record.stack != stack or config.engine.backend != backend:
             raise EngineError(f"Prepared TFLM requires {stack}/{backend}")
+        _reject_config_path(config)
         return TflmArtifacts(
             extra_modules=[prepare_runtime_module(runtime, work_dir)],
             engine_header=TFLM_ENGINE_HEADER,
@@ -48,11 +57,7 @@ class TFLMAdapter(SingleArenaPlacementMixin):
 
     def prepare(self, config: ProfileConfig, work_dir: Path) -> TflmArtifacts:
         """Resolve the reference or upstream-CMSIS-NN TFLM NSX modules."""
-        if config.engine.config_path is not None:
-            raise EngineError(
-                "TFLM does not read engine.config_path",
-                hint="Remove engine.config_path; select the TFLM backend with engine.backend.",
-            )
+        _reject_config_path(config)
         del work_dir
 
         backend = config.engine.backend or "reference"
