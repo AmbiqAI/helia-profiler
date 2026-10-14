@@ -337,7 +337,7 @@ def test_inspect_environment_include_versions_false_by_default(monkeypatch) -> N
 
     result = inspect_environment()
 
-    assert result.versions == ()
+    assert not {"cmake", "hpx", "neuralspotx"} & {v.name for v in result.versions}
 
 
 def test_inspect_environment_include_versions_true_populates_versions(monkeypatch) -> None:

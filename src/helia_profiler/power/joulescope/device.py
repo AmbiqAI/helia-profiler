@@ -167,6 +167,14 @@ def _is_device_busy_error(message: str) -> bool:
     )
 
 
+def _check_environment(family: str) -> None:
+    from ...hostenv.doctor import _check_joulescope_environment
+
+    check = _check_joulescope_environment(family)
+    if check.ok is False:
+        raise PowerError(f"Unsupported Joulescope environment: {check.installed}", hint=check.hint)
+
+
 def _open_device(serial: str | None) -> tuple[Any, str, str]:
     """The caller must release the device with :func:`_close_device` (or ignore
     that step if the device handle should remain open across calls — e.g.
@@ -207,6 +215,7 @@ def _open_device(serial: str | None) -> tuple[Any, str, str]:
         device_path = paths[0]
 
     family = _family_from_path(device_path)
+    _check_environment(family)
 
     with _device_open_lock:
         if _open_refcounts.get(device_path, 0) > 0:
