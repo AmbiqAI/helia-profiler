@@ -7,13 +7,11 @@ to the main Typer app via :func:`register` so the module needs no import of
 
 from __future__ import annotations
 
+from enum import StrEnum
 from pathlib import Path
 from typing import Annotated, Optional
 
 import typer
-
-# typer vendors click for ``click_type``; see the note in ``app.py``.
-from typer._types import TyperChoice
 
 
 def register(app: typer.Typer) -> None:
@@ -51,18 +49,17 @@ def register(app: typer.Typer) -> None:
     )(validate_command)
 
 
-_POWER_ON_DRIVER_CHOICE = TyperChoice(["joulescope"])
+_PowerOnDriver = StrEnum("_PowerOnDriver", ["joulescope"])
 
 
 def power_on_command(
     driver: Annotated[
-        str,
+        _PowerOnDriver,
         typer.Option(
             "--driver",
-            click_type=_POWER_ON_DRIVER_CHOICE,
             help="Power driver that holds the target rail on (JS110/JS220/JS320 auto-detected)",
         ),
-    ] = "joulescope",
+    ] = _PowerOnDriver.joulescope,
     power_serial: Annotated[
         Optional[str],
         typer.Option(
@@ -75,11 +72,11 @@ def power_on_command(
     """Enable Joulescope current passthrough and hold open until Ctrl-C."""
     from .power_cmd import _cmd_power_on
 
-    _cmd_power_on(driver, power_serial=power_serial)
+    _cmd_power_on(str(driver), power_serial=power_serial)
 
 
-_VALIDATE_POWER_CHOICE = TyperChoice(["both", "on", "off"])
-_VALIDATE_SUITE_CHOICE = TyperChoice(["smoke", "models-rt", "models-aot", "complete"])
+_ValidatePower = StrEnum("_ValidatePower", ["both", "on", "off"])
+_ValidateSuite = StrEnum("_ValidateSuite", ["smoke", "models-rt", "models-aot", "complete"])
 
 
 def validate_command(
@@ -146,13 +143,12 @@ def validate_command(
         ),
     ] = "",
     power: Annotated[
-        str,
+        _ValidatePower,
         typer.Option(
             "--power",
-            click_type=_VALIDATE_POWER_CHOICE,
             help="Power matrix: off (default) | on (only Joulescope runs) | both.",
         ),
-    ] = "off",
+    ] = _ValidatePower.off,
     power_boards: Annotated[
         str,
         typer.Option(
@@ -196,10 +192,9 @@ def validate_command(
         ),
     ] = "",
     suite: Annotated[
-        Optional[str],
+        Optional[_ValidateSuite],
         typer.Option(
             "--suite",
-            click_type=_VALIDATE_SUITE_CHOICE,
             help=(
                 "Preset suite. 'smoke' defaults unset axes to models=kws, engines=helia-rt, "
                 "toolchains=arm-none-eabi-gcc, interfaces=rtt, memories=auto. "
@@ -288,13 +283,13 @@ def validate_command(
         engines=engines,
         executorch_backends=executorch_backends,
         ns_cmsis_nn_ref=ns_cmsis_nn_ref,
-        power=power,
+        power=str(power),
         power_boards=power_boards,
         boards=boards,
         toolchains=toolchains,
         transports=transports,
         memories=memories,
-        suite=suite,
+        suite=str(suite) if suite is not None else None,
         jlink_serials=jlink_serials,
         power_serials=power_serials,
         power_gpios=power_gpios,
