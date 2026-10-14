@@ -771,5 +771,5 @@ def test_power_render_gates_full_restore_loop_after_warmups(tmp_path, engine):
     assert "deployment_output_1[i] =" in text[end:]
     assert text.count("_model_init(&model_ctx)") == (1 if engine is EngineType.HELIA_AOT else 0)
     main = text.split("int main() {", 1)[1]
-    for index, value in enumerate(("0x50575231", "1", "29", "36", "14")):
+    for index, value in enumerate(("0x50575231", "2", "29", "36", "14")):
         assert main.index(f"deployment_power[{index}] = {value}U;") < main.index("nsx_system_init")
