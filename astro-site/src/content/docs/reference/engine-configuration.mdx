@@ -52,8 +52,8 @@ compile heliaRT with the selected toolchain instead.
 Registry and local-source builds declare `nsx-cmsis-nn` and derive its float
 switches from the model. HPX enables `ARM_NN_ENABLE_F32` when the model computes
 in float, or when its tensor types cannot be read. It additionally enables
-`ARM_NN_ENABLE_F16` for FLOAT16 compute on an MVE-capable core. FLOAT16 weights
-with FLOAT32 compute do not by themselves enable FP16 kernels. Integer-only
+`ARM_NN_ENABLE_F16` for FLOAT16 compute on an MVE-capable core, including
+FLOAT16 weights widened by `DEQUANTIZE` before FLOAT32 computation. Integer-only
 models request neither float switch.
 
 These switches select source-build capabilities, not proof that a particular
