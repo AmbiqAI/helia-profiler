@@ -102,6 +102,49 @@ helia-rt 13 2060239.0
 
 ## Variations
 
+### Portable ordinary-profile view
+
+For ordinary profile bundles with summary schema 11 or 12, the additive
+offline reader verifies publication, artifact paths, sizes and hashes, and
+summary/metadata identity before returning a native record:
+
+```python
+from helia_profiler.api import inspect_result, load_result, observations, export_result
+
+checked = inspect_result("my-profile/results")
+if checked.result is None:
+    raise ValueError(f"{checked.code}: {checked.message}")
+record = load_result("my-profile/results")
+view = observations(record)
+export_result(record, "portable-result.json")  # refuses an existing destination
+```
+
+The same reader is available without loading device drivers:
+
+```bash
+hpx results inspect my-profile/results
+hpx results show my-profile/results
+hpx results export my-profile/results --output portable-result.json
+```
+
+`inspect` emits a structured envelope and exits nonzero for incomplete,
+unsupported or invalid evidence. A verified failed run remains a failed
+result; it does not become a successful measurement. Missing manifests and
+publication markers are refusals, without a legacy fallback.
+
+The portable view uses the draft result contract maintained in
+[helia-benchmark's result-contract work](https://github.com/AmbiqAI/helia-benchmark/issues/75).
+It maps profiled Invoke timing, explicitly recorded restore-plus-Invoke
+timing, arena capacity/allocation and linked data/BSS as distinct facts.
+Unknown values and provenance remain null. Byte counts remain integers;
+timing converted from microseconds retains its source pointer and conversion.
+Reported and observed clocks are evidence, not external calibration.
+
+This view does not map fixture captures, rail energy or per-layer attribution.
+It does not replace the existing native loaders or `hpx compare`, and it
+does not qualify numerical correctness or authenticate a result. The older
+shipped examples above continue to use their existing native loaders.
+
 - Regression gate in CI: save the profile below and run
   `hpx compare baseline candidate --profile regression-profile.json`; a
   regression beyond the tolerance exits non-zero.
@@ -131,7 +174,7 @@ helia-rt 13 2060239.0
 
 ## Validated on
 
-Host-only. Every command above was executed on 2026-09-21 on macOS with
+Host-only. The original shipped-bundle loaders and comparison example were executed on 2026-09-21 on macOS with
 hpx 0.1.6 against the shipped bundles, which come from nightly hardware
 validation [run 35078330526](https://github.com/AmbiqAI/helia-profiler/actions/runs/35078330526)
 (2026-09-16, source commit `0714893`, boards `apollo510_evb`,

@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ambiqai.github.io/helia-benchmark/contracts/results/v1/inspection.schema.json",
+  "title": "Helia result inspection (draft v1)",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "1.0-draft"
+    },
+    "status": {
+      "enum": [
+        "verified",
+        "incomplete",
+        "unverified",
+        "invalid",
+        "unsupported"
+      ]
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "result": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "result.schema.json"
+        }
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "status",
+    "issues",
+    "result"
+  ],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "verified"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "$ref": "result.schema.json"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "result": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ]
+}

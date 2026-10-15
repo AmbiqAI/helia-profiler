@@ -1,119 +1,249 @@
 """heliaPROFILER — Profile LiteRT and ExecuTorch models on Ambiq silicon"""
 
-from . import examples
-from ._version import __version__
-from .api import profile
-from .config import (
-    BuildConfig,
-    ClockSelection,
-    EngineConfig,
-    HeartbeatConfig,
-    ModelConfig,
-    NsxModuleOverride,
-    OutputConfig,
-    OutputFormat,
-    PowerConfig,
-    ProfileConfig,
-    ProfilingConfig,
-    TargetConfig,
-    TimeoutsConfig,
-    Toolchain,
-    Transport,
-)
-from .deps.compatibility import (
-    CompatibilityBaseline,
-    CompatibilityResolution,
-    QualificationState,
-    load_compatibility_baseline,
-)
-from .deps.dependencies import read_dependency_lock_provenance
-from .diagnostics.support_bundle import (
-    SupportBundleOptions,
-    collect_support_bundle,
-    verify_support_bundle,
-    write_support_bundle,
-)
-from .engines import EngineType
-from .errors import (
-    BuildError,
-    CaptureError,
-    ConfigError,
-    DependencyError,
-    DeterministicCaptureError,
-    EngineError,
-    FirmwareError,
-    HpxError,
-    LockError,
-    NetworkError,
-    PlatformError,
-    PowerError,
-    ReportError,
-    VersionError,
-)
-from .evaluation import (
-    ComparabilityAssessment,
-    ComparabilityIssue,
-    ComparabilitySeverity,
-    CompareResult,
-    ComparisonProfile,
-    ComparisonVerdict,
-    MetricDirection,
-    MetricPolicy,
-    MetricVerdict,
-    MissingMetricPolicy,
-    RunEvaluation,
-    VerdictStatus,
-    assess_comparability,
-    evaluate_comparison_profile,
-    evaluate_run,
-)
-from .hostenv.doctor import DoctorCheck, DoctorResult, DoctorVersionCheck
-from .modelcost import ModelAnalysis
-from .pipeline import ProgressUpdate
-from .placement import Placement
-from .platform import BoardDef, SocDef, build_platform_registry, get_soc
-from .platform.counters import PmuCounter
-from .power.base import PowerMode, PowerResult
-from .power.metadata import (
-    MeasurementScope,
-    ObservationMode,
-    PowerIntegrity,
-    PowerMetadata,
-)
-from .results import (
-    DependencyLockProvenance,
-    FirmwareMeta,
-    LayerResult,
-    NsxModuleRef,
-    OnDevicePowerSummary,
-    PmuResult,
-    PowerObservation,
-    PowerTerminalRecord,
-    PresetResult,
-    ProfileResult,
-    ResultArtifact,
-    ResultIssue,
-    ResultManifest,
-    ResultValidity,
-    RunMetadata,
-    RunStatus,
-    SupportBundleManifest,
-    SupportBundleSection,
-    load_result_manifest,
-)
-from .runtime_records import (
-    Qualification,
-    QualifiedTarget,
-    RuntimeQualification,
-    RuntimeRecord,
-    RuntimeSource,
-    qualification,
-    runtimes,
-)
-from .session import Session
-from .target.lifecycle import ResetStrategy
-from .target.probe.jlink import JLinkProbe, JLinkProbeMatch
-from .transport.ports import SerialPortInfo
+from __future__ import annotations
+
+from importlib import import_module
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from . import examples
+    from ._version import __version__
+    from .api import profile
+    from .config import (
+        BuildConfig,
+        ClockSelection,
+        EngineConfig,
+        HeartbeatConfig,
+        ModelConfig,
+        NsxModuleOverride,
+        OutputConfig,
+        OutputFormat,
+        PowerConfig,
+        ProfileConfig,
+        ProfilingConfig,
+        TargetConfig,
+        TimeoutsConfig,
+        Toolchain,
+        Transport,
+    )
+    from .deps.compatibility import (
+        CompatibilityBaseline,
+        CompatibilityResolution,
+        QualificationState,
+        load_compatibility_baseline,
+    )
+    from .deps.dependencies import read_dependency_lock_provenance
+    from .diagnostics.support_bundle import (
+        SupportBundleOptions,
+        collect_support_bundle,
+        verify_support_bundle,
+        write_support_bundle,
+    )
+    from .engines import EngineType
+    from .errors import (
+        BuildError,
+        CaptureError,
+        ConfigError,
+        DependencyError,
+        DeterministicCaptureError,
+        EngineError,
+        FirmwareError,
+        HpxError,
+        LockError,
+        NetworkError,
+        PlatformError,
+        PowerError,
+        ReportError,
+        VersionError,
+    )
+    from .evaluation import (
+        ComparabilityAssessment,
+        ComparabilityIssue,
+        ComparabilitySeverity,
+        CompareResult,
+        ComparisonProfile,
+        ComparisonVerdict,
+        MetricDirection,
+        MetricPolicy,
+        MetricVerdict,
+        MissingMetricPolicy,
+        RunEvaluation,
+        VerdictStatus,
+        assess_comparability,
+        evaluate_comparison_profile,
+        evaluate_run,
+    )
+    from .hostenv.doctor import DoctorCheck, DoctorResult, DoctorVersionCheck
+    from .modelcost import ModelAnalysis
+    from .pipeline import ProgressUpdate
+    from .placement import Placement
+    from .platform import BoardDef, SocDef, build_platform_registry, get_soc
+    from .platform.counters import PmuCounter
+    from .power.base import PowerMode, PowerResult
+    from .power.metadata import (
+        MeasurementScope,
+        ObservationMode,
+        PowerIntegrity,
+        PowerMetadata,
+    )
+    from .results import (
+        DependencyLockProvenance,
+        FirmwareMeta,
+        LayerResult,
+        NsxModuleRef,
+        OnDevicePowerSummary,
+        PmuResult,
+        PowerObservation,
+        PowerTerminalRecord,
+        PresetResult,
+        ProfileResult,
+        ResultArtifact,
+        ResultIssue,
+        ResultManifest,
+        ResultValidity,
+        RunMetadata,
+        RunStatus,
+        SupportBundleManifest,
+        SupportBundleSection,
+        load_result_manifest,
+    )
+    from .runtime_records import (
+        Qualification,
+        QualifiedTarget,
+        RuntimeQualification,
+        RuntimeRecord,
+        RuntimeSource,
+        qualification,
+        runtimes,
+    )
+    from .session import Session
+    from .target.lifecycle import ResetStrategy
+    from .target.probe.jlink import JLinkProbe, JLinkProbeMatch
+    from .transport.ports import SerialPortInfo
+
+_EXPORTS = {
+    "examples": (".examples", None),
+    "__version__": ("._version", "__version__"),
+    "profile": (".api", "profile"),
+    "BuildConfig": (".config", "BuildConfig"),
+    "ClockSelection": (".config", "ClockSelection"),
+    "EngineConfig": (".config", "EngineConfig"),
+    "HeartbeatConfig": (".config", "HeartbeatConfig"),
+    "ModelConfig": (".config", "ModelConfig"),
+    "NsxModuleOverride": (".config", "NsxModuleOverride"),
+    "OutputConfig": (".config", "OutputConfig"),
+    "OutputFormat": (".config", "OutputFormat"),
+    "PowerConfig": (".config", "PowerConfig"),
+    "ProfileConfig": (".config", "ProfileConfig"),
+    "ProfilingConfig": (".config", "ProfilingConfig"),
+    "TargetConfig": (".config", "TargetConfig"),
+    "TimeoutsConfig": (".config", "TimeoutsConfig"),
+    "Toolchain": (".config", "Toolchain"),
+    "Transport": (".config", "Transport"),
+    "CompatibilityBaseline": (".deps.compatibility", "CompatibilityBaseline"),
+    "CompatibilityResolution": (".deps.compatibility", "CompatibilityResolution"),
+    "QualificationState": (".deps.compatibility", "QualificationState"),
+    "load_compatibility_baseline": (".deps.compatibility", "load_compatibility_baseline"),
+    "read_dependency_lock_provenance": (".deps.dependencies", "read_dependency_lock_provenance"),
+    "SupportBundleOptions": (".diagnostics.support_bundle", "SupportBundleOptions"),
+    "collect_support_bundle": (".diagnostics.support_bundle", "collect_support_bundle"),
+    "verify_support_bundle": (".diagnostics.support_bundle", "verify_support_bundle"),
+    "write_support_bundle": (".diagnostics.support_bundle", "write_support_bundle"),
+    "EngineType": (".engines", "EngineType"),
+    "BuildError": (".errors", "BuildError"),
+    "CaptureError": (".errors", "CaptureError"),
+    "ConfigError": (".errors", "ConfigError"),
+    "DependencyError": (".errors", "DependencyError"),
+    "DeterministicCaptureError": (".errors", "DeterministicCaptureError"),
+    "EngineError": (".errors", "EngineError"),
+    "FirmwareError": (".errors", "FirmwareError"),
+    "HpxError": (".errors", "HpxError"),
+    "LockError": (".errors", "LockError"),
+    "NetworkError": (".errors", "NetworkError"),
+    "PlatformError": (".errors", "PlatformError"),
+    "PowerError": (".errors", "PowerError"),
+    "ReportError": (".errors", "ReportError"),
+    "VersionError": (".errors", "VersionError"),
+    "ComparabilityAssessment": (".evaluation", "ComparabilityAssessment"),
+    "ComparabilityIssue": (".evaluation", "ComparabilityIssue"),
+    "ComparabilitySeverity": (".evaluation", "ComparabilitySeverity"),
+    "CompareResult": (".evaluation", "CompareResult"),
+    "ComparisonProfile": (".evaluation", "ComparisonProfile"),
+    "ComparisonVerdict": (".evaluation", "ComparisonVerdict"),
+    "MetricDirection": (".evaluation", "MetricDirection"),
+    "MetricPolicy": (".evaluation", "MetricPolicy"),
+    "MetricVerdict": (".evaluation", "MetricVerdict"),
+    "MissingMetricPolicy": (".evaluation", "MissingMetricPolicy"),
+    "RunEvaluation": (".evaluation", "RunEvaluation"),
+    "VerdictStatus": (".evaluation", "VerdictStatus"),
+    "assess_comparability": (".evaluation", "assess_comparability"),
+    "evaluate_comparison_profile": (".evaluation", "evaluate_comparison_profile"),
+    "evaluate_run": (".evaluation", "evaluate_run"),
+    "DoctorCheck": (".hostenv.doctor", "DoctorCheck"),
+    "DoctorResult": (".hostenv.doctor", "DoctorResult"),
+    "DoctorVersionCheck": (".hostenv.doctor", "DoctorVersionCheck"),
+    "ModelAnalysis": (".modelcost", "ModelAnalysis"),
+    "ProgressUpdate": (".pipeline", "ProgressUpdate"),
+    "Placement": (".placement", "Placement"),
+    "BoardDef": (".platform", "BoardDef"),
+    "SocDef": (".platform", "SocDef"),
+    "build_platform_registry": (".platform", "build_platform_registry"),
+    "get_soc": (".platform", "get_soc"),
+    "PmuCounter": (".platform.counters", "PmuCounter"),
+    "PowerMode": (".power.base", "PowerMode"),
+    "PowerResult": (".power.base", "PowerResult"),
+    "MeasurementScope": (".power.metadata", "MeasurementScope"),
+    "ObservationMode": (".power.metadata", "ObservationMode"),
+    "PowerIntegrity": (".power.metadata", "PowerIntegrity"),
+    "PowerMetadata": (".power.metadata", "PowerMetadata"),
+    "DependencyLockProvenance": (".results", "DependencyLockProvenance"),
+    "FirmwareMeta": (".results", "FirmwareMeta"),
+    "LayerResult": (".results", "LayerResult"),
+    "NsxModuleRef": (".results", "NsxModuleRef"),
+    "OnDevicePowerSummary": (".results", "OnDevicePowerSummary"),
+    "PmuResult": (".results", "PmuResult"),
+    "PowerObservation": (".results", "PowerObservation"),
+    "PowerTerminalRecord": (".results", "PowerTerminalRecord"),
+    "PresetResult": (".results", "PresetResult"),
+    "ProfileResult": (".results", "ProfileResult"),
+    "ResultArtifact": (".results", "ResultArtifact"),
+    "ResultIssue": (".results", "ResultIssue"),
+    "ResultManifest": (".results", "ResultManifest"),
+    "ResultValidity": (".results", "ResultValidity"),
+    "RunMetadata": (".results", "RunMetadata"),
+    "RunStatus": (".results", "RunStatus"),
+    "SupportBundleManifest": (".results", "SupportBundleManifest"),
+    "SupportBundleSection": (".results", "SupportBundleSection"),
+    "load_result_manifest": (".results", "load_result_manifest"),
+    "Qualification": (".runtime_records", "Qualification"),
+    "QualifiedTarget": (".runtime_records", "QualifiedTarget"),
+    "RuntimeQualification": (".runtime_records", "RuntimeQualification"),
+    "RuntimeRecord": (".runtime_records", "RuntimeRecord"),
+    "RuntimeSource": (".runtime_records", "RuntimeSource"),
+    "qualification": (".runtime_records", "qualification"),
+    "runtimes": (".runtime_records", "runtimes"),
+    "Session": (".session", "Session"),
+    "ResetStrategy": (".target.lifecycle", "ResetStrategy"),
+    "JLinkProbe": (".target.probe.jlink", "JLinkProbe"),
+    "JLinkProbeMatch": (".target.probe.jlink", "JLinkProbeMatch"),
+    "SerialPortInfo": (".transport.ports", "SerialPortInfo"),
+}
+
+
+def __getattr__(name: str) -> Any:
+    """Resolve public symbols without importing execution code for offline readers."""
+    if name not in _EXPORTS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module, attribute = _EXPORTS[name]
+    loaded = import_module(module, __name__)
+    value = loaded if attribute is None else getattr(loaded, attribute)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | set(_EXPORTS))
+
 
 __all__ = [
     "__version__",

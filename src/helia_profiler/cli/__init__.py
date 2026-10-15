@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .app import app
+import sys
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -12,7 +12,25 @@ def main(argv: list[str] | None = None) -> None:
     command implementations continue to raise ``SystemExit`` with the same
     exit codes as the previous argparse-based CLI.
     """
-    app(args=argv, prog_name="hpx")
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments[:1] == ["results"]:
+        from .results_cmd import app as results_app
+
+        results_app(args=arguments[1:], prog_name="hpx results")
+        return
+    from .app import app
+
+    globals()["app"] = app
+    app(args=arguments, prog_name="hpx")
+
+
+def __getattr__(name: str):
+    if name == "app":
+        from .app import app
+
+        globals()["app"] = app
+        return app
+    raise AttributeError(name)
 
 
 __all__ = ["main"]

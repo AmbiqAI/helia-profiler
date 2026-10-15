@@ -1,0 +1,14 @@
+{
+  "authority": "AmbiqAI/helia-benchmark#75",
+  "status": "draft, not released",
+  "files": {
+    "result.schema.json": {
+      "source": "/home/adamp/Ambiq/aitg/orchestration/teams/docs-bench/workspaces/bench/worktrees/helia-benchmark-result-contract-20261015/contracts/results/v1/result.schema.json",
+      "sha256": "8826d24d4447e79cda5970665b3de563cac0d5059883df1ae2ec17c57e3e516f"
+    },
+    "inspection.schema.json": {
+      "source": "/home/adamp/Ambiq/aitg/orchestration/teams/docs-bench/workspaces/bench/worktrees/helia-benchmark-result-contract-20261015/contracts/results/v1/inspection.schema.json",
+      "sha256": "59ef3a2d64c02067aa3aa946fb59526109cc45a9d545f48428366c329a9274b8"
+    }
+  }
+}
