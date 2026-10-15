@@ -2617,7 +2617,10 @@
         "epilog": null,
         "deprecated": false,
         "hidden": false,
-        "source": null,
+        "source": {
+          "path": "src/helia_profiler/cli/results_cmd.py",
+          "line": 20
+        },
         "arguments": [],
         "options": [],
         "panels": [],
@@ -2637,7 +2640,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/results_cmd.py",
-              "line": 63
+              "line": 70
             },
             "arguments": [
               {
@@ -2722,7 +2725,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/results_cmd.py",
-              "line": 18
+              "line": 25
             },
             "arguments": [
               {
@@ -2775,7 +2778,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/results_cmd.py",
-              "line": 53
+              "line": 60
             },
             "arguments": [
               {

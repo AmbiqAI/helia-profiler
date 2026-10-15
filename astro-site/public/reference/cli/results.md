@@ -10,6 +10,8 @@ hpx results COMMAND [ARGS]...
 
 Inspect and export verified ordinary profile bundles.
 
+Defined in `src/helia_profiler/cli/results_cmd.py` line 20.
+
 ## hpx results export
 
 ```bash
@@ -18,7 +20,7 @@ hpx results export [OPTIONS] LOCATION
 
 Write a new portable JSON file; existing evidence is never overwritten.
 
-Defined in `src/helia_profiler/cli/results_cmd.py` line 63.
+Defined in `src/helia_profiler/cli/results_cmd.py` line 70.
 
 ### Arguments
 
@@ -40,7 +42,7 @@ hpx results inspect LOCATION
 
 Emit a structured inspection; a verified failed run is not corrupt evidence.
 
-Defined in `src/helia_profiler/cli/results_cmd.py` line 18.
+Defined in `src/helia_profiler/cli/results_cmd.py` line 25.
 
 ### Arguments
 
@@ -56,7 +58,7 @@ hpx results show LOCATION
 
 Emit the portable JSON view of a verified native bundle.
 
-Defined in `src/helia_profiler/cli/results_cmd.py` line 53.
+Defined in `src/helia_profiler/cli/results_cmd.py` line 60.
 
 ### Arguments
 
