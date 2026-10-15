@@ -511,13 +511,14 @@ def _write_attributes_header(aot_module_dir: Path, prefix: str) -> Path:
     return header_path
 
 
-def _check_helia_aot_version() -> str:
+def _check_helia_aot_version(*, allow_unsupported_version: bool = False) -> str:
     """Verify the installed ``helia-aot`` package is within the recorded range.
 
     Raises ``EngineError`` with installation guidance if the package is
     missing, older than ``HELIAAOT_MIN_VERSION``, or at/above
-    ``HELIAAOT_MAX_VERSION_EXCLUSIVE``. Logs the detected version on success
-    so it shows up in run logs.
+    ``HELIAAOT_MAX_VERSION_EXCLUSIVE`` unless explicitly opted into development
+    testing. The override warns and never suppresses a missing package or
+    subsequent compiler failures. Logs the actual installed version.
     """
     from importlib.metadata import PackageNotFoundError
     from importlib.metadata import version as _pkg_version
@@ -543,6 +544,16 @@ def _check_helia_aot_version() -> str:
         log.warning(
             "Could not parse helia-aot version %r — skipping the recorded-range "
             "check (supported: >=%s, <%s).",
+            installed,
+            minimum,
+            maximum,
+        )
+        return installed
+
+    if allow_unsupported_version:
+        log.warning(
+            "AOT development override enabled: installed %s; recorded range >=%s,<%s. "
+            "Compatibility is not established by this run.",
             installed,
             minimum,
             maximum,

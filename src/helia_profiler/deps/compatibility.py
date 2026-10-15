@@ -266,6 +266,7 @@ def resolve_compatibility(
     engine_config_path: Path | None,
     engine_type: str,
     engine_backend: str | None,
+    allow_unsupported_version: bool = False,
 ) -> CompatibilityResolution:
     """Classify explicit module and engine overrides without mutating config.
 
@@ -276,6 +277,8 @@ def resolve_compatibility(
     """
     modules = {str(name) for name in module_overrides if str(name) not in ENGINE_OWNED_MODULE_NAMES}
     engines: set[str] = set()
+    if allow_unsupported_version:
+        engines.add("engine.allow_unsupported_version")
     if engine_config_path is not None:
         # The file's contents aren't parsed here, so treat any use of an
         # engine config file conservatively as a possible source override.
@@ -298,7 +301,11 @@ def resolve_compatibility(
         if os.environ.get(variable):
             engines.add(f"env.{variable}")
 
-    if modules or baseline.fingerprint != load_compatibility_baseline().fingerprint:
+    if (
+        allow_unsupported_version
+        or modules
+        or baseline.fingerprint != load_compatibility_baseline().fingerprint
+    ):
         qualification = QualificationState.DEVELOPMENT_OVERRIDES
     elif engines:
         qualification = QualificationState.QUALIFIED_WITH_ENGINE_OVERRIDE
