@@ -4,6 +4,7 @@ import pytest
 
 from helia_profiler.platform.counters import (
     DEFAULT_COUNTERS,
+    EXTENDED_COUNTERS,
     GROUPS,
     MAX_COUNTERS_PER_PASS,
     get_counter,
@@ -22,13 +23,14 @@ def test_groups_exist():
 
 
 def test_catalog_matches_upstream_export_size():
-    # 70 ARM PMU counters from the upstream export + 9 Ethos-U NPU events.
+    # 70 ARM PMU counters from the upstream export + 9 Ethos-U NPU events
+    # + 22 name-only Ethos-U85 diagnostic events.
     counters = list_counters()
     arm = [c for c in counters if c.name.startswith("ARM_PMU_")]
     npu = [c for c in counters if c.name.startswith("ETHOSU_PMU_")]
     assert len(arm) == 70
-    assert len(npu) == 9
-    assert len(counters) == 79
+    assert len(npu) == 9 + 22
+    assert len(counters) == 101
 
 
 def test_catalog_includes_noncontiguous_unaligned_mve_counter():
@@ -140,3 +142,62 @@ def test_ethos_npu_gated_by_domain():
         validate_group_selection(
             {"ethos_npu": "default"}, supported_groups=("cpu", "memory", "mve")
         )
+
+
+def test_ethos_npu_all_excludes_extended_events():
+    names = [c.name for c in resolve_counters({"ethos_npu": "all"})]
+    extended = EXTENDED_COUNTERS["ethos_npu"]
+    assert len(extended) == 22
+    assert len(set(extended)) == 22
+    assert not set(names) & set(extended)
+    assert not set(DEFAULT_COUNTERS["ethos_npu"]) & set(extended)
+    assert not set(GROUPS["ethos_npu"]) & set(extended)
+
+
+def test_ethos_npu_extended_events_resolve_by_name_in_order():
+    wanted = [
+        "ETHOSU_PMU_SRAM1_RD_DATA_BEAT_RECEIVED",
+        "ETHOSU_PMU_SRAM0_RD_DATA_BEAT_RECEIVED",
+        "ETHOSU_PMU_SRAM_WR_DATA_BEAT_STALLED",
+        "ETHOSU_PMU_NPU_ACTIVE",
+        "ETHOSU_PMU_SRAM_RD_STALL_LIMIT",
+    ]
+    counters = resolve_counters({"ethos_npu": wanted})
+    assert [c.name for c in counters] == wanted
+    assert all(c.group == "ethos_npu" for c in counters)
+    passes = plan_passes(counters)
+    assert [len(p.counters) for p in passes] == [4, 1]
+    assert [c.name for p in passes for c in p.counters] == wanted
+
+
+def test_ethos_npu_extended_events_are_listed_for_the_group():
+    listed = [c.name for c in list_counters("ethos_npu")]
+    assert listed[:9] == GROUPS["ethos_npu"]
+    assert listed[9:] == EXTENDED_COUNTERS["ethos_npu"]
+
+
+def test_ethos_npu_extended_events_duplicate_selection_is_deduplicated():
+    name = "ETHOSU_PMU_SRAM0_WR_TRANS_ACCEPTED"
+    assert [c.name for c in resolve_counters({"ethos_npu": [name, name]})] == [name]
+
+
+def test_ethos_npu_extended_events_gated_by_domain():
+    with pytest.raises(ValueError):
+        validate_group_selection(
+            {"ethos_npu": ["ETHOSU_PMU_SRAM1_RD_DATA_BEAT_RECEIVED"]},
+            supported_groups=("cpu", "memory", "mve"),
+        )
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "ETHOSU_PMU_SRAM2_RD_DATA_BEAT_RECEIVED",
+        "ETHOSU_PMU_SRAM0_RD_DATA_BEAT",
+        "",
+        "ethosu_pmu_wd_stalled",
+    ],
+)
+def test_unknown_ethos_npu_event_name_is_rejected(bad):
+    with pytest.raises(ValueError, match="Unknown PMU counter"):
+        resolve_counters({"ethos_npu": [bad]})

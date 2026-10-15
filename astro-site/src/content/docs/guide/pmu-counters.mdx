@@ -116,6 +116,37 @@ selection first.
 | `ETHOSU_PMU_SRAM_WR_DATA_BEAT_WRITTEN` | 0 | SRAM interface write data beats |
 | `ETHOSU_PMU_WD_ACTIVE` | 0 | Cycles the weight decoder is active |
 
+##### Name-only Ethos-U85 diagnostic counters: 22
+
+Per-port traffic and stall attribution. Select them with an explicit list, for example
+`ethos_npu: [ETHOSU_PMU_NPU_ACTIVE, ETHOSU_PMU_SRAM0_RD_DATA_BEAT_RECEIVED, ETHOSU_PMU_SRAM1_RD_DATA_BEAT_RECEIVED]`.
+They are not part of `all`, so `ethos_npu: all` still means the 9 counters above. Four counters fit in one pass, in list order.
+
+| Counter | Event | Description |
+|---|---|---|
+| `ETHOSU_PMU_AO_STALLED_BY_OB` | 0 | Cycles the activation output was stalled by the output buffer |
+| `ETHOSU_PMU_EXT0_RD_DATA_BEAT_RECEIVED` | 0 | External port 0 read data beats |
+| `ETHOSU_PMU_EXT0_RD_TRANS_ACCEPTED` | 0 | External port 0 read transactions accepted |
+| `ETHOSU_PMU_EXT1_RD_DATA_BEAT_RECEIVED` | 0 | External port 1 read data beats |
+| `ETHOSU_PMU_EXT1_RD_TRANS_ACCEPTED` | 0 | External port 1 read transactions accepted |
+| `ETHOSU_PMU_EXT_RD_STALL_LIMIT` | 0 | Cycles external reads were stalled by the outstanding-transaction limit |
+| `ETHOSU_PMU_EXT_RD_TRAN_REQ_STALLED` | 0 | Cycles an external read request was stalled (ARVALID && !ARREADY) |
+| `ETHOSU_PMU_MAC_STALLED_BY_IB` | 0 | Cycles the MAC was stalled waiting for the input buffer |
+| `ETHOSU_PMU_SRAM0_RD_DATA_BEAT_RECEIVED` | 0 | SRAM port 0 read data beats |
+| `ETHOSU_PMU_SRAM0_RD_TRANS_ACCEPTED` | 0 | SRAM port 0 read transactions accepted |
+| `ETHOSU_PMU_SRAM0_WR_DATA_BEAT_WRITTEN` | 0 | SRAM port 0 write data beats |
+| `ETHOSU_PMU_SRAM0_WR_TRANS_ACCEPTED` | 0 | SRAM port 0 write transactions accepted |
+| `ETHOSU_PMU_SRAM1_RD_DATA_BEAT_RECEIVED` | 0 | SRAM port 1 read data beats |
+| `ETHOSU_PMU_SRAM1_RD_TRANS_ACCEPTED` | 0 | SRAM port 1 read transactions accepted |
+| `ETHOSU_PMU_SRAM1_WR_DATA_BEAT_WRITTEN` | 0 | SRAM port 1 write data beats |
+| `ETHOSU_PMU_SRAM1_WR_TRANS_ACCEPTED` | 0 | SRAM port 1 write transactions accepted |
+| `ETHOSU_PMU_SRAM_RD_STALL_LIMIT` | 0 | Cycles SRAM reads were stalled by the outstanding-transaction limit |
+| `ETHOSU_PMU_SRAM_RD_TRAN_REQ_STALLED` | 0 | Cycles an SRAM read request was stalled (ARVALID && !ARREADY) |
+| `ETHOSU_PMU_SRAM_WR_DATA_BEAT_STALLED` | 0 | Cycles an SRAM write data beat was stalled (WVALID && !WREADY) |
+| `ETHOSU_PMU_SRAM_WR_STALL_LIMIT` | 0 | Cycles SRAM writes were stalled by the outstanding-transaction limit |
+| `ETHOSU_PMU_SRAM_WR_TRAN_REQ_STALLED` | 0 | Cycles an SRAM write request was stalled (AWVALID && !AWREADY) |
+| `ETHOSU_PMU_WD_STALLED` | 0 | Cycles the weight decoder was stalled |
+
 #### `memory`: 15 counters
 
 `default` selects `ARM_PMU_MEM_ACCESS`, `ARM_PMU_L1D_CACHE_REFILL`, `ARM_PMU_BUS_ACCESS`, `ARM_PMU_BUS_CYCLES`.
