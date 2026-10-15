@@ -384,7 +384,8 @@ def test_extreme_latency_inspection_is_structured(tmp_path):
     assert response["issues"][0]["code"] == "invalid_measurement"
 
 
-def test_cli_app_repeated_import_retains_public_object(tmp_path):
+@pytest.mark.parametrize("implementation_first", [False, True])
+def test_cli_application_supported_import_orders(tmp_path, implementation_first):
     probe = tmp_path / "cli_export.py"
     probe.write_text("""
 import sys, importlib.abc, importlib.util
@@ -398,15 +399,154 @@ class AppStub(importlib.abc.MetaPathFinder, importlib.abc.Loader):
     def exec_module(self, module):
         module.app = sentinel
 sys.meta_path.insert(0, AppStub())
-from helia_profiler.cli import app as first
-from helia_profiler.cli import app as second
-assert first is second is sentinel
+if sys.argv[1] == "True":
+    from helia_profiler.cli.app import app as first
+else:
+    from helia_profiler.cli import app as first
+    from helia_profiler.cli import app as repeated
+    assert repeated is first
+from helia_profiler.cli.app import app as second
+from helia_profiler.cli.app import app as third
+assert first is second is third is sentinel
 """)
     guard = Path(__file__).resolve().parents[1] / "tools" / "software_only.py"
     result = subprocess.run(
-        [sys.executable, str(guard), "python", str(probe)],
+        [sys.executable, str(guard), "python", str(probe), str(implementation_first)],
         capture_output=True,
         text=True,
         timeout=20,
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+@pytest.mark.parametrize(
+    "change", ["message", "code", "severity", "context", "extension", "missing", "extra"]
+)
+def test_summary_issue_contradiction_refuses_verified_bundle(tmp_path, change):
+    path = bundle(tmp_path)
+    issue = {
+        "code": "clock.warning",
+        "severity": "warning",
+        "message": "retained warning",
+        "context": {"clock": 1},
+        "future": 7,
+    }
+    edit_manifest(path, lambda d: d.update(validity="degraded", issues=[issue]))
+    other = dict(issue)
+    if change == "context":
+        other["context"] = {"clock": 2}
+    elif change == "extension":
+        other["future"] = 8
+    elif change not in ("missing", "extra"):
+        other[change] = "different"
+    issues = [] if change == "missing" else [other, other] if change == "extra" else [other]
+    edit_document(path, "summary.json", lambda d: d.update(validity="degraded", issues=issues))
+    assert inspect_result(path).code == "identity_mismatch"
+
+
+@pytest.mark.parametrize("issues", [None, {}, "warning", [None], [{"code": "x"}]])
+def test_malformed_present_summary_issues_refuse(tmp_path, issues):
+    path = bundle(tmp_path)
+    edit_document(path, "summary.json", lambda d: d.update(issues=issues))
+    assert inspect_result(path).result is None
+
+
+def test_matching_normalized_issues_and_missing_summary_issues(tmp_path):
+    from helia_profiler.api import observations
+
+    path = bundle(tmp_path)
+    issue = {
+        "code": "clock.warning",
+        "severity": "warning",
+        "message": "retained warning",
+        "future": {"value": 7},
+    }
+    edit_manifest(path, lambda d: d.update(validity="degraded", issues=[issue]))
+    # Older summaries may omit issues; no missing evidence is invented.
+    assert inspect_result(path).code is None
+    edit_document(
+        path,
+        "summary.json",
+        lambda d: d.update(validity="degraded", issues=[dict(issue, context={})]),
+    )
+    record = load_result(path)
+    assert observations(record)["outcome"]["reason"] == "retained warning"
+    assert record.manifest.issues[0].extra == {"future": {"value": 7}}
+
+
+@pytest.mark.parametrize(
+    "field,section,key,value",
+    [
+        ("engine", "engine", "type", "tflm"),
+        ("model_sha256", "model", "sha256", "a" * 64),
+        ("board", "platform", "board", "apollo510_evb"),
+        ("engine_version", "engine", "version", "1.0"),
+    ],
+)
+@pytest.mark.parametrize(
+    "case",
+    [
+        "matching",
+        "contradictory",
+        "manifest_null",
+        "native_null",
+        "manifest_missing",
+        "native_missing",
+    ],
+)
+def test_comparability_overlapping_identity(tmp_path, field, section, key, value, case):
+    path = bundle(tmp_path)
+    native = None if case == "native_null" else value
+    if case != "native_missing":
+        edit_document(
+            path, "run_metadata.json", lambda d: d.setdefault(section, {}).update({key: native})
+        )
+    elif field == "engine":
+        edit_document(path, "run_metadata.json", lambda d: d.pop("engine"))
+    declared = (
+        "different" if case == "contradictory" else None if case == "manifest_null" else value
+    )
+    if case != "manifest_missing":
+        edit_manifest(path, lambda d: d["comparability"].update({field: declared}))
+    checked = inspect_result(path)
+    assert checked.code == ("identity_mismatch" if case == "contradictory" else None)
+
+
+def test_comparability_checks_summary_without_metadata(tmp_path):
+    path = bundle(tmp_path, status="failed")
+    edit_manifest(
+        path,
+        lambda d: d.update(
+            artifacts=[a for a in d["artifacts"] if a["name"] != "hpx.run-metadata"],
+            comparability={"engine": "helia-aot"},
+        ),
+    )
+    assert inspect_result(path).code == "identity_mismatch"
+
+
+def test_comparability_model_checks_retained_provenance(tmp_path):
+    path = bundle(tmp_path)
+    edit_manifest(
+        path,
+        lambda d: d.update(
+            provenance={"model": {"sha256": "a" * 64}},
+            comparability={"model_sha256": "b" * 64},
+        ),
+    )
+    assert inspect_result(path).code == "identity_mismatch"
+
+
+@pytest.mark.parametrize(
+    "field,path", [("engine", ("engine", "type")), ("board", ("target", "board"))]
+)
+def test_native_config_identity_also_agrees_without_manifest_override(tmp_path, field, path):
+    manifest = bundle(tmp_path)
+    edit_document(
+        manifest,
+        "run_metadata.json",
+        lambda d: d.update(
+            platform={"board": "apollo510_evb"},
+            config={path[0]: {path[1]: "different"}},
+        ),
+    )
+    assert inspect_result(manifest).code == "identity_mismatch"

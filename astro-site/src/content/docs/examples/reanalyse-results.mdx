@@ -106,7 +106,9 @@ helia-rt 13 2060239.0
 
 For ordinary profile bundles with summary schema 11 or 12, the additive
 offline reader verifies publication, artifact paths, sizes and hashes, and
-summary/metadata identity before returning a native record:
+agreement of retained issues and overlapping summary/metadata/comparability
+identities before returning a native record. Missing identity facts remain
+unknown; contradictory recorded facts are refused:
 
 ```python
 from helia_profiler.api import inspect_result, load_result, observations, export_result
@@ -126,6 +128,12 @@ hpx results inspect my-profile/results
 hpx results show my-profile/results
 hpx results export my-profile/results --output portable-result.json
 ```
+
+For programmatic CLI execution use `helia_profiler.cli.main`. If you need the
+full Typer application, import `app` from `helia_profiler.cli.app`; the
+package-level `helia_profiler.cli.app` attribute can also name the implementation
+module depending on import order. The full application loads operational
+dependencies; the offline `hpx results` route does not.
 
 `inspect` emits a structured envelope and exits nonzero for incomplete,
 unsupported or invalid evidence. A verified failed run remains a failed

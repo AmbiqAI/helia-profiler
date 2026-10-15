@@ -14,13 +14,16 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
 from .errors import ReportError
+from .results.dimensions import DIMENSION_REGISTRY, ComparisonDimension
 from .results.manifest import (
     RESULT_PUBLICATION_INCOMPLETE,
     ResultArtifact,
+    ResultIssue,
     ResultManifest,
     RunStatus,
 )
 from .results.run_summary import RUN_SUMMARY_SCHEMA, RunSummary
+from .results.serde import nested_get
 
 
 class ResultReadError(ReportError):
@@ -140,6 +143,29 @@ def _document(root: Path, artifact: ResultArtifact) -> dict[str, Any]:
     return data
 
 
+def _reconcile_identities(
+    manifest: ResultManifest, summary: RunSummary | None, metadata: dict[str, Any] | None
+) -> None:
+    facts = {
+        ComparisonDimension.ENGINE: (
+            summary.engine if summary is not None else None,
+            nested_get(metadata, "engine", "type"),
+        ),
+        ComparisonDimension.MODEL_SHA256: (nested_get(manifest.provenance, "model", "sha256"),),
+        ComparisonDimension.BOARD: (nested_get(metadata, "platform", "board"),),
+        ComparisonDimension.ENGINE_VERSION: (),
+    }
+    for dimension, recorded in facts.items():
+        values = (
+            manifest.comparability.get(dimension),
+            nested_get(metadata, *DIMENSION_REGISTRY[dimension].path),
+            *recorded,
+        )
+        known = [value for value in values if value is not None]
+        if known and any(value != known[0] for value in known[1:]):
+            raise ResultReadError("identity_mismatch", f"Native identities differ for {dimension}")
+
+
 def load_result(location: str | Path) -> ProfileResultRecord:
     """Strictly load an ordinary profile manifest or its containing directory.
 
@@ -188,6 +214,12 @@ def _load_result(location: Path) -> ProfileResultRecord:
             and summary_data["validity"] != manifest.validity.value
         ):
             raise ResultReadError("identity_mismatch", "Summary differs from manifest validity")
+        if "issues" in summary_data:
+            issues = summary_data["issues"]
+            if not isinstance(issues, list):
+                raise ResultReadError("invalid_summary", "Summary issues must be a list")
+            if tuple(ResultIssue.from_dict(issue) for issue in issues) != manifest.issues:
+                raise ResultReadError("identity_mismatch", "Summary differs from manifest issues")
         if (
             not isinstance(summary_data.get("engine"), str)
             or not summary_data["engine"]
@@ -222,13 +254,6 @@ def _load_result(location: Path) -> ProfileResultRecord:
             or metadata.get("hpx_version") != manifest.hpx_version
         ):
             raise ResultReadError("identity_mismatch", "Metadata differs from manifest identity")
-        engine = metadata.get("engine")
-        if (
-            summary is not None
-            and isinstance(engine, dict)
-            and engine.get("type") != summary.engine
-        ):
-            raise ResultReadError("identity_mismatch", "Summary differs from metadata engine")
         declared_model = manifest.provenance.get("model")
         recorded_model = metadata.get("model")
         if isinstance(declared_model, dict) and isinstance(recorded_model, dict):
@@ -241,6 +266,7 @@ def _load_result(location: Path) -> ProfileResultRecord:
                     raise ResultReadError(
                         "identity_mismatch", f"Metadata differs from manifest model {field}"
                     )
+    _reconcile_identities(manifest, summary, metadata)
     if manifest.status is RunStatus.COMPLETE and (summary is None or metadata is None):
         raise ResultReadError(
             "incomplete_result", "Completed profile lacks native summary/metadata"
