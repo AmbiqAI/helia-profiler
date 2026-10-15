@@ -597,3 +597,12 @@ def test_development_override_does_not_hide_missing_package(monkeypatch):
     monkeypatch.setattr("importlib.metadata.version", missing)
     with pytest.raises(EngineError, match="not installed"):
         aot_compile._check_helia_aot_version(allow_unsupported_version=True)
+
+
+def test_version_override_preserves_positional_engine_config():
+    from helia_profiler.config import EngineConfig
+    from helia_profiler.engines import EngineType
+
+    config = EngineConfig(EngineType.TFLM, "cmsis_nn", {}, None)
+    assert config.backend == "cmsis_nn"
+    assert config.allow_unsupported_version is False
