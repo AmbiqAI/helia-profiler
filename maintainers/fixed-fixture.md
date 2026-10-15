@@ -464,3 +464,18 @@ its threshold constants. Import `observe_operator_timing` from the public facade
 and apply comparison policy in the consumer. The profiler reports facts and
 non-waivable integrity/attribution limitations, not a benchmark acceptance verdict.
 Historical raw records and build/capture safety validation are unchanged.
+
+### Model inspection and engine admission
+
+LiteRT fixture preparation uses `EngineAdapter.prepare_fixture_model`. Each
+adapter owns its integration limits and resolver selection. The shared LiteRT
+reader validates the container and records graph facts without selecting an
+engine; public IO validation and legacy stateless restrictions are applied
+separately. The parsed model is reused for cost analysis.
+
+The adapter's `FixtureModelPreparation` protocol describes common analysis,
+byte extents and state metadata. LiteRT analysis results retain their existing
+resolver and subgraph fields for compatibility; those fields are not required
+by the adapter protocol. A future `.pte` fixture integration can supply its own
+concrete preparation result. ExecuTorch fixture preparation is currently
+unsupported; ordinary ExecuTorch profiling is unchanged.

@@ -22,7 +22,7 @@ from ...modelcost import analyze_air_model
 from ...placement import ArenaRole, Placement
 from ...results import NsxModuleRef
 from .. import EngineType
-from ..base import ArenaRegion, HeliaAotArtifacts, PsramWeightsSource
+from ..base import ArenaRegion, FixtureModelPreparation, HeliaAotArtifacts, PsramWeightsSource
 from ..cmsis_nn import cmsis_nn_cmake_vars, cmsis_nn_module_ref
 from ..ethos_u import nsx_npu_module_ref
 from .compile import (
@@ -127,6 +127,16 @@ class HeliaAOTAdapter:
     @property
     def name(self) -> str:
         return "heliaAOT"
+
+    def prepare_fixture_model(self, path: Path, *, single_io: bool) -> FixtureModelPreparation:
+        from ...firmware.op_resolver import ResolverPlan
+        from ...fixture_analysis import prepare_litert_fixture
+
+        return prepare_litert_fixture(
+            path,
+            single_io=single_io,
+            resolver=lambda analysis, facts: ResolverPlan(mode="engine", registrations=()),
+        )
 
     @property
     def engine_type(self) -> EngineType:

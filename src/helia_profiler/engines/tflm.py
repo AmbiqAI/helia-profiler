@@ -8,7 +8,12 @@ from ..config import ProfileConfig
 from ..errors import EngineError
 from ..results import NsxModuleRef
 from . import TFLM_ENGINE_HEADER, EngineType
-from .base import PsramWeightsSource, SingleArenaPlacementMixin, TflmArtifacts
+from .base import (
+    FixtureModelPreparation,
+    PsramWeightsSource,
+    SingleArenaPlacementMixin,
+    TflmArtifacts,
+)
 from .cmsis_nn import ARM_CMSIS_NN_MODULE, ARM_CMSIS_NN_PROJECT
 
 TFLITE_MICRO_MODULE = "nsx-tflite-micro"
@@ -44,6 +49,17 @@ class TFLMAdapter(SingleArenaPlacementMixin):
     @property
     def name(self) -> str:
         return "Stock TFLM"
+
+    def prepare_fixture_model(self, path: Path, *, single_io: bool) -> FixtureModelPreparation:
+        from ..firmware.op_resolver import build_fixture_resolver_plan
+        from ..fixture_analysis import prepare_litert_fixture
+
+        def resolver(analysis, facts):
+            return build_fixture_resolver_plan(
+                analysis, allow_state=True, additional_ops=facts.operator_names
+            )
+
+        return prepare_litert_fixture(path, single_io=single_io, resolver=resolver)
 
     @property
     def engine_type(self) -> EngineType:
