@@ -18,9 +18,17 @@ The CLI (``hpx profile``) runs the same pipeline through
 
 from __future__ import annotations
 
-from .config import ProfileConfig
-from .pipeline import ProgressSink
-from .results import ProfileResult
+from typing import TYPE_CHECKING
+
+from ._result_view import export_result as export_result
+from ._result_view import observations as observations
+from .records import inspect_result as inspect_result
+from .records import load_result as load_result
+
+if TYPE_CHECKING:
+    from .config import ProfileConfig
+    from .pipeline import ProgressSink
+    from .results import ProfileResult
 
 
 def profile(
@@ -36,6 +44,7 @@ def profile(
     Raises :class:`HpxError` (or a subclass) on failure.
     """
     from .profiler import run_profile
+    from .results import ProfileResult
 
     ctx = run_profile(config, progress_sink=progress_sink)
 

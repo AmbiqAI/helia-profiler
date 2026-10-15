@@ -24,6 +24,7 @@ from ..power import list_drivers
 from ..target.lifecycle import ResetStrategy
 from . import inspect_app as _inspect_app
 from . import validation_app as _validation_app
+from .results_cmd import app as results_app
 
 app = typer.Typer(
     name="hpx",
@@ -34,6 +35,7 @@ app = typer.Typer(
     add_completion=False,
     context_settings={"help_option_names": ["-h", "--help"]},
 )
+app.add_typer(results_app, name="results")
 
 
 def _version_callback(value: bool) -> None:

@@ -1,96 +1,188 @@
 """Public result models and persisted/workflow result contracts."""
 
-from ..deps.compatibility import CompatibilityResolution
-from .artifacts import (
-    DeploymentRecord,
-    FirmwareArtifact,
-    OnDevicePowerSummary,
-    PowerObservation,
-    PowerRun,
-    PowerRunPlan,
-    PowerTerminalEnvelope,
-    PowerTerminalRecord,
-    ProfileRun,
-)
-from .dependencies import (
-    ContentDigest,
-    DependencyLockMode,
-    DependencyLockProvenance,
-    DependencyLockState,
-    DependencyModule,
-    DependencyOverride,
-    DependencyProvenance,
-    DependencyRequest,
-    DependencyWorkspace,
-)
+from __future__ import annotations
 
-# Spec/family *classes* (IssueSpec, ComparabilitySpec, ComparabilityCodeFamily,
-# DimensionSpec) are deliberately not re-exported — only instances, registries,
-# and the enum vocabulary are public here. Import the classes from their
-# modules directly where needed.
-from .dimensions import (
-    DIMENSION_REGISTRY,
-    DimensionEffect,
-    dimensions_with_effect,
-)
-from .issues import (
-    COMPARABILITY_FAMILIES,
-    COMPARABILITY_REGISTRY,
-    DIMENSION_DIFFERS,
-    ISSUE_REGISTRY,
-    MEMORY_DIMENSION_MISMATCH,
-    METRIC_BLOCKING_CODE_BY_GROUP,
-    POWER_DIMENSION_MISMATCH,
-    ComparabilityCode,
-    ComparabilitySeverity,
-    ComparisonDimension,
-    IssueCode,
-    Severity,
-    error_metric_group,
-)
-from .manifest import (
-    RESULT_MANIFEST_SCHEMA,
-    RESULT_MANIFEST_SCHEMA_VERSION,
-    ResultArtifact,
-    ResultIssue,
-    ResultManifest,
-    ResultValidity,
-    RunStatus,
-    load_result_manifest,
-)
-from .models import (
-    BinarySections,
-    BuildImage,
-    ConsumerKind,
-    ConsumerReconciliation,
-    EngineInfo,
-    FirmwareMeta,
-    LayerResult,
-    MeasuredMemoryRegions,
-    MeasuredRegion,
-    MemoryConsumer,
-    MemoryPlan,
-    MemoryReconciliation,
-    MemoryRegionUsage,
-    ModelInfo,
-    NsxModuleRef,
-    PlatformInfo,
-    PmuResult,
-    PresetResult,
-    ProfileResult,
-    PsramInfo,
-    RegionReconciliation,
-    RunMetadata,
-    TimingInfo,
-    ToolchainInfo,
-    UnattributedSection,
-)
-from .support_bundle import (
-    SUPPORT_BUNDLE_SCHEMA,
-    SUPPORT_BUNDLE_SCHEMA_VERSION,
-    SupportBundleManifest,
-    SupportBundleSection,
-)
+from importlib import import_module
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from ..deps.compatibility import CompatibilityResolution
+    from .artifacts import (
+        DeploymentRecord,
+        FirmwareArtifact,
+        OnDevicePowerSummary,
+        PowerObservation,
+        PowerRun,
+        PowerRunPlan,
+        PowerTerminalEnvelope,
+        PowerTerminalRecord,
+        ProfileRun,
+    )
+    from .dependencies import (
+        ContentDigest,
+        DependencyLockMode,
+        DependencyLockProvenance,
+        DependencyLockState,
+        DependencyModule,
+        DependencyOverride,
+        DependencyProvenance,
+        DependencyRequest,
+        DependencyWorkspace,
+    )
+    from .dimensions import (
+        DIMENSION_REGISTRY,
+        DimensionEffect,
+        dimensions_with_effect,
+    )
+    from .issues import (
+        COMPARABILITY_FAMILIES,
+        COMPARABILITY_REGISTRY,
+        DIMENSION_DIFFERS,
+        ISSUE_REGISTRY,
+        MEMORY_DIMENSION_MISMATCH,
+        METRIC_BLOCKING_CODE_BY_GROUP,
+        POWER_DIMENSION_MISMATCH,
+        ComparabilityCode,
+        ComparabilitySeverity,
+        ComparisonDimension,
+        IssueCode,
+        Severity,
+        error_metric_group,
+    )
+    from .manifest import (
+        RESULT_MANIFEST_SCHEMA,
+        RESULT_MANIFEST_SCHEMA_VERSION,
+        ResultArtifact,
+        ResultIssue,
+        ResultManifest,
+        ResultValidity,
+        RunStatus,
+        load_result_manifest,
+    )
+    from .models import (
+        BinarySections,
+        BuildImage,
+        ConsumerKind,
+        ConsumerReconciliation,
+        EngineInfo,
+        FirmwareMeta,
+        LayerResult,
+        MeasuredMemoryRegions,
+        MeasuredRegion,
+        MemoryConsumer,
+        MemoryPlan,
+        MemoryReconciliation,
+        MemoryRegionUsage,
+        ModelInfo,
+        NsxModuleRef,
+        PlatformInfo,
+        PmuResult,
+        PresetResult,
+        ProfileResult,
+        PsramInfo,
+        RegionReconciliation,
+        RunMetadata,
+        TimingInfo,
+        ToolchainInfo,
+        UnattributedSection,
+    )
+    from .support_bundle import (
+        SUPPORT_BUNDLE_SCHEMA,
+        SUPPORT_BUNDLE_SCHEMA_VERSION,
+        SupportBundleManifest,
+        SupportBundleSection,
+    )
+
+_EXPORTS = {
+    "CompatibilityResolution": ("..deps.compatibility", "CompatibilityResolution"),
+    "DeploymentRecord": (".artifacts", "DeploymentRecord"),
+    "FirmwareArtifact": (".artifacts", "FirmwareArtifact"),
+    "OnDevicePowerSummary": (".artifacts", "OnDevicePowerSummary"),
+    "PowerObservation": (".artifacts", "PowerObservation"),
+    "PowerRun": (".artifacts", "PowerRun"),
+    "PowerRunPlan": (".artifacts", "PowerRunPlan"),
+    "PowerTerminalEnvelope": (".artifacts", "PowerTerminalEnvelope"),
+    "PowerTerminalRecord": (".artifacts", "PowerTerminalRecord"),
+    "ProfileRun": (".artifacts", "ProfileRun"),
+    "ContentDigest": (".dependencies", "ContentDigest"),
+    "DependencyLockMode": (".dependencies", "DependencyLockMode"),
+    "DependencyLockProvenance": (".dependencies", "DependencyLockProvenance"),
+    "DependencyLockState": (".dependencies", "DependencyLockState"),
+    "DependencyModule": (".dependencies", "DependencyModule"),
+    "DependencyOverride": (".dependencies", "DependencyOverride"),
+    "DependencyProvenance": (".dependencies", "DependencyProvenance"),
+    "DependencyRequest": (".dependencies", "DependencyRequest"),
+    "DependencyWorkspace": (".dependencies", "DependencyWorkspace"),
+    "DIMENSION_REGISTRY": (".dimensions", "DIMENSION_REGISTRY"),
+    "DimensionEffect": (".dimensions", "DimensionEffect"),
+    "dimensions_with_effect": (".dimensions", "dimensions_with_effect"),
+    "COMPARABILITY_FAMILIES": (".issues", "COMPARABILITY_FAMILIES"),
+    "COMPARABILITY_REGISTRY": (".issues", "COMPARABILITY_REGISTRY"),
+    "DIMENSION_DIFFERS": (".issues", "DIMENSION_DIFFERS"),
+    "ISSUE_REGISTRY": (".issues", "ISSUE_REGISTRY"),
+    "MEMORY_DIMENSION_MISMATCH": (".issues", "MEMORY_DIMENSION_MISMATCH"),
+    "METRIC_BLOCKING_CODE_BY_GROUP": (".issues", "METRIC_BLOCKING_CODE_BY_GROUP"),
+    "POWER_DIMENSION_MISMATCH": (".issues", "POWER_DIMENSION_MISMATCH"),
+    "ComparabilityCode": (".issues", "ComparabilityCode"),
+    "ComparabilitySeverity": (".issues", "ComparabilitySeverity"),
+    "ComparisonDimension": (".issues", "ComparisonDimension"),
+    "IssueCode": (".issues", "IssueCode"),
+    "Severity": (".issues", "Severity"),
+    "error_metric_group": (".issues", "error_metric_group"),
+    "RESULT_MANIFEST_SCHEMA": (".manifest", "RESULT_MANIFEST_SCHEMA"),
+    "RESULT_MANIFEST_SCHEMA_VERSION": (".manifest", "RESULT_MANIFEST_SCHEMA_VERSION"),
+    "ResultArtifact": (".manifest", "ResultArtifact"),
+    "ResultIssue": (".manifest", "ResultIssue"),
+    "ResultManifest": (".manifest", "ResultManifest"),
+    "ResultValidity": (".manifest", "ResultValidity"),
+    "RunStatus": (".manifest", "RunStatus"),
+    "load_result_manifest": (".manifest", "load_result_manifest"),
+    "BinarySections": (".models", "BinarySections"),
+    "BuildImage": (".models", "BuildImage"),
+    "ConsumerKind": (".models", "ConsumerKind"),
+    "ConsumerReconciliation": (".models", "ConsumerReconciliation"),
+    "EngineInfo": (".models", "EngineInfo"),
+    "FirmwareMeta": (".models", "FirmwareMeta"),
+    "LayerResult": (".models", "LayerResult"),
+    "MeasuredMemoryRegions": (".models", "MeasuredMemoryRegions"),
+    "MeasuredRegion": (".models", "MeasuredRegion"),
+    "MemoryConsumer": (".models", "MemoryConsumer"),
+    "MemoryPlan": (".models", "MemoryPlan"),
+    "MemoryReconciliation": (".models", "MemoryReconciliation"),
+    "MemoryRegionUsage": (".models", "MemoryRegionUsage"),
+    "ModelInfo": (".models", "ModelInfo"),
+    "NsxModuleRef": (".models", "NsxModuleRef"),
+    "PlatformInfo": (".models", "PlatformInfo"),
+    "PmuResult": (".models", "PmuResult"),
+    "PresetResult": (".models", "PresetResult"),
+    "ProfileResult": (".models", "ProfileResult"),
+    "PsramInfo": (".models", "PsramInfo"),
+    "RegionReconciliation": (".models", "RegionReconciliation"),
+    "RunMetadata": (".models", "RunMetadata"),
+    "TimingInfo": (".models", "TimingInfo"),
+    "ToolchainInfo": (".models", "ToolchainInfo"),
+    "UnattributedSection": (".models", "UnattributedSection"),
+    "SUPPORT_BUNDLE_SCHEMA": (".support_bundle", "SUPPORT_BUNDLE_SCHEMA"),
+    "SUPPORT_BUNDLE_SCHEMA_VERSION": (".support_bundle", "SUPPORT_BUNDLE_SCHEMA_VERSION"),
+    "SupportBundleManifest": (".support_bundle", "SupportBundleManifest"),
+    "SupportBundleSection": (".support_bundle", "SupportBundleSection"),
+}
+
+
+def __getattr__(name: str) -> Any:
+    """Resolve public symbols without importing execution code for offline readers."""
+    if name not in _EXPORTS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module, attribute = _EXPORTS[name]
+    loaded = import_module(module, __name__)
+    value = loaded if attribute is None else getattr(loaded, attribute)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | set(_EXPORTS))
+
 
 __all__ = [
     "BinarySections",

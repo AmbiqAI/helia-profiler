@@ -5,6 +5,7 @@ _fixture_facts.py
 _fixture_record.py
 _fixture_request.py
 _litert_inspection.py
+_result_view.py
 _version.py
 api.py
 capture/__init__.py
@@ -22,6 +23,7 @@ cli/inspect_app.py
 cli/inspect_cmds.py
 cli/power_cmd.py
 cli/profile_cmd.py
+cli/results_cmd.py
 cli/runtimes_cmd.py
 cli/validate_cmd.py
 cli/validation_app.py
@@ -195,6 +197,7 @@ power/metadata.py
 power/sync.py
 prepared_runtimes.py
 profiler.py
+records.py
 report/__init__.py
 report/aot.py
 report/contracts.py
