@@ -10,8 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Sequence
 
+from ._model_explorer_overlay import GradientItem, build_overlay
 from .records import _document, _object, load_result
-from .report.model_explorer import GradientItem, build_overlay
 from .results.manifest import ResultValidity, RunStatus
 
 TIME_BASIS = "cumulative aggregated operator cost; not recorded wall-clock time"
@@ -73,14 +73,16 @@ def read_visual_run(location: Path, label: str) -> VisualRun:
         or data["schema_version"] != 1
     ):
         raise ValueError("Unsupported layer table schema")
-    # The standalone metadata document adds firmware facts after the JSON table.
+    # Standalone metadata adds post-capture facts after the JSON table.
+    enrichment = {"firmware", "target_lifecycle", "power_terminal", "on_device_power"}
     embedded = data.get("metadata", {})
-    if not isinstance(embedded, dict) or {k: v for k, v in embedded.items() if k != "firmware"} != {
-        k: v for k, v in (record.metadata or {}).items() if k != "firmware"
-    }:
+    if not isinstance(embedded, dict) or {
+        k: v for k, v in embedded.items() if k not in enrichment
+    } != {k: v for k, v in (record.metadata or {}).items() if k not in enrichment}:
         raise ValueError("Layer table metadata differs from verified run metadata")
-    if "firmware" in embedded and embedded["firmware"] != (record.metadata or {}).get("firmware"):
-        raise ValueError("Layer firmware metadata differs from run metadata")
+    for key in enrichment & embedded.keys():
+        if embedded[key] != (record.metadata or {}).get(key):
+            raise ValueError(f"Layer {key} differs from run metadata")
     if (
         data.get("overflow_detected") is not False
         or record.summary is None
@@ -232,11 +234,14 @@ def _trace(runs: Sequence[VisualRun], mapping: dict) -> dict:
                 },
             ]
         )
-        cursor = 0.0
+        cursor_cycles = 0.0
+        cursor_ns = 0
         for layer in run.layers:
-            duration = layer.cycles / run.clock_hz * 1e6
-            if not math.isfinite(cursor + duration):
+            cursor_cycles += layer.cycles
+            end_ns_float = cursor_cycles / run.clock_hz * 1e9
+            if not math.isfinite(end_ns_float):
                 raise ValueError("Unrepresentable cumulative duration")
+            end_ns = round(end_ns_float)
             annotation = mapping.get(run.manifest_sha256, {}).get(layer.event_id, {})
             args = {
                 "event_id": layer.event_id,
@@ -250,17 +255,17 @@ def _trace(runs: Sequence[VisualRun], mapping: dict) -> dict:
             }
             events.append(
                 {
-                    "ph": "X",
+                    "ph": "B",
                     "pid": pid,
                     "tid": 1,
-                    "ts": cursor,
-                    "dur": duration,
+                    "ts": cursor_ns / 1000,
                     "cat": "reconstructed operator cost",
                     "name": layer.name,
                     "args": args,
                 }
             )
-            cursor += duration
+            events.append({"ph": "E", "pid": pid, "tid": 1, "ts": end_ns / 1000})
+            cursor_ns = end_ns
         if run.totals["profiled_mean_us"] is not None:
             duration = _number(run.totals["profiled_mean_us"], "profiled mean")
             events.append(

@@ -75,12 +75,13 @@ def test_units_separate_totals_explicit_mapping_and_delta(tmp_path):
         [a, b], tmp_path / "out", mapping_path=mapping(tmp_path / "map.json", [a, b])
     )
     trace = json.loads((out / "comparison.perfetto.json").read_text())
-    slices = [e for e in trace["traceEvents"] if e["ph"] == "X" and e["tid"] == 1]
-    assert [(e["ts"], e["dur"]) for e in slices] == [
-        (0, 100000),
-        (100000, 300000),
-        (0, 200000),
-        (200000, 150000),
+    slices = [e for e in trace["traceEvents"] if e["ph"] == "B" and e["tid"] == 1]
+    assert [e["ts"] for e in slices] == [0, 100000, 0, 200000]
+    assert [e["ts"] for e in trace["traceEvents"] if e["ph"] == "E"] == [
+        100000,
+        400000,
+        200000,
+        350000,
     ]
     assert "not recorded wall-clock" in trace["otherData"]["time_basis"]
     totals = [e for e in trace["traceEvents"] if e["ph"] == "X" and e["tid"] == 2]
@@ -189,3 +190,59 @@ def test_mapping_bytes_remain_identified(tmp_path):
     view = json.loads((out / "comparison.json").read_text())
     assert view["mapping"]["sha256"] == digest
     assert view["runs"][0]["unmapped_event_ids"] == [1]
+
+
+@pytest.mark.parametrize("key", ["target_lifecycle", "power_terminal", "on_device_power"])
+def test_native_post_capture_enrichment_is_accepted(tmp_path, key):
+    path = profile(tmp_path)
+    edit_document(path, "run_metadata.json", lambda d: d.update({key: {"status": "recorded"}}))
+    assert read_visual_run(path, "one").clock_hz == 1000
+    edit_document(path, "layers.json", lambda d: d["metadata"].update({key: {"status": "other"}}))
+    with pytest.raises(ValueError, match="differs"):
+        read_visual_run(path, "one")
+
+
+def test_visualization_import_never_attempts_model_or_device_modules(tmp_path):
+    import subprocess
+    import sys
+
+    script = tmp_path / "import_probe.py"
+    script.write_text("""
+import sys
+class Refuse:
+    def find_spec(self, name, *args):
+        if name.split('.')[0] in {'ai_edge_litert', 'helia_aot', 'tensorflow', 'pylink', 'pyjoulescope_driver', 'neuralspotx'}:
+            raise RuntimeError('Forbidden import attempted: ' + name)
+sys.meta_path.insert(0, Refuse())
+from helia_profiler._profile_visualization import read_visual_run, export_visualization
+""")
+    completed = subprocess.run(
+        [sys.executable, str(script)], capture_output=True, text=True, timeout=15
+    )
+    assert completed.returncode == 0, completed.stderr
+
+
+def test_fractional_cost_boundaries_are_shared_not_added_durations(tmp_path):
+    path = profile(tmp_path / "source", (83, 61, 107))
+    edit_document(
+        path, "run_metadata.json", lambda d: d["firmware"].update(system_clock_hz=96000000)
+    )
+    edit_document(
+        path,
+        "layers.json",
+        lambda d: (
+            d["summary"].update(system_clock_hz=96000000),
+            d["metadata"]["firmware"].update(system_clock_hz=96000000),
+        ),
+    )
+    run = read_visual_run(path, "one")
+    out = export_visualization([run], tmp_path / "view")
+    events = [
+        e
+        for e in json.loads((out / "run-1.perfetto.json").read_text())["traceEvents"]
+        if e["tid"] == 1 and e["ph"] != "M"
+    ]
+    assert [e["ph"] for e in events] == ["B", "E", "B", "E", "B", "E"]
+    assert events[1]["ts"] == events[2]["ts"]
+    assert events[3]["ts"] == events[4]["ts"]
+    assert events[-1]["ts"] == round(251 / 96000000 * 1e9) / 1000
