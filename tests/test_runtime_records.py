@@ -77,7 +77,7 @@ def test_hardware_workflow_uses_default_executorch_commit() -> None:
     assert workflow["env"]["HPX_NSX_EXECUTORCH_REF"] == default.source.commit
 
 
-def test_shipped_records_keep_the_fixture_capability_table() -> None:
+def test_fixture_integration_capability_table() -> None:
     from helia_profiler._fixture_build import FIXTURE_CAPABILITIES
 
     table = {
@@ -342,3 +342,27 @@ def test_explicit_released_aot_record_does_not_inherit_qualification():
         ).state
         == RuntimeQualification.SUPPORTED
     )
+
+
+@pytest.mark.parametrize("state", list(RuntimeQualification))
+def test_fixture_io_capabilities_ignore_qualification_records(monkeypatch, state):
+    import importlib.util
+    import sys
+
+    from helia_profiler import _fixture_build, runtime_records
+
+    calls = []
+
+    def qualification_answer(*args, **kwargs):
+        calls.append((args, kwargs))
+        return runtime_records.Qualification(state, "no matching selected-runtime evidence", None)
+
+    monkeypatch.setattr(runtime_records, "qualification", qualification_answer)
+    name = "helia_profiler._fixture_capability_probe"
+    spec = importlib.util.spec_from_file_location(name, _fixture_build.__file__)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    monkeypatch.setitem(sys.modules, name, module)
+    spec.loader.exec_module(module)
+    assert module.FIXTURE_CAPABILITIES == _fixture_build.FIXTURE_CAPABILITIES
+    assert calls == []

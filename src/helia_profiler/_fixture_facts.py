@@ -1,4 +1,4 @@
-"""What the installed profiler qualifies for fixed-fixture builds and captures."""
+"""Supported integrations and limits for fixed-fixture builds and captures."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from .fixture_target import FIXTURE_CLOCK_PROFILE, supported_fixture_target
 
 @dataclass(frozen=True)
 class QualifiedFixtureTarget:
-    """A board and clock profile with a qualified fixture build and capture path."""
+    """A supported fixture build and capture target, not model qualification."""
 
     board: str
     clock_profile: str
@@ -50,7 +50,7 @@ class FixtureCapabilities:
 
 
 def fixture_capabilities() -> FixtureCapabilities:
-    """Report the qualified targets and per-engine dtype status."""
+    """Report supported targets and public IO types, independently of qualification."""
     from .fixture import FIXTURE_API_VERSION
 
     target = supported_fixture_target()
