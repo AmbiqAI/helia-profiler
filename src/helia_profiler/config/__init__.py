@@ -257,10 +257,10 @@ class EngineConfig:
     """Inference engine selection and passthrough config."""
 
     type: EngineType = EngineType.HELIA_RT
-    allow_unsupported_version: StrictBool = False
     backend: str | None = None  # TFLM: reference/cmsis_nn; ExecuTorch: arm/ns
     config: dict[str, Any] = field(default_factory=dict)
     config_path: Path | None = None  # path to engine-specific YAML
+    allow_unsupported_version: StrictBool = field(default=False, kw_only=True)
 
     @model_validator(mode="after")
     def _validate_version_override(self) -> EngineConfig:
