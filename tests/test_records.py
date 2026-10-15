@@ -5,7 +5,7 @@ import json
 import shutil
 import subprocess
 import sys
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 import pytest
 
@@ -191,7 +191,15 @@ def test_integrity_refusals(tmp_path, change):
 def test_cross_platform_containment(tmp_path, value):
     path = bundle(tmp_path)
     edit_manifest(path, lambda d: d["artifacts"][0].update(path=value))
-    assert inspect_result(path).code == "invalid_path"
+    checked = inspect_result(path)
+    assert checked.result is None
+    # Native manifest validation rejects host-absolute paths before portability checks.
+    if Path(value).is_absolute():
+        assert checked.code == "invalid_evidence"
+        assert checked.message is not None
+        assert "non-empty relative path" in checked.message
+    else:
+        assert checked.code == "invalid_path"
 
 
 @pytest.mark.parametrize(
@@ -550,3 +558,16 @@ def test_native_config_identity_also_agrees_without_manifest_override(tmp_path, 
         ),
     )
     assert inspect_result(manifest).code == "identity_mismatch"
+
+
+def test_windows_native_path_rejection_precedes_portable_checks(tmp_path, monkeypatch):
+    import helia_profiler.results.manifest as native_manifest
+
+    path = bundle(tmp_path)
+    edit_manifest(path, lambda d: d["artifacts"][0].update(path="C:/summary.json"))
+    monkeypatch.setattr(native_manifest, "Path", PureWindowsPath)
+    checked = inspect_result(path)
+    assert checked.result is None
+    assert checked.code == "invalid_evidence"
+    assert checked.message is not None
+    assert "non-empty relative path" in checked.message
