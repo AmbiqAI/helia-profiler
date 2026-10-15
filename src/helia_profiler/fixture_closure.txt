@@ -5,6 +5,7 @@ _fixture_facts.py
 _fixture_record.py
 _fixture_request.py
 _litert_inspection.py
+_profile_visualization.py
 _result_view.py
 _version.py
 api.py
