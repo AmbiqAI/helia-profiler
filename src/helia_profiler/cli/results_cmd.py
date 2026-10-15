@@ -4,19 +4,26 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Annotated
 
 import typer
 
 from ..api import export_result, inspect_result, load_result, observations
 from ..records import ResultReadError
 
-app = typer.Typer(
+results_app = typer.Typer(
     help="Inspect and export verified ordinary profile bundles.", add_completion=False
 )
+app = results_app
 
 
-@app.command("inspect")
-def inspect(location: Path) -> None:
+@results_app.callback()
+def results() -> None:
+    """Inspect and export verified ordinary profile bundles."""
+
+
+@results_app.command("inspect")
+def inspect(location: Annotated[Path, typer.Argument()]) -> None:
     """Emit a structured inspection; a verified failed run is not corrupt evidence."""
     checked = inspect_result(location)
     view = None
@@ -50,8 +57,8 @@ def inspect(location: Path) -> None:
         raise typer.Exit(1)
 
 
-@app.command("show")
-def show(location: Path) -> None:
+@results_app.command("show")
+def show(location: Annotated[Path, typer.Argument()]) -> None:
     """Emit the portable JSON view of a verified native bundle."""
     try:
         typer.echo(json.dumps(observations(load_result(location)), indent=2, allow_nan=False))
@@ -60,8 +67,11 @@ def show(location: Path) -> None:
         raise typer.Exit(1) from exc
 
 
-@app.command("export")
-def export(location: Path, output: Path = typer.Option(..., "--output")) -> None:
+@results_app.command("export")
+def export(
+    location: Annotated[Path, typer.Argument()],
+    output: Annotated[Path, typer.Option("--output")],
+) -> None:
     """Write a new portable JSON file; existing evidence is never overwritten."""
     try:
         export_result(load_result(location), output)
