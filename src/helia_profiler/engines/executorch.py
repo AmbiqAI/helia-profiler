@@ -14,7 +14,12 @@ from ..errors import EngineError
 from ..results import NsxModuleRef
 from ..runtime_records import RuntimeRecord, runtime
 from . import EngineType
-from .base import ExecutorchArtifacts, PsramWeightsSource, SingleArenaPlacementMixin
+from .base import (
+    ExecutorchArtifacts,
+    FixtureModelPreparation,
+    PsramWeightsSource,
+    SingleArenaPlacementMixin,
+)
 from .cmsis_nn import arm_cmsis_nn_module_ref, cmsis_nn_module_ref
 
 log = logging.getLogger("hpx")
@@ -355,6 +360,9 @@ class ExecuTorchAdapter(SingleArenaPlacementMixin):
     @property
     def name(self) -> str:
         return "ExecuTorch"
+
+    def prepare_fixture_model(self, path: Path, *, single_io: bool) -> FixtureModelPreparation:
+        raise ValueError("ExecuTorch fixture model integration is unavailable")
 
     @property
     def engine_type(self) -> EngineType:

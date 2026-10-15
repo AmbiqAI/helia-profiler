@@ -427,3 +427,78 @@ def test_engine_selection_is_a_typed_closed_set(tmp_path):
         api.analyze_typed_fixture_model_for_engine(
             tmp_path / "unread", engine=cast(Any, "helia-aot")
         )
+
+
+def test_inspection_reports_facts_before_engine_admission(tmp_path):
+    from helia_profiler._litert_inspection import inspect_litert_model
+
+    def change(model, graph):
+        graph.tensors[2].isVariable = True
+        graph.tensors[2].shapeSignature = [1, -1]
+        model.subgraphs.append(graph)
+
+    path = typed_model(
+        tmp_path, [F32], [Y32], extra=[("state", "float32", (1, 4), None, None)], change=change
+    )
+    original = path.read_bytes()
+    facts = inspect_litert_model(path).facts
+    assert facts.has_internal_state and facts.has_dynamic_shapes
+    assert not facts.has_dynamic_io
+    assert facts.subgraph_count == 2
+    assert facts.operator_names == ("ADD",)
+    with pytest.raises(ValueError, match="integration is unavailable"):
+        api.analyze_typed_fixture_model_for_engine(path, engine=api.EngineType.HELIA_RT)
+    assert inspect_litert_model(path).facts == facts
+    assert path.read_bytes() == original
+
+
+def test_selected_adapter_owns_fixture_preparation(tmp_path, monkeypatch):
+    from helia_profiler.engines import get_adapter
+
+    path = typed_model(tmp_path, [F32], [Y32])
+    expected = api.analyze_typed_fixture_model(path)
+    adapter_type = type(get_adapter(api.EngineType.TFLM))
+    calls = []
+
+    def prepare(self, model_path, *, single_io):
+        calls.append((model_path, single_io))
+        return expected
+
+    monkeypatch.setattr(adapter_type, "prepare_fixture_model", prepare)
+    assert api.analyze_typed_fixture_model_for_engine(path, engine=api.EngineType.TFLM) is expected
+    assert calls == [(path, False)]
+
+
+def test_engine_fixture_inspection_parses_once(tmp_path, monkeypatch):
+    from test_typed_fixture_analysis import s
+
+    from helia_profiler.modelcost import model_analysis
+
+    path = typed_model(tmp_path, [F32], [Y32])
+    original = s.Model.GetRootAs
+    models = []
+
+    def parse(*args, **kwargs):
+        model = original(*args, **kwargs)
+        models.append(model)
+        return model
+
+    original_analysis = model_analysis._analyze_parsed_model
+
+    def analyze(model):
+        assert models == [model]
+        return original_analysis(model)
+
+    monkeypatch.setattr(s.Model, "GetRootAs", parse)
+    monkeypatch.setattr(model_analysis, "_analyze_parsed_model", analyze)
+    api.analyze_typed_fixture_model_for_engine(path, engine=api.EngineType.HELIA_AOT)
+    assert len(models) == 1
+
+
+def test_executorch_fixture_refusal_precedes_litert_inspection(tmp_path):
+    from helia_profiler.engines import get_adapter
+
+    with pytest.raises(ValueError, match="ExecuTorch fixture model integration is unavailable"):
+        get_adapter(api.EngineType.EXECUTORCH).prepare_fixture_model(
+            tmp_path / "unread.pte", single_io=False
+        )

@@ -295,6 +295,22 @@ class PreparedRuntimeAdapter(Protocol):
     ) -> EngineArtifacts: ...
 
 
+class FixtureModelPreparation(Protocol):
+    """Common fixture metadata; concrete results retain format-specific details."""
+
+    @property
+    def analysis(self) -> ModelAnalysis: ...
+
+    @property
+    def input_bytes(self) -> int: ...
+
+    @property
+    def output_bytes(self) -> int: ...
+
+    @property
+    def has_internal_state(self) -> bool: ...
+
+
 @runtime_checkable
 class EngineAdapter(Protocol):
     """Interface that each inference engine adapter must implement.
@@ -314,6 +330,15 @@ class EngineAdapter(Protocol):
     @property
     def engine_type(self) -> EngineType:
         """Identity of this adapter (single source of truth)."""
+        ...
+
+    def prepare_fixture_model(self, path: Path, *, single_io: bool) -> FixtureModelPreparation:
+        """Inspect and admit a fixture model without compiling or executing it.
+
+        The adapter owns format decoding and runtime integration limits.
+        Unsupported integrations raise a concrete error. Format-specific
+        metadata belongs to the concrete result, not this common contract.
+        """
         ...
 
     def prepare(self, config: ProfileConfig, work_dir: Path) -> EngineArtifacts:

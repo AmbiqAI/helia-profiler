@@ -17,7 +17,12 @@ from ...config import ProfileConfig
 from ...errors import EngineError
 from ...results import NsxModuleRef
 from .. import TFLM_ENGINE_HEADER, EngineType
-from ..base import HeliaRtArtifacts, PsramWeightsSource, SingleArenaPlacementMixin
+from ..base import (
+    FixtureModelPreparation,
+    HeliaRtArtifacts,
+    PsramWeightsSource,
+    SingleArenaPlacementMixin,
+)
 from ..cmsis_nn import (
     CMSIS_NN_MODULE,
     cmsis_nn_cmake_vars,
@@ -143,6 +148,19 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
     @property
     def name(self) -> str:
         return "heliaRT"
+
+    def prepare_fixture_model(self, path: Path, *, single_io: bool) -> FixtureModelPreparation:
+        from ...firmware.op_resolver import build_fixture_resolver_plan
+        from ...fixture_analysis import prepare_litert_fixture
+
+        def resolver(analysis, facts):
+            if facts.has_internal_state or facts.subgraph_count != 1:
+                raise ValueError(
+                    "helia-rt fixture resource/multiple-subgraph integration is unavailable"
+                )
+            return build_fixture_resolver_plan(analysis, additional_ops=facts.operator_names)
+
+        return prepare_litert_fixture(path, single_io=single_io, resolver=resolver)
 
     @property
     def engine_type(self) -> EngineType:
