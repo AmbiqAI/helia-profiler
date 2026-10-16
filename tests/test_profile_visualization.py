@@ -246,3 +246,54 @@ def test_fractional_cost_boundaries_are_shared_not_added_durations(tmp_path):
     assert events[1]["ts"] == events[2]["ts"]
     assert events[3]["ts"] == events[4]["ts"]
     assert events[-1]["ts"] == round(251 / 96000000 * 1e9) / 1000
+
+
+def test_complete_pmu_metric_is_stacked_with_exact_layer_totals(tmp_path):
+    path = profile(tmp_path / "source")
+    edit_document(
+        path,
+        "layers.json",
+        lambda d: [
+            row.update(ARM_PMU_STALL_BACKEND=value)
+            for row, value in zip(d["layers"], (0, 75), strict=True)
+        ],
+    )
+    out = export_visualization([read_visual_run(path, "one")], tmp_path / "view")
+    trace = json.loads((out / "comparison.perfetto.json").read_text())
+    track = [e for e in trace["traceEvents"] if e["ph"] == "C" and "STALL_BACKEND" in e["name"]]
+    assert [e["ts"] for e in track] == [0, 100000, 400000]
+    assert [e["args"]["per-layer total"] for e in track] == [0, 75, 0]
+    assert "not sampled" in trace["otherData"]["pmu_basis"]
+
+
+def test_missing_pmu_metric_is_a_gap_not_a_held_or_zero_value(tmp_path):
+    path = profile(tmp_path / "source", (100, 100, 100))
+    edit_document(
+        path,
+        "layers.json",
+        lambda d: (
+            d["layers"][0].update(ARM_PMU_MEM_ACCESS=12),
+            d["layers"][2].update(ARM_PMU_MEM_ACCESS=0),
+        ),
+    )
+    out = export_visualization([read_visual_run(path, "one")], tmp_path / "view")
+    events = json.loads((out / "comparison.perfetto.json").read_text())["traceEvents"]
+    assert not [e for e in events if e["ph"] == "C" and "MEM_ACCESS" in e["name"]]
+    tid = next(
+        e["tid"]
+        for e in events
+        if e["ph"] == "M" and "MEM_ACCESS" in e.get("args", {}).get("name", "")
+    )
+    slices = [e for e in events if e["ph"] != "M" and e.get("tid") == tid]
+    assert [e["ph"] for e in slices] == ["B", "E", "B", "E"]
+    assert [e["ts"] for e in slices] == [0, 100000, 200000, 300000]
+    assert [e["args"]["value"] for e in slices if e["ph"] == "B"] == [12, 0]
+
+
+def test_zero_width_operator_counter_keeps_identity_as_slice(tmp_path):
+    path = profile(tmp_path / "source", (0, 100))
+    out = export_visualization([read_visual_run(path, "one")], tmp_path / "view")
+    events = json.loads((out / "comparison.perfetto.json").read_text())["traceEvents"]
+    assert not [e for e in events if e["ph"] == "C"]
+    values = [e["args"]["value"] for e in events if e["ph"] == "B" and e.get("tid", 0) >= 3]
+    assert values == [0, 100]

@@ -15,6 +15,10 @@ from .records import _document, _object, load_result
 from .results.manifest import ResultValidity, RunStatus
 
 TIME_BASIS = "cumulative aggregated operator cost; not recorded wall-clock time"
+PMU_BASIS = (
+    "aggregated per-layer totals, not sampled time series; acquisition passes are not "
+    "simultaneous; final graph zero closes the display, not another measurement"
+)
 
 
 @dataclass(frozen=True)
@@ -206,6 +210,65 @@ def _mapping(
     }
 
 
+def _counter_tracks(run: VisualRun, pid: int, spans: list[tuple[int, int]]) -> list[dict]:
+    events: list[dict] = []
+    metrics = sorted({metric for layer in run.layers for metric in layer.counters})
+    for tid, metric in enumerate(metrics, 3):
+        name = f"PMU per-layer total: {metric}"
+        if all(metric in layer.counters for layer in run.layers) and all(
+            end > start for start, end in spans
+        ):
+            for layer, (start, _) in zip(run.layers, spans, strict=True):
+                events.append(
+                    {
+                        "ph": "C",
+                        "pid": pid,
+                        "tid": 0,
+                        "name": name,
+                        "ts": start / 1000,
+                        "args": {"per-layer total": layer.counters[metric]},
+                    }
+                )
+            events.append(
+                {
+                    "ph": "C",
+                    "pid": pid,
+                    "tid": 0,
+                    "name": name,
+                    "ts": spans[-1][1] / 1000,
+                    "args": {"per-layer total": 0},
+                }
+            )
+            continue
+        # A graph would hold a missing value forward or erase a zero-width operator.
+        events.append(
+            {"ph": "M", "pid": pid, "tid": tid, "name": "thread_name", "args": {"name": name}}
+        )
+        for layer, (start, end) in zip(run.layers, spans, strict=True):
+            if metric not in layer.counters:
+                continue
+            value = layer.counters[metric]
+            events.extend(
+                [
+                    {
+                        "ph": "B",
+                        "pid": pid,
+                        "tid": tid,
+                        "ts": start / 1000,
+                        "name": f"{layer.name}: {value:g}",
+                        "args": {
+                            "value": value,
+                            "metric": metric,
+                            "event_id": layer.event_id,
+                            "pmu_basis": PMU_BASIS,
+                        },
+                    },
+                    {"ph": "E", "pid": pid, "tid": tid, "ts": end / 1000},
+                ]
+            )
+    return events
+
+
 def _trace(runs: Sequence[VisualRun], mapping: dict) -> dict:
     events: list[dict] = []
     for pid, run in enumerate(runs, 1):
@@ -236,6 +299,7 @@ def _trace(runs: Sequence[VisualRun], mapping: dict) -> dict:
         )
         cursor_cycles = 0.0
         cursor_ns = 0
+        spans: list[tuple[int, int]] = []
         for layer in run.layers:
             cursor_cycles += layer.cycles
             end_ns_float = cursor_cycles / run.clock_hz * 1e9
@@ -251,6 +315,7 @@ def _trace(runs: Sequence[VisualRun], mapping: dict) -> dict:
                 "time_basis": TIME_BASIS,
                 "manifest_sha256": run.manifest_sha256,
                 "counters": layer.counters,
+                "pmu_basis": PMU_BASIS,
                 "attribution": annotation,
             }
             events.append(
@@ -265,7 +330,9 @@ def _trace(runs: Sequence[VisualRun], mapping: dict) -> dict:
                 }
             )
             events.append({"ph": "E", "pid": pid, "tid": 1, "ts": end_ns / 1000})
+            spans.append((cursor_ns, end_ns))
             cursor_ns = end_ns
+        events.extend(_counter_tracks(run, pid, spans))
         if run.totals["profiled_mean_us"] is not None:
             duration = _number(run.totals["profiled_mean_us"], "profiled mean")
             events.append(
@@ -285,6 +352,7 @@ def _trace(runs: Sequence[VisualRun], mapping: dict) -> dict:
         "displayTimeUnit": "ms",
         "otherData": {
             "time_basis": TIME_BASIS,
+            "pmu_basis": PMU_BASIS,
             "alignment": "each run starts at zero; no simultaneity, idle, overlap or power alignment inferred",
         },
     }

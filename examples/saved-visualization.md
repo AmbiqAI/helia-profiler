@@ -26,6 +26,21 @@ Open `comparison.perfetto.json` at <https://ui.perfetto.dev>, or open one
 an operator slice for cycles, counters, nominal CPU frequency, aggregation,
 source manifest identity and any supplied shapes/kernel annotation.
 
+Expand a run's track group to see a stacked graph for each captured PMU counter:
+CPU instructions/stalls, memory/cache/bus events, and MVE events when present.
+Each step shows the operator's aggregated counter total, not a sampling rate or
+continuous measurement. A metric missing from any operator uses labelled slices
+with gaps instead; a missing measurement is never filled with zero or the previous
+operator's value. Zero-duration operators also use slices so their identity is
+retained. The final zero on a complete graph only terminates its display.
+
+All captured counters also remain together in the operator's details. Counter
+availability follows the saved run, so a cycles-only capture cannot show cache or
+vector measurements. The viewer does not infer cache-hit percentages from general
+memory accesses, MAC utilization from instruction counts, or a bottleneck label.
+Those need appropriate denominators and hardware semantics. Derived metrics and
+timestamp-aligned power tracks remain future extensions.
+
 The horizontal axis is **cumulative aggregated operator cost**, in time units
 using the recorded CPU frequency. It is not a captured wall-clock timeline.
 Median layer costs may come from different invocations. Both runs start at
