@@ -149,7 +149,9 @@ the instrument, or [INA228 on the target](../power-ina228/) if you do not.
 ## Fixed-input captures
 
 The public `helia_profiler.fixture` API builds fixed-input firmware without opening
-an instrument. Timing-only captures read the complete output and timing terminal.
+an instrument. `fixture_capabilities().targets` lists each board’s supported
+`engines`; combine that list with the engine/dtype capabilities when selecting a
+fixture. AP510B supports heliaAOT and TFLM. Timing-only captures read the complete output and timing terminal.
 For measured rail energy, build a method with `FixturePowerSync` protocol 2, then
 add a `FixtureRailPowerRequest` to the verified capture request. The firmware
 signals READY after initialization and warmups, acknowledges GO, gates the entire

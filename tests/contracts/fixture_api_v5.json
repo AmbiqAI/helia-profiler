@@ -1,7 +1,7 @@
 {
   "api_version": [
     5,
-    3
+    4
   ],
   "surface": {
     "ElfSection": {
@@ -1824,6 +1824,11 @@
           "settle_ticks",
           "tuple[int, int]",
           "<required>"
+        ],
+        [
+          "engines",
+          "tuple[EngineType, ...]",
+          "()"
         ]
       ],
       "frozen": true,
