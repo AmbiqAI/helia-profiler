@@ -559,7 +559,9 @@ def test_fixture_refuses_any_board_or_clock_but_the_fixture_target(
     )
     c = config_for(tmp_path, f)
     target = replace(c.target, board=board, clock=ClockSelection(cpu=clock))
-    with pytest.raises(ConfigError, match="supports apollo510_evb at the lp clock only"):
+    with pytest.raises(
+        ConfigError, match="Unsupported fixture target board|supports the lp clock only"
+    ):
         build_fixed_fixture(replace(c, target=target), f, method=METHOD, runtime=runtime(tmp_path))
 
 

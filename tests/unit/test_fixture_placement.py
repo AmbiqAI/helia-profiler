@@ -26,13 +26,15 @@ def test_paired_tcm_request_has_distinct_intent_and_config(tmp_path):
     _validate(config, tcm.fixture)
 
 
+@pytest.mark.parametrize("board", ["apollo510_evb", "apollo510b_evb"])
 @pytest.mark.parametrize("engine", [EngineType.TFLM, EngineType.HELIA_AOT])
 @pytest.mark.parametrize("placement", [Placement.SRAM, Placement.TCM])
-def test_complete_fixture_render_uses_requested_regions(tmp_path, engine, placement):
+def test_complete_fixture_render_uses_requested_regions(tmp_path, engine, placement, board):
     fixture = typed(tmp_path)
     config = config_for(tmp_path, fixture, engine)
     config = replace(
         config,
+        target=replace(config.target, board=board),
         model=replace(
             config.model,
             arena_location=placement,

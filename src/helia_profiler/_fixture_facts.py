@@ -11,9 +11,14 @@ from ._fixture_build import (
     FixtureDType,
 )
 from .engines import EngineType
-from .fixture_capture import FIXTURE_CPU_HZ, FIXTURE_SETTLE_TICKS, FIXTURE_TIMER_HZ
+from .fixture_capture import FIXTURE_SETTLE_TICKS, FIXTURE_TIMER_HZ
 from .fixture_image import MAX_IMAGE
-from .fixture_target import FIXTURE_CLOCK_PROFILE, supported_fixture_target
+from .fixture_target import (
+    FIXTURE_BOARDS,
+    FIXTURE_CLOCK_PROFILE,
+    fixture_cpu_hz,
+    fixture_target_for_board,
+)
 
 
 @dataclass(frozen=True)
@@ -53,20 +58,21 @@ def fixture_capabilities() -> FixtureCapabilities:
     """Report supported targets and public IO types, independently of qualification."""
     from .fixture import FIXTURE_API_VERSION
 
-    target = supported_fixture_target()
     return FixtureCapabilities(
         api_version=FIXTURE_API_VERSION,
-        targets=(
+        targets=tuple(
             QualifiedFixtureTarget(
                 board=target.board,
                 clock_profile=FIXTURE_CLOCK_PROFILE,
-                cpu_hz=FIXTURE_CPU_HZ,
+                cpu_hz=fixture_cpu_hz(target.board),
                 device=target.device,
                 load_address=target.load_address,
                 timer_hz=FIXTURE_TIMER_HZ,
                 image_limit=MAX_IMAGE,
                 settle_ticks=FIXTURE_SETTLE_TICKS,
-            ),
+            )
+            for board in FIXTURE_BOARDS
+            for target in (fixture_target_for_board(board),)
         ),
         engines=tuple(
             EngineDTypeCapability(engine, FixtureDType(dtype), capability)

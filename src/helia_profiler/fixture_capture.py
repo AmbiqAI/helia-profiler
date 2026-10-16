@@ -199,6 +199,11 @@ def capture_fixture(
 ) -> FixtureCaptureResult:
     """Capture one bounded raw terminal snapshot and persist every attempted operation."""
     require(
+        request.target.board != "apollo510b_evb"
+        or (request.power_sync is None and request.psram_weights is None),
+        "AP510B fixture capture requires timing-only MRAM or TCM weights",
+    )
+    require(
         request.psram_weights is None
         or isinstance(request.psram_weights, FixturePsramWeights)
         and request.psram_weights.image_sha256 == request.image.sha256,
@@ -547,7 +552,7 @@ def capture_fixture(
         require(
             timing.iterations > 0
             and timing.timer_hz == FIXTURE_TIMER_HZ
-            and timing.cpu_hz == FIXTURE_CPU_HZ
+            and timing.cpu_hz == fixture_cpu_hz(request.target.board)
             and 0 < timing.ticks < 60 * timing.timer_hz
             and FIXTURE_SETTLE_TICKS[0] <= timing.settle_ticks <= FIXTURE_SETTLE_TICKS[1],
             "Invalid timing completion terminal",

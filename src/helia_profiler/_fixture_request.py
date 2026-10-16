@@ -123,7 +123,11 @@ class FixtureBuildRequest:
             self.target.verify()
         except ValueError as exc:
             raise ConfigError(str(exc)) from exc
-        validate_fixture_placement(self.placement.arena, self.placement.weights, self.engine)
+        if self.target.board == "apollo510b_evb" and self.method.power_sync is not None:
+            raise ConfigError("AP510B fixture integration is timing-only")
+        validate_fixture_placement(
+            self.placement.arena, self.placement.weights, self.engine, board=self.target.board
+        )
 
     @property
     def intent_identity(self) -> str:
