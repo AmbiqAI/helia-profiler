@@ -135,3 +135,121 @@ def test_aot_physical_bank_cannot_be_hidden_by_logical_override(tmp_path, placem
     )
     with pytest.raises(ConfigError, match="physical memory differs"):
         fixture_template_vars(ctx, [region])
+
+
+def mixed_context(tmp_path):
+    from helia_profiler.engines.base import HeliaAotArtifacts
+    from helia_profiler.placement import MemoryRegion
+    from helia_profiler.results import MemoryPlan, MemoryRegionUsage
+
+    fixture = typed(tmp_path)
+    config = config_for(tmp_path, fixture, EngineType.HELIA_AOT)
+    config = replace(
+        config,
+        engine=replace(
+            config.engine,
+            config={
+                "aot_args": {
+                    "memory": {
+                        "tensors": [
+                            {"type": "scratch", "attributes": {"memory": "dtcm"}},
+                            {"type": "scratch", "id": "slow", "attributes": {"memory": "sram"}},
+                        ]
+                    }
+                }
+            },
+        ),
+    )
+    regions = [
+        ArenaRegion(0, "fast", 256, 16, ArenaRole.SCRATCH, "dtcm", Placement.TCM),
+        ArenaRegion(1, "slow", 512, 16, ArenaRole.SCRATCH, "sram", Placement.SRAM),
+        ArenaRegion(2, "weights", 128, 16, ArenaRole.CONSTANT, "mram", Placement.MRAM, "c.bin"),
+    ]
+    plan = MemoryPlan(
+        engine=EngineType.HELIA_AOT,
+        regions=tuple(
+            MemoryRegionUsage(MemoryRegion(bank), 0, size)
+            for bank, size in (("DTCM", 256), ("SRAM", 512), ("MRAM", 128))
+        ),
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ctx.fixture = FixtureRenderSpec(fixture, METHOD, analysis_of(fixture))
+    ctx.memory_plan = plan
+    ctx.engine_artifacts = HeliaAotArtifacts(
+        engine_header="m.h",
+        aot_prefix="m",
+        aot_module_name="m",
+        aot_cmake_target="m",
+        helia_aot_version="test",
+        aot_user_memory_config=True,
+        aot_arena_regions=regions,
+        memory_plan=plan,
+    )
+    return ctx, regions
+
+
+def test_explicit_mixed_aot_regions_keep_emitted_banks(tmp_path):
+    ctx, regions = mixed_context(tmp_path)
+    fixture_template_vars(ctx, regions)
+    assert [r.memory for r in regions] == ["dtcm", "sram", "mram"]
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "coarse",
+        "missing_plan",
+        "missing_region",
+        "wrong_bank",
+        "writable_mram",
+        "oversized",
+        "zero_size",
+        "bad_alignment",
+        "external",
+    ],
+)
+def test_mixed_regions_preserve_admission_guards(tmp_path, fault):
+    ctx, regions = mixed_context(tmp_path)
+    if fault == "coarse":
+        ctx.config = replace(ctx.config, engine=replace(ctx.config.engine, config={}))
+    elif fault == "missing_plan":
+        ctx.memory_plan = None
+    elif fault == "missing_region":
+        regions = regions[:-1]
+    elif fault == "external":
+        ctx.engine_artifacts = replace(ctx.engine_artifacts, aot_allocate_arenas=False)
+    else:
+        changes = {
+            "wrong_bank": {"memory": "sram"},
+            "writable_mram": {"memory": "mram", "placement": Placement.MRAM},
+            "oversized": {"size": 10_000_000},
+            "zero_size": {"size": 0},
+            "bad_alignment": {"alignment": 3},
+        }
+        regions[0] = replace(regions[0], **changes[fault])
+    with pytest.raises(ConfigError):
+        fixture_template_vars(ctx, regions)
+
+
+def test_mixed_region_evidence_survives_record_and_rejects_tampering(tmp_path):
+    import json
+
+    from test_fixture_record import _build, _pin
+
+    from helia_profiler._fixture_placement import validate_fixture_regions
+    from helia_profiler._fixture_record import compiled_fixture_identity
+    from helia_profiler.fixture import dump_fixture_build, load_fixture_build
+
+    ctx, regions = mixed_context(tmp_path)
+    evidence = validate_fixture_regions(ctx, regions)
+    assert evidence is not None
+    assert [r["memory"] for r in evidence["regions"]] == ["dtcm", "sram", "mram"]
+    assert evidence["memory_intent"]["tensors"][1]["id"] == "slow"
+    pinned = _pin(tmp_path / "fixture-aot-regions.json", json.dumps(evidence).encode())
+    build = replace(_build(tmp_path), aot_outputs=(pinned,), planned_memory=ctx.memory_plan)
+    build = replace(build, build_identity=compiled_fixture_identity(build))
+    record = dump_fixture_build(build, roots={"run": tmp_path})
+    assert load_fixture_build(record, roots={"run": tmp_path}) == build
+    pinned.path.write_text("{}", encoding="utf-8")
+    with pytest.raises(ValueError):
+        load_fixture_build(record, roots={"run": tmp_path})

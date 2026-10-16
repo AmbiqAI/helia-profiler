@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import cast
 
+from .._fixture_placement import validate_fixture_regions
 from ..engines import EngineType
 from ..engines.base import ArenaRegion, HeliaAotArtifacts
 from ..errors import ConfigError
@@ -103,22 +104,7 @@ def fixture_template_vars(ctx: PipelineContext, regions: list[ArenaRegion]) -> d
         for r in regions
     ):
         raise ConfigError("Writable AOT region cannot use MRAM fixture placement")
-    for region in regions:
-        requested = (
-            ctx.config.model.weights_location
-            if region.role is ArenaRole.CONSTANT
-            else ctx.config.model.arena_location
-        )
-        if region.placement != requested:
-            raise ConfigError("AOT region placement differs from fixture request")
-        banks = {
-            Placement.SRAM: ("sram", "dram"),
-            Placement.MRAM: ("mram",),
-            Placement.TCM: ("dtcm",),
-            Placement.PSRAM: ("psram",),
-        }
-        if region.memory not in banks[requested]:
-            raise ConfigError("AOT physical memory differs from fixture request")
+    validate_fixture_regions(ctx, regions)
     payloads = fixture_psram_payloads(ctx, regions) if psram else ()
     return {
         "fixture_cpu_hz": fixture_cpu_hz(ctx.config.target.board),
