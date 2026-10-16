@@ -453,6 +453,7 @@ def load_fixture_build(record: str | bytes, *, roots: Mapping[str, Path]) -> Fix
             _json((5, 1)),
             _json((5, 2)),
             _json((5, 3)),
+            _json((5, 4)),
             _json(FIXTURE_API_VERSION),
         )
     ):
@@ -463,7 +464,7 @@ def load_fixture_build(record: str | bytes, *, roots: Mapping[str, Path]) -> Fix
     if power_fields and _json(outer["fixture_api"]) == _json((5, 0)):
         raise ValueError("Power firmware requires its declared API version")
     ram_fields = {"observe_ram"} if "observe_ram" in outer["build"] else set()
-    if ram_fields and outer["fixture_api"] != list(FIXTURE_API_VERSION):
+    if ram_fields and outer["fixture_api"] not in ([5, 4], list(FIXTURE_API_VERSION)):
         raise ValueError("RAM diagnostic requires its declared API version")
     value = dict(_object(outer["build"], _FIELDS | power_fields | ram_fields))
     try:
