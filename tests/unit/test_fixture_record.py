@@ -337,3 +337,10 @@ def test_build_record_requires_an_object(tmp_path, value):
     record = {"schema_version": 1, "fixture_api": [5, 4], "build": value}
     with pytest.raises(ValueError, match="JSON object"):
         load_fixture_build(json.dumps(record), roots={"run": tmp_path})
+
+
+def test_previous_api_record_remains_readable(tmp_path):
+    build = _build(tmp_path)
+    record = json.loads(dump_fixture_build(build, roots={"run": tmp_path}))
+    record["fixture_api"] = [5, 3]
+    assert load_fixture_build(json.dumps(record), roots={"run": tmp_path}) == build
