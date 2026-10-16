@@ -547,6 +547,7 @@ def build_fixed_fixture(
     runtime: PreparedUpstreamRuntime | None = None,
     compile: bool = True,
     observe_aot_arenas: bool = False,
+    observe_ram: bool = False,
 ) -> FixtureBuild:
     """Render or compile one fixed fixture through profiler's host-only stages."""
     return _build(
@@ -556,6 +557,7 @@ def build_fixed_fixture(
         runtime=runtime,
         compile=compile,
         observe_aot_arenas=observe_aot_arenas,
+        observe_ram=observe_ram,
     )
 
 

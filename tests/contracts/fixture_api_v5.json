@@ -2109,7 +2109,7 @@
     },
     "build_fixed_fixture": {
       "kind": "function",
-      "signature": "(config: 'ProfileConfig', fixture: 'FixedFixture | TypedFixture', *, method: 'FixtureMethod', runtime: 'PreparedUpstreamRuntime | None' = None, compile: 'bool' = True, observe_aot_arenas: 'bool' = False) -> 'FixtureBuild'"
+      "signature": "(config: 'ProfileConfig', fixture: 'FixedFixture | TypedFixture', *, method: 'FixtureMethod', runtime: 'PreparedUpstreamRuntime | None' = None, compile: 'bool' = True, observe_aot_arenas: 'bool' = False, observe_ram: 'bool' = False) -> 'FixtureBuild'"
     },
     "build_fixture": {
       "kind": "function",

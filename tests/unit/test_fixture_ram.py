@@ -167,3 +167,31 @@ def test_ram_image_binds_stack_and_optional_heap_symbols(tmp_path):
     struct.pack_into("<I", raw, table_at + 4 * 40 + 8, 0)
     with pytest.raises(ContractError, match="stack extent"):
         inspect_elf(bytes(raw), binary.read(), 0x410000, {"deployment_ram": 32})
+
+
+@pytest.mark.parametrize("observe", [False, True])
+def test_public_config_wrapper_preserves_config_and_ram_option(monkeypatch, observe):
+    from helia_profiler import _fixture_build as module
+    from helia_profiler.fixture import build_fixed_fixture
+
+    config, fixture, runtime, expected = object(), object(), object(), object()
+    received = {}
+
+    def build(actual_config, actual_fixture, **kwargs):
+        assert actual_config is config and actual_fixture is fixture
+        received.update(kwargs)
+        return expected
+
+    monkeypatch.setattr(module, "_build", build)
+    options = {"observe_ram": True} if observe else {}
+    assert (
+        build_fixed_fixture(
+            config, fixture, method=METHOD, runtime=runtime, compile=False, **options
+        )
+        is expected
+    )
+    assert received["observe_ram"] is observe
+    assert received["runtime"] is runtime
+    assert received["method"] is METHOD
+    assert received["compile"] is False
+    assert received["observe_aot_arenas"] is False
