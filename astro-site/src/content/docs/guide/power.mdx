@@ -159,7 +159,13 @@ The host retains the statistics and both packed GPIO streams. One shared native
 sample-counter transaction identifies the selected gate, its integral and typed
 completion. Missing transitions, stream gaps, multiple eligible transactions or
 incomplete batch evidence cannot yield accepted energy. The caller-selected
-`settle_seconds` bounds startup and completion separately, each at most 60 seconds.
+`settle_seconds` bounds startup and completion separately, each at most 60 seconds
+for rail measurements. Timing-only fixture captures accept an explicit finite budget
+up to 300 seconds; the ordinary 60-second caller default is unchanged. The station
+permit must cover that budget plus setup and readback. The timing terminal must
+also fit the requested budget. Flat fixture images are bounded by the canonical
+target application flash region, with full ELF segment, sink and image readback
+validation.
 Independent firmware and sensor clocks remain separate observations; a sample
 boundary uncertainty is not instrument calibration.
 

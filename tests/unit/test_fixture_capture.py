@@ -524,7 +524,7 @@ def test_target_is_not_halted_until_status_is_terminal(rig, monkeypatch):
     assert first_halt >= 1
     assert all(kind == "read_status" for kind, *_ in events[:first_halt])
     assert events[first_halt - 1] == ("read_status", 0)
-    assert sleeps[0] == capture._FIRST_POLL_S
+    assert sleeps[0] == 0  # Short budgets reserve the attachment window.
     assert all(0 < s <= capture._POLL_INTERVAL_S for s in sleeps[1:])
 
 
@@ -602,7 +602,7 @@ def test_predicted_run_stays_detached_and_completes_on_first_poll(rig, monkeypat
     sleeps: list[float] = []
     monkeypatch.setattr(capture.time, "sleep", sleeps.append)
     result = capture.capture_fixture(
-        replace(request, settle_seconds=10, expected_duration_s=2.0), guard=guard
+        replace(request, settle_seconds=30, expected_duration_s=2.0), guard=guard
     )
     assert result.state == "success", result.error
     assert sleeps[0] == 2.0 * capture._EXPECTED_MARGIN
@@ -619,7 +619,7 @@ def test_predicted_detach_is_bounded_by_settle_seconds(rig, monkeypatch):
         replace(request, settle_seconds=5, expected_duration_s=4.5), guard=guard
     )
     assert result.state == "success", result.error
-    assert sleeps[0] == 5
+    assert sleeps[0] == 0
 
 
 def test_short_prediction_falls_back_to_polling(rig, monkeypatch):
@@ -651,7 +651,7 @@ def test_short_prediction_falls_back_to_polling(rig, monkeypatch):
         replace(request, settle_seconds=5, expected_duration_s=0.1), guard=guard
     )
     assert result.state == "success", result.error
-    assert sleeps[0] == capture._FIRST_POLL_S
+    assert sleeps[0] == 0  # Short budgets reserve the attachment window.
     completion = json.loads((request.evidence_dir / "completion.json").read_text())
     assert completion["complete_on_first_poll"] is False and completion["polls"] == 3
 
@@ -837,8 +837,8 @@ def test_outputs_are_returned_in_model_order_past_ten(rig, tmp_path, checksum_ok
 _MIB = 1024 * 1024
 
 
-@pytest.mark.parametrize("size", [_MIB + 1, 3 * _MIB // 2, 2 * _MIB])
-def test_images_up_to_two_mib_are_flashed_verified_and_captured(rig, tmp_path, size):
+@pytest.mark.parametrize("size", [_MIB + 1, 2 * _MIB, 2297828, 0x003F0000])
+def test_images_within_application_extent_are_flashed_verified_and_captured(rig, tmp_path, size):
     request, memory, terminal, writes, flashes, guard = rig
     binary = bytes((i * 7 + 1) & 0xFF for i in range(size))
     (tmp_path / "large").mkdir()
@@ -850,25 +850,25 @@ def test_images_up_to_two_mib_are_flashed_verified_and_captured(rig, tmp_path, s
     assert (request.evidence_dir / "image.bin").read_bytes() == binary
 
 
-def test_image_over_two_mib_is_refused_before_device(rig, tmp_path):
+def test_image_over_application_extent_is_refused_before_device(rig, tmp_path):
     request, memory, terminal, writes, flashes, guard = rig
     (tmp_path / "large").mkdir()
-    elf, image, _ = image_files(tmp_path / "large", binary=b"\x01" * (2 * _MIB + 4))
+    elf, image, _ = image_files(tmp_path / "large", binary=b"\x01" * (0x003F0000 + 1))
     result = capture.capture_fixture(replace(request, elf=elf, image=image), guard=guard)
     assert result.state == "failure" and result.error == "Image size"
     assert not flashes and not writes and not guard.calls
 
 
-def test_elf_inspection_admits_two_mib_and_keeps_the_mram_bound(tmp_path):
+def test_elf_inspection_admits_application_extent_and_keeps_the_mram_bound(tmp_path):
     from helia_profiler.fixture_image import MAX_IMAGE, MRAM, bounded
 
-    assert MAX_IMAGE == 2 * _MIB
+    assert MAX_IMAGE == MRAM[1] - MRAM[0]
     assert MRAM == (0x00410000, 0x00800000)
     assert bounded(0x00410000, 0x003F0000, MRAM) and not bounded(0x00410000, 0x003F0001, MRAM)
-    elf, image, sizes = image_files(tmp_path, binary=b"\x02" * (2 * _MIB))
-    assert len(inspect_elf(elf.read(), image.read(), 0x410000, sizes).binary) == 2 * _MIB
+    elf, image, sizes = image_files(tmp_path, binary=b"\x02" * 0x003F0000)
+    assert len(inspect_elf(elf.read(), image.read(), 0x410000, sizes).binary) == 0x003F0000
     (tmp_path / "over").mkdir()
-    elf, image, sizes = image_files(tmp_path / "over", binary=b"\x02" * (2 * _MIB + 4))
+    elf, image, sizes = image_files(tmp_path / "over", binary=b"\x02" * (0x003F0000 + 1))
     with pytest.raises(ValueError, match="image outside bounded application MRAM"):
         inspect_elf(elf.read(), image.read(), 0x410000, sizes)
 
@@ -1189,3 +1189,104 @@ def test_supply_authority_failure_stops_before_attachment(rig, monkeypatch, when
     assert result.state == "failure" and "station" in (result.error or "")
     assert bool(powered) is (when == "after_supply")
     assert not writes and not flashes
+
+
+@pytest.mark.parametrize(
+    "completion_s, tick_seconds, accepted",
+    [(120, 110, True), (299, 290, True), (301, 290, False), (120, 301, False)],
+)
+def test_explicit_long_timing_budget_binds_wait_and_terminal(
+    rig, monkeypatch, completion_s, tick_seconds, accepted
+):
+    request, memory, terminal, _, flashes, guard = rig
+    request = replace(request, settle_seconds=300)
+    terminal[0x2000000C] = struct.pack("<7I", tick_seconds * 32768, 10, 2, 32768, 300, 96000000, 1)
+    clock = [0.0]
+    reset = capture.reset_target
+
+    def complete(**kwargs):
+        reset(**kwargs)
+        clock[0] = completion_s
+
+    monkeypatch.setattr(capture, "reset_target", complete)
+    monkeypatch.setattr(capture.time, "monotonic", lambda: clock[0])
+    result = capture.capture_fixture(request, guard=guard)
+    assert (result.state == "success") is accepted, result.error
+    assert len(flashes) == 1
+    assert (True, 600) in guard.calls
+    assert (True, 420) in guard.calls
+    completion = json.loads((request.evidence_dir / "completion.json").read_text())
+    assert completion["elapsed_s"] == completion_s
+    assert completion["max_wait_s"] == 300
+
+
+@pytest.mark.parametrize("seconds", [True, 0, -1, 301, float("inf"), float("nan")])
+def test_invalid_timing_budget_refuses_before_device(rig, seconds):
+    request, _, _, writes, flashes, guard = rig
+    with pytest.raises(ValueError, match="Unbounded settle time"):
+        capture.capture_fixture(replace(request, settle_seconds=seconds), guard=guard)
+    assert not flashes and not writes and not guard.calls
+
+
+def test_long_timing_requires_full_permit_before_probe(rig, monkeypatch):
+    request, _, _, writes, flashes, _ = rig
+
+    class ShortPermit(Guard):
+        def check(self, *, require_free, remaining_s):
+            if remaining_s > 360:
+                raise PermissionError("permit cannot cover requested run")
+
+    monkeypatch.setattr(capture, "list_connected_probes", lambda: pytest.fail("probe reached"))
+    result = capture.capture_fixture(replace(request, settle_seconds=300), guard=ShortPermit())
+    assert result.error == "permit cannot cover requested run"
+    assert not flashes and not writes
+
+
+@pytest.mark.parametrize("seconds", [60.01, 300])
+def test_rail_budget_stays_bounded_before_device(rig, seconds):
+    request, _, _, writes, flashes, guard = rig
+    rail = capture.FixtureRailPowerRequest("serial", "MCU", 1.8, 29, 36, 14)
+    guard.verify_power_device = lambda **kwargs: None
+    request = replace(
+        request,
+        settle_seconds=seconds,
+        rail_power=rail,
+        power_sync=rail.firmware_wiring(),
+        timing_scope=FixtureTimingScope.RESTORE_AND_INVOKE,
+    )
+    with pytest.raises(ValueError, match="Unbounded settle time"):
+        capture.capture_fixture(request, guard=guard)
+    assert not flashes and not writes and not guard.calls
+
+
+@pytest.mark.parametrize("budget, prediction", [(300, 250), (60, 55), (5, 4.5), (0.5, None)])
+def test_predicted_detach_reserves_attachment_after_reset(rig, monkeypatch, budget, prediction):
+    request, _, _, _, _, guard = rig
+    clock = [0.0]
+    original_reset = capture.reset_target
+    original_attach = capture.attached_session
+
+    def reset(**kwargs):
+        clock[0] += 0.1
+        original_reset(**kwargs)
+
+    @contextmanager
+    def attach(**kwargs):
+        clock[0] += 0.1
+        with original_attach(**kwargs) as session:
+            yield session
+
+    def sleep(seconds):
+        clock[0] += seconds
+
+    monkeypatch.setattr(capture, "reset_target", reset)
+    monkeypatch.setattr(capture, "attached_session", attach)
+    monkeypatch.setattr(capture.time, "sleep", sleep)
+    monkeypatch.setattr(capture.time, "monotonic", lambda: clock[0])
+    result = capture.capture_fixture(
+        replace(request, settle_seconds=budget, expected_duration_s=prediction), guard=guard
+    )
+    assert result.state == "success", result.error
+    completion = json.loads((request.evidence_dir / "completion.json").read_text())
+    assert completion["elapsed_s"] < budget
+    assert completion["complete_on_first_poll"] is True

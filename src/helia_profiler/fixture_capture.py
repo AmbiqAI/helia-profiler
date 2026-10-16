@@ -63,6 +63,7 @@ FIXTURE_TIMER_HZ = STIMER_HZ
 FIXTURE_SETTLE_TICKS = STIMER_SETTLE_TICKS
 _STATUS_POISON = struct.unpack("<i", bytes([0xA5]) * 4)[0]
 _STATUS_RUNNING = -1
+_ATTACH_TIMEOUT_S = 15
 _FIRST_POLL_S = 1.0
 _POLL_INTERVAL_S = 0.25
 _EXPECTED_MARGIN = 1.25
@@ -76,6 +77,7 @@ class FixtureCaptureRequest:
 
     ``settle_seconds`` bounds each wait for startup READY and measured completion.
     READY follows firmware initialization and warmups; it precedes the measured gate.
+    Timing-only requests allow up to 300 seconds; rail measurements retain 60 seconds.
     """
 
     elf: FixtureFile
@@ -90,7 +92,8 @@ class FixtureCaptureRequest:
     target: FixtureTarget
     arena_capacity: int | None = None
     #: Caller-predicted firmware run time after reset; the host stays detached for
-    #: ``max(1 s, expected_duration_s * 1.25)``, bounded by ``settle_seconds``, before polling.
+    #: ``max(1 s, expected_duration_s * 1.25)``, bounded by the remaining completion
+    #: budget minus attachment time and one polling interval, before polling.
     expected_duration_s: float | None = None
     #: Sizes of outputs after the first, in model order (typed fixtures).
     extra_output_sizes: tuple[int, ...] = ()
@@ -261,7 +264,7 @@ def capture_fixture(
     require(
         type(request.settle_seconds) in (int, float)
         and math.isfinite(request.settle_seconds)
-        and 0 < request.settle_seconds <= 60,
+        and 0 < request.settle_seconds <= (60 if request.rail_power is not None else 300),
         "Unbounded settle time",
     )
     require(
@@ -308,7 +311,9 @@ def capture_fixture(
     def attach():
         guard.check(require_free=True, remaining_s=90)
         return attached_session(
-            device=request.device, jlink_serial=request.jlink_serial, attach_timeout_s=15
+            device=request.device,
+            jlink_serial=request.jlink_serial,
+            attach_timeout_s=_ATTACH_TIMEOUT_S,
         )
 
     def read(session, address: int, count: int) -> bytes:
@@ -362,12 +367,12 @@ def capture_fixture(
             cast(FixturePowerGuard, guard).verify_power_device(
                 serial=supply.serial, rail=supply.rail
             )
-            guard.check(require_free=True, remaining_s=360)
+            guard.check(require_free=True, remaining_s=max(360, request.settle_seconds + 300))
             from .power import ensure_target_powered
 
             ensure_target_powered(driver_name=supply.driver, serial=supply.serial, required=True)
-            guard.check(require_free=True, remaining_s=360)
-        guard.check(require_free=True, remaining_s=360)
+            guard.check(require_free=True, remaining_s=max(360, request.settle_seconds + 300))
+        guard.check(require_free=True, remaining_s=max(360, request.settle_seconds + 300))
         require(
             sum(str(p.serial) == request.jlink_serial for p in list_connected_probes()) == 1,
             "Probe enumeration mismatch",
@@ -407,7 +412,7 @@ def capture_fixture(
                 (int.from_bytes(read(session, 0xE000ED00, 4), "little") >> 4) & 0xFFF == 0xD22,
                 "Unexpected core",
             )
-        guard.check(require_free=True, remaining_s=240)
+        guard.check(require_free=True, remaining_s=max(240, request.settle_seconds + 180))
         flash_image.read()
         flash_binary(
             binary_path=flash_image.path,
@@ -468,7 +473,7 @@ def capture_fixture(
                 "the retained samples do not establish full-batch energy",
             )
             require(
-                completed,
+                completed and (request.rail_power is not None or elapsed <= request.settle_seconds),
                 f"Firmware did not complete within {request.settle_seconds} s: "
                 + _running_stage(live, live_memory),
             )
@@ -500,9 +505,10 @@ def capture_fixture(
         else:
             reset_target(device=request.device, jlink_serial=request.jlink_serial)
             # Stay detached through boot and, when predicted, the whole run.
+            remaining = request.settle_seconds - (time.monotonic() - started)
             detached = min(
                 max(_FIRST_POLL_S, (request.expected_duration_s or 0.0) * _EXPECTED_MARGIN),
-                request.settle_seconds,
+                max(0.0, remaining - _ATTACH_TIMEOUT_S - _POLL_INTERVAL_S),
             )
             time.sleep(detached)
         with attach() as session:
@@ -553,7 +559,7 @@ def capture_fixture(
             timing.iterations > 0
             and timing.timer_hz == FIXTURE_TIMER_HZ
             and timing.cpu_hz == fixture_cpu_hz(request.target.board)
-            and 0 < timing.ticks < 60 * timing.timer_hz
+            and 0 < timing.ticks < request.settle_seconds * timing.timer_hz
             and FIXTURE_SETTLE_TICKS[0] <= timing.settle_ticks <= FIXTURE_SETTLE_TICKS[1],
             "Invalid timing completion terminal",
         )
