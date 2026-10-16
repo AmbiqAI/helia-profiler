@@ -439,7 +439,13 @@ def load_fixture_build(record: str | bytes, *, roots: Mapping[str, Path]) -> Fix
         type(outer["schema_version"]) is not int
         or outer["schema_version"] != 1
         or _json(outer["fixture_api"])
-        not in (_json((5, 0)), _json((5, 1)), _json((5, 2)), _json(FIXTURE_API_VERSION))
+        not in (
+            _json((5, 0)),
+            _json((5, 1)),
+            _json((5, 2)),
+            _json((5, 3)),
+            _json(FIXTURE_API_VERSION),
+        )
     ):
         raise ValueError("Unsupported fixture build record/API version")
     power_fields = (

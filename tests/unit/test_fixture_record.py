@@ -330,3 +330,10 @@ def test_saved_api52_record_keeps_identity_and_file_checks(tmp_path, with_power)
     build.flat_binary.path.write_bytes(b"wrong image")
     with pytest.raises(ValueError):
         load_fixture_build(encoded, roots={"run": tmp_path})
+
+
+def test_previous_api_record_remains_readable(tmp_path):
+    build = _build(tmp_path)
+    record = json.loads(dump_fixture_build(build, roots={"run": tmp_path}))
+    record["fixture_api"] = [5, 3]
+    assert load_fixture_build(json.dumps(record), roots={"run": tmp_path}) == build
