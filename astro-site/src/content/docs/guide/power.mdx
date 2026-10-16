@@ -207,3 +207,48 @@ Results expose gross measured joules, joules per completed iteration, scope,
 instrument identity and retained evidence. Repeats, comparison thresholds and
 calibration acceptance belong to the calling experiment. The typed request and
 result classes are exported by `helia_profiler.fixture`.
+
+
+## Optional fixture RAM diagnostics
+
+For timing-only fixtures, pass `observe_ram=True` to `build_fixed_fixture` or
+`FixtureBuildRequest`. The config-based entry point preserves the supplied
+compatibility baseline and compiler launcher. Derive the capture request with
+`fixture_capture_request(build, ...)`; enabling the flag only at capture time
+cannot instrument an existing image. The option defaults to `False` and requires
+fixture API 5.4 when enabled.
+
+Successful diagnostic captures include a hashed `ram.json` file in
+`FixtureCaptureResult.artifacts`. Read it through `FixtureFile.read()` to verify
+its digest. The JSON has `schema_version: 1` and these quantities:
+
+| Field | Meaning |
+| --- | --- |
+| `stack_reserved_bytes` | Linked stack capacity in bytes. |
+| `stack_written_high_water_lower_bound_bytes` | Observed written stack depth in bytes; a lower bound, not an exact stack peak. |
+| `baseline_active_stack_bytes` | Active stack depth when painting began, in bytes. |
+| `heap_sbrk_backing_high_water_bytes` | Optional linked allocator backing maximum in bytes. |
+| `heap_system_memory_high_water_bytes` | Optional allocator system-memory backing maximum in bytes; overlaps the preceding counter. |
+| `heap_peak_bytes` | `null`: peak live heap payload is not measured. |
+
+Missing allocator counters are `null`, with a corresponding `<field>_reason`
+value of `allocator_counter_not_linked`. A present counter reporting zero is
+not missing evidence. `heap_peak_reason` is `not_instrumented`. A disabled or
+failed capture must not be interpreted as zero RAM usage.
+
+The stack window covers model initialization, warmups and invokes, including
+diagnostic overhead and interrupts. It excludes boot/system initialization.
+Paint collisions and stack reservations without writes can underestimate depth.
+Allocator counters cover backing obtained since reset; they overlap and must
+not be added together or to an entire reserved heap region. The JSON also
+retains `measurement_window`, `limitations` and `heap_counter_basis` strings.
+These observations do not establish total peak RAM.
+
+AOT arena painting is a separate option. Keep `observe_aot_arenas=False` for
+carry-state workloads unless the selected emitted arenas are proven scratch-only
+and contain no initialized state. Static arena accounting does not require
+painting.
+
+API 5.4 reads earlier 5.x build records with RAM observation disabled. Disabled
+`observe_ram` is omitted from serialized build records; enabled records contain
+`true`. Existing result dataclass fields retain their meanings.
