@@ -139,7 +139,7 @@ def test_heap_counters_are_overlapping_backing_not_live_peak():
 def test_ram_image_binds_stack_and_optional_heap_symbols(tmp_path):
     from test_fixture_capture import image_files
 
-    from helia_profiler.fixture_image import inspect_elf
+    from helia_profiler.fixture_image import DTCM, inspect_elf
 
     elf, binary, sizes = image_files(
         tmp_path,
@@ -165,6 +165,15 @@ def test_ram_image_binds_stack_and_optional_heap_symbols(tmp_path):
     image = inspect_elf(bytes(raw), binary.read(), 0x410000, {"deployment_ram": 32})
     assert image.stack_bounds == (0x20001000, 0x20002000)
     assert image.heap_capacity == 4096
+    heap_header = table_at + 5 * 40
+    struct.pack_into("<I", raw, heap_header + 12, DTCM[1])
+    struct.pack_into("<I", raw, heap_header + 20, 0)
+    empty = inspect_elf(bytes(raw), binary.read(), 0x410000, {"deployment_ram": 32})
+    assert empty.heap_capacity == 0
+    struct.pack_into("<I", raw, heap_header + 12, DTCM[1] + 1)
+    with pytest.raises(ContractError, match="heap extent"):
+        inspect_elf(bytes(raw), binary.read(), 0x410000, {"deployment_ram": 32})
+    struct.pack_into("<I", raw, heap_header + 12, DTCM[1])
     assert {s.name for s in image.sinks} == set(sizes)
     struct.pack_into("<I", raw, table_at + 4 * 40 + 8, 0)
     with pytest.raises(ContractError, match="stack extent"):

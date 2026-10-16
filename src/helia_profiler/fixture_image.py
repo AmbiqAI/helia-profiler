@@ -180,7 +180,7 @@ def inspect_elf(data: bytes, binary: bytes, load_address: int, sizes: dict[str, 
             require(
                 len(heaps) == 1
                 and heaps[0][2] & 3 == 3
-                and bounded(heaps[0][3], heaps[0][5], DTCM),
+                and DTCM[0] <= heaps[0][3] <= heaps[0][3] + heaps[0][5] <= DTCM[1],
                 "Invalid diagnostic heap extent",
             )
             heap_capacity = heaps[0][5]
