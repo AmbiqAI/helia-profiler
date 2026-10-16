@@ -1840,6 +1840,11 @@
           "settle_ticks",
           "tuple[int, int]",
           "<required>"
+        ],
+        [
+          "engines",
+          "tuple[EngineType, ...]",
+          "()"
         ]
       ],
       "frozen": true,

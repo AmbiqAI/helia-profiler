@@ -17,6 +17,7 @@ from .fixture_target import (
     FIXTURE_BOARDS,
     FIXTURE_CLOCK_PROFILE,
     fixture_cpu_hz,
+    fixture_engines_for_board,
     fixture_target_for_board,
 )
 
@@ -33,6 +34,7 @@ class QualifiedFixtureTarget:
     timer_hz: int
     image_limit: int
     settle_ticks: tuple[int, int]
+    engines: tuple[EngineType, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -70,6 +72,7 @@ def fixture_capabilities() -> FixtureCapabilities:
                 timer_hz=FIXTURE_TIMER_HZ,
                 image_limit=MAX_IMAGE,
                 settle_ticks=FIXTURE_SETTLE_TICKS,
+                engines=fixture_engines_for_board(target.board),
             )
             for board in FIXTURE_BOARDS
             for target in (fixture_target_for_board(board),)
