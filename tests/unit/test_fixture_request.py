@@ -238,6 +238,8 @@ def test_engine_source_records_the_install_commit(
 def test_capabilities_report_the_qualified_contract() -> None:
     facts = fixture_capabilities()
     target, ap510b = facts.targets
+    assert set(ap510b.engines) == {EngineType.HELIA_AOT, EngineType.TFLM}
+    assert set(target.engines) == {EngineType.HELIA_AOT, EngineType.TFLM, EngineType.HELIA_RT}
     assert ap510b.board == "apollo510b_evb"
     assert ap510b.device == "AP510BFA-CBR"
     assert (target.board, target.clock_profile) == ("apollo510_evb", "lp")

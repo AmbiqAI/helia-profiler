@@ -317,6 +317,13 @@ def test_render_derives_extents_ops_counts_and_scope(tmp_path, kind, scope):
     assert values["fixture_timing_scope"] == scope.value
     assert len(str(fixture_input["initializer"]).split(",")) == f.input_tensor.size
     source = _jinja_env.get_template("fixed_fixture.cc.j2").render(**values)
+    assert "ticks >= 300U*HPX_STIMER_HZ" in source
+    from helia_profiler.fixture_power import FixturePowerSync
+
+    power_source = _jinja_env.get_template("fixed_fixture.cc.j2").render(
+        **{**values, "fixture_power_sync": FixturePowerSync(29, 36, 14)}
+    )
+    assert "ticks >= 60U*HPX_STIMER_HZ" in power_source
     assert f"deployment_output[{f.output_tensor.size}]" in source
     assert f"input->bytes != {f.input_tensor.size}" in source
     for registration in model.resolver.registrations:

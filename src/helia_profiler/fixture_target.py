@@ -77,6 +77,13 @@ def fixture_app_region(region: MemoryRegion, board: str = FIXTURE_BOARD) -> tupl
     return extent.start, extent.end
 
 
+def fixture_engines_for_board(board: str) -> tuple[EngineType, ...]:
+    """Engines implemented by the fixture target."""
+    _fixture_soc(board)
+    engines = (EngineType.HELIA_AOT, EngineType.TFLM)
+    return engines if board == "apollo510b_evb" else (*engines, EngineType.HELIA_RT)
+
+
 def validate_fixture_placement(
     arena: Placement | None,
     weights: Placement | None,
@@ -87,7 +94,7 @@ def validate_fixture_placement(
     """Validate the fixture's implemented static arenas and weight backing."""
     fixture_target_for_board(board)
     if board == "apollo510b_evb" and (
-        engine not in (EngineType.HELIA_AOT, EngineType.TFLM)
+        engine not in fixture_engines_for_board(board)
         or weights not in (Placement.MRAM, Placement.TCM)
     ):
         raise ConfigError("AP510B fixtures implement AOT/TFLM with MRAM or TCM weights")
