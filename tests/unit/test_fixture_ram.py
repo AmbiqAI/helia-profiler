@@ -170,11 +170,16 @@ def test_ram_image_binds_stack_and_optional_heap_symbols(tmp_path):
 
 
 @pytest.mark.parametrize("observe", [False, True])
-def test_public_config_wrapper_preserves_config_and_ram_option(monkeypatch, observe):
+def test_public_config_wrapper_preserves_config_and_ram_option(tmp_path, monkeypatch, observe):
+    from test_typed_fixture import runtime as prepared_runtime
+
     from helia_profiler import _fixture_build as module
     from helia_profiler.fixture import build_fixed_fixture
 
-    config, fixture, runtime, expected = object(), object(), object(), object()
+    fixture = typed(tmp_path)
+    config = config_for(tmp_path, fixture)
+    runtime = prepared_runtime(tmp_path)
+    expected = object()
     received = {}
 
     def build(actual_config, actual_fixture, **kwargs):

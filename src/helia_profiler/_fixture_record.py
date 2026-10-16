@@ -457,11 +457,9 @@ def load_fixture_build(record: str | bytes, *, roots: Mapping[str, Path]) -> Fix
         )
     ):
         raise ValueError("Unsupported fixture build record/API version")
-    power_fields = (
-        {"power_sync"}
-        if isinstance(outer["build"], dict) and "power_sync" in outer["build"]
-        else set()
-    )
+    if not isinstance(outer["build"], dict):
+        raise ValueError("Fixture build must be a JSON object")
+    power_fields = {"power_sync"} if "power_sync" in outer["build"] else set()
     if power_fields and _json(outer["fixture_api"]) == _json((5, 0)):
         raise ValueError("Power firmware requires its declared API version")
     ram_fields = {"observe_ram"} if "observe_ram" in outer["build"] else set()
