@@ -16,6 +16,7 @@ from helia_profiler.engines.helia_aot.manifest import (
     _extract_arena_regions,
     _extract_memory_plan,
 )
+from helia_profiler.errors import EngineError
 from helia_profiler.placement import ArenaRole, Placement
 
 
@@ -137,16 +138,32 @@ class TestExtractArenaRegions:
         regions = _extract_arena_regions(_FakeCodegenCtxWithPlan(plan), "hpx")
         assert regions[0].placement is Placement.MRAM
 
-    def test_unknown_memory_skipped(self):
-        """An unrecognised memory name is dropped (rather than silently
-        mis-placing) — surfaces upstream as an arena-binding gap."""
+    @pytest.mark.parametrize("memory,role", [("HBM", "scratch"), ("SRAM", "unknown")])
+    def test_unsupported_trailing_arena_is_refused(self, memory, role):
         plan = _FakeRenderPlan(
-            scratch_arenas=[_FakeArena(0, "HBM", 1024, 16, "scratch")],
+            scratch_arenas=[
+                _FakeArena(0, "DTCM", 16, 16, "scratch"),
+                _FakeArena(1, memory, 1024, 16, role),
+            ],
+            persistent_arenas=[],
+            constant_arenas=[],
+        )
+        with pytest.raises(EngineError, match="unsupported"):
+            _extract_arena_regions(_FakeCodegenCtxWithPlan(plan), "hpx")
+
+    def test_trailing_dram_arena_is_preserved(self):
+        plan = _FakeRenderPlan(
+            scratch_arenas=[
+                _FakeArena(0, "DTCM", 16, 16, "scratch"),
+                _FakeArena(1, "DRAM", 1024, 16, "scratch"),
+            ],
             persistent_arenas=[],
             constant_arenas=[],
         )
         regions = _extract_arena_regions(_FakeCodegenCtxWithPlan(plan), "hpx")
-        assert regions == []
+        assert [r.region_id for r in regions] == [0, 1]
+        assert regions[1].memory == "dram"
+        assert regions[1].placement is Placement.SRAM
 
     def test_missing_render_plan_returns_empty(self):
         ctx = _FakeCodegenCtxWithPlan(None)

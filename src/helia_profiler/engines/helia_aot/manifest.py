@@ -25,6 +25,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from ...errors import EngineError
 from ...placement import ArenaRole, MemoryRegion, Placement
 from ...results import ConsumerKind, MemoryConsumer, MemoryPlan, MemoryRegionUsage
 from .. import EngineType
@@ -151,23 +152,15 @@ def _extract_arena_regions(codegen_ctx: Any, prefix: str) -> list[ArenaRegion]:
             mem_str = str(arena.memory).lower()
             placement = _AOT_MEMORY_TO_PLACEMENT.get(mem_str)
             if placement is None:
-                # Unknown physical memory — skip rather than silently
-                # mis-placing the buffer.  Surfaces upstream as an
-                # arena binding gap during firmware build.
-                log.warning(
-                    "AOT planner emitted unrecognised memory %r — skipping arena %d",
-                    mem_str,
-                    arena.region_id,
+                raise EngineError(
+                    f"AOT arena {arena.region_id} has unsupported physical memory {mem_str!r}"
                 )
-                continue
             try:
                 role = ArenaRole(str(arena.role).lower())
-            except ValueError:
-                log.warning(
-                    "AOT planner emitted unrecognised arena role %r — defaulting to scratch",
-                    arena.role,
-                )
-                role = ArenaRole.SCRATCH
+            except ValueError as exc:
+                raise EngineError(
+                    f"AOT arena {arena.region_id} has unsupported role {arena.role!r}"
+                ) from exc
             name = f"{prefix}_arena_{mem_str}"
             blob_fn = const_blob_filenames.get(arena.region_id)
             regions.append(

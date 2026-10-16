@@ -229,6 +229,8 @@ class HeliaAotArtifacts(EngineArtifacts):
     #: then keeps the planner's arena placement instead of applying the
     #: profiler's arena override.
     aot_user_memory_config: bool = False
+    #: Canonical caller memory intent frozen before compiler invocation.
+    aot_memory_intent_json: str = "{}"
     #: Arena buffers the firmware binds individually via ``bind_arena()``.
     aot_arena_regions: list[ArenaRegion] = field(default_factory=list)
 

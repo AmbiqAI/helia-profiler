@@ -370,7 +370,7 @@ class FixtureBuild:
     #: heliaAOT scratch arenas painted and scanned: (region id, size in bytes).
     aot_arena_scan: tuple[tuple[int, int], ...] = ()
     #: heliaAOT's ``<prefix>_plan.json`` and ``<prefix>_report.json`` when the
-    #: installed heliaAOT writes them.
+    #: installed heliaAOT writes them, plus explicit mixed-placement region evidence.
     aot_outputs: tuple[FixtureFile, ...] = ()
     #: The engine package that generated the model code, when one did.
     engine_source: EngineSource | None = None
@@ -746,6 +746,15 @@ def _build(
         ctx.engine_artifacts is None or ctx.engine_artifacts.memory_plan is None
     ):
         planned_memory = None
+    region_evidence = ()
+    if isinstance(ctx.engine_artifacts, HeliaAotArtifacts):
+        from ._fixture_placement import validate_fixture_regions
+
+        residence = validate_fixture_regions(ctx, ctx.engine_artifacts.aot_arena_regions)
+        if residence is not None:
+            record = root / "fixture-aot-regions.json"
+            record.write_text(json.dumps(residence, sort_keys=True, indent=2), encoding="utf-8")
+            region_evidence = (pin(record),)
     inputs, output_tensors = _measurement_io(fixture)
     result = FixtureBuild(
         fixture_identity=fixture.identity,
@@ -786,7 +795,7 @@ def _build(
             )
             if observe_aot_arenas and r.role is ArenaRole.SCRATCH
         ),
-        aot_outputs=_aot_outputs(root, ctx.engine_artifacts.aot_prefix)
+        aot_outputs=(*_aot_outputs(root, ctx.engine_artifacts.aot_prefix), *region_evidence)
         if isinstance(ctx.engine_artifacts, HeliaAotArtifacts)
         else (),
         engine_source=_engine_source(config.engine.type),

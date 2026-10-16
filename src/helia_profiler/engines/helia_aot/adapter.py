@@ -190,6 +190,15 @@ class HeliaAOTAdapter:
         aot_platform = _resolve_aot_platform(config)
 
         aot_args = _merged_aot_args(config)
+        memory_intent_json = json.dumps(aot_args["memory"], sort_keys=True)
+        compiler_config = _dc_replace(
+            config,
+            engine=_dc_replace(
+                config.engine,
+                config_path=None,
+                config={**config.engine.config, "aot_args": aot_args},
+            ),
+        )
         allocate_arenas = not _external_arena_mode(aot_args)
         user_memory_config = config.engine.config_path is not None or bool(
             _user_tensor_rules(aot_args)
@@ -198,7 +207,7 @@ class HeliaAOTAdapter:
         aot_output_dir = work_dir / "aot_output"
         aot_module_dir = aot_output_dir / module_name
         codegen_ctx = _run_aot_compiler(
-            config,
+            compiler_config,
             aot_output_dir,
             module_name,
             prefix,
@@ -267,6 +276,7 @@ class HeliaAOTAdapter:
             helia_aot_version=aot_version,
             aot_allocate_arenas=allocate_arenas,
             aot_user_memory_config=user_memory_config,
+            aot_memory_intent_json=memory_intent_json,
             aot_arena_regions=arena_regions,
             aot_op_manifest=op_manifest or None,
             compiled_analysis=compiled_analysis,
