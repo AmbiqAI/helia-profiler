@@ -38,7 +38,6 @@ from .fixture_target import (
     FixtureTarget,
     fixture_cpu_hz,
     fixture_target_for_board,
-    supported_fixture_target,
     validate_fixture_placement,
 )
 from .pipeline import PipelineContext, PipelineRunner, Stage, serialize_config
