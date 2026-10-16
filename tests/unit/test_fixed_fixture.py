@@ -455,7 +455,13 @@ def test_external_aot_arena_mode_rejected(tmp_path):
 
 @pytest.mark.parametrize(
     "size,refused",
-    [(3 * 1024 * 1024 // 2, False), (2 * 1024 * 1024, False), (2 * 1024 * 1024 + 1, True)],
+    [
+        (3 * 1024 * 1024 // 2, False),
+        (2 * 1024 * 1024, False),
+        (2 * 1024 * 1024 + 1, False),
+        (0x800000 - 0x410000, False),
+        (0x800000 - 0x410000 + 1, True),
+    ],
 )
 def test_build_refuses_a_flat_image_capture_cannot_flash(tmp_path, monkeypatch, size, refused):
     from helia_profiler.errors import ConfigError
