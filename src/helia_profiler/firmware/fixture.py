@@ -107,6 +107,8 @@ def fixture_template_vars(ctx: PipelineContext, regions: list[ArenaRegion]) -> d
     validate_fixture_regions(ctx, regions)
     payloads = fixture_psram_payloads(ctx, regions) if psram else ()
     return {
+        "fixture_observe_ram": spec.observe_ram,
+        "fixture_dtcm": fixture_app_region(MemoryRegion.DTCM, ctx.config.target.board),
         "fixture_cpu_hz": fixture_cpu_hz(ctx.config.target.board),
         "fixture_power_sync": spec.method.power_sync,
         "fixture_psram": psram,

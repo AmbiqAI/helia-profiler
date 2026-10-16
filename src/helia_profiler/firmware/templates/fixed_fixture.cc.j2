@@ -52,7 +52,9 @@ volatile uint32_t deployment_timing[7];
 volatile uint32_t deployment_arena_scan[{{ 2 * (fixture_scan_arenas | length) }}];
 {%- endif %}
 
-static int infer_fixture() {
+{% if fixture_observe_ram | default(false) %}
+{% include "fixed_fixture_ram.h.j2" %}
+{% endif %}static int infer_fixture() {
 {% if fixture_psram | default(false) %}
     if (!hpx_psram_start()) return {{ fixture_status.psram }};
 {% endif %}
@@ -255,8 +257,17 @@ int main() {
         sram.eActiveWithGFX = AM_HAL_PWRCTRL_SRAM_NONE;
         sram.eActiveWithDISP = AM_HAL_PWRCTRL_SRAM_NONE;
         sram.eSRAMRetain = AM_HAL_PWRCTRL_SRAM_3M;
-        status = am_hal_pwrctrl_sram_config(&sram) == 0 ? infer_fixture() : {{ fixture_status.sram_config }};
-        uint32_t checksum = 0;
+{% if fixture_observe_ram | default(false) %}
+        status = am_hal_pwrctrl_sram_config(&sram) == 0 ? 0 : {{ fixture_status.sram_config }};
+        if (status == 0) {
+            if (!hpx_ram_begin()) status = {{ fixture_status.ram_diagnostic }};
+            else {
+                status = infer_fixture();
+                hpx_ram_finish();
+            }
+        }
+{% else %}        status = am_hal_pwrctrl_sram_config(&sram) == 0 ? infer_fixture() : {{ fixture_status.sram_config }};
+{% endif %}        uint32_t checksum = 0;
 {%- for io in fixture_outputs %}
         for (unsigned i = 0; i < sizeof({{ io.sink }}); ++i) checksum = checksum*31U + {{ io.sink }}[i];
 {%- endfor %}

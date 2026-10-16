@@ -153,3 +153,14 @@ def test_observed_aot_scratch_arenas_reserve_their_scan_sink(tmp_path, observe):
     assert dtcm is not None
     sizes = {c.name: c.size for c in dtcm.consumers}
     assert sizes.get("fixture_arena_scan") == (16 if observe else None)
+
+
+@pytest.mark.parametrize("observe", [False, True])
+def test_ram_diagnostic_terminal_is_accounted_in_static_memory(tmp_path, observe):
+    from dataclasses import replace
+
+    ctx = context(tmp_path, EngineType.HELIA_AOT, 12)
+    ctx.fixture = replace(ctx.fixture, observe_ram=observe)
+    PlanMemoryStage().run(ctx)
+    sizes = {c.name: c.size for c in ctx.memory_plan.region("DTCM").consumers}
+    assert sizes.get("fixture_ram", 0) == (32 if observe else 0)

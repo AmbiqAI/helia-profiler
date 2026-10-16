@@ -104,6 +104,7 @@ class FixtureCaptureRequest:
     power_sync: FixturePowerSync | None = None
     rail_power: FixtureRailPowerRequest | None = None
     board_power: FixtureBoardPowerRequest | None = None
+    observe_ram: bool = False
 
 
 @dataclass(frozen=True)
@@ -287,6 +288,11 @@ def capture_fixture(
         and 0 < request.expected_duration_s <= request.settle_seconds,
         "Invalid expected duration",
     )
+    require(
+        type(request.observe_ram) is bool
+        and not (request.observe_ram and request.power_sync is not None),
+        "RAM diagnostic requires energy-off method",
+    )
     require(isinstance(request.timing_scope, FixtureTimingScope), "Explicit timing scope required")
     require(isinstance(request.target, FixtureTarget), "Explicit typed fixture target required")
     request.target.verify()
@@ -333,6 +339,7 @@ def capture_fixture(
         sizes = fixture_sink_sizes(
             output_sizes,
             power=request.power_sync is not None,
+            ram=request.observe_ram,
             memory=request.arena_capacity is not None,
             arena_count=len(request.arena_scan_sizes),
             psram_size=request.psram_weights.sink_size if request.psram_weights else 0,
@@ -577,6 +584,19 @@ def capture_fixture(
                     for (touched, high), size in zip(arena_scan, request.arena_scan_sizes)
                 ),
                 "Invalid arena scan terminal",
+            )
+        if request.observe_ram:
+            from ._fixture_ram import decode_heap, decode_ram
+
+            pin(
+                "ram.json",
+                json.dumps(
+                    {
+                        **decode_ram(values["deployment_ram"], image.stack_bounds),
+                        **decode_heap(values, image.heap_capacity),
+                    },
+                    sort_keys=True,
+                ).encode(),
             )
         result = FixtureCaptureResult(
             "success",

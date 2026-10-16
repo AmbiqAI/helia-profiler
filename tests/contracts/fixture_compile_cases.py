@@ -48,6 +48,7 @@ FIXTURE_KIND_ENGINES = tuple(
         "psram-tcm",
         "psram-tcm-resource",
         "power-resource",
+        "ram",
     )
     for engine in ("tflm", "helia-aot")
 )
@@ -70,6 +71,7 @@ def render_fixture(
         "psram-tcm",
         "psram-tcm-resource",
         "power-resource",
+        "ram",
     ):
         if kind.startswith("psram"):
             placement = FixturePlacement(
@@ -82,6 +84,7 @@ def render_fixture(
             placement=placement,
             resource=kind.endswith("resource"),
             power=kind.startswith("power") and scope == "restore_and_invoke",
+            ram=kind == "ram",
         )
     if kind == "tcn":
         inp = Int8Tensor((1, 240, 14), 0.007843011990189552, -1, 0)
@@ -158,6 +161,7 @@ def _render_typed(
     placement: FixturePlacement,
     resource: bool = False,
     power: bool = False,
+    ram: bool = False,
 ) -> tuple[str, dict[str, str]]:
     """Render mixed-dtype inputs and outputs; heliaAOT also scans its scratch arena."""
     aot = EngineType(engine) is EngineType.HELIA_AOT
@@ -228,6 +232,7 @@ def _render_typed(
                 resource_variable_count=20 if resource else 0,
             ),
             observe_aot_arenas=aot,
+            observe_ram=ram,
         )
         regions = (
             [

@@ -1,7 +1,7 @@
 {
   "api_version": [
     5,
-    3
+    4
   ],
   "surface": {
     "ElfSection": {
@@ -455,6 +455,11 @@
           "power_sync",
           "FixturePowerSync | None",
           "None"
+        ],
+        [
+          "observe_ram",
+          "bool",
+          "False"
         ]
       ],
       "frozen": true,
@@ -526,6 +531,11 @@
         ],
         [
           "observe_aot_arenas",
+          "bool",
+          "False"
+        ],
+        [
+          "observe_ram",
           "bool",
           "False"
         ]
@@ -674,6 +684,11 @@
           "board_power",
           "FixtureBoardPowerRequest | None",
           "None"
+        ],
+        [
+          "observe_ram",
+          "bool",
+          "False"
         ]
       ],
       "frozen": true,
@@ -1399,6 +1414,7 @@
         "MODEL_SCHEMA": -4,
         "POWER_SYNC": -11,
         "PSRAM": -10,
+        "RAM_DIAGNOSTIC": -12,
         "RESOLVER": -3,
         "SRAM_CONFIG": -2,
         "STIMER": -8,

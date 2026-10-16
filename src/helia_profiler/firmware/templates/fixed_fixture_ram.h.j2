@@ -1,0 +1,40 @@
+volatile uint32_t deployment_ram[8];
+
+static bool hpx_ram_begin() {
+    const uint32_t mask = __get_PRIMASK();
+    __disable_irq();
+    const uintptr_t low = __get_MSPLIM();
+    const uintptr_t sp = __get_MSP();
+    const uintptr_t top = *reinterpret_cast<volatile const uint32_t*>(SCB->VTOR);
+    const bool valid = (__get_CONTROL() & 2U) == 0U && __get_IPSR() == 0U
+        && {{ fixture_dtcm[0] }}U <= low && low < sp && sp <= top
+        && top <= {{ fixture_dtcm[1] }}U && top-low <= 65536U
+        && ((low | sp | top) & 3U) == 0U;
+    if (valid) {
+        deployment_ram[0] = 0x52414d31U;
+        deployment_ram[1] = 1U;
+        deployment_ram[2] = low;
+        deployment_ram[3] = top;
+        deployment_ram[4] = sp;
+        // Paint below this active frame only; boot/system-init history is excluded.
+        for (uintptr_t p = low; p < sp; p += 4U) {
+            *reinterpret_cast<volatile uint32_t*>(p) = 0xa55aa55aU;
+        }
+    }
+    __set_PRIMASK(mask);
+    return valid;
+}
+
+static void hpx_ram_finish() {
+    const uint32_t mask = __get_PRIMASK();
+    __disable_irq();
+    uintptr_t p = deployment_ram[2];
+    while (p < deployment_ram[4]
+        && *reinterpret_cast<volatile const uint32_t*>(p) == 0xa55aa55aU) p += 4U;
+    deployment_ram[5] = deployment_ram[3] - p;
+    deployment_ram[6] = 1U;
+    uint32_t checksum = 0;
+    for (unsigned i = 0; i < 7; ++i) checksum = checksum*31U + deployment_ram[i];
+    deployment_ram[7] = checksum;
+    __set_PRIMASK(mask);
+}
