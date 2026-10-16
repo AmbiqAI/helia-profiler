@@ -251,6 +251,7 @@ carry-state workloads unless the selected emitted arenas are proven scratch-only
 and contain no initialized state. Static arena accounting does not require
 painting.
 
-API 5.4 reads earlier 5.x build records with RAM observation disabled. Disabled
+API 5.5 reads 5.0–5.4 build records, including RAM observations from API 5.4.
+Records older than 5.4 must have RAM observation disabled. Disabled
 `observe_ram` is omitted from serialized build records; enabled records contain
 `true`. Existing result dataclass fields retain their meanings.
