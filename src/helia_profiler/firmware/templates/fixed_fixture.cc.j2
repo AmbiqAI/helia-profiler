@@ -200,7 +200,7 @@ static int infer_fixture() {
     hpx_sync_window_end();
 {% endif %}
     if (invocation_status != 0) return {{ fixture_status.invoke }};
-    if (!ticks || ticks >= 60U*HPX_STIMER_HZ) return {{ fixture_status.timing_bound }};
+    if (!ticks || ticks >= {{ 60 if fixture_power_sync | default(none) else 300 }}U*HPX_STIMER_HZ) return {{ fixture_status.timing_bound }};
 {% if not fixture_aot %}
     hpx_fixture_memory_snapshot(5, interpreter.arena_used_bytes());
     hpx_fixture_memory_finish();

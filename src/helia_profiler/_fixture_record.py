@@ -193,7 +193,11 @@ def verify_fixture_build(build: FixtureBuild) -> None:
         raise ValueError("Invalid power-capable fixture method")
     if type(build.source_initializer_present) is not bool:
         raise ValueError("Invalid source initializer fact")
-    validate_fixture_placement(build.arena_location, build.weights_location, build.engine)
+    if build.target.board == "apollo510b_evb" and build.power_sync is not None:
+        raise ValueError("AP510B fixture integration is timing-only")
+    validate_fixture_placement(
+        build.arena_location, build.weights_location, build.engine, board=build.target.board
+    )
     for name, low, high in (
         ("iterations", 1, 100_000),
         ("warmups", 0, 10_000),
@@ -204,7 +208,7 @@ def verify_fixture_build(build: FixtureBuild) -> None:
             raise ValueError(f"Invalid fixture {name}")
     if (build.clock_profile, build.cpu_hz, build.timer_hz) != (
         FIXTURE_CLOCK_PROFILE,
-        fixture_cpu_hz(),
+        fixture_cpu_hz(build.target.board),
         STIMER_HZ,
     ):
         raise ValueError("Unsupported fixture clock/timer facts")
@@ -435,7 +439,13 @@ def load_fixture_build(record: str | bytes, *, roots: Mapping[str, Path]) -> Fix
         type(outer["schema_version"]) is not int
         or outer["schema_version"] != 1
         or _json(outer["fixture_api"])
-        not in (_json((5, 0)), _json((5, 1)), _json((5, 2)), _json(FIXTURE_API_VERSION))
+        not in (
+            _json((5, 0)),
+            _json((5, 1)),
+            _json((5, 2)),
+            _json((5, 3)),
+            _json(FIXTURE_API_VERSION),
+        )
     ):
         raise ValueError("Unsupported fixture build record/API version")
     power_fields = (

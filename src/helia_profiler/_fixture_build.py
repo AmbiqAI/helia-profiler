@@ -37,7 +37,7 @@ from .fixture_target import (
     FIXTURE_CLOCK_PROFILE,
     FixtureTarget,
     fixture_cpu_hz,
-    supported_fixture_target,
+    fixture_target_for_board,
     validate_fixture_placement,
 )
 from .pipeline import PipelineContext, PipelineRunner, Stage, serialize_config
@@ -500,16 +500,17 @@ def _validate(config: ProfileConfig, fixture: FixedFixture | TypedFixture) -> No
         raise ConfigError("Fixture supports upstream TFLM, heliaRT or helia-AOT only")
     if config.target.custom_socs or config.target.custom_boards:
         raise ConfigError("Fixed fixture does not support custom target declarations")
-    if (
-        config.target.board != supported_fixture_target().board
-        or config.target.clock.cpu != FIXTURE_CLOCK_PROFILE
-    ):
-        raise ConfigError(
-            f"Fixed fixture supports {supported_fixture_target().board} "
-            f"at the {FIXTURE_CLOCK_PROFILE} clock only"
-        )
+    try:
+        fixture_target_for_board(config.target.board)
+    except ValueError as exc:
+        raise ConfigError(str(exc)) from exc
+    if config.target.clock.cpu != FIXTURE_CLOCK_PROFILE:
+        raise ConfigError(f"Fixed fixture supports the {FIXTURE_CLOCK_PROFILE} clock only")
     validate_fixture_placement(
-        config.model.arena_location, config.model.weights_location, config.engine.type
+        config.model.arena_location,
+        config.model.weights_location,
+        config.engine.type,
+        board=config.target.board,
     )
     if config.model.arena_size is None or not 0 < config.model.arena_size <= 3 * 1024 * 1024:
         raise ConfigError("Explicit bounded arena capacity required")
@@ -571,6 +572,8 @@ def _build(
     if method.power_sync is not None and method.power_sync.protocol_version != 2:
         raise ConfigError("New power firmware requires completion protocol 2")
     _validate(config, fixture)
+    if config.target.board == "apollo510b_evb" and method.power_sync is not None:
+        raise ConfigError("AP510B fixture integration is timing-only")
     model: FixtureModelAnalysis | TypedFixtureModelAnalysis
     if isinstance(fixture, TypedFixture):
         model = analyze_typed_fixture_model_for_engine(
@@ -728,7 +731,7 @@ def _build(
     if flat_binary is not None:
         size = flat_binary.path.stat().st_size
         if not 0 < size <= MAX_IMAGE or not bounded(
-            supported_fixture_target().load_address, size, MRAM
+            fixture_target_for_board(config.target.board).load_address, size, MRAM
         ):
             raise ConfigError(
                 f"Flat image is {size} B; fixture capture accepts at most {MAX_IMAGE} B in MRAM"
@@ -761,7 +764,7 @@ def _build(
         iterations=config.profiling.iterations,
         warmups=config.profiling.warmup,
         intent_identity=intent_identity,
-        target=supported_fixture_target(),
+        target=fixture_target_for_board(config.target.board),
         toolchain=toolchain,
         provider_provenance="manifest-declared; independently audit the pinned build/source record"
         if runtime
@@ -798,7 +801,7 @@ def _build(
         output_tensors=output_tensors,
         arena_capacity=config.model.arena_size,
         clock_profile=FIXTURE_CLOCK_PROFILE,
-        cpu_hz=fixture_cpu_hz(),
+        cpu_hz=fixture_cpu_hz(config.target.board),
         timer_hz=STIMER_HZ,
         power_sync=method.power_sync,
     )

@@ -317,6 +317,13 @@ def test_render_derives_extents_ops_counts_and_scope(tmp_path, kind, scope):
     assert values["fixture_timing_scope"] == scope.value
     assert len(str(fixture_input["initializer"]).split(",")) == f.input_tensor.size
     source = _jinja_env.get_template("fixed_fixture.cc.j2").render(**values)
+    assert "ticks >= 300U*HPX_STIMER_HZ" in source
+    from helia_profiler.fixture_power import FixturePowerSync
+
+    power_source = _jinja_env.get_template("fixed_fixture.cc.j2").render(
+        **{**values, "fixture_power_sync": FixturePowerSync(29, 36, 14)}
+    )
+    assert "ticks >= 60U*HPX_STIMER_HZ" in power_source
     assert f"deployment_output[{f.output_tensor.size}]" in source
     assert f"input->bytes != {f.input_tensor.size}" in source
     for registration in model.resolver.registrations:
@@ -455,7 +462,13 @@ def test_external_aot_arena_mode_rejected(tmp_path):
 
 @pytest.mark.parametrize(
     "size,refused",
-    [(3 * 1024 * 1024 // 2, False), (2 * 1024 * 1024, False), (2 * 1024 * 1024 + 1, True)],
+    [
+        (3 * 1024 * 1024 // 2, False),
+        (2 * 1024 * 1024, False),
+        (2 * 1024 * 1024 + 1, False),
+        (0x800000 - 0x410000, False),
+        (0x800000 - 0x410000 + 1, True),
+    ],
 )
 def test_build_refuses_a_flat_image_capture_cannot_flash(tmp_path, monkeypatch, size, refused):
     from helia_profiler.errors import ConfigError

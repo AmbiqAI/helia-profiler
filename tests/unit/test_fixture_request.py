@@ -237,7 +237,11 @@ def test_engine_source_records_the_install_commit(
 
 def test_capabilities_report_the_qualified_contract() -> None:
     facts = fixture_capabilities()
-    (target,) = facts.targets
+    target, ap510b = facts.targets
+    assert set(ap510b.engines) == {EngineType.HELIA_AOT, EngineType.TFLM}
+    assert set(target.engines) == {EngineType.HELIA_AOT, EngineType.TFLM, EngineType.HELIA_RT}
+    assert ap510b.board == "apollo510b_evb"
+    assert ap510b.device == "AP510BFA-CBR"
     assert (target.board, target.clock_profile) == ("apollo510_evb", "lp")
     assert (target.cpu_hz, target.timer_hz, target.settle_ticks) == (
         FIXTURE_CPU_HZ,
@@ -418,3 +422,35 @@ def test_a_foreign_work_directory_keeps_its_heliaaot_outputs(
     with pytest.raises(ConfigError, match="different fixture"):
         build_fixture(request, compile=False)
     assert kept.path.exists()
+
+
+def test_ap510b_request_preserves_actual_target(tmp_path):
+    from helia_profiler._fixture_build import _validate
+    from helia_profiler.fixture_target import fixture_target_for_board
+
+    default = _request(tmp_path)
+    target = fixture_target_for_board("apollo510b_evb")
+    request = replace(default, target=target)
+    assert target.device == "AP510BFA-CBR"
+    assert target.device != default.target.device
+    assert request.intent_identity != default.intent_identity
+    assert request.to_config().target.board == "apollo510b_evb"
+    _validate(request.to_config(), request.fixture)
+    with pytest.raises(ValueError, match="Unsupported fixture target"):
+        replace(target, device=default.target.device).verify()
+    with pytest.raises(ConfigError, match="MRAM or TCM"):
+        replace(request, placement=FixturePlacement(weights=Placement.PSRAM))
+
+
+def test_ap510b_refuses_canonical_image_layout_drift(monkeypatch):
+    import helia_profiler.fixture_target as targets
+
+    original = targets.fixture_app_region
+
+    def changed(region, board=targets.FIXTURE_BOARD):
+        start, end = original(region, board)
+        return (start, end - 4) if board == "apollo510b_evb" else (start, end)
+
+    monkeypatch.setattr(targets, "fixture_app_region", changed)
+    with pytest.raises(ValueError, match="image/sink layout"):
+        targets.fixture_target_for_board("apollo510b_evb")

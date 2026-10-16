@@ -8,12 +8,12 @@ from hashlib import sha256
 from .fixture_target import fixture_app_region, supported_fixture_target
 from .platform.memory_map import MemoryRegion
 
-#: Largest flat image a fixture capture flashes and reads back in full, well inside the
-#: MRAM application region below; each capture pays for flashing and verifying every byte.
-MAX_IMAGE = 2 * 1024 * 1024
-MAX_ELF = 32 * MAX_IMAGE
 MRAM = fixture_app_region(MemoryRegion.MRAM)
 DTCM = fixture_app_region(MemoryRegion.DTCM)
+#: Flat image extent available at the canonical application boot origin.
+MAX_IMAGE = MRAM[1] - supported_fixture_target().load_address
+#: Bounded parser input including debug sections, independent of flash capacity.
+MAX_ELF = 64 * 1024 * 1024
 
 
 class ContractError(ValueError):

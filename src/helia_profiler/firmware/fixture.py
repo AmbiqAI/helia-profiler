@@ -81,7 +81,10 @@ def fixture_template_vars(ctx: PipelineContext, regions: list[ArenaRegion]) -> d
         raise ConfigError("Fixture render specification missing")
     spec.fixture.verify()
     validate_fixture_placement(
-        ctx.config.model.arena_location, ctx.config.model.weights_location, ctx.config.engine.type
+        ctx.config.model.arena_location,
+        ctx.config.model.weights_location,
+        ctx.config.engine.type,
+        board=ctx.config.target.board,
     )
     psram = ctx.config.model.weights_location is Placement.PSRAM
     if (
@@ -118,7 +121,7 @@ def fixture_template_vars(ctx: PipelineContext, regions: list[ArenaRegion]) -> d
             raise ConfigError("AOT physical memory differs from fixture request")
     payloads = fixture_psram_payloads(ctx, regions) if psram else ()
     return {
-        "fixture_cpu_hz": fixture_cpu_hz(),
+        "fixture_cpu_hz": fixture_cpu_hz(ctx.config.target.board),
         "fixture_power_sync": spec.method.power_sync,
         "fixture_psram": psram,
         "fixture_psram_base": fixture_app_region(MemoryRegion.PSRAM)[0] if psram else None,
