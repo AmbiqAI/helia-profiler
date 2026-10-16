@@ -158,6 +158,7 @@ _PLACEMENT_TO_AOT_MEMTYPE: dict[Placement, str] = {
 # means "tightly-coupled", same logical region as "dtcm"). Kept separate from
 # _PLACEMENT_TO_AOT_MEMTYPE so that dict stays a clean 1:1 canonical mapping.
 _AOT_MEMORY_ALIASES: dict[str, Placement] = {
+    "dram": Placement.SRAM,
     "itcm": Placement.TCM,
 }
 

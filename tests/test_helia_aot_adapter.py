@@ -179,10 +179,14 @@ class TestMergedAotArgs:
 class TestPrepareArtifactFlags:
     """``prepare()`` derives its artifact flags from the merged AOT args."""
 
-    def _prepare(self, monkeypatch, tmp_path, config, model=None) -> HeliaAotArtifacts:
+    def _prepare(
+        self, monkeypatch, tmp_path, config, model=None, *, compiler_hook=None
+    ) -> HeliaAotArtifacts:
         from helia_profiler.engines.helia_aot import adapter as adapter_mod
 
         def fake_run_aot_compiler(config, output_dir, module_name, *_args):
+            if compiler_hook is not None:
+                compiler_hook(config)
             (output_dir / module_name).mkdir(parents=True)
             from types import SimpleNamespace
 
@@ -255,3 +259,24 @@ class TestPrepareArtifactFlags:
         assert analysis.total_ops == 24
         assert analysis.layers[0].id == 0
         assert analysis.layers[0].original_id == 5
+
+    def test_compiler_and_evidence_keep_original_file_intent(self, monkeypatch, tmp_path):
+        import json
+
+        aot_yaml = _write_aot_yaml(
+            tmp_path, "memory:\n  tensors:\n    - type: scratch\n      attributes: {memory: dtcm}\n"
+        )
+        config = _aot_cfg({"config_path": str(aot_yaml)})
+        consumed = []
+
+        def edit_file_before_compiler_read(compiler_config):
+            aot_yaml.write_text(
+                "memory: {tensors: [{type: scratch, attributes: {memory: sram}}]}", encoding="utf-8"
+            )
+            consumed.append(_merged_aot_args(compiler_config)["memory"])
+
+        artifacts = self._prepare(
+            monkeypatch, tmp_path, config, compiler_hook=edit_file_before_compiler_read
+        )
+        assert consumed[0]["tensors"][0]["attributes"]["memory"] == "dtcm"
+        assert json.loads(artifacts.aot_memory_intent_json) == consumed[0]

@@ -1,5 +1,6 @@
 """Explicit paired placements keep request identity and rendered regions aligned."""
 
+import json
 from dataclasses import replace
 
 import pytest
@@ -182,6 +183,7 @@ def mixed_context(tmp_path):
         aot_cmake_target="m",
         helia_aot_version="test",
         aot_user_memory_config=True,
+        aot_memory_intent_json=json.dumps(config.engine.config["aot_args"]["memory"]),
         aot_arena_regions=regions,
         memory_plan=plan,
     )
@@ -211,7 +213,7 @@ def test_explicit_mixed_aot_regions_keep_emitted_banks(tmp_path):
 def test_mixed_regions_preserve_admission_guards(tmp_path, fault):
     ctx, regions = mixed_context(tmp_path)
     if fault == "coarse":
-        ctx.config = replace(ctx.config, engine=replace(ctx.config.engine, config={}))
+        ctx.engine_artifacts = replace(ctx.engine_artifacts, aot_memory_intent_json="{}")
     elif fault == "missing_plan":
         ctx.memory_plan = None
     elif fault == "missing_region":
@@ -232,8 +234,6 @@ def test_mixed_regions_preserve_admission_guards(tmp_path, fault):
 
 
 def test_mixed_region_evidence_survives_record_and_rejects_tampering(tmp_path):
-    import json
-
     from test_fixture_record import _build, _pin
 
     from helia_profiler._fixture_placement import validate_fixture_regions
@@ -253,3 +253,18 @@ def test_mixed_region_evidence_survives_record_and_rejects_tampering(tmp_path):
     pinned.path.write_text("{}", encoding="utf-8")
     with pytest.raises(ValueError):
         load_fixture_build(record, roots={"run": tmp_path})
+
+
+def test_mixed_evidence_does_not_reread_config_path(tmp_path):
+    from helia_profiler._fixture_placement import validate_fixture_regions
+
+    ctx, regions = mixed_context(tmp_path)
+    ctx.config = replace(
+        ctx.config,
+        engine=replace(
+            ctx.config.engine, config_path=tmp_path / "no-longer-present.yaml", config={}
+        ),
+    )
+    evidence = validate_fixture_regions(ctx, regions)
+    assert evidence is not None
+    assert evidence["memory_intent"]["tensors"][0]["attributes"]["memory"] == "dtcm"

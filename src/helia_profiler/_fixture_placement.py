@@ -1,5 +1,6 @@
 """Validate fixture backing without replacing the engine's placement planner."""
 
+import json
 from dataclasses import asdict
 from typing import Any
 
@@ -29,9 +30,7 @@ def validate_fixture_regions(
         and artifacts.aot_user_memory_config
         and ctx.config.model.weights_location is not Placement.PSRAM
     ):
-        from .engines.helia_aot.compile import _merged_aot_args
-
-        intent = _merged_aot_args(ctx.config)["memory"]
+        intent = json.loads(artifacts.aot_memory_intent_json)
         explicit = bool(intent.get("tensors"))
     if explicit:
         if (
