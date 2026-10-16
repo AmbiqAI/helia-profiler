@@ -214,7 +214,7 @@ def _counter_tracks(run: VisualRun, pid: int, spans: list[tuple[int, int]]) -> l
     events: list[dict] = []
     metrics = sorted({metric for layer in run.layers for metric in layer.counters})
     for tid, metric in enumerate(metrics, 3):
-        name = f"PMU per-layer total: {metric}"
+        name = f"{metric.removeprefix('ARM_PMU_')} (per-layer)"
         if all(metric in layer.counters for layer in run.layers) and all(
             end > start for start, end in spans
         ):
