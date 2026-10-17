@@ -73,12 +73,14 @@ until `get_adapter(engine_type)` asks for it.
 ### The adapter protocol
 
 `EngineAdapter` in `engines/base.py` has a `name`, an `engine_type`, and
-`prepare(config, work_dir)` returning that engine's artifact subtype. Two
+`prepare(config, work_dir)` returning that engine's artifact subtype. Three
 hooks let an engine shape memory placement:
 `apply_arena_placement_override()` for engines that emit typed arena
-regions, and `check_psram_placement()` together with
-`psram_weights_source`, which is how the PSRAM preflight on
-[Memory placement](../../memory/#6-psram) is enforced per engine.
+regions; `placement_config()`, which returns the engine settings a requested
+placement implies (fixture builds apply it before hashing their inputs); and
+`check_psram_placement()` together with `psram_weights_source`, which is how
+the PSRAM preflight on [Memory placement](../../memory/#6-psram) is enforced
+per engine.
 
 ### What each adapter's `prepare()` does
 
@@ -98,9 +100,12 @@ SoC is a registry question, answered on [Engines](../../engines/) and
 
 ### Artifacts
 
-`EngineArtifacts` carries only what every engine produces: `engine_type`,
+`EngineArtifacts` carries what every engine produces: `engine_type`,
 `engine_header` (no default; each adapter states its own), `extra_modules`,
-`cmake_vars` and `memory_plan`. Engine-specific fields live on the subclass, so reading
+`cmake_vars` and `memory_plan`, plus two preparation facts any engine may
+report: `source` (the installed package that generated the model code) and
+`report_files` (files the engine wrote describing the preparation, which
+fixture builds pin as evidence). Engine-specific fields live on the subclass, so reading
 another engine's field is an `AttributeError` at the access site rather
 than a silent `None`; each subclass pins its `engine_type` and raises
 `ValueError` if constructed with another. Four `resolved_*` properties

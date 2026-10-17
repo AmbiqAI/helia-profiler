@@ -179,7 +179,7 @@ class TestMergedAotArgs:
 
 
 def _prepare(monkeypatch, tmp_path, config, model=None, *, compiler_hook=None) -> HeliaAotArtifacts:
-    """Run ``prepare()`` against a fake converter; ``compiler_hook(config, output_dir)`` runs in its place."""
+    """Run ``prepare()`` against a fake converter that calls ``compiler_hook(config, output_dir)``."""
     from helia_profiler.engines.helia_aot import adapter as adapter_mod
 
     def fake_run_aot_compiler(config, output_dir, module_name, *_args):
@@ -321,18 +321,24 @@ class TestPreparationEvidence:
 
     def test_pins_this_conversions_reports_and_drops_stale_ones(self, monkeypatch, tmp_path):
         output = tmp_path / "work" / "aot_output"
-        stale = output / "hpx_plan.json"
-        stale.parent.mkdir(parents=True)
-        stale.write_text('{"stale": true}')
+        stale = (output / "hpx_plan.json", output / "old_module" / "hpx_report.json")
+        for path in stale:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('{"stale": true}')
+        # A build workspace copy outside aot_output is not this conversion's output.
+        copy = tmp_path / "work" / "dependency-workspaces" / "x" / "hpx_plan.json"
+        copy.parent.mkdir(parents=True)
+        copy.write_text("{}")
         stale_seen_by_compiler = []
 
         def write_reports(_config, output_dir):
-            stale_seen_by_compiler.append(stale.exists())
+            stale_seen_by_compiler.append([path.exists() for path in stale])
             (output_dir / "hpx_plan.json").write_text("{}")
             (output_dir / "hpx_model" / "hpx_report.json").write_text("{}")
 
         artifacts = _prepare(monkeypatch, tmp_path, _aot_cfg({}), compiler_hook=write_reports)
-        assert stale_seen_by_compiler == [False]
+        assert stale_seen_by_compiler == [[False, False]]
+        assert copy.exists()
         assert artifacts.report_files == (
             output / "hpx_plan.json",
             output / "hpx_model" / "hpx_report.json",

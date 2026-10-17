@@ -94,8 +94,9 @@ class EngineArtifacts:
 
     Every adapter returns a per-engine subclass (:class:`TflmArtifacts`,
     :class:`HeliaRtArtifacts`, :class:`HeliaAotArtifacts`,
-    :class:`ExecutorchArtifacts`).  This base carries only what *every*
-    engine produces; engine-specific outputs live on the subclass, so a
+    :class:`ExecutorchArtifacts`).  This base carries what *every* engine
+    produces plus the preparation facts any engine may report (``source``,
+    ``report_files``); engine-specific outputs live on the subclass, so a
     wrong-engine read is an ``AttributeError`` at the access site instead
     of a silently-defaulted ``None``.
 
@@ -382,8 +383,8 @@ class EngineAdapter(Protocol):
     def placement_config(self, config: ProfileConfig) -> ProfileConfig:
         """Return ``config`` with the engine settings its requested placement implies.
 
-        Fixture builds refuse caller engine overrides, so they derive those
-        settings here. Identity for engines whose placement needs none.
+        Placement owns these settings: they take precedence over caller
+        values. Identity for engines whose placement needs none.
         """
         ...
 
@@ -420,7 +421,7 @@ class SingleArenaPlacementMixin:
 
     Engines whose firmware template manages one arena (TFLM, heliaRT,
     ExecuTorch) share these identity implementations; AOT-style engines
-    override both hooks with real placement logic.
+    override these hooks with real placement logic.
     """
 
     def apply_arena_placement_override(

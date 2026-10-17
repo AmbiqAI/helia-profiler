@@ -15,6 +15,7 @@ from helia_profiler.engines import get_adapter
 from helia_profiler.engines.tflm import TFLMAdapter
 from helia_profiler.fixture import EngineType, FixtureBackend, TypedFixture, build_fixture
 from helia_profiler.pipeline import PipelineContext
+from helia_profiler.placement import Placement
 from helia_profiler.stages.prepare_engine import PrepareEngineStage
 
 
@@ -138,4 +139,5 @@ def test_builder_applies_adapter_placement_settings_and_pins_its_evidence(tmp_pa
 @pytest.mark.parametrize("engine", [e for e in EngineType if e is not EngineType.HELIA_AOT])
 def test_single_arena_engines_add_no_placement_settings(tmp_path, engine):
     config = _request(tmp_path).to_config()
+    config = replace(config, model=replace(config.model, weights_location=Placement.PSRAM))
     assert get_adapter(engine).placement_config(config) is config

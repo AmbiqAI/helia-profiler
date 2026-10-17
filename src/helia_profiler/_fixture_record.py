@@ -17,7 +17,6 @@ if TYPE_CHECKING:
     from .fixture_capture import FixtureCaptureRequest
 
 from ._fixture_build import (
-    EngineSource,
     FixtureBuild,
     FixtureCapability,
     FixtureIO,
@@ -27,6 +26,7 @@ from ._fixture_build import (
     _io_capabilities,
 )
 from .engines import EngineType
+from .engines.base import EngineSource
 from .fixture_analysis import FixtureTensor, PerAxisQuantization, PerTensorQuantization
 from .fixture_power import FixturePowerSync
 from .fixture_psram import FixturePsramPayload, FixturePsramWeights

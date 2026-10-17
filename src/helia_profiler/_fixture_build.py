@@ -576,7 +576,7 @@ def _build(
     if config.work_dir is None:
         raise ConfigError("Explicit work directory required")
     root = config.work_dir.resolve()
-    # Callers cannot supply engine overrides, so the engine derives what placement implies.
+    # Placement owns the engine settings it implies; they take precedence over caller values.
     config = adapter.placement_config(config)
     root.mkdir(parents=True, exist_ok=True)
     identity_path = root / "fixed-fixture-identity.json"
