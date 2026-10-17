@@ -209,8 +209,9 @@ def _extract_operator_manifest(
     - ``id``      — AIR operator ID passed to the callback
     - ``op_type`` — operator type string (from ``AirOpType``)
     - ``name``    — full operator name as emitted by heliaAOT
-    - ``kernel_calls`` — CORE entries the generated source calls, by role;
-      ``{}`` calls none, ``None`` is unrecorded (see :func:`_kernel_calls`)
+    - ``kernel_calls`` — CORE entries the generated source calls, keyed by
+      role or helper; ``{}`` calls none, ``None`` is unrecorded (see
+      :func:`_kernel_calls`)
     - ``inputs``  — list of input tensor metadata (shape/dtype/size)
     - ``outputs`` — list of output tensor metadata
     """
@@ -265,28 +266,34 @@ def _extract_operator_manifest(
 
 
 def _kernel_calls(aot_op: Any) -> dict[str, str] | None:
-    """The CORE entries the generated source calls directly, by role.
+    """The CORE entries the generated source calls directly, keyed by role or helper.
 
-    This is the compiler's own record of the selected route. ``None`` is
-    unrecorded coverage: the installed heliaAOT does not report calls, or
-    does not cover this operator. A symbol linked into the image is not a call.
+    This is the compiler's own record of the selected route; an ``init`` role
+    runs in the operator's initialisation, outside the measured window. ``None``
+    is unrecorded: the installed heliaAOT does not report calls, does not cover
+    this operator, or reported something malformed. A symbol linked into the
+    image is not a call. A failing compiler method propagates like any engine fault.
     """
     report = getattr(aot_op, "kernel_calls", None)
     if not callable(report):
         return None
-    try:
-        calls = report()
-    except Exception as exc:  # noqa: BLE001 — a compiler-side fault leaves the fact unrecorded
-        log.warning("heliaAOT did not report CORE calls for %s: %s", aot_op.name, exc)
-        return None
+    calls = report()
     if calls is None:
         return None
     if not isinstance(calls, dict) or not all(
-        isinstance(role, str) and isinstance(symbol, str) for role, symbol in calls.items()
+        _is_call_role(role) and _is_call_symbol(symbol) for role, symbol in calls.items()
     ):
         log.warning("heliaAOT reported malformed CORE calls for %s", aot_op.name)
         return None
     return dict(calls)
+
+
+def _is_call_role(role: object) -> bool:
+    return isinstance(role, str) and bool(role) and not set(role) & {";", "="}
+
+
+def _is_call_symbol(symbol: object) -> bool:
+    return isinstance(symbol, str) and symbol.isidentifier()
 
 
 def _arena_region_id_lookup(codegen_ctx: Any) -> dict[tuple[str, str, str], int]:

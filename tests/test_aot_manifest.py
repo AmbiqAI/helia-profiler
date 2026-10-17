@@ -191,6 +191,14 @@ class TestExtractOperatorManifest:
         out = _extract_operator_manifest(_FakeCtx([conv, reshape]))
         assert [e["kernel_calls"] for e in out] == [{"run": "arm_convolve_s8"}, {}]
 
+    def test_a_failing_compiler_method_propagates(self):
+        def failing():
+            raise ValueError("operand")
+
+        op = _FakeAotOp(id=0, type_name="CONV_2D", kernel_calls=failing)
+        with pytest.raises(ValueError, match="operand"):
+            _extract_operator_manifest(_FakeCtx([op]))
+
     @pytest.mark.parametrize(
         ("report", "warns"),
         [
@@ -198,9 +206,21 @@ class TestExtractOperatorManifest:
             (lambda: None, False),
             (lambda: "arm_convolve_s8", True),
             (lambda: {"run": 7}, True),
-            (lambda: (_ for _ in ()).throw(ValueError("operand")), True),
+            (lambda: {"run": ""}, True),
+            (lambda: {"run": "a;b"}, True),
+            (lambda: {"": "arm_convolve_s8"}, True),
+            (lambda: {"run=x": "arm_convolve_s8"}, True),
         ],
-        ids=["no-method", "none", "not-a-mapping", "non-string-symbol", "raises"],
+        ids=[
+            "no-method",
+            "none",
+            "not-a-mapping",
+            "non-string-symbol",
+            "empty-symbol",
+            "non-identifier-symbol",
+            "empty-role",
+            "role-with-separator",
+        ],
     )
     def test_kernel_calls_without_a_usable_compiler_record_stay_unrecorded(
         self, report, warns, caplog

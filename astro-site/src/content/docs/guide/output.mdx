@@ -183,17 +183,20 @@ One row per layer, written from the merged per-layer table:
 | Column | Unit | Meaning |
 |---|---|---|
 | `id` | index | the firmware's execution position: the sequential layer index for the interpreter engines, the post-compilation position for AOT (which skips operators such as `VAR_HANDLE` without renumbering) |
-| `source_index` | index | AOT only: the original operator index retained as provenance; compiled-graph costs join on execution position |
 | `op` | string | operator type; `DEPTHWISE_CONV_2D:1` on AOT carries the original index |
-| `kernel_calls` | symbols | AOT only, when the installed `helia-aot` records them: the CORE entries the generated operator calls directly, `;`-separated; `none` when the compiler recorded no CORE call; empty when it recorded nothing for that operator. Interpreter engines select kernels at run time and have no column. A symbol linked into the image is not evidence that it ran |
+| `source_index` | index | AOT only: the original operator index retained as provenance; compiled-graph costs join on execution position |
+| `kernel_calls` | `role=symbol` pairs | AOT only, when the installed `helia-aot` records them: the CORE entries the generated operator calls directly, `;`-separated and sorted by role. `run` calls execute inside the measured window; `init` calls run in the operator's initialisation before it; other keys name shared helpers. `none` when the compiler recorded no CORE call; empty when it recorded nothing for that operator. Interpreter engines select kernels at run time and have no column. A symbol linked into the image is not evidence that it ran |
 | `<COUNTER>` columns | event counts | each requested counter, aggregated across iterations by `profiling.aggregation` |
 | `cycles` | cycles | the dedicated cycle counter |
 | `overflow` | bool | any counter of this layer saturated; its values are a lower bound |
 | `macs`, `ops`, `cycles_per_mac` | count, count, cycles per MAC | present when the model could be analysed (the `analysis` extra) |
 
-The JSON form (`output.format: json`) carries the same rows under `layers`
-with `metadata`, `summary`, `presets`, `overflow_detected` and `power` at
-the root, per `profile_results.schema.v1.json`.
+The JSON form (`output.format: json`) carries the measured rows under
+`layers` (`id`, `op`, counters, `cycles`, `cycles_pct`, `overflow`) without
+the attribution columns, with `metadata`, `summary`, `presets`,
+`overflow_detected` and `power` at the root, per
+`profile_results.schema.v1.json`. `aot_operator_manifest.json` keeps the
+per-operator provenance for either format.
 
 ### 3. `run_metadata.json`
 
@@ -223,9 +226,11 @@ informative dimension.
 after graph transforms, each with inputs, outputs and local tensors
 (weights, weight sums, per-operator scratch). `kernel_calls` is the
 compiler's record of the CORE entries the operator's generated code calls,
-by role, or `null` when the installed `helia-aot` does not record them;
-the compiler's own `<prefix>_report.json` carries the module-wide list with
-its unrecorded operators. When the installed
+keyed by role or shared helper, or `null` when nothing was recorded for that
+operator (the installed `helia-aot` does not report calls, does not cover the
+operator, or reported it malformed). The compiler's own `<prefix>_report.json`,
+beside the generated module under `aot_output/` in the work directory, carries
+the module-wide list with its unrecorded operators. When the installed
 `helia-aot` exposes placement, tensor entries add `memory` (`dtcm`, `sram`,
 `mram`, `psram`), `source_memory`, `staged`, `arena_role` (`scratch`,
 `persistent`, `constant`), `arena_region_id`, `offset` and

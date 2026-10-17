@@ -235,7 +235,7 @@ class HeliaAotArtifacts(EngineArtifacts):
     aot_arena_regions: list[ArenaRegion] = field(default_factory=list)
 
     #: AOT operator manifest — ordered list of post-codegen operator
-    #: descriptors (idx, id, op_type, name, inputs, outputs).  Consumed by
+    #: descriptors (idx, id, op_type, name, kernel_calls, inputs, outputs).  Consumed by
     #: the firmware template (``main_aot.cc.j2``) for the per-op callback
     #: table and by the report stage.  ``None`` when the manifest could not
     #: be extracted from the codegen context.

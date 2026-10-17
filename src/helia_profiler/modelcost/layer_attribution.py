@@ -45,9 +45,10 @@ class LayerAttribution:
     explicit: bool
     macs: int | None = None
     ops: int | None = None
-    #: CORE entries the compiler recorded the operator calling: ``()`` for none,
-    #: ``None`` when unrecorded or when no compiler record exists for the run.
-    kernel_calls: tuple[str, ...] | None = None
+    #: The compiler's recorded CORE calls as ``(role, symbol)`` pairs sorted by
+    #: role: ``()`` for an operator that calls none, ``None`` when unrecorded or
+    #: when the run has no compiler record. Not analysis: a compiler fact.
+    kernel_calls: tuple[tuple[str, str], ...] | None = None
 
 
 def manifest_source_map(manifest: Sequence[Any]) -> dict[int, int]:
@@ -69,26 +70,31 @@ def manifest_source_map(manifest: Sequence[Any]) -> dict[int, int]:
     return mapping
 
 
-def manifest_kernel_calls(manifest: Sequence[Any]) -> dict[int, tuple[str, ...]]:
-    """Execution position -> distinct CORE call symbols, for recorded entries only.
+def manifest_kernel_calls(manifest: Sequence[Any]) -> dict[int, tuple[tuple[str, str], ...]]:
+    """Execution position -> ``(role, symbol)`` pairs sorted by role, for recorded entries.
 
-    An entry whose ``kernel_calls`` is absent, ``None`` or malformed is not a
-    recorded fact and stays out of the map; ``{}`` records that the operator
-    calls no CORE entry.
+    The first entry naming a position decides it, as in :func:`manifest_source_map`.
+    A ``kernel_calls`` value that is absent, ``None`` or malformed is not a
+    recorded fact; ``{}`` records that the operator calls no CORE entry.
     """
-    calls: dict[int, tuple[str, ...]] = {}
+    calls: dict[int, tuple[tuple[str, str], ...]] = {}
+    seen: set[int] = set()
     for entry in manifest:
         if not isinstance(entry, Mapping):
             continue
         idx, recorded = entry.get("idx"), entry.get("kernel_calls")
-        if (
-            isinstance(idx, bool)
-            or not isinstance(idx, int)
-            or not isinstance(recorded, Mapping)
-            or not all(isinstance(symbol, str) for symbol in recorded.values())
-        ):
+        if isinstance(idx, bool) or not isinstance(idx, int) or idx in seen:
             continue
-        calls.setdefault(idx, tuple(sorted(set(recorded.values()))))
+        seen.add(idx)
+        if isinstance(recorded, Mapping) and all(
+            isinstance(role, str)
+            and role
+            and not set(role) & {";", "="}
+            and isinstance(symbol, str)
+            and symbol.isidentifier()
+            for role, symbol in recorded.items()
+        ):
+            calls[idx] = tuple(sorted(recorded.items()))
     return calls
 
 

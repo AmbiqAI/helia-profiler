@@ -17,6 +17,7 @@ boundary is contract-tested, and engine dispatch lives in
 from .layer_attribution import (
     LayerAttribution,
     LayerAttributor,
+    manifest_kernel_calls,
     manifest_source_map,
     source_index_from_op,
 )
@@ -43,6 +44,7 @@ __all__ = [
     "aot_softmax_verdict",
     "is_aot_available",
     "is_available",
+    "manifest_kernel_calls",
     "manifest_source_map",
     "scan_softmax_scaling",
     "source_index_from_op",
