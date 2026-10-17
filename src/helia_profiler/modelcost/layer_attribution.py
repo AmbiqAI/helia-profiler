@@ -10,6 +10,7 @@ from .model_analysis import LayerOps, ModelAnalysis
 __all__ = [
     "LayerAttribution",
     "LayerAttributor",
+    "manifest_kernel_calls",
     "manifest_source_map",
     "source_index_from_op",
 ]
@@ -44,6 +45,10 @@ class LayerAttribution:
     explicit: bool
     macs: int | None = None
     ops: int | None = None
+    #: The compiler's recorded CORE calls as ``(role, symbol)`` pairs sorted by
+    #: role: ``()`` for an operator that calls none, ``None`` when unrecorded or
+    #: when the run has no compiler record. Not analysis: a compiler fact.
+    kernel_calls: tuple[tuple[str, str], ...] | None = None
 
 
 def manifest_source_map(manifest: Sequence[Any]) -> dict[int, int]:
@@ -63,6 +68,34 @@ def manifest_source_map(manifest: Sequence[Any]) -> dict[int, int]:
         if isinstance(idx, int) and isinstance(source, int):
             mapping.setdefault(idx, source)
     return mapping
+
+
+def manifest_kernel_calls(manifest: Sequence[Any]) -> dict[int, tuple[tuple[str, str], ...]]:
+    """Execution position -> ``(role, symbol)`` pairs sorted by role, for recorded entries.
+
+    The first entry naming a position decides it, as in :func:`manifest_source_map`.
+    A ``kernel_calls`` value that is absent, ``None`` or malformed is not a
+    recorded fact; ``{}`` records that the operator calls no CORE entry.
+    """
+    calls: dict[int, tuple[tuple[str, str], ...]] = {}
+    seen: set[int] = set()
+    for entry in manifest:
+        if not isinstance(entry, Mapping):
+            continue
+        idx, recorded = entry.get("idx"), entry.get("kernel_calls")
+        if isinstance(idx, bool) or not isinstance(idx, int) or idx in seen:
+            continue
+        seen.add(idx)
+        if isinstance(recorded, Mapping) and all(
+            isinstance(role, str)
+            and role
+            and not set(role) & {";", "="}
+            and isinstance(symbol, str)
+            and symbol.isidentifier()
+            for role, symbol in recorded.items()
+        ):
+            calls[idx] = tuple(sorted(recorded.items()))
+    return calls
 
 
 def _analysis_by_source(analysis: ModelAnalysis) -> dict[int, LayerOps]:
@@ -95,6 +128,9 @@ class LayerAttributor:
         self._by_source = _analysis_by_source(analysis) if analysis is not None else {}
         self._source_map = (
             manifest_source_map(aot_op_manifest) if aot_op_manifest is not None else None
+        )
+        self._kernel_calls = (
+            manifest_kernel_calls(aot_op_manifest) if aot_op_manifest is not None else {}
         )
 
     def attribute(
@@ -133,4 +169,5 @@ class LayerAttributor:
             explicit=explicit,
             macs=found.macs if found is not None else None,
             ops=found.ops if found is not None else None,
+            kernel_calls=self._kernel_calls.get(position) if position is not None else None,
         )

@@ -69,8 +69,9 @@ for row in hottest:
     print(row["id"], row["op"], row["cycles"], row.get(counter), row["overflow"])
 ```
 
-With `output.format: json` the same rows are `profile_results.json`'s
-`layers` list and the file validates against
+With `output.format: json` the measured columns of the same rows are
+`profile_results.json`'s `layers` list (attribution columns such as
+`source_index` and `kernel_calls` stay in the CSV and the AOT manifest) and the file validates against
 `profile_results.schema.v1.json`. Join AOT rows on `source_index`, never on
 position: heliaAOT skips operators without renumbering.
 

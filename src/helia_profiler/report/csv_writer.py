@@ -38,6 +38,11 @@ def _layer_to_flat_dict(
     row: dict[str, Any] = {"id": layer.id, "op": layer.op}
     if attribution is not None and attribution.explicit and attribution.source_index is not None:
         row["source_index"] = attribution.source_index
+    if attribution is not None and attribution.kernel_calls is not None:
+        # The compiler's recorded calls by role; an unrecorded operator leaves the cell empty.
+        row["kernel_calls"] = (
+            ";".join(f"{role}={symbol}" for role, symbol in attribution.kernel_calls) or "none"
+        )
     row.update(layer.counters)
     if layer.cycles is not None:
         row["cycles"] = layer.cycles
@@ -84,9 +89,10 @@ def _write_csv(
         for layer in layers
     ]
     fieldnames = _union_fieldnames(rows)
-    if "source_index" in fieldnames and "source_index" not in rows[0]:
-        fieldnames.remove("source_index")
-        fieldnames.insert(2, "source_index")
+    # Provenance columns form one fixed-order block after ``op``, whatever row 0 has.
+    provenance = [name for name in ("source_index", "kernel_calls") if name in fieldnames]
+    fieldnames = [name for name in fieldnames if name not in provenance]
+    fieldnames[fieldnames.index("op") + 1 : fieldnames.index("op") + 1] = provenance
     if analysis is not None:
         for col in ("macs", "ops", "cycles_per_mac"):
             if col not in fieldnames:

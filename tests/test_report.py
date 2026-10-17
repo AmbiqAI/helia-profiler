@@ -490,6 +490,40 @@ def test_write_csv_includes_layer_cycle_percentages(tmp_path: Path, op: str):
     assert rows[1]["cycles_pct"] == "75.0"
 
 
+def test_write_csv_records_the_compilers_calls_per_layer(tmp_path: Path):
+    pmu = PmuResult(
+        meta=FirmwareMeta(),
+        layers=[
+            LayerResult(id=0, op="CONV_2D:0", cycles=50.0),
+            LayerResult(id=1, op="RESHAPE:1", cycles=10.0),
+            LayerResult(id=2, op="FULLY_CONNECTED:3", cycles=40.0),
+        ],
+    )
+    manifest = [
+        {"idx": 0, "id": 0, "kernel_calls": {"run": "arm_convolve_s8", "init": "arm_memset_s8"}},
+        {"idx": 1, "id": 1, "kernel_calls": {}},
+        {"idx": 2, "id": 3, "kernel_calls": None},
+    ]
+
+    def header_and_cells(
+        directory: Path, entries: list[dict] | None
+    ) -> tuple[list[str], list[str]]:
+        directory.mkdir(exist_ok=True)
+        with open(_write_csv(pmu, directory, None, entries), newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            cells = [row.get("kernel_calls", "<absent>") for row in reader]
+            return list(reader.fieldnames or []), cells
+
+    header, cells = header_and_cells(tmp_path, manifest)
+    assert header[:4] == ["id", "op", "source_index", "kernel_calls"]
+    assert cells == ["init=arm_memset_s8;run=arm_convolve_s8", "none", ""]
+    # The block keeps its order when the first row is unrecorded or absent from the manifest.
+    block = ["id", "op", "source_index", "kernel_calls"]
+    assert header_and_cells(tmp_path / "unrecorded_first", list(reversed(manifest)))[0][:4] == block
+    assert header_and_cells(tmp_path / "missing_first", manifest[1:])[0][:4] == block
+    assert "kernel_calls" not in header_and_cells(tmp_path / "plain", None)[0]
+
+
 def test_write_json_includes_layer_cycle_percentages(tmp_path: Path):
     pmu = PmuResult(
         meta=FirmwareMeta(),

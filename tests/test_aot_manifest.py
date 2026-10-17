@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import csv
 import json
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+import pytest
 
 from helia_profiler.engines.base import HeliaAotArtifacts
 from helia_profiler.engines.helia_aot.compile import _BOARD_TO_AOT_PLATFORM
@@ -57,6 +60,7 @@ class _FakeAotOp:
         inputs: list[_FakeTensor] | None = None,
         outputs: list[_FakeTensor] | None = None,
         local_tensors: list[_FakeTensor] | None = None,
+        kernel_calls: Callable[[], Any] | None = None,
     ):
         self.id = id
         self.TYPE = type_name
@@ -64,6 +68,9 @@ class _FakeAotOp:
         self.input_tensors = inputs or []
         self.output_tensors = outputs or []
         self.local_tensors = local_tensors or []
+        # Older heliaAOT operators have no kernel_calls method at all.
+        if kernel_calls is not None:
+            self.kernel_calls = kernel_calls
 
 
 class _FakeCtx:
@@ -172,8 +179,57 @@ class TestExtractOperatorManifest:
         assert entry["id"] == 0
         assert entry["op_type"] == "CONV_2D"
         assert entry["name"] == "conv_2d_0"
+        assert entry["kernel_calls"] is None
         assert entry["inputs"] == []
         assert entry["outputs"] == []
+
+    def test_kernel_calls_record_the_compilers_selected_entries(self):
+        conv = _FakeAotOp(
+            id=0, type_name="CONV_2D", kernel_calls=lambda: {"run": "arm_convolve_s8"}
+        )
+        reshape = _FakeAotOp(id=1, type_name="RESHAPE", kernel_calls=lambda: {})
+        out = _extract_operator_manifest(_FakeCtx([conv, reshape]))
+        assert [e["kernel_calls"] for e in out] == [{"run": "arm_convolve_s8"}, {}]
+
+    def test_a_failing_compiler_method_propagates(self):
+        def failing():
+            raise ValueError("operand")
+
+        op = _FakeAotOp(id=0, type_name="CONV_2D", kernel_calls=failing)
+        with pytest.raises(ValueError, match="operand"):
+            _extract_operator_manifest(_FakeCtx([op]))
+
+    @pytest.mark.parametrize(
+        ("report", "warns"),
+        [
+            (None, False),
+            (lambda: None, False),
+            (lambda: "arm_convolve_s8", True),
+            (lambda: {"run": 7}, True),
+            (lambda: {"run": ""}, True),
+            (lambda: {"run": "a;b"}, True),
+            (lambda: {"": "arm_convolve_s8"}, True),
+            (lambda: {"run=x": "arm_convolve_s8"}, True),
+        ],
+        ids=[
+            "no-method",
+            "none",
+            "not-a-mapping",
+            "non-string-symbol",
+            "empty-symbol",
+            "non-identifier-symbol",
+            "empty-role",
+            "role-with-separator",
+        ],
+    )
+    def test_kernel_calls_without_a_usable_compiler_record_stay_unrecorded(
+        self, report, warns, caplog
+    ):
+        op = _FakeAotOp(id=0, type_name="CONV_2D", kernel_calls=report)
+        with caplog.at_level("WARNING", logger="hpx"):
+            entry = _extract_operator_manifest(_FakeCtx([op]))[0]
+        assert entry["kernel_calls"] is None
+        assert ("CORE calls" in caplog.text) is warns
 
     def test_multi_op_preserves_execution_order(self):
         ops = [
