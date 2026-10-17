@@ -284,8 +284,8 @@ def test_the_helia_aot_range_spans_the_records() -> None:
     from helia_profiler.engines.helia_aot.compile import _recorded_range
 
     records = load_runtime_records(Path(__file__).parents[1] / "src/helia_profiler/data/runtimes")
-    assert _recorded_range(records) == ("0.23.0", "0.30.0")
-    newest = [r for r in records if (r.name, r.version) == ("helia-aot", "0.29.0")]
+    assert _recorded_range(records) == ("0.23.0", "0.31.0")
+    newest = [r for r in records if (r.name, r.version) == ("helia-aot", "0.30.0")]
     assert not newest[0].default
     assert _recorded_range([replace(newest[0], version="1.2.3")]) == ("1.2.3", "1.3.0")
     with pytest.raises(ConfigError, match="major.minor.patch"):
