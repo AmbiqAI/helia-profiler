@@ -550,3 +550,59 @@ def test_heliart_nsx_fixture_version_tracks_the_qualified_release():
     fixture = Path(__file__).parent / "fixtures" / "heliart_nsx" / "nsx-module.yaml"
     data = yaml.safe_load(fixture.read_text(encoding="utf-8"))
     assert data["module"]["version"] == HELIART_VERSION
+
+
+@pytest.mark.parametrize("version", ["0.1.0", "99.0.0"])
+def test_aot_development_override_is_explicit(tmp_path, monkeypatch, caplog, version):
+    from helia_profiler.engines.helia_aot import compile as aot_compile
+    from helia_profiler.errors import EngineError
+
+    monkeypatch.setattr("importlib.metadata.version", lambda _: version)
+    with pytest.raises(EngineError):
+        aot_compile._check_helia_aot_version(allow_unsupported_version=False)
+    config = _config(tmp_path, engine={"type": "helia-aot", "allow_unsupported_version": True})
+    assert (
+        aot_compile._check_helia_aot_version(
+            allow_unsupported_version=config.engine.allow_unsupported_version
+        )
+        == version
+    )
+    assert version in caplog.text
+    assert "development override" in caplog.text
+    provenance = config.compatibility.to_dict()
+    assert provenance["qualification"] == "development-overrides"
+    assert "engine.allow_unsupported_version" in provenance["engine_overrides"]
+
+
+@pytest.mark.parametrize("value", ["false", "true", 1, None])
+def test_aot_development_override_requires_boolean(tmp_path, value):
+    with pytest.raises((ConfigError, ValueError)):
+        _config(tmp_path, engine={"type": "helia-aot", "allow_unsupported_version": value})
+
+
+def test_development_override_rejects_other_engines(tmp_path):
+    with pytest.raises((ConfigError, ValueError), match="helia-aot"):
+        _config(tmp_path, engine={"type": "helia-rt", "allow_unsupported_version": True})
+
+
+def test_development_override_does_not_hide_missing_package(monkeypatch):
+    from importlib.metadata import PackageNotFoundError
+
+    from helia_profiler.engines.helia_aot import compile as aot_compile
+    from helia_profiler.errors import EngineError
+
+    def missing(_):
+        raise PackageNotFoundError("helia-aot")
+
+    monkeypatch.setattr("importlib.metadata.version", missing)
+    with pytest.raises(EngineError, match="not installed"):
+        aot_compile._check_helia_aot_version(allow_unsupported_version=True)
+
+
+def test_version_override_preserves_positional_engine_config():
+    from helia_profiler.config import EngineConfig
+    from helia_profiler.engines import EngineType
+
+    config = EngineConfig(EngineType.TFLM, "cmsis_nn", {}, None)
+    assert config.backend == "cmsis_nn"
+    assert config.allow_unsupported_version is False

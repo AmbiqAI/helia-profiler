@@ -71,3 +71,28 @@ Read the configuration differences and comparability notes alongside the metrics
 - [Engine configuration](../../reference/engine-configuration/): adapter options, dependency overrides and source builds.
 - [Memory placement](../memory/): control where weights and working memory live.
 - [Toolchains](../toolchains/): choose the compiler used to build profiling firmware.
+
+
+### Testing an unrecorded AOT version
+
+For local development, explicitly opt out of the AOT package version range:
+
+```yaml
+engine:
+  type: helia-aot
+  allow_unsupported_version: true
+  config:
+    cmsis_nn_path: /path/to/ns-cmsis-nn
+```
+
+`engine.allow_unsupported_version` defaults to `false`, accepts only a YAML
+boolean, and is supported only for `helia-aot`. It permits an installed AOT
+version outside HPX's recorded range; it does not install a package, change
+CORE selection, or suppress compiler/build errors. The local CORE path above
+is optional and remains an independent selector.
+
+Every opted-in run warns with the installed version and recorded range and
+records `development-overrides` with `engine.allow_unsupported_version` in
+its compatibility provenance, even when the installed version is in range.
+The actual AOT version remains in run metadata. Such a run is experimental,
+not evidence that the dependency combination is generally compatible.

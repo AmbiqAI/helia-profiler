@@ -192,7 +192,7 @@ class TestPrepareArtifactFlags:
 
             return SimpleNamespace(model=model)
 
-        monkeypatch.setattr(adapter_mod, "_check_helia_aot_version", lambda: "0.0.0")
+        monkeypatch.setattr(adapter_mod, "_check_helia_aot_version", lambda **_: "0.0.0")
         monkeypatch.setattr(adapter_mod, "_resolve_aot_platform", lambda _c: "apollo510_evb")
         monkeypatch.setattr(adapter_mod, "_run_aot_compiler", fake_run_aot_compiler)
         monkeypatch.setattr(adapter_mod, "_extract_operator_manifest", lambda _ctx: [])
