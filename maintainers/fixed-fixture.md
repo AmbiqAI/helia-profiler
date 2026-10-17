@@ -114,6 +114,21 @@ caller-owned. Timing, operator-instrumented and rail images remain distinct.
 builds have `expected=None` and `outputs=()`. Internal reset remains unsupported;
 explicit carry initializes once and keeps internal state across warmups and samples.
 
+API 5.6 adds `FixtureBuild.kernel_source` (`FixtureKernelSource`) and
+`FixtureBuild.runtime_source` (`FixtureRuntimeSource`), so a consumer reads
+which kernel library and prepared runtime a build linked without parsing the
+dependency lock or the prepared-runtime manifest, whose layouts are internal.
+A heliaRT or TFLM build takes both from its verified manifest: the kernel is
+`ns-cmsis-nn` or `arm-cmsis-nn` at the manifest's commit, and the runtime is
+`helia-rt` or `tflite-micro` with its commit and archive sha256. The runtime
+`version` is the runtime record built from that commit, when HPX has one.
+A compiled heliaAOT build takes the kernel from the one CMSIS-NN module its
+dependency lock resolved, with the lock's release tag as `version` when the
+lock named one; it has no runtime source. Unknown facts stay `None`. Both
+fields are bound into the compiled identity, written only when known, and
+refused in records that declare an earlier API, so records from API 5.5 and
+earlier load unchanged with both fields `None`.
+
 Constructing `FixtureBuildRequest` performs no runtime-cache lookup. When an
 interpreter request omits `runtime`, `build_fixture` looks up the already prepared
 default archive and binds its manifest into the compiled intent; it does not

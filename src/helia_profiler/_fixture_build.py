@@ -28,6 +28,12 @@ from .fixture_image import MAX_IMAGE, MRAM, bounded, fixture_sink_sizes, inspect
 from .fixture_power import FixturePowerSync
 from .fixture_psram import FixturePsramWeights
 from .fixture_runtime import FixtureFile, PreparedUpstreamRuntime, prove_prepared_runtime_build
+from .fixture_sources import (
+    FixtureKernelSource,
+    FixtureRuntimeSource,
+    locked_kernel_source,
+    prepared_runtime_sources,
+)
 from .fixture_target import (
     FIXTURE_CLOCK_PROFILE,
     FixtureTarget,
@@ -330,6 +336,10 @@ class FixtureBuild:
     timer_hz: int | None = None
     power_sync: FixturePowerSync | None = None
     observe_ram: bool = False
+    #: The kernel library linked, from the prepared-runtime manifest or the dependency lock.
+    kernel_source: FixtureKernelSource | None = None
+    #: The prepared runtime archive linked, for the heliaRT and TFLM engines.
+    runtime_source: FixtureRuntimeSource | None = None
 
 
 #: Environment variables outside the compatibility classifier that change what a
@@ -639,6 +649,11 @@ def _build(
             record.write_text(json.dumps(residence, sort_keys=True, indent=2), encoding="utf-8")
             region_evidence = (pin(record),)
     report_files = tuple(pin(path) for path in artifacts.report_files) if artifacts else ()
+    kernel_source = runtime_source = None
+    if verified_runtime is not None:
+        kernel_source, runtime_source = prepared_runtime_sources(verified_runtime.record)
+    elif binary is not None and ctx.run_metadata.dependencies is not None:
+        kernel_source = locked_kernel_source(ctx.run_metadata.dependencies.modules)
     inputs, output_tensors = _measurement_io(fixture)
     result = FixtureBuild(
         fixture_identity=fixture.identity,
@@ -679,6 +694,8 @@ def _build(
         ),
         aot_outputs=(*report_files, *region_evidence),
         engine_source=artifacts.source if artifacts else None,
+        kernel_source=kernel_source,
+        runtime_source=runtime_source,
         dependency_state=dependency_state,
         psram_weights=_psram_weights(ctx, flat_binary),
         arena_location=config.model.arena_location,

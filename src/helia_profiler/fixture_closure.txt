@@ -155,6 +155,7 @@ fixture_operator_timing.py
 fixture_power.py
 fixture_psram.py
 fixture_runtime.py
+fixture_sources.py
 fixture_stage.py
 fixture_target.py
 hostenv/__init__.py

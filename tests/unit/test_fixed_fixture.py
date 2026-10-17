@@ -4,6 +4,7 @@ from hashlib import sha256
 from types import SimpleNamespace
 
 import pytest
+from test_fixture_sources import NS as KERNELS
 
 from helia_profiler._fixture_build import (
     FixedFixture,
@@ -27,6 +28,7 @@ from helia_profiler.config import (
 from helia_profiler.engines import EngineType
 from helia_profiler.firmware.op_resolver import build_fixture_resolver_plan
 from helia_profiler.fixture_analysis import FixtureModelAnalysis
+from helia_profiler.fixture_sources import FixtureKernelSource
 from helia_profiler.modelcost.model_analysis import LayerOps, ModelAnalysis
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.placement import Placement
@@ -187,8 +189,9 @@ def test_host_only_stage_selection_and_source_receipt(
                     if aot_plan_available
                     else None
                 ),
-                run_metadata=RunMetadata(
-                    toolchain=ToolchainInfo(compiler="atfe", compiler_version=compiler_version)
+                run_metadata=SimpleNamespace(
+                    toolchain=ToolchainInfo(compiler="atfe", compiler_version=compiler_version),
+                    dependencies=SimpleNamespace(modules=(KERNELS,)),
                 ),
                 resolved_firmware_dir=app,
                 dependency_lock_path=snapshot,
@@ -265,6 +268,17 @@ def test_host_only_stage_selection_and_source_receipt(
     assert r.engine is engine
     assert r.psram_weights is None
     assert (r.runtime_manifest is not None) == (engine is EngineType.TFLM)
+    if engine is EngineType.TFLM:
+        declared = json.loads(rt.manifest.read())["providers"]
+        assert r.kernel_source == FixtureKernelSource(
+            "arm-cmsis-nn", declared["cmsis-nn"]["url"], None, declared["cmsis-nn"]["revision"]
+        )
+        assert r.runtime_source is not None and r.runtime_source.name == "tflite-micro"
+    else:
+        assert r.kernel_source == FixtureKernelSource(
+            "ns-cmsis-nn", KERNELS.url, "v7.45.1", KERNELS.peeled_commit
+        )
+        assert r.runtime_source is None
     for altered_config, altered_method in (
         (c, FixtureMethod(FixtureTimingScope.INVOKE_ONLY)),
         (replace(c, profiling=ProfilingConfig(iterations=7, warmup=2)), METHOD),

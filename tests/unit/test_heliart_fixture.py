@@ -29,6 +29,7 @@ from helia_profiler.engines.base import HeliaRtArtifacts
 from helia_profiler.errors import ConfigError
 from helia_profiler.firmware.op_resolver import build_fixture_resolver_plan
 from helia_profiler.fixture_analysis import FixtureModelAnalysis
+from helia_profiler.fixture_sources import FixtureKernelSource, FixtureRuntimeSource
 from helia_profiler.modelcost.model_analysis import LayerOps, ModelAnalysis
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.placement import Placement
@@ -348,6 +349,17 @@ def test_heliart_build_links_and_proves_the_prepared_archive(tmp_path, monkeypat
     assert r.built and r.engine is EngineType.HELIA_RT
     assert r.runtime_manifest == rt.manifest
     assert r.capabilities == (("int8", FixtureCapability.SUPPORTED),)
+    declared = json.loads(rt.manifest.read())["providers"]
+    assert r.kernel_source == FixtureKernelSource(
+        "ns-cmsis-nn", declared["ns-cmsis-nn"]["url"], None, declared["ns-cmsis-nn"]["revision"]
+    )
+    assert r.runtime_source == FixtureRuntimeSource(
+        "helia-rt",
+        declared["helia-rt"]["url"],
+        None,
+        declared["helia-rt"]["revision"],
+        rt.archive.sha256,
+    )
 
 
 @pytest.mark.parametrize(

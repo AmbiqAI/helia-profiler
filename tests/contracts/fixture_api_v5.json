@@ -1,7 +1,7 @@
 {
   "api_version": [
     5,
-    5
+    6
   ],
   "surface": {
     "ElfSection": {
@@ -460,6 +460,16 @@
           "observe_ram",
           "bool",
           "False"
+        ],
+        [
+          "kernel_source",
+          "FixtureKernelSource | None",
+          "None"
+        ],
+        [
+          "runtime_source",
+          "FixtureRuntimeSource | None",
+          "None"
         ]
       ],
       "frozen": true,
@@ -919,6 +929,34 @@
           "role",
           "FixtureRole",
           "<FixtureRole.SIGNAL: 'signal'>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "FixtureKernelSource": {
+      "fields": [
+        [
+          "name",
+          "str",
+          "<required>"
+        ],
+        [
+          "url",
+          "str | None",
+          "<required>"
+        ],
+        [
+          "version",
+          "str | None",
+          "<required>"
+        ],
+        [
+          "commit",
+          "str | None",
+          "<required>"
         ]
       ],
       "frozen": true,
@@ -1403,6 +1441,39 @@
         "AUX": "aux",
         "SIGNAL": "signal"
       }
+    },
+    "FixtureRuntimeSource": {
+      "fields": [
+        [
+          "name",
+          "str",
+          "<required>"
+        ],
+        [
+          "url",
+          "str",
+          "<required>"
+        ],
+        [
+          "version",
+          "str | None",
+          "<required>"
+        ],
+        [
+          "commit",
+          "str",
+          "<required>"
+        ],
+        [
+          "archive_sha256",
+          "str",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
     },
     "FixtureStage": {
       "base": "int",

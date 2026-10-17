@@ -31,6 +31,7 @@ from .fixture_analysis import FixtureTensor, PerAxisQuantization, PerTensorQuant
 from .fixture_power import FixturePowerSync
 from .fixture_psram import FixturePsramPayload, FixturePsramWeights
 from .fixture_runtime import FixtureFile
+from .fixture_sources import FixtureKernelSource, FixtureRuntimeSource
 from .fixture_target import (
     FIXTURE_CLOCK_PROFILE,
     FixtureTarget,
@@ -88,6 +89,10 @@ _FIELDS = frozenset(
 )
 
 
+#: Optional since API 5.6; absent from a record when unknown, so older identities hold.
+_SOURCE_FIELDS = ("kernel_source", "runtime_source")
+
+
 def _json(value: object) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
@@ -120,6 +125,9 @@ def _payload(build: FixtureBuild, *, file, path) -> dict:
     result = asdict(build)
     if not build.observe_ram:
         del result["observe_ram"]
+    for name in _SOURCE_FIELDS:
+        if result[name] is None:
+            del result[name]
     if result["power_sync"] is None:
         del result["power_sync"]
     elif build.power_sync is not None and build.power_sync.protocol_version == 1:
@@ -128,7 +136,8 @@ def _payload(build: FixtureBuild, *, file, path) -> dict:
         result,
         _FIELDS
         | ({"power_sync"} if build.power_sync is not None else set())
-        | ({"observe_ram"} if build.observe_ram else set()),
+        | ({"observe_ram"} if build.observe_ram else set())
+        | {name for name in _SOURCE_FIELDS if getattr(build, name) is not None},
     )
     result["app_dir"] = path(build.app_dir)
     for name in _FILE_FIELDS:
@@ -240,6 +249,35 @@ def verify_fixture_build(build: FixtureBuild) -> None:
         )
     ):
         raise ValueError("Engine source fields must be strings or an absent commit")
+    if build.kernel_source is not None and (
+        not isinstance(build.kernel_source, FixtureKernelSource)
+        or not isinstance(build.kernel_source.name, str)
+        or not build.kernel_source.name
+        or any(
+            value is not None and not isinstance(value, str)
+            for value in (
+                build.kernel_source.url,
+                build.kernel_source.version,
+                build.kernel_source.commit,
+            )
+        )
+    ):
+        raise ValueError("Kernel source requires a name and string or absent facts")
+    if build.runtime_source is not None:
+        if not isinstance(build.runtime_source, FixtureRuntimeSource) or any(
+            not isinstance(value, str) or not value
+            for value in (
+                build.runtime_source.name,
+                build.runtime_source.url,
+                build.runtime_source.commit,
+            )
+        ):
+            raise ValueError("Runtime source requires its name, URL and commit")
+        if build.runtime_source.version is not None and not isinstance(
+            build.runtime_source.version, str
+        ):
+            raise ValueError("Runtime source version must be a string or absent")
+        _digest(build.runtime_source.archive_sha256)
     if build.planned_memory is not None:
         _memory(asdict(build.planned_memory))
     for name in _FILE_FIELDS:
@@ -454,6 +492,7 @@ def load_fixture_build(record: str | bytes, *, roots: Mapping[str, Path]) -> Fix
             _json((5, 2)),
             _json((5, 3)),
             _json((5, 4)),
+            _json((5, 5)),
             _json(FIXTURE_API_VERSION),
         )
     ):
@@ -464,9 +503,12 @@ def load_fixture_build(record: str | bytes, *, roots: Mapping[str, Path]) -> Fix
     if power_fields and _json(outer["fixture_api"]) == _json((5, 0)):
         raise ValueError("Power firmware requires its declared API version")
     ram_fields = {"observe_ram"} if "observe_ram" in outer["build"] else set()
-    if ram_fields and outer["fixture_api"] not in ([5, 4], list(FIXTURE_API_VERSION)):
+    if ram_fields and outer["fixture_api"] not in ([5, 4], [5, 5], list(FIXTURE_API_VERSION)):
         raise ValueError("RAM diagnostic requires its declared API version")
-    value = dict(_object(outer["build"], _FIELDS | power_fields | ram_fields))
+    source_fields = {name for name in _SOURCE_FIELDS if name in outer["build"]}
+    if source_fields and outer["fixture_api"] != list(FIXTURE_API_VERSION):
+        raise ValueError("Kernel and runtime sources require their declared API version")
+    value = dict(_object(outer["build"], _FIELDS | power_fields | ram_fields | source_fields))
     try:
         value["app_dir"] = mapping.decode(value["app_dir"])
         for name in _FILE_FIELDS:
@@ -492,6 +534,16 @@ def load_fixture_build(record: str | bytes, *, roots: Mapping[str, Path]) -> Fix
         if value["engine_source"] is not None:
             value["engine_source"] = EngineSource(
                 **_object(value["engine_source"], ("package", "version", "commit"))
+            )
+        if "kernel_source" in value:
+            value["kernel_source"] = FixtureKernelSource(
+                **_object(value["kernel_source"], ("name", "url", "version", "commit"))
+            )
+        if "runtime_source" in value:
+            value["runtime_source"] = FixtureRuntimeSource(
+                **_object(
+                    value["runtime_source"], ("name", "url", "version", "commit", "archive_sha256")
+                )
             )
         for name, enum in (
             ("engine", EngineType),

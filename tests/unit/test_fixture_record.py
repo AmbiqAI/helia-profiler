@@ -344,3 +344,62 @@ def test_previous_api_record_remains_readable(tmp_path):
     record = json.loads(dump_fixture_build(build, roots={"run": tmp_path}))
     record["fixture_api"] = [5, 3]
     assert load_fixture_build(json.dumps(record), roots={"run": tmp_path}) == build
+
+
+def _sourced(build):
+    from helia_profiler.fixture import FixtureKernelSource, FixtureRuntimeSource
+
+    build = replace(
+        build,
+        kernel_source=FixtureKernelSource("ns-cmsis-nn", "https://k", None, "d" * 40),
+        runtime_source=FixtureRuntimeSource("helia-rt", "https://r", "1.21.3", "c" * 40, "e" * 64),
+    )
+    return replace(build, build_identity=compiled_fixture_identity(build))
+
+
+def test_kernel_and_runtime_sources_round_trip_and_bind_identity(tmp_path):
+    plain = _build(tmp_path)
+    build = _sourced(plain)
+    assert build.build_identity != plain.build_identity
+    record = dump_fixture_build(build, roots={"run": tmp_path})
+    assert load_fixture_build(record, roots={"run": tmp_path}) == build
+    altered = json.loads(record)
+    altered["build"]["kernel_source"]["commit"] = "0" * 40
+    with pytest.raises(ValueError):
+        load_fixture_build(json.dumps(altered), roots={"run": tmp_path})
+
+
+@pytest.mark.parametrize("version", [[5, 4], [5, 5]])
+def test_records_before_sources_load_with_unknown_sources(tmp_path, version):
+    build = replace(_build(tmp_path), observe_ram=True)
+    build = replace(build, build_identity=compiled_fixture_identity(build))
+    record = json.loads(dump_fixture_build(build, roots={"run": tmp_path}))
+    assert not {"kernel_source", "runtime_source"} & set(record["build"])
+    record["fixture_api"] = version
+    loaded = load_fixture_build(json.dumps(record), roots={"run": tmp_path})
+    assert loaded == build
+    assert loaded.kernel_source is None and loaded.runtime_source is None
+
+
+def test_sources_require_their_declared_api_version(tmp_path):
+    record = json.loads(dump_fixture_build(_sourced(_build(tmp_path)), roots={"run": tmp_path}))
+    record["fixture_api"] = [5, 5]
+    with pytest.raises(ValueError, match="declared API version"):
+        load_fixture_build(json.dumps(record), roots={"run": tmp_path})
+
+
+@pytest.mark.parametrize(
+    "field,key,value",
+    [
+        ("kernel_source", "name", ""),
+        ("kernel_source", "commit", 7),
+        ("runtime_source", "commit", None),
+        ("runtime_source", "version", 1),
+        ("runtime_source", "archive_sha256", "E" * 64),
+    ],
+)
+def test_malformed_sources_are_refused(tmp_path, field, key, value):
+    build = _sourced(_build(tmp_path))
+    build = replace(build, **{field: replace(getattr(build, field), **{key: value})})
+    with pytest.raises(ValueError):
+        verify_fixture_build(replace(build, build_identity=compiled_fixture_identity(build)))
