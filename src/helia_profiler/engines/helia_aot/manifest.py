@@ -197,6 +197,7 @@ def _extract_operator_manifest(
         [
             {
                 "idx": 0, "id": 0, "op_type": "CONV_2D", "name": "conv_2d_0",
+                "kernel_calls": {"run": "arm_convolve_s8"},
                 "inputs": [{"name": "x", "shape": [1, 49, 10, 1], ...}],
                 "outputs": [{"name": "y", "shape": [1, 25, 5, 8], ...}],
             },
@@ -208,6 +209,8 @@ def _extract_operator_manifest(
     - ``id``      — AIR operator ID passed to the callback
     - ``op_type`` — operator type string (from ``AirOpType``)
     - ``name``    — full operator name as emitted by heliaAOT
+    - ``kernel_calls`` — CORE entries the generated source calls, by role;
+      ``{}`` calls none, ``None`` is unrecorded (see :func:`_kernel_calls`)
     - ``inputs``  — list of input tensor metadata (shape/dtype/size)
     - ``outputs`` — list of output tensor metadata
     """
@@ -232,6 +235,7 @@ def _extract_operator_manifest(
             "id": int(aot_op.id),
             "op_type": str(aot_op.TYPE),
             "name": aot_op.name,
+            "kernel_calls": _kernel_calls(aot_op),
         }
         try:
             entry["inputs"] = [
@@ -258,6 +262,31 @@ def _extract_operator_manifest(
             pass
         manifest.append(entry)
     return manifest
+
+
+def _kernel_calls(aot_op: Any) -> dict[str, str] | None:
+    """The CORE entries the generated source calls directly, by role.
+
+    This is the compiler's own record of the selected route. ``None`` is
+    unrecorded coverage: the installed heliaAOT does not report calls, or
+    does not cover this operator. A symbol linked into the image is not a call.
+    """
+    report = getattr(aot_op, "kernel_calls", None)
+    if not callable(report):
+        return None
+    try:
+        calls = report()
+    except Exception as exc:  # noqa: BLE001 — a compiler-side fault leaves the fact unrecorded
+        log.warning("heliaAOT did not report CORE calls for %s: %s", aot_op.name, exc)
+        return None
+    if calls is None:
+        return None
+    if not isinstance(calls, dict) or not all(
+        isinstance(role, str) and isinstance(symbol, str) for role, symbol in calls.items()
+    ):
+        log.warning("heliaAOT reported malformed CORE calls for %s", aot_op.name)
+        return None
+    return dict(calls)
 
 
 def _arena_region_id_lookup(codegen_ctx: Any) -> dict[tuple[str, str, str], int]:

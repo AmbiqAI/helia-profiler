@@ -16,6 +16,7 @@ import pytest
 from helia_profiler.modelcost import LayerOps, ModelAnalysis
 from helia_profiler.modelcost.layer_attribution import (
     LayerAttributor,
+    manifest_kernel_calls,
     manifest_source_map,
     source_index_from_op,
 )
@@ -78,7 +79,51 @@ class TestManifestSourceMap:
         assert manifest_source_map(rows) == {5: 6}
 
 
+class TestManifestKernelCalls:
+    def test_recorded_entries_map_position_to_distinct_symbols(self):
+        manifest = [
+            {
+                "idx": 0,
+                "id": 0,
+                "kernel_calls": {"init": "arm_convolve_s8", "run": "arm_convolve_s8"},
+            },
+            {"idx": 1, "id": 3, "kernel_calls": {}},
+            {"idx": 2, "id": 5, "kernel_calls": None},
+            {"idx": 3, "id": 6},
+        ]
+        assert manifest_kernel_calls(manifest) == {0: ("arm_convolve_s8",), 1: ()}
+
+    def test_malformed_entries_are_not_recorded_facts(self):
+        rows = [
+            {"idx": "0", "kernel_calls": {"run": "a"}},
+            {"idx": True, "kernel_calls": {"run": "a"}},
+            {"idx": 1, "kernel_calls": ["a"]},
+            {"idx": 2, "kernel_calls": {"run": 7}},
+            "not-a-mapping",
+            {"idx": 3, "kernel_calls": {"run": "arm_fully_connected_s8"}},
+        ]
+        assert manifest_kernel_calls(rows) == {3: ("arm_fully_connected_s8",)}
+
+
 class TestLayerAttributor:
+    def test_kernel_calls_join_by_execution_position_only(self):
+        att = LayerAttributor(
+            _skewed_analysis(),
+            [
+                {"idx": 0, "id": 0, "kernel_calls": {"run": "arm_convolve_s8"}},
+                {"idx": 1, "id": 5, "kernel_calls": {}},
+                {"idx": 2, "id": 3},
+            ],
+        )
+        assert att.attribute(0, "CONV_2D:0").kernel_calls == ("arm_convolve_s8",)
+        assert att.attribute(1, "SOFTMAX:5").kernel_calls == ()
+        assert att.attribute(2, "FULLY_CONNECTED:3").kernel_calls is None
+        assert att.attribute(9, "CONV_2D:0").kernel_calls is None
+        # Interpreter engines have no compiler record: never inferred from the label.
+        assert (
+            LayerAttributor(_skewed_analysis(), None).attribute(0, "CONV_2D").kernel_calls is None
+        )
+
     def test_manifest_join_beats_position(self):
         """The observed #218 shape: position 1 is FULLY_CONNECTED:3 — a
         a positional join would hand it analysis.layers[1]... which here IS

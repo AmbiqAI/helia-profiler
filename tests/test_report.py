@@ -490,6 +490,37 @@ def test_write_csv_includes_layer_cycle_percentages(tmp_path: Path, op: str):
     assert rows[1]["cycles_pct"] == "75.0"
 
 
+def test_write_csv_records_the_compilers_calls_per_layer(tmp_path: Path):
+    pmu = PmuResult(
+        meta=FirmwareMeta(),
+        layers=[
+            LayerResult(id=0, op="CONV_2D:0", cycles=50.0),
+            LayerResult(id=1, op="RESHAPE:1", cycles=10.0),
+            LayerResult(id=2, op="FULLY_CONNECTED:3", cycles=40.0),
+        ],
+    )
+    manifest = [
+        {"idx": 0, "id": 0, "kernel_calls": {"run": "arm_convolve_s8", "init": "arm_convolve_s8"}},
+        {"idx": 1, "id": 1, "kernel_calls": {}},
+        {"idx": 2, "id": 3, "kernel_calls": None},
+    ]
+
+    out_path = _write_csv(pmu, tmp_path, None, manifest)
+    with open(out_path, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        rows = list(reader)
+        fieldnames = reader.fieldnames
+
+    assert fieldnames is not None
+    assert fieldnames[:4] == ["id", "op", "source_index", "kernel_calls"]
+    assert [row["kernel_calls"] for row in rows] == ["arm_convolve_s8", "none", ""]
+
+    (tmp_path / "plain").mkdir()
+    without_manifest = _write_csv(pmu, tmp_path / "plain")
+    with open(without_manifest, newline="", encoding="utf-8") as f:
+        assert "kernel_calls" not in (csv.DictReader(f).fieldnames or [])
+
+
 def test_write_json_includes_layer_cycle_percentages(tmp_path: Path):
     pmu = PmuResult(
         meta=FirmwareMeta(),

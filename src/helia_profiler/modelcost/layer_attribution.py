@@ -10,6 +10,7 @@ from .model_analysis import LayerOps, ModelAnalysis
 __all__ = [
     "LayerAttribution",
     "LayerAttributor",
+    "manifest_kernel_calls",
     "manifest_source_map",
     "source_index_from_op",
 ]
@@ -44,6 +45,9 @@ class LayerAttribution:
     explicit: bool
     macs: int | None = None
     ops: int | None = None
+    #: CORE entries the compiler recorded the operator calling: ``()`` for none,
+    #: ``None`` when unrecorded or when no compiler record exists for the run.
+    kernel_calls: tuple[str, ...] | None = None
 
 
 def manifest_source_map(manifest: Sequence[Any]) -> dict[int, int]:
@@ -63,6 +67,29 @@ def manifest_source_map(manifest: Sequence[Any]) -> dict[int, int]:
         if isinstance(idx, int) and isinstance(source, int):
             mapping.setdefault(idx, source)
     return mapping
+
+
+def manifest_kernel_calls(manifest: Sequence[Any]) -> dict[int, tuple[str, ...]]:
+    """Execution position -> distinct CORE call symbols, for recorded entries only.
+
+    An entry whose ``kernel_calls`` is absent, ``None`` or malformed is not a
+    recorded fact and stays out of the map; ``{}`` records that the operator
+    calls no CORE entry.
+    """
+    calls: dict[int, tuple[str, ...]] = {}
+    for entry in manifest:
+        if not isinstance(entry, Mapping):
+            continue
+        idx, recorded = entry.get("idx"), entry.get("kernel_calls")
+        if (
+            isinstance(idx, bool)
+            or not isinstance(idx, int)
+            or not isinstance(recorded, Mapping)
+            or not all(isinstance(symbol, str) for symbol in recorded.values())
+        ):
+            continue
+        calls.setdefault(idx, tuple(sorted(set(recorded.values()))))
+    return calls
 
 
 def _analysis_by_source(analysis: ModelAnalysis) -> dict[int, LayerOps]:
@@ -95,6 +122,9 @@ class LayerAttributor:
         self._by_source = _analysis_by_source(analysis) if analysis is not None else {}
         self._source_map = (
             manifest_source_map(aot_op_manifest) if aot_op_manifest is not None else None
+        )
+        self._kernel_calls = (
+            manifest_kernel_calls(aot_op_manifest) if aot_op_manifest is not None else {}
         )
 
     def attribute(
@@ -133,4 +163,5 @@ class LayerAttributor:
             explicit=explicit,
             macs=found.macs if found is not None else None,
             ops=found.ops if found is not None else None,
+            kernel_calls=self._kernel_calls.get(position) if position is not None else None,
         )
