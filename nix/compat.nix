@@ -18,6 +18,10 @@ let
   # release uses the first rule whose `from` it has reached.
   floors = [
     {
+      from = "0.30.0";
+      nsCmsisNn = "7.45.0";
+    }
+    {
       from = "0.28.0";
       nsCmsisNn = "7.44.2";
     }
@@ -37,6 +41,9 @@ let
     "5f3fed9f21a57390cc7f00f77a37db8f5f110cb8" = "7.39.2";
     "714e058a7f654d6d24106bbb47ec6363058557bf" = "7.44.0";
     "063fdd35fc398e44edf3f32f8f95b3d101803874" = "7.44.1";
+    "166a6fa94004b53512de718099aa35ed655a70cf" = "7.44.2";
+    "3573bfbdb651092a14662daaa3557ce63452e294" = "7.45.0";
+    "afe4e5de42f8d67de562ec2c853a8031872e2931" = "7.45.1";
   };
 
   baselineRef = baseline.projects.ns-cmsis-nn.ref;
