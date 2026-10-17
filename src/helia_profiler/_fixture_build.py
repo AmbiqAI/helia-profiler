@@ -28,12 +28,7 @@ from .fixture_image import MAX_IMAGE, MRAM, bounded, fixture_sink_sizes, inspect
 from .fixture_power import FixturePowerSync
 from .fixture_psram import FixturePsramWeights
 from .fixture_runtime import FixtureFile, PreparedUpstreamRuntime, prove_prepared_runtime_build
-from .fixture_sources import (
-    FixtureKernelSource,
-    FixtureRuntimeSource,
-    locked_kernel_source,
-    prepared_runtime_sources,
-)
+from .fixture_sources import FixtureKernelSource, FixtureRuntimeSource, pinned_sources
 from .fixture_target import (
     FIXTURE_CLOCK_PROFILE,
     FixtureTarget,
@@ -336,9 +331,10 @@ class FixtureBuild:
     timer_hz: int | None = None
     power_sync: FixturePowerSync | None = None
     observe_ram: bool = False
-    #: The kernel library linked, from the prepared-runtime manifest or the dependency lock.
+    #: Compiled builds only: the kernel library linked, as the pinned prepared-runtime
+    #: manifest or dependency state states it.
     kernel_source: FixtureKernelSource | None = None
-    #: The prepared runtime archive linked, for the heliaRT and TFLM engines.
+    #: Compiled heliaRT and TFLM builds only: the prepared runtime archive linked.
     runtime_source: FixtureRuntimeSource | None = None
 
 
@@ -649,11 +645,11 @@ def _build(
             record.write_text(json.dumps(residence, sort_keys=True, indent=2), encoding="utf-8")
             region_evidence = (pin(record),)
     report_files = tuple(pin(path) for path in artifacts.report_files) if artifacts else ()
-    kernel_source = runtime_source = None
-    if verified_runtime is not None:
-        kernel_source, runtime_source = prepared_runtime_sources(verified_runtime.record)
-    elif binary is not None and ctx.run_metadata.dependencies is not None:
-        kernel_source = locked_kernel_source(ctx.run_metadata.dependencies.modules)
+    kernel_source, runtime_source = (
+        pinned_sources(runtime.manifest.read() if runtime else None, dependency_state.read())
+        if dependency_state is not None
+        else (None, None)
+    )
     inputs, output_tensors = _measurement_io(fixture)
     result = FixtureBuild(
         fixture_identity=fixture.identity,

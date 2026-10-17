@@ -31,7 +31,7 @@ from .fixture_analysis import FixtureTensor, PerAxisQuantization, PerTensorQuant
 from .fixture_power import FixturePowerSync
 from .fixture_psram import FixturePsramPayload, FixturePsramWeights
 from .fixture_runtime import FixtureFile
-from .fixture_sources import FixtureKernelSource, FixtureRuntimeSource
+from .fixture_sources import FixtureKernelSource, FixtureRuntimeSource, comparable, pinned_sources
 from .fixture_target import (
     FIXTURE_CLOCK_PROFILE,
     FixtureTarget,
@@ -278,6 +278,18 @@ def verify_fixture_build(build: FixtureBuild) -> None:
         ):
             raise ValueError("Runtime source version must be a string or absent")
         _digest(build.runtime_source.archive_sha256)
+    if build.kernel_source is not None or build.runtime_source is not None:
+        if build.power_sync is not None and build.power_sync.protocol_version == 1:
+            raise ValueError("Kernel and runtime sources postdate power protocol 1 records")
+        try:
+            stated = pinned_sources(
+                build.runtime_manifest.read() if build.runtime_manifest else None,
+                build.dependency_state.read() if build.dependency_state else None,
+            )
+        except (KeyError, TypeError, AttributeError, ValueError) as exc:
+            raise ValueError("Kernel and runtime sources cannot be re-derived") from exc
+        if comparable(stated) != comparable((build.kernel_source, build.runtime_source)):
+            raise ValueError("Kernel and runtime sources differ from the pinned manifest/state")
     if build.planned_memory is not None:
         _memory(asdict(build.planned_memory))
     for name in _FILE_FIELDS:
@@ -506,7 +518,7 @@ def load_fixture_build(record: str | bytes, *, roots: Mapping[str, Path]) -> Fix
     if ram_fields and outer["fixture_api"] not in ([5, 4], [5, 5], list(FIXTURE_API_VERSION)):
         raise ValueError("RAM diagnostic requires its declared API version")
     source_fields = {name for name in _SOURCE_FIELDS if name in outer["build"]}
-    if source_fields and outer["fixture_api"] != list(FIXTURE_API_VERSION):
+    if source_fields and tuple(outer["fixture_api"]) < (5, 6):
         raise ValueError("Kernel and runtime sources require their declared API version")
     value = dict(_object(outer["build"], _FIELDS | power_fields | ram_fields | source_fields))
     try:

@@ -116,15 +116,20 @@ explicit carry initializes once and keeps internal state across warmups and samp
 
 API 5.6 adds `FixtureBuild.kernel_source` (`FixtureKernelSource`) and
 `FixtureBuild.runtime_source` (`FixtureRuntimeSource`), so a consumer reads
-which kernel library and prepared runtime a build linked without parsing the
-dependency lock or the prepared-runtime manifest, whose layouts are internal.
-A heliaRT or TFLM build takes both from its verified manifest: the kernel is
-`ns-cmsis-nn` or `arm-cmsis-nn` at the manifest's commit, and the runtime is
-`helia-rt` or `tflite-micro` with its commit and archive sha256. The runtime
-`version` is the runtime record built from that commit, when HPX has one.
-A compiled heliaAOT build takes the kernel from the one CMSIS-NN module its
-dependency lock resolved, with the lock's release tag as `version` when the
-lock named one; it has no runtime source. Unknown facts stay `None`. Both
+which kernel library and prepared runtime a compiled build linked without
+parsing the dependency state or the prepared-runtime manifest, whose layouts
+are internal. Both are derived from those pinned files. A heliaRT or TFLM
+build states both in its manifest: the kernel is `ns-cmsis-nn` or
+`arm-cmsis-nn` at the manifest's commit, and the runtime is `helia-rt` or
+`tflite-micro` with its commit and archive sha256. A heliaAOT build states
+the kernel as the one CMSIS-NN module its dependency state resolved, with the
+lock's release tag as `version` when the lock named one, and has no runtime
+source. Render-only builds have neither. Unknown facts stay `None`.
+
+`verify_fixture_build` re-derives both from the pinned files and refuses a
+record whose fields differ. The runtime `version` is the exception: it names
+the runtime record built from both the runtime and kernel commits, when the
+producing HPX shipped one, and runtime records change between releases. Both
 fields are bound into the compiled identity, written only when known, and
 refused in records that declare an earlier API, so records from API 5.5 and
 earlier load unchanged with both fields `None`.

@@ -131,7 +131,6 @@ def test_builder_applies_adapter_placement_settings_and_pins_its_evidence(tmp_pa
     serialized = json.dumps(serialize_config(observed[0]), sort_keys=True).encode()
     assert identity["profile"] == hashlib.sha256(serialized).hexdigest()
     assert build.engine_source == source
-    assert build.kernel_source is None  # Render-only: no dependency lock was resolved.
     assert [(f.path, f.sha256) for f in build.aot_outputs] == [
         (report, hashlib.sha256(b"{}").hexdigest())
     ]

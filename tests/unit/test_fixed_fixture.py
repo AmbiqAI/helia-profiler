@@ -1,5 +1,5 @@
 import json
-from dataclasses import replace
+from dataclasses import asdict, replace
 from hashlib import sha256
 from types import SimpleNamespace
 
@@ -177,7 +177,12 @@ def test_host_only_stage_selection_and_source_receipt(
             snapshot.parent.mkdir(parents=True, exist_ok=True)
             snapshot.write_bytes((app / "nsx.lock").read_bytes())
             snapshot.with_name("hpx-dependencies.json").write_text(
-                json.dumps({"lock": {"mode": "resolved" if len(calls) == 2 else "reused"}})
+                json.dumps(
+                    {
+                        "lock": {"mode": "resolved" if len(calls) == 2 else "reused"},
+                        "modules": [asdict(KERNELS)],
+                    }
+                )
             )
             return SimpleNamespace(
                 config=config,
@@ -189,9 +194,8 @@ def test_host_only_stage_selection_and_source_receipt(
                     if aot_plan_available
                     else None
                 ),
-                run_metadata=SimpleNamespace(
-                    toolchain=ToolchainInfo(compiler="atfe", compiler_version=compiler_version),
-                    dependencies=SimpleNamespace(modules=(KERNELS,)),
+                run_metadata=RunMetadata(
+                    toolchain=ToolchainInfo(compiler="atfe", compiler_version=compiler_version)
                 ),
                 resolved_firmware_dir=app,
                 dependency_lock_path=snapshot,
@@ -201,6 +205,7 @@ def test_host_only_stage_selection_and_source_receipt(
     monkeypatch.setattr("helia_profiler._fixture_build.PipelineRunner", Runner)
     r = build_fixed_fixture(c, f, method=METHOD, runtime=selected_runtime, compile=False)
     assert not r.built and r.binary is None and len(r.generated_sources) == 4
+    assert r.kernel_source is None and r.runtime_source is None  # Nothing was linked.
     assert r.build_identity is None
     assert (r.planned_memory is None) == (engine is EngineType.HELIA_AOT and not aot_plan_available)
     assert (r.planned_memory_reason is not None) == (
