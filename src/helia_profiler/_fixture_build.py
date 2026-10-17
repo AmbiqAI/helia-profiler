@@ -608,7 +608,7 @@ def _build(
             app,
             config.target.board,
             dependency_lock.read(),
-            link_map.read().decode(),
+            link_map.read(),
         )
     if flat_binary is not None:
         size = flat_binary.path.stat().st_size

@@ -622,9 +622,10 @@ def test_link_map_proof_on_posix_and_windows_paths(stack, style, host, case, ref
     ("fault", "error", "message"),
     [
         (None, None, None),
-        ("archive", ValueError, "hash mismatch"),
-        ("manifest", ValueError, "hash mismatch"),
+        ("archive", ValueError, "hash mismatch.*runtime.a"),
+        ("manifest", ValueError, "hash mismatch.*provider-manifest.json"),
         ("lock-provider", ConfigError, "Unexpected runtime provider"),
+        ("lock-other-stack", ConfigError, "Unexpected runtime provider"),
         ("lock-missing", ConfigError, "Unexpected runtime provider"),
         ("map", ConfigError, "explicit helia-rt provider"),
     ],
@@ -632,7 +633,7 @@ def test_link_map_proof_on_posix_and_windows_paths(stack, style, host, case, ref
 def test_prepared_runtime_build_proof_owns_module_lock_and_map_checks(
     tmp_path, fault, error, message
 ):
-    """The proof lives beside the staging layout it verifies, independent of the builder."""
+    """A built app proves the exact staged archive, lock providers and linked archive, or is refused."""
     from helia_profiler.fixture_runtime import prove_prepared_runtime_build
 
     rt = runtime(tmp_path / "rt")
@@ -650,12 +651,16 @@ def test_prepared_runtime_build_proof_owns_module_lock_and_map_checks(
         (module / "provider-manifest.json").write_bytes(b"{}")
     if fault == "lock-provider":
         lock += b"      nsx-tflite-micro: {}\n"
+    if fault == "lock-other-stack":
+        lock += b"      hpx-upstream-runtime: {}\n"
     if fault == "lock-missing":
         lock = b"targets:\n  apollo510_evb:\n    modules:\n      nsx-core: {}\n"
     if fault == "map":
         map_text = f"  41101e   41101e       42     2         {app}/build/src/main.cc.obj:(.text)\n"
     if error is None:
-        prove_prepared_runtime_build(rt, verified, app, "apollo510_evb", lock, map_text)
+        prove_prepared_runtime_build(rt, verified, app, "apollo510_evb", lock, map_text.encode())
     else:
         with pytest.raises(error, match=message):
-            prove_prepared_runtime_build(rt, verified, app, "apollo510_evb", lock, map_text)
+            prove_prepared_runtime_build(
+                rt, verified, app, "apollo510_evb", lock, map_text.encode()
+            )

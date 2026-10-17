@@ -1,4 +1,4 @@
-"""Hash-verified prepared-runtime declarations and host-only NSX staging."""
+"""Hash-verified prepared-runtime declarations, host-only NSX staging and the proof a built app links exactly that stage."""
 
 from __future__ import annotations
 
@@ -301,7 +301,7 @@ def prove_prepared_runtime_build(
     app: Path,
     board: str,
     lock: bytes,
-    map_text: str,
+    link_map: bytes,
 ) -> None:
     """Refuse a built app unless its staged module, resolved lock and link map prove the archive.
 
@@ -320,7 +320,7 @@ def prove_prepared_runtime_build(
     modules = yaml.safe_load(lock)["targets"][board]["modules"]
     if name not in modules or any(m in others or _RUNTIME_PROVIDER.search(m) for m in modules):
         raise ConfigError("Unexpected runtime provider in resolved dependency lock")
-    _prove_link_map(map_text, app, stack)
+    _prove_link_map(link_map.decode(), app, stack)
 
 
 def prepare_runtime_module(runtime: VerifiedPreparedRuntime, work_dir: Path):
