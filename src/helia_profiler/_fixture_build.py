@@ -5,10 +5,9 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import re
 from dataclasses import asdict, dataclass, replace
 from enum import StrEnum
-from pathlib import Path, PurePath
+from pathlib import Path
 
 from .config import ProfileConfig
 from .deps.compatibility import resolve_compatibility
@@ -28,11 +27,7 @@ from .fixture_analysis import (
 from .fixture_image import MAX_IMAGE, MRAM, bounded, fixture_sink_sizes, inspect_elf
 from .fixture_power import FixturePowerSync
 from .fixture_psram import FixturePsramWeights
-from .fixture_runtime import (
-    PREPARED_RUNTIME_MODULES,
-    FixtureFile,
-    PreparedUpstreamRuntime,
-)
+from .fixture_runtime import FixtureFile, PreparedUpstreamRuntime, prove_prepared_runtime_build
 from .fixture_target import (
     FIXTURE_CLOCK_PROFILE,
     FixtureTarget,
@@ -171,65 +166,6 @@ FIXTURE_CAPABILITIES: dict[EngineType, dict[str, FixtureCapability]] = {
     }
     for engine, supported in _FIXTURE_IO_DTYPES.items()
 }
-
-#: Runtime providers a prepared-runtime build must not also resolve or link:
-#: any module whose name carries one of these, and the other prepared stacks.
-_RUNTIME_PROVIDER = re.compile(r"helia-rt|tflite-micro|cmsis-nn")
-_PREPARED_MODULES = frozenset(name for name, _, _ in PREPARED_RUNTIME_MODULES.values())
-#: Archives and objects a link map lists as inputs, e.g. ``.../libx.a(y.o):`` or ``.../y.o:``.
-_MAP_INPUT = re.compile(r"((?:[A-Za-z]:)?[^\s():]+)\.(?:a|o|obj)(?=[(:])")
-#: An LLD map input line: address, load address, size and alignment columns, then the
-#: input path, which may contain spaces.
-_LLD_INPUT = re.compile(r"\s*(?:[0-9A-Fa-f]+\s+){4}((?:[A-Za-z]:)?[^():]+?)\.(?:a|o|obj)(?=[(:])")
-
-
-def _linked_components(map_text: str, app: PurePath) -> set[str]:
-    """Path components naming each linked input, not the directories above the app.
-
-    Inputs under ``app`` and relative inputs contribute every component; other
-    absolute inputs (the toolchain's libraries) contribute the components after
-    their first ``modules`` or ``_nsx`` directory, or else their parent directory
-    and file stem. Underscores are read as hyphens, the NSX build-directory spelling.
-    """
-    # Windows maps may spell separators either way, whatever the app path uses.
-    root = str(app).replace("\\", "/").rstrip("/")
-    names = set()
-    for line in map_text.splitlines():
-        lld = _LLD_INPUT.match(line)
-        for found in [lld.group(1)] if lld else _MAP_INPUT.findall(line):
-            names.update(_input_components(found.replace("\\", "/"), root))
-    return names
-
-
-def _input_components(path: str, root: str) -> set[str]:
-    """Components of one ``/``-separated input path, per :func:`_linked_components`."""
-    prefix = path[: len(root) + 1]
-    # A drive-letter root is a Windows path, whose case does not matter.
-    windows = re.match(r"[A-Za-z]:", root) is not None
-    if prefix == root + "/" or (windows and prefix.lower() == (root + "/").lower()):
-        parts = path[len(root) + 1 :].split("/")
-    else:
-        parts = path.split("/")
-        if path.startswith("/") or re.match(r"[A-Za-z]:", path):
-            marks = [i for i, part in enumerate(parts) if part in ("modules", "_nsx")]
-            parts = parts[marks[0] + 1 :] if marks else parts[-2:]
-    return {part.replace("_", "-") for part in parts if part}
-
-
-def _prove_link_map(map_text: str, app: PurePath, stack: str) -> None:
-    """Refuse a link map that lacks the stack's archive or names another runtime provider."""
-    name = PREPARED_RUNTIME_MODULES[stack][0]
-    others = _PREPARED_MODULES - {name}
-    if (
-        f"{name}/runtime.a(" not in map_text.replace("\\", "/")
-        or any(
-            part in others or _RUNTIME_PROVIDER.search(part)
-            for part in _linked_components(map_text, app)
-        )
-        or (stack == "upstream" and ("helia_rt" in map_text or "helia-rt" in map_text))
-    ):
-        raise ConfigError(f"Link map does not prove the explicit {stack} provider")
-
 
 #: Largest total output a fixture may expose for full readback.
 FIXTURE_READBACK_BUDGET = 128 * 1024
@@ -665,21 +601,15 @@ def _build(
         dependency_lock = pin(ctx.dependency_lock_path)
         dependency_state = pin(ctx.dependency_lock_path.with_name("hpx-dependencies.json"))
     if binary is not None and runtime is not None and verified_runtime is not None:
-        import yaml
-
-        assert dependency_lock is not None
-        stack = verified_runtime.record.stack
-        name = PREPARED_RUNTIME_MODULES[stack][0]
-        others = _PREPARED_MODULES - {name}
-        module = app / "modules" / name
-        FixtureFile(module / "runtime.a", runtime.archive.sha256).read()
-        FixtureFile(module / "provider-manifest.json", runtime.manifest.sha256).read()
-        modules = yaml.safe_load(dependency_lock.read())["targets"][config.target.board]["modules"]
-        if name not in modules or any(m in others or _RUNTIME_PROVIDER.search(m) for m in modules):
-            raise ConfigError("Unexpected runtime provider in resolved dependency lock")
-        flat_binary = pin(binary.path.with_suffix(".bin"))
-        link_map = pin(binary.path.with_suffix(".map"))
-        _prove_link_map(link_map.read().decode(), app, stack)
+        assert dependency_lock is not None and link_map is not None
+        prove_prepared_runtime_build(
+            runtime,
+            verified_runtime,
+            app,
+            config.target.board,
+            dependency_lock.read(),
+            link_map.read().decode(),
+        )
     if flat_binary is not None:
         size = flat_binary.path.stat().st_size
         if not 0 < size <= MAX_IMAGE or not bounded(
