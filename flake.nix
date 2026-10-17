@@ -324,6 +324,8 @@
           accepts = version: ref: (builtins.tryEval (probe version ref).requiredNsCmsisNn).success;
           v7_39_2 = "5f3fed9f21a57390cc7f00f77a37db8f5f110cb8";
           v7_44_1 = "063fdd35fc398e44edf3f32f8f95b3d101803874";
+          v7_44_2 = "166a6fa94004b53512de718099aa35ed655a70cf";
+          v7_45_0 = "3573bfbdb651092a14662daaa3557ce63452e294";
           v7_45_1 = "afe4e5de42f8d67de562ec2c853a8031872e2931";
           compatCases = {
             "0.25.0 on v7.39.2" = accepts "0.25.0" v7_39_2;
@@ -332,7 +334,9 @@
             "0.27.0 on v7.44.1" = accepts "0.27.0" v7_44_1;
             "0.28.0 rejected on v7.39.2" = !accepts "0.28.0" v7_39_2;
             "0.28.0 rejected on v7.44.1" = !accepts "0.28.0" v7_44_1;
-            "0.30.0 rejected on v7.44.1" = !accepts "0.30.0" v7_44_1;
+            "0.28.0 on v7.44.2" = accepts "0.28.0" v7_44_2;
+            "0.30.0 rejected on v7.44.2" = !accepts "0.30.0" v7_44_2;
+            "0.30.0 on v7.45.0" = accepts "0.30.0" v7_45_0;
             "0.30.0 on v7.45.1" = accepts "0.30.0" v7_45_1;
             "1.0.0 rejected on v7.44.1" = !accepts "1.0.0" v7_44_1;
             "unmapped baseline commit reported, not blocking" =

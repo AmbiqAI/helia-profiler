@@ -109,10 +109,10 @@ built on that core and the two move as one set; 0.30.0 becomes the default when
 a heliaRT release built on v7.45.x is adopted. Installing 0.30.0 against this
 baseline passes the range check and stops at configure time when the generated
 module needs a newer core. 0.30.0 is also the first release whose operators
-report the CORE entries they call, which `profile_results.csv` records as
-`kernel_calls` (hpx#522).
+report the CORE entries their generated code calls, the per-operator record
+that hpx#522 consumes.
 
-This revision moves neuralSPOT-X `0.7.17 → 0.8.1` for the Apollo4 Blue Lite
+The neuralSPOT-X 0.8.1 revision moves neuralSPOT-X `0.7.17 → 0.8.1` for the Apollo4 Blue Lite
 board descriptor fix (AmbiqAI/neuralspotx#250, closing hpx#263): 0.7.17's
 `apollo4l_evb` and `apollo4l_blue_evb` descriptors cleared `NSX_SYSTEM_SOURCE`,
 so the startup library was built without the CMSIS system file and every
@@ -456,4 +456,4 @@ heliaRT, nsx-sensors) are unchanged.
 
 </details>
 
-The nondefault heliaAOT `0.29.0` record declares no qualified tuples. Selecting it does not change the default or qualify an experimental compatibility baseline.
+The nondefault heliaAOT `0.29.0` and `0.30.0` records declare no qualified tuples. Selecting one does not change the default or qualify an experimental compatibility baseline.
