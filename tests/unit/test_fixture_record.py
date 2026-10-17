@@ -332,6 +332,13 @@ def test_saved_api52_record_keeps_identity_and_file_checks(tmp_path, with_power)
         load_fixture_build(encoded, roots={"run": tmp_path})
 
 
+@pytest.mark.parametrize("value", [None, 7, True, [], "observe_ram"])
+def test_build_record_requires_an_object(tmp_path, value):
+    record = {"schema_version": 1, "fixture_api": [5, 4], "build": value}
+    with pytest.raises(ValueError, match="JSON object"):
+        load_fixture_build(json.dumps(record), roots={"run": tmp_path})
+
+
 def test_previous_api_record_remains_readable(tmp_path):
     build = _build(tmp_path)
     record = json.loads(dump_fixture_build(build, roots={"run": tmp_path}))

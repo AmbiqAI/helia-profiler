@@ -105,6 +105,7 @@ class FixtureBuildRequest:
     runtime: PreparedUpstreamRuntime | None = None
     aot: HeliaAotOptions | None = None
     observe_aot_arenas: bool = False
+    observe_ram: bool = False
 
     def __post_init__(self) -> None:
         if self.engine not in FIXTURE_CAPABILITIES:
@@ -148,6 +149,8 @@ class FixtureBuildRequest:
             else None,
             "observe_aot_arenas": self.observe_aot_arenas,
         }
+        if self.observe_ram:
+            intent["observe_ram"] = True
         if self.method.power_sync is not None:
             intent["power_sync"] = asdict(self.method.power_sync)
         if self.method.state_policy is not None:
@@ -197,5 +200,6 @@ def build_fixture(request: FixtureBuildRequest, *, compile: bool = True) -> Fixt
         runtime=request.runtime,
         compile=compile,
         observe_aot_arenas=request.observe_aot_arenas,
+        observe_ram=request.observe_ram,
         intent_identity=request.intent_identity,
     )

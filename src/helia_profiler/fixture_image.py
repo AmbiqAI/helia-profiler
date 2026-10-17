@@ -76,6 +76,8 @@ class Image:
     binary: bytes
     sinks: tuple[Sink, ...]
     elf_sha256: str
+    stack_bounds: tuple[int, int] | None = None
+    heap_capacity: int | None = None
 
     def sink(self, name):
         return next(s for s in self.sinks if s.name == name)
@@ -84,7 +86,7 @@ class Image:
 _BYTE_SINK = re.compile(r"deployment_output(_[1-9][0-9]*)?")
 #: Sinks only typed fixtures emit; an image carrying one the caller did not declare is refused.
 _TYPED_SINK = re.compile(
-    r"deployment_output_[1-9][0-9]*|deployment_arena_scan|deployment_psram_weights"
+    r"deployment_output_[1-9][0-9]*|deployment_arena_scan|deployment_psram_weights|deployment_ram"
 )
 
 
@@ -95,6 +97,7 @@ def fixture_sink_sizes(
     memory: bool,
     arena_count: int,
     psram_size: int,
+    ram: bool = False,
 ) -> dict[str, int]:
     sizes = {
         "deployment_status": 4,
@@ -105,6 +108,8 @@ def fixture_sink_sizes(
         "deployment_checksum": 4,
         "deployment_timing": 28,
     }
+    if ram:
+        sizes["deployment_ram"] = 32
     if power:
         sizes["deployment_power"] = 20
     if memory:
@@ -159,6 +164,26 @@ def inspect_elf(data: bytes, binary: bytes, load_address: int, sizes: dict[str, 
     sections = [struct.unpack_from("<10I", data, shoff + i * 40) for i in range(shnum)]
     require(sections[shstr][1] == 3, "invalid section names")
     names = span(data, sections[shstr][4], sections[shstr][5])
+    stack_bounds = None
+    heap_capacity = None
+    if "deployment_ram" in sizes:
+        stacks = [s for s in sections if cstring(names, s[0]) == ".stack"]
+        require(len(stacks) == 1, "RAM diagnostic requires one linked stack section")
+        stack = stacks[0]
+        require(
+            stack[2] & 3 == 3 and bounded(stack[3], stack[5], DTCM) and stack[5] <= 65536,
+            "Invalid diagnostic stack extent",
+        )
+        stack_bounds = (stack[3], stack[3] + stack[5])
+        heaps = [s for s in sections if cstring(names, s[0]) == ".heap"]
+        if heaps:
+            require(
+                len(heaps) == 1
+                and heaps[0][2] & 3 == 3
+                and DTCM[0] <= heaps[0][3] <= heaps[0][3] + heaps[0][5] <= DTCM[1],
+                "Invalid diagnostic heap extent",
+            )
+            heap_capacity = heaps[0][5]
     segments = []
     coverage = bytearray(len(binary))
     for i in range(phnum):
@@ -195,6 +220,13 @@ def inspect_elf(data: bytes, binary: bytes, load_address: int, sizes: dict[str, 
         "overlapping section file ranges",
     )
     require(sum(s[5] // 16 for s in sections if s[1] in (2, 11)) <= 100000, "symbol table budget")
+    required = set(sizes)
+    optional = (
+        {"__malloc_max_sbrked_mem", "__malloc_max_total_mem"}
+        if "deployment_ram" in sizes
+        else set()
+    )
+    sizes = {**sizes, **{name: 4 for name in optional}}
     found = {name: [] for name in sizes}
     for i, s in enumerate(sections):
         n, typ, fl, va, off, size, link, info, align, entsize = s
@@ -232,11 +264,14 @@ def inspect_elf(data: bytes, binary: bytes, load_address: int, sizes: dict[str, 
                 "sink outside writable load memory",
             )
             found[name].append(Sink(name, value, length))
-    require(all(len(v) == 1 for v in found.values()), "missing or duplicate exact sink symbol")
-    sinks = tuple(found[n][0] for n in sorted(found))
+    require(
+        all(len(found[n]) == 1 for n in required) and all(len(found[n]) <= 1 for n in optional),
+        "missing or duplicate exact sink symbol",
+    )
+    sinks = tuple(found[n][0] for n in sorted(found) if found[n])
     ordered = sorted(sinks, key=lambda s: s.address)
     require(
         all(a.address + a.size <= b.address for a, b in zip(ordered, ordered[1:])),
         "overlapping sinks",
     )
-    return Image(load_address, bytes(binary), sinks, digest(data))
+    return Image(load_address, bytes(binary), sinks, digest(data), stack_bounds, heap_capacity)

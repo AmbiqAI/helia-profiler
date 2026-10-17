@@ -610,6 +610,8 @@ def test_matrix_covers_every_engine_family():
         "510-helia-aot-fixture-resource",
         "510-tflm-fixture-power-resource",
         "510-helia-aot-fixture-power-resource",
+        "510-tflm-fixture-ram",
+        "510-helia-aot-fixture-ram",
         "510-tflm-fixture-psram",
         "510-helia-aot-fixture-psram",
         "510-tflm-fixture-psram-resource",
@@ -859,6 +861,7 @@ def test_fixture_real_toolchain_preparation_renders_current_sources(tmp_path, ca
         "typed": 4,
         "resource": 4,
         "power-resource": 4,
+        "ram": 4,
         "psram": 4,
         "psram-resource": 4,
         "psram-tcm": 4,
@@ -876,7 +879,12 @@ def test_fixture_real_toolchain_preparation_renders_current_sources(tmp_path, ca
         )
         assert (scratch / "model_data.h").read_text(encoding="utf-8") == "// model data\n"
 
-    if case.fixture_kind in ("typed", "resource") or case.fixture_kind.startswith("psram"):
+    if case.fixture_kind == "ram":
+        assert "volatile uint32_t deployment_ram[8]" in text
+        assert "__get_MSPLIM()" in text
+        assert "hpx_ram_begin()" in text and "hpx_ram_finish()" in text
+
+    if case.fixture_kind in ("typed", "resource", "ram") or case.fixture_kind.startswith("psram"):
         assert "int main(" in text
         assert "static const uint8_t fixed_input_2[]" in text
         assert "std::memcpy(input_data_2, fixed_input_2, sizeof(fixed_input_2))" in text

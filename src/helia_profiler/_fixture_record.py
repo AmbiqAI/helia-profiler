@@ -118,11 +118,18 @@ def _read_json(value):
 def _payload(build: FixtureBuild, *, file, path) -> dict:
     """The single build schema, with different path encodings for identity/storage."""
     result = asdict(build)
+    if not build.observe_ram:
+        del result["observe_ram"]
     if result["power_sync"] is None:
         del result["power_sync"]
     elif build.power_sync is not None and build.power_sync.protocol_version == 1:
         del result["power_sync"]["protocol_version"]
-    _object(result, _FIELDS | ({"power_sync"} if build.power_sync is not None else set()))
+    _object(
+        result,
+        _FIELDS
+        | ({"power_sync"} if build.power_sync is not None else set())
+        | ({"observe_ram"} if build.observe_ram else set()),
+    )
     result["app_dir"] = path(build.app_dir)
     for name in _FILE_FIELDS:
         value = getattr(build, name)
@@ -186,6 +193,8 @@ def verify_fixture_build(build: FixtureBuild) -> None:
         raise ValueError("Explicit fixture engine and timing scope required")
     if build.state_policy is not None and not isinstance(build.state_policy, FixtureStatePolicy):
         raise ValueError("Invalid fixture state policy")
+    if type(build.observe_ram) is not bool or (build.observe_ram and build.power_sync is not None):
+        raise ValueError("RAM diagnostic requires boolean option and energy-off method")
     if build.power_sync is not None and (
         not isinstance(build.power_sync, FixturePowerSync)
         or build.timing_scope is not FixtureTimingScope.RESTORE_AND_INVOKE
@@ -444,18 +453,20 @@ def load_fixture_build(record: str | bytes, *, roots: Mapping[str, Path]) -> Fix
             _json((5, 1)),
             _json((5, 2)),
             _json((5, 3)),
+            _json((5, 4)),
             _json(FIXTURE_API_VERSION),
         )
     ):
         raise ValueError("Unsupported fixture build record/API version")
-    power_fields = (
-        {"power_sync"}
-        if isinstance(outer["build"], dict) and "power_sync" in outer["build"]
-        else set()
-    )
+    if not isinstance(outer["build"], dict):
+        raise ValueError("Fixture build must be a JSON object")
+    power_fields = {"power_sync"} if "power_sync" in outer["build"] else set()
     if power_fields and _json(outer["fixture_api"]) == _json((5, 0)):
         raise ValueError("Power firmware requires its declared API version")
-    value = dict(_object(outer["build"], _FIELDS | power_fields))
+    ram_fields = {"observe_ram"} if "observe_ram" in outer["build"] else set()
+    if ram_fields and outer["fixture_api"] not in ([5, 4], list(FIXTURE_API_VERSION)):
+        raise ValueError("RAM diagnostic requires its declared API version")
+    value = dict(_object(outer["build"], _FIELDS | power_fields | ram_fields))
     try:
         value["app_dir"] = mapping.decode(value["app_dir"])
         for name in _FILE_FIELDS:
@@ -564,4 +575,5 @@ def fixture_capture_request(
         arena_scan_sizes=tuple(size for _, size in build.aot_arena_scan),
         psram_weights=build.psram_weights,
         power_sync=build.power_sync,
+        observe_ram=build.observe_ram,
     )

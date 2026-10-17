@@ -113,6 +113,7 @@ class FixtureRenderSpec:
     model: FixtureModelAnalysis | TypedFixtureModelAnalysis
     #: Paint heliaAOT scratch arenas and report touched bytes after the run.
     observe_aot_arenas: bool = False
+    observe_ram: bool = False
 
 
 @dataclass(frozen=True)
@@ -392,6 +393,7 @@ class FixtureBuild:
     cpu_hz: int | None = None
     timer_hz: int | None = None
     power_sync: FixturePowerSync | None = None
+    observe_ram: bool = False
 
 
 @dataclass(frozen=True)
@@ -545,6 +547,7 @@ def build_fixed_fixture(
     runtime: PreparedUpstreamRuntime | None = None,
     compile: bool = True,
     observe_aot_arenas: bool = False,
+    observe_ram: bool = False,
 ) -> FixtureBuild:
     """Render or compile one fixed fixture through profiler's host-only stages."""
     return _build(
@@ -554,6 +557,7 @@ def build_fixed_fixture(
         runtime=runtime,
         compile=compile,
         observe_aot_arenas=observe_aot_arenas,
+        observe_ram=observe_ram,
     )
 
 
@@ -566,6 +570,7 @@ def _build(
     compile: bool,
     observe_aot_arenas: bool,
     intent_identity: str | None = None,
+    observe_ram: bool = False,
 ) -> FixtureBuild:
     if not isinstance(method, FixtureMethod):
         raise ConfigError("Explicit FixtureMethod required")
@@ -574,6 +579,8 @@ def _build(
     _validate(config, fixture)
     if config.target.board == "apollo510b_evb" and method.power_sync is not None:
         raise ConfigError("AP510B fixture integration is timing-only")
+    if type(observe_ram) is not bool or (observe_ram and method.power_sync is not None):
+        raise ConfigError("RAM diagnostic requires a boolean option and energy-off method")
     model: FixtureModelAnalysis | TypedFixtureModelAnalysis
     if isinstance(fixture, TypedFixture):
         model = analyze_typed_fixture_model_for_engine(
@@ -638,6 +645,8 @@ def _build(
         identity["power_sync"] = asdict(method.power_sync)
     if method.state_policy is not None:
         identity["state_policy"] = method.state_policy.value
+    if observe_ram:
+        identity["observe_ram"] = True
     if observe_aot_arenas:
         identity["observe_aot_arenas"] = True
 
@@ -683,6 +692,7 @@ def _build(
                 method=method,
                 model=model,
                 observe_aot_arenas=observe_aot_arenas,
+                observe_ram=observe_ram,
             )
         ),
         PlanMemoryStage(),
@@ -813,11 +823,12 @@ def _build(
         cpu_hz=fixture_cpu_hz(config.target.board),
         timer_hz=STIMER_HZ,
         power_sync=method.power_sync,
+        observe_ram=observe_ram,
     )
     if binary is not None:
         from ._fixture_record import compiled_fixture_identity
 
-        if result.power_sync is not None:
+        if result.power_sync is not None or result.observe_ram:
             assert flat_binary is not None
             inspect_elf(
                 binary.read(),
@@ -825,7 +836,8 @@ def _build(
                 result.target.load_address,
                 fixture_sink_sizes(
                     tuple(tensor.size_bytes for tensor in result.output_tensors),
-                    power=True,
+                    power=result.power_sync is not None,
+                    ram=result.observe_ram,
                     memory=result.engine is not EngineType.HELIA_AOT,
                     arena_count=len(result.aot_arena_scan),
                     psram_size=result.psram_weights.sink_size if result.psram_weights else 0,

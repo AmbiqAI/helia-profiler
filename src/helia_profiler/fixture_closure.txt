@@ -3,6 +3,7 @@ _fixture_build.py
 _fixture_closure.py
 _fixture_facts.py
 _fixture_placement.py
+_fixture_ram.py
 _fixture_record.py
 _fixture_request.py
 _litert_inspection.py
@@ -134,6 +135,7 @@ firmware/templates/_usb_timer.j2
 firmware/templates/fixed_fixture.cc.j2
 firmware/templates/fixed_fixture_memory.h.j2
 firmware/templates/fixed_fixture_psram.h.j2
+firmware/templates/fixed_fixture_ram.h.j2
 firmware/templates/hpx_pmu_profiler.cc.j2
 firmware/templates/hpx_pmu_profiler.h.j2
 firmware/templates/main.cc.j2

@@ -37,6 +37,15 @@ static inline void NVIC_EnableIRQ(IRQn_Type irq) { (void)irq; }
 static inline void NVIC_DisableIRQ(IRQn_Type irq) { (void)irq; }
 
 // --- Core intrinsics -----------------------------------------------------
+typedef struct { volatile uint32_t VTOR; } HpxStubScbType;
+#define SCB ((HpxStubScbType *)0x3000)
+static inline uint32_t __get_PRIMASK(void) { return 0U; }
+static inline void __disable_irq(void) {}
+static inline void __set_PRIMASK(uint32_t value) { (void)value; }
+static inline uint32_t __get_MSPLIM(void) { return 0U; }
+static inline uint32_t __get_MSP(void) { return 0U; }
+static inline uint32_t __get_CONTROL(void) { return 0U; }
+static inline uint32_t __get_IPSR(void) { return 0U; }
 static inline void __NOP(void) {}
 static inline void __WFI(void) {}
 static inline void __DMB(void) {}
