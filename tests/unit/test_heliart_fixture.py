@@ -517,7 +517,7 @@ def test_linked_inputs_keep_a_windows_drive_letter(sep):
     """ATfE maps on Windows name inputs as ``C:\\...`` with either separator."""
     from pathlib import PureWindowsPath
 
-    from helia_profiler._fixture_build import _linked_components
+    from helia_profiler.fixture_runtime import _linked_components
 
     root = sep.join(["C:", "Users", "r", "helia-rt-bench", "modules", "tflite-micro", "app"])
     app = PureWindowsPath(root)
@@ -571,7 +571,7 @@ def test_link_map_proof_on_posix_and_windows_paths(stack, style, host, case, ref
     """Every map-scan case under POSIX and Windows paths, spaces and either separator."""
     from pathlib import PurePosixPath, PureWindowsPath
 
-    from helia_profiler._fixture_build import PREPARED_RUNTIME_MODULES, _prove_link_map
+    from helia_profiler.fixture_runtime import PREPARED_RUNTIME_MODULES, _prove_link_map
 
     base = host.replace("-lower-drive", "")
     root, native = _APPS[base]
@@ -616,3 +616,51 @@ def test_link_map_proof_on_posix_and_windows_paths(stack, style, host, case, ref
             _prove_link_map(text, app, stack)
     else:
         _prove_link_map(text, app, stack)
+
+
+@pytest.mark.parametrize(
+    ("fault", "error", "message"),
+    [
+        (None, None, None),
+        ("archive", ValueError, "hash mismatch.*runtime.a"),
+        ("manifest", ValueError, "hash mismatch.*provider-manifest.json"),
+        ("lock-provider", ConfigError, "Unexpected runtime provider"),
+        ("lock-other-stack", ConfigError, "Unexpected runtime provider"),
+        ("lock-missing", ConfigError, "Unexpected runtime provider"),
+        ("map", ConfigError, "explicit helia-rt provider"),
+    ],
+)
+def test_prepared_runtime_build_proof_owns_module_lock_and_map_checks(
+    tmp_path, fault, error, message
+):
+    """A built app proves the exact staged archive, lock providers and linked archive, or is refused."""
+    from helia_profiler.fixture_runtime import prove_prepared_runtime_build
+
+    rt = runtime(tmp_path / "rt")
+    verified = rt.verify()
+    app = tmp_path / "app"
+    module = app / "modules" / "hpx-heliart-runtime"
+    module.mkdir(parents=True)
+    (module / "runtime.a").write_bytes(rt.archive.read())
+    (module / "provider-manifest.json").write_bytes(rt.manifest.read())
+    lock = b"targets:\n  apollo510_evb:\n    modules:\n      hpx-heliart-runtime: {}\n"
+    map_text = f"  41101e   41101e       42     2         {app}/modules/hpx-heliart-runtime/runtime.a(m.cc.obj):(.text)\n"
+    if fault == "archive":
+        (module / "runtime.a").write_bytes(b"!<arch>\nother")
+    if fault == "manifest":
+        (module / "provider-manifest.json").write_bytes(b"{}")
+    if fault == "lock-provider":
+        lock += b"      nsx-tflite-micro: {}\n"
+    if fault == "lock-other-stack":
+        lock += b"      hpx-upstream-runtime: {}\n"
+    if fault == "lock-missing":
+        lock = b"targets:\n  apollo510_evb:\n    modules:\n      nsx-core: {}\n"
+    if fault == "map":
+        map_text = f"  41101e   41101e       42     2         {app}/build/src/main.cc.obj:(.text)\n"
+    if error is None:
+        prove_prepared_runtime_build(rt, verified, app, "apollo510_evb", lock, map_text.encode())
+    else:
+        with pytest.raises(error, match=message):
+            prove_prepared_runtime_build(
+                rt, verified, app, "apollo510_evb", lock, map_text.encode()
+            )
