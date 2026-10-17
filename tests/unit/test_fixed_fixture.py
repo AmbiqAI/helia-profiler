@@ -181,7 +181,9 @@ def test_host_only_stage_selection_and_source_receipt(
                 config=config,
                 memory_plan=MemoryPlan(engine=engine),
                 engine_artifacts=(
-                    SimpleNamespace(memory_plan=MemoryPlan(engine=engine))
+                    SimpleNamespace(
+                        memory_plan=MemoryPlan(engine=engine), report_files=(), source=None
+                    )
                     if aot_plan_available
                     else None
                 ),

@@ -17,12 +17,19 @@ from pathlib import Path
 from typing import Any
 
 from ...config import ProfileConfig
-from ...errors import ConfigError
+from ...errors import ConfigError, EngineError
 from ...modelcost import analyze_air_model
 from ...placement import ArenaRole, Placement
 from ...results import NsxModuleRef
+from ...results.dependencies import installed_aot_source
 from .. import EngineType
-from ..base import ArenaRegion, FixtureModelPreparation, HeliaAotArtifacts, PsramWeightsSource
+from ..base import (
+    ArenaRegion,
+    EngineSource,
+    FixtureModelPreparation,
+    HeliaAotArtifacts,
+    PsramWeightsSource,
+)
 from ..cmsis_nn import cmsis_nn_cmake_vars, cmsis_nn_module_ref
 from ..ethos_u import nsx_npu_module_ref
 from .compile import (
@@ -90,6 +97,33 @@ def _external_arena_mode(aot_args: dict[str, Any]) -> bool:
     return not aot_args["memory"].get("allocate_arenas", True)
 
 
+def _report_names(prefix: str) -> tuple[str, str]:
+    return f"{prefix}_plan.json", f"{prefix}_report.json"
+
+
+def _clear_reports(output_dir: Path, prefix: str) -> None:
+    """Drop plan and report files an earlier conversion left, so a build pins only its own."""
+    for name in _report_names(prefix):
+        for stale in output_dir.rglob(name):
+            stale.unlink()
+
+
+def _report_files(output_dir: Path, prefix: str) -> tuple[Path, ...]:
+    """The plan and report JSON this conversion wrote, when the installed heliaAOT writes them."""
+    found: list[Path] = []
+    for name in _report_names(prefix):
+        matches = sorted(output_dir.rglob(name))
+        if len(matches) > 1:
+            raise EngineError(f"More than one heliaAOT {name} in the work directory")
+        found += matches
+    return tuple(found)
+
+
+def _installed_source() -> EngineSource | None:
+    source = installed_aot_source()
+    return EngineSource(**source) if source is not None else None
+
+
 def _build_extra_modules(
     config: ProfileConfig,
     cmsis_nn_ref: NsxModuleRef,
@@ -150,6 +184,21 @@ class HeliaAOTAdapter:
         # that actually renders that machinery.
         return PsramWeightsSource.SELF_CONTAINED
 
+    def placement_config(self, config: ProfileConfig) -> ProfileConfig:
+        # PSRAM constants render only in external-arena mode (check_psram_placement
+        # refuses anything else), so PSRAM weights imply that converter setting.
+        if config.model.weights_location is not Placement.PSRAM:
+            return config
+        aot_args = dict(config.engine.config.get("aot_args", {}))
+        memory = aot_args.get("memory")
+        aot_args["memory"] = {**({} if memory is None else dict(memory)), "allocate_arenas": False}
+        return _dc_replace(
+            config,
+            engine=_dc_replace(
+                config.engine, config={**config.engine.config, "aot_args": aot_args}
+            ),
+        )
+
     def check_psram_placement(self, config: ProfileConfig) -> None:
         aot_args = _merged_aot_args(config)
         if _external_arena_mode(aot_args) or not _psram_requested(config, aot_args):
@@ -206,6 +255,7 @@ class HeliaAOTAdapter:
 
         aot_output_dir = work_dir / "aot_output"
         aot_module_dir = aot_output_dir / module_name
+        _clear_reports(aot_output_dir, prefix)
         codegen_ctx = _run_aot_compiler(
             compiler_config,
             aot_output_dir,
@@ -281,4 +331,6 @@ class HeliaAOTAdapter:
             aot_op_manifest=op_manifest or None,
             compiled_analysis=compiled_analysis,
             memory_plan=memory_plan,
+            source=_installed_source(),
+            report_files=_report_files(aot_output_dir, prefix),
         )

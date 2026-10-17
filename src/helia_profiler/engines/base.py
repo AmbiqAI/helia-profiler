@@ -79,6 +79,15 @@ class ArenaRegion:
     blob_filename: str | None = None
 
 
+@dataclass(frozen=True)
+class EngineSource:
+    """Installed engine package: its version and, for a VCS install, the commit."""
+
+    package: str
+    version: str
+    commit: str | None = None
+
+
 @dataclass(frozen=True, kw_only=True)
 class EngineArtifacts:
     """Common core of the outputs produced by an engine adapter's prepare step.
@@ -114,6 +123,13 @@ class EngineArtifacts:
     # stage synthesises a conservative plan from ``model.arena_size`` and
     # the resolved split placement.
     memory_plan: MemoryPlan | None = None
+
+    #: The installed package that generated the model code, when one did.
+    #: Interpreter engines resolve their runtime as an NSX module instead.
+    source: EngineSource | None = None
+    #: Files the engine wrote describing this preparation, such as heliaAOT's
+    #: plan and report JSON. Fixture builds pin them as evidence.
+    report_files: tuple[Path, ...] = ()
 
     #: Engine type this class is pinned to — ``None`` on the base, which
     #: accepts any.  Read by :meth:`__post_init__`.
@@ -363,6 +379,14 @@ class EngineAdapter(Protocol):
         """
         ...
 
+    def placement_config(self, config: ProfileConfig) -> ProfileConfig:
+        """Return ``config`` with the engine settings its requested placement implies.
+
+        Fixture builds refuse caller engine overrides, so they derive those
+        settings here. Identity for engines whose placement needs none.
+        """
+        ...
+
     def check_psram_placement(self, config: ProfileConfig) -> None:
         """Validate engine-specific PSRAM-placement constraints.
 
@@ -405,6 +429,10 @@ class SingleArenaPlacementMixin:
         # A single template-managed arena: no engine-side override needed.
         del target
         return regions
+
+    def placement_config(self, config: ProfileConfig) -> ProfileConfig:
+        # One template-managed arena: placement selects a section, not an engine setting.
+        return config
 
     def check_psram_placement(self, config: ProfileConfig) -> None:
         # Single-arena engines have no engine-specific PSRAM config to

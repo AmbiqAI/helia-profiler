@@ -213,6 +213,8 @@ def test_common_core_stays_on_the_base():
         assert artifacts.extra_modules == []
         assert artifacts.cmake_vars == {}
         assert artifacts.memory_plan is None
+        assert artifacts.source is None
+        assert artifacts.report_files == ()
 
 
 # The render-snapshot suite hand-mirrors template variables and never calls
