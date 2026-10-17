@@ -286,7 +286,7 @@ def verify_fixture_build(build: FixtureBuild) -> None:
                 build.runtime_manifest.read() if build.runtime_manifest else None,
                 build.dependency_state.read() if build.dependency_state else None,
             )
-        except (KeyError, TypeError, AttributeError, ValueError) as exc:
+        except (KeyError, TypeError, AttributeError, ValueError, RecursionError) as exc:
             raise ValueError("Kernel and runtime sources cannot be re-derived") from exc
         if comparable(stated) != comparable((build.kernel_source, build.runtime_source)):
             raise ValueError("Kernel and runtime sources differ from the pinned manifest/state")

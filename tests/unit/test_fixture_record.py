@@ -473,3 +473,10 @@ def test_malformed_runtime_source_is_refused(tmp_path, key, value):
         verify_fixture_build(
             _reseal(_build(tmp_path), runtime_source=replace(source, **{key: value}))
         )
+
+
+def test_unparseable_pinned_state_refuses_sources_as_a_value_error(tmp_path):
+    build = _sourced(tmp_path)
+    nested = _pin(tmp_path / "evidence" / "nested.json", b"[" * 100000)
+    with pytest.raises(ValueError, match="cannot be re-derived"):
+        verify_fixture_build(_reseal(build, dependency_state=nested))
