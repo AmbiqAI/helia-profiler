@@ -79,14 +79,24 @@ class ArenaRegion:
     blob_filename: str | None = None
 
 
+@dataclass(frozen=True)
+class EngineSource:
+    """Installed engine package: its version and, for a VCS install, the commit."""
+
+    package: str
+    version: str
+    commit: str | None = None
+
+
 @dataclass(frozen=True, kw_only=True)
 class EngineArtifacts:
     """Common core of the outputs produced by an engine adapter's prepare step.
 
     Every adapter returns a per-engine subclass (:class:`TflmArtifacts`,
     :class:`HeliaRtArtifacts`, :class:`HeliaAotArtifacts`,
-    :class:`ExecutorchArtifacts`).  This base carries only what *every*
-    engine produces; engine-specific outputs live on the subclass, so a
+    :class:`ExecutorchArtifacts`).  This base carries what *every* engine
+    produces plus the preparation facts any engine may report (``source``,
+    ``report_files``); engine-specific outputs live on the subclass, so a
     wrong-engine read is an ``AttributeError`` at the access site instead
     of a silently-defaulted ``None``.
 
@@ -114,6 +124,13 @@ class EngineArtifacts:
     # stage synthesises a conservative plan from ``model.arena_size`` and
     # the resolved split placement.
     memory_plan: MemoryPlan | None = None
+
+    #: The installed package that generated the model code, when one did.
+    #: Interpreter engines resolve their runtime as an NSX module instead.
+    source: EngineSource | None = None
+    #: Files the engine wrote describing this preparation, such as heliaAOT's
+    #: plan and report JSON. Fixture builds pin them as evidence.
+    report_files: tuple[Path, ...] = ()
 
     #: Engine type this class is pinned to — ``None`` on the base, which
     #: accepts any.  Read by :meth:`__post_init__`.
@@ -363,6 +380,14 @@ class EngineAdapter(Protocol):
         """
         ...
 
+    def placement_config(self, config: ProfileConfig) -> ProfileConfig:
+        """Return ``config`` with the engine settings its requested placement implies.
+
+        Placement owns these settings: they take precedence over caller
+        values. Identity for engines whose placement needs none.
+        """
+        ...
+
     def check_psram_placement(self, config: ProfileConfig) -> None:
         """Validate engine-specific PSRAM-placement constraints.
 
@@ -396,7 +421,7 @@ class SingleArenaPlacementMixin:
 
     Engines whose firmware template manages one arena (TFLM, heliaRT,
     ExecuTorch) share these identity implementations; AOT-style engines
-    override both hooks with real placement logic.
+    override these hooks with real placement logic.
     """
 
     def apply_arena_placement_override(
@@ -405,6 +430,10 @@ class SingleArenaPlacementMixin:
         # A single template-managed arena: no engine-side override needed.
         del target
         return regions
+
+    def placement_config(self, config: ProfileConfig) -> ProfileConfig:
+        # One template-managed arena: placement selects a section, not an engine setting.
+        return config
 
     def check_psram_placement(self, config: ProfileConfig) -> None:
         # Single-arena engines have no engine-specific PSRAM config to

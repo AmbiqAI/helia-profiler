@@ -9,12 +9,13 @@ when the AOT module's CMakeLists resolves it.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 from helia_profiler.config import load_config
-from helia_profiler.engines.base import HeliaAotArtifacts
+from helia_profiler.engines.base import EngineSource, HeliaAotArtifacts
 from helia_profiler.engines.ethos_u import NSX_NPU_MODULE, NSX_NPU_PROJECT
 from helia_profiler.engines.helia_aot.adapter import HeliaAOTAdapter, _build_extra_modules
 from helia_profiler.engines.helia_aot.compile import (
@@ -22,7 +23,8 @@ from helia_profiler.engines.helia_aot.compile import (
     _merged_aot_args,
     _resolve_aot_platform,
 )
-from helia_profiler.errors import EngineError
+from helia_profiler.errors import ConfigError, EngineError
+from helia_profiler.placement import Placement
 from helia_profiler.results import NsxModuleRef
 
 _CMSIS_REF = NsxModuleRef(name="ns-cmsis-nn", path=Path("/tmp/cmsis"))
@@ -176,54 +178,54 @@ class TestMergedAotArgs:
             _merged_aot_args(config)
 
 
+def _prepare(monkeypatch, tmp_path, config, model=None, *, compiler_hook=None) -> HeliaAotArtifacts:
+    """Run ``prepare()`` against a fake converter that calls ``compiler_hook(config, output_dir)``."""
+    from helia_profiler.engines.helia_aot import adapter as adapter_mod
+
+    def fake_run_aot_compiler(config, output_dir, module_name, *_args):
+        (output_dir / module_name).mkdir(parents=True)
+        if compiler_hook is not None:
+            compiler_hook(config, output_dir)
+        from types import SimpleNamespace
+
+        return SimpleNamespace(model=model)
+
+    monkeypatch.setattr(adapter_mod, "_check_helia_aot_version", lambda: "0.0.0")
+    monkeypatch.setattr(adapter_mod, "_resolve_aot_platform", lambda _c: "apollo510_evb")
+    monkeypatch.setattr(adapter_mod, "_run_aot_compiler", fake_run_aot_compiler)
+    monkeypatch.setattr(adapter_mod, "_extract_operator_manifest", lambda _ctx: [])
+    monkeypatch.setattr(adapter_mod, "_validate_pragmas", lambda *_a: None)
+    monkeypatch.setattr(adapter_mod, "cmsis_nn_module_ref", lambda *_a: _CMSIS_REF)
+    monkeypatch.setattr(adapter_mod, "_write_attributes_header", lambda d, p: d / f"{p}.h")
+    monkeypatch.setattr(adapter_mod, "_extract_memory_plan", lambda *_a, **_k: None)
+    monkeypatch.setattr(adapter_mod, "_extract_arena_regions", lambda *_a: [])
+    return HeliaAOTAdapter().prepare(config, tmp_path / "work")
+
+
 class TestPrepareArtifactFlags:
     """``prepare()`` derives its artifact flags from the merged AOT args."""
 
-    def _prepare(
-        self, monkeypatch, tmp_path, config, model=None, *, compiler_hook=None
-    ) -> HeliaAotArtifacts:
-        from helia_profiler.engines.helia_aot import adapter as adapter_mod
-
-        def fake_run_aot_compiler(config, output_dir, module_name, *_args):
-            if compiler_hook is not None:
-                compiler_hook(config)
-            (output_dir / module_name).mkdir(parents=True)
-            from types import SimpleNamespace
-
-            return SimpleNamespace(model=model)
-
-        monkeypatch.setattr(adapter_mod, "_check_helia_aot_version", lambda: "0.0.0")
-        monkeypatch.setattr(adapter_mod, "_resolve_aot_platform", lambda _c: "apollo510_evb")
-        monkeypatch.setattr(adapter_mod, "_run_aot_compiler", fake_run_aot_compiler)
-        monkeypatch.setattr(adapter_mod, "_extract_operator_manifest", lambda _ctx: [])
-        monkeypatch.setattr(adapter_mod, "_validate_pragmas", lambda *_a: None)
-        monkeypatch.setattr(adapter_mod, "cmsis_nn_module_ref", lambda *_a: _CMSIS_REF)
-        monkeypatch.setattr(adapter_mod, "_write_attributes_header", lambda d, p: d / f"{p}.h")
-        monkeypatch.setattr(adapter_mod, "_extract_memory_plan", lambda *_a, **_k: None)
-        monkeypatch.setattr(adapter_mod, "_extract_arena_regions", lambda *_a: [])
-        return HeliaAOTAdapter().prepare(config, tmp_path / "work")
-
     def test_config_path_allocate_arenas_false(self, monkeypatch, tmp_path):
         aot_yaml = _write_aot_yaml(tmp_path, "memory:\n  allocate_arenas: false\n")
-        artifacts = self._prepare(monkeypatch, tmp_path, _aot_cfg({"config_path": str(aot_yaml)}))
+        artifacts = _prepare(monkeypatch, tmp_path, _aot_cfg({"config_path": str(aot_yaml)}))
         assert artifacts.aot_allocate_arenas is False
         assert artifacts.aot_user_memory_config is True
 
     def test_inline_tensor_rules(self, monkeypatch, tmp_path):
         rule = {"type": "scratch", "attributes": {"memory": "sram"}}
         config = _aot_cfg({"config": {"aot_args": {"memory": {"tensors": [rule]}}}})
-        artifacts = self._prepare(monkeypatch, tmp_path, config)
+        artifacts = _prepare(monkeypatch, tmp_path, config)
         assert artifacts.aot_allocate_arenas is True
         assert artifacts.aot_user_memory_config is True
 
     def test_inline_allocate_arenas_only(self, monkeypatch, tmp_path):
         config = _aot_cfg({"config": {"aot_args": {"memory": {"allocate_arenas": False}}}})
-        artifacts = self._prepare(monkeypatch, tmp_path, config)
+        artifacts = _prepare(monkeypatch, tmp_path, config)
         assert artifacts.aot_allocate_arenas is False
         assert artifacts.aot_user_memory_config is False
 
     def test_defaults_without_aot_config(self, monkeypatch, tmp_path):
-        artifacts = self._prepare(monkeypatch, tmp_path, _aot_cfg({}))
+        artifacts = _prepare(monkeypatch, tmp_path, _aot_cfg({}))
         assert artifacts.aot_allocate_arenas is True
         assert artifacts.aot_user_memory_config is False
 
@@ -251,7 +253,7 @@ class TestPrepareArtifactFlags:
             ],
             get_tensor=tensors.get,
         )
-        artifacts = self._prepare(monkeypatch, tmp_path, _aot_cfg({}), model)
+        artifacts = _prepare(monkeypatch, tmp_path, _aot_cfg({}), model)
         analysis = artifacts.compiled_analysis
         assert analysis is not None
         assert analysis.index_space == "execution"
@@ -269,14 +271,125 @@ class TestPrepareArtifactFlags:
         config = _aot_cfg({"config_path": str(aot_yaml)})
         consumed = []
 
-        def edit_file_before_compiler_read(compiler_config):
+        def edit_file_before_compiler_read(compiler_config, _output_dir):
             aot_yaml.write_text(
                 "memory: {tensors: [{type: scratch, attributes: {memory: sram}}]}", encoding="utf-8"
             )
             consumed.append(_merged_aot_args(compiler_config)["memory"])
 
-        artifacts = self._prepare(
+        artifacts = _prepare(
             monkeypatch, tmp_path, config, compiler_hook=edit_file_before_compiler_read
         )
         assert consumed[0]["tensors"][0]["attributes"]["memory"] == "dtcm"
         assert json.loads(artifacts.aot_memory_intent_json) == consumed[0]
+
+
+class TestPlacementConfig:
+    """The adapter, not the fixture builder, derives converter settings from placement."""
+
+    @pytest.mark.parametrize("memory", [{"planner": "greedy"}, None])
+    def test_psram_weights_imply_external_arenas(self, memory):
+        config = _aot_cfg({"config": {"aot_args": {"memory": memory}}})
+        config = replace(config, model=replace(config.model, weights_location=Placement.PSRAM))
+        adapter = HeliaAOTAdapter()
+        derived = adapter.placement_config(config)
+        assert derived.engine.config["aot_args"]["memory"] == {
+            **(memory or {}),
+            "allocate_arenas": False,
+        }
+        assert config.engine.config["aot_args"] == {"memory": memory}
+        adapter.check_psram_placement(derived)
+        with pytest.raises(ConfigError, match="external-arena mode"):
+            adapter.check_psram_placement(config)
+
+    def test_other_placements_keep_the_caller_config(self):
+        config = _aot_cfg({"config": {"aot_args": {"memory": {"planner": "greedy"}}}})
+        assert HeliaAOTAdapter().placement_config(config) is config
+
+
+class _Distribution:
+    def __init__(self, direct_url: str | None) -> None:
+        self.version = "0.24.0"
+        self._direct_url = direct_url
+
+    def read_text(self, name: str) -> str | None:
+        return self._direct_url if name == "direct_url.json" else None
+
+
+class TestPreparationEvidence:
+    """``prepare()`` owns the converter's report files and the installed-package identity."""
+
+    def test_pins_this_conversions_reports_and_drops_stale_ones(self, monkeypatch, tmp_path):
+        output = tmp_path / "work" / "aot_output"
+        stale = (output / "hpx_plan.json", output / "old_module" / "hpx_report.json")
+        for path in stale:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('{"stale": true}')
+        # A build workspace copy outside aot_output is not this conversion's output.
+        copy = tmp_path / "work" / "dependency-workspaces" / "x" / "hpx_plan.json"
+        copy.parent.mkdir(parents=True)
+        copy.write_text("{}")
+        stale_seen_by_compiler = []
+
+        def write_reports(_config, output_dir):
+            stale_seen_by_compiler.append([path.exists() for path in stale])
+            (output_dir / "hpx_plan.json").write_text("{}")
+            (output_dir / "hpx_model" / "hpx_report.json").write_text("{}")
+
+        artifacts = _prepare(monkeypatch, tmp_path, _aot_cfg({}), compiler_hook=write_reports)
+        assert stale_seen_by_compiler == [[False, False]]
+        assert copy.exists()
+        assert artifacts.report_files == (
+            output / "hpx_plan.json",
+            output / "hpx_model" / "hpx_report.json",
+        )
+
+    def test_without_reports_pins_nothing(self, monkeypatch, tmp_path):
+        assert _prepare(monkeypatch, tmp_path, _aot_cfg({})).report_files == ()
+
+    def test_refuses_ambiguous_reports(self, monkeypatch, tmp_path):
+        def write_two_plans(_config, output_dir):
+            (output_dir / "hpx_plan.json").write_text("{}")
+            (output_dir / "hpx_model" / "hpx_plan.json").write_text("{}")
+
+        with pytest.raises(EngineError, match="More than one"):
+            _prepare(monkeypatch, tmp_path, _aot_cfg({}), compiler_hook=write_two_plans)
+
+    @pytest.mark.parametrize(
+        ("direct_url", "commit"),
+        [
+            (
+                '{"url": "https://x", "vcs_info": {"vcs": "git", "commit_id": "5bec204b"}}',
+                "5bec204b",
+            ),
+            ('{"url": "file:///x", "dir_info": {}}', None),
+            (None, None),
+        ],
+    )
+    def test_records_the_installed_package_and_its_commit(
+        self, monkeypatch, tmp_path, direct_url, commit
+    ):
+        monkeypatch.setattr("importlib.metadata.distribution", lambda _: _Distribution(direct_url))
+        artifacts = _prepare(monkeypatch, tmp_path, _aot_cfg({}))
+        assert artifacts.source == EngineSource("helia-aot", "0.24.0", commit)
+
+    def test_source_without_the_package_or_with_a_malformed_record(self, monkeypatch, tmp_path):
+        from importlib import metadata
+
+        def missing(_: str) -> None:
+            raise metadata.PackageNotFoundError("helia-aot")
+
+        monkeypatch.setattr("importlib.metadata.distribution", missing)
+        assert _prepare(monkeypatch, tmp_path / "missing", _aot_cfg({})).source is None
+        malformed = (
+            "{not json",
+            '["list"]',
+            '{"vcs_info": "text"}',
+            '{"vcs_info": {"commit_id": 7}}',
+        )
+        for index, text in enumerate(malformed):
+            monkeypatch.setattr(
+                "importlib.metadata.distribution", lambda _, t=text: _Distribution(t)
+            )
+            source = _prepare(monkeypatch, tmp_path / str(index), _aot_cfg({})).source
+            assert source == EngineSource("helia-aot", "0.24.0", None)

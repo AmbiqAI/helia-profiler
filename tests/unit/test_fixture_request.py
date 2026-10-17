@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import hashlib
-import json
 from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 import helia_profiler
-from helia_profiler._fixture_build import FIXTURE_CAPABILITIES, _aot_outputs, _engine_source
+from helia_profiler._fixture_build import FIXTURE_CAPABILITIES
 from helia_profiler.errors import ConfigError
 from helia_profiler.fixture import (
     EngineType,
@@ -195,46 +194,6 @@ def test_request_config_carries_every_setting(tmp_path: Path) -> None:
     assert config.work_dir == tmp_path / "work"
 
 
-def test_aot_outputs_pin_plan_and_report_when_written(tmp_path: Path) -> None:
-    assert _aot_outputs(tmp_path, "hpx") == ()
-    plan = _pin(tmp_path / "aot_output" / "hpx_plan.json", b"{}")
-    report = _pin(tmp_path / "aot_output" / "hpx_model" / "hpx_report.json", b"{}")
-    assert _aot_outputs(tmp_path, "hpx") == (plan, report)
-    _pin(tmp_path / "aot_output" / "other" / "hpx_plan.json", b"{}")
-    with pytest.raises(ConfigError, match="More than one"):
-        _aot_outputs(tmp_path, "hpx")
-
-
-class _Distribution:
-    def __init__(self, direct_url: str | None) -> None:
-        self.version = "0.24.0"
-        self._direct_url = direct_url
-
-    def read_text(self, name: str) -> str | None:
-        return self._direct_url if name == "direct_url.json" else None
-
-
-@pytest.mark.parametrize(
-    ("direct_url", "commit"),
-    [
-        (
-            json.dumps({"url": "https://x", "vcs_info": {"vcs": "git", "commit_id": "5bec204b"}}),
-            "5bec204b",
-        ),
-        (json.dumps({"url": "file:///x", "dir_info": {}}), None),
-        (None, None),
-    ],
-)
-def test_engine_source_records_the_install_commit(
-    monkeypatch: pytest.MonkeyPatch, direct_url: str | None, commit: str | None
-) -> None:
-    monkeypatch.setattr("importlib.metadata.distribution", lambda _: _Distribution(direct_url))
-    source = _engine_source(EngineType.HELIA_AOT)
-    assert source is not None
-    assert (source.package, source.version, source.commit) == ("helia-aot", "0.24.0", commit)
-    assert _engine_source(EngineType.TFLM) is None
-
-
 def test_capabilities_report_the_qualified_contract() -> None:
     facts = fixture_capabilities()
     target, ap510b = facts.targets
@@ -357,22 +316,6 @@ def test_request_config_carries_every_heliaaot_option(tmp_path: Path) -> None:
         "platform_name": "plat",
         "cmsis_nn_requantize_inline_asm": True,
     }
-
-
-def test_engine_source_without_the_package_or_with_a_malformed_record(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from importlib import metadata
-
-    def missing(_: str) -> None:
-        raise metadata.PackageNotFoundError("helia-aot")
-
-    monkeypatch.setattr("importlib.metadata.distribution", missing)
-    assert _engine_source(EngineType.HELIA_AOT) is None
-    for text in ("{not json", '["list"]', '{"vcs_info": "text"}', '{"vcs_info": {"commit_id": 7}}'):
-        monkeypatch.setattr("importlib.metadata.distribution", lambda _, t=text: _Distribution(t))
-        source = _engine_source(EngineType.HELIA_AOT)
-        assert source is not None and source.commit is None
 
 
 def _tiny_request(root: Path) -> FixtureBuildRequest:

@@ -12,7 +12,6 @@ from typing import Final
 from ._fixture_build import (
     FIXTURE_CAPABILITIES,
     FIXTURE_READBACK_BUDGET,
-    EngineSource,
     FixedFixture,
     FixtureBackend,
     FixtureBuild,
@@ -47,6 +46,7 @@ from ._fixture_request import (
     build_fixture,
 )
 from .engines import EngineType
+from .engines.base import EngineSource
 from .fixture_analysis import (
     FixtureTensor,
     Int8Tensor,

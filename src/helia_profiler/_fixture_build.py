@@ -13,7 +13,7 @@ from pathlib import Path, PurePath
 from .config import ProfileConfig
 from .deps.compatibility import resolve_compatibility
 from .engines import EngineType, get_adapter
-from .engines.base import HeliaAotArtifacts, PreparedRuntimeAdapter
+from .engines.base import EngineSource, HeliaAotArtifacts, PreparedRuntimeAdapter
 from .errors import ConfigError
 from .firmware.launcher import _DISABLED_LAUNCHER_VALUES
 from .fixture_analysis import (
@@ -396,45 +396,6 @@ class FixtureBuild:
     observe_ram: bool = False
 
 
-@dataclass(frozen=True)
-class EngineSource:
-    """Installed engine package: its version and, for a VCS install, the commit."""
-
-    package: str
-    version: str
-    commit: str | None = None
-
-
-def _engine_source(engine: EngineType) -> EngineSource | None:
-    if engine is not EngineType.HELIA_AOT:
-        return None
-    from .results.dependencies import installed_aot_source
-
-    source = installed_aot_source()
-    return EngineSource(**source) if source is not None else None
-
-
-def _aot_output_names(prefix: str) -> tuple[str, str]:
-    return f"{prefix}_plan.json", f"{prefix}_report.json"
-
-
-def _clear_aot_outputs(work_dir: Path, prefix: str) -> None:
-    """Drop plan and report files an earlier conversion left, so a build pins only its own."""
-    for name in _aot_output_names(prefix):
-        for stale in (work_dir / "aot_output").rglob(name):
-            stale.unlink()
-
-
-def _aot_outputs(work_dir: Path, prefix: str) -> tuple[FixtureFile, ...]:
-    found = []
-    for name in _aot_output_names(prefix):
-        matches = sorted((work_dir / "aot_output").rglob(name))
-        if len(matches) > 1:
-            raise ConfigError(f"More than one heliaAOT {name} in the work directory")
-        found += [FixtureFile(m, hashlib.sha256(m.read_bytes()).hexdigest()) for m in matches]
-    return tuple(found)
-
-
 #: Environment variables outside the compatibility classifier that change what a
 #: fixture build compiles or which inputs it accepts: HPX's own source paths,
 #: variables CMake and the compilers read, and NSX's check bypasses.
@@ -615,22 +576,8 @@ def _build(
     if config.work_dir is None:
         raise ConfigError("Explicit work directory required")
     root = config.work_dir.resolve()
-    # Placement owns this fixed converter setting; callers cannot supply engine overrides.
-    if (
-        config.engine.type is EngineType.HELIA_AOT
-        and config.model.weights_location is Placement.PSRAM
-    ):
-        aot_args = dict(config.engine.config.get("aot_args", {}))
-        memory_value = aot_args.get("memory")
-        memory_args = {} if memory_value is None else dict(memory_value)
-        aot_args["memory"] = {**memory_args, "allocate_arenas": False}
-        config = replace(
-            config,
-            engine=replace(
-                config.engine,
-                config={**config.engine.config, "aot_args": aot_args},
-            ),
-        )
+    # Placement owns the engine settings it implies; they take precedence over caller values.
+    config = adapter.placement_config(config)
     root.mkdir(parents=True, exist_ok=True)
     identity_path = root / "fixed-fixture-identity.json"
     identity = {
@@ -666,11 +613,6 @@ def _build(
                 raise ConfigError("Work directory belongs to a different fixture")
             identity_path.write_text(json.dumps(identity, sort_keys=True), encoding="utf-8")
             fixture.verify()
-            if config.engine.type is EngineType.HELIA_AOT:
-                from .engines.helia_aot.compile import _DEFAULT_PREFIX
-
-                prefix = str(config.engine.config.get("prefix", _DEFAULT_PREFIX))
-                _clear_aot_outputs(root, prefix)
 
     from .stages import (
         BuildFirmwareStage,
@@ -752,19 +694,21 @@ def _build(
     if compile and (toolchain is None or not toolchain.compiler_version):
         raise ConfigError("Compiled fixture requires recorded toolchain provenance")
     planned_memory = ctx.memory_plan
+    artifacts = ctx.engine_artifacts
     if config.engine.type is EngineType.HELIA_AOT and (
-        ctx.engine_artifacts is None or ctx.engine_artifacts.memory_plan is None
+        artifacts is None or artifacts.memory_plan is None
     ):
         planned_memory = None
     region_evidence = ()
-    if isinstance(ctx.engine_artifacts, HeliaAotArtifacts):
+    if isinstance(artifacts, HeliaAotArtifacts):
         from ._fixture_placement import validate_fixture_regions
 
-        residence = validate_fixture_regions(ctx, ctx.engine_artifacts.aot_arena_regions)
+        residence = validate_fixture_regions(ctx, artifacts.aot_arena_regions)
         if residence is not None:
             record = root / "fixture-aot-regions.json"
             record.write_text(json.dumps(residence, sort_keys=True, indent=2), encoding="utf-8")
             region_evidence = (pin(record),)
+    report_files = tuple(pin(path) for path in artifacts.report_files) if artifacts else ()
     inputs, output_tensors = _measurement_io(fixture)
     result = FixtureBuild(
         fixture_identity=fixture.identity,
@@ -799,16 +743,12 @@ def _build(
         aot_arena_scan=tuple(
             (r.region_id, r.size)
             for r in (
-                ctx.engine_artifacts.aot_arena_regions
-                if isinstance(ctx.engine_artifacts, HeliaAotArtifacts)
-                else ()
+                artifacts.aot_arena_regions if isinstance(artifacts, HeliaAotArtifacts) else ()
             )
             if observe_aot_arenas and r.role is ArenaRole.SCRATCH
         ),
-        aot_outputs=(*_aot_outputs(root, ctx.engine_artifacts.aot_prefix), *region_evidence)
-        if isinstance(ctx.engine_artifacts, HeliaAotArtifacts)
-        else (),
-        engine_source=_engine_source(config.engine.type),
+        aot_outputs=(*report_files, *region_evidence),
+        engine_source=artifacts.source if artifacts else None,
         dependency_state=dependency_state,
         psram_weights=_psram_weights(ctx, flat_binary),
         arena_location=config.model.arena_location,
