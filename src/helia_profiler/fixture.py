@@ -92,13 +92,14 @@ from .fixture_runtime import (
     VerifiedPreparedRuntime,
 )
 from .fixture_runtime import RuntimeManifest as PreparedRuntimeManifest
+from .fixture_sources import FixtureKernelSource, FixtureRuntimeSource
 from .fixture_stage import FixtureStage
 from .fixture_target import FixtureTarget, supported_fixture_target
 from .hostenv.elf_inventory import ElfSection, LoadSegment, SectionInventory, section_inventory
 from .placement import Placement
 from .results.models import ToolchainInfo
 
-FIXTURE_API_VERSION: Final[tuple[int, int]] = (5, 5)
+FIXTURE_API_VERSION: Final[tuple[int, int]] = (5, 6)
 
 __all__ = [
     "FIXTURE_API_VERSION",
@@ -161,6 +162,8 @@ __all__ = [
     "EngineDTypeCapability",
     "EngineSource",
     "FixtureCapabilities",
+    "FixtureKernelSource",
+    "FixtureRuntimeSource",
     "PreparedRuntimeManifest",
     "QualifiedFixtureTarget",
     "RuntimeABI",

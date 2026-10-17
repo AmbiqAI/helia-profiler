@@ -3,7 +3,7 @@
 import hashlib
 import json
 import shutil
-from dataclasses import replace
+from dataclasses import asdict, replace
 
 import pytest
 
@@ -344,3 +344,139 @@ def test_previous_api_record_remains_readable(tmp_path):
     record = json.loads(dump_fixture_build(build, roots={"run": tmp_path}))
     record["fixture_api"] = [5, 3]
     assert load_fixture_build(json.dumps(record), roots={"run": tmp_path}) == build
+
+
+def _sourced(root, build=None):
+    """A heliaAOT record whose kernel is the one its pinned dependency state names."""
+    from test_fixture_sources import NS
+
+    from helia_profiler.fixture import FixtureKernelSource
+
+    build = build or _build(root)
+    assert build.dependency_lock is not None
+    data = {"lock": {"sha256": {"value": build.dependency_lock.sha256}}, "modules": [asdict(NS)]}
+    build = replace(
+        build,
+        dependency_state=_pin(root / "evidence" / "sourced-state.json", json.dumps(data).encode()),
+        kernel_source=FixtureKernelSource("ns-cmsis-nn", NS.url, "v7.45.1", NS.peeled_commit),
+    )
+    return replace(build, build_identity=compiled_fixture_identity(build))
+
+
+def _reseal(build, **change):
+    build = replace(build, **change)
+    return replace(build, build_identity=compiled_fixture_identity(build))
+
+
+def test_kernel_source_round_trips_and_binds_identity(tmp_path):
+    build = _sourced(tmp_path)
+    assert build.build_identity != _build(tmp_path).build_identity
+    record = dump_fixture_build(build, roots={"run": tmp_path})
+    assert load_fixture_build(record, roots={"run": tmp_path}) == build
+    altered = json.loads(record)
+    altered["build"]["kernel_source"]["commit"] = "0" * 40
+    with pytest.raises(ValueError):
+        load_fixture_build(json.dumps(altered), roots={"run": tmp_path})
+
+
+def test_resealed_sources_must_match_the_pinned_files(tmp_path):
+    from helia_profiler.fixture import FixtureRuntimeSource
+
+    build = _sourced(tmp_path)
+    assert build.kernel_source is not None
+    for altered in (
+        _reseal(build, kernel_source=replace(build.kernel_source, commit="0" * 40)),
+        _reseal(build, kernel_source=replace(build.kernel_source, name="arm-cmsis-nn")),
+        _reseal(
+            build,
+            runtime_source=FixtureRuntimeSource("helia-rt", "https://r", None, "c" * 40, "e" * 64),
+        ),
+    ):
+        with pytest.raises(ValueError, match="differ from the pinned"):
+            verify_fixture_build(altered)
+
+
+def test_prepared_runtime_sources_are_checked_against_the_pinned_manifest(tmp_path):
+    from test_heliart_fixture import runtime
+
+    from helia_profiler.fixture_sources import pinned_sources
+
+    rt = runtime(tmp_path / "rt")
+    kernel, stated = pinned_sources(rt.manifest.read(), None)
+    assert kernel is not None and stated is not None
+    build = _reseal(
+        _build(tmp_path),
+        engine=EngineType.TFLM,
+        capabilities=(("int8", FIXTURE_CAPABILITIES[EngineType.TFLM]["int8"]),),
+        runtime_manifest=rt.manifest,
+        kernel_source=kernel,
+        runtime_source=stated,
+    )
+    verify_fixture_build(build)
+    # The record version is not re-derived: a later HPX may ship more runtime records.
+    verify_fixture_build(_reseal(build, runtime_source=replace(stated, version="9.9.9")))
+    with pytest.raises(ValueError, match="differ from the pinned"):
+        verify_fixture_build(
+            _reseal(build, runtime_source=replace(stated, archive_sha256="0" * 64))
+        )
+
+
+@pytest.mark.parametrize("version", [[5, 4], [5, 5]])
+def test_records_before_sources_load_with_unknown_sources(tmp_path, version):
+    build = _reseal(_build(tmp_path), observe_ram=True)
+    record = json.loads(dump_fixture_build(build, roots={"run": tmp_path}))
+    assert not {"kernel_source", "runtime_source"} & set(record["build"])
+    record["fixture_api"] = version
+    loaded = load_fixture_build(json.dumps(record), roots={"run": tmp_path})
+    assert loaded == build
+    assert loaded.kernel_source is None and loaded.runtime_source is None
+
+
+def test_sources_require_their_declared_api_version(tmp_path):
+    record = json.loads(dump_fixture_build(_sourced(tmp_path), roots={"run": tmp_path}))
+    record["fixture_api"] = [5, 5]
+    with pytest.raises(ValueError, match="declared API version"):
+        load_fixture_build(json.dumps(record), roots={"run": tmp_path})
+
+
+def test_sources_are_refused_on_power_protocol_one_records(tmp_path):
+    from helia_profiler.fixture import FixturePowerSync
+
+    build = _sourced(tmp_path)
+    build = _reseal(
+        build,
+        timing_scope=FixtureTimingScope.RESTORE_AND_INVOKE,
+        power_sync=FixturePowerSync(29, 36, 14, protocol_version=1),
+    )
+    with pytest.raises(ValueError, match="power protocol 1"):
+        dump_fixture_build(build, roots={"run": tmp_path})
+
+
+@pytest.mark.parametrize("key,value", [("name", ""), ("commit", 7), ("url", 3)])
+def test_malformed_kernel_source_is_refused(tmp_path, key, value):
+    build = _sourced(tmp_path)
+    assert build.kernel_source is not None
+    with pytest.raises(ValueError):
+        verify_fixture_build(
+            _reseal(build, kernel_source=replace(build.kernel_source, **{key: value}))
+        )
+
+
+@pytest.mark.parametrize(
+    "key,value", [("commit", None), ("version", 1), ("archive_sha256", "E" * 64)]
+)
+def test_malformed_runtime_source_is_refused(tmp_path, key, value):
+    from helia_profiler.fixture import FixtureRuntimeSource
+
+    source = FixtureRuntimeSource("helia-rt", "https://r", None, "c" * 40, "e" * 64)
+    with pytest.raises(ValueError):
+        verify_fixture_build(
+            _reseal(_build(tmp_path), runtime_source=replace(source, **{key: value}))
+        )
+
+
+def test_unparseable_pinned_state_refuses_sources_as_a_value_error(tmp_path):
+    build = _sourced(tmp_path)
+    nested = _pin(tmp_path / "evidence" / "nested.json", b"[" * 100000)
+    with pytest.raises(ValueError, match="cannot be re-derived"):
+        verify_fixture_build(_reseal(build, dependency_state=nested))
