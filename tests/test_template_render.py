@@ -533,6 +533,11 @@ class TestMainCcRender:
         assert "nsx_psram_get_info(&psram_info)" in out
         assert "HPX_PSRAM_RXDQS_DELAY" in out
 
+    @pytest.mark.parametrize("has_dcache", [True, False])
+    def test_psram_weights_invalidate_the_dcache_only_where_there_is_one(self, has_dcache):
+        out = _render_tflm(transport="rtt", weights_region="psram", has_dcache=has_dcache)
+        assert ("SCB_InvalidateDCache_by_Addr((void *)psram_info.base_address" in out) is has_dcache
+
     def test_psram_weights_override_skips_model_data_header(self):
         out = _render_tflm(transport="rtt", weights_region="psram")
         assert '#include "model_data.h"' not in out

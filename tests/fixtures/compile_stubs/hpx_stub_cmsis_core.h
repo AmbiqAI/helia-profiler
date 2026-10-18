@@ -52,7 +52,8 @@ static inline void __DMB(void) {}
 static inline void __DSB(void) {}
 static inline void __ISB(void) {}
 
-// --- D-cache maintenance (cache-coherent M55 parts) ----------------------
+// --- D-cache maintenance (M55 parts only; core_cm4.h declares none) -----
+#if defined(HPX_STUB_HAS_DCACHE_API)
 static inline void SCB_InvalidateDCache_by_Addr(volatile void *addr, int32_t dsize) {
     (void)addr;
     (void)dsize;
@@ -63,6 +64,7 @@ static inline void SCB_CleanDCache_by_Addr(volatile void *addr, int32_t dsize) {
 }
 static inline void SCB_CleanInvalidateDCache(void) {}
 static inline void SCB_InvalidateDCache(void) {}
+#endif
 
 // --- Armv8-M PMU (M55 parts only; guarded by the per-part header) --------
 #if defined(HPX_STUB_HAS_ARMV8M_PMU)

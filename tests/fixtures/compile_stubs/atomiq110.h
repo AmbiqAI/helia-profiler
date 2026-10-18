@@ -4,5 +4,6 @@
 #pragma once
 #define PART_atomiq110 1
 #define __DCACHE_PRESENT 1U
+#define HPX_STUB_HAS_DCACHE_API 1
 #define HPX_STUB_HAS_ARMV8M_PMU 1
 #include "hpx_stub_cmsis_core.h"

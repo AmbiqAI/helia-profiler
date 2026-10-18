@@ -321,6 +321,18 @@ def _build_cases() -> list[_CompileCase]:
             )
         )
 
+    # PSRAM weights invalidate the D-cache after the host upload. The stub
+    # declares that API only for M55 parts, as CMSIS does, so a call that
+    # reaches a Cortex-M4 render fails here (#464).
+    for soc in ("apollo3p", "apollo4p", "apollo510"):
+        cases.append(
+            _CompileCase(
+                case_id=f"{soc}|rtt|helia-rt|psram-weights",
+                text=_render(soc, "rtt", "helia-rt", overrides={"weights_region": "psram"}),
+                vars=_common_kwargs(soc, "rtt"),
+            )
+        )
+
     # hpx_pmu_profiler.cc: the second TU of every TFLM/heliaRT app
     # (CMakeLists.txt.j2 compiles it into both binaries), rendered per SoC
     # exactly as firmware/__init__.py renders it.
