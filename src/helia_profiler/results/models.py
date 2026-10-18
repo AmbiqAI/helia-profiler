@@ -403,7 +403,9 @@ class MemoryRegionUsage:
     """PLANNED usage for a single memory region (e.g. DTCM, MRAM).
 
     Part of the memory-plan DECISION RECORD: ``capacity`` is the SoC's
-    declared size and ``used`` sums only what hpx itself placed. Since
+    declared size, except MRAM, which since run-summary schema v13 is the
+    linker's application window where the SoC has a linked memory map; ``used``
+    sums only what hpx itself placed. Since
     run-summary schema v3 the ``free``/``overflow`` properties are
     plan-time capacity checks (``plan_memory`` raises on oversubscription)
     and are NOT serialized — the measured truth is

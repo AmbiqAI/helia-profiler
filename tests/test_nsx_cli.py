@@ -7,7 +7,7 @@ so these tests patch the API functions instead of a subprocess.
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 import pytest
 from neuralspotx.api import NSXError
@@ -32,7 +32,12 @@ class TestNsxBuild:
         with patch("helia_profiler.deps.nsx.nsx_api.build_app") as build_mock:
             nsx.build(tmp_path, toolchain="armclang", timeout_s=42)
         build_mock.assert_called_once_with(
-            tmp_path, toolchain="armclang", target=None, timeout_s=42, emit=nsx._quiet_emitter
+            tmp_path,
+            toolchain="armclang",
+            target=None,
+            timeout_s=42,
+            emit=nsx._quiet_emitter,
+            on_line=ANY,
         )
 
     def test_target_forwarded_to_api(self, tmp_path: Path) -> None:
@@ -46,6 +51,7 @@ class TestNsxBuild:
             target="hpx_profiler_power",
             timeout_s=42,
             emit=nsx._quiet_emitter,
+            on_line=ANY,
         )
 
     def test_nsxerror_raises_build_error(self, tmp_path: Path) -> None:
@@ -55,6 +61,18 @@ class TestNsxBuild:
         err = exc_info.value
         assert "nsx build" in str(err)
         assert "boom" in (err.details or "")
+
+    def test_failed_build_carries_the_output_tail(self, tmp_path: Path) -> None:
+        def fake_build(*_args, on_line, **_kwargs):
+            on_line("[445/446] Linking CXX executable hpx_profiler")
+            on_line("ld: region `MCU_MRAM' overflowed by 468852 bytes")
+            raise NSXError("boom")
+
+        with patch("helia_profiler.deps.nsx.nsx_api.build_app", side_effect=fake_build):
+            with pytest.raises(BuildError) as exc_info:
+                nsx.build(tmp_path)
+        details = exc_info.value.details or ""
+        assert "boom" in details and "overflowed by 468852 bytes" in details
 
     def test_timeout_surfaces_as_build_error(self, tmp_path: Path) -> None:
         # The watchdog lives in neuralspotx; here we only verify the

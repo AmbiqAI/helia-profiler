@@ -1434,6 +1434,45 @@ class TestBuildApp:
 
         assert not stamp.exists()  # next run must fully re-verify the workspace
 
+    def test_linker_region_overflow_is_reported_as_a_placement_error(
+        self, tmp_path: Path, fake_dist: Path, monkeypatch
+    ):
+        ctx = _make_ctx(tmp_path, fake_dist)
+        ResolvePlatformStage().run(ctx)
+        app_dir = tmp_path / "app"
+        (app_dir / "build" / "apollo510_evb").mkdir(parents=True, exist_ok=True)
+        object.__setattr__(ctx, "firmware_dir", app_dir)
+        _stub_locked_dependencies(ctx, app_dir, monkeypatch)
+        for step in ("lock", "sync", "configure"):
+            monkeypatch.setattr(f"helia_profiler.firmware.nsx_cli.{step}", lambda *a, **kw: None)
+
+        def overflowing_build(*_args, **_kwargs) -> None:
+            raise BuildError(
+                "nsx build failed",
+                details="ld.lld: error: section '.text' will not fit in region 'MCU_MRAM': "
+                "overflowed by 434308 bytes",
+            )
+
+        monkeypatch.setattr("helia_profiler.firmware.nsx_cli.build", overflowing_build)
+        with pytest.raises(
+            BuildError, match="does not fit in MCU_MRAM: overflowed by 434,308"
+        ) as exc:
+            build_app(ctx)
+        assert "PSRAM" in (exc.value.hint or "")
+
+    @pytest.mark.parametrize(
+        ("region", "advice"),
+        [("MCU_MRAM", "PSRAM"), ("ROMEM", "smaller model"), ("MCU_TCM", "arena")],
+    )
+    def test_region_overflow_advice_follows_the_region(self, region: str, advice: str):
+        from helia_profiler.firmware.build import region_overflow_error
+
+        error = region_overflow_error(
+            BuildError("nsx build failed", details=f"ld: region `{region}' overflowed by 8 bytes")
+        )
+        assert error is not None and advice in (error.hint or "")
+        assert region not in ("ROMEM",) or "MRAM" not in (error.hint or "")
+
     def test_missing_binary_invalidates_frozen_sync_stamp(
         self, tmp_path: Path, fake_dist: Path, monkeypatch
     ):

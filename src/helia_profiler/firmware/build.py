@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import glob
 import logging
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -91,7 +92,15 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
                 # CMake's regeneration rule handles deterministic source/template
                 # changes; dependency verification already ran via sync --frozen.
                 log.info("Reusing configured deterministic workspace: %s", build_dir)
-            nsx_cli.build(app_dir, toolchain=nsx_tc, timeout_s=timeouts.build_s, verbose=verbose)
+            try:
+                nsx_cli.build(
+                    app_dir, toolchain=nsx_tc, timeout_s=timeouts.build_s, verbose=verbose
+                )
+            except BuildError as exc:
+                translated = region_overflow_error(exc)
+                if translated is None:
+                    raise
+                raise translated from exc
 
             # Prefer the ELF-form executable: later reporting stages run
             # size tools against it to capture text/data/bss.
@@ -113,6 +122,39 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
     log.info("Binary: %s", binary_path)
 
     return build_dir, binary_path
+
+
+# lld: "section '.text' will not fit in region 'MCU_MRAM': overflowed by 434308 bytes"
+# GNU ld: "region `MCU_MRAM' overflowed by 434308 bytes"
+_REGION_OVERFLOW = re.compile(
+    r"region [`']?(?P<region>[A-Za-z0-9_]+)'?:? overflowed by (?P<bytes>\d+) bytes"
+)
+
+
+#: Linker regions that hold code and weights: MRAM on Apollo4/5, NOR flash
+#: ("ROMEM") on Apollo3.
+_NONVOLATILE_REGIONS = ("MRAM", "ROMEM", "FLASH")
+
+
+def region_overflow_error(exc: BuildError) -> BuildError | None:
+    """A linker region overflow as a placement error, or ``None`` for other failures."""
+    match = _REGION_OVERFLOW.search(f"{exc.details or ''}\n{exc}")
+    if match is None:
+        return None
+    region, overflow = match["region"], int(match["bytes"])
+    hint = (
+        f"The model weights plus the runtime and application code exceed the {region} "
+        "space the linker can use. Use a smaller model, or place weights in PSRAM "
+        "(--weights-location psram) on a board that has PSRAM."
+        if any(kind in region.upper() for kind in _NONVOLATILE_REGIONS)
+        else "Reduce the arena size or choose another --arena-location."
+    )
+    return BuildError(
+        f"The linked image does not fit in {region}: overflowed by {overflow:,} bytes",
+        hint=hint,
+        returncode=exc.returncode,
+        details=exc.details,
+    )
 
 
 def find_target_binary(build_dir: Path, target_name: str) -> Path | None:
