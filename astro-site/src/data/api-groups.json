@@ -30,6 +30,16 @@
       ]
     },
     {
+      "path": "helia_profiler.frozen_run",
+      "summary": "Replayable run plans: every resolved setting, the model's hash and the toolchain and runtime identities, saved so another host can rebuild the same run.",
+      "members": [
+        "FrozenRun",
+        "FrozenModel",
+        "FrozenRuntime",
+        "ToolchainIdentity"
+      ]
+    },
+    {
       "path": "helia_profiler.config.power",
       "summary": "Power capture settings: which instrument measures the rail, how it is wired to the board, and which window of the run is integrated.",
       "members": [

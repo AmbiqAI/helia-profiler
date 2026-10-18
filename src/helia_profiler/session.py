@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 
     from .engines import EngineType
     from .evaluation import CompareResult, ComparisonProfile
+    from .frozen_run import FrozenRun
     from .hostenv.doctor import DoctorResult
     from .modelcost import ModelAnalysis
     from .pipeline import ProgressUpdate
@@ -224,6 +225,12 @@ class Session:
         if model is not None:
             overrides = _merge(overrides, {"model": {"path": model}})
         return load_config(None, overrides)
+
+    def freeze(self, model: str | Path | None = None) -> FrozenRun:
+        """Resolve this session into a replayable :class:`FrozenRun` plan."""
+        from .frozen_run import freeze_config
+
+        return freeze_config(self.resolve(model))
 
     def profile(
         self,

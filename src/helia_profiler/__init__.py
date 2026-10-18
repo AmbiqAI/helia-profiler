@@ -73,6 +73,7 @@ if TYPE_CHECKING:
         evaluate_comparison_profile,
         evaluate_run,
     )
+    from .frozen_run import FrozenModel, FrozenRun, FrozenRuntime, ToolchainIdentity
     from .hostenv.doctor import DoctorCheck, DoctorResult, DoctorVersionCheck
     from .modelcost import ModelAnalysis
     from .pipeline import ProgressUpdate
@@ -223,6 +224,10 @@ _EXPORTS = {
     "qualification": (".runtime_records", "qualification"),
     "runtimes": (".runtime_records", "runtimes"),
     "Session": (".session", "Session"),
+    "FrozenRun": (".frozen_run", "FrozenRun"),
+    "FrozenModel": (".frozen_run", "FrozenModel"),
+    "FrozenRuntime": (".frozen_run", "FrozenRuntime"),
+    "ToolchainIdentity": (".frozen_run", "ToolchainIdentity"),
     "ResetStrategy": (".target.lifecycle", "ResetStrategy"),
     "JLinkProbe": (".target.probe.jlink", "JLinkProbe"),
     "JLinkProbeMatch": (".target.probe.jlink", "JLinkProbeMatch"),
@@ -250,6 +255,10 @@ __all__ = [
     # Public API
     "profile",
     "Session",
+    "FrozenRun",
+    "FrozenModel",
+    "FrozenRuntime",
+    "ToolchainIdentity",
     "ProgressUpdate",
     "examples",
     # Config
@@ -406,6 +415,10 @@ _STABLE_API = {
 }
 
 _EXPERIMENTAL_API = {
+    "FrozenRun",
+    "FrozenModel",
+    "FrozenRuntime",
+    "ToolchainIdentity",
     "Qualification",
     "QualifiedTarget",
     "RuntimeQualification",
