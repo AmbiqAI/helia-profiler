@@ -51,6 +51,8 @@ struct HpxStubString {
 
 struct OperatorCode {
     const HpxStubString *custom_code() const { return nullptr; }
+    int8_t deprecated_builtin_code() const { return 0; }
+    BuiltinOperator builtin_code() const { return BuiltinOperator_CUSTOM; }
 };
 
 struct Tensor {
