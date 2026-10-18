@@ -56,6 +56,19 @@ release pull requests from Conventional Commits.
   capture taken while it was still settling says so.
 
 
+## [0.2.2](https://github.com/AmbiqAI/helia-profiler/compare/v0.2.1...v0.2.2) (2026-10-18)
+
+
+### Bug Fixes
+
+* **fixture:** run models with internal state without a declared carry policy ([#536](https://github.com/AmbiqAI/helia-profiler/issues/536)) ([f0a65d7](https://github.com/AmbiqAI/helia-profiler/commit/f0a65d76bbee18e974316886b10f451ba9efb010)), closes [#482](https://github.com/AmbiqAI/helia-profiler/issues/482)
+
+
+### Documentation
+
+* describe the heliaRT NSX wrapper as the prebuilt-release adapter ([#535](https://github.com/AmbiqAI/helia-profiler/issues/535)) ([7b8f5fa](https://github.com/AmbiqAI/helia-profiler/commit/7b8f5faf5a0431946c8c6fc4fd6c37544904821a))
+* record only tool versions in the generated CLI and configuration reference ([#532](https://github.com/AmbiqAI/helia-profiler/issues/532)) ([feb0c8b](https://github.com/AmbiqAI/helia-profiler/commit/feb0c8b0c415a400e07e2bd880610a09d8ba7937))
+
 ## [0.2.1](https://github.com/AmbiqAI/helia-profiler/compare/v0.2.0...v0.2.1) (2026-10-18)
 
 
