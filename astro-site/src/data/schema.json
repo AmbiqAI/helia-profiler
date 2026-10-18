@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "kind": "config-schema",
   "generatedFrom": {
-    "helia_profiler": "0.1.6",
+    "helia_profiler": "0.2.0",
     "typer": "0.27.3",
     "click": "8.3.3",
     "pydantic": "2.13.4"
