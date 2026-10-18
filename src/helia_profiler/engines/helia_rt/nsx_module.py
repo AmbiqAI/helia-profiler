@@ -1,13 +1,13 @@
-"""heliaRT NSX wrapper generation.
+"""heliaRT NSX wrapper generation for the opt-in local modes.
 
-heliaRT ships a native ``nsx/`` CMake module in its distributions, but that
-native module is either source-build-only (requires the full repo) or needs
-a thin wrapper to expose the prebuilt static library as ``nsx::helia_rt``.
-This module generates the temporary ``nsx-module.yaml`` + ``CMakeLists.txt``
-wrapper (and a nested shim copy) that HPX installs under
-``work_dir/modules/helia-rt/`` for each profiler run.  This shim is retired
-once heliaRT ships a native ``nsx-module.yaml`` compatible with both build
-modes directly.
+The default route builds heliaRT's own ``nsx-helia-rt`` module from the NSX
+registry and never reaches this module. heliaRT's native ``nsx/`` module builds
+only from source (it needs the repo's ``cmake/helia_rt_sources.cmake``), so a
+prebuilt release (``engine.config.dist_path`` or ``source``) needs a generated
+``nsx-module.yaml`` + ``CMakeLists.txt`` exposing its static library as
+``nsx::helia_rt``; a local source checkout (``source_path``) gets a thin
+wrapper around the native module. Both are installed under
+``work_dir/modules/helia-rt/`` with a nested copy for NSX's lock layout.
 """
 
 from __future__ import annotations
