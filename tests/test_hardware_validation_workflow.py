@@ -35,6 +35,14 @@ def _step(job: dict[str, Any], name: str) -> dict[str, Any]:
     raise AssertionError(f"step {name!r} not found")
 
 
+def test_bench_python_reaches_the_js320_driver_lane(validate_job: dict[str, Any]) -> None:
+    # Python 3.11 resolves pyjoulescope-driver 2.2.x, which times out on the JS320 (#228).
+    install = _step(validate_job, "Install Python")["run"]
+    sync = _step(validate_job, "Install validation dependencies")["run"]
+    assert install == "uv python install 3.12"
+    assert "--python 3.12 " in sync
+
+
 def test_ns_cmsis_nn_resolution_requires_input(
     workflow: dict[Any, Any], validate_job: dict[str, Any]
 ) -> None:

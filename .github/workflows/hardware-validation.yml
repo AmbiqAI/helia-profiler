@@ -246,10 +246,10 @@ jobs:
           enable-cache: true
 
       - name: Install Python
-        run: uv python install 3.11
+        run: uv python install 3.12
 
       - name: Install validation dependencies
-        run: uv sync --locked --python 3.11 --group test --extra aot
+        run: uv sync --locked --python 3.12 --group test --extra aot
 
       - name: Fetch LFS fixtures
         run: git lfs pull
