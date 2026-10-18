@@ -1,4 +1,5 @@
 #include "nsx_psram.h"
+{% include "_cache_shims.j2" %}
 
 volatile uint32_t deployment_psram_weights[{{ 8 + 4 * (fixture_psram_payloads | length) }}];
 static uint32_t hpx_psram_base = 0;
@@ -16,7 +17,7 @@ static bool hpx_psram_start() {
     deployment_psram_weights[0] = UINT32_C(0x50535231);
     deployment_psram_weights[1] = 1;
     deployment_psram_weights[7] = {{ fixture_psram_payloads | length }};
-    SCB_CleanInvalidateDCache();
+    HPX_CACHE_SYNC_SHARED_DATA();
     nsx_psram_config_t config;
     uint32_t status = nsx_psram_default_config(&config);
     if (status == 0) {
@@ -48,7 +49,7 @@ static bool hpx_psram_load(unsigned slot, uint32_t region, const uint8_t *source
     if (offset > hpx_psram_size || size > hpx_psram_size - offset)
         return false;
     if (nsx_psram_write(offset, source, size) != 0) return false;
-    SCB_InvalidateDCache();
+    HPX_CACHE_INVALIDATE_OBSERVED();
     const auto *destination = reinterpret_cast<const uint8_t *>(hpx_psram_base + offset);
     uint32_t checksum = hpx_psram_checksum(destination, size);
     if (checksum != expected || hpx_psram_checksum(source, size) != expected) return false;
