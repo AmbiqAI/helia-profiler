@@ -228,9 +228,13 @@ static tflite::MicroMutableOpResolver<kMaxOps> &get_resolver() {
                 if (go_pos >= 6) break; // "HPX_GO" is 6 chars
             }
         }
+{% if has_dcache | default(false) %}
         // Invalidate D-cache for PSRAM region so CPU reads fresh J-Link data.
+#if defined(__DCACHE_PRESENT) && (__DCACHE_PRESENT == 1U)
         SCB_InvalidateDCache_by_Addr((void *)psram_info.base_address,
                                      (int32_t)model_data_len);
+#endif
+{% endif %}
     }
 {% endif %}
 {% endif %}
