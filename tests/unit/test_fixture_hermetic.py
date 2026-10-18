@@ -63,6 +63,7 @@ def test_environment_overrides_are_refused(
         ({"build": {"compiler_launcher": "ccache"}}, "build.compiler_launcher"),
         ({"build": {"nsx_modules": {"nsx-core": {"ref": "feat/x"}}}}, "nsx-core"),
         ({"engine": {"config": {"cmsis_nn_ref": "main"}}}, "cmsis-nn"),
+        ({"engine": {"allow_unsupported_version": True}}, "engine.allow_unsupported_version"),
     ],
 )
 def test_config_overrides_are_refused(
