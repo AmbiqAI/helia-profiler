@@ -56,6 +56,18 @@ release pull requests from Conventional Commits.
   capture taken while it was still settling says so.
 
 
+## [0.2.1](https://github.com/AmbiqAI/helia-profiler/compare/v0.2.0...v0.2.1) (2026-10-18)
+
+
+### Bug Fixes
+
+* **firmware:** keep D-cache maintenance off parts without a D-cache ([#531](https://github.com/AmbiqAI/helia-profiler/issues/531)) ([eb8582b](https://github.com/AmbiqAI/helia-profiler/commit/eb8582b061e8c30c940eaa9f9bc0d5fc92338af8)), closes [#464](https://github.com/AmbiqAI/helia-profiler/issues/464)
+
+
+### Documentation
+
+* keep the package version out of the committed API reference ([#529](https://github.com/AmbiqAI/helia-profiler/issues/529)) ([1f486be](https://github.com/AmbiqAI/helia-profiler/commit/1f486be1680290b0f0077d69b5d19014a782ce90))
+
 ## [0.2.0](https://github.com/AmbiqAI/helia-profiler/compare/v0.1.6...v0.2.0) (2026-10-18)
 
 
