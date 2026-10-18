@@ -128,6 +128,66 @@ def test_state_policy_binds_request_identity_without_changing_legacy(tmp_path):
     assert request.intent_identity != carry.intent_identity
 
 
+def test_stateful_build_records_carry_without_a_declared_policy(tmp_path, monkeypatch):
+    import hashlib
+    import json
+
+    from helia_profiler import _fixture_build as build
+    from helia_profiler.config import load_config
+    from helia_profiler.fixture_runtime import FixtureFile
+
+    def stateful(model, graph):
+        graph.tensors[2].isVariable = True
+
+    path = typed_model(
+        tmp_path, [F32], [Y32], extra=[("state", "float32", (1, 4), None, None)], change=stateful
+    )
+    data = tmp_path / "io.bin"
+    data.write_bytes(bytes(16))
+
+    def pin(p):
+        return FixtureFile(p, hashlib.sha256(p.read_bytes()).hexdigest())
+
+    analyzed = api.analyze_typed_fixture_model_for_engine(path, engine=api.EngineType.HELIA_AOT)
+    assert analyzed.has_internal_state
+    fixture = api.TypedFixture(
+        pin(path),
+        tuple(api.FixtureIO(t, pin(data)) for t in analyzed.inputs),
+        tuple(api.FixtureIO(t, pin(data)) for t in analyzed.outputs),
+    )
+    work = tmp_path / "native"
+    config = load_config(
+        None,
+        {
+            "model": {
+                "path": str(path),
+                "arena_size": 32768,
+                "arena_location": "sram",
+                "weights_location": "mram",
+            },
+            "engine": {"type": "helia-aot"},
+            "target": {"board": "apollo510_evb", "toolchain": "atfe", "clock": {"cpu": "lp"}},
+            "work_dir": str(work),
+        },
+    )
+    monkeypatch.setattr(build, "_refuse_overrides", lambda config: None)
+
+    class ReachedPipeline(Exception):
+        pass
+
+    def bind_identity_then_stop(self, config):
+        self._stages[0].run(None)
+        raise ReachedPipeline
+
+    monkeypatch.setattr(build.PipelineRunner, "run", bind_identity_then_stop)
+    with pytest.raises(ReachedPipeline):
+        api.build_fixed_fixture(
+            config, fixture, method=api.FixtureMethod(api.FixtureTimingScope.INVOKE_ONLY)
+        )
+    identity = json.loads((work / "fixed-fixture-identity.json").read_text(encoding="utf-8"))
+    assert identity["state_policy"] == "carry"
+
+
 def test_output_transport_and_dtype_limits_remain(tmp_path):
     path = typed_model(tmp_path, [F32], [("y", "float32", (1, 40000), None, None)])
     model = api.analyze_typed_fixture_model_for_engine(path, engine=api.EngineType.HELIA_AOT)

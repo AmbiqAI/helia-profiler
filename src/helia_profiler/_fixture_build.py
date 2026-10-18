@@ -79,11 +79,13 @@ class FixtureBackend(StrEnum):
 
 @dataclass(frozen=True)
 class FixtureMethod:
-    """Select input-restoration timing and declare internal-state carry explicitly.
+    """Select input-restoration timing and, optionally, the internal-state policy.
 
     Carry initializes the engine once, then retains internal state through
-    warmups and measurements. Fixed external inputs are still restored each
-    invocation; no internal reset or source-initializer equivalence is implied.
+    warmups and measurements. It is how fixtures always run, so a build of a
+    model with internal state records it when no policy is given. Fixed external
+    inputs are still restored each invocation; no internal reset or
+    source-initializer equivalence is implied.
     """
 
     timing_scope: FixtureTimingScope
