@@ -283,14 +283,35 @@ def _resolve_candidate(app_dir: Path, case: _HwCase) -> _Workspace | str:
     # the hpx_profiler_power stanza, which a bench without a power instrument
     # never configures (most boards): that is a skip, not a rejected render.
     source = "src/main_power.cc" if case.target == "hpx_profiler_power" else "src/main.cc"
-    if _tu_variables(ninja_text, case.target, source) is None:
+    variables = _tu_variables(ninja_text, case.target, source)
+    if variables is None:
         hint = " (no power instrument on this bench?)" if case.power_only else ""
         return f"configured without the {case.target} target{hint}"
+    # PSRAM and power fixtures include module headers (nsx_psram.h, nsx_gpio.h)
+    # that only a workspace configured with that module puts on the include path.
+    includes = variables.get("INCLUDES", "")
+    for module in _fixture_modules(case.fixture_kind):
+        if f"{module}/" not in includes:
+            return f"configured without the {module} module ({_MODULE_WARMUP[module]})"
     return _Workspace(
         app_dir=app_dir,
         build_dir=build_dir,
         compiler=compiler,
         ninja_text=ninja_text,
+    )
+
+
+_MODULE_WARMUP = {
+    "nsx-psram": "profile with PSRAM weights to warm it",
+    "nsx-gpio": "profile with power capture to warm it",
+}
+
+
+def _fixture_modules(kind: str | None) -> tuple[str, ...]:
+    """NSX modules a fixture kind's render includes beyond the base profiler."""
+    kind = kind or ""
+    return (("nsx-psram",) if kind.startswith("psram") else ()) + (
+        ("nsx-gpio",) if kind.startswith("power") else ()
     )
 
 
@@ -687,6 +708,37 @@ class TestWorkspaceResolution:
 
         assert isinstance(resolved, str)
         assert "records no baseline fingerprint" in resolved
+
+    def test_psram_fixture_legs_need_a_workspace_with_the_psram_module(
+        self, tmp_path: Path, monkeypatch
+    ):
+        import time
+
+        case = next(c for c in _MATRIX if c.fixture_kind == "psram")
+        current = load_compatibility_baseline().fingerprint
+        with_psram = self._make_tree(tmp_path, case, "old-psram", fingerprint=current)
+        (with_psram / "build" / case.board / "build.ninja").write_text(
+            f"build CMakeFiles/{case.target}.dir/src/main.cc.obj: C ../src/main.cc\n"
+            "  DEFINES = -DX\n"
+            "  INCLUDES = -I/ws/src -I/ws/modules/nsx-ambiq-sdk/modules/nsx-psram/includes-api\n"
+            "  FLAGS = -O2\n"
+        )
+        past = time.time() - 1000
+        for path in with_psram.rglob("*"):
+            os.utime(path, (past, past))
+        os.utime(with_psram, (past, past))
+        self._make_tree(tmp_path, case, "new-plain", fingerprint=current)
+        monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path))
+
+        resolved = _resolve_workspace(case)
+        assert isinstance(resolved, _Workspace), resolved
+        assert resolved.app_dir == with_psram
+
+        plain_only = tmp_path / "plain-only"
+        self._make_tree(plain_only, case, "plain", fingerprint=current)
+        monkeypatch.setenv("HPX_CACHE_DIR", str(plain_only))
+        skipped = _resolve_workspace(case)
+        assert isinstance(skipped, str) and "nsx-psram module" in skipped
 
     def _write_ninja(self, app: Path, case: _HwCase, *stanzas: tuple[str, str]) -> None:
         lines = []
