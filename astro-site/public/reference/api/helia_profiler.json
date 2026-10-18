@@ -24,7 +24,7 @@
           "params": [],
           "raises": [],
           "returns": [],
-          "signature": "__version__ = '0.1.6'",
+          "signature": "__version__ = '0.2.0'",
           "source": {
             "line": 1,
             "path": "src/helia_profiler/_version.py",

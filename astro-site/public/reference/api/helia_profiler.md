@@ -105,7 +105,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 `attribute` · `python`
 
 ```python
-__version__ = '0.1.6'
+__version__ = '0.2.0'
 ```
 
 **API tier:** `stable`
