@@ -131,6 +131,11 @@ _REGION_OVERFLOW = re.compile(
 )
 
 
+#: Linker regions that hold code and weights: MRAM on Apollo4/5, NOR flash
+#: ("ROMEM") on Apollo3.
+_NONVOLATILE_REGIONS = ("MRAM", "ROMEM", "FLASH")
+
+
 def region_overflow_error(exc: BuildError) -> BuildError | None:
     """A linker region overflow as a placement error, or ``None`` for other failures."""
     match = _REGION_OVERFLOW.search(f"{exc.details or ''}\n{exc}")
@@ -138,10 +143,10 @@ def region_overflow_error(exc: BuildError) -> BuildError | None:
         return None
     region, overflow = match["region"], int(match["bytes"])
     hint = (
-        "The model weights plus the runtime and application code exceed the MRAM "
-        "the linker can use. Place weights in PSRAM (--weights-location psram) on a "
-        "board with PSRAM, or use a smaller model."
-        if "MRAM" in region.upper()
+        f"The model weights plus the runtime and application code exceed the {region} "
+        "space the linker can use. Use a smaller model, or place weights in PSRAM "
+        "(--weights-location psram) on a board that has PSRAM."
+        if any(kind in region.upper() for kind in _NONVOLATILE_REGIONS)
         else "Reduce the arena size or choose another --arena-location."
     )
     return BuildError(

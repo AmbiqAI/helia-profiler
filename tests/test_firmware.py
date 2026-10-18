@@ -1460,6 +1460,19 @@ class TestBuildApp:
             build_app(ctx)
         assert "PSRAM" in (exc.value.hint or "")
 
+    @pytest.mark.parametrize(
+        ("region", "advice"),
+        [("MCU_MRAM", "PSRAM"), ("ROMEM", "smaller model"), ("MCU_TCM", "arena")],
+    )
+    def test_region_overflow_advice_follows_the_region(self, region: str, advice: str):
+        from helia_profiler.firmware.build import region_overflow_error
+
+        error = region_overflow_error(
+            BuildError("nsx build failed", details=f"ld: region `{region}' overflowed by 8 bytes")
+        )
+        assert error is not None and advice in (error.hint or "")
+        assert region not in ("ROMEM",) or "MRAM" not in (error.hint or "")
+
     def test_missing_binary_invalidates_frozen_sync_stamp(
         self, tmp_path: Path, fake_dist: Path, monkeypatch
     ):
