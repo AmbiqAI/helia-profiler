@@ -64,7 +64,9 @@ RUN_SUMMARY_SCHEMA = "hpx.run-summary"
 #: gate_elapsed_s; elapsed_us stays the whole firmware window (ceiling, frozen).
 #: v12: #224 AOT costs use the compiled graph and execution positions;
 #: model_analysis records engine and index_space.
-RUN_SUMMARY_SCHEMA_VERSION = 12
+#: v13: #466 memory_plan MRAM capacity is the linker's application window for the
+#: selected toolchain where the SoC has a linked memory map, not the whole part.
+RUN_SUMMARY_SCHEMA_VERSION = 13
 
 __all__ = [
     "RUN_SUMMARY_SCHEMA",
