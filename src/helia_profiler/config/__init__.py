@@ -9,15 +9,9 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Literal, get_args
 
-from pydantic import (
-    ConfigDict,
-    StrictBool,
-    TypeAdapter,
-    ValidationError,
-    field_validator,
-    model_validator,
-)
+from pydantic import ConfigDict, TypeAdapter, ValidationError, field_validator, model_validator
 from pydantic.dataclasses import dataclass as pydantic_dataclass
+from pydantic.types import StrictBool
 
 from ..deps.compatibility import (
     CompatibilityBaseline,
