@@ -100,6 +100,18 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 | [PowerError](/helia-profiler/reference/api/helia_profiler/errors/#helia_profiler.PowerError) | `helia_profiler.PowerError` |
 | [ReportError](/helia-profiler/reference/api/helia_profiler/errors/#helia_profiler.ReportError) | `helia_profiler.ReportError` |
 
+## helia_profiler.__version__
+
+`attribute` · `python`
+
+```python
+__version__ = '__DOCS_PACKAGE_VERSION__'
+```
+
+**API tier:** `stable`
+
+Source: `src/helia_profiler/_version.py:1`
+
 ## helia_profiler.profile
 
 `function` · `python`

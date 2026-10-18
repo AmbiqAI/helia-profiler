@@ -23,7 +23,11 @@ import { fileURLToPath } from 'node:url';
 
 export const SOURCE_REF_TOKEN = '__DOCS_SOURCE_REF__';
 export const SOURCE_TREE_TOKEN = '__DOCS_SOURCE_TREE__';
-export const TOKENS = [SOURCE_REF_TOKEN, SOURCE_TREE_TOKEN];
+/* The value of the published `__version__`. A release commit bumps the version
+ * without regenerating the reference, so a committed value would leave every
+ * release build's reference stale. */
+export const PACKAGE_VERSION_TOKEN = '__DOCS_PACKAGE_VERSION__';
+export const TOKENS = [SOURCE_REF_TOKEN, SOURCE_TREE_TOKEN, PACKAGE_VERSION_TOKEN];
 
 const REWRITTEN = new Set(['.html', '.json', '.md', '.txt', '.xml']);
 
@@ -56,10 +60,22 @@ export function sourceTreeOf(buildInfo) {
   return tree;
 }
 
+/** The package version this build documents, read from _version.py by build-info.mjs. */
+export function packageVersionOf(buildInfo) {
+  const version = buildInfo?.version;
+  if (!version) {
+    throw new Error(
+      'build-info.json carries no version. It is written by npm run prepare:docs, which runs in prebuild.',
+    );
+  }
+  return version;
+}
+
 /** Every placeholder the committed files carry, paired with this build's value. */
 export const substitutions = (buildInfo) => [
   [SOURCE_REF_TOKEN, sourceRef(buildInfo)],
   [SOURCE_TREE_TOKEN, sourceTreeOf(buildInfo)],
+  [PACKAGE_VERSION_TOKEN, packageVersionOf(buildInfo)],
 ];
 
 export const substitute = (body, pairs) =>

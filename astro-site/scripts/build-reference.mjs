@@ -234,13 +234,14 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
      * build-info.json, which knows what this build is of. */
     '--source-url',
     `https://github.com/AmbiqAI/helia-profiler/blob/${SOURCE_REF_TOKEN}/{path}#L{line}`,
-    /* The default filters drop every underscore name but __init__. That
-     * includes __version__: its value changes with every release, and a
-     * release commit does not regenerate this reference. */
+    /* __version__ is the one dunder the package publishes; the default
+     * filters drop every underscore name but __init__. */
     '--filter',
     '!^_',
     '--filter',
     '^__init__$',
+    '--filter',
+    '^__version__$',
   ]);
 
   const report = JSON.parse(fs.readFileSync(path.join(generated, 'scope-report.json'), 'utf8'));

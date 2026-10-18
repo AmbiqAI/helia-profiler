@@ -27,7 +27,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { SOURCE_TREE_TOKEN } from '../src/integrations/source-ref.mjs';
+import { PACKAGE_VERSION_TOKEN, SOURCE_TREE_TOKEN } from '../src/integrations/source-ref.mjs';
 
 const site = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -298,6 +298,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     tiers: readJson(path.join(generated, 'api-tiers.json')),
     groups: readJson(path.join(site, 'src/data/api-groups.json')),
   });
+
+  const version = scoped[PACKAGE]?.members?.__version__;
+  if (!version) throw new Error(`${PACKAGE}.__version__ is missing from the scoped dump.`);
+  version.value = `'${PACKAGE_VERSION_TOKEN}'`;
 
   fs.writeFileSync(path.join(generated, 'griffe.scoped.json'), `${JSON.stringify(scoped)}\n`);
   fs.writeFileSync(
