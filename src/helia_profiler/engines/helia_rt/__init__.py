@@ -3,7 +3,7 @@
 ``HeliaRTAdapter`` lives in :mod:`.adapter`; distribution resolution and
 version pinning live in :mod:`.artifacts` (``HELIART_VERSION`` is re-exported
 here so ``helia_profiler.engines.helia_rt.HELIART_VERSION`` keeps working);
-the generated NSX wrapper (the "heliaRT NSX Wrapper" shim) lives in
+the NSX wrapper generated for prebuilt and local-source heliaRT lives in
 :mod:`.nsx_module`.
 """
 

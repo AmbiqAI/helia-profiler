@@ -64,8 +64,11 @@ marker alone does not guard anything.
   `pyserial`, no POSIX-only assumptions.
 - **`cli/` stays thin:** parse args, call `api`/`Session`, hand results to
   `console/`. The library never prints; only the console layer does.
-- The heliaRT NSX wrapper (`engines/helia_rt/`) is a shim until heliaRT ships
-  a native `nsx-module.yaml`.
+- The default heliaRT route builds heliaRT's own `nsx-helia-rt` module from
+  the registry. `engines/helia_rt/nsx_module.py` generates a wrapper only for
+  the opt-in local modes: a prebuilt release (`engine.config.dist_path` or
+  `source`) and a source checkout (`source_path`). heliaRT's module builds only
+  from source, so the prebuilt wrapper is permanent, not a temporary shim.
 - Runtime versions and qualification live in
   `src/helia_profiler/data/runtimes/<name>/<version>.json`. Adopt a release
   by adding its record (and moving `default`), then update what still
