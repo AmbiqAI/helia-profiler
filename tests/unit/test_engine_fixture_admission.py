@@ -8,7 +8,7 @@ import pytest
 from test_typed_fixture_analysis import typed_model
 
 from helia_profiler import fixture as api
-from helia_profiler._fixture_build import _check_typed_fixture, _validate_state_policy
+from helia_profiler._fixture_build import _check_typed_fixture, _state_method
 from helia_profiler.errors import ConfigError
 from helia_profiler.fixture_analysis import analyze_fixture_model
 
@@ -84,7 +84,7 @@ def test_aot_is_not_gated_by_micro_registration(tmp_path):
         api.analyze_typed_fixture_model_for_engine(path, engine=api.EngineType.TFLM)
 
 
-def test_internal_state_requires_typed_policy_and_initializer_is_not_assumed(tmp_path):
+def test_internal_state_carries_without_a_declared_policy(tmp_path):
     def change(model, graph):
         graph.tensors[2].isVariable = True
 
@@ -95,13 +95,11 @@ def test_internal_state_requires_typed_policy_and_initializer_is_not_assumed(tmp
     assert model.has_internal_state
     with pytest.raises(ValueError, match="FixtureStatePolicy"):
         api.FixtureMethod(api.FixtureTimingScope.INVOKE_ONLY, cast(Any, "carry"))
-    with pytest.raises(ConfigError, match="explicit carry"):
-        _validate_state_policy(
-            model, api.EngineType.HELIA_AOT, api.FixtureMethod(api.FixtureTimingScope.INVOKE_ONLY)
-        )
+    implicit = api.FixtureMethod(api.FixtureTimingScope.INVOKE_ONLY)
     carry = api.FixtureMethod(api.FixtureTimingScope.INVOKE_ONLY, api.FixtureStatePolicy.CARRY)
-    _validate_state_policy(model, api.EngineType.HELIA_AOT, carry)
-    _validate_state_policy(replace(model, has_initializer=True), api.EngineType.HELIA_AOT, carry)
+    assert _state_method(model, implicit) == carry
+    assert _state_method(model, carry) == carry
+    assert _state_method(replace(model, has_internal_state=False), implicit) == implicit
 
 
 def test_state_policy_binds_request_identity_without_changing_legacy(tmp_path):
@@ -316,7 +314,7 @@ def test_resource_renderer_allocates_once_and_keeps_full_model(tmp_path):
 
 
 @pytest.mark.parametrize("engine", [api.EngineType.HELIA_AOT, api.EngineType.TFLM])
-def test_stateful_operator_needs_carry_without_tensor_flags(tmp_path, engine):
+def test_stateful_operator_carries_without_tensor_flags(tmp_path, engine):
     from test_typed_fixture_analysis import s
 
     def change(model, graph):
@@ -326,10 +324,8 @@ def test_stateful_operator_needs_carry_without_tensor_flags(tmp_path, engine):
     path = typed_model(tmp_path, [F32], [Y32], change=change)
     actual = api.analyze_typed_fixture_model_for_engine(path, engine=engine)
     assert actual.has_internal_state
-    with pytest.raises(ConfigError, match="explicit carry"):
-        _validate_state_policy(
-            actual, engine, api.FixtureMethod(api.FixtureTimingScope.INVOKE_ONLY)
-        )
+    implicit = api.FixtureMethod(api.FixtureTimingScope.INVOKE_ONLY)
+    assert _state_method(actual, implicit).state_policy is api.FixtureStatePolicy.CARRY
 
 
 def test_auxiliary_float16_is_metadata_not_public_io_capability(tmp_path):

@@ -111,8 +111,10 @@ caller-owned. Timing, operator-instrumented and rail images remain distinct.
 `FixtureBuild.inputs`, `output_tensors`, `model`, `arena_capacity`, `clock_profile`,
 `cpu_hz` and `timer_hz` carry complete producer facts. Existing `timing_scope`,
 `state_policy`, `iterations` and `warmups` retain their meanings. Descriptor-only
-builds have `expected=None` and `outputs=()`. Internal reset remains unsupported;
-explicit carry initializes once and keeps internal state across warmups and samples.
+builds have `expected=None` and `outputs=()`. Internal reset remains unsupported:
+the firmware initializes once and keeps internal state across warmups and samples.
+A model with internal state needs no declared policy; its build records
+`state_policy=CARRY` because that is how it ran.
 
 API 5.6 adds `FixtureBuild.kernel_source` (`FixtureKernelSource`) and
 `FixtureBuild.runtime_source` (`FixtureRuntimeSource`), so a consumer reads

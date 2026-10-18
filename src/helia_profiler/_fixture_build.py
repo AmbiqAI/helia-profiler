@@ -235,11 +235,11 @@ class TypedFixture:
         ).hexdigest()
 
 
-def _validate_state_policy(model, engine: EngineType, method: FixtureMethod) -> None:
-    if model.has_internal_state and method.state_policy is not FixtureStatePolicy.CARRY:
-        raise ConfigError(
-            "Internal-state fixtures require explicit carry policy; inputs restore separately"
-        )
+def _state_method(model, method: FixtureMethod) -> FixtureMethod:
+    """Record that internal state carries between invocations, as the firmware runs it."""
+    if model.has_internal_state and method.state_policy is None:
+        return replace(method, state_policy=FixtureStatePolicy.CARRY)
+    return method
 
 
 def _check_typed_fixture(
@@ -499,7 +499,7 @@ def _build(
         ):
             raise ConfigError("Fixture tensor declarations differ from analyzed model")
         capabilities = (("int8", FIXTURE_CAPABILITIES[config.engine.type]["int8"]),)
-    _validate_state_policy(model, config.engine.type, method)
+    method = _state_method(model, method)
     adapter = get_adapter(config.engine.type)
     if isinstance(adapter, PreparedRuntimeAdapter):
         stack, backend = adapter.prepared_runtime_contract
