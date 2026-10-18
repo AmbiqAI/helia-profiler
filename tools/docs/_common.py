@@ -35,12 +35,14 @@ def dump(payload: dict[str, Any], path: pathlib.Path) -> None:
 
 
 def tool_versions() -> dict[str, str]:
+    """Versions of the tools that shape the reference.
+
+    The package's own version is left out: a release commit bumps it without
+    regenerating the reference, and the site reads it from build-info.json.
+    """
     from importlib.metadata import version
 
-    from helia_profiler._version import __version__
-
     return {
-        "helia_profiler": __version__,
         "typer": version("typer"),
         "click": version("click"),
         "pydantic": version("pydantic"),

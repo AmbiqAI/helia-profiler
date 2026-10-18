@@ -43,7 +43,9 @@ request that updates:
 It does not regenerate the docs-site reference, so nothing committed there may
 record the package version: the release build checks the reference against the
 tag and refuses to deploy stale pages. The API reference commits `__version__`
-as a placeholder that the site build fills in from `_version.py`.
+as a placeholder that the site build fills in from `_version.py`, and the CLI,
+configuration and issue-code data record only the tool versions, not the
+package's.
 
 The workflow explicitly dispatches CI for that automation-created pull request.
 Before merging it:
