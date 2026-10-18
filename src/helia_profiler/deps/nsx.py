@@ -21,6 +21,7 @@ from __future__ import annotations
 import functools
 import logging
 import time
+from collections import deque
 from pathlib import Path
 from typing import Any, Callable, TypeVar
 
@@ -149,13 +150,28 @@ def build(
         target or "default",
     )
     emit = emitter_for_verbosity(verbose)
-    _translate(
-        "nsx build",
-        lambda: nsx_api.build_app(
-            app_dir, toolchain=toolchain, target=target, timeout_s=timeout_s, emit=emit
-        ),
-    )
+    # The quiet emitter drops build output, so keep its tail for the error.
+    tail: deque[str] = deque(maxlen=_BUILD_OUTPUT_TAIL_LINES)
+    try:
+        _translate(
+            "nsx build",
+            lambda: nsx_api.build_app(
+                app_dir,
+                toolchain=toolchain,
+                target=target,
+                timeout_s=timeout_s,
+                emit=emit,
+                on_line=tail.append,
+            ),
+        )
+    except BuildError as exc:
+        if tail:
+            output = "\n".join(tail)
+            exc.details = f"{exc.details}\n{output}" if exc.details else output
+        raise
 
+
+_BUILD_OUTPUT_TAIL_LINES = 200
 
 _RESOLVE_TTL_S: float = 1800  # 30 min — safe for typical profiling sessions
 

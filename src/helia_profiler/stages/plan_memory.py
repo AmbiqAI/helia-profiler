@@ -56,6 +56,30 @@ _REGION_FIELDS: dict[MemoryRegion, str] = {
 }
 
 
+def _mram_app_window(ctx: PipelineContext) -> int | None:
+    """Bytes of MRAM the selected toolchain's linker can place the image in."""
+    from ..platform.memory_map import link_family_for_toolchain, linked_memory_map
+
+    if ctx.soc is None:
+        return None
+    linker_profile = str(ctx.config.engine.config.get("linker_profile") or "default")
+    window = next(
+        (
+            w
+            for w in linked_memory_map(ctx.soc, linker_profile=linker_profile)
+            if w.region is MemoryRegion.MRAM
+        ),
+        None,
+    )
+    if window is None:
+        return None
+    try:
+        extent = window.app_window[link_family_for_toolchain(ctx.config.target.toolchain)]
+    except ValueError:
+        return None
+    return extent.end - extent.start
+
+
 class PlanMemoryStage:
     @property
     def name(self) -> str:
@@ -234,6 +258,7 @@ class PlanMemoryStage:
             return plan
 
         layout: MemoryLayout = ctx.soc.memory
+        mram_app = _mram_app_window(ctx)
 
         by_region = {r.region.upper(): r for r in plan.regions}
 
@@ -241,6 +266,10 @@ class PlanMemoryStage:
         for region_name, field in _REGION_FIELDS.items():
             cap_kb = int(getattr(layout, field, 0))
             cap_bytes = cap_kb * 1024
+            if region_name is MemoryRegion.MRAM and mram_app is not None:
+                # The linker places the image in the application window, not
+                # the whole part; the bootloader keeps the rest (#466).
+                cap_bytes = mram_app
             existing = by_region.pop(region_name, None)
             if existing is not None:
                 if existing.capacity not in (0, cap_bytes):
