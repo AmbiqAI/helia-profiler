@@ -1,6 +1,6 @@
 [project]
 name = "helia-profiler"
-version = "0.1.6"
+version = "0.2.0"
 description = "Profile LiteRT and ExecuTorch models on Ambiq Apollo hardware"
 readme = "README.md"
 requires-python = ">=3.11"
