@@ -14,25 +14,6 @@
       "summary": "The entry points of the heliaPROFILER Python API: one call, one session, and the progress stream they report through.",
       "symbols": [
         {
-          "description": "**API tier:** `stable`",
-          "examples": [],
-          "id": "helia_profiler.__version__",
-          "kind": "attribute",
-          "language": "python",
-          "members": [],
-          "name": "__version__",
-          "params": [],
-          "raises": [],
-          "returns": [],
-          "signature": "__version__ = '0.2.0'",
-          "source": {
-            "line": 1,
-            "path": "src/helia_profiler/_version.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_version.py#L1"
-          },
-          "summary": "API tier: stable"
-        },
-        {
           "description": "Run a full profiling session.\n\nThis is the main programmatic entry point.  It builds the default pipeline,\nexecutes all stages, and returns a typed :class:`ProfileResult`.\n\nRaises :class:`HpxError` (or a subclass) on failure.\n\n**API tier:** `stable`",
           "examples": [],
           "id": "helia_profiler.profile",

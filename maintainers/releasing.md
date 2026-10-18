@@ -40,6 +40,11 @@ request that updates:
 - `__version__` in `src/helia_profiler/_version.py`;
 - the editable HPX package version in `uv.lock`.
 
+It does not regenerate the docs-site reference, so nothing generated there may
+record the package version: the release build checks the reference against the
+tag and refuses to deploy stale pages. The API reference leaves out
+`__version__` for that reason.
+
 The workflow explicitly dispatches CI for that automation-created pull request.
 Before merging it:
 
