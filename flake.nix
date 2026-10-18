@@ -25,7 +25,7 @@
     # release, or a Git revision of the private AmbiqAI/helia-aot repository, with
     # --override-input (see the Nix environment guide, getting-started/nix).
     helia-aot = {
-      url = "https://files.pythonhosted.org/packages/57/45/cddc80a6eeb59ea11d6dd57057eb97bd7f5e106cbf84e06c1615e683b510/helia_aot-0.25.0.tar.gz";
+      url = "https://files.pythonhosted.org/packages/be/52/c218f821193dbca8629851f65875c16826d1cd9d968f65189f21721a5908/helia_aot-0.30.0.tar.gz";
       flake = false;
     };
   };
@@ -327,6 +327,7 @@
           v7_44_2 = "166a6fa94004b53512de718099aa35ed655a70cf";
           v7_45_0 = "3573bfbdb651092a14662daaa3557ce63452e294";
           v7_45_1 = "afe4e5de42f8d67de562ec2c853a8031872e2931";
+          v7_46_0 = "4a937fe7988935e1cfc2d8a41859fdada042c17c";
           compatCases = {
             "0.25.0 on v7.39.2" = accepts "0.25.0" v7_39_2;
             "0.26.0 on v7.39.2" = accepts "0.26.0" v7_39_2;
@@ -338,6 +339,7 @@
             "0.30.0 rejected on v7.44.2" = !accepts "0.30.0" v7_44_2;
             "0.30.0 on v7.45.0" = accepts "0.30.0" v7_45_0;
             "0.30.0 on v7.45.1" = accepts "0.30.0" v7_45_1;
+            "0.30.0 on v7.46.0" = accepts "0.30.0" v7_46_0;
             "1.0.0 rejected on v7.44.1" = !accepts "1.0.0" v7_44_1;
             "unmapped baseline commit reported, not blocking" =
               accepts "0.26.0" "0000000000000000000000000000000000000000"

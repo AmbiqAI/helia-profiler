@@ -503,7 +503,7 @@ def test_collect_support_bundle_always_includes_checks_and_compatibility() -> No
     checks_payload = json.loads(collection.members["checks.json"])
     assert "checks" in checks_payload and "versions" in checks_payload
     compatibility_payload = json.loads(collection.members["compatibility.json"])
-    assert compatibility_payload["baseline_id"] == "hpx-neuralspotx-0.8.1-2026-09"
+    assert compatibility_payload["baseline_id"] == "hpx-neuralspotx-0.8.1-2026-10"
     assert compatibility_payload["neuralspotx"]["version"] == "0.8.1"
     assert (
         compatibility_payload["neuralspotx"]["sha256"]

@@ -11,7 +11,7 @@ Stage 5 combines its identity and canonical hash with the NSX registry hash,
 target, engine, overrides, and relevant build inputs to select an isolated
 dependency workspace.
 
-The current baseline is `hpx-neuralspotx-0.8.1-2026-09`:
+The current baseline is `hpx-neuralspotx-0.8.1-2026-10`:
 
 | Identity | Qualified reference |
 | --- | --- |
@@ -21,11 +21,11 @@ The current baseline is `hpx-neuralspotx-0.8.1-2026-09`:
 | `nsx-pmu-armv8m` | `5725c065…c88` |
 | `nsx-tflite-micro` | `7afcf2b4…333` |
 | `arm-cmsis-nn` | `6d21a6f8…f7c` |
-| `ns-cmsis-nn` | `5f3fed9f…cb8` (`v7.39.2`, hpx-declared, see below) |
+| `ns-cmsis-nn` | `4a937fe7…17c` (`v7.46.0`, hpx-declared, see below) |
 | `nsx-executorch` | `5514ac1e…b48e` |
 | `nsx-sensors` | `c219a2bc…3e25` (`v0.3.0`, peeled) |
-| heliaRT | `1.21.3`, commit `dc8533ab…f5f`, from the runtime record (min supported `1.16.0`, from `HELIART_MIN_VERSION` in code) |
-| heliaAOT | runtime records `0.23.0`, `0.24.0`, `0.25.0` (default), `0.26.0`, `0.27.0`, `0.29.0`, `0.30.0`; accepted range `>=0.23.0,<0.31.0` |
+| heliaRT | runtime records `1.21.3`, `2.1.0` (default, commit `3eca66cb…3e8`; min supported `1.16.0`, from `HELIART_MIN_VERSION` in code) |
+| heliaAOT | runtime records `0.23.0`, `0.24.0`, `0.25.0`, `0.26.0`, `0.27.0`, `0.29.0`, `0.30.0` (default); accepted range `>=0.23.0,<0.31.0` |
 | tflm | profile path: governed by the `nsx-tflite-micro` and `arm-cmsis-nn` module refs above (the `tflm` runtime record describes the fixed fixture's prepared upstream archive instead); `nsx-tflite-micro` builds TFLM from the `helia-rt-source` project, which the baseline does not list and the neuralSPOT-X 0.8.1 registry lock fixes at `7c1b162c` (helia-rt v1.17.0) |
 | executorch | `0.1.0`, commit `5514ac1e…b48e`, from the runtime record (a checkout's `version.txt` and commit are verified against it) |
 
@@ -97,6 +97,29 @@ completed result bundle.
 
 <details>
 <summary>Why earlier promotions changed these pins</summary>
+
+heliaRT 2.1.0 (`3eca66cb…3e8`) and `ns-cmsis-nn v7.46.0` (`4a937fe7…17c`)
+replace 1.21.3 and v7.39.2, and heliaAOT 0.30.0 becomes the default and the
+locked release. heliaRT 2.1.0 is the release built on v7.46.0, and its native
+NSX module requires v7.46.0 or newer; heliaAOT 0.30.0 needs v7.45.0 or newer
+(`nix/compat.nix`), so the three move together. heliaAOT 0.30.0's own CI ran
+against v7.45.1; v7.46.0 adds kernels and changes no API that 0.30.0 calls.
+heliaRT 2.0 removed the `tensorflow/lite/{c,core,kernels}` and
+`tensorflow/compiler` headers, `micro_error_reporter.h` and the
+`TF_LITE_STATIC_MEMORY` switch. The profiler firmware no longer includes the
+two removed headers it used (it resolves builtin operator codes inline), and
+the define hpx still passes to prepared heliaRT archives is ignored by 2.x and
+required by 1.21.3. ExecuTorch's `ns` backend builds against the same core and
+is not separately verified here.
+
+**Verified.** On an Apollo510 EVB (ATfE, SRAM arena, MRAM weights), int8
+keyword spotting profiles end to end on heliaAOT 0.30.0, heliaRT 2.1.0
+(source build) and TFLM, and on heliaRT with PSRAM weights. Build only: GCC
+for heliaRT and heliaAOT, an all-FLOAT16 keyword model with ATfE for both,
+a heliaRT build from the 2.1.0 release archive, a heliaRT fixed fixture
+linking the prepared 2.1.0 archive, and ExecuTorch's `ns` backend with GCC.
+These are smoke runs, not qualification: the new runtime records declare no
+qualified targets, and no outputs or timings were compared with earlier runs.
 
 heliaAOT `0.30.0` (`5af37fba…9ba`) is recorded and the accepted range widens to
 `[0.23.0, 0.31.0)`; the default and the locked release stay at 0.25.0, and

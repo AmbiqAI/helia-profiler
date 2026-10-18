@@ -26,6 +26,8 @@
 {%- endblock %}
 
 {% block engine_includes %}
+#include <algorithm>
+
 #include "{{ engine_header }}"
 #if {{ resource_variable_count }} > 0
 #include "tensorflow/lite/micro/micro_allocator.h"
@@ -33,9 +35,7 @@
 #endif
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/micro/system_setup.h"
-#include "tensorflow/lite/micro/tflite_bridge/micro_error_reporter.h"
 #include "tensorflow/lite/schema/schema_generated.h"
-#include "tensorflow/compiler/mlir/lite/schema/schema_utils.h"
 
 #include "hpx_pmu_profiler.h"
 {% if has_ethos_u | default(false) %}
@@ -315,7 +315,10 @@ static tflite::MicroMutableOpResolver<kMaxOps> &get_resolver() {
             for (unsigned i = 0; i < opcodes->size(); ++i) {
                 const tflite::OperatorCode *oc = opcodes->Get(i);
                 const TFLMRegistration *reg = nullptr;
-                tflite::BuiltinOperator b = tflite::GetBuiltinCode(oc);
+                // GetBuiltinCode's header differs between TFLM and newer heliaRT releases.
+                tflite::BuiltinOperator b = std::max(
+                    oc->builtin_code(),
+                    static_cast<tflite::BuiltinOperator>(oc->deprecated_builtin_code()));
                 if (b == tflite::BuiltinOperator_CUSTOM) {
                     const char *cname = oc->custom_code() ? oc->custom_code()->c_str() : "";
                     reg = resolver.FindOp(cname);
