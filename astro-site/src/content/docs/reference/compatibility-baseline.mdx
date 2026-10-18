@@ -479,4 +479,9 @@ heliaRT, nsx-sensors) are unchanged.
 
 </details>
 
-The nondefault heliaAOT `0.29.0` and `0.30.0` records declare no qualified tuples. Selecting one does not change the default or qualify an experimental compatibility baseline.
+The heliaAOT `0.29.0` and `0.30.0` records declare no qualified tuples. Selecting one does not qualify an experimental compatibility baseline.
+
+The explicit AOT `engine.allow_unsupported_version: true` option also stamps
+`development-overrides` and records that option in `engine_overrides`. It only
+relaxes the AOT package version-range check; dependency lock verification and
+normal build/capture checks remain active.

@@ -379,6 +379,7 @@ def _refuse_overrides(config: ProfileConfig) -> None:
         engine_config_path=config.engine.config_path,
         engine_type=config.engine.type.value,
         engine_backend=config.engine.backend,
+        allow_unsupported_version=config.engine.allow_unsupported_version,
     )
     overrides = {*resolution.module_overrides, *resolution.engine_overrides}
     overrides.update(f"env.{name}" for name in FIXTURE_REFUSED_ENVIRONMENT if os.environ.get(name))

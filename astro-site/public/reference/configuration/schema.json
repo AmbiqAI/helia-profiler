@@ -9,8 +9,8 @@
   },
   "counts": {
     "classes": 15,
-    "declaredFields": 106,
-    "schemaProperties": 106,
+    "declaredFields": 107,
+    "schemaProperties": 107,
     "enums": 4,
     "unreachableFromRoot": [
       "MonitorBoardPreset"
@@ -108,6 +108,13 @@
           "pythonType": "Path | None",
           "required": false,
           "default": null,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "allow_unsupported_version",
+          "pythonType": "Annotated[bool, Strict(strict=True)]",
+          "required": false,
+          "default": false,
           "defaultFromFactory": false
         }
       ],
@@ -466,7 +473,7 @@
           "name": "engine",
           "pythonType": "EngineConfig",
           "required": false,
-          "default": "EngineConfig(type=<EngineType.HELIA_RT: 'helia-rt'>, backend=None, config={}, config_path=None)",
+          "default": "EngineConfig(type=<EngineType.HELIA_RT: 'helia-rt'>, backend=None, config={}, config_path=None, allow_unsupported_version=False)",
           "defaultFromFactory": true
         },
         {
@@ -822,8 +829,8 @@
         "reachableFromRoot": true
       },
       "EngineConfig": {
-        "declared": 4,
-        "inSchema": 4,
+        "declared": 5,
+        "inSchema": 5,
         "reachableFromRoot": true
       },
       "HeartbeatConfig": {
@@ -1313,6 +1320,11 @@
           ],
           "default": null,
           "title": "Config Path"
+        },
+        "allow_unsupported_version": {
+          "default": false,
+          "title": "Allow Unsupported Version",
+          "type": "boolean"
         }
       },
       "title": "EngineConfig",

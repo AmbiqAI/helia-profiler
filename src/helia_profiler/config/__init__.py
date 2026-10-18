@@ -11,6 +11,7 @@ from typing import Any, Literal, get_args
 
 from pydantic import ConfigDict, TypeAdapter, ValidationError, field_validator, model_validator
 from pydantic.dataclasses import dataclass as pydantic_dataclass
+from pydantic.types import StrictBool
 
 from ..deps.compatibility import (
     CompatibilityBaseline,
@@ -253,6 +254,13 @@ class EngineConfig:
     backend: str | None = None  # TFLM: reference/cmsis_nn; ExecuTorch: arm/ns
     config: dict[str, Any] = field(default_factory=dict)
     config_path: Path | None = None  # path to engine-specific YAML
+    allow_unsupported_version: StrictBool = field(default=False, kw_only=True)
+
+    @model_validator(mode="after")
+    def _validate_version_override(self) -> EngineConfig:
+        if self.allow_unsupported_version and self.type != EngineType.HELIA_AOT:
+            raise ValueError("engine.allow_unsupported_version is supported only for helia-aot")
+        return self
 
     @field_validator("config")
     @classmethod
@@ -691,6 +699,7 @@ class ProfileConfig:
                     engine_config_path=self.engine.config_path,
                     engine_type=self.engine.type.value,
                     engine_backend=self.engine.backend,
+                    allow_unsupported_version=self.engine.allow_unsupported_version,
                 ),
             )
 
