@@ -50,7 +50,7 @@ FIXTURE_KIND_ENGINES = tuple(
         "power-resource",
         "ram",
     )
-    for engine in ("tflm", "helia-aot")
+    for engine in FIXTURE_ENGINES
 )
 
 

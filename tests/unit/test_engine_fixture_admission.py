@@ -23,10 +23,12 @@ def test_internal_symbolic_shapes_are_engine_owned(tmp_path):
     path = typed_model(
         tmp_path, [F32], [Y32], extra=[("internal", "float32", (1, 4), None, None)], change=change
     )
-    with pytest.raises(ValueError, match="Dynamic"):
-        api.analyze_typed_fixture_model(path)
-    for engine in (api.EngineType.HELIA_AOT, api.EngineType.TFLM):
-        actual = api.analyze_typed_fixture_model_for_engine(path, engine=engine)
+    for engine in (None, api.EngineType.HELIA_AOT, api.EngineType.TFLM, api.EngineType.HELIA_RT):
+        actual = (
+            api.analyze_typed_fixture_model(path)
+            if engine is None
+            else api.analyze_typed_fixture_model_for_engine(path, engine=engine)
+        )
         assert actual.inputs[0].shape == (1, 4)
         assert actual.output_bytes == 16
 
@@ -502,8 +504,8 @@ def test_inspection_reports_facts_before_engine_admission(tmp_path):
     assert not facts.has_dynamic_io
     assert facts.subgraph_count == 2
     assert facts.operator_names == ("ADD",)
-    with pytest.raises(ValueError, match="integration is unavailable"):
-        api.analyze_typed_fixture_model_for_engine(path, engine=api.EngineType.HELIA_RT)
+    heliart = api.analyze_typed_fixture_model_for_engine(path, engine=api.EngineType.HELIA_RT)
+    assert heliart.has_internal_state and heliart.subgraph_count == 2
     assert inspect_litert_model(path).facts == facts
     assert path.read_bytes() == original
 

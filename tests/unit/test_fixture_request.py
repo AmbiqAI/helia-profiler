@@ -161,14 +161,13 @@ def test_requests_forward_independent_supported_banks(tmp_path, engine, placemen
     assert request.intent_identity != replace(request, placement=FixturePlacement()).intent_identity
 
 
-def test_requests_refuse_psram_weights_without_an_implemented_loader(tmp_path):
-    with pytest.raises(ConfigError, match="Self-loading PSRAM fixtures"):
-        _request(
-            tmp_path,
-            engine=EngineType.HELIA_RT,
-            backend=FixtureBackend.HELIA,
-            placement=FixturePlacement(weights=Placement.PSRAM),
-        )
+def test_heliart_requests_accept_psram_weights(tmp_path):
+    _request(
+        tmp_path,
+        engine=EngineType.HELIA_RT,
+        backend=FixtureBackend.HELIA,
+        placement=FixturePlacement(weights=Placement.PSRAM),
+    )
 
 
 def test_request_config_carries_every_setting(tmp_path: Path) -> None:
