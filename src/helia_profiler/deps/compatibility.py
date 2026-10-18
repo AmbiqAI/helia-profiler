@@ -266,7 +266,7 @@ def resolve_compatibility(
     engine_config_path: Path | None,
     engine_type: str,
     engine_backend: str | None,
-    allow_unsupported_version: bool = False,
+    allow_unsupported_version: bool,
 ) -> CompatibilityResolution:
     """Classify explicit module and engine overrides without mutating config.
 
