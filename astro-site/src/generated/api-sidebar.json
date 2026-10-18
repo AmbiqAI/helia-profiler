@@ -40,6 +40,10 @@
       "slug": "reference/api/helia_profiler/examples"
     },
     {
+      "label": "frozen_run",
+      "slug": "reference/api/helia_profiler/frozen_run"
+    },
+    {
       "label": "modelcost",
       "slug": "reference/api/helia_profiler/modelcost"
     },
