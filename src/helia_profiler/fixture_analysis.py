@@ -253,22 +253,19 @@ def prepare_litert_fixture(
     *,
     single_io: bool,
     resolver: Callable[[ModelAnalysis, LiteRTGraphFacts], ResolverPlan],
-    legacy: bool = False,
 ) -> FixtureModelAnalysis | TypedFixtureModelAnalysis:
-    """Project inspected LiteRT facts into the existing fixture IO contract."""
+    """Project inspected LiteRT facts into the existing fixture IO contract.
+
+    Only the fixed-size public IO is a fixture constraint here; what the graph
+    may contain is the selected engine's decision, made by *resolver*.
+    """
     inspected = inspect_litert_model(path)
     facts, graph = inspected.facts, inspected.graph
-    if legacy and facts.subgraph_count != 1:
-        raise ValueError("Fixture model requires exactly one subgraph")
     if single_io and (graph.InputsLength() != 1 or graph.OutputsLength() != 1):
         raise ValueError("Fixture model requires exactly one input and one output")
     if not single_io and (graph.InputsLength() < 1 or graph.OutputsLength() < 1):
         raise ValueError("Fixture model requires at least one input and one output")
-    if legacy and facts.has_stateful_tensors:
-        raise ValueError("Variable or stateful fixture tensors are unsupported")
-    if legacy and facts.has_mutating_inputs:
-        raise ValueError("Stateful fixture operators are unsupported")
-    if facts.has_dynamic_io or (legacy and facts.has_dynamic_shapes):
+    if facts.has_dynamic_io:
         raise ValueError("Dynamic fixture tensor shapes are unsupported")
     plan = resolver(inspected.analysis, facts)
     try:
@@ -281,14 +278,17 @@ def prepare_litert_fixture(
         raise ValueError(f"Malformed fixture model flatbuffer: {exc}") from exc
 
 
-def _legacy_resolver(analysis: ModelAnalysis, facts: LiteRTGraphFacts) -> ResolverPlan:
-    return build_fixture_resolver_plan(analysis, additional_ops=facts.operator_names)
+def litert_fixture_resolver(analysis: ModelAnalysis, facts: LiteRTGraphFacts) -> ResolverPlan:
+    """Register every graph operator with a TFLM-family kernel, including stateful ones."""
+    return build_fixture_resolver_plan(
+        analysis, allow_state=True, additional_ops=facts.operator_names
+    )
 
 
 def analyze_fixture_model(path: Path, *, _engine: EngineType | None = None) -> FixtureModelAnalysis:
-    """Read a single-IO LiteRT fixture with legacy or selected-engine admission."""
+    """Read a single-IO LiteRT fixture, admitted by the selected engine when one is given."""
     result = (
-        prepare_litert_fixture(path, single_io=True, resolver=_legacy_resolver, legacy=True)
+        prepare_litert_fixture(path, single_io=True, resolver=litert_fixture_resolver)
         if _engine is None
         else get_adapter(_engine).prepare_fixture_model(path, single_io=True)
     )
@@ -298,8 +298,8 @@ def analyze_fixture_model(path: Path, *, _engine: EngineType | None = None) -> F
 
 
 def analyze_typed_fixture_model(path: Path) -> TypedFixtureModelAnalysis:
-    """Read a model through the legacy stateless fixture admission contract."""
-    result = prepare_litert_fixture(path, single_io=False, resolver=_legacy_resolver, legacy=True)
+    """Read a model's fixture IO and facts without selecting an engine."""
+    result = prepare_litert_fixture(path, single_io=False, resolver=litert_fixture_resolver)
     assert isinstance(result, TypedFixtureModelAnalysis)
     return result
 

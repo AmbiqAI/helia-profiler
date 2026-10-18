@@ -480,8 +480,7 @@ def test_psram_other_placements_still_refuse(tmp_path, engine):
     ]:
         with pytest.raises(ConfigError):
             validate_fixture_placement(arena, weights, engine)
-    with pytest.raises(ConfigError):
-        validate_fixture_placement(Placement.SRAM, Placement.PSRAM, EngineType.HELIA_RT)
+    validate_fixture_placement(Placement.SRAM, Placement.PSRAM, EngineType.HELIA_RT)
 
 
 @pytest.mark.parametrize("engine", [EngineType.HELIA_AOT, EngineType.TFLM])

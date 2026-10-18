@@ -113,10 +113,10 @@ caller-owned. Timing, operator-instrumented and rail images remain distinct.
 `state_policy`, `iterations` and `warmups` retain their meanings. Descriptor-only
 builds have `expected=None` and `outputs=()`. Internal reset remains unsupported:
 the firmware initializes once and keeps internal state across warmups and samples.
-On the typed path, a heliaAOT or TFLM model with internal state needs no
-declared policy; its build records `state_policy=CARRY` because that is how it
-ran. heliaRT fixtures and the legacy single-IO INT8 path still refuse models with
-internal state.
+A model with internal state needs no declared policy; its build records
+`state_policy=CARRY` because that is how it ran. Variable and resource state,
+initializer subgraphs and multiple subgraphs are admitted on heliaAOT, TFLM and
+heliaRT alike; what a model may contain is the engine's decision.
 
 API 5.6 adds `FixtureBuild.kernel_source` (`FixtureKernelSource`) and
 `FixtureBuild.runtime_source` (`FixtureRuntimeSource`), so a consumer reads
@@ -208,8 +208,8 @@ flashes. `compile=False` prepares and renders without linking.
 Supply SHA256-pinned `FixtureFile` records for model/input/reference and
 `FixedFixture` tensor declarations. Model analysis verifies dimensions, indices,
 INT8 type and per-tensor quantization, then derives the used operator resolver.
-The supported capability is one static, stateless INT8 input and output on
-Apollo510 EVB LP, ATfE, SRAM arena and MRAM weights. Unsupported graphs fail
+The single-IO capability is one static INT8 input and output on Apollo510 EVB
+LP, ATfE, SRAM arena and MRAM weights. Unsupported graphs fail
 before engine preparation. Advisory batch wildcards are accepted only when
 the stored shape has batch one; firmware never resizes or rewrites the model.
 No model names or fixed shapes select execution.
@@ -366,7 +366,7 @@ dependency-workspace requirements.
 ## Typed multi-tensor fixtures
 
 `TypedFixture(model, inputs, outputs)` covers every input and output of a
-static, stateless, single-subgraph model. Each `FixtureIO` pairs a
+model whose public inputs and outputs have static shapes. Each `FixtureIO` pairs a
 `FixtureTensor(name, index, dtype, shape, quantization)` with the pinned bytes of
 that tensor: fixed input bytes, or the expected output. Inputs carry a role
 (`signal` or `aux`); outputs are `signal`. Dtypes are `int8`, `int16`, `int32`,
@@ -494,8 +494,8 @@ Historical raw records and build/capture safety validation are unchanged.
 LiteRT fixture preparation uses `EngineAdapter.prepare_fixture_model`. Each
 adapter owns its integration limits and resolver selection. The shared LiteRT
 reader validates the container and records graph facts without selecting an
-engine; public IO validation and legacy stateless restrictions are applied
-separately. The parsed model is reused for cost analysis.
+engine; public IO validation is applied separately, and the only graph-level
+fixture constraint is static public IO. The parsed model is reused for cost analysis.
 
 The adapter's `FixtureModelPreparation` protocol describes common analysis,
 byte extents and state metadata. LiteRT analysis results retain their existing

@@ -620,6 +620,14 @@ def test_matrix_covers_every_engine_family():
         "510-helia-aot-fixture-psram-tcm",
         "510-tflm-fixture-psram-tcm-resource",
         "510-helia-aot-fixture-psram-tcm-resource",
+        # heliaRT fixtures admit the same state, resource and PSRAM forms as TFLM.
+        "510-helia-rt-fixture-resource",
+        "510-helia-rt-fixture-power-resource",
+        "510-helia-rt-fixture-ram",
+        "510-helia-rt-fixture-psram",
+        "510-helia-rt-fixture-psram-resource",
+        "510-helia-rt-fixture-psram-tcm",
+        "510-helia-rt-fixture-psram-tcm-resource",
     }, "the Tier-2 leg set changed — deliberate? update this pin with the reason"
 
 

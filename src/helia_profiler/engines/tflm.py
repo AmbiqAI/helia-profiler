@@ -51,15 +51,9 @@ class TFLMAdapter(SingleArenaPlacementMixin):
         return "Stock TFLM"
 
     def prepare_fixture_model(self, path: Path, *, single_io: bool) -> FixtureModelPreparation:
-        from ..firmware.op_resolver import build_fixture_resolver_plan
-        from ..fixture_analysis import prepare_litert_fixture
+        from ..fixture_analysis import litert_fixture_resolver, prepare_litert_fixture
 
-        def resolver(analysis, facts):
-            return build_fixture_resolver_plan(
-                analysis, allow_state=True, additional_ops=facts.operator_names
-            )
-
-        return prepare_litert_fixture(path, single_io=single_io, resolver=resolver)
+        return prepare_litert_fixture(path, single_io=single_io, resolver=litert_fixture_resolver)
 
     @property
     def engine_type(self) -> EngineType:

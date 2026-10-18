@@ -103,12 +103,10 @@ def test_io_and_costs_use_one_original_model_snapshot(tmp_path, monkeypatch, typ
 @pytest.mark.parametrize(
     "change,match",
     [
-        (lambda m, g: setattr(m, "subgraphs", [g, g]), "one subgraph"),
         (lambda m, g: setattr(g, "inputs", [0, 1]), "one input"),
         (lambda m, g: setattr(g, "outputs", [0, 1]), "one output"),
         (lambda m, g: setattr(g.tensors[0], "shapeSignature", [1, -1]), "Dynamic"),
         (lambda m, g: setattr(g.tensors[1], "shape", [1, 0]), "Dynamic"),
-        (lambda m, g: setattr(g.tensors[0], "isVariable", True), "stateful"),
         (lambda m, g: setattr(g.tensors[1], "type", s.TensorType.FLOAT32), "INT8"),
         (lambda m, g: setattr(g.tensors[0].quantization, "scale", [0.1, 0.2]), "per-tensor"),
         (lambda m, g: setattr(g.tensors[0].quantization, "scale", [float("nan")]), "finite"),
@@ -117,7 +115,6 @@ def test_io_and_costs_use_one_original_model_snapshot(tmp_path, monkeypatch, typ
         (lambda m, g: setattr(g.operators[0], "opcodeIndex", 9), "code index"),
         (lambda m, g: setattr(g.operators[0], "outputs", [9]), "tensor index"),
         (lambda m, g: setattr(g.tensors[0], "buffer", 9), "buffer index"),
-        (lambda m, g: setattr(g.operators[0], "mutatingVariableInputs", [True]), "Stateful"),
     ],
 )
 def test_rejects_unsupported_signature(tmp_path, change, match):
@@ -125,7 +122,25 @@ def test_rejects_unsupported_signature(tmp_path, change, match):
         analyze_fixture_model(model_file(tmp_path, change=change))
 
 
-@pytest.mark.parametrize("op", [s.BuiltinOperator.CUSTOM, s.BuiltinOperator.VAR_HANDLE, 999])
+@pytest.mark.parametrize(
+    "change",
+    [
+        lambda m, g: setattr(m, "subgraphs", [g, g]),
+        lambda m, g: setattr(g.tensors[0], "isVariable", True),
+        lambda m, g: setattr(g.operators[0], "mutatingVariableInputs", [True]),
+    ],
+)
+def test_graph_contents_are_reported_not_refused(tmp_path, change):
+    analysis = analyze_fixture_model(model_file(tmp_path, change=change))
+    assert analysis.has_internal_state or analysis.subgraph_count == 2
+
+
+def test_stateful_operators_are_registered(tmp_path):
+    analysis = analyze_fixture_model(model_file(tmp_path, op=s.BuiltinOperator.VAR_HANDLE))
+    assert analysis.has_internal_state
+
+
+@pytest.mark.parametrize("op", [s.BuiltinOperator.CUSTOM, 999])
 def test_rejects_unsupported_operator(tmp_path, op):
     with pytest.raises(ValueError, match="Unsupported fixture operators"):
         analyze_fixture_model(model_file(tmp_path, op=op))

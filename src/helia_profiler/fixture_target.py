@@ -109,6 +109,3 @@ def validate_fixture_placement(
             raise ConfigError("Fixture target has no selected memory bank") from exc
         if start >= end:
             raise ConfigError("Fixture target memory bank has no usable capacity")
-    if weights is Placement.PSRAM:
-        if engine not in (EngineType.HELIA_AOT, EngineType.TFLM):
-            raise ConfigError("Self-loading PSRAM fixtures implement helia-AOT or upstream TFLM")

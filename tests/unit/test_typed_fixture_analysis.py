@@ -180,9 +180,7 @@ def test_rejects_unsupported_io_dtype(tmp_path):
 @pytest.mark.parametrize(
     "change,match",
     [
-        (lambda m, g: setattr(m, "subgraphs", [g, g]), "one subgraph"),
         (lambda m, g: setattr(g, "outputs", []), "at least one input and one output"),
-        (lambda m, g: setattr(g.tensors[1], "isVariable", True), "stateful"),
         (lambda m, g: setattr(g.tensors[0], "shapeSignature", [1, -1]), "Dynamic"),
     ],
 )
