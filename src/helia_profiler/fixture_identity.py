@@ -11,7 +11,6 @@ import hashlib
 import json
 from dataclasses import fields, is_dataclass
 from enum import Enum
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from .fixture_runtime import FixtureFile
@@ -54,10 +53,7 @@ def fixture_run_identity(
             warmups=build.warmups,
             timing_scope=build.timing_scope.value,
         ),
-        producer=_workspace_fact(
-            workspace if isinstance(workspace, Unknown) else workspace.get("inputs", {}),
-            "hpx_version",
-        ),
+        producer=_workspace_fact(_inputs(workspace), "hpx_version"),
         build_hash=_build_hash(build, archive),
         observation_hash=_observation_hash(capture) if capture is not None else None,
     )
@@ -66,10 +62,21 @@ def fixture_run_identity(
 def _workspace(build: FixtureBuild) -> dict[str, Any] | Unknown:
     if build.dependency_state is None:
         return _NOT_COMPILED
-    workspace = json.loads(build.dependency_state.read()).get("workspace")
+    try:
+        state = json.loads(build.dependency_state.read())
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return Unknown("the dependency state is not JSON")
+    workspace = state.get("workspace") if isinstance(state, dict) else None
     if not isinstance(workspace, dict):
         return Unknown("the dependency state records no workspace")
     return workspace
+
+
+def _inputs(workspace: dict[str, Any] | Unknown) -> dict[str, Any] | Unknown:
+    if isinstance(workspace, Unknown):
+        return workspace
+    inputs = workspace.get("inputs")
+    return inputs if isinstance(inputs, dict) else Unknown("the workspace records no inputs")
 
 
 def _workspace_fact(source: dict[str, Any] | Unknown, key: str) -> str | Unknown:
@@ -117,12 +124,11 @@ def _kernels(build: FixtureBuild) -> KernelIdentity:
 def _build_facts(build: FixtureBuild) -> BuildFacts:
     toolchain = build.toolchain
     unrecorded = Unknown("the record predates this fact")
+    no_toolchain = Unknown("the record states no toolchain") if build.built else _NOT_COMPILED
     return BuildFacts(
-        toolchain=toolchain.compiler if toolchain and toolchain.compiler else _NOT_COMPILED,
+        toolchain=toolchain.compiler if toolchain and toolchain.compiler else no_toolchain,
         toolchain_version=(
-            toolchain.compiler_version
-            if toolchain and toolchain.compiler_version
-            else _NOT_COMPILED
+            toolchain.compiler_version if toolchain and toolchain.compiler_version else no_toolchain
         ),
         board=build.target.board,
         cpu_hz=build.cpu_hz if build.cpu_hz is not None else unrecorded,
@@ -155,6 +161,7 @@ def _build_hash(build: FixtureBuild, archive: str | None) -> str | Unknown:
 
 def _observation_hash(capture: FixtureCaptureResult) -> str:
     facts = _facts(capture)
+    # Evidence files record host timings and paths, not the measurement.
     facts.pop("artifacts", None)
     return _digest(facts)
 
@@ -165,8 +172,6 @@ def _facts(value: Any) -> Any:
         return value.sha256
     if isinstance(value, Enum):
         return value.value
-    if isinstance(value, Path):
-        return None
     if is_dataclass(value) and not isinstance(value, type):
         return {f.name: _facts(getattr(value, f.name)) for f in fields(value)}
     if isinstance(value, (list, tuple)):

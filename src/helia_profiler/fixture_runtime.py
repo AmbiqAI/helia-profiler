@@ -7,6 +7,7 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path, PurePath
+from typing import Any
 
 from .errors import ConfigError
 
@@ -137,7 +138,9 @@ def read_prepared_runtime_manifest(manifest: FixtureFile) -> PreparedRuntimeFact
     return _manifest_facts(manifest)[2]
 
 
-def _manifest_facts(manifest: FixtureFile) -> tuple[int, dict, PreparedRuntimeFacts]:
+def _manifest_facts(
+    manifest: FixtureFile,
+) -> tuple[int, dict[str, Any], PreparedRuntimeFacts]:
     raw = json.loads(manifest.read(), object_pairs_hook=_unique_object)
     schema = raw.get("schema_version") if isinstance(raw, dict) else None
     if type(schema) is not int or schema not in (1, 2):

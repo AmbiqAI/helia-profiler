@@ -140,9 +140,9 @@ def test_the_observation_hash_follows_measured_facts_not_paths(tmp_path):
     assert fixture_run_identity(build).observation_hash is None
 
 
-def _manifest(root, *, stack_schema=2):
+def _manifest(root):
     data = {
-        "schema_version": stack_schema,
+        "schema_version": 2,
         "archive_sha256": "c" * 64,
         "providers": {
             "helia-rt": {"url": "https://github.com/AmbiqAI/helia-rt", "revision": "a" * 40},
@@ -175,3 +175,101 @@ def test_a_record_from_the_previous_api_still_loads(tmp_path):
     assert record["fixture_api"] == [5, 7]
     record["fixture_api"] = [5, 6]
     assert load_fixture_build(json.dumps(record), roots={"run": tmp_path}) == build
+
+
+def test_the_build_hash_covers_the_runtime_archive_the_model_and_the_lock(tmp_path):
+    from helia_profiler.fixture import FixtureRuntimeSource
+
+    build = _aot(tmp_path)
+    base = fixture_run_identity(build).build_hash
+    archive = FixtureRuntimeSource(
+        "helia-rt", "https://github.com/AmbiqAI/helia-rt", "2.2.2", "a" * 40, "c" * 64
+    )
+    for changed in (
+        replace(build, runtime_source=archive),
+        replace(build, model=_pin(tmp_path / "other" / "model.tflite", b"other model")),
+        replace(build, dependency_lock=_pin(tmp_path / "other" / "nsx.lock", b"other lock")),
+    ):
+        assert fixture_run_identity(changed).build_hash != base
+
+
+def test_each_missing_fact_states_its_own_reason(tmp_path):
+    from helia_profiler.fixture import FixtureRuntimeSource
+
+    build = _aot(tmp_path)
+    identity = fixture_run_identity(
+        replace(build, model=None, inputs=(), cpu_hz=None, toolchain=None, kernel_source=None)
+    )
+    assert identity.model_sha256 == Unknown("the record predates pinned models")
+    assert identity.inputs_sha256 == Unknown("the record predates pinned inputs")
+    assert identity.build.cpu_hz == Unknown("the record predates this fact")
+    assert identity.build.toolchain == Unknown("the record states no toolchain")
+    assert identity.kernels.library == Unknown(
+        "the dependency state names no single CMSIS-NN module"
+    )
+    unmatched = FixtureRuntimeSource(
+        "helia-rt", "https://github.com/AmbiqAI/helia-rt", None, "a" * 40, "c" * 64
+    )
+    version = fixture_run_identity(replace(build, runtime_source=unmatched)).runtime.version
+    assert version == Unknown(f"no runtime record matches {'a' * 40}")
+
+
+@pytest.mark.parametrize(
+    ("content", "reason"),
+    [
+        (b"not json", "the dependency state is not JSON"),
+        (b"\xff\xfe", "the dependency state is not JSON"),
+        (b"[]", "the dependency state records no workspace"),
+        (b'{"workspace": "x"}', "the dependency state records no workspace"),
+    ],
+)
+def test_a_malformed_dependency_state_is_an_unknown_not_a_crash(tmp_path, content, reason):
+    build = replace(_aot(tmp_path), dependency_state=_pin(tmp_path / "bad.json", content))
+    assert fixture_run_identity(build).baseline_id == Unknown(reason)
+
+
+def test_a_workspace_without_inputs_has_no_producer(tmp_path):
+    state = _pin(
+        tmp_path / "s.json", json.dumps({"workspace": {"baseline_id": "b", "inputs": "x"}}).encode()
+    )
+    identity = fixture_run_identity(replace(_aot(tmp_path), dependency_state=state))
+    assert identity.baseline_id == "b"
+    assert identity.producer == Unknown("the workspace records no inputs")
+
+
+def test_lifecycle_and_input_names_are_part_of_the_identity(tmp_path):
+    build = _aot(tmp_path)
+    assert fixture_run_identity(replace(build, state_policy=None)).run.lifecycle == "stateless"
+    renamed = tuple(
+        replace(io, tensor=replace(io.tensor, name=io.tensor.name + "_x")) for io in build.inputs
+    )
+    assert (
+        fixture_run_identity(replace(build, inputs=renamed)).inputs_sha256
+        != fixture_run_identity(build).inputs_sha256
+    )
+
+
+def test_a_ram_observing_record_from_the_previous_api_still_loads(tmp_path):
+    build = _reseal(_aot(tmp_path), observe_ram=True)
+    record = json.loads(dump_fixture_build(build, roots={"run": tmp_path}))
+    record["fixture_api"] = [5, 6]
+    assert load_fixture_build(json.dumps(record), roots={"run": tmp_path}) == build
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        (
+            lambda d: d["providers"]["helia-rt"].update(url="https://example.com/fork"),
+            "provider source",
+        ),
+        (lambda d: d.update(stack="mystery"), "stack"),
+        (lambda d: d.update(archive_sha256="not-a-digest"), "SHA256"),
+    ],
+)
+def test_the_manifest_reader_checks_declared_fields(tmp_path, change, message):
+    manifest = _manifest(tmp_path)
+    data = json.loads(manifest.path.read_bytes())
+    change(data)
+    with pytest.raises(ValueError, match=message):
+        read_prepared_runtime_manifest(_pin(tmp_path / "changed.json", json.dumps(data).encode()))
