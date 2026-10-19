@@ -25,7 +25,7 @@
     # release, or a Git revision of the private AmbiqAI/helia-aot repository, with
     # --override-input (see the Nix environment guide, getting-started/nix).
     helia-aot = {
-      url = "https://files.pythonhosted.org/packages/be/52/c218f821193dbca8629851f65875c16826d1cd9d968f65189f21721a5908/helia_aot-0.30.0.tar.gz";
+      url = "https://files.pythonhosted.org/packages/74/4e/1ce35c91334b7fd0ffff2c4eb7afa679d5c9c2fcd137777668cd88c855ea/helia_aot-0.31.0.tar.gz";
       flake = false;
     };
   };
@@ -340,6 +340,8 @@
             "0.30.0 on v7.45.0" = accepts "0.30.0" v7_45_0;
             "0.30.0 on v7.45.1" = accepts "0.30.0" v7_45_1;
             "0.30.0 on v7.46.0" = accepts "0.30.0" v7_46_0;
+            "0.31.0 rejected on v7.45.1" = !accepts "0.31.0" v7_45_1;
+            "0.31.0 on v7.46.0" = accepts "0.31.0" v7_46_0;
             "1.0.0 rejected on v7.44.1" = !accepts "1.0.0" v7_44_1;
             "unmapped baseline commit reported, not blocking" =
               accepts "0.26.0" "0000000000000000000000000000000000000000"

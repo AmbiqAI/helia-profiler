@@ -67,7 +67,7 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "arm-cmsis-nn": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",
         "ns-cmsis-nn": "4a937fe7988935e1cfc2d8a41859fdada042c17c",
         "nsx-executorch": "5514ac1ea8439b3fe615d180bf68c75a9dabb48e",
-        "helia-rt": "3eca66cbe9494b90c00293a5f620d1f45d6653e8",
+        "helia-rt": "4f922ed365177a6533f869feffe069b0e8b7afb2",
         # nsx-sensors: INA228 driver pinned for the shunt-cal register
         # fixes and raw 40-bit accumulator reads power.driver: ina228
         # needs (issue #95).
@@ -81,7 +81,7 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "arm-cmsis-nn": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",
         "nsx-cmsis-nn": "4a937fe7988935e1cfc2d8a41859fdada042c17c",
         "nsx-executorch": "5514ac1ea8439b3fe615d180bf68c75a9dabb48e",
-        "nsx-helia-rt": "3eca66cbe9494b90c00293a5f620d1f45d6653e8",
+        "nsx-helia-rt": "4f922ed365177a6533f869feffe069b0e8b7afb2",
         "nsx-sensors": "c219a2bc98c62f96819fae20ab6c8911fcea3e25",
     }
 
@@ -134,7 +134,7 @@ def test_aot_extra_and_lock_match_the_recorded_helia_aot_range() -> None:
     # The range runs from the oldest helia-aot runtime record to the minor after the newest.
     minimum = aot_compile.HELIAAOT_MIN_VERSION
     maximum = aot_compile.HELIAAOT_MAX_VERSION_EXCLUSIVE
-    assert (minimum, maximum) == ("0.23.0", "0.31.0")
+    assert (minimum, maximum) == ("0.23.0", "0.32.0")
     specifier = f">={minimum},<{maximum}"
 
     with (repo_root / "pyproject.toml").open("rb") as stream:
@@ -456,10 +456,10 @@ def test_helia_aot_version_check_uses_the_recorded_range(monkeypatch: pytest.Mon
     ) as excinfo:
         aot_compile._check_helia_aot_version()
     # The upgrade command stays inside the recorded range.
-    assert "'helia-aot>=0.23.0,<0.31.0'" in (excinfo.value.hint or "")
+    assert "'helia-aot>=0.23.0,<0.32.0'" in (excinfo.value.hint or "")
 
     def _fake_version_too_new(name: str) -> str:
-        return "0.31.0"
+        return "0.32.0"
 
     monkeypatch.setattr("importlib.metadata.version", _fake_version_too_new)
     with pytest.raises(EngineError, match=r"outside the recorded range"):
@@ -485,7 +485,7 @@ def test_helia_aot_unparseable_version_warns_full_range(
 
     assert result == "not-a-version"
     messages = [rec.message for rec in caplog.records]
-    assert any("0.23.0" in message and "0.31.0" in message for message in messages)
+    assert any("0.23.0" in message and "0.32.0" in message for message in messages)
     assert not any("floor" in message for message in messages)
 
 
@@ -501,7 +501,7 @@ def test_helia_aot_success_debug_log_only_after_max_check(
     from helia_profiler.errors import EngineError
 
     def _fake_version_too_new(name: str) -> str:
-        return "0.31.0"
+        return "0.32.0"
 
     monkeypatch.setattr("importlib.metadata.version", _fake_version_too_new)
     with caplog.at_level(logging.DEBUG):

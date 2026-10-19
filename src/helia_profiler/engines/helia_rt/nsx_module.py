@@ -42,7 +42,12 @@ def _install_nsx_module(
     if not src_yaml.is_file():
         raise EngineError(
             f"heliaRT distribution at {dist_path} is missing nsx/nsx-module.yaml",
-            hint=(f"Expected nsx/nsx-module.yaml. Use heliaRT >= v{HELIART_MIN_VERSION}."),
+            hint=(
+                "heliaRT 2.2.0 and later releases ship no NSX module. Use the default "
+                "registry route (remove engine.config.dist_path/source) or a heliaRT "
+                f"source checkout (engine.config.source_path); older prebuilt releases "
+                f"need v{HELIART_MIN_VERSION} or newer."
+            ),
         )
 
     shutil.copy2(src_yaml, module_dir / "nsx-module.yaml")

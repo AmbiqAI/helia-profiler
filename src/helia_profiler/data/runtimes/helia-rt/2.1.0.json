@@ -2,7 +2,7 @@
   "schema": "helia-profiler/runtime@1",
   "name": "helia-rt",
   "version": "2.1.0",
-  "default": true,
+  "default": false,
   "source": {
     "repo": "AmbiqAI/helia-rt",
     "commit": "3eca66cbe9494b90c00293a5f620d1f45d6653e8"
