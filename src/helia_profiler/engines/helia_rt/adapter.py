@@ -15,6 +15,7 @@ from pathlib import Path
 
 from ...config import ProfileConfig
 from ...errors import EngineError
+from ...lifecycle import Lifecycle
 from ...results import NsxModuleRef
 from .. import TFLM_ENGINE_HEADER, EngineType
 from ..base import (
@@ -163,6 +164,13 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
         # Same host-upload flow as stock TFLM: the flatbuffer is pushed
         # over J-Link after the firmware's HPX_PSRAM_READY.
         return PsramWeightsSource.HOST_UPLOAD
+
+    @property
+    def lifecycles(self) -> frozenset[Lifecycle]:
+        return frozenset({Lifecycle.CARRY, Lifecycle.SINGLE})
+
+    def lifecycle_refusal(self, lifecycle: Lifecycle) -> str:
+        return f"{self.name} firmware does not implement the {lifecycle.value} lifecycle"
 
     def prepare(self, config: ProfileConfig, work_dir: Path) -> HeliaRtArtifacts:
         _reject_config_path(config)

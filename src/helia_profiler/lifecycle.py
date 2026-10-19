@@ -9,10 +9,9 @@ decide.
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from .engines import EngineType
+from .engines import EngineType, get_adapter
+from .errors import EngineError
 
 
 class Lifecycle(StrEnum):
@@ -29,8 +28,19 @@ class Lifecycle(StrEnum):
 
 
 def require_lifecycle(engine: EngineType, lifecycle: Lifecycle) -> None:
-    """Refuse *lifecycle* when *engine* does not implement it, with the engine's reason."""
-    del engine, lifecycle
+    """Refuse *lifecycle* when *engine* does not implement it, with the engine's reason.
+
+    Raises:
+        EngineError: The engine's adapter does not declare *lifecycle*.
+    """
+    adapter = get_adapter(engine)
+    if lifecycle in adapter.lifecycles:
+        return
+    supported = ", ".join(sorted(item.value for item in adapter.lifecycles))
+    raise EngineError(
+        adapter.lifecycle_refusal(lifecycle),
+        hint=f"Request a lifecycle {adapter.name} implements: {supported}.",
+    )
 
 
 def lifecycle_invocations(lifecycle: Lifecycle, iterations: int, warmups: int) -> tuple[int, int]:
