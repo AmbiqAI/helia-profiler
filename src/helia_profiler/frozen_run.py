@@ -54,10 +54,11 @@ _HOST_LOCAL_SETTINGS = (
 #: Environment variables that can point a build at local sources.
 _SOURCE_VARIABLES = ("SEGGER_RTT_PATH", "CMSIS_NN_PATH")
 
-#: Environment variables that change what is built (read by the compilers,
-#: CMake or NSX) or how a measurement is judged. Compiler launchers are
-#: host-local and excluded.
-_ENVIRONMENT_VARIABLES = (
+#: Environment variables the compilers, CMake or NSX read that change what is
+#: built. Compiler launchers are host-local and excluded. Values are recorded
+#: as strings: files or directories they name (response files, include paths)
+#: are not content-identified.
+_BUILD_VARIABLES = (
     "ASM",
     "ASMFLAGS",
     "CC",
@@ -77,9 +78,12 @@ _ENVIRONMENT_VARIABLES = (
     "LIBRARY_PATH",
     "NSX_ALLOW_VERSION_MISMATCH",
     "NSX_SKIP_COMPAT_CHECK",
-    "HPX_POWER_ALLOW_NEGATIVE",
-    "HPX_POWER_FULLRATE_XCHECK",
 )
+
+#: Environment variables that change how a measurement is judged.
+_MEASUREMENT_VARIABLES = ("HPX_POWER_ALLOW_NEGATIVE", "HPX_POWER_FULLRATE_XCHECK")
+
+_ENVIRONMENT_VARIABLES = (*_BUILD_VARIABLES, *_MEASUREMENT_VARIABLES)
 
 #: The ExecuTorch ``<model>.pte.json`` export sidecar, recorded beside the model.
 _SIDECAR = "model.sidecar"
@@ -185,8 +189,14 @@ class FrozenRun:
 
     @property
     def portable(self) -> bool:
-        """Whether every input is pinned or content-identified, so another host can rebuild it."""
-        return all(item.kind == "file" for item in self.local_inputs)
+        """Whether every input is pinned or content-identified, so another host can rebuild it.
+
+        A compiler environment variable makes a plan host-specific, since the
+        files it may name are not tracked.
+        """
+        return all(item.kind == "file" for item in self.local_inputs) and not any(
+            name in _BUILD_VARIABLES for name in self.environment
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {

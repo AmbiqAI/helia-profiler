@@ -497,6 +497,7 @@ def test_compiler_environment_is_part_of_the_intent_and_checked_on_replay(sessio
     monkeypatch.setenv("CMAKE_C_COMPILER_LAUNCHER", "ccache")
     plan = session.freeze()
     assert dict(plan.environment) == {"CFLAGS": "-O0"}
+    assert not plan.portable
     assert FrozenRun.from_dict(plan.to_dict()) == plan
 
     monkeypatch.setenv("CFLAGS", "-O3")
@@ -544,5 +545,6 @@ def test_an_unused_heliart_distribution_is_not_an_input(session, tmp_path, monke
 def test_a_power_judgement_variable_is_part_of_the_intent(session, monkeypatch):
     plan = session.freeze()
     monkeypatch.setenv("HPX_POWER_ALLOW_NEGATIVE", "1")
+    assert session.freeze().portable
     with pytest.raises(ConfigError, match="environment"):
         plan.config()
