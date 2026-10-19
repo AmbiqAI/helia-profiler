@@ -56,6 +56,14 @@ release pull requests from Conventional Commits.
   capture taken while it was still settling says so.
 
 
+## [0.2.5](https://github.com/AmbiqAI/helia-profiler/compare/v0.2.4...v0.2.5) (2026-10-19)
+
+
+### Features
+
+* **deps:** adopt heliaAOT 0.32.0 ([#557](https://github.com/AmbiqAI/helia-profiler/issues/557)) ([34a7932](https://github.com/AmbiqAI/helia-profiler/commit/34a79327e3ea71527d7453f5cb98e116b9c973a5)), closes [#537](https://github.com/AmbiqAI/helia-profiler/issues/537)
+* **results:** state a profile run's RunIdentity ([#555](https://github.com/AmbiqAI/helia-profiler/issues/555)) ([0db88da](https://github.com/AmbiqAI/helia-profiler/commit/0db88dac9c7512001748deccf5f12d40c325f5d2)), closes [#537](https://github.com/AmbiqAI/helia-profiler/issues/537)
+
 ## [0.2.4](https://github.com/AmbiqAI/helia-profiler/compare/v0.2.3...v0.2.4) (2026-10-19)
 
 
