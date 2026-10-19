@@ -6,6 +6,7 @@ _fixture_placement.py
 _fixture_ram.py
 _fixture_record.py
 _fixture_request.py
+_identity_hash.py
 _litert_inspection.py
 _result_view.py
 _version.py
@@ -209,6 +210,7 @@ power/joulescope_compatibility.py
 power/metadata.py
 power/sync.py
 prepared_runtimes.py
+profile_identity.py
 profiler.py
 records.py
 report/__init__.py

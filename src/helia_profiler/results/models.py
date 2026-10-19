@@ -26,6 +26,7 @@ from ..placement import MemoryRegion
 from ..power.base import PowerResult
 
 if TYPE_CHECKING:
+    from ..identity import RunIdentity
     from .artifacts import OnDevicePowerSummary, PowerObservation, PowerTerminalRecord
     from .dependencies import DependencyProvenance
 
@@ -282,6 +283,10 @@ class BuildImage:
     configured translation units containing it, across the whole build tree
     including potentially unbuilt targets. Prebuilt-library flags are unavailable;
     the mapping is empty when the build left no compile database.
+
+    ``sha256`` hashes the linked ELF, whose debug info names host paths.
+    ``flash_sha256`` hashes the flat ``.bin`` image the probe writes, which
+    does not; it is ``None`` when the build left no such image.
     """
 
     role: str = ""
@@ -291,6 +296,7 @@ class BuildImage:
     size_bytes: int = 0
     architecture_flags: dict[str, int] = field(default_factory=dict)
     translation_units: int = 0
+    flash_sha256: str | None = None
 
 
 @dataclass
@@ -313,6 +319,9 @@ class RunMetadata:
     timing: TimingInfo | None = None
     compatibility: CompatibilityResolution | None = None
     dependencies: "DependencyProvenance | None" = None
+    #: What ran, in the vocabulary fixture builds share. Set when the report
+    #: is written, once the capture it hashes is complete.
+    identity: "RunIdentity | None" = None
 
 
 @dataclass(frozen=True)

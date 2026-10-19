@@ -66,7 +66,9 @@ RUN_SUMMARY_SCHEMA = "hpx.run-summary"
 #: model_analysis records engine and index_space.
 #: v13: #466 memory_plan MRAM capacity is the linker's application window for the
 #: selected toolchain where the SoC has a linked memory map, not the whole part.
-RUN_SUMMARY_SCHEMA_VERSION = 13
+#: v14: #537 adds identity, the run's RunIdentity in the vocabulary fixture
+#: builds share. Additive: no existing field changes meaning.
+RUN_SUMMARY_SCHEMA_VERSION = 14
 
 __all__ = [
     "RUN_SUMMARY_SCHEMA",
@@ -509,6 +511,8 @@ class RunSummary:
     schema_version: int = RUN_SUMMARY_SCHEMA_VERSION
     compatibility: Mapping[str, Any] | None = None
     dependencies: Mapping[str, Any] | None = None
+    #: The run's ``RunIdentity.to_dict()``; absent before schema v14.
+    identity: Mapping[str, Any] | None = None
     top_layers: tuple[Mapping[str, Any], ...] = ()
     memory: MemorySection | None = None
     psram: Mapping[str, Any] | None = None
@@ -539,6 +543,7 @@ class RunSummary:
         }
         _put(out, "compatibility", self.compatibility)
         _put(out, "dependencies", self.dependencies)
+        _put(out, "identity", self.identity)
         out["top_layers"] = list(self.top_layers)
         if self.memory is not None:
             memory = self.memory.to_dict()
@@ -573,6 +578,7 @@ class RunSummary:
             "overflow_detected",
             "compatibility",
             "dependencies",
+            "identity",
             "top_layers",
             "memory",
             "psram",
@@ -602,6 +608,7 @@ class RunSummary:
             schema_version=to_int(data.get("schema_version")) or 1,
             compatibility=data.get("compatibility"),
             dependencies=data.get("dependencies"),
+            identity=data.get("identity"),
             top_layers=_tuple_of_mappings(data.get("top_layers")),
             memory=(MemorySection.from_dict(memory) if isinstance(memory, Mapping) else None),
             psram=data.get("psram"),
