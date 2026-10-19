@@ -64,7 +64,7 @@ def analysis_boundary(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
         for key, value in attributes.items():
             setattr(module, key, value)
         monkeypatch.setitem(sys.modules, name, module)
-    compiler.return_value.convert.return_value = SimpleNamespace(model=object())
+    compiler.return_value.convert.return_value = _context(model=object())
     result = ModelAnalysis(layers=[], total_macs=0, total_ops=0, num_parameters=0)
     monkeypatch.setattr(engine_analysis, "is_available", lambda: True)
     monkeypatch.setattr(engine_analysis, "is_aot_available", lambda: True)
@@ -131,19 +131,68 @@ def test_unknown_analysis_board_preserves_aot_refusal(analysis_boundary):
         engine_analysis.analyze_for_engine(model, engine="helia-aot", board="unknown_463_board")
 
 
+def _context(**fields: object) -> SimpleNamespace:
+    return SimpleNamespace(
+        **{
+            "operators": [],
+            "model": object(),
+            "memory_plan": object(),
+            "render_plan": object(),
+            **fields,
+        }
+    )
+
+
 def test_codegen_context_prefers_the_internal_context_over_the_conversion_result():
     from helia_profiler.engines.helia_aot.compile import codegen_context
 
+    context = _context()
+
     class Current:
         def convert(self):
-            return "result"
+            return SimpleNamespace(output=None, plan=None, report=None)
 
         def _convert(self):
-            return "context"
+            return context
 
     class Older:
         def convert(self):
-            return "context"
+            return context
 
-    assert codegen_context(Current()) == "context"
-    assert codegen_context(Older()) == "context"
+    assert codegen_context(Current()) is context
+    assert codegen_context(Older()) is context
+
+
+def test_a_conversion_result_without_the_context_is_refused():
+    from helia_profiler.engines.helia_aot.compile import codegen_context
+
+    class PublicOnly:
+        def convert(self):
+            return SimpleNamespace(output=None, prefix="aot", plan=None, report=None, work_dir=None)
+
+    with pytest.raises(
+        EngineError, match="missing operators, model, memory_plan, render_plan"
+    ) as refused:
+        codegen_context(PublicOnly())
+    assert refused.value.hint and "hpx runtimes list" in refused.value.hint
+
+
+def test_a_context_without_its_plans_is_refused():
+    from helia_profiler.engines.helia_aot.compile import codegen_context
+
+    class Partial:
+        def convert(self):
+            return _context(memory_plan=None, render_plan=None)
+
+    with pytest.raises(EngineError, match="missing memory_plan, render_plan"):
+        codegen_context(Partial())
+
+
+def test_callers_keep_the_refusal_and_its_hint(analysis_boundary):
+    model, compiler, _ = analysis_boundary
+    compiler.return_value.convert.return_value = SimpleNamespace(output=None, plan=None)
+    with pytest.raises(
+        EngineError, match="^heliaAOT returned no code generation context"
+    ) as refused:
+        engine_analysis.analyze_for_engine(model, engine="helia-aot", board="apollo510_evb")
+    assert refused.value.hint

@@ -277,12 +277,32 @@ def _merged_aot_args(config: ProfileConfig) -> dict[str, Any]:
     return base_data
 
 
+#: The code generation context fields hpx attributes layers and plans arenas from.
+_CODEGEN_FIELDS = ("operators", "model", "memory_plan", "render_plan")
+
+
 def codegen_context(converter: Any) -> Any:
-    """Convert and return heliaAOT's code generation context."""
-    # WORKAROUND helia-aot: convert() returns only the written plan and report;
-    # the operators, AIR model and memory plan stay on the internal context.
+    """Convert and return heliaAOT's code generation context.
+
+    Raises :class:`EngineError` when the installed heliaAOT returns no context.
+    """
+    # WORKAROUND helia-aot#874: convert() returns only the written plan and
+    # report; the operators, AIR model and memory plan stay on the internal context.
     private = getattr(type(converter), "_convert", None)
-    return private(converter) if private is not None else converter.convert()
+    context = private(converter) if private is not None else converter.convert()
+    # A model with no generated operators is valid; the other fields are always set.
+    missing = [
+        name
+        for name in _CODEGEN_FIELDS
+        if not hasattr(context, name) or (name != "operators" and getattr(context, name) is None)
+    ]
+    if missing:
+        raise EngineError(
+            f"heliaAOT returned no code generation context (missing {', '.join(missing)})",
+            hint="Install a heliaAOT release inside the range this hpx records "
+            "(hpx runtimes list).",
+        )
+    return context
 
 
 def _run_aot_compiler(
@@ -363,6 +383,8 @@ def _run_aot_compiler(
 
     try:
         codegen_ctx = codegen_context(AotConverter(config=convert_args))
+    except EngineError:
+        raise
     except Exception as exc:
         raise EngineError(f"heliaAOT compilation failed: {exc}") from exc
 
