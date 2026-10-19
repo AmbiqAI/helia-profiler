@@ -277,12 +277,28 @@ def _merged_aot_args(config: ProfileConfig) -> dict[str, Any]:
     return base_data
 
 
+#: The code generation context fields hpx attributes layers and plans arenas from.
+_CODEGEN_FIELDS = ("operators", "model", "memory_plan", "render_plan")
+
+
 def codegen_context(converter: Any) -> Any:
-    """Convert and return heliaAOT's code generation context."""
-    # WORKAROUND helia-aot: convert() returns only the written plan and report;
-    # the operators, AIR model and memory plan stay on the internal context.
+    """Convert and return heliaAOT's code generation context.
+
+    Raises :class:`EngineError` when the installed heliaAOT returns no
+    context, instead of letting every layer and arena fact go missing.
+    """
+    # WORKAROUND helia-aot#874: convert() returns only the written plan and
+    # report; the operators, AIR model and memory plan stay on the internal context.
     private = getattr(type(converter), "_convert", None)
-    return private(converter) if private is not None else converter.convert()
+    context = private(converter) if private is not None else converter.convert()
+    missing = [name for name in _CODEGEN_FIELDS if not hasattr(context, name)]
+    if missing:
+        raise EngineError(
+            f"heliaAOT returned no code generation context (missing {', '.join(missing)})",
+            hint="Install a heliaAOT release inside the range this hpx records "
+            "(hpx runtimes list).",
+        )
+    return context
 
 
 def _run_aot_compiler(

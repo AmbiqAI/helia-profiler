@@ -64,7 +64,7 @@ def analysis_boundary(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
         for key, value in attributes.items():
             setattr(module, key, value)
         monkeypatch.setitem(sys.modules, name, module)
-    compiler.return_value.convert.return_value = SimpleNamespace(model=object())
+    compiler.return_value.convert.return_value = _context(model=object())
     result = ModelAnalysis(layers=[], total_macs=0, total_ops=0, num_parameters=0)
     monkeypatch.setattr(engine_analysis, "is_available", lambda: True)
     monkeypatch.setattr(engine_analysis, "is_aot_available", lambda: True)
@@ -131,19 +131,38 @@ def test_unknown_analysis_board_preserves_aot_refusal(analysis_boundary):
         engine_analysis.analyze_for_engine(model, engine="helia-aot", board="unknown_463_board")
 
 
+def _context(**fields: object) -> SimpleNamespace:
+    return SimpleNamespace(
+        **{"operators": [], "model": None, "memory_plan": None, "render_plan": None, **fields}
+    )
+
+
 def test_codegen_context_prefers_the_internal_context_over_the_conversion_result():
     from helia_profiler.engines.helia_aot.compile import codegen_context
 
+    context = _context()
+
     class Current:
         def convert(self):
-            return "result"
+            return SimpleNamespace(output=None, plan=None, report=None)
 
         def _convert(self):
-            return "context"
+            return context
 
     class Older:
         def convert(self):
-            return "context"
+            return context
 
-    assert codegen_context(Current()) == "context"
-    assert codegen_context(Older()) == "context"
+    assert codegen_context(Current()) is context
+    assert codegen_context(Older()) is context
+
+
+def test_a_conversion_result_without_the_context_is_refused():
+    from helia_profiler.engines.helia_aot.compile import codegen_context
+
+    class PublicOnly:
+        def convert(self):
+            return SimpleNamespace(output=None, prefix="aot", plan=None, report=None, work_dir=None)
+
+    with pytest.raises(EngineError, match="no code generation context .*operators, model"):
+        codegen_context(PublicOnly())

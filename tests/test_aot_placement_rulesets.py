@@ -231,7 +231,10 @@ class TestRunAotCompilerUsesConfigRegistry:
                 self.force = False
 
         class _FakeCodegenCtx:
-            pass
+            operators: list = []
+            model = None
+            memory_plan = None
+            render_plan = None
 
         class _FakeAotConverter:
             def __init__(self, config):
