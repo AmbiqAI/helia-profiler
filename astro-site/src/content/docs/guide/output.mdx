@@ -178,7 +178,7 @@ guessed:
 | `model_sha256`, `inputs_sha256` | the model file; profile firmware feeds zero-filled inputs, so `inputs_sha256` is unknown |
 | `run` | `lifecycle` (`carry`: the engine keeps its state across invocations), `iterations`, `warmups`, `timing_scope` (`restore_and_invoke` for heliaAOT's clean window, else `invoke_only`) |
 | `build_hash` | sha256 over the flashed `.bin` image, what the lock resolved, and the model; it ignores the HPX release and the lock's timestamps, so it changes only when what runs changes |
-| `observation_hash` | sha256 over the PMU and device timing results, without host paths; two captures of the same firmware differ |
+| `observation_hash` | sha256 over the PMU and device timing results, without host paths; two captures of the same firmware can differ |
 
 Four more top-level sections appear when the run produced them and are
 owned by other pages: `compatibility` and `dependencies` (the qualified

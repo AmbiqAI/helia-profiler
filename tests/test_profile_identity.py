@@ -275,6 +275,14 @@ def test_a_backend_label_without_a_linked_module_states_no_library(tmp_path):
     assert identity.kernels.commit == reason
 
 
+def test_only_tflm_reference_links_no_kernel_module(tmp_path):
+    identity = profile_run_identity(_ctx(tmp_path, backend=None, modules=(HELIA_RT,)))
+
+    assert identity.kernels.library == Unknown(
+        "the dependency lock names 0 CMSIS-NN modules, not one"
+    )
+
+
 def test_tflm_reference_links_no_kernel_module_and_states_reference(tmp_path):
     identity = profile_run_identity(_ctx(tmp_path, engine="tflm", modules=(TFLM,), version=None))
 

@@ -11,7 +11,6 @@ import json
 from collections.abc import Callable, Mapping
 from dataclasses import fields, is_dataclass
 from enum import Enum
-from pathlib import Path
 from typing import Any
 
 import yaml
@@ -25,7 +24,7 @@ def build_hash(
     *, image_sha256: str, lock: bytes, runtime_archive: str | None, model_sha256: str
 ) -> str | Unknown:
     """The hash of what runs: the flashed image, the resolved lock, the runtime archive, the model."""
-    resolved = resolved_lock(lock)
+    resolved = _resolved_lock(lock)
     if isinstance(resolved, Unknown):
         return resolved
     return digest(
@@ -38,7 +37,7 @@ def build_hash(
     )
 
 
-def resolved_lock(lock: bytes) -> Any:
+def _resolved_lock(lock: bytes) -> Any:
     """What the dependency lock resolved, without the times and tool version NSX stamps on it."""
     try:
         data = yaml.safe_load(lock)
@@ -75,8 +74,6 @@ def measured_facts(value: Any, leaf: Callable[[Any], Any] | None = None) -> Any:
         reduced = leaf(value)
         if reduced is not NotImplemented:
             return reduced
-    if isinstance(value, Path):
-        return None
     if isinstance(value, Enum):
         return value.value
     if is_dataclass(value) and not isinstance(value, type):
