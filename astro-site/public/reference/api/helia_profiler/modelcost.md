@@ -29,7 +29,7 @@ Full model analysis result.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/modelcost/model_analysis.py:165`
+Source: `src/helia_profiler/modelcost/model_analysis.py:147`
 
 ### helia_profiler.ModelAnalysis.layers
 
@@ -39,7 +39,7 @@ Source: `src/helia_profiler/modelcost/model_analysis.py:165`
 layers: list[LayerOps]
 ```
 
-Source: `src/helia_profiler/modelcost/model_analysis.py:169`
+Source: `src/helia_profiler/modelcost/model_analysis.py:151`
 
 ### helia_profiler.ModelAnalysis.total_macs
 
@@ -49,7 +49,7 @@ Source: `src/helia_profiler/modelcost/model_analysis.py:169`
 total_macs: int
 ```
 
-Source: `src/helia_profiler/modelcost/model_analysis.py:170`
+Source: `src/helia_profiler/modelcost/model_analysis.py:152`
 
 ### helia_profiler.ModelAnalysis.total_ops
 
@@ -59,7 +59,7 @@ Source: `src/helia_profiler/modelcost/model_analysis.py:170`
 total_ops: int
 ```
 
-Source: `src/helia_profiler/modelcost/model_analysis.py:171`
+Source: `src/helia_profiler/modelcost/model_analysis.py:153`
 
 ### helia_profiler.ModelAnalysis.num_parameters
 
@@ -71,7 +71,7 @@ num_parameters: int
 
 Approximate parameter count (weights + biases).
 
-Source: `src/helia_profiler/modelcost/model_analysis.py:172`
+Source: `src/helia_profiler/modelcost/model_analysis.py:154`
 
 ### helia_profiler.ModelAnalysis.engine
 
@@ -83,7 +83,7 @@ engine: str = 'tflite'
 
 Engine/interpreter that produced this analysis ('tflite', 'helia-rt', 'helia-aot').
 
-Source: `src/helia_profiler/modelcost/model_analysis.py:174`
+Source: `src/helia_profiler/modelcost/model_analysis.py:156`
 
 ### helia_profiler.ModelAnalysis.index_space
 
@@ -95,7 +95,7 @@ index_space: Literal['source', 'execution'] = 'source'
 
 Whether layer IDs identify original operators or compiled execution positions.
 
-Source: `src/helia_profiler/modelcost/model_analysis.py:177`
+Source: `src/helia_profiler/modelcost/model_analysis.py:159`
 
 ### helia_profiler.ModelAnalysis.ethos_u_op_count
 
@@ -107,7 +107,7 @@ ethos_u_op_count: int
 
 Number of Vela-generated ethos-u custom ops in the graph.
 
-Source: `src/helia_profiler/modelcost/model_analysis.py:185`
+Source: `src/helia_profiler/modelcost/model_analysis.py:167`
 
 ### helia_profiler.ModelAnalysis.has_ethos_u_op
 
@@ -119,7 +119,7 @@ has_ethos_u_op: bool
 
 True when the model was compiled by Vela (contains ethos-u ops).
 
-Source: `src/helia_profiler/modelcost/model_analysis.py:190`
+Source: `src/helia_profiler/modelcost/model_analysis.py:172`
 
 ### helia_profiler.ModelAnalysis.to_dict
 
@@ -131,4 +131,4 @@ to_dict() -> dict[str, Any]
 
 Return the analysis and its layers as plain dicts.
 
-Source: `src/helia_profiler/modelcost/model_analysis.py:180`
+Source: `src/helia_profiler/modelcost/model_analysis.py:162`
