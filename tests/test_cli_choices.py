@@ -11,6 +11,8 @@ from typer.testing import CliRunner
 
 from helia_profiler import power
 from helia_profiler.cli.app import app
+from helia_profiler.cli.common import EngineName
+from helia_profiler.cli.profile_cmd import _build_cli_overrides
 from helia_profiler.config import Aggregation, PowerFirmware, Transport
 from helia_profiler.engines import EngineType
 from helia_profiler.placement import Placement
@@ -18,7 +20,7 @@ from helia_profiler.power import list_drivers
 from helia_profiler.target.lifecycle import ResetStrategy
 
 VALUES = {
-    "engine": list(EngineType),
+    "engine": list(EngineName),
     "runtime_arena_location": [p for p in Placement if p != Placement.MRAM],
     "runtime_weights_location": list(Placement),
     "core_override": ["cm4", "cm55"],
@@ -191,3 +193,21 @@ def test_choice_values_reach_command_as_plain_strings(
         expected = value if explicit else defaults.get(name)
         assert received[name] == expected
         assert received[name] is None or type(received[name]) is str
+
+
+@pytest.mark.parametrize(
+    "command,target",
+    [("analyze model.tflite", "analyze_cmd._cmd_analyze"), ("doctor", "inspect_cmds._cmd_doctor")],
+)
+@pytest.mark.parametrize("name", ["litert", "tflm"])
+def test_litert_and_its_tflm_alias_select_the_same_engine(monkeypatch, command, target, name):
+    handler = Mock()
+    monkeypatch.setattr(f"helia_profiler.cli.{target}", handler)
+    result = CliRunner().invoke(app, [*command.split(), "--engine", name])
+    assert result.exit_code == 0, result.output
+    assert handler.call_args.kwargs["engine"] == "tflm"
+
+
+@pytest.mark.parametrize("name,expected", [("litert", EngineType.TFLM), ("tflm", EngineType.TFLM)])
+def test_profile_engine_override_takes_the_canonical_name(name, expected):
+    assert _build_cli_overrides(engine=name)["engine"]["type"] is expected
