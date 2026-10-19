@@ -25,6 +25,7 @@ from .errors import ConfigError
 
 if TYPE_CHECKING:
     from .config import ProfileConfig
+    from .deps.compatibility import CompatibilityResolution
 
 FROZEN_RUN_SCHEMA = "hpx.frozen-run"
 FROZEN_RUN_SCHEMA_VERSION = 1
@@ -52,6 +53,30 @@ _HOST_LOCAL_SETTINGS = (
 
 #: Environment variables that can point a build at local sources.
 _SOURCE_VARIABLES = ("SEGGER_RTT_PATH", "CMSIS_NN_PATH")
+
+#: Environment variables the compilers, CMake or NSX read that change what is
+#: built. Compiler launchers are host-local and excluded.
+_BUILD_VARIABLES = (
+    "ASM",
+    "ASMFLAGS",
+    "CC",
+    "CCC_OVERRIDE_OPTIONS",
+    "CFLAGS",
+    "CMAKE_BUILD_TYPE",
+    "CMAKE_TOOLCHAIN_FILE",
+    "COMPILER_PATH",
+    "CPATH",
+    "CPLUS_INCLUDE_PATH",
+    "CPPFLAGS",
+    "CXX",
+    "CXXFLAGS",
+    "C_INCLUDE_PATH",
+    "GCC_EXEC_PREFIX",
+    "LDFLAGS",
+    "LIBRARY_PATH",
+    "NSX_ALLOW_VERSION_MISMATCH",
+    "NSX_SKIP_COMPAT_CHECK",
+)
 
 #: The ExecuTorch ``<model>.pte.json`` export sidecar, recorded beside the model.
 _SIDECAR = "model.sidecar"
@@ -137,6 +162,7 @@ class FrozenRun:
     qualification: str
     overrides: tuple[str, ...]
     local_inputs: tuple[LocalInput, ...]
+    build_environment: Mapping[str, str]
     toolchain: ToolchainIdentity
     runtime: FrozenRuntime | None
     hpx_version: str
@@ -146,6 +172,7 @@ class FrozenRun:
         object.__setattr__(self, "settings", _freeze(self.settings))
         object.__setattr__(self, "overrides", tuple(self.overrides))
         object.__setattr__(self, "local_inputs", tuple(self.local_inputs))
+        object.__setattr__(self, "build_environment", _freeze(self.build_environment))
         object.__setattr__(self, "_intent", _intent_hash(self))
 
     @property
@@ -169,6 +196,7 @@ class FrozenRun:
             "qualification": self.qualification,
             "overrides": list(self.overrides),
             "local_inputs": [asdict(item) for item in self.local_inputs],
+            "build_environment": _thaw(self.build_environment),
             "toolchain": asdict(self.toolchain),
             "runtime": asdict(self.runtime) if self.runtime is not None else None,
             "hpx_version": self.hpx_version,
@@ -188,6 +216,7 @@ class FrozenRun:
             if not isinstance(settings, Mapping) or not isinstance(settings.get("model"), Mapping):
                 raise TypeError("settings and settings.model must be objects")
             baseline = _typed(dict, data["baseline"], "baseline", id=str, fingerprint=str)
+            environment = _typed(dict, data["build_environment"], "build_environment")
             plan = cls(
                 settings=settings,
                 model=_record(FrozenModel, data["model"], "model"),
@@ -201,6 +230,9 @@ class FrozenRun:
                 local_inputs=tuple(
                     _record(LocalInput, item, "local_inputs[]")
                     for item in _typed(list, data["local_inputs"], "local_inputs")
+                ),
+                build_environment=_typed(
+                    dict, environment, "build_environment", **dict.fromkeys(environment, str)
                 ),
                 toolchain=_record(ToolchainIdentity, data["toolchain"], "toolchain"),
                 runtime=(
@@ -305,7 +337,7 @@ def freeze_config(config: ProfileConfig) -> FrozenRun:
         _drop(settings, path)
     model_path = Path(config.model.path)
     baseline = config.compatibility_baseline
-    resolution = config.compatibility
+    resolution = _compatibility(config)
     return FrozenRun(
         settings=settings,
         model=FrozenModel(
@@ -322,6 +354,7 @@ def freeze_config(config: ProfileConfig) -> FrozenRun:
             else ()
         ),
         local_inputs=_local_inputs(config),
+        build_environment=_build_environment(),
         toolchain=_toolchain_identity(config),
         runtime=_frozen_runtime(config),
         hpx_version=__version__,
@@ -336,7 +369,7 @@ def _local_inputs(config: ProfileConfig) -> tuple[LocalInput, ...]:
         sidecar = Path(f"{config.model.path}.json")
         if sidecar.is_file():
             candidates.append((_SIDECAR, str(sidecar)))
-    if config.target.segger_rtt_path is not None:
+    if config.target.segger_rtt_path is not None and _uses_rtt(config):
         candidates.append(("target.segger_rtt_path", str(config.target.segger_rtt_path)))
     if config.engine.config_path is not None:
         candidates.append(("engine.config_path", str(config.engine.config_path)))
@@ -370,7 +403,7 @@ def _source_environment(config: ProfileConfig) -> dict[str, str]:
     engine = config.engine.type
     engine_config = config.engine.config
     effective: dict[str, str] = {}
-    if config.target.segger_rtt_path is None:
+    if config.target.segger_rtt_path is None and _uses_rtt(config):
         effective["SEGGER_RTT_PATH"] = environment["SEGGER_RTT_PATH"]
     if engine is not EngineType.TFLM:
         provider = cmsis_nn_provider_module(engine.value, _effective_backend(config))
@@ -379,6 +412,39 @@ def _source_environment(config: ProfileConfig) -> dict[str, str]:
             effective["CMSIS_NN_PATH"] = environment["CMSIS_NN_PATH"]
     effective.update(heliart_environment(engine.value, engine_config))
     return {variable: value for variable, value in effective.items() if value}
+
+
+def _build_environment() -> dict[str, str]:
+    environment = {variable: os.environ.get(variable) for variable in _BUILD_VARIABLES}
+    return {variable: value for variable, value in environment.items() if value}
+
+
+def _uses_rtt(config: ProfileConfig) -> bool:
+    from .vocab import Transport
+
+    return config.target.transport == Transport.RTT
+
+
+def _compatibility(config: ProfileConfig) -> CompatibilityResolution | None:
+    """The compatibility resolution against the kernel provider the build uses.
+
+    An ExecuTorch sidecar can select the provider after ``ProfileConfig``
+    resolved compatibility from ``engine.backend`` alone.
+    """
+    backend = _effective_backend(config)
+    if config.compatibility is None or backend == config.engine.backend:
+        return config.compatibility
+    from .deps.compatibility import resolve_compatibility
+
+    return resolve_compatibility(
+        config.compatibility_baseline,
+        module_overrides=config.build.nsx_modules,
+        engine_config=config.engine.config,
+        engine_config_path=config.engine.config_path,
+        engine_type=config.engine.type.value,
+        engine_backend=backend,
+        allow_unsupported_version=config.engine.allow_unsupported_version,
+    )
 
 
 def _effective_backend(config: ProfileConfig) -> str | None:
@@ -442,6 +508,7 @@ def _check_replay(plan: FrozenRun, replayed: FrozenRun) -> None:
             ("engine runtime", plan.runtime, replayed.runtime),
             ("qualification", plan.qualification, replayed.qualification),
             ("overrides", plan.overrides, replayed.overrides),
+            ("build environment", dict(plan.build_environment), dict(replayed.build_environment)),
         )
         if frozen != now
     ] or ["resolved settings differ"]
@@ -507,7 +574,8 @@ def _frozen_runtime(config: ProfileConfig) -> FrozenRuntime | None:
     from .runtime_records import runtime
 
     baseline = config.compatibility_baseline
-    overridden = set(config.compatibility.module_overrides) if config.compatibility else set()
+    resolution = _compatibility(config)
+    overridden = set(resolution.module_overrides) if resolution else set()
 
     def kernels(module: str | None) -> tuple[str | None, str | None]:
         if module is None or module in overridden:
@@ -604,6 +672,7 @@ def _intent_hash(plan: FrozenRun) -> str:
             [item.setting, item.kind, item.sha256 or item.path] for item in plan.local_inputs
         ],
         "toolchain": [plan.toolchain.name, plan.toolchain.version],
+        "build_environment": _thaw(plan.build_environment),
         "runtime": asdict(plan.runtime) if plan.runtime is not None else None,
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()

@@ -22,11 +22,14 @@ def compiler(monkeypatch: pytest.MonkeyPatch) -> dict[str, str | None]:
         "helia_profiler.hostenv._proc.tool_output",
         lambda command, *, timeout_s: reply["output"],
     )
+    from helia_profiler.frozen_run import _BUILD_VARIABLES
+
     for variable in (
         "SEGGER_RTT_PATH",
         "CMSIS_NN_PATH",
         "HELIART_DIST_PATH",
         "HELIART_SOURCE_PATH",
+        *_BUILD_VARIABLES,
     ):
         monkeypatch.delenv(variable, raising=False)
     return reply
@@ -484,3 +487,36 @@ def test_a_relative_source_path_is_recorded_resolved(session, tmp_path, monkeypa
 def test_a_non_object_plan_is_refused():
     with pytest.raises(ConfigError, match="must be an object"):
         FrozenRun.from_dict([])  # ty: ignore[invalid-argument-type]
+
+
+def test_compiler_environment_is_part_of_the_intent_and_checked_on_replay(session, monkeypatch):
+    monkeypatch.setenv("CFLAGS", "-O0")
+    monkeypatch.setenv("CMAKE_C_COMPILER_LAUNCHER", "ccache")
+    plan = session.freeze()
+    assert dict(plan.build_environment) == {"CFLAGS": "-O0"}
+    assert FrozenRun.from_dict(plan.to_dict()) == plan
+
+    monkeypatch.setenv("CFLAGS", "-O3")
+    with pytest.raises(ConfigError, match="build environment: frozen"):
+        plan.config()
+    monkeypatch.delenv("CFLAGS")
+    with pytest.raises(ConfigError, match="build environment"):
+        plan.config()
+    assert session.freeze().intent_hash != plan.intent_hash
+
+
+def test_rtt_sources_count_only_for_the_rtt_transport(session, tmp_path, monkeypatch):
+    monkeypatch.setenv("SEGGER_RTT_PATH", str(tmp_path / "absent"))
+    uart = session.with_target(transport="uart", segger_rtt_path=str(tmp_path / "gone"))
+    assert uart.freeze().local_inputs == ()
+
+
+def test_a_sidecar_selected_provider_decides_qualification(tmp_path, monkeypatch):
+    checkout = tmp_path / "cmsis"
+    checkout.mkdir()
+    monkeypatch.setenv("CMSIS_NN_PATH", str(checkout))
+    plan = _pte_session(tmp_path, kernel_provider="ns").freeze()
+
+    assert "env.CMSIS_NN_PATH" in [i.setting for i in plan.local_inputs]
+    assert plan.qualification != "qualified" and "nsx-cmsis-nn" in plan.overrides
+    assert plan.runtime is not None and plan.runtime.kernels_commit is None
