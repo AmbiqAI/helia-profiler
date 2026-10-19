@@ -2859,9 +2859,9 @@
               "returns": [],
               "signature": "read_dependency_lock_provenance(app_or_workspace_path: str | Path) -> DependencyLockProvenance",
               "source": {
-                "line": 531,
+                "line": 536,
                 "path": "src/helia_profiler/deps/dependencies.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/dependencies.py#L531"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/deps/dependencies.py#L536"
               },
               "summary": "Read typed lock provenance without mutating an app or workspace."
             }
@@ -6829,7 +6829,7 @@
                   "summary": "SHA-256 of what this plan asks for; the HPX release is not part of it."
                 },
                 {
-                  "description": "Whether every input is pinned or content-identified, so another host can rebuild it.\n\nA compiler environment variable makes a plan host-specific, since the\nfiles it may name are not tracked, and so does a dependency selector\nthat names a branch, tag or version rather than a commit.",
+                  "description": "Whether every input is pinned or content-identified, so another host can rebuild it.\n\nA compiler environment variable makes a plan host-specific, since the\nfiles it may name are not tracked, and so do a dependency selector\nthat names a branch, tag or version rather than a commit and a custom\nheliaRT release, whose archive is not content-identified.",
                   "examples": [],
                   "id": "helia_profiler.FrozenRun.portable",
                   "kind": "attribute",
@@ -6860,9 +6860,9 @@
                   "returns": [],
                   "signature": "to_dict() -> dict[str, Any]",
                   "source": {
-                    "line": 205,
+                    "line": 206,
                     "path": "src/helia_profiler/frozen_run.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L205"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L206"
                   },
                   "summary": ""
                 },
@@ -6879,9 +6879,9 @@
                   "returns": [],
                   "signature": "from_dict(data: Mapping[str, Any]) -> FrozenRun",
                   "source": {
-                    "line": 222,
+                    "line": 223,
                     "path": "src/helia_profiler/frozen_run.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L222"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L223"
                   },
                   "summary": ""
                 },
@@ -6898,9 +6898,9 @@
                   "returns": [],
                   "signature": "save(path: str | Path) -> Path",
                   "source": {
-                    "line": 271,
+                    "line": 272,
                     "path": "src/helia_profiler/frozen_run.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L271"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L272"
                   },
                   "summary": "Write the plan as JSON and return its path."
                 },
@@ -6917,9 +6917,9 @@
                   "returns": [],
                   "signature": "load(path: str | Path) -> FrozenRun",
                   "source": {
-                    "line": 280,
+                    "line": 281,
                     "path": "src/helia_profiler/frozen_run.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L280"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L281"
                   },
                   "summary": "Read a plan written by :meth:save, verifying its intent hash."
                 },
@@ -6936,9 +6936,9 @@
                   "returns": [],
                   "signature": "config(*, model: str | Path | None = None, host: Mapping[str, Any] | None = None) -> ProfileConfig",
                   "source": {
-                    "line": 294,
+                    "line": 295,
                     "path": "src/helia_profiler/frozen_run.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L294"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L295"
                   },
                   "summary": "The :class:ProfileConfig this plan describes, on this host."
                 }

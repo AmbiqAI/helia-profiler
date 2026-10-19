@@ -411,8 +411,9 @@ portable: bool
 Whether every input is pinned or content-identified, so another host can rebuild it.
 
 A compiler environment variable makes a plan host-specific, since the
-files it may name are not tracked, and so does a dependency selector
-that names a branch, tag or version rather than a commit.
+files it may name are not tracked, and so do a dependency selector
+that names a branch, tag or version rather than a commit and a custom
+heliaRT release, whose archive is not content-identified.
 
 Source: `src/helia_profiler/frozen_run.py:192`
 
@@ -424,7 +425,7 @@ Source: `src/helia_profiler/frozen_run.py:192`
 to_dict() -> dict[str, Any]
 ```
 
-Source: `src/helia_profiler/frozen_run.py:205`
+Source: `src/helia_profiler/frozen_run.py:206`
 
 ### helia_profiler.FrozenRun.from_dict
 
@@ -436,7 +437,7 @@ from_dict(data: Mapping[str, Any]) -> FrozenRun
 
 `classmethod`
 
-Source: `src/helia_profiler/frozen_run.py:222`
+Source: `src/helia_profiler/frozen_run.py:223`
 
 ### helia_profiler.FrozenRun.save
 
@@ -448,7 +449,7 @@ save(path: str | Path) -> Path
 
 Write the plan as JSON and return its path.
 
-Source: `src/helia_profiler/frozen_run.py:271`
+Source: `src/helia_profiler/frozen_run.py:272`
 
 ### helia_profiler.FrozenRun.load
 
@@ -462,7 +463,7 @@ load(path: str | Path) -> FrozenRun
 
 Read a plan written by :meth:`save`, verifying its intent hash.
 
-Source: `src/helia_profiler/frozen_run.py:280`
+Source: `src/helia_profiler/frozen_run.py:281`
 
 ### helia_profiler.FrozenRun.config
 
@@ -484,4 +485,4 @@ variable set, unset or changed, another compiler version, or another
 engine runtime. Only the model can move; other local files must be
 at their recorded paths.
 
-Source: `src/helia_profiler/frozen_run.py:294`
+Source: `src/helia_profiler/frozen_run.py:295`
