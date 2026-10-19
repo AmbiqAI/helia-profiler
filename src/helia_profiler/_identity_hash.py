@@ -61,7 +61,11 @@ def _resolved_module(entry: dict[str, Any]) -> dict[str, Any]:
     # A git module is its URL and commit; its checkout hash varies with line endings.
     if entry.get("kind") == "git":
         return {**pinned, "url": resolved.get("url"), "commit": resolved.get("commit")}
-    return {**pinned, "content_hash": resolved.get("content_hash")}
+    # Packaged tooling is identified by content. Vendored and local modules are
+    # generated per run (dates, host paths); the flashed image already reflects them.
+    if entry.get("kind") == "packaged":
+        return {**pinned, "content_hash": resolved.get("content_hash")}
+    return pinned
 
 
 def measured_facts(value: Any, leaf: Callable[[Any], Any] | None = None) -> Any:
