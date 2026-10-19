@@ -46,13 +46,17 @@ log = logging.getLogger("hpx")
 
 
 def _recorded_range(records: Iterable[RuntimeRecord]) -> tuple[str, str]:
-    """The oldest heliaAOT record's version and the minor after the newest."""
+    """The oldest heliaAOT record's version and the major after the newest.
+
+    A 0.x record counts as major 1: heliaAOT's last 0.x release carries its
+    first stable API (helia-aot#874), so it shares that major's range.
+    """
     versions = sorted(parse_semver(r.version) for r in records if r.name == "helia-aot")
     if not versions:
         raise ConfigError("heliaPROFILER ships no heliaAOT runtime record")
     if (0, 0, 0) in versions:
         raise ConfigError("heliaAOT runtime records need major.minor.patch versions")
-    return "{}.{}.{}".format(*versions[0]), f"{versions[-1][0]}.{versions[-1][1] + 1}.0"
+    return "{}.{}.{}".format(*versions[0]), f"{max(versions[-1][0], 1) + 1}.0.0"
 
 
 HELIAAOT_MIN_VERSION, HELIAAOT_MAX_VERSION_EXCLUSIVE = _recorded_range(runtimes())

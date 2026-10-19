@@ -109,17 +109,27 @@ def test_fixture_integration_capability_table() -> None:
     }
 
 
-def test_generic_fixture_io_support_does_not_inherit_release_qualification() -> None:
+def test_generic_fixture_io_support_does_not_inherit_release_qualification(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from helia_profiler import runtime_records
     from helia_profiler.fixture import EngineType, FixtureCapability, fixture_capabilities
 
-    for version in ("0.23.0", None, "0.26.0"):
+    aot = {"name": "helia-aot", "source": {"repo": "AmbiqAI/helia-aot", "commit": _COMMIT}}
+    root = _write(
+        tmp_path,
+        _record(**aot, version="1.0.0", default=False),
+        _record(**aot, version="1.1.0", qualified=[]),
+        _record(**aot, version="1.2.0", default=False, qualified=[]),
+    )
+    records = load_runtime_records(root)
+    monkeypatch.setattr(runtime_records, "runtimes", lambda: records)
+    for version in ("1.0.0", None, "1.2.0"):
         answer = qualification(
             "helia-aot", version, board="apollo510_evb", clock="lp", precision="a8w8"
         )
         expected = (
-            RuntimeQualification.QUALIFIED
-            if version == "0.23.0"
-            else RuntimeQualification.SUPPORTED
+            RuntimeQualification.QUALIFIED if version == "1.0.0" else RuntimeQualification.SUPPORTED
         )
         assert answer.state is expected
         assert answer.record is not None and answer.record.source.commit
@@ -134,11 +144,11 @@ def test_generic_fixture_io_support_does_not_inherit_release_qualification() -> 
 @pytest.mark.parametrize(
     ("name", "version", "precision", "board", "state", "reason"),
     [
-        ("helia-aot", "0.23.0", "a8w8", "apollo510_evb", "qualified", None),
+        ("tflm", "85638f0", "a8w8", "apollo510_evb", "qualified", None),
         ("tflm", None, "a8w8", "apollo510_evb", "qualified", None),
-        ("helia-aot", None, "a8w8", "apollo510_evb", "supported", "0.32.0 is not qualified"),
-        ("helia-aot", "0.23.0", "a16w8", "apollo510_evb", "supported", "not qualified for a16w8"),
-        ("helia-aot", "0.23.0", "a8w8", "apollo4p_evb", "supported", "on apollo4p_evb at lp"),
+        ("helia-aot", None, "a8w8", "apollo510_evb", "supported", "0.33.0 is not qualified"),
+        ("tflm", "85638f0", "a16w8", "apollo510_evb", "supported", "not qualified for a16w8"),
+        ("tflm", "85638f0", "a8w8", "apollo4p_evb", "supported", "on apollo4p_evb at lp"),
         ("tflm", None, "fp16", "apollo510_evb", "unsupported", "refuses any model with a FLOAT16"),
         ("helia-rt", None, "a8w4", "apollo510_evb", "unsupported", "does not declare a8w4"),
         ("helia-aot", "0.25.1", "a8w8", "apollo510_evb", "unsupported", "No runtime record"),
@@ -164,9 +174,10 @@ def test_qualification_is_per_clock() -> None:
 
 def test_an_omitted_version_means_the_default_record() -> None:
     default = runtime("helia-aot")
-    assert default is not None and (default.version, default.default) == ("0.32.0", True)
-    assert runtime("helia-aot", "0.23.0") is not None
-    assert runtime("helia-aot", "0.23.0") is not default
+    assert default is not None and (default.version, default.default) == ("0.33.0", True)
+    explicit = runtime("helia-rt", "2.1.0")
+    assert explicit is not None and not explicit.default
+    assert explicit is not runtime("helia-rt")
 
 
 def test_qualification_refuses_a_precision_outside_the_vocabulary() -> None:
@@ -284,10 +295,13 @@ def test_the_helia_aot_range_spans_the_records() -> None:
     from helia_profiler.engines.helia_aot.compile import _recorded_range
 
     records = load_runtime_records(Path(__file__).parents[1] / "src/helia_profiler/data/runtimes")
-    assert _recorded_range(records) == ("0.23.0", "0.33.0")
-    newest = [r for r in records if (r.name, r.version) == ("helia-aot", "0.32.0")]
+    assert _recorded_range(records) == ("0.33.0", "2.0.0")
+    newest = [r for r in records if (r.name, r.version) == ("helia-aot", "0.33.0")]
     assert newest[0].default
-    assert _recorded_range([replace(newest[0], version="1.2.3")]) == ("1.2.3", "1.3.0")
+    assert _recorded_range([replace(newest[0], version="1.2.3")]) == ("1.2.3", "2.0.0")
+    assert _recorded_range([replace(newest[0], version="2.4.0")]) == ("2.4.0", "3.0.0")
+    spanned = [replace(newest[0], version=v) for v in ("1.4.0", "0.33.0", "2.1.0")]
+    assert _recorded_range(spanned) == ("0.33.0", "3.0.0")
     with pytest.raises(ConfigError, match="major.minor.patch"):
         _recorded_range([replace(newest[0], version="next")])
     with pytest.raises(ConfigError, match="no heliaAOT runtime record"):
@@ -317,10 +331,11 @@ def test_runtimes_cli_lists_and_shows_records() -> None:
     runner = CliRunner()
     listed = runner.invoke(app, ["runtimes", "list"])
     assert listed.exit_code == 0, listed.output
-    assert "helia-aot   0.23.0           AmbiqAI/helia-aot@d75c96eb  apollo510_evb/lp: a8w8" in (
-        listed.output
+    assert (
+        "tflm        85638f0  default tensorflow/tflite-micro@85638f0b  apollo510_evb/lp: a8w8"
+        in listed.output
     )
-    assert "helia-aot   0.32.0   default AmbiqAI/helia-aot@6224613f  -" in listed.output
+    assert "helia-aot   0.33.0   default AmbiqAI/helia-aot@d31bf222  -" in listed.output
 
     shown = runner.invoke(app, ["runtimes", "show", "helia-rt"])
     assert shown.exit_code == 0, shown.output
@@ -331,14 +346,14 @@ def test_runtimes_cli_lists_and_shows_records() -> None:
     assert "No runtime record for helia-rt 9.9.9." in missing.output
 
 
-def test_explicit_released_aot_record_does_not_inherit_qualification():
-    record = runtime("helia-aot", "0.26.0")
+def test_the_shipped_aot_record_claims_no_qualification():
+    record = runtime("helia-aot", "0.33.0")
     assert record is not None
-    assert record.source.commit == "ea5cd6c0b97150857cfcbe6019205efd2d00489e"
-    assert not record.default and not record.qualified
+    assert record.source.commit == "d31bf2226e58e4120eaf8e6da289b5ee91e2e06b"
+    assert not record.qualified
     assert (
         qualification(
-            "helia-aot", "0.26.0", board="apollo510_evb", clock="lp", precision="a8w8"
+            "helia-aot", "0.33.0", board="apollo510_evb", clock="lp", precision="a8w8"
         ).state
         == RuntimeQualification.SUPPORTED
     )

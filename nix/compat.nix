@@ -18,28 +18,8 @@ let
   # release uses the first rule whose `from` it has reached.
   floors = [
     {
-      from = "0.32.0";
+      from = "0.33.0";
       nsCmsisNn = "7.47.0";
-    }
-    {
-      from = "0.31.0";
-      nsCmsisNn = "7.46.0";
-    }
-    {
-      from = "0.30.0";
-      nsCmsisNn = "7.45.0";
-    }
-    {
-      from = "0.28.0";
-      nsCmsisNn = "7.44.2";
-    }
-    {
-      from = "0.27.0";
-      nsCmsisNn = "7.43.0";
-    }
-    {
-      from = "0.23.0";
-      nsCmsisNn = "7.39.2";
     }
   ];
 
