@@ -37,10 +37,12 @@ PROFILE_LIFECYCLE = "carry"
 
 _NO_PROVENANCE = Unknown("the run recorded no dependency provenance")
 
-#: The NSX module that is each interpreter engine's runtime.
+#: The NSX modules that hold each interpreter engine's runtime source, most specific first.
+#: TFLM's interpreter and reference kernels live in helia-rt-source, which the
+#: nsx-tflite-micro wrapper requires.
 _RUNTIME_MODULES = {
-    EngineType.TFLM: "nsx-tflite-micro",
-    EngineType.HELIA_RT: "nsx-helia-rt",
+    EngineType.TFLM: ("helia-rt-source", "nsx-tflite-micro"),
+    EngineType.HELIA_RT: ("nsx-helia-rt",),
 }
 
 
@@ -93,11 +95,14 @@ def _runtime(ctx: PipelineContext, provenance: DependencyProvenance | None) -> R
         )
     if provenance is None:
         return RuntimeIdentity(engine, _NO_PROVENANCE, _NO_PROVENANCE, _NO_PROVENANCE)
-    name = _RUNTIME_MODULES[engine_type]
-    module = _module(provenance, name)
+    candidates = _RUNTIME_MODULES[engine_type]
+    module = next(
+        (found for name in candidates if (found := _module(provenance, name)) is not None), None
+    )
     if module is None:
-        reason = Unknown(f"the dependency lock names no {name} module")
+        reason = Unknown(f"the dependency lock names no {' or '.join(candidates)} module")
         return RuntimeIdentity(engine, reason, reason, reason)
+    name = module.name
     local = Unknown(f"the {name} module is a local copy; the lock records no source")
     engine_info = ctx.run_metadata.engine
     version = (
@@ -160,8 +165,27 @@ def _kernels(
         return KernelIdentity(
             CanonicalKernel.REFERENCE, runtime_id.repository, runtime_id.version, runtime_id.commit
         )
-    reason = Unknown(f"the dependency lock names {len(found)} CMSIS-NN modules, not one")
+    if not found and _prebuilt_heliart(ctx):
+        reason = Unknown("heliaCORE is built into the prebuilt heliaRT archive")
+    else:
+        reason = Unknown(f"the dependency lock names {len(found)} CMSIS-NN modules, not one")
     return KernelIdentity(reason, reason, reason, reason)
+
+
+def _prebuilt_heliart(ctx: PipelineContext) -> bool:
+    from .deps.compatibility import heliart_environment
+
+    engine = ctx.config.engine
+    if engine.type is not EngineType.HELIA_RT or engine.config.get("source_path"):
+        return False
+    selected = heliart_environment(engine.type.value, engine.config)
+    if "HELIART_SOURCE_PATH" in selected:
+        return False
+    return bool(
+        engine.config.get("dist_path")
+        or engine.config.get("source")
+        or "HELIART_DIST_PATH" in selected
+    )
 
 
 def _links_reference_kernels(ctx: PipelineContext) -> bool:

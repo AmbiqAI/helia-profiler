@@ -153,11 +153,16 @@ def _ctx(
     engine_inputs=None,
     model="model.tflite",
     profiling=None,
+    engine_config=None,
 ) -> PipelineContext:
     root.mkdir(parents=True, exist_ok=True)
     overrides = {
         "model": {"path": model},
-        "engine": {"type": engine, **({"backend": backend} if backend else {})},
+        "engine": {
+            "type": engine,
+            **({"backend": backend} if backend else {}),
+            **({"config": engine_config} if engine_config else {}),
+        },
         "output": {"dir": str(root / "results")},
     }
     if profiling:
@@ -576,3 +581,32 @@ def test_the_summary_carries_the_identity(tmp_path):
     loaded = load_run_summary(tmp_path / "results" / "summary.json")
     assert loaded.identity == identity.to_dict()
     assert "identity" not in loaded.extras
+
+
+HELIA_RT_SOURCE = _module(
+    "helia-rt-source", "helia-rt", url="https://github.com/AmbiqAI/helia-rt.git", commit="6" * 40
+)
+
+
+def test_tflm_runtime_and_reference_kernels_come_from_helia_rt_source(tmp_path):
+    identity = profile_run_identity(
+        _ctx(tmp_path, engine="tflm", modules=(TFLM, HELIA_RT_SOURCE), version=None)
+    )
+    assert identity.runtime.commit == "6" * 40
+    assert identity.kernels.library is CanonicalKernel.REFERENCE
+    assert identity.kernels.commit == "6" * 40
+
+
+def test_a_prebuilt_heliart_says_its_kernels_are_in_the_archive(tmp_path):
+    identity = profile_run_identity(
+        _ctx(tmp_path, modules=(HELIA_RT,), engine_config={"dist_path": str(tmp_path)})
+    )
+    assert identity.kernels.library == Unknown(
+        "heliaCORE is built into the prebuilt heliaRT archive"
+    )
+
+
+def test_a_nan_counter_still_gives_an_observation_hash(tmp_path):
+    ctx = _ctx(tmp_path)
+    set_profile_result(ctx, _pmu(float("nan")))
+    assert isinstance(profile_run_identity(ctx).observation_hash, str)

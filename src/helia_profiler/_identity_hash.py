@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from collections.abc import Callable, Mapping
 from dataclasses import fields, is_dataclass
 from enum import Enum
@@ -89,7 +90,18 @@ def measured_facts(value: Any, leaf: Callable[[Any], Any] | None = None) -> Any:
     return value
 
 
+def _finite(value: Any) -> Any:
+    """``value`` with non-finite floats spelled out, so a NaN counter still hashes."""
+    if isinstance(value, float) and not math.isfinite(value):
+        return repr(value)
+    if isinstance(value, dict):
+        return {key: _finite(item) for key, item in value.items()}
+    if isinstance(value, list | tuple):
+        return [_finite(item) for item in value]
+    return value
+
+
 def digest(value: Any) -> str:
     """The sha256 of ``value``'s canonical JSON."""
-    encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    encoded = json.dumps(_finite(value), sort_keys=True, separators=(",", ":"), allow_nan=False)
     return hashlib.sha256(encoded.encode()).hexdigest()
