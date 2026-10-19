@@ -25,7 +25,7 @@ invocations.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/lifecycle.py:18`
+Source: `src/helia_profiler/lifecycle.py:17`
 
 ### helia_profiler.Lifecycle.CARRY
 
@@ -35,7 +35,7 @@ Source: `src/helia_profiler/lifecycle.py:18`
 CARRY = 'carry'
 ```
 
-Source: `src/helia_profiler/lifecycle.py:27`
+Source: `src/helia_profiler/lifecycle.py:26`
 
 ### helia_profiler.Lifecycle.SINGLE
 
@@ -45,7 +45,7 @@ Source: `src/helia_profiler/lifecycle.py:27`
 SINGLE = 'single'
 ```
 
-Source: `src/helia_profiler/lifecycle.py:28`
+Source: `src/helia_profiler/lifecycle.py:27`
 
 ## helia_profiler.BuildRecord
 
@@ -127,7 +127,7 @@ save(path: str | Path, *, roots: Mapping[str, Path]) -> Path
 
 Write the record as JSON with paths relative to *roots* and return its path.
 
-Source: `src/helia_profiler/build_record.py:79`
+Source: `src/helia_profiler/build_record.py:89`
 
 ### helia_profiler.BuildRecord.load
 
@@ -141,7 +141,7 @@ load(path: str | Path, *, roots: Mapping[str, Path]) -> BuildRecord
 
 Read and verify a record written by :meth:`save`, resolving paths under *roots*.
 
-Source: `src/helia_profiler/build_record.py:101`
+Source: `src/helia_profiler/build_record.py:115`
 
 ### helia_profiler.BuildRecord.run
 
@@ -164,7 +164,7 @@ Flash the recorded image, capture one run and compare outputs when *expect* is g
 A failed capture comes back with ``capture.state == "failure"`` and no
 verification; errors raised while capturing propagate.
 
-Source: `src/helia_profiler/build_record.py:135`
+Source: `src/helia_profiler/build_record.py:149`
 
 ## helia_profiler.RunResult
 
@@ -185,7 +185,7 @@ One capture from a :class:`BuildRecord`.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/build_record.py:175`
+Source: `src/helia_profiler/build_record.py:196`
 
 ### helia_profiler.RunResult.record
 
@@ -195,7 +195,7 @@ Source: `src/helia_profiler/build_record.py:175`
 record: BuildRecord
 ```
 
-Source: `src/helia_profiler/build_record.py:179`
+Source: `src/helia_profiler/build_record.py:200`
 
 ### helia_profiler.RunResult.capture
 
@@ -205,7 +205,7 @@ Source: `src/helia_profiler/build_record.py:179`
 capture: FixtureCaptureResult
 ```
 
-Source: `src/helia_profiler/build_record.py:180`
+Source: `src/helia_profiler/build_record.py:201`
 
 ### helia_profiler.RunResult.identity
 
@@ -215,7 +215,7 @@ Source: `src/helia_profiler/build_record.py:180`
 identity: RunIdentity
 ```
 
-Source: `src/helia_profiler/build_record.py:181`
+Source: `src/helia_profiler/build_record.py:202`
 
 ### helia_profiler.RunResult.verification
 
@@ -225,7 +225,7 @@ Source: `src/helia_profiler/build_record.py:181`
 verification: Verification | None
 ```
 
-Source: `src/helia_profiler/build_record.py:182`
+Source: `src/helia_profiler/build_record.py:203`
 
 ### helia_profiler.RunResult.succeeded
 
@@ -235,4 +235,4 @@ Source: `src/helia_profiler/build_record.py:182`
 succeeded: bool
 ```
 
-Source: `src/helia_profiler/build_record.py:185`
+Source: `src/helia_profiler/build_record.py:206`

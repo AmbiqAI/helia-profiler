@@ -30,7 +30,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   signature={"Lifecycle()"}
   level={2}
   summary={"State handling across invocations."}
-  source={{"path":"src/helia_profiler/lifecycle.py","line":18,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/lifecycle.py#L18"}}
+  source={{"path":"src/helia_profiler/lifecycle.py","line":17,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/lifecycle.py#L17"}}
 >
 
   State handling across invocations.
@@ -49,7 +49,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"CARRY = 'carry'"}
     level={3}
-    source={{"path":"src/helia_profiler/lifecycle.py","line":27,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/lifecycle.py#L27"}}
+    source={{"path":"src/helia_profiler/lifecycle.py","line":26,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/lifecycle.py#L26"}}
   >
 
 
@@ -63,7 +63,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"SINGLE = 'single'"}
     level={3}
-    source={{"path":"src/helia_profiler/lifecycle.py","line":28,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/lifecycle.py#L28"}}
+    source={{"path":"src/helia_profiler/lifecycle.py","line":27,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/lifecycle.py#L27"}}
   >
 
 
@@ -169,7 +169,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"save(path: str | Path, *, roots: Mapping[str, Path]) -> Path"}
     level={3}
     summary={"Write the record as JSON with paths relative to roots and return its path."}
-    source={{"path":"src/helia_profiler/build_record.py","line":79,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L79"}}
+    source={{"path":"src/helia_profiler/build_record.py","line":89,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L89"}}
   >
 
     Write the record as JSON with paths relative to *roots* and return its path.
@@ -184,7 +184,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"load(path: str | Path, *, roots: Mapping[str, Path]) -> BuildRecord"}
     level={3}
     summary={"Read and verify a record written by :meth:save, resolving paths under roots."}
-    source={{"path":"src/helia_profiler/build_record.py","line":101,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L101"}}
+    source={{"path":"src/helia_profiler/build_record.py","line":115,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L115"}}
   >
 
     `classmethod`
@@ -201,7 +201,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"run(\n    *,\n    guard: FixtureCaptureGuard,\n    jlink_serial: str,\n    evidence_dir: Path,\n    settle_seconds: float,\n    expect: Expect | None = None,\n    expected_duration_s: float | None = None,\n) -> RunResult"}
     level={3}
     summary={"Flash the recorded image, capture one run and compare outputs when expect is given."}
-    source={{"path":"src/helia_profiler/build_record.py","line":135,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L135"}}
+    source={{"path":"src/helia_profiler/build_record.py","line":149,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L149"}}
   >
 
     Flash the recorded image, capture one run and compare outputs when *expect* is given.
@@ -221,7 +221,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   signature={"RunResult(\n    record: BuildRecord,\n    capture: FixtureCaptureResult,\n    identity: RunIdentity,\n    verification: Verification | None,\n) -> None"}
   level={2}
   summary={"One capture from a :class:BuildRecord."}
-  source={{"path":"src/helia_profiler/build_record.py","line":175,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L175"}}
+  source={{"path":"src/helia_profiler/build_record.py","line":196,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L196"}}
 >
 
   `dataclass`
@@ -237,7 +237,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"record: BuildRecord"}
     level={3}
-    source={{"path":"src/helia_profiler/build_record.py","line":179,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L179"}}
+    source={{"path":"src/helia_profiler/build_record.py","line":200,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L200"}}
   >
 
 
@@ -251,7 +251,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"capture: FixtureCaptureResult"}
     level={3}
-    source={{"path":"src/helia_profiler/build_record.py","line":180,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L180"}}
+    source={{"path":"src/helia_profiler/build_record.py","line":201,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L201"}}
   >
 
 
@@ -265,7 +265,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"identity: RunIdentity"}
     level={3}
-    source={{"path":"src/helia_profiler/build_record.py","line":181,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L181"}}
+    source={{"path":"src/helia_profiler/build_record.py","line":202,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L202"}}
   >
 
 
@@ -279,7 +279,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"verification: Verification | None"}
     level={3}
-    source={{"path":"src/helia_profiler/build_record.py","line":182,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L182"}}
+    source={{"path":"src/helia_profiler/build_record.py","line":203,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L203"}}
   >
 
 
@@ -293,7 +293,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"succeeded: bool"}
     level={3}
-    source={{"path":"src/helia_profiler/build_record.py","line":185,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L185"}}
+    source={{"path":"src/helia_profiler/build_record.py","line":206,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L206"}}
   >
 
 
