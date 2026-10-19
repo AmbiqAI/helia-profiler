@@ -22,7 +22,7 @@ The model a plan was frozen against, identified by content.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/frozen_run.py:64`
+Source: `src/helia_profiler/frozen_run.py:66`
 
 ### helia_profiler.FrozenModel.path
 
@@ -32,7 +32,7 @@ Source: `src/helia_profiler/frozen_run.py:64`
 path: str
 ```
 
-Source: `src/helia_profiler/frozen_run.py:68`
+Source: `src/helia_profiler/frozen_run.py:70`
 
 ### helia_profiler.FrozenModel.sha256
 
@@ -42,7 +42,7 @@ Source: `src/helia_profiler/frozen_run.py:68`
 sha256: str
 ```
 
-Source: `src/helia_profiler/frozen_run.py:69`
+Source: `src/helia_profiler/frozen_run.py:71`
 
 ### helia_profiler.FrozenModel.size_bytes
 
@@ -52,7 +52,7 @@ Source: `src/helia_profiler/frozen_run.py:69`
 size_bytes: int
 ```
 
-Source: `src/helia_profiler/frozen_run.py:70`
+Source: `src/helia_profiler/frozen_run.py:72`
 
 ## helia_profiler.ToolchainIdentity
 
@@ -72,7 +72,7 @@ it is ``None`` when the compiler could not be run, with the reason in
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/frozen_run.py:73`
+Source: `src/helia_profiler/frozen_run.py:75`
 
 ### helia_profiler.ToolchainIdentity.name
 
@@ -82,7 +82,7 @@ Source: `src/helia_profiler/frozen_run.py:73`
 name: str
 ```
 
-Source: `src/helia_profiler/frozen_run.py:82`
+Source: `src/helia_profiler/frozen_run.py:84`
 
 ### helia_profiler.ToolchainIdentity.version
 
@@ -92,7 +92,7 @@ Source: `src/helia_profiler/frozen_run.py:82`
 version: str | None
 ```
 
-Source: `src/helia_profiler/frozen_run.py:83`
+Source: `src/helia_profiler/frozen_run.py:85`
 
 ### helia_profiler.ToolchainIdentity.unavailable_reason
 
@@ -102,7 +102,7 @@ Source: `src/helia_profiler/frozen_run.py:83`
 unavailable_reason: str | None = None
 ```
 
-Source: `src/helia_profiler/frozen_run.py:84`
+Source: `src/helia_profiler/frozen_run.py:86`
 
 ## helia_profiler.FrozenRuntime
 
@@ -129,7 +129,7 @@ engine links no kernel library or its provider is overridden.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/frozen_run.py:87`
+Source: `src/helia_profiler/frozen_run.py:89`
 
 ### helia_profiler.FrozenRuntime.name
 
@@ -139,7 +139,7 @@ Source: `src/helia_profiler/frozen_run.py:87`
 name: str
 ```
 
-Source: `src/helia_profiler/frozen_run.py:96`
+Source: `src/helia_profiler/frozen_run.py:98`
 
 ### helia_profiler.FrozenRuntime.version
 
@@ -149,7 +149,7 @@ Source: `src/helia_profiler/frozen_run.py:96`
 version: str | None
 ```
 
-Source: `src/helia_profiler/frozen_run.py:97`
+Source: `src/helia_profiler/frozen_run.py:99`
 
 ### helia_profiler.FrozenRuntime.source_commit
 
@@ -159,7 +159,7 @@ Source: `src/helia_profiler/frozen_run.py:97`
 source_commit: str | None
 ```
 
-Source: `src/helia_profiler/frozen_run.py:98`
+Source: `src/helia_profiler/frozen_run.py:100`
 
 ### helia_profiler.FrozenRuntime.kernels_module
 
@@ -169,7 +169,7 @@ Source: `src/helia_profiler/frozen_run.py:98`
 kernels_module: str | None = None
 ```
 
-Source: `src/helia_profiler/frozen_run.py:99`
+Source: `src/helia_profiler/frozen_run.py:101`
 
 ### helia_profiler.FrozenRuntime.kernels_commit
 
@@ -179,7 +179,7 @@ Source: `src/helia_profiler/frozen_run.py:99`
 kernels_commit: str | None = None
 ```
 
-Source: `src/helia_profiler/frozen_run.py:100`
+Source: `src/helia_profiler/frozen_run.py:102`
 
 ### helia_profiler.FrozenRuntime.unavailable_reason
 
@@ -189,7 +189,7 @@ Source: `src/helia_profiler/frozen_run.py:100`
 unavailable_reason: str | None = None
 ```
 
-Source: `src/helia_profiler/frozen_run.py:101`
+Source: `src/helia_profiler/frozen_run.py:103`
 
 ## helia_profiler.LocalInput
 
@@ -208,7 +208,7 @@ a plan with one is not portable to another host.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/frozen_run.py:104`
+Source: `src/helia_profiler/frozen_run.py:106`
 
 ### helia_profiler.LocalInput.setting
 
@@ -218,7 +218,7 @@ Source: `src/helia_profiler/frozen_run.py:104`
 setting: str
 ```
 
-Source: `src/helia_profiler/frozen_run.py:112`
+Source: `src/helia_profiler/frozen_run.py:114`
 
 ### helia_profiler.LocalInput.path
 
@@ -228,7 +228,7 @@ Source: `src/helia_profiler/frozen_run.py:112`
 path: str
 ```
 
-Source: `src/helia_profiler/frozen_run.py:113`
+Source: `src/helia_profiler/frozen_run.py:115`
 
 ### helia_profiler.LocalInput.kind
 
@@ -238,7 +238,7 @@ Source: `src/helia_profiler/frozen_run.py:113`
 kind: str
 ```
 
-Source: `src/helia_profiler/frozen_run.py:114`
+Source: `src/helia_profiler/frozen_run.py:116`
 
 ### helia_profiler.LocalInput.sha256
 
@@ -248,7 +248,7 @@ Source: `src/helia_profiler/frozen_run.py:114`
 sha256: str | None = None
 ```
 
-Source: `src/helia_profiler/frozen_run.py:115`
+Source: `src/helia_profiler/frozen_run.py:117`
 
 ## helia_profiler.FrozenRun
 
@@ -275,7 +275,7 @@ A resolved, replayable run plan. Build it with :meth:`Session.freeze`.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/frozen_run.py:118`
+Source: `src/helia_profiler/frozen_run.py:120`
 
 ### helia_profiler.FrozenRun.settings
 
@@ -285,7 +285,7 @@ Source: `src/helia_profiler/frozen_run.py:118`
 settings: Mapping[str, Any]
 ```
 
-Source: `src/helia_profiler/frozen_run.py:122`
+Source: `src/helia_profiler/frozen_run.py:124`
 
 ### helia_profiler.FrozenRun.model
 
@@ -295,7 +295,7 @@ Source: `src/helia_profiler/frozen_run.py:122`
 model: FrozenModel
 ```
 
-Source: `src/helia_profiler/frozen_run.py:123`
+Source: `src/helia_profiler/frozen_run.py:125`
 
 ### helia_profiler.FrozenRun.baseline_id
 
@@ -305,7 +305,7 @@ Source: `src/helia_profiler/frozen_run.py:123`
 baseline_id: str
 ```
 
-Source: `src/helia_profiler/frozen_run.py:124`
+Source: `src/helia_profiler/frozen_run.py:126`
 
 ### helia_profiler.FrozenRun.baseline_fingerprint
 
@@ -315,7 +315,7 @@ Source: `src/helia_profiler/frozen_run.py:124`
 baseline_fingerprint: str
 ```
 
-Source: `src/helia_profiler/frozen_run.py:125`
+Source: `src/helia_profiler/frozen_run.py:127`
 
 ### helia_profiler.FrozenRun.qualification
 
@@ -325,7 +325,7 @@ Source: `src/helia_profiler/frozen_run.py:125`
 qualification: str
 ```
 
-Source: `src/helia_profiler/frozen_run.py:126`
+Source: `src/helia_profiler/frozen_run.py:128`
 
 ### helia_profiler.FrozenRun.overrides
 
@@ -335,7 +335,7 @@ Source: `src/helia_profiler/frozen_run.py:126`
 overrides: tuple[str, ...]
 ```
 
-Source: `src/helia_profiler/frozen_run.py:127`
+Source: `src/helia_profiler/frozen_run.py:129`
 
 ### helia_profiler.FrozenRun.local_inputs
 
@@ -345,7 +345,7 @@ Source: `src/helia_profiler/frozen_run.py:127`
 local_inputs: tuple[LocalInput, ...]
 ```
 
-Source: `src/helia_profiler/frozen_run.py:128`
+Source: `src/helia_profiler/frozen_run.py:130`
 
 ### helia_profiler.FrozenRun.toolchain
 
@@ -355,7 +355,7 @@ Source: `src/helia_profiler/frozen_run.py:128`
 toolchain: ToolchainIdentity
 ```
 
-Source: `src/helia_profiler/frozen_run.py:129`
+Source: `src/helia_profiler/frozen_run.py:131`
 
 ### helia_profiler.FrozenRun.runtime
 
@@ -365,7 +365,7 @@ Source: `src/helia_profiler/frozen_run.py:129`
 runtime: FrozenRuntime | None
 ```
 
-Source: `src/helia_profiler/frozen_run.py:130`
+Source: `src/helia_profiler/frozen_run.py:132`
 
 ### helia_profiler.FrozenRun.hpx_version
 
@@ -375,7 +375,7 @@ Source: `src/helia_profiler/frozen_run.py:130`
 hpx_version: str
 ```
 
-Source: `src/helia_profiler/frozen_run.py:131`
+Source: `src/helia_profiler/frozen_run.py:133`
 
 ### helia_profiler.FrozenRun.intent_hash
 
@@ -387,7 +387,7 @@ intent_hash: str
 
 SHA-256 of what this plan asks for; the HPX release is not part of it.
 
-Source: `src/helia_profiler/frozen_run.py:141`
+Source: `src/helia_profiler/frozen_run.py:143`
 
 ### helia_profiler.FrozenRun.portable
 
@@ -399,7 +399,7 @@ portable: bool
 
 Whether every input is pinned or content-identified, so another host can rebuild it.
 
-Source: `src/helia_profiler/frozen_run.py:146`
+Source: `src/helia_profiler/frozen_run.py:148`
 
 ### helia_profiler.FrozenRun.to_dict
 
@@ -409,7 +409,7 @@ Source: `src/helia_profiler/frozen_run.py:146`
 to_dict() -> dict[str, Any]
 ```
 
-Source: `src/helia_profiler/frozen_run.py:150`
+Source: `src/helia_profiler/frozen_run.py:152`
 
 ### helia_profiler.FrozenRun.from_dict
 
@@ -421,7 +421,7 @@ from_dict(data: Mapping[str, Any]) -> FrozenRun
 
 `classmethod`
 
-Source: `src/helia_profiler/frozen_run.py:166`
+Source: `src/helia_profiler/frozen_run.py:168`
 
 ### helia_profiler.FrozenRun.save
 
@@ -433,7 +433,7 @@ save(path: str | Path) -> Path
 
 Write the plan as JSON and return its path.
 
-Source: `src/helia_profiler/frozen_run.py:197`
+Source: `src/helia_profiler/frozen_run.py:199`
 
 ### helia_profiler.FrozenRun.load
 
@@ -447,7 +447,7 @@ load(path: str | Path) -> FrozenRun
 
 Read a plan written by :meth:`save`, verifying its intent hash.
 
-Source: `src/helia_profiler/frozen_run.py:206`
+Source: `src/helia_profiler/frozen_run.py:208`
 
 ### helia_profiler.FrozenRun.config
 
@@ -465,4 +465,4 @@ any other key is refused. Refuses when this HPX carries a different
 baseline, when the model (the recorded path, or *model* when it moved)
 has a different hash, or when a local input differs or is missing.
 
-Source: `src/helia_profiler/frozen_run.py:220`
+Source: `src/helia_profiler/frozen_run.py:222`

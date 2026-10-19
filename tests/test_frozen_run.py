@@ -141,7 +141,8 @@ def test_the_engine_identity_is_what_a_profile_build_uses(session):
     )
     from helia_profiler.runtime_records import runtime
 
-    assert heliart is not None and heliart.version == runtime("helia-rt").version
+    record = runtime("helia-rt")
+    assert record is not None and heliart is not None and heliart.version == record.version
     assert heliart.source_commit == baseline.module("nsx-helia-rt").ref
     assert heliart.kernels_commit == baseline.module("nsx-cmsis-nn").ref
 
