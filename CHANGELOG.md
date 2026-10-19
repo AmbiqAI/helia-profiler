@@ -56,6 +56,19 @@ release pull requests from Conventional Commits.
   capture taken while it was still settling says so.
 
 
+## [0.2.3](https://github.com/AmbiqAI/helia-profiler/compare/v0.2.2...v0.2.3) (2026-10-19)
+
+
+### Features
+
+* **deps:** adopt heliaRT 2.2.0 and heliaAOT 0.31.0 ([#544](https://github.com/AmbiqAI/helia-profiler/issues/544)) ([6a4d42d](https://github.com/AmbiqAI/helia-profiler/commit/6a4d42d78e7134e1f670c4b1876811c90eeefa15))
+* **expect:** compare a run's outputs with reference outputs ([#545](https://github.com/AmbiqAI/helia-profiler/issues/545)) ([41238ee](https://github.com/AmbiqAI/helia-profiler/commit/41238eeb85f9c4fead35b240758cace847d985b4)), closes [#537](https://github.com/AmbiqAI/helia-profiler/issues/537)
+
+
+### Bug Fixes
+
+* **plan:** check MRAM against the linker's application window and explain link overflows ([#540](https://github.com/AmbiqAI/helia-profiler/issues/540)) ([87e1e8f](https://github.com/AmbiqAI/helia-profiler/commit/87e1e8f813a775f2e6d1965f8784766336b4409b)), closes [#466](https://github.com/AmbiqAI/helia-profiler/issues/466)
+
 ## [0.2.2](https://github.com/AmbiqAI/helia-profiler/compare/v0.2.1...v0.2.2) (2026-10-18)
 
 
