@@ -521,6 +521,7 @@ class ExecuTorchAdapter(SingleArenaPlacementMixin):
         provider_module = _provider_module_ref(config, work_dir, provider)
         return ExecutorchArtifacts(
             engine_type=EngineType.EXECUTORCH,
+            source_roots=((source_root, "nsx-executorch"),),
             extra_modules=[
                 # The provider must precede nsx-executorch so NSX configures it
                 # exactly once before the runtime creates its idempotent bridge.

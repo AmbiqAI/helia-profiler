@@ -343,4 +343,5 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
             heliart_version=version,
             heliart_variant=variant,
             heliart_toolchain_tag=toolchain_tag,
+            source_roots=((source_path, "helia-rt-source"),) if source_path is not None else (),
         )

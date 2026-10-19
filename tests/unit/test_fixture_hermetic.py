@@ -134,3 +134,21 @@ def test_every_build_maps_the_app_directory_out_before_the_modules() -> None:
     )
     assert 'add_compile_options("-ffile-prefix-map=${CMAKE_CURRENT_LIST_DIR}=.")' in rendered
     assert rendered.index("file-prefix-map") < rendered.index("modules.cmake")
+
+
+def test_source_trees_outside_the_app_are_recorded_by_name() -> None:
+    from helia_profiler.firmware.render import _jinja_env
+
+    assert _jinja_env.loader is not None
+    source, _, _ = _jinja_env.loader.get_source(_jinja_env, "CMakeLists.txt.j2")
+    template = _jinja_env.overlay(undefined=jinja2.ChainableUndefined).from_string(source)
+    rendered = template.render(
+        board="apollo510_evb",
+        engine_type="executorch",
+        cmake_vars={},
+        transport="rtt",
+        source_roots=[("/cache/nsx-executorch", "nsx-executorch")],
+    )
+    line = 'add_compile_options("-ffile-prefix-map=/cache/nsx-executorch=nsx-executorch")'
+    assert line in rendered
+    assert rendered.index(line) < rendered.index("modules.cmake")
