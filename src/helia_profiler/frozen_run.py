@@ -18,8 +18,8 @@ import os
 import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Mapping
+from types import MappingProxyType, UnionType
+from typing import TYPE_CHECKING, Any, Mapping, TypeVar, get_args, get_type_hints
 
 from .errors import ConfigError
 
@@ -28,6 +28,8 @@ if TYPE_CHECKING:
 
 FROZEN_RUN_SCHEMA = "hpx.frozen-run"
 FROZEN_RUN_SCHEMA_VERSION = 1
+
+_T = TypeVar("_T")
 
 #: Resolved fields HPX derives itself; ``load_config`` refuses them as input.
 _DERIVED_SETTINGS = ("platform_registry", "compatibility", "compatibility_baseline")
@@ -45,15 +47,14 @@ _HOST_LOCAL_SETTINGS = (
     ("power", "serial"),
     ("build", "compiler_launcher"),
     ("build", "offline"),
+    ("frozen",),  # alias that forces build.offline
 )
 
-#: Environment variables that point a build at local sources, and the engines that read them.
-_SOURCE_ENVIRONMENT = {
-    "SEGGER_RTT_PATH": ("tflm", "helia-rt", "helia-aot", "executorch"),
-    "CMSIS_NN_PATH": ("helia-rt", "helia-aot", "executorch"),
-    "HELIART_DIST_PATH": ("helia-rt",),
-    "HELIART_SOURCE_PATH": ("helia-rt",),
-}
+#: Environment variables that can point a build at local sources.
+_SOURCE_VARIABLES = ("SEGGER_RTT_PATH", "CMSIS_NN_PATH")
+
+#: The ExecuTorch ``<model>.pte.json`` export sidecar, recorded beside the model.
+_SIDECAR = "model.sidecar"
 
 #: ``engine.config`` keys that point a build at local sources.
 _SOURCE_ENGINE_KEYS = ("dist_path", "source_path", "cmsis_nn_path")
@@ -113,8 +114,16 @@ class LocalInput:
 
     setting: str
     path: str
-    kind: str  # "file", "directory" or "missing"
+    kind: str  # "file" or "directory"
     sha256: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.kind not in ("file", "directory") or (self.kind == "file") != (
+            self.sha256 is not None
+        ):
+            raise ValueError(
+                f"local input {self.setting}: kind {self.kind!r}, sha256 {self.sha256!r}"
+            )
 
 
 @dataclass(frozen=True)
@@ -167,25 +176,39 @@ class FrozenRun:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> FrozenRun:
+        if not isinstance(data, Mapping):
+            raise ConfigError("A frozen run plan must be an object.")
         if data.get("schema") != FROZEN_RUN_SCHEMA:
             raise ConfigError(f"Not a frozen run plan: schema {data.get('schema')!r}")
         version = data.get("schema_version")
         if type(version) is not int or version != FROZEN_RUN_SCHEMA_VERSION:
             raise ConfigError(f"Unsupported frozen run plan version: {version!r}")
         try:
-            if not isinstance(data["settings"], Mapping):
-                raise TypeError("settings must be an object")
+            settings = data["settings"]
+            if not isinstance(settings, Mapping) or not isinstance(settings.get("model"), Mapping):
+                raise TypeError("settings and settings.model must be objects")
+            baseline = _typed(dict, data["baseline"], "baseline", id=str, fingerprint=str)
             plan = cls(
-                settings=data["settings"],
-                model=FrozenModel(**data["model"]),
-                baseline_id=data["baseline"]["id"],
-                baseline_fingerprint=data["baseline"]["fingerprint"],
-                qualification=data["qualification"],
-                overrides=tuple(data["overrides"]),
-                local_inputs=tuple(LocalInput(**item) for item in data["local_inputs"]),
-                toolchain=ToolchainIdentity(**data["toolchain"]),
-                runtime=FrozenRuntime(**data["runtime"]) if data["runtime"] is not None else None,
-                hpx_version=data["hpx_version"],
+                settings=settings,
+                model=_record(FrozenModel, data["model"], "model"),
+                baseline_id=baseline["id"],
+                baseline_fingerprint=baseline["fingerprint"],
+                qualification=_typed(str, data["qualification"], "qualification"),
+                overrides=tuple(
+                    _typed(str, item, "overrides[]")
+                    for item in _typed(list, data["overrides"], "overrides")
+                ),
+                local_inputs=tuple(
+                    _record(LocalInput, item, "local_inputs[]")
+                    for item in _typed(list, data["local_inputs"], "local_inputs")
+                ),
+                toolchain=_record(ToolchainIdentity, data["toolchain"], "toolchain"),
+                runtime=(
+                    None
+                    if data["runtime"] is None
+                    else _record(FrozenRuntime, data["runtime"], "runtime")
+                ),
+                hpx_version=_typed(str, data["hpx_version"], "hpx_version"),
             )
         except (KeyError, TypeError, AttributeError, ValueError) as exc:
             raise ConfigError(f"Malformed frozen run plan: {exc}") from exc
@@ -231,7 +254,10 @@ class FrozenRun:
         example ``{"target": {"jlink_serial": "..."}, "output": {"dir": "..."}}``;
         any other key is refused. Refuses when this HPX carries a different
         baseline, when the model (the recorded path, or *model* when it moved)
-        has a different hash, or when a local input differs or is missing.
+        has a different hash, when a local input differs or is missing, or
+        when this host would build something else: a source-path environment
+        variable set, unset or changed, another compiler version, or another
+        engine runtime.
         """
         from .config import deep_merge, load_config
         from .deps.compatibility import load_compatibility_baseline
@@ -252,13 +278,17 @@ class FrozenRun:
                 hint="Pass model= with the file the plan was frozen against.",
             )
         for item in self.local_inputs:
-            _check_local_input(item)
+            if item.setting != _SIDECAR:
+                _check_local_input(item)
         settings = _thaw(self.settings)
+        _check_sidecar(self, settings, model_path)
         settings["model"] = {**settings["model"], "path": str(model_path)}
         if host:
             _check_host_overlay(host)
             settings = deep_merge(settings, _thaw(host))
-        return load_config(None, settings)
+        replayed = load_config(None, settings)
+        _check_replay(self, freeze_config(replayed))
+        return replayed
 
 
 def freeze_config(config: ProfileConfig) -> FrozenRun:
@@ -299,7 +329,13 @@ def freeze_config(config: ProfileConfig) -> FrozenRun:
 
 
 def _local_inputs(config: ProfileConfig) -> tuple[LocalInput, ...]:
+    from .engines import EngineType
+
     candidates: list[tuple[str, str]] = []
+    if config.engine.type is EngineType.EXECUTORCH:
+        sidecar = Path(f"{config.model.path}.json")
+        if sidecar.is_file():
+            candidates.append((_SIDECAR, str(sidecar)))
     if config.target.segger_rtt_path is not None:
         candidates.append(("target.segger_rtt_path", str(config.target.segger_rtt_path)))
     if config.engine.config_path is not None:
@@ -312,21 +348,61 @@ def _local_inputs(config: ProfileConfig) -> tuple[LocalInput, ...]:
         local = getattr(override, "path", None)
         if local:
             candidates.append((f"build.nsx_modules.{name}.path", str(local)))
-    engine = config.engine.type.value
-    for variable, readers in _SOURCE_ENVIRONMENT.items():
-        value = os.environ.get(variable)
-        if value and engine in readers:
-            candidates.append((f"env.{variable}", value))
+    for variable, value in _source_environment(config).items():
+        candidates.append((f"env.{variable}", value))
     return tuple(_describe_local(setting, value) for setting, value in candidates)
 
 
+def _source_environment(config: ProfileConfig) -> dict[str, str]:
+    """The source-path environment variables this build reads, with their values.
+
+    Follows each reader's precedence: an explicit setting beats its variable,
+    and a variable counts only for the engine and kernel provider that read it.
+    """
+    from .deps.compatibility import (
+        cmsis_nn_provider_module,
+        heliart_environment,
+        select_cmsis_nn_override,
+    )
+    from .engines import EngineType
+
+    environment = {variable: os.environ.get(variable) or "" for variable in _SOURCE_VARIABLES}
+    engine = config.engine.type
+    engine_config = config.engine.config
+    effective: dict[str, str] = {}
+    if config.target.segger_rtt_path is None:
+        effective["SEGGER_RTT_PATH"] = environment["SEGGER_RTT_PATH"]
+    if engine is not EngineType.TFLM:
+        provider = cmsis_nn_provider_module(engine.value, _effective_backend(config))
+        selected = select_cmsis_nn_override(engine_config, provider_module=provider)
+        if selected is not None and selected.selector == "env.CMSIS_NN_PATH":
+            effective["CMSIS_NN_PATH"] = environment["CMSIS_NN_PATH"]
+    effective.update(heliart_environment(engine.value, engine_config))
+    return {variable: value for variable, value in effective.items() if value}
+
+
+def _effective_backend(config: ProfileConfig) -> str | None:
+    """``engine.backend``, or for ExecuTorch the provider its PTE sidecar selects."""
+    from .engines import EngineType
+
+    if config.engine.type is not EngineType.EXECUTORCH or config.engine.backend:
+        return config.engine.backend
+    from .engines.executorch import _load_pte_sidecar
+
+    sidecar = _load_pte_sidecar(Path(config.model.path)) or {}
+    return sidecar.get("kernel_provider") or "arm"
+
+
 def _describe_local(setting: str, value: str) -> LocalInput:
-    path = Path(value).expanduser()
+    path = Path(value).expanduser().resolve()
     if path.is_file():
-        return LocalInput(setting, value, "file", _file_sha256(path))
+        return LocalInput(setting, str(path), "file", _file_sha256(path))
     if path.is_dir():
-        return LocalInput(setting, value, "directory")
-    return LocalInput(setting, value, "missing")
+        return LocalInput(setting, str(path), "directory")
+    raise ConfigError(
+        f"{setting} {value} does not exist",
+        hint="Create it or remove the setting, then freeze the plan again.",
+    )
 
 
 def _check_local_input(item: LocalInput) -> None:
@@ -339,6 +415,50 @@ def _check_local_input(item: LocalInput) -> None:
             )
     elif item.kind == "directory" and not path.is_dir():
         raise ConfigError(f"{item.setting} directory {item.path} does not exist on this host")
+
+
+def _check_sidecar(plan: FrozenRun, settings: Mapping[str, Any], model_path: Path) -> None:
+    """Check the ExecuTorch sidecar beside the replayed model before anything reads it."""
+    sidecar = Path(f"{model_path}.json")
+    recorded = next((item for item in plan.local_inputs if item.setting == _SIDECAR), None)
+    if recorded is not None:
+        _check_local_input(LocalInput(_SIDECAR, str(sidecar), "file", recorded.sha256))
+    elif settings["engine"].get("type") == "executorch" and sidecar.exists():
+        raise ConfigError(
+            f"{_SIDECAR} {sidecar} was not there when the plan was frozen",
+            hint="Remove it, or freeze the plan again with it.",
+        )
+
+
+def _check_replay(plan: FrozenRun, replayed: FrozenRun) -> None:
+    """Refuse a replay whose resolved run differs from the plan."""
+    if replayed.intent_hash == plan.intent_hash:
+        return
+    drift = [
+        f"{name}: frozen {frozen!r}, this host {now!r}"
+        for name, frozen, now in (
+            ("local inputs", _input_keys(plan), _input_keys(replayed)),
+            ("toolchain", plan.toolchain.version, _toolchain_fact(replayed.toolchain)),
+            ("engine runtime", plan.runtime, replayed.runtime),
+            ("qualification", plan.qualification, replayed.qualification),
+            ("overrides", plan.overrides, replayed.overrides),
+        )
+        if frozen != now
+    ] or ["resolved settings differ"]
+    raise ConfigError(
+        "This host would build a different run than the frozen plan: " + "; ".join(drift),
+        hint="Restore the frozen environment and toolchain, or freeze the plan again on this host.",
+    )
+
+
+def _toolchain_fact(toolchain: ToolchainIdentity) -> str | None:
+    if toolchain.version is None and toolchain.unavailable_reason:
+        return f"unavailable ({toolchain.unavailable_reason})"
+    return toolchain.version
+
+
+def _input_keys(plan: FrozenRun) -> list[tuple[str, str, str]]:
+    return [(item.setting, item.kind, item.sha256 or item.path) for item in plan.local_inputs]
 
 
 def _check_host_overlay(host: Mapping[str, Any], prefix: tuple[str, ...] = ()) -> None:
@@ -405,18 +525,36 @@ def _frozen_runtime(config: ProfileConfig) -> FrozenRuntime | None:
         )
         return FrozenRuntime("tflm", None, pinned(TFLITE_MICRO_MODULE), module, commit)
     if engine is EngineType.HELIA_RT:
+        # A prebuilt heliaRT archive carries its own CMSIS-NN; only a source build links the module.
+        prebuilt = bool(
+            config.engine.config.get("dist_path")
+            or config.engine.config.get("source")
+            or "HELIART_DIST_PATH" in _source_environment(config)
+        )
+        source_build = bool(
+            config.engine.config.get("source_path")
+            or "HELIART_SOURCE_PATH" in _source_environment(config)
+        )
+        module, commit = (None, None) if prebuilt and not source_build else kernels(CMSIS_NN_MODULE)
         selected = [
-            key for key in ("source", *_SOURCE_ENGINE_KEYS) if config.engine.config.get(key)
+            f"engine.config.{key}"
+            for key in ("source", "dist_path", "source_path")
+            if config.engine.config.get(key)
+        ] + [
+            f"env.{variable}"
+            for variable in _source_environment(config)
+            if variable.startswith("HELIART_")
         ]
         if selected:
             return FrozenRuntime(
                 "helia-rt",
                 None,
                 None,
-                unavailable_reason=f"heliaRT selected by engine.config: {', '.join(selected)}",
+                module,
+                commit,
+                f"heliaRT selected by {', '.join(selected)}",
             )
         record = runtime("helia-rt")
-        module, commit = kernels(CMSIS_NN_MODULE)
         return FrozenRuntime(
             "helia-rt",
             record.version if record else None,
@@ -436,7 +574,9 @@ def _frozen_runtime(config: ProfileConfig) -> FrozenRuntime | None:
         return FrozenRuntime("helia-aot", source["version"], source["commit"], module, commit)
     if engine is EngineType.EXECUTORCH:
         record = runtime("executorch")
-        module, commit = kernels(CMSIS_NN_MODULE if backend == "ns" else ARM_CMSIS_NN_MODULE)
+        module, commit = kernels(
+            CMSIS_NN_MODULE if _effective_backend(config) == "ns" else ARM_CMSIS_NN_MODULE
+        )
         return FrozenRuntime(
             "executorch",
             record.version if record else None,
@@ -449,8 +589,11 @@ def _frozen_runtime(config: ProfileConfig) -> FrozenRuntime | None:
 
 def _intent_hash(plan: FrozenRun) -> str:
     settings = _thaw(plan.settings)
-    if isinstance(settings.get("model"), dict):
-        settings["model"].pop("path", None)
+    _drop(settings, ("model", "path"))
+    # Local inputs are identified by content (files) or by their recorded path.
+    for item in plan.local_inputs:
+        if not item.setting.startswith("env.") and item.setting != _SIDECAR:
+            _drop(settings, _setting_path(item.setting))
     payload = {
         "settings": settings,
         "model_sha256": plan.model.sha256,
@@ -465,6 +608,30 @@ def _intent_hash(plan: FrozenRun) -> str:
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _setting_path(setting: str) -> tuple[str, ...]:
+    module_prefix = "build.nsx_modules."
+    if setting.startswith(module_prefix):
+        return ("build", "nsx_modules", setting[len(module_prefix) : -len(".path")], "path")
+    return tuple(setting.split("."))
+
+
+def _record(cls: type[_T], data: Any, where: str) -> _T:
+    """Build a plan record from JSON, refusing fields of the wrong type."""
+    hints = get_type_hints(cls)
+    return cls(**_typed(dict, data, where, **{name: hints[name] for name in data if name in hints}))
+
+
+def _typed(expected: Any, value: Any, where: str, **fields: Any) -> Any:
+    """Return *value* when its JSON type is exactly *expected*; check *fields* of an object."""
+    options = get_args(expected) if isinstance(expected, UnionType) else (expected,)
+    if not any(type(value) is option for option in options):
+        raise TypeError(f"{where} must be {getattr(expected, '__name__', expected)}")
+    for name, field_type in fields.items():
+        if name in value:
+            _typed(field_type, value[name], f"{where}.{name}")
+    return value
 
 
 def _drop(settings: dict[str, Any], path: tuple[str, ...]) -> None:

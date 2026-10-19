@@ -254,3 +254,233 @@ def test_an_overridden_engine_module_has_no_pinned_source(session, tmp_path):
     )
     runtime = overridden.freeze().runtime
     assert runtime is not None and runtime.source_commit is None
+
+
+def _pte_session(tmp_path: Path, *, kernel_provider: str | None = None) -> hpx.Session:
+    import hashlib
+
+    model = tmp_path / "model.pte"
+    model.write_bytes(b"PTE0" + bytes(64))
+    if kernel_provider is not None:
+        sidecar = {
+            "schema": "nsx-executorch.pte-manifest/1",
+            "pte_sha256": hashlib.sha256(model.read_bytes()).hexdigest(),
+            "kernel_provider": kernel_provider,
+        }
+        Path(f"{model}.json").write_text(json.dumps(sidecar), encoding="utf-8")
+    return (
+        hpx.Session()
+        .with_model(model)
+        .with_engine("executorch")
+        .with_target(board="apollo510_evb", toolchain="arm-none-eabi-gcc")
+    )
+
+
+def test_a_changed_set_or_unset_source_variable_is_refused_on_replay(
+    session, tmp_path, monkeypatch
+):
+    first, second = tmp_path / "rt-a", tmp_path / "rt-b"
+    first.mkdir()
+    second.mkdir()
+    monkeypatch.setenv("HELIART_SOURCE_PATH", str(first))
+    plan = session.freeze()
+
+    monkeypatch.setenv("HELIART_SOURCE_PATH", str(second))
+    with pytest.raises(ConfigError, match="different run than the frozen plan: local inputs"):
+        plan.config()
+    monkeypatch.delenv("HELIART_SOURCE_PATH")
+    with pytest.raises(ConfigError, match="local inputs"):
+        plan.config()
+    clean = session.freeze()
+    monkeypatch.setenv("CMSIS_NN_PATH", str(first))
+    with pytest.raises(ConfigError, match="env.CMSIS_NN_PATH"):
+        clean.config()
+
+
+def test_explicit_settings_beat_the_variables_they_replace(session, tmp_path, monkeypatch):
+    rtt, source = tmp_path / "rtt", tmp_path / "rt"
+    rtt.mkdir()
+    source.mkdir()
+    monkeypatch.setenv("SEGGER_RTT_PATH", str(tmp_path))
+    monkeypatch.setenv("HELIART_DIST_PATH", str(tmp_path))
+    plan = session.with_target(segger_rtt_path=str(rtt)).with_engine(
+        "helia-rt", config={"source_path": str(source)}
+    )
+    assert [i.setting for i in plan.freeze().local_inputs] == [
+        "target.segger_rtt_path",
+        "engine.config.source_path",
+    ]
+
+
+def test_another_compiler_or_engine_runtime_is_refused_on_replay(session, compiler, monkeypatch):
+    plan = session.freeze()
+    compiler["output"] = "arm-none-eabi-gcc (Arm GNU Toolchain 14.3.Rel1) 14.3.1\n"
+    with pytest.raises(ConfigError, match="toolchain: frozen"):
+        plan.config()
+
+    compiler["output"] = _GCC
+    installed = {"package": "helia-aot", "version": "0.30.0", "commit": "abc123"}
+    monkeypatch.setattr(
+        "helia_profiler.results.dependencies.installed_aot_source", lambda: dict(installed)
+    )
+    aot_plan = session.with_engine("helia-aot").freeze()
+    installed.update(version="0.31.0", commit="def456")
+    with pytest.raises(ConfigError, match="engine runtime"):
+        aot_plan.config()
+
+
+def test_the_executorch_sidecar_is_frozen_beside_the_model(tmp_path):
+    session = _pte_session(tmp_path, kernel_provider="ns")
+    plan = session.freeze()
+    sidecar = Path(f"{plan.model.path}.json")
+
+    assert [(i.setting, i.kind) for i in plan.local_inputs] == [("model.sidecar", "file")]
+    runtime = plan.runtime
+    assert runtime is not None and runtime.kernels_module == "nsx-cmsis-nn"
+
+    moved_dir = tmp_path / "moved"
+    moved_dir.mkdir()
+    moved = moved_dir / "model.pte"
+    moved.write_bytes(Path(plan.model.path).read_bytes())
+    with pytest.raises(ConfigError, match="model.sidecar"):
+        plan.config(model=moved)
+    Path(f"{moved}.json").write_bytes(sidecar.read_bytes())
+    assert plan.config(model=moved).model.path == moved
+
+    sidecar.write_text(sidecar.read_text(encoding="utf-8") + " ", encoding="utf-8")
+    with pytest.raises(ConfigError, match="model.sidecar"):
+        plan.config()
+
+
+def test_a_sidecar_that_appears_after_freezing_is_refused(tmp_path):
+    bare = _pte_session(tmp_path).freeze()
+    assert bare.local_inputs == () and bare.runtime is not None
+    assert bare.runtime.kernels_module == "arm-cmsis-nn"
+    _pte_session(tmp_path, kernel_provider="arm")
+    with pytest.raises(ConfigError, match="model.sidecar"):
+        bare.config()
+
+
+def test_the_arm_provider_ignores_cmsis_nn_path(tmp_path, monkeypatch):
+    monkeypatch.setenv("CMSIS_NN_PATH", str(tmp_path))
+    assert _pte_session(tmp_path).freeze().local_inputs == ()
+    ns = _pte_session(tmp_path).with_engine("executorch", backend="ns").freeze()
+    assert [i.setting for i in ns.local_inputs] == ["env.CMSIS_NN_PATH"]
+
+
+def test_a_missing_local_input_is_refused_at_freeze(session, tmp_path):
+    with pytest.raises(ConfigError, match="does not exist"):
+        session.with_target(segger_rtt_path=str(tmp_path / "absent")).freeze()
+
+
+def test_heliart_runtime_selectors_are_separate_from_kernel_overrides(
+    session, tmp_path, monkeypatch
+):
+    from helia_profiler.runtime_records import runtime
+
+    kernels = session.with_engine("helia-rt", config={"cmsis_nn_path": str(tmp_path)}).freeze()
+    record = runtime("helia-rt")
+    assert kernels.runtime is not None and record is not None
+    assert kernels.runtime.version == record.version and kernels.runtime.kernels_commit is None
+
+    monkeypatch.setenv("HELIART_DIST_PATH", str(tmp_path))
+    local = session.freeze().runtime
+    assert local is not None and local.version is None and local.source_commit is None
+    assert local.unavailable_reason == "heliaRT selected by env.HELIART_DIST_PATH"
+
+
+def test_the_frozen_alias_is_host_local(session):
+    plan = session.with_options(frozen=True).freeze()
+    assert plan.intent_hash == session.freeze().intent_hash
+    assert "frozen" not in plan.to_dict()["settings"]
+    assert plan.config(host={"frozen": True}).build.offline
+
+
+@pytest.mark.parametrize(
+    ("section", "key", "value"),
+    [
+        ("model", "path", None),
+        ("model", "size_bytes", "68"),
+        ("toolchain", "version", 15),
+        ("baseline", "id", None),
+    ],
+)
+def test_a_plan_field_of_the_wrong_type_is_refused(session, tmp_path, section, key, value):
+    data = session.freeze().to_dict()
+    data[section][key] = value
+    with pytest.raises(ConfigError, match=f"Malformed frozen run plan: {section}.{key} must be"):
+        FrozenRun.from_dict(data)
+
+
+def test_a_local_input_without_a_known_kind_is_refused(session, tmp_path):
+    rtt = tmp_path / "rtt"
+    rtt.mkdir()
+    data = session.with_target(segger_rtt_path=str(rtt)).freeze().to_dict()
+    data["local_inputs"][0]["kind"] = "missing"
+    with pytest.raises(ConfigError, match="Malformed frozen run plan: local input"):
+        FrozenRun.from_dict(data)
+
+
+def test_identical_config_files_at_different_paths_share_an_intent(session, tmp_path):
+    first, second = tmp_path / "a.yaml", tmp_path / "b.yaml"
+    for path in (first, second):
+        path.write_text("memory: {}\n", encoding="utf-8")
+    plans = [
+        session.with_engine("helia-aot", config_path=str(path)).freeze() for path in (first, second)
+    ]
+    assert plans[0].intent_hash == plans[1].intent_hash
+    assert plans[0].settings["engine"]["config_path"] == str(first)
+
+
+def test_a_heliart_variable_other_engines_ignore_does_not_block_replay(
+    session, tmp_path, monkeypatch
+):
+    monkeypatch.setenv("HELIART_DIST_PATH", str(tmp_path))
+    tflm = session.with_engine("tflm").freeze()
+    assert tflm.qualification == "qualified" and tflm.overrides == ()
+    monkeypatch.delenv("HELIART_DIST_PATH")
+    assert tflm.config().engine.type.value == "tflm"
+
+
+def test_a_prebuilt_heliart_links_no_separate_kernel_module(session, tmp_path, monkeypatch):
+    monkeypatch.setenv("HELIART_DIST_PATH", str(tmp_path))
+    prebuilt = session.freeze().runtime
+    assert prebuilt is not None and (prebuilt.kernels_module, prebuilt.kernels_commit) == (
+        None,
+        None,
+    )
+    monkeypatch.setenv("HELIART_SOURCE_PATH", str(tmp_path))
+    source = session.freeze().runtime
+    assert source is not None and source.kernels_module == "nsx-cmsis-nn"
+    assert source.unavailable_reason == "heliaRT selected by env.HELIART_SOURCE_PATH"
+
+
+def test_a_corrupted_sidecar_is_a_config_error_on_replay(tmp_path):
+    plan = _pte_session(tmp_path, kernel_provider="ns").freeze()
+    Path(f"{plan.model.path}.json").write_text("{", encoding="utf-8")
+    with pytest.raises(ConfigError, match="differs from the frozen file"):
+        plan.config()
+    bare_dir = tmp_path / "bare"
+    bare_dir.mkdir()
+    bare = _pte_session(bare_dir).freeze()
+    Path(f"{bare.model.path}.json").write_text("{", encoding="utf-8")
+    with pytest.raises(ConfigError, match="was not there when the plan was frozen"):
+        bare.config()
+
+
+def test_a_relative_source_path_is_recorded_resolved(session, tmp_path, monkeypatch):
+    (tmp_path / "rtt").mkdir()
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("SEGGER_RTT_PATH", "rtt")
+    plan = session.freeze()
+    assert [i.path for i in plan.local_inputs] == [str((tmp_path / "rtt").resolve())]
+    elsewhere = tmp_path / "elsewhere"
+    (elsewhere / "rtt").mkdir(parents=True)
+    monkeypatch.chdir(elsewhere)
+    with pytest.raises(ConfigError, match="local inputs"):
+        plan.config()
+
+
+def test_a_non_object_plan_is_refused():
+    with pytest.raises(ConfigError, match="must be an object"):
+        FrozenRun.from_dict([])  # ty: ignore[invalid-argument-type]
