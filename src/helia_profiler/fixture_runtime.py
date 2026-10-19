@@ -139,7 +139,7 @@ def read_prepared_runtime_manifest(manifest: FixtureFile) -> PreparedRuntimeFact
 
 
 def _manifest_facts(
-    manifest: FixtureFile,
+    manifest: FixtureFile, *, archive_sha256: str | None = None
 ) -> tuple[int, dict[str, Any], PreparedRuntimeFacts]:
     raw = json.loads(manifest.read(), object_pairs_hook=_unique_object)
     schema = raw.get("schema_version") if isinstance(raw, dict) else None
@@ -150,6 +150,8 @@ def _manifest_facts(
     stack = data["stack"] if schema == 2 else "upstream"
     if schema == 2 and (not isinstance(stack, str) or stack not in _STACK_KERNEL_DIR):
         raise ValueError("Unsupported prepared runtime stack")
+    if archive_sha256 is not None and _digest(data["archive_sha256"]) != archive_sha256:
+        raise ValueError("Runtime manifest/archive identity mismatch")
     declared = _STACK_PROVIDERS[stack]
     providers = _object(data["providers"], {name for name, _ in declared}, "providers")
     sources = []
@@ -195,10 +197,8 @@ class PreparedUpstreamRuntime:
         archive = self.archive.read()
         if len(archive) <= 8 or not archive.startswith(b"!<arch>\n"):
             raise ValueError("Prepared runtime requires a nonempty regular archive")
-        schema, data, facts = _manifest_facts(self.manifest)
+        schema, data, facts = _manifest_facts(self.manifest, archive_sha256=self.archive.sha256)
         stack, sources = facts.stack, list(facts.providers)
-        if facts.archive_sha256 != self.archive.sha256:
-            raise ValueError("Runtime manifest/archive identity mismatch")
         defines, kernel_dir = _UPSTREAM_DEFINES, None
         if schema == 2:
             build = _object(data["build"], {"consumer_defines", "kernel_dir"}, "build")

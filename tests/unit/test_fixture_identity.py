@@ -27,6 +27,43 @@ from helia_profiler.fixture import (
 AOT_COMMIT = "7b92ec8a3ced8459eb68940a42d405536144368e"
 
 
+def _lock(*, stamp="2026-10-19T11:59:32+00:00", tool="0.2.3", commit="9" * 40):
+    return f"""schema_version: 4
+targets:
+  apollo510_evb:
+    generated_at: '{stamp}'
+    nsx_tool:
+      version: {tool}
+    manifest:
+      path: nsx.yml
+      hash: sha256:{"1" * 64}
+    target:
+      board: apollo510_evb
+      soc: apollo510
+      toolchain: atfe
+    modules:
+      nsx-cmsis-nn:
+        project: ns-cmsis-nn
+        kind: git
+        constraint: {commit}
+        resolved:
+          url: https://github.com/AmbiqAI/ns-cmsis-nn.git
+          commit: {commit}
+          vendored_at: modules/ns-cmsis-nn
+          content_hash: sha256:{"2" * 64}
+          acquired_at: '{stamp}'
+      nsx-tooling:
+        project: neuralspotx
+        kind: packaged
+        constraint: packaged
+        resolved:
+          tool_version: {tool}
+          vendored_at: cmake/nsx
+          content_hash: sha256:{"3" * 64}
+          acquired_at: '{stamp}'
+""".encode()
+
+
 def _state(root, build, *, hpx_version="0.2.3", name="state.json"):
     assert build.dependency_lock is not None
     data = {
@@ -45,8 +82,9 @@ def _reseal(build, **change):
     return replace(build, build_identity=compiled_fixture_identity(build))
 
 
-def _aot(root, **state):
+def _aot(root, lock=None, **state):
     build = _sourced(root)
+    build = replace(build, dependency_lock=_pin(root / "evidence" / "nsx.lock", lock or _lock()))
     return _reseal(
         build,
         dependency_state=_state(root, build, **state),
@@ -71,7 +109,13 @@ def test_a_compiled_build_states_what_it_linked(tmp_path):
 
 def test_the_build_hash_ignores_the_hpx_release_but_not_the_image(tmp_path):
     first = fixture_run_identity(_aot(tmp_path / "a", hpx_version="0.2.3"))
-    later = fixture_run_identity(_aot(tmp_path / "b", hpx_version="0.3.0"))
+    later = fixture_run_identity(
+        _aot(
+            tmp_path / "b",
+            _lock(stamp="2026-11-02T08:00:00+00:00", tool="0.2.4"),
+            hpx_version="0.3.0",
+        )
+    )
     assert first.producer != later.producer
     assert first.build_hash == later.build_hash
 
@@ -188,7 +232,9 @@ def test_the_build_hash_covers_the_runtime_archive_the_model_and_the_lock(tmp_pa
     for changed in (
         replace(build, runtime_source=archive),
         replace(build, model=_pin(tmp_path / "other" / "model.tflite", b"other model")),
-        replace(build, dependency_lock=_pin(tmp_path / "other" / "nsx.lock", b"other lock")),
+        replace(
+            build, dependency_lock=_pin(tmp_path / "other" / "nsx.lock", _lock(commit="8" * 40))
+        ),
     ):
         assert fixture_run_identity(changed).build_hash != base
 
@@ -197,15 +243,24 @@ def test_each_missing_fact_states_its_own_reason(tmp_path):
     from helia_profiler.fixture import FixtureRuntimeSource
 
     build = _aot(tmp_path)
+    no_modules = _pin(tmp_path / "none.json", json.dumps({"modules": []}).encode())
     identity = fixture_run_identity(
-        replace(build, model=None, inputs=(), cpu_hz=None, toolchain=None, kernel_source=None)
+        replace(
+            build,
+            model=None,
+            inputs=(),
+            cpu_hz=None,
+            toolchain=None,
+            kernel_source=None,
+            dependency_state=no_modules,
+        )
     )
     assert identity.model_sha256 == Unknown("the record predates pinned models")
     assert identity.inputs_sha256 == Unknown("the record predates pinned inputs")
     assert identity.build.cpu_hz == Unknown("the record predates this fact")
     assert identity.build.toolchain == Unknown("the record states no toolchain")
     assert identity.kernels.library == Unknown(
-        "the dependency state names no single CMSIS-NN module"
+        "the dependency state names 0 CMSIS-NN modules, not one"
     )
     unmatched = FixtureRuntimeSource(
         "helia-rt", "https://github.com/AmbiqAI/helia-rt", None, "a" * 40, "c" * 64
@@ -295,3 +350,43 @@ def test_an_absent_or_empty_workspace_fact_is_unknown(tmp_path, baseline):
     state = _pin(tmp_path / "s.json", json.dumps({"workspace": workspace}).encode())
     identity = fixture_run_identity(replace(_aot(tmp_path), dependency_state=state))
     assert identity.baseline_id == Unknown("the workspace records no baseline_id")
+
+
+def test_a_lock_that_is_not_an_nsx_lock_has_no_build_hash(tmp_path):
+    build = replace(_aot(tmp_path), dependency_lock=_pin(tmp_path / "x.lock", b"- not a lock"))
+    assert fixture_run_identity(build).build_hash == Unknown(
+        "the dependency lock is not an NSX lock"
+    )
+
+
+def test_records_that_predate_sources_rederive_them_from_pinned_files(tmp_path):
+    build = _aot(tmp_path)
+    older = replace(build, kernel_source=None, runtime_source=None)
+    assert fixture_run_identity(older).kernels == fixture_run_identity(build).kernels
+
+    manifest = _manifest(tmp_path / "rt")
+    heliart = replace(build, runtime_manifest=manifest, kernel_source=None, engine_source=None)
+    identity = fixture_run_identity(heliart)
+    assert identity.runtime.commit == "a" * 40 and identity.kernels.commit == "b" * 40
+    assert identity.prepared_archive_sha256 == "c" * 64
+
+
+def test_the_ram_observation_is_part_of_the_observation_hash(tmp_path):
+    build = _aot(tmp_path)
+    capture = _capture(tmp_path / "x")
+
+    def with_ram(stack):
+        ram = _pin(tmp_path / f"ram{stack}" / "ram.json", json.dumps({"stack": stack}).encode())
+        return fixture_run_identity(build, replace(capture, artifacts=(ram,))).observation_hash
+
+    assert with_ram(2048) != with_ram(61440)
+
+
+def test_an_error_message_is_not_part_of_the_observation(tmp_path):
+    build = _aot(tmp_path)
+    capture = replace(_capture(tmp_path / "x"), state="failure", error="flash failed at /tmp/a")
+    other = replace(capture, error="flash failed at /home/b")
+    assert (
+        fixture_run_identity(build, capture).observation_hash
+        == fixture_run_identity(build, other).observation_hash
+    )
