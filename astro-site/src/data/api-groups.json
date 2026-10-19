@@ -144,12 +144,12 @@
       "members": [
         "Expect",
         "Tolerance",
-        "verify_fixture_outputs",
+        "compare_fixture_outputs",
         "compare_outputs",
         "host_reference",
         "Verification",
         "TensorComparison",
-        "Reference",
+        "ReferenceOutputs",
         "ReferenceOrigin"
       ]
     },

@@ -94,6 +94,7 @@ evaluation/engine_analysis.py
 evaluation/run_metrics.py
 evaluation/validity.py
 examples.py
+expect.py
 firmware/__init__.py
 firmware/build.py
 firmware/context.py
