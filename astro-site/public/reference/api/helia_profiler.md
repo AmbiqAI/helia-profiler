@@ -28,6 +28,11 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 | [FrozenRuntime](/helia-profiler/reference/api/helia_profiler/frozen_run/#helia_profiler.FrozenRuntime) | `helia_profiler.FrozenRuntime` |
 | [LocalInput](/helia-profiler/reference/api/helia_profiler/frozen_run/#helia_profiler.LocalInput) | `helia_profiler.LocalInput` |
 | [ToolchainIdentity](/helia-profiler/reference/api/helia_profiler/frozen_run/#helia_profiler.ToolchainIdentity) | `helia_profiler.ToolchainIdentity` |
+| [CanonicalEngine](/helia-profiler/reference/api/helia_profiler/identity/#helia_profiler.CanonicalEngine) | `helia_profiler.CanonicalEngine` |
+| [CanonicalKernel](/helia-profiler/reference/api/helia_profiler/identity/#helia_profiler.CanonicalKernel) | `helia_profiler.CanonicalKernel` |
+| [Unknown](/helia-profiler/reference/api/helia_profiler/identity/#helia_profiler.Unknown) | `helia_profiler.Unknown` |
+| [canonical_engine](/helia-profiler/reference/api/helia_profiler/identity/#helia_profiler.canonical_engine) | `helia_profiler.canonical_engine` |
+| [canonical_kernel](/helia-profiler/reference/api/helia_profiler/identity/#helia_profiler.canonical_kernel) | `helia_profiler.canonical_kernel` |
 | [PowerConfig](/helia-profiler/reference/api/helia_profiler/config/power/#helia_profiler.PowerConfig) | `helia_profiler.PowerConfig` |
 | [EngineType](/helia-profiler/reference/api/helia_profiler/vocab/#helia_profiler.EngineType) | `helia_profiler.EngineType` |
 | [Toolchain](/helia-profiler/reference/api/helia_profiler/vocab/#helia_profiler.Toolchain) | `helia_profiler.Toolchain` |

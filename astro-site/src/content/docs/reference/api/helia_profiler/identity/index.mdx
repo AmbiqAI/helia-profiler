@@ -1,0 +1,229 @@
+---
+title: "identity"
+description: "Shared identity vocabulary: canonical engine and kernel names with today's spellings as aliases, and unknown facts that carry their reason."
+sidebar:
+  order: 9
+---
+
+import RefMembers from '@ambiqai/helia-ui/astro/RefMembers';
+import RefParams from '@ambiqai/helia-ui/astro/RefParams';
+import RefSection from '@ambiqai/helia-ui/astro/RefSection';
+import RefSymbol from '@ambiqai/helia-ui/astro/RefSymbol';
+
+Shared identity vocabulary: canonical engine and kernel names with today's spellings as aliases, and unknown facts that carry their reason.
+
+Every name on this page is imported from `helia_profiler`.
+
+**API tier:** `experimental`
+
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
+
+[Machine-readable model](/helia-profiler/reference/api/helia_profiler/identity.json)
+
+<RefMembers label="On this page" items={[{"id":"helia_profiler.CanonicalEngine","name":"CanonicalEngine","kind":"class","summary":"An inference engine, by its shared name."},{"id":"helia_profiler.CanonicalKernel","name":"CanonicalKernel","kind":"class","summary":"A kernel library, by its shared name."},{"id":"helia_profiler.Unknown","name":"Unknown","kind":"class","summary":"A fact that could not be determined, with the reason."},{"id":"helia_profiler.canonical_engine","name":"canonical_engine","kind":"function","summary":"The shared name for an engine, from its canonical name or any alias."},{"id":"helia_profiler.canonical_kernel","name":"canonical_kernel","kind":"function","summary":"The shared name for a kernel library, from its canonical name or any alias."}]} />
+
+<RefSymbol
+  id={"helia_profiler.CanonicalEngine"}
+  name={"CanonicalEngine"}
+  kind={"class"}
+  language={"python"}
+  signature={"CanonicalEngine()"}
+  level={2}
+  summary={"An inference engine, by its shared name."}
+  source={{"path":"src/helia_profiler/identity.py","line":24,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L24"}}
+>
+
+  An inference engine, by its shared name.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.CanonicalEngine.LITERT"}
+    name={"LITERT"}
+    kind={"constant"}
+    language={"python"}
+    signature={"LITERT = 'litert'"}
+    level={3}
+    source={{"path":"src/helia_profiler/identity.py","line":27,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L27"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.CanonicalEngine.HELIA_RT"}
+    name={"HELIA_RT"}
+    kind={"constant"}
+    language={"python"}
+    signature={"HELIA_RT = 'helia-rt'"}
+    level={3}
+    source={{"path":"src/helia_profiler/identity.py","line":28,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L28"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.CanonicalEngine.HELIA_AOT"}
+    name={"HELIA_AOT"}
+    kind={"constant"}
+    language={"python"}
+    signature={"HELIA_AOT = 'helia-aot'"}
+    level={3}
+    source={{"path":"src/helia_profiler/identity.py","line":29,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L29"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.CanonicalEngine.EXECUTORCH"}
+    name={"EXECUTORCH"}
+    kind={"constant"}
+    language={"python"}
+    signature={"EXECUTORCH = 'executorch'"}
+    level={3}
+    source={{"path":"src/helia_profiler/identity.py","line":30,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L30"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.CanonicalKernel"}
+  name={"CanonicalKernel"}
+  kind={"class"}
+  language={"python"}
+  signature={"CanonicalKernel()"}
+  level={2}
+  summary={"A kernel library, by its shared name."}
+  source={{"path":"src/helia_profiler/identity.py","line":33,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L33"}}
+>
+
+  A kernel library, by its shared name.
+
+  ``CMSIS_NN`` is Arm's CMSIS-NN. ``HELIA_CORE`` is heliaCORE, the product
+  name of Ambiq's ``ns-cmsis-nn`` library.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.CanonicalKernel.REFERENCE"}
+    name={"REFERENCE"}
+    kind={"constant"}
+    language={"python"}
+    signature={"REFERENCE = 'reference'"}
+    level={3}
+    source={{"path":"src/helia_profiler/identity.py","line":40,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L40"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.CanonicalKernel.CMSIS_NN"}
+    name={"CMSIS_NN"}
+    kind={"constant"}
+    language={"python"}
+    signature={"CMSIS_NN = 'cmsis-nn'"}
+    level={3}
+    source={{"path":"src/helia_profiler/identity.py","line":41,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L41"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.CanonicalKernel.HELIA_CORE"}
+    name={"HELIA_CORE"}
+    kind={"constant"}
+    language={"python"}
+    signature={"HELIA_CORE = 'helia-core'"}
+    level={3}
+    source={{"path":"src/helia_profiler/identity.py","line":42,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L42"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.Unknown"}
+  name={"Unknown"}
+  kind={"class"}
+  language={"python"}
+  signature={"Unknown(reason: str) -> None"}
+  level={2}
+  summary={"A fact that could not be determined, with the reason."}
+  source={{"path":"src/helia_profiler/identity.py","line":45,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L45"}}
+>
+
+  `dataclass`
+
+  A fact that could not be determined, with the reason.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.Unknown.reason"}
+    name={"reason"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"reason: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/identity.py","line":49,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L49"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.canonical_engine"}
+  name={"canonical_engine"}
+  kind={"function"}
+  language={"python"}
+  signature={"canonical_engine(name: str) -> CanonicalEngine"}
+  level={2}
+  summary={"The shared name for an engine, from its canonical name or any alias."}
+  source={{"path":"src/helia_profiler/identity.py","line":85,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L85"}}
+>
+
+  The shared name for an engine, from its canonical name or any alias.
+
+  **API tier:** `experimental`
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.canonical_kernel"}
+  name={"canonical_kernel"}
+  kind={"function"}
+  language={"python"}
+  signature={"canonical_kernel(name: str) -> CanonicalKernel"}
+  level={2}
+  summary={"The shared name for a kernel library, from its canonical name or any alias."}
+  source={{"path":"src/helia_profiler/identity.py","line":90,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L90"}}
+>
+
+  The shared name for a kernel library, from its canonical name or any alias.
+
+  **API tier:** `experimental`
+
+</RefSymbol>
+
+---
+
+Machine-readable: [`identity.json`](/helia-profiler/reference/api/helia_profiler/identity.json) · [`identity.md`](/helia-profiler/reference/api/helia_profiler/identity.md), complete and lossless.
