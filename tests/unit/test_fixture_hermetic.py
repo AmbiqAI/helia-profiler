@@ -123,25 +123,14 @@ def test_build_refuses_before_any_stage_or_work_directory(
     assert config.work_dir is not None and not config.work_dir.exists()
 
 
-def test_fixture_flag_only_inserts_the_prefix_map_before_the_modules() -> None:
+def test_every_build_maps_the_app_directory_out_before_the_modules() -> None:
     from helia_profiler.firmware.render import _jinja_env
 
     assert _jinja_env.loader is not None
     source, _, _ = _jinja_env.loader.get_source(_jinja_env, "CMakeLists.txt.j2")
     template = _jinja_env.overlay(undefined=jinja2.ChainableUndefined).from_string(source)
-    values = {
-        "board": "apollo510_evb",
-        "engine_type": "helia-aot",
-        "cmake_vars": {},
-        "transport": "rtt",
-    }
-    plain = template.render(**values, strip_build_paths=False)
-    stripped = template.render(**values, strip_build_paths=True)
-    inserted = (
-        "\n\n# Record no build-machine paths, so the ELF depends only on its inputs.\n"
-        'add_compile_options("-ffile-prefix-map=${CMAKE_CURRENT_LIST_DIR}=.")'
+    rendered = template.render(
+        board="apollo510_evb", engine_type="helia-aot", cmake_vars={}, transport="rtt"
     )
-    anchor = "set(CMAKE_EXPORT_COMPILE_COMMANDS ON)"
-    assert "file-prefix-map" not in plain
-    assert stripped == plain.replace(anchor, anchor + inserted, 1)
-    assert stripped.index("file-prefix-map") < stripped.index("modules.cmake")
+    assert 'add_compile_options("-ffile-prefix-map=${CMAKE_CURRENT_LIST_DIR}=.")' in rendered
+    assert rendered.index("file-prefix-map") < rendered.index("modules.cmake")
