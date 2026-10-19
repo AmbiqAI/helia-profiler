@@ -805,7 +805,7 @@ save(path: str | Path, *, roots: Mapping[str, Path]) -> Path
 
 Write the record as JSON with paths relative to *roots* and return its path.
 
-Source: `src/helia_profiler/build_record.py:66`
+Source: `src/helia_profiler/build_record.py:79`
 
 ### helia_profiler.BuildRecord.load
 
@@ -819,7 +819,7 @@ load(path: str | Path, *, roots: Mapping[str, Path]) -> BuildRecord
 
 Read and verify a record written by :meth:`save`, resolving paths under *roots*.
 
-Source: `src/helia_profiler/build_record.py:88`
+Source: `src/helia_profiler/build_record.py:101`
 
 ### helia_profiler.BuildRecord.run
 
@@ -839,7 +839,7 @@ run(
 
 Flash the recorded image, capture one run and compare outputs when *expect* is given.
 
-Source: `src/helia_profiler/build_record.py:122`
+Source: `src/helia_profiler/build_record.py:135`
 
 ## helia_profiler.RunResult
 
@@ -860,7 +860,7 @@ One capture from a :class:`BuildRecord`.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/build_record.py:136`
+Source: `src/helia_profiler/build_record.py:149`
 
 ### helia_profiler.RunResult.record
 
@@ -870,7 +870,7 @@ Source: `src/helia_profiler/build_record.py:136`
 record: BuildRecord
 ```
 
-Source: `src/helia_profiler/build_record.py:140`
+Source: `src/helia_profiler/build_record.py:153`
 
 ### helia_profiler.RunResult.capture
 
@@ -880,7 +880,7 @@ Source: `src/helia_profiler/build_record.py:140`
 capture: FixtureCaptureResult
 ```
 
-Source: `src/helia_profiler/build_record.py:141`
+Source: `src/helia_profiler/build_record.py:154`
 
 ### helia_profiler.RunResult.identity
 
@@ -890,7 +890,7 @@ Source: `src/helia_profiler/build_record.py:141`
 identity: RunIdentity
 ```
 
-Source: `src/helia_profiler/build_record.py:142`
+Source: `src/helia_profiler/build_record.py:155`
 
 ### helia_profiler.RunResult.verification
 
@@ -900,7 +900,7 @@ Source: `src/helia_profiler/build_record.py:142`
 verification: Verification | None
 ```
 
-Source: `src/helia_profiler/build_record.py:143`
+Source: `src/helia_profiler/build_record.py:156`
 
 ### helia_profiler.RunResult.succeeded
 
@@ -910,7 +910,7 @@ Source: `src/helia_profiler/build_record.py:143`
 succeeded: bool
 ```
 
-Source: `src/helia_profiler/build_record.py:146`
+Source: `src/helia_profiler/build_record.py:159`
 
 ---
 
