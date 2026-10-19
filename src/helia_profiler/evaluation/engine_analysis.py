@@ -71,6 +71,7 @@ def analyze_for_engine(
             model={"path": str(path)},
             module={"path": tmp, "type": ModuleType("nsx").value},
             platform={"name": aot_platform_for_board(board) or board},
+            result_views=True,
         )
         try:
             result = convert_with_views(AotConverter(config=convert_args))

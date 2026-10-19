@@ -173,9 +173,7 @@ def _is_call_symbol(symbol: object) -> bool:
     return isinstance(symbol, str) and symbol.isidentifier()
 
 
-def _extract_memory_plan(
-    result: Any, prefix: str = "hpx", *, allocate_arenas: bool = True
-) -> MemoryPlan | None:
+def _extract_memory_plan(result: Any, *, allocate_arenas: bool = True) -> MemoryPlan | None:
     """Build a ``MemoryPlan`` from the result's arena regions.
 
     Generated C allocates one buffer per region; tensor placements share those
@@ -247,10 +245,8 @@ def _extract_memory_plan(
     )
 
 
-def _aot_memory_region_key(memory: Any) -> str | None:
-    if memory is None:
-        return None
-    key = str(memory).upper()
+def _aot_memory_region_key(memory: str) -> str | None:
+    key = memory.upper()
     if key == "TCM":
         return "DTCM"
     if key == "DRAM":

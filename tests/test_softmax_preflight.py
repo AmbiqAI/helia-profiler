@@ -582,7 +582,7 @@ def test_aot_absent_beta_matches_the_installed_helia_aot():
     silently re-diverging the two engines' absent-options semantics.
     """
     pytest.importorskip("helia_aot")
-    from helia_aot.air.options import AirSoftmaxOptions
+    from helia_aot.air import AirSoftmaxOptions
 
     from helia_profiler.modelcost.softmax_preflight import AOT_ABSENT_BETA
 

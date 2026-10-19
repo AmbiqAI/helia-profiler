@@ -65,11 +65,10 @@ class TestExtractMemoryPlan:
     def test_external_mode_names_hpx_storage_for_writable_regions(self):
         plan = _extract_memory_plan(
             _regions(
-                _region(0, "DTCM"),
+                _region(0, "DTCM", symbol="kws_arena_dtcm_buffer"),
                 _region(2, "SRAM", "persistent"),
                 _region(3, "PSRAM", "constant", sidecar_file="kws_arena_3.bin"),
             ),
-            "kws",
             allocate_arenas=False,
         )
         assert plan is not None

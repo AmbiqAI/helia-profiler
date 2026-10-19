@@ -297,7 +297,7 @@ class HeliaAOTAdapter:
 
         # The plan_memory stage validates this plan against the SoC's
         # physical memory layout.
-        memory_plan = _extract_memory_plan(result, prefix, allocate_arenas=allocate_arenas)
+        memory_plan = _extract_memory_plan(result, allocate_arenas=allocate_arenas)
         arena_regions = _extract_arena_regions(result, prefix)
 
         extra_modules = _build_extra_modules(config, cmsis_nn_ref, module_name, aot_module_dir)

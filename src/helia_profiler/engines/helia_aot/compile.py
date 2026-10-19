@@ -282,11 +282,10 @@ _VIEW_FIELDS = ("operators", "tensors", "regions", "placements")
 
 
 def convert_with_views(converter: Any) -> Any:
-    """Convert with ``result_views`` set and return heliaAOT's ``ConversionResult``.
+    """Convert and return heliaAOT's ``ConversionResult``, whose config set ``result_views``.
 
     Raises :class:`EngineError` when the result lacks a view.
     """
-    converter.config.result_views = True
     result = converter.convert()
     missing = [name for name in _VIEW_FIELDS if getattr(result, name, None) is None]
     if missing:
@@ -362,6 +361,7 @@ def _run_aot_compiler(
     convert_args.module.type = ModuleType("nsx")
     convert_args.platform.name = aot_platform
     convert_args.force = True
+    convert_args.result_views = True
 
     log.info(
         "heliaAOT convert: model=%s, module=%s/%s, platform=%s",

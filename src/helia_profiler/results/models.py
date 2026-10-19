@@ -444,7 +444,7 @@ class MemoryPlan:
     """Engine-agnostic memory plan for a single profiling run.
 
     Produced by the ``plan_memory`` stage by combining engine-specific
-    knowledge (AOT arena_usages, TFLM single-arena size, weight placement)
+    knowledge (AOT arena regions, TFLM single-arena size, weight placement)
     with the SoC's physical memory layout.  Consumed by the report and by
     the firmware template generator for placement macros / linker hints.
     """

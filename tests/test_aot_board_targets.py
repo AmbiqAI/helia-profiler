@@ -124,6 +124,7 @@ def test_native_analysis_names_pass_to_aot(board, analysis_boundary):
     model, compiler, result = analysis_boundary
     assert engine_analysis.analyze_for_engine(model, engine="helia-aot", board=board) is result
     assert compiler.call_args.kwargs["config"].platform == {"name": board}
+    assert compiler.call_args.kwargs["config"].result_views is True
 
 
 def test_unknown_analysis_board_preserves_aot_refusal(analysis_boundary):
@@ -133,20 +134,11 @@ def test_unknown_analysis_board_preserves_aot_refusal(analysis_boundary):
         engine_analysis.analyze_for_engine(model, engine="helia-aot", board="unknown_463_board")
 
 
-def test_convert_with_views_asks_for_the_views_and_returns_the_result():
+def test_convert_with_views_returns_the_result():
     from helia_profiler.engines.helia_aot.compile import convert_with_views
 
     result = Result()
-
-    class Converter:
-        def __init__(self):
-            self.config = SimpleNamespace(result_views=False)
-
-        def convert(self):
-            assert self.config.result_views is True
-            return result
-
-    assert convert_with_views(Converter()) is result
+    assert convert_with_views(SimpleNamespace(convert=lambda: result)) is result
 
 
 def _converter(result: object) -> SimpleNamespace:

@@ -614,6 +614,8 @@ def analyze_aot_operators(
         if op.type in _AOT_MAC_OPS:
             ops = 2 * macs
         elif op.type in ("AVERAGE_POOL_2D", "MAX_POOL_2D"):
+            if "filter_h" not in params:
+                log.warning("No source window for %s; its ops count as 0", op.symbol)
             ops = out_elements * params.get("filter_h", 0) * params.get("filter_w", 0)
         elif op.type == "SOFTMAX":
             ops = 5 * out_elements

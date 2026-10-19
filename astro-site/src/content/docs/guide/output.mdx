@@ -247,19 +247,26 @@ informative dimension.
 
 ### 4. AOT artifacts
 
-`aot_operator_manifest.json` records the operators the AOT compiler emitted
-after graph transforms, each with inputs, outputs and local tensors
-(weights, weight sums, per-operator scratch). `kernel_calls` is the
-compiler's record of the CORE entries the operator's generated code calls,
-keyed by role or shared helper, or `null` when nothing was recorded for that
-operator (the installed `helia-aot` does not report calls, does not cover the
-operator, or reported it malformed). The compiler's own `<prefix>_report.json`,
-beside the generated module under `aot_output/` in the work directory, carries
-the module-wide list with its unrecorded operators. When the installed
-`helia-aot` exposes placement, tensor entries add `memory` (`dtcm`, `sram`,
-`mram`, `psram`), `source_memory`, `staged`, `arena_role` (`scratch`,
-`persistent`, `constant`), `arena_region_id`, `offset` and
-`allocation_size`, all in bytes where they are sizes.
+`aot_operator_manifest.json` records every operator the AOT compiler emitted
+after graph transforms, in execution order, each with inputs, outputs and
+local tensors (weights, weight sums, per-operator scratch). `idx` is the
+execution position. `id` is the operator's `.tflite` index, or `null` when
+a transform created it or fused several (`source_indices` lists every index
+it came from); the firmware labels such a layer `<OP_TYPE>:-1`.
+`kernel_calls` is the compiler's record of the CORE entries the operator's
+generated code calls, keyed by role or shared helper, or `null` when nothing
+was recorded for that operator or it was malformed. The compiler's own
+`<prefix>_report.json`, beside the generated module under `aot_output/` in
+the work directory, carries the module-wide list with its unrecorded
+operators. Tensor entries carry `id`, the model's `name` when it has one,
+`dtype`, `ctype`, `kind` (`input`, `output`, `constant`, `persistent` or
+`scratch`), `nbytes` and `shape`. Placed tensors add `memory` (`dtcm`,
+`sram`, `mram`, `psram`), `source_memory`, `staged`, `arena_role`
+(`scratch`, `persistent`, `constant`), `arena_region_id`, `offset` and
+`allocation_size`, all in bytes where they are sizes. Manifests from
+hpx 0.2.x recorded model inputs and outputs as `scratch` and named tensors
+`tensor_<id>`, so `hpx compare` against such a run reports their placement
+as changed.
 `aot_memory_layers.csv` is the same data as one row per tensor with
 `layer_idx`, `layer_id`, `op_type`, `op_name`, `tensor_role`, `tensor_id`,
 `tensor_name`, `tensor_kind`, `memory`, `source_memory`, `staged`,

@@ -434,9 +434,9 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
         from ..engines.base import HeliaAotArtifacts
         from ..modelcost.layer_attribution import LayerAttributor
 
-        # An AOT run always gets an authoritative manifest — [] when
-        # extraction failed, because degraded firmware labels layers with
-        # POSITIONS and the suffix fallback would join positionally again.
+        # An AOT run always gets an authoritative manifest — [] when it has
+        # none, because degraded firmware labels layers with POSITIONS and
+        # the suffix fallback would join positionally again.
         manifest = (
             (ctx.engine_artifacts.aot_op_manifest or [])
             if isinstance(ctx.engine_artifacts, HeliaAotArtifacts)

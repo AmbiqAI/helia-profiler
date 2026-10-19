@@ -120,8 +120,7 @@ class EngineArtifacts:
     cmake_vars: dict[str, str] = field(default_factory=dict)
 
     # Optional memory plan the engine reports (e.g. heliaAOT's arena
-    # regions).  If None, ``plan_memory``
-    # stage synthesises a conservative plan from ``model.arena_size`` and
+    # regions).  If None, the ``plan_memory`` stage synthesises a conservative plan from ``model.arena_size`` and
     # the resolved split placement.
     memory_plan: MemoryPlan | None = None
 
@@ -257,8 +256,8 @@ class HeliaAotArtifacts(EngineArtifacts):
     #: AOT operator manifest — ordered list of post-codegen operator
     #: descriptors (idx, id, op_type, name, kernel_calls, inputs, outputs).  Consumed by
     #: the firmware template (``main_aot.cc.j2``) for the per-op callback
-    #: table and by the report stage.  ``None`` when the manifest could not
-    #: be extracted from the codegen context.
+    #: table and by the report stage.  ``None`` when heliaAOT generated no
+    #: operators.
     aot_op_manifest: list[dict[str, Any]] | None = None
     compiled_analysis: ModelAnalysis | None = None
     """Analysis of the same transformed graph used to generate the firmware."""
