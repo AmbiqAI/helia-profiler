@@ -55,7 +55,7 @@ def analyze_for_engine(
 
     import tempfile
 
-    from ..engines.helia_aot.compile import aot_platform_for_board
+    from ..engines.helia_aot.compile import aot_platform_for_board, codegen_context
 
     try:
         from helia_aot.cli.defines import ConvertArgs
@@ -74,7 +74,7 @@ def analyze_for_engine(
             platform={"name": aot_platform_for_board(board) or board},
         )
         try:
-            context = AotConverter(config=convert_args).convert()
+            context = codegen_context(AotConverter(config=convert_args))
         except Exception as exc:
             raise EngineError(f"AOT compilation failed: {exc}") from exc
 

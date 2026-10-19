@@ -376,7 +376,7 @@ wheels = [
 
 [[package]]
 name = "helia-aot"
-version = "0.30.0"
+version = "0.31.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "ai-edge-litert" },
@@ -391,9 +391,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/be/52/c218f821193dbca8629851f65875c16826d1cd9d968f65189f21721a5908/helia_aot-0.30.0.tar.gz", hash = "sha256:6600764a23cda45e87ca2c1006cb0d9fe12cebf4cfd58b97cbe51ed245553be9", size = 612551, upload-time = "2026-10-17T06:11:37.118Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/74/4e/1ce35c91334b7fd0ffff2c4eb7afa679d5c9c2fcd137777668cd88c855ea/helia_aot-0.31.0.tar.gz", hash = "sha256:06051a2cbc3ce0531ee476b25af2d19fb504ba44b42f180c851d79cc57f69696", size = 624713, upload-time = "2026-10-19T03:07:40.992Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/67/f9/f7bac85c24c294ea74f1abda0c4dcb96edad970f216fcd6a52f76b63ba93/helia_aot-0.30.0-py3-none-any.whl", hash = "sha256:78909ee8f03fa35791cb00b8a72468b0706f27b63bb69bf80236dafa105ec66b", size = 841215, upload-time = "2026-10-17T06:11:35.275Z" },
+    { url = "https://files.pythonhosted.org/packages/58/37/139d4fb5500ea9a84a1b7d9e7055cc8f8bfeaa2d55065315ae08679d4c1c/helia_aot-0.31.0-py3-none-any.whl", hash = "sha256:47f12ffb73b8331bb6560f684bfeeb0b6cc7cbae226a5bfce0ec37e16e38ec92", size = 854129, upload-time = "2026-10-19T03:07:39.413Z" },
 ]
 
 [[package]]
@@ -450,7 +450,7 @@ requires-dist = [
     { name = "backports-strenum", marker = "extra == 'aot'", specifier = "<1.3" },
     { name = "click", specifier = ">=8.2" },
     { name = "flatbuffers", marker = "extra == 'analysis'", specifier = ">=24.0" },
-    { name = "helia-aot", marker = "extra == 'aot'", specifier = ">=0.23.0,<0.31.0" },
+    { name = "helia-aot", marker = "extra == 'aot'", specifier = ">=0.23.0,<0.32.0" },
     { name = "jinja2", specifier = ">=3.1" },
     { name = "neuralspotx", specifier = "==0.8.1" },
     { name = "numpy", specifier = ">=2.1,<3" },
