@@ -10,6 +10,7 @@ _litert_inspection.py
 _result_view.py
 _version.py
 api.py
+build_record.py
 capture/__init__.py
 capture/parser.py
 capture/power_terminal.py
@@ -174,6 +175,7 @@ hostenv/memory_measurement.py
 hostenv/toolchain_probe.py
 hostenv/toolchains.py
 identity.py
+lifecycle.py
 modelcost/__init__.py
 modelcost/_tflite_reader.py
 modelcost/layer_attribution.py

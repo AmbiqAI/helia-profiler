@@ -506,6 +506,22 @@ and apply comparison policy in the consumer. The profiler reports facts and
 non-waivable integrity/attribution limitations, not a benchmark acceptance verdict.
 Historical raw records and build/capture safety validation are unchanged.
 
+### Running a build record
+
+`BuildRecord.run(guard=..., jlink_serial=..., evidence_dir=..., settle_seconds=...,
+expect=None, expected_duration_s=None)` captures once from a record without
+rebuilding. It builds the request with `fixture_capture_request`, captures with
+`capture_fixture` under the caller's guard, and returns a `RunResult` holding the
+record, the raw `capture`, the run's `identity` and the `verification`. The
+identity is `fixture_run_identity` of the build and capture, so it carries an
+`observation_hash`, with `run.lifecycle` taken from the record. With an
+`Expect`, a successful capture is compared through `compare_fixture_outputs`;
+without one, or when the capture failed, `verification` is `None`.
+`RunResult.succeeded` is true only for a `success` capture. A failed capture is
+returned, not raised; errors raised while capturing propagate.
+`examples/run_api_conformance.py` walks freeze, build, save, load and run on a
+typed fixture and prints the identity, verification facts and key measurements.
+
 ### Model inspection and engine admission
 
 LiteRT fixture preparation uses `EngineAdapter.prepare_fixture_model`. Each

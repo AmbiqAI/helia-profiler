@@ -63,8 +63,34 @@ class BuildRecord:
         expect: Expect | None = None,
         expected_duration_s: float | None = None,
     ) -> RunResult:
-        """Flash the recorded image, capture one run and compare outputs when *expect* is given."""
-        raise NotImplementedError
+        """Flash the recorded image, capture one run and compare outputs when *expect* is given.
+
+        A failed capture comes back with ``capture.state == "failure"`` and no
+        verification; errors raised while capturing propagate.
+        """
+        from dataclasses import replace
+
+        from ._fixture_record import fixture_capture_request
+        from .expect import compare_fixture_outputs
+        from .fixture_capture import capture_fixture
+        from .fixture_identity import fixture_run_identity
+
+        request = fixture_capture_request(
+            self.build,
+            jlink_serial=jlink_serial,
+            evidence_dir=evidence_dir,
+            settle_seconds=settle_seconds,
+            expected_duration_s=expected_duration_s,
+        )
+        capture = capture_fixture(request, guard=guard)
+        identity = fixture_run_identity(self.build, capture)
+        identity = replace(identity, run=replace(identity.run, lifecycle=self.lifecycle.value))
+        verification = (
+            compare_fixture_outputs(self.build, capture, expect)
+            if expect is not None and capture.state == "success"
+            else None
+        )
+        return RunResult(self, capture, identity, verification)
 
 
 @dataclass(frozen=True)
