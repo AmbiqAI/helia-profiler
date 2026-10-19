@@ -27,8 +27,8 @@ def test_stability_tiers_partition_the_public_surface() -> None:
     }
     sizes = {name: len(members) for name, members in tiers.items()}
 
-    assert sizes == {"stable": 45, "experimental": 56, "implementation": 13}
-    assert sum(sizes.values()) == 114 == len(helia_profiler.__all__)
+    assert sizes == {"stable": 45, "experimental": 61, "implementation": 13}
+    assert sum(sizes.values()) == 119 == len(helia_profiler.__all__)
 
     for left, right in combinations(tiers, 2):
         assert not tiers[left] & tiers[right], (
@@ -97,11 +97,15 @@ def test_public_surface_membership_snapshot() -> None:
         "Expect",
         "FirmwareError",
         "FirmwareMeta",
+        "FrozenModel",
+        "FrozenRun",
+        "FrozenRuntime",
         "HeartbeatConfig",
         "HpxError",
         "JLinkProbe",
         "JLinkProbeMatch",
         "LayerResult",
+        "LocalInput",
         "LockError",
         "MeasurementScope",
         "MetricDirection",
@@ -162,6 +166,7 @@ def test_public_surface_membership_snapshot() -> None:
         "TimeoutsConfig",
         "Tolerance",
         "Toolchain",
+        "ToolchainIdentity",
         "Transport",
         "VerdictStatus",
         "Verification",

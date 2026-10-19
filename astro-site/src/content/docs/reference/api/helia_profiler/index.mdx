@@ -33,6 +33,11 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 | [TimeoutsConfig](/helia-profiler/reference/api/helia_profiler/config/#helia_profiler.TimeoutsConfig) | `helia_profiler.TimeoutsConfig` |
 | [ClockSelection](/helia-profiler/reference/api/helia_profiler/config/#helia_profiler.ClockSelection) | `helia_profiler.ClockSelection` |
 | [OutputFormat](/helia-profiler/reference/api/helia_profiler/config/#helia_profiler.OutputFormat) | `helia_profiler.OutputFormat` |
+| [FrozenRun](/helia-profiler/reference/api/helia_profiler/frozen_run/#helia_profiler.FrozenRun) | `helia_profiler.FrozenRun` |
+| [FrozenModel](/helia-profiler/reference/api/helia_profiler/frozen_run/#helia_profiler.FrozenModel) | `helia_profiler.FrozenModel` |
+| [FrozenRuntime](/helia-profiler/reference/api/helia_profiler/frozen_run/#helia_profiler.FrozenRuntime) | `helia_profiler.FrozenRuntime` |
+| [LocalInput](/helia-profiler/reference/api/helia_profiler/frozen_run/#helia_profiler.LocalInput) | `helia_profiler.LocalInput` |
+| [ToolchainIdentity](/helia-profiler/reference/api/helia_profiler/frozen_run/#helia_profiler.ToolchainIdentity) | `helia_profiler.ToolchainIdentity` |
 | [PowerConfig](/helia-profiler/reference/api/helia_profiler/config/power/#helia_profiler.PowerConfig) | `helia_profiler.PowerConfig` |
 | [EngineType](/helia-profiler/reference/api/helia_profiler/vocab/#helia_profiler.EngineType) | `helia_profiler.EngineType` |
 | [Toolchain](/helia-profiler/reference/api/helia_profiler/vocab/#helia_profiler.Toolchain) | `helia_profiler.Toolchain` |
@@ -285,7 +290,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   signature={"Session(\n    yaml_path: Path | None = None,\n    _base: Mapping[str, Any] = lambda : ...(),\n    _overrides: Mapping[str, Any] = lambda : ...(),\n) -> None"}
   level={2}
   summary={"Immutable, branchable configuration for interactive HPX operations."}
-  source={{"path":"src/helia_profiler/session.py","line":85,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L85"}}
+  source={{"path":"src/helia_profiler/session.py","line":86,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L86"}}
 >
 
   `dataclass`
@@ -305,7 +310,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"yaml_path: Path | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/session.py","line":94,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L94"}}
+    source={{"path":"src/helia_profiler/session.py","line":95,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L95"}}
   >
 
 
@@ -320,7 +325,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"from_yaml(path: str | Path) -> Self"}
     level={3}
     summary={"Create a session from an immutable snapshot of an HPX YAML config."}
-    source={{"path":"src/helia_profiler/session.py","line":108,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L108"}}
+    source={{"path":"src/helia_profiler/session.py","line":109,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L109"}}
   >
 
     `classmethod`
@@ -337,7 +342,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"from_dict(intent: Mapping[str, Any]) -> Self"}
     level={3}
     summary={"Create a session from unresolved configuration intent."}
-    source={{"path":"src/helia_profiler/session.py","line":114,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L114"}}
+    source={{"path":"src/helia_profiler/session.py","line":115,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L115"}}
   >
 
     `classmethod`
@@ -354,7 +359,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"load(path: str | Path) -> Self"}
     level={3}
     summary={"Load a versioned unresolved-intent snapshot from JSON."}
-    source={{"path":"src/helia_profiler/session.py","line":121,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L121"}}
+    source={{"path":"src/helia_profiler/session.py","line":122,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L122"}}
   >
 
     `classmethod`
@@ -371,7 +376,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"intent_dict() -> dict[str, Any]"}
     level={3}
     summary={"Return JSON-safe unresolved intent without expanding defaults."}
-    source={{"path":"src/helia_profiler/session.py","line":147,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L147"}}
+    source={{"path":"src/helia_profiler/session.py","line":148,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L148"}}
   >
 
     Return JSON-safe unresolved intent without expanding defaults.
@@ -386,7 +391,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"resolved_dict(model: str | Path | None = None) -> dict[str, Any]"}
     level={3}
     summary={"Return the fully resolved and validated configuration snapshot."}
-    source={{"path":"src/helia_profiler/session.py","line":151,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L151"}}
+    source={{"path":"src/helia_profiler/session.py","line":152,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L152"}}
   >
 
     Return the fully resolved and validated configuration snapshot.
@@ -401,7 +406,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"save(path: str | Path) -> Path"}
     level={3}
     summary={"Persist unresolved intent as a versioned JSON snapshot."}
-    source={{"path":"src/helia_profiler/session.py","line":157,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L157"}}
+    source={{"path":"src/helia_profiler/session.py","line":158,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L158"}}
   >
 
     Persist unresolved intent as a versioned JSON snapshot.
@@ -416,7 +421,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"with_overrides(overrides: Mapping[str, Any]) -> Self"}
     level={3}
     summary={"Return a session with advanced raw configuration overrides merged in."}
-    source={{"path":"src/helia_profiler/session.py","line":173,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L173"}}
+    source={{"path":"src/helia_profiler/session.py","line":174,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L174"}}
   >
 
     Return a session with advanced raw configuration overrides merged in.
@@ -430,7 +435,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"with_model(path: str | Path, **options: Any = {}) -> Self"}
     level={3}
-    source={{"path":"src/helia_profiler/session.py","line":177,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L177"}}
+    source={{"path":"src/helia_profiler/session.py","line":178,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L178"}}
   >
 
 
@@ -444,7 +449,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"with_engine(engine: Any, **options: Any = {}) -> Self"}
     level={3}
-    source={{"path":"src/helia_profiler/session.py","line":180,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L180"}}
+    source={{"path":"src/helia_profiler/session.py","line":181,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L181"}}
   >
 
 
@@ -458,7 +463,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"with_target(**options: Any = {}) -> Self"}
     level={3}
-    source={{"path":"src/helia_profiler/session.py","line":183,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L183"}}
+    source={{"path":"src/helia_profiler/session.py","line":184,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L184"}}
   >
 
 
@@ -472,7 +477,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"with_profiling(**options: Any = {}) -> Self"}
     level={3}
-    source={{"path":"src/helia_profiler/session.py","line":186,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L186"}}
+    source={{"path":"src/helia_profiler/session.py","line":187,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L187"}}
   >
 
 
@@ -486,7 +491,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"with_power(**options: Any = {}) -> Self"}
     level={3}
-    source={{"path":"src/helia_profiler/session.py","line":189,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L189"}}
+    source={{"path":"src/helia_profiler/session.py","line":190,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L190"}}
   >
 
 
@@ -500,7 +505,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"with_output(**options: Any = {}) -> Self"}
     level={3}
-    source={{"path":"src/helia_profiler/session.py","line":192,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L192"}}
+    source={{"path":"src/helia_profiler/session.py","line":193,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L193"}}
   >
 
 
@@ -514,7 +519,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"with_build(**options: Any = {}) -> Self"}
     level={3}
-    source={{"path":"src/helia_profiler/session.py","line":195,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L195"}}
+    source={{"path":"src/helia_profiler/session.py","line":196,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L196"}}
   >
 
 
@@ -528,7 +533,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"with_timeouts(**options: Any = {}) -> Self"}
     level={3}
-    source={{"path":"src/helia_profiler/session.py","line":198,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L198"}}
+    source={{"path":"src/helia_profiler/session.py","line":199,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L199"}}
   >
 
 
@@ -543,7 +548,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"with_options(\n    *,\n    verbose: int | None = None,\n    frozen: bool | None = None,\n    work_dir: str | Path | None = None,\n    clean: bool | None = None,\n) -> Self"}
     level={3}
     summary={"Return a session with top-level run options."}
-    source={{"path":"src/helia_profiler/session.py","line":201,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L201"}}
+    source={{"path":"src/helia_profiler/session.py","line":202,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L202"}}
   >
 
     Return a session with top-level run options.
@@ -558,10 +563,25 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"resolve(model: str | Path | None = None) -> ProfileConfig"}
     level={3}
     summary={"Resolve and validate this session as a complete profile config."}
-    source={{"path":"src/helia_profiler/session.py","line":221,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L221"}}
+    source={{"path":"src/helia_profiler/session.py","line":222,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L222"}}
   >
 
     Resolve and validate this session as a complete profile config.
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.Session.freeze"}
+    name={"freeze"}
+    kind={"method"}
+    language={"python"}
+    signature={"freeze(model: str | Path | None = None) -> FrozenRun"}
+    level={3}
+    summary={"Resolve this session into a replayable :class:FrozenRun plan."}
+    source={{"path":"src/helia_profiler/session.py","line":229,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L229"}}
+  >
+
+    Resolve this session into a replayable :class:`FrozenRun` plan.
 
   </RefSymbol>
 
@@ -573,7 +593,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"profile(\n    model: str | Path | None = None,\n    *,\n    progress_sink: Callable[[ProgressUpdate], None] | None = None,\n) -> ProfileResult"}
     level={3}
     summary={"Run a profile using this session's resolved configuration."}
-    source={{"path":"src/helia_profiler/session.py","line":228,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L228"}}
+    source={{"path":"src/helia_profiler/session.py","line":235,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L235"}}
   >
 
     Run a profile using this session's resolved configuration.
@@ -588,7 +608,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"analyze(model: str | Path | None = None) -> ModelAnalysis"}
     level={3}
     summary={"Analyze the configured model without building or flashing firmware."}
-    source={{"path":"src/helia_profiler/session.py","line":239,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L239"}}
+    source={{"path":"src/helia_profiler/session.py","line":246,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L246"}}
   >
 
     Analyze the configured model without building or flashing firmware.
@@ -603,7 +623,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"compare(\n    baseline: str | Path | ProfileResult,\n    candidate: str | Path | ProfileResult,\n    *,\n    output_dir: str | Path | None = None,\n    profile: str | Path | ComparisonProfile | None = None,\n) -> CompareResult"}
     level={3}
     summary={"Compare two completed profiles and optionally write diff artifacts."}
-    source={{"path":"src/helia_profiler/session.py","line":250,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L250"}}
+    source={{"path":"src/helia_profiler/session.py","line":257,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L257"}}
   >
 
     Compare two completed profiles and optionally write diff artifacts.
@@ -618,7 +638,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"doctor(*, include_versions: bool = False) -> DoctorResult"}
     level={3}
     summary={"Return structured host dependency checks."}
-    source={{"path":"src/helia_profiler/session.py","line":278,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L278"}}
+    source={{"path":"src/helia_profiler/session.py","line":285,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L285"}}
   >
 
     Return structured host dependency checks.
@@ -636,7 +656,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"show(value: Any, *, console: Console | None = None) -> Any"}
     level={3}
     summary={"Pretty-print a typed interactive value and return it unchanged."}
-    source={{"path":"src/helia_profiler/session.py","line":297,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L297"}}
+    source={{"path":"src/helia_profiler/session.py","line":304,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L304"}}
   >
 
     Pretty-print a typed interactive value and return it unchanged.
@@ -651,7 +671,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"boards() -> tuple[BoardDef, ...]"}
     level={3}
     summary={"Return boards visible to this session's platform registry."}
-    source={{"path":"src/helia_profiler/session.py","line":303,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L303"}}
+    source={{"path":"src/helia_profiler/session.py","line":310,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L310"}}
   >
 
     Return boards visible to this session's platform registry.
@@ -666,7 +686,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"engines() -> tuple[EngineType, ...]"}
     level={3}
     summary={"Return supported inference engine identifiers."}
-    source={{"path":"src/helia_profiler/session.py","line":310,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L310"}}
+    source={{"path":"src/helia_profiler/session.py","line":317,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L317"}}
   >
 
     Return supported inference engine identifiers.
@@ -681,7 +701,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"counter_groups() -> tuple[str, ...]"}
     level={3}
     summary={"Return registered PMU counter group names."}
-    source={{"path":"src/helia_profiler/session.py","line":316,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L316"}}
+    source={{"path":"src/helia_profiler/session.py","line":323,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L323"}}
   >
 
     Return registered PMU counter group names.
@@ -696,7 +716,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"counters(group: str | None = None) -> tuple[PmuCounter, ...]"}
     level={3}
     summary={"Return registered PMU counters, optionally filtered by group."}
-    source={{"path":"src/helia_profiler/session.py","line":322,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L322"}}
+    source={{"path":"src/helia_profiler/session.py","line":329,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L329"}}
   >
 
     Return registered PMU counters, optionally filtered by group.
@@ -711,7 +731,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"probes() -> tuple[JLinkProbe, ...]"}
     level={3}
     summary={"Return connected J-Link probes."}
-    source={{"path":"src/helia_profiler/session.py","line":328,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L328"}}
+    source={{"path":"src/helia_profiler/session.py","line":335,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L335"}}
   >
 
     Return connected J-Link probes.
@@ -726,7 +746,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"inspect_probes(board: str | None = None) -> tuple[JLinkProbeMatch, ...]"}
     level={3}
     summary={"Inspect the target core visible through each connected probe."}
-    source={{"path":"src/helia_profiler/session.py","line":334,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L334"}}
+    source={{"path":"src/helia_profiler/session.py","line":341,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L341"}}
   >
 
     Inspect the target core visible through each connected probe.
@@ -741,7 +761,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"match_probe(board: str | None = None, *, serial: str | None = None) -> str"}
     level={3}
     summary={"Resolve the J-Link serial matching a board target."}
-    source={{"path":"src/helia_profiler/session.py","line":345,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L345"}}
+    source={{"path":"src/helia_profiler/session.py","line":352,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L352"}}
   >
 
     Resolve the J-Link serial matching a board target.
@@ -756,7 +776,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"ports(*, include_all: bool = False) -> tuple[SerialPortInfo, ...]"}
     level={3}
     summary={"Return host serial ports relevant to HPX transports."}
-    source={{"path":"src/helia_profiler/session.py","line":363,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L363"}}
+    source={{"path":"src/helia_profiler/session.py","line":370,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L370"}}
   >
 
     Return host serial ports relevant to HPX transports.
@@ -771,7 +791,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"reset(board: str | None = None, *, serial: str | None = None, kind: Literal['debug', 'swpoi'] = 'debug') -> None"}
     level={3}
     summary={"Reset the configured target through its J-Link probe."}
-    source={{"path":"src/helia_profiler/session.py","line":369,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L369"}}
+    source={{"path":"src/helia_profiler/session.py","line":376,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/session.py#L376"}}
   >
 
     Reset the configured target through its J-Link probe.

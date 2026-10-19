@@ -45,7 +45,7 @@ def test_pinned_config_is_accepted(tmp_path: Path, launcher: str) -> None:
 
 @pytest.mark.parametrize(
     "name",
-    [*FIXTURE_REFUSED_ENVIRONMENT, "CMSIS_NN_PATH", "HELIART_DIST_PATH", "HELIART_SOURCE_PATH"],
+    [*FIXTURE_REFUSED_ENVIRONMENT, "CMSIS_NN_PATH"],
 )
 def test_environment_overrides_are_refused(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str

@@ -162,6 +162,7 @@ fixture_runtime.py
 fixture_sources.py
 fixture_stage.py
 fixture_target.py
+frozen_run.py
 hostenv/__init__.py
 hostenv/_proc.py
 hostenv/cache_dirs.py

@@ -23,6 +23,11 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 | [TimeoutsConfig](/helia-profiler/reference/api/helia_profiler/config/#helia_profiler.TimeoutsConfig) | `helia_profiler.TimeoutsConfig` |
 | [ClockSelection](/helia-profiler/reference/api/helia_profiler/config/#helia_profiler.ClockSelection) | `helia_profiler.ClockSelection` |
 | [OutputFormat](/helia-profiler/reference/api/helia_profiler/config/#helia_profiler.OutputFormat) | `helia_profiler.OutputFormat` |
+| [FrozenRun](/helia-profiler/reference/api/helia_profiler/frozen_run/#helia_profiler.FrozenRun) | `helia_profiler.FrozenRun` |
+| [FrozenModel](/helia-profiler/reference/api/helia_profiler/frozen_run/#helia_profiler.FrozenModel) | `helia_profiler.FrozenModel` |
+| [FrozenRuntime](/helia-profiler/reference/api/helia_profiler/frozen_run/#helia_profiler.FrozenRuntime) | `helia_profiler.FrozenRuntime` |
+| [LocalInput](/helia-profiler/reference/api/helia_profiler/frozen_run/#helia_profiler.LocalInput) | `helia_profiler.LocalInput` |
+| [ToolchainIdentity](/helia-profiler/reference/api/helia_profiler/frozen_run/#helia_profiler.ToolchainIdentity) | `helia_profiler.ToolchainIdentity` |
 | [PowerConfig](/helia-profiler/reference/api/helia_profiler/config/power/#helia_profiler.PowerConfig) | `helia_profiler.PowerConfig` |
 | [EngineType](/helia-profiler/reference/api/helia_profiler/vocab/#helia_profiler.EngineType) | `helia_profiler.EngineType` |
 | [Toolchain](/helia-profiler/reference/api/helia_profiler/vocab/#helia_profiler.Toolchain) | `helia_profiler.Toolchain` |
@@ -256,7 +261,7 @@ CLI. Every ``with_*`` method returns an independent session.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/session.py:85`
+Source: `src/helia_profiler/session.py:86`
 
 ### helia_profiler.Session.yaml_path
 
@@ -266,7 +271,7 @@ Source: `src/helia_profiler/session.py:85`
 yaml_path: Path | None = None
 ```
 
-Source: `src/helia_profiler/session.py:94`
+Source: `src/helia_profiler/session.py:95`
 
 ### helia_profiler.Session.from_yaml
 
@@ -280,7 +285,7 @@ from_yaml(path: str | Path) -> Self
 
 Create a session from an immutable snapshot of an HPX YAML config.
 
-Source: `src/helia_profiler/session.py:108`
+Source: `src/helia_profiler/session.py:109`
 
 ### helia_profiler.Session.from_dict
 
@@ -294,7 +299,7 @@ from_dict(intent: Mapping[str, Any]) -> Self
 
 Create a session from unresolved configuration intent.
 
-Source: `src/helia_profiler/session.py:114`
+Source: `src/helia_profiler/session.py:115`
 
 ### helia_profiler.Session.load
 
@@ -308,7 +313,7 @@ load(path: str | Path) -> Self
 
 Load a versioned unresolved-intent snapshot from JSON.
 
-Source: `src/helia_profiler/session.py:121`
+Source: `src/helia_profiler/session.py:122`
 
 ### helia_profiler.Session.intent_dict
 
@@ -320,7 +325,7 @@ intent_dict() -> dict[str, Any]
 
 Return JSON-safe unresolved intent without expanding defaults.
 
-Source: `src/helia_profiler/session.py:147`
+Source: `src/helia_profiler/session.py:148`
 
 ### helia_profiler.Session.resolved_dict
 
@@ -332,7 +337,7 @@ resolved_dict(model: str | Path | None = None) -> dict[str, Any]
 
 Return the fully resolved and validated configuration snapshot.
 
-Source: `src/helia_profiler/session.py:151`
+Source: `src/helia_profiler/session.py:152`
 
 ### helia_profiler.Session.save
 
@@ -344,7 +349,7 @@ save(path: str | Path) -> Path
 
 Persist unresolved intent as a versioned JSON snapshot.
 
-Source: `src/helia_profiler/session.py:157`
+Source: `src/helia_profiler/session.py:158`
 
 ### helia_profiler.Session.with_overrides
 
@@ -356,7 +361,7 @@ with_overrides(overrides: Mapping[str, Any]) -> Self
 
 Return a session with advanced raw configuration overrides merged in.
 
-Source: `src/helia_profiler/session.py:173`
+Source: `src/helia_profiler/session.py:174`
 
 ### helia_profiler.Session.with_model
 
@@ -366,7 +371,7 @@ Source: `src/helia_profiler/session.py:173`
 with_model(path: str | Path, **options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:177`
+Source: `src/helia_profiler/session.py:178`
 
 ### helia_profiler.Session.with_engine
 
@@ -376,7 +381,7 @@ Source: `src/helia_profiler/session.py:177`
 with_engine(engine: Any, **options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:180`
+Source: `src/helia_profiler/session.py:181`
 
 ### helia_profiler.Session.with_target
 
@@ -386,7 +391,7 @@ Source: `src/helia_profiler/session.py:180`
 with_target(**options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:183`
+Source: `src/helia_profiler/session.py:184`
 
 ### helia_profiler.Session.with_profiling
 
@@ -396,7 +401,7 @@ Source: `src/helia_profiler/session.py:183`
 with_profiling(**options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:186`
+Source: `src/helia_profiler/session.py:187`
 
 ### helia_profiler.Session.with_power
 
@@ -406,7 +411,7 @@ Source: `src/helia_profiler/session.py:186`
 with_power(**options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:189`
+Source: `src/helia_profiler/session.py:190`
 
 ### helia_profiler.Session.with_output
 
@@ -416,7 +421,7 @@ Source: `src/helia_profiler/session.py:189`
 with_output(**options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:192`
+Source: `src/helia_profiler/session.py:193`
 
 ### helia_profiler.Session.with_build
 
@@ -426,7 +431,7 @@ Source: `src/helia_profiler/session.py:192`
 with_build(**options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:195`
+Source: `src/helia_profiler/session.py:196`
 
 ### helia_profiler.Session.with_timeouts
 
@@ -436,7 +441,7 @@ Source: `src/helia_profiler/session.py:195`
 with_timeouts(**options: Any = {}) -> Self
 ```
 
-Source: `src/helia_profiler/session.py:198`
+Source: `src/helia_profiler/session.py:199`
 
 ### helia_profiler.Session.with_options
 
@@ -454,7 +459,7 @@ with_options(
 
 Return a session with top-level run options.
 
-Source: `src/helia_profiler/session.py:201`
+Source: `src/helia_profiler/session.py:202`
 
 ### helia_profiler.Session.resolve
 
@@ -466,7 +471,19 @@ resolve(model: str | Path | None = None) -> ProfileConfig
 
 Resolve and validate this session as a complete profile config.
 
-Source: `src/helia_profiler/session.py:221`
+Source: `src/helia_profiler/session.py:222`
+
+### helia_profiler.Session.freeze
+
+`method` · `python`
+
+```python
+freeze(model: str | Path | None = None) -> FrozenRun
+```
+
+Resolve this session into a replayable :class:`FrozenRun` plan.
+
+Source: `src/helia_profiler/session.py:229`
 
 ### helia_profiler.Session.profile
 
@@ -482,7 +499,7 @@ profile(
 
 Run a profile using this session's resolved configuration.
 
-Source: `src/helia_profiler/session.py:228`
+Source: `src/helia_profiler/session.py:235`
 
 ### helia_profiler.Session.analyze
 
@@ -494,7 +511,7 @@ analyze(model: str | Path | None = None) -> ModelAnalysis
 
 Analyze the configured model without building or flashing firmware.
 
-Source: `src/helia_profiler/session.py:239`
+Source: `src/helia_profiler/session.py:246`
 
 ### helia_profiler.Session.compare
 
@@ -512,7 +529,7 @@ compare(
 
 Compare two completed profiles and optionally write diff artifacts.
 
-Source: `src/helia_profiler/session.py:250`
+Source: `src/helia_profiler/session.py:257`
 
 ### helia_profiler.Session.doctor
 
@@ -527,7 +544,7 @@ Return structured host dependency checks.
 Set *include_versions* to also compare installed tool and package
 versions against the HPX compatibility baseline.
 
-Source: `src/helia_profiler/session.py:278`
+Source: `src/helia_profiler/session.py:285`
 
 ### helia_profiler.Session.show
 
@@ -539,7 +556,7 @@ show(value: Any, *, console: Console | None = None) -> Any
 
 Pretty-print a typed interactive value and return it unchanged.
 
-Source: `src/helia_profiler/session.py:297`
+Source: `src/helia_profiler/session.py:304`
 
 ### helia_profiler.Session.boards
 
@@ -551,7 +568,7 @@ boards() -> tuple[BoardDef, ...]
 
 Return boards visible to this session's platform registry.
 
-Source: `src/helia_profiler/session.py:303`
+Source: `src/helia_profiler/session.py:310`
 
 ### helia_profiler.Session.engines
 
@@ -563,7 +580,7 @@ engines() -> tuple[EngineType, ...]
 
 Return supported inference engine identifiers.
 
-Source: `src/helia_profiler/session.py:310`
+Source: `src/helia_profiler/session.py:317`
 
 ### helia_profiler.Session.counter_groups
 
@@ -575,7 +592,7 @@ counter_groups() -> tuple[str, ...]
 
 Return registered PMU counter group names.
 
-Source: `src/helia_profiler/session.py:316`
+Source: `src/helia_profiler/session.py:323`
 
 ### helia_profiler.Session.counters
 
@@ -587,7 +604,7 @@ counters(group: str | None = None) -> tuple[PmuCounter, ...]
 
 Return registered PMU counters, optionally filtered by group.
 
-Source: `src/helia_profiler/session.py:322`
+Source: `src/helia_profiler/session.py:329`
 
 ### helia_profiler.Session.probes
 
@@ -599,7 +616,7 @@ probes() -> tuple[JLinkProbe, ...]
 
 Return connected J-Link probes.
 
-Source: `src/helia_profiler/session.py:328`
+Source: `src/helia_profiler/session.py:335`
 
 ### helia_profiler.Session.inspect_probes
 
@@ -611,7 +628,7 @@ inspect_probes(board: str | None = None) -> tuple[JLinkProbeMatch, ...]
 
 Inspect the target core visible through each connected probe.
 
-Source: `src/helia_profiler/session.py:334`
+Source: `src/helia_profiler/session.py:341`
 
 ### helia_profiler.Session.match_probe
 
@@ -623,7 +640,7 @@ match_probe(board: str | None = None, *, serial: str | None = None) -> str
 
 Resolve the J-Link serial matching a board target.
 
-Source: `src/helia_profiler/session.py:345`
+Source: `src/helia_profiler/session.py:352`
 
 ### helia_profiler.Session.ports
 
@@ -635,7 +652,7 @@ ports(*, include_all: bool = False) -> tuple[SerialPortInfo, ...]
 
 Return host serial ports relevant to HPX transports.
 
-Source: `src/helia_profiler/session.py:363`
+Source: `src/helia_profiler/session.py:370`
 
 ### helia_profiler.Session.reset
 
@@ -647,7 +664,7 @@ reset(board: str | None = None, *, serial: str | None = None, kind: Literal['deb
 
 Reset the configured target through its J-Link probe.
 
-Source: `src/helia_profiler/session.py:369`
+Source: `src/helia_profiler/session.py:376`
 
 ---
 
@@ -2416,7 +2433,7 @@ recorded run state before a surface is returned.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/deps/dependencies.py:532`
+Source: `src/helia_profiler/deps/dependencies.py:536`
 
 ---
 
@@ -4628,6 +4645,497 @@ times as the firmware invokes it (warmups, then timed iterations).
 **API tier:** `experimental`
 
 Source: `src/helia_profiler/expect.py:256`
+
+---
+
+# helia_profiler.frozen_run
+
+Replayable run plans: every resolved setting, the model's hash and the toolchain and runtime identities, saved so another host can rebuild the same run.
+
+Every name on this page is imported from `helia_profiler`.
+
+**API tier:** `experimental`
+
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
+
+## helia_profiler.FrozenModel
+
+`class` · `python`
+
+```python
+FrozenModel(path: str, sha256: str, size_bytes: int) -> None
+```
+
+`dataclass`
+
+The model a plan was frozen against, identified by content.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/frozen_run.py:100`
+
+### helia_profiler.FrozenModel.path
+
+`attribute` · `python`
+
+```python
+path: str
+```
+
+Source: `src/helia_profiler/frozen_run.py:104`
+
+### helia_profiler.FrozenModel.sha256
+
+`attribute` · `python`
+
+```python
+sha256: str
+```
+
+Source: `src/helia_profiler/frozen_run.py:105`
+
+### helia_profiler.FrozenModel.size_bytes
+
+`attribute` · `python`
+
+```python
+size_bytes: int
+```
+
+Source: `src/helia_profiler/frozen_run.py:106`
+
+## helia_profiler.ToolchainIdentity
+
+`class` · `python`
+
+```python
+ToolchainIdentity(name: str, version: str | None, unavailable_reason: str | None = None) -> None
+```
+
+`dataclass`
+
+The compiler a plan expects: name and exact version, never a path.
+
+``version`` holds the version-bearing lines of ``<compiler> --version``;
+it is ``None`` when the compiler could not be run, with the reason in
+``unavailable_reason``.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/frozen_run.py:109`
+
+### helia_profiler.ToolchainIdentity.name
+
+`attribute` · `python`
+
+```python
+name: str
+```
+
+Source: `src/helia_profiler/frozen_run.py:118`
+
+### helia_profiler.ToolchainIdentity.version
+
+`attribute` · `python`
+
+```python
+version: str | None
+```
+
+Source: `src/helia_profiler/frozen_run.py:119`
+
+### helia_profiler.ToolchainIdentity.unavailable_reason
+
+`attribute` · `python`
+
+```python
+unavailable_reason: str | None = None
+```
+
+Source: `src/helia_profiler/frozen_run.py:120`
+
+## helia_profiler.FrozenRuntime
+
+`class` · `python`
+
+```python
+FrozenRuntime(
+    name: str,
+    version: str | None,
+    source_commit: str | None,
+    kernels_module: str | None = None,
+    kernels_commit: str | None = None,
+    unavailable_reason: str | None = None,
+) -> None
+```
+
+`dataclass`
+
+The engine and kernel sources a profile build uses.
+
+Commits are NSX module or source revisions from the compatibility
+baseline or the installed package. ``kernels_commit`` is ``None`` when the
+engine links no kernel library or its provider is overridden.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/frozen_run.py:123`
+
+### helia_profiler.FrozenRuntime.name
+
+`attribute` · `python`
+
+```python
+name: str
+```
+
+Source: `src/helia_profiler/frozen_run.py:132`
+
+### helia_profiler.FrozenRuntime.version
+
+`attribute` · `python`
+
+```python
+version: str | None
+```
+
+Source: `src/helia_profiler/frozen_run.py:133`
+
+### helia_profiler.FrozenRuntime.source_commit
+
+`attribute` · `python`
+
+```python
+source_commit: str | None
+```
+
+Source: `src/helia_profiler/frozen_run.py:134`
+
+### helia_profiler.FrozenRuntime.kernels_module
+
+`attribute` · `python`
+
+```python
+kernels_module: str | None = None
+```
+
+Source: `src/helia_profiler/frozen_run.py:135`
+
+### helia_profiler.FrozenRuntime.kernels_commit
+
+`attribute` · `python`
+
+```python
+kernels_commit: str | None = None
+```
+
+Source: `src/helia_profiler/frozen_run.py:136`
+
+### helia_profiler.FrozenRuntime.unavailable_reason
+
+`attribute` · `python`
+
+```python
+unavailable_reason: str | None = None
+```
+
+Source: `src/helia_profiler/frozen_run.py:137`
+
+## helia_profiler.LocalInput
+
+`class` · `python`
+
+```python
+LocalInput(setting: str, path: str, kind: str, sha256: str | None = None) -> None
+```
+
+`dataclass`
+
+A local file or directory the build reads instead of a pinned source.
+
+Files are identified by content. A directory is recorded by path only, so
+a plan with one is not portable to another host.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/frozen_run.py:140`
+
+### helia_profiler.LocalInput.setting
+
+`attribute` · `python`
+
+```python
+setting: str
+```
+
+Source: `src/helia_profiler/frozen_run.py:148`
+
+### helia_profiler.LocalInput.path
+
+`attribute` · `python`
+
+```python
+path: str
+```
+
+Source: `src/helia_profiler/frozen_run.py:149`
+
+### helia_profiler.LocalInput.kind
+
+`attribute` · `python`
+
+```python
+kind: str
+```
+
+Source: `src/helia_profiler/frozen_run.py:150`
+
+### helia_profiler.LocalInput.sha256
+
+`attribute` · `python`
+
+```python
+sha256: str | None = None
+```
+
+Source: `src/helia_profiler/frozen_run.py:151`
+
+## helia_profiler.FrozenRun
+
+`class` · `python`
+
+```python
+FrozenRun(
+    settings: Mapping[str, Any],
+    model: FrozenModel,
+    baseline_id: str,
+    baseline_fingerprint: str,
+    qualification: str,
+    overrides: tuple[str, ...],
+    local_inputs: tuple[LocalInput, ...],
+    environment: Mapping[str, str],
+    toolchain: ToolchainIdentity,
+    runtime: FrozenRuntime | None,
+    hpx_version: str,
+) -> None
+```
+
+`dataclass`
+
+A resolved, replayable run plan. Build it with :meth:`Session.freeze`.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/frozen_run.py:162`
+
+### helia_profiler.FrozenRun.settings
+
+`attribute` · `python`
+
+```python
+settings: Mapping[str, Any]
+```
+
+Source: `src/helia_profiler/frozen_run.py:166`
+
+### helia_profiler.FrozenRun.model
+
+`attribute` · `python`
+
+```python
+model: FrozenModel
+```
+
+Source: `src/helia_profiler/frozen_run.py:167`
+
+### helia_profiler.FrozenRun.baseline_id
+
+`attribute` · `python`
+
+```python
+baseline_id: str
+```
+
+Source: `src/helia_profiler/frozen_run.py:168`
+
+### helia_profiler.FrozenRun.baseline_fingerprint
+
+`attribute` · `python`
+
+```python
+baseline_fingerprint: str
+```
+
+Source: `src/helia_profiler/frozen_run.py:169`
+
+### helia_profiler.FrozenRun.qualification
+
+`attribute` · `python`
+
+```python
+qualification: str
+```
+
+Source: `src/helia_profiler/frozen_run.py:170`
+
+### helia_profiler.FrozenRun.overrides
+
+`attribute` · `python`
+
+```python
+overrides: tuple[str, ...]
+```
+
+Source: `src/helia_profiler/frozen_run.py:171`
+
+### helia_profiler.FrozenRun.local_inputs
+
+`attribute` · `python`
+
+```python
+local_inputs: tuple[LocalInput, ...]
+```
+
+Source: `src/helia_profiler/frozen_run.py:172`
+
+### helia_profiler.FrozenRun.environment
+
+`attribute` · `python`
+
+```python
+environment: Mapping[str, str]
+```
+
+Source: `src/helia_profiler/frozen_run.py:173`
+
+### helia_profiler.FrozenRun.toolchain
+
+`attribute` · `python`
+
+```python
+toolchain: ToolchainIdentity
+```
+
+Source: `src/helia_profiler/frozen_run.py:174`
+
+### helia_profiler.FrozenRun.runtime
+
+`attribute` · `python`
+
+```python
+runtime: FrozenRuntime | None
+```
+
+Source: `src/helia_profiler/frozen_run.py:175`
+
+### helia_profiler.FrozenRun.hpx_version
+
+`attribute` · `python`
+
+```python
+hpx_version: str
+```
+
+Source: `src/helia_profiler/frozen_run.py:176`
+
+### helia_profiler.FrozenRun.intent_hash
+
+`attribute` · `python`
+
+```python
+intent_hash: str
+```
+
+SHA-256 of what this plan asks for; the HPX release is not part of it.
+
+Source: `src/helia_profiler/frozen_run.py:187`
+
+### helia_profiler.FrozenRun.portable
+
+`attribute` · `python`
+
+```python
+portable: bool
+```
+
+Whether every input is pinned or content-identified, so another host can rebuild it.
+
+A compiler environment variable makes a plan host-specific, since the
+files it may name are not tracked, and so do a dependency selector
+that names a branch, tag or version rather than a commit and a custom
+heliaRT release, whose archive is not content-identified.
+
+Source: `src/helia_profiler/frozen_run.py:192`
+
+### helia_profiler.FrozenRun.to_dict
+
+`method` · `python`
+
+```python
+to_dict() -> dict[str, Any]
+```
+
+Source: `src/helia_profiler/frozen_run.py:206`
+
+### helia_profiler.FrozenRun.from_dict
+
+`method` · `python`
+
+```python
+from_dict(data: Mapping[str, Any]) -> FrozenRun
+```
+
+`classmethod`
+
+Source: `src/helia_profiler/frozen_run.py:223`
+
+### helia_profiler.FrozenRun.save
+
+`method` · `python`
+
+```python
+save(path: str | Path) -> Path
+```
+
+Write the plan as JSON and return its path.
+
+Source: `src/helia_profiler/frozen_run.py:272`
+
+### helia_profiler.FrozenRun.load
+
+`method` · `python`
+
+```python
+load(path: str | Path) -> FrozenRun
+```
+
+`classmethod`
+
+Read a plan written by :meth:`save`, verifying its intent hash.
+
+Source: `src/helia_profiler/frozen_run.py:281`
+
+### helia_profiler.FrozenRun.config
+
+`method` · `python`
+
+```python
+config(*, model: str | Path | None = None, host: Mapping[str, Any] | None = None) -> ProfileConfig
+```
+
+The :class:`ProfileConfig` this plan describes, on this host.
+
+*host* supplies host-local settings for the replaying host, for
+example ``{"target": {"jlink_serial": "..."}, "output": {"dir": "..."}}``;
+any other key is refused. Refuses when this HPX carries a different
+baseline, when the model (the recorded path, or *model* when it moved)
+has a different hash, when a local input differs or is missing, or
+when this host would build something else: a source-path environment
+variable set, unset or changed, another compiler version, or another
+engine runtime. Only the model can move; other local files must be
+at their recorded paths.
+
+Source: `src/helia_profiler/frozen_run.py:295`
 
 ---
 

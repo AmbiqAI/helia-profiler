@@ -84,6 +84,7 @@ if TYPE_CHECKING:
         compare_outputs,
         host_reference,
     )
+    from .frozen_run import FrozenModel, FrozenRun, FrozenRuntime, LocalInput, ToolchainIdentity
     from .hostenv.doctor import DoctorCheck, DoctorResult, DoctorVersionCheck
     from .modelcost import ModelAnalysis
     from .pipeline import ProgressUpdate
@@ -243,6 +244,11 @@ _EXPORTS = {
     "qualification": (".runtime_records", "qualification"),
     "runtimes": (".runtime_records", "runtimes"),
     "Session": (".session", "Session"),
+    "FrozenRun": (".frozen_run", "FrozenRun"),
+    "FrozenModel": (".frozen_run", "FrozenModel"),
+    "FrozenRuntime": (".frozen_run", "FrozenRuntime"),
+    "ToolchainIdentity": (".frozen_run", "ToolchainIdentity"),
+    "LocalInput": (".frozen_run", "LocalInput"),
     "ResetStrategy": (".target.lifecycle", "ResetStrategy"),
     "JLinkProbe": (".target.probe.jlink", "JLinkProbe"),
     "JLinkProbeMatch": (".target.probe.jlink", "JLinkProbeMatch"),
@@ -270,6 +276,11 @@ __all__ = [
     # Public API
     "profile",
     "Session",
+    "FrozenRun",
+    "FrozenModel",
+    "FrozenRuntime",
+    "LocalInput",
+    "ToolchainIdentity",
     "ProgressUpdate",
     "examples",
     # Config
@@ -435,6 +446,11 @@ _STABLE_API = {
 }
 
 _EXPERIMENTAL_API = {
+    "FrozenRun",
+    "FrozenModel",
+    "FrozenRuntime",
+    "LocalInput",
+    "ToolchainIdentity",
     "Qualification",
     "QualifiedTarget",
     "RuntimeQualification",

@@ -249,6 +249,27 @@ def select_cmsis_nn_override(engine_config: Any, *, provider_module: str) -> Cms
     return None
 
 
+def heliart_environment(engine_type: str, engine_config: Any) -> dict[str, str]:
+    """The heliaRT selector variable a build reads, with its value.
+
+    Follows the adapter's precedence: ``engine.config.source_path``, then
+    ``HELIART_SOURCE_PATH``, then ``engine.config.dist_path``, then
+    ``HELIART_DIST_PATH``. Other engines read neither variable.
+    """
+    if engine_type != "helia-rt":
+        return {}
+    config = engine_config if isinstance(engine_config, Mapping) else {}
+    if config.get("source_path"):
+        return {}
+    source = os.environ.get("HELIART_SOURCE_PATH")
+    if source:
+        return {"HELIART_SOURCE_PATH": source}
+    dist = os.environ.get("HELIART_DIST_PATH")
+    if dist and not config.get("dist_path"):
+        return {"HELIART_DIST_PATH": dist}
+    return {}
+
+
 # NSX module names that engine adapters resolve themselves (via
 # engine.config's dist_path/source_path/source/cmsis_nn_path/cmsis_nn_ref, not build.nsx_modules).
 # Mirrors the canonical engine module constants — a test
@@ -297,9 +318,9 @@ def resolve_compatibility(
     )
     if cmsis_nn is not None:
         modules.add(cmsis_nn.module)
-    for variable in ("HELIART_DIST_PATH", "HELIART_SOURCE_PATH"):
-        if os.environ.get(variable):
-            engines.add(f"env.{variable}")
+    engines.update(
+        f"env.{variable}" for variable in heliart_environment(engine_type, engine_config)
+    )
 
     if (
         allow_unsupported_version
