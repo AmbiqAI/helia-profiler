@@ -4,7 +4,7 @@ The script walks the whole run API once, as a benchmark harness would:
 
 1. freeze a :class:`~helia_profiler.FrozenRun` plan from a session;
 2. build it for a :class:`~helia_profiler.fixture.TypedFixture` with fixed input bytes;
-3. save the :class:`~helia_profiler.build_record.BuildRecord` and load it back,
+3. save the :class:`~helia_profiler.compiled_build.CompiledBuild` and load it back,
    as another host would;
 4. run the loaded record on the board and compare its outputs with host LiteRT.
 
@@ -27,7 +27,7 @@ from hashlib import sha256
 from pathlib import Path
 
 import helia_profiler as hpx
-from helia_profiler import BuildRecord, RunResult
+from helia_profiler import CompiledBuild, RunResult
 from helia_profiler.expect import Expect, Tolerance
 from helia_profiler.fixture import (
     FixtureFile,
@@ -107,7 +107,7 @@ def run_conformance(
         host={"output": {"dir": str(out / "build")}},
     )
     roots = {"run": out}
-    record = BuildRecord.load(built.save(out / "record.json", roots=roots), roots=roots)
+    record = CompiledBuild.load(built.save(out / "record.json", roots=roots), roots=roots)
     return record.run(
         guard=OperatorGuard(jlink_serial),
         jlink_serial=jlink_serial,

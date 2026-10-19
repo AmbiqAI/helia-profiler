@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from . import examples
     from ._version import __version__
     from .api import profile
-    from .build_record import BuildRecord, RunResult
+    from .compiled_build import CompiledBuild, RunResult, build, load_build, run_build
     from .config import (
         BuildConfig,
         ClockSelection,
@@ -257,8 +257,11 @@ _EXPORTS = {
     "FrozenModel": (".frozen_run", "FrozenModel"),
     "FrozenRuntime": (".frozen_run", "FrozenRuntime"),
     "ToolchainIdentity": (".frozen_run", "ToolchainIdentity"),
-    "BuildRecord": (".build_record", "BuildRecord"),
-    "RunResult": (".build_record", "RunResult"),
+    "CompiledBuild": (".compiled_build", "CompiledBuild"),
+    "RunResult": (".compiled_build", "RunResult"),
+    "build": (".compiled_build", "build"),
+    "load_build": (".compiled_build", "load_build"),
+    "run_build": (".compiled_build", "run_build"),
     "Lifecycle": (".lifecycle", "Lifecycle"),
     "CanonicalEngine": (".identity", "CanonicalEngine"),
     "CanonicalKernel": (".identity", "CanonicalKernel"),
@@ -298,8 +301,11 @@ __all__ = [
     "FrozenRuntime",
     "LocalInput",
     "ToolchainIdentity",
-    "BuildRecord",
+    "CompiledBuild",
     "RunResult",
+    "build",
+    "load_build",
+    "run_build",
     "Lifecycle",
     "CanonicalEngine",
     "CanonicalKernel",
@@ -476,8 +482,11 @@ _EXPERIMENTAL_API = {
     "FrozenRuntime",
     "LocalInput",
     "ToolchainIdentity",
-    "BuildRecord",
+    "CompiledBuild",
     "RunResult",
+    "build",
+    "load_build",
+    "run_build",
     "Lifecycle",
     "CanonicalEngine",
     "CanonicalKernel",

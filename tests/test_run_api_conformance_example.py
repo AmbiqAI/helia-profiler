@@ -12,7 +12,7 @@ import pytest
 
 import helia_profiler as hpx
 from helia_profiler._fixture_record import compiled_fixture_identity
-from helia_profiler.build_record import BuildRecord
+from helia_profiler.compiled_build import CompiledBuild
 from helia_profiler.expect import host_reference
 from helia_profiler.fixture import (
     FixtureBuild,
@@ -103,7 +103,7 @@ def test_the_report_states_identity_verification_and_measurements(
     build = _compiled(fixture, out / "build")
     _fake_capture(monkeypatch, tmp_path / "raw", [build])
 
-    result = BuildRecord(plan, build, Lifecycle.CARRY).run(
+    result = CompiledBuild(plan, build, Lifecycle.CARRY).run(
         guard=example.OperatorGuard("1160002255"),
         jlink_serial="1160002255",
         evidence_dir=out / "evidence",
@@ -138,7 +138,7 @@ def test_main_freezes_builds_saves_loads_and_runs(example, model, tmp_path, monk
         built.append(_compiled(fixture, out / "build"))
         return built[0]
 
-    for owner in ("_fixture_build", "fixture", "build_record"):
+    for owner in ("_fixture_build", "fixture", "compiled_build"):
         monkeypatch.setattr(
             f"helia_profiler.{owner}.build_fixed_fixture", build_fixed_fixture, raising=False
         )

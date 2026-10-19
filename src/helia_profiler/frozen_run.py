@@ -25,7 +25,7 @@ from .errors import ConfigError
 
 if TYPE_CHECKING:
     from ._fixture_build import TypedFixture
-    from .build_record import BuildRecord
+    from .compiled_build import CompiledBuild
     from .config import ProfileConfig
     from .deps.compatibility import CompatibilityResolution
 
@@ -343,11 +343,11 @@ class FrozenRun:
         _check_replay(self, freeze_config(replayed))
         return replayed
 
-    def build(self, fixture: TypedFixture, **options: Any) -> BuildRecord:
-        """Compile this plan for *fixture*'s pinned inputs; see :func:`build_record`."""
-        from .build_record import build_record
+    def build(self, fixture: TypedFixture, **options: Any) -> CompiledBuild:
+        """Compile this plan for *fixture*'s pinned inputs; see :func:`~helia_profiler.build`."""
+        from .compiled_build import build
 
-        return build_record(self, fixture, **options)
+        return build(self, fixture, **options)
 
 
 def freeze_config(config: ProfileConfig) -> FrozenRun:

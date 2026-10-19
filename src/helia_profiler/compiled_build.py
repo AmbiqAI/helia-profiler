@@ -1,10 +1,11 @@
 """Build once, run later: a frozen plan's compiled firmware as a durable record.
 
-``FrozenRun.build`` compiles a plan for fixed inputs and returns a
-:class:`BuildRecord`, which can be saved, verified and loaded on another
-host. :meth:`BuildRecord.run` captures from the record without rebuilding and
-returns a :class:`RunResult` with the run's identity, its measurements and,
-when asked, the comparison of its outputs with reference outputs.
+:func:`build` compiles a plan for fixed inputs and returns a
+:class:`CompiledBuild`, which can be saved, verified and loaded on another
+host with :func:`load_build`. :func:`run_build` captures from it without
+rebuilding and returns a :class:`RunResult` with the run's identity, its
+measurements and, when asked, the comparison of its outputs with reference
+outputs.
 """
 
 from __future__ import annotations
@@ -25,14 +26,14 @@ if TYPE_CHECKING:
     from .frozen_run import FrozenRun
     from .identity import RunIdentity
 
-BUILD_RECORD_SCHEMA = "hpx.build-record"
-BUILD_RECORD_SCHEMA_VERSION = 1
+COMPILED_BUILD_SCHEMA = "hpx.compiled-build"
+COMPILED_BUILD_SCHEMA_VERSION = 1
 
 _DOCUMENT_KEYS = frozenset({"schema", "schema_version", "plan", "lifecycle", "build"})
 
 
 @dataclass(frozen=True)
-class BuildRecord:
+class CompiledBuild:
     """A frozen plan and the firmware compiled from it, verifiable on any host."""
 
     plan: FrozenRun
@@ -41,7 +42,7 @@ class BuildRecord:
 
     @property
     def identity(self) -> RunIdentity:
-        """The record's identity; ``observation_hash`` is ``None`` until it runs."""
+        """The build's identity; ``observation_hash`` is ``None`` until it runs."""
         from .fixture_identity import fixture_run_identity
 
         identity = fixture_run_identity(self.build)
@@ -55,7 +56,7 @@ class BuildRecord:
         try:
             verify_fixture_build(self.build)
         except (ValueError, OSError) as exc:
-            raise ConfigError(f"Build record does not verify: {exc}") from exc
+            raise ConfigError(f"Compiled build does not verify: {exc}") from exc
         settings = self.plan.settings
         facts = {
             "engine": (settings.get("engine", {}).get("type"), self.build.engine.value),
@@ -64,11 +65,11 @@ class BuildRecord:
         for name, (planned, built) in facts.items():
             if planned != built:
                 raise ConfigError(
-                    f"Build record's {name} {built!r} differs from its plan's {planned!r}"
+                    f"Compiled build's {name} {built!r} differs from its plan's {planned!r}"
                 )
         if self.build.model is None or self.build.model.sha256 != self.plan.model.sha256:
             raise ConfigError(
-                "Build record's model does not match its plan "
+                "Compiled build's model does not match its plan "
                 f"(sha256 {self.plan.model.sha256[:12]}…)"
             )
         FrozenRun.from_dict(self.plan.to_dict())
@@ -78,26 +79,26 @@ class BuildRecord:
                 self.lifecycle, profiling["iterations"], profiling["warmup"]
             )
         except (KeyError, TypeError) as exc:
-            raise ConfigError(f"Build record's plan has no profiling counts: {exc}") from exc
+            raise ConfigError(f"Compiled build's plan has no profiling counts: {exc}") from exc
         if (self.build.iterations, self.build.warmups) != expected:
             raise ConfigError(
-                f"Build record runs {self.build.iterations} iterations and "
+                f"Compiled build runs {self.build.iterations} iterations and "
                 f"{self.build.warmups} warmups; lifecycle {self.lifecycle.value} of its plan "
                 f"runs {expected[0]} and {expected[1]}"
             )
 
     def save(self, path: str | Path, *, roots: Mapping[str, Path]) -> Path:
-        """Write the record as JSON with paths relative to *roots* and return its path."""
+        """Write the build as JSON with paths relative to *roots* and return its path."""
         from ._fixture_record import dump_fixture_build
 
         self.verify()
         try:
             build = json.loads(dump_fixture_build(self.build, roots=roots))
         except ValueError as exc:
-            raise ConfigError(f"Cannot save build record: {exc}") from exc
+            raise ConfigError(f"Cannot save compiled build: {exc}") from exc
         document = {
-            "schema": BUILD_RECORD_SCHEMA,
-            "schema_version": BUILD_RECORD_SCHEMA_VERSION,
+            "schema": COMPILED_BUILD_SCHEMA,
+            "schema_version": COMPILED_BUILD_SCHEMA_VERSION,
             "plan": self.plan.to_dict(),
             "lifecycle": self.lifecycle.value,
             "build": build,
@@ -109,12 +110,12 @@ class BuildRecord:
             with target.open("w", encoding="utf-8", newline="\n") as stream:
                 stream.write(text)
         except OSError as exc:
-            raise ConfigError(f"Cannot save build record to {target}: {exc}") from exc
+            raise ConfigError(f"Cannot save compiled build to {target}: {exc}") from exc
         return target
 
     @classmethod
-    def load(cls, path: str | Path, *, roots: Mapping[str, Path]) -> BuildRecord:
-        """Read and verify a record written by :meth:`save`, resolving paths under *roots*."""
+    def load(cls, path: str | Path, *, roots: Mapping[str, Path]) -> CompiledBuild:
+        """Read and verify a build written by :meth:`save`, resolving paths under *roots*."""
         from ._fixture_record import _read_json, load_fixture_build
         from .frozen_run import FrozenRun
 
@@ -122,24 +123,24 @@ class BuildRecord:
         try:
             data = _read_json(source.read_text(encoding="utf-8"))
         except FileNotFoundError as exc:
-            raise ConfigError(f"Build record not found: {source}") from exc
+            raise ConfigError(f"Compiled build not found: {source}") from exc
         except (OSError, ValueError, RecursionError) as exc:
-            raise ConfigError(f"Cannot read build record {source}: {exc}") from exc
+            raise ConfigError(f"Cannot read compiled build {source}: {exc}") from exc
         document = _document(data)
         try:
             lifecycle = Lifecycle(document["lifecycle"])
         except (ValueError, TypeError) as exc:
             raise ConfigError(
-                f"Malformed build record: unknown lifecycle {document['lifecycle']!r}"
+                f"Malformed compiled build: unknown lifecycle {document['lifecycle']!r}"
             ) from exc
         plan = FrozenRun.from_dict(document["plan"])
         try:
             build = load_fixture_build(json.dumps(document["build"]), roots=roots)
         except ValueError as exc:
-            raise ConfigError(f"Malformed build record: {exc}") from exc
+            raise ConfigError(f"Malformed compiled build: {exc}") from exc
         except OSError as exc:
             raise ConfigError(
-                f"Build record file is missing under the given roots: {exc}",
+                f"Compiled build file is missing under the given roots: {exc}",
                 hint="Pass roots= naming where the record's files now live.",
             ) from exc
         record = cls(plan, build, lifecycle)
@@ -169,7 +170,7 @@ class BuildRecord:
         self.verify()
         if expect is not None and expect.source == "build" and not self.build.outputs:
             raise ConfigError(
-                "This build record carries no expected outputs",
+                "This compiled build carries no expected outputs",
                 hint="Use Expect.host_litert() or Expect.from_files().",
             )
         try:
@@ -181,7 +182,7 @@ class BuildRecord:
                 expected_duration_s=expected_duration_s,
             )
         except ValueError as exc:
-            raise ConfigError(f"Cannot capture from this build record: {exc}") from exc
+            raise ConfigError(f"Cannot capture from this compiled build: {exc}") from exc
         capture = capture_fixture(request, guard=guard)
         identity = fixture_run_identity(self.build, capture)
         identity = replace(identity, run=replace(identity.run, lifecycle=self.lifecycle.value))
@@ -195,9 +196,9 @@ class BuildRecord:
 
 @dataclass(frozen=True)
 class RunResult:
-    """One capture from a :class:`BuildRecord`."""
+    """One capture from a :class:`CompiledBuild`."""
 
-    record: BuildRecord
+    record: CompiledBuild
     capture: FixtureCaptureResult
     identity: RunIdentity
     verification: Verification | None
@@ -207,7 +208,7 @@ class RunResult:
         return self.capture.state == "success"
 
 
-def build_record(
+def build(
     plan: FrozenRun,
     fixture: TypedFixture,
     *,
@@ -218,8 +219,13 @@ def build_record(
     host: Mapping[str, object] | None = None,
     observe_aot_arenas: bool = False,
     observe_ram: bool = False,
-) -> BuildRecord:
-    """Compile *plan* for *fixture*'s pinned inputs and return the record."""
+) -> CompiledBuild:
+    """Compile *plan* for *fixture*'s pinned inputs and return the compiled build.
+
+    *lifecycle* must be one the plan's engine implements; it sets the timed
+    iterations and warmups the firmware runs. *host* supplies host-local
+    settings, such as ``{"work_dir": ...}``, as :meth:`FrozenRun.config` does.
+    """
     from ._fixture_build import build_fixed_fixture
 
     if fixture.model.sha256 != plan.model.sha256:
@@ -236,7 +242,7 @@ def build_record(
                 hint="Use Lifecycle.CARRY for a power run.",
             )
         raise ConfigError(
-            "BuildRecord.run() takes no power request yet",
+            "run_build() takes no power request yet",
             hint="Build and capture power fixtures with helia_profiler.fixture for now.",
         )
     config = plan.config(model=model, host=host)
@@ -247,7 +253,7 @@ def build_record(
     config = replace(
         config, profiling=replace(config.profiling, iterations=iterations, warmup=warmup)
     )
-    build = build_fixed_fixture(
+    fixture_build = build_fixed_fixture(
         config,
         fixture,
         method=method,
@@ -256,19 +262,45 @@ def build_record(
         observe_aot_arenas=observe_aot_arenas,
         observe_ram=observe_ram,
     )
-    return BuildRecord(plan, build, lifecycle)
+    return CompiledBuild(plan, fixture_build, lifecycle)
+
+
+def load_build(path: str | Path, *, roots: Mapping[str, Path]) -> CompiledBuild:
+    """Read and verify a compiled build written by :meth:`CompiledBuild.save`."""
+    return CompiledBuild.load(path, roots=roots)
+
+
+def run_build(
+    record: CompiledBuild,
+    *,
+    guard: FixtureCaptureGuard,
+    jlink_serial: str,
+    evidence_dir: Path,
+    settle_seconds: float,
+    expect: Expect | None = None,
+    expected_duration_s: float | None = None,
+) -> RunResult:
+    """Flash *record*'s image, capture one run and compare outputs; see :meth:`CompiledBuild.run`."""
+    return record.run(
+        guard=guard,
+        jlink_serial=jlink_serial,
+        evidence_dir=evidence_dir,
+        settle_seconds=settle_seconds,
+        expect=expect,
+        expected_duration_s=expected_duration_s,
+    )
 
 
 def _document(data: Any) -> dict[str, Any]:
     if not isinstance(data, dict):
-        raise ConfigError("A build record must be a JSON object.")
-    if data.get("schema") != BUILD_RECORD_SCHEMA:
-        raise ConfigError(f"Not a build record: schema {data.get('schema')!r}")
+        raise ConfigError("A compiled build must be a JSON object.")
+    if data.get("schema") != COMPILED_BUILD_SCHEMA:
+        raise ConfigError(f"Not a compiled build: schema {data.get('schema')!r}")
     version = data.get("schema_version")
-    if type(version) is not int or version != BUILD_RECORD_SCHEMA_VERSION:
-        raise ConfigError(f"Unsupported build record version: {version!r}")
+    if type(version) is not int or version != COMPILED_BUILD_SCHEMA_VERSION:
+        raise ConfigError(f"Unsupported compiled build version: {version!r}")
     if data.keys() != _DOCUMENT_KEYS:
         raise ConfigError(
-            f"Malformed build record: fields {sorted(data)}, expected {sorted(_DOCUMENT_KEYS)}"
+            f"Malformed compiled build: fields {sorted(data)}, expected {sorted(_DOCUMENT_KEYS)}"
         )
     return data

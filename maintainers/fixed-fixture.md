@@ -156,16 +156,17 @@ record alone, so a relocated or reloaded record gives the same identity.
 hash and providers after checking only the manifest's own hash. The record
 format is unchanged; API 5.7 reads records from 5.0 through 5.6.
 
-`FrozenRun.build(fixture, method=..., lifecycle=...)` compiles a frozen plan
-for a fixture through `build_fixed_fixture` and returns a `BuildRecord` of the
-plan, the compiled `FixtureBuild` and the `Lifecycle` it runs. It refuses a
-fixture whose model is not the plan's, asks the engine whether it implements
-the lifecycle, and applies the lifecycle's invocation counts (`SINGLE` runs
-one timed invocation and no warmups). `BuildRecord.identity` is the build's
-`RunIdentity` with that lifecycle. `save(path, roots=...)` writes one
-canonical JSON document (`hpx.build-record`, schema version 1) holding the
+`helia_profiler.build(plan, fixture, method=..., lifecycle=...)`, also reached
+as `FrozenRun.build(fixture, ...)`, compiles a frozen plan for a fixture through
+`build_fixed_fixture` and returns a `CompiledBuild` of the plan, the compiled
+`FixtureBuild` and the `Lifecycle` it runs. It refuses a fixture whose model is
+not the plan's, asks the engine whether it implements the lifecycle, and
+applies the lifecycle's invocation counts (`SINGLE` runs one timed invocation
+and no warmups). `CompiledBuild.identity` is the build's `RunIdentity` with
+that lifecycle. `save(path, roots=...)` writes one canonical JSON document
+(`hpx.compiled-build`, schema version 1) holding the
 plan's `to_dict()`, the lifecycle and the `dump_fixture_build` record as an
-object; `load(path, roots=...)` rebuilds both halves, resolving files under
+object; `load_build(path, roots=...)` (or `CompiledBuild.load`) rebuilds both halves, resolving files under
 the caller's roots, so moving the record means passing new roots. `verify()`
 re-checks the build's pinned files, that its model is the plan's model and
 that the plan's intent hash matches its contents; `load` calls it. Every
@@ -522,10 +523,10 @@ and apply comparison policy in the consumer. The profiler reports facts and
 non-waivable integrity/attribution limitations, not a benchmark acceptance verdict.
 Historical raw records and build/capture safety validation are unchanged.
 
-### Running a build record
+### Running a compiled build
 
-`BuildRecord.run(guard=..., jlink_serial=..., evidence_dir=..., settle_seconds=...,
-expect=None, expected_duration_s=None)` captures once from a record without
+`run_build(record, guard=..., jlink_serial=..., evidence_dir=..., settle_seconds=...,
+expect=None, expected_duration_s=None)`, or `record.run(...)`, captures once from a record without
 rebuilding. It builds the request with `fixture_capture_request`, captures with
 `capture_fixture` under the caller's guard, and returns a `RunResult` holding the
 record, the raw `capture`, the run's `identity` and the `verification`. The

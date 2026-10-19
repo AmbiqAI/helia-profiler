@@ -1,4 +1,4 @@
-"""BuildRecord.run: capture from a recorded build, state its identity, compare its outputs."""
+"""CompiledBuild.run: capture from a recorded build, state its identity, compare its outputs."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import pytest
 
 import helia_profiler as hpx
 from helia_profiler._fixture_record import compiled_fixture_identity, fixture_capture_request
-from helia_profiler.build_record import BuildRecord, RunResult
+from helia_profiler.compiled_build import CompiledBuild, RunResult
 from helia_profiler.errors import ConfigError
 from helia_profiler.expect import Expect
 from helia_profiler.fixture import (
@@ -42,7 +42,7 @@ def build(tmp_path: Path) -> FixtureBuild:
 
 
 @pytest.fixture
-def record(tmp_path: Path, build: FixtureBuild, monkeypatch: pytest.MonkeyPatch) -> BuildRecord:
+def record(tmp_path: Path, build: FixtureBuild, monkeypatch: pytest.MonkeyPatch) -> CompiledBuild:
     monkeypatch.setattr(
         "helia_profiler.hostenv._proc.tool_output", lambda command, *, timeout_s: _GCC
     )
@@ -59,7 +59,7 @@ def record(tmp_path: Path, build: FixtureBuild, monkeypatch: pytest.MonkeyPatch)
     assert build.state_policy is FixtureStatePolicy.CARRY
     single = replace(build, iterations=1, warmups=0)
     single = replace(single, build_identity=compiled_fixture_identity(single))
-    return BuildRecord(plan, single, Lifecycle.SINGLE)
+    return CompiledBuild(plan, single, Lifecycle.SINGLE)
 
 
 def _success(root: Path, score: bytes = _SCORE) -> FixtureCaptureResult:
@@ -101,7 +101,7 @@ def device(monkeypatch: pytest.MonkeyPatch) -> _Device:
 
 
 def _run(
-    record: BuildRecord,
+    record: CompiledBuild,
     device: _Device,
     capture: FixtureCaptureResult,
     tmp_path: Path,

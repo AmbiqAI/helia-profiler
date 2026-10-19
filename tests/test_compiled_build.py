@@ -1,4 +1,4 @@
-"""BuildRecord: a frozen plan's compiled fixture, saved, verified and reloaded."""
+"""CompiledBuild: a frozen plan's compiled fixture, saved, verified and reloaded."""
 
 from __future__ import annotations
 
@@ -19,11 +19,10 @@ from helia_profiler._fixture_build import (
     TypedFixture,
 )
 from helia_profiler._fixture_record import compiled_fixture_identity
-from helia_profiler.build_record import (
-    BUILD_RECORD_SCHEMA,
-    BUILD_RECORD_SCHEMA_VERSION,
-    BuildRecord,
-    build_record,
+from helia_profiler.compiled_build import (
+    COMPILED_BUILD_SCHEMA,
+    COMPILED_BUILD_SCHEMA_VERSION,
+    CompiledBuild,
 )
 from helia_profiler.errors import ConfigError
 from helia_profiler.fixture import FixtureFile, fixture_run_identity
@@ -104,7 +103,7 @@ def test_build_applies_the_lifecycle_and_compiles(plan, build, fixture, calls, l
     assert (profiling.iterations, profiling.warmup) == expected
     assert call["compile"] is True and call["observe_ram"] is True
     assert call["method"] is _METHOD and call["fixture"] is fixture
-    assert record == BuildRecord(plan, build, lifecycle)
+    assert record == CompiledBuild(plan, build, lifecycle)
     assert record.plan is plan
 
 
@@ -112,9 +111,9 @@ def test_build_asks_the_engine_for_the_lifecycle(plan, fixture, calls, monkeypat
     def refuse(engine, lifecycle):
         raise ConfigError(f"{engine.value} refuses {lifecycle.value}")
 
-    monkeypatch.setattr("helia_profiler.build_record.require_lifecycle", refuse)
+    monkeypatch.setattr("helia_profiler.compiled_build.require_lifecycle", refuse)
     with pytest.raises(ConfigError, match="helia-aot refuses single"):
-        build_record(plan, fixture, method=_METHOD, lifecycle=Lifecycle.SINGLE)
+        hpx.build(plan, fixture, method=_METHOD, lifecycle=Lifecycle.SINGLE)
     assert not calls
 
 
@@ -151,8 +150,8 @@ def test_a_single_invocation_is_refused_for_power(plan, fixture, calls):
 def test_a_deeply_nested_record_is_a_config_error(tmp_path, root):
     path = tmp_path / "deep.json"
     path.write_text("[" * 100000, encoding="utf-8")
-    with pytest.raises(ConfigError, match="Cannot read build record"):
-        BuildRecord.load(path, roots={"run": root})
+    with pytest.raises(ConfigError, match="Cannot read compiled build"):
+        CompiledBuild.load(path, roots={"run": root})
 
 
 def test_build_refuses_a_fixture_of_another_model(plan, fixture, calls, tmp_path):
@@ -160,13 +159,13 @@ def test_build_refuses_a_fixture_of_another_model(plan, fixture, calls, tmp_path
     other.write_bytes(b"other")
     changed = replace(fixture, model=FixtureFile(other, hashlib.sha256(b"other").hexdigest()))
     with pytest.raises(ConfigError, match="does not match the plan's model"):
-        build_record(plan, changed, method=_METHOD)
+        hpx.build(plan, changed, method=_METHOD)
     assert not calls
 
 
 def test_identity_states_the_lifecycle_that_ran(plan, build):
     base = fixture_run_identity(build)
-    identity = BuildRecord(plan, build, Lifecycle.SINGLE).identity
+    identity = CompiledBuild(plan, build, Lifecycle.SINGLE).identity
 
     assert base.run.lifecycle == "carry"
     assert identity.run.lifecycle == "single"
@@ -181,7 +180,7 @@ def _single(build):
 
 def test_save_and_load_round_trip_after_relocation(plan, build, root, tmp_path):
     build = _single(build)
-    record = BuildRecord(plan, build, Lifecycle.SINGLE)
+    record = CompiledBuild(plan, build, Lifecycle.SINGLE)
     identity = record.identity
     path = record.save(tmp_path / "records" / "kws.json", roots={"run": root})
 
@@ -189,15 +188,15 @@ def test_save_and_load_round_trip_after_relocation(plan, build, root, tmp_path):
     data = json.loads(text)
     assert text == json.dumps(data, indent=2, sort_keys=True) + "\n"
     assert str(root) not in text
-    assert data["schema"] == BUILD_RECORD_SCHEMA
-    assert data["schema_version"] == BUILD_RECORD_SCHEMA_VERSION
+    assert data["schema"] == COMPILED_BUILD_SCHEMA
+    assert data["schema_version"] == COMPILED_BUILD_SCHEMA_VERSION
     assert data["lifecycle"] == "single"
     assert data["plan"] == plan.to_dict()
     assert isinstance(data["build"], dict)
 
     moved = tmp_path / "moved"
     shutil.move(root, moved)
-    loaded = BuildRecord.load(path, roots={"run": moved})
+    loaded = CompiledBuild.load(path, roots={"run": moved})
 
     assert loaded.lifecycle is Lifecycle.SINGLE
     assert loaded.plan.to_dict() == plan.to_dict()
@@ -209,14 +208,14 @@ def test_save_and_load_round_trip_after_relocation(plan, build, root, tmp_path):
 
 
 def test_save_refuses_a_file_outside_the_roots(plan, build, tmp_path):
-    with pytest.raises(ConfigError, match="Cannot save build record"):
-        BuildRecord(plan, build, Lifecycle.CARRY).save(
+    with pytest.raises(ConfigError, match="Cannot save compiled build"):
+        CompiledBuild(plan, build, Lifecycle.CARRY).save(
             tmp_path / "r.json", roots={"run": tmp_path / "elsewhere"}
         )
 
 
 def test_verify_refuses_a_tampered_build(plan, build):
-    record = BuildRecord(plan, build, Lifecycle.CARRY)
+    record = CompiledBuild(plan, build, Lifecycle.CARRY)
     record.verify()
     assert build.flat_binary is not None
     build.flat_binary.path.write_bytes(b"changed image")
@@ -225,34 +224,36 @@ def test_verify_refuses_a_tampered_build(plan, build):
 
 
 def test_verify_refuses_a_lifecycle_the_firmware_does_not_run(plan, build):
-    BuildRecord(plan, _single(build), Lifecycle.SINGLE).verify()
+    CompiledBuild(plan, _single(build), Lifecycle.SINGLE).verify()
     assert build.iterations == 100
     with pytest.raises(ConfigError, match="lifecycle single of its plan runs 1 and 0"):
-        BuildRecord(plan, build, Lifecycle.SINGLE).verify()
+        CompiledBuild(plan, build, Lifecycle.SINGLE).verify()
     with pytest.raises(ConfigError, match="lifecycle carry of its plan runs 100 and 5"):
-        BuildRecord(plan, _single(build), Lifecycle.CARRY).verify()
+        CompiledBuild(plan, _single(build), Lifecycle.CARRY).verify()
 
 
 def test_verify_refuses_a_plan_for_another_model(plan, build):
     other = replace(plan, model=replace(plan.model, sha256="0" * 64))
     with pytest.raises(ConfigError, match="model does not match its plan"):
-        BuildRecord(other, build, Lifecycle.CARRY).verify()
+        CompiledBuild(other, build, Lifecycle.CARRY).verify()
 
 
 def test_verify_refuses_a_plan_whose_intent_hash_is_stale(plan, build):
     object.__setattr__(plan, "_intent", "0" * 64)
     with pytest.raises(ConfigError, match="intent hash"):
-        BuildRecord(plan, build, Lifecycle.CARRY).verify()
+        CompiledBuild(plan, build, Lifecycle.CARRY).verify()
 
 
 def test_load_verifies_the_plan_against_the_build(plan, build, root, tmp_path):
-    path = BuildRecord(plan, build, Lifecycle.CARRY).save(tmp_path / "r.json", roots={"run": root})
+    path = CompiledBuild(plan, build, Lifecycle.CARRY).save(
+        tmp_path / "r.json", roots={"run": root}
+    )
     data = json.loads(path.read_text())
     other = replace(plan, model=replace(plan.model, sha256="0" * 64))
     data["plan"] = other.to_dict()
     path.write_text(json.dumps(data))
     with pytest.raises(ConfigError, match="model does not match its plan"):
-        BuildRecord.load(path, roots={"run": root})
+        CompiledBuild.load(path, roots={"run": root})
 
 
 def _edit(data: dict[str, Any], mutation: str) -> str:
@@ -305,49 +306,82 @@ def _edit(data: dict[str, Any], mutation: str) -> str:
     ],
 )
 def test_malformed_records_are_refused_as_config_errors(plan, build, root, tmp_path, mutation):
-    path = BuildRecord(plan, build, Lifecycle.CARRY).save(tmp_path / "r.json", roots={"run": root})
+    path = CompiledBuild(plan, build, Lifecycle.CARRY).save(
+        tmp_path / "r.json", roots={"run": root}
+    )
     edited = _edit(json.loads(path.read_text()), mutation)
     assert edited != path.read_text()
     path.write_text(edited)
     with pytest.raises(ConfigError):
-        BuildRecord.load(path, roots={"run": root})
+        CompiledBuild.load(path, roots={"run": root})
 
 
 def test_missing_record_or_pinned_file_is_a_config_error(plan, build, root, tmp_path):
     with pytest.raises(ConfigError, match="not found"):
-        BuildRecord.load(tmp_path / "absent.json", roots={"run": root})
-    path = BuildRecord(plan, build, Lifecycle.CARRY).save(tmp_path / "r.json", roots={"run": root})
+        CompiledBuild.load(tmp_path / "absent.json", roots={"run": root})
+    path = CompiledBuild(plan, build, Lifecycle.CARRY).save(
+        tmp_path / "r.json", roots={"run": root}
+    )
     assert build.flat_binary is not None
     build.flat_binary.path.unlink()
     with pytest.raises(ConfigError, match="missing under the given roots"):
-        BuildRecord.load(path, roots={"run": root})
+        CompiledBuild.load(path, roots={"run": root})
 
 
 @pytest.mark.parametrize(
     "key,value",
     [
         ("schema", "hpx.frozen-run"),
-        ("schema_version", BUILD_RECORD_SCHEMA_VERSION + 1),
-        ("schema_version", str(BUILD_RECORD_SCHEMA_VERSION)),
+        ("schema_version", COMPILED_BUILD_SCHEMA_VERSION + 1),
+        ("schema_version", str(COMPILED_BUILD_SCHEMA_VERSION)),
         ("schema_version", True),
     ],
 )
 def test_unknown_schema_or_version_is_refused(plan, build, root, tmp_path, key, value):
-    path = BuildRecord(plan, build, Lifecycle.CARRY).save(tmp_path / "r.json", roots={"run": root})
+    path = CompiledBuild(plan, build, Lifecycle.CARRY).save(
+        tmp_path / "r.json", roots={"run": root}
+    )
     data = json.loads(path.read_text())
     data[key] = value
     path.write_text(json.dumps(data))
-    match = "Not a build record" if key == "schema" else "Unsupported build record version"
+    match = "Not a compiled build" if key == "schema" else "Unsupported compiled build version"
     with pytest.raises(ConfigError, match=match):
-        BuildRecord.load(path, roots={"run": root})
+        CompiledBuild.load(path, roots={"run": root})
 
 
-def test_package_exports_the_record_types():
-    assert hpx.BuildRecord is BuildRecord
+_RUN_API = ("CompiledBuild", "RunResult", "Lifecycle", "build", "load_build", "run_build")
+
+
+def test_package_exports_the_run_api():
+    import importlib.util
+
+    assert hpx.CompiledBuild is CompiledBuild
     assert hpx.Lifecycle is Lifecycle
-    assert hpx.RunResult.__module__ == "helia_profiler.build_record"
-    assert {hpx.__api_stability__[name] for name in ("BuildRecord", "RunResult", "Lifecycle")} == {
-        "experimental"
+    assert hpx.RunResult.__module__ == "helia_profiler.compiled_build"
+    assert hpx.build.__module__ == "helia_profiler.compiled_build"
+    assert {hpx.__api_stability__[name] for name in _RUN_API} == {"experimental"}
+    assert importlib.util.find_spec("helia_profiler.build") is None
+
+
+def test_load_build_and_run_build_delegate_to_the_record(plan, build, root, tmp_path, monkeypatch):
+    record = CompiledBuild(plan, build, Lifecycle.CARRY)
+    path = record.save(tmp_path / "r.json", roots={"run": root})
+    assert hpx.load_build(path, roots={"run": root}) == record
+
+    seen: dict[str, Any] = {}
+    monkeypatch.setattr(CompiledBuild, "run", lambda self, **options: seen.update(options) or "ran")
+    guard: Any = object()
+    result = hpx.run_build(
+        record, guard=guard, jlink_serial="1", evidence_dir=tmp_path, settle_seconds=1.0
+    )
+    assert result == "ran"
+    assert seen == {
+        "guard": guard,
+        "jlink_serial": "1",
+        "evidence_dir": tmp_path,
+        "settle_seconds": 1.0,
+        "expect": None,
+        "expected_duration_s": None,
     }
 
 
@@ -363,7 +397,7 @@ def test_verify_refuses_a_plan_for_another_engine(tmp_path, build):
         .freeze()
     )
     with pytest.raises(ConfigError, match="engine 'helia-aot' differs from its plan's 'helia-rt'"):
-        BuildRecord(plan, build, Lifecycle.CARRY).verify()
+        CompiledBuild(plan, build, Lifecycle.CARRY).verify()
 
 
 def test_a_lifecycle_given_by_name_is_a_lifecycle(plan, fixture, calls):

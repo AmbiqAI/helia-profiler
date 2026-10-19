@@ -11,7 +11,6 @@ _litert_inspection.py
 _result_view.py
 _version.py
 api.py
-build_record.py
 capture/__init__.py
 capture/parser.py
 capture/power_terminal.py
@@ -31,6 +30,7 @@ cli/results_cmd.py
 cli/runtimes_cmd.py
 cli/validate_cmd.py
 cli/validation_app.py
+compiled_build.py
 config/__init__.py
 config/power.py
 console/__init__.py
