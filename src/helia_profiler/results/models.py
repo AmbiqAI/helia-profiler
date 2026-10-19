@@ -26,6 +26,7 @@ from ..placement import MemoryRegion
 from ..power.base import PowerResult
 
 if TYPE_CHECKING:
+    from ..identity import RunIdentity
     from .artifacts import OnDevicePowerSummary, PowerObservation, PowerTerminalRecord
     from .dependencies import DependencyProvenance
 
@@ -318,6 +319,9 @@ class RunMetadata:
     timing: TimingInfo | None = None
     compatibility: CompatibilityResolution | None = None
     dependencies: "DependencyProvenance | None" = None
+    #: What ran, in the vocabulary fixture builds share. Set when the report
+    #: is written, once the capture it hashes is complete.
+    identity: "RunIdentity | None" = None
 
 
 @dataclass(frozen=True)

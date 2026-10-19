@@ -255,3 +255,23 @@ def test_null_legacy_keys_fall_through_to_canonical() -> None:
     section = PowerSection.from_dict({"total_energy_uj": None, "energy_j": 2e-6})
     assert section.energy_uj == pytest.approx(2.0)
     assert PowerSection.from_dict({"avg_current_ma": None}).avg_current_ma is None
+
+
+def test_identity_is_modelled_and_emitted_after_dependencies() -> None:
+    identity = {"runtime": {"engine": "helia-rt"}, "build_hash": {"unknown": "no image"}}
+    summary = _base_summary()
+    ordered = {key: summary[key] for key in list(summary)[:6]}
+    ordered["dependencies"] = {"lock": {}}
+    ordered["identity"] = identity
+    ordered.update({key: summary[key] for key in list(summary)[6:]})
+
+    _shape_check(ordered)
+    assert RunSummary.from_dict(ordered).identity == identity
+
+
+def test_a_v13_summary_reads_without_identity() -> None:
+    summary = RunSummary.from_dict(_base_summary(schema_version=13))
+
+    assert summary.schema_version == 13
+    assert summary.identity is None
+    assert summary.extras == {}
