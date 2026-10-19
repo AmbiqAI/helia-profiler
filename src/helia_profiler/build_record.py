@@ -62,6 +62,19 @@ class BuildRecord:
                 f"(sha256 {self.plan.model.sha256[:12]}…)"
             )
         FrozenRun.from_dict(self.plan.to_dict())
+        try:
+            profiling = self.plan.settings["profiling"]
+            expected = lifecycle_invocations(
+                self.lifecycle, profiling["iterations"], profiling["warmup"]
+            )
+        except (KeyError, TypeError) as exc:
+            raise ConfigError(f"Build record's plan has no profiling counts: {exc}") from exc
+        if (self.build.iterations, self.build.warmups) != expected:
+            raise ConfigError(
+                f"Build record runs {self.build.iterations} iterations and "
+                f"{self.build.warmups} warmups; lifecycle {self.lifecycle.value} of its plan "
+                f"runs {expected[0]} and {expected[1]}"
+            )
 
     def save(self, path: str | Path, *, roots: Mapping[str, Path]) -> Path:
         """Write the record as JSON with paths relative to *roots* and return its path."""

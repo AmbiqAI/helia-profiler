@@ -18,6 +18,7 @@ from helia_profiler._fixture_build import (
     FixtureTimingScope,
     TypedFixture,
 )
+from helia_profiler._fixture_record import compiled_fixture_identity
 from helia_profiler.build_record import (
     BUILD_RECORD_SCHEMA,
     BUILD_RECORD_SCHEMA_VERSION,
@@ -68,7 +69,7 @@ def plan(tmp_path: Path, build) -> FrozenRun:
         .with_model(model)
         .with_engine("helia-rt")
         .with_target(board="apollo510_evb", toolchain="arm-none-eabi-gcc")
-        .with_profiling(iterations=7, warmup=3)
+        .with_profiling(iterations=100, warmup=5)
         .freeze()
     )
 
@@ -93,7 +94,7 @@ def calls(monkeypatch: pytest.MonkeyPatch, build) -> list[dict[str, Any]]:
 
 
 @pytest.mark.parametrize(
-    "lifecycle,expected", [(Lifecycle.CARRY, (7, 3)), (Lifecycle.SINGLE, (1, 0))]
+    "lifecycle,expected", [(Lifecycle.CARRY, (100, 5)), (Lifecycle.SINGLE, (1, 0))]
 )
 def test_build_applies_the_lifecycle_and_compiles(plan, build, fixture, calls, lifecycle, expected):
     record = plan.build(fixture, method=_METHOD, lifecycle=lifecycle, observe_ram=True)
@@ -136,7 +137,13 @@ def test_identity_states_the_lifecycle_that_ran(plan, build):
     assert identity.observation_hash is None
 
 
+def _single(build):
+    once = replace(build, iterations=1, warmups=0)
+    return replace(once, build_identity=compiled_fixture_identity(once))
+
+
 def test_save_and_load_round_trip_after_relocation(plan, build, root, tmp_path):
+    build = _single(build)
     record = BuildRecord(plan, build, Lifecycle.SINGLE)
     identity = record.identity
     path = record.save(tmp_path / "records" / "kws.json", roots={"run": root})
@@ -178,6 +185,15 @@ def test_verify_refuses_a_tampered_build(plan, build):
     build.flat_binary.path.write_bytes(b"changed image")
     with pytest.raises(ConfigError, match="does not verify"):
         record.verify()
+
+
+def test_verify_refuses_a_lifecycle_the_firmware_does_not_run(plan, build):
+    BuildRecord(plan, _single(build), Lifecycle.SINGLE).verify()
+    assert build.iterations == 100
+    with pytest.raises(ConfigError, match="lifecycle single of its plan runs 1 and 0"):
+        BuildRecord(plan, build, Lifecycle.SINGLE).verify()
+    with pytest.raises(ConfigError, match="lifecycle carry of its plan runs 100 and 5"):
+        BuildRecord(plan, _single(build), Lifecycle.CARRY).verify()
 
 
 def test_verify_refuses_a_plan_for_another_model(plan, build):
