@@ -565,3 +565,10 @@ def test_an_unavailable_compiler_is_not_reported_as_drift(session, compiler, mon
     with pytest.raises(ConfigError, match="environment") as refused:
         plan.config()
     assert "toolchain: frozen" not in str(refused.value)
+
+
+@pytest.mark.parametrize(
+    "source", [{"ref": "4f922ed365177a6533f869feffe069b0e8b7afb2"}, {"repo": "AmbiqAI/helia-rt"}]
+)
+def test_a_custom_heliart_release_is_not_portable(session, source):
+    assert not session.with_engine("helia-rt", config={"source": source}).freeze().portable

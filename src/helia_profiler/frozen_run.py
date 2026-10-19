@@ -193,8 +193,9 @@ class FrozenRun:
         """Whether every input is pinned or content-identified, so another host can rebuild it.
 
         A compiler environment variable makes a plan host-specific, since the
-        files it may name are not tracked, and so does a dependency selector
-        that names a branch, tag or version rather than a commit.
+        files it may name are not tracked, and so do a dependency selector
+        that names a branch, tag or version rather than a commit and a custom
+        heliaRT release, whose archive is not content-identified.
         """
         return (
             all(item.kind == "file" for item in self.local_inputs)
@@ -552,12 +553,8 @@ def _floating_selectors(settings: Mapping[str, Any]) -> list[str]:
     floating = []
     if engine.get("cmsis_nn_ref") and not _COMMIT.fullmatch(str(engine["cmsis_nn_ref"])):
         floating.append("engine.config.cmsis_nn_ref")
-    source = engine.get("source")
-    if (
-        isinstance(source, Mapping)
-        and source.get("ref")
-        and not _COMMIT.fullmatch(str(source["ref"]))
-    ):
+    # A heliaRT release mapping resolves to an archive that is not content-identified.
+    if engine.get("source"):
         floating.append("engine.config.source")
     for name, module in sorted((settings.get("build", {}).get("nsx_modules") or {}).items()):
         selector = module.get("ref") or module.get("version")

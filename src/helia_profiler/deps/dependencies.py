@@ -182,9 +182,14 @@ def _override_inputs(ctx: PipelineContext) -> tuple[dict[str, Any], tuple[Depend
             provenance.append(DependencyOverride("module", name, "version", override.version))
 
     engine_config = ctx.config.engine.config
+    source_build = ctx.config.engine.type.value == "helia-rt" and bool(
+        engine_config.get("source_path")
+        or "HELIART_SOURCE_PATH" in heliart_environment("helia-rt", engine_config)
+    )
     for key in ("dist_path", "source_path"):
         raw = engine_config.get(key)
-        if raw is None or raw == "":
+        # A heliaRT source build ignores any distribution.
+        if raw is None or raw == "" or (key == "dist_path" and source_build):
             continue
         if not isinstance(raw, (str, Path)):
             raise DependencyError(

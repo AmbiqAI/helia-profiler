@@ -939,6 +939,26 @@ def test_heliart_variables_count_only_where_the_adapter_reads_them(
     assert [o.name for o in overrides if o.name.startswith("env.")] == expected
 
 
+@pytest.mark.parametrize("from_environment", [False, True])
+def test_a_heliart_source_build_does_not_digest_a_shadowed_distribution(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, from_environment: bool
+) -> None:
+    from helia_profiler.deps.dependencies import _override_inputs
+
+    monkeypatch.chdir(tmp_path)
+    source = tmp_path / "rt-src"
+    source.mkdir()
+    engine_config = {"dist_path": str(tmp_path / "no-dist")}
+    if from_environment:
+        monkeypatch.setenv("HELIART_SOURCE_PATH", str(source))
+    else:
+        engine_config["source_path"] = str(source)
+    ctx = _context(tmp_path, engine_type="helia-rt", engine_config=engine_config)
+
+    _, overrides = _override_inputs(ctx)
+    assert "dist_path" not in [o.name for o in overrides]
+
+
 def test_workspace_records_observed_aot_install_identity(tmp_path, monkeypatch):
     from helia_profiler.results.dependencies import installed_aot_source
 
