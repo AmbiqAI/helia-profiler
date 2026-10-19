@@ -113,11 +113,11 @@ def _runtime(build: FixtureBuild, source: FixtureRuntimeSource | None) -> Runtim
         return RuntimeIdentity(engine, source.url, version, source.commit)
     if build.engine_source is not None:
         package = build.engine_source
-        record = runtime(package.package, package.version)
+        record = runtime(package.package)
         repository = (
             f"https://github.com/{record.source.repo}"
             if record is not None
-            else Unknown(f"no runtime record for {package.package} {package.version}")
+            else Unknown(f"no runtime record for {package.package}")
         )
         commit = package.commit or Unknown(f"{package.package} {package.version} records no commit")
         return RuntimeIdentity(engine, repository, package.version, commit)
@@ -209,21 +209,22 @@ def _resolved_lock(lock: FixtureFile) -> Any:
             name: {
                 "target": target["target"],
                 "modules": {
-                    module: {
-                        "project": entry.get("project"),
-                        "kind": entry.get("kind"),
-                        **{
-                            key: entry.get("resolved", {}).get(key)
-                            for key in ("url", "commit", "tag", "content_hash")
-                        },
-                    }
-                    for module, entry in target["modules"].items()
+                    module: _resolved_module(entry) for module, entry in target["modules"].items()
                 },
             }
             for name, target in targets.items()
         }
     except (yaml.YAMLError, KeyError, TypeError, AttributeError):
         return Unknown("the dependency lock is not an NSX lock")
+
+
+def _resolved_module(entry: dict[str, Any]) -> dict[str, Any]:
+    resolved = entry.get("resolved", {})
+    pinned = {"project": entry.get("project"), "kind": entry.get("kind")}
+    # A git module is its URL and commit; its checkout hash varies with line endings.
+    if entry.get("kind") == "git":
+        return {**pinned, "url": resolved.get("url"), "commit": resolved.get("commit")}
+    return {**pinned, "content_hash": resolved.get("content_hash")}
 
 
 def _observation_hash(capture: FixtureCaptureResult) -> str:

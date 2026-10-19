@@ -145,7 +145,10 @@ dependency lock, model and input hashes; how it runs; and the HPX release that
 produced it. A fact the record does not state is `Unknown` with the reason,
 not `None`. `build_hash` covers the flashed image, the dependency lock, the
 prepared runtime archive and the model, and never the HPX release, so it
-changes only when what runs changes; `observation_hash` covers a capture's
+changes only when what runs changes. The lock counts by what it resolved: git
+modules by URL and commit, packaged and vendored ones by content hash, so a
+neuralspotx release that changes its packaged build tooling changes it too.
+`observation_hash` covers a capture's
 measured facts with files reduced to their content hashes. Both come from the
 record alone, so a relocated or reloaded record gives the same identity.
 `read_prepared_runtime_manifest` returns a prepared runtime's stack, archive

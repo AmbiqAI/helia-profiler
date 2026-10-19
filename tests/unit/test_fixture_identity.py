@@ -390,3 +390,11 @@ def test_an_error_message_is_not_part_of_the_observation(tmp_path):
         fixture_run_identity(build, capture).observation_hash
         == fixture_run_identity(build, other).observation_hash
     )
+
+
+def test_a_git_module_counts_by_commit_and_packaged_tooling_by_content(tmp_path):
+    base = fixture_run_identity(_aot(tmp_path / "a")).build_hash
+    crlf = _lock().replace(b"sha256:" + b"2" * 64, b"sha256:" + b"4" * 64)
+    assert fixture_run_identity(_aot(tmp_path / "b", crlf)).build_hash == base
+    tooling = _lock().replace(b"sha256:" + b"3" * 64, b"sha256:" + b"5" * 64)
+    assert fixture_run_identity(_aot(tmp_path / "c", tooling)).build_hash != base
