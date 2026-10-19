@@ -150,5 +150,5 @@ def test_source_trees_outside_the_app_are_recorded_by_name() -> None:
         source_roots=[("/cache/nsx-executorch", "nsx-executorch")],
     )
     line = 'add_compile_options("-ffile-prefix-map=/cache/nsx-executorch=nsx-executorch")'
-    assert line in rendered
-    assert rendered.index(line) < rendered.index("modules.cmake")
+    app = 'add_compile_options("-ffile-prefix-map=${CMAKE_CURRENT_LIST_DIR}=.")'
+    assert rendered.index(line) < rendered.index(app) < rendered.index("modules.cmake")
