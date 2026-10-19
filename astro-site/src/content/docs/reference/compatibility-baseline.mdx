@@ -105,6 +105,10 @@ selects the NSX type by value), and its `ConversionResult` now carries the
 post-transform operators, tensors, regions and placements; hpx still reads
 the converter's internal context until it moves to those views.
 
+**Verified.** On an Apollo510 EVB (ATfE, int8 keyword spotting), heliaAOT
+0.32.0, heliaRT 2.2.2 and TFLM profile end to end with every layer
+attributed.
+
 heliaRT 2.2.2 (`7fe6dfdb…0f0`) and `ns-cmsis-nn v7.47.0` (`9f793bd9…abe`)
 replace 2.2.0 and v7.46.0. heliaRT 2.2.1 and later require v7.47.0 or newer, so
 the two move together. 2.2.2 refuses models with a tensor above rank 6 at
