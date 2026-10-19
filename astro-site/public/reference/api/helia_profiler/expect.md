@@ -20,11 +20,12 @@ Tolerance(max_abs_error: float = 0.0) -> None
 
 Largest accepted absolute error per element, in each tensor's stored units.
 
-Integer tensors count quantization steps; float tensors count values.
+Integer tensors count quantization steps; float tensors count values. One
+tolerance applies to every output tensor.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/expect.py:42`
+Source: `src/helia_profiler/expect.py:44`
 
 ### helia_profiler.Tolerance.max_abs_error
 
@@ -34,7 +35,7 @@ Source: `src/helia_profiler/expect.py:42`
 max_abs_error: float = 0.0
 ```
 
-Source: `src/helia_profiler/expect.py:49`
+Source: `src/helia_profiler/expect.py:52`
 
 ## helia_profiler.ReferenceOrigin
 
@@ -42,7 +43,7 @@ Source: `src/helia_profiler/expect.py:49`
 
 ```python
 ReferenceOrigin(
-    kind: str,
+    kind: ReferenceKind,
     litert_version: str | None = None,
     resolver: str | None = None,
     invocations: int | None = None,
@@ -51,25 +52,24 @@ ReferenceOrigin(
 
 `dataclass`
 
-Where reference bytes came from.
+Where reference outputs came from.
 
-``kind`` is ``"host-litert"`` or ``"files"``. A host reference records the
-LiteRT package version, its op resolver and how many times the model was
-invoked on the inputs, matching the firmware when state carries.
+A host reference records the LiteRT package version, its op resolver and
+how many times the model was invoked on the inputs.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/expect.py:56`
+Source: `src/helia_profiler/expect.py:59`
 
 ### helia_profiler.ReferenceOrigin.kind
 
 `attribute` · `python`
 
 ```python
-kind: str
+kind: ReferenceKind
 ```
 
-Source: `src/helia_profiler/expect.py:65`
+Source: `src/helia_profiler/expect.py:67`
 
 ### helia_profiler.ReferenceOrigin.litert_version
 
@@ -79,7 +79,7 @@ Source: `src/helia_profiler/expect.py:65`
 litert_version: str | None = None
 ```
 
-Source: `src/helia_profiler/expect.py:66`
+Source: `src/helia_profiler/expect.py:68`
 
 ### helia_profiler.ReferenceOrigin.resolver
 
@@ -89,7 +89,7 @@ Source: `src/helia_profiler/expect.py:66`
 resolver: str | None = None
 ```
 
-Source: `src/helia_profiler/expect.py:67`
+Source: `src/helia_profiler/expect.py:69`
 
 ### helia_profiler.ReferenceOrigin.invocations
 
@@ -99,14 +99,14 @@ Source: `src/helia_profiler/expect.py:67`
 invocations: int | None = None
 ```
 
-Source: `src/helia_profiler/expect.py:68`
+Source: `src/helia_profiler/expect.py:70`
 
-## helia_profiler.Reference
+## helia_profiler.ReferenceOutputs
 
 `class` · `python`
 
 ```python
-Reference(origin: ReferenceOrigin, outputs: tuple[bytes, ...]) -> None
+ReferenceOutputs(origin: ReferenceOrigin, outputs: tuple[bytes, ...]) -> None
 ```
 
 `dataclass`
@@ -115,9 +115,9 @@ Reference bytes for every output, in model order, and their origin.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/expect.py:71`
+Source: `src/helia_profiler/expect.py:73`
 
-### helia_profiler.Reference.origin
+### helia_profiler.ReferenceOutputs.origin
 
 `attribute` · `python`
 
@@ -125,9 +125,9 @@ Source: `src/helia_profiler/expect.py:71`
 origin: ReferenceOrigin
 ```
 
-Source: `src/helia_profiler/expect.py:75`
+Source: `src/helia_profiler/expect.py:77`
 
-### helia_profiler.Reference.outputs
+### helia_profiler.ReferenceOutputs.outputs
 
 `attribute` · `python`
 
@@ -135,7 +135,7 @@ Source: `src/helia_profiler/expect.py:75`
 outputs: tuple[bytes, ...]
 ```
 
-Source: `src/helia_profiler/expect.py:76`
+Source: `src/helia_profiler/expect.py:78`
 
 ## helia_profiler.Expect
 
@@ -143,7 +143,7 @@ Source: `src/helia_profiler/expect.py:76`
 
 ```python
 Expect(
-    source: Literal['host-litert', 'files'],
+    source: ReferenceKind,
     files: tuple[FixtureFile | Path, ...] = (),
     resolver: LiteRtResolver = 'BUILTIN_REF',
     tolerance: Tolerance | None = None,
@@ -152,21 +152,23 @@ Expect(
 
 `dataclass`
 
-What a run's outputs are compared against. Build with :meth:`reference` or :meth:`from_files`.
+What a run's outputs are compared against.
+
+Build with :meth:`host_litert`, :meth:`from_build` or :meth:`from_files`.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/expect.py:79`
+Source: `src/helia_profiler/expect.py:81`
 
 ### helia_profiler.Expect.source
 
 `attribute` · `python`
 
 ```python
-source: Literal['host-litert', 'files']
+source: ReferenceKind
 ```
 
-Source: `src/helia_profiler/expect.py:83`
+Source: `src/helia_profiler/expect.py:88`
 
 ### helia_profiler.Expect.files
 
@@ -176,7 +178,7 @@ Source: `src/helia_profiler/expect.py:83`
 files: tuple[FixtureFile | Path, ...] = ()
 ```
 
-Source: `src/helia_profiler/expect.py:84`
+Source: `src/helia_profiler/expect.py:89`
 
 ### helia_profiler.Expect.resolver
 
@@ -186,7 +188,7 @@ Source: `src/helia_profiler/expect.py:84`
 resolver: LiteRtResolver = 'BUILTIN_REF'
 ```
 
-Source: `src/helia_profiler/expect.py:85`
+Source: `src/helia_profiler/expect.py:90`
 
 ### helia_profiler.Expect.tolerance
 
@@ -196,21 +198,35 @@ Source: `src/helia_profiler/expect.py:85`
 tolerance: Tolerance | None = None
 ```
 
-Source: `src/helia_profiler/expect.py:86`
+Source: `src/helia_profiler/expect.py:91`
 
-### helia_profiler.Expect.reference
+### helia_profiler.Expect.host_litert
 
 `method` · `python`
 
 ```python
-reference(*, resolver: LiteRtResolver = 'BUILTIN_REF', tolerance: Tolerance | None = None) -> Expect
+host_litert(*, resolver: LiteRtResolver = 'BUILTIN_REF', tolerance: Tolerance | None = None) -> Expect
 ```
 
 `classmethod`
 
-Run the model with host LiteRT on the run's inputs (LiteRT models only).
+Run the model with host LiteRT on the run's input bytes (LiteRT models only).
 
-Source: `src/helia_profiler/expect.py:88`
+Source: `src/helia_profiler/expect.py:93`
+
+### helia_profiler.Expect.from_build
+
+`method` · `python`
+
+```python
+from_build(*, tolerance: Tolerance | None = None) -> Expect
+```
+
+`classmethod`
+
+Use the expected outputs the fixture build carries.
+
+Source: `src/helia_profiler/expect.py:101`
 
 ### helia_profiler.Expect.from_files
 
@@ -224,7 +240,7 @@ from_files(*files: FixtureFile | str | Path = (), tolerance: Tolerance | None = 
 
 Compare with caller bytes, one file per output in model order.
 
-Source: `src/helia_profiler/expect.py:95`
+Source: `src/helia_profiler/expect.py:106`
 
 ## helia_profiler.TensorComparison
 
@@ -251,13 +267,13 @@ TensorComparison(
 Comparison facts for one output tensor.
 
 ``max_abs_error`` is in stored units; ``max_abs_error_real`` is the same
-error after dequantization, ``None`` for float tensors. A NaN on one side
-only counts as a mismatch with infinite error. ``within_tolerance`` is
-``None`` when no tolerance was given.
+error after dequantization, ``None`` for an unquantized tensor. A NaN on
+one side only counts as a mismatch with infinite error. ``within_tolerance``
+is ``None`` when no tolerance was given.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/expect.py:106`
+Source: `src/helia_profiler/expect.py:117`
 
 ### helia_profiler.TensorComparison.name
 
@@ -267,7 +283,7 @@ Source: `src/helia_profiler/expect.py:106`
 name: str
 ```
 
-Source: `src/helia_profiler/expect.py:116`
+Source: `src/helia_profiler/expect.py:127`
 
 ### helia_profiler.TensorComparison.index
 
@@ -277,7 +293,7 @@ Source: `src/helia_profiler/expect.py:116`
 index: int
 ```
 
-Source: `src/helia_profiler/expect.py:117`
+Source: `src/helia_profiler/expect.py:128`
 
 ### helia_profiler.TensorComparison.dtype
 
@@ -287,7 +303,7 @@ Source: `src/helia_profiler/expect.py:117`
 dtype: str
 ```
 
-Source: `src/helia_profiler/expect.py:118`
+Source: `src/helia_profiler/expect.py:129`
 
 ### helia_profiler.TensorComparison.shape
 
@@ -297,7 +313,7 @@ Source: `src/helia_profiler/expect.py:118`
 shape: tuple[int, ...]
 ```
 
-Source: `src/helia_profiler/expect.py:119`
+Source: `src/helia_profiler/expect.py:130`
 
 ### helia_profiler.TensorComparison.reference_sha256
 
@@ -307,7 +323,7 @@ Source: `src/helia_profiler/expect.py:119`
 reference_sha256: str
 ```
 
-Source: `src/helia_profiler/expect.py:120`
+Source: `src/helia_profiler/expect.py:131`
 
 ### helia_profiler.TensorComparison.observed_sha256
 
@@ -317,7 +333,7 @@ Source: `src/helia_profiler/expect.py:120`
 observed_sha256: str
 ```
 
-Source: `src/helia_profiler/expect.py:121`
+Source: `src/helia_profiler/expect.py:132`
 
 ### helia_profiler.TensorComparison.elements
 
@@ -327,7 +343,7 @@ Source: `src/helia_profiler/expect.py:121`
 elements: int
 ```
 
-Source: `src/helia_profiler/expect.py:122`
+Source: `src/helia_profiler/expect.py:133`
 
 ### helia_profiler.TensorComparison.mismatched_elements
 
@@ -337,7 +353,7 @@ Source: `src/helia_profiler/expect.py:122`
 mismatched_elements: int
 ```
 
-Source: `src/helia_profiler/expect.py:123`
+Source: `src/helia_profiler/expect.py:134`
 
 ### helia_profiler.TensorComparison.max_abs_error
 
@@ -347,7 +363,7 @@ Source: `src/helia_profiler/expect.py:123`
 max_abs_error: float
 ```
 
-Source: `src/helia_profiler/expect.py:124`
+Source: `src/helia_profiler/expect.py:135`
 
 ### helia_profiler.TensorComparison.max_abs_error_real
 
@@ -357,7 +373,7 @@ Source: `src/helia_profiler/expect.py:124`
 max_abs_error_real: float | None
 ```
 
-Source: `src/helia_profiler/expect.py:125`
+Source: `src/helia_profiler/expect.py:136`
 
 ### helia_profiler.TensorComparison.within_tolerance
 
@@ -367,7 +383,7 @@ Source: `src/helia_profiler/expect.py:125`
 within_tolerance: bool | None
 ```
 
-Source: `src/helia_profiler/expect.py:126`
+Source: `src/helia_profiler/expect.py:137`
 
 ### helia_profiler.TensorComparison.identical
 
@@ -377,14 +393,14 @@ Source: `src/helia_profiler/expect.py:126`
 identical: bool
 ```
 
-Source: `src/helia_profiler/expect.py:129`
+Source: `src/helia_profiler/expect.py:140`
 
 ## helia_profiler.Verification
 
 `class` · `python`
 
 ```python
-Verification(reference: Reference, tensors: tuple[TensorComparison, ...], tolerance: Tolerance | None) -> None
+Verification(reference: ReferenceOutputs, tensors: tuple[TensorComparison, ...], tolerance: Tolerance | None) -> None
 ```
 
 `dataclass`
@@ -393,17 +409,17 @@ Per-tensor comparison facts, the reference they used and an optional verdict.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/expect.py:133`
+Source: `src/helia_profiler/expect.py:144`
 
 ### helia_profiler.Verification.reference
 
 `attribute` · `python`
 
 ```python
-reference: Reference
+reference: ReferenceOutputs
 ```
 
-Source: `src/helia_profiler/expect.py:137`
+Source: `src/helia_profiler/expect.py:148`
 
 ### helia_profiler.Verification.tensors
 
@@ -413,7 +429,7 @@ Source: `src/helia_profiler/expect.py:137`
 tensors: tuple[TensorComparison, ...]
 ```
 
-Source: `src/helia_profiler/expect.py:138`
+Source: `src/helia_profiler/expect.py:149`
 
 ### helia_profiler.Verification.tolerance
 
@@ -423,7 +439,7 @@ Source: `src/helia_profiler/expect.py:138`
 tolerance: Tolerance | None
 ```
 
-Source: `src/helia_profiler/expect.py:139`
+Source: `src/helia_profiler/expect.py:150`
 
 ### helia_profiler.Verification.matched
 
@@ -435,7 +451,7 @@ matched: bool | None
 
 Whether every tensor is within tolerance; ``None`` when no tolerance was given.
 
-Source: `src/helia_profiler/expect.py:142`
+Source: `src/helia_profiler/expect.py:153`
 
 ## helia_profiler.host_reference
 
@@ -449,17 +465,18 @@ host_reference(
     *,
     resolver: LiteRtResolver = 'BUILTIN_REF',
     invocations: int = 1,
-) -> Reference
+) -> ReferenceOutputs
 ```
 
 Run a LiteRT model on the host and return its output bytes in *outputs* order.
 
-Inputs are restored before every invocation, as the fixture firmware does,
-so internal state carries across *invocations* while inputs do not.
+*inputs* must cover every model input. They are restored before every
+invocation, as the fixture firmware does, so internal state carries across
+*invocations* while inputs do not.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/expect.py:149`
+Source: `src/helia_profiler/expect.py:160`
 
 ## helia_profiler.compare_outputs
 
@@ -468,36 +485,31 @@ Source: `src/helia_profiler/expect.py:149`
 ```python
 compare_outputs(
     tensors: Sequence[FixtureTensor],
-    reference: Reference,
+    reference: ReferenceOutputs,
     observed: Sequence[bytes],
     tolerance: Tolerance | None = None,
 ) -> Verification
 ```
 
-Compare observed output bytes with a reference, tensor by tensor.
+Compare observed output bytes with reference outputs, tensor by tensor.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/expect.py:204`
+Source: `src/helia_profiler/expect.py:234`
 
-## helia_profiler.verify_fixture_outputs
+## helia_profiler.compare_fixture_outputs
 
 `function` · `python`
 
 ```python
-verify_fixture_outputs(
-    fixture: TypedFixture,
-    build: FixtureBuild,
-    capture: FixtureCaptureResult,
-    expect: Expect,
-) -> Verification
+compare_fixture_outputs(build: FixtureBuild, capture: FixtureCaptureResult, expect: Expect) -> Verification
 ```
 
 Compare a fixture capture's outputs with *expect*.
 
-A host reference runs the fixture's model on its pinned input bytes, as
-many times as the firmware invoked it when internal state carries.
+A host reference runs the build's model on its pinned input bytes as many
+times as the firmware invokes it (warmups, then timed iterations).
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/expect.py:226`
+Source: `src/helia_profiler/expect.py:256`
