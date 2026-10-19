@@ -88,19 +88,21 @@ def fixture_template_vars(ctx: PipelineContext, regions: list[ArenaRegion]) -> d
         board=ctx.config.target.board,
     )
     psram = ctx.config.model.weights_location is Placement.PSRAM
-    if (
+    external = (
         isinstance(ctx.engine_artifacts, HeliaAotArtifacts)
         and not ctx.engine_artifacts.aot_allocate_arenas
-        and not psram
-    ):
+    )
+    if external and not psram:
         raise ConfigError("Fixture external AOT binding currently requires PSRAM weight backing")
     if any(
         r.placement not in (Placement.SRAM, Placement.MRAM, Placement.TCM, Placement.PSRAM)
         for r in regions
     ):
         raise ConfigError("Fixture AOT region has no implemented SRAM/MRAM/DTCM/PSRAM backing")
+    # Only external binding reads a constant region's sidecar file.
     if any(
-        r.placement == "mram" and (not r.blob_filename or r.role is not ArenaRole.CONSTANT)
+        r.placement == "mram"
+        and (r.role is not ArenaRole.CONSTANT or (external and not r.blob_filename))
         for r in regions
     ):
         raise ConfigError("Writable AOT region cannot use MRAM fixture placement")

@@ -25,7 +25,7 @@ hpx doctor
 |---|---|---|
 | nixpkgs, Python, CMake, Ninja, uv | `flake.lock` (nixpkgs) | Python 3.12, CMake 4.3, Ninja 1.13, uv 0.11 |
 | Python packages | `uv.lock` | for example neuralspotx 0.8.1, ai-edge-litert 2.2.0 |
-| heliaAOT | the `helia-aot` flake input, recorded in `flake.lock` | 0.32.0 |
+| heliaAOT | the `helia-aot` flake input, recorded in `flake.lock` | 0.33.0 |
 | Arm GNU Toolchain | `flake.lock` (nixpkgs `gcc-arm-embedded`) | 15.2.Rel1 |
 | Arm Toolchain for Embedded (ATfE) | `nix/atfe.nix` | 22.1.0 |
 | SEGGER J-Link software | `nix/jlink.nix` | 9.62 |
@@ -41,14 +41,14 @@ The `helia-aot` input selects the heliaAOT source. By default it is the PyPI sou
 
 ```bash
 nix develop --override-input helia-aot \
-  https://files.pythonhosted.org/packages/1d/bf/af443412002a96935133c387a24068b9f609aef9b7d8a98c51027b66825f/helia_aot-0.26.0.tar.gz
+  https://files.pythonhosted.org/packages/a5/a7/ea3f4962c304e176435b57ba1384dcc65abb3a280e1036a3843a4e850b6d/helia_aot-0.33.0.tar.gz
 ```
 
 **A Git revision.** heliaAOT's repository is private, so this needs SSH access to `AmbiqAI/helia-aot`. The revision must be the commit in the matching runtime record (`source.commit`), and a checkout with uncommitted changes is refused:
 
 ```bash
 nix develop --override-input helia-aot \
-  'git+ssh://git@github.com/AmbiqAI/helia-aot?rev=ea5cd6c0b97150857cfcbe6019205efd2d00489e'
+  'git+ssh://git@github.com/AmbiqAI/helia-aot?rev=d31bf2226e58e4120eaf8e6da289b5ee91e2e06b'
 ```
 
 `--override-input` lasts for one command. To keep a selection for a capture, write it into `flake.lock` and commit the result. Pass the same full URL as above, either the PyPI URL or the `git+ssh://…?rev=` URL:
@@ -87,14 +87,9 @@ Each heliaAOT release needs a minimum ns-cmsis-nn. The flake checks the selected
 
 | heliaAOT | Minimum ns-cmsis-nn | Baseline in this commit |
 |---|---|---|
-| 0.23.0 to 0.26.x | 7.39.2 | v7.47.0: supported |
-| 0.27.x | 7.43.0 | v7.47.0: supported |
-| 0.28.0 to 0.29.x | 7.44.2 | v7.47.0: supported |
-| 0.30.x | 7.45.0 | v7.47.0: supported |
-| 0.31.x | 7.46.0 | v7.47.0: supported |
-| 0.32.0 and later, including 1.0 | 7.47.0 | v7.47.0: supported |
+| 0.33.0 and later, including 1.0 | 7.47.0 | v7.47.0: supported |
 
-Releases older than 0.23.0 have no rule and are refused.
+Releases older than 0.33.0 have no rule and are refused.
 
 Moving the baseline changes the ns-cmsis-nn that heliaAOT, heliaRT and ExecuTorch builds share. The runtimes that use it are requalified before it moves.
 

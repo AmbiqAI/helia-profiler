@@ -7243,9 +7243,9 @@
                   "returns": [],
                   "signature": "layers: list[LayerOps]",
                   "source": {
-                    "line": 169,
+                    "line": 151,
                     "path": "src/helia_profiler/modelcost/model_analysis.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L169"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L151"
                   },
                   "summary": ""
                 },
@@ -7262,9 +7262,9 @@
                   "returns": [],
                   "signature": "total_macs: int",
                   "source": {
-                    "line": 170,
+                    "line": 152,
                     "path": "src/helia_profiler/modelcost/model_analysis.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L170"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L152"
                   },
                   "summary": ""
                 },
@@ -7281,9 +7281,9 @@
                   "returns": [],
                   "signature": "total_ops: int",
                   "source": {
-                    "line": 171,
+                    "line": 153,
                     "path": "src/helia_profiler/modelcost/model_analysis.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L171"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L153"
                   },
                   "summary": ""
                 },
@@ -7300,9 +7300,9 @@
                   "returns": [],
                   "signature": "num_parameters: int",
                   "source": {
-                    "line": 172,
+                    "line": 154,
                     "path": "src/helia_profiler/modelcost/model_analysis.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L172"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L154"
                   },
                   "summary": "Approximate parameter count (weights + biases)."
                 },
@@ -7319,9 +7319,9 @@
                   "returns": [],
                   "signature": "engine: str = 'tflite'",
                   "source": {
-                    "line": 174,
+                    "line": 156,
                     "path": "src/helia_profiler/modelcost/model_analysis.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L174"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L156"
                   },
                   "summary": "Engine/interpreter that produced this analysis ('tflite', 'helia-rt', 'helia-aot')."
                 },
@@ -7338,9 +7338,9 @@
                   "returns": [],
                   "signature": "index_space: Literal['source', 'execution'] = 'source'",
                   "source": {
-                    "line": 177,
+                    "line": 159,
                     "path": "src/helia_profiler/modelcost/model_analysis.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L177"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L159"
                   },
                   "summary": "Whether layer IDs identify original operators or compiled execution positions."
                 },
@@ -7357,9 +7357,9 @@
                   "returns": [],
                   "signature": "ethos_u_op_count: int",
                   "source": {
-                    "line": 185,
+                    "line": 167,
                     "path": "src/helia_profiler/modelcost/model_analysis.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L185"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L167"
                   },
                   "summary": "Number of Vela-generated ethos-u custom ops in the graph."
                 },
@@ -7376,9 +7376,9 @@
                   "returns": [],
                   "signature": "has_ethos_u_op: bool",
                   "source": {
-                    "line": 190,
+                    "line": 172,
                     "path": "src/helia_profiler/modelcost/model_analysis.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L190"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L172"
                   },
                   "summary": "True when the model was compiled by Vela (contains ethos-u ops)."
                 },
@@ -7395,9 +7395,9 @@
                   "returns": [],
                   "signature": "to_dict() -> dict[str, Any]",
                   "source": {
-                    "line": 180,
+                    "line": 162,
                     "path": "src/helia_profiler/modelcost/model_analysis.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L180"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L162"
                   },
                   "summary": "Return the analysis and its layers as plain dicts."
                 }
@@ -7408,9 +7408,9 @@
               "returns": [],
               "signature": "ModelAnalysis(\n    layers: list[LayerOps],\n    total_macs: int,\n    total_ops: int,\n    num_parameters: int,\n    engine: str = 'tflite',\n    index_space: Literal['source', 'execution'] = 'source',\n) -> None",
               "source": {
-                "line": 165,
+                "line": 147,
                 "path": "src/helia_profiler/modelcost/model_analysis.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L165"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/modelcost/model_analysis.py#L147"
               },
               "summary": "Full model analysis result."
             }

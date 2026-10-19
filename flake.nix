@@ -25,7 +25,7 @@
     # release, or a Git revision of the private AmbiqAI/helia-aot repository, with
     # --override-input (see the Nix environment guide, getting-started/nix).
     helia-aot = {
-      url = "https://files.pythonhosted.org/packages/a3/3d/c8ae28696bebfef588b5280f87d7876a4081dfeab4c9ca6a53643e0768e6/helia_aot-0.32.0.tar.gz";
+      url = "https://files.pythonhosted.org/packages/a5/a7/ea3f4962c304e176435b57ba1384dcc65abb3a280e1036a3843a4e850b6d/helia_aot-0.33.0.tar.gz";
       flake = false;
     };
   };
@@ -322,35 +322,17 @@
               baseline.projects.ns-cmsis-nn.ref = ref;
             };
           accepts = version: ref: (builtins.tryEval (probe version ref).requiredNsCmsisNn).success;
-          v7_39_2 = "5f3fed9f21a57390cc7f00f77a37db8f5f110cb8";
-          v7_44_1 = "063fdd35fc398e44edf3f32f8f95b3d101803874";
-          v7_44_2 = "166a6fa94004b53512de718099aa35ed655a70cf";
-          v7_45_0 = "3573bfbdb651092a14662daaa3557ce63452e294";
-          v7_45_1 = "afe4e5de42f8d67de562ec2c853a8031872e2931";
           v7_46_0 = "4a937fe7988935e1cfc2d8a41859fdada042c17c";
           v7_47_0 = "9f793bd9343b60e794f915b285bd7b7c4a885abe";
           compatCases = {
-            "0.25.0 on v7.39.2" = accepts "0.25.0" v7_39_2;
-            "0.26.0 on v7.39.2" = accepts "0.26.0" v7_39_2;
-            "0.27.0 rejected on v7.39.2" = !accepts "0.27.0" v7_39_2;
-            "0.27.0 on v7.44.1" = accepts "0.27.0" v7_44_1;
-            "0.28.0 rejected on v7.39.2" = !accepts "0.28.0" v7_39_2;
-            "0.28.0 rejected on v7.44.1" = !accepts "0.28.0" v7_44_1;
-            "0.28.0 on v7.44.2" = accepts "0.28.0" v7_44_2;
-            "0.30.0 rejected on v7.44.2" = !accepts "0.30.0" v7_44_2;
-            "0.30.0 on v7.45.0" = accepts "0.30.0" v7_45_0;
-            "0.30.0 on v7.45.1" = accepts "0.30.0" v7_45_1;
-            "0.30.0 on v7.46.0" = accepts "0.30.0" v7_46_0;
-            "0.31.0 rejected on v7.45.1" = !accepts "0.31.0" v7_45_1;
-            "0.31.0 on v7.46.0" = accepts "0.31.0" v7_46_0;
-            "0.31.0 on v7.47.0" = accepts "0.31.0" v7_47_0;
-            "0.32.0 rejected on v7.46.0" = !accepts "0.32.0" v7_46_0;
-            "0.32.0 on v7.47.0" = accepts "0.32.0" v7_47_0;
-            "1.0.0 rejected on v7.44.1" = !accepts "1.0.0" v7_44_1;
+            "0.33.0 rejected on v7.46.0" = !accepts "0.33.0" v7_46_0;
+            "0.33.0 on v7.47.0" = accepts "0.33.0" v7_47_0;
+            "1.0.0 on v7.47.0" = accepts "1.0.0" v7_47_0;
+            "1.0.0 rejected on v7.46.0" = !accepts "1.0.0" v7_46_0;
             "unmapped baseline commit reported, not blocking" =
-              accepts "0.26.0" "0000000000000000000000000000000000000000"
-              && !(probe "0.26.0" "0000000000000000000000000000000000000000").baselineMapped;
-            "release older than every rule rejected" = !accepts "0.22.0" v7_39_2;
+              accepts "0.33.0" "0000000000000000000000000000000000000000"
+              && !(probe "0.33.0" "0000000000000000000000000000000000000000").baselineMapped;
+            "release older than every rule rejected" = !accepts "0.32.0" v7_47_0;
           };
           failedCompatCases = lib.attrNames (lib.filterAttrs (_: ok: !ok) compatCases);
           heliaAotDefault = (lib.importJSON ./flake.lock).nodes.helia-aot.original.url;

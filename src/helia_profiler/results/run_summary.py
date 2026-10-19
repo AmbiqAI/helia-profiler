@@ -68,7 +68,10 @@ RUN_SUMMARY_SCHEMA = "hpx.run-summary"
 #: selected toolchain where the SoC has a linked memory map, not the whole part.
 #: v14: #537 adds identity, the run's RunIdentity in the vocabulary fixture
 #: builds share. Additive: no existing field changes meaning.
-RUN_SUMMARY_SCHEMA_VERSION = 14
+#: v15: #558 heliaAOT model_analysis takes heliaAOT's own MAC and parameter
+#: counts from its result views; total_macs, num_parameters, total_ops, TOPS
+#: and cycles_per_mac move for models whose weights lowering repacks.
+RUN_SUMMARY_SCHEMA_VERSION = 15
 
 __all__ = [
     "RUN_SUMMARY_SCHEMA",

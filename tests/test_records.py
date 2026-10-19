@@ -237,7 +237,7 @@ def test_incomplete_status_is_not_a_verified_failure(tmp_path):
     assert inspect_result(bundle(tmp_path, status="incomplete")).code == "incomplete_result"
 
 
-@pytest.mark.parametrize("version", [True, 10, 15])
+@pytest.mark.parametrize("version", [True, 10, RUN_SUMMARY_SCHEMA_VERSION + 1])
 def test_unsupported_summary_semantics_are_explicit(tmp_path, version):
     path = bundle(tmp_path)
     edit_document(path, "summary.json", lambda d: d.update(schema_version=version))

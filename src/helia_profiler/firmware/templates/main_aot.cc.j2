@@ -118,7 +118,7 @@ static int      g_hb_iter = 0;
 {% if aot_op_manifest %}
 static constexpr int kNumAotOps = {{ aot_op_manifest | length }};
 struct AotOpInfo {
-    int32_t id;           // AIR operator ID (callback value)
+    int32_t id;           // .tflite operator index; -1 when it has none or several
     const char *op_type;  // e.g. "CONV_2D", "FULLY_CONNECTED"
 };
 static const AotOpInfo kAotOps[kNumAotOps] = {

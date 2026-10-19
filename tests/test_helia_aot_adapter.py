@@ -26,6 +26,7 @@ from helia_profiler.engines.helia_aot.compile import (
 from helia_profiler.errors import ConfigError, EngineError
 from helia_profiler.placement import Placement
 from helia_profiler.results import NsxModuleRef
+from tests.aot_views import Result, TensorView, operator
 
 _CMSIS_REF = NsxModuleRef(name="ns-cmsis-nn", path=Path("/tmp/cmsis"))
 
@@ -178,7 +179,9 @@ class TestMergedAotArgs:
             _merged_aot_args(config)
 
 
-def _prepare(monkeypatch, tmp_path, config, model=None, *, compiler_hook=None) -> HeliaAotArtifacts:
+def _prepare(
+    monkeypatch, tmp_path, config, result=None, source=None, *, compiler_hook=None
+) -> HeliaAotArtifacts:
     """Run ``prepare()`` against a fake converter that calls ``compiler_hook(config, output_dir)``."""
     from helia_profiler.engines.helia_aot import adapter as adapter_mod
 
@@ -186,19 +189,15 @@ def _prepare(monkeypatch, tmp_path, config, model=None, *, compiler_hook=None) -
         (output_dir / module_name).mkdir(parents=True)
         if compiler_hook is not None:
             compiler_hook(config, output_dir)
-        from types import SimpleNamespace
-
-        return SimpleNamespace(model=model)
+        return Result() if result is None else result
 
     monkeypatch.setattr(adapter_mod, "_check_helia_aot_version", lambda **_: "0.0.0")
     monkeypatch.setattr(adapter_mod, "_resolve_aot_platform", lambda _c: "apollo510_evb")
     monkeypatch.setattr(adapter_mod, "_run_aot_compiler", fake_run_aot_compiler)
-    monkeypatch.setattr(adapter_mod, "_extract_operator_manifest", lambda _ctx: [])
+    monkeypatch.setattr(adapter_mod, "analyze_model", lambda _path: source)
     monkeypatch.setattr(adapter_mod, "_validate_pragmas", lambda *_a: None)
     monkeypatch.setattr(adapter_mod, "cmsis_nn_module_ref", lambda *_a: _CMSIS_REF)
     monkeypatch.setattr(adapter_mod, "_write_attributes_header", lambda d, p: d / f"{p}.h")
-    monkeypatch.setattr(adapter_mod, "_extract_memory_plan", lambda *_a, **_k: None)
-    monkeypatch.setattr(adapter_mod, "_extract_arena_regions", lambda *_a: [])
     return HeliaAOTAdapter().prepare(config, tmp_path / "work")
 
 
@@ -230,37 +229,32 @@ class TestPrepareArtifactFlags:
         assert artifacts.aot_user_memory_config is False
 
     def test_retains_compiled_graph_costs(self, monkeypatch, tmp_path):
-        from types import SimpleNamespace
+        import json
 
-        from helia_profiler.modelcost import model_analysis
+        from helia_profiler.modelcost import LayerOps, ModelAnalysis
 
-        kinds = SimpleNamespace(CONV_2D="conv", DEPTHWISE_CONV_2D="dw", FULLY_CONNECTED="fc")
-        monkeypatch.setattr(model_analysis, "_AirOpType", kinds)
-        tensors = {
-            "in": SimpleNamespace(shape=[1, 4]),
-            "weights": SimpleNamespace(shape=[3, 4]),
-            "out": SimpleNamespace(shape=[1, 3]),
-        }
-        model = SimpleNamespace(
-            operators=[
-                SimpleNamespace(
-                    id="5",
-                    op_type=kinds.FULLY_CONNECTED,
-                    input_ids=["in", "weights"],
-                    output_ids=["out"],
-                    named_tensors={"weights": "weights"},
-                )
-            ],
-            get_tensor=tensors.get,
+        fc = operator(0, "FULLY_CONNECTED", ("in",), ("out",), sources=(5,), macs=12, parameters=15)
+        result = Result(
+            operators=(fc,),
+            tensors=(TensorView("in", None, (1, 4)), TensorView("out", None, (1, 3))),
         )
-        artifacts = _prepare(monkeypatch, tmp_path, _aot_cfg({}), model)
+        source = ModelAnalysis(
+            [LayerOps(5, "FULLY_CONNECTED", 12, params={"keep_num_dims": False})], 12, 24, 15
+        )
+        artifacts = _prepare(monkeypatch, tmp_path, _aot_cfg({}), result, source)
         analysis = artifacts.compiled_analysis
         assert analysis is not None
         assert analysis.index_space == "execution"
         assert analysis.total_macs == 12
         assert analysis.total_ops == 24
+        assert analysis.num_parameters == 15
         assert analysis.layers[0].id == 0
         assert analysis.layers[0].original_id == 5
+        assert analysis.layers[0].params == {"keep_num_dims": False}
+        assert artifacts.aot_op_manifest is not None
+        assert [op["id"] for op in artifacts.aot_op_manifest] == [5]
+        written = (tmp_path / "work" / "aot_operator_manifest.json").read_text(encoding="utf-8")
+        assert json.loads(written) == artifacts.aot_op_manifest
 
     def test_compiler_and_evidence_keep_original_file_intent(self, monkeypatch, tmp_path):
         import json
