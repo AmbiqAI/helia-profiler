@@ -254,10 +254,10 @@ class HeliaAotArtifacts(EngineArtifacts):
     aot_arena_regions: list[ArenaRegion] = field(default_factory=list)
 
     #: AOT operator manifest — ordered list of post-codegen operator
-    #: descriptors (idx, id, op_type, name, kernel_calls, inputs, outputs).  Consumed by
-    #: the firmware template (``main_aot.cc.j2``) for the per-op callback
-    #: table and by the report stage.  ``None`` when heliaAOT generated no
-    #: operators.
+    #: descriptors (idx, id, source_indices, op_type, name, kernel_calls,
+    #: inputs, outputs).  Consumed by the firmware template
+    #: (``main_aot.cc.j2``) for the per-op callback table and by the report
+    #: stage.  ``None`` when heliaAOT generated no operators.
     aot_op_manifest: list[dict[str, Any]] | None = None
     compiled_analysis: ModelAnalysis | None = None
     """Analysis of the same transformed graph used to generate the firmware."""

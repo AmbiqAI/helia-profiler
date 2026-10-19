@@ -238,7 +238,11 @@ def _render_engine_context(tmp_path, engine: str, artifacts, arena_regions=None)
 def test_from_pipeline_context_carries_the_aot_fields(tmp_path):
     artifacts = _build(
         EngineType.HELIA_AOT,
-        aot_op_manifest=[{"id": 7, "op_type": "conv_2d"}, {"id": None, "op_type": "while"}],
+        aot_op_manifest=[
+            {"id": 7, "op_type": "conv_2d"},
+            {"id": None, "op_type": "while"},
+            {"id": 3, "op_type": 'my.op,"x'},
+        ],
         aot_allocate_arenas=False,
     )
     engine = _render_engine_context(tmp_path, "helia-aot", artifacts)
@@ -248,6 +252,7 @@ def test_from_pipeline_context_carries_the_aot_fields(tmp_path):
     assert [(op.id, op.op_type) for op in engine.aot_op_manifest] == [
         (7, "conv_2d"),
         (-1, "while"),
+        (3, "my_op__x"),
     ]
 
 

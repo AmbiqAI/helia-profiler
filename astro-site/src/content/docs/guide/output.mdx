@@ -252,7 +252,9 @@ after graph transforms, in execution order, each with inputs, outputs and
 local tensors (weights, weight sums, per-operator scratch). `idx` is the
 execution position. `id` is the operator's `.tflite` index, or `null` when
 a transform created it or fused several (`source_indices` lists every index
-it came from); the firmware labels such a layer `<OP_TYPE>:-1`.
+it came from); the firmware labels such a layer `<OP_TYPE>:-1`, where
+`<OP_TYPE>` is `op_type` upper-cased with any character outside `A-Z`, `0-9`
+and `_` replaced by `_`.
 `kernel_calls` is the compiler's record of the CORE entries the operator's
 generated code calls, keyed by role or shared helper, or `null` when nothing
 was recorded for that operator or it was malformed. The compiler's own
@@ -261,7 +263,7 @@ the work directory, carries the module-wide list with its unrecorded
 operators. Tensor entries carry `id`, the model's `name` when it has one,
 `dtype`, `ctype`, `kind` (`input`, `output`, `constant`, `persistent` or
 `scratch`), `nbytes` and `shape`. Placed tensors add `memory` (`dtcm`,
-`sram`, `mram`, `psram`), `source_memory`, `staged`, `arena_role`
+`itcm`, `sram`, `mram`, `psram`), `source_memory`, `staged`, `arena_role`
 (`scratch`, `persistent`, `constant`), `arena_region_id`, `offset` and
 `allocation_size`, all in bytes where they are sizes. Manifests from
 hpx 0.2.x recorded model inputs and outputs as `scratch` and named tensors

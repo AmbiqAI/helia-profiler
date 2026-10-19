@@ -46,8 +46,8 @@ from each engine's default record. The baseline's `helia-rt` and
 heliaAOT is a separately pip-installed package, so HPX cannot select its
 version; it can only validate the one already installed.
 `engines/helia_aot/compile._check_helia_aot_version()` accepts versions from
-the oldest heliaAOT record to the minor after the newest, and raises a clear
-`EngineError` outside that range.
+the oldest heliaAOT record to the major after the newest (a 0.x record counts
+as major 1), and raises a clear `EngineError` outside that range.
 
 ## Qualification states
 
@@ -104,13 +104,16 @@ only heliaAOT runtime record. hpx now reads the operators, tensors, regions and
 placements from the public views on heliaAOT's `ConversionResult` instead of
 the converter's internal context, so it accepts only releases that have them:
 the accepted range becomes `>=0.33.0,<2.0.0` (0.33.0 carries the 1.0 API, so
-it shares the 1.x range), and the 0.23.0 to 0.32.0 records are dropped. The 0.23.0 record's Apollo510 EVB (LP, a8w8) qualification goes
-with it, so no heliaAOT record is qualified. 0.33.0 needs `ns-cmsis-nn
+it shares the 1.x range), and the 0.23.0 to 0.32.0 records are dropped. The
+0.23.0 record's Apollo510 EVB (LP, a8w8) qualification goes with it, so no
+heliaAOT record is qualified. 0.33.0 needs `ns-cmsis-nn
 v7.47.0`, which the baseline already pins, and `nix/compat.nix` keeps one rule.
 
-**Verified (host only).** With helia-aot 0.33.0, real conversions of the test
-models expose the operators, tensors and MAC counts hpx reads through the
-public views. No hardware run is recorded for 0.33.0 yet.
+**Verified.** With helia-aot 0.33.0, real conversions of the KWS test model
+expose the operators, tensors, arena symbols and MAC counts hpx reads through
+the public views. On the Apollo510 EVB (ATfE, LP), int8 keyword spotting
+profiles end to end: 13 layers, VALID, 1,364,345 cycles, 2,656,768 MACs, every
+memory consumer matched. That run compares no outputs, so it qualifies nothing.
 
 heliaAOT 0.32.0 (`6224613f…6dd`) becomes the default and the locked release,
 and the accepted range widens to `<0.33.0`. It needs `ns-cmsis-nn v7.47.0`,

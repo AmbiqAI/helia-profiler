@@ -7,6 +7,7 @@ which is where the bulk of the estimation bugs would hide.
 
 from __future__ import annotations
 
+import logging
 import struct
 from pathlib import Path
 
@@ -177,7 +178,12 @@ class TestAnalyzeAotOperators:
         source = self._source(LayerOps(0, op_type, params={"filter_h": 2, "filter_w": 3}))
         op = operator(0, op_type, ("in",), ("out",), macs=0)
         assert analyze_aot_operators((op,), self.TENSORS, source).layers[0].ops == 64 * 2 * 3
-        assert analyze_aot_operators((op,), self.TENSORS, None).layers[0].ops == 0
+
+    def test_pooling_without_a_source_window_warns(self, caplog):
+        op = operator(0, "AVERAGE_POOL_2D", ("in",), ("out",), macs=0)
+        with caplog.at_level(logging.WARNING, logger="hpx"):
+            assert analyze_aot_operators((op,), self.TENSORS, None).layers[0].ops == 0
+        assert "No source window for hpx_average_pool_2d_0" in caplog.text
 
     @pytest.mark.parametrize(
         ("op_type", "ops"), [("SOFTMAX", 50), ("ADD", 10), ("RESHAPE", 0), ("GATHER", 0)]
