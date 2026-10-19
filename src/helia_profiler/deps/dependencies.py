@@ -39,6 +39,7 @@ from .compatibility import (
     CMSIS_NN_PROVIDER_MODULES,
     QualificationState,
     cmsis_nn_provider_module,
+    heliart_environment,
     select_cmsis_nn_override,
 )
 from .sync import (
@@ -242,19 +243,17 @@ def _override_inputs(ctx: PipelineContext) -> tuple[dict[str, Any], tuple[Depend
                 f"{repository}@{reference}",
             )
         )
-    for variable in ("HELIART_DIST_PATH", "HELIART_SOURCE_PATH"):
-        raw = os.environ.get(variable)
-        if raw:
-            path = Path(raw).expanduser()
-            provenance.append(
-                DependencyOverride(
-                    "engine",
-                    f"env.{variable}",
-                    "path",
-                    normalize_path(raw),
-                    _digest_path(path),
-                )
+    for variable, raw in heliart_environment(ctx.config.engine.type.value, engine_config).items():
+        path = Path(raw).expanduser()
+        provenance.append(
+            DependencyOverride(
+                "engine",
+                f"env.{variable}",
+                "path",
+                normalize_path(raw),
+                _digest_path(path),
             )
+        )
     if ctx.config.engine.config_path is not None:
         path = ctx.config.engine.config_path.expanduser()
         digest = _digest_path(path)

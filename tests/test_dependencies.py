@@ -913,6 +913,32 @@ def test_empty_engine_source_override_is_not_digested(
     assert [o for o in overrides if o.scope == "engine"] == []
 
 
+@pytest.mark.parametrize(
+    ("engine_type", "engine_config", "expected"),
+    [
+        ("tflm", {}, []),
+        ("helia-rt", {"source_path": "rt"}, []),
+        ("helia-rt", {}, ["env.HELIART_DIST_PATH"]),
+    ],
+)
+def test_heliart_variables_count_only_where_the_adapter_reads_them(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    engine_type: str,
+    engine_config: dict[str, str],
+    expected: list[str],
+) -> None:
+    from helia_profiler.deps.dependencies import _override_inputs
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "rt").mkdir()
+    monkeypatch.setenv("HELIART_DIST_PATH", str(tmp_path))
+    ctx = _context(tmp_path, engine_type=engine_type, engine_config=engine_config)
+
+    _, overrides = _override_inputs(ctx)
+    assert [o.name for o in overrides if o.name.startswith("env.")] == expected
+
+
 def test_workspace_records_observed_aot_install_identity(tmp_path, monkeypatch):
     from helia_profiler.results.dependencies import installed_aot_source
 

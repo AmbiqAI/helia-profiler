@@ -27,8 +27,6 @@ REFUSED = {
     ("deps/compatibility.py", "CMSIS_NN_PATH"),
     ("deps/compatibility.py", "HELIART_DIST_PATH"),
     ("deps/compatibility.py", "HELIART_SOURCE_PATH"),
-    ("deps/dependencies.py", "HELIART_DIST_PATH"),
-    ("deps/dependencies.py", "HELIART_SOURCE_PATH"),
     ("engines/helia_rt/adapter.py", "HELIART_DIST_PATH"),
     ("engines/helia_rt/artifacts.py", "HELIART_DIST_PATH"),
     ("engines/helia_rt/artifacts.py", "HELIART_SOURCE_PATH"),
