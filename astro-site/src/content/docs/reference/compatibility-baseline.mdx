@@ -11,7 +11,7 @@ Stage 5 combines its identity and canonical hash with the NSX registry hash,
 target, engine, overrides, and relevant build inputs to select an isolated
 dependency workspace.
 
-The current baseline is `hpx-neuralspotx-0.8.1-2026-10`:
+The current baseline is `hpx-neuralspotx-0.8.1-2026-10-19`:
 
 | Identity | Qualified reference |
 | --- | --- |
@@ -24,7 +24,7 @@ The current baseline is `hpx-neuralspotx-0.8.1-2026-10`:
 | `ns-cmsis-nn` | `4a937fe7…17c` (`v7.46.0`, hpx-declared, see below) |
 | `nsx-executorch` | `5514ac1e…b48e` |
 | `nsx-sensors` | `c219a2bc…3e25` (`v0.3.0`, peeled) |
-| heliaRT | runtime records `1.21.3`, `2.1.0` (default, commit `3eca66cb…3e8`; min supported `1.16.0`, from `HELIART_MIN_VERSION` in code) |
+| heliaRT | runtime records `1.21.3`, `2.1.0`, `2.2.0` (default, commit `4f922ed3…fb2`; min supported `1.16.0`, from `HELIART_MIN_VERSION` in code) |
 | heliaAOT | runtime records `0.23.0`, `0.24.0`, `0.25.0`, `0.26.0`, `0.27.0`, `0.29.0`, `0.30.0` (default); accepted range `>=0.23.0,<0.31.0` |
 | tflm | profile path: governed by the `nsx-tflite-micro` and `arm-cmsis-nn` module refs above (the `tflm` runtime record describes the fixed fixture's prepared upstream archive instead); `nsx-tflite-micro` builds TFLM from the `helia-rt-source` project, which the baseline does not list and the neuralSPOT-X 0.8.1 registry lock fixes at `7c1b162c` (helia-rt v1.17.0) |
 | executorch | `0.1.0`, commit `5514ac1e…b48e`, from the runtime record (a checkout's `version.txt` and commit are verified against it) |
@@ -97,6 +97,12 @@ completed result bundle.
 
 <details>
 <summary>Why earlier promotions changed these pins</summary>
+
+heliaRT 2.2.0 (`4f922ed3…fb2`) replaces 2.1.0 on the same `ns-cmsis-nn v7.46.0`.
+Its release zip no longer contains an NSX module: the default profile route builds
+heliaRT from the registry source as before, and a prebuilt release passed through
+`engine.config.dist_path` or `source` is refused with that reason. The fixed fixture
+links the 2.2.0 prepared archive.
 
 heliaRT 2.1.0 (`3eca66cb…3e8`) and `ns-cmsis-nn v7.46.0` (`4a937fe7…17c`)
 replace 1.21.3 and v7.39.2, and heliaAOT 0.30.0 becomes the default and the
