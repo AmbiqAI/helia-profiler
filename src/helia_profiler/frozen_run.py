@@ -54,9 +54,10 @@ _HOST_LOCAL_SETTINGS = (
 #: Environment variables that can point a build at local sources.
 _SOURCE_VARIABLES = ("SEGGER_RTT_PATH", "CMSIS_NN_PATH")
 
-#: Environment variables the compilers, CMake or NSX read that change what is
-#: built. Compiler launchers are host-local and excluded.
-_BUILD_VARIABLES = (
+#: Environment variables that change what is built (read by the compilers,
+#: CMake or NSX) or how a measurement is judged. Compiler launchers are
+#: host-local and excluded.
+_ENVIRONMENT_VARIABLES = (
     "ASM",
     "ASMFLAGS",
     "CC",
@@ -76,6 +77,8 @@ _BUILD_VARIABLES = (
     "LIBRARY_PATH",
     "NSX_ALLOW_VERSION_MISMATCH",
     "NSX_SKIP_COMPAT_CHECK",
+    "HPX_POWER_ALLOW_NEGATIVE",
+    "HPX_POWER_FULLRATE_XCHECK",
 )
 
 #: The ExecuTorch ``<model>.pte.json`` export sidecar, recorded beside the model.
@@ -162,7 +165,7 @@ class FrozenRun:
     qualification: str
     overrides: tuple[str, ...]
     local_inputs: tuple[LocalInput, ...]
-    build_environment: Mapping[str, str]
+    environment: Mapping[str, str]
     toolchain: ToolchainIdentity
     runtime: FrozenRuntime | None
     hpx_version: str
@@ -172,7 +175,7 @@ class FrozenRun:
         object.__setattr__(self, "settings", _freeze(self.settings))
         object.__setattr__(self, "overrides", tuple(self.overrides))
         object.__setattr__(self, "local_inputs", tuple(self.local_inputs))
-        object.__setattr__(self, "build_environment", _freeze(self.build_environment))
+        object.__setattr__(self, "environment", _freeze(self.environment))
         object.__setattr__(self, "_intent", _intent_hash(self))
 
     @property
@@ -196,7 +199,7 @@ class FrozenRun:
             "qualification": self.qualification,
             "overrides": list(self.overrides),
             "local_inputs": [asdict(item) for item in self.local_inputs],
-            "build_environment": _thaw(self.build_environment),
+            "environment": _thaw(self.environment),
             "toolchain": asdict(self.toolchain),
             "runtime": asdict(self.runtime) if self.runtime is not None else None,
             "hpx_version": self.hpx_version,
@@ -216,7 +219,7 @@ class FrozenRun:
             if not isinstance(settings, Mapping) or not isinstance(settings.get("model"), Mapping):
                 raise TypeError("settings and settings.model must be objects")
             baseline = _typed(dict, data["baseline"], "baseline", id=str, fingerprint=str)
-            environment = _typed(dict, data["build_environment"], "build_environment")
+            environment = _typed(dict, data["environment"], "environment")
             plan = cls(
                 settings=settings,
                 model=_record(FrozenModel, data["model"], "model"),
@@ -231,8 +234,8 @@ class FrozenRun:
                     _record(LocalInput, item, "local_inputs[]")
                     for item in _typed(list, data["local_inputs"], "local_inputs")
                 ),
-                build_environment=_typed(
-                    dict, environment, "build_environment", **dict.fromkeys(environment, str)
+                environment=_typed(
+                    dict, environment, "environment", **dict.fromkeys(environment, str)
                 ),
                 toolchain=_record(ToolchainIdentity, data["toolchain"], "toolchain"),
                 runtime=(
@@ -354,7 +357,7 @@ def freeze_config(config: ProfileConfig) -> FrozenRun:
             else ()
         ),
         local_inputs=_local_inputs(config),
-        build_environment=_build_environment(),
+        environment=_environment(),
         toolchain=_toolchain_identity(config),
         runtime=_frozen_runtime(config),
         hpx_version=__version__,
@@ -375,7 +378,7 @@ def _local_inputs(config: ProfileConfig) -> tuple[LocalInput, ...]:
         candidates.append(("engine.config_path", str(config.engine.config_path)))
     for key in _SOURCE_ENGINE_KEYS:
         value = config.engine.config.get(key)
-        if value:
+        if value and not (key == "dist_path" and _heliart_source_build(config)):
             candidates.append((f"engine.config.{key}", str(value)))
     for name, override in sorted(config.build.nsx_modules.items()):
         local = getattr(override, "path", None)
@@ -414,9 +417,19 @@ def _source_environment(config: ProfileConfig) -> dict[str, str]:
     return {variable: value for variable, value in effective.items() if value}
 
 
-def _build_environment() -> dict[str, str]:
-    environment = {variable: os.environ.get(variable) for variable in _BUILD_VARIABLES}
+def _environment() -> dict[str, str]:
+    environment = {variable: os.environ.get(variable) for variable in _ENVIRONMENT_VARIABLES}
     return {variable: value for variable, value in environment.items() if value}
+
+
+def _heliart_source_build(config: ProfileConfig) -> bool:
+    """Whether heliaRT builds from a source tree, which wins over any distribution."""
+    from .engines import EngineType
+
+    return config.engine.type is EngineType.HELIA_RT and bool(
+        config.engine.config.get("source_path")
+        or "HELIART_SOURCE_PATH" in _source_environment(config)
+    )
 
 
 def _uses_rtt(config: ProfileConfig) -> bool:
@@ -508,7 +521,7 @@ def _check_replay(plan: FrozenRun, replayed: FrozenRun) -> None:
             ("engine runtime", plan.runtime, replayed.runtime),
             ("qualification", plan.qualification, replayed.qualification),
             ("overrides", plan.overrides, replayed.overrides),
-            ("build environment", dict(plan.build_environment), dict(replayed.build_environment)),
+            ("environment", dict(plan.environment), dict(replayed.environment)),
         )
         if frozen != now
     ] or ["resolved settings differ"]
@@ -588,10 +601,15 @@ def _frozen_runtime(config: ProfileConfig) -> FrozenRuntime | None:
     engine = config.engine.type
     backend = config.engine.backend
     if engine is EngineType.TFLM:
-        module, commit = kernels(
-            None if (backend or "reference") == "reference" else ARM_CMSIS_NN_MODULE
+        # TFLM's modules take no build.nsx_modules override or CMSIS-NN selector.
+        module = None if (backend or "reference") == "reference" else ARM_CMSIS_NN_MODULE
+        return FrozenRuntime(
+            "tflm",
+            None,
+            baseline.module(TFLITE_MICRO_MODULE).ref,
+            module,
+            baseline.module(module).ref if module else None,
         )
-        return FrozenRuntime("tflm", None, pinned(TFLITE_MICRO_MODULE), module, commit)
     if engine is EngineType.HELIA_RT:
         # A prebuilt heliaRT archive carries its own CMSIS-NN; only a source build links the module.
         prebuilt = bool(
@@ -599,14 +617,11 @@ def _frozen_runtime(config: ProfileConfig) -> FrozenRuntime | None:
             or config.engine.config.get("source")
             or "HELIART_DIST_PATH" in _source_environment(config)
         )
-        source_build = bool(
-            config.engine.config.get("source_path")
-            or "HELIART_SOURCE_PATH" in _source_environment(config)
-        )
+        source_build = _heliart_source_build(config)
         module, commit = (None, None) if prebuilt and not source_build else kernels(CMSIS_NN_MODULE)
         selected = [
             f"engine.config.{key}"
-            for key in ("source", "dist_path", "source_path")
+            for key in (("source_path",) if source_build else ("source", "dist_path"))
             if config.engine.config.get(key)
         ] + [
             f"env.{variable}"
@@ -672,7 +687,7 @@ def _intent_hash(plan: FrozenRun) -> str:
             [item.setting, item.kind, item.sha256 or item.path] for item in plan.local_inputs
         ],
         "toolchain": [plan.toolchain.name, plan.toolchain.version],
-        "build_environment": _thaw(plan.build_environment),
+        "environment": _thaw(plan.environment),
         "runtime": asdict(plan.runtime) if plan.runtime is not None else None,
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()

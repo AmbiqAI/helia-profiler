@@ -22,14 +22,14 @@ def compiler(monkeypatch: pytest.MonkeyPatch) -> dict[str, str | None]:
         "helia_profiler.hostenv._proc.tool_output",
         lambda command, *, timeout_s: reply["output"],
     )
-    from helia_profiler.frozen_run import _BUILD_VARIABLES
+    from helia_profiler.frozen_run import _ENVIRONMENT_VARIABLES
 
     for variable in (
         "SEGGER_RTT_PATH",
         "CMSIS_NN_PATH",
         "HELIART_DIST_PATH",
         "HELIART_SOURCE_PATH",
-        *_BUILD_VARIABLES,
+        *_ENVIRONMENT_VARIABLES,
     ):
         monkeypatch.delenv(variable, raising=False)
     return reply
@@ -249,14 +249,17 @@ def test_a_non_utf8_plan_file_is_refused(tmp_path):
         FrozenRun.load(path)
 
 
-def test_an_overridden_engine_module_has_no_pinned_source(session, tmp_path):
+def test_tflm_modules_ignore_overrides_the_build_does_not_apply(session, tmp_path):
+    from helia_profiler.deps.compatibility import load_compatibility_baseline
+
     module_dir = tmp_path / "nsx-tflite-micro"
     module_dir.mkdir()
     overridden = session.with_engine("tflm").with_build(
         nsx_modules={"nsx-tflite-micro": {"path": str(module_dir)}}
     )
     runtime = overridden.freeze().runtime
-    assert runtime is not None and runtime.source_commit is None
+    expected = load_compatibility_baseline().module("nsx-tflite-micro").ref
+    assert runtime is not None and runtime.source_commit == expected
 
 
 def _pte_session(tmp_path: Path, *, kernel_provider: str | None = None) -> hpx.Session:
@@ -493,14 +496,14 @@ def test_compiler_environment_is_part_of_the_intent_and_checked_on_replay(sessio
     monkeypatch.setenv("CFLAGS", "-O0")
     monkeypatch.setenv("CMAKE_C_COMPILER_LAUNCHER", "ccache")
     plan = session.freeze()
-    assert dict(plan.build_environment) == {"CFLAGS": "-O0"}
+    assert dict(plan.environment) == {"CFLAGS": "-O0"}
     assert FrozenRun.from_dict(plan.to_dict()) == plan
 
     monkeypatch.setenv("CFLAGS", "-O3")
-    with pytest.raises(ConfigError, match="build environment: frozen"):
+    with pytest.raises(ConfigError, match="environment: frozen"):
         plan.config()
     monkeypatch.delenv("CFLAGS")
-    with pytest.raises(ConfigError, match="build environment"):
+    with pytest.raises(ConfigError, match="environment"):
         plan.config()
     assert session.freeze().intent_hash != plan.intent_hash
 
@@ -520,3 +523,26 @@ def test_a_sidecar_selected_provider_decides_qualification(tmp_path, monkeypatch
     assert "env.CMSIS_NN_PATH" in [i.setting for i in plan.local_inputs]
     assert plan.qualification != "qualified" and "nsx-cmsis-nn" in plan.overrides
     assert plan.runtime is not None and plan.runtime.kernels_commit is None
+
+
+def test_an_unused_heliart_distribution_is_not_an_input(session, tmp_path, monkeypatch):
+    source = tmp_path / "rt-src"
+    source.mkdir()
+    absent = str(tmp_path / "no-dist")
+    explicit = session.with_engine(
+        "helia-rt", config={"source_path": str(source), "dist_path": absent}
+    ).freeze()
+    assert [i.setting for i in explicit.local_inputs] == ["engine.config.source_path"]
+    assert explicit.runtime is not None
+    assert explicit.runtime.unavailable_reason == "heliaRT selected by engine.config.source_path"
+
+    monkeypatch.setenv("HELIART_SOURCE_PATH", str(source))
+    from_env = session.with_engine("helia-rt", config={"dist_path": absent}).freeze()
+    assert [i.setting for i in from_env.local_inputs] == ["env.HELIART_SOURCE_PATH"]
+
+
+def test_a_power_judgement_variable_is_part_of_the_intent(session, monkeypatch):
+    plan = session.freeze()
+    monkeypatch.setenv("HPX_POWER_ALLOW_NEGATIVE", "1")
+    with pytest.raises(ConfigError, match="environment"):
+        plan.config()
