@@ -6,6 +6,7 @@ from pathlib import Path
 
 from ..config import ProfileConfig
 from ..errors import EngineError
+from ..lifecycle import Lifecycle
 from ..results import NsxModuleRef
 from . import TFLM_ENGINE_HEADER, EngineType
 from .base import (
@@ -64,6 +65,13 @@ class TFLMAdapter(SingleArenaPlacementMixin):
         # The flatbuffer lives on the host; firmware asks for it via
         # HPX_PSRAM_READY and the J-Link upload path fills PSRAM.
         return PsramWeightsSource.HOST_UPLOAD
+
+    @property
+    def lifecycles(self) -> frozenset[Lifecycle]:
+        return frozenset({Lifecycle.CARRY, Lifecycle.SINGLE})
+
+    def lifecycle_refusal(self, lifecycle: Lifecycle) -> str:
+        return f"{self.name} firmware does not implement the {lifecycle.value} lifecycle"
 
     def prepare(self, config: ProfileConfig, work_dir: Path) -> TflmArtifacts:
         """Resolve the reference or upstream-CMSIS-NN TFLM NSX modules."""
