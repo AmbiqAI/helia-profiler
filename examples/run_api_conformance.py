@@ -3,14 +3,30 @@
 The script walks the whole run API once, as a benchmark harness would:
 
 1. freeze a :class:`~helia_profiler.FrozenRun` plan from a session;
-2. build it for a :class:`~helia_profiler.fixture.TypedFixture` with fixed input bytes;
-3. save the :class:`~helia_profiler.compiled_build.CompiledBuild` and load it back,
-   as another host would;
-4. run the loaded record on the board and compare its outputs with host LiteRT.
+2. :func:`~helia_profiler.build` it for a
+   :class:`~helia_profiler.fixture.TypedFixture` with fixed input bytes;
+3. save the :class:`~helia_profiler.CompiledBuild` and
+   :func:`~helia_profiler.load_build` it back, as another host would;
+4. :func:`~helia_profiler.run_build` the loaded build on the board and compare
+   its outputs with host LiteRT.
 
 It prints the run's identity, the per-tensor verification facts and the key
-measurements as JSON. Everything it writes lives under ``--out``, which is the
-only root the record names, so the directory can move to another host.
+measurements as JSON.
+
+Before running it:
+
+- Install ATfE; fixture builds use no other toolchain.
+- For ``helia-rt`` or ``tflm``, prepare the runtime once with
+  ``hpx runtimes prepare helia-rt`` (or ``tflm``). heliaAOT needs nothing.
+- Replace :class:`PlaceholderGuard`. It refuses every capture: a harness
+  passes its own guard to :func:`run_conformance`, one that proves the
+  physical board behind the probe serial and holds it for the capture.
+
+The plan states what a fixture build requires: the ``lp`` clock, an SRAM
+arena of ``--arena-size`` bytes and MRAM weights. The build works under
+``<out>/build``. The saved build names two roots, ``run`` for ``--out`` and
+``cache`` for the HPX cache that holds the prepared runtime, so both
+directories can move to another host.
 
 Example::
 
@@ -27,38 +43,40 @@ from hashlib import sha256
 from pathlib import Path
 
 import helia_profiler as hpx
-from helia_profiler import CompiledBuild, RunResult
+from helia_profiler import Lifecycle, RunResult
 from helia_profiler.expect import Expect, Tolerance
 from helia_profiler.fixture import (
+    FixtureCaptureGuard,
     FixtureFile,
     FixtureIO,
     FixtureMethod,
     FixtureOutput,
     FixtureTarget,
     FixtureTimingScope,
+    PreparedUpstreamRuntime,
     TypedFixture,
     analyze_typed_fixture_model,
 )
-from helia_profiler.lifecycle import Lifecycle
+from helia_profiler.hostenv.cache_dirs import hpx_cache_root
+from helia_profiler.prepared_runtimes import prepared_runtime
+
+#: The kernel backend each prepared-runtime engine builds its fixture with.
+BACKENDS = {"helia-rt": "helia", "tflm": "cmsis_nn"}
 
 
-class OperatorGuard:
-    """Trust the operator's word that *jlink_serial* is the intended, idle board.
-
-    A harness replaces this with its board lock, which proves the physical board
-    and holds it exclusively for the capture.
-    """
-
-    def __init__(self, jlink_serial: str) -> None:
-        self.jlink_serial = jlink_serial
+class PlaceholderGuard:
+    """Refuses every capture until a harness replaces it with a real board guard."""
 
     def check(self, *, require_free: bool, remaining_s: float) -> None:
         del require_free, remaining_s
+        raise RuntimeError(
+            "PlaceholderGuard refuses to capture: pass your harness's board guard "
+            "to run_conformance(guard=...)"
+        )
 
     def verify_target(self, *, target: FixtureTarget, jlink_serial: str) -> None:
-        del target
-        if jlink_serial != self.jlink_serial:
-            raise RuntimeError(f"Probe {jlink_serial} is not the declared {self.jlink_serial}")
+        del target, jlink_serial
+        self.check(require_free=True, remaining_s=0.0)
 
 
 def _pin(path: Path, data: bytes) -> FixtureFile:
@@ -81,14 +99,19 @@ def typed_fixture(model: Path, out: Path) -> TypedFixture:
     )
 
 
+def runtime_for(engine: str) -> PreparedUpstreamRuntime | None:
+    """The prepared runtime *engine* links, or ``None`` for heliaAOT."""
+    return prepared_runtime(engine).runtime if engine in BACKENDS else None
+
+
 def run_conformance(
     *,
     model: Path,
     engine: str,
     board: str,
-    toolchain: str,
     jlink_serial: str,
     out: Path,
+    guard: FixtureCaptureGuard,
     arena_size: int = 128 * 1024,
     settle_seconds: float = 60.0,
 ) -> RunResult:
@@ -102,20 +125,23 @@ def run_conformance(
             arena_location="sram",
             weights_location="mram",
         )
-        .with_engine(engine)
-        .with_target(board=board, toolchain=toolchain, clock={"cpu": "lp"})
+        .with_engine(engine, backend=BACKENDS.get(engine))
+        .with_target(board=board, toolchain="atfe", clock={"cpu": "lp"})
         .freeze()
     )
-    built = plan.build(
+    built = hpx.build(
+        plan,
         fixture,
         method=FixtureMethod(FixtureTimingScope.INVOKE_ONLY),
         lifecycle=Lifecycle.CARRY,
-        host={"output": {"dir": str(out / "build")}},
+        runtime=runtime_for(engine),
+        host={"work_dir": str(out / "build")},
     )
-    roots = {"run": out}
-    record = CompiledBuild.load(built.save(out / "record.json", roots=roots), roots=roots)
-    return record.run(
-        guard=OperatorGuard(jlink_serial),
+    roots = {"run": out, "cache": hpx_cache_root()}
+    record = hpx.load_build(built.save(out / "build.json", roots=roots), roots=roots)
+    return hpx.run_build(
+        record,
+        guard=guard,
         jlink_serial=jlink_serial,
         evidence_dir=out / "evidence",
         settle_seconds=settle_seconds,
@@ -161,18 +187,19 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--jlink-serial", required=True)
     parser.add_argument("--model", type=Path, help="LiteRT model; defaults to the tiny CNN")
-    parser.add_argument("--engine", default="helia-rt")
+    parser.add_argument("--engine", choices=("helia-rt", "helia-aot", "tflm"), default="helia-rt")
     parser.add_argument("--board", default="apollo510_evb")
-    parser.add_argument("--toolchain", default="atfe")
+    parser.add_argument("--arena-size", type=int, default=128 * 1024)
     parser.add_argument("--out", type=Path, default=Path("runs") / "conformance")
     args = parser.parse_args(argv)
     result = run_conformance(
         model=args.model or hpx.examples.tiny_cnn(),
         engine=args.engine,
         board=args.board,
-        toolchain=args.toolchain,
         jlink_serial=args.jlink_serial,
         out=args.out.resolve(),
+        guard=PlaceholderGuard(),
+        arena_size=args.arena_size,
     )
     print(json.dumps(report(result), indent=2))
     return 0 if result.succeeded else 1

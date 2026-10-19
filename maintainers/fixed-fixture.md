@@ -567,6 +567,11 @@ without one, or when the capture failed, `verification` is `None`.
 returned, not raised; errors raised while capturing propagate.
 `examples/run_api_conformance.py` walks freeze, build, save, load and run on a
 typed fixture and prints the identity, verification facts and key measurements.
+Its plan states what a fixture build requires (ATfE, the `lp` clock, an SRAM
+arena of explicit size, MRAM weights), the build works under the host's
+`work_dir`, heliaRT and TFLM pass the runtime `hpx runtimes prepare` cached,
+and the saved build names the HPX cache as a second root. Its
+`PlaceholderGuard` refuses every capture; a harness passes its own guard.
 
 ### Timing windows by route
 

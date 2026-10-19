@@ -5,11 +5,13 @@ from __future__ import annotations
 import importlib.util
 import json
 from pathlib import Path
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
+from typing import Any
 
 import pytest
 
 import helia_profiler as hpx
+from helia_profiler.engines import EngineType
 from helia_profiler.expect import host_reference
 from helia_profiler.fixture import (
     FixtureBuild,
@@ -18,7 +20,8 @@ from helia_profiler.fixture import (
     TypedFixture,
 )
 from helia_profiler.lifecycle import Lifecycle
-from tests.run_api_helpers import ATFE_OUTPUT, atfe_build, compiled, plan_for
+from helia_profiler.placement import Placement
+from tests.run_api_helpers import ATFE_OUTPUT, atfe_build, compiled, plan_for, reseal
 from tests.unit.test_fixture_record import _build, _pin
 
 _EXAMPLE = Path(__file__).resolve().parents[1] / "examples" / "run_api_conformance.py"
@@ -43,10 +46,11 @@ def model(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return hpx.examples.tiny_cnn()
 
 
-def _compiled(fixture: TypedFixture, root: Path) -> FixtureBuild:
+def _compiled(fixture: TypedFixture, root: Path, engine: str = "helia-aot") -> FixtureBuild:
     """A compiled record of *fixture*, as the host build would produce it."""
     return atfe_build(
         _build(root),
+        engine=EngineType(engine),
         model=fixture.model,
         inputs=fixture.inputs,
         output_tensors=tuple(output.tensor for output in fixture.outputs),
@@ -95,7 +99,7 @@ def test_the_report_states_identity_verification_and_measurements(
     _fake_capture(monkeypatch, tmp_path / "raw", [build])
 
     result = compiled(plan, build, Lifecycle.CARRY).run(
-        guard=example.OperatorGuard("1160002255"),
+        guard=_Unconsulted(),
         jlink_serial="1160002255",
         evidence_dir=out / "evidence",
         settle_seconds=60.0,
@@ -113,34 +117,70 @@ def test_the_report_states_identity_verification_and_measurements(
     assert report["measurements"]["latency_s"] == pytest.approx(1 / build.iterations)
 
 
-def test_the_operator_guard_refuses_another_probe(example):
-    guard = example.OperatorGuard("1160002255")
+class _Unconsulted:
+    """The mocked capture never asks a guard."""
 
-    guard.verify_target(target=None, jlink_serial="1160002255")
-    with pytest.raises(RuntimeError, match="is not the declared"):
-        guard.verify_target(target=None, jlink_serial="999")
+    def check(self, *, require_free: bool, remaining_s: float) -> None:
+        raise AssertionError("the mocked capture consulted the guard")
+
+    def verify_target(self, *, target: object, jlink_serial: str) -> None:
+        raise AssertionError("the mocked capture consulted the guard")
 
 
-def test_main_freezes_builds_saves_loads_and_runs(example, model, tmp_path, monkeypatch, capsys):
+def test_the_placeholder_guard_refuses_every_capture(example):
+    guard = example.PlaceholderGuard()
+
+    with pytest.raises(RuntimeError, match="pass your harness's board guard"):
+        guard.check(require_free=True, remaining_s=90)
+    with pytest.raises(RuntimeError, match="pass your harness's board guard"):
+        guard.verify_target(target=None, jlink_serial="1160002255")
+
+
+@pytest.mark.parametrize(
+    "engine,backend", [("helia-aot", None), ("helia-rt", "helia"), ("tflm", "cmsis_nn")]
+)
+def test_main_builds_with_what_a_fixture_build_requires(
+    example, model, tmp_path, monkeypatch, capsys, engine, backend
+):
     out = tmp_path / "out"
+    cache = tmp_path / "cache"
+    prepared = object()
+    calls: list[dict[str, Any]] = []
     built: list[FixtureBuild] = []
 
-    def build_fixed_fixture(config, fixture, *, method, **options):
-        built.append(_compiled(fixture, out / "build"))
-        return built[0]
+    def build_fixed_fixture(config, fixture, **options):
+        calls.append({"config": config, **options})
+        build = _compiled(fixture, out / "build", engine)
+        if engine != "helia-aot":
+            manifest = _pin(cache / "runtimes" / engine / "provider-manifest.json", b"{}")
+            build = reseal(build, runtime_manifest=manifest)
+        built.append(build)
+        return build
 
     for owner in ("_fixture_build", "fixture", "compiled_build"):
         monkeypatch.setattr(
             f"helia_profiler.{owner}.build_fixed_fixture", build_fixed_fixture, raising=False
         )
+    monkeypatch.setattr(example, "prepared_runtime", lambda name: SimpleNamespace(runtime=prepared))
     _fake_capture(monkeypatch, tmp_path / "raw", built)
 
-    status = example.main(
-        ["--jlink-serial", "1160002255", "--engine", "helia-aot", "--out", str(out)]
-    )
+    status = example.main(["--jlink-serial", "1160002255", "--engine", engine, "--out", str(out)])
 
     report = json.loads(capsys.readouterr().out)
     assert status == 0 and report["succeeded"]
     assert report["identity"]["observation_hash"]
+    assert report["identity"]["intent_hash"]
     assert report["verification"]["matched"] is True
-    assert (out / "record.json").is_file()
+    (call,) = calls
+    config = call["config"]
+    assert (config.target.toolchain, config.target.clock.cpu) == ("atfe", "lp")
+    assert (config.model.arena_location, config.model.weights_location) == (
+        Placement.SRAM,
+        Placement.MRAM,
+    )
+    assert config.model.arena_size == 128 * 1024 and config.work_dir == out / "build"
+    assert config.engine.backend == backend and call["compile"] is True
+    assert call["runtime"] is (None if engine == "helia-aot" else prepared)
+    saved = json.dumps(json.loads((out / "build.json").read_text())["build"])
+    assert str(tmp_path) not in saved
+    assert ('"cache"' in saved) is (engine != "helia-aot")
