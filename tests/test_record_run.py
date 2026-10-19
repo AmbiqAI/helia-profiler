@@ -7,7 +7,6 @@ from pathlib import Path
 
 import pytest
 
-import helia_profiler as hpx
 from helia_profiler._fixture_record import compiled_fixture_identity, fixture_capture_request
 from helia_profiler.compiled_build import CompiledBuild, RunResult
 from helia_profiler.errors import ConfigError
@@ -22,9 +21,9 @@ from helia_profiler.fixture import (
     fixture_run_identity,
 )
 from helia_profiler.lifecycle import Lifecycle
+from tests.run_api_helpers import ATFE_OUTPUT, atfe_build, compiled, plan_for, reseal
 from tests.unit.test_fixture_record import _build, _pin
 
-_GCC = "arm-none-eabi-gcc (Arm GNU Toolchain 15.2.Rel1) 15.2.1 20251203\n"
 _SCORE, _CACHE = b"\x01\x02", b"\x03\x04\x05\x06"
 
 
@@ -38,28 +37,17 @@ class _Guard:
 
 @pytest.fixture
 def build(tmp_path: Path) -> FixtureBuild:
-    return _build(tmp_path / "run")
+    return atfe_build(_build(tmp_path / "run"))
 
 
 @pytest.fixture
 def record(tmp_path: Path, build: FixtureBuild, monkeypatch: pytest.MonkeyPatch) -> CompiledBuild:
     monkeypatch.setattr(
-        "helia_profiler.hostenv._proc.tool_output", lambda command, *, timeout_s: _GCC
+        "helia_profiler.hostenv._proc.tool_output", lambda command, *, timeout_s: ATFE_OUTPUT
     )
-    model = tmp_path / "model.tflite"
-    assert build.model is not None
-    model.write_bytes(build.model.read())
-    plan = (
-        hpx.Session()
-        .with_model(model)
-        .with_engine("helia-aot")
-        .with_target(board="apollo510_evb", toolchain="arm-none-eabi-gcc")
-        .freeze()
-    )
+    plan = plan_for(build, tmp_path / "model.tflite")
     assert build.state_policy is FixtureStatePolicy.CARRY
-    single = replace(build, iterations=1, warmups=0)
-    single = replace(single, build_identity=compiled_fixture_identity(single))
-    return CompiledBuild(plan, single, Lifecycle.SINGLE)
+    return compiled(plan, reseal(build, iterations=1, warmups=0), Lifecycle.SINGLE)
 
 
 def _success(root: Path, score: bytes = _SCORE) -> FixtureCaptureResult:

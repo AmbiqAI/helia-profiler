@@ -89,15 +89,21 @@ def run_conformance(
     toolchain: str,
     jlink_serial: str,
     out: Path,
+    arena_size: int = 128 * 1024,
     settle_seconds: float = 60.0,
 ) -> RunResult:
     """Freeze, build, save, load and run *model* once; return the run's result."""
     fixture = typed_fixture(model, out)
     plan = (
         hpx.Session()
-        .with_model(fixture.model.path)
+        .with_model(
+            fixture.model.path,
+            arena_size=arena_size,
+            arena_location="sram",
+            weights_location="mram",
+        )
         .with_engine(engine)
-        .with_target(board=board, toolchain=toolchain)
+        .with_target(board=board, toolchain=toolchain, clock={"cpu": "lp"})
         .freeze()
     )
     built = plan.build(
@@ -157,7 +163,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--model", type=Path, help="LiteRT model; defaults to the tiny CNN")
     parser.add_argument("--engine", default="helia-rt")
     parser.add_argument("--board", default="apollo510_evb")
-    parser.add_argument("--toolchain", default="arm-none-eabi-gcc")
+    parser.add_argument("--toolchain", default="atfe")
     parser.add_argument("--out", type=Path, default=Path("runs") / "conformance")
     args = parser.parse_args(argv)
     result = run_conformance(

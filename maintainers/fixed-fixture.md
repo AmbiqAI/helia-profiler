@@ -175,13 +175,31 @@ not the plan's, asks the engine whether it implements the lifecycle, and
 applies the lifecycle's invocation counts (`SINGLE` runs one timed invocation
 and no warmups). `CompiledBuild.identity` is the build's `RunIdentity` with
 that lifecycle. `save(path, roots=...)` writes one canonical JSON document
-(`hpx.compiled-build`, schema version 1) holding the
-plan's `to_dict()`, the lifecycle and the `dump_fixture_build` record as an
-object; `load_build(path, roots=...)` (or `CompiledBuild.load`) rebuilds both halves, resolving files under
-the caller's roots, so moving the record means passing new roots. `verify()`
-re-checks the build's pinned files, that its model is the plan's model and
-that the plan's intent hash matches its contents; `load` calls it. Every
-refusal, including a malformed or unknown-version file, is a `ConfigError`.
+(`hpx.compiled-build`, schema version 2) holding the plan's `to_dict()`, the
+lifecycle, the binding and the `dump_fixture_build` record as an object;
+`load_build(path, roots=...)` (or `CompiledBuild.load`) rebuilds both halves,
+resolving files under the caller's roots, so moving the record means passing
+new roots. `load` and `save` call `verify()`, and every refusal, including a
+malformed or unknown-version file, is a `ConfigError` naming what failed.
+
+The binding ties a build to the plan it was compiled from. `build()` hashes
+the plan's intent hash, the lifecycle, the timing scope and state policy the
+build records, its prepared-runtime manifest hash (or none) and what it
+observes (the RAM diagnostic and the scanned heliaAOT arenas). No host path
+enters it, so a build relocated to another host keeps its binding.
+`verify()` re-checks the build's pinned files and the plan's intent hash,
+recomputes the binding, and then compares what the build records with what
+the plan states: engine, board, model hash and size, toolchain name, the
+compiler version among the plan's version lines, arena and weights
+placement, arena size (both are the configured capacity), clock profile and
+the lifecycle's invocation counts. A plan swapped into a saved file fails on
+the binding; a plan paired in memory with a build of other settings fails on
+the first fact that differs.
+
+The plan fields outside its intent hash are informational: `hpx_version`,
+`model.path`, `baseline.id` (the fingerprint is in the hash) and
+`toolchain.unavailable_reason`. `model.size_bytes` is outside it too, so
+`verify()` checks it against the built model.
 
 Constructing `FixtureBuildRequest` performs no runtime-cache lookup. When an
 interpreter request omits `runtime`, `build_fixture` looks up the already prepared

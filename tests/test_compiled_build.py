@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
 from dataclasses import replace
 from pathlib import Path
@@ -23,21 +24,31 @@ from helia_profiler.compiled_build import (
     COMPILED_BUILD_SCHEMA,
     COMPILED_BUILD_SCHEMA_VERSION,
     CompiledBuild,
+    _binding,
 )
 from helia_profiler.errors import ConfigError
 from helia_profiler.fixture import FixtureFile, fixture_run_identity
 from helia_profiler.frozen_run import _ENVIRONMENT_VARIABLES, FrozenRun
 from helia_profiler.lifecycle import Lifecycle
-from tests.unit.test_fixture_record import _build
+from helia_profiler.placement import Placement
+from helia_profiler.results.models import ToolchainInfo
+from tests.run_api_helpers import (
+    ATFE_OUTPUT,
+    ATFE_VERSION,
+    atfe_build,
+    compiled,
+    plan_for,
+    reseal,
+)
+from tests.unit.test_fixture_record import _build, _pin
 
 _METHOD = FixtureMethod(FixtureTimingScope.INVOKE_ONLY)
-_GCC = "arm-none-eabi-gcc (Arm GNU Toolchain 15.2.Rel1) 15.2.1 20251203\nCopyright (C) 2025\n"
 
 
 @pytest.fixture(autouse=True)
 def compiler(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "helia_profiler.hostenv._proc.tool_output", lambda command, *, timeout_s: _GCC
+        "helia_profiler.hostenv._proc.tool_output", lambda command, *, timeout_s: ATFE_OUTPUT
     )
     for variable in (
         "SEGGER_RTT_PATH",
@@ -56,21 +67,12 @@ def root(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def build(root: Path):
-    return _build(root)
+    return atfe_build(_build(root))
 
 
 @pytest.fixture
 def plan(tmp_path: Path, build) -> FrozenRun:
-    model = tmp_path / "model.tflite"
-    model.write_bytes(build.model.read())
-    return (
-        hpx.Session()
-        .with_model(model)
-        .with_engine("helia-aot")
-        .with_target(board="apollo510_evb", toolchain="arm-none-eabi-gcc")
-        .with_profiling(iterations=100, warmup=5)
-        .freeze()
-    )
+    return plan_for(build, tmp_path / "model.tflite")
 
 
 @pytest.fixture
@@ -103,7 +105,7 @@ def test_build_applies_the_lifecycle_and_compiles(plan, build, fixture, calls, l
     assert (profiling.iterations, profiling.warmup) == expected
     assert call["compile"] is True and call["observe_ram"] is True
     assert call["method"] is _METHOD and call["fixture"] is fixture
-    assert record == CompiledBuild(plan, build, lifecycle)
+    assert record == compiled(plan, build, lifecycle)
     assert record.plan is plan
 
 
@@ -165,7 +167,7 @@ def test_build_refuses_a_fixture_of_another_model(plan, fixture, calls, tmp_path
 
 def test_identity_states_the_lifecycle_that_ran(plan, build):
     base = fixture_run_identity(build)
-    identity = CompiledBuild(plan, build, Lifecycle.SINGLE).identity
+    identity = compiled(plan, build, Lifecycle.SINGLE).identity
 
     assert base.run.lifecycle == "carry"
     assert identity.run.lifecycle == "single"
@@ -181,7 +183,7 @@ def _single(build):
 
 def test_save_and_load_round_trip_after_relocation(plan, build, root, tmp_path):
     build = _single(build)
-    record = CompiledBuild(plan, build, Lifecycle.SINGLE)
+    record = compiled(plan, build, Lifecycle.SINGLE)
     identity = record.identity
     path = record.save(tmp_path / "records" / "kws.json", roots={"run": root})
 
@@ -210,13 +212,13 @@ def test_save_and_load_round_trip_after_relocation(plan, build, root, tmp_path):
 
 def test_save_refuses_a_file_outside_the_roots(plan, build, tmp_path):
     with pytest.raises(ConfigError, match="Cannot save compiled build"):
-        CompiledBuild(plan, build, Lifecycle.CARRY).save(
+        compiled(plan, build, Lifecycle.CARRY).save(
             tmp_path / "r.json", roots={"run": tmp_path / "elsewhere"}
         )
 
 
 def test_verify_refuses_a_tampered_build(plan, build):
-    record = CompiledBuild(plan, build, Lifecycle.CARRY)
+    record = compiled(plan, build, Lifecycle.CARRY)
     record.verify()
     assert build.flat_binary is not None
     build.flat_binary.path.write_bytes(b"changed image")
@@ -225,35 +227,33 @@ def test_verify_refuses_a_tampered_build(plan, build):
 
 
 def test_verify_refuses_a_lifecycle_the_firmware_does_not_run(plan, build):
-    CompiledBuild(plan, _single(build), Lifecycle.SINGLE).verify()
+    compiled(plan, _single(build), Lifecycle.SINGLE).verify()
     assert build.iterations == 100
     with pytest.raises(ConfigError, match="lifecycle single of its plan runs 1 and 0"):
-        CompiledBuild(plan, build, Lifecycle.SINGLE).verify()
+        compiled(plan, build, Lifecycle.SINGLE).verify()
     with pytest.raises(ConfigError, match="lifecycle carry of its plan runs 100 and 5"):
-        CompiledBuild(plan, _single(build), Lifecycle.CARRY).verify()
+        compiled(plan, _single(build), Lifecycle.CARRY).verify()
 
 
 def test_verify_refuses_a_plan_for_another_model(plan, build):
     other = replace(plan, model=replace(plan.model, sha256="0" * 64))
     with pytest.raises(ConfigError, match="model does not match its plan"):
-        CompiledBuild(other, build, Lifecycle.CARRY).verify()
+        compiled(other, build, Lifecycle.CARRY).verify()
 
 
 def test_verify_refuses_a_plan_whose_intent_hash_is_stale(plan, build):
     object.__setattr__(plan, "_intent", "0" * 64)
     with pytest.raises(ConfigError, match="intent hash"):
-        CompiledBuild(plan, build, Lifecycle.CARRY).verify()
+        compiled(plan, build, Lifecycle.CARRY).verify()
 
 
 def test_load_verifies_the_plan_against_the_build(plan, build, root, tmp_path):
-    path = CompiledBuild(plan, build, Lifecycle.CARRY).save(
-        tmp_path / "r.json", roots={"run": root}
-    )
+    path = compiled(plan, build, Lifecycle.CARRY).save(tmp_path / "r.json", roots={"run": root})
     data = json.loads(path.read_text())
     other = replace(plan, model=replace(plan.model, sha256="0" * 64))
     data["plan"] = other.to_dict()
     path.write_text(json.dumps(data))
-    with pytest.raises(ConfigError, match="model does not match its plan"):
+    with pytest.raises(ConfigError, match="binding does not match its plan"):
         CompiledBuild.load(path, roots={"run": root})
 
 
@@ -307,9 +307,7 @@ def _edit(data: dict[str, Any], mutation: str) -> str:
     ],
 )
 def test_malformed_records_are_refused_as_config_errors(plan, build, root, tmp_path, mutation):
-    path = CompiledBuild(plan, build, Lifecycle.CARRY).save(
-        tmp_path / "r.json", roots={"run": root}
-    )
+    path = compiled(plan, build, Lifecycle.CARRY).save(tmp_path / "r.json", roots={"run": root})
     edited = _edit(json.loads(path.read_text()), mutation)
     assert edited != path.read_text()
     path.write_text(edited)
@@ -320,9 +318,7 @@ def test_malformed_records_are_refused_as_config_errors(plan, build, root, tmp_p
 def test_missing_record_or_pinned_file_is_a_config_error(plan, build, root, tmp_path):
     with pytest.raises(ConfigError, match="not found"):
         CompiledBuild.load(tmp_path / "absent.json", roots={"run": root})
-    path = CompiledBuild(plan, build, Lifecycle.CARRY).save(
-        tmp_path / "r.json", roots={"run": root}
-    )
+    path = compiled(plan, build, Lifecycle.CARRY).save(tmp_path / "r.json", roots={"run": root})
     assert build.flat_binary is not None
     build.flat_binary.path.unlink()
     with pytest.raises(ConfigError, match="missing under the given roots"):
@@ -339,9 +335,7 @@ def test_missing_record_or_pinned_file_is_a_config_error(plan, build, root, tmp_
     ],
 )
 def test_unknown_schema_or_version_is_refused(plan, build, root, tmp_path, key, value):
-    path = CompiledBuild(plan, build, Lifecycle.CARRY).save(
-        tmp_path / "r.json", roots={"run": root}
-    )
+    path = compiled(plan, build, Lifecycle.CARRY).save(tmp_path / "r.json", roots={"run": root})
     data = json.loads(path.read_text())
     data[key] = value
     path.write_text(json.dumps(data))
@@ -365,7 +359,7 @@ def test_package_exports_the_run_api():
 
 
 def test_load_build_and_run_build_delegate_to_the_record(plan, build, root, tmp_path, monkeypatch):
-    record = CompiledBuild(plan, build, Lifecycle.CARRY)
+    record = compiled(plan, build, Lifecycle.CARRY)
     path = record.save(tmp_path / "r.json", roots={"run": root})
     assert hpx.load_build(path, roots={"run": root}) == record
 
@@ -386,22 +380,123 @@ def test_load_build_and_run_build_delegate_to_the_record(plan, build, root, tmp_
     }
 
 
-def test_verify_refuses_a_plan_for_another_engine(tmp_path, build):
-    model = tmp_path / "other-engine.tflite"
-    model.write_bytes(build.model.read())
-    plan = (
-        hpx.Session()
-        .with_model(model)
-        .with_engine("helia-rt")
-        .with_target(board="apollo510_evb", toolchain="arm-none-eabi-gcc")
-        .with_profiling(iterations=100, warmup=5)
-        .freeze()
-    )
-    with pytest.raises(ConfigError, match="engine 'helia-aot' differs from its plan's 'helia-rt'"):
-        CompiledBuild(plan, build, Lifecycle.CARRY).verify()
-
-
 def test_a_lifecycle_given_by_name_is_a_lifecycle(plan, fixture, calls):
     record = plan.build(fixture, method=_METHOD, lifecycle="single")
     assert record.lifecycle is Lifecycle.SINGLE
     assert (calls[0]["config"].profiling.iterations, calls[0]["config"].profiling.warmup) == (1, 0)
+
+
+@pytest.mark.parametrize(
+    "fact,plan_options,build_change,message",
+    [
+        (
+            "engine",
+            {"engine": "helia-rt"},
+            {},
+            "engine 'helia-aot' differs from its plan's 'helia-rt'",
+        ),
+        (
+            "board",
+            {"board": "apollo510b_evb"},
+            {},
+            "board 'apollo510_evb' differs from its plan's 'apollo510b_evb'",
+        ),
+        (
+            "toolchain",
+            {},
+            {"toolchain": ToolchainInfo("arm-none-eabi-gcc", ATFE_VERSION, "3.31")},
+            "toolchain 'arm-none-eabi-gcc' differs from its plan's 'atfe'",
+        ),
+        (
+            "toolchain version",
+            {},
+            {"toolchain": ToolchainInfo("atfe", "clang version 21.1.0", "3.31")},
+            "toolchain version 'clang version 21.1.0' is not its plan's 'clang version 22.1.0'",
+        ),
+        (
+            "arena location",
+            {},
+            {"arena_location": Placement.TCM},
+            "arena location 'tcm' differs from its plan's 'sram'",
+        ),
+        (
+            "weights location",
+            {},
+            {"weights_location": Placement.TCM},
+            "weights location 'tcm' differs from its plan's 'mram'",
+        ),
+        (
+            "arena size",
+            {},
+            {"arena_capacity": 65536},
+            "arena size 65536 differs from its plan's 32768",
+        ),
+        ("clock profile", {"clock": "hp"}, {}, "clock profile 'lp' differs from its plan's 'hp'"),
+    ],
+)
+def test_verify_names_the_fact_a_build_does_not_share_with_its_plan(
+    tmp_path, build, fact, plan_options, build_change, message
+):
+    plan = plan_for(build, tmp_path / "planned.tflite", **plan_options)
+    built = reseal(build, **build_change) if build_change else build
+    with pytest.raises(ConfigError, match=re.escape(message)):
+        compiled(plan, built, Lifecycle.CARRY).verify()
+
+
+def test_verify_checks_the_plan_model_size_against_the_built_model(plan, build):
+    assert build.model is not None
+    size = build.model.path.stat().st_size
+    other = replace(plan, model=replace(plan.model, size_bytes=size + 1))
+    with pytest.raises(ConfigError, match=f"model size {size} differs from its plan's {size + 1}"):
+        compiled(other, build, Lifecycle.CARRY).verify()
+
+
+def test_the_build_binds_its_plan_and_lifecycle(plan, fixture, calls, build, tmp_path):
+    record = plan.build(fixture, method=_METHOD)
+    record.verify()
+
+    other = plan_for(build, tmp_path / "other.tflite", warmup=6)
+    for swapped in (replace(record, plan=other), replace(record, lifecycle=Lifecycle.SINGLE)):
+        with pytest.raises(ConfigError, match="binding does not match its plan and lifecycle"):
+            swapped.verify()
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"timing_scope": FixtureTimingScope.RESTORE_AND_INVOKE},
+        {"state_policy": None},
+        {"observe_ram": True},
+        {"aot_arena_scan": ((0, 1024),)},
+    ],
+)
+def test_the_binding_covers_the_method_and_observations_the_build_records(plan, build, change):
+    record = compiled(plan, build, Lifecycle.CARRY)
+    with pytest.raises(ConfigError, match="binding does not match"):
+        replace(record, build=reseal(build, **change)).verify()
+
+
+def test_the_binding_covers_the_prepared_runtime(plan, build, root):
+    manifest = _pin(root / "runtime" / "manifest.json", b"{}")
+    record = compiled(plan, build, Lifecycle.CARRY)
+    assert _binding(plan, Lifecycle.CARRY, reseal(build, runtime_manifest=manifest)) != (
+        record.binding
+    )
+
+
+def test_the_binding_names_no_host_path(plan, tmp_path):
+    here, there = atfe_build(_build(tmp_path / "here")), atfe_build(_build(tmp_path / "there"))
+    assert _binding(plan, Lifecycle.CARRY, here) == _binding(plan, Lifecycle.CARRY, there)
+
+
+@pytest.mark.parametrize(
+    "binding,message", [("0" * 64, "binding does not match"), (7, "binding is not a string")]
+)
+def test_load_refuses_an_edited_binding(plan, build, root, tmp_path, binding, message):
+    path = compiled(plan, build, Lifecycle.CARRY).save(tmp_path / "r.json", roots={"run": root})
+    data = json.loads(path.read_text())
+    assert data["binding"] == compiled(plan, build, Lifecycle.CARRY).binding
+    data["binding"] = binding
+    path.write_text(json.dumps(data))
+    with pytest.raises(ConfigError, match=message):
+        hpx.load_build(path, roots={"run": root})

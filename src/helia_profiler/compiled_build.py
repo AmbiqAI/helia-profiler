@@ -10,8 +10,10 @@ outputs.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass, replace
+from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Mapping
 
@@ -22,23 +24,28 @@ if TYPE_CHECKING:
     from ._fixture_build import FixtureBuild, FixtureMethod, TypedFixture
     from .expect import Expect, Verification
     from .fixture_capture import FixtureCaptureGuard, FixtureCaptureResult
-    from .fixture_runtime import PreparedUpstreamRuntime
+    from .fixture_runtime import FixtureFile, PreparedUpstreamRuntime
     from .frozen_run import FrozenRun
     from .identity import RunIdentity
 
 COMPILED_BUILD_SCHEMA = "hpx.compiled-build"
-COMPILED_BUILD_SCHEMA_VERSION = 1
+COMPILED_BUILD_SCHEMA_VERSION = 2
 
-_DOCUMENT_KEYS = frozenset({"schema", "schema_version", "plan", "lifecycle", "build"})
+_DOCUMENT_KEYS = frozenset({"schema", "schema_version", "plan", "lifecycle", "binding", "build"})
 
 
 @dataclass(frozen=True)
 class CompiledBuild:
-    """A frozen plan and the firmware compiled from it, verifiable on any host."""
+    """A frozen plan and the firmware compiled from it, verifiable on any host.
+
+    ``binding`` ties the build to the plan and lifecycle it was compiled
+    from; :func:`build` computes it and :meth:`verify` recomputes it.
+    """
 
     plan: FrozenRun
     build: FixtureBuild
     lifecycle: Lifecycle
+    binding: str
 
     @property
     def identity(self) -> RunIdentity:
@@ -55,7 +62,17 @@ class CompiledBuild:
         )
 
     def verify(self) -> None:
-        """Re-check the build against its pinned files and its plan; raise on any mismatch."""
+        """Re-check the build against its pinned files and its plan; raise on any mismatch.
+
+        The build's files must match their hashes, the plan its intent hash,
+        and the binding the plan, lifecycle and build. The facts the build
+        records must be the ones the plan states: engine, board, model,
+        toolchain and its version, arena and weights placement, arena size,
+        clock profile and the lifecycle's invocation counts.
+
+        Raises:
+            ConfigError: Naming the first fact that does not match.
+        """
         from ._fixture_record import verify_fixture_build
         from .frozen_run import FrozenRun
 
@@ -63,22 +80,34 @@ class CompiledBuild:
             verify_fixture_build(self.build)
         except (ValueError, OSError) as exc:
             raise ConfigError(f"Compiled build does not verify: {exc}") from exc
-        settings = self.plan.settings
-        facts = {
-            "engine": (settings.get("engine", {}).get("type"), self.build.engine.value),
-            "board": (settings.get("target", {}).get("board"), self.build.target.board),
-        }
-        for name, (planned, built) in facts.items():
-            if planned != built:
-                raise ConfigError(
-                    f"Compiled build's {name} {built!r} differs from its plan's {planned!r}"
-                )
-        if self.build.model is None or self.build.model.sha256 != self.plan.model.sha256:
+        FrozenRun.from_dict(self.plan.to_dict())
+        if self.binding != _binding(self.plan, self.lifecycle, self.build):
+            raise ConfigError(
+                "Compiled build's binding does not match its plan and lifecycle",
+                hint="A compiled build runs only with the plan it was built from; build it again.",
+            )
+        model = self.build.model
+        if model is None or model.sha256 != self.plan.model.sha256:
             raise ConfigError(
                 "Compiled build's model does not match its plan "
                 f"(sha256 {self.plan.model.sha256[:12]}…)"
             )
-        FrozenRun.from_dict(self.plan.to_dict())
+        for name, planned, built in self._facts(model):
+            if planned != built:
+                raise ConfigError(
+                    f"Compiled build's {name} {built!r} differs from its plan's {planned!r}"
+                )
+        toolchain = self.build.toolchain
+        version = self.plan.toolchain.version
+        if (
+            toolchain is None
+            or version is None
+            or toolchain.compiler_version not in version.split(" | ")
+        ):
+            raise ConfigError(
+                "Compiled build's toolchain version "
+                f"{toolchain.compiler_version if toolchain else None!r} is not its plan's {version!r}"
+            )
         try:
             profiling = self.plan.settings["profiling"]
             expected = lifecycle_invocations(
@@ -92,6 +121,27 @@ class CompiledBuild:
                 f"{self.build.warmups} warmups; lifecycle {self.lifecycle.value} of its plan "
                 f"runs {expected[0]} and {expected[1]}"
             )
+
+    def _facts(self, model: FixtureFile) -> list[tuple[str, object, object]]:
+        """Each fact as (name, what the plan states, what the build records)."""
+        settings = self.plan.settings
+        target = settings.get("target", {})
+        planned_model = settings.get("model", {})
+        build = self.build
+        return [
+            ("engine", settings.get("engine", {}).get("type"), build.engine.value),
+            ("board", target.get("board"), build.target.board),
+            ("toolchain", target.get("toolchain"), build.toolchain and build.toolchain.compiler),
+            ("arena location", planned_model.get("arena_location"), _value(build.arena_location)),
+            (
+                "weights location",
+                planned_model.get("weights_location"),
+                _value(build.weights_location),
+            ),
+            ("arena size", planned_model.get("arena_size"), build.arena_capacity),
+            ("clock profile", target.get("clock", {}).get("cpu"), build.clock_profile),
+            ("model size", self.plan.model.size_bytes, model.path.stat().st_size),
+        ]
 
     def save(self, path: str | Path, *, roots: Mapping[str, Path]) -> Path:
         """Write the build as JSON with paths relative to *roots* and return its path."""
@@ -107,6 +157,7 @@ class CompiledBuild:
             "schema_version": COMPILED_BUILD_SCHEMA_VERSION,
             "plan": self.plan.to_dict(),
             "lifecycle": self.lifecycle.value,
+            "binding": self.binding,
             "build": build,
         }
         target = Path(path).expanduser()
@@ -139,6 +190,8 @@ class CompiledBuild:
             raise ConfigError(
                 f"Malformed compiled build: unknown lifecycle {document['lifecycle']!r}"
             ) from exc
+        if not isinstance(document["binding"], str):
+            raise ConfigError("Malformed compiled build: binding is not a string")
         plan = FrozenRun.from_dict(document["plan"])
         try:
             build = load_fixture_build(json.dumps(document["build"]), roots=roots)
@@ -149,7 +202,7 @@ class CompiledBuild:
                 f"Compiled build file is missing under the given roots: {exc}",
                 hint="Pass roots= naming where the record's files now live.",
             ) from exc
-        record = cls(plan, build, lifecycle)
+        record = cls(plan, build, lifecycle, document["binding"])
         record.verify()
         return record
 
@@ -267,7 +320,31 @@ def build(
         observe_aot_arenas=observe_aot_arenas,
         observe_ram=observe_ram,
     )
-    return CompiledBuild(plan, fixture_build, lifecycle)
+    return CompiledBuild(plan, fixture_build, lifecycle, _binding(plan, lifecycle, fixture_build))
+
+
+def _binding(plan: FrozenRun, lifecycle: Lifecycle, build: FixtureBuild) -> str:
+    """SHA-256 tying *build* to the plan and lifecycle it was compiled from.
+
+    It covers the plan's intent hash, the lifecycle, the timing scope and
+    state policy the build records, its prepared runtime manifest, and what
+    it observes, and no host path.
+    """
+    payload = {
+        "plan": plan.intent_hash,
+        "lifecycle": lifecycle.value,
+        "timing_scope": build.timing_scope.value,
+        "state_policy": _value(build.state_policy),
+        "runtime_manifest": build.runtime_manifest.sha256 if build.runtime_manifest else None,
+        "observe_ram": build.observe_ram,
+        "observe_aot_arenas": [list(arena) for arena in build.aot_arena_scan],
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    return hashlib.sha256(encoded.encode()).hexdigest()
+
+
+def _value(member: StrEnum | None) -> str | None:
+    return member.value if member is not None else None
 
 
 def load_build(path: str | Path, *, roots: Mapping[str, Path]) -> CompiledBuild:
