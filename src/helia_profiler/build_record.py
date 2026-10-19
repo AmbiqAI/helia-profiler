@@ -56,6 +56,16 @@ class BuildRecord:
             verify_fixture_build(self.build)
         except (ValueError, OSError) as exc:
             raise ConfigError(f"Build record does not verify: {exc}") from exc
+        settings = self.plan.settings
+        facts = {
+            "engine": (settings.get("engine", {}).get("type"), self.build.engine.value),
+            "board": (settings.get("target", {}).get("board"), self.build.target.board),
+        }
+        for name, (planned, built) in facts.items():
+            if planned != built:
+                raise ConfigError(
+                    f"Build record's {name} {built!r} differs from its plan's {planned!r}"
+                )
         if self.build.model is None or self.build.model.sha256 != self.plan.model.sha256:
             raise ConfigError(
                 "Build record's model does not match its plan "
@@ -80,6 +90,7 @@ class BuildRecord:
         """Write the record as JSON with paths relative to *roots* and return its path."""
         from ._fixture_record import dump_fixture_build
 
+        self.verify()
         try:
             build = json.loads(dump_fixture_build(self.build, roots=roots))
         except ValueError as exc:
@@ -92,10 +103,13 @@ class BuildRecord:
             "build": build,
         }
         target = Path(path).expanduser()
-        target.parent.mkdir(parents=True, exist_ok=True)
         text = json.dumps(document, indent=2, sort_keys=True, allow_nan=False) + "\n"
-        with target.open("w", encoding="utf-8", newline="\n") as stream:
-            stream.write(text)
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with target.open("w", encoding="utf-8", newline="\n") as stream:
+                stream.write(text)
+        except OSError as exc:
+            raise ConfigError(f"Cannot save build record to {target}: {exc}") from exc
         return target
 
     @classmethod
@@ -152,13 +166,22 @@ class BuildRecord:
         from .fixture_capture import capture_fixture
         from .fixture_identity import fixture_run_identity
 
-        request = fixture_capture_request(
-            self.build,
-            jlink_serial=jlink_serial,
-            evidence_dir=evidence_dir,
-            settle_seconds=settle_seconds,
-            expected_duration_s=expected_duration_s,
-        )
+        self.verify()
+        if expect is not None and expect.source == "build" and not self.build.outputs:
+            raise ConfigError(
+                "This build record carries no expected outputs",
+                hint="Use Expect.host_litert() or Expect.from_files().",
+            )
+        try:
+            request = fixture_capture_request(
+                self.build,
+                jlink_serial=jlink_serial,
+                evidence_dir=evidence_dir,
+                settle_seconds=settle_seconds,
+                expected_duration_s=expected_duration_s,
+            )
+        except ValueError as exc:
+            raise ConfigError(f"Cannot capture from this build record: {exc}") from exc
         capture = capture_fixture(request, guard=guard)
         identity = fixture_run_identity(self.build, capture)
         identity = replace(identity, run=replace(identity.run, lifecycle=self.lifecycle.value))
@@ -205,13 +228,19 @@ def build_record(
             f"(sha256 {plan.model.sha256[:12]}…)",
             hint="Build the fixture from the model the plan was frozen against.",
         )
+    lifecycle = Lifecycle(lifecycle)
+    if method.power_sync is not None:
+        if lifecycle is Lifecycle.SINGLE:
+            raise ConfigError(
+                "A single invocation is too short for a power capture",
+                hint="Use Lifecycle.CARRY for a power run.",
+            )
+        raise ConfigError(
+            "BuildRecord.run() takes no power request yet",
+            hint="Build and capture power fixtures with helia_profiler.fixture for now.",
+        )
     config = plan.config(model=model, host=host)
     require_lifecycle(config.engine.type, lifecycle)
-    if lifecycle is Lifecycle.SINGLE and method.power_sync is not None:
-        raise ConfigError(
-            "A single invocation is too short for a power capture",
-            hint="Use Lifecycle.CARRY for a power run.",
-        )
     iterations, warmup = lifecycle_invocations(
         lifecycle, config.profiling.iterations, config.profiling.warmup
     )

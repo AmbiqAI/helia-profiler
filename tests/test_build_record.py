@@ -67,7 +67,7 @@ def plan(tmp_path: Path, build) -> FrozenRun:
     return (
         hpx.Session()
         .with_model(model)
-        .with_engine("helia-rt")
+        .with_engine("helia-aot")
         .with_target(board="apollo510_evb", toolchain="arm-none-eabi-gcc")
         .with_profiling(iterations=100, warmup=5)
         .freeze()
@@ -113,7 +113,7 @@ def test_build_asks_the_engine_for_the_lifecycle(plan, fixture, calls, monkeypat
         raise ConfigError(f"{engine.value} refuses {lifecycle.value}")
 
     monkeypatch.setattr("helia_profiler.build_record.require_lifecycle", refuse)
-    with pytest.raises(ConfigError, match="helia-rt refuses single"):
+    with pytest.raises(ConfigError, match="helia-aot refuses single"):
         build_record(plan, fixture, method=_METHOD, lifecycle=Lifecycle.SINGLE)
     assert not calls
 
@@ -349,3 +349,24 @@ def test_package_exports_the_record_types():
     assert {hpx.__api_stability__[name] for name in ("BuildRecord", "RunResult", "Lifecycle")} == {
         "experimental"
     }
+
+
+def test_verify_refuses_a_plan_for_another_engine(tmp_path, build):
+    model = tmp_path / "other-engine.tflite"
+    model.write_bytes(build.model.read())
+    plan = (
+        hpx.Session()
+        .with_model(model)
+        .with_engine("helia-rt")
+        .with_target(board="apollo510_evb", toolchain="arm-none-eabi-gcc")
+        .with_profiling(iterations=100, warmup=5)
+        .freeze()
+    )
+    with pytest.raises(ConfigError, match="engine 'helia-aot' differs from its plan's 'helia-rt'"):
+        BuildRecord(plan, build, Lifecycle.CARRY).verify()
+
+
+def test_a_lifecycle_given_by_name_is_a_lifecycle(plan, fixture, calls):
+    record = plan.build(fixture, method=_METHOD, lifecycle="single")
+    assert record.lifecycle is Lifecycle.SINGLE
+    assert (calls[0]["config"].profiling.iterations, calls[0]["config"].profiling.warmup) == (1, 0)

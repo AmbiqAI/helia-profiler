@@ -10,6 +10,7 @@ import pytest
 import helia_profiler as hpx
 from helia_profiler._fixture_record import compiled_fixture_identity, fixture_capture_request
 from helia_profiler.build_record import BuildRecord, RunResult
+from helia_profiler.errors import ConfigError
 from helia_profiler.expect import Expect
 from helia_profiler.fixture import (
     FixtureBuild,
@@ -46,7 +47,8 @@ def record(tmp_path: Path, build: FixtureBuild, monkeypatch: pytest.MonkeyPatch)
         "helia_profiler.hostenv._proc.tool_output", lambda command, *, timeout_s: _GCC
     )
     model = tmp_path / "model.tflite"
-    model.write_bytes(b"TFL3" + bytes(64))
+    assert build.model is not None
+    model.write_bytes(build.model.read())
     plan = (
         hpx.Session()
         .with_model(model)
@@ -55,7 +57,9 @@ def record(tmp_path: Path, build: FixtureBuild, monkeypatch: pytest.MonkeyPatch)
         .freeze()
     )
     assert build.state_policy is FixtureStatePolicy.CARRY
-    return BuildRecord(plan, build, Lifecycle.SINGLE)
+    single = replace(build, iterations=1, warmups=0)
+    single = replace(single, build_identity=compiled_fixture_identity(single))
+    return BuildRecord(plan, single, Lifecycle.SINGLE)
 
 
 def _success(root: Path, score: bytes = _SCORE) -> FixtureCaptureResult:
@@ -183,7 +187,7 @@ def test_an_expectation_compares_a_successful_capture(record, device, tmp_path, 
 def test_a_failed_capture_is_returned_without_verification(record, device, tmp_path):
     capture = _failure()
 
-    result = _run(record, device, capture, tmp_path, expect=Expect.from_build())
+    result = _run(record, device, capture, tmp_path, expect=Expect.from_files(tmp_path / "ref.bin"))
 
     assert not result.succeeded and result.capture is capture
     assert result.verification is None
@@ -203,3 +207,8 @@ def test_an_error_raised_by_the_capture_propagates(record, monkeypatch, tmp_path
             evidence_dir=tmp_path / "evidence",
             settle_seconds=30.0,
         )
+
+
+def test_an_unusable_expectation_is_refused_before_flashing(record, device, tmp_path):
+    with pytest.raises(ConfigError, match="carries no expected outputs"):
+        _run(record, device, _failure(), tmp_path, expect=Expect.from_build())
