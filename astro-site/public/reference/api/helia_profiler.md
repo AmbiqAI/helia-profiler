@@ -28,6 +28,9 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 | [FrozenRuntime](/helia-profiler/reference/api/helia_profiler/frozen_run/#helia_profiler.FrozenRuntime) | `helia_profiler.FrozenRuntime` |
 | [LocalInput](/helia-profiler/reference/api/helia_profiler/frozen_run/#helia_profiler.LocalInput) | `helia_profiler.LocalInput` |
 | [ToolchainIdentity](/helia-profiler/reference/api/helia_profiler/frozen_run/#helia_profiler.ToolchainIdentity) | `helia_profiler.ToolchainIdentity` |
+| [BuildRecord](/helia-profiler/reference/api/helia_profiler/build_record/#helia_profiler.BuildRecord) | `helia_profiler.BuildRecord` |
+| [RunResult](/helia-profiler/reference/api/helia_profiler/build_record/#helia_profiler.RunResult) | `helia_profiler.RunResult` |
+| [Lifecycle](/helia-profiler/reference/api/helia_profiler/build_record/#helia_profiler.Lifecycle) | `helia_profiler.Lifecycle` |
 | [CanonicalEngine](/helia-profiler/reference/api/helia_profiler/identity/#helia_profiler.CanonicalEngine) | `helia_profiler.CanonicalEngine` |
 | [CanonicalKernel](/helia-profiler/reference/api/helia_profiler/identity/#helia_profiler.CanonicalKernel) | `helia_profiler.CanonicalKernel` |
 | [Unknown](/helia-profiler/reference/api/helia_profiler/identity/#helia_profiler.Unknown) | `helia_profiler.Unknown` |

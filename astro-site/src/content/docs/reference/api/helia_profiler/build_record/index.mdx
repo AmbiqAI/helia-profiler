@@ -1,0 +1,304 @@
+---
+title: "build_record"
+description: "Build once, run later: a frozen plan's compiled firmware saved as a record that any host can verify, relocate and capture from, and how model state carries acr…"
+sidebar:
+  order: 1
+---
+
+import RefMembers from '@ambiqai/helia-ui/astro/RefMembers';
+import RefParams from '@ambiqai/helia-ui/astro/RefParams';
+import RefSection from '@ambiqai/helia-ui/astro/RefSection';
+import RefSymbol from '@ambiqai/helia-ui/astro/RefSymbol';
+
+Build once, run later: a frozen plan's compiled firmware saved as a record that any host can verify, relocate and capture from, and how model state carries across a run's invocations.
+
+Every name on this page is imported from `helia_profiler`.
+
+**API tier:** `experimental`
+
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
+
+[Machine-readable model](/helia-profiler/reference/api/helia_profiler/build_record.json)
+
+<RefMembers label="On this page" items={[{"id":"helia_profiler.Lifecycle","name":"Lifecycle","kind":"class","summary":"State handling across invocations."},{"id":"helia_profiler.BuildRecord","name":"BuildRecord","kind":"class","summary":"A frozen plan and the firmware compiled from it, verifiable on any host."},{"id":"helia_profiler.RunResult","name":"RunResult","kind":"class","summary":"One capture from a :class:BuildRecord."}]} />
+
+<RefSymbol
+  id={"helia_profiler.Lifecycle"}
+  name={"Lifecycle"}
+  kind={"class"}
+  language={"python"}
+  signature={"Lifecycle()"}
+  level={2}
+  summary={"State handling across invocations."}
+  source={{"path":"src/helia_profiler/lifecycle.py","line":18,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/lifecycle.py#L18"}}
+>
+
+  State handling across invocations.
+
+  ``CARRY`` initializes the engine once and keeps internal state through
+  warmups and timed invocations, restoring only the fixed inputs each time.
+  ``SINGLE`` invokes the model once, so no state carries between
+  invocations.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.Lifecycle.CARRY"}
+    name={"CARRY"}
+    kind={"constant"}
+    language={"python"}
+    signature={"CARRY = 'carry'"}
+    level={3}
+    source={{"path":"src/helia_profiler/lifecycle.py","line":27,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/lifecycle.py#L27"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.Lifecycle.SINGLE"}
+    name={"SINGLE"}
+    kind={"constant"}
+    language={"python"}
+    signature={"SINGLE = 'single'"}
+    level={3}
+    source={{"path":"src/helia_profiler/lifecycle.py","line":28,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/lifecycle.py#L28"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.BuildRecord"}
+  name={"BuildRecord"}
+  kind={"class"}
+  language={"python"}
+  signature={"BuildRecord(plan: FrozenRun, build: FixtureBuild, lifecycle: Lifecycle) -> None"}
+  level={2}
+  summary={"A frozen plan and the firmware compiled from it, verifiable on any host."}
+  source={{"path":"src/helia_profiler/build_record.py","line":34,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L34"}}
+>
+
+  `dataclass`
+
+  A frozen plan and the firmware compiled from it, verifiable on any host.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.BuildRecord.plan"}
+    name={"plan"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"plan: FrozenRun"}
+    level={3}
+    source={{"path":"src/helia_profiler/build_record.py","line":38,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L38"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.BuildRecord.build"}
+    name={"build"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"build: FixtureBuild"}
+    level={3}
+    source={{"path":"src/helia_profiler/build_record.py","line":39,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L39"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.BuildRecord.lifecycle"}
+    name={"lifecycle"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"lifecycle: Lifecycle"}
+    level={3}
+    source={{"path":"src/helia_profiler/build_record.py","line":40,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L40"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.BuildRecord.identity"}
+    name={"identity"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"identity: RunIdentity"}
+    level={3}
+    summary={"The record's identity; observationhash is None until it runs."}
+    source={{"path":"src/helia_profiler/build_record.py","line":43,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L43"}}
+  >
+
+    The record's identity; ``observation_hash`` is ``None`` until it runs.
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.BuildRecord.verify"}
+    name={"verify"}
+    kind={"method"}
+    language={"python"}
+    signature={"verify() -> None"}
+    level={3}
+    summary={"Re-check the build against its pinned files and its plan; raise on any mismatch."}
+    source={{"path":"src/helia_profiler/build_record.py","line":50,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L50"}}
+  >
+
+    Re-check the build against its pinned files and its plan; raise on any mismatch.
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.BuildRecord.save"}
+    name={"save"}
+    kind={"method"}
+    language={"python"}
+    signature={"save(path: str | Path, *, roots: Mapping[str, Path]) -> Path"}
+    level={3}
+    summary={"Write the record as JSON with paths relative to roots and return its path."}
+    source={{"path":"src/helia_profiler/build_record.py","line":66,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L66"}}
+  >
+
+    Write the record as JSON with paths relative to *roots* and return its path.
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.BuildRecord.load"}
+    name={"load"}
+    kind={"method"}
+    language={"python"}
+    signature={"load(path: str | Path, *, roots: Mapping[str, Path]) -> BuildRecord"}
+    level={3}
+    summary={"Read and verify a record written by :meth:save, resolving paths under roots."}
+    source={{"path":"src/helia_profiler/build_record.py","line":88,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L88"}}
+  >
+
+    `classmethod`
+
+    Read and verify a record written by :meth:`save`, resolving paths under *roots*.
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.BuildRecord.run"}
+    name={"run"}
+    kind={"method"}
+    language={"python"}
+    signature={"run(\n    *,\n    guard: FixtureCaptureGuard,\n    jlink_serial: str,\n    evidence_dir: Path,\n    settle_seconds: float,\n    expect: Expect | None = None,\n    expected_duration_s: float | None = None,\n) -> RunResult"}
+    level={3}
+    summary={"Flash the recorded image, capture one run and compare outputs when expect is given."}
+    source={{"path":"src/helia_profiler/build_record.py","line":122,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L122"}}
+  >
+
+    Flash the recorded image, capture one run and compare outputs when *expect* is given.
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.RunResult"}
+  name={"RunResult"}
+  kind={"class"}
+  language={"python"}
+  signature={"RunResult(\n    record: BuildRecord,\n    capture: FixtureCaptureResult,\n    identity: RunIdentity,\n    verification: Verification | None,\n) -> None"}
+  level={2}
+  summary={"One capture from a :class:BuildRecord."}
+  source={{"path":"src/helia_profiler/build_record.py","line":136,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L136"}}
+>
+
+  `dataclass`
+
+  One capture from a :class:`BuildRecord`.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.RunResult.record"}
+    name={"record"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"record: BuildRecord"}
+    level={3}
+    source={{"path":"src/helia_profiler/build_record.py","line":140,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L140"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RunResult.capture"}
+    name={"capture"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"capture: FixtureCaptureResult"}
+    level={3}
+    source={{"path":"src/helia_profiler/build_record.py","line":141,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L141"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RunResult.identity"}
+    name={"identity"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"identity: RunIdentity"}
+    level={3}
+    source={{"path":"src/helia_profiler/build_record.py","line":142,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L142"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RunResult.verification"}
+    name={"verification"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"verification: Verification | None"}
+    level={3}
+    source={{"path":"src/helia_profiler/build_record.py","line":143,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L143"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RunResult.succeeded"}
+    name={"succeeded"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"succeeded: bool"}
+    level={3}
+    source={{"path":"src/helia_profiler/build_record.py","line":146,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L146"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+---
+
+Machine-readable: [`build_record.json`](/helia-profiler/reference/api/helia_profiler/build_record.json) · [`build_record.md`](/helia-profiler/reference/api/helia_profiler/build_record.md), complete and lossless.
