@@ -130,11 +130,6 @@ def test_the_operator_guard_refuses_another_probe(example):
         guard.verify_target(target=None, jlink_serial="999")
 
 
-@pytest.mark.xfail(
-    raises=NotImplementedError,
-    strict=True,
-    reason="build_record, save and load land in the sibling #537 build-side PR",
-)
 def test_main_freezes_builds_saves_loads_and_runs(example, model, tmp_path, monkeypatch, capsys):
     out = tmp_path / "out"
     built: list[FixtureBuild] = []
