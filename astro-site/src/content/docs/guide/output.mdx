@@ -215,7 +215,7 @@ The provenance of the run, from `report/contracts.py`:
 | `model` | `name`, `size` in bytes, `sha256` |
 | `toolchain` | `compiler`, `compiler_version`, `cmake_version` as found on the host |
 | `engine` | type and the measured runtime version where one resolves (heliaRT, heliaAOT) |
-| `build_images[]` | one entry per built target (`profile`, and `power` on a power run): `target_name`, `binary_name`, `sha256` of the image, `size_bytes`, `architecture_flags` counted from the configured build tree's `compile_commands.json`, `translation_units` |
+| `build_images[]` | one entry per built target (`profile`, and `power` on a power run): `target_name`, `binary_name`, `sha256` of the linked ELF, `flash_sha256` of the flat `.bin` image the probe writes (no host paths; `null` when the build left none), `size_bytes`, `architecture_flags` counted from the configured build tree's `compile_commands.json`, `translation_units` |
 | `firmware` | `arena_size`, `allocated_arena`, `model_size` as the firmware reported them |
 | dependency provenance | the typed registry hash, baseline identity and fingerprint, workspace fingerprint, lock mode and update state, requested refs and tags, peeled commits, content hashes and explicit overrides |
 

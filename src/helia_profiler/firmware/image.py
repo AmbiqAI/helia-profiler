@@ -61,7 +61,18 @@ def build_image(
         size_bytes=size_bytes,
         architecture_flags=flags,
         translation_units=translation_units,
+        flash_sha256=_flash_image_sha256(binary_path),
     )
+
+
+def _flash_image_sha256(binary_path: Path) -> str | None:
+    """Hash the flat image the probe flashes: the ``.bin`` NSX writes beside the ELF."""
+    image = binary_path if binary_path.suffix == ".bin" else binary_path.with_suffix(".bin")
+    try:
+        return sha256_file(image)
+    except OSError as exc:
+        log.info("Flash image digest unavailable for %s: %s", image, exc)
+        return None
 
 
 def record_build_image(

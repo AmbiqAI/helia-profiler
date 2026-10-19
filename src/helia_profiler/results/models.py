@@ -282,6 +282,10 @@ class BuildImage:
     configured translation units containing it, across the whole build tree
     including potentially unbuilt targets. Prebuilt-library flags are unavailable;
     the mapping is empty when the build left no compile database.
+
+    ``sha256`` hashes the linked ELF, whose debug info names host paths.
+    ``flash_sha256`` hashes the flat ``.bin`` image the probe writes, which
+    does not; it is ``None`` when the build left no such image.
     """
 
     role: str = ""
@@ -291,6 +295,7 @@ class BuildImage:
     size_bytes: int = 0
     architecture_flags: dict[str, int] = field(default_factory=dict)
     translation_units: int = 0
+    flash_sha256: str | None = None
 
 
 @dataclass
