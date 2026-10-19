@@ -129,3 +129,21 @@ def test_unknown_analysis_board_preserves_aot_refusal(analysis_boundary):
     compiler.return_value.convert.side_effect = ValueError("Unknown platform")
     with pytest.raises(EngineError, match="Unknown platform"):
         engine_analysis.analyze_for_engine(model, engine="helia-aot", board="unknown_463_board")
+
+
+def test_codegen_context_prefers_the_internal_context_over_the_conversion_result():
+    from helia_profiler.engines.helia_aot.compile import codegen_context
+
+    class Current:
+        def convert(self):
+            return "result"
+
+        def _convert(self):
+            return "context"
+
+    class Older:
+        def convert(self):
+            return "context"
+
+    assert codegen_context(Current()) == "context"
+    assert codegen_context(Older()) == "context"

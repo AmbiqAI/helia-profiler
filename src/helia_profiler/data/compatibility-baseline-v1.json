@@ -1,7 +1,7 @@
 {
   "schema": "hpx.compatibility-baseline",
   "schema_version": 1,
-  "baseline_id": "hpx-neuralspotx-0.8.1-2026-10",
+  "baseline_id": "hpx-neuralspotx-0.8.1-2026-10-19",
   "neuralspotx": {
     "package": "neuralspotx",
     "version": "0.8.1",
@@ -42,7 +42,7 @@
     },
     "helia-rt": {
       "url": "https://github.com/AmbiqAI/helia-rt.git",
-      "ref": "3eca66cbe9494b90c00293a5f620d1f45d6653e8"
+      "ref": "4f922ed365177a6533f869feffe069b0e8b7afb2"
     },
     "nsx-sensors": {
       "url": "https://github.com/AmbiqAI/nsx-sensors.git",
@@ -80,7 +80,7 @@
     },
     "nsx-helia-rt": {
       "project": "helia-rt",
-      "ref": "3eca66cbe9494b90c00293a5f620d1f45d6653e8"
+      "ref": "4f922ed365177a6533f869feffe069b0e8b7afb2"
     },
     "nsx-sensors": {
       "project": "nsx-sensors",

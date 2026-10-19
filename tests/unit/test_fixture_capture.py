@@ -71,6 +71,24 @@ class Guard:
         self.calls.append((require_free, remaining_s))
 
 
+class _Clock:
+    """Capture's clock in tests: each reading advances one tick and a sleep advances
+    by its argument, so a slow runner's real elapsed time never decides a
+    completion window."""
+
+    TICK_S = 1e-4
+
+    def __init__(self) -> None:
+        self.now = 0.0
+
+    def monotonic(self) -> float:
+        self.now += self.TICK_S
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.now += max(0.0, seconds)
+
+
 @pytest.fixture
 def rig(tmp_path, monkeypatch):
     elf, image, sizes = image_files(tmp_path)
@@ -132,7 +150,7 @@ def rig(tmp_path, monkeypatch):
 
     monkeypatch.setattr(capture, "reset_target", reset)
     monkeypatch.setattr(capture, "list_connected_probes", lambda: [SimpleNamespace(serial="123")])
-    monkeypatch.setattr(capture.time, "sleep", lambda _: None)
+    monkeypatch.setattr(capture, "time", _Clock())
     return request, memory, terminal, writes, flashes, Guard()
 
 
@@ -1290,3 +1308,20 @@ def test_predicted_detach_reserves_attachment_after_reset(rig, monkeypatch, budg
     completion = json.loads((request.evidence_dir / "completion.json").read_text())
     assert completion["elapsed_s"] < budget
     assert completion["complete_on_first_poll"] is True
+
+
+def test_a_slow_host_does_not_decide_the_completion_window(rig, monkeypatch):
+    import time as wall
+
+    request, _, _, _, _, guard = rig
+    reset = capture.reset_target
+
+    def slow_reset(**kwargs):
+        reset(**kwargs)
+        end = wall.perf_counter() + 2 * request.settle_seconds
+        while wall.perf_counter() < end:
+            pass
+
+    monkeypatch.setattr(capture, "reset_target", slow_reset)
+    result = capture.capture_fixture(request, guard=guard)
+    assert result.state == "success", result.error

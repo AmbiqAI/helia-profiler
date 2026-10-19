@@ -277,6 +277,14 @@ def _merged_aot_args(config: ProfileConfig) -> dict[str, Any]:
     return base_data
 
 
+def codegen_context(converter: Any) -> Any:
+    """Convert and return heliaAOT's code generation context."""
+    # WORKAROUND helia-aot: convert() returns only the written plan and report;
+    # the operators, AIR model and memory plan stay on the internal context.
+    private = getattr(type(converter), "_convert", None)
+    return private(converter) if private is not None else converter.convert()
+
+
 def _run_aot_compiler(
     config: ProfileConfig,
     output_dir: Path,
@@ -286,8 +294,9 @@ def _run_aot_compiler(
 ) -> Any:
     """Run heliaAOT via its Python API and return the ``CodeGenContext``.
 
-    Uses ``AotConverter.convert()`` so we get the full post-transform graph
-    (operator list, AIR model, memory plan) without parsing generated C.
+    Uses the converter's code generation context so we get the full
+    post-transform graph (operator list, AIR model, memory plan) without
+    parsing generated C.
 
     ``ConvertArgs`` come from :func:`_merged_aot_args` plus the profiler's
     tensor rulesets; the profiler's mandatory fields (model, module,
@@ -353,8 +362,7 @@ def _run_aot_compiler(
     log.debug("ConvertArgs: %s", convert_args)
 
     try:
-        converter = AotConverter(config=convert_args)
-        codegen_ctx = converter.convert()
+        codegen_ctx = codegen_context(AotConverter(config=convert_args))
     except Exception as exc:
         raise EngineError(f"heliaAOT compilation failed: {exc}") from exc
 

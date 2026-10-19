@@ -397,10 +397,10 @@ def test_exact_dependency_provenance_serialization(
 
     assert ctx.dependency_lock_path.read_bytes() == snapshot_bytes == exact_lock
     assert serialized["workspace"]["registry_hash"]["algorithm"] == "sha256"
-    assert serialized["workspace"]["baseline_id"] == "hpx-neuralspotx-0.8.1-2026-10"
+    assert serialized["workspace"]["baseline_id"] == "hpx-neuralspotx-0.8.1-2026-10-19"
     assert (
         serialized["workspace"]["baseline_fingerprint"]
-        == "2ed8417bc50352f7cf434d48805de0b97926b2c8118e3b6334d0dffe3014839b"
+        == "33310bfcc1c86aa15846bd2ba4f77efde01496ae5f8b4faaa794e3718eb9fb54"
     )
     assert serialized["lock"]["mode"] == "reused"
     assert serialized["qualification"] == "development-overrides"

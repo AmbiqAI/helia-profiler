@@ -136,7 +136,7 @@ def test_generic_fixture_io_support_does_not_inherit_release_qualification() -> 
     [
         ("helia-aot", "0.23.0", "a8w8", "apollo510_evb", "qualified", None),
         ("tflm", None, "a8w8", "apollo510_evb", "qualified", None),
-        ("helia-aot", None, "a8w8", "apollo510_evb", "supported", "0.30.0 is not qualified"),
+        ("helia-aot", None, "a8w8", "apollo510_evb", "supported", "0.31.0 is not qualified"),
         ("helia-aot", "0.23.0", "a16w8", "apollo510_evb", "supported", "not qualified for a16w8"),
         ("helia-aot", "0.23.0", "a8w8", "apollo4p_evb", "supported", "on apollo4p_evb at lp"),
         ("tflm", None, "fp16", "apollo510_evb", "unsupported", "refuses any model with a FLOAT16"),
@@ -164,7 +164,7 @@ def test_qualification_is_per_clock() -> None:
 
 def test_an_omitted_version_means_the_default_record() -> None:
     default = runtime("helia-aot")
-    assert default is not None and (default.version, default.default) == ("0.30.0", True)
+    assert default is not None and (default.version, default.default) == ("0.31.0", True)
     assert runtime("helia-aot", "0.23.0") is not None
     assert runtime("helia-aot", "0.23.0") is not default
 
@@ -284,8 +284,8 @@ def test_the_helia_aot_range_spans_the_records() -> None:
     from helia_profiler.engines.helia_aot.compile import _recorded_range
 
     records = load_runtime_records(Path(__file__).parents[1] / "src/helia_profiler/data/runtimes")
-    assert _recorded_range(records) == ("0.23.0", "0.31.0")
-    newest = [r for r in records if (r.name, r.version) == ("helia-aot", "0.30.0")]
+    assert _recorded_range(records) == ("0.23.0", "0.32.0")
+    newest = [r for r in records if (r.name, r.version) == ("helia-aot", "0.31.0")]
     assert newest[0].default
     assert _recorded_range([replace(newest[0], version="1.2.3")]) == ("1.2.3", "1.3.0")
     with pytest.raises(ConfigError, match="major.minor.patch"):
@@ -320,11 +320,11 @@ def test_runtimes_cli_lists_and_shows_records() -> None:
     assert "helia-aot   0.23.0           AmbiqAI/helia-aot@d75c96eb  apollo510_evb/lp: a8w8" in (
         listed.output
     )
-    assert "helia-aot   0.30.0   default AmbiqAI/helia-aot@5af37fba  -" in listed.output
+    assert "helia-aot   0.31.0   default AmbiqAI/helia-aot@7b92ec8a  -" in listed.output
 
     shown = runner.invoke(app, ["runtimes", "show", "helia-rt"])
     assert shown.exit_code == 0, shown.output
-    assert json.loads(shown.output)["version"] == "2.1.0"
+    assert json.loads(shown.output)["version"] == "2.2.0"
 
     missing = runner.invoke(app, ["runtimes", "show", "helia-rt", "9.9.9"])
     assert missing.exit_code == 1
