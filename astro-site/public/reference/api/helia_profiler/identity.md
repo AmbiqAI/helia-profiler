@@ -20,7 +20,7 @@ An inference engine, by its shared name.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/identity.py:15`
+Source: `src/helia_profiler/identity.py:24`
 
 ### helia_profiler.CanonicalEngine.LITERT
 
@@ -30,7 +30,7 @@ Source: `src/helia_profiler/identity.py:15`
 LITERT = 'litert'
 ```
 
-Source: `src/helia_profiler/identity.py:18`
+Source: `src/helia_profiler/identity.py:27`
 
 ### helia_profiler.CanonicalEngine.HELIA_RT
 
@@ -40,7 +40,7 @@ Source: `src/helia_profiler/identity.py:18`
 HELIA_RT = 'helia-rt'
 ```
 
-Source: `src/helia_profiler/identity.py:19`
+Source: `src/helia_profiler/identity.py:28`
 
 ### helia_profiler.CanonicalEngine.HELIA_AOT
 
@@ -50,7 +50,7 @@ Source: `src/helia_profiler/identity.py:19`
 HELIA_AOT = 'helia-aot'
 ```
 
-Source: `src/helia_profiler/identity.py:20`
+Source: `src/helia_profiler/identity.py:29`
 
 ### helia_profiler.CanonicalEngine.EXECUTORCH
 
@@ -60,7 +60,7 @@ Source: `src/helia_profiler/identity.py:20`
 EXECUTORCH = 'executorch'
 ```
 
-Source: `src/helia_profiler/identity.py:21`
+Source: `src/helia_profiler/identity.py:30`
 
 ## helia_profiler.CanonicalKernel
 
@@ -77,7 +77,7 @@ name of Ambiq's ``ns-cmsis-nn`` library.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/identity.py:24`
+Source: `src/helia_profiler/identity.py:33`
 
 ### helia_profiler.CanonicalKernel.REFERENCE
 
@@ -87,7 +87,7 @@ Source: `src/helia_profiler/identity.py:24`
 REFERENCE = 'reference'
 ```
 
-Source: `src/helia_profiler/identity.py:31`
+Source: `src/helia_profiler/identity.py:40`
 
 ### helia_profiler.CanonicalKernel.CMSIS_NN
 
@@ -97,7 +97,7 @@ Source: `src/helia_profiler/identity.py:31`
 CMSIS_NN = 'cmsis-nn'
 ```
 
-Source: `src/helia_profiler/identity.py:32`
+Source: `src/helia_profiler/identity.py:41`
 
 ### helia_profiler.CanonicalKernel.HELIA_CORE
 
@@ -107,7 +107,7 @@ Source: `src/helia_profiler/identity.py:32`
 HELIA_CORE = 'helia-core'
 ```
 
-Source: `src/helia_profiler/identity.py:33`
+Source: `src/helia_profiler/identity.py:42`
 
 ## helia_profiler.Unknown
 
@@ -123,7 +123,7 @@ A fact that could not be determined, with the reason.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/identity.py:36`
+Source: `src/helia_profiler/identity.py:45`
 
 ### helia_profiler.Unknown.reason
 
@@ -133,7 +133,7 @@ Source: `src/helia_profiler/identity.py:36`
 reason: str
 ```
 
-Source: `src/helia_profiler/identity.py:40`
+Source: `src/helia_profiler/identity.py:49`
 
 ## helia_profiler.canonical_engine
 
@@ -147,7 +147,7 @@ The shared name for an engine, from its canonical name or any alias.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/identity.py:74`
+Source: `src/helia_profiler/identity.py:85`
 
 ## helia_profiler.canonical_kernel
 
@@ -161,4 +161,4 @@ The shared name for a kernel library, from its canonical name or any alias.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/identity.py:79`
+Source: `src/helia_profiler/identity.py:90`

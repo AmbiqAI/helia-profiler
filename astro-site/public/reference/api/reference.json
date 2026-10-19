@@ -6984,9 +6984,9 @@
                   "returns": [],
                   "signature": "LITERT = 'litert'",
                   "source": {
-                    "line": 18,
+                    "line": 27,
                     "path": "src/helia_profiler/identity.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L18"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L27"
                   },
                   "summary": ""
                 },
@@ -7003,9 +7003,9 @@
                   "returns": [],
                   "signature": "HELIA_RT = 'helia-rt'",
                   "source": {
-                    "line": 19,
+                    "line": 28,
                     "path": "src/helia_profiler/identity.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L19"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L28"
                   },
                   "summary": ""
                 },
@@ -7022,9 +7022,9 @@
                   "returns": [],
                   "signature": "HELIA_AOT = 'helia-aot'",
                   "source": {
-                    "line": 20,
+                    "line": 29,
                     "path": "src/helia_profiler/identity.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L20"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L29"
                   },
                   "summary": ""
                 },
@@ -7041,9 +7041,9 @@
                   "returns": [],
                   "signature": "EXECUTORCH = 'executorch'",
                   "source": {
-                    "line": 21,
+                    "line": 30,
                     "path": "src/helia_profiler/identity.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L21"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L30"
                   },
                   "summary": ""
                 }
@@ -7054,9 +7054,9 @@
               "returns": [],
               "signature": "CanonicalEngine()",
               "source": {
-                "line": 15,
+                "line": 24,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L15"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L24"
               },
               "summary": "An inference engine, by its shared name."
             },
@@ -7080,9 +7080,9 @@
                   "returns": [],
                   "signature": "REFERENCE = 'reference'",
                   "source": {
-                    "line": 31,
+                    "line": 40,
                     "path": "src/helia_profiler/identity.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L31"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L40"
                   },
                   "summary": ""
                 },
@@ -7099,9 +7099,9 @@
                   "returns": [],
                   "signature": "CMSIS_NN = 'cmsis-nn'",
                   "source": {
-                    "line": 32,
+                    "line": 41,
                     "path": "src/helia_profiler/identity.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L32"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L41"
                   },
                   "summary": ""
                 },
@@ -7118,9 +7118,9 @@
                   "returns": [],
                   "signature": "HELIA_CORE = 'helia-core'",
                   "source": {
-                    "line": 33,
+                    "line": 42,
                     "path": "src/helia_profiler/identity.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L33"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L42"
                   },
                   "summary": ""
                 }
@@ -7131,9 +7131,9 @@
               "returns": [],
               "signature": "CanonicalKernel()",
               "source": {
-                "line": 24,
+                "line": 33,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L24"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L33"
               },
               "summary": "A kernel library, by its shared name."
             },
@@ -7157,9 +7157,9 @@
                   "returns": [],
                   "signature": "reason: str",
                   "source": {
-                    "line": 40,
+                    "line": 49,
                     "path": "src/helia_profiler/identity.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L40"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L49"
                   },
                   "summary": ""
                 }
@@ -7170,9 +7170,9 @@
               "returns": [],
               "signature": "Unknown(reason: str) -> None",
               "source": {
-                "line": 36,
+                "line": 45,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L36"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L45"
               },
               "summary": "A fact that could not be determined, with the reason."
             },
@@ -7189,9 +7189,9 @@
               "returns": [],
               "signature": "canonical_engine(name: str) -> CanonicalEngine",
               "source": {
-                "line": 74,
+                "line": 85,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L74"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L85"
               },
               "summary": "The shared name for an engine, from its canonical name or any alias."
             },
@@ -7208,9 +7208,9 @@
               "returns": [],
               "signature": "canonical_kernel(name: str) -> CanonicalKernel",
               "source": {
-                "line": 79,
+                "line": 90,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L79"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L90"
               },
               "summary": "The shared name for a kernel library, from its canonical name or any alias."
             }
