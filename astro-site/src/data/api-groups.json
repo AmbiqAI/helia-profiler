@@ -36,6 +36,7 @@
         "FrozenRun",
         "FrozenModel",
         "FrozenRuntime",
+        "LocalInput",
         "ToolchainIdentity"
       ]
     },

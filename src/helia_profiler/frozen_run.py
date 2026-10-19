@@ -1,17 +1,22 @@
 """Frozen run plans: every resolved setting, saved so another host can rebuild it.
 
-A :class:`FrozenRun` is :meth:`Session.resolve` captured as data. It records
-the resolved settings, the compatibility baseline, the model's hash, the
-toolchain's identity and the runtime record the engine resolves to. It names
-no device and no install path, so a saved plan replays on another host, and
-:meth:`FrozenRun.config` refuses a replay whose baseline or model differs.
+A :class:`FrozenRun` is :meth:`Session.resolve` captured as data: the settings
+that determine the firmware and the measurement, the compatibility baseline
+and its override classification, the model's hash, the toolchain's identity,
+the engine identity a profile build uses, and every local file or directory
+the build reads. Host-local settings (probe serials, ports, output and work
+directories, timeouts) are not stored; :meth:`FrozenRun.config` takes them
+for the replaying host. ``intent_hash`` identifies what the plan asks for and
+excludes the HPX release.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass, field
+import os
+import re
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Mapping
@@ -27,17 +32,33 @@ FROZEN_RUN_SCHEMA_VERSION = 1
 #: Resolved fields HPX derives itself; ``load_config`` refuses them as input.
 _DERIVED_SETTINGS = ("platform_registry", "compatibility", "compatibility_baseline")
 
-#: Settings that name this host or session rather than what is built or measured.
+#: Settings that name the host, device or session, or only shape host-side
+#: reporting and waits. None of them changes the firmware or what it measures.
 _HOST_LOCAL_SETTINGS = (
     ("work_dir",),
     ("verbose",),
     ("clean",),
-    ("output", "dir"),
+    ("output",),
+    ("timeouts",),
     ("target", "jlink_serial"),
     ("target", "usb_port"),
-    ("target", "segger_rtt_path"),
+    ("power", "serial"),
     ("build", "compiler_launcher"),
+    ("build", "offline"),
 )
+
+#: Environment variables that point a build at local sources.
+_SOURCE_ENVIRONMENT = (
+    "SEGGER_RTT_PATH",
+    "CMSIS_NN_PATH",
+    "HELIART_DIST_PATH",
+    "HELIART_SOURCE_PATH",
+)
+
+#: ``engine.config`` keys that point a build at local sources.
+_SOURCE_ENGINE_KEYS = ("dist_path", "source_path", "cmsis_nn_path")
+
+_VERSION_LINE = re.compile(r"\d+\.\d+")
 
 
 @dataclass(frozen=True)
@@ -53,8 +74,9 @@ class FrozenModel:
 class ToolchainIdentity:
     """The compiler a plan expects: name and exact version, never a path.
 
-    ``version`` is ``None`` when the compiler could not be probed at freeze
-    time; ``unavailable_reason`` then says why.
+    ``version`` holds the version-bearing lines of ``<compiler> --version``;
+    it is ``None`` when the compiler could not be run, with the reason in
+    ``unavailable_reason``.
     """
 
     name: str
@@ -64,14 +86,33 @@ class ToolchainIdentity:
 
 @dataclass(frozen=True)
 class FrozenRuntime:
-    """The runtime record the engine resolves to, or why there is none."""
+    """The engine and kernel sources a profile build uses.
+
+    Commits are NSX module or source revisions from the compatibility
+    baseline or the installed package. ``kernels_commit`` is ``None`` when the
+    engine links no kernel library or its provider is overridden.
+    """
 
     name: str
     version: str | None
     source_commit: str | None
+    kernels_module: str | None = None
     kernels_commit: str | None = None
-    archive_sha256: str | None = None
     unavailable_reason: str | None = None
+
+
+@dataclass(frozen=True)
+class LocalInput:
+    """A local file or directory the build reads instead of a pinned source.
+
+    Files are identified by content. A directory is recorded by path only, so
+    a plan with one is not portable to another host.
+    """
+
+    setting: str
+    path: str
+    kind: str  # "file", "directory" or "missing"
+    sha256: str | None = None
 
 
 @dataclass(frozen=True)
@@ -82,6 +123,9 @@ class FrozenRun:
     model: FrozenModel
     baseline_id: str
     baseline_fingerprint: str
+    qualification: str
+    overrides: tuple[str, ...]
+    local_inputs: tuple[LocalInput, ...]
     toolchain: ToolchainIdentity
     runtime: FrozenRuntime | None
     hpx_version: str
@@ -89,12 +133,19 @@ class FrozenRun:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "settings", _freeze(self.settings))
+        object.__setattr__(self, "overrides", tuple(self.overrides))
+        object.__setattr__(self, "local_inputs", tuple(self.local_inputs))
         object.__setattr__(self, "_intent", _intent_hash(self))
 
     @property
     def intent_hash(self) -> str:
-        """SHA-256 of what this plan asks for, excluding host-local settings and the HPX release."""
+        """SHA-256 of what this plan asks for; the HPX release is not part of it."""
         return self._intent
+
+    @property
+    def portable(self) -> bool:
+        """Whether every input is pinned or content-identified, so another host can rebuild it."""
+        return all(item.kind == "file" for item in self.local_inputs)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -102,10 +153,13 @@ class FrozenRun:
             "schema_version": FROZEN_RUN_SCHEMA_VERSION,
             "intent_hash": self.intent_hash,
             "settings": _thaw(self.settings),
-            "model": vars(self.model),
+            "model": asdict(self.model),
             "baseline": {"id": self.baseline_id, "fingerprint": self.baseline_fingerprint},
-            "toolchain": vars(self.toolchain),
-            "runtime": vars(self.runtime) if self.runtime is not None else None,
+            "qualification": self.qualification,
+            "overrides": list(self.overrides),
+            "local_inputs": [asdict(item) for item in self.local_inputs],
+            "toolchain": asdict(self.toolchain),
+            "runtime": asdict(self.runtime) if self.runtime is not None else None,
             "hpx_version": self.hpx_version,
         }
 
@@ -117,16 +171,21 @@ class FrozenRun:
         if type(version) is not int or version != FROZEN_RUN_SCHEMA_VERSION:
             raise ConfigError(f"Unsupported frozen run plan version: {version!r}")
         try:
+            if not isinstance(data["settings"], Mapping):
+                raise TypeError("settings must be an object")
             plan = cls(
                 settings=data["settings"],
                 model=FrozenModel(**data["model"]),
                 baseline_id=data["baseline"]["id"],
                 baseline_fingerprint=data["baseline"]["fingerprint"],
+                qualification=data["qualification"],
+                overrides=tuple(data["overrides"]),
+                local_inputs=tuple(LocalInput(**item) for item in data["local_inputs"]),
                 toolchain=ToolchainIdentity(**data["toolchain"]),
                 runtime=FrozenRuntime(**data["runtime"]) if data["runtime"] is not None else None,
                 hpx_version=data["hpx_version"],
             )
-        except (KeyError, TypeError) as exc:
+        except (KeyError, TypeError, AttributeError, ValueError) as exc:
             raise ConfigError(f"Malformed frozen run plan: {exc}") from exc
         if data.get("intent_hash") != plan.intent_hash:
             raise ConfigError(
@@ -139,9 +198,9 @@ class FrozenRun:
         """Write the plan as JSON and return its path."""
         target = Path(path).expanduser()
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(
-            json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
+        text = json.dumps(self.to_dict(), indent=2, sort_keys=True, allow_nan=False) + "\n"
+        with target.open("w", encoding="utf-8", newline="\n") as stream:
+            stream.write(text)
         return target
 
     @classmethod
@@ -158,14 +217,21 @@ class FrozenRun:
             raise ConfigError("A frozen run plan must be a JSON object.")
         return cls.from_dict(data)
 
-    def config(self, *, model: str | Path | None = None) -> ProfileConfig:
+    def config(
+        self,
+        *,
+        model: str | Path | None = None,
+        host: Mapping[str, Any] | None = None,
+    ) -> ProfileConfig:
         """The :class:`ProfileConfig` this plan describes, on this host.
 
-        Refuses when this HPX carries a different compatibility baseline, or
-        when the model file (the recorded path, or *model* when the file has
-        moved) no longer has the recorded hash.
+        *host* supplies host-local settings for the replaying host, for
+        example ``{"target": {"jlink_serial": "..."}, "output": {"dir": "..."}}``;
+        any other key is refused. Refuses when this HPX carries a different
+        baseline, when the model (the recorded path, or *model* when it moved)
+        has a different hash, or when a local input differs or is missing.
         """
-        from .config import load_config
+        from .config import deep_merge, load_config
         from .deps.compatibility import load_compatibility_baseline
 
         baseline = load_compatibility_baseline()
@@ -177,14 +243,19 @@ class FrozenRun:
                 hint="Freeze the plan again with this HPX, or use the HPX release it was frozen with.",
             )
         model_path = Path(model).expanduser() if model is not None else Path(self.model.path)
-        if _sha256(model_path) != self.model.sha256:
+        if _file_sha256(model_path) != self.model.sha256:
             raise ConfigError(
                 f"Model {model_path} does not match the frozen model "
                 f"(sha256 {self.model.sha256[:12]}…)",
                 hint="Pass model= with the file the plan was frozen against.",
             )
+        for item in self.local_inputs:
+            _check_local_input(item)
         settings = _thaw(self.settings)
         settings["model"] = {**settings["model"], "path": str(model_path)}
+        if host:
+            _check_host_overlay(host)
+            settings = deep_merge(settings, _thaw(host))
         return load_config(None, settings)
 
 
@@ -198,103 +269,200 @@ def freeze_config(config: ProfileConfig) -> FrozenRun:
         for key, value in serialize_config(config).items()
         if key not in _DERIVED_SETTINGS
     }
+    for path in _HOST_LOCAL_SETTINGS:
+        _drop(settings, path)
     model_path = Path(config.model.path)
     baseline = config.compatibility_baseline
+    resolution = config.compatibility
     return FrozenRun(
         settings=settings,
         model=FrozenModel(
             path=str(config.model.path),
-            sha256=_sha256(model_path),
+            sha256=_file_sha256(model_path),
             size_bytes=model_path.stat().st_size,
         ),
         baseline_id=baseline.baseline_id,
         baseline_fingerprint=baseline.fingerprint,
+        qualification=resolution.qualification.value if resolution else "unknown",
+        overrides=tuple(
+            sorted({*resolution.module_overrides, *resolution.engine_overrides})
+            if resolution
+            else ()
+        ),
+        local_inputs=_local_inputs(config),
         toolchain=_toolchain_identity(config),
         runtime=_frozen_runtime(config),
         hpx_version=__version__,
     )
 
 
+def _local_inputs(config: ProfileConfig) -> tuple[LocalInput, ...]:
+    candidates: list[tuple[str, str]] = []
+    if config.target.segger_rtt_path is not None:
+        candidates.append(("target.segger_rtt_path", str(config.target.segger_rtt_path)))
+    if config.engine.config_path is not None:
+        candidates.append(("engine.config_path", str(config.engine.config_path)))
+    for key in _SOURCE_ENGINE_KEYS:
+        value = config.engine.config.get(key)
+        if value:
+            candidates.append((f"engine.config.{key}", str(value)))
+    for name, override in sorted(config.build.nsx_modules.items()):
+        local = getattr(override, "path", None)
+        if local:
+            candidates.append((f"build.nsx_modules.{name}.path", str(local)))
+    for variable in _SOURCE_ENVIRONMENT:
+        value = os.environ.get(variable)
+        if value:
+            candidates.append((f"env.{variable}", value))
+    return tuple(_describe_local(setting, value) for setting, value in candidates)
+
+
+def _describe_local(setting: str, value: str) -> LocalInput:
+    path = Path(value).expanduser()
+    if path.is_file():
+        return LocalInput(setting, value, "file", _file_sha256(path))
+    if path.is_dir():
+        return LocalInput(setting, value, "directory")
+    return LocalInput(setting, value, "missing")
+
+
+def _check_local_input(item: LocalInput) -> None:
+    path = Path(item.path).expanduser()
+    if item.kind == "file":
+        if not path.is_file() or _file_sha256(path) != item.sha256:
+            raise ConfigError(
+                f"{item.setting} {item.path} is missing or differs from the frozen file",
+                hint="Restore the file the plan was frozen with, or freeze the plan again.",
+            )
+    elif item.kind == "directory" and not path.is_dir():
+        raise ConfigError(f"{item.setting} directory {item.path} does not exist on this host")
+
+
+def _check_host_overlay(host: Mapping[str, Any], prefix: tuple[str, ...] = ()) -> None:
+    for key, value in host.items():
+        path = (*prefix, key)
+        if path in _HOST_LOCAL_SETTINGS:
+            continue
+        if isinstance(value, Mapping) and any(
+            local[: len(path)] == path for local in _HOST_LOCAL_SETTINGS
+        ):
+            _check_host_overlay(value, path)
+            continue
+        raise ConfigError(
+            f"{'.'.join(path)} is not a host-local setting",
+            hint="Only host-local settings can be supplied when replaying a frozen plan.",
+        )
+
+
 def _toolchain_identity(config: ProfileConfig) -> ToolchainIdentity:
-    from .hostenv.toolchain_probe import compiler_version
+    from .hostenv._proc import tool_output
+    from .hostenv.toolchain_probe import _compiler_command
 
     name = str(config.target.toolchain)
     try:
-        version = compiler_version(name, timeout_s=config.timeouts.binary_probe_s)
-    except Exception as exc:  # the probe shells out; any failure is an unknown, not a crash
-        return ToolchainIdentity(name, None, f"compiler probe failed: {exc}")
-    if not version:
-        return ToolchainIdentity(name, None, "compiler reported no version")
-    return ToolchainIdentity(name, version)
+        command = _compiler_command(name)
+    except Exception as exc:  # an unknown toolchain is a recorded unknown, not a crash
+        return ToolchainIdentity(name, None, f"no compiler for {name}: {exc}")
+    output = tool_output([command, "--version"], timeout_s=config.timeouts.toolchain_probe_s)
+    if output is None:
+        return ToolchainIdentity(name, None, f"{command} --version could not run")
+    lines = [line.strip() for line in output.splitlines() if _VERSION_LINE.search(line)]
+    if not lines:
+        return ToolchainIdentity(name, None, f"{command} --version reported no version")
+    return ToolchainIdentity(name, " | ".join(lines))
 
 
 def _frozen_runtime(config: ProfileConfig) -> FrozenRuntime | None:
     from .engines import EngineType
+    from .engines.cmsis_nn import ARM_CMSIS_NN_MODULE, CMSIS_NN_MODULE
+    from .engines.helia_rt.artifacts import HELIART_MODULE
+    from .engines.tflm import TFLITE_MICRO_MODULE
     from .runtime_records import runtime
 
-    names = {
-        EngineType.TFLM: "tflm",
-        EngineType.HELIA_RT: "helia-rt",
-        EngineType.HELIA_AOT: "helia-aot",
-        EngineType.EXECUTORCH: "executorch",
-    }
-    name = names.get(config.engine.type)
-    if name is None:
-        return None
-    overrides = config.compatibility.engine_overrides if config.compatibility else ()
-    if overrides:
-        return FrozenRuntime(
-            name, None, None, unavailable_reason=f"engine overrides: {', '.join(overrides)}"
-        )
-    version = None
-    if config.engine.type is EngineType.HELIA_AOT:
-        from importlib.metadata import PackageNotFoundError
-        from importlib.metadata import version as installed
+    baseline = config.compatibility_baseline
+    overridden = set(config.compatibility.module_overrides) if config.compatibility else set()
 
-        try:
-            version = installed("helia-aot")
-        except PackageNotFoundError:
-            return FrozenRuntime(name, None, None, unavailable_reason="helia-aot is not installed")
-    record = runtime(name, version)
-    if record is None:
+    def kernels(module: str | None) -> tuple[str | None, str | None]:
+        if module is None or module in overridden:
+            return module, None
+        return module, baseline.module(module).ref
+
+    engine = config.engine.type
+    backend = config.engine.backend
+    if engine is EngineType.TFLM:
+        module, commit = kernels(None if backend == "reference" else ARM_CMSIS_NN_MODULE)
+        return FrozenRuntime("tflm", None, baseline.module(TFLITE_MICRO_MODULE).ref, module, commit)
+    if engine is EngineType.HELIA_RT:
+        local = [key for key in ("source", *_SOURCE_ENGINE_KEYS) if config.engine.config.get(key)]
+        if local:
+            return FrozenRuntime(
+                "helia-rt", None, None, unavailable_reason=f"local heliaRT: {', '.join(local)}"
+            )
+        record = runtime("helia-rt")
+        module, commit = kernels(CMSIS_NN_MODULE)
         return FrozenRuntime(
-            name, version, None, unavailable_reason=f"no runtime record for {name} {version}"
+            "helia-rt",
+            record.version if record else None,
+            baseline.module(HELIART_MODULE).ref,
+            module,
+            commit,
         )
-    return FrozenRuntime(
-        name=record.name,
-        version=record.version,
-        source_commit=record.source.commit,
-        kernels_commit=record.kernels.commit if record.kernels is not None else None,
-        archive_sha256=record.archive_sha256,
-    )
+    if engine is EngineType.HELIA_AOT:
+        from .results.dependencies import installed_aot_source
+
+        source = installed_aot_source()
+        module, commit = kernels(CMSIS_NN_MODULE)
+        if source is None:
+            return FrozenRuntime(
+                "helia-aot", None, None, module, commit, "helia-aot is not installed"
+            )
+        return FrozenRuntime("helia-aot", source["version"], source["commit"], module, commit)
+    if engine is EngineType.EXECUTORCH:
+        record = runtime("executorch")
+        module, commit = kernels(CMSIS_NN_MODULE if backend == "ns" else ARM_CMSIS_NN_MODULE)
+        return FrozenRuntime(
+            "executorch",
+            record.version if record else None,
+            record.source.commit if record else None,
+            module,
+            commit,
+        )
+    return None
 
 
 def _intent_hash(plan: FrozenRun) -> str:
     settings = _thaw(plan.settings)
-    for path in _HOST_LOCAL_SETTINGS:
-        parent = settings
-        for key in path[:-1]:
-            parent = parent.get(key, {}) if isinstance(parent, dict) else {}
-        if isinstance(parent, dict):
-            parent.pop(path[-1], None)
     if isinstance(settings.get("model"), dict):
         settings["model"].pop("path", None)
     payload = {
         "settings": settings,
         "model_sha256": plan.model.sha256,
         "baseline_fingerprint": plan.baseline_fingerprint,
+        "qualification": plan.qualification,
+        "overrides": list(plan.overrides),
+        "local_inputs": [
+            [item.setting, item.kind, item.sha256 or item.path] for item in plan.local_inputs
+        ],
         "toolchain": [plan.toolchain.name, plan.toolchain.version],
-        "runtime": vars(plan.runtime) if plan.runtime is not None else None,
+        "runtime": asdict(plan.runtime) if plan.runtime is not None else None,
     }
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
     return hashlib.sha256(encoded).hexdigest()
 
 
-def _sha256(path: Path) -> str:
+def _drop(settings: dict[str, Any], path: tuple[str, ...]) -> None:
+    parent: Any = settings
+    for key in path[:-1]:
+        parent = parent.get(key) if isinstance(parent, dict) else None
+    if isinstance(parent, dict):
+        parent.pop(path[-1], None)
+
+
+def _file_sha256(path: Path) -> str:
     try:
         return hashlib.sha256(path.read_bytes()).hexdigest()
     except OSError as exc:
-        raise ConfigError(f"Cannot read model {path}: {exc}") from exc
+        raise ConfigError(f"Cannot read {path}: {exc}") from exc
 
 
 def _freeze(value: Any) -> Any:
@@ -308,6 +476,6 @@ def _freeze(value: Any) -> Any:
 def _thaw(value: Any) -> Any:
     if isinstance(value, Mapping):
         return {key: _thaw(item) for key, item in value.items()}
-    if isinstance(value, tuple):
+    if isinstance(value, tuple | list):
         return [_thaw(item) for item in value]
     return value

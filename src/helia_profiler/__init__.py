@@ -73,7 +73,7 @@ if TYPE_CHECKING:
         evaluate_comparison_profile,
         evaluate_run,
     )
-    from .frozen_run import FrozenModel, FrozenRun, FrozenRuntime, ToolchainIdentity
+    from .frozen_run import FrozenModel, FrozenRun, FrozenRuntime, LocalInput, ToolchainIdentity
     from .hostenv.doctor import DoctorCheck, DoctorResult, DoctorVersionCheck
     from .modelcost import ModelAnalysis
     from .pipeline import ProgressUpdate
@@ -228,6 +228,7 @@ _EXPORTS = {
     "FrozenModel": (".frozen_run", "FrozenModel"),
     "FrozenRuntime": (".frozen_run", "FrozenRuntime"),
     "ToolchainIdentity": (".frozen_run", "ToolchainIdentity"),
+    "LocalInput": (".frozen_run", "LocalInput"),
     "ResetStrategy": (".target.lifecycle", "ResetStrategy"),
     "JLinkProbe": (".target.probe.jlink", "JLinkProbe"),
     "JLinkProbeMatch": (".target.probe.jlink", "JLinkProbeMatch"),
@@ -258,6 +259,7 @@ __all__ = [
     "FrozenRun",
     "FrozenModel",
     "FrozenRuntime",
+    "LocalInput",
     "ToolchainIdentity",
     "ProgressUpdate",
     "examples",
@@ -418,6 +420,7 @@ _EXPERIMENTAL_API = {
     "FrozenRun",
     "FrozenModel",
     "FrozenRuntime",
+    "LocalInput",
     "ToolchainIdentity",
     "Qualification",
     "QualifiedTarget",
