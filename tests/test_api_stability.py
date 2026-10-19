@@ -27,8 +27,8 @@ def test_stability_tiers_partition_the_public_surface() -> None:
     }
     sizes = {name: len(members) for name, members in tiers.items()}
 
-    assert sizes == {"stable": 45, "experimental": 47, "implementation": 13}
-    assert sum(sizes.values()) == 105 == len(helia_profiler.__all__)
+    assert sizes == {"stable": 45, "experimental": 56, "implementation": 13}
+    assert sum(sizes.values()) == 114 == len(helia_profiler.__all__)
 
     for left, right in combinations(tiers, 2):
         assert not tiers[left] & tiers[right], (
@@ -94,6 +94,7 @@ def test_public_surface_membership_snapshot() -> None:
         "EngineConfig",
         "EngineError",
         "EngineType",
+        "Expect",
         "FirmwareError",
         "FirmwareMeta",
         "HeartbeatConfig",
@@ -136,6 +137,8 @@ def test_public_surface_membership_snapshot() -> None:
         "Qualification",
         "QualificationState",
         "QualifiedTarget",
+        "Reference",
+        "ReferenceOrigin",
         "ReportError",
         "ResetStrategy",
         "ResultArtifact",
@@ -155,25 +158,31 @@ def test_public_surface_membership_snapshot() -> None:
         "SupportBundleOptions",
         "SupportBundleSection",
         "TargetConfig",
+        "TensorComparison",
         "TimeoutsConfig",
+        "Tolerance",
         "Toolchain",
         "Transport",
         "VerdictStatus",
+        "Verification",
         "VersionError",
         "__version__",
         "assess_comparability",
         "build_platform_registry",
         "collect_support_bundle",
+        "compare_outputs",
         "evaluate_comparison_profile",
         "evaluate_run",
         "examples",
         "get_soc",
+        "host_reference",
         "load_compatibility_baseline",
         "load_result_manifest",
         "profile",
         "qualification",
         "read_dependency_lock_provenance",
         "runtimes",
+        "verify_fixture_outputs",
         "verify_support_bundle",
         "write_support_bundle",
     ]

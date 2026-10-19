@@ -73,6 +73,17 @@ if TYPE_CHECKING:
         evaluate_comparison_profile,
         evaluate_run,
     )
+    from .expect import (
+        Expect,
+        Reference,
+        ReferenceOrigin,
+        TensorComparison,
+        Tolerance,
+        Verification,
+        compare_outputs,
+        host_reference,
+        verify_fixture_outputs,
+    )
     from .hostenv.doctor import DoctorCheck, DoctorResult, DoctorVersionCheck
     from .modelcost import ModelAnalysis
     from .pipeline import ProgressUpdate
@@ -179,6 +190,15 @@ _EXPORTS = {
     "assess_comparability": (".evaluation", "assess_comparability"),
     "evaluate_comparison_profile": (".evaluation", "evaluate_comparison_profile"),
     "evaluate_run": (".evaluation", "evaluate_run"),
+    "Expect": (".expect", "Expect"),
+    "Tolerance": (".expect", "Tolerance"),
+    "Reference": (".expect", "Reference"),
+    "ReferenceOrigin": (".expect", "ReferenceOrigin"),
+    "TensorComparison": (".expect", "TensorComparison"),
+    "Verification": (".expect", "Verification"),
+    "compare_outputs": (".expect", "compare_outputs"),
+    "host_reference": (".expect", "host_reference"),
+    "verify_fixture_outputs": (".expect", "verify_fixture_outputs"),
     "DoctorCheck": (".hostenv.doctor", "DoctorCheck"),
     "DoctorResult": (".hostenv.doctor", "DoctorResult"),
     "DoctorVersionCheck": (".hostenv.doctor", "DoctorVersionCheck"),
@@ -329,6 +349,15 @@ __all__ = [
     "collect_support_bundle",
     "write_support_bundle",
     "verify_support_bundle",
+    "Expect",
+    "Tolerance",
+    "Reference",
+    "ReferenceOrigin",
+    "TensorComparison",
+    "Verification",
+    "compare_outputs",
+    "host_reference",
+    "verify_fixture_outputs",
     "DoctorCheck",
     "DoctorResult",
     "DoctorVersionCheck",
@@ -453,6 +482,15 @@ _EXPERIMENTAL_API = {
     "collect_support_bundle",
     "write_support_bundle",
     "verify_support_bundle",
+    "Expect",
+    "Tolerance",
+    "Reference",
+    "ReferenceOrigin",
+    "TensorComparison",
+    "Verification",
+    "compare_outputs",
+    "host_reference",
+    "verify_fixture_outputs",
 }
 
 _IMPLEMENTATION_API = {
