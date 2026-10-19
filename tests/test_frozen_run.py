@@ -548,3 +548,20 @@ def test_a_power_judgement_variable_is_part_of_the_intent(session, monkeypatch):
     assert session.freeze().portable
     with pytest.raises(ConfigError, match="environment"):
         plan.config()
+
+
+def test_a_selector_that_is_not_a_commit_is_not_portable(session):
+    commit = "4a937fe7988935e1cfc2d8a41859fdada042c17c"
+    assert not session.with_engine("helia-rt", config={"cmsis_nn_ref": "main"}).freeze().portable
+    assert session.with_engine("helia-rt", config={"cmsis_nn_ref": commit}).freeze().portable
+    assert not session.with_build(nsx_modules={"nsx-core": {"ref": "main"}}).freeze().portable
+    assert session.with_build(nsx_modules={"nsx-core": {"ref": commit}}).freeze().portable
+
+
+def test_an_unavailable_compiler_is_not_reported_as_drift(session, compiler, monkeypatch):
+    compiler["output"] = None
+    plan = session.freeze()
+    monkeypatch.setenv("CFLAGS", "-O3")
+    with pytest.raises(ConfigError, match="environment") as refused:
+        plan.config()
+    assert "toolchain: frozen" not in str(refused.value)

@@ -92,6 +92,7 @@ _SIDECAR = "model.sidecar"
 _SOURCE_ENGINE_KEYS = ("dist_path", "source_path", "cmsis_nn_path")
 
 _VERSION_LINE = re.compile(r"\d+\.\d+")
+_COMMIT = re.compile(r"[0-9a-f]{40}")
 #: ``--version`` lines that carry install locations rather than the version.
 _LOCATION_LINE = re.compile(r"^(InstalledDir|Configuration file):")
 
@@ -192,10 +193,13 @@ class FrozenRun:
         """Whether every input is pinned or content-identified, so another host can rebuild it.
 
         A compiler environment variable makes a plan host-specific, since the
-        files it may name are not tracked.
+        files it may name are not tracked, and so does a dependency selector
+        that names a branch, tag or version rather than a commit.
         """
-        return all(item.kind == "file" for item in self.local_inputs) and not any(
-            name in _BUILD_VARIABLES for name in self.environment
+        return (
+            all(item.kind == "file" for item in self.local_inputs)
+            and not any(name in _BUILD_VARIABLES for name in self.environment)
+            and not _floating_selectors(self.settings)
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -302,7 +306,8 @@ class FrozenRun:
         has a different hash, when a local input differs or is missing, or
         when this host would build something else: a source-path environment
         variable set, unset or changed, another compiler version, or another
-        engine runtime.
+        engine runtime. Only the model can move; other local files must be
+        at their recorded paths.
         """
         from .config import deep_merge, load_config
         from .deps.compatibility import load_compatibility_baseline
@@ -527,7 +532,7 @@ def _check_replay(plan: FrozenRun, replayed: FrozenRun) -> None:
         f"{name}: frozen {frozen!r}, this host {now!r}"
         for name, frozen, now in (
             ("local inputs", _input_keys(plan), _input_keys(replayed)),
-            ("toolchain", plan.toolchain.version, _toolchain_fact(replayed.toolchain)),
+            ("toolchain", _toolchain_fact(plan.toolchain), _toolchain_fact(replayed.toolchain)),
             ("engine runtime", plan.runtime, replayed.runtime),
             ("qualification", plan.qualification, replayed.qualification),
             ("overrides", plan.overrides, replayed.overrides),
@@ -539,6 +544,26 @@ def _check_replay(plan: FrozenRun, replayed: FrozenRun) -> None:
         "This host would build a different run than the frozen plan: " + "; ".join(drift),
         hint="Restore the frozen environment and toolchain, or freeze the plan again on this host.",
     )
+
+
+def _floating_selectors(settings: Mapping[str, Any]) -> list[str]:
+    """Dependency selectors that name something other than a commit."""
+    engine = settings.get("engine", {}).get("config") or {}
+    floating = []
+    if engine.get("cmsis_nn_ref") and not _COMMIT.fullmatch(str(engine["cmsis_nn_ref"])):
+        floating.append("engine.config.cmsis_nn_ref")
+    source = engine.get("source")
+    if (
+        isinstance(source, Mapping)
+        and source.get("ref")
+        and not _COMMIT.fullmatch(str(source["ref"]))
+    ):
+        floating.append("engine.config.source")
+    for name, module in sorted((settings.get("build", {}).get("nsx_modules") or {}).items()):
+        selector = module.get("ref") or module.get("version")
+        if selector and not _COMMIT.fullmatch(str(selector)):
+            floating.append(f"build.nsx_modules.{name}")
+    return floating
 
 
 def _toolchain_fact(toolchain: ToolchainIdentity) -> str | None:
