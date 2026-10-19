@@ -368,7 +368,7 @@ def _run_aot_compiler(
     convert_args.module.path = output_dir
     convert_args.module.name = module_name
     convert_args.module.prefix = prefix
-    convert_args.module.type = ModuleType.nsx
+    convert_args.module.type = ModuleType("nsx")
     convert_args.platform.name = aot_platform
     convert_args.force = True
 

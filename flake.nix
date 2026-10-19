@@ -328,6 +328,7 @@
           v7_45_0 = "3573bfbdb651092a14662daaa3557ce63452e294";
           v7_45_1 = "afe4e5de42f8d67de562ec2c853a8031872e2931";
           v7_46_0 = "4a937fe7988935e1cfc2d8a41859fdada042c17c";
+          v7_47_0 = "9f793bd9343b60e794f915b285bd7b7c4a885abe";
           compatCases = {
             "0.25.0 on v7.39.2" = accepts "0.25.0" v7_39_2;
             "0.26.0 on v7.39.2" = accepts "0.26.0" v7_39_2;
@@ -342,6 +343,9 @@
             "0.30.0 on v7.46.0" = accepts "0.30.0" v7_46_0;
             "0.31.0 rejected on v7.45.1" = !accepts "0.31.0" v7_45_1;
             "0.31.0 on v7.46.0" = accepts "0.31.0" v7_46_0;
+            "0.31.0 on v7.47.0" = accepts "0.31.0" v7_47_0;
+            "0.32.0 rejected on v7.46.0" = !accepts "0.32.0" v7_46_0;
+            "0.32.0 on v7.47.0" = accepts "0.32.0" v7_47_0;
             "1.0.0 rejected on v7.44.1" = !accepts "1.0.0" v7_44_1;
             "unmapped baseline commit reported, not blocking" =
               accepts "0.26.0" "0000000000000000000000000000000000000000"
