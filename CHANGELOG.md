@@ -56,6 +56,17 @@ release pull requests from Conventional Commits.
   capture taken while it was still settling says so.
 
 
+## [0.3.0](https://github.com/AmbiqAI/helia-profiler/compare/v0.2.5...v0.3.0) (2026-10-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* **aot:** heliaAOT releases before 0.33.0 are no longer accepted.
+
+### Features
+
+* **aot:** require heliaAOT 0.33.0, the 1.0 API, and drop older releases ([#559](https://github.com/AmbiqAI/helia-profiler/issues/559)) ([6695937](https://github.com/AmbiqAI/helia-profiler/commit/669593798ae6f50f50f949854a98e23d25479eac))
+
 ## [0.2.5](https://github.com/AmbiqAI/helia-profiler/compare/v0.2.4...v0.2.5) (2026-10-19)
 
 
