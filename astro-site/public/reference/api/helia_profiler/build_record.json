@@ -212,7 +212,7 @@
               "summary": "Read and verify a record written by :meth:save, resolving paths under roots."
             },
             {
-              "description": "Flash the recorded image, capture one run and compare outputs when *expect* is given.",
+              "description": "Flash the recorded image, capture one run and compare outputs when *expect* is given.\n\nA failed capture comes back with ``capture.state == \"failure\"`` and no\nverification; errors raised while capturing propagate.",
               "examples": [],
               "id": "helia_profiler.BuildRecord.run",
               "kind": "method",
@@ -263,9 +263,9 @@
               "returns": [],
               "signature": "record: BuildRecord",
               "source": {
-                "line": 153,
+                "line": 179,
                 "path": "src/helia_profiler/build_record.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L153"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L179"
               },
               "summary": ""
             },
@@ -282,9 +282,9 @@
               "returns": [],
               "signature": "capture: FixtureCaptureResult",
               "source": {
-                "line": 154,
+                "line": 180,
                 "path": "src/helia_profiler/build_record.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L154"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L180"
               },
               "summary": ""
             },
@@ -301,9 +301,9 @@
               "returns": [],
               "signature": "identity: RunIdentity",
               "source": {
-                "line": 155,
+                "line": 181,
                 "path": "src/helia_profiler/build_record.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L155"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L181"
               },
               "summary": ""
             },
@@ -320,9 +320,9 @@
               "returns": [],
               "signature": "verification: Verification | None",
               "source": {
-                "line": 156,
+                "line": 182,
                 "path": "src/helia_profiler/build_record.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L156"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L182"
               },
               "summary": ""
             },
@@ -339,9 +339,9 @@
               "returns": [],
               "signature": "succeeded: bool",
               "source": {
-                "line": 159,
+                "line": 185,
                 "path": "src/helia_profiler/build_record.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L159"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L185"
               },
               "summary": ""
             }
@@ -352,9 +352,9 @@
           "returns": [],
           "signature": "RunResult(\n    record: BuildRecord,\n    capture: FixtureCaptureResult,\n    identity: RunIdentity,\n    verification: Verification | None,\n) -> None",
           "source": {
-            "line": 149,
+            "line": 175,
             "path": "src/helia_profiler/build_record.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L149"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L175"
           },
           "summary": "One capture from a :class:BuildRecord."
         }

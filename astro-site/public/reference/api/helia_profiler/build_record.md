@@ -161,6 +161,9 @@ run(
 
 Flash the recorded image, capture one run and compare outputs when *expect* is given.
 
+A failed capture comes back with ``capture.state == "failure"`` and no
+verification; errors raised while capturing propagate.
+
 Source: `src/helia_profiler/build_record.py:135`
 
 ## helia_profiler.RunResult
@@ -182,7 +185,7 @@ One capture from a :class:`BuildRecord`.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/build_record.py:149`
+Source: `src/helia_profiler/build_record.py:175`
 
 ### helia_profiler.RunResult.record
 
@@ -192,7 +195,7 @@ Source: `src/helia_profiler/build_record.py:149`
 record: BuildRecord
 ```
 
-Source: `src/helia_profiler/build_record.py:153`
+Source: `src/helia_profiler/build_record.py:179`
 
 ### helia_profiler.RunResult.capture
 
@@ -202,7 +205,7 @@ Source: `src/helia_profiler/build_record.py:153`
 capture: FixtureCaptureResult
 ```
 
-Source: `src/helia_profiler/build_record.py:154`
+Source: `src/helia_profiler/build_record.py:180`
 
 ### helia_profiler.RunResult.identity
 
@@ -212,7 +215,7 @@ Source: `src/helia_profiler/build_record.py:154`
 identity: RunIdentity
 ```
 
-Source: `src/helia_profiler/build_record.py:155`
+Source: `src/helia_profiler/build_record.py:181`
 
 ### helia_profiler.RunResult.verification
 
@@ -222,7 +225,7 @@ Source: `src/helia_profiler/build_record.py:155`
 verification: Verification | None
 ```
 
-Source: `src/helia_profiler/build_record.py:156`
+Source: `src/helia_profiler/build_record.py:182`
 
 ### helia_profiler.RunResult.succeeded
 
@@ -232,4 +235,4 @@ Source: `src/helia_profiler/build_record.py:156`
 succeeded: bool
 ```
 
-Source: `src/helia_profiler/build_record.py:159`
+Source: `src/helia_profiler/build_record.py:185`

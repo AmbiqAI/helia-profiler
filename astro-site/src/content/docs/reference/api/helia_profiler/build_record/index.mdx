@@ -206,6 +206,9 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
     Flash the recorded image, capture one run and compare outputs when *expect* is given.
 
+    A failed capture comes back with ``capture.state == "failure"`` and no
+    verification; errors raised while capturing propagate.
+
   </RefSymbol>
 
 </RefSymbol>
@@ -218,7 +221,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   signature={"RunResult(\n    record: BuildRecord,\n    capture: FixtureCaptureResult,\n    identity: RunIdentity,\n    verification: Verification | None,\n) -> None"}
   level={2}
   summary={"One capture from a :class:BuildRecord."}
-  source={{"path":"src/helia_profiler/build_record.py","line":149,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L149"}}
+  source={{"path":"src/helia_profiler/build_record.py","line":175,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L175"}}
 >
 
   `dataclass`
@@ -234,7 +237,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"record: BuildRecord"}
     level={3}
-    source={{"path":"src/helia_profiler/build_record.py","line":153,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L153"}}
+    source={{"path":"src/helia_profiler/build_record.py","line":179,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L179"}}
   >
 
 
@@ -248,7 +251,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"capture: FixtureCaptureResult"}
     level={3}
-    source={{"path":"src/helia_profiler/build_record.py","line":154,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L154"}}
+    source={{"path":"src/helia_profiler/build_record.py","line":180,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L180"}}
   >
 
 
@@ -262,7 +265,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"identity: RunIdentity"}
     level={3}
-    source={{"path":"src/helia_profiler/build_record.py","line":155,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L155"}}
+    source={{"path":"src/helia_profiler/build_record.py","line":181,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L181"}}
   >
 
 
@@ -276,7 +279,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"verification: Verification | None"}
     level={3}
-    source={{"path":"src/helia_profiler/build_record.py","line":156,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L156"}}
+    source={{"path":"src/helia_profiler/build_record.py","line":182,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L182"}}
   >
 
 
@@ -290,7 +293,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"succeeded: bool"}
     level={3}
-    source={{"path":"src/helia_profiler/build_record.py","line":159,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L159"}}
+    source={{"path":"src/helia_profiler/build_record.py","line":185,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/build_record.py#L185"}}
   >
 
 
