@@ -1,0 +1,179 @@
+"""The :class:`RunIdentity` of a fixture build, and of a capture made from it.
+
+Every fact comes from the build record and the files it pins, so a saved
+record gives the same identity on any host. A fact the record does not state
+is :class:`Unknown`, with the reason.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from dataclasses import fields, is_dataclass
+from enum import Enum
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+from .fixture_runtime import FixtureFile
+from .identity import (
+    BuildFacts,
+    KernelIdentity,
+    RunFacts,
+    RunIdentity,
+    RuntimeIdentity,
+    Unknown,
+    canonical_engine,
+    canonical_kernel,
+)
+
+if TYPE_CHECKING:
+    from ._fixture_build import FixtureBuild
+    from .fixture_capture import FixtureCaptureResult
+
+_NOT_COMPILED = Unknown("the build was not compiled")
+
+
+def fixture_run_identity(
+    build: FixtureBuild, capture: FixtureCaptureResult | None = None
+) -> RunIdentity:
+    """The identity of a fixture build, and of *capture* when one is given."""
+    workspace = _workspace(build)
+    archive = build.runtime_source.archive_sha256 if build.runtime_source else None
+    return RunIdentity(
+        runtime=_runtime(build),
+        kernels=_kernels(build),
+        prepared_archive_sha256=archive,
+        build=_build_facts(build),
+        baseline_id=_workspace_fact(workspace, "baseline_id"),
+        dependency_lock_sha256=_sha(build.dependency_lock),
+        model_sha256=_sha(build.model, Unknown("the record predates pinned models")),
+        inputs_sha256=_inputs_sha256(build),
+        run=RunFacts(
+            lifecycle=(build.state_policy.value if build.state_policy else "stateless"),
+            iterations=build.iterations,
+            warmups=build.warmups,
+            timing_scope=build.timing_scope.value,
+        ),
+        producer=_workspace_fact(
+            workspace if isinstance(workspace, Unknown) else workspace.get("inputs", {}),
+            "hpx_version",
+        ),
+        build_hash=_build_hash(build, archive),
+        observation_hash=_observation_hash(capture) if capture is not None else None,
+    )
+
+
+def _workspace(build: FixtureBuild) -> dict[str, Any] | Unknown:
+    if build.dependency_state is None:
+        return _NOT_COMPILED
+    workspace = json.loads(build.dependency_state.read()).get("workspace")
+    if not isinstance(workspace, dict):
+        return Unknown("the dependency state records no workspace")
+    return workspace
+
+
+def _workspace_fact(source: dict[str, Any] | Unknown, key: str) -> str | Unknown:
+    if isinstance(source, Unknown):
+        return source
+    value = source.get(key)
+    return value if isinstance(value, str) and value else Unknown(f"the workspace records no {key}")
+
+
+def _runtime(build: FixtureBuild) -> RuntimeIdentity:
+    engine = canonical_engine(build.engine.value)
+    if build.runtime_source is not None:
+        source = build.runtime_source
+        version = source.version or Unknown(f"no runtime record matches {source.commit}")
+        return RuntimeIdentity(engine, source.url, version, source.commit)
+    if build.engine_source is not None:
+        source = build.engine_source
+        commit = source.commit or Unknown(f"{source.package} {source.version} records no commit")
+        return RuntimeIdentity(engine, source.package, source.version, commit)
+    reason = _NOT_COMPILED if not build.built else Unknown("the record states no runtime source")
+    return RuntimeIdentity(engine, reason, reason, reason)
+
+
+def _kernels(build: FixtureBuild) -> KernelIdentity:
+    source = build.kernel_source
+    if source is None:
+        reason = (
+            _NOT_COMPILED
+            if build.dependency_state is None and build.runtime_manifest is None
+            else Unknown("the dependency state names no single CMSIS-NN module")
+        )
+        return KernelIdentity(reason, reason, reason, reason)
+
+    def absent(what: str) -> Unknown:
+        return Unknown(f"the {source.name} source states no {what}")
+
+    return KernelIdentity(
+        canonical_kernel(source.name),
+        source.url or absent("repository"),
+        source.version or absent("release tag"),
+        source.commit or absent("commit"),
+    )
+
+
+def _build_facts(build: FixtureBuild) -> BuildFacts:
+    toolchain = build.toolchain
+    unrecorded = Unknown("the record predates this fact")
+    return BuildFacts(
+        toolchain=toolchain.compiler if toolchain and toolchain.compiler else _NOT_COMPILED,
+        toolchain_version=(
+            toolchain.compiler_version
+            if toolchain and toolchain.compiler_version
+            else _NOT_COMPILED
+        ),
+        board=build.target.board,
+        cpu_hz=build.cpu_hz if build.cpu_hz is not None else unrecorded,
+        clock_profile=build.clock_profile or unrecorded,
+        arena_location=build.arena_location.value if build.arena_location else unrecorded,
+        weights_location=build.weights_location.value if build.weights_location else unrecorded,
+        arena_bytes=build.arena_capacity if build.arena_capacity is not None else unrecorded,
+    )
+
+
+def _sha(file: FixtureFile | None, absent: Unknown = _NOT_COMPILED) -> str | Unknown:
+    return file.sha256 if file is not None else absent
+
+
+def _inputs_sha256(build: FixtureBuild) -> str | Unknown:
+    if not build.inputs:
+        return Unknown("the record predates pinned inputs")
+    return _digest([[io.tensor.name, io.data.sha256] for io in build.inputs])
+
+
+def _build_hash(build: FixtureBuild, archive: str | None) -> str | Unknown:
+    pinned = (build.flat_binary, build.dependency_lock, build.model)
+    if any(file is None for file in pinned):
+        return (
+            _NOT_COMPILED if not build.built else Unknown("the record pins no image, lock or model")
+        )
+    image, lock, model = (file.sha256 for file in pinned if file is not None)
+    return _digest({"image": image, "lock": lock, "runtime_archive": archive, "model": model})
+
+
+def _observation_hash(capture: FixtureCaptureResult) -> str:
+    facts = _facts(capture)
+    facts.pop("artifacts", None)
+    return _digest(facts)
+
+
+def _facts(value: Any) -> Any:
+    """A capture's measured facts with every file reduced to its content hash."""
+    if isinstance(value, FixtureFile):
+        return value.sha256
+    if isinstance(value, Enum):
+        return value.value
+    if isinstance(value, Path):
+        return None
+    if is_dataclass(value) and not isinstance(value, type):
+        return {f.name: _facts(getattr(value, f.name)) for f in fields(value)}
+    if isinstance(value, (list, tuple)):
+        return [_facts(item) for item in value]
+    return value
+
+
+def _digest(value: Any) -> str:
+    encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    return hashlib.sha256(encoded.encode()).hexdigest()
