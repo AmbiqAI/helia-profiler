@@ -18,7 +18,7 @@ from typing import Any
 
 from ...config import ProfileConfig
 from ...errors import ConfigError, EngineError
-from ...modelcost import analyze_air_model
+from ...modelcost import analyze_aot_operators, analyze_model
 from ...placement import ArenaRole, Placement
 from ...results import NsxModuleRef
 from ...results.dependencies import installed_aot_source
@@ -258,7 +258,7 @@ class HeliaAOTAdapter:
         aot_output_dir = work_dir / "aot_output"
         aot_module_dir = aot_output_dir / module_name
         _clear_reports(aot_output_dir, prefix)
-        codegen_ctx = _run_aot_compiler(
+        result = _run_aot_compiler(
             compiler_config,
             aot_output_dir,
             module_name,
@@ -266,24 +266,15 @@ class HeliaAOTAdapter:
             aot_platform,
         )
 
-        # heliaAOT transforms/fuses ops — the AIR graph may differ
-        # significantly from the original TFLite flatbuffer.  The
-        # manifest captures what the AOT compiler *actually* emits.
-        air_model = getattr(codegen_ctx, "model", None)
-        compiled_analysis = analyze_air_model(air_model) if air_model is not None else None
-        op_manifest = _extract_operator_manifest(codegen_ctx)
-        if op_manifest:
-            manifest_path = work_dir / "aot_operator_manifest.json"
-            manifest_path.write_text(json.dumps(op_manifest, indent=2), encoding="utf-8")
-            log.info(
-                "Extracted %d AOT operators from CodeGenContext",
-                len(op_manifest),
-            )
-        else:
-            log.warning(
-                "Could not extract operator manifest from AOT — "
-                "per-layer names will fall back to op_N."
-            )
+        # heliaAOT transforms/fuses ops, so the generated graph may differ
+        # from the .tflite; the views describe what it actually emits.
+        compiled_analysis = analyze_aot_operators(
+            result.operators, result.tensors, analyze_model(config.model.path)
+        )
+        op_manifest = _extract_operator_manifest(result, prefix)
+        manifest_path = work_dir / "aot_operator_manifest.json"
+        manifest_path.write_text(json.dumps(op_manifest, indent=2), encoding="utf-8")
+        log.info("Extracted %d AOT operators", len(op_manifest))
 
         _validate_pragmas(aot_module_dir, prefix)
         cmsis_nn_ref = cmsis_nn_module_ref(config, work_dir)
@@ -304,12 +295,10 @@ class HeliaAOTAdapter:
 
         engine_cmake_vars = _engine_cmake_vars(config)
 
-        # Build a MemoryPlan from the AOT codegen context so the
-        # plan_memory stage can validate placement against the SoC's
-        # physical memory layout.  allocate_arenas hints the symbols the
-        # templates actually emit in each mode (#179).
-        memory_plan = _extract_memory_plan(codegen_ctx, prefix, allocate_arenas=allocate_arenas)
-        arena_regions = _extract_arena_regions(codegen_ctx, prefix)
+        # The plan_memory stage validates this plan against the SoC's
+        # physical memory layout.
+        memory_plan = _extract_memory_plan(result, prefix, allocate_arenas=allocate_arenas)
+        arena_regions = _extract_arena_regions(result, prefix)
 
         extra_modules = _build_extra_modules(config, cmsis_nn_ref, module_name, aot_module_dir)
 

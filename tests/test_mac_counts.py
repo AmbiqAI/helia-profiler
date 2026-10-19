@@ -22,7 +22,7 @@ from helia_profiler.modelcost.model_analysis import (  # noqa: E402
     _batch_matmul_macs,
     _fully_connected_macs,
     _transpose_conv_macs,
-    analyze_air_model,
+    analyze_model,
     is_aot_available,
 )
 
@@ -109,14 +109,8 @@ def _analyzed_macs(path: Path) -> int:
     return analysis.layers[0].macs
 
 
-def _air_macs(path: Path) -> int:
-    from helia_aot.converters import convert_backend_model
-    from helia_aot.registry.context import build_default_registry_context
-
-    air_model = convert_backend_model(path, build_default_registry_context(), verbose=0)
-    analysis = analyze_air_model(air_model)
-    assert analysis is not None
-    return analysis.total_macs
+def _aot_macs(path: Path) -> int:
+    return analyze_for_engine(path, engine="helia-aot").total_macs
 
 
 _needs_aot = pytest.mark.skipif(not is_aot_available(), reason="helia-aot not installed")
@@ -183,9 +177,9 @@ def test_transpose_conv_counts_input_pixels(transpose_conv_model):
 
 
 @_needs_aot
-def test_air_transpose_conv_counts_input_pixels(transpose_conv_model):
+def test_aot_transpose_conv_counts_input_pixels(transpose_conv_model):
     path, _, multiplies = transpose_conv_model
-    assert _air_macs(path) == multiplies
+    assert _aot_macs(path) == multiplies
 
 
 def _reference_fully_connected(x: np.ndarray, w: np.ndarray) -> tuple[np.ndarray, int]:
@@ -281,9 +275,9 @@ def test_batch_matmul_counts_shared_dim(tmp_path: Path, adj_x: bool):
 
 @_needs_aot
 @_ADJ_X
-def test_air_batch_matmul_counts_shared_dim(tmp_path: Path, adj_x: bool):
+def test_aot_batch_matmul_counts_shared_dim(tmp_path: Path, adj_x: bool):
     path, multiplies = _batch_matmul_model(tmp_path, adj_x)
-    assert _air_macs(path) == multiplies
+    assert _aot_macs(path) == multiplies
 
 
 def test_helpers_reject_malformed_shapes():
@@ -298,7 +292,7 @@ def test_helpers_reject_malformed_shapes():
     ("op_name", "arity"),
     [("SQRT", 1), ("RSQRT", 1), ("ABS", 1), ("SQUARED_DIFFERENCE", 2)],
 )
-def test_air_elementwise_ops_match_tflite(tmp_path: Path, op_name: str, arity: int):
+def test_aot_elementwise_ops_match_tflite(tmp_path: Path, op_name: str, arity: int):
     shape = (1, 4, 4, 8)
     path = _write_model(
         tmp_path / f"{op_name.lower()}.tflite",
@@ -309,12 +303,18 @@ def test_air_elementwise_ops_match_tflite(tmp_path: Path, op_name: str, arity: i
         options_type=0,
         options=None,
     )
-    from helia_aot.converters import convert_backend_model
-    from helia_aot.registry.context import build_default_registry_context
+    aot = analyze_for_engine(path, engine="helia-aot")
+    assert [(layer.op, layer.ops) for layer in aot.layers] == [(op_name, math.prod(shape))]
+    assert aot.total_ops == analyze_for_engine(path, engine="tflm").total_ops
 
-    air = analyze_air_model(
-        convert_backend_model(path, build_default_registry_context(), verbose=0)
-    )
-    assert air is not None
-    assert [(layer.op, layer.ops) for layer in air.layers] == [(op_name, math.prod(shape))]
-    assert air.total_ops == analyze_for_engine(path, engine="tflm").total_ops
+
+_KWS_MODELS = sorted((Path(__file__).parent / "fixtures").glob("kws*.tflite"))
+
+
+@_needs_aot
+@pytest.mark.parametrize("path", _KWS_MODELS, ids=[p.stem for p in _KWS_MODELS])
+def test_aot_totals_match_the_source_model(path: Path):
+    source = analyze_model(path)
+    aot = analyze_for_engine(path, engine="helia-aot")
+    assert source is not None
+    assert (aot.total_macs, aot.num_parameters) == (source.total_macs, source.num_parameters)

@@ -119,8 +119,8 @@ class EngineArtifacts:
     extra_modules: list[NsxModuleRef] = field(default_factory=list)
     cmake_vars: dict[str, str] = field(default_factory=dict)
 
-    # Optional memory plan built from engine-specific internals (e.g.
-    # heliaAOT's ``codegen_ctx.memory_plan``).  If None, ``plan_memory``
+    # Optional memory plan the engine reports (e.g. heliaAOT's arena
+    # regions).  If None, ``plan_memory``
     # stage synthesises a conservative plan from ``model.arena_size`` and
     # the resolved split placement.
     memory_plan: MemoryPlan | None = None

@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import csv
+import dataclasses
 import json
-from collections.abc import Callable
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -14,11 +13,12 @@ import pytest
 from helia_profiler.engines.base import HeliaAotArtifacts
 from helia_profiler.engines.helia_aot.compile import _BOARD_TO_AOT_PLATFORM
 from helia_profiler.engines.helia_aot.manifest import (
-    _arena_region_id_lookup,
     _extract_operator_manifest,
     _tensor_metadata,
 )
 from helia_profiler.report import _write_aot_manifest, _write_aot_memory_layers
+from tests import aot_views
+from tests.aot_views import PlacementView, RegionView, Result, TensorView, operator
 
 
 def test_apollo4_board_variants_map_to_aot_platform():
@@ -35,124 +35,47 @@ def test_apollo4_board_variants_map_to_aot_platform():
         assert _BOARD_TO_AOT_PLATFORM.get(board) == board
 
 
-@dataclass
-class _FakeTensor:
-    name: str = "t"
-    shape: list[int] = field(default_factory=lambda: [1, 8, 8, 3])
-    dtype: str = "int8"
-    ctype: str = "int8_t"
-    nbytes: int = 192
-    size: int = 192
-    ndim: int = 4
-    is_constant: bool = False
-    is_persistent: bool = False
-    is_scratch: bool = False
-    id: int = 0
-    buffer_index: int = 0
-    kind: str = "input"
+def test_aot_views_match_helia_aot():
+    views = pytest.importorskip("helia_aot.views")
+    from helia_aot import ConversionResult
+
+    def names(cls: Any) -> list[str]:
+        return [f.name for f in dataclasses.fields(cls)]
+
+    for name in ("OperatorView", "QuantizationView", "TensorView", "RegionView", "PlacementView"):
+        assert names(getattr(aot_views, name)) == names(getattr(views, name)), name
+    assert set(names(Result)) <= set(names(ConversionResult))
 
 
-class _FakeAotOp:
-    def __init__(
-        self,
-        id: int,
-        type_name: str,
-        inputs: list[_FakeTensor] | None = None,
-        outputs: list[_FakeTensor] | None = None,
-        local_tensors: list[_FakeTensor] | None = None,
-        kernel_calls: Callable[[], Any] | None = None,
-    ):
-        self.id = id
-        self.TYPE = type_name
-        self.name = f"{type_name.lower()}_{id}"
-        self.input_tensors = inputs or []
-        self.output_tensors = outputs or []
-        self.local_tensors = local_tensors or []
-        # Older heliaAOT operators have no kernel_calls method at all.
-        if kernel_calls is not None:
-            self.kernel_calls = kernel_calls
-
-
-class _FakeCtx:
-    def __init__(
-        self,
-        operators: list[Any] | None,
-        memory_plan: Any | None = None,
-        render_plan: Any | None = None,
-    ):
-        if operators is not None:
-            self.operators = operators
-        if memory_plan is not None:
-            self.memory_plan = memory_plan
-        if render_plan is not None:
-            self.render_plan = render_plan
-
-
-@dataclass
-class _FakeBinding:
-    role: str
-    memory: str
-    source_memory: str
-    offset: int
-
-
-@dataclass
-class _FakeAllocation:
-    memory: str
-    offset: int
-    size: int
-    binding: _FakeBinding
-
-
-@dataclass
-class _FakeMemoryPlan:
-    tensor_allocs: dict[str, _FakeAllocation]
-
-
-@dataclass
-class _FakeArena:
-    region_id: int
-    role: str
-    memory: str
-    source_memory: str | None
+def _tensor(tid: str, name: str | None = None, shape: tuple[int, ...] = (1, 8, 8, 3), **fields):
+    return TensorView(tid, name, shape, **fields)
 
 
 class TestTensorMetadata:
-    def test_full_tensor_produces_full_metadata(self):
-        t = _FakeTensor(name="conv_in", shape=[1, 8, 8, 3], dtype="int8", nbytes=192)
-        meta = _tensor_metadata(t)
-        assert meta["name"] == "conv_in"
-        assert meta["dtype"] == "int8"
-        assert meta["shape"] == [1, 8, 8, 3]
-        assert meta["nbytes"] == 192
-        assert meta["is_constant"] is False
+    def test_unplaced_tensor_has_no_placement_keys(self):
+        t = _tensor("4", "conv_in", nbytes=192, kind="input")
+        assert _tensor_metadata(t, None, {}) == {
+            "id": "4",
+            "name": "conv_in",
+            "dtype": "int8",
+            "ctype": "int8_t",
+            "kind": "input",
+            "nbytes": 192,
+            "shape": [1, 8, 8, 3],
+        }
 
-    def test_missing_attributes_are_omitted(self):
-        class _Bare:
-            name = "x"
+    def test_unnamed_tensor_omits_name(self):
+        assert "name" not in _tensor_metadata(_tensor("4"), None, {})
 
-        meta = _tensor_metadata(_Bare())
-        assert meta == {"name": "x"}
+    def test_placement_without_a_region_adds_nothing(self):
+        placement = PlacementView(None, 0, 0, "sram")
+        assert "memory" not in _tensor_metadata(_tensor("4"), placement, {})
 
-    def test_non_iterable_shape_is_dropped(self):
-        class _Weird:
-            name = "y"
-            shape = 42  # noqa — simulates malformed AOT surface
+    def test_placement_metadata_comes_from_the_placement_and_its_region(self):
+        region = RegionView(3, "DTCM", "DTCM", "scratch", size=4096)
+        placement = PlacementView(3, 128, 256, "DTCM")
 
-        meta = _tensor_metadata(_Weird())
-        assert "shape" not in meta
-        assert meta["name"] == "y"
-
-    def test_allocation_metadata_is_embedded_when_available(self):
-        t = _FakeTensor(name="x", id=7)
-        alloc = _FakeAllocation(
-            memory="DTCM",
-            offset=128,
-            size=256,
-            binding=_FakeBinding(role="scratch", memory="DTCM", source_memory="DTCM", offset=128),
-        )
-
-        meta = _tensor_metadata(t, {"7": alloc}, {("scratch", "dtcm", "dtcm"): 3})
+        meta = _tensor_metadata(_tensor("7", "x"), placement, {3: region})
 
         assert meta["memory"] == "dtcm"
         assert meta["source_memory"] == "dtcm"
@@ -164,57 +87,60 @@ class TestTensorMetadata:
 
 
 class TestExtractOperatorManifest:
-    def test_missing_operators_returns_empty_list(self):
-        assert _extract_operator_manifest(_FakeCtx(None)) == []
-
     def test_empty_operators_returns_empty_list(self):
-        assert _extract_operator_manifest(_FakeCtx([])) == []
+        assert _extract_operator_manifest(Result(), "hpx") == []
 
     def test_single_op_minimal_fields(self):
-        op = _FakeAotOp(id=0, type_name="CONV_2D")
-        out = _extract_operator_manifest(_FakeCtx([op]))
-        assert len(out) == 1
-        entry = out[0]
-        assert entry["idx"] == 0
-        assert entry["id"] == 0
-        assert entry["op_type"] == "CONV_2D"
-        assert entry["name"] == "conv_2d_0"
-        assert entry["kernel_calls"] is None
-        assert entry["inputs"] == []
-        assert entry["outputs"] == []
+        result = Result(operators=(operator(0, "CONV_2D"),))
+        assert _extract_operator_manifest(result, "hpx") == [
+            {
+                "idx": 0,
+                "id": 0,
+                "source_indices": [0],
+                "op_type": "CONV_2D",
+                "name": "conv_2d_0",
+                "kernel_calls": None,
+                "inputs": [],
+                "outputs": [],
+            }
+        ]
+
+    def test_name_strips_only_the_module_prefix(self):
+        result = Result(operators=(operator(0, "ADD", prefix="kws"),))
+        assert _extract_operator_manifest(result, "kws")[0]["name"] == "add_0"
+        assert _extract_operator_manifest(result, "hpx")[0]["name"] == "kws_add_0"
+
+    def test_operators_without_a_single_source_index_are_kept(self):
+        created = operator(1, "RESHAPE", sources=())
+        fused = operator(2, "WHILE", sources=(4, 5))
+        result = Result(operators=(operator(0, "CONV_2D", sources=(3,)), created, fused))
+
+        out = _extract_operator_manifest(result, "hpx")
+
+        assert [(e["idx"], e["id"], e["source_indices"]) for e in out] == [
+            (0, 3, [3]),
+            (1, None, []),
+            (2, None, [4, 5]),
+        ]
 
     def test_kernel_calls_record_the_compilers_selected_entries(self):
-        conv = _FakeAotOp(
-            id=0, type_name="CONV_2D", kernel_calls=lambda: {"run": "arm_convolve_s8"}
-        )
-        reshape = _FakeAotOp(id=1, type_name="RESHAPE", kernel_calls=lambda: {})
-        out = _extract_operator_manifest(_FakeCtx([conv, reshape]))
+        conv = operator(0, "CONV_2D", kernel_calls={"run": "arm_convolve_s8"})
+        reshape = operator(1, "RESHAPE", kernel_calls={})
+        out = _extract_operator_manifest(Result(operators=(conv, reshape)), "hpx")
         assert [e["kernel_calls"] for e in out] == [{"run": "arm_convolve_s8"}, {}]
-
-    def test_a_failing_compiler_method_propagates(self):
-        def failing():
-            raise ValueError("operand")
-
-        op = _FakeAotOp(id=0, type_name="CONV_2D", kernel_calls=failing)
-        with pytest.raises(ValueError, match="operand"):
-            _extract_operator_manifest(_FakeCtx([op]))
 
     @pytest.mark.parametrize(
         ("report", "warns"),
         [
             (None, False),
-            (lambda: None, False),
-            (lambda: "arm_convolve_s8", True),
-            (lambda: {"run": 7}, True),
-            (lambda: {"run": ""}, True),
-            (lambda: {"run": "a;b"}, True),
-            (lambda: {"": "arm_convolve_s8"}, True),
-            (lambda: {"run=x": "arm_convolve_s8"}, True),
+            ({"run": 7}, True),
+            ({"run": ""}, True),
+            ({"run": "a;b"}, True),
+            ({"": "arm_convolve_s8"}, True),
+            ({"run=x": "arm_convolve_s8"}, True),
         ],
         ids=[
-            "no-method",
             "none",
-            "not-a-mapping",
             "non-string-symbol",
             "empty-symbol",
             "non-identifier-symbol",
@@ -225,103 +151,59 @@ class TestExtractOperatorManifest:
     def test_kernel_calls_without_a_usable_compiler_record_stay_unrecorded(
         self, report, warns, caplog
     ):
-        op = _FakeAotOp(id=0, type_name="CONV_2D", kernel_calls=report)
+        result = Result(operators=(operator(0, "CONV_2D", kernel_calls=report),))
         with caplog.at_level("WARNING", logger="hpx"):
-            entry = _extract_operator_manifest(_FakeCtx([op]))[0]
+            entry = _extract_operator_manifest(result, "hpx")[0]
         assert entry["kernel_calls"] is None
         assert ("CORE calls" in caplog.text) is warns
 
     def test_multi_op_preserves_execution_order(self):
-        ops = [
-            _FakeAotOp(id=0, type_name="CONV_2D"),
-            _FakeAotOp(id=3, type_name="DEPTHWISE_CONV_2D"),
-            _FakeAotOp(id=7, type_name="ADD"),
-        ]
-        out = _extract_operator_manifest(_FakeCtx(ops))
+        ops = (
+            operator(0, "CONV_2D", sources=(0,)),
+            operator(1, "DEPTHWISE_CONV_2D", sources=(3,)),
+            operator(2, "ADD", sources=(7,)),
+        )
+        out = _extract_operator_manifest(Result(operators=ops), "hpx")
         assert [e["idx"] for e in out] == [0, 1, 2]
         assert [e["id"] for e in out] == [0, 3, 7]
         assert [e["op_type"] for e in out] == ["CONV_2D", "DEPTHWISE_CONV_2D", "ADD"]
 
+    def test_idx_is_the_layer_index_not_the_list_position(self):
+        result = Result(operators=(operator(4, "ADD"),))
+        assert _extract_operator_manifest(result, "hpx")[0]["idx"] == 4
+
     def test_tensor_metadata_embedded_on_each_op(self):
-        x = _FakeTensor(name="x", shape=[1, 8, 8, 3])
-        y = _FakeTensor(name="y", shape=[1, 8, 8, 16])
-        op = _FakeAotOp(id=0, type_name="CONV_2D", inputs=[x], outputs=[y])
-        out = _extract_operator_manifest(_FakeCtx([op]))
-        entry = out[0]
+        result = Result(
+            operators=(operator(0, "CONV_2D", ("x",), ("y",)),),
+            tensors=(_tensor("x", "x", (1, 8, 8, 3)), _tensor("y", "y", (1, 8, 8, 16))),
+        )
+        entry = _extract_operator_manifest(result, "hpx")[0]
         assert entry["inputs"][0]["shape"] == [1, 8, 8, 3]
         assert entry["outputs"][0]["shape"] == [1, 8, 8, 16]
         assert entry["inputs"][0]["name"] == "x"
 
     def test_local_tensor_placement_is_embedded_on_each_op(self):
-        local = _FakeTensor(name="weights", id=17, kind="constant", is_constant=True)
-        op = _FakeAotOp(id=0, type_name="CONV_2D", local_tensors=[local])
-        memory_plan = _FakeMemoryPlan(
-            {
-                "17": _FakeAllocation(
-                    memory="MRAM",
-                    offset=64,
-                    size=1024,
-                    binding=_FakeBinding(
-                        role="constant",
-                        memory="DTCM",
-                        source_memory="MRAM",
-                        offset=64,
-                    ),
-                )
-            }
+        result = Result(
+            operators=(operator(0, "CONV_2D", local_tensor_ids=("17",)),),
+            tensors=(_tensor("17", "weights", kind="constant"),),
+            regions=(
+                RegionView(0, "DTCM", "DTCM", "scratch", size=64),
+                RegionView(1, "DTCM", "MRAM", "constant", size=2048),
+            ),
+            placements={"17": PlacementView(1, 64, 1024, "MRAM", staged=True)},
         )
-        render_plan = type(
-            "_RenderPlan",
-            (),
-            {
-                "scratch_arenas": [],
-                "persistent_arenas": [],
-                "constant_arenas": [_FakeArena(1, "constant", "DTCM", "MRAM")],
-            },
-        )()
 
-        out = _extract_operator_manifest(_FakeCtx([op], memory_plan, render_plan))
+        tensor = _extract_operator_manifest(result, "hpx")[0]["local_tensors"][0]
 
-        tensor = out[0]["local_tensors"][0]
         assert tensor["name"] == "weights"
         assert tensor["memory"] == "dtcm"
         assert tensor["source_memory"] == "mram"
         assert tensor["staged"] is True
         assert tensor["arena_region_id"] == 1
 
-    def test_tensor_property_raising_is_swallowed(self):
-        class _BadOp:
-            id = 0
-            TYPE = "ADD"
-            name = "add_0"
-
-            @property
-            def input_tensors(self):
-                raise RuntimeError("AOT internals broke")
-
-            @property
-            def output_tensors(self):
-                return []
-
-        out = _extract_operator_manifest(_FakeCtx([_BadOp()]))
-        assert len(out) == 1
-        assert "inputs" not in out[0]
-        assert out[0]["outputs"] == []
-
-    def test_arena_lookup_uses_runtime_memory_when_source_memory_is_none(self):
-        render_plan = type(
-            "_RenderPlan",
-            (),
-            {
-                "scratch_arenas": [],
-                "persistent_arenas": [],
-                "constant_arenas": [_FakeArena(2, "constant", "DTCM", None)],
-            },
-        )()
-
-        lookup = _arena_region_id_lookup(_FakeCtx([], render_plan=render_plan))
-
-        assert lookup[("constant", "dtcm", "dtcm")] == 2
+    def test_operators_without_local_tensors_have_no_local_tensors_key(self):
+        result = Result(operators=(operator(0, "ADD"),))
+        assert "local_tensors" not in _extract_operator_manifest(result, "hpx")[0]
 
 
 def _aot_artifacts(manifest: list[dict[str, Any]] | None) -> HeliaAotArtifacts:
@@ -436,7 +318,6 @@ class TestWriteAotMemoryLayers:
                         "memory": "dtcm",
                         "source_memory": "mram",
                         "nbytes": 1024,
-                        "size": 256,
                     }
                 ],
             }
@@ -450,39 +331,3 @@ class TestWriteAotMemoryLayers:
         assert out is not None
         rows = list(csv.DictReader(open(out, encoding="utf-8")))
         assert rows[0]["size"] == "1024"
-
-
-class TestAotSymbolHints:
-    """The hints must name symbols the templates ACTUALLY emit,
-    per mode and staging (#179)."""
-
-    def _hint(self, role, *, staged=False, allocate=True, region_id=0):
-        from helia_profiler.engines.helia_aot.manifest import _aot_buffer_symbol
-
-        return _aot_buffer_symbol(
-            "hpx",
-            role,
-            "DTCM",
-            staged=staged,
-            allocate_arenas=allocate,
-            region_id=region_id,
-        )
-
-    def test_cold_constant_is_the_blob_only_with_internal_arenas(self):
-        assert self._hint("constant") == "hpx_arena_const_dtcm__blob"
-        # External-arena mode emits NO constant symbols (sidecar files);
-        # a __blob hint there would be a false "missing" (#179).
-        assert self._hint("constant", allocate=False) is None
-
-    def test_staged_constant_is_the_gated_runtime_buffer(self):
-        assert self._hint("constant", staged=True) == "hpx_arena_const_dtcm_buffer"
-        # tensors.c.j2 gates that buffer on allocate_arenas: external mode
-        # has no single symbol -> None (unmatchable, never false-missing).
-        assert self._hint("constant", staged=True, allocate=False) is None
-
-    def test_scratch_and_persistent_by_mode(self):
-        assert self._hint("scratch") == "hpx_arena_dtcm_buffer"
-        assert self._hint("persistent") == "hpx_arena_persistent_dtcm_buffer"
-        # external mode: hpx's own main_aot.cc.j2 storage symbol, literal
-        # "hpx_" regardless of the AOT prefix, keyed by region_id.
-        assert self._hint("scratch", allocate=False, region_id=2) == "hpx_arena_buf_storage_2"

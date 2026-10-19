@@ -196,6 +196,19 @@ def test_explicit_mixed_aot_regions_keep_emitted_banks(tmp_path):
     assert [r.memory for r in regions] == ["dtcm", "sram", "mram"]
 
 
+def test_internal_aot_constant_mram_needs_no_sidecar_file(tmp_path):
+    ctx, regions = mixed_context(tmp_path)
+    regions[2] = replace(regions[2], blob_filename=None)
+    fixture_template_vars(ctx, regions)
+
+
+def test_writable_aot_region_cannot_use_mram(tmp_path):
+    ctx, regions = mixed_context(tmp_path)
+    regions[2] = replace(regions[2], role=ArenaRole.SCRATCH)
+    with pytest.raises(ConfigError, match="Writable AOT region cannot use MRAM"):
+        fixture_template_vars(ctx, regions)
+
+
 @pytest.mark.parametrize(
     "fault",
     [

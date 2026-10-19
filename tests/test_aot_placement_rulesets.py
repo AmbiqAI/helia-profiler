@@ -217,6 +217,8 @@ class TestRunAotCompilerUsesConfigRegistry:
         import sys
         import types
 
+        from tests.aot_views import Result
+
         class _FakeSection:
             def __init__(self):
                 self.path = None
@@ -230,35 +232,19 @@ class TestRunAotCompilerUsesConfigRegistry:
                 self.module = _FakeSection()
                 self.platform = _FakeSection()
                 self.force = False
-
-        class _FakeCodegenCtx:
-            operators = ()
-            model = object()
-            memory_plan = object()
-            render_plan = object()
+                self.result_views = False
 
         class _FakeAotConverter:
             def __init__(self, config):
-                self._config = config
+                self.config = config
 
             def convert(self):
-                module_dir = Path(self._config.module.path) / self._config.module.name
+                assert self.config.result_views is True
+                module_dir = Path(self.config.module.path) / self.config.module.name
                 (module_dir / "src").mkdir(parents=True, exist_ok=True)
                 (module_dir / "includes-api").mkdir(parents=True, exist_ok=True)
-                return _FakeCodegenCtx()
+                return Result()
 
-        fake_defines = types.ModuleType("helia_aot.cli.defines")
-        fake_defines.ConvertArgs = (  # ty: ignore[unresolved-attribute]
-            _FakeConvertArgs
-        )
-        fake_cli = types.ModuleType("helia_aot.cli")
-        fake_cli.defines = (  # ty: ignore[unresolved-attribute]
-            fake_defines
-        )
-        fake_converter_mod = types.ModuleType("helia_aot.converter")
-        fake_converter_mod.AotConverter = (  # ty: ignore[unresolved-attribute]
-            _FakeAotConverter
-        )
         fake_top_defines = types.ModuleType("helia_aot.defines")
 
         class _ModuleTypeEnum(StrEnum):
@@ -268,20 +254,17 @@ class TestRunAotCompilerUsesConfigRegistry:
             _ModuleTypeEnum
         )
         fake_helia_aot = types.ModuleType("helia_aot")
-        fake_helia_aot.cli = (  # ty: ignore[unresolved-attribute]
-            fake_cli
+        fake_helia_aot.AotConverter = (  # ty: ignore[unresolved-attribute]
+            _FakeAotConverter
         )
-        fake_helia_aot.converter = (  # ty: ignore[unresolved-attribute]
-            fake_converter_mod
+        fake_helia_aot.ConvertArgs = (  # ty: ignore[unresolved-attribute]
+            _FakeConvertArgs
         )
         fake_helia_aot.defines = (  # ty: ignore[unresolved-attribute]
             fake_top_defines
         )
 
         monkeypatch.setitem(sys.modules, "helia_aot", fake_helia_aot)
-        monkeypatch.setitem(sys.modules, "helia_aot.cli", fake_cli)
-        monkeypatch.setitem(sys.modules, "helia_aot.cli.defines", fake_defines)
-        monkeypatch.setitem(sys.modules, "helia_aot.converter", fake_converter_mod)
         monkeypatch.setitem(sys.modules, "helia_aot.defines", fake_top_defines)
 
     def test_custom_board_resolves_soc_via_config_registry(self, tmp_path, monkeypatch):
@@ -325,7 +308,7 @@ class TestRunAotCompilerUsesConfigRegistry:
 
         monkeypatch.setattr(compile_mod, "get_soc_for_board", spy_get_soc_for_board)
 
-        codegen_ctx = compile_mod._run_aot_compiler(
+        result = compile_mod._run_aot_compiler(
             config,
             output_dir=tmp_path / "out",
             module_name="profiler_module",
@@ -333,7 +316,7 @@ class TestRunAotCompilerUsesConfigRegistry:
             aot_platform="apollo510_evb",
         )
 
-        assert codegen_ctx is not None
+        assert result is not None
         # The custom board only exists in config.platform_registry; without
         # threading it through, get_soc_for_board would raise ValueError.
         assert seen["board"] == "apollo510_custom_board"
@@ -366,17 +349,17 @@ class TestRunAotCompilerUsesConfigRegistry:
 
         assert config.engine.config["aot_args"] == {"memory": {"allocate_arenas": False}}
 
-    def test_a_context_refusal_keeps_its_message_and_hint(self, tmp_path, monkeypatch):
+    def test_a_view_refusal_keeps_its_message_and_hint(self, tmp_path, monkeypatch):
         from helia_profiler.engines.helia_aot import compile as compile_mod
 
         self._install_fake_helia_aot(monkeypatch)
 
         def refuse(_converter):
-            raise EngineError("heliaAOT returned no code generation context", hint="range")
+            raise EngineError("heliaAOT returned no conversion views", hint="range")
 
-        monkeypatch.setattr(compile_mod, "codegen_context", refuse)
+        monkeypatch.setattr(compile_mod, "convert_with_views", refuse)
         config = load_config(None, {"model": {"path": "m.tflite"}, "engine": {"type": "helia-aot"}})
-        with pytest.raises(EngineError, match="^heliaAOT returned no code") as refused:
+        with pytest.raises(EngineError, match="^heliaAOT returned no conversion") as refused:
             compile_mod._run_aot_compiler(
                 config,
                 output_dir=tmp_path / "out",

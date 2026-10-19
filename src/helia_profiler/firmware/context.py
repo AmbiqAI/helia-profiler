@@ -308,7 +308,9 @@ class FirmwareRenderContext:
             aot_prefix = artifacts.aot_prefix
             allocate_arenas = artifacts.aot_allocate_arenas
             aot_manifest = tuple(
-                AotOpContext(id=int(op["id"]), op_type=str(op["op_type"]))
+                AotOpContext(
+                    id=-1 if op["id"] is None else int(op["id"]), op_type=str(op["op_type"])
+                )
                 for op in (artifacts.aot_op_manifest or [])
             )
         else:
