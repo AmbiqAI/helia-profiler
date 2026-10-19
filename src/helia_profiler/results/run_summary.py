@@ -71,7 +71,10 @@ RUN_SUMMARY_SCHEMA = "hpx.run-summary"
 #: v15: #558 heliaAOT model_analysis takes heliaAOT's own MAC and parameter
 #: counts from its result views; total_macs, num_parameters, total_ops, TOPS
 #: and cycles_per_mac move for models whose weights lowering repacks.
-RUN_SUMMARY_SCHEMA_VERSION = 15
+#: v16: #558 identity adds intent_hash and, under run, the instance boundary,
+#: first-invoke initializer and window, and the timing clock, its rate and the
+#: statistic; an ExecuTorch run's lifecycle is single. Otherwise additive.
+RUN_SUMMARY_SCHEMA_VERSION = 16
 
 __all__ = [
     "RUN_SUMMARY_SCHEMA",

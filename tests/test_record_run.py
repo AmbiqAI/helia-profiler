@@ -149,7 +149,12 @@ def test_the_identity_states_the_observation_and_the_record_lifecycle(record, de
     assert identity.observation_hash is not None
     assert identity.observation_hash == plain.observation_hash
     assert plain.run.lifecycle == "carry" and identity.run.lifecycle == "single"
-    assert identity == replace(plain, run=replace(plain.run, lifecycle="single"))
+    assert plain.intent_hash is None and identity.intent_hash == record.plan.intent_hash
+    assert identity == replace(
+        plain,
+        run=replace(plain.run, lifecycle="single"),
+        intent_hash=record.plan.intent_hash,
+    )
 
 
 def test_no_expectation_gives_no_verification(record, device, tmp_path):

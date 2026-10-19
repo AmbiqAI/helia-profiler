@@ -15,7 +15,8 @@ from pathlib import Path
 
 from ...config import ProfileConfig
 from ...errors import EngineError
-from ...lifecycle import Lifecycle
+from ...identity import Unknown
+from ...lifecycle import InstanceBoundary, Lifecycle
 from ...results import NsxModuleRef
 from .. import TFLM_ENGINE_HEADER, EngineType
 from ..base import (
@@ -171,6 +172,15 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
 
     def lifecycle_refusal(self, lifecycle: Lifecycle) -> str:
         return f"{self.name} firmware does not implement the {lifecycle.value} lifecycle"
+
+    @property
+    def instance_boundary(self) -> InstanceBoundary:
+        return InstanceBoundary.BOOT
+
+    def first_invoke_initializer(self, model_initializer: bool | Unknown) -> bool | Unknown:
+        # heliaRT's MicroInterpreter runs a CALL_ONCE subgraph inside the
+        # first Invoke(), as TFLM does.
+        return model_initializer
 
     def prepare(self, config: ProfileConfig, work_dir: Path) -> HeliaRtArtifacts:
         _reject_config_path(config)

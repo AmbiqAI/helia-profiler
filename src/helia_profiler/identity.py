@@ -137,14 +137,38 @@ class BuildFacts:
     arena_bytes: int | Unknown
 
 
+_UNRECORDED = Unknown("the record predates this fact")
+
+
 @dataclass(frozen=True)
 class RunFacts:
-    """How the model was run: state handling, invocation counts and the timed span."""
+    """How the model was run: state handling, invocation counts, the timed span and its clock.
+
+    ``timing_scope`` is what each timed span covers: ``invoke_only`` or
+    ``restore_and_invoke``, which also restores the fixed inputs.
+    ``instance_boundary`` is where one model instance ends: ``boot`` when the
+    engine initializes once and every invocation reuses it, ``invocation``
+    when each invocation loads and initializes its own.
+    ``first_invoke_initializer`` is whether the first invocation of an
+    instance runs the model's one-time initializer, such as a LiteRT
+    ``CALL_ONCE`` subgraph, and ``first_invoke_window`` where that invocation
+    falls: ``warmup`` or ``measured``. ``timing_clock`` is the clock that times
+    the span, ``cpu`` cycles or the 32.768 kHz ``stimer``; ``timing_clock_hz``
+    is its configured rate, not a measured one. ``timing_statistic`` is what
+    the reported time is: the ``total`` over the measured invocations or
+    their ``mean``.
+    """
 
     lifecycle: str
     iterations: int
     warmups: int
     timing_scope: str
+    instance_boundary: str | Unknown = _UNRECORDED
+    first_invoke_initializer: bool | Unknown = _UNRECORDED
+    first_invoke_window: str | Unknown = _UNRECORDED
+    timing_clock: str | Unknown = _UNRECORDED
+    timing_clock_hz: int | Unknown = _UNRECORDED
+    timing_statistic: str | Unknown = _UNRECORDED
 
 
 @dataclass(frozen=True)
@@ -155,6 +179,8 @@ class RunIdentity:
     runtime archive and the model, and never the HPX release (``producer``),
     so it changes only when what runs changes. ``observation_hash`` covers a
     capture's measured facts, so the same firmware measured twice gives two.
+    ``intent_hash`` is the :attr:`~helia_profiler.FrozenRun.intent_hash` of
+    the plan a run was built from, and ``None`` for a run built without one.
     """
 
     runtime: RuntimeIdentity
@@ -169,6 +195,7 @@ class RunIdentity:
     producer: str | Unknown
     build_hash: str | Unknown
     observation_hash: str | None = None
+    intent_hash: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """JSON-ready form; an unknown fact becomes ``{"unknown": reason}``."""

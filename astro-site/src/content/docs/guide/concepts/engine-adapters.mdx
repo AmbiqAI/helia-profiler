@@ -96,6 +96,15 @@ ExecuTorch implements `single` only, because its firmware reloads the
 program on every invocation. Further lifecycles, such as resetting state
 before each invocation, arrive per engine as each firmware implements them.
 
+Each adapter also states its `instance_boundary` (`boot`, or `invocation`
+for ExecuTorch) and answers `first_invoke_initializer()`: whether the first
+invocation of an instance runs the model's one-time initializer. TFLM and
+heliaRT run a LiteRT `CALL_ONCE` subgraph inside the first `Invoke()`, so
+the answer is whether the model has one; heliaAOT runs it in `model_init()`,
+so `false`; ExecuTorch answers unknown. Run identities record both, with
+where the first invocation falls (see
+[Inference and layer timing](../../latency/#5-check-the-window-facts-before-comparing-routes)).
+
 ### What each adapter's `prepare()` does
 
 | Engine | Module | Steps | Modules it adds |

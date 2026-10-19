@@ -12,7 +12,8 @@ if TYPE_CHECKING:
     from ..modelcost import ModelAnalysis
 
 from ..config import ProfileConfig
-from ..lifecycle import Lifecycle
+from ..identity import Unknown
+from ..lifecycle import InstanceBoundary, Lifecycle
 from ..placement import ArenaRole, Placement
 from ..results import MemoryPlan, NsxModuleRef
 from . import EngineType
@@ -398,6 +399,22 @@ class EngineAdapter(Protocol):
 
         Called only for a lifecycle outside :attr:`lifecycles`; the message
         names the engine and the firmware behaviour that rules it out.
+        """
+        ...
+
+    @property
+    def instance_boundary(self) -> InstanceBoundary:
+        """Whether this engine's firmware keeps one model instance per boot or per invocation."""
+        ...
+
+    def first_invoke_initializer(self, model_initializer: bool | Unknown) -> bool | Unknown:
+        """Whether the first invocation of an instance runs the model's one-time initializer.
+
+        *model_initializer* is whether the source model declares one (a
+        LiteRT ``CALL_ONCE``), or why that is unknown. An engine that runs
+        the initializer before the first invocation answers ``False``
+        whatever the model declares; ``Unknown`` carries the reason HPX
+        cannot tell.
         """
         ...
 

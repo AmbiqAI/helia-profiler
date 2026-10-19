@@ -18,7 +18,8 @@ from typing import Any
 
 from ...config import ProfileConfig
 from ...errors import ConfigError, EngineError
-from ...lifecycle import Lifecycle
+from ...identity import Unknown
+from ...lifecycle import InstanceBoundary, Lifecycle
 from ...modelcost import analyze_aot_operators, analyze_model
 from ...placement import ArenaRole, Placement
 from ...results import NsxModuleRef
@@ -191,6 +192,15 @@ class HeliaAOTAdapter:
 
     def lifecycle_refusal(self, lifecycle: Lifecycle) -> str:
         return f"{self.name} firmware does not implement the {lifecycle.value} lifecycle"
+
+    @property
+    def instance_boundary(self) -> InstanceBoundary:
+        return InstanceBoundary.BOOT
+
+    def first_invoke_initializer(self, model_initializer: bool | Unknown) -> bool | Unknown:
+        # heliaAOT sets a CALL_ONCE's constant initial values in the operator
+        # init hooks that model_init() runs, before the first model_run().
+        return False
 
     def placement_config(self, config: ProfileConfig) -> ProfileConfig:
         # PSRAM constants render only in external-arena mode (check_psram_placement

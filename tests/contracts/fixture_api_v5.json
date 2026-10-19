@@ -1,7 +1,7 @@
 {
   "api_version": [
     5,
-    7
+    8
   ],
   "surface": {
     "BuildFacts": {
@@ -2062,6 +2062,36 @@
           "timing_scope",
           "str",
           "<required>"
+        ],
+        [
+          "instance_boundary",
+          "str | Unknown",
+          "Unknown(reason='the record predates this fact')"
+        ],
+        [
+          "first_invoke_initializer",
+          "bool | Unknown",
+          "Unknown(reason='the record predates this fact')"
+        ],
+        [
+          "first_invoke_window",
+          "str | Unknown",
+          "Unknown(reason='the record predates this fact')"
+        ],
+        [
+          "timing_clock",
+          "str | Unknown",
+          "Unknown(reason='the record predates this fact')"
+        ],
+        [
+          "timing_clock_hz",
+          "int | Unknown",
+          "Unknown(reason='the record predates this fact')"
+        ],
+        [
+          "timing_statistic",
+          "str | Unknown",
+          "Unknown(reason='the record predates this fact')"
         ]
       ],
       "frozen": true,
@@ -2128,6 +2158,11 @@
         ],
         [
           "observation_hash",
+          "str | None",
+          "None"
+        ],
+        [
+          "intent_hash",
           "str | None",
           "None"
         ]

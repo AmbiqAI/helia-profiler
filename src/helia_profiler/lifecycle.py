@@ -20,11 +20,25 @@ class Lifecycle(StrEnum):
     ``CARRY`` initializes the engine once and keeps internal state through
     warmups and timed invocations, restoring only the fixed inputs each time.
     ``SINGLE`` invokes the model once, so no state carries between
-    invocations.
+    invocations. The fixture firmware times with the 32.768 kHz STIMER and
+    refuses a timed span that reads zero ticks, so a ``SINGLE`` invocation
+    shorter than one tick, about 30.5 µs, can fail as out of bounds.
     """
 
     CARRY = "carry"
     SINGLE = "single"
+
+
+class InstanceBoundary(StrEnum):
+    """Where one model instance ends.
+
+    ``BOOT``: the engine initializes once per boot and every invocation
+    reuses that instance. ``INVOCATION``: each invocation loads and
+    initializes its own instance.
+    """
+
+    BOOT = "boot"
+    INVOCATION = "invocation"
 
 
 def require_lifecycle(engine: EngineType, lifecycle: Lifecycle) -> None:
@@ -48,3 +62,8 @@ def lifecycle_invocations(lifecycle: Lifecycle, iterations: int, warmups: int) -
     if lifecycle is Lifecycle.SINGLE:
         return 1, 0
     return iterations, warmups
+
+
+def first_invoke_window(boundary: InstanceBoundary, warmups: int) -> str:
+    """Whether the first invocation of the measured instance is a ``warmup`` or ``measured``."""
+    return "warmup" if boundary is InstanceBoundary.BOOT and warmups > 0 else "measured"

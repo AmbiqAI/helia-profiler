@@ -42,11 +42,17 @@ class CompiledBuild:
 
     @property
     def identity(self) -> RunIdentity:
-        """The build's identity; ``observation_hash`` is ``None`` until it runs."""
+        """The build's identity, with its plan's ``intent_hash``; ``observation_hash`` is ``None`` until it runs."""
         from .fixture_identity import fixture_run_identity
 
-        identity = fixture_run_identity(self.build)
-        return replace(identity, run=replace(identity.run, lifecycle=self.lifecycle.value))
+        return self._identity(fixture_run_identity(self.build))
+
+    def _identity(self, identity: RunIdentity) -> RunIdentity:
+        return replace(
+            identity,
+            run=replace(identity.run, lifecycle=self.lifecycle.value),
+            intent_hash=self.plan.intent_hash,
+        )
 
     def verify(self) -> None:
         """Re-check the build against its pinned files and its plan; raise on any mismatch."""
@@ -184,8 +190,7 @@ class CompiledBuild:
         except ValueError as exc:
             raise ConfigError(f"Cannot capture from this compiled build: {exc}") from exc
         capture = capture_fixture(request, guard=guard)
-        identity = fixture_run_identity(self.build, capture)
-        identity = replace(identity, run=replace(identity.run, lifecycle=self.lifecycle.value))
+        identity = self._identity(fixture_run_identity(self.build, capture))
         verification = (
             compare_fixture_outputs(self.build, capture, expect)
             if expect is not None and capture.state == "success"

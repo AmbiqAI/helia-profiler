@@ -169,7 +169,8 @@ def test_identity_states_the_lifecycle_that_ran(plan, build):
 
     assert base.run.lifecycle == "carry"
     assert identity.run.lifecycle == "single"
-    assert replace(identity, run=base.run) == base
+    assert base.intent_hash is None and identity.intent_hash == plan.intent_hash
+    assert replace(identity, run=base.run, intent_hash=None) == base
     assert identity.observation_hash is None
 
 

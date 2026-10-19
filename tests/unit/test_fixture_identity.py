@@ -10,6 +10,7 @@ from test_fixture_record import _build, _pin, _sourced
 from test_fixture_sources import NS
 
 from helia_profiler._fixture_record import compiled_fixture_identity
+from helia_profiler.engines import EngineType
 from helia_profiler.engines.base import EngineSource
 from helia_profiler.fixture import (
     CanonicalEngine,
@@ -216,9 +217,10 @@ def test_a_prepared_runtime_manifest_reads_without_its_archive(tmp_path):
 def test_a_record_from_the_previous_api_still_loads(tmp_path):
     build = _aot(tmp_path)
     record = json.loads(dump_fixture_build(build, roots={"run": tmp_path}))
-    assert record["fixture_api"] == [5, 7]
-    record["fixture_api"] = [5, 6]
-    assert load_fixture_build(json.dumps(record), roots={"run": tmp_path}) == build
+    assert record["fixture_api"] == [5, 8]
+    for previous in ([5, 6], [5, 7]):
+        record["fixture_api"] = previous
+        assert load_fixture_build(json.dumps(record), roots={"run": tmp_path}) == build
 
 
 def test_the_build_hash_covers_the_runtime_archive_the_model_and_the_lock(tmp_path):
@@ -416,3 +418,41 @@ def test_generated_vendored_modules_do_not_change_the_build_hash(tmp_path):
     first = fixture_run_identity(_aot(tmp_path / "a", lock("6" * 64))).build_hash
     second = fixture_run_identity(_aot(tmp_path / "b", lock("7" * 64))).build_hash
     assert first == second
+
+
+@pytest.mark.parametrize(
+    "engine,declared,expected",
+    [
+        (EngineType.TFLM, True, True),
+        (EngineType.TFLM, False, False),
+        (EngineType.HELIA_RT, True, True),
+        (EngineType.HELIA_AOT, True, False),
+    ],
+)
+def test_the_first_invocation_states_whether_it_runs_the_initializer(
+    tmp_path, engine, declared, expected
+):
+    build = replace(_build(tmp_path), engine=engine, source_initializer_present=declared)
+    run = fixture_run_identity(build).run
+
+    assert run.first_invoke_initializer is expected
+    assert run.instance_boundary == "boot"
+    assert (run.warmups, run.first_invoke_window) == (5, "warmup")
+    unwarmed = fixture_run_identity(replace(build, warmups=0)).run
+    assert unwarmed.first_invoke_window == "measured"
+
+
+def test_the_window_is_one_stimer_total_over_the_timed_invocations(tmp_path):
+    identity = fixture_run_identity(_build(tmp_path))
+
+    run = identity.run
+    assert (run.timing_scope, run.timing_clock, run.timing_clock_hz) == (
+        "invoke_only",
+        "stimer",
+        32768,
+    )
+    assert run.timing_statistic == "total"
+    assert identity.intent_hash is None
+    assert fixture_run_identity(replace(_build(tmp_path), timer_hz=None)).run.timing_clock_hz == (
+        Unknown("the record predates this fact")
+    )

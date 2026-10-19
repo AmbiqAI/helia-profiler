@@ -156,6 +156,17 @@ record alone, so a relocated or reloaded record gives the same identity.
 hash and providers after checking only the manifest's own hash. The record
 format is unchanged; API 5.7 reads records from 5.0 through 5.6.
 
+API 5.8 adds `RunIdentity.intent_hash`, the frozen plan's intent hash for a
+run-API build and `None` otherwise, and six `RunFacts` fields: where a model
+instance ends (`instance_boundary`), whether the first invocation of an
+instance runs the model's one-time initializer (`first_invoke_initializer`)
+and where that invocation falls (`first_invoke_window`), and the clock, rate
+and statistic of the timed span (`timing_clock`, `timing_clock_hz`,
+`timing_statistic`). Each adapter supplies the instance boundary and the
+initializer answer; see "Timing windows by route" below. The new fields
+default to `Unknown`, and the record format is unchanged; API 5.8 reads
+records from 5.0 through 5.7.
+
 `helia_profiler.build(plan, fixture, method=..., lifecycle=...)`, also reached
 as `FrozenRun.build(fixture, ...)`, compiles a frozen plan for a fixture through
 `build_fixed_fixture` and returns a `CompiledBuild` of the plan, the compiled
@@ -538,6 +549,42 @@ without one, or when the capture failed, `verification` is `None`.
 returned, not raised; errors raised while capturing propagate.
 `examples/run_api_conformance.py` walks freeze, build, save, load and run on a
 typed fixture and prints the identity, verification facts and key measurements.
+
+### Timing windows by route
+
+Each route states its window in `RunIdentity.run`. The firmware decides the
+facts; the identity builders copy them.
+
+- **Ordinary profile** (`profile_identity.py`, `_main_base.cc.j2`): the clean
+  window runs after at least one warmup (`clean_warmup = max(1, warmup)` in
+  `firmware/context.py`) and reports the mean per invocation
+  (`HPX_CLEAN_INFER_AVG_*`, `timing_statistic="mean"`). Apollo5 times it
+  with one STIMER bracket; other families sum DWT cycles per invocation;
+  ExecuTorch sums the runtime's execute-only cycles, so its per-call load
+  is outside the window. The heliaAOT clean window restores its inputs
+  inside the span. Per-layer counters are separate and aggregated by
+  `profiling.aggregation`.
+- **Fixture** (`fixture_identity.py`, `fixed_fixture.cc.j2`): engine setup
+  and warmups run before the first timed STIMER read. `invoke_only`
+  sums one STIMER bracket per invocation; `restore_and_invoke` takes one
+  bracket around the timed loop, input copies included. `deployment_timing`
+  reports the total ticks (`timing_statistic="total"`) at `timer_hz`.
+- **Run API** (`compiled_build.py`): the fixture firmware with the build's
+  lifecycle counts. `CARRY` keeps the plan's iterations and warmups;
+  `SINGLE` times one invocation with no warmup, so `first_invoke_window` is
+  `measured`. `RunResult.identity` also states the plan's `intent_hash`.
+
+`first_invoke_initializer` comes from each adapter. TFLM's and heliaRT's
+`MicroInterpreter` runs a `CALL_ONCE` subgraph inside the first `Invoke()`
+(`kernels/call_once.cc`), so it is the build's `source_initializer_present`.
+heliaAOT runs the initializer's constant assignments in the operator init
+hooks `model_init()` calls, so it is `False`. ExecuTorch reloads its program
+before every execute, its `instance_boundary` is `invocation`, and the
+answer is `Unknown`.
+
+The fixture firmware rejects a timed span of zero ticks as `TIMING_BOUND`.
+One STIMER tick is about 30.5 µs, so a `SINGLE` invocation shorter than that
+can fail; `CARRY` with enough iterations does not.
 
 ### Model inspection and engine admission
 

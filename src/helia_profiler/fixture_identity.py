@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 from ._identity_hash import build_hash, digest, measured_facts
 from .deps.compatibility import CMSIS_NN_PROVIDER_MODULES
+from .engines import get_adapter
 from .fixture_runtime import FixtureFile
 from .fixture_sources import FixtureKernelSource, FixtureRuntimeSource, pinned_sources
 from .identity import (
@@ -24,6 +25,7 @@ from .identity import (
     canonical_engine,
     canonical_kernel,
 )
+from .lifecycle import first_invoke_window
 from .runtime_records import runtime
 
 if TYPE_CHECKING:
@@ -51,15 +53,32 @@ def fixture_run_identity(
         dependency_lock_sha256=_sha(build.dependency_lock),
         model_sha256=_sha(build.model, Unknown("the record predates pinned models")),
         inputs_sha256=_inputs_sha256(build),
-        run=RunFacts(
-            lifecycle=(build.state_policy.value if build.state_policy else "stateless"),
-            iterations=build.iterations,
-            warmups=build.warmups,
-            timing_scope=build.timing_scope.value,
-        ),
+        run=_run_facts(build),
         producer=_workspace_fact(_inputs(workspace), "hpx_version"),
         build_hash=_build_hash(build, archive),
         observation_hash=_observation_hash(capture) if capture is not None else None,
+    )
+
+
+def _run_facts(build: FixtureBuild) -> RunFacts:
+    adapter = get_adapter(build.engine)
+    boundary = adapter.instance_boundary
+    return RunFacts(
+        lifecycle=(build.state_policy.value if build.state_policy else "stateless"),
+        iterations=build.iterations,
+        warmups=build.warmups,
+        timing_scope=build.timing_scope.value,
+        instance_boundary=boundary.value,
+        first_invoke_initializer=adapter.first_invoke_initializer(build.source_initializer_present),
+        first_invoke_window=first_invoke_window(boundary, build.warmups),
+        timing_clock="stimer",
+        timing_clock_hz=(
+            build.timer_hz
+            if build.timer_hz is not None
+            else Unknown("the record predates this fact")
+        ),
+        # fixed_fixture.cc.j2 reports one tick count over every timed invocation.
+        timing_statistic="total",
     )
 
 

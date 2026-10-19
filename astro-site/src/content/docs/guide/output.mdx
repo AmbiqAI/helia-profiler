@@ -17,7 +17,7 @@ A `results/` directory from [First profile](../../getting-started/first-profile/
 | File | Schema | Role | When present |
 |---|---|---|---|
 | `result_manifest.json` | `hpx.result-manifest` v1 (`results/manifest.py`) | the bundle envelope: identity, validity, issues, provenance, comparability, and every artifact's path, media type, size and SHA-256 | always; written last |
-| `summary.json` | `hpx.run-summary` v15 (`results/run_summary.py`) | headline metrics and health signals; read this first | always |
+| `summary.json` | `hpx.run-summary` v16 (`results/run_summary.py`) | headline metrics and health signals; read this first | always |
 | `profile_results.csv` or `.json` | `hpx.profile-results` v1 for the JSON form (`report/contracts.py`); the CSV carries the semantic name without a published schema | one row per layer, one column per counter | always; one of the two per `output.format` |
 | `run_metadata.json` | `hpx.run-metadata` v1 (`report/contracts.py`) | the resolved configuration, platform, model, toolchain, build images | always |
 | `nsx.lock` | neuralSPOT-X lock file | the exact module lock the firmware was built from | always |
@@ -65,13 +65,13 @@ nested memory and analysis tables described below:
 
 (the engine, layer and cycle values are from the shipped bundle
 `examples/results/hardware-validation-2026-09-16/apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto/`,
-which retains schema version 5. New runs use schema version 15; use the
+which retains schema version 5. New runs use schema version 16; use the
 typed loader to read historical bundles without rewriting them). Top-level
 fields in new runs:
 
 | Field | Type | Unit | What it measures |
 |---|---|---|---|
-| `schema`, `schema_version` | string, int | none | `hpx.run-summary`, version 15 |
+| `schema`, `schema_version` | string, int | none | `hpx.run-summary`, version 16 |
 | `engine` | string | none | the engine that ran |
 | `layers` | int | count | operators in the profiled graph |
 | `total_cycles` | number | CPU cycles | the sum of the per-layer instrumented cycle counts (`report/summary.py`), so it includes the per-layer counter reads; the clean window is `latency.device_clean_infer_avg_cycles` |
@@ -176,9 +176,16 @@ guessed:
 | `build` | `toolchain`, `toolchain_version`, `board`, `cpu_hz`, `clock_profile`, `arena_location`, `weights_location`, `arena_bytes` |
 | `baseline_id`, `dependency_lock_sha256`, `producer` | the compatibility baseline, the lock's sha256 and the HPX release, from the dependency workspace |
 | `model_sha256`, `inputs_sha256` | the model file; profile firmware feeds zero-filled inputs, so `inputs_sha256` is unknown |
-| `run` | `lifecycle` (`carry`: the engine keeps its state across invocations), `iterations`, `warmups`, `timing_scope` (`restore_and_invoke` for heliaAOT's clean window, else `invoke_only`) |
+| `run` | how it ran and how the clean window was timed: the fields below |
+| `run.lifecycle`, `run.instance_boundary` | `carry` with `boot`: the engine initializes once and keeps its state across invocations; `single` with `invocation` for ExecuTorch, whose firmware reloads and initializes the program on every call |
+| `run.iterations`, `run.warmups` | the configured counts; the clean window always runs at least one warmup |
+| `run.first_invoke_initializer`, `run.first_invoke_window` | whether the first invocation of an instance runs the model's one-time initializer, and where it falls. TFLM and heliaRT run a LiteRT `CALL_ONCE` subgraph inside the first `Invoke()`, so this is whether the source model has one; heliaAOT runs it in `model_init()`, so `false`; unknown for ExecuTorch. The window is `warmup`, except `measured` for ExecuTorch, where every invocation is its instance's first |
+| `run.timing_scope` | `restore_and_invoke` for heliaAOT's clean window, else `invoke_only` |
+| `run.timing_clock`, `run.timing_clock_hz` | the clock that times the clean window and its configured rate: `stimer` at 32,768 Hz on Apollo5 and for the `busy_loop` probe, otherwise `cpu` cycles (DWT, or ExecuTorch's execute-cycle count) at the CPU clock |
+| `run.timing_statistic` | `mean`: the clean window reports the mean per invocation (`latency.device_clean_infer_avg_us`); per-layer counters use `profiling.aggregation` |
 | `build_hash` | sha256 over the flashed `.bin` image, what the lock resolved, and the model; it ignores the HPX release and the lock's timestamps, so it changes only when what runs changes |
 | `observation_hash` | sha256 over the PMU and device timing results, without host paths; two captures of the same firmware can differ |
+| `intent_hash` | the frozen plan's intent hash for a run built from one; `null` for an ordinary profile |
 
 Four more top-level sections appear when the run produced them and are
 owned by other pages: `compatibility` and `dependencies` (the qualified
@@ -200,6 +207,10 @@ Fusions can change totals and derived rates; compare like analysis bases.
 
 Version 14 adds `identity`. The change is additive: no existing field changes
 meaning, and the typed loader reads version 13 summaries, which have none.
+
+Version 16 adds `identity.intent_hash` and the `run` fields from
+`instance_boundary` to `timing_statistic`. An ExecuTorch run's
+`run.lifecycle` becomes `single`; nothing else changes meaning.
 
 ### 2. `profile_results.csv`
 

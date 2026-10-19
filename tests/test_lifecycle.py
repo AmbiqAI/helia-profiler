@@ -23,7 +23,14 @@ from helia_profiler.fixture import (
     PerTensorQuantization,
     TypedFixture,
 )
-from helia_profiler.lifecycle import Lifecycle, lifecycle_invocations, require_lifecycle
+from helia_profiler.identity import Unknown
+from helia_profiler.lifecycle import (
+    InstanceBoundary,
+    Lifecycle,
+    first_invoke_window,
+    lifecycle_invocations,
+    require_lifecycle,
+)
 
 #: What each engine's firmware runs today. ExecuTorch reloads its program on
 #: every invocation, so it cannot carry state.
@@ -138,3 +145,42 @@ def test_single_invocation_counts_pass_fixture_validation(
     _validate(config, fixture)
 
     assert (config.profiling.iterations, config.profiling.warmup) == (1, 0)
+
+
+#: Where each engine runs a model's one-time initializer, from its firmware.
+FIRST_INVOKE: dict[EngineType, tuple[InstanceBoundary, object]] = {
+    EngineType.TFLM: (InstanceBoundary.BOOT, "declared"),
+    EngineType.HELIA_RT: (InstanceBoundary.BOOT, "declared"),
+    EngineType.HELIA_AOT: (InstanceBoundary.BOOT, False),
+    EngineType.EXECUTORCH: (InstanceBoundary.INVOCATION, Unknown),
+}
+
+
+@pytest.mark.parametrize("engine", list(EngineType))
+@pytest.mark.parametrize("declared", [True, False, Unknown("no analysis")])
+def test_each_engine_states_its_instance_boundary_and_first_invocation(engine, declared) -> None:
+    adapter = get_adapter(engine)
+    boundary, initializer = FIRST_INVOKE[engine]
+
+    answer = adapter.first_invoke_initializer(declared)
+    assert adapter.instance_boundary is boundary
+    if initializer == "declared":
+        assert answer == declared
+    elif initializer is Unknown:
+        assert isinstance(answer, Unknown) and "every execute" in answer.reason
+    else:
+        assert answer is initializer
+
+
+@pytest.mark.parametrize(
+    "boundary,warmups,window",
+    [
+        (InstanceBoundary.BOOT, 5, "warmup"),
+        (InstanceBoundary.BOOT, 0, "measured"),
+        (InstanceBoundary.INVOCATION, 5, "measured"),
+    ],
+)
+def test_the_first_invocation_falls_in_a_warmup_only_when_one_shares_its_instance(
+    boundary, warmups, window
+) -> None:
+    assert first_invoke_window(boundary, warmups) == window

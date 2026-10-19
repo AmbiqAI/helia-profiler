@@ -170,7 +170,7 @@ def load_result(location: str | Path) -> ProfileResultRecord:
     """Strictly load an ordinary profile manifest or its containing directory.
 
     Failed native runs remain failed records. Missing manifests and interrupted
-    publication are refusals, not legacy fallbacks. Summary versions 11 to 15
+    publication are refusals, not legacy fallbacks. Summary versions 11 to 16
     retain the timing/memory fields read here; other versions remain available
     to native readers without receiving this verification guarantee.
     """
@@ -206,9 +206,9 @@ def _load_result(location: Path) -> ProfileResultRecord:
     summary = None
     if summary_data is not None:
         version = summary_data.get("schema_version")
-        if type(version) is not int or version not in (11, 12, 13, 14, 15):
+        if type(version) is not int or version not in (11, 12, 13, 14, 15, 16):
             raise ResultReadError(
-                "unsupported_schema", "Supported summary versions: 11, 12, 13, 14, 15"
+                "unsupported_schema", "Supported summary versions: 11, 12, 13, 14, 15, 16"
             )
         _schema(summary_data, RUN_SUMMARY_SCHEMA, version)
         if (

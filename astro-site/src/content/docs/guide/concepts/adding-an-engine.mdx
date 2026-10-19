@@ -93,7 +93,8 @@ and the placement hooks (`apply_arena_placement_override()` and
 or placement implies engine settings, `check_psram_placement()` for
 engine-specific PSRAM constraints; `SingleArenaPlacementMixin` supplies the
 identity versions), and the [state lifecycles](../engine-adapters/#state-lifecycles)
-its firmware implements (`lifecycles` and `lifecycle_refusal()`). `prepare()` validates
+its firmware implements (`lifecycles`, `lifecycle_refusal()`, `instance_boundary`
+and `first_invoke_initializer()`). `prepare()` validates
 `config.engine.*`, creates any local NSX module under `work_dir`, and
 returns the artifact type fully populated:
 

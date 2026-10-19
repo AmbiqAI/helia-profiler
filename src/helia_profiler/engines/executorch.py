@@ -11,7 +11,8 @@ from typing import Any
 
 from ..config import ProfileConfig
 from ..errors import EngineError
-from ..lifecycle import Lifecycle
+from ..identity import Unknown
+from ..lifecycle import InstanceBoundary, Lifecycle
 from ..results import NsxModuleRef
 from ..runtime_records import RuntimeRecord, runtime
 from . import EngineType
@@ -386,6 +387,16 @@ class ExecuTorchAdapter(SingleArenaPlacementMixin):
                 "the program on every invocation (nsx::executorch::run_once_profiled)"
             )
         return f"{self.name} firmware does not implement the {lifecycle.value} lifecycle"
+
+    @property
+    def instance_boundary(self) -> InstanceBoundary:
+        return InstanceBoundary.INVOCATION
+
+    def first_invoke_initializer(self, model_initializer: bool | Unknown) -> bool | Unknown:
+        return Unknown(
+            "ExecuTorch loads and initialises the program before every execute; HPX does "
+            "not establish whether the program runs one-time initialization inside it"
+        )
 
     def prepare(self, config: ProfileConfig, work_dir: Path) -> ExecutorchArtifacts:
         engine_config = config.engine.config
