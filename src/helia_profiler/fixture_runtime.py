@@ -7,6 +7,7 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path, PurePath
+from typing import Any
 
 from .errors import ConfigError
 
@@ -119,6 +120,56 @@ class RuntimeManifest:
 
 
 @dataclass(frozen=True)
+class PreparedRuntimeFacts:
+    """What a prepared runtime's manifest declares: its stack, archive and providers."""
+
+    stack: str
+    archive_sha256: str
+    providers: tuple[RuntimeProvider, ...]
+
+
+def read_prepared_runtime_manifest(manifest: FixtureFile) -> PreparedRuntimeFacts:
+    """Read a prepared runtime's manifest without verifying its archive or headers.
+
+    The manifest's own hash and declared fields are checked;
+    :meth:`PreparedUpstreamRuntime.verify` also checks the archive, ABI and
+    header closure.
+    """
+    return _manifest_facts(manifest)[2]
+
+
+def _manifest_facts(
+    manifest: FixtureFile, *, archive_sha256: str | None = None
+) -> tuple[int, dict[str, Any], PreparedRuntimeFacts]:
+    raw = json.loads(manifest.read(), object_pairs_hook=_unique_object)
+    schema = raw.get("schema_version") if isinstance(raw, dict) else None
+    if type(schema) is not int or schema not in (1, 2):
+        raise ValueError("Unsupported runtime manifest schema version")
+    fields = {"schema_version", "archive_sha256", "providers", "abi", "headers", "include_dirs"}
+    data = _object(raw, fields | ({"stack", "build"} if schema == 2 else set()), "manifest")
+    stack = data["stack"] if schema == 2 else "upstream"
+    if schema == 2 and (not isinstance(stack, str) or stack not in _STACK_KERNEL_DIR):
+        raise ValueError("Unsupported prepared runtime stack")
+    if archive_sha256 is not None and _digest(data["archive_sha256"]) != archive_sha256:
+        raise ValueError("Runtime manifest/archive identity mismatch")
+    declared = _STACK_PROVIDERS[stack]
+    providers = _object(data["providers"], {name for name, _ in declared}, "providers")
+    sources = []
+    for name, url in declared:
+        provider = _object(providers[name], {"url", "revision"}, "provider")
+        revision = provider["revision"]
+        if (
+            provider["url"] != url
+            or not isinstance(revision, str)
+            or not re.fullmatch(r"[0-9a-f]{40}", revision)
+        ):
+            raise ValueError("Invalid runtime provider source identity")
+        sources.append(RuntimeProvider(name, url, revision))
+    facts = PreparedRuntimeFacts(stack, _digest(data["archive_sha256"]), tuple(sources))
+    return schema, data, facts
+
+
+@dataclass(frozen=True)
 class VerifiedPreparedRuntime:
     archive: FixtureFile
     header_root: Path
@@ -146,30 +197,8 @@ class PreparedUpstreamRuntime:
         archive = self.archive.read()
         if len(archive) <= 8 or not archive.startswith(b"!<arch>\n"):
             raise ValueError("Prepared runtime requires a nonempty regular archive")
-        raw = json.loads(self.manifest.read(), object_pairs_hook=_unique_object)
-        schema = raw.get("schema_version") if isinstance(raw, dict) else None
-        if type(schema) is not int or schema not in (1, 2):
-            raise ValueError("Unsupported runtime manifest schema version")
-        fields = {"schema_version", "archive_sha256", "providers", "abi", "headers", "include_dirs"}
-        data = _object(raw, fields | ({"stack", "build"} if schema == 2 else set()), "manifest")
-        stack = data["stack"] if schema == 2 else "upstream"
-        if schema == 2 and (not isinstance(stack, str) or stack not in _STACK_KERNEL_DIR):
-            raise ValueError("Unsupported prepared runtime stack")
-        if _digest(data["archive_sha256"]) != self.archive.sha256:
-            raise ValueError("Runtime manifest/archive identity mismatch")
-        declared = _STACK_PROVIDERS[stack]
-        providers = _object(data["providers"], {name for name, _ in declared}, "providers")
-        sources = []
-        for name, url in declared:
-            provider = _object(providers[name], {"url", "revision"}, "provider")
-            revision = provider["revision"]
-            if (
-                provider["url"] != url
-                or not isinstance(revision, str)
-                or not re.fullmatch(r"[0-9a-f]{40}", revision)
-            ):
-                raise ValueError("Invalid runtime provider source identity")
-            sources.append(RuntimeProvider(name, url, revision))
+        schema, data, facts = _manifest_facts(self.manifest, archive_sha256=self.archive.sha256)
+        stack, sources = facts.stack, list(facts.providers)
         defines, kernel_dir = _UPSTREAM_DEFINES, None
         if schema == 2:
             build = _object(data["build"], {"consumer_defines", "kernel_dir"}, "build")

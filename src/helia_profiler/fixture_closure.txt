@@ -152,6 +152,7 @@ firmware/workload.py
 fixture.py
 fixture_analysis.py
 fixture_capture.py
+fixture_identity.py
 fixture_image.py
 fixture_metrics.py
 fixture_observation.py

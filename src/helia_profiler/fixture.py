@@ -64,6 +64,7 @@ from .fixture_capture import (
     FixtureTiming,
     capture_fixture,
 )
+from .fixture_identity import fixture_run_identity
 from .fixture_metrics import FixtureFootprint, FixtureMetric, inspect_fixture_footprint
 from .fixture_observation import (
     FixtureMeasurements,
@@ -85,21 +86,33 @@ from .fixture_power import (
 from .fixture_psram import FixturePsramObservation, FixturePsramPayload, FixturePsramWeights
 from .fixture_runtime import (
     FixtureFile,
+    PreparedRuntimeFacts,
     PreparedUpstreamRuntime,
     RuntimeABI,
     RuntimeHeader,
     RuntimeProvider,
     VerifiedPreparedRuntime,
+    read_prepared_runtime_manifest,
 )
 from .fixture_runtime import RuntimeManifest as PreparedRuntimeManifest
 from .fixture_sources import FixtureKernelSource, FixtureRuntimeSource
 from .fixture_stage import FixtureStage
 from .fixture_target import FixtureTarget, supported_fixture_target
 from .hostenv.elf_inventory import ElfSection, LoadSegment, SectionInventory, section_inventory
+from .identity import (
+    BuildFacts,
+    CanonicalEngine,
+    CanonicalKernel,
+    KernelIdentity,
+    RunFacts,
+    RunIdentity,
+    RuntimeIdentity,
+    Unknown,
+)
 from .placement import Placement
 from .results.models import ToolchainInfo
 
-FIXTURE_API_VERSION: Final[tuple[int, int]] = (5, 6)
+FIXTURE_API_VERSION: Final[tuple[int, int]] = (5, 7)
 
 __all__ = [
     "FIXTURE_API_VERSION",
@@ -116,6 +129,8 @@ __all__ = [
     "FixtureTimingScope",
     "FixtureStatePolicy",
     "Placement",
+    "CanonicalEngine",
+    "CanonicalKernel",
     # Inputs
     "FixtureBuildRequest",
     "FixturePlacement",
@@ -154,6 +169,8 @@ __all__ = [
     "capture_fixture",
     "inspect_fixture_footprint",
     "observe_operator_timing",
+    "fixture_run_identity",
+    "read_prepared_runtime_manifest",
     "section_inventory",
     "source_closure",
     "summarize_fixture_measurements",
@@ -188,4 +205,11 @@ __all__ = [
     "SectionInventory",
     "SourceClosure",
     "ToolchainInfo",
+    "PreparedRuntimeFacts",
+    "RunIdentity",
+    "RuntimeIdentity",
+    "KernelIdentity",
+    "BuildFacts",
+    "RunFacts",
+    "Unknown",
 ]

@@ -16,7 +16,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import TypeVar
+from typing import Any, TypeVar
 
 _Name = TypeVar("_Name", bound=StrEnum)
 
@@ -101,3 +101,85 @@ def _canonical(name: str, aliases: Mapping[str, _Name], what: str) -> _Name:
         raise ValueError(
             f"Unrecognised {what} name {name!r}; known: {', '.join(sorted(aliases))}"
         ) from None
+
+
+@dataclass(frozen=True)
+class RuntimeIdentity:
+    """The runtime a build linked: its engine, source repository, version and commit."""
+
+    engine: CanonicalEngine
+    repository: str | Unknown
+    version: str | Unknown
+    commit: str | Unknown
+
+
+@dataclass(frozen=True)
+class KernelIdentity:
+    """The kernel library a build linked, taken from the module or archive it linked."""
+
+    library: CanonicalKernel | Unknown
+    repository: str | Unknown
+    version: str | Unknown
+    commit: str | Unknown
+
+
+@dataclass(frozen=True)
+class BuildFacts:
+    """How the image was built and placed."""
+
+    toolchain: str | Unknown
+    toolchain_version: str | Unknown
+    board: str
+    cpu_hz: int | Unknown
+    clock_profile: str | Unknown
+    arena_location: str | Unknown
+    weights_location: str | Unknown
+    arena_bytes: int | Unknown
+
+
+@dataclass(frozen=True)
+class RunFacts:
+    """How the model was run: state handling, invocation counts and the timed span."""
+
+    lifecycle: str
+    iterations: int
+    warmups: int
+    timing_scope: str
+
+
+@dataclass(frozen=True)
+class RunIdentity:
+    """Everything a comparison needs to know about what ran.
+
+    ``build_hash`` covers the flashed image, the dependency lock, the linked
+    runtime archive and the model, and never the HPX release (``producer``),
+    so it changes only when what runs changes. ``observation_hash`` covers a
+    capture's measured facts, so the same firmware measured twice gives two.
+    """
+
+    runtime: RuntimeIdentity
+    kernels: KernelIdentity
+    prepared_archive_sha256: str | None
+    build: BuildFacts
+    baseline_id: str | Unknown
+    dependency_lock_sha256: str | Unknown
+    model_sha256: str | Unknown
+    inputs_sha256: str | Unknown
+    run: RunFacts
+    producer: str | Unknown
+    build_hash: str | Unknown
+    observation_hash: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """JSON-ready form; an unknown fact becomes ``{"unknown": reason}``."""
+        return _plain(self)
+
+
+def _plain(value: Any) -> Any:
+    if isinstance(value, Unknown):
+        return {"unknown": value.reason}
+    if isinstance(value, StrEnum):
+        return value.value
+    if hasattr(value, "__dataclass_fields__"):
+        return {name: _plain(getattr(value, name)) for name in value.__dataclass_fields__}
+    return value

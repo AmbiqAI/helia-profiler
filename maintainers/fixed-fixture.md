@@ -138,6 +138,23 @@ fields are bound into the compiled identity, written only when known, and
 refused in records that declare an earlier API, so records from API 5.5 and
 earlier load unchanged with both fields `None`.
 
+API 5.7 adds `fixture_run_identity(build, capture=None)`, which returns a
+`RunIdentity`: the runtime and kernel library a build linked, by their shared
+names (`CanonicalEngine`, `CanonicalKernel`); its build facts, baseline,
+dependency lock, model and input hashes; how it runs; and the HPX release that
+produced it. A fact the record does not state is `Unknown` with the reason,
+not `None`. `build_hash` covers the flashed image, the dependency lock, the
+prepared runtime archive and the model, and never the HPX release, so it
+changes only when what runs changes. The lock counts by what it resolved: git
+modules by URL and commit, packaged and vendored ones by content hash, so a
+neuralspotx release that changes its packaged build tooling changes it too.
+`observation_hash` covers a capture's
+measured facts with files reduced to their content hashes. Both come from the
+record alone, so a relocated or reloaded record gives the same identity.
+`read_prepared_runtime_manifest` returns a prepared runtime's stack, archive
+hash and providers after checking only the manifest's own hash. The record
+format is unchanged; API 5.7 reads records from 5.0 through 5.6.
+
 Constructing `FixtureBuildRequest` performs no runtime-cache lookup. When an
 interpreter request omits `runtime`, `build_fixture` looks up the already prepared
 default archive and binds its manifest into the compiled intent; it does not

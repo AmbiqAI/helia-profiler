@@ -1,9 +1,76 @@
 {
   "api_version": [
     5,
-    6
+    7
   ],
   "surface": {
+    "BuildFacts": {
+      "fields": [
+        [
+          "toolchain",
+          "str | Unknown",
+          "<required>"
+        ],
+        [
+          "toolchain_version",
+          "str | Unknown",
+          "<required>"
+        ],
+        [
+          "board",
+          "str",
+          "<required>"
+        ],
+        [
+          "cpu_hz",
+          "int | Unknown",
+          "<required>"
+        ],
+        [
+          "clock_profile",
+          "str | Unknown",
+          "<required>"
+        ],
+        [
+          "arena_location",
+          "str | Unknown",
+          "<required>"
+        ],
+        [
+          "weights_location",
+          "str | Unknown",
+          "<required>"
+        ],
+        [
+          "arena_bytes",
+          "int | Unknown",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "CanonicalEngine": {
+      "base": "str",
+      "kind": "enum",
+      "members": {
+        "EXECUTORCH": "executorch",
+        "HELIA_AOT": "helia-aot",
+        "HELIA_RT": "helia-rt",
+        "LITERT": "litert"
+      }
+    },
+    "CanonicalKernel": {
+      "base": "str",
+      "kind": "enum",
+      "members": {
+        "CMSIS_NN": "cmsis-nn",
+        "HELIA_CORE": "helia-core",
+        "REFERENCE": "reference"
+      }
+    },
     "ElfSection": {
       "fields": [
         [
@@ -1680,6 +1747,34 @@
         "size"
       ]
     },
+    "KernelIdentity": {
+      "fields": [
+        [
+          "library",
+          "CanonicalKernel | Unknown",
+          "<required>"
+        ],
+        [
+          "repository",
+          "str | Unknown",
+          "<required>"
+        ],
+        [
+          "version",
+          "str | Unknown",
+          "<required>"
+        ],
+        [
+          "commit",
+          "str | Unknown",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
     "LoadSegment": {
       "fields": [
         [
@@ -1791,6 +1886,29 @@
         "SRAM": "sram",
         "TCM": "tcm"
       }
+    },
+    "PreparedRuntimeFacts": {
+      "fields": [
+        [
+          "stack",
+          "str",
+          "<required>"
+        ],
+        [
+          "archive_sha256",
+          "str",
+          "<required>"
+        ],
+        [
+          "providers",
+          "tuple[RuntimeProvider, ...]",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
     },
     "PreparedRuntimeManifest": {
       "fields": [
@@ -1923,6 +2041,104 @@
       "methods": {},
       "properties": []
     },
+    "RunFacts": {
+      "fields": [
+        [
+          "lifecycle",
+          "str",
+          "<required>"
+        ],
+        [
+          "iterations",
+          "int",
+          "<required>"
+        ],
+        [
+          "warmups",
+          "int",
+          "<required>"
+        ],
+        [
+          "timing_scope",
+          "str",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "RunIdentity": {
+      "fields": [
+        [
+          "runtime",
+          "RuntimeIdentity",
+          "<required>"
+        ],
+        [
+          "kernels",
+          "KernelIdentity",
+          "<required>"
+        ],
+        [
+          "prepared_archive_sha256",
+          "str | None",
+          "<required>"
+        ],
+        [
+          "build",
+          "BuildFacts",
+          "<required>"
+        ],
+        [
+          "baseline_id",
+          "str | Unknown",
+          "<required>"
+        ],
+        [
+          "dependency_lock_sha256",
+          "str | Unknown",
+          "<required>"
+        ],
+        [
+          "model_sha256",
+          "str | Unknown",
+          "<required>"
+        ],
+        [
+          "inputs_sha256",
+          "str | Unknown",
+          "<required>"
+        ],
+        [
+          "run",
+          "RunFacts",
+          "<required>"
+        ],
+        [
+          "producer",
+          "str | Unknown",
+          "<required>"
+        ],
+        [
+          "build_hash",
+          "str | Unknown",
+          "<required>"
+        ],
+        [
+          "observation_hash",
+          "str | None",
+          "None"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {
+        "to_dict": "(self) -> 'dict[str, Any]'"
+      },
+      "properties": []
+    },
     "RuntimeABI": {
       "fields": [
         [
@@ -1961,6 +2177,34 @@
         [
           "sha256",
           "str",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "RuntimeIdentity": {
+      "fields": [
+        [
+          "engine",
+          "CanonicalEngine",
+          "<required>"
+        ],
+        [
+          "repository",
+          "str | Unknown",
+          "<required>"
+        ],
+        [
+          "version",
+          "str | Unknown",
+          "<required>"
+        ],
+        [
+          "commit",
+          "str | Unknown",
           "<required>"
         ]
       ],
@@ -2145,6 +2389,19 @@
         "output_bytes"
       ]
     },
+    "Unknown": {
+      "fields": [
+        [
+          "reason",
+          "str",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
     "VerifiedPreparedRuntime": {
       "fields": [
         [
@@ -2207,6 +2464,10 @@
       "kind": "function",
       "signature": "(build: 'FixtureBuild', *, jlink_serial: 'str', evidence_dir: 'Path', settle_seconds: 'float', expected_duration_s: 'float | None' = None) -> 'FixtureCaptureRequest'"
     },
+    "fixture_run_identity": {
+      "kind": "function",
+      "signature": "(build: 'FixtureBuild', capture: 'FixtureCaptureResult | None' = None) -> 'RunIdentity'"
+    },
     "inspect_fixture_footprint": {
       "kind": "function",
       "signature": "(*, elf: 'FixtureFile', image: 'FixtureFile', link_map: 'FixtureFile', target: 'FixtureTarget', toolchain: 'str') -> 'FixtureFootprint'"
@@ -2218,6 +2479,10 @@
     "observe_operator_timing": {
       "kind": "function",
       "signature": "(build: 'FixtureBuild', fixture: 'FixedFixture | TypedFixture', profile: 'ProfileResult') -> 'FixtureOperatorTimingFacts'"
+    },
+    "read_prepared_runtime_manifest": {
+      "kind": "function",
+      "signature": "(manifest: 'FixtureFile') -> 'PreparedRuntimeFacts'"
     },
     "section_inventory": {
       "kind": "function",
