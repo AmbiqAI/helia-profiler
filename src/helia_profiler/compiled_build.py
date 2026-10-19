@@ -326,18 +326,17 @@ def build(
 def _binding(plan: FrozenRun, lifecycle: Lifecycle, build: FixtureBuild) -> str:
     """SHA-256 tying *build* to the plan and lifecycle it was compiled from.
 
-    It covers the plan's intent hash, the lifecycle, the timing scope and
-    state policy the build records, its prepared runtime manifest, and what
-    it observes, and no host path.
+    It covers the plan's intent hash, the lifecycle and the build's content:
+    every fact and pinned file hash the build records (image, dependency
+    lock, model, inputs, runtime manifest, method and observations), but not
+    its work directory or any other host path.
     """
+    from ._fixture_record import fixture_build_content
+
     payload = {
         "plan": plan.intent_hash,
         "lifecycle": lifecycle.value,
-        "timing_scope": build.timing_scope.value,
-        "state_policy": _value(build.state_policy),
-        "runtime_manifest": build.runtime_manifest.sha256 if build.runtime_manifest else None,
-        "observe_ram": build.observe_ram,
-        "observe_aot_arenas": [list(arena) for arena in build.aot_arena_scan],
+        "build": fixture_build_content(build),
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
     return hashlib.sha256(encoded.encode()).hexdigest()

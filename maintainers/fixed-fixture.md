@@ -184,10 +184,12 @@ new roots. `load` and `save` call `verify()`, and every refusal, including a
 malformed or unknown-version file, is a `ConfigError` naming what failed.
 
 The binding ties a build to the plan it was compiled from. `build()` hashes
-the plan's intent hash, the lifecycle, the timing scope and state policy the
-build records, its prepared-runtime manifest hash (or none) and what it
-observes (the RAM diagnostic and the scanned heliaAOT arenas). No host path
-enters it, so a build relocated to another host keeps its binding.
+the plan's intent hash, the lifecycle and the build's content: every fact
+and pinned file hash the `FixtureBuild` records (image, ELF, dependency lock,
+model, inputs, prepared-runtime manifest, method and observations). It
+leaves out `intent_identity` and `build_identity`, which hash the work
+directory, and every path, so a build relocated to another host keeps its
+binding and a different image spliced in under it is refused.
 `verify()` re-checks the build's pinned files and the plan's intent hash,
 recomputes the binding, and then compares what the build records with what
 the plan states: engine, board, model hash and size, toolchain name, the

@@ -159,6 +159,19 @@ def compiled_fixture_identity(build: FixtureBuild) -> str:
     return hashlib.sha256(_json(value).encode()).hexdigest()
 
 
+def fixture_build_content(build: FixtureBuild) -> str:
+    """Bind a build's recorded facts and file contents without its work directory.
+
+    The compiled identity also covers ``intent_identity``, which hashes the
+    configuration including ``work_dir``; this leaves that out, so the same
+    build relocated or reproduced elsewhere hashes the same.
+    """
+    value = _payload(build, file=lambda f: f.sha256, path=lambda _: None)
+    value.pop("build_identity")
+    value.pop("intent_identity")
+    return hashlib.sha256(_json(value).encode()).hexdigest()
+
+
 def _digest(value):
     if (
         not isinstance(value, str)

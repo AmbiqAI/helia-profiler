@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from helia_profiler._fixture_record import compiled_fixture_identity, fixture_capture_request
+from helia_profiler._fixture_record import fixture_capture_request
 from helia_profiler.compiled_build import CompiledBuild, RunResult
 from helia_profiler.errors import ConfigError
 from helia_profiler.expect import Expect
@@ -158,9 +158,8 @@ def test_an_expectation_compares_a_successful_capture(record, device, tmp_path, 
             _pin(tmp_path / "ref" / "a.bin", b"\x01\x05"),
             _pin(tmp_path / "ref" / "b.bin", _CACHE),
         )
-        build = replace(record.build, outputs=reference, expected=reference[0])
-        build = replace(build, build_identity=compiled_fixture_identity(build))
-        record = replace(record, build=build)
+        build = reseal(record.build, outputs=reference, expected=reference[0])
+        record = compiled(record.plan, build, record.lifecycle)
         expectation = Expect.from_build()
     else:
         (tmp_path / "ref").mkdir()
