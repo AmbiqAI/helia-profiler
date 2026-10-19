@@ -173,7 +173,8 @@ as `FrozenRun.build(fixture, ...)`, compiles a frozen plan for a fixture through
 `FixtureBuild` and the `Lifecycle` it runs. It refuses a fixture whose model is
 not the plan's, asks the engine whether it implements the lifecycle, and
 applies the lifecycle's invocation counts (`SINGLE` runs one timed invocation
-and no warmups). `CompiledBuild.identity` is the build's `RunIdentity` with
+and no warmups, so an invocation shorter than one STIMER tick can fail; see
+"Timing windows by route"). `CompiledBuild.identity` is the build's `RunIdentity` with
 that lifecycle. `save(path, roots=...)` writes one canonical JSON document
 (`hpx.compiled-build`, schema version 2) holding the plan's `to_dict()`, the
 lifecycle, the binding and the `dump_fixture_build` record as an object;
@@ -564,7 +565,10 @@ identity is `fixture_run_identity` of the build and capture, so it carries an
 `Expect`, a successful capture is compared through `compare_fixture_outputs`;
 without one, or when the capture failed, `verification` is `None`.
 `RunResult.succeeded` is true only for a `success` capture. A failed capture is
-returned, not raised; errors raised while capturing propagate.
+returned, not raised; errors raised while capturing propagate. A `SINGLE`
+build of a model whose invocation takes less than one STIMER tick, about
+30.5 µs, can come back as a `FixtureStage.TIMING_BOUND` failure, because the firmware
+refuses a timed span of zero ticks; build such a model with `CARRY`.
 `examples/run_api_conformance.py` walks freeze, build, save, load and run on a
 typed fixture and prints the identity, verification facts and key measurements.
 Its plan states what a fixture build requires (ATfE, the `lp` clock, an SRAM
@@ -605,7 +609,7 @@ hooks `model_init()` calls, so it is `False`. ExecuTorch reloads its program
 before every execute, its `instance_boundary` is `invocation`, and the
 answer is `Unknown`.
 
-The fixture firmware rejects a timed span of zero ticks as `TIMING_BOUND`.
+The fixture firmware rejects a timed span of zero ticks as `FixtureStage.TIMING_BOUND`.
 One STIMER tick is about 30.5 µs, so a `SINGLE` invocation shorter than that
 can fail; `CARRY` with enough iterations does not.
 
