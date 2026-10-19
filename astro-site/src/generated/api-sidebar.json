@@ -6,8 +6,8 @@
       "slug": "reference/api/helia_profiler"
     },
     {
-      "label": "build_record",
-      "slug": "reference/api/helia_profiler/build_record"
+      "label": "compiled_build",
+      "slug": "reference/api/helia_profiler/compiled_build"
     },
     {
       "label": "config",

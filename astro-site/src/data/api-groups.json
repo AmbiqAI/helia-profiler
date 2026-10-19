@@ -41,10 +41,13 @@
       ]
     },
     {
-      "path": "helia_profiler.build_record",
-      "summary": "Build once, run later: a frozen plan's compiled firmware saved as a record that any host can verify, relocate and capture from, and how model state carries across a run's invocations.",
+      "path": "helia_profiler.compiled_build",
+      "summary": "Build once, run later: a frozen plan's compiled firmware, bound to its plan and saved so any host can verify, relocate and capture from it, and how model state carries across a run's invocations.",
       "members": [
-        "BuildRecord",
+        "build",
+        "load_build",
+        "run_build",
+        "CompiledBuild",
         "RunResult",
         "Lifecycle"
       ]

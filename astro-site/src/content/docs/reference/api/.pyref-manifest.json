@@ -1,7 +1,7 @@
 {
   "version": 1,
   "out": [
-    "helia_profiler/build_record/index.mdx",
+    "helia_profiler/compiled_build/index.mdx",
     "helia_profiler/config/index.mdx",
     "helia_profiler/config/power/index.mdx",
     "helia_profiler/deps/index.mdx",
@@ -23,7 +23,7 @@
   ],
   "public": [
     "reference/api/helia_profiler.json",
-    "reference/api/helia_profiler/build_record.json",
+    "reference/api/helia_profiler/compiled_build.json",
     "reference/api/helia_profiler/config.json",
     "reference/api/helia_profiler/config/power.json",
     "reference/api/helia_profiler/deps.json",

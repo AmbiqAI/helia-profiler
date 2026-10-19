@@ -492,9 +492,9 @@ Source: `src/helia_profiler/frozen_run.py:297`
 `method` · `python`
 
 ```python
-build(fixture: TypedFixture, **options: Any = {}) -> BuildRecord
+build(fixture: TypedFixture, **options: Any = {}) -> CompiledBuild
 ```
 
-Compile this plan for *fixture*'s pinned inputs; see :func:`build_record`.
+Compile this plan for *fixture*'s pinned inputs; see :func:`~helia_profiler.build`.
 
 Source: `src/helia_profiler/frozen_run.py:346`
