@@ -177,6 +177,7 @@ def test_adapter_wraps_root_layout_checkout_for_arm_provider(tmp_path: Path):
     source = _source_tree(tmp_path)
     artifacts = ExecuTorchAdapter().prepare(_config(tmp_path, source), tmp_path / "work")
 
+    assert artifacts.source_roots == ((source.resolve(), "nsx-executorch"),)
     assert artifacts.cmake_vars["NSX_EXECUTORCH_ENABLE_PROFILING"] == "ON"
     assert artifacts.cmake_vars["NSX_EXECUTORCH_CMSIS_NN_PROVIDER"] == "arm"
     assert artifacts.cmake_vars["NSX_EXECUTORCH_PORTABLE_SELECT_OPS_LIST"] == ("aten::clamp.out")

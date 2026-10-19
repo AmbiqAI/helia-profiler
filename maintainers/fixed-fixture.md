@@ -196,9 +196,9 @@ check bypasses, and explicit compiler launchers (`auto` and disabled stay
 allowed, from config or `HPX_COMPILER_LAUNCHER`).
 `tests/contracts/test_fixture_environment.py` classifies every environment
 read in this package and in the pinned neuralspotx, so a new one must be
-refused or justified. Fixture apps
-compile with `-ffile-prefix-map`, so the ELF does not record the work
-directory.
+refused or justified. Every app, fixture or profile, compiles with
+`-ffile-prefix-map`, so neither the ELF nor the flashed image records the
+work directory.
 
 `helia_profiler.fixture.build_fixed_fixture(config, fixture, method=method,
 runtime=runtime, compile=True)` composes the existing platform, engine,

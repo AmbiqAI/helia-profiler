@@ -596,6 +596,9 @@ class TestSourceBuildMode:
         assert "nsx-helia-rt" in yaml_text
 
         assert not (module_dir / "lib").exists()
+        assert [(root.as_posix(), name) for root, name in ctx.prepared_artifacts.source_roots] == [
+            (fake_source_tree.as_posix(), "helia-rt-source")
+        ]
 
     def test_invalid_source_path_raises(self, tmp_path: Path):
         from helia_profiler.engines.helia_rt import _resolve_source_path

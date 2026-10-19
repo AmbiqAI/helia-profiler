@@ -187,8 +187,8 @@ def _resolve_source_root(config: ProfileConfig) -> Path:
         # project entry contributes the URL.
         ref = _executorch_record().source.commit
         if config.build.offline:
-            return _offline_cached_source(ref)
-        return _auto_clone_nsx_executorch(baseline.project(EXECUTORCH_PROJECT).url, ref)
+            return _offline_cached_source(ref).resolve()
+        return _auto_clone_nsx_executorch(baseline.project(EXECUTORCH_PROJECT).url, ref).resolve()
     if not isinstance(source_value, (str, Path)) or not str(source_value).strip():
         raise EngineError(
             "engine.config.source_path must be a non-empty filesystem path",
@@ -521,6 +521,7 @@ class ExecuTorchAdapter(SingleArenaPlacementMixin):
         provider_module = _provider_module_ref(config, work_dir, provider)
         return ExecutorchArtifacts(
             engine_type=EngineType.EXECUTORCH,
+            source_roots=((source_root, "nsx-executorch"),),
             extra_modules=[
                 # The provider must precede nsx-executorch so NSX configures it
                 # exactly once before the runtime creates its idempotent bridge.

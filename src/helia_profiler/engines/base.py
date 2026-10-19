@@ -131,6 +131,9 @@ class EngineArtifacts:
     #: Files the engine wrote describing this preparation, such as heliaAOT's
     #: plan and report JSON. Fixture builds pin them as evidence.
     report_files: tuple[Path, ...] = ()
+    #: Source trees the build compiles in place outside the app directory, each
+    #: with the name the image records it under instead of its host path.
+    source_roots: tuple[tuple[Path, str], ...] = ()
 
     #: Engine type this class is pinned to — ``None`` on the base, which
     #: accepts any.  Read by :meth:`__post_init__`.

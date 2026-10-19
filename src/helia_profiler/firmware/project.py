@@ -374,9 +374,6 @@ class ProjectRenderContext:
     #: (src/main_power.cc). Gated on config.power.enabled so non-power runs'
     #: CMakeLists.txt — and firmware-render digests — stay byte-identical.
     power_binary_enabled: bool = False
-    #: Map the app directory out of compiled paths (fixed-fixture builds), so the
-    #: ELF does not depend on where the work directory lives.
-    strip_build_paths: bool = False
 
 
 def render_project_files(ctx: ProjectRenderContext) -> None:
@@ -411,8 +408,8 @@ def render_project_files(ctx: ProjectRenderContext) -> None:
             engine_type=ctx.artifacts.engine_type,
             has_ethos_u=ctx.artifacts.resolved_backend == "ethos_u",
             cmake_vars=ctx.artifacts.cmake_vars,
+            source_roots=[(root.as_posix(), name) for root, name in ctx.artifacts.source_roots],
             compiler_launcher=ctx.compiler_launcher,
-            strip_build_paths=ctx.strip_build_paths,
             # Only heliaAOT links a generated engine target; every other
             # engine renders the empty string the template already expects.
             aot_cmake_target=(
