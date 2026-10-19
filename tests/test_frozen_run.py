@@ -139,7 +139,9 @@ def test_the_engine_identity_is_what_a_profile_build_uses(session):
         "arm-cmsis-nn",
         baseline.module("arm-cmsis-nn").ref,
     )
-    assert heliart is not None and heliart.version == "2.1.0"
+    from helia_profiler.runtime_records import runtime
+
+    assert heliart is not None and heliart.version == runtime("helia-rt").version
     assert heliart.source_commit == baseline.module("nsx-helia-rt").ref
     assert heliart.kernels_commit == baseline.module("nsx-cmsis-nn").ref
 
@@ -182,3 +184,72 @@ def test_the_hpx_release_is_recorded_but_not_part_of_the_intent(session):
     plan = session.freeze()
     assert plan.hpx_version == hpx.__version__
     assert replace(plan, hpx_version="9.9.9").intent_hash == plan.intent_hash
+
+
+def test_default_tflm_links_no_kernel_library(session):
+    runtime = session.with_engine("tflm").freeze().runtime
+    assert runtime is not None and runtime.kernels_module is None and runtime.kernels_commit is None
+
+
+def test_heliaaot_records_the_installed_compiler(session, monkeypatch):
+    monkeypatch.setattr(
+        "helia_profiler.results.dependencies.installed_aot_source",
+        lambda: {"package": "helia-aot", "version": "0.30.0", "commit": "abc123"},
+    )
+    runtime = session.with_engine("helia-aot").freeze().runtime
+    assert runtime is not None
+    assert (runtime.name, runtime.version, runtime.source_commit) == (
+        "helia-aot",
+        "0.30.0",
+        "abc123",
+    )
+
+
+def test_an_overridden_kernel_provider_has_no_pinned_commit(session, tmp_path, monkeypatch):
+    monkeypatch.setenv("CMSIS_NN_PATH", str(tmp_path))
+    runtime = session.freeze().runtime
+    assert runtime is not None and runtime.kernels_module == "nsx-cmsis-nn"
+    assert runtime.kernels_commit is None
+
+
+def test_source_variables_count_only_for_engines_that_read_them(session, tmp_path, monkeypatch):
+    monkeypatch.setenv("HELIART_DIST_PATH", str(tmp_path))
+    assert session.with_engine("tflm").freeze().local_inputs == ()
+    assert [i.setting for i in session.freeze().local_inputs] == ["env.HELIART_DIST_PATH"]
+
+
+def test_module_and_engine_path_inputs_are_recorded(session, tmp_path):
+    module_dir = tmp_path / "nsx-sensors"
+    module_dir.mkdir()
+    plan = session.with_build(nsx_modules={"nsx-sensors": {"path": str(module_dir)}}).freeze()
+    assert [(i.setting, i.kind) for i in plan.local_inputs] == [
+        ("build.nsx_modules.nsx-sensors.path", "directory")
+    ]
+    module_dir.rmdir()
+    with pytest.raises(ConfigError, match="does not exist on this host"):
+        plan.config()
+
+
+def test_toolchain_identity_drops_install_locations(session, compiler):
+    compiler["output"] = (
+        "clang version 19.1.5\nTarget: arm-none-eabi\n"
+        "InstalledDir: /opt/LLVM-ET-Arm-19.1.5/bin\nConfiguration file: /opt/x-1.2/cfg\n"
+    )
+    assert session.freeze().toolchain.version == "clang version 19.1.5"
+
+
+def test_a_non_utf8_plan_file_is_refused(tmp_path):
+    path = tmp_path / "run.json"
+    path.write_bytes(b"\xff\xfe{")
+    with pytest.raises(ConfigError, match="Cannot read frozen run plan"):
+        FrozenRun.load(path)
+
+
+def test_an_overridden_engine_module_has_no_pinned_source(session, tmp_path):
+    module_dir = tmp_path / "nsx-tflite-micro"
+    module_dir.mkdir()
+    overridden = session.with_engine("tflm").with_build(
+        nsx_modules={"nsx-tflite-micro": {"path": str(module_dir)}}
+    )
+    runtime = overridden.freeze().runtime
+    assert runtime is not None and runtime.source_commit is None

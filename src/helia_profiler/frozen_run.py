@@ -47,18 +47,20 @@ _HOST_LOCAL_SETTINGS = (
     ("build", "offline"),
 )
 
-#: Environment variables that point a build at local sources.
-_SOURCE_ENVIRONMENT = (
-    "SEGGER_RTT_PATH",
-    "CMSIS_NN_PATH",
-    "HELIART_DIST_PATH",
-    "HELIART_SOURCE_PATH",
-)
+#: Environment variables that point a build at local sources, and the engines that read them.
+_SOURCE_ENVIRONMENT = {
+    "SEGGER_RTT_PATH": ("tflm", "helia-rt", "helia-aot", "executorch"),
+    "CMSIS_NN_PATH": ("helia-rt", "helia-aot", "executorch"),
+    "HELIART_DIST_PATH": ("helia-rt",),
+    "HELIART_SOURCE_PATH": ("helia-rt",),
+}
 
 #: ``engine.config`` keys that point a build at local sources.
 _SOURCE_ENGINE_KEYS = ("dist_path", "source_path", "cmsis_nn_path")
 
 _VERSION_LINE = re.compile(r"\d+\.\d+")
+#: ``--version`` lines that carry install locations rather than the version.
+_LOCATION_LINE = re.compile(r"^(InstalledDir|Configuration file):")
 
 
 @dataclass(frozen=True)
@@ -211,7 +213,7 @@ class FrozenRun:
             data = json.loads(source.read_text(encoding="utf-8"))
         except FileNotFoundError as exc:
             raise ConfigError(f"Frozen run plan not found: {source}") from exc
-        except (OSError, json.JSONDecodeError) as exc:
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise ConfigError(f"Cannot read frozen run plan {source}: {exc}") from exc
         if not isinstance(data, dict):
             raise ConfigError("A frozen run plan must be a JSON object.")
@@ -310,9 +312,10 @@ def _local_inputs(config: ProfileConfig) -> tuple[LocalInput, ...]:
         local = getattr(override, "path", None)
         if local:
             candidates.append((f"build.nsx_modules.{name}.path", str(local)))
-    for variable in _SOURCE_ENVIRONMENT:
+    engine = config.engine.type.value
+    for variable, readers in _SOURCE_ENVIRONMENT.items():
         value = os.environ.get(variable)
-        if value:
+        if value and engine in readers:
             candidates.append((f"env.{variable}", value))
     return tuple(_describe_local(setting, value) for setting, value in candidates)
 
@@ -366,7 +369,11 @@ def _toolchain_identity(config: ProfileConfig) -> ToolchainIdentity:
     output = tool_output([command, "--version"], timeout_s=config.timeouts.toolchain_probe_s)
     if output is None:
         return ToolchainIdentity(name, None, f"{command} --version could not run")
-    lines = [line.strip() for line in output.splitlines() if _VERSION_LINE.search(line)]
+    lines = [
+        line.strip()
+        for line in output.splitlines()
+        if _VERSION_LINE.search(line) and not _LOCATION_LINE.match(line.strip())
+    ]
     if not lines:
         return ToolchainIdentity(name, None, f"{command} --version reported no version")
     return ToolchainIdentity(name, " | ".join(lines))
@@ -387,23 +394,33 @@ def _frozen_runtime(config: ProfileConfig) -> FrozenRuntime | None:
             return module, None
         return module, baseline.module(module).ref
 
+    def pinned(module: str) -> str | None:
+        return None if module in overridden else baseline.module(module).ref
+
     engine = config.engine.type
     backend = config.engine.backend
     if engine is EngineType.TFLM:
-        module, commit = kernels(None if backend == "reference" else ARM_CMSIS_NN_MODULE)
-        return FrozenRuntime("tflm", None, baseline.module(TFLITE_MICRO_MODULE).ref, module, commit)
+        module, commit = kernels(
+            None if (backend or "reference") == "reference" else ARM_CMSIS_NN_MODULE
+        )
+        return FrozenRuntime("tflm", None, pinned(TFLITE_MICRO_MODULE), module, commit)
     if engine is EngineType.HELIA_RT:
-        local = [key for key in ("source", *_SOURCE_ENGINE_KEYS) if config.engine.config.get(key)]
-        if local:
+        selected = [
+            key for key in ("source", *_SOURCE_ENGINE_KEYS) if config.engine.config.get(key)
+        ]
+        if selected:
             return FrozenRuntime(
-                "helia-rt", None, None, unavailable_reason=f"local heliaRT: {', '.join(local)}"
+                "helia-rt",
+                None,
+                None,
+                unavailable_reason=f"heliaRT selected by engine.config: {', '.join(selected)}",
             )
         record = runtime("helia-rt")
         module, commit = kernels(CMSIS_NN_MODULE)
         return FrozenRuntime(
             "helia-rt",
             record.version if record else None,
-            baseline.module(HELIART_MODULE).ref,
+            pinned(HELIART_MODULE),
             module,
             commit,
         )
