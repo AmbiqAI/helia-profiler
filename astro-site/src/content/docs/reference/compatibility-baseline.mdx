@@ -109,6 +109,10 @@ convolution accumulates in FP32 on MVE, so FP16 depthwise layers on heliaAOT
 (default `precise` accumulation) and heliaRT time differently from v7.46.0. The
 fixed fixture links the 2.2.2 prepared archive.
 
+**Verified.** On an Apollo510 EVB (ATfE, SRAM arena, MRAM weights), int8
+keyword spotting profiles end to end on heliaRT 2.2.2, heliaAOT 0.31.0 and
+TFLM, each with every layer attributed.
+
 heliaAOT 0.31.0 (`7b92ec8a…68e`) becomes the default and the locked release,
 and the accepted range widens to `<0.32.0`. It needs `ns-cmsis-nn v7.46.0` or
 newer (`nix/compat.nix`), which this baseline already pins, so no other pin
