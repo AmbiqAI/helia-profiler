@@ -83,6 +83,15 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 | [VerdictStatus](/helia-profiler/reference/api/helia_profiler/evaluation/#helia_profiler.VerdictStatus) | `helia_profiler.VerdictStatus` |
 | [evaluate_run](/helia-profiler/reference/api/helia_profiler/evaluation/#helia_profiler.evaluate_run) | `helia_profiler.evaluate_run` |
 | [RunEvaluation](/helia-profiler/reference/api/helia_profiler/evaluation/#helia_profiler.RunEvaluation) | `helia_profiler.RunEvaluation` |
+| [Expect](/helia-profiler/reference/api/helia_profiler/expect/#helia_profiler.Expect) | `helia_profiler.Expect` |
+| [Tolerance](/helia-profiler/reference/api/helia_profiler/expect/#helia_profiler.Tolerance) | `helia_profiler.Tolerance` |
+| [compare_fixture_outputs](/helia-profiler/reference/api/helia_profiler/expect/#helia_profiler.compare_fixture_outputs) | `helia_profiler.compare_fixture_outputs` |
+| [compare_outputs](/helia-profiler/reference/api/helia_profiler/expect/#helia_profiler.compare_outputs) | `helia_profiler.compare_outputs` |
+| [host_reference](/helia-profiler/reference/api/helia_profiler/expect/#helia_profiler.host_reference) | `helia_profiler.host_reference` |
+| [Verification](/helia-profiler/reference/api/helia_profiler/expect/#helia_profiler.Verification) | `helia_profiler.Verification` |
+| [TensorComparison](/helia-profiler/reference/api/helia_profiler/expect/#helia_profiler.TensorComparison) | `helia_profiler.TensorComparison` |
+| [ReferenceOutputs](/helia-profiler/reference/api/helia_profiler/expect/#helia_profiler.ReferenceOutputs) | `helia_profiler.ReferenceOutputs` |
+| [ReferenceOrigin](/helia-profiler/reference/api/helia_profiler/expect/#helia_profiler.ReferenceOrigin) | `helia_profiler.ReferenceOrigin` |
 | [ModelAnalysis](/helia-profiler/reference/api/helia_profiler/modelcost/#helia_profiler.ModelAnalysis) | `helia_profiler.ModelAnalysis` |
 | [SupportBundleOptions](/helia-profiler/reference/api/helia_profiler/diagnostics/#helia_profiler.SupportBundleOptions) | `helia_profiler.SupportBundleOptions` |
 | [collect_support_bundle](/helia-profiler/reference/api/helia_profiler/diagnostics/#helia_profiler.collect_support_bundle) | `helia_profiler.collect_support_bundle` |

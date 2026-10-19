@@ -40,8 +40,8 @@
       "slug": "reference/api/helia_profiler/examples"
     },
     {
-      "label": "frozen_run",
-      "slug": "reference/api/helia_profiler/frozen_run"
+      "label": "expect",
+      "slug": "reference/api/helia_profiler/expect"
     },
     {
       "label": "modelcost",
