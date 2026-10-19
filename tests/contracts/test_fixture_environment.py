@@ -40,6 +40,10 @@ REFUSED = {
 ALLOWED = {
     ("_fixture_build.py", "<name>"): "the fixture refusal check itself",
     ("_fixture_build.py", "HPX_COMPILER_LAUNCHER"): "the fixture refusal check itself",
+    (
+        "frozen_run.py",
+        "<variable>",
+    ): "records source-path variables in a frozen plan; never a build input",
     ("engines/helia_rt/download.py", "GITHUB_TOKEN"): "download auth; archives are hash-verified",
     ("engines/helia_rt/download.py", "GH_TOKEN"): "download auth; archives are hash-verified",
     ("hostenv/cache_dirs.py", "HPX_CACHE_DIR"): "cache location; cached content is hash-verified",
