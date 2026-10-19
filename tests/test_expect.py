@@ -242,6 +242,9 @@ def test_build_and_caller_references_and_executorch_refuses_a_host_one(tmp_path)
     assert from_files.reference.origin == FILES and from_files.tensors == from_build.tensors
     with pytest.raises(ConfigError, match="cannot run an ExecuTorch model"):
         compare_fixture_outputs(build, capture, Expect.host_litert())
+    with pytest.raises(ConfigError, match="Unknown reference source"):
+        weird = Expect("weird")  # ty: ignore[invalid-argument-type]
+        compare_fixture_outputs(build, capture, weird)
     with pytest.raises(ConfigError, match="carries no expected outputs"):
         compare_fixture_outputs(_build(tmp_path), capture, Expect.from_build())
 

@@ -287,10 +287,12 @@ def compare_fixture_outputs(
         reference = ReferenceOutputs(
             ReferenceOrigin("build"), tuple(_read(f) for f in build.outputs)
         )
+    elif expect.source != "host-litert":
+        raise ConfigError(f"Unknown reference source {expect.source!r}")
     elif build.engine is EngineType.EXECUTORCH:
         raise ConfigError(
             "A host LiteRT reference cannot run an ExecuTorch model",
-            hint="Use Expect.from_files() with reference outputs.",
+            hint="Use Expect.from_build() or Expect.from_files() with reference outputs.",
         )
     else:
         reference = host_reference(
