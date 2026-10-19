@@ -25,7 +25,7 @@ The current baseline is `hpx-neuralspotx-0.8.1-2026-10-19.2`:
 | `nsx-executorch` | `5514ac1e…b48e` |
 | `nsx-sensors` | `c219a2bc…3e25` (`v0.3.0`, peeled) |
 | heliaRT | runtime records `1.21.3`, `2.1.0`, `2.2.0`, `2.2.2` (default, commit `7fe6dfdb…0f0`; min supported `1.16.0`, from `HELIART_MIN_VERSION` in code) |
-| heliaAOT | runtime records `0.23.0`, `0.24.0`, `0.25.0`, `0.26.0`, `0.27.0`, `0.29.0`, `0.30.0`, `0.31.0` (default); accepted range `>=0.23.0,<0.32.0` |
+| heliaAOT | runtime records `0.23.0`, `0.24.0`, `0.25.0`, `0.26.0`, `0.27.0`, `0.29.0`, `0.30.0`, `0.31.0`, `0.32.0` (default); accepted range `>=0.23.0,<0.33.0` |
 | tflm | profile path: governed by the `nsx-tflite-micro` and `arm-cmsis-nn` module refs above (the `tflm` runtime record describes the fixed fixture's prepared upstream archive instead); `nsx-tflite-micro` builds TFLM from the `helia-rt-source` project, which the baseline does not list and the neuralSPOT-X 0.8.1 registry lock fixes at `7c1b162c` (helia-rt v1.17.0) |
 | executorch | `0.1.0`, commit `5514ac1e…b48e`, from the runtime record (a checkout's `version.txt` and commit are verified against it) |
 
@@ -97,6 +97,13 @@ completed result bundle.
 
 <details>
 <summary>Why earlier promotions changed these pins</summary>
+
+heliaAOT 0.32.0 (`6224613f…6dd`) becomes the default and the locked release,
+and the accepted range widens to `<0.33.0`. It needs `ns-cmsis-nn v7.47.0`,
+which the baseline already pins. Its `ModuleType` members are upper case (hpx
+selects the NSX type by value), and its `ConversionResult` now carries the
+post-transform operators, tensors, regions and placements; hpx still reads
+the converter's internal context until it moves to those views.
 
 heliaRT 2.2.2 (`7fe6dfdb…0f0`) and `ns-cmsis-nn v7.47.0` (`9f793bd9…abe`)
 replace 2.2.0 and v7.46.0. heliaRT 2.2.1 and later require v7.47.0 or newer, so
@@ -512,7 +519,7 @@ heliaRT, nsx-sensors) are unchanged.
 
 </details>
 
-The heliaAOT `0.29.0`, `0.30.0` and `0.31.0` records declare no qualified tuples. Selecting one does not qualify an experimental compatibility baseline.
+The heliaAOT `0.29.0`, `0.30.0`, `0.31.0` and `0.32.0` records declare no qualified tuples. Selecting one does not qualify an experimental compatibility baseline.
 
 The explicit AOT `engine.allow_unsupported_version: true` option also stamps
 `development-overrides` and records that option in `engine_overrides`. It only
