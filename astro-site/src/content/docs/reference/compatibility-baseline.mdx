@@ -102,7 +102,8 @@ heliaRT 2.2.2 (`7fe6dfdb…0f0`) and `ns-cmsis-nn v7.47.0` (`9f793bd9…abe`)
 replace 2.2.0 and v7.46.0. heliaRT 2.2.1 and later require v7.47.0 or newer, so
 the two move together. 2.2.2 refuses models with a tensor above rank 6 at
 `AllocateTensors()` and fixes per-channel DEQUANTIZE. heliaAOT 0.31.0 stays the
-default; it needs v7.46.0 or newer and was tested against v7.47.0. ExecuTorch's
+default; it needs v7.46.0 or newer, and its release notes say it was tested
+against v7.47.0. ExecuTorch's
 `ns` provider follows the baseline to v7.47.0 too. v7.47.0's FP16 depthwise
 convolution accumulates in FP32 on MVE, so FP16 depthwise layers on heliaAOT
 (default `precise` accumulation) and heliaRT time differently from v7.46.0. The
