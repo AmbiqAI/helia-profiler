@@ -118,6 +118,43 @@ def test_build_asks_the_engine_for_the_lifecycle(plan, fixture, calls, monkeypat
     assert not calls
 
 
+def test_the_engine_refuses_a_lifecycle_it_does_not_run(plan, fixture, calls, monkeypatch):
+    from types import SimpleNamespace
+
+    from helia_profiler.errors import EngineError
+
+    adapter = SimpleNamespace(
+        name="fake",
+        lifecycles=frozenset({Lifecycle.SINGLE}),
+        lifecycle_refusal=lambda lifecycle: "it reloads the program on every call",
+    )
+    monkeypatch.setattr("helia_profiler.lifecycle.get_adapter", lambda engine: adapter)
+    with pytest.raises(EngineError, match="reloads the program on every call"):
+        plan.build(fixture, method=_METHOD, lifecycle=Lifecycle.CARRY)
+    assert not calls
+
+
+def test_host_settings_reach_the_build(plan, fixture, calls):
+    plan.build(fixture, method=_METHOD, host={"target": {"jlink_serial": "777"}})
+    assert calls[0]["config"].target.jlink_serial == "777"
+
+
+def test_a_single_invocation_is_refused_for_power(plan, fixture, calls):
+    from types import SimpleNamespace
+
+    with pytest.raises(ConfigError, match="too short for a power capture"):
+        power_method: Any = SimpleNamespace(power_sync=object())
+        plan.build(fixture, method=power_method, lifecycle=Lifecycle.SINGLE)
+    assert not calls
+
+
+def test_a_deeply_nested_record_is_a_config_error(tmp_path, root):
+    path = tmp_path / "deep.json"
+    path.write_text("[" * 100000, encoding="utf-8")
+    with pytest.raises(ConfigError, match="Cannot read build record"):
+        BuildRecord.load(path, roots={"run": root})
+
+
 def test_build_refuses_a_fixture_of_another_model(plan, fixture, calls, tmp_path):
     other = tmp_path / "other.tflite"
     other.write_bytes(b"other")

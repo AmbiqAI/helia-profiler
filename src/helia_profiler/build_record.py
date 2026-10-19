@@ -109,7 +109,7 @@ class BuildRecord:
             data = _read_json(source.read_text(encoding="utf-8"))
         except FileNotFoundError as exc:
             raise ConfigError(f"Build record not found: {source}") from exc
-        except (OSError, ValueError) as exc:
+        except (OSError, ValueError, RecursionError) as exc:
             raise ConfigError(f"Cannot read build record {source}: {exc}") from exc
         document = _document(data)
         try:
@@ -147,8 +147,6 @@ class BuildRecord:
         A failed capture comes back with ``capture.state == "failure"`` and no
         verification; errors raised while capturing propagate.
         """
-        from dataclasses import replace
-
         from ._fixture_record import fixture_capture_request
         from .expect import compare_fixture_outputs
         from .fixture_capture import capture_fixture
@@ -209,6 +207,11 @@ def build_record(
         )
     config = plan.config(model=model, host=host)
     require_lifecycle(config.engine.type, lifecycle)
+    if lifecycle is Lifecycle.SINGLE and method.power_sync is not None:
+        raise ConfigError(
+            "A single invocation is too short for a power capture",
+            hint="Use Lifecycle.CARRY for a power run.",
+        )
     iterations, warmup = lifecycle_invocations(
         lifecycle, config.profiling.iterations, config.profiling.warmup
     )

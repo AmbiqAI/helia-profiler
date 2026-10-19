@@ -1,6 +1,6 @@
 """Run API conformance: freeze, build, save, load and run one typed fixture.
 
-The script walks the whole run API once, as a consumer such as BENCH does:
+The script walks the whole run API once, as a benchmark harness would:
 
 1. freeze a :class:`~helia_profiler.FrozenRun` plan from a session;
 2. build it for a :class:`~helia_profiler.fixture.TypedFixture` with fixed input bytes;
@@ -14,7 +14,7 @@ only root the record names, so the directory can move to another host.
 
 Example::
 
-    uv run python examples/run_api_conformance.py --jlink-serial 1160002255 \\
+    uv run python examples/run_api_conformance.py --jlink-serial <probe-serial> \\
         --engine helia-rt --board apollo510_evb --out runs/conformance
 """
 
@@ -27,7 +27,7 @@ from hashlib import sha256
 from pathlib import Path
 
 import helia_profiler as hpx
-from helia_profiler.build_record import BuildRecord, RunResult
+from helia_profiler import BuildRecord, RunResult
 from helia_profiler.expect import Expect, Tolerance
 from helia_profiler.fixture import (
     FixtureFile,
@@ -45,7 +45,7 @@ from helia_profiler.lifecycle import Lifecycle
 class OperatorGuard:
     """Trust the operator's word that *jlink_serial* is the intended, idle board.
 
-    BENCH replaces this with its board lock, which proves the physical board
+    A harness replaces this with its board lock, which proves the physical board
     and holds it exclusively for the capture.
     """
 
