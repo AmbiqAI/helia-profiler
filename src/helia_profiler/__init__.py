@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from . import examples
     from ._version import __version__
     from .api import profile
+    from .build_record import BuildRecord, RunResult
     from .config import (
         BuildConfig,
         ClockSelection,
@@ -93,6 +94,7 @@ if TYPE_CHECKING:
         canonical_engine,
         canonical_kernel,
     )
+    from .lifecycle import Lifecycle
     from .modelcost import ModelAnalysis
     from .pipeline import ProgressUpdate
     from .placement import Placement
@@ -255,6 +257,9 @@ _EXPORTS = {
     "FrozenModel": (".frozen_run", "FrozenModel"),
     "FrozenRuntime": (".frozen_run", "FrozenRuntime"),
     "ToolchainIdentity": (".frozen_run", "ToolchainIdentity"),
+    "BuildRecord": (".build_record", "BuildRecord"),
+    "RunResult": (".build_record", "RunResult"),
+    "Lifecycle": (".lifecycle", "Lifecycle"),
     "CanonicalEngine": (".identity", "CanonicalEngine"),
     "CanonicalKernel": (".identity", "CanonicalKernel"),
     "Unknown": (".identity", "Unknown"),
@@ -293,6 +298,9 @@ __all__ = [
     "FrozenRuntime",
     "LocalInput",
     "ToolchainIdentity",
+    "BuildRecord",
+    "RunResult",
+    "Lifecycle",
     "CanonicalEngine",
     "CanonicalKernel",
     "Unknown",
@@ -468,6 +476,9 @@ _EXPERIMENTAL_API = {
     "FrozenRuntime",
     "LocalInput",
     "ToolchainIdentity",
+    "BuildRecord",
+    "RunResult",
+    "Lifecycle",
     "CanonicalEngine",
     "CanonicalKernel",
     "Unknown",

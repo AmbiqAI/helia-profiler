@@ -41,6 +41,15 @@
       ]
     },
     {
+      "path": "helia_profiler.build_record",
+      "summary": "Build once, run later: a frozen plan's compiled firmware saved as a record that any host can verify, relocate and capture from, and how model state carries across a run's invocations.",
+      "members": [
+        "BuildRecord",
+        "RunResult",
+        "Lifecycle"
+      ]
+    },
+    {
       "path": "helia_profiler.identity",
       "summary": "Shared identity vocabulary: canonical engine and kernel names with today's spellings as aliases, and unknown facts that carry their reason.",
       "members": [

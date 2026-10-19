@@ -27,8 +27,8 @@ def test_stability_tiers_partition_the_public_surface() -> None:
     }
     sizes = {name: len(members) for name, members in tiers.items()}
 
-    assert sizes == {"stable": 45, "experimental": 66, "implementation": 13}
-    assert sum(sizes.values()) == 124 == len(helia_profiler.__all__)
+    assert sizes == {"stable": 45, "experimental": 69, "implementation": 13}
+    assert sum(sizes.values()) == 127 == len(helia_profiler.__all__)
 
     for left, right in combinations(tiers, 2):
         assert not tiers[left] & tiers[right], (
@@ -74,6 +74,7 @@ def test_public_surface_membership_snapshot() -> None:
         "BoardDef",
         "BuildConfig",
         "BuildError",
+        "BuildRecord",
         "CanonicalEngine",
         "CanonicalKernel",
         "CaptureError",
@@ -107,6 +108,7 @@ def test_public_surface_membership_snapshot() -> None:
         "JLinkProbe",
         "JLinkProbeMatch",
         "LayerResult",
+        "Lifecycle",
         "LocalInput",
         "LockError",
         "MeasurementScope",
@@ -153,6 +155,7 @@ def test_public_surface_membership_snapshot() -> None:
         "ResultValidity",
         "RunEvaluation",
         "RunMetadata",
+        "RunResult",
         "RunStatus",
         "RuntimeQualification",
         "RuntimeRecord",

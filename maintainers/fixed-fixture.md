@@ -155,6 +155,21 @@ record alone, so a relocated or reloaded record gives the same identity.
 hash and providers after checking only the manifest's own hash. The record
 format is unchanged; API 5.7 reads records from 5.0 through 5.6.
 
+`FrozenRun.build(fixture, method=..., lifecycle=...)` compiles a frozen plan
+for a fixture through `build_fixed_fixture` and returns a `BuildRecord` of the
+plan, the compiled `FixtureBuild` and the `Lifecycle` it runs. It refuses a
+fixture whose model is not the plan's, asks the engine whether it implements
+the lifecycle, and applies the lifecycle's invocation counts (`SINGLE` runs
+one timed invocation and no warmups). `BuildRecord.identity` is the build's
+`RunIdentity` with that lifecycle. `save(path, roots=...)` writes one
+canonical JSON document (`hpx.build-record`, schema version 1) holding the
+plan's `to_dict()`, the lifecycle and the `dump_fixture_build` record as an
+object; `load(path, roots=...)` rebuilds both halves, resolving files under
+the caller's roots, so moving the record means passing new roots. `verify()`
+re-checks the build's pinned files, that its model is the plan's model and
+that the plan's intent hash matches its contents; `load` calls it. Every
+refusal, including a malformed or unknown-version file, is a `ConfigError`.
+
 Constructing `FixtureBuildRequest` performs no runtime-cache lookup. When an
 interpreter request omits `runtime`, `build_fixture` looks up the already prepared
 default archive and binds its manifest into the compiled intent; it does not
