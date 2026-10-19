@@ -48,6 +48,10 @@
       "slug": "reference/api/helia_profiler/frozen_run"
     },
     {
+      "label": "identity",
+      "slug": "reference/api/helia_profiler/identity"
+    },
+    {
       "label": "modelcost",
       "slug": "reference/api/helia_profiler/modelcost"
     },

@@ -1,0 +1,270 @@
+{
+  "$schema": "https://ambiqai.github.io/helia-ui/schema/reference-model-1.json",
+  "generatedFrom": {
+    "tool": "pyref",
+    "version": "1.7.3"
+  },
+  "language": "python",
+  "modules": [
+    {
+      "description": "Shared identity vocabulary: canonical engine and kernel names with today's spellings as aliases, and unknown facts that carry their reason.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.",
+      "name": "identity",
+      "path": "helia_profiler.identity",
+      "submodules": [],
+      "summary": "Shared identity vocabulary: canonical engine and kernel names with today's spellings as aliases, and unknown facts that carry their reason.",
+      "symbols": [
+        {
+          "description": "An inference engine, by its shared name.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.CanonicalEngine",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.CanonicalEngine.LITERT",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "LITERT",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "LITERT = 'litert'",
+              "source": {
+                "line": 18,
+                "path": "src/helia_profiler/identity.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L18"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.CanonicalEngine.HELIA_RT",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "HELIA_RT",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "HELIA_RT = 'helia-rt'",
+              "source": {
+                "line": 19,
+                "path": "src/helia_profiler/identity.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L19"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.CanonicalEngine.HELIA_AOT",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "HELIA_AOT",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "HELIA_AOT = 'helia-aot'",
+              "source": {
+                "line": 20,
+                "path": "src/helia_profiler/identity.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L20"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.CanonicalEngine.EXECUTORCH",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "EXECUTORCH",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "EXECUTORCH = 'executorch'",
+              "source": {
+                "line": 21,
+                "path": "src/helia_profiler/identity.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L21"
+              },
+              "summary": ""
+            }
+          ],
+          "name": "CanonicalEngine",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "CanonicalEngine()",
+          "source": {
+            "line": 15,
+            "path": "src/helia_profiler/identity.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L15"
+          },
+          "summary": "An inference engine, by its shared name."
+        },
+        {
+          "description": "A kernel library, by its shared name.\n\n``CMSIS_NN`` is Arm's CMSIS-NN. ``HELIA_CORE`` is heliaCORE, the product\nname of Ambiq's ``ns-cmsis-nn`` library.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.CanonicalKernel",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.CanonicalKernel.REFERENCE",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "REFERENCE",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "REFERENCE = 'reference'",
+              "source": {
+                "line": 31,
+                "path": "src/helia_profiler/identity.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L31"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.CanonicalKernel.CMSIS_NN",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "CMSIS_NN",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "CMSIS_NN = 'cmsis-nn'",
+              "source": {
+                "line": 32,
+                "path": "src/helia_profiler/identity.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L32"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.CanonicalKernel.HELIA_CORE",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "HELIA_CORE",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "HELIA_CORE = 'helia-core'",
+              "source": {
+                "line": 33,
+                "path": "src/helia_profiler/identity.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L33"
+              },
+              "summary": ""
+            }
+          ],
+          "name": "CanonicalKernel",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "CanonicalKernel()",
+          "source": {
+            "line": 24,
+            "path": "src/helia_profiler/identity.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L24"
+          },
+          "summary": "A kernel library, by its shared name."
+        },
+        {
+          "description": "`dataclass`\n\nA fact that could not be determined, with the reason.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.Unknown",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.Unknown.reason",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "reason",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "reason: str",
+              "source": {
+                "line": 40,
+                "path": "src/helia_profiler/identity.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L40"
+              },
+              "summary": ""
+            }
+          ],
+          "name": "Unknown",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "Unknown(reason: str) -> None",
+          "source": {
+            "line": 36,
+            "path": "src/helia_profiler/identity.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L36"
+          },
+          "summary": "A fact that could not be determined, with the reason."
+        },
+        {
+          "description": "The shared name for an engine, from its canonical name or any alias.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.canonical_engine",
+          "kind": "function",
+          "language": "python",
+          "members": [],
+          "name": "canonical_engine",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "canonical_engine(name: str) -> CanonicalEngine",
+          "source": {
+            "line": 74,
+            "path": "src/helia_profiler/identity.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L74"
+          },
+          "summary": "The shared name for an engine, from its canonical name or any alias."
+        },
+        {
+          "description": "The shared name for a kernel library, from its canonical name or any alias.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.canonical_kernel",
+          "kind": "function",
+          "language": "python",
+          "members": [],
+          "name": "canonical_kernel",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "canonical_kernel(name: str) -> CanonicalKernel",
+          "source": {
+            "line": 79,
+            "path": "src/helia_profiler/identity.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L79"
+          },
+          "summary": "The shared name for a kernel library, from its canonical name or any alias."
+        }
+      ]
+    }
+  ],
+  "name": "helia_profiler"
+}
