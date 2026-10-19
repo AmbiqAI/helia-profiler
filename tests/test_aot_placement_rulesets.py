@@ -9,6 +9,7 @@ each kind to a concrete memory. User-provided
 
 from __future__ import annotations
 
+from enum import StrEnum
 from pathlib import Path
 
 import pytest
@@ -260,8 +261,8 @@ class TestRunAotCompilerUsesConfigRegistry:
         )
         fake_top_defines = types.ModuleType("helia_aot.defines")
 
-        class _ModuleTypeEnum:
-            nsx = "nsx"
+        class _ModuleTypeEnum(StrEnum):
+            NSX = "nsx"
 
         fake_top_defines.ModuleType = (  # ty: ignore[unresolved-attribute]
             _ModuleTypeEnum

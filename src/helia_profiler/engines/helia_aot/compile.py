@@ -42,7 +42,7 @@ log = logging.getLogger("hpx")
 # We don't manage downloads/caches like we do for heliaRT — pip already
 # does that better. We just enforce the recorded version range at runtime so
 # a user with an unrecorded install gets a clear error instead of a confusing
-# build failure (e.g. missing ModuleType.nsx).
+# build failure (e.g. a missing NSX module type).
 
 
 def _recorded_range(records: Iterable[RuntimeRecord]) -> tuple[str, str]:
@@ -368,7 +368,7 @@ def _run_aot_compiler(
     convert_args.module.path = output_dir
     convert_args.module.name = module_name
     convert_args.module.prefix = prefix
-    convert_args.module.type = ModuleType.nsx
+    convert_args.module.type = ModuleType("nsx")
     convert_args.platform.name = aot_platform
     convert_args.force = True
 

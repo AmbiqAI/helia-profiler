@@ -1,7 +1,7 @@
 {
   "schema": "hpx.compatibility-baseline",
   "schema_version": 1,
-  "baseline_id": "hpx-neuralspotx-0.8.1-2026-10-19",
+  "baseline_id": "hpx-neuralspotx-0.8.1-2026-10-19.2",
   "neuralspotx": {
     "package": "neuralspotx",
     "version": "0.8.1",
@@ -34,7 +34,7 @@
     },
     "ns-cmsis-nn": {
       "url": "https://github.com/AmbiqAI/ns-cmsis-nn.git",
-      "ref": "4a937fe7988935e1cfc2d8a41859fdada042c17c"
+      "ref": "9f793bd9343b60e794f915b285bd7b7c4a885abe"
     },
     "nsx-executorch": {
       "url": "https://github.com/AmbiqAI/nsx-executorch.git",
@@ -42,7 +42,7 @@
     },
     "helia-rt": {
       "url": "https://github.com/AmbiqAI/helia-rt.git",
-      "ref": "4f922ed365177a6533f869feffe069b0e8b7afb2"
+      "ref": "7fe6dfdb5f8187b7a5200d718e568ecc9ba9c0f0"
     },
     "nsx-sensors": {
       "url": "https://github.com/AmbiqAI/nsx-sensors.git",
@@ -72,7 +72,7 @@
     },
     "nsx-cmsis-nn": {
       "project": "ns-cmsis-nn",
-      "ref": "4a937fe7988935e1cfc2d8a41859fdada042c17c"
+      "ref": "9f793bd9343b60e794f915b285bd7b7c4a885abe"
     },
     "nsx-executorch": {
       "project": "nsx-executorch",
@@ -80,7 +80,7 @@
     },
     "nsx-helia-rt": {
       "project": "helia-rt",
-      "ref": "4f922ed365177a6533f869feffe069b0e8b7afb2"
+      "ref": "7fe6dfdb5f8187b7a5200d718e568ecc9ba9c0f0"
     },
     "nsx-sensors": {
       "project": "nsx-sensors",

@@ -150,7 +150,7 @@ class HeliaAOTAdapter:
 
     Workflow:
     1. Validate profiler board maps to a known AOT platform.
-    2. Invoke ``helia-aot convert`` on the input .tflite model (ModuleType.nsx).
+    2. Invoke ``helia-aot convert`` on the input .tflite model as an NSX module.
     3. Validate generated memory-placement pragmas match expectations.
     4. Resolve the ns-cmsis-nn NSX module (baseline ref, or a user override).
     5. Generate an attribute header mapping AOT macros → Ambiq sections.
@@ -288,7 +288,7 @@ class HeliaAOTAdapter:
         _validate_pragmas(aot_module_dir, prefix)
         cmsis_nn_ref = cmsis_nn_module_ref(config, work_dir)
 
-        # AOT output is already a valid NSX module (ModuleType.nsx), so no
+        # AOT output is already a valid NSX module, so no
         # wrapper is generated here — just the attribute header.
         attr_header = _write_attributes_header(aot_module_dir, prefix)
         cmake_name = module_name.replace("-", "_")

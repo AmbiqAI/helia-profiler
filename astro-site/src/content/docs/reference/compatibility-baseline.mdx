@@ -11,7 +11,7 @@ Stage 5 combines its identity and canonical hash with the NSX registry hash,
 target, engine, overrides, and relevant build inputs to select an isolated
 dependency workspace.
 
-The current baseline is `hpx-neuralspotx-0.8.1-2026-10-19`:
+The current baseline is `hpx-neuralspotx-0.8.1-2026-10-19.2`:
 
 | Identity | Qualified reference |
 | --- | --- |
@@ -21,10 +21,10 @@ The current baseline is `hpx-neuralspotx-0.8.1-2026-10-19`:
 | `nsx-pmu-armv8m` | `5725c065…c88` |
 | `nsx-tflite-micro` | `7afcf2b4…333` |
 | `arm-cmsis-nn` | `6d21a6f8…f7c` |
-| `ns-cmsis-nn` | `4a937fe7…17c` (`v7.46.0`, hpx-declared, see below) |
+| `ns-cmsis-nn` | `9f793bd9…abe` (`v7.47.0`, hpx-declared, see below) |
 | `nsx-executorch` | `5514ac1e…b48e` |
 | `nsx-sensors` | `c219a2bc…3e25` (`v0.3.0`, peeled) |
-| heliaRT | runtime records `1.21.3`, `2.1.0`, `2.2.0` (default, commit `4f922ed3…fb2`; min supported `1.16.0`, from `HELIART_MIN_VERSION` in code) |
+| heliaRT | runtime records `1.21.3`, `2.1.0`, `2.2.0`, `2.2.2` (default, commit `7fe6dfdb…0f0`; min supported `1.16.0`, from `HELIART_MIN_VERSION` in code) |
 | heliaAOT | runtime records `0.23.0`, `0.24.0`, `0.25.0`, `0.26.0`, `0.27.0`, `0.29.0`, `0.30.0`, `0.31.0` (default); accepted range `>=0.23.0,<0.32.0` |
 | tflm | profile path: governed by the `nsx-tflite-micro` and `arm-cmsis-nn` module refs above (the `tflm` runtime record describes the fixed fixture's prepared upstream archive instead); `nsx-tflite-micro` builds TFLM from the `helia-rt-source` project, which the baseline does not list and the neuralSPOT-X 0.8.1 registry lock fixes at `7c1b162c` (helia-rt v1.17.0) |
 | executorch | `0.1.0`, commit `5514ac1e…b48e`, from the runtime record (a checkout's `version.txt` and commit are verified against it) |
@@ -97,6 +97,21 @@ completed result bundle.
 
 <details>
 <summary>Why earlier promotions changed these pins</summary>
+
+heliaRT 2.2.2 (`7fe6dfdb…0f0`) and `ns-cmsis-nn v7.47.0` (`9f793bd9…abe`)
+replace 2.2.0 and v7.46.0. heliaRT 2.2.1 and later require v7.47.0 or newer, so
+the two move together. 2.2.2 refuses models with a tensor above rank 6 at
+`AllocateTensors()` and fixes per-channel DEQUANTIZE. heliaAOT 0.31.0 stays the
+default; it needs v7.46.0 or newer, and its release notes say it was tested
+against v7.47.0. ExecuTorch's
+`ns` provider follows the baseline to v7.47.0 too. v7.47.0's FP16 depthwise
+convolution accumulates in FP32 on MVE, so FP16 depthwise layers on heliaAOT
+(default `precise` accumulation) and heliaRT time differently from v7.46.0. The
+fixed fixture links the 2.2.2 prepared archive.
+
+**Verified.** On an Apollo510 EVB (ATfE, SRAM arena, MRAM weights), int8
+keyword spotting profiles end to end on heliaRT 2.2.2, heliaAOT 0.31.0 and
+TFLM, each with every layer attributed.
 
 heliaAOT 0.31.0 (`7b92ec8a…68e`) becomes the default and the locked release,
 and the accepted range widens to `<0.32.0`. It needs `ns-cmsis-nn v7.46.0` or

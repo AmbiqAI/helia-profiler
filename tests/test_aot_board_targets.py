@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import sys
+from enum import StrEnum
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from unittest.mock import Mock
@@ -58,7 +59,7 @@ def analysis_boundary(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     for name, attributes in {
         "helia_aot.cli.defines": {"ConvertArgs": SimpleNamespace},
         "helia_aot.converter": {"AotConverter": compiler},
-        "helia_aot.defines": {"ModuleType": SimpleNamespace(nsx=SimpleNamespace(value="nsx"))},
+        "helia_aot.defines": {"ModuleType": StrEnum("ModuleType", {"NSX": "nsx"})},
     }.items():
         module = ModuleType(name)
         for key, value in attributes.items():

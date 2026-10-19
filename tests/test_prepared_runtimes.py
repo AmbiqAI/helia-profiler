@@ -45,11 +45,11 @@ RECORD = _RECORD
 ARCHIVE = b"!<arch>\nhelia-rt-member"
 
 
-def _dist(root: Path, *, commit: str = "4f922ed") -> Path:
+def _dist(root: Path, *, commit: str = "7fe6dfd") -> Path:
     (root / "lib").mkdir(parents=True)
     (root / "lib" / "libhelia-rt-cm55-atfe-release-with-logs.a").write_bytes(ARCHIVE)
     (root / "lib" / "libhelia-rt-cm55-atfe-release.a").write_bytes(b"!<arch>\nother")
-    (root / "MANIFEST.txt").write_text(f"helia-rt helia-rt-v2.2.0\nCommit: {commit}\n")
+    (root / "MANIFEST.txt").write_text(f"helia-rt helia-rt-v2.2.2\nCommit: {commit}\n")
     for include in prepared_runtimes._HELIA_RT_INCLUDE_DIRS[1:]:
         (root / include).mkdir(parents=True, exist_ok=True)
         (root / include / "api.h").write_text(f"// {include}\n")
@@ -67,7 +67,7 @@ def cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     dist = _dist(tmp_path / "dist")
     monkeypatch.setattr(
         "helia_profiler.engines.helia_rt.download._fetch_github_release",
-        lambda repo, ref, **_: (dist, "2.2.0") if ref == "helia-rt-v2.2.0" else pytest.fail(ref),
+        lambda repo, ref, **_: (dist, "2.2.2") if ref == "helia-rt-v2.2.2" else pytest.fail(ref),
     )
     return tmp_path / "cache"
 
@@ -75,7 +75,7 @@ def cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 def test_prepare_builds_a_verified_archive_from_the_record(cache: Path) -> None:
     assert RECORD.kernels is not None
     prepared = prepare_runtime("helia-rt")
-    assert prepared.directory == cache / "runtimes" / "helia-rt" / "2.2.0"
+    assert prepared.directory == cache / "runtimes" / "helia-rt" / "2.2.2"
     verified = prepared.runtime.verify()
     assert prepared.runtime.archive.read() == ARCHIVE
     providers = {p.name: p.revision for p in verified.record.providers}
@@ -84,7 +84,7 @@ def test_prepare_builds_a_verified_archive_from_the_record(cache: Path) -> None:
     assert "tensorflow/lite/micro.h" in headers and "signal/fft.h" in headers
     assert all(name.endswith(".h") for name in headers)
     assert verified.record.consumer_defines == prepared_runtimes._HELIA_RT_DEFINES
-    assert not (prepared.directory.parent / "2.2.0.partial").exists()
+    assert not (prepared.directory.parent / "2.2.2.partial").exists()
 
 
 def test_a_differing_archive_is_reported_not_refused(cache: Path, monkeypatch) -> None:
@@ -101,9 +101,9 @@ def test_prepare_refuses_a_release_built_from_another_commit(tmp_path, monkeypat
     dist = _dist(tmp_path / "dist", commit="0123456")
     monkeypatch.setattr(
         "helia_profiler.engines.helia_rt.download._fetch_github_release",
-        lambda *_a, **_k: (dist, "2.2.0"),
+        lambda *_a, **_k: (dist, "2.2.2"),
     )
-    with pytest.raises(ConfigError, match="not built from 4f922ed3"):
+    with pytest.raises(ConfigError, match="not built from 7fe6dfdb"):
         prepare_runtime("helia-rt")
     assert not (tmp_path / "cache" / "runtimes").exists()
 
@@ -123,9 +123,9 @@ def test_prepare_refuses_runtimes_without_an_archive(name, version, message) -> 
 
 def test_a_missing_prepared_runtime_names_the_prepare_command(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path))
-    with pytest.raises(ConfigError, match="No prepared helia-rt 2.2.0 runtime") as exc:
+    with pytest.raises(ConfigError, match="No prepared helia-rt 2.2.2 runtime") as exc:
         prepared_runtime("helia-rt")
-    assert "hpx runtimes prepare helia-rt 2.2.0" in (exc.value.hint or "")
+    assert "hpx runtimes prepare helia-rt 2.2.2" in (exc.value.hint or "")
 
 
 def _pin(path: Path, data: bytes) -> FixtureFile:
@@ -187,8 +187,8 @@ def test_a_helia_rt_build_without_a_prepared_runtime_is_refused(
 def test_runtimes_prepare_cli_reports_the_archive(cache: Path) -> None:
     result = CliRunner().invoke(app, ["runtimes", "prepare", "helia-rt"])
     assert result.exit_code == 0, result.output
-    assert f"Prepared helia-rt 2.2.0 in {prepared_directory(RECORD)}" in result.output
-    assert "differs from the record's 3a985000" in result.output
+    assert f"Prepared helia-rt 2.2.2 in {prepared_directory(RECORD)}" in result.output
+    assert "differs from the record's c027cc65" in result.output
 
     refused = CliRunner().invoke(app, ["runtimes", "prepare", "helia-aot"])
     assert refused.exit_code == 1
@@ -198,7 +198,7 @@ def test_runtimes_prepare_cli_reports_the_archive(cache: Path) -> None:
 def _fetch(monkeypatch, dist: Path) -> None:
     monkeypatch.setattr(
         "helia_profiler.engines.helia_rt.download._fetch_github_release",
-        lambda *_a, **_k: (dist, "2.2.0"),
+        lambda *_a, **_k: (dist, "2.2.2"),
     )
 
 
@@ -210,7 +210,7 @@ def test_a_failed_prepare_leaves_nothing_behind_and_no_traceback(tmp_path, monke
     _fetch(monkeypatch, dist)
     result = CliRunner().invoke(app, ["runtimes", "prepare", "helia-rt"])
     assert result.exit_code == 1
-    assert "Cannot prepare helia-rt 2.2.0" in result.output and "Traceback" not in result.output
+    assert "Cannot prepare helia-rt 2.2.2" in result.output and "Traceback" not in result.output
     assert list((cache / "runtimes" / "helia-rt").iterdir()) == []
 
 
@@ -228,7 +228,7 @@ def test_re_preparing_replaces_the_install_without_leftovers(cache: Path) -> Non
     (first.directory / "stale.txt").write_text("from the first install")
     second = prepare_runtime("helia-rt")
     assert second.directory == first.directory and not (second.directory / "stale.txt").exists()
-    assert sorted(p.name for p in second.directory.parent.iterdir()) == ["2.2.0"]
+    assert sorted(p.name for p in second.directory.parent.iterdir()) == ["2.2.2"]
     assert second.runtime.manifest.sha256 == first.runtime.manifest.sha256
 
 
@@ -237,7 +237,7 @@ def test_a_malformed_prepared_manifest_names_the_prepare_command(cache: Path) ->
     (prepared.directory / "provider-manifest.json").write_text("{}")
     with pytest.raises(ConfigError, match="unreadable") as exc:
         prepared_runtime("helia-rt")
-    assert "hpx runtimes prepare helia-rt 2.2.0" in (exc.value.hint or "")
+    assert "hpx runtimes prepare helia-rt 2.2.2" in (exc.value.hint or "")
 
 
 def test_an_explicit_runtime_is_kept_and_identity_covers_the_runtime(
@@ -274,7 +274,7 @@ def test_a_failed_swap_restores_the_previous_install(cache: Path, monkeypatch) -
     real_rename = Path.rename
 
     def failing_rename(self: Path, target):
-        if self.name.startswith(".2.2.0-") and "-old-" not in self.name:
+        if self.name.startswith(".2.2.2-") and "-old-" not in self.name:
             raise OSError("injected rename failure")
         return real_rename(self, target)
 
@@ -283,7 +283,7 @@ def test_a_failed_swap_restores_the_previous_install(cache: Path, monkeypatch) -
         prepare_runtime("helia-rt")
     monkeypatch.setattr(Path, "rename", real_rename)
     assert marker.read_text() == "previous install"
-    assert sorted(p.name for p in first.directory.parent.iterdir()) == ["2.2.0"]
+    assert sorted(p.name for p in first.directory.parent.iterdir()) == ["2.2.2"]
     if os.name == "posix":  # Windows reports no POSIX permission bits
         assert oct(first.directory.stat().st_mode & 0o777) in ("0o755", "0o775")
 
@@ -293,7 +293,7 @@ def test_a_damaged_prepared_install_names_the_prepare_command(cache: Path) -> No
     (prepared.directory / "include" / "signal" / "fft.h").unlink()
     with pytest.raises(ConfigError, match="is damaged") as exc:
         prepared_runtime("helia-rt")
-    assert "hpx runtimes prepare helia-rt 2.2.0" in (exc.value.hint or "")
+    assert "hpx runtimes prepare helia-rt 2.2.2" in (exc.value.hint or "")
 
 
 def test_a_helia_rt_record_without_an_archive_is_refused(monkeypatch) -> None:
@@ -306,10 +306,10 @@ def test_a_helia_rt_record_without_an_archive_is_refused(monkeypatch) -> None:
 
 def test_a_prepare_removes_leftovers_of_an_interrupted_replace(cache: Path) -> None:
     first = prepare_runtime("helia-rt")
-    leftover = first.directory.parent / ".2.2.0-old-abcd1234" / "install"
+    leftover = first.directory.parent / ".2.2.2-old-abcd1234" / "install"
     leftover.mkdir(parents=True)
     prepare_runtime("helia-rt")
-    assert sorted(p.name for p in first.directory.parent.iterdir()) == ["2.2.0"]
+    assert sorted(p.name for p in first.directory.parent.iterdir()) == ["2.2.2"]
 
 
 #: Build steps run as POSIX process groups; TFLM is prepared on POSIX hosts only.

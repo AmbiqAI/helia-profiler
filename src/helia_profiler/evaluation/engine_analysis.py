@@ -70,7 +70,7 @@ def analyze_for_engine(
     with tempfile.TemporaryDirectory(prefix="hpx_aot_") as tmp:
         convert_args = ConvertArgs(
             model={"path": str(path)},
-            module={"path": tmp, "type": ModuleType.nsx.value},
+            module={"path": tmp, "type": ModuleType("nsx").value},
             platform={"name": aot_platform_for_board(board) or board},
         )
         try:
