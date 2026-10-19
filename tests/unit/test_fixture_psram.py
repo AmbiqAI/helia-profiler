@@ -230,6 +230,15 @@ def test_psram_aot_render_refuses_inconsistent_artifacts(tmp_path, fault):
         fixture_template_vars(ctx, regions)
 
 
+def test_external_aot_constant_mram_needs_its_sidecar_file(tmp_path):
+    from helia_profiler.firmware.fixture import fixture_template_vars
+
+    ctx, regions = render_context(tmp_path, EngineType.HELIA_AOT)
+    regions[1] = replace(regions[1], memory="mram", placement=Placement.MRAM, blob_filename=None)
+    with pytest.raises(ConfigError, match="Writable AOT region cannot use MRAM"):
+        fixture_template_vars(ctx, regions)
+
+
 @pytest.mark.parametrize("memory_args", [{"planner": "greedy"}, None])
 def test_psram_aot_fake_pipeline_derives_setting_before_prepare(tmp_path, monkeypatch, memory_args):
     from types import SimpleNamespace

@@ -237,11 +237,18 @@ def test_incomplete_status_is_not_a_verified_failure(tmp_path):
     assert inspect_result(bundle(tmp_path, status="incomplete")).code == "incomplete_result"
 
 
-@pytest.mark.parametrize("version", [True, 10, 14])
+@pytest.mark.parametrize("version", [True, 10, RUN_SUMMARY_SCHEMA_VERSION + 1])
 def test_unsupported_summary_semantics_are_explicit(tmp_path, version):
     path = bundle(tmp_path)
     edit_document(path, "summary.json", lambda d: d.update(schema_version=version))
     assert inspect_result(path).code == "unsupported_schema"
+
+
+@pytest.mark.parametrize("version", [13, RUN_SUMMARY_SCHEMA_VERSION])
+def test_summaries_before_and_with_identity_both_read(tmp_path, version):
+    path = bundle(tmp_path)
+    edit_document(path, "summary.json", lambda d: d.update(schema_version=version))
+    assert load_result(path).summary is not None
 
 
 @pytest.mark.parametrize("value", [True, 0.5, -1])

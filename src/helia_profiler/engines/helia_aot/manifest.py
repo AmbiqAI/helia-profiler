@@ -1,28 +1,19 @@
-"""heliaAOT operator manifest and memory-plan extraction (from CodeGenContext).
+"""heliaAOT operator manifest and memory-plan extraction from ``ConversionResult`` views.
 
-heliaAOT transforms/fuses/removes operators compared to the original TFLite
-flatbuffer; this module extracts the post-transform operator graph and
-concrete arena layout directly from the AOT compiler's ``CodeGenContext``
-(``codegen_ctx.operators`` / ``codegen_ctx.render_plan``) rather than
-parsing generated C source.
+heliaAOT transforms, fuses and removes operators relative to the original
+``.tflite``. Its ``ConversionResult`` views (``operators``, ``tensors``,
+``regions``, ``placements``) describe the generated module, so hpx reads the
+post-transform graph and arena layout from them rather than parsing C.
 
-The extracted operator manifest is intentionally a list of loosely-typed
-dicts (``list[dict[str, Any]]``) rather than a frozen dataclass: heliaAOT's
-per-tensor metadata is dynamic (older/newer heliaAOT versions expose
-different optional fields — see ``_tensor_metadata``'s ``getattr(..., None)``
-probing), and ``report/aot.py`` consumes the manifest generically (JSON dump,
-plus an ad-hoc CSV flattening keyed by whichever fields happen to be
-present). Typing this at the source would require mirroring heliaAOT's own
-evolving tensor-attribute surface in HPX; the loose dict contract is the
-documented exception mirroring ``LayerResult.counters: dict[str, float]``
-(see ``firmware/context.py``'s ``AotOpContext``, which extracts only the
-two fields — ``id`` and ``op_type`` — actually needed by firmware
-templates).
+The operator manifest stays a list of plain dicts: ``report/aot.py`` dumps it
+generically and ``firmware/context.py``'s ``AotOpContext`` reads only ``id``
+and ``op_type``.
 """
 
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from typing import Any
 
 from ...errors import EngineError
@@ -46,244 +37,130 @@ _AOT_MEMORY_TO_PLACEMENT: dict[str, Placement] = {
 }
 
 
-def _tensor_metadata(
-    tensor: Any,
-    allocations: dict[str, Any] | None = None,
-    arena_region_ids: dict[tuple[str, str, str], int] | None = None,
-) -> dict[str, Any]:
-    """Extract a JSON-serialisable summary from an ``AirTensor``.
+def _name(value: Any) -> str:
+    """An enum's value, or a plain string, lowercased."""
+    return str(getattr(value, "value", value)).lower()
 
-    Returns only the fields useful for post-run analysis; silently omits
-    any attribute that the tensor does not expose (older heliaAOT
-    versions may not expose every field).
-    """
-    meta: dict[str, Any] = {}
-    for key in ("name", "dtype", "ctype", "kind"):
-        val = getattr(tensor, key, None)
-        if val is not None:
-            meta[key] = str(val)
-    for key in ("id", "nbytes", "size", "ndim", "buffer_index"):
-        val = getattr(tensor, key, None)
-        if isinstance(val, (int, float)):
-            meta[key] = int(val)
-    shape = getattr(tensor, "shape", None)
-    if shape is not None:
-        try:
-            meta["shape"] = [int(d) for d in shape]
-        except (TypeError, ValueError):
-            pass
-    for flag in ("is_constant", "is_persistent", "is_scratch"):
-        val = getattr(tensor, flag, None)
-        if isinstance(val, bool):
-            meta[flag] = val
-    if allocations:
-        tensor_keys = [
-            str(v)
-            for v in (
-                getattr(tensor, "id", None),
-                getattr(tensor, "name", None),
-                meta.get("id"),
-                meta.get("name"),
-            )
-            if v is not None
-        ]
-        alloc = next((allocations[k] for k in tensor_keys if k in allocations), None)
-        if alloc is not None:
-            binding = getattr(alloc, "binding", None)
-            memory = getattr(binding, "memory", getattr(alloc, "memory", None))
-            source_memory = getattr(binding, "source_memory", None)
-            role = getattr(binding, "role", None)
-            offset = getattr(binding, "offset", getattr(alloc, "offset", None))
-            size = getattr(alloc, "size", None)
 
-            if memory is not None:
-                meta["memory"] = str(memory).lower()
-            if source_memory is not None:
-                meta["source_memory"] = str(source_memory).lower()
-            if role is not None:
-                meta["arena_role"] = str(role).lower()
-            if isinstance(offset, (int, float)):
-                meta["offset"] = int(offset)
-            if isinstance(size, (int, float)):
-                meta["allocation_size"] = int(size)
-
-            if memory is not None and role is not None:
-                key = (
-                    str(role).lower(),
-                    str(memory).lower(),
-                    str(source_memory or memory).lower(),
-                )
-                if arena_region_ids and key in arena_region_ids:
-                    meta["arena_region_id"] = arena_region_ids[key]
-            source = meta.get("source_memory")
-            runtime = meta.get("memory")
-            if source is not None and runtime is not None:
-                meta["staged"] = source != runtime
+def _tensor_metadata(tensor: Any, placement: Any, regions: Mapping[int, Any]) -> dict[str, Any]:
+    """A JSON-serialisable summary of one ``TensorView`` and its ``PlacementView``."""
+    meta: dict[str, Any] = {"id": tensor.id}
+    if tensor.name is not None:
+        meta["name"] = tensor.name
+    meta.update(
+        dtype=tensor.dtype,
+        ctype=tensor.ctype,
+        kind=_name(tensor.kind),
+        nbytes=tensor.nbytes,
+        shape=list(tensor.shape),
+    )
+    if placement is None or placement.region is None:
+        return meta
+    region = regions[placement.region]
+    meta.update(
+        memory=_name(region.memory),
+        source_memory=_name(placement.source_memory),
+        arena_role=_name(region.role),
+        offset=placement.offset,
+        allocation_size=placement.size,
+        arena_region_id=placement.region,
+        staged=placement.staged,
+    )
     return meta
 
 
-def _extract_arena_regions(codegen_ctx: Any, prefix: str) -> list[ArenaRegion]:
-    """Extract arena region info from the CodeGenContext's render_plan.
+def _extract_arena_regions(result: Any, prefix: str) -> list[ArenaRegion]:
+    """One :class:`ArenaRegion` per region, ordered by region id.
 
-    Returns a list of :class:`ArenaRegion` instances — one per AOT
-    scratch / persistent / constant arena.  Used by the firmware
-    template to emit ``bind_arena()`` calls in external-arena mode
-    (``allocate_arenas=false``).
+    The firmware template emits ``bind_arena()`` calls from these in
+    external-arena mode (``allocate_arenas=false``).
     """
-    render_plan = getattr(codegen_ctx, "render_plan", None)
-    if render_plan is None:
-        return []
-
-    # Build a lookup from constant arena memory → sidecar blob filename.
-    # constant_blobs is ordered to match constant_arenas.
-    const_blob_filenames: dict[int, str] = {}
-    constant_blobs = getattr(render_plan, "constant_blobs", ())
-    constant_arenas = getattr(render_plan, "constant_arenas", ())
-    for arena, blob in zip(constant_arenas, constant_blobs):
-        const_blob_filenames[arena.region_id] = blob.sidecar_filename
-
     regions: list[ArenaRegion] = []
-    for arena_list in (
-        render_plan.scratch_arenas,
-        render_plan.persistent_arenas,
-        render_plan.constant_arenas,
-    ):
-        for arena in arena_list:
-            mem_str = str(arena.memory).lower()
-            placement = _AOT_MEMORY_TO_PLACEMENT.get(mem_str)
-            if placement is None:
-                raise EngineError(
-                    f"AOT arena {arena.region_id} has unsupported physical memory {mem_str!r}"
-                )
-            try:
-                role = ArenaRole(str(arena.role).lower())
-            except ValueError as exc:
-                raise EngineError(
-                    f"AOT arena {arena.region_id} has unsupported role {arena.role!r}"
-                ) from exc
-            name = f"{prefix}_arena_{mem_str}"
-            blob_fn = const_blob_filenames.get(arena.region_id)
-            regions.append(
-                ArenaRegion(
-                    region_id=arena.region_id,
-                    name=name,
-                    size=int(arena.size),
-                    alignment=int(arena.alignment),
-                    role=role,
-                    memory=mem_str,
-                    placement=placement,
-                    blob_filename=blob_fn,
-                )
+    for region in result.regions:
+        mem_str = _name(region.memory)
+        placement = _AOT_MEMORY_TO_PLACEMENT.get(mem_str)
+        if placement is None:
+            raise EngineError(f"AOT arena {region.id} has unsupported physical memory {mem_str!r}")
+        try:
+            role = ArenaRole(_name(region.role))
+        except ValueError as exc:
+            raise EngineError(
+                f"AOT arena {region.id} has unsupported role {region.role!r}"
+            ) from exc
+        regions.append(
+            ArenaRegion(
+                region_id=region.id,
+                name=f"{prefix}_arena_{mem_str}",
+                size=region.size,
+                alignment=region.alignment,
+                role=role,
+                memory=mem_str,
+                placement=placement,
+                blob_filename=region.sidecar_file,
             )
-
-    # Sort by region_id to match the generated enum ordering
-    regions.sort(key=lambda r: r.region_id)
+        )
     return regions
 
 
-def _extract_operator_manifest(
-    codegen_ctx: Any,
-) -> list[dict[str, Any]]:
-    """Build the operator manifest from the ``CodeGenContext``.
+def _extract_operator_manifest(result: Any, prefix: str) -> list[dict[str, Any]]:
+    """The operator manifest, one entry per generated operator in execution order.
 
-    heliaAOT may transform, fuse, or remove operators compared to the
-    original TFLite flatbuffer.  ``codegen_ctx.operators`` is the
-    authoritative post-transform list of ``AotOperator`` objects — each
-    with a stable ``.TYPE`` (``AirOpType``) and ``.id`` (original TFLite
-    operator index, preserved through transforms).
+    Each entry::
 
-    Returns a list of dicts ordered by execution sequence::
+        {
+            "idx": 0, "id": 0, "source_indices": [0], "op_type": "CONV_2D",
+            "name": "conv_2d_0", "kernel_calls": {"run": "arm_convolve_s8"},
+            "inputs": [...], "outputs": [...], "local_tensors": [...],
+        }
 
-        [
-            {
-                "idx": 0, "id": 0, "op_type": "CONV_2D", "name": "conv_2d_0",
-                "kernel_calls": {"run": "arm_convolve_s8"},
-                "inputs": [{"name": "x", "shape": [1, 49, 10, 1], ...}],
-                "outputs": [{"name": "y", "shape": [1, 25, 5, 8], ...}],
-            },
-            ...
-        ]
-
-    Where:
-    - ``idx``     — sequential execution index (matches firmware CSV "Layer")
-    - ``id``      — AIR operator ID passed to the callback
-    - ``op_type`` — operator type string (from ``AirOpType``)
-    - ``name``    — full operator name as emitted by heliaAOT
+    - ``idx`` — execution position, the generated callback's ``op`` argument
+      and the firmware CSV "Layer"
+    - ``id`` — the operator's ``.tflite`` index, or ``None`` when it has none
+      or several (a transform created it, or a hook fused several)
+    - ``source_indices`` — every ``.tflite`` index the operator came from
+    - ``name`` — the operator's generated symbol without the module prefix
     - ``kernel_calls`` — CORE entries the generated source calls, keyed by
-      role or helper; ``{}`` calls none, ``None`` is unrecorded (see
-      :func:`_kernel_calls`)
-    - ``inputs``  — list of input tensor metadata (shape/dtype/size)
-    - ``outputs`` — list of output tensor metadata
+      role; ``{}`` calls none, ``None`` is unrecorded (see :func:`_kernel_calls`)
     """
-    operators = getattr(codegen_ctx, "operators", None)
-    if not operators:
-        return []
+    tensors = {tensor.id: tensor for tensor in result.tensors}
+    regions = {region.id: region for region in result.regions}
+    placements = result.placements
 
-    memory_plan = getattr(codegen_ctx, "memory_plan", None)
-    allocations = getattr(memory_plan, "tensor_allocs", None) or {}
-    arena_region_ids = _arena_region_id_lookup(codegen_ctx)
+    def describe(ids: tuple[str, ...]) -> list[dict[str, Any]]:
+        return [_tensor_metadata(tensors[tid], placements.get(tid), regions) for tid in ids]
 
     manifest: list[dict[str, Any]] = []
-    for idx, aot_op in enumerate(operators):
-        # The litert frontend always mints numeric ids (the original tflite
-        # index), but OpId is a str — a future frontend or synthetic
-        # transform id must degrade to an unmapped position (#218 dashes
-        # it), not crash prepare().
-        if not str(aot_op.id).isdigit():
-            continue
+    for op in result.operators:
+        sources = list(op.source_indices)
         entry: dict[str, Any] = {
-            "idx": idx,
-            "id": int(aot_op.id),
-            "op_type": str(aot_op.TYPE),
-            "name": aot_op.name,
-            "kernel_calls": _kernel_calls(aot_op),
+            "idx": op.layer_index,
+            "id": sources[0] if len(sources) == 1 else None,
+            "source_indices": sources,
+            "op_type": op.type,
+            "name": op.symbol.removeprefix(f"{prefix}_"),
+            "kernel_calls": _kernel_calls(op),
+            "inputs": describe(op.input_ids),
+            "outputs": describe(op.output_ids),
         }
-        try:
-            entry["inputs"] = [
-                _tensor_metadata(t, allocations, arena_region_ids)
-                for t in (aot_op.input_tensors or [])
-            ]
-        except Exception:  # noqa: BLE001 — defensive for older heliaAOT
-            pass
-        try:
-            entry["outputs"] = [
-                _tensor_metadata(t, allocations, arena_region_ids)
-                for t in (aot_op.output_tensors or [])
-            ]
-        except Exception:  # noqa: BLE001
-            pass
-        try:
-            local_tensors = [
-                _tensor_metadata(t, allocations, arena_region_ids)
-                for t in (aot_op.local_tensors or [])
-            ]
-            if local_tensors:
-                entry["local_tensors"] = local_tensors
-        except Exception:  # noqa: BLE001
-            pass
+        if op.local_tensor_ids:
+            entry["local_tensors"] = describe(op.local_tensor_ids)
         manifest.append(entry)
     return manifest
 
 
-def _kernel_calls(aot_op: Any) -> dict[str, str] | None:
-    """The CORE entries the generated source calls directly, keyed by role or helper.
+def _kernel_calls(op: Any) -> dict[str, str] | None:
+    """The CORE entries the generated source calls directly, keyed by role.
 
     This is the compiler's own record of the selected route; an ``init`` role
     runs in the operator's initialisation, outside the measured window. ``None``
-    is unrecorded: the installed heliaAOT does not report calls, does not cover
-    this operator, or reported something malformed. A symbol linked into the
-    image is not a call. A failing compiler method propagates like any engine fault.
+    is unrecorded: heliaAOT does not record calls for this operator, or reported
+    something malformed. A symbol linked into the image is not a call.
     """
-    report = getattr(aot_op, "kernel_calls", None)
-    if not callable(report):
-        return None
-    calls = report()
+    calls = op.kernel_calls
     if calls is None:
         return None
-    if not isinstance(calls, dict) or not all(
-        _is_call_role(role) and _is_call_symbol(symbol) for role, symbol in calls.items()
-    ):
-        log.warning("heliaAOT reported malformed CORE calls for %s", aot_op.name)
+    if not all(_is_call_role(role) and _is_call_symbol(symbol) for role, symbol in calls.items()):
+        log.warning("heliaAOT reported malformed CORE calls for %s", op.symbol)
         return None
     return dict(calls)
 
@@ -296,180 +173,66 @@ def _is_call_symbol(symbol: object) -> bool:
     return isinstance(symbol, str) and symbol.isidentifier()
 
 
-def _arena_region_id_lookup(codegen_ctx: Any) -> dict[tuple[str, str, str], int]:
-    """Return ``(role, runtime_memory, source_memory) → region_id``."""
+def _extract_memory_plan(result: Any, *, allocate_arenas: bool = True) -> MemoryPlan | None:
+    """Build a ``MemoryPlan`` from the result's arena regions.
 
-    render_plan = getattr(codegen_ctx, "render_plan", None)
-    if render_plan is None:
-        return {}
-    lookup: dict[tuple[str, str, str], int] = {}
-    for arena_list in (
-        getattr(render_plan, "scratch_arenas", ()),
-        getattr(render_plan, "persistent_arenas", ()),
-        getattr(render_plan, "constant_arenas", ()),
-    ):
-        for arena in arena_list:
-            role = str(getattr(arena, "role", "")).lower()
-            memory = str(getattr(arena, "memory", "")).lower()
-            raw_source_memory = getattr(arena, "source_memory", None)
-            source_memory = str(
-                raw_source_memory if raw_source_memory is not None else getattr(arena, "memory", "")
-            ).lower()
-            region_id = getattr(arena, "region_id", None)
-            if role and memory and source_memory and isinstance(region_id, (int, float)):
-                lookup[(role, memory, source_memory)] = int(region_id)
-    return lookup
+    Generated C allocates one buffer per region; tensor placements share those
+    buffers and are never summed as independent RAM. Capacities are left 0:
+    the ``plan_memory`` stage fills them from the SoC layout.
 
-
-def _aot_buffer_symbol(
-    prefix: str,
-    role: str,
-    region_key: str,
-    *,
-    staged: bool,
-    allocate_arenas: bool,
-    region_id: int,
-) -> str | None:
-    """The symbol heliaAOT's templates ACTUALLY emit for an arena
-    consumer, per the installed wheel's tensors.c.j2 / constants.c.j2 and
-    hpx's main_aot.cc.j2 (#179):
-
-    * cold constant -> {prefix}_arena_const_{mem}__blob (constants.c.j2,
-      emitted regardless of allocate_arenas);
-    * staged constant, internal arenas -> {prefix}_arena_const_{mem}_buffer
-      (tensors.c.j2, GATED on allocate_arenas — None in external mode);
-    * scratch/persistent, internal -> {prefix}_arena_{mem}_buffer /
-      {prefix}_arena_persistent_{mem}_buffer (same gate);
-    * scratch/persistent, external -> hpx_arena_buf_storage_{region_id}
-      (hpx's own main_aot.cc.j2 — literal "hpx_", not the AOT prefix).
-    None means no single symbol exists — the reconciler reports
-    unmatchable, never a false missing."""
-    mem = region_key.lower()
-    if role == ArenaRole.CONSTANT.value:
-        if not allocate_arenas:
-            # External-arena mode emits no constant symbols at all (the cold
-            # __blob is inside the allocate_arenas guard too); constants ship
-            # as sidecar binaries instead (#179).
-            return None
-        if not staged:
-            return f"{prefix}_arena_const_{mem}__blob"
-        return f"{prefix}_arena_const_{mem}_buffer"
-    if not allocate_arenas:
-        return f"hpx_arena_buf_storage_{region_id}"
-    if role == "persistent":
-        return f"{prefix}_arena_persistent_{mem}_buffer"
-    return f"{prefix}_arena_{mem}_buffer"
-
-
-def _extract_memory_plan(
-    codegen_ctx: Any, prefix: str = "hpx", *, allocate_arenas: bool = True
-) -> MemoryPlan | None:
-    """Build a ``MemoryPlan`` from the heliaAOT ``CodeGenContext``.
-
-    The AOT render plan is the source of truth for runtime memory: generated C
-    allocates one buffer per scratch / persistent / constant arena.  The lower
-    level ``memory_plan.tensor_allocs`` entries describe tensor assignments into
-    those shared arenas and must not be summed as independent RAM usage.
-
-    Returns ``None`` when the context does not expose both a memory plan and a
-    render plan.  In that case HPX should avoid presenting a precise AOT memory
-    accounting table rather than falling back to misleading tensor sums.
+    Returns ``None`` when a region names a memory hpx does not model, rather
+    than presenting a partial accounting table.
     """
-    aot_plan = getattr(codegen_ctx, "memory_plan", None)
-    render_plan = getattr(codegen_ctx, "render_plan", None)
-    if aot_plan is None or render_plan is None:
-        return None
-
-    arena_usages = getattr(aot_plan, "arena_usages", None) or {}
-    return _extract_memory_plan_from_render_plan(
-        render_plan,
-        arena_usages,
-        prefix=prefix,
-        allocate_arenas=allocate_arenas,
-    )
-
-
-def _extract_memory_plan_from_render_plan(
-    render_plan: Any,
-    arena_usages: dict[Any, Any],
-    prefix: str = "hpx",
-    allocate_arenas: bool = True,
-) -> MemoryPlan | None:
     buckets: dict[str, list[MemoryConsumer]] = {}
     total_weights = 0
 
-    for arena_list_name in (
-        "scratch_arenas",
-        "persistent_arenas",
-        "constant_arenas",
-    ):
-        for arena in getattr(render_plan, arena_list_name, ()):
-            runtime_key = _aot_memory_region_key(getattr(arena, "memory", None))
-            if runtime_key is None:
-                log.warning("AOT memory plan unavailable: unsupported runtime memory mapping")
-                return None
-
-            size = int(getattr(arena, "size", 0))
-            if size <= 0:
-                continue
-
-            role = str(getattr(arena, "role", arena_list_name.removesuffix("_arenas"))).lower()
-            region_id = int(getattr(arena, "region_id", len(buckets)))
-            kind = ConsumerKind.WEIGHTS if role == ArenaRole.CONSTANT.value else ConsumerKind.ARENA
-            source_key_early = _aot_memory_region_key(getattr(arena, "source_memory", None))
-            if getattr(arena, "source_memory", None) is not None and source_key_early is None:
-                log.warning("AOT memory plan unavailable: unsupported source memory mapping")
-                return None
-            staged = source_key_early is not None and source_key_early != runtime_key
-            buckets.setdefault(runtime_key, []).append(
-                MemoryConsumer(
-                    name=f"{runtime_key.lower()}_{role}_arena_{region_id}",
-                    size=size,
-                    kind=kind,
-                    symbol=_aot_buffer_symbol(
-                        prefix,
-                        role,
-                        runtime_key,
-                        staged=staged,
-                        allocate_arenas=allocate_arenas,
-                        region_id=region_id,
-                    ),
-                )
+    for region in result.regions:
+        if region.size <= 0:
+            continue
+        runtime_key = _aot_memory_region_key(_name(region.memory))
+        source_key = _aot_memory_region_key(_name(region.source_memory))
+        if runtime_key is None or source_key is None:
+            log.warning("AOT memory plan unavailable: unsupported memory mapping")
+            return None
+        role = _name(region.role)
+        constant = role == ArenaRole.CONSTANT.value
+        symbol = region.symbol
+        if not allocate_arenas and not constant:
+            # hpx's main_aot.cc.j2 owns external scratch/persistent storage (#179).
+            symbol = f"hpx_arena_buf_storage_{region.id}"
+        buckets.setdefault(runtime_key, []).append(
+            MemoryConsumer(
+                name=f"{runtime_key.lower()}_{role}_arena_{region.id}",
+                size=region.size,
+                kind=ConsumerKind.WEIGHTS if constant else ConsumerKind.ARENA,
+                symbol=symbol,
             )
-            if role == ArenaRole.CONSTANT.value:
-                total_weights += size
-                source_key = _aot_memory_region_key(getattr(arena, "source_memory", None))
-                if source_key is not None and source_key != runtime_key:
-                    buckets.setdefault(source_key, []).append(
-                        MemoryConsumer(
-                            name=f"{source_key.lower()}_{role}_source_{region_id}",
-                            size=size,
-                            kind=ConsumerKind.WEIGHTS,
-                            # constants.c.j2:44 — the staged SOURCE blob
-                            # is named by the RUNTIME memory, placed in
-                            # source memory (#179).
-                            symbol=(f"{prefix}_arena_const_{runtime_key.lower()}__source"),
-                        )
+        )
+        if constant:
+            total_weights += region.size
+            if source_key != runtime_key:
+                buckets.setdefault(source_key, []).append(
+                    MemoryConsumer(
+                        name=f"{source_key.lower()}_{role}_source_{region.id}",
+                        size=region.size,
+                        kind=ConsumerKind.WEIGHTS,
+                        symbol=region.source_symbol,
                     )
+                )
 
     if not buckets:
         return None
 
-    capacities = {
-        key: int(getattr(usage, "total_size", 0))
-        for mem_type, usage in arena_usages.items()
-        if (key := _aot_memory_region_key(mem_type)) is not None
-    }
     ordered_keys = ["MRAM", "SRAM", "DTCM", "ITCM", "PSRAM"]
-    keys = [key for key in ordered_keys if key in buckets or key in capacities]
-    keys.extend(sorted((set(buckets) | set(capacities)) - set(keys)))
+    keys = [key for key in ordered_keys if key in buckets]
+    keys.extend(sorted(set(buckets) - set(keys)))
 
     regions = tuple(
         MemoryRegionUsage(
             region=MemoryRegion(key),
-            capacity=capacities.get(key, 0),
-            used=sum(c.size for c in buckets.get(key, ())),
-            consumers=tuple(buckets.get(key, ())),
+            capacity=0,
+            used=sum(c.size for c in buckets[key]),
+            consumers=tuple(buckets[key]),
         )
         for key in keys
     )
@@ -482,10 +245,8 @@ def _extract_memory_plan_from_render_plan(
     )
 
 
-def _aot_memory_region_key(memory: Any) -> str | None:
-    if memory is None:
-        return None
-    key = str(memory).upper()
+def _aot_memory_region_key(memory: str) -> str | None:
+    key = memory.upper()
     if key == "TCM":
         return "DTCM"
     if key == "DRAM":

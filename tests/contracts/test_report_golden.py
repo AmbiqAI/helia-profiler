@@ -484,7 +484,7 @@ def _make_aot_ctx(tmp_path: Path) -> PipelineContext:
                         "kind": "activation",
                         "memory": "tcm",
                         "offset": 1024,
-                        "size": 2048,
+                        "nbytes": 2048,
                         "shape": [1, 26, 26, 8],
                     },
                 ],

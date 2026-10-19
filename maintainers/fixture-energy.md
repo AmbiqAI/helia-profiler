@@ -41,7 +41,7 @@ identities. Timing-only completion polling is unchanged.
 
 Experiment counts, repeat aggregation, comparison thresholds, calibration acceptance and rail coverage belong to the caller. Instrument GPIO reference voltage is not a substitute for measured rail voltage. No battery or whole-application energy claim follows from a rail measurement.
 
-The runtime catalog also admits non-default AOT 0.29.0 from its exact release commit. Its empty qualification list makes no target qualification claim. The published compiler requires CORE 7.44.2; an explicitly loaded task compatibility baseline records that tuple as development overrides when it differs from the unchanged package default. Package range admission, generated firmware fit, physical execution and numerical correctness remain distinct.
+The runtime catalog admits AOT 0.33.0 only, from its exact release commit. Its empty qualification list makes no target qualification claim. An explicitly loaded task compatibility baseline whose CORE differs from the unchanged package default is recorded as development overrides. Package range admission, generated firmware fit, physical execution and numerical correctness remain distinct.
 
 Trace acceptance reconstructs the original packed UINT1 GPIO frames, including the valid sample count, little-endian bit order, channel, decimation mode/increment and clock metadata. A bounded recorder preserves those bytes; malformed, dropped or overflowed evidence cannot produce accepted energy. The JS220/JS320 adapter establishes the shared native sensor counter from the instrument stream contract, and checks the current level-preserving mode before enabling streams. It does not infer valid padding or a clock origin from frame arrival times.
 

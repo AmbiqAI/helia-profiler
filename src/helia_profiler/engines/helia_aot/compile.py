@@ -46,13 +46,17 @@ log = logging.getLogger("hpx")
 
 
 def _recorded_range(records: Iterable[RuntimeRecord]) -> tuple[str, str]:
-    """The oldest heliaAOT record's version and the minor after the newest."""
+    """The oldest heliaAOT record's version and the major after the newest.
+
+    A 0.x record counts as major 1: heliaAOT's last 0.x release carries its
+    first stable API (helia-aot#874), so it shares that major's range.
+    """
     versions = sorted(parse_semver(r.version) for r in records if r.name == "helia-aot")
     if not versions:
         raise ConfigError("heliaPROFILER ships no heliaAOT runtime record")
     if (0, 0, 0) in versions:
         raise ConfigError("heliaAOT runtime records need major.minor.patch versions")
-    return "{}.{}.{}".format(*versions[0]), f"{versions[-1][0]}.{versions[-1][1] + 1}.0"
+    return "{}.{}.{}".format(*versions[0]), f"{max(versions[-1][0], 1) + 1}.0.0"
 
 
 HELIAAOT_MIN_VERSION, HELIAAOT_MAX_VERSION_EXCLUSIVE = _recorded_range(runtimes())
@@ -277,32 +281,24 @@ def _merged_aot_args(config: ProfileConfig) -> dict[str, Any]:
     return base_data
 
 
-#: The code generation context fields hpx attributes layers and plans arenas from.
-_CODEGEN_FIELDS = ("operators", "model", "memory_plan", "render_plan")
+#: The ``ConversionResult`` views hpx attributes layers and plans arenas from.
+_VIEW_FIELDS = ("operators", "tensors", "regions", "placements")
 
 
-def codegen_context(converter: Any) -> Any:
-    """Convert and return heliaAOT's code generation context.
+def convert_with_views(converter: Any) -> Any:
+    """Convert and return heliaAOT's ``ConversionResult``, whose config set ``result_views``.
 
-    Raises :class:`EngineError` when the installed heliaAOT returns no context.
+    Raises :class:`EngineError` when the result lacks a view.
     """
-    # WORKAROUND helia-aot#874: convert() returns only the written plan and
-    # report; the operators, AIR model and memory plan stay on the internal context.
-    private = getattr(type(converter), "_convert", None)
-    context = private(converter) if private is not None else converter.convert()
-    # A model with no generated operators is valid; the other fields are always set.
-    missing = [
-        name
-        for name in _CODEGEN_FIELDS
-        if not hasattr(context, name) or (name != "operators" and getattr(context, name) is None)
-    ]
+    result = converter.convert()
+    missing = [name for name in _VIEW_FIELDS if getattr(result, name, None) is None]
     if missing:
         raise EngineError(
-            f"heliaAOT returned no code generation context (missing {', '.join(missing)})",
+            f"heliaAOT returned no conversion views (missing {', '.join(missing)})",
             hint="Install a heliaAOT release inside the range this hpx records "
             "(hpx runtimes list).",
         )
-    return context
+    return result
 
 
 def _run_aot_compiler(
@@ -312,19 +308,17 @@ def _run_aot_compiler(
     prefix: str,
     aot_platform: str,
 ) -> Any:
-    """Run heliaAOT via its Python API and return the ``CodeGenContext``.
+    """Run heliaAOT via its Python API and return its ``ConversionResult``.
 
-    Uses the converter's code generation context so we get the full
-    post-transform graph (operator list, AIR model, memory plan) without
-    parsing generated C.
+    The result's views describe the post-transform graph (operators, tensors,
+    arena regions, placements) without parsing generated C.
 
     ``ConvertArgs`` come from :func:`_merged_aot_args` plus the profiler's
     tensor rulesets; the profiler's mandatory fields (model, module,
     platform) override any values there.
     """
     try:
-        from helia_aot.cli.defines import ConvertArgs
-        from helia_aot.converter import AotConverter
+        from helia_aot import AotConverter, ConvertArgs
         from helia_aot.defines import ModuleType
     except ImportError as exc:
         raise EngineError(
@@ -371,6 +365,7 @@ def _run_aot_compiler(
     convert_args.module.type = ModuleType("nsx")
     convert_args.platform.name = aot_platform
     convert_args.force = True
+    convert_args.result_views = True
 
     log.info(
         "heliaAOT convert: model=%s, module=%s/%s, platform=%s",
@@ -382,7 +377,7 @@ def _run_aot_compiler(
     log.debug("ConvertArgs: %s", convert_args)
 
     try:
-        codegen_ctx = codegen_context(AotConverter(config=convert_args))
+        result = convert_with_views(AotConverter(config=convert_args))
     except EngineError:
         raise
     except Exception as exc:
@@ -400,7 +395,7 @@ def _run_aot_compiler(
                 f"AOT output missing {required_dir}/ directory: {module_dir}",
             )
 
-    return codegen_ctx
+    return result
 
 
 def _merge_aot_tensor_rulesets(

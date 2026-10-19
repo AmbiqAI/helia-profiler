@@ -6,6 +6,7 @@ _fixture_placement.py
 _fixture_ram.py
 _fixture_record.py
 _fixture_request.py
+_identity_hash.py
 _litert_inspection.py
 _result_view.py
 _version.py
@@ -50,14 +51,7 @@ data/result_manifest.schema.v1.json
 data/run_metadata.schema.v1.json
 data/run_summary.schema.v1.json
 data/runtimes/executorch/0.1.0.json
-data/runtimes/helia-aot/0.23.0.json
-data/runtimes/helia-aot/0.24.0.json
-data/runtimes/helia-aot/0.25.0.json
-data/runtimes/helia-aot/0.26.0.json
-data/runtimes/helia-aot/0.27.0.json
-data/runtimes/helia-aot/0.29.0.json
-data/runtimes/helia-aot/0.30.0.json
-data/runtimes/helia-aot/0.31.0.json
+data/runtimes/helia-aot/0.33.0.json
 data/runtimes/helia-rt/1.21.3.json
 data/runtimes/helia-rt/2.1.0.json
 data/runtimes/helia-rt/2.2.0.json
@@ -211,6 +205,7 @@ power/joulescope_compatibility.py
 power/metadata.py
 power/sync.py
 prepared_runtimes.py
+profile_identity.py
 profiler.py
 records.py
 report/__init__.py

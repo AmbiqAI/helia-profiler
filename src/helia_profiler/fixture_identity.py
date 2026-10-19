@@ -7,14 +7,10 @@ is :class:`Unknown`, with the reason.
 
 from __future__ import annotations
 
-import hashlib
 import json
-from dataclasses import fields, is_dataclass
-from enum import Enum
 from typing import TYPE_CHECKING, Any
 
-import yaml
-
+from ._identity_hash import build_hash, digest, measured_facts
 from .deps.compatibility import CMSIS_NN_PROVIDER_MODULES
 from .fixture_runtime import FixtureFile
 from .fixture_sources import FixtureKernelSource, FixtureRuntimeSource, pinned_sources
@@ -181,7 +177,7 @@ def _sha(file: FixtureFile | None, absent: Unknown = _NOT_COMPILED) -> str | Unk
 def _inputs_sha256(build: FixtureBuild) -> str | Unknown:
     if not build.inputs:
         return Unknown("the record predates pinned inputs")
-    return _digest([[io.tensor.name, io.data.sha256] for io in build.inputs])
+    return digest([[io.tensor.name, io.data.sha256] for io in build.inputs])
 
 
 def _build_hash(build: FixtureBuild, archive: str | None) -> str | Unknown:
@@ -192,65 +188,24 @@ def _build_hash(build: FixtureBuild, archive: str | None) -> str | Unknown:
         )
     image, lock, model = pinned
     assert image is not None and lock is not None and model is not None
-    resolved = _resolved_lock(lock)
-    if isinstance(resolved, Unknown):
-        return resolved
-    return _digest(
-        {"image": image.sha256, "lock": resolved, "runtime_archive": archive, "model": model.sha256}
+    return build_hash(
+        image_sha256=image.sha256,
+        lock=lock.read(),
+        runtime_archive=archive,
+        model_sha256=model.sha256,
     )
 
 
-def _resolved_lock(lock: FixtureFile) -> Any:
-    """What the dependency lock resolved, without the times and tool version NSX stamps on it."""
-    try:
-        data = yaml.safe_load(lock.read())
-        targets = data["targets"]
-        return {
-            name: {
-                "target": target["target"],
-                "modules": {
-                    module: _resolved_module(entry) for module, entry in target["modules"].items()
-                },
-            }
-            for name, target in targets.items()
-        }
-    except (yaml.YAMLError, KeyError, TypeError, AttributeError):
-        return Unknown("the dependency lock is not an NSX lock")
-
-
-def _resolved_module(entry: dict[str, Any]) -> dict[str, Any]:
-    resolved = entry.get("resolved", {})
-    pinned = {"project": entry.get("project"), "kind": entry.get("kind")}
-    # A git module is its URL and commit; its checkout hash varies with line endings.
-    if entry.get("kind") == "git":
-        return {**pinned, "url": resolved.get("url"), "commit": resolved.get("commit")}
-    return {**pinned, "content_hash": resolved.get("content_hash")}
-
-
 def _observation_hash(capture: FixtureCaptureResult) -> str:
-    facts = _facts(capture)
+    facts = measured_facts(capture, _file_hash)
     # Evidence files record host timings and paths; only the RAM observation is measured.
     facts["artifacts"] = sorted(
         item.sha256 for item in capture.artifacts if item.path.name in _MEASURED_EVIDENCE
     )
     # An error's text can name host paths; the state and status carry the outcome.
     facts["error"] = capture.error is not None
-    return _digest(facts)
+    return digest(facts)
 
 
-def _facts(value: Any) -> Any:
-    """A capture's measured facts with every file reduced to its content hash."""
-    if isinstance(value, FixtureFile):
-        return value.sha256
-    if isinstance(value, Enum):
-        return value.value
-    if is_dataclass(value) and not isinstance(value, type):
-        return {f.name: _facts(getattr(value, f.name)) for f in fields(value)}
-    if isinstance(value, (list, tuple)):
-        return [_facts(item) for item in value]
-    return value
-
-
-def _digest(value: Any) -> str:
-    encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False)
-    return hashlib.sha256(encoded.encode()).hexdigest()
+def _file_hash(value: Any) -> Any:
+    return value.sha256 if isinstance(value, FixtureFile) else NotImplemented

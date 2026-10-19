@@ -56,6 +56,41 @@ release pull requests from Conventional Commits.
   capture taken while it was still settling says so.
 
 
+## [0.3.0](https://github.com/AmbiqAI/helia-profiler/compare/v0.2.5...v0.3.0) (2026-10-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* **aot:** heliaAOT releases before 0.33.0 are no longer accepted.
+
+### Features
+
+* **aot:** require heliaAOT 0.33.0, the 1.0 API, and drop older releases ([#559](https://github.com/AmbiqAI/helia-profiler/issues/559)) ([6695937](https://github.com/AmbiqAI/helia-profiler/commit/669593798ae6f50f50f949854a98e23d25479eac))
+
+## [0.2.5](https://github.com/AmbiqAI/helia-profiler/compare/v0.2.4...v0.2.5) (2026-10-19)
+
+
+### Features
+
+* **deps:** adopt heliaAOT 0.32.0 ([#557](https://github.com/AmbiqAI/helia-profiler/issues/557)) ([34a7932](https://github.com/AmbiqAI/helia-profiler/commit/34a79327e3ea71527d7453f5cb98e116b9c973a5)), closes [#537](https://github.com/AmbiqAI/helia-profiler/issues/537)
+* **results:** state a profile run's RunIdentity ([#555](https://github.com/AmbiqAI/helia-profiler/issues/555)) ([0db88da](https://github.com/AmbiqAI/helia-profiler/commit/0db88dac9c7512001748deccf5f12d40c325f5d2)), closes [#537](https://github.com/AmbiqAI/helia-profiler/issues/537)
+
+## [0.2.4](https://github.com/AmbiqAI/helia-profiler/compare/v0.2.3...v0.2.4) (2026-10-19)
+
+
+### Features
+
+* **deps:** adopt heliaCORE v7.47.0 and heliaRT 2.2.2 ([#554](https://github.com/AmbiqAI/helia-profiler/issues/554)) ([463e039](https://github.com/AmbiqAI/helia-profiler/commit/463e039af3cf25586ce7df72114fceffc7c92aec)), closes [#537](https://github.com/AmbiqAI/helia-profiler/issues/537)
+* **fixture:** state a fixture build's RunIdentity ([#553](https://github.com/AmbiqAI/helia-profiler/issues/553)) ([60df0c2](https://github.com/AmbiqAI/helia-profiler/commit/60df0c26f4461a4abe7c7a23ca17825826dff88b)), closes [#537](https://github.com/AmbiqAI/helia-profiler/issues/537)
+* **identity:** canonical engine and kernel names and reasoned unknowns ([#552](https://github.com/AmbiqAI/helia-profiler/issues/552)) ([c462d16](https://github.com/AmbiqAI/helia-profiler/commit/c462d16b973ed0742433404de084ec5fba0c6571)), closes [#537](https://github.com/AmbiqAI/helia-profiler/issues/537)
+* **session:** freeze a resolved session into a replayable FrozenRun plan ([#543](https://github.com/AmbiqAI/helia-profiler/issues/543)) ([56b2217](https://github.com/AmbiqAI/helia-profiler/commit/56b22170f53ccb7a4ba0cb0de97ad940606ce526)), closes [#537](https://github.com/AmbiqAI/helia-profiler/issues/537)
+
+
+### Bug Fixes
+
+* **aot:** refuse a heliaAOT conversion that returns no code generation context ([#550](https://github.com/AmbiqAI/helia-profiler/issues/550)) ([555ae7b](https://github.com/AmbiqAI/helia-profiler/commit/555ae7bc3bf3755bead8eb2973b022607ddf0104))
+* **firmware:** map build paths out of every firmware image ([#551](https://github.com/AmbiqAI/helia-profiler/issues/551)) ([b92a245](https://github.com/AmbiqAI/helia-profiler/commit/b92a245d0c8f06fdc81ce4224d14a5fbf39a3e00)), closes [#537](https://github.com/AmbiqAI/helia-profiler/issues/537)
+
 ## [0.2.3](https://github.com/AmbiqAI/helia-profiler/compare/v0.2.2...v0.2.3) (2026-10-19)
 
 

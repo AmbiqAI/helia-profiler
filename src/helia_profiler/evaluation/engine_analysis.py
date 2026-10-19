@@ -14,7 +14,7 @@ from pathlib import Path
 
 from ..modelcost.model_analysis import (
     ModelAnalysis,
-    analyze_air_model,
+    analyze_aot_operators,
     analyze_model,
     is_aot_available,
     is_available,
@@ -55,11 +55,10 @@ def analyze_for_engine(
 
     import tempfile
 
-    from ..engines.helia_aot.compile import aot_platform_for_board, codegen_context
+    from ..engines.helia_aot.compile import aot_platform_for_board, convert_with_views
 
     try:
-        from helia_aot.cli.defines import ConvertArgs
-        from helia_aot.converter import AotConverter
+        from helia_aot import AotConverter, ConvertArgs
         from helia_aot.defines import ModuleType
     except ImportError as exc:
         raise ConfigError(
@@ -72,15 +71,13 @@ def analyze_for_engine(
             model={"path": str(path)},
             module={"path": tmp, "type": ModuleType("nsx").value},
             platform={"name": aot_platform_for_board(board) or board},
+            result_views=True,
         )
         try:
-            context = codegen_context(AotConverter(config=convert_args))
+            result = convert_with_views(AotConverter(config=convert_args))
         except EngineError:
             raise
         except Exception as exc:
             raise EngineError(f"AOT compilation failed: {exc}") from exc
 
-        result = analyze_air_model(context.model)
-        if result is None:
-            raise EngineError(f"Failed to analyze AOT-transformed model: {path}")
-        return result
+        return analyze_aot_operators(result.operators, result.tensors, analyze_model(path))

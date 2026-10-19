@@ -65,6 +65,31 @@ def test_the_image_is_identified_by_the_digest_of_the_binary_itself(tmp_path):
     assert image.role == "profile"
 
 
+def test_the_flashed_image_is_hashed_beside_the_elf_digest(tmp_path):
+    build_dir, binary = _build_tree(tmp_path, [MVE])
+    flat = binary.with_suffix(".bin")
+    flat.write_bytes(b"flat image")
+
+    image = build_image(
+        role="profile", target_name="hpx_profiler", binary_path=binary, build_dir=build_dir
+    )
+
+    assert image is not None
+    assert image.flash_sha256 == hashlib.sha256(b"flat image").hexdigest()
+    assert image.sha256 == hashlib.sha256(binary.read_bytes()).hexdigest()
+
+
+def test_a_build_without_a_flat_image_states_no_flash_digest(tmp_path):
+    build_dir, binary = _build_tree(tmp_path, [MVE])
+
+    image = build_image(
+        role="profile", target_name="hpx_profiler", binary_path=binary, build_dir=build_dir
+    )
+
+    assert image is not None and image.sha256
+    assert image.flash_sha256 is None
+
+
 def test_a_uniform_build_reports_one_cpu_flag_over_every_translation_unit(tmp_path):
     image = _image(tmp_path, [MVE], units=5)
 

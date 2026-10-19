@@ -15,13 +15,30 @@
   ],
   "properties": {
     "schema": {"const": "hpx.run-summary"},
-    "schema_version": {"const": 13},
+    "schema_version": {"const": 15},
     "engine": {"type": "string", "minLength": 1},
     "layers": {"type": "integer", "minimum": 0},
     "total_cycles": {"type": ["number", "null"]},
     "overflow_detected": {"type": "boolean"},
     "validity": {"enum": ["valid", "degraded", "invalid"]},
-    "issues": {"type": "array", "items": {"type": "object"}}
+    "issues": {"type": "array", "items": {"type": "object"}},
+    "identity": {
+      "type": "object",
+      "required": [
+        "runtime",
+        "kernels",
+        "prepared_archive_sha256",
+        "build",
+        "baseline_id",
+        "dependency_lock_sha256",
+        "model_sha256",
+        "inputs_sha256",
+        "run",
+        "producer",
+        "build_hash",
+        "observation_hash"
+      ]
+    }
   },
   "additionalProperties": true
 }

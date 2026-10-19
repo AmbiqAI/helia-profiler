@@ -86,6 +86,8 @@ def _write_summary(
         summary["compatibility"] = ctx.run_metadata.compatibility.to_dict()
     if ctx.run_metadata.dependencies is not None:
         summary["dependencies"] = ctx.run_metadata.dependencies.to_dict()
+    if ctx.run_metadata.identity is not None:
+        summary["identity"] = ctx.run_metadata.identity.to_dict()
 
     summary["top_layers"] = [
         {

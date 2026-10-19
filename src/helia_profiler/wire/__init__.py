@@ -226,7 +226,7 @@ CSV_GRAMMAR: Mapping[str, str] = MappingProxyType(
         EngineType.HELIA_RT.value: "Identical to tflm — same template, same profiler class.",
         EngineType.HELIA_AOT.value: (
             "rows are `<index>,<OP_TYPE>:<op_id>,<counters...>,<overflow>`; the "
-            "operator id disambiguates repeated op types."
+            "operator id is its .tflite index, or -1 when it has none or several."
         ),
         EngineType.EXECUTORCH.value: (
             "rows are `<index>,<operator>:c<chain>i<instr>,<counters...>,<overflow>`; "

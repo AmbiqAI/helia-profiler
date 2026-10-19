@@ -7,12 +7,20 @@ which is where the bulk of the estimation bugs would hide.
 
 from __future__ import annotations
 
+import logging
 import struct
 from pathlib import Path
 
 import pytest
 
-from helia_profiler.modelcost import analyze_model, is_available, vela_accelerator_config
+from helia_profiler.modelcost import (
+    LayerOps,
+    ModelAnalysis,
+    analyze_aot_operators,
+    analyze_model,
+    is_available,
+    vela_accelerator_config,
+)
 from helia_profiler.modelcost.model_analysis import (
     _conv2d_macs,
     _decode_cop_optimizer_config,
@@ -21,6 +29,7 @@ from helia_profiler.modelcost.model_analysis import (
     _fully_connected_macs,
     _transpose_conv_macs,
 )
+from tests.aot_views import TensorView, operator
 
 
 class TestConv2DMacs:
@@ -111,6 +120,77 @@ class TestElementwise:
 
     def test_empty_shape(self):
         assert _elementwise_ops([]) == 0
+
+
+class TestAnalyzeAotOperators:
+    TENSORS = (
+        TensorView("in", None, (1, 8, 8, 4)),
+        TensorView("out", None, (1, 4, 4, 4)),
+        TensorView("logits", None, (1, 10)),
+    )
+
+    @staticmethod
+    def _source(*layers: LayerOps) -> ModelAnalysis:
+        return ModelAnalysis(list(layers), 0, 0, 0)
+
+    def test_macs_and_parameters_are_the_views_counts(self):
+        ops = (
+            operator(0, "CONV_2D", ("in",), ("out",), macs=100, parameters=40),
+            operator(1, "FULLY_CONNECTED", ("out",), ("logits",), macs=640, parameters=650),
+        )
+        analysis = analyze_aot_operators(ops, self.TENSORS, None)
+        assert [(layer.macs, layer.ops) for layer in analysis.layers] == [(100, 200), (640, 1280)]
+        assert (analysis.total_macs, analysis.total_ops) == (740, 1480)
+        assert analysis.num_parameters == 690
+        assert (analysis.engine, analysis.index_space) == ("helia-aot", "execution")
+
+    def test_layers_carry_execution_index_and_shapes(self):
+        op = operator(3, "CONV_2D", ("in",), ("out",), sources=(7,), macs=1)
+        layer = analyze_aot_operators((op,), self.TENSORS, None).layers[0]
+        assert (layer.id, layer.original_id, layer.op) == (3, 7, "CONV_2D")
+        assert layer.input_shapes == [[1, 8, 8, 4]]
+        assert layer.output_shapes == [[1, 4, 4, 4]]
+
+    def test_an_operator_without_a_count_has_zero_macs(self):
+        op = operator(0, "RESHAPE", ("out",), ("logits",), macs=None, parameters=None)
+        analysis = analyze_aot_operators((op,), self.TENSORS, None)
+        assert (analysis.total_macs, analysis.num_parameters) == (0, 0)
+
+    def test_params_come_from_a_same_type_source_layer(self):
+        source = self._source(LayerOps(2, "CONV_2D", params={"stride_h": 2, "stride_w": 2}))
+        op = operator(0, "CONV_2D", ("in",), ("out",), sources=(2,), macs=1)
+        layer = analyze_aot_operators((op,), self.TENSORS, source).layers[0]
+        assert layer.params == {"stride_h": 2, "stride_w": 2}
+
+    def test_params_are_not_copied_across_a_rewrite(self):
+        source = self._source(LayerOps(2, "DEPTHWISE_CONV_2D", params={"depth_multiplier": 1}))
+        op = operator(0, "CONV_2D", ("in",), ("out",), sources=(2,), macs=1)
+        assert analyze_aot_operators((op,), self.TENSORS, source).layers[0].params == {}
+
+    def test_a_fused_operator_has_no_original_id_or_params(self):
+        source = self._source(LayerOps(4, "WHILE", params={"cond": 1}))
+        op = operator(0, "WHILE", ("in",), ("out",), sources=(4, 5))
+        layer = analyze_aot_operators((op,), self.TENSORS, source).layers[0]
+        assert (layer.original_id, layer.params) == (None, {})
+
+    @pytest.mark.parametrize("op_type", ["AVERAGE_POOL_2D", "MAX_POOL_2D"])
+    def test_pooling_ops_use_the_source_window(self, op_type):
+        source = self._source(LayerOps(0, op_type, params={"filter_h": 2, "filter_w": 3}))
+        op = operator(0, op_type, ("in",), ("out",), macs=0)
+        assert analyze_aot_operators((op,), self.TENSORS, source).layers[0].ops == 64 * 2 * 3
+
+    def test_pooling_without_a_source_window_warns(self, caplog):
+        op = operator(0, "AVERAGE_POOL_2D", ("in",), ("out",), macs=0)
+        with caplog.at_level(logging.WARNING, logger="hpx"):
+            assert analyze_aot_operators((op,), self.TENSORS, None).layers[0].ops == 0
+        assert "No source window for hpx_average_pool_2d_0" in caplog.text
+
+    @pytest.mark.parametrize(
+        ("op_type", "ops"), [("SOFTMAX", 50), ("ADD", 10), ("RESHAPE", 0), ("GATHER", 0)]
+    )
+    def test_non_mac_ops_scale_with_output_elements(self, op_type, ops):
+        op = operator(0, op_type, ("out",), ("logits",))
+        assert analyze_aot_operators((op,), self.TENSORS, None).layers[0].ops == ops
 
 
 @pytest.mark.skipif(not is_available(), reason="ai-edge-litert not installed")

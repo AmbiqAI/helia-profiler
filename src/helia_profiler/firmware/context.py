@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -308,7 +309,12 @@ class FirmwareRenderContext:
             aot_prefix = artifacts.aot_prefix
             allocate_arenas = artifacts.aot_allocate_arenas
             aot_manifest = tuple(
-                AotOpContext(id=int(op["id"]), op_type=str(op["op_type"]))
+                AotOpContext(
+                    id=-1 if op["id"] is None else int(op["id"]),
+                    # A custom operator's key can hold any character; the
+                    # firmware prints it inside a C literal and a CSV row.
+                    op_type=re.sub(r"[^0-9A-Za-z_]", "_", str(op["op_type"])),
+                )
                 for op in (artifacts.aot_op_manifest or [])
             )
         else:

@@ -3,14 +3,14 @@
     "helia-aot": {
       "flake": false,
       "locked": {
-        "lastModified": 1792379075,
-        "narHash": "sha256-Bg90m8MuiprBf5GHfGqGW5+UFPyMyF3W9bDLRT+WT1U=",
+        "lastModified": 1792443776,
+        "narHash": "sha256-5cms3jvQj3DlBEjB0DjgjEwoW0+8vCKKOaGIJEVNgV0=",
         "type": "tarball",
-        "url": "https://files.pythonhosted.org/packages/74/4e/1ce35c91334b7fd0ffff2c4eb7afa679d5c9c2fcd137777668cd88c855ea/helia_aot-0.31.0.tar.gz"
+        "url": "https://files.pythonhosted.org/packages/a5/a7/ea3f4962c304e176435b57ba1384dcc65abb3a280e1036a3843a4e850b6d/helia_aot-0.33.0.tar.gz"
       },
       "original": {
         "type": "tarball",
-        "url": "https://files.pythonhosted.org/packages/74/4e/1ce35c91334b7fd0ffff2c4eb7afa679d5c9c2fcd137777668cd88c855ea/helia_aot-0.31.0.tar.gz"
+        "url": "https://files.pythonhosted.org/packages/a5/a7/ea3f4962c304e176435b57ba1384dcc65abb3a280e1036a3843a4e850b6d/helia_aot-0.33.0.tar.gz"
       }
     },
     "nixpkgs": {

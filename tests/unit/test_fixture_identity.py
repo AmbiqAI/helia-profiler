@@ -398,3 +398,21 @@ def test_a_git_module_counts_by_commit_and_packaged_tooling_by_content(tmp_path)
     assert fixture_run_identity(_aot(tmp_path / "b", crlf)).build_hash == base
     tooling = _lock().replace(b"sha256:" + b"3" * 64, b"sha256:" + b"5" * 64)
     assert fixture_run_identity(_aot(tmp_path / "c", tooling)).build_hash != base
+
+
+def test_generated_vendored_modules_do_not_change_the_build_hash(tmp_path):
+    vendored = b"""      hpx_model:
+        project: hpx_model
+        kind: vendored
+        constraint: vendored
+        resolved:
+          vendored_at: modules/hpx_model
+          content_hash: sha256:{digest}
+"""
+
+    def lock(digest):
+        return _lock() + vendored.replace(b"{digest}", digest.encode())
+
+    first = fixture_run_identity(_aot(tmp_path / "a", lock("6" * 64))).build_hash
+    second = fixture_run_identity(_aot(tmp_path / "b", lock("7" * 64))).build_hash
+    assert first == second

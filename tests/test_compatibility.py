@@ -131,10 +131,10 @@ def test_aot_extra_and_lock_match_the_recorded_helia_aot_range() -> None:
     from helia_profiler.engines.semver import parse_semver
 
     repo_root = Path(__file__).resolve().parent.parent
-    # The range runs from the oldest helia-aot runtime record to the minor after the newest.
+    # The range runs from the oldest helia-aot runtime record to the major after the newest.
     minimum = aot_compile.HELIAAOT_MIN_VERSION
     maximum = aot_compile.HELIAAOT_MAX_VERSION_EXCLUSIVE
-    assert (minimum, maximum) == ("0.23.0", "0.32.0")
+    assert (minimum, maximum) == ("0.33.0", "2.0.0")
     specifier = f">={minimum},<{maximum}"
 
     with (repo_root / "pyproject.toml").open("rb") as stream:
@@ -435,31 +435,29 @@ def test_helia_aot_version_check_uses_the_recorded_range(monkeypatch: pytest.Mon
 
     def _fake_version(name: str) -> str:
         assert name == "helia-aot"
-        return "0.23.4"
+        return "0.33.1"
 
     monkeypatch.setattr("importlib.metadata.version", _fake_version)
     # Within the recorded range, the installed version is accepted.
-    assert aot_compile._check_helia_aot_version() == "0.23.4"
-    monkeypatch.setattr("importlib.metadata.version", lambda _: "0.26.0")
-    assert aot_compile._check_helia_aot_version() == "0.26.0"
-    monkeypatch.setattr("importlib.metadata.version", lambda _: "0.27.0")
-    assert aot_compile._check_helia_aot_version() == "0.27.0"
-    monkeypatch.setattr("importlib.metadata.version", lambda _: "0.29.0")
-    assert aot_compile._check_helia_aot_version() == "0.29.0"
+    assert aot_compile._check_helia_aot_version() == "0.33.1"
+    monkeypatch.setattr("importlib.metadata.version", lambda _: "1.0.0")
+    assert aot_compile._check_helia_aot_version() == "1.0.0"
+    monkeypatch.setattr("importlib.metadata.version", lambda _: "1.9.3")
+    assert aot_compile._check_helia_aot_version() == "1.9.3"
 
     def _fake_version_too_old(name: str) -> str:
-        return "0.22.9"
+        return "0.32.0"
 
     monkeypatch.setattr("importlib.metadata.version", _fake_version_too_old)
     with pytest.raises(
-        EngineError, match=r"below the minimum supported version \(v0\.23\.0\)"
+        EngineError, match=r"below the minimum supported version \(v0\.33\.0\)"
     ) as excinfo:
         aot_compile._check_helia_aot_version()
     # The upgrade command stays inside the recorded range.
-    assert "'helia-aot>=0.23.0,<0.32.0'" in (excinfo.value.hint or "")
+    assert "'helia-aot>=0.33.0,<2.0.0'" in (excinfo.value.hint or "")
 
     def _fake_version_too_new(name: str) -> str:
-        return "0.32.0"
+        return "2.0.0"
 
     monkeypatch.setattr("importlib.metadata.version", _fake_version_too_new)
     with pytest.raises(EngineError, match=r"outside the recorded range"):
@@ -485,7 +483,7 @@ def test_helia_aot_unparseable_version_warns_full_range(
 
     assert result == "not-a-version"
     messages = [rec.message for rec in caplog.records]
-    assert any("0.23.0" in message and "0.32.0" in message for message in messages)
+    assert any("0.33.0" in message and "2.0.0" in message for message in messages)
     assert not any("floor" in message for message in messages)
 
 
@@ -501,7 +499,7 @@ def test_helia_aot_success_debug_log_only_after_max_check(
     from helia_profiler.errors import EngineError
 
     def _fake_version_too_new(name: str) -> str:
-        return "0.32.0"
+        return "2.0.0"
 
     monkeypatch.setattr("importlib.metadata.version", _fake_version_too_new)
     with caplog.at_level(logging.DEBUG):
@@ -511,7 +509,7 @@ def test_helia_aot_success_debug_log_only_after_max_check(
     assert not any("Using helia-aot" in rec.message for rec in caplog.records)
 
     def _fake_version_ok(name: str) -> str:
-        return "0.23.4"
+        return "0.33.1"
 
     monkeypatch.setattr("importlib.metadata.version", _fake_version_ok)
     caplog.clear()

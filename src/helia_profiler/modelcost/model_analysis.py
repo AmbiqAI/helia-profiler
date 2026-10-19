@@ -5,34 +5,31 @@ to parse the ``.tflite`` schema and compute MAC counts from operator
 parameters and tensor shapes.  Both packages are **optional** — when
 unavailable the analysis gracefully returns ``None``.
 
-Optionally, when ``helia-aot`` is installed, :func:`analyze_air_model` can
-compute the same breakdown on a *transformed* ``AirModel`` graph after AOT
-fusions/optimizations.
+:func:`analyze_aot_operators` computes the same breakdown for the graph
+heliaAOT generates, from its ``ConversionResult`` views.
 
 Public API
 ----------
 ``analyze_model(path)``
     Parse a ``.tflite`` file and return a :class:`ModelAnalysis`.
-``analyze_air_model(air_model)``
-    Compute per-layer MACs from a heliaAOT :class:`AirModel`.
+``analyze_aot_operators(operators, tensors, source)``
+    Per-layer MACs for heliaAOT's generated operators.
 ``is_available()``
     True if ``ai-edge-litert`` is installed.
 ``is_aot_available()``
-    True if ``helia-aot`` is installed (for ``analyze_air_model``).
+    True if ``helia-aot`` is installed.
 """
 
 from __future__ import annotations
 
+import importlib.util
 import logging
 import math
 import struct
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
-
-if TYPE_CHECKING:
-    from helia_aot.air.enums import AirOpType
-    from helia_aot.air.model import AirModel
+from typing import Any, Literal
 
 log = logging.getLogger("hpx")
 
@@ -49,23 +46,8 @@ def is_available() -> bool:
     return _HAS_LITERT
 
 
-_HAS_AOT = False
-_AirModel: type[AirModel] | None
-_AirOpType: type[AirOpType] | None
-try:
-    from helia_aot.air.enums import AirOpType as _imported_air_op_type
-    from helia_aot.air.model import AirModel as _imported_air_model
-
-    _AirModel = _imported_air_model
-    _AirOpType = _imported_air_op_type
-    _HAS_AOT = True
-except ImportError:
-    _AirModel = None
-    _AirOpType = None
-
-
 def is_aot_available() -> bool:
-    return _HAS_AOT
+    return importlib.util.find_spec("helia_aot") is not None
 
 
 #: Display name of the Vela-generated Ethos-U custom op (see _display_name).
@@ -599,140 +581,69 @@ def _analyze_parsed_model(model: Any) -> ModelAnalysis | None:
     )
 
 
-def analyze_air_model(air_model: Any) -> ModelAnalysis | None:
-    """Compute per-layer MACs from a heliaAOT :class:`AirModel`.
+#: Operator types whose views count MACs; their arithmetic is two ops per MAC.
+_AOT_MAC_OPS = frozenset(
+    {"CONV_2D", "DEPTHWISE_CONV_2D", "FULLY_CONNECTED", "TRANSPOSE_CONV", "BATCH_MATMUL"}
+)
 
-    The ``AirModel`` represents the *post-transform* graph after AOT
-    fusions/optimizations — operator count and shapes may differ from the
-    original ``.tflite``.
 
-    Returns ``None`` if ``helia-aot`` is not installed.
+def analyze_aot_operators(
+    operators: Sequence[Any], tensors: Sequence[Any], source: ModelAnalysis | None
+) -> ModelAnalysis:
+    """Per-layer MACs for heliaAOT's generated operators, in execution order.
+
+    *operators* and *tensors* are a ``ConversionResult``'s ``OperatorView`` and
+    ``TensorView`` sequences. MACs and parameters are heliaAOT's own counts.
+    Operator options (strides, pooling windows) are not in the views, so a
+    layer takes ``params`` from the *source* ``.tflite`` layer it came from
+    when that layer has the same type; pooling arithmetic needs its window.
     """
-    if _AirOpType is None:
-        log.debug("helia-aot not installed — skipping AirModel analysis")
-        return None
+    shapes = {tensor.id: list(tensor.shape) for tensor in tensors}
+    by_source = {layer.id: layer for layer in source.layers} if source is not None else {}
 
     layers: list[LayerOps] = []
-    total_params = 0
+    for op in operators:
+        in_shapes = [shapes.get(tid, []) for tid in op.input_ids]
+        out_shapes = [shapes.get(tid, []) for tid in op.output_ids]
+        original_id = op.source_indices[0] if len(op.source_indices) == 1 else None
+        origin = by_source.get(original_id) if original_id is not None else None
+        params = dict(origin.params) if origin is not None and origin.op == op.type else {}
+        macs = op.macs or 0
+        out_elements = math.prod(out_shapes[0]) if out_shapes else 0
 
-    for i, op in enumerate(air_model.operators):
-        op_name = op.op_type.name if hasattr(op.op_type, "name") else str(op.op_type)
-
-        # Collect shapes from input/output tensor IDs
-        in_shapes: list[list[int]] = []
-        for tid in op.input_ids:
-            t = air_model.get_tensor(tid)
-            in_shapes.append(list(t.shape) if t is not None else [])
-
-        out_shapes: list[list[int]] = []
-        for tid in op.output_ids:
-            t = air_model.get_tensor(tid)
-            out_shapes.append(list(t.shape) if t is not None else [])
-
-        macs = 0
-        ops = 0
-        params: dict[str, Any] = {}
-
-        # Get weight tensor shape via named_tensors
-        weight_shape: list[int] = []
-        if "weights" in op.named_tensors:
-            wt = air_model.get_tensor(op.named_tensors["weights"])
-            if wt is not None:
-                weight_shape = list(wt.shape)
-                total_params += math.prod(wt.shape)
-        if "bias" in op.named_tensors:
-            bt = air_model.get_tensor(op.named_tensors["bias"])
-            if bt is not None:
-                total_params += math.prod(bt.shape)
-
-        ot = op.op_type
-
-        if ot == _AirOpType.CONV_2D and weight_shape and out_shapes:
-            opts = op.options
-            params = {
-                "stride_h": getattr(opts, "stride_height", 1),
-                "stride_w": getattr(opts, "stride_width", 1),
-                "dilation_h": getattr(opts, "dilation_height", 1),
-                "dilation_w": getattr(opts, "dilation_width", 1),
-            }
-            macs = _conv2d_macs(weight_shape, out_shapes[0])
+        if op.type in _AOT_MAC_OPS:
             ops = 2 * macs
-
-        elif ot == _AirOpType.DEPTHWISE_CONV_2D and weight_shape and out_shapes:
-            opts = op.options
-            dm = getattr(opts, "depth_multiplier", 1)
-            params = {
-                "stride_h": getattr(opts, "stride_height", 1),
-                "stride_w": getattr(opts, "stride_width", 1),
-                "dilation_h": getattr(opts, "dilation_height", 1),
-                "dilation_w": getattr(opts, "dilation_width", 1),
-                "depth_multiplier": dm,
-            }
-            macs = _depthwise_conv2d_macs(
-                in_shapes[0] if in_shapes else [],
-                weight_shape,
-                out_shapes[0],
-                dm,
-            )
-            ops = 2 * macs
-
-        elif ot == _AirOpType.FULLY_CONNECTED and weight_shape:
-            macs = _fully_connected_macs(in_shapes[0] if in_shapes else [], weight_shape)
-            ops = 2 * macs
-
-        elif ot == _AirOpType.TRANSPOSE_CONV and weight_shape and in_shapes:
-            macs = _transpose_conv_macs(in_shapes[0], weight_shape)
-            ops = 2 * macs
-
-        elif ot == _AirOpType.BATCH_MATMUL and in_shapes and out_shapes:
-            adj_x = bool(getattr(op.options, "adj_x", False))
-            params = {"adj_x": adj_x, "adj_y": bool(getattr(op.options, "adj_y", False))}
-            macs = _batch_matmul_macs(in_shapes[0], out_shapes[0], adj_x)
-            ops = 2 * macs
-
-        elif ot in (_AirOpType.AVERAGE_POOL_2D, _AirOpType.MAX_POOL_2D):
-            opts = op.options
-            fh = getattr(opts, "filter_height", 1)
-            fw = getattr(opts, "filter_width", 1)
-            params = {"filter_h": fh, "filter_w": fw}
-            if out_shapes:
-                ops = math.prod(out_shapes[0]) * fh * fw
-
-        elif ot == _AirOpType.SOFTMAX:
-            if out_shapes:
-                ops = 5 * math.prod(out_shapes[0])
-
-        elif op_name in _ELEMENTWISE_OPS:
-            if out_shapes:
-                ops = _elementwise_ops(out_shapes[0])
-
-        elif op_name in _ZERO_COST_OPS:
-            pass
-
+        elif op.type in ("AVERAGE_POOL_2D", "MAX_POOL_2D"):
+            if "filter_h" not in params:
+                log.warning("No source window for %s; its ops count as 0", op.symbol)
+            ops = out_elements * params.get("filter_h", 0) * params.get("filter_w", 0)
+        elif op.type == "SOFTMAX":
+            ops = 5 * out_elements
+        elif op.type in _ELEMENTWISE_OPS:
+            ops = out_elements
         else:
-            log.debug("air_model_analysis: unhandled op %s", op_name)
+            if op.type not in _ZERO_COST_OPS:
+                log.debug("aot_operator_analysis: unhandled op %s", op.type)
+            ops = 0
 
         layers.append(
             LayerOps(
-                id=i,
-                op=op_name,
+                id=op.layer_index,
+                op=op.type,
                 macs=macs,
                 ops=ops,
                 input_shapes=in_shapes,
                 output_shapes=out_shapes,
                 params=params,
-                original_id=int(op.id) if str(op.id).isdigit() else None,
+                original_id=original_id,
             )
         )
 
-    total_macs = sum(l.macs for l in layers)
-    total_ops = sum(l.ops for l in layers)
-
     return ModelAnalysis(
         layers=layers,
-        total_macs=total_macs,
-        total_ops=total_ops,
-        num_parameters=total_params,
+        total_macs=sum(layer.macs for layer in layers),
+        total_ops=sum(layer.ops for layer in layers),
+        num_parameters=sum(op.parameters or 0 for op in operators),
         engine="helia-aot",
         index_space="execution",
     )

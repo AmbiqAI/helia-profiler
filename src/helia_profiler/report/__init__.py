@@ -33,6 +33,7 @@ from typing import TYPE_CHECKING, Any
 
 from ..errors import ReportError
 from ..evaluation import evaluate_run
+from ..profile_identity import profile_run_identity
 from ..results.manifest import RESULT_PUBLICATION_INCOMPLETE
 from .aot import _write_aot_manifest, _write_aot_memory_layers
 from .csv_writer import _write_csv, _write_preset_csv
@@ -108,6 +109,7 @@ def write_report(ctx: PipelineContext) -> list[Path]:
     # fail-on-invalid exit policy consume it too.
     evaluation = evaluate_run(ctx)
     ctx.run_evaluation = evaluation
+    ctx.run_metadata.identity = profile_run_identity(ctx)
     p = _write_summary(ctx, output_dir, evaluation)
     paths.append(p)
 
