@@ -40,6 +40,10 @@
       "slug": "reference/api/helia_profiler/examples"
     },
     {
+      "label": "expect",
+      "slug": "reference/api/helia_profiler/expect"
+    },
+    {
       "label": "modelcost",
       "slug": "reference/api/helia_profiler/modelcost"
     },

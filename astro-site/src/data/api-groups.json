@@ -139,6 +139,21 @@
       ]
     },
     {
+      "path": "helia_profiler.expect",
+      "summary": "Checking a run's outputs: reference outputs from host LiteRT or caller files, compared tensor by tensor, with a verdict only when a tolerance is given.",
+      "members": [
+        "Expect",
+        "Tolerance",
+        "compare_fixture_outputs",
+        "compare_outputs",
+        "host_reference",
+        "Verification",
+        "TensorComparison",
+        "ReferenceOutputs",
+        "ReferenceOrigin"
+      ]
+    },
+    {
       "path": "helia_profiler.modelcost",
       "summary": "The static cost model of a network, read from the model file before anything is built or run.",
       "members": [
