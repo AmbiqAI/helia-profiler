@@ -24,6 +24,8 @@ from typing import TYPE_CHECKING, Any, Mapping, TypeVar, get_args, get_type_hint
 from .errors import ConfigError
 
 if TYPE_CHECKING:
+    from ._fixture_build import TypedFixture
+    from .build_record import BuildRecord
     from .config import ProfileConfig
     from .deps.compatibility import CompatibilityResolution
 
@@ -340,6 +342,12 @@ class FrozenRun:
         replayed = load_config(None, settings)
         _check_replay(self, freeze_config(replayed))
         return replayed
+
+    def build(self, fixture: TypedFixture, **options: Any) -> BuildRecord:
+        """Compile this plan for *fixture*'s pinned inputs; see :func:`build_record`."""
+        from .build_record import build_record
+
+        return build_record(self, fixture, **options)
 
 
 def freeze_config(config: ProfileConfig) -> FrozenRun:
