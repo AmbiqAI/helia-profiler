@@ -300,6 +300,12 @@ def test_vocab_is_a_leaf() -> None:
     assert _hpx_import_targets(_SRC / "vocab.py", module_level_only=False) == []
 
 
+def test_identity_is_a_leaf() -> None:
+    """identity.py is shared vocabulary that results, config and RunIdentity
+    build on, so it imports nothing from hpx."""
+    assert _hpx_import_targets(_SRC / "identity.py", module_level_only=False) == []
+
+
 def test_engines_package_init_stays_stdlib_light() -> None:
     """``from ..engines import EngineType`` is cycle-safe for wire/, results/
     and config/ ONLY while engines/__init__ imports nothing from hpx at

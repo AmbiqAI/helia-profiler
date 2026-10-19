@@ -3,13 +3,22 @@
 The canonical names are the ones heliaPROFILER, heliaESTIMATOR and the
 benchmark harness share. Each component's existing spellings stay accepted
 as aliases: the engine selector, the TFLM backend, the ExecuTorch kernel
-provider, the NSX module and the library project name.
+provider, the NSX module and the library project name. Case, ``_`` and
+``-`` are interchangeable.
+
+These functions translate names, not evidence: a configured backend label
+need not be what a build links (heliaRT always links heliaCORE), so derive
+a build's kernel library from the module it linked.
 """
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import TypeVar
+
+_Name = TypeVar("_Name", bound=StrEnum)
 
 
 class CanonicalEngine(StrEnum):
@@ -48,26 +57,28 @@ _ENGINE_ALIASES = {
     "litert": CanonicalEngine.LITERT,
     "tflm": CanonicalEngine.LITERT,
     "tflite-micro": CanonicalEngine.LITERT,
+    "nsx-tflite-micro": CanonicalEngine.LITERT,
     "upstream": CanonicalEngine.LITERT,
     "helia-rt": CanonicalEngine.HELIA_RT,
-    "helia_rt": CanonicalEngine.HELIA_RT,
     "heliart": CanonicalEngine.HELIA_RT,
+    "nsx-helia-rt": CanonicalEngine.HELIA_RT,
     "helia-aot": CanonicalEngine.HELIA_AOT,
-    "helia_aot": CanonicalEngine.HELIA_AOT,
+    "heliaaot": CanonicalEngine.HELIA_AOT,
     "executorch": CanonicalEngine.EXECUTORCH,
+    "nsx-executorch": CanonicalEngine.EXECUTORCH,
 }
 
 _KERNEL_ALIASES = {
     "reference": CanonicalKernel.REFERENCE,
     "cmsis-nn": CanonicalKernel.CMSIS_NN,
-    "cmsis_nn": CanonicalKernel.CMSIS_NN,
     "arm-cmsis-nn": CanonicalKernel.CMSIS_NN,
-    "arm": CanonicalKernel.CMSIS_NN,
+    "arm": CanonicalKernel.CMSIS_NN,  # ExecuTorch's kernel provider
     "helia-core": CanonicalKernel.HELIA_CORE,
+    "heliacore": CanonicalKernel.HELIA_CORE,
     "ns-cmsis-nn": CanonicalKernel.HELIA_CORE,
     "nsx-cmsis-nn": CanonicalKernel.HELIA_CORE,
-    "ns": CanonicalKernel.HELIA_CORE,
-    "helia": CanonicalKernel.HELIA_CORE,
+    "ns": CanonicalKernel.HELIA_CORE,  # ExecuTorch's kernel provider
+    "helia": CanonicalKernel.HELIA_CORE,  # heliaRT's backend
 }
 
 
@@ -81,10 +92,12 @@ def canonical_kernel(name: str) -> CanonicalKernel:
     return _canonical(name, _KERNEL_ALIASES, "kernel library")
 
 
-def _canonical(name: str, aliases: dict, what: str):
+def _canonical(name: str, aliases: Mapping[str, _Name], what: str) -> _Name:
+    if not isinstance(name, str):
+        raise ValueError(f"A {what} name must be a string, not {type(name).__name__}")
     try:
-        return aliases[str(name).strip().lower()]
+        return aliases[name.strip().lower().replace("_", "-")]
     except KeyError:
         raise ValueError(
-            f"Unknown {what} name {name!r}; known: {', '.join(sorted(aliases))}"
+            f"Unrecognised {what} name {name!r}; known: {', '.join(sorted(aliases))}"
         ) from None
