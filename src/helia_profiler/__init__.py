@@ -86,6 +86,13 @@ if TYPE_CHECKING:
     )
     from .frozen_run import FrozenModel, FrozenRun, FrozenRuntime, LocalInput, ToolchainIdentity
     from .hostenv.doctor import DoctorCheck, DoctorResult, DoctorVersionCheck
+    from .identity import (
+        CanonicalEngine,
+        CanonicalKernel,
+        Unknown,
+        canonical_engine,
+        canonical_kernel,
+    )
     from .modelcost import ModelAnalysis
     from .pipeline import ProgressUpdate
     from .placement import Placement
@@ -245,6 +252,11 @@ _EXPORTS = {
     "runtimes": (".runtime_records", "runtimes"),
     "Session": (".session", "Session"),
     "FrozenRun": (".frozen_run", "FrozenRun"),
+    "CanonicalEngine": (".identity", "CanonicalEngine"),
+    "CanonicalKernel": (".identity", "CanonicalKernel"),
+    "Unknown": (".identity", "Unknown"),
+    "canonical_engine": (".identity", "canonical_engine"),
+    "canonical_kernel": (".identity", "canonical_kernel"),
     "FrozenModel": (".frozen_run", "FrozenModel"),
     "FrozenRuntime": (".frozen_run", "FrozenRuntime"),
     "ToolchainIdentity": (".frozen_run", "ToolchainIdentity"),
@@ -281,6 +293,11 @@ __all__ = [
     "FrozenRuntime",
     "LocalInput",
     "ToolchainIdentity",
+    "CanonicalEngine",
+    "CanonicalKernel",
+    "Unknown",
+    "canonical_engine",
+    "canonical_kernel",
     "ProgressUpdate",
     "examples",
     # Config
@@ -451,6 +468,11 @@ _EXPERIMENTAL_API = {
     "FrozenRuntime",
     "LocalInput",
     "ToolchainIdentity",
+    "CanonicalEngine",
+    "CanonicalKernel",
+    "Unknown",
+    "canonical_engine",
+    "canonical_kernel",
     "Qualification",
     "QualifiedTarget",
     "RuntimeQualification",

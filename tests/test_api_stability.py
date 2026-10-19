@@ -27,8 +27,8 @@ def test_stability_tiers_partition_the_public_surface() -> None:
     }
     sizes = {name: len(members) for name, members in tiers.items()}
 
-    assert sizes == {"stable": 45, "experimental": 61, "implementation": 13}
-    assert sum(sizes.values()) == 119 == len(helia_profiler.__all__)
+    assert sizes == {"stable": 45, "experimental": 66, "implementation": 13}
+    assert sum(sizes.values()) == 124 == len(helia_profiler.__all__)
 
     for left, right in combinations(tiers, 2):
         assert not tiers[left] & tiers[right], (
@@ -74,6 +74,8 @@ def test_public_surface_membership_snapshot() -> None:
         "BoardDef",
         "BuildConfig",
         "BuildError",
+        "CanonicalEngine",
+        "CanonicalKernel",
         "CaptureError",
         "ClockSelection",
         "ComparabilityAssessment",
@@ -168,12 +170,15 @@ def test_public_surface_membership_snapshot() -> None:
         "Toolchain",
         "ToolchainIdentity",
         "Transport",
+        "Unknown",
         "VerdictStatus",
         "Verification",
         "VersionError",
         "__version__",
         "assess_comparability",
         "build_platform_registry",
+        "canonical_engine",
+        "canonical_kernel",
         "collect_support_bundle",
         "compare_fixture_outputs",
         "compare_outputs",

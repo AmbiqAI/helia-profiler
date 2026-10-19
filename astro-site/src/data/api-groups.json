@@ -41,6 +41,17 @@
       ]
     },
     {
+      "path": "helia_profiler.identity",
+      "summary": "Shared identity vocabulary: canonical engine and kernel names with today's spellings as aliases, and unknown facts that carry their reason.",
+      "members": [
+        "CanonicalEngine",
+        "CanonicalKernel",
+        "Unknown",
+        "canonical_engine",
+        "canonical_kernel"
+      ]
+    },
+    {
       "path": "helia_profiler.config.power",
       "summary": "Power capture settings: which instrument measures the rail, how it is wired to the board, and which window of the run is integrated.",
       "members": [
