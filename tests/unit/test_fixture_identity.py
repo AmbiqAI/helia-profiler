@@ -218,7 +218,7 @@ def test_each_missing_fact_states_its_own_reason(tmp_path):
     ("content", "reason"),
     [
         (b"not json", "the dependency state is not JSON"),
-        (b"\xff\xfe", "the dependency state is not JSON"),
+        (b"\x80abc", "the dependency state is not JSON"),
         (b"[]", "the dependency state records no workspace"),
         (b'{"workspace": "x"}', "the dependency state records no workspace"),
     ],
@@ -273,3 +273,25 @@ def test_the_manifest_reader_checks_declared_fields(tmp_path, change, message):
     change(data)
     with pytest.raises(ValueError, match=message):
         read_prepared_runtime_manifest(_pin(tmp_path / "changed.json", json.dumps(data).encode()))
+
+
+def test_capture_evidence_files_are_not_part_of_the_observation(tmp_path):
+    build = _aot(tmp_path)
+    capture = _capture(tmp_path / "x")
+    noted = replace(
+        capture, artifacts=(_pin(tmp_path / "x" / "completion.json", b'{"elapsed_s": 1}'),)
+    )
+    assert (
+        fixture_run_identity(build, capture).observation_hash
+        == fixture_run_identity(build, noted).observation_hash
+    )
+
+
+@pytest.mark.parametrize("baseline", [None, ""])
+def test_an_absent_or_empty_workspace_fact_is_unknown(tmp_path, baseline):
+    workspace = {"inputs": {"hpx_version": "0.2.3"}}
+    if baseline is not None:
+        workspace["baseline_id"] = baseline
+    state = _pin(tmp_path / "s.json", json.dumps({"workspace": workspace}).encode())
+    identity = fixture_run_identity(replace(_aot(tmp_path), dependency_state=state))
+    assert identity.baseline_id == Unknown("the workspace records no baseline_id")
