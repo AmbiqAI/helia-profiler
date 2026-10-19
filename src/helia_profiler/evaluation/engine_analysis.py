@@ -75,6 +75,8 @@ def analyze_for_engine(
         )
         try:
             context = codegen_context(AotConverter(config=convert_args))
+        except EngineError:
+            raise
         except Exception as exc:
             raise EngineError(f"AOT compilation failed: {exc}") from exc
 

@@ -231,10 +231,10 @@ class TestRunAotCompilerUsesConfigRegistry:
                 self.force = False
 
         class _FakeCodegenCtx:
-            operators: list = []
-            model = None
-            memory_plan = None
-            render_plan = None
+            operators = ()
+            model = object()
+            memory_plan = object()
+            render_plan = object()
 
         class _FakeAotConverter:
             def __init__(self, config):
@@ -364,6 +364,26 @@ class TestRunAotCompilerUsesConfigRegistry:
         )
 
         assert config.engine.config["aot_args"] == {"memory": {"allocate_arenas": False}}
+
+    def test_a_context_refusal_keeps_its_message_and_hint(self, tmp_path, monkeypatch):
+        from helia_profiler.engines.helia_aot import compile as compile_mod
+
+        self._install_fake_helia_aot(monkeypatch)
+
+        def refuse(_converter):
+            raise EngineError("heliaAOT returned no code generation context", hint="range")
+
+        monkeypatch.setattr(compile_mod, "codegen_context", refuse)
+        config = load_config(None, {"model": {"path": "m.tflite"}, "engine": {"type": "helia-aot"}})
+        with pytest.raises(EngineError, match="^heliaAOT returned no code") as refused:
+            compile_mod._run_aot_compiler(
+                config,
+                output_dir=tmp_path / "out",
+                module_name="profiler_module",
+                prefix="hpx",
+                aot_platform="apollo510_evb",
+            )
+        assert refused.value.hint == "range"
 
 
 class TestEthosUPlacement:
