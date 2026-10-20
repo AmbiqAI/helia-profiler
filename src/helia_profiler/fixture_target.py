@@ -18,6 +18,8 @@ FIXTURE_CLOCK_PROFILE = "lp"
 
 @dataclass(frozen=True)
 class FixtureTarget:
+    """The board a fixture image runs on, its J-Link device and the image's load address."""
+
     board: str
     device: str
     load_address: int

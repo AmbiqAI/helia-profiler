@@ -7,6 +7,15 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from . import examples
+    from ._fixture_build import (
+        FixtureIO,
+        FixtureMethod,
+        FixtureOutput,
+        FixtureRole,
+        FixtureTimingScope,
+        TypedFixture,
+    )
+    from ._fixture_facts import EngineDTypeCapability, FixtureCapabilities, QualifiedFixtureTarget
     from ._version import __version__
     from .api import profile
     from .compiled_build import CompiledBuild, RunResult, build, load_build, run_build
@@ -85,6 +94,10 @@ if TYPE_CHECKING:
         compare_outputs,
         host_reference,
     )
+    from .fixture_analysis import FixtureTensor, TypedFixtureModelAnalysis
+    from .fixture_capture import FixtureCaptureGuard
+    from .fixture_runtime import FixtureFile, PreparedUpstreamRuntime
+    from .fixture_target import FixtureTarget
     from .frozen_run import FrozenModel, FrozenRun, FrozenRuntime, LocalInput, ToolchainIdentity
     from .hostenv.cache_dirs import hpx_cache_root
     from .hostenv.doctor import DoctorCheck, DoctorResult, DoctorVersionCheck
@@ -129,6 +142,7 @@ if TYPE_CHECKING:
         SupportBundleSection,
         load_result_manifest,
     )
+    from .run_inputs import analyze_run_model, analyze_run_model_for_engine, capabilities
     from .runtime_records import (
         Qualification,
         QualifiedTarget,
@@ -264,6 +278,24 @@ _EXPORTS = {
     "load_build": (".compiled_build", "load_build"),
     "run_build": (".compiled_build", "run_build"),
     "hpx_cache_root": (".hostenv.cache_dirs", "hpx_cache_root"),
+    "TypedFixture": ("._fixture_build", "TypedFixture"),
+    "FixtureIO": ("._fixture_build", "FixtureIO"),
+    "FixtureOutput": ("._fixture_build", "FixtureOutput"),
+    "FixtureRole": ("._fixture_build", "FixtureRole"),
+    "FixtureMethod": ("._fixture_build", "FixtureMethod"),
+    "FixtureTimingScope": ("._fixture_build", "FixtureTimingScope"),
+    "FixtureFile": (".fixture_runtime", "FixtureFile"),
+    "PreparedUpstreamRuntime": (".fixture_runtime", "PreparedUpstreamRuntime"),
+    "FixtureTensor": (".fixture_analysis", "FixtureTensor"),
+    "TypedFixtureModelAnalysis": (".fixture_analysis", "TypedFixtureModelAnalysis"),
+    "FixtureCaptureGuard": (".fixture_capture", "FixtureCaptureGuard"),
+    "FixtureTarget": (".fixture_target", "FixtureTarget"),
+    "FixtureCapabilities": ("._fixture_facts", "FixtureCapabilities"),
+    "QualifiedFixtureTarget": ("._fixture_facts", "QualifiedFixtureTarget"),
+    "EngineDTypeCapability": ("._fixture_facts", "EngineDTypeCapability"),
+    "capabilities": (".run_inputs", "capabilities"),
+    "analyze_run_model": (".run_inputs", "analyze_run_model"),
+    "analyze_run_model_for_engine": (".run_inputs", "analyze_run_model_for_engine"),
     "Lifecycle": (".lifecycle", "Lifecycle"),
     "CanonicalEngine": (".identity", "CanonicalEngine"),
     "CanonicalKernel": (".identity", "CanonicalKernel"),
@@ -309,6 +341,24 @@ __all__ = [
     "load_build",
     "run_build",
     "hpx_cache_root",
+    "TypedFixture",
+    "FixtureIO",
+    "FixtureOutput",
+    "FixtureRole",
+    "FixtureFile",
+    "FixtureTensor",
+    "FixtureMethod",
+    "FixtureTimingScope",
+    "FixtureCaptureGuard",
+    "FixtureTarget",
+    "PreparedUpstreamRuntime",
+    "analyze_run_model",
+    "analyze_run_model_for_engine",
+    "TypedFixtureModelAnalysis",
+    "capabilities",
+    "FixtureCapabilities",
+    "QualifiedFixtureTarget",
+    "EngineDTypeCapability",
     "Lifecycle",
     "CanonicalEngine",
     "CanonicalKernel",
@@ -491,6 +541,24 @@ _EXPERIMENTAL_API = {
     "load_build",
     "run_build",
     "hpx_cache_root",
+    "TypedFixture",
+    "FixtureIO",
+    "FixtureOutput",
+    "FixtureRole",
+    "FixtureFile",
+    "FixtureTensor",
+    "FixtureMethod",
+    "FixtureTimingScope",
+    "FixtureCaptureGuard",
+    "FixtureTarget",
+    "PreparedUpstreamRuntime",
+    "analyze_run_model",
+    "analyze_run_model_for_engine",
+    "TypedFixtureModelAnalysis",
+    "capabilities",
+    "FixtureCapabilities",
+    "QualifiedFixtureTarget",
+    "EngineDTypeCapability",
     "Lifecycle",
     "CanonicalEngine",
     "CanonicalKernel",

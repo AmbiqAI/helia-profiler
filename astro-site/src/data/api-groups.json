@@ -54,6 +54,30 @@
       ]
     },
     {
+      "path": "helia_profiler.run_inputs",
+      "summary": "What a run is built for and captured under: the typed fixture that pins a model's input bytes and declares its outputs, how the run is timed, the board guard a capture answers to, the model analysis that lists a model's inputs and outputs, and the targets and IO types this heliaPROFILER builds.",
+      "members": [
+        "TypedFixture",
+        "FixtureIO",
+        "FixtureOutput",
+        "FixtureRole",
+        "FixtureFile",
+        "FixtureTensor",
+        "FixtureMethod",
+        "FixtureTimingScope",
+        "PreparedUpstreamRuntime",
+        "analyze_run_model",
+        "analyze_run_model_for_engine",
+        "TypedFixtureModelAnalysis",
+        "FixtureCaptureGuard",
+        "FixtureTarget",
+        "capabilities",
+        "FixtureCapabilities",
+        "QualifiedFixtureTarget",
+        "EngineDTypeCapability"
+      ]
+    },
+    {
       "path": "helia_profiler.identity",
       "summary": "Shared identity vocabulary: canonical engine and kernel names with today's spellings as aliases, and unknown facts that carry their reason.",
       "members": [

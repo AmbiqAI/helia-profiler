@@ -4,7 +4,7 @@ The script walks the whole run API once, as a benchmark harness would:
 
 1. freeze a :class:`~helia_profiler.FrozenRun` plan from a session;
 2. :func:`~helia_profiler.build` it for a
-   :class:`~helia_profiler.fixture.TypedFixture` with fixed input bytes;
+   :class:`~helia_profiler.TypedFixture` with fixed input bytes;
 3. save the :class:`~helia_profiler.CompiledBuild` and
    :func:`~helia_profiler.load_build` it back, as another host would;
 4. :func:`~helia_profiler.run_build` the loaded build on the board and compare
@@ -46,9 +46,8 @@ from hashlib import sha256
 from pathlib import Path
 
 import helia_profiler as hpx
-from helia_profiler import Lifecycle, RunResult
-from helia_profiler.expect import Expect, Tolerance
-from helia_profiler.fixture import (
+from helia_profiler import (
+    Expect,
     FixtureCaptureGuard,
     FixtureFile,
     FixtureIO,
@@ -56,8 +55,11 @@ from helia_profiler.fixture import (
     FixtureOutput,
     FixtureTarget,
     FixtureTimingScope,
+    Lifecycle,
+    RunResult,
+    Tolerance,
     TypedFixture,
-    analyze_typed_fixture_model,
+    analyze_run_model,
 )
 
 #: The kernel backend each prepared-runtime engine builds its fixture with.
@@ -88,7 +90,7 @@ def _pin(path: Path, data: bytes) -> FixtureFile:
 def typed_fixture(model: Path, out: Path) -> TypedFixture:
     """A fixture of *model* with zero-filled inputs, its files copied under *out*."""
     pinned = _pin(out / "inputs" / model.name, model.read_bytes())
-    analysis = analyze_typed_fixture_model(pinned.path)
+    analysis = analyze_run_model(pinned.path)
     return TypedFixture(
         pinned,
         tuple(
