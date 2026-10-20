@@ -212,6 +212,14 @@ def test_save_and_load_round_trip_after_relocation(plan, build, root, tmp_path):
     assert loaded.save(tmp_path / "again.json", roots={"run": moved}).read_text() == text
 
 
+def test_save_verifies_before_writing(plan, build, tmp_path):
+    record = replace(compiled(plan, build, Lifecycle.CARRY), lifecycle=Lifecycle.SINGLE)
+    target = tmp_path / "records" / "kws.json"
+    with pytest.raises(ConfigError):
+        record.save(target, roots={"run": tmp_path / "run"})
+    assert not target.exists()
+
+
 def test_save_refuses_a_file_outside_the_roots(plan, build, tmp_path):
     with pytest.raises(ConfigError, match="Cannot save compiled build"):
         compiled(plan, build, Lifecycle.CARRY).save(

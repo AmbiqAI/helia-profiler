@@ -245,3 +245,26 @@ def test_counts_the_device_reports_must_be_the_builds(record, device, tmp_path):
     )
     with pytest.raises(CaptureError, match="reported 100 and 5 .* runs 1 and 0"):
         _run(record, device, capture, tmp_path)
+
+
+def test_run_verifies_the_build_before_the_device(record, device, tmp_path):
+    assert record.build.flat_binary is not None
+    record.build.flat_binary.path.write_bytes(b"changed image")
+    with pytest.raises(ConfigError, match="does not verify"):
+        _run(record, device, _success(tmp_path), tmp_path)
+    assert device.calls == []
+
+
+def test_run_never_builds(record, device, tmp_path, monkeypatch):
+    def forbidden(*args: object, **kwargs: object) -> None:
+        raise AssertionError("run() must not build")
+
+    for target in (
+        "helia_profiler._fixture_build.build_fixed_fixture",
+        "helia_profiler._fixture_request.build_fixture",
+        "helia_profiler.deps.nsx.build",
+        "helia_profiler.stages.build_firmware.BuildFirmwareStage.run",
+    ):
+        monkeypatch.setattr(target, forbidden)
+    assert _run(record, device, _success(tmp_path), tmp_path).succeeded
+    assert len(device.calls) == 1
