@@ -222,6 +222,19 @@ def test_freeze_refuses_to_write_the_plan_over_the_model(tmp_path, monkeypatch):
     assert model.read_bytes() == b"model"
 
 
+def test_freeze_refuses_a_hard_link_to_the_model(tmp_path):
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"model")
+    output = tmp_path / "plan.json"
+    output.hardlink_to(model)
+
+    result = _invoke("freeze", model, *_FREEZE, "-o", output)
+
+    assert result.exit_code == 1
+    assert "is the model the plan is frozen against" in _plain(result.output)
+    assert model.read_bytes() == b"model"
+
+
 def test_freeze_records_the_model_by_its_resolved_path(tmp_path, monkeypatch):
     (tmp_path / "models").mkdir()
     model = tmp_path / "models" / "model.tflite"
