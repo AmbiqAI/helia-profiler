@@ -8,10 +8,14 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from . import examples
     from ._fixture_build import (
+        FixtureBuild,
+        FixtureCapability,
+        FixtureDType,
         FixtureIO,
         FixtureMethod,
         FixtureOutput,
         FixtureRole,
+        FixtureStatePolicy,
         FixtureTimingScope,
         TypedFixture,
     )
@@ -50,6 +54,7 @@ if TYPE_CHECKING:
         write_support_bundle,
     )
     from .engines import EngineType
+    from .engines.base import EngineSource
     from .errors import (
         BuildError,
         CaptureError,
@@ -94,16 +99,45 @@ if TYPE_CHECKING:
         compare_outputs,
         host_reference,
     )
-    from .fixture_analysis import FixtureTensor, TypedFixtureModelAnalysis
-    from .fixture_capture import FixtureCaptureGuard
-    from .fixture_runtime import FixtureFile, PreparedUpstreamRuntime
+    from .firmware.op_resolver import ResolverPlan
+    from .fixture_analysis import (
+        FixtureTensor,
+        PerAxisQuantization,
+        PerTensorQuantization,
+        TypedFixtureModelAnalysis,
+    )
+    from .fixture_capture import (
+        FixtureCaptureGuard,
+        FixtureCaptureResult,
+        FixtureMemory,
+        FixtureTiming,
+    )
+    from .fixture_power import FixtureBatchCompletion, FixturePowerSync, FixtureRailEnergy
+    from .fixture_psram import FixturePsramObservation, FixturePsramPayload, FixturePsramWeights
+    from .fixture_runtime import (
+        FixtureFile,
+        PreparedUpstreamRuntime,
+        RuntimeABI,
+        RuntimeHeader,
+        RuntimeProvider,
+        VerifiedPreparedRuntime,
+    )
+    from .fixture_runtime import (
+        RuntimeManifest as PreparedRuntimeManifest,
+    )
+    from .fixture_sources import FixtureKernelSource, FixtureRuntimeSource
     from .fixture_target import FixtureTarget
     from .frozen_run import FrozenModel, FrozenRun, FrozenRuntime, LocalInput, ToolchainIdentity
     from .hostenv.cache_dirs import hpx_cache_root
     from .hostenv.doctor import DoctorCheck, DoctorResult, DoctorVersionCheck
     from .identity import (
+        BuildFacts,
         CanonicalEngine,
         CanonicalKernel,
+        KernelIdentity,
+        RunFacts,
+        RunIdentity,
+        RuntimeIdentity,
         Unknown,
         canonical_engine,
         canonical_kernel,
@@ -142,6 +176,7 @@ if TYPE_CHECKING:
         SupportBundleSection,
         load_result_manifest,
     )
+    from .results.models import MemoryPlan, ToolchainInfo
     from .run_guard import OperatorGuard
     from .run_inputs import analyze_run_model, analyze_run_model_for_engine, capabilities
     from .runtime_records import (
@@ -294,6 +329,37 @@ _EXPORTS = {
     "FixtureCapabilities": ("._fixture_facts", "FixtureCapabilities"),
     "QualifiedFixtureTarget": ("._fixture_facts", "QualifiedFixtureTarget"),
     "EngineDTypeCapability": ("._fixture_facts", "EngineDTypeCapability"),
+    "FixtureBuild": ("._fixture_build", "FixtureBuild"),
+    "FixtureCapability": ("._fixture_build", "FixtureCapability"),
+    "FixtureDType": ("._fixture_build", "FixtureDType"),
+    "FixtureStatePolicy": ("._fixture_build", "FixtureStatePolicy"),
+    "PerTensorQuantization": (".fixture_analysis", "PerTensorQuantization"),
+    "PerAxisQuantization": (".fixture_analysis", "PerAxisQuantization"),
+    "ResolverPlan": (".firmware.op_resolver", "ResolverPlan"),
+    "FixtureCaptureResult": (".fixture_capture", "FixtureCaptureResult"),
+    "FixtureTiming": (".fixture_capture", "FixtureTiming"),
+    "FixtureMemory": (".fixture_capture", "FixtureMemory"),
+    "FixturePowerSync": (".fixture_power", "FixturePowerSync"),
+    "FixtureRailEnergy": (".fixture_power", "FixtureRailEnergy"),
+    "FixtureBatchCompletion": (".fixture_power", "FixtureBatchCompletion"),
+    "FixturePsramWeights": (".fixture_psram", "FixturePsramWeights"),
+    "FixturePsramPayload": (".fixture_psram", "FixturePsramPayload"),
+    "FixturePsramObservation": (".fixture_psram", "FixturePsramObservation"),
+    "FixtureKernelSource": (".fixture_sources", "FixtureKernelSource"),
+    "FixtureRuntimeSource": (".fixture_sources", "FixtureRuntimeSource"),
+    "EngineSource": (".engines.base", "EngineSource"),
+    "MemoryPlan": (".results.models", "MemoryPlan"),
+    "ToolchainInfo": (".results.models", "ToolchainInfo"),
+    "VerifiedPreparedRuntime": (".fixture_runtime", "VerifiedPreparedRuntime"),
+    "PreparedRuntimeManifest": (".fixture_runtime", "RuntimeManifest"),
+    "RuntimeABI": (".fixture_runtime", "RuntimeABI"),
+    "RuntimeHeader": (".fixture_runtime", "RuntimeHeader"),
+    "RuntimeProvider": (".fixture_runtime", "RuntimeProvider"),
+    "RunIdentity": (".identity", "RunIdentity"),
+    "RunFacts": (".identity", "RunFacts"),
+    "BuildFacts": (".identity", "BuildFacts"),
+    "KernelIdentity": (".identity", "KernelIdentity"),
+    "RuntimeIdentity": (".identity", "RuntimeIdentity"),
     "capabilities": (".run_inputs", "capabilities"),
     "analyze_run_model": (".run_inputs", "analyze_run_model"),
     "analyze_run_model_for_engine": (".run_inputs", "analyze_run_model_for_engine"),
@@ -362,6 +428,37 @@ __all__ = [
     "FixtureCapabilities",
     "QualifiedFixtureTarget",
     "EngineDTypeCapability",
+    "FixtureBuild",
+    "FixtureCapability",
+    "FixtureDType",
+    "FixtureStatePolicy",
+    "PerTensorQuantization",
+    "PerAxisQuantization",
+    "ResolverPlan",
+    "FixtureCaptureResult",
+    "FixtureTiming",
+    "FixtureMemory",
+    "FixturePowerSync",
+    "FixtureRailEnergy",
+    "FixtureBatchCompletion",
+    "FixturePsramWeights",
+    "FixturePsramPayload",
+    "FixturePsramObservation",
+    "FixtureKernelSource",
+    "FixtureRuntimeSource",
+    "EngineSource",
+    "MemoryPlan",
+    "ToolchainInfo",
+    "VerifiedPreparedRuntime",
+    "PreparedRuntimeManifest",
+    "RuntimeABI",
+    "RuntimeHeader",
+    "RuntimeProvider",
+    "RunIdentity",
+    "RunFacts",
+    "BuildFacts",
+    "KernelIdentity",
+    "RuntimeIdentity",
     "Lifecycle",
     "CanonicalEngine",
     "CanonicalKernel",
@@ -563,6 +660,37 @@ _EXPERIMENTAL_API = {
     "FixtureCapabilities",
     "QualifiedFixtureTarget",
     "EngineDTypeCapability",
+    "FixtureBuild",
+    "FixtureCapability",
+    "FixtureDType",
+    "FixtureStatePolicy",
+    "PerTensorQuantization",
+    "PerAxisQuantization",
+    "ResolverPlan",
+    "FixtureCaptureResult",
+    "FixtureTiming",
+    "FixtureMemory",
+    "FixturePowerSync",
+    "FixtureRailEnergy",
+    "FixtureBatchCompletion",
+    "FixturePsramWeights",
+    "FixturePsramPayload",
+    "FixturePsramObservation",
+    "FixtureKernelSource",
+    "FixtureRuntimeSource",
+    "EngineSource",
+    "MemoryPlan",
+    "ToolchainInfo",
+    "VerifiedPreparedRuntime",
+    "PreparedRuntimeManifest",
+    "RuntimeABI",
+    "RuntimeHeader",
+    "RuntimeProvider",
+    "RunIdentity",
+    "RunFacts",
+    "BuildFacts",
+    "KernelIdentity",
+    "RuntimeIdentity",
     "Lifecycle",
     "CanonicalEngine",
     "CanonicalKernel",

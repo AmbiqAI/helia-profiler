@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
+import ast
+import dataclasses
+import enum
+import importlib
+import inspect
+import typing
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -28,8 +35,44 @@ _SAME_AS_FACADE = {
     "FixtureCapabilities": "FixtureCapabilities",
     "QualifiedFixtureTarget": "QualifiedFixtureTarget",
     "EngineDTypeCapability": "EngineDTypeCapability",
+    "PerTensorQuantization": "PerTensorQuantization",
+    "PerAxisQuantization": "PerAxisQuantization",
+    "FixtureDType": "FixtureDType",
+    "FixtureCapability": "FixtureCapability",
+    "FixtureStatePolicy": "FixtureStatePolicy",
+    "FixturePowerSync": "FixturePowerSync",
+    "RunIdentity": "RunIdentity",
+    "RunFacts": "RunFacts",
+    "BuildFacts": "BuildFacts",
+    "KernelIdentity": "KernelIdentity",
+    "RuntimeIdentity": "RuntimeIdentity",
+    "FixtureBuild": "FixtureBuild",
+    "FixtureCaptureResult": "FixtureCaptureResult",
+    "FixtureTiming": "FixtureTiming",
+    "FixtureMemory": "FixtureMemory",
+    "FixtureRailEnergy": "FixtureRailEnergy",
+    "FixtureBatchCompletion": "FixtureBatchCompletion",
+    "FixturePsramWeights": "FixturePsramWeights",
+    "FixturePsramPayload": "FixturePsramPayload",
+    "FixturePsramObservation": "FixturePsramObservation",
+    "FixtureKernelSource": "FixtureKernelSource",
+    "FixtureRuntimeSource": "FixtureRuntimeSource",
+    "EngineSource": "EngineSource",
+    "ToolchainInfo": "ToolchainInfo",
+    "VerifiedPreparedRuntime": "VerifiedPreparedRuntime",
+    "PreparedRuntimeManifest": "PreparedRuntimeManifest",
+    "RuntimeABI": "RuntimeABI",
+    "RuntimeHeader": "RuntimeHeader",
+    "RuntimeProvider": "RuntimeProvider",
 }
-_NEW = ("capabilities", "analyze_run_model", "analyze_run_model_for_engine", "OperatorGuard")
+_NEW = (
+    "capabilities",
+    "analyze_run_model",
+    "analyze_run_model_for_engine",
+    "OperatorGuard",
+    "MemoryPlan",
+    "ResolverPlan",
+)
 
 
 @pytest.mark.parametrize("name,facade_name", sorted(_SAME_AS_FACADE.items()))
@@ -37,10 +80,121 @@ def test_each_input_type_is_the_fixture_type(name, facade_name):
     assert getattr(hpx, name) is getattr(facade, facade_name)
 
 
+def test_the_types_outside_the_fixture_facade_are_their_modules_types():
+    from helia_profiler.firmware.op_resolver import ResolverPlan
+    from helia_profiler.results.models import MemoryPlan
+
+    assert (hpx.MemoryPlan, hpx.ResolverPlan) == (MemoryPlan, ResolverPlan)
+
+
 def test_the_run_inputs_are_experimental_exports():
     names = {*_SAME_AS_FACADE, *_NEW, "Expect", "Tolerance"}
     assert names <= set(hpx.__all__)
     assert {hpx.__api_stability__[name] for name in names} == {"experimental"}
+
+
+#: The run API's own modules. The walk descends into their types; a type from another
+#: surface, such as ``ProfileConfig``, must be exported where it is met but is not walked.
+_RUN_API_MODULES = {
+    f"helia_profiler.{name}"
+    for name in (
+        "compiled_build",
+        "_fixture_build",
+        "_fixture_facts",
+        "fixture_analysis",
+        "fixture_capture",
+        "fixture_power",
+        "fixture_psram",
+        "fixture_runtime",
+        "fixture_sources",
+        "fixture_target",
+        "frozen_run",
+        "identity",
+        "expect",
+        "lifecycle",
+        "run_guard",
+    )
+}
+_RUN_API_ENTRY_POINTS = (
+    "build",
+    "load_build",
+    "run_build",
+    "capabilities",
+    "analyze_run_model",
+    "analyze_run_model_for_engine",
+)
+
+
+def _hints(obj: Any, module_name: str) -> dict[str, Any]:
+    """*obj*'s resolved annotations, names imported only under ``TYPE_CHECKING`` included."""
+    module = importlib.import_module(module_name)
+    namespace = dict(vars(module))
+    for node in ast.parse(inspect.getsource(module)).body:
+        if isinstance(node, ast.If) and getattr(node.test, "id", None) == "TYPE_CHECKING":
+            block = ast.Module(body=node.body, type_ignores=[])
+            exec(compile(block, module.__file__ or module_name, "exec"), namespace)
+    return typing.get_type_hints(obj, globalns=namespace)
+
+
+def _classes(annotation: Any) -> typing.Iterator[type]:
+    for argument in typing.get_args(annotation):
+        yield from _classes(argument)
+    origin = typing.get_origin(annotation)
+    if isinstance(origin, type):
+        yield origin
+    elif origin is None and isinstance(annotation, type):
+        yield annotation
+
+
+def _reachable_run_api_types() -> dict[type, str]:
+    """Every public HPX class the run API's signatures, fields and return types name."""
+    reached: dict[type, str] = {}
+
+    def callable_(function: Any, module_name: str, via: str) -> None:
+        for annotation in _hints(function, module_name).values():
+            for cls in _classes(annotation):
+                class_(cls, via)
+
+    def class_(cls: type, via: str) -> None:
+        if not cls.__module__.startswith("helia_profiler") or cls.__name__.startswith("_"):
+            return
+        if cls in reached:
+            return
+        reached[cls] = via
+        if issubclass(cls, (enum.Enum, BaseException)) or cls.__module__ not in _RUN_API_MODULES:
+            return
+        if dataclasses.is_dataclass(cls):
+            for annotation in _hints(cls, cls.__module__).values():
+                for member in _classes(annotation):
+                    class_(member, cls.__name__)
+        for name, member in vars(cls).items():
+            if name.startswith("_"):
+                continue
+            if isinstance(member, property):
+                member = member.fget
+            elif isinstance(member, (classmethod, staticmethod)):
+                member = member.__func__
+            if inspect.isfunction(member):
+                callable_(member, cls.__module__, f"{cls.__name__}.{name}")
+
+    for name in _RUN_API_ENTRY_POINTS:
+        function = getattr(hpx, name)
+        callable_(function, function.__module__, name)
+    return reached
+
+
+def test_every_type_the_run_api_reaches_is_importable_from_helia_profiler():
+    exported = {id(getattr(hpx, name)) for name in hpx.__all__}
+    reached = _reachable_run_api_types()
+
+    missing = sorted(
+        f"{cls.__qualname__} (via {via})" for cls, via in reached.items() if id(cls) not in exported
+    )
+
+    assert missing == []
+    assert {hpx.FixtureBuild, hpx.FixtureTiming, hpx.RunIdentity, hpx.PerAxisQuantization} <= set(
+        reached
+    )
 
 
 def test_capabilities_reports_what_the_fixture_api_reports():

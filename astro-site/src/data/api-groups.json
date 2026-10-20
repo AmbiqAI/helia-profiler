@@ -42,7 +42,7 @@
     },
     {
       "path": "helia_profiler.compiled_build",
-      "summary": "Build once, run later: a frozen plan's compiled firmware, bound to its plan and saved so any host can verify, relocate and capture from it, and how model state carries across a run's invocations. The hpx freeze, hpx build, hpx validate build and hpx run commands drive the same flow from the command line.",
+      "summary": "Build once, run later: a frozen plan's compiled firmware, bound to its plan and saved so any host can verify, relocate and capture from it, how model state carries across a run's invocations, and the build and capture records a compiled build and a run result carry. The hpx freeze, hpx build, hpx validate build and hpx run commands drive the same flow from the command line.",
       "members": [
         "build",
         "load_build",
@@ -50,12 +50,27 @@
         "hpx_cache_root",
         "CompiledBuild",
         "RunResult",
-        "Lifecycle"
+        "Lifecycle",
+        "FixtureBuild",
+        "FixtureCaptureResult",
+        "FixtureTiming",
+        "FixtureMemory",
+        "FixturePowerSync",
+        "FixtureRailEnergy",
+        "FixtureBatchCompletion",
+        "FixturePsramWeights",
+        "FixturePsramPayload",
+        "FixturePsramObservation",
+        "FixtureKernelSource",
+        "FixtureRuntimeSource",
+        "EngineSource",
+        "MemoryPlan",
+        "ToolchainInfo"
       ]
     },
     {
       "path": "helia_profiler.run_inputs",
-      "summary": "What a run is built for and captured under: the typed fixture that pins a model's input bytes and declares its outputs, how the run is timed, the board guard a capture answers to, the model analysis that lists a model's inputs and outputs, and the targets and IO types this heliaPROFILER builds.",
+      "summary": "What a run is built for and captured under: the typed fixture that pins a model's input bytes and declares its outputs, the tensors' element types and quantization, how the run is timed, the prepared runtime a build links, the board guard a capture answers to, the model analysis that lists a model's inputs and outputs, and the targets and IO types this heliaPROFILER builds.",
       "members": [
         "TypedFixture",
         "FixtureIO",
@@ -75,13 +90,29 @@
         "capabilities",
         "FixtureCapabilities",
         "QualifiedFixtureTarget",
-        "EngineDTypeCapability"
+        "EngineDTypeCapability",
+        "PerTensorQuantization",
+        "PerAxisQuantization",
+        "FixtureDType",
+        "FixtureCapability",
+        "FixtureStatePolicy",
+        "ResolverPlan",
+        "VerifiedPreparedRuntime",
+        "PreparedRuntimeManifest",
+        "RuntimeABI",
+        "RuntimeHeader",
+        "RuntimeProvider"
       ]
     },
     {
       "path": "helia_profiler.identity",
-      "summary": "Shared identity vocabulary: canonical engine and kernel names with today's spellings as aliases, and unknown facts that carry their reason.",
+      "summary": "Shared identity vocabulary: the identity of a captured run and the build, run, runtime and kernel facts it names, canonical engine and kernel names with today's spellings as aliases, and unknown facts that carry their reason.",
       "members": [
+        "RunIdentity",
+        "RunFacts",
+        "BuildFacts",
+        "RuntimeIdentity",
+        "KernelIdentity",
         "CanonicalEngine",
         "CanonicalKernel",
         "Unknown",
