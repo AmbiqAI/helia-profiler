@@ -108,6 +108,9 @@ class FrozenModel:
     size_bytes: int
 
 
+_VERSION_SEPARATOR = " | "
+
+
 @dataclass(frozen=True)
 class ToolchainIdentity:
     """The compiler a plan expects: name and exact version, never a path.
@@ -120,6 +123,11 @@ class ToolchainIdentity:
     name: str
     version: str | None
     unavailable_reason: str | None = None
+
+    @property
+    def lines(self) -> tuple[str, ...]:
+        """The version-bearing lines ``version`` joins, or none when it is unknown."""
+        return tuple(self.version.split(_VERSION_SEPARATOR)) if self.version else ()
 
 
 @dataclass(frozen=True)
@@ -616,7 +624,7 @@ def _toolchain_identity(config: ProfileConfig) -> ToolchainIdentity:
     ]
     if not lines:
         return ToolchainIdentity(name, None, f"{command} --version reported no version")
-    return ToolchainIdentity(name, " | ".join(lines))
+    return ToolchainIdentity(name, _VERSION_SEPARATOR.join(lines))
 
 
 def _frozen_runtime(config: ProfileConfig) -> FrozenRuntime | None:

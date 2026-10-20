@@ -87,6 +87,7 @@ class CompiledBuild:
             verify_fixture_build(self.build)
         except (ValueError, OSError) as exc:
             raise ConfigError(f"Compiled build does not verify: {exc}") from exc
+        # Round-trips the plan to recheck its intent hash against its settings.
         FrozenRun.from_dict(self.plan.to_dict())
         if self.binding != _binding(self.plan, self.lifecycle, self.build):
             raise ConfigError(
@@ -109,11 +110,12 @@ class CompiledBuild:
         if (
             toolchain is None
             or version is None
-            or toolchain.compiler_version not in version.split(" | ")
+            or toolchain.compiler_version not in self.plan.toolchain.lines
         ):
             raise ConfigError(
                 "Compiled build's toolchain version "
-                f"{toolchain.compiler_version if toolchain else None!r} is not its plan's {version!r}"
+                f"{toolchain.compiler_version if toolchain else None!r} is not its plan's {version!r}",
+                hint="Freeze the plan with target.toolchain set to the toolchain the build uses.",
             )
         try:
             profiling = self.plan.settings["profiling"]
@@ -249,6 +251,10 @@ class CompiledBuild:
 
         A failed capture comes back with ``capture.state == "failure"`` and no
         verification; errors raised while capturing propagate.
+
+        Raises:
+            ConfigError: The build does not verify, or *expect* cannot be compared.
+            CaptureError: The device reports counts other than the build's.
         """
         from ._fixture_record import fixture_capture_request
         from .expect import check_fixture_expectation, compare_fixture_outputs
@@ -305,6 +311,7 @@ class RunResult:
 
     @property
     def succeeded(self) -> bool:
+        """True only for a ``success`` capture."""
         return self.capture.state == "success"
 
 
@@ -337,7 +344,13 @@ def build(
             f"(sha256 {plan.model.sha256[:12]}…)",
             hint="Build the fixture from the model the plan was frozen against.",
         )
-    lifecycle = Lifecycle(lifecycle)
+    try:
+        lifecycle = Lifecycle(lifecycle)
+    except ValueError as exc:
+        raise ConfigError(
+            f"Unknown lifecycle {lifecycle!r}",
+            hint="Use Lifecycle.CARRY or Lifecycle.SINGLE; reset is reserved.",
+        ) from exc
     if method.power_sync is not None:
         if lifecycle is Lifecycle.SINGLE:
             raise ConfigError(
@@ -345,7 +358,7 @@ def build(
                 hint="Use Lifecycle.CARRY for a power run.",
             )
         raise ConfigError(
-            "run_build() takes no power request yet",
+            "build() takes no power request yet",
             hint="Build and capture power fixtures with helia_profiler.fixture for now.",
         )
     config = plan.config(model=model, host=host)

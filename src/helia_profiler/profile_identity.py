@@ -237,7 +237,7 @@ def _run_facts(ctx: PipelineContext) -> RunFacts:
     clock, clock_hz = _timing_clock(ctx, boundary)
     return RunFacts(
         lifecycle=(
-            Lifecycle.SINGLE if boundary is InstanceBoundary.INVOCATION else Lifecycle.CARRY
+            Lifecycle.SINGLE if adapter.lifecycles == {Lifecycle.SINGLE} else Lifecycle.CARRY
         ).value,
         iterations=ctx.config.profiling.iterations,
         warmups=ctx.config.profiling.warmup,
