@@ -456,7 +456,8 @@ def redact_value(
                 counts = counts.combined(key_counts)
             result[redacted_key] = redacted_value
         return result, counts
-    if isinstance(value, (list, tuple)) and not isinstance(value, (str, bytes)):
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        # Tuples stay tuples; other sequences become lists.
         counts = RedactionCounts()
         items = []
         for item in value:
@@ -466,17 +467,6 @@ def redact_value(
             items.append(redacted)
             counts = counts.combined(item_counts)
         return (tuple(items) if isinstance(value, tuple) else items), counts
-    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
-        # Defensive: any other JSON-safe sequence type behaves like a list.
-        counts = RedactionCounts()
-        items = []
-        for item in value:
-            redacted, item_counts = redact_value(
-                item, policy, key=key, _inside_secret=inside_secret
-            )
-            items.append(redacted)
-            counts = counts.combined(item_counts)
-        return items, counts
     if inside_secret and value is not None:
         # A non-string, non-container leaf (int, float, bool, bytes, ...)
         # directly under a secret-shaped key -- e.g. a numeric PIN written

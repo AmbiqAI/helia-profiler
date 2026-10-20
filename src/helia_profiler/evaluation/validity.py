@@ -304,20 +304,7 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                 _error(IssueCode.POWER_OBSERVATION_MISSING, "Power observation is missing.")
             )
         if observation is not None:
-            if observation.integrity == "invalid":
-                issues.append(
-                    _error(
-                        IssueCode.POWER_OBSERVATION_INVALID,
-                        "Power observation integrity is invalid.",
-                    )
-                )
-            elif observation.integrity == "degraded":
-                issues.append(
-                    _warning(
-                        IssueCode.POWER_OBSERVATION_DEGRADED,
-                        "Power observation is diagnostic and not valid for efficiency metrics.",
-                    )
-                )
+            issues.extend(_integrity_issues(observation.integrity))
             if observation.mode == "gpio_gated" and not (
                 observation.gate_rise_observed and observation.gate_fall_observed
             ):
@@ -549,13 +536,7 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
             )
             if duration is not None:
                 if duration.below_minimum:
-                    issues.append(
-                        _error(
-                            IssueCode.POWER_GATE_BELOW_MINIMUM,
-                            "Measured power gate is shorter than the minimum accepted window.",
-                            **duration.to_metadata(),
-                        )
-                    )
+                    issues.append(_below_minimum_issue(duration))
                 elif not duration.valid:
                     if observer_agrees is None:
                         issues.append(
@@ -645,31 +626,12 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
                 )
             )
     elif ctx.power_result is not None:
-        integrity = ctx.power_result.metadata.integrity
-        if integrity == "invalid":
-            issues.append(
-                _error(
-                    IssueCode.POWER_OBSERVATION_INVALID, "Power observation integrity is invalid."
-                )
-            )
-        elif integrity == "degraded":
-            issues.append(
-                _warning(
-                    IssueCode.POWER_OBSERVATION_DEGRADED,
-                    "Power observation is diagnostic and not valid for efficiency metrics.",
-                )
-            )
+        issues.extend(_integrity_issues(ctx.power_result.metadata.integrity))
         duration = ctx.power_result.metadata.gate_duration_integrity
         if duration is not None and duration.below_minimum:
             # No power_run means no terminal to arbitrate, but the floor
             # never needed arbitration -- same severity as the run path.
-            issues.append(
-                _error(
-                    IssueCode.POWER_GATE_BELOW_MINIMUM,
-                    "Measured power gate is shorter than the minimum accepted window.",
-                    **duration.to_metadata(),
-                )
-            )
+            issues.append(_below_minimum_issue(duration))
         elif duration is not None and not duration.valid:
             issues.append(
                 _warning(
@@ -683,6 +645,29 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
         validity=_validity_for(issues),
         issues=tuple(issues),
         gate_arbitration=arbitration,
+    )
+
+
+def _integrity_issues(integrity: str | None) -> list[ResultIssue]:
+    if integrity == "invalid":
+        return [
+            _error(IssueCode.POWER_OBSERVATION_INVALID, "Power observation integrity is invalid.")
+        ]
+    if integrity == "degraded":
+        return [
+            _warning(
+                IssueCode.POWER_OBSERVATION_DEGRADED,
+                "Power observation is diagnostic and not valid for efficiency metrics.",
+            )
+        ]
+    return []
+
+
+def _below_minimum_issue(duration: GateDurationIntegrity) -> ResultIssue:
+    return _error(
+        IssueCode.POWER_GATE_BELOW_MINIMUM,
+        "Measured power gate is shorter than the minimum accepted window.",
+        **duration.to_metadata(),
     )
 
 
