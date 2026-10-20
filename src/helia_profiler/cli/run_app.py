@@ -14,6 +14,7 @@ from typing import Annotated, Optional
 import typer
 
 from ..engines import EngineType
+from ..lifecycle import Lifecycle
 from ..placement import Placement
 from .choices import _ArenaLocation, _CoreOverride
 
@@ -22,11 +23,8 @@ G_TARGET = "target hardware"
 G_EXPECT = "output verification"
 
 
-class _Lifecycle(StrEnum):
-    CARRY = "carry"
-    SINGLE = "single"
-
-
+# A copy of FixtureTimingScope: importing _fixture_build would slow every hpx command.
+# tests/test_cli_choices.py keeps the two in step.
 class _TimingScope(StrEnum):
     INVOKE_ONLY = "invoke_only"
     RESTORE_AND_INVOKE = "restore_and_invoke"
@@ -34,7 +32,6 @@ class _TimingScope(StrEnum):
 
 class _Expect(StrEnum):
     HOST_LITERT = "host-litert"
-    BUILD = "build"
     NONE = "none"
 
 
@@ -51,13 +48,15 @@ def register(app: typer.Typer) -> None:
         "freeze",
         help="Freeze a resolved run plan to JSON for hpx build",
         epilog=(
-            "Resolves the same config and options hpx profile does and writes the plan, "
-            "with the model's hash and the toolchain and runtime identities, so any host "
-            "can build the same run.\n\n"
+            "Takes the config file and the engine, target and profiling options of hpx "
+            "profile, plus --backend, and writes the resolved plan with the model's hash "
+            "and the toolchain and runtime identities, so any host can build the same "
+            "run.\n\n"
             "Example:\n\n"
-            "  hpx freeze model.tflite --engine helia-rt --backend helia --toolchain atfe \\\n\n"
-            "      --cpu-clock lp --arena-size 131072 --arena-location sram \\\n\n"
-            "      --weights-location mram -o plan.json"
+            # One paragraph: a blank line inside the command would end it at a backslash.
+            "  hpx freeze model.tflite --engine helia-rt --backend helia \\\n"
+            "      --toolchain atfe --cpu-clock lp --arena-size 131072 \\\n"
+            "      --arena-location sram --weights-location mram -o plan.json"
         ),
     )(freeze_command)
     app.command(
@@ -65,9 +64,10 @@ def register(app: typer.Typer) -> None:
         help="Build a frozen plan for fixed inputs into a run directory",
         epilog=(
             "Writes OUT/build.json, the model and one input_<index>.bin per model input "
-            "under OUT/inputs, and the firmware under OUT/work. heliaRT and LiteRT link "
-            "the runtime that hpx runtimes prepare cached. Prints the saved build's path "
-            "and identity as JSON.\n\n"
+            "under OUT/inputs, and the firmware under OUT/work. OUT must be new or empty, "
+            "so a failed build never touches an earlier one. heliaRT and LiteRT link the "
+            "runtime that hpx runtimes prepare cached under the HPX cache. Prints the saved "
+            "build's path, inputs and identity as JSON.\n\n"
             "Example:\n\n"
             "  hpx build plan.json --out runs/kws --input kws_input.bin"
         ),
@@ -76,10 +76,11 @@ def register(app: typer.Typer) -> None:
         "run",
         help="Capture once from a run directory on a board you name",
         epilog=(
-            "The operator vouches for the physical board, as hpx profile assumes: "
-            "--board names the board wired to the probe that --jlink-serial names, and "
-            "the operator holds it for the capture. A board other than the build's is "
-            "refused before any device is touched.\n\n"
+            "The operator vouches for the physical board behind the probe, as hpx profile "
+            "assumes: --board names the board wired to the probe that --jlink-serial names, "
+            "and the operator holds it for the capture. A --board other than the build's "
+            "board is refused before any device is touched; HPX cannot check the physical "
+            "board itself.\n\n"
             "Each capture writes its evidence to a fresh directory. Prints the outcome, "
             "identity, verification and timing as JSON. Exit status: 0 when the capture "
             "succeeds and its outputs match, 1 on a refusal or a failed capture, 3 when "
@@ -221,7 +222,7 @@ def build_command(
         ),
     ] = None,
     lifecycle: Annotated[
-        _Lifecycle,
+        Lifecycle,
         typer.Option(
             "--lifecycle",
             help=(
@@ -229,7 +230,7 @@ def build_command(
                 "single times one invocation per boot"
             ),
         ),
-    ] = _Lifecycle.CARRY,
+    ] = Lifecycle.CARRY,
     timing_scope: Annotated[
         _TimingScope,
         typer.Option(
@@ -248,7 +249,13 @@ def build_command(
     ] = None,
     work_dir: Annotated[
         Optional[Path],
-        typer.Option("--work-dir", help="Firmware build directory (default: OUT/work)"),
+        typer.Option(
+            "--work-dir",
+            help=(
+                "Firmware build directory inside OUT (default: OUT/work); the saved build "
+                "records its files relative to OUT"
+            ),
+        ),
     ] = None,
     verbose: Annotated[
         int, typer.Option("-v", "--verbose", count=True, help="Increase verbosity")
@@ -291,7 +298,7 @@ def run_command(
             "--expect",
             help=(
                 "Reference outputs: host-litert runs the model on the host (default), "
-                "build uses the outputs the build carries, none skips verification"
+                "none skips verification"
             ),
             rich_help_panel=G_EXPECT,
         ),

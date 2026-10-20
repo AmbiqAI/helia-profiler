@@ -596,12 +596,15 @@ and the saved build names the HPX cache as a second root. Its
 
 ### Run API names and the command line
 
-The run API's inputs are importable from `helia_profiler` itself, and that is
-the documented route: `TypedFixture`, `FixtureIO`, `FixtureOutput`,
-`FixtureRole`, `FixtureFile`, `FixtureTensor`, `FixtureMethod`,
-`FixtureTimingScope`, `FixtureCaptureGuard`, `FixtureTarget`,
-`PreparedUpstreamRuntime`, `Expect` and `Tolerance` are the same objects as
-in `helia_profiler.fixture` (experimental tier). `hpx.capabilities()` returns
+The run API's inputs, and every type its signatures, fields and return
+values reach, are importable from `helia_profiler` itself, and that is the
+documented route: `TypedFixture`, `FixtureIO`, `FixtureTensor` and its
+quantization, `FixtureBuild`, `FixtureCaptureResult` with its timing, memory,
+power and PSRAM parts, `RunIdentity` and its facts, the prepared runtime
+records, `Expect`, `Tolerance` and the rest are the same objects as in
+`helia_profiler.fixture` (experimental tier). `test_run_inputs.py` walks the
+run API's annotations and fails on a reachable type the package does not
+export. `hpx.capabilities()` returns
 what `fixture_capabilities()` returns. `analyze_run_model(path)` and
 `analyze_run_model_for_engine(path, engine)` (`run_inputs.py`) return the
 `TypedFixtureModelAnalysis` of `analyze_typed_fixture_model` and its
@@ -612,34 +615,49 @@ keeps working until the cleanup slice removes it.
 The command line drives the same flow over a run directory
 (`run_directory.py`): `build.json`, the model and one `input_<index>.bin` per
 model input under `inputs/`, the firmware under `work/` unless `--work-dir`
-names another, and one `evidence-<N>` per capture. The build is saved with
-the roots `run` (the directory) and `cache` (`hpx_cache_root()`).
+names another directory inside it, and one `evidence-<N>` per capture. The
+build is saved with the roots `run` (the directory) and `cache`
+(`hpx_cache_root()`), so a heliaRT or LiteRT build also needs its prepared
+runtime in the loading host's cache; a missing cache file is reported with
+the `hpx runtimes prepare` command that restores it.
 
-- `hpx freeze` resolves `-c/--config` and the shared engine and target
-  options through `_build_cli_overrides`, the same mapping `hpx profile`
-  uses, plus `--backend` (`engine.backend`), and writes `Session.freeze()`
-  with `FrozenRun.save`.
-- `hpx build PLAN --out DIR` pins the plan's model (or `--model`) and the
-  `--input` files, zero bytes when none are given, refuses a count or size
-  that does not fit the model, and calls `build()` with `--lifecycle`
-  (default `carry`) and `--timing-scope` (default `invoke_only`).
-- `hpx validate build DIR` loads, and so verifies, `DIR/build.json`.
+- `hpx freeze` resolves `-c/--config` and the shared engine, target and
+  profiling options through `_build_cli_overrides`, the same mapping
+  `hpx profile` uses, plus `--backend` (`engine.backend`), and writes
+  `Session.freeze()` with `FrozenRun.save`. It refuses a directory or the
+  model itself as `-o`.
+- `hpx build PLAN --out DIR` takes only a new or empty `DIR`, so a failed
+  rebuild never breaks an earlier build. It checks the model's sha256
+  against the plan (the plan's model, or `--model`) and the `--input` files
+  against the model, zero bytes when none are given, before it writes any
+  file, refuses a `--work-dir` outside `DIR` before compiling, and calls
+  `build()` with `--lifecycle` (default `carry`) and `--timing-scope`
+  (default `invoke_only`). Its summary lists each input's name, size, pinned
+  path and source.
+- `hpx validate build DIR` loads, and so verifies, `DIR/build.json`; it and
+  `hpx run` also take the path of `build.json`.
   `hpx validate` became a group whose callback still runs the MLPerf suite
   when no subcommand is given; suite options given with `build` are refused
   as a usage error rather than ignored.
 - `hpx run DIR --board B --jlink-serial S` captures under an
   `OperatorGuard(board, jlink_serial)` (`run_guard.py`): the operator vouches
   for the physical board, as `hpx profile` assumes. Its `verify_target`
-  refuses a target board or serial other than the operator's, and `check()`
-  allows every step. `run_directory.run_from` asks the guard about the
-  build's target before `run_build`, so a wrong board is refused before the
-  evidence directory exists. `--expect host-litert|build|none` (default
-  `host-litert`), `--tolerance` (`max_abs_error`, default 0) and repeated
-  `--reference` files (instead of `--expect`) map onto `Expect`. Exit status
-  is 1 for a refusal or a failed capture and 3 when the outputs do not match.
+  refuses a `--board` other than the build's board, or another serial, and
+  `check()` allows every step; HPX cannot check the physical board. The run
+  summary records `"authority": "operator"`. `run_directory.run_from` asks
+  the guard about the build's target before `run_build`, and refuses an
+  existing `--evidence-dir`, so neither touches a device. `--expect
+  host-litert|none` (default `host-litert`), `--tolerance` (`max_abs_error`,
+  default 0) and repeated `--reference` files (instead of `--expect`) map
+  onto `Expect`; a CLI build carries no expected outputs, so `Expect.from_build`
+  has no flag. `--settle-seconds` takes the capture's bound, more than 0 and
+  at most 300. A non-finite `max_abs_error` is written as `null`. Exit
+  status is 1 for a refusal or a failed capture and 3 when the outputs do
+  not match.
 
-Each command prints its summary as JSON on stdout and reports a typed error
-on stderr with exit status 1.
+Each command prints its summary as JSON on stdout and reports an error on
+stderr with exit status 1: an `HpxError`, and a `ValueError` or `OSError`,
+never a traceback.
 
 ### Timing windows by route
 

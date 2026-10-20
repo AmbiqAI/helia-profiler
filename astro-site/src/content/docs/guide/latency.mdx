@@ -42,28 +42,43 @@ hpx validate build runs/model
 hpx run runs/model --board apollo510_evb --jlink-serial 1160002255 --tolerance 1
 ```
 
-- [`hpx freeze`](../../reference/cli/freeze/) resolves the config file and
-  options `hpx profile` takes and writes the plan. A run build needs ATfE,
-  the `lp` clock, an SRAM arena of explicit size and MRAM weights.
+- [`hpx freeze`](../../reference/cli/freeze/) takes a subset of the options
+  `hpx profile` takes: the config file (`-c`), the model, `--engine`,
+  `--engine-config`, `--arena-size`, `--arena-location`,
+  `--weights-location`, `--core-override`, `--board`, `--toolchain`,
+  `--cpu-clock`, `--iterations` and `--warmup`, plus `--backend` for
+  `engine.backend`. It writes the resolved plan. A run build needs ATfE, the
+  `lp` clock, an SRAM arena of explicit size and MRAM weights.
 - [`hpx build`](../../reference/cli/build/) copies the model and one file
   per model input (`--input`, repeated in model order; zero bytes when
   omitted) into `runs/model/inputs`, compiles under `runs/model/work`, and
-  saves `runs/model/build.json`. `--lifecycle` and `--timing-scope` choose
-  how the build runs and what its timed span covers.
+  saves `runs/model/build.json`. The directory must be new or empty, so a
+  failed build never touches an earlier one; a `--work-dir` must sit inside
+  it, since the saved build records its files relative to the run directory.
+  `--lifecycle` and `--timing-scope` choose how the build runs and what its
+  timed span covers.
 - [`hpx validate build`](../../reference/cli/validate/#hpx-validate-build) re-verifies
   every pinned file and the plan without hardware. The saved build names the
-  run directory and the HPX cache as roots, so the directory can move.
+  run directory and the HPX cache as roots. The run directory can move to
+  another host as a unit, but a heliaRT or LiteRT build links a runtime
+  prepared under the HPX cache: on the new host, run `hpx runtimes prepare`
+  for the same release, or set `HPX_CACHE_DIR` to a cache that holds it.
 - [`hpx run`](../../reference/cli/run/) flashes the build and captures once
-  into a fresh `evidence-<N>` directory. You vouch for the physical board,
-  as `hpx profile` assumes: `--board` names the board wired to the probe
-  `--jlink-serial` names, and a board other than the build's is refused
-  before any device is touched. Outputs are compared with host LiteRT by
-  default (the `analysis` extra); `--expect build`, `--reference` files or
-  `--expect none` change that.
+  into a fresh `evidence-<N>` directory, or a new `--evidence-dir`. You
+  vouch for the physical board behind the probe, as `hpx profile` assumes:
+  `--board` names the board wired to the probe `--jlink-serial` names. A
+  `--board` other than the build's board is refused before any device is
+  touched; HPX cannot check the physical board itself. Outputs are compared
+  with host LiteRT by default (the `analysis` extra); `--reference` files
+  or `--expect none` change that.
 
-Each command prints JSON: the build's identity, or a run's outcome,
-identity, per-tensor verification and timing. `hpx run` exits 1 when the
-capture fails and 3 when the outputs do not match.
+`hpx validate build` and `hpx run` take the run directory or its
+`build.json`. Each command prints JSON: the build's inputs and identity, or
+a run's outcome, the authority that vouched for the board, its identity,
+per-tensor verification and timing. A non-finite error is written as
+`null`; `identical` and `mismatched_elements` still say what differed.
+`hpx run` exits 1 when the capture fails and 3 when the outputs do not
+match.
 
 ## Prerequisites
 

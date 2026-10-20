@@ -422,9 +422,82 @@ def test_validate_build_refuses_a_changed_pinned_file(out, plan, build):
     assert "Fixture hash mismatch" in " ".join(result.output.split())
 
 
+@pytest.fixture
+def rt_plan_file(tmp_path, build, monkeypatch) -> Path:
+    """A heliaRT plan whose mocked build links a runtime prepared under the HPX cache."""
+    from helia_profiler.hostenv.cache_dirs import hpx_cache_root
+    from tests.run_api_helpers import linking
+
+    plan = plan_for(build, tmp_path / "rt-model.tflite", engine="helia-rt")
+    assert plan.runtime is not None
+    source, kernels = plan.runtime.source_commit, plan.runtime.kernels_commit
+    assert source is not None and kernels is not None
+    analysis = SimpleNamespace(
+        inputs=tuple(io.tensor for io in build.inputs), outputs=build.output_tensors
+    )
+    monkeypatch.setattr("helia_profiler.run_inputs.analyze_run_model", lambda path: analysis)
+    monkeypatch.setattr(
+        "helia_profiler.prepared_runtimes.prepared_runtime",
+        lambda name, version=None: SimpleNamespace(runtime=None),
+    )
+
+    def build_fixed_fixture(config, fixture, **options):
+        made = linking(
+            atfe_build(_build(config.work_dir)),
+            hpx_cache_root(),
+            "helia-rt",
+            source,
+            kernels,
+        )
+        return reseal(made, model=fixture.model, inputs=fixture.inputs)
+
+    monkeypatch.setattr("helia_profiler._fixture_build.build_fixed_fixture", build_fixed_fixture)
+    return plan.save(tmp_path / "rt-plan.json")
+
+
+def test_build_saves_a_runtime_from_the_cache_under_the_cache_root(
+    tmp_path, dest, rt_plan_file, monkeypatch
+):
+    result = _invoke("build", rt_plan_file, "--out", dest)
+
+    assert result.exit_code == 0, result.output
+    assert _invoke("validate", "build", dest).exit_code == 0
+    runtime = FrozenRun.load(rt_plan_file).runtime
+    assert runtime is not None
+
+    monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "another-cache"))
+    moved = _invoke("validate", "build", dest)
+
+    assert moved.exit_code == 1
+    text = " ".join(moved.output.split())
+    assert f"hpx runtimes prepare helia-rt {runtime.version}" in text and "HPX_CACHE_DIR" in text
+    assert "roots=" not in text
+
+
+def test_a_missing_file_under_the_run_directory_says_so(out, plan, build):
+    _saved(out, plan, build)
+    assert build.flat_binary is not None
+    build.flat_binary.path.unlink()
+
+    result = _invoke("validate", "build", out)
+
+    assert result.exit_code == 1
+    text = " ".join(result.output.split())
+    assert "is incomplete; build it again" in text and "roots=" not in text
+
+
 def test_validate_build_refuses_a_missing_directory(tmp_path):
     result = _invoke("validate", "build", tmp_path / "absent")
     assert result.exit_code == 1 and "not found" in result.output
+
+
+def test_a_refused_suite_option_is_named_by_its_flag(out, monkeypatch):
+    monkeypatch.setattr("helia_profiler.cli.validate_cmd._cmd_validate", lambda **_: None)
+
+    result = _invoke("validate", "-k", "kws", "build", out)
+
+    assert result.exit_code == 2
+    assert "-k" in result.output and "--keyword" not in result.output
 
 
 def test_suite_options_do_not_reach_validate_build(out, monkeypatch):
@@ -471,6 +544,7 @@ def test_run_captures_under_the_operator_guard(out, plan, build, monkeypatch):
     assert seen["request"].evidence_dir == out / "evidence-1"
     report = json.loads(result.stdout)
     assert report["succeeded"] is True and report["verification"] is None
+    assert report["authority"] == "operator"
     assert report["evidence_dir"] == str(out / "evidence-1")
     assert report["identity"]["observation_hash"]
     assert report["timing"]["latency_s"] == pytest.approx(2 / build.iterations)
@@ -512,7 +586,6 @@ def runs(monkeypatch: pytest.MonkeyPatch, out, plan, build) -> list[dict[str, An
     "args,expected",
     [
         ((), Expect.host_litert(tolerance=Tolerance(0))),
-        (("--expect", "build", "--tolerance", "2"), Expect.from_build(tolerance=Tolerance(2))),
         (
             ("--expect", "host-litert", "--tolerance", "1.5"),
             Expect.host_litert(tolerance=Tolerance(1.5)),
@@ -527,6 +600,12 @@ def test_run_maps_expect_and_tolerance(out, runs, args, expected):
     (call,) = runs
     assert call["expect"] == expected
     assert call["jlink_serial"] == SERIAL and call["settle_seconds"] == 60.0
+
+
+def test_run_offers_no_build_expectation(out, runs):
+    # A build from hpx build carries no expected outputs, so Expect.from_build cannot succeed.
+    result = _invoke("run", out, "--board", BOARD, "--jlink-serial", SERIAL, "--expect", "build")
+    assert result.exit_code == 2 and runs == []
 
 
 def test_run_compares_with_reference_files(tmp_path, out, runs):
@@ -567,7 +646,7 @@ def test_run_refuses_references_with_an_expect(tmp_path, out, runs):
         "--jlink-serial",
         SERIAL,
         "--expect",
-        "build",
+        "host-litert",
         "--reference",
         tmp_path / "score.bin",
     )
@@ -782,6 +861,18 @@ def test_the_summary_of_a_refused_terminal_states_no_latency(tmp_path, plan, bui
         error="Invalid timing completion terminal",
     )
 
-    summary = run_summary(RunResult(record, refused, record.identity, None), tmp_path)
+    summary = run_summary(
+        RunResult(record, refused, record.identity, None), tmp_path, authority="operator"
+    )
 
     assert summary["succeeded"] is False and summary["timing"]["latency_s"] is None
+
+
+def test_each_run_command_epilog_keeps_its_example_in_one_paragraph():
+    from helia_profiler.cli.validation_app import validate_app
+
+    epilogs = [command.epilog for command in app.registered_commands] + [
+        command.epilog for command in validate_app.registered_commands
+    ]
+
+    assert epilogs and all("\\\n\n" not in (epilog or "") for epilog in epilogs)

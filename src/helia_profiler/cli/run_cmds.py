@@ -152,7 +152,7 @@ def _cmd_run(
             settle_seconds=settle_seconds,
             expect=expectation,
         )
-    _print(run_summary(result, evidence))
+    _print(run_summary(result, evidence, authority="operator"))
     if not result.succeeded:
         raise typer.Exit(1)
     if result.verification is not None and result.verification.matched is False:
@@ -175,7 +175,6 @@ def _expectation(kind: str | None, tolerance: float, references: list[Path]) -> 
         return Expect.from_files(*references, tolerance=bound)
     choices: dict[str, Callable[[], Expect | None]] = {
         "host-litert": lambda: Expect.host_litert(tolerance=bound),
-        "build": lambda: Expect.from_build(tolerance=bound),
         "none": lambda: None,
     }
     return choices[kind or "host-litert"]()

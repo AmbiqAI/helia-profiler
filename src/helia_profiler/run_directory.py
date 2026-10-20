@@ -8,8 +8,9 @@
     DIR/evidence-<N>/   one per capture
 
 The saved build names two roots, ``run`` for the directory and ``cache`` for
-the HPX cache that holds a prepared runtime, so the directory can move to
-another host as a unit.
+the HPX cache that holds a prepared runtime. The directory can move to
+another host as a unit; a heliaRT or LiteRT build also needs its prepared
+runtime in that host's HPX cache.
 """
 
 from __future__ import annotations
@@ -171,10 +172,53 @@ def build_into(
 
 
 def load_from(directory: str | Path) -> CompiledBuild:
-    """Load and verify the build saved in *directory*."""
+    """Load and verify the build saved in *directory*.
+
+    Raises:
+        ConfigError: The build does not verify, or a file it records is
+            missing, with a hint naming how to restore a missing runtime.
+    """
     from .compiled_build import load_build
 
-    return load_build(_absolute(directory) / BUILD_FILE, roots=run_roots(directory))
+    roots = run_roots(directory)
+    path = roots["run"] / BUILD_FILE
+    try:
+        return load_build(path, roots=roots)
+    except ConfigError as exc:
+        missing = exc.__cause__
+        if not isinstance(missing, OSError) or missing.filename is None:
+            raise
+        message = str(exc.args[0]) if exc.args else str(exc)
+        if Path(missing.filename).is_relative_to(roots["cache"]):
+            raise ConfigError(message, hint=_prepare_hint(path, roots["cache"])) from exc
+        raise ConfigError(
+            message, hint=f"The run directory {roots['run']} is incomplete; build it again."
+        ) from exc
+
+
+def _prepare_hint(path: Path, cache: Path) -> str:
+    """How to restore the prepared runtime the build in *path* links."""
+    import json
+
+    from .compiled_build import _linked_runtime
+    from .errors import HpxError
+    from .frozen_run import FrozenRun
+
+    try:
+        linked = _linked_runtime(
+            FrozenRun.from_dict(json.loads(path.read_text(encoding="utf-8"))["plan"])
+        )
+    except (HpxError, OSError, ValueError, KeyError, TypeError):
+        linked = None
+    command = (
+        f"hpx runtimes prepare {linked.name} {linked.version}"
+        if linked is not None and linked.version
+        else "hpx runtimes prepare <engine> <version>"
+    )
+    return (
+        f"The build links a runtime prepared under the HPX cache {cache}. Run "
+        f"`{command}` on this host, or set HPX_CACHE_DIR to the cache that holds it."
+    )
 
 
 def fresh_evidence_dir(directory: str | Path) -> Path:
@@ -243,12 +287,17 @@ def build_summary(
     }
 
 
-def run_summary(result: RunResult, evidence_dir: str | Path) -> dict[str, Any]:
-    """A capture's outcome, identity, verification facts and key timing, JSON-ready."""
+def run_summary(result: RunResult, evidence_dir: str | Path, *, authority: str) -> dict[str, Any]:
+    """A capture's outcome, identity, verification facts and key timing, JSON-ready.
+
+    *authority* names who vouched for the board, ``operator`` for an
+    :class:`~helia_profiler.OperatorGuard`.
+    """
     capture, verification = result.capture, result.verification
     timing, memory = capture.timing, capture.memory
     return {
         "succeeded": result.succeeded,
+        "authority": authority,
         "error": capture.error,
         "evidence_dir": str(_absolute(evidence_dir)),
         "identity": result.identity.to_dict(),

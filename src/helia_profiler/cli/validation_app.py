@@ -294,10 +294,11 @@ def validate_command(
     """Drive the hardware validation suite via pytest."""
     if ctx.invoked_subcommand is not None:
         given = sorted(
-            f"--{name.rstrip('_').replace('_', '-')}"
-            for name in ctx.params
+            max(param.opts, key=len)
+            for param in ctx.command.params
             # Typer vendors its own click, so the source enum is matched by name.
-            if getattr(ctx.get_parameter_source(name), "name", "DEFAULT") != "DEFAULT"
+            if param.name is not None
+            and getattr(ctx.get_parameter_source(param.name), "name", "DEFAULT") != "DEFAULT"
         )
         if given:
             raise typer.BadParameter(
