@@ -957,6 +957,7 @@ class TestGatedStatsProcessing:
     def test_missing_gate_returns_degraded_whole_capture(
         self, saw_rise: bool, saw_fall: bool, failure_kind: str
     ):
+        from helia_profiler.power.diagnostics import classify_gate_failure
         from helia_profiler.power.joulescope.capture_gated import (
             _degraded_observation_result,
         )
@@ -978,6 +979,9 @@ class TestGatedStatsProcessing:
             saw_gate_rise=saw_rise,
             saw_gate_fall=saw_fall,
             short_pulses_ignored=0,
+            failure=classify_gate_failure(
+                saw_gate_rise=saw_rise, saw_gate_fall=saw_fall, duration_s=7.0
+            ),
         )
 
         assert result.gated_windows == []
@@ -998,6 +1002,7 @@ class TestGatedStatsProcessing:
         metadata has to name ``power.lockstep: true`` too -- not just the live
         log line (issue #114).
         """
+        from helia_profiler.power.diagnostics import classify_gate_failure
         from helia_profiler.power.joulescope.capture_gated import (
             _degraded_observation_result,
         )
@@ -1019,8 +1024,13 @@ class TestGatedStatsProcessing:
             saw_gate_rise=False,
             saw_gate_fall=False,
             short_pulses_ignored=0,
-            lockstep=False,
-            lockstep_wiring_available=True,
+            failure=classify_gate_failure(
+                saw_gate_rise=False,
+                saw_gate_fall=False,
+                duration_s=7.0,
+                lockstep=False,
+                lockstep_wiring_available=True,
+            ),
         )
 
         gate_failure = result.metadata.gate_failure
