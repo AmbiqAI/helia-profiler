@@ -42,25 +42,25 @@
       "properties": {
         "build_hash": {
           "oneOf": [
-            {"type": "string", "pattern": "^hpx\\.build/1:sha256:[0-9a-f]{64}$"},
+            {"type": "string", "pattern": "^hpx\\.build/1:sha256:[0-9a-f]{64}$", "minLength": 83, "maxLength": 83},
             {"type": "object", "required": ["unknown"], "properties": {"unknown": {"type": "string"}}, "additionalProperties": false}
           ]
         },
         "inputs_hash": {
           "oneOf": [
-            {"type": "string", "pattern": "^hpx\\.inputs/1:sha256:[0-9a-f]{64}$"},
+            {"type": "string", "pattern": "^hpx\\.inputs/1:sha256:[0-9a-f]{64}$", "minLength": 84, "maxLength": 84},
             {"type": "object", "required": ["unknown"], "properties": {"unknown": {"type": "string"}}, "additionalProperties": false}
           ]
         },
         "observation_hash": {
           "oneOf": [
-            {"type": "string", "pattern": "^hpx\\.observation/1:sha256:[0-9a-f]{64}$"},
+            {"type": "string", "pattern": "^hpx\\.observation/1:sha256:[0-9a-f]{64}$", "minLength": 89, "maxLength": 89},
             {"type": "null"}
           ]
         },
         "intent_hash": {
           "oneOf": [
-            {"type": "string", "pattern": "^hpx\\.intent/1:sha256:[0-9a-f]{64}$"},
+            {"type": "string", "pattern": "^hpx\\.intent/1:sha256:[0-9a-f]{64}$", "minLength": 84, "maxLength": 84},
             {"type": "null"}
           ]
         }

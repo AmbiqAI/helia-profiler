@@ -282,6 +282,14 @@ _READABLE = [
     _identity(observation_hash=None, intent_hash=None),
 ]
 
+# Python's ``re.search`` lets ``$`` match before a final newline.
+_TRAILING = (
+    ("build_hash", "build"),
+    ("inputs_hash", "inputs"),
+    ("observation_hash", "observation"),
+    ("intent_hash", "intent"),
+)
+
 _REFUSED = [
     _identity(build_hash=_HEX),
     _identity(build_hash=None),
@@ -298,6 +306,7 @@ _REFUSED = [
     _identity(intent_hash=_HEX),
     _identity(intent_hash=_DROP),
     _identity(intent_hash=f"hpx.build/1:sha256:{_HEX}"),
+    *(_identity(**{field: f"hpx.{kind}/1:sha256:{_HEX}\n"}) for field, kind in _TRAILING),
     None,
     "not an object",
     [],
