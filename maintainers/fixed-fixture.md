@@ -173,8 +173,8 @@ as `FrozenRun.build(fixture, ...)`, compiles a frozen plan for a fixture through
 `FixtureBuild` and the `Lifecycle` it runs. It refuses a fixture whose model is
 not the plan's, asks the engine whether it implements the lifecycle, and
 applies the lifecycle's invocation counts (`SINGLE` runs one timed invocation
-and no warmups, so an invocation shorter than one STIMER tick can fail; see
-"Timing windows by route"). `CompiledBuild.identity` is the build's `RunIdentity` with
+and no warmups; see [Timing windows by route](#timing-windows-by-route) for its
+one-tick floor). `CompiledBuild.identity` is the build's `RunIdentity` with
 that lifecycle. `save(path, roots=...)` writes one canonical JSON document
 (`hpx.compiled-build`, schema version 2) holding the plan's `to_dict()`, the
 lifecycle, the binding and the `dump_fixture_build` record as an object;

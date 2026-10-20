@@ -17,12 +17,14 @@ from .errors import EngineError
 class Lifecycle(StrEnum):
     """State handling across invocations.
 
-    ``CARRY`` initializes the engine once and keeps internal state through
+    ``CARRY`` initializes one instance and keeps its internal state through
     warmups and timed invocations, restoring only the fixed inputs each time.
-    ``SINGLE`` invokes the model once, so no state carries between
-    invocations. The fixture firmware times with the 32.768 kHz STIMER and
-    refuses a timed span that reads zero ticks, so a ``SINGLE`` invocation
-    shorter than one tick, about 30.5 µs, can fail as out of bounds.
+    ``SINGLE`` runs one measured invocation per initialized instance, so no
+    state carries between invocations. Where an instance ends is the engine's
+    :class:`InstanceBoundary`: for a ``boot`` engine ``SINGLE`` is one timed
+    invocation and no warmups per boot; for an ``invocation`` engine, such as
+    ExecuTorch, every invocation is its own instance, so several measurements
+    are several instances, never one carried state.
     """
 
     CARRY = "carry"
