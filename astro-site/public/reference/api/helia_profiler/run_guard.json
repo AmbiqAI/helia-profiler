@@ -7,11 +7,11 @@
   "language": "python",
   "modules": [
     {
-      "description": "Who vouches for the board a run flashes: the guard protocol a capture consults and the operator guard the command line uses.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.",
+      "description": "Who vouches for the board a run flashes and the instrument it powers or measures with: the guard protocols a capture consults, the operator guard the command line uses, and the rail and supply requests a power run selects.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.",
       "name": "run_guard",
       "path": "helia_profiler.run_guard",
       "submodules": [],
-      "summary": "Who vouches for the board a run flashes: the guard protocol a capture consults and the operator guard the command line uses.",
+      "summary": "Who vouches for the board a run flashes and the instrument it powers or measures with: the guard protocols a capture consults, the operator guard the command l…",
       "symbols": [
         {
           "description": "`dataclass`\n\nCapture authority from an operator who names the board and the J-Link probe on it.\n\nHPX cannot prove which physical board a probe is wired to: the core's\nCPUID and the probe list name a SoC and a serial, not a board. With this\nguard the operator vouches for the board and holds it for the whole\ncapture, as ``hpx profile`` assumes. :meth:`verify_target` refuses a\ncapture whose board or probe serial differs from the ones the operator\nnamed, and :meth:`check` allows every step. A harness that can prove the\nboard and lock it passes its own\n:class:`~helia_profiler.FixtureCaptureGuard` instead.\n\n**API tier:** `experimental`",
@@ -211,6 +211,83 @@
           "summary": "The board a fixture image runs on, its J-Link device and the image's load address."
         },
         {
+          "description": "`dataclass`\n\nExplicit station-owned supply path; enabling it does not request energy measurement.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.FixtureBoardPowerRequest",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBoardPowerRequest.driver",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "driver",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "driver: str",
+              "source": {
+                "line": 46,
+                "path": "src/helia_profiler/fixture_power.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L46"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBoardPowerRequest.serial",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "serial",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "serial: str",
+              "source": {
+                "line": 47,
+                "path": "src/helia_profiler/fixture_power.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L47"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBoardPowerRequest.rail",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "rail",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "rail: str",
+              "source": {
+                "line": 48,
+                "path": "src/helia_profiler/fixture_power.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L48"
+              },
+              "summary": ""
+            }
+          ],
+          "name": "FixtureBoardPowerRequest",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "FixtureBoardPowerRequest(driver: str, serial: str, rail: str) -> None",
+          "source": {
+            "line": 42,
+            "path": "src/helia_profiler/fixture_power.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L42"
+          },
+          "summary": "Explicit station-owned supply path; enabling it does not request energy measurement."
+        },
+        {
           "description": "Caller-owned authorization and remaining-window checks.\n\n**API tier:** `experimental`",
           "examples": [],
           "id": "helia_profiler.FixtureCaptureGuard",
@@ -267,6 +344,293 @@
             "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_capture.py#L46"
           },
           "summary": "Caller-owned authorization and remaining-window checks."
+        },
+        {
+          "description": "`dataclass`\n\nStation-selected instrument/rail and channels, separate from firmware wiring.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.FixtureRailPowerRequest",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureRailPowerRequest.serial",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "serial",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "serial: str",
+              "source": {
+                "line": 61,
+                "path": "src/helia_profiler/fixture_power.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L61"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureRailPowerRequest.rail",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "rail",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "rail: str",
+              "source": {
+                "line": 62,
+                "path": "src/helia_profiler/fixture_power.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L62"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureRailPowerRequest.io_voltage",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "io_voltage",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "io_voltage: float",
+              "source": {
+                "line": 63,
+                "path": "src/helia_profiler/fixture_power.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L63"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureRailPowerRequest.sync_gpio_pin",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "sync_gpio_pin",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "sync_gpio_pin: int",
+              "source": {
+                "line": 64,
+                "path": "src/helia_profiler/fixture_power.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L64"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureRailPowerRequest.state_gpio_pin",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "state_gpio_pin",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "state_gpio_pin: int",
+              "source": {
+                "line": 65,
+                "path": "src/helia_profiler/fixture_power.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L65"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureRailPowerRequest.go_gpio_pin",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "go_gpio_pin",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "go_gpio_pin: int",
+              "source": {
+                "line": 66,
+                "path": "src/helia_profiler/fixture_power.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L66"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureRailPowerRequest.sync_input_index",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "sync_input_index",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "sync_input_index: int = 0",
+              "source": {
+                "line": 67,
+                "path": "src/helia_profiler/fixture_power.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L67"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureRailPowerRequest.state_input_index",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "state_input_index",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "state_input_index: int = 1",
+              "source": {
+                "line": 68,
+                "path": "src/helia_profiler/fixture_power.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L68"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureRailPowerRequest.go_output_index",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "go_output_index",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "go_output_index: int = 0",
+              "source": {
+                "line": 69,
+                "path": "src/helia_profiler/fixture_power.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L69"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureRailPowerRequest.stats_rate_hz",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "stats_rate_hz",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "stats_rate_hz: int = 1000",
+              "source": {
+                "line": 70,
+                "path": "src/helia_profiler/fixture_power.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L70"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureRailPowerRequest.firmware_wiring",
+              "kind": "method",
+              "language": "python",
+              "members": [],
+              "name": "firmware_wiring",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "firmware_wiring() -> FixturePowerSync",
+              "source": {
+                "line": 93,
+                "path": "src/helia_profiler/fixture_power.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L93"
+              },
+              "summary": ""
+            }
+          ],
+          "name": "FixtureRailPowerRequest",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "FixtureRailPowerRequest(\n    serial: str,\n    rail: str,\n    io_voltage: float,\n    sync_gpio_pin: int,\n    state_gpio_pin: int,\n    go_gpio_pin: int,\n    sync_input_index: int = 0,\n    state_input_index: int = 1,\n    go_output_index: int = 0,\n    stats_rate_hz: int = 1000,\n) -> None",
+          "source": {
+            "line": 57,
+            "path": "src/helia_profiler/fixture_power.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L57"
+          },
+          "summary": "Station-selected instrument/rail and channels, separate from firmware wiring."
+        },
+        {
+          "description": "Station authority for the board and measured instrument/rail.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.FixturePowerGuard",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixturePowerGuard.check",
+              "kind": "method",
+              "language": "python",
+              "members": [],
+              "name": "check",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "check(*, require_free: bool, remaining_s: float) -> None",
+              "source": {
+                "line": 100,
+                "path": "src/helia_profiler/fixture_power.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L100"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixturePowerGuard.verify_power_device",
+              "kind": "method",
+              "language": "python",
+              "members": [],
+              "name": "verify_power_device",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "verify_power_device(*, serial: str, rail: str) -> None",
+              "source": {
+                "line": 102,
+                "path": "src/helia_profiler/fixture_power.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L102"
+              },
+              "summary": ""
+            }
+          ],
+          "name": "FixturePowerGuard",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "FixturePowerGuard()",
+          "source": {
+            "line": 97,
+            "path": "src/helia_profiler/fixture_power.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L97"
+          },
+          "summary": "Station authority for the board and measured instrument/rail."
         }
       ]
     }

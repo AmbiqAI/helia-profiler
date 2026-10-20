@@ -76,11 +76,14 @@
     },
     {
       "path": "helia_profiler.run_guard",
-      "summary": "Who vouches for the board a run flashes: the guard protocol a capture consults and the operator guard the command line uses.",
+      "summary": "Who vouches for the board a run flashes and the instrument it powers or measures with: the guard protocols a capture consults, the operator guard the command line uses, and the rail and supply requests a power run selects.",
       "members": [
         "FixtureCaptureGuard",
         "OperatorGuard",
-        "FixtureTarget"
+        "FixtureTarget",
+        "FixturePowerGuard",
+        "FixtureRailPowerRequest",
+        "FixtureBoardPowerRequest"
       ]
     },
     {
@@ -136,10 +139,11 @@
     },
     {
       "path": "helia_profiler.identity",
-      "summary": "Shared identity vocabulary: the identity of a captured run and the build, run, runtime and kernel facts it names, canonical engine and kernel names with today's spellings as aliases, and unknown facts that carry their reason.",
+      "summary": "Shared identity vocabulary: the identity of a captured run and the build, run, energy, runtime and kernel facts it names, canonical engine and kernel names with today's spellings as aliases, and unknown facts that carry their reason.",
       "members": [
         "RunIdentity",
         "RunFacts",
+        "EnergyFacts",
         "BuildFacts",
         "RuntimeIdentity",
         "KernelIdentity",
