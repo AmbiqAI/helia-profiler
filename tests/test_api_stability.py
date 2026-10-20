@@ -27,8 +27,8 @@ def test_stability_tiers_partition_the_public_surface() -> None:
     }
     sizes = {name: len(members) for name, members in tiers.items()}
 
-    assert sizes == {"stable": 45, "experimental": 66, "implementation": 13}
-    assert sum(sizes.values()) == 124 == len(helia_profiler.__all__)
+    assert sizes == {"stable": 45, "experimental": 73, "implementation": 13}
+    assert sum(sizes.values()) == 131 == len(helia_profiler.__all__)
 
     for left, right in combinations(tiers, 2):
         assert not tiers[left] & tiers[right], (
@@ -86,6 +86,7 @@ def test_public_surface_membership_snapshot() -> None:
         "ComparisonVerdict",
         "CompatibilityBaseline",
         "CompatibilityResolution",
+        "CompiledBuild",
         "ConfigError",
         "DependencyError",
         "DependencyLockProvenance",
@@ -107,6 +108,7 @@ def test_public_surface_membership_snapshot() -> None:
         "JLinkProbe",
         "JLinkProbeMatch",
         "LayerResult",
+        "Lifecycle",
         "LocalInput",
         "LockError",
         "MeasurementScope",
@@ -153,6 +155,7 @@ def test_public_surface_membership_snapshot() -> None:
         "ResultValidity",
         "RunEvaluation",
         "RunMetadata",
+        "RunResult",
         "RunStatus",
         "RuntimeQualification",
         "RuntimeRecord",
@@ -176,6 +179,7 @@ def test_public_surface_membership_snapshot() -> None:
         "VersionError",
         "__version__",
         "assess_comparability",
+        "build",
         "build_platform_registry",
         "canonical_engine",
         "canonical_kernel",
@@ -187,11 +191,14 @@ def test_public_surface_membership_snapshot() -> None:
         "examples",
         "get_soc",
         "host_reference",
+        "hpx_cache_root",
+        "load_build",
         "load_compatibility_baseline",
         "load_result_manifest",
         "profile",
         "qualification",
         "read_dependency_lock_provenance",
+        "run_build",
         "runtimes",
         "verify_support_bundle",
         "write_support_bundle",

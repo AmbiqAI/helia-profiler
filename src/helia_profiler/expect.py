@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib.metadata
+import importlib.util
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -253,6 +254,53 @@ def compare_outputs(
     )
 
 
+def check_fixture_expectation(build: FixtureBuild, expect: Expect) -> None:
+    """Refuse *expect* when it cannot be compared with *build*'s outputs.
+
+    Run before a capture, so a missing or mis-sized reference costs no
+    device time.
+    """
+    from .engines import EngineType
+
+    tensors = build.output_tensors
+    if build.model is None or not build.inputs or not tensors:
+        raise ConfigError(
+            "This fixture build does not record its measurement inputs and outputs",
+            hint="Build the fixture again with this HPX.",
+        )
+    if expect.source == "host-litert":
+        if build.engine is EngineType.EXECUTORCH:
+            raise ConfigError(
+                "A host LiteRT reference cannot run an ExecuTorch model",
+                hint="Use Expect.from_build() or Expect.from_files() with reference outputs.",
+            )
+        if importlib.util.find_spec("ai_edge_litert") is None:
+            raise ConfigError(
+                "A host reference needs the LiteRT interpreter",
+                hint="Install helia-profiler with the 'analysis' extra, or use Expect.from_files().",
+            )
+        return
+    if expect.source == "files":
+        references: Sequence[FixtureFile | Path] = expect.files
+    elif expect.source == "build":
+        if len(build.outputs) != len(tensors):
+            raise ConfigError("This fixture build carries no expected outputs")
+        references = build.outputs
+    else:
+        raise ConfigError(f"Unknown reference source {expect.source!r}")
+    if len(references) != len(tensors):
+        raise ConfigError(
+            f"{len(tensors)} output tensors, {len(references)} reference outputs",
+            hint="Give one reference file per output, in model order.",
+        )
+    for tensor, item in zip(tensors, references, strict=True):
+        size = len(_read(item))
+        if size != tensor.size_bytes:
+            raise ConfigError(
+                f"{tensor.name}: reference has {size} B, the tensor {tensor.size_bytes} B"
+            )
+
+
 def compare_fixture_outputs(
     build: FixtureBuild,
     capture: FixtureCaptureResult,
@@ -263,14 +311,8 @@ def compare_fixture_outputs(
     A host reference runs the build's model on its pinned input bytes as many
     times as the firmware invokes it (warmups, then timed iterations).
     """
-    from .engines import EngineType
-
+    check_fixture_expectation(build, expect)
     tensors = build.output_tensors
-    if build.model is None or not build.inputs or not tensors:
-        raise ConfigError(
-            "This fixture build does not record its measurement inputs and outputs",
-            hint="Build the fixture again with this HPX.",
-        )
     if capture.state != "success" or len(capture.outputs) != len(tensors):
         raise ConfigError(
             f"Capture {capture.state} with {len(capture.outputs)} of {len(tensors)} outputs",
@@ -282,19 +324,12 @@ def compare_fixture_outputs(
             ReferenceOrigin("files"), tuple(_read(f) for f in expect.files)
         )
     elif expect.source == "build":
-        if len(build.outputs) != len(tensors):
-            raise ConfigError("This fixture build carries no expected outputs")
         reference = ReferenceOutputs(
             ReferenceOrigin("build"), tuple(_read(f) for f in build.outputs)
         )
-    elif expect.source != "host-litert":
-        raise ConfigError(f"Unknown reference source {expect.source!r}")
-    elif build.engine is EngineType.EXECUTORCH:
-        raise ConfigError(
-            "A host LiteRT reference cannot run an ExecuTorch model",
-            hint="Use Expect.from_build() or Expect.from_files() with reference outputs.",
-        )
     else:
+        # check_fixture_expectation refused a build without a model.
+        assert build.model is not None
         reference = host_reference(
             _read(build.model),
             [(io.tensor, _read(io.data)) for io in build.inputs],

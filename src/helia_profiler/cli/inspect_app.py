@@ -21,7 +21,7 @@ import click
 import typer
 
 from ..config import Transport
-from ..engines import EngineType
+from .common import EngineName, engine_type
 
 
 class _TargetResetKind(StrEnum):
@@ -84,8 +84,10 @@ def doctor_command(
         ),
     ] = None,
     engine: Annotated[
-        Optional[EngineType],
-        typer.Option("--engine", help="Engine to check (default: helia-rt)"),
+        Optional[EngineName],
+        typer.Option(
+            "--engine", help="Engine to check (default: helia-rt); tflm is an alias of litert"
+        ),
     ] = None,
     no_probes: Annotated[
         bool,
@@ -113,7 +115,7 @@ def doctor_command(
         config=str(config) if config is not None else None,
         toolchain=toolchain,
         transport=str(transport) if transport is not None else None,
-        engine=str(engine) if engine is not None else None,
+        engine=str(engine_type(engine)) if engine is not None else None,
         no_probes=no_probes,
         no_ports=no_ports,
         raw_probe_ids=raw_probe_ids,

@@ -30,6 +30,7 @@ cli/results_cmd.py
 cli/runtimes_cmd.py
 cli/validate_cmd.py
 cli/validation_app.py
+compiled_build.py
 config/__init__.py
 config/power.py
 console/__init__.py
@@ -168,6 +169,7 @@ hostenv/memory_measurement.py
 hostenv/toolchain_probe.py
 hostenv/toolchains.py
 identity.py
+lifecycle.py
 modelcost/__init__.py
 modelcost/_tflite_reader.py
 modelcost/layer_attribution.py

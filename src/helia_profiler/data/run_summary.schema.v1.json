@@ -15,7 +15,7 @@
   ],
   "properties": {
     "schema": {"const": "hpx.run-summary"},
-    "schema_version": {"const": 15},
+    "schema_version": {"const": 16},
     "engine": {"type": "string", "minLength": 1},
     "layers": {"type": "integer", "minimum": 0},
     "total_cycles": {"type": ["number", "null"]},
@@ -36,7 +36,8 @@
         "run",
         "producer",
         "build_hash",
-        "observation_hash"
+        "observation_hash",
+        "intent_hash"
       ]
     }
   },

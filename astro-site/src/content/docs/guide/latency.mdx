@@ -92,6 +92,25 @@ you convert or transfer a figure, say which tier.
   is inside it from schema v6); a comparison across different workloads is
   not a latency comparison.
 
+### 5. Check the window facts before comparing routes
+
+`summary.identity.run` states how a time was taken, and a fixed-input
+fixture or a run-API capture states the same fields in its `RunIdentity`.
+Compare times only when these agree:
+
+| Field | Ordinary profile | Fixture and run API |
+|---|---|---|
+| `timing_scope` | the clean window: `restore_and_invoke` on heliaAOT, else `invoke_only` | the caller's `FixtureMethod`: `invoke_only` brackets each invocation, `restore_and_invoke` one span around the timed loop, input restoration included |
+| `timing_clock`, `timing_clock_hz` | `stimer` at 32,768 Hz for the `busy_loop` probe; otherwise `cpu` cycles at the CPU clock for ExecuTorch (its execute-cycle count) on every SoC, `stimer` on Apollo5, and `cpu` (DWT) cycles elsewhere | `stimer` at 32,768 Hz; a `single` invocation under about 30.5 µs can fail as `TIMING_BOUND` |
+| `timing_statistic` | `mean` per invocation | `total` ticks over the timed invocations; divide by `iterations` and the rate for a mean |
+| `lifecycle`, `instance_boundary` | `carry`/`boot`; ExecuTorch `single`/`invocation`: every call reloads the program, so each invocation is its own instance | the build's lifecycle: `carry` runs the plan's counts, `single` one timed invocation and no warmups per boot |
+| `first_invoke_initializer`, `first_invoke_window` | whether the first invocation runs a one-time initializer, and whether it is a `warmup` (always, before the clean window) or `measured` (ExecuTorch) | the same answer per engine; `measured` under `single` or with no warmups, so a `CALL_ONCE` lands in the timed span |
+
+TFLM and heliaRT run a LiteRT `CALL_ONCE` subgraph inside the first
+`Invoke()`; heliaAOT runs it in `model_init()`, before any timed span.
+Engine initialization (`AllocateTensors()`, `model_init()`) is never
+timed. Clock rates are the configured ones, not measured.
+
 ## Expected output
 
 A number you can label: "N cycles per inference, clean window, average over

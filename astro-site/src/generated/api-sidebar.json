@@ -6,6 +6,10 @@
       "slug": "reference/api/helia_profiler"
     },
     {
+      "label": "compiled_build",
+      "slug": "reference/api/helia_profiler/compiled_build"
+    },
+    {
       "label": "config",
       "collapsed": true,
       "items": [

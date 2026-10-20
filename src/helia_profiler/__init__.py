@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from . import examples
     from ._version import __version__
     from .api import profile
+    from .compiled_build import CompiledBuild, RunResult, build, load_build, run_build
     from .config import (
         BuildConfig,
         ClockSelection,
@@ -85,6 +86,7 @@ if TYPE_CHECKING:
         host_reference,
     )
     from .frozen_run import FrozenModel, FrozenRun, FrozenRuntime, LocalInput, ToolchainIdentity
+    from .hostenv.cache_dirs import hpx_cache_root
     from .hostenv.doctor import DoctorCheck, DoctorResult, DoctorVersionCheck
     from .identity import (
         CanonicalEngine,
@@ -93,6 +95,7 @@ if TYPE_CHECKING:
         canonical_engine,
         canonical_kernel,
     )
+    from .lifecycle import Lifecycle
     from .modelcost import ModelAnalysis
     from .pipeline import ProgressUpdate
     from .placement import Placement
@@ -255,6 +258,13 @@ _EXPORTS = {
     "FrozenModel": (".frozen_run", "FrozenModel"),
     "FrozenRuntime": (".frozen_run", "FrozenRuntime"),
     "ToolchainIdentity": (".frozen_run", "ToolchainIdentity"),
+    "CompiledBuild": (".compiled_build", "CompiledBuild"),
+    "RunResult": (".compiled_build", "RunResult"),
+    "build": (".compiled_build", "build"),
+    "load_build": (".compiled_build", "load_build"),
+    "run_build": (".compiled_build", "run_build"),
+    "hpx_cache_root": (".hostenv.cache_dirs", "hpx_cache_root"),
+    "Lifecycle": (".lifecycle", "Lifecycle"),
     "CanonicalEngine": (".identity", "CanonicalEngine"),
     "CanonicalKernel": (".identity", "CanonicalKernel"),
     "Unknown": (".identity", "Unknown"),
@@ -293,6 +303,13 @@ __all__ = [
     "FrozenRuntime",
     "LocalInput",
     "ToolchainIdentity",
+    "CompiledBuild",
+    "RunResult",
+    "build",
+    "load_build",
+    "run_build",
+    "hpx_cache_root",
+    "Lifecycle",
     "CanonicalEngine",
     "CanonicalKernel",
     "Unknown",
@@ -468,6 +485,13 @@ _EXPERIMENTAL_API = {
     "FrozenRuntime",
     "LocalInput",
     "ToolchainIdentity",
+    "CompiledBuild",
+    "RunResult",
+    "build",
+    "load_build",
+    "run_build",
+    "hpx_cache_root",
+    "Lifecycle",
     "CanonicalEngine",
     "CanonicalKernel",
     "Unknown",

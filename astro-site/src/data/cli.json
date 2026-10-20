@@ -174,13 +174,14 @@
               "name": "choice",
               "class": "TyperChoice",
               "choices": [
-                "tflm",
+                "litert",
                 "helia-rt",
                 "helia-aot",
-                "executorch"
+                "executorch",
+                "tflm"
               ]
             },
-            "python_type": "Optional[EngineType]",
+            "python_type": "Optional[EngineName]",
             "default": null,
             "required": false,
             "help": "Analyze as this engine would execute it. Default (no flag) uses the raw tflite graph. 'helia-aot' runs AOT compilation and analyzes the transformed graph. 'helia-rt' analyzes the original tflite graph.",
@@ -326,7 +327,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/inspect_app.py",
-          "line": 130
+          "line": 132
         },
         "arguments": [],
         "options": [],
@@ -803,16 +804,17 @@
               "name": "choice",
               "class": "TyperChoice",
               "choices": [
-                "tflm",
+                "litert",
                 "helia-rt",
                 "helia-aot",
-                "executorch"
+                "executorch",
+                "tflm"
               ]
             },
-            "python_type": "Optional[EngineType]",
+            "python_type": "Optional[EngineName]",
             "default": null,
             "required": false,
-            "help": "Engine to check (default: helia-rt)",
+            "help": "Engine to check (default: helia-rt); tflm is an alias of litert",
             "panel": null,
             "is_flag": false,
             "multiple": false,
@@ -916,7 +918,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/inspect_app.py",
-          "line": 123
+          "line": 125
         },
         "arguments": [],
         "options": [],
@@ -936,7 +938,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/inspect_app.py",
-          "line": 189
+          "line": 191
         },
         "arguments": [],
         "options": [],
@@ -957,7 +959,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/inspect_app.py",
-              "line": 196
+              "line": 198
             },
             "arguments": [],
             "options": [
@@ -1109,7 +1111,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/inspect_app.py",
-          "line": 142
+          "line": 144
         },
         "arguments": [],
         "options": [],
@@ -1130,7 +1132,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/inspect_app.py",
-              "line": 149
+              "line": 151
             },
             "arguments": [],
             "options": [
@@ -1230,7 +1232,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/inspect_app.py",
-              "line": 167
+              "line": 169
             },
             "arguments": [],
             "options": [
@@ -1441,16 +1443,17 @@
               "name": "choice",
               "class": "TyperChoice",
               "choices": [
-                "tflm",
+                "litert",
                 "helia-rt",
                 "helia-aot",
-                "executorch"
+                "executorch",
+                "tflm"
               ]
             },
-            "python_type": "Optional[EngineType]",
+            "python_type": "Optional[EngineName]",
             "default": null,
             "required": false,
-            "help": "Inference engine (default: helia-rt)",
+            "help": "Inference engine (default: helia-rt); tflm is an alias of litert",
             "panel": "engine",
             "is_flag": false,
             "multiple": false,
@@ -3022,7 +3025,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/inspect_app.py",
-          "line": 214
+          "line": 216
         },
         "arguments": [],
         "options": [],
@@ -3043,7 +3046,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/inspect_app.py",
-              "line": 221
+              "line": 223
             },
             "arguments": [],
             "options": [

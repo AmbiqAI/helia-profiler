@@ -5,6 +5,7 @@ __pycache__/
 
 # Distribution / packaging
 build/
+!examples/results/run-api-synthetic/build/
 dist/
 *.egg-info/
 *.egg

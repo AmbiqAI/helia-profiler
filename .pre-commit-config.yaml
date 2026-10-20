@@ -20,6 +20,7 @@ repos:
             nix/patches/.*|
             tests/fixtures/.*|
             examples/results/hardware-validation-.*|
+            examples/results/run-api-synthetic/.*|
             src/helia_profiler/vendor/segger_rtt/.*
           )$
       - id: end-of-file-fixer
@@ -28,6 +29,7 @@ repos:
             nix/patches/.*|
             tests/fixtures/.*|
             examples/results/hardware-validation-.*|
+            examples/results/run-api-synthetic/.*|
             src/helia_profiler/vendor/segger_rtt/.*
           )$
       - id: check-merge-conflict

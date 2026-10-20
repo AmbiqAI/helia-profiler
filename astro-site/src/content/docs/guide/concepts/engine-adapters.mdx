@@ -82,6 +82,29 @@ placement implies (fixture builds apply it before hashing their inputs); and
 the PSRAM preflight on [Memory placement](../../memory/#6-psram) is enforced
 per engine.
 
+### State lifecycles
+
+A lifecycle says how a model's internal state behaves across the
+invocations of one run. `carry` initializes the engine once and keeps its
+internal state through warmups and timed invocations, restoring only the
+fixed inputs each time. `single` invokes the model once, so no state
+carries between invocations. Each adapter declares the lifecycles its own
+firmware implements in `lifecycles`; `require_lifecycle()` refuses any
+other with the adapter's `lifecycle_refusal()` reason. HPX never inspects
+the model graph to decide. TFLM, heliaRT and heliaAOT implement both.
+ExecuTorch implements `single` only, because its firmware reloads the
+program on every invocation. Further lifecycles, such as resetting state
+before each invocation, arrive per engine as each firmware implements them.
+
+Each adapter also states its `instance_boundary` (`boot`, or `invocation`
+for ExecuTorch) and answers `first_invoke_initializer()`: whether the first
+invocation of an instance runs the model's one-time initializer. TFLM and
+heliaRT run a LiteRT `CALL_ONCE` subgraph inside the first `Invoke()`, so
+the answer is whether the model has one; heliaAOT runs it in `model_init()`,
+so `false`; ExecuTorch answers unknown. Run identities record both, with
+where the first invocation falls (see
+[Inference and layer timing](../../latency/#5-check-the-window-facts-before-comparing-routes)).
+
 ### What each adapter's `prepare()` does
 
 | Engine | Module | Steps | Modules it adds |

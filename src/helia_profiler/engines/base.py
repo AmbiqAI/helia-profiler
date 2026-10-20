@@ -12,6 +12,8 @@ if TYPE_CHECKING:
     from ..modelcost import ModelAnalysis
 
 from ..config import ProfileConfig
+from ..identity import Unknown
+from ..lifecycle import InstanceBoundary, Lifecycle
 from ..placement import ArenaRole, Placement
 from ..results import MemoryPlan, NsxModuleRef
 from . import EngineType
@@ -379,6 +381,40 @@ class EngineAdapter(Protocol):
         Consulted by preflight (to refuse unsupported placements) and by
         the RTT transport (to decide whether a host-side model upload and
         the ``HPX_PSRAM_READY``/``HPX_GO`` handshake exist for this run).
+        """
+        ...
+
+    @property
+    def lifecycles(self) -> frozenset[Lifecycle]:
+        """The state lifecycles this engine's own firmware implements.
+
+        Consulted by :func:`~helia_profiler.lifecycle.require_lifecycle`,
+        which refuses any other lifecycle with :meth:`lifecycle_refusal`.
+        Declared per adapter, never inferred from the model graph.
+        """
+        ...
+
+    def lifecycle_refusal(self, lifecycle: Lifecycle) -> str:
+        """Why this engine's firmware cannot run *lifecycle*.
+
+        Called only for a lifecycle outside :attr:`lifecycles`; the message
+        names the engine and the firmware behaviour that rules it out.
+        """
+        ...
+
+    @property
+    def instance_boundary(self) -> InstanceBoundary:
+        """Whether this engine's firmware keeps one model instance per boot or per invocation."""
+        ...
+
+    def first_invoke_initializer(self, model_initializer: bool | Unknown) -> bool | Unknown:
+        """Whether the first invocation of an instance runs the model's one-time initializer.
+
+        *model_initializer* is whether the source model declares one (a
+        LiteRT ``CALL_ONCE``), or why that is unknown. An engine that runs
+        the initializer before the first invocation answers ``False``
+        whatever the model declares; ``Unknown`` carries the reason HPX
+        cannot tell.
         """
         ...
 

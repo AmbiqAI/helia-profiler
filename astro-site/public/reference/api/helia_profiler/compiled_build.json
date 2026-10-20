@@ -1,0 +1,474 @@
+{
+  "$schema": "https://ambiqai.github.io/helia-ui/schema/reference-model-1.json",
+  "generatedFrom": {
+    "tool": "pyref",
+    "version": "1.7.3"
+  },
+  "language": "python",
+  "modules": [
+    {
+      "description": "Build once, run later: a frozen plan's compiled firmware, bound to its plan and saved so any host can verify, relocate and capture from it, and how model state carries across a run's invocations.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.",
+      "name": "compiled_build",
+      "path": "helia_profiler.compiled_build",
+      "submodules": [],
+      "summary": "Build once, run later: a frozen plan's compiled firmware, bound to its plan and saved so any host can verify, relocate and capture from it, and how model state…",
+      "symbols": [
+        {
+          "description": "State handling across invocations.\n\n``CARRY`` initializes one instance and keeps its internal state through\nwarmups and timed invocations, restoring only the fixed inputs each time.\n``SINGLE`` runs one measured invocation per initialized instance, so no\nstate carries between invocations. Where an instance ends is the engine's\n:class:`InstanceBoundary`: for a ``boot`` engine ``SINGLE`` is one timed\ninvocation and no warmups per boot; for an ``invocation`` engine, such as\nExecuTorch, every invocation is its own instance, so several measurements\nare several instances, never one carried state. The fixture firmware\nrefuses a timed span of zero ticks of its 32.768 kHz timer, so a\n``SINGLE`` invocation shorter than about 30.5 µs can fail as\n``TIMING_BOUND``.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.Lifecycle",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.Lifecycle.CARRY",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "CARRY",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "CARRY = 'carry'",
+              "source": {
+                "line": 33,
+                "path": "src/helia_profiler/lifecycle.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/lifecycle.py#L33"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.Lifecycle.SINGLE",
+              "kind": "constant",
+              "language": "python",
+              "members": [],
+              "name": "SINGLE",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "SINGLE = 'single'",
+              "source": {
+                "line": 34,
+                "path": "src/helia_profiler/lifecycle.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/lifecycle.py#L34"
+              },
+              "summary": ""
+            }
+          ],
+          "name": "Lifecycle",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "Lifecycle()",
+          "source": {
+            "line": 17,
+            "path": "src/helia_profiler/lifecycle.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/lifecycle.py#L17"
+          },
+          "summary": "State handling across invocations."
+        },
+        {
+          "description": "Return the root directory for hpx's persistent caches.\n\nResolved at call time so environment overrides apply per-invocation;\ncallers must not cache the result at import time.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.hpx_cache_root",
+          "kind": "function",
+          "language": "python",
+          "members": [],
+          "name": "hpx_cache_root",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "hpx_cache_root() -> Path",
+          "source": {
+            "line": 26,
+            "path": "src/helia_profiler/hostenv/cache_dirs.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/hostenv/cache_dirs.py#L26"
+          },
+          "summary": "Return the root directory for hpx's persistent caches."
+        },
+        {
+          "description": "`dataclass`\n\nA frozen plan and the firmware compiled from it, verifiable on any host.\n\n``binding`` ties the build to the plan and lifecycle it was compiled\nfrom; :func:`build` computes it and :meth:`verify` recomputes it.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.CompiledBuild",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.CompiledBuild.plan",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "plan",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "plan: FrozenRun",
+              "source": {
+                "line": 47,
+                "path": "src/helia_profiler/compiled_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/compiled_build.py#L47"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.CompiledBuild.build",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "build",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "build: FixtureBuild",
+              "source": {
+                "line": 48,
+                "path": "src/helia_profiler/compiled_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/compiled_build.py#L48"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.CompiledBuild.lifecycle",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "lifecycle",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "lifecycle: Lifecycle",
+              "source": {
+                "line": 49,
+                "path": "src/helia_profiler/compiled_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/compiled_build.py#L49"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.CompiledBuild.binding",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "binding",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "binding: str",
+              "source": {
+                "line": 50,
+                "path": "src/helia_profiler/compiled_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/compiled_build.py#L50"
+              },
+              "summary": ""
+            },
+            {
+              "description": "The build's identity, with its plan's ``intent_hash``; ``observation_hash`` is ``None`` until it runs.",
+              "examples": [],
+              "id": "helia_profiler.CompiledBuild.identity",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "identity",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "identity: RunIdentity",
+              "source": {
+                "line": 53,
+                "path": "src/helia_profiler/compiled_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/compiled_build.py#L53"
+              },
+              "summary": "The build's identity, with its plan's intenthash; observationhash is None until it runs."
+            },
+            {
+              "description": "Re-check the build against its pinned files and its plan; raise on any mismatch.\n\nThe build's files must match their hashes, the plan its intent hash,\nand the binding the plan, lifecycle and build. The facts the build\nrecords must be the ones the plan states: engine, board, model,\ntoolchain and its version, arena and weights placement, arena size,\nclock profile and the lifecycle's invocation counts.\n\nThe runtime version and commit and the kernel commit are compared\nwherever both the plan and the build state one; a build or plan\nthat states none of a fact is not compared on it. heliaRT and\nheliaAOT compare with the plan's pins. TFLM compares with this HPX's\nprepared TFLM record, because the plan pins the modules an ordinary\nprofile builds from source, which a fixture build does not link.",
+              "examples": [],
+              "id": "helia_profiler.CompiledBuild.verify",
+              "kind": "method",
+              "language": "python",
+              "members": [],
+              "name": "verify",
+              "params": [],
+              "raises": [
+                {
+                  "description": "Naming the first fact that does not match.",
+                  "type": "ConfigError"
+                }
+              ],
+              "returns": [],
+              "signature": "verify() -> None",
+              "source": {
+                "line": 66,
+                "path": "src/helia_profiler/compiled_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/compiled_build.py#L66"
+              },
+              "summary": "Re-check the build against its pinned files and its plan; raise on any mismatch."
+            },
+            {
+              "description": "Write the build as JSON with paths relative to *roots* and return its path.",
+              "examples": [],
+              "id": "helia_profiler.CompiledBuild.save",
+              "kind": "method",
+              "language": "python",
+              "members": [],
+              "name": "save",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "save(path: str | Path, *, roots: Mapping[str, Path]) -> Path",
+              "source": {
+                "line": 180,
+                "path": "src/helia_profiler/compiled_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/compiled_build.py#L180"
+              },
+              "summary": "Write the build as JSON with paths relative to roots and return its path."
+            },
+            {
+              "description": "`classmethod`\n\nRead and verify a build written by :meth:`save`, resolving paths under *roots*.",
+              "examples": [],
+              "id": "helia_profiler.CompiledBuild.load",
+              "kind": "method",
+              "language": "python",
+              "members": [],
+              "name": "load",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "load(path: str | Path, *, roots: Mapping[str, Path]) -> CompiledBuild",
+              "source": {
+                "line": 221,
+                "path": "src/helia_profiler/compiled_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/compiled_build.py#L221"
+              },
+              "summary": "Read and verify a build written by :meth:save, resolving paths under roots."
+            },
+            {
+              "description": "Flash the recorded image, capture one run and compare outputs when *expect* is given.\n\nA failed capture comes back with ``capture.state == \"failure\"`` and no\nverification; errors raised while capturing propagate.",
+              "examples": [],
+              "id": "helia_profiler.CompiledBuild.run",
+              "kind": "method",
+              "language": "python",
+              "members": [],
+              "name": "run",
+              "params": [],
+              "raises": [
+                {
+                  "description": "The build does not verify, or *expect* cannot be compared.",
+                  "type": "ConfigError"
+                },
+                {
+                  "description": "The device reports counts other than the build's.",
+                  "type": "CaptureError"
+                }
+              ],
+              "returns": [],
+              "signature": "run(\n    *,\n    guard: FixtureCaptureGuard,\n    jlink_serial: str,\n    evidence_dir: Path,\n    settle_seconds: float,\n    expect: Expect | None = None,\n    expected_duration_s: float | None = None,\n) -> RunResult",
+              "source": {
+                "line": 257,
+                "path": "src/helia_profiler/compiled_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/compiled_build.py#L257"
+              },
+              "summary": "Flash the recorded image, capture one run and compare outputs when expect is given."
+            }
+          ],
+          "name": "CompiledBuild",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "CompiledBuild(plan: FrozenRun, build: FixtureBuild, lifecycle: Lifecycle, binding: str) -> None",
+          "source": {
+            "line": 39,
+            "path": "src/helia_profiler/compiled_build.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/compiled_build.py#L39"
+          },
+          "summary": "A frozen plan and the firmware compiled from it, verifiable on any host."
+        },
+        {
+          "description": "`dataclass`\n\nOne capture from a :class:`CompiledBuild`.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.RunResult",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.RunResult.compiled",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "compiled",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "compiled: CompiledBuild",
+              "source": {
+                "line": 324,
+                "path": "src/helia_profiler/compiled_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/compiled_build.py#L324"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.RunResult.capture",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "capture",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "capture: FixtureCaptureResult",
+              "source": {
+                "line": 325,
+                "path": "src/helia_profiler/compiled_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/compiled_build.py#L325"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.RunResult.identity",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "identity",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "identity: RunIdentity",
+              "source": {
+                "line": 326,
+                "path": "src/helia_profiler/compiled_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/compiled_build.py#L326"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.RunResult.verification",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "verification",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "verification: Verification | None",
+              "source": {
+                "line": 327,
+                "path": "src/helia_profiler/compiled_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/compiled_build.py#L327"
+              },
+              "summary": ""
+            },
+            {
+              "description": "True only for a ``success`` capture.",
+              "examples": [],
+              "id": "helia_profiler.RunResult.succeeded",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "succeeded",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "succeeded: bool",
+              "source": {
+                "line": 330,
+                "path": "src/helia_profiler/compiled_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/compiled_build.py#L330"
+              },
+              "summary": "True only for a success capture."
+            }
+          ],
+          "name": "RunResult",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "RunResult(\n    compiled: CompiledBuild,\n    capture: FixtureCaptureResult,\n    identity: RunIdentity,\n    verification: Verification | None,\n) -> None",
+          "source": {
+            "line": 320,
+            "path": "src/helia_profiler/compiled_build.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/compiled_build.py#L320"
+          },
+          "summary": "One capture from a :class:CompiledBuild."
+        },
+        {
+          "description": "Compile *plan* for *fixture*'s pinned inputs and return the compiled build.\n\n*lifecycle* must be one the plan's engine implements; it sets the timed\niterations and warmups the firmware runs. *host* supplies host-local\nsettings, such as ``{\"work_dir\": ...}``, as :meth:`FrozenRun.config` does.\nheliaRT and TFLM link a prepared runtime: without *runtime*, the one the\nplan names is taken from the HPX cache (``hpx runtimes prepare``), never\ndownloaded or built. The result is verified before it is returned.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.build",
+          "kind": "function",
+          "language": "python",
+          "members": [],
+          "name": "build",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "build(\n    plan: FrozenRun,\n    fixture: TypedFixture,\n    *,\n    method: FixtureMethod,\n    lifecycle: Lifecycle = Lifecycle.CARRY,\n    runtime: PreparedUpstreamRuntime | None = None,\n    model: str | Path | None = None,\n    host: Mapping[str, object] | None = None,\n    observe_aot_arenas: bool = False,\n    observe_ram: bool = False,\n) -> CompiledBuild",
+          "source": {
+            "line": 335,
+            "path": "src/helia_profiler/compiled_build.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/compiled_build.py#L335"
+          },
+          "summary": "Compile plan for fixture's pinned inputs and return the compiled build."
+        },
+        {
+          "description": "Read and verify a compiled build written by :meth:`CompiledBuild.save`.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.load_build",
+          "kind": "function",
+          "language": "python",
+          "members": [],
+          "name": "load_build",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "load_build(path: str | Path, *, roots: Mapping[str, Path]) -> CompiledBuild",
+          "source": {
+            "line": 494,
+            "path": "src/helia_profiler/compiled_build.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/compiled_build.py#L494"
+          },
+          "summary": "Read and verify a compiled build written by :meth:CompiledBuild.save."
+        },
+        {
+          "description": "Flash *compiled*'s image, capture one run and compare outputs; see :meth:`CompiledBuild.run`.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.run_build",
+          "kind": "function",
+          "language": "python",
+          "members": [],
+          "name": "run_build",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "run_build(\n    compiled: CompiledBuild,\n    *,\n    guard: FixtureCaptureGuard,\n    jlink_serial: str,\n    evidence_dir: Path,\n    settle_seconds: float,\n    expect: Expect | None = None,\n    expected_duration_s: float | None = None,\n) -> RunResult",
+          "source": {
+            "line": 499,
+            "path": "src/helia_profiler/compiled_build.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/compiled_build.py#L499"
+          },
+          "summary": "Flash compiled's image, capture one run and compare outputs; see :meth:CompiledBuild.run."
+        }
+      ]
+    }
+  ],
+  "name": "helia_profiler"
+}

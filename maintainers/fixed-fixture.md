@@ -156,6 +156,59 @@ record alone, so a relocated or reloaded record gives the same identity.
 hash and providers after checking only the manifest's own hash. The record
 format is unchanged; API 5.7 reads records from 5.0 through 5.6.
 
+API 5.8 adds `RunIdentity.intent_hash`, the frozen plan's intent hash for a
+run-API build and `None` otherwise, and six `RunFacts` fields: where a model
+instance ends (`instance_boundary`), whether the first invocation of an
+instance runs the model's one-time initializer (`first_invoke_initializer`)
+and where that invocation falls (`first_invoke_window`), and the clock, rate
+and statistic of the timed span (`timing_clock`, `timing_clock_hz`,
+`timing_statistic`). Each adapter supplies the instance boundary and the
+initializer answer; see "Timing windows by route" below. The new fields
+default to `Unknown`, and the record format is unchanged; API 5.8 reads
+records from 5.0 through 5.7.
+
+`helia_profiler.build(plan, fixture, method=..., lifecycle=...)`, also reached
+as `FrozenRun.build(fixture, ...)`, compiles a frozen plan for a fixture through
+`build_fixed_fixture` and returns a `CompiledBuild` of the plan, the compiled
+`FixtureBuild` and the `Lifecycle` it runs. heliaRT and TFLM link the
+prepared runtime the plan names, taken from the HPX cache (`hpx runtimes
+prepare`) unless `runtime=` is passed. It refuses a fixture whose model is
+not the plan's, asks the engine whether it implements the lifecycle,
+verifies the result before returning it, and applies the lifecycle's
+invocation counts (`SINGLE` runs one timed invocation
+and no warmups; see [Timing windows by route](#timing-windows-by-route) for its
+one-tick floor). `CompiledBuild.identity` is the build's `RunIdentity` with
+that lifecycle. `save(path, roots=...)` writes one canonical JSON document
+(`hpx.compiled-build`, schema version 2) holding the plan's `to_dict()`, the
+lifecycle, the binding and the `dump_fixture_build` record as an object;
+`load_build(path, roots=...)` (or `CompiledBuild.load`) rebuilds both halves,
+resolving files under the caller's roots, so moving the record means passing
+new roots. `load` and `save` call `verify()`, and every refusal, including a
+malformed or unknown-version file, is a `ConfigError` naming what failed.
+
+The binding ties a build to the plan it was compiled from. `build()` hashes
+the plan's intent hash, the lifecycle, the timing scope and state policy the
+build records, its prepared-runtime manifest hash (or none) and what it
+observes (the RAM diagnostic and the scanned heliaAOT arenas). No host path
+enters it, so a build relocated to another host keeps its binding.
+`verify()` re-checks the build's pinned files and the plan's intent hash,
+recomputes the binding, and then compares what the build records with what
+the plan states: engine, board, model hash and size, toolchain name, the
+compiler version among the plan's version lines, arena and weights
+placement, arena size (both are the configured capacity), clock profile,
+the lifecycle's invocation counts, and the runtime version and commit and
+kernel commit wherever both the plan and the build state one. heliaRT and
+heliaAOT compare with the plan's pins; TFLM compares with the prepared TFLM
+record, because the plan pins the modules an ordinary profile builds from
+source, which a fixture build does not link. A plan swapped into a saved file fails on
+the binding; a plan paired in memory with a build of other settings fails on
+the first fact that differs.
+
+The plan fields outside its intent hash are informational: `hpx_version`,
+`model.path`, `baseline.id` (the fingerprint is in the hash) and
+`toolchain.unavailable_reason`. `model.size_bytes` is outside it too, so
+`verify()` checks it against the built model.
+
 Constructing `FixtureBuildRequest` performs no runtime-cache lookup. When an
 interpreter request omits `runtime`, `build_fixture` looks up the already prepared
 default archive and binds its manifest into the compiled intent; it does not
@@ -506,6 +559,67 @@ its threshold constants. Import `observe_operator_timing` from the public facade
 and apply comparison policy in the consumer. The profiler reports facts and
 non-waivable integrity/attribution limitations, not a benchmark acceptance verdict.
 Historical raw records and build/capture safety validation are unchanged.
+
+### Running a compiled build
+
+`run_build(compiled, guard=..., jlink_serial=..., evidence_dir=..., settle_seconds=...,
+expect=None, expected_duration_s=None)`, or `compiled.run(...)`, captures once from a
+compiled build without rebuilding. It verifies the build first, checks an `Expect` before
+the capture (one readable reference of each output's size, outputs the build carries, or
+LiteRT installed for a host reference), builds the request with `fixture_capture_request`,
+captures with `capture_fixture` under the caller's guard, and returns a `RunResult` holding
+the `compiled` build, the raw `capture`, the run's `identity` and the `verification`. A
+successful capture whose iterations and warmups differ from the build's raises
+`CaptureError`. The identity is `fixture_run_identity` of the build and capture, so it
+carries an `observation_hash`, with `run.lifecycle` taken from the build. With an
+`Expect`, a successful capture is compared through `compare_fixture_outputs`; without one,
+or when the capture failed, `verification` is `None`. `RunResult.succeeded` is true only
+for a `success` capture. A failed capture is returned, not raised; errors raised while
+capturing propagate. A very short `SINGLE` invocation can hit the one-tick floor described
+under [Timing windows by route](#timing-windows-by-route).
+`examples/run_api_conformance.py` walks freeze, build, save, load and run on a
+typed fixture and prints the identity, verification facts and key measurements.
+Its plan states what a fixture build requires (ATfE, the `lp` clock, an SRAM
+arena of explicit size, MRAM weights), the build works under the host's
+`work_dir`, `build()` links the heliaRT or TFLM runtime `hpx runtimes prepare` cached,
+and the saved build names the HPX cache as a second root. Its
+`PlaceholderGuard` refuses every capture; a harness passes its own guard.
+
+### Timing windows by route
+
+Each route states its window in `RunIdentity.run`. The firmware decides the
+facts; the identity builders copy them.
+
+- **Ordinary profile** (`profile_identity.py`, `_main_base.cc.j2`): the clean
+  window runs after at least one warmup (`clean_warmup = max(1, warmup)` in
+  `firmware/context.py`) and reports the mean per invocation
+  (`HPX_CLEAN_INFER_AVG_*`, `timing_statistic="mean"`). Apollo5 times it
+  with one STIMER bracket; other families sum DWT cycles per invocation;
+  ExecuTorch sums the runtime's execute-only cycles, so its per-call load
+  is outside the window. The heliaAOT clean window restores its inputs
+  inside the span. Per-layer counters are separate and aggregated by
+  `profiling.aggregation`.
+- **Fixture** (`fixture_identity.py`, `fixed_fixture.cc.j2`): engine setup
+  and warmups run before the first timed STIMER read. `invoke_only`
+  sums one STIMER bracket per invocation; `restore_and_invoke` takes one
+  bracket around the timed loop, input copies included. `deployment_timing`
+  reports the total ticks (`timing_statistic="total"`) at `timer_hz`.
+- **Run API** (`compiled_build.py`): the fixture firmware with the build's
+  lifecycle counts. `CARRY` keeps the plan's iterations and warmups;
+  `SINGLE` times one invocation with no warmup, so `first_invoke_window` is
+  `measured`. `RunResult.identity` also states the plan's `intent_hash`.
+
+`first_invoke_initializer` comes from each adapter. TFLM's and heliaRT's
+`MicroInterpreter` runs a `CALL_ONCE` subgraph inside the first `Invoke()`
+(`kernels/call_once.cc`), so it is the build's `source_initializer_present`.
+heliaAOT runs the initializer's constant assignments in the operator init
+hooks `model_init()` calls, so it is `False`. ExecuTorch reloads its program
+before every execute, its `instance_boundary` is `invocation`, and the
+answer is `Unknown`.
+
+The fixture firmware rejects a timed span of zero ticks as `FixtureStage.TIMING_BOUND`.
+One STIMER tick is about 30.5 µs, so a `SINGLE` invocation shorter than that
+can fail; `CARRY` with enough iterations does not.
 
 ### Model inspection and engine admission
 

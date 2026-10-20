@@ -24,6 +24,8 @@ from typing import TYPE_CHECKING, Any, Mapping, TypeVar, get_args, get_type_hint
 from .errors import ConfigError
 
 if TYPE_CHECKING:
+    from ._fixture_build import TypedFixture
+    from .compiled_build import CompiledBuild
     from .config import ProfileConfig
     from .deps.compatibility import CompatibilityResolution
 
@@ -106,6 +108,9 @@ class FrozenModel:
     size_bytes: int
 
 
+_VERSION_SEPARATOR = " | "
+
+
 @dataclass(frozen=True)
 class ToolchainIdentity:
     """The compiler a plan expects: name and exact version, never a path.
@@ -118,6 +123,11 @@ class ToolchainIdentity:
     name: str
     version: str | None
     unavailable_reason: str | None = None
+
+    @property
+    def lines(self) -> tuple[str, ...]:
+        """The version-bearing lines ``version`` joins, or none when it is unknown."""
+        return tuple(self.version.split(_VERSION_SEPARATOR)) if self.version else ()
 
 
 @dataclass(frozen=True)
@@ -340,6 +350,12 @@ class FrozenRun:
         replayed = load_config(None, settings)
         _check_replay(self, freeze_config(replayed))
         return replayed
+
+    def build(self, fixture: TypedFixture, **options: Any) -> CompiledBuild:
+        """Compile this plan for *fixture*'s pinned inputs; see :func:`~helia_profiler.build`."""
+        from .compiled_build import build
+
+        return build(self, fixture, **options)
 
 
 def freeze_config(config: ProfileConfig) -> FrozenRun:
@@ -608,7 +624,7 @@ def _toolchain_identity(config: ProfileConfig) -> ToolchainIdentity:
     ]
     if not lines:
         return ToolchainIdentity(name, None, f"{command} --version reported no version")
-    return ToolchainIdentity(name, " | ".join(lines))
+    return ToolchainIdentity(name, _VERSION_SEPARATOR.join(lines))
 
 
 def _frozen_runtime(config: ProfileConfig) -> FrozenRuntime | None:

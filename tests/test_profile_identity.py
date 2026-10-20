@@ -6,14 +6,17 @@ import hashlib
 import json
 from dataclasses import replace
 from pathlib import Path
+from typing import Literal
 
 import pytest
 
 from helia_profiler.config import load_config
 from helia_profiler.deps.compatibility import QualificationState
 from helia_profiler.identity import CanonicalEngine, CanonicalKernel, Unknown
+from helia_profiler.modelcost.model_analysis import LayerOps, ModelAnalysis
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.placement import Placement
+from helia_profiler.platform import get_soc_for_board
 from helia_profiler.profile_identity import profile_run_identity
 from helia_profiler.report import write_report
 from helia_profiler.results import (
@@ -610,3 +613,75 @@ def test_a_nan_counter_still_gives_an_observation_hash(tmp_path):
     ctx = _ctx(tmp_path)
     set_profile_result(ctx, _pmu(float("nan")))
     assert isinstance(profile_run_identity(ctx).observation_hash, str)
+
+
+def _analysis(*ops: str, index_space: Literal["source", "execution"] = "source") -> ModelAnalysis:
+    layers = [LayerOps(id=index, op=op) for index, op in enumerate(ops)]
+    return ModelAnalysis(layers, 0, 0, 0, index_space=index_space)
+
+
+@pytest.mark.parametrize(
+    "engine,analysis,expected",
+    [
+        ("helia-rt", _analysis("CALL_ONCE", "CONV_2D"), True),
+        ("tflm", _analysis("CONV_2D"), False),
+        ("helia-rt", None, Unknown("the run recorded no analysis of the source model's operators")),
+        ("helia-aot", _analysis("CALL_ONCE", index_space="execution"), False),
+    ],
+)
+def test_the_first_invocation_states_whether_it_runs_the_initializer(
+    tmp_path, engine, analysis, expected
+):
+    ctx = _ctx(tmp_path, engine=engine, profiling={"warmup": 0})
+    ctx.model_analysis = analysis
+    run = profile_run_identity(ctx).run
+
+    assert run.first_invoke_initializer == expected
+    assert (run.lifecycle, run.instance_boundary) == ("carry", "boot")
+    # The clean window always warms up first, even with no configured warmups.
+    assert (run.warmups, run.first_invoke_window) == (0, "warmup")
+
+
+def test_executorch_reloads_its_instance_for_every_invocation(tmp_path):
+    ctx = _ctx(tmp_path, engine="executorch", backend="arm", version=None, model="model.pte")
+    ctx.soc = get_soc_for_board("apollo510_evb")
+    run = profile_run_identity(ctx).run
+
+    assert (run.lifecycle, run.instance_boundary, run.first_invoke_window) == (
+        "single",
+        "invocation",
+        "measured",
+    )
+    assert isinstance(run.first_invoke_initializer, Unknown)
+    assert (run.timing_clock, run.timing_clock_hz, run.timing_statistic) == (
+        "cpu",
+        96_000_000,
+        "mean",
+    )
+
+
+@pytest.mark.parametrize(
+    "board,probe,clock,clock_hz",
+    [
+        ("apollo510_evb", "infer", "stimer", 32768),
+        ("apollo4p_evb", "infer", "cpu", 96_000_000),
+        ("apollo4p_evb", "busy_loop", "stimer", 32768),
+    ],
+)
+def test_the_clean_window_states_the_clock_that_timed_it(tmp_path, board, probe, clock, clock_hz):
+    ctx = _ctx(tmp_path, profiling={"clean_window_probe": probe})
+    ctx.soc = get_soc_for_board(board)
+    run = profile_run_identity(ctx).run
+
+    assert (run.timing_clock, run.timing_clock_hz, run.timing_statistic) == (
+        clock,
+        clock_hz,
+        "mean",
+    )
+
+
+def test_a_run_without_a_resolved_soc_states_why_its_clock_is_unknown(tmp_path):
+    identity = profile_run_identity(_ctx(tmp_path))
+
+    assert identity.run.timing_clock == Unknown("the run resolved no SoC")
+    assert identity.intent_hash is None
