@@ -484,11 +484,30 @@
                 ]
               },
               "value_hz": {
-                "type": "integer",
-                "minimum": 1
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "exclusiveMinimum": 0
               },
               "source": {
                 "$ref": "#/$defs/source"
+              },
+              "domain": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/clockDomain"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Physical clock domain; null or absent means unknown, never inferred from list order or rate."
               }
             },
             "required": [
@@ -506,6 +525,16 @@
         "transformation"
       ],
       "additionalProperties": false
+    },
+    "clockDomain": {
+      "title": "ClockDomain",
+      "enum": [
+        "cpu",
+        "npu",
+        "timer",
+        "memory",
+        "system"
+      ]
     }
   }
 }
