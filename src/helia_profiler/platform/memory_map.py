@@ -404,7 +404,7 @@ def linked_memory_map(
     Returns an empty tuple for any non-builtin SoC — a ``target.custom_socs``
     part was never checked against these scripts, EVEN IF its name collides
     with a registered part's (same rule and rationale as
-    ``capabilities._FAMILY_APP_FLASH_LOAD_ADDR``; see ``SocDef.is_builtin``).
+    ``capabilities.resolve_app_flash_load_addr``; see ``SocDef.is_builtin``).
     Every registered SoC is currently characterized, so builtins never hit
     the empty branch today. Callers treat empty as unavailable, never
     guessed, per #131's discipline.
@@ -441,6 +441,14 @@ def linked_memory_map(
             ),
         )
     return windows
+
+
+def mram_app_origin(soc_name: str) -> int | None:
+    """Start of *soc_name*'s linked MRAM window, if mapped."""
+    for entry in _MAPS.get(soc_name, ()):
+        if entry.region is MemoryRegion.MRAM:
+            return entry.window.start
+    return None
 
 
 def classify_address(address: int, windows: tuple[LinkedRegionWindow, ...]) -> MemoryRegion | None:

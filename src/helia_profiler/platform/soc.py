@@ -195,10 +195,10 @@ class SocDef:
     #: :func:`~helia_profiler.platform.capabilities.resolve_app_flash_load_addr`,
     #: which is the single place that policy lives.
     #:
-    #: The built-in registry deliberately leaves this ``None`` and keeps its
-    #: addresses in that module's per-SoC/per-family tables, which are pinned
-    #: against NSX's ``cmake/socs/facts/*.cmake`` values part by part.  This
-    #: field exists for SoCs those tables cannot speak for -- above all
+    #: The built-in registry deliberately leaves this ``None``; its parts
+    #: load at the start of their verified linked MRAM window in
+    #: ``platform.memory_map``.  This field exists for SoCs that map cannot
+    #: speak for -- above all
     #: ``target.custom_socs`` entries, where a user-named novel part must be
     #: able to say ``app_flash_load_addr:`` instead of being routed through a
     #: family tag that, in this model, only records a core tier.
@@ -240,7 +240,7 @@ class SocDef:
           ``replace`` unprompted is precisely the case a default-safe field
           cannot catch.
           ``replace(get_soc("apollo510"), name="atomiq110")`` would otherwise
-          keep ``BUILTIN`` and read atomiq110's per-SoC override -- an address
+          keep ``BUILTIN`` and read atomiq110's MRAM origin -- an address
           belonging to a different part.
         * An ``is _SOCS[name]`` identity check alone is too strict, and was the
           bug ``origin`` replaced: ``get_soc_for_board`` returns a ``replace``
