@@ -149,7 +149,7 @@ class TestPowerConfigIna228Coupling:
             None,
             {
                 "model": {"path": str(model)},
-                "engine": {"type": "tflm"},
+                "engine": {"type": "litert"},
                 "power": {
                     "enabled": True,
                     "driver": "ina228",
@@ -197,7 +197,7 @@ def _profile_config(tmp_path: Path, power: dict):
         None,
         {
             "model": {"path": str(model)},
-            "engine": {"type": "tflm"},
+            "engine": {"type": "litert"},
             "power": power,
             "work_dir": str(tmp_path / "work"),
         },

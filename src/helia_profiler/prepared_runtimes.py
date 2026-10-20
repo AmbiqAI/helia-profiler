@@ -252,14 +252,14 @@ def _fetch_tflm(
 
     if sys.platform == "win32":
         raise ConfigError(
-            "Preparing tflm is not supported on Windows; prepare it on Linux or macOS"
+            "Preparing litert is not supported on Windows; prepare it on Linux or macOS"
         )
     missing = [tool for tool in _TFLM_HOST_TOOLS if shutil.which(tool) is None]
     if missing:
-        raise ConfigError(f"Preparing tflm needs {' and '.join(missing)} on PATH")
+        raise ConfigError(f"Preparing litert needs {' and '.join(missing)} on PATH")
     if not os.environ.get("ATFE_ROOT"):
         raise ConfigError(
-            "Preparing tflm needs ATFE_ROOT",
+            "Preparing litert needs ATFE_ROOT",
             hint="Set ATFE_ROOT to an Arm Toolchain for Embedded installation (see hpx doctor).",
         )
     cc, cxx, ar = (
@@ -314,7 +314,7 @@ def _fetch_tflm(
 
 def _download_tree(source: RuntimeSource, tree: Path, timeout_s: float) -> Path:
     if not hasattr(tarfile, "data_filter"):
-        raise ConfigError("Preparing tflm needs a Python whose tarfile has extraction filters")
+        raise ConfigError("Preparing litert needs a Python whose tarfile has extraction filters")
     url = f"https://github.com/{source.repo}/archive/{source.commit}.tar.gz"
     try:
         with urlopen(url, timeout=timeout_s) as response:
@@ -365,11 +365,13 @@ def _run(argv: list[str], cwd: Path, timeout_s: float, *, group: bool = False) -
     except BaseException as exc:
         _stop(process, group=group)
         if isinstance(exc, subprocess.TimeoutExpired):
-            raise ConfigError(f"Preparing tflm timed out at {step} after {timeout_s:g} s") from exc
+            raise ConfigError(
+                f"Preparing litert timed out at {step} after {timeout_s:g} s"
+            ) from exc
         raise
     if process.returncode != 0:
         tail = "\n".join(stderr.strip().splitlines()[-20:])
-        raise ConfigError(f"Preparing tflm failed at {step} (exit {process.returncode}):\n{tail}")
+        raise ConfigError(f"Preparing litert failed at {step} (exit {process.returncode}):\n{tail}")
     return stdout
 
 
@@ -510,5 +512,5 @@ _Stage = Callable[[RuntimeRecord, RuntimeSource, Path, Path], None]
 #: How each runtime's archive is fetched or built, then staged with its manifest.
 _PREPARERS: dict[str, tuple[_Fetch, _Stage]] = {
     "helia-rt": (_fetch_helia_rt, _stage_helia_rt),
-    "tflm": (_fetch_tflm, _stage_tflm),
+    "litert": (_fetch_tflm, _stage_tflm),
 }

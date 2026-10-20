@@ -330,7 +330,7 @@ leave the optional axes empty. It uses the same model, board, toolchain,
 transport, and memory axes as `models-rt`, but runs `helia-aot`.
 
 For the full hardware regression, select `suite=complete`. It combines
-heliaRT/ns-cmsis-nn, heliaAOT/ns-cmsis-nn, the stock TFLM ARM CMSIS-NN
+heliaRT/ns-cmsis-nn, heliaAOT/ns-cmsis-nn, the LiteRT ARM CMSIS-NN
 baseline, and ExecuTorch/ns-cmsis-nn into one sweep by default. Run
 `uv run hpx validate --list --suite complete --executorch-backends ns` for the exact current case
 count and axes.
@@ -338,7 +338,7 @@ count and axes.
 To compare runtime engines on the same smoke model, keep `suite=smoke` and set:
 
 ```text
-engines=helia-rt,helia-aot,tflm,executorch
+engines=helia-rt,helia-aot,litert,executorch
 executorch_backends=both
 ```
 

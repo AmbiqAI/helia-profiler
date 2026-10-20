@@ -31,7 +31,7 @@ class PsramWeightsSource(StrEnum):
 
     #: Firmware initialises PSRAM, emits ``HPX_PSRAM_READY``, and waits for
     #: the host to write the model image over J-Link and answer ``HPX_GO``.
-    #: The interpreter engines (TFLM, heliaRT) work this way: their weights
+    #: The interpreter engines (LiteRT, heliaRT) work this way: their weights
     #: are a host-side flatbuffer the firmware cannot embed.
     HOST_UPLOAD = "host_upload"
 
@@ -94,7 +94,7 @@ class EngineSource:
 class EngineArtifacts:
     """Common core of the outputs produced by an engine adapter's prepare step.
 
-    Every adapter returns a per-engine subclass (:class:`TflmArtifacts`,
+    Every adapter returns a per-engine subclass (:class:`LiteRtArtifacts`,
     :class:`HeliaRtArtifacts`, :class:`HeliaAotArtifacts`,
     :class:`ExecutorchArtifacts`).  This base carries what *every* engine
     produces plus the preparation facts any engine may report (``source``,
@@ -148,7 +148,7 @@ class EngineArtifacts:
             # exists to make loud).
             raise TypeError(
                 "EngineArtifacts is abstract - construct the engine's artifact "
-                "type (TflmArtifacts, HeliaRtArtifacts, HeliaAotArtifacts, "
+                "type (LiteRtArtifacts, HeliaRtArtifacts, HeliaAotArtifacts, "
                 "ExecutorchArtifacts) instead."
             )
         pinned = type(self)._PINNED_ENGINE_TYPE
@@ -183,12 +183,12 @@ class EngineArtifacts:
 
 
 @dataclass(frozen=True, kw_only=True)
-class TflmArtifacts(EngineArtifacts):
-    """Stock TFLM adapter outputs — the common core, nothing more."""
+class LiteRtArtifacts(EngineArtifacts):
+    """LiteRT adapter outputs — the common core, nothing more."""
 
-    engine_type: EngineType = EngineType.TFLM
+    engine_type: EngineType = EngineType.LITERT
 
-    _PINNED_ENGINE_TYPE: ClassVar[EngineType | None] = EngineType.TFLM
+    _PINNED_ENGINE_TYPE: ClassVar[EngineType | None] = EngineType.LITERT
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -457,7 +457,7 @@ class EngineAdapter(Protocol):
 class SingleArenaPlacementMixin:
     """No-op capability-hook defaults for single-arena engines.
 
-    Engines whose firmware template manages one arena (TFLM, heliaRT,
+    Engines whose firmware template manages one arena (LiteRT, heliaRT,
     ExecuTorch) share these identity implementations; AOT-style engines
     override these hooks with real placement logic.
     """
@@ -476,7 +476,7 @@ class SingleArenaPlacementMixin:
     def check_psram_placement(self, config: ProfileConfig) -> None:
         # Single-arena engines have no engine-specific PSRAM config to
         # validate: either the shared host-upload path serves them
-        # (TFLM, heliaRT) or preflight already refused the placement via
+        # (LiteRT, heliaRT) or preflight already refused the placement via
         # ``psram_weights_source`` (ExecuTorch).  Each adapter still
         # declares that property itself — this mixin deliberately does
         # not, so a new engine cannot inherit a PSRAM story by accident.

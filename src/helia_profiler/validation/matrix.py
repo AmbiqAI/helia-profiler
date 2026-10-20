@@ -78,7 +78,7 @@ class ModelSpec:
     id: str  # short stable ID (used on CLI + in reports)
     name: str
     fixture_path: str  # path relative to helia-profiler root
-    arena_size: int  # tensor arena in bytes (RT / TFLM)
+    arena_size: int  # tensor arena in bytes (RT / LiteRT)
     description: str = ""
     comparison_group: str | None = None
     executorch: ExecuTorchModelSpec | None = None
@@ -159,7 +159,7 @@ class CaseSpec:
             if self.cmsis_nn_backend is None:
                 raise ValueError("ExecuTorch validation case is missing a CMSIS-NN provider")
             return self.cmsis_nn_backend
-        if self.engine is EngineType.TFLM:
+        if self.engine is EngineType.LITERT:
             return CmsisNNProvider.ARM
         return CmsisNNProvider.NS
 
@@ -259,7 +259,7 @@ def _board_spec(board_id: str, display_name: str, description: str = "") -> Boar
 ENGINES: tuple[EngineType, ...] = (
     EngineType.HELIA_RT,
     EngineType.HELIA_AOT,
-    EngineType.TFLM,
+    EngineType.LITERT,
     EngineType.EXECUTORCH,
 )
 
@@ -503,7 +503,7 @@ def build_matrix(
             :class:`EngineType`; default: all in :data:`ENGINES`).
         executorch_backends: ExecuTorch CMSIS-NN providers to include (``arm``
             and/or ``ns``). Defaults to both. Other engines use their fixed
-            validation provider: ARM CMSIS-NN for TFLM and ns-cmsis-nn for
+            validation provider: ARM CMSIS-NN for LiteRT and ns-cmsis-nn for
             heliaRT/heliaAOT.
         power: One of ``"both"``, ``"on"``, ``"off"``.  ``"both"`` runs each
             (model, engine) case twice — with and without Joulescope.

@@ -16,8 +16,8 @@ measurements as JSON.
 Before running it:
 
 - Install ATfE; fixture builds use no other toolchain.
-- For ``helia-rt`` or ``tflm``, prepare the runtime once with
-  ``hpx runtimes prepare helia-rt`` (or ``tflm``); :func:`~helia_profiler.build`
+- For ``helia-rt`` or ``litert``, prepare the runtime once with
+  ``hpx runtimes prepare helia-rt`` (or ``litert``); :func:`~helia_profiler.build`
   links the one the plan names from the HPX cache. heliaAOT needs nothing.
 - To capture, call :func:`run_conformance` from a harness with its own board
   guard, one that proves the physical board behind the probe serial and holds
@@ -61,7 +61,7 @@ from helia_profiler.fixture import (
 )
 
 #: The kernel backend each prepared-runtime engine builds its fixture with.
-BACKENDS = {"helia-rt": "helia", "tflm": "cmsis_nn"}
+BACKENDS = {"helia-rt": "helia", "litert": "cmsis_nn"}
 
 
 class PlaceholderGuard:
@@ -208,7 +208,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Freeze, build, save, load and verify; capture nothing",
     )
     parser.add_argument("--model", type=Path, help="LiteRT model; defaults to the tiny CNN")
-    parser.add_argument("--engine", choices=("helia-rt", "helia-aot", "tflm"), default="helia-rt")
+    parser.add_argument("--engine", choices=("helia-rt", "helia-aot", "litert"), default="helia-rt")
     parser.add_argument("--board", default="apollo510_evb")
     parser.add_argument("--arena-size", type=int, default=128 * 1024)
     parser.add_argument("--out", type=Path, default=Path("runs") / "conformance")

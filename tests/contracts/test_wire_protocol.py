@@ -30,7 +30,7 @@ known case is ``HPX_ERROR=unsupported_op``, which the TFLM template prints from
 a custom-op and a builtin-op site with different payload fields, and the
 per-operator ``HPX_HEARTBEAT phase=infer``, which has three sites across three
 engines. Where losing one site matters, it is pinned by hand
-(:func:`test_tflm_init_heartbeat_keeps_its_t0_payload` and the CSV row-format
+(:func:`test_litert_init_heartbeat_keeps_its_t0_payload` and the CSV row-format
 pins are that shape).
 """
 
@@ -191,8 +191,8 @@ def _bare_tokens(text: str) -> set[str]:
 
 _SOCS = ("apollo3p", "apollo4p", "apollo510")
 _TRANSPORTS = ("rtt", "usb_cdc", "swo", "uart")
-_ENGINES = ("tflm", "helia-rt", "helia-aot", "executorch")
-_POWER_ENGINES = ("tflm", "helia-rt", "helia-aot")
+_ENGINES = ("litert", "helia-rt", "helia-aot", "executorch")
+_POWER_ENGINES = ("litert", "helia-rt", "helia-aot")
 
 #: ExecuTorch is Cortex-M55 only and has no power binary (preflight rejects
 #: engine.type=executorch with power.enabled), exactly as in the render
@@ -265,7 +265,7 @@ class _Render:
             window_mode=window_mode,
             overrides=overrides,
         )
-        if engine in ("tflm", "helia-rt"):
+        if engine in ("litert", "helia-rt"):
             # A TFLM/heliaRT app is two translation units, and both binaries
             # link both of them (see CMakeLists.txt.j2): the per-operator
             # heartbeat lives in the profiler class, not in main.cc.
@@ -312,31 +312,31 @@ def _matrix() -> list[_Render]:
     renders += [
         # psram_needed, both placements, both binaries.
         _Render(
-            "ap510|rtt|tflm|psram-arena",
+            "ap510|rtt|litert|psram-arena",
             "apollo510",
             "rtt",
-            "tflm",
+            "litert",
             overrides={"arena_region": "psram"},
         ),
         _Render(
-            "ap510|rtt|tflm|psram-weights",
+            "ap510|rtt|litert|psram-weights",
             "apollo510",
             "rtt",
-            "tflm",
+            "litert",
             overrides={"weights_region": "psram"},
         ),
         _Render(
-            "ap510|swo|tflm|psram-weights",
+            "ap510|swo|litert|psram-weights",
             "apollo510",
             "swo",
-            "tflm",
+            "litert",
             overrides={"weights_region": "psram"},
         ),
         _Render(
-            "ap510|rtt|tflm|psram-arena|power",
+            "ap510|rtt|litert|psram-arena|power",
             "apollo510",
             "rtt",
-            "tflm",
+            "litert",
             power_only=True,
             overrides={"arena_region": "psram"},
         ),
@@ -388,7 +388,7 @@ def _matrix() -> list[_Render]:
         ),
         # Ethos-U NPU init: gates _npu_init.j2 (HPX_NPU + npu_init_failed)
         # in both engine mains. The render is heliaRT — a published NPU
-        # producer (NPU_ENGINES); stock tflm shares the template but can
+        # producer (NPU_ENGINES); stock litert shares the template but can
         # never gate it true (_check_npu_backend).
         _Render(
             "ap510|rtt|helia-rt|ethos-u",
@@ -407,10 +407,10 @@ def _matrix() -> list[_Render]:
         # Apollo3 burst, both engines that can reach an Apollo3 build (the
         # gate is per-engine, and heliaAOT renders its own template).
         _Render(
-            "ap3p|rtt|tflm|burst",
+            "ap3p|rtt|litert|burst",
             "apollo3p",
             "rtt",
-            "tflm",
+            "litert",
             overrides={"apollo3_burst": True},
         ),
         _Render(
@@ -422,17 +422,17 @@ def _matrix() -> list[_Render]:
         ),
         # Clean-window trace: emitted on RTT, suppressed on SWO/UART.
         _Render(
-            "ap3p|rtt|tflm|trace",
+            "ap3p|rtt|litert|trace",
             "apollo3p",
             "rtt",
-            "tflm",
+            "litert",
             overrides={"clean_window_trace": True},
         ),
         _Render(
-            "ap3p|swo|tflm|trace",
+            "ap3p|swo|litert|trace",
             "apollo3p",
             "swo",
-            "tflm",
+            "litert",
             overrides={"clean_window_trace": True},
         ),
         _Render(
@@ -449,10 +449,10 @@ def _matrix() -> list[_Render]:
         # Both engines that render the base window on a STIMER SoC are here,
         # because they take that branch through different templates.
         _Render(
-            "ap510|rtt|tflm|trace",
+            "ap510|rtt|litert|trace",
             "apollo510",
             "rtt",
-            "tflm",
+            "litert",
             overrides={"clean_window_trace": True},
         ),
         _Render(
@@ -466,10 +466,10 @@ def _matrix() -> list[_Render]:
         # clock on every SoC (the busy window cannot poll DWT — #112), which
         # is also the only way ExecuTorch reaches the shared window.
         _Render(
-            "ap510|rtt|tflm|busy-loop",
+            "ap510|rtt|litert|busy-loop",
             "apollo510",
             "rtt",
-            "tflm",
+            "litert",
             clean_window_probe="busy_loop",
         ),
         _Render(
@@ -494,10 +494,10 @@ def _matrix() -> list[_Render]:
             clean_window_probe="busy_loop",
         ),
         _Render(
-            "ap3p|rtt|tflm|busy-loop|power",
+            "ap3p|rtt|litert|busy-loop|power",
             "apollo3p",
             "rtt",
-            "tflm",
+            "litert",
             power_only=True,
             clean_window_probe="busy_loop",
         ),
@@ -510,17 +510,17 @@ def _matrix() -> list[_Render]:
         # est_ms; the hardcoded 0 survives only in power and busy-loop
         # renders (see EST_MS_GAP and its census test below).
         _Render(
-            "ap3p|rtt|tflm|auto-window",
+            "ap3p|rtt|litert|auto-window",
             "apollo3p",
             "rtt",
-            "tflm",
+            "litert",
             window_mode="auto",
         ),
         _Render(
-            "ap510|rtt|tflm|auto-window",
+            "ap510|rtt|litert|auto-window",
             "apollo510",
             "rtt",
-            "tflm",
+            "litert",
             window_mode="auto",
         ),
         _Render(
@@ -532,26 +532,26 @@ def _matrix() -> list[_Render]:
         ),
         # GPIO power gate armed.
         _Render(
-            "ap510|rtt|tflm|power-sync",
+            "ap510|rtt|litert|power-sync",
             "apollo510",
             "rtt",
-            "tflm",
+            "litert",
             overrides={"power_sync_enabled": True},
         ),
         # Heartbeat by elapsed time rather than operator count.
         _Render(
-            "ap510|rtt|tflm|hb-ms",
+            "ap510|rtt|litert|hb-ms",
             "apollo510",
             "rtt",
-            "tflm",
+            "litert",
             overrides={"heartbeat_every_ms": 500, "heartbeat_every_n_ops": 0},
         ),
         # On-target INA228: the only source of the measurement payload.
         _Render(
-            "ap510|rtt|tflm|ina228|power",
+            "ap510|rtt|litert|ina228|power",
             "apollo510",
             "rtt",
-            "tflm",
+            "litert",
             power_only=True,
             overrides=dict(_INA228_VARS),
         ),
@@ -570,10 +570,10 @@ def _matrix() -> list[_Render]:
         # entirely in the runtime gates, so the census must see the same
         # tokens from both.
         _Render(
-            "ap510|rtt|tflm|ina228-bystander|power",
+            "ap510|rtt|litert|ina228-bystander|power",
             "apollo510",
             "rtt",
-            "tflm",
+            "litert",
             power_only=True,
             overrides={**_INA228_VARS, "ina228_required": False},
         ),
@@ -723,7 +723,7 @@ _UNFLIPPABLE_PAIRS: dict[tuple[str, str], str] = {
         "true for it and the gate has only one reachable side."
     ),
     ("busy_loop_probe", "helia-rt"): (
-        "heliaRT renders main.cc.j2 byte-identically to tflm, which carries "
+        "heliaRT renders main.cc.j2 byte-identically to litert, which carries "
         "the busy-loop renders; a second identical render would prove nothing."
     ),
     ("apollo3_burst", "executorch"): (
@@ -731,27 +731,27 @@ _UNFLIPPABLE_PAIRS: dict[tuple[str, str], str] = {
         "feature, so no build has both."
     ),
     ("apollo3_burst", "helia-rt"): (
-        "heliaRT renders main.cc.j2 byte-identically to tflm, which carries "
+        "heliaRT renders main.cc.j2 byte-identically to litert, which carries "
         "the burst render; a second identical render would prove nothing."
     ),
     ("weights_region == psram and transport == rtt and not power_only", "helia-rt"): (
-        "Same template as tflm, which carries the PSRAM-weights renders."
+        "Same template as litert, which carries the PSRAM-weights renders."
     ),
     ("weights_region == psram", "helia-rt"): (
-        "Same template as tflm, which carries the PSRAM-weights renders."
+        "Same template as litert, which carries the PSRAM-weights renders."
     ),
     ("arena_region == psram", "helia-rt"): (
-        "Same template as tflm, which carries the PSRAM-arena renders."
+        "Same template as litert, which carries the PSRAM-arena renders."
     ),
-    ("psram_needed", "helia-rt"): ("Same template as tflm, which carries every PSRAM render."),
+    ("psram_needed", "helia-rt"): ("Same template as litert, which carries every PSRAM render."),
     ("psram_needed and not power_only", "helia-rt"): (
-        "Same template as tflm, which carries every PSRAM render."
+        "Same template as litert, which carries every PSRAM render."
     ),
     ("power_only and power_monitor == ina228", "helia-rt"): (
-        "Same template as tflm, which carries the INA228 power renders."
+        "Same template as litert, which carries the INA228 power renders."
     ),
     ("clean_window_trace and transport not in (swo, uart)", "helia-rt"): (
-        "Same template as tflm, which carries the trace renders on both the "
+        "Same template as litert, which carries the trace renders on both the "
         "DWT and STIMER window bodies."
     ),
     ("use_stimer_window and not power_only", "executorch"): (
@@ -761,10 +761,10 @@ _UNFLIPPABLE_PAIRS: dict[tuple[str, str], str] = {
 }
 
 
-def test_helia_rt_renders_identically_to_tflm_but_for_the_engine_id():
+def test_helia_rt_renders_identically_to_litert_but_for_the_engine_id():
     """The premise most of :data:`_UNFLIPPABLE_PAIRS` rests on, proven.
 
-    Eight exemptions read "same template as tflm, which flips it both ways".
+    Eight exemptions read "same template as litert, which flips it both ways".
     That is a claim about the firmware, not an excuse, so it is checked rather
     than trusted: if heliaRT ever grows a branch of its own, those exemptions
     stop being harmless and this test says so before the census silently loses
@@ -772,12 +772,12 @@ def test_helia_rt_renders_identically_to_tflm_but_for_the_engine_id():
     """
     for soc in _SOCS:
         for transport in _TRANSPORTS:
-            tflm = _render(soc, transport, "tflm")
+            litert = _render(soc, transport, "litert")
             helia_rt = _render(soc, transport, "helia-rt")
-            assert helia_rt.replace("HPX_ENGINE=helia_rt", "HPX_ENGINE=tflm") == tflm, (
+            assert helia_rt.replace("HPX_ENGINE=helia_rt", "HPX_ENGINE=litert") == litert, (
                 f"{soc}|{transport}: heliaRT no longer renders main.cc.j2 "
-                "identically to tflm — the _UNFLIPPABLE_PAIRS entries that "
-                "defer heliaRT coverage to tflm need real renders now"
+                "identically to litert — the _UNFLIPPABLE_PAIRS entries that "
+                "defer heliaRT coverage to litert need real renders now"
             )
 
 
@@ -786,7 +786,7 @@ def test_every_gate_is_flipped_both_ways_for_every_engine_in_its_scope():
 
     ``test_every_condition_is_flipped_both_ways_by_the_matrix`` asks only
     whether the matrix contains *some* render on each side of each condition.
-    That is satisfied by a single engine: ``psram_needed`` flipped by tflm
+    That is satisfied by a single engine: ``psram_needed`` flipped by litert
     renders says nothing about whether heliaAOT's template still honours it,
     and the two do not even share a template. This asks the sharper question —
     for every spec, and every engine that spec claims to be in scope for, does
@@ -1032,17 +1032,17 @@ def test_heartbeat_phase_catalogue():
     }
 
 
-def test_tflm_init_heartbeat_keeps_its_t0_payload():
+def test_litert_init_heartbeat_keeps_its_t0_payload():
     """The one payload variant the phase catalogue cannot express."""
-    tflm = _render("apollo510", "rtt", "tflm")
+    litert = _render("apollo510", "rtt", "litert")
     aot = _render("apollo510", "rtt", "helia-aot")
-    assert "HPX_HEARTBEAT phase=init t=0\\n" in tflm
+    assert "HPX_HEARTBEAT phase=init t=0\\n" in litert
     assert "HPX_HEARTBEAT phase=init\\n" in aot
 
 
 def test_clean_window_begin_is_the_protocol_critical_phase():
     """The host parses iters= and est_ms= out of exactly this line."""
-    text = _render("apollo3p", "rtt", "tflm")
+    text = _render("apollo3p", "rtt", "litert")
     assert "HPX_HEARTBEAT phase=clean_window_begin iters=%d est_ms=" in text
 
 
@@ -1076,7 +1076,7 @@ def test_the_est_ms_gap_is_told_once_and_is_true_of_the_firmware():
     # modes — the #164 false-timeout needed exactly one configuration,
     # apollo510 (STIMER window) with window_mode: fixed, and these are the
     # renders that prove it closed.
-    for engine in ("tflm", "helia-aot", "executorch"):
+    for engine in ("litert", "helia-aot", "executorch"):
         fixed = _render("apollo510", "rtt", engine, window_mode="fixed")
         auto = _render("apollo510", "rtt", engine, window_mode="auto")
         assert measured in fixed, engine
@@ -1084,7 +1084,7 @@ def test_the_est_ms_gap_is_told_once_and_is_true_of_the_firmware():
         assert measured in auto, engine
         assert zero not in auto, engine
     # ...a DWT-timed fixed window derives one from its stall-check warmup...
-    assert measured in _render("apollo3p", "rtt", "tflm", window_mode="fixed")
+    assert measured in _render("apollo3p", "rtt", "litert", window_mode="fixed")
     # ...busy-loop windows announce the compile-time target in BOTH window
     # modes — the only duration statement that describes a busy loop sized to
     # fill window_target_ms (#170); never the measured shape, never zero —
@@ -1094,7 +1094,7 @@ def test_the_est_ms_gap_is_told_once_and_is_true_of_the_firmware():
             busy = _render(
                 soc,
                 "rtt",
-                "tflm",
+                "litert",
                 clean_window_probe="busy_loop",
                 window_mode=wm,
             )
@@ -1109,7 +1109,7 @@ def test_the_est_ms_gap_is_told_once_and_is_true_of_the_firmware():
             power = _render(
                 "apollo510",
                 "rtt",
-                "tflm",
+                "litert",
                 power_only=True,
                 clean_window_probe=probe,
                 window_mode=wm,
@@ -1140,7 +1140,7 @@ def test_power_renders_measure_nothing_pre_window():
             power = _render(
                 "apollo4p",
                 "rtt",
-                "tflm",
+                "litert",
                 power_only=True,
                 clean_window_probe=probe,
                 window_mode=wm,
@@ -1188,11 +1188,11 @@ def _csv_emitter(soc: str, engine: str, *, has_armv8m_pmu: bool = True) -> str:
     TFLM/heliaRT print theirs from the profiler class rather than from
     main.cc, so both translation units are concatenated — the earlier version
     of this helper *replaced* the app render with the profiler render, which
-    meant the tflm case silently asserted nothing about main.cc and the
+    meant the litert case silently asserted nothing about main.cc and the
     profiler case asserted nothing about the SoC it claimed to cover.
     """
     text = _render(soc, "rtt", engine)
-    if engine in ("tflm", "helia-rt"):
+    if engine in ("litert", "helia-rt"):
         text += _jinja_env.get_template("hpx_pmu_profiler.cc.j2").render(
             has_armv8m_pmu=has_armv8m_pmu,
         )
@@ -1202,7 +1202,7 @@ def _csv_emitter(soc: str, engine: str, *, has_armv8m_pmu: bool = True) -> str:
 def test_csv_header_shape_is_the_same_for_every_engine():
     """The CSV body has no HPX_ token, so the census cannot see it."""
     for soc, engine in (
-        ("apollo510", "tflm"),
+        ("apollo510", "litert"),
         ("apollo510", "helia-aot"),
         ("apollo510", "executorch"),
     ):
@@ -1227,9 +1227,9 @@ def test_csv_row_format_is_pinned_per_engine():
     index where the host expects ``OPTYPE:opid`` and nothing would notice
     until a parse produced unlabelled layers.
     """
-    tflm = _csv_emitter("apollo510", "tflm")
+    litert = _csv_emitter("apollo510", "litert")
     # The tag comes from TFLM's per-op tag string, with `?` where it has none.
-    assert 'hpx_printf("%d,%s", i, rec.tag ? rec.tag : "?");' in tflm
+    assert 'hpx_printf("%d,%s", i, rec.tag ? rec.tag : "?");' in litert
     # ...and the non-Armv8-M profiler prints the whole row in one call.
     m4 = _jinja_env.get_template("hpx_pmu_profiler.cc.j2").render(has_armv8m_pmu=False)
     assert 'hpx_printf("%d,%s,%lu,%d\\n",' in m4
@@ -1246,7 +1246,7 @@ def test_csv_row_format_is_pinned_per_engine():
 
     # The three loop-based emitters close the row with the overflow flag; the
     # Cortex-M4 profiler folds it into the single call pinned above.
-    for label, text in (("tflm", tflm), ("helia-aot", aot), ("executorch", et)):
+    for label, text in (("litert", litert), ("helia-aot", aot), ("executorch", et)):
         assert 'hpx_printf(",%d\\n"' in text, label
 
 

@@ -1,12 +1,12 @@
 ---
-title: "Vanilla TFLM baseline"
-description: "Profile the upstream TensorFlow Lite Micro port with its reference or CMSIS-NN kernels to get the number every Ambiq-optimised engine is measured against."
+title: "LiteRT baseline"
+description: "Profile LiteRT, the upstream TensorFlow Lite Micro port, with its reference or CMSIS-NN kernels to get the number every Ambiq-optimised engine is measured against."
 ---
 
 ## Goal
 
 Produce the baseline that gives the heliaRT and heliaAOT numbers their
-meaning. You will learn what the `tflm` engine is and is not, how to pick
+meaning. You will learn what the `litert` engine is and is not, how to pick
 its kernel backend, and how its binary compares.
 
 ## Hardware and wiring
@@ -16,19 +16,19 @@ An Apollo510 EVB on its J-Link USB port; no other connections.
 ## Software prerequisites
 
 hpx, the GNU Arm toolchain, CMake, Ninja and J-Link software
-([Install](../../getting-started/install/)). No extra: the `tflm` engine
+([Install](../../getting-started/install/)). No extra: the `litert` engine
 resolves the `nsx-tflite-micro` module from the registry.
 
 ## Config file
 
-[`examples/quickstart/hpx_tflm_baseline.yml`](https://github.com/AmbiqAI/helia-profiler/blob/main/examples/quickstart/hpx_tflm_baseline.yml):
+[`examples/quickstart/hpx_litert_baseline.yml`](https://github.com/AmbiqAI/helia-profiler/blob/main/examples/quickstart/hpx_litert_baseline.yml):
 
 ```yaml
 model:
   path: examples/quickstart/kws_model.tflite
   arena_size: 131072
 engine:
-  type: tflm
+  type: litert
   backend: cmsis_nn    # reference or cmsis_nn
 target:
   board: apollo510_evb
@@ -44,7 +44,7 @@ power:
   enabled: false
 output:
   format: csv
-  dir: ./results/results_tflm_baseline
+  dir: ./results/results_litert_baseline
 ```
 
 `engine.backend: cmsis_nn` links upstream Arm CMSIS-NN; `reference`
@@ -56,7 +56,7 @@ that is the point of the baseline.
 From the repository root (the model path is repository-relative):
 
 ```bash
-hpx profile --config examples/quickstart/hpx_tflm_baseline.yml
+hpx profile --config examples/quickstart/hpx_litert_baseline.yml
 ```
 
 ## Expected output
@@ -64,7 +64,7 @@ hpx profile --config examples/quickstart/hpx_tflm_baseline.yml
 From the nightly case named under Validated on (the arena progress bar is omitted):
 
 ```
-  Engine              tflm
+  Engine              litert
   Board               apollo510_evb
   Layers              13
   Total cycles        2,118,339
@@ -99,7 +99,7 @@ From the nightly case named under Validated on (the arena progress bar is omitte
 ## Variations
 
 - Reference kernels: copy the config, set `backend: reference`, keep
-  everything else, and compare the two TFLM runs to see what CMSIS-NN buys
+  everything else, and compare the two LiteRT runs to see what CMSIS-NN buys
   on this core.
 - Another model: change `model.path` and `model.arena_size`; the arena
   usage line tells you how much you needed.
@@ -112,7 +112,7 @@ From the nightly case named under Validated on (the arena progress bar is omitte
 |---|---|
 | Board | `apollo510_evb`, `lp` clock tier |
 | Run | nightly hardware validation [run 35078330526](https://github.com/AmbiqAI/helia-profiler/actions/runs/35078330526), 2026-09-16, hpx 0.1.6 at `0714893` |
-| Case | `apollo510_evb-kws-tflm-arm-arm-none-eabi-gcc-rtt-auto` (`arm` is the CMSIS-NN provider), verdict `valid` |
+| Case | `apollo510_evb-kws-tflm-arm-arm-none-eabi-gcc-rtt-auto` (`arm` is the CMSIS-NN provider; captured when the engine was named `tflm`), verdict `valid` |
 | nsx modules | `nsx-tflite-micro` 7afcf2b, `arm-cmsis-nn` 6d21a6f, `nsx-ambiq-sdk` a9f4ec2, `nsx-pmu-armv8m` 5725c06 (bundle `nsx.lock`) |
 | Toolchain | arm-none-eabi-gcc 15.2.1, CMake 4.1.2 |
 | Differences from the config above | `arena_size: 32768`, `pmu_counters: {cpu: default}` in the nightly case |

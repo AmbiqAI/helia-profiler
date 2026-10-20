@@ -336,7 +336,7 @@ def _resolve_cmsis_nn_provider(engine: str, backend: str | None, provider: str |
             raise ReportError("ExecuTorch validation backend/provider metadata is inconsistent")
         return backend
     expected = {
-        "tflm": "arm",
+        "litert": "arm",
         "helia-rt": "ns",
         "helia-aot": "ns",
     }.get(engine)

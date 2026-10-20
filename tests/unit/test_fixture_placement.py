@@ -28,7 +28,7 @@ def test_paired_tcm_request_has_distinct_intent_and_config(tmp_path):
 
 
 @pytest.mark.parametrize("board", ["apollo510_evb", "apollo510b_evb"])
-@pytest.mark.parametrize("engine", [EngineType.TFLM, EngineType.HELIA_AOT])
+@pytest.mark.parametrize("engine", [EngineType.LITERT, EngineType.HELIA_AOT])
 @pytest.mark.parametrize("placement", [Placement.SRAM, Placement.TCM])
 def test_complete_fixture_render_uses_requested_regions(tmp_path, engine, placement, board):
     fixture = typed(tmp_path)
@@ -68,7 +68,7 @@ def test_complete_fixture_render_uses_requested_regions(tmp_path, engine, placem
         )
         assert source.count(restore) == 2
     assert "deployment_output_1[8]" in source
-    if engine is EngineType.TFLM:
+    if engine is EngineType.LITERT:
         macro = "NSX_MEM_FAST_BSS" if placement is Placement.TCM else "NSX_MEM_SRAM_BSS"
         assert f"{macro} alignas(16) static uint8_t arena[262144];" in source
 

@@ -315,7 +315,7 @@ def test_a_prepare_removes_leftovers_of_an_interrupted_replace(cache: Path) -> N
 #: Build steps run as POSIX process groups; TFLM is prepared on POSIX hosts only.
 posix_only = pytest.mark.skipif(os.name != "posix", reason="TFLM is prepared on POSIX hosts")
 
-_TFLM = runtime("tflm")
+_TFLM = runtime("litert")
 assert _TFLM is not None and _TFLM.kernels is not None
 TFLM, TFLM_KERNELS = _TFLM, _TFLM.kernels
 # A make dry run: download notes and a non-compile line shlex cannot split, which must be
@@ -331,7 +331,7 @@ clang -O2 -std=c17 --target=arm-arm-none-eabi -mcpu=cortex-m55 \
 """
 
 
-def _tflm_tree(tree: Path, *, pin: str = TFLM_KERNELS.commit) -> Path:
+def _litert_tree(tree: Path, *, pin: str = TFLM_KERNELS.commit) -> Path:
     for include in prepared_runtimes._TFLM_INCLUDE_DIRS:
         (tree / include).mkdir(parents=True, exist_ok=True)
         (tree / include / "api.h").write_text(f"// {include}\n")
@@ -345,8 +345,8 @@ def _tflm_tree(tree: Path, *, pin: str = TFLM_KERNELS.commit) -> Path:
 
 
 @pytest.fixture
-def tflm_build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
-    """Prepare tflm with the download and every build step faked; returns the build argvs."""
+def litert_build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
+    """Prepare litert with the download and every build step faked; returns the build argvs."""
     if sys.platform == "win32":
         pytest.skip("TFLM is prepared on POSIX hosts")
     monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "cache"))
@@ -356,7 +356,7 @@ def tflm_build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[list[str
         (tmp_path / "atfe" / "bin" / tool).write_text("")
     monkeypatch.setattr(prepared_runtimes.shutil, "which", lambda tool: f"/usr/bin/{tool}")
     monkeypatch.setattr(
-        prepared_runtimes, "_download_tree", lambda source, tree, timeout_s: _tflm_tree(tree)
+        prepared_runtimes, "_download_tree", lambda source, tree, timeout_s: _litert_tree(tree)
     )
     calls: list[list[str]] = []
 
@@ -376,12 +376,12 @@ def tflm_build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[list[str
     return calls
 
 
-def test_prepare_tflm_compiles_tflm_s_source_list_with_the_recorded_flags(
-    tflm_build: list[list[str]], tmp_path: Path
+def test_prepare_litert_compiles_tflm_s_source_list_with_the_recorded_flags(
+    litert_build: list[list[str]], tmp_path: Path
 ) -> None:
-    prepared = prepare_runtime("tflm")
-    assert prepared.directory == tmp_path / "cache" / "runtimes" / "tflm" / "85638f0"
-    make, *compiles, archive = tflm_build
+    prepared = prepare_runtime("litert")
+    assert prepared.directory == tmp_path / "cache" / "runtimes" / "litert" / "85638f0"
+    make, *compiles, archive = litert_build
     selection = prepared_runtimes._TFLM_MAKE_SELECTION
     assert make == ["make", "-n", "-f", prepared_runtimes._TFLM_MAKEFILE, *selection, "microlite"]
     atfe = tmp_path / "atfe" / "bin"
@@ -413,69 +413,71 @@ def test_prepare_tflm_compiles_tflm_s_source_list_with_the_recorded_flags(
     assert all(name.endswith(".h") for name in headers)
 
 
-def test_a_tflm_tree_pinning_other_kernels_is_refused(tflm_build, tmp_path, monkeypatch) -> None:
+def test_a_litert_tree_pinning_other_kernels_is_refused(
+    litert_build, tmp_path, monkeypatch
+) -> None:
     other = "0123456789abcdef0123456789abcdef01234567"
     monkeypatch.setattr(
-        prepared_runtimes, "_download_tree", lambda s, tree, t: _tflm_tree(tree, pin=other)
+        prepared_runtimes, "_download_tree", lambda s, tree, t: _litert_tree(tree, pin=other)
     )
     with pytest.raises(
         ConfigError, match=f"pins CMSIS-NN {other}, not the record's {TFLM_KERNELS.commit[:8]}"
     ):
-        prepare_runtime("tflm")
-    assert tflm_build == []
+        prepare_runtime("litert")
+    assert litert_build == []
     assert not (tmp_path / "cache" / "runtimes").exists()
 
 
-def test_a_relative_atfe_root_names_absolute_tools(tflm_build, tmp_path, monkeypatch) -> None:
+def test_a_relative_atfe_root_names_absolute_tools(litert_build, tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("ATFE_ROOT", "atfe")  # the fixture's tmp_path/atfe
-    prepare_runtime("tflm")
-    assert tflm_build[1][0] == str(tmp_path / "atfe" / "bin" / "clang++")
-    assert tflm_build[-1][0] == str(tmp_path / "atfe" / "bin" / "llvm-ar")
+    prepare_runtime("litert")
+    assert litert_build[1][0] == str(tmp_path / "atfe" / "bin" / "clang++")
+    assert litert_build[-1][0] == str(tmp_path / "atfe" / "bin" / "llvm-ar")
 
 
 @pytest.mark.parametrize("line", ["clang++ -c", "clang++ -c x.cc", 'clang "unterminated -c x.cc'])
-def test_an_unparseable_compile_line_is_refused_cleanly(tflm_build, monkeypatch, line) -> None:
+def test_an_unparseable_compile_line_is_refused_cleanly(litert_build, monkeypatch, line) -> None:
     monkeypatch.setattr(prepared_runtimes, "_run", lambda argv, cwd, timeout_s, **_: line + "\n")
-    result = CliRunner().invoke(app, ["runtimes", "prepare", "tflm"])
+    result = CliRunner().invoke(app, ["runtimes", "prepare", "litert"])
     assert result.exit_code == 1
     assert "Cannot read TFLM's make dry-run line" in result.output
     assert "".join(line.split()) in "".join(result.output.split())
     assert "Traceback" not in result.output
 
 
-def test_preparing_tflm_needs_atfe_root(tflm_build, monkeypatch) -> None:
+def test_preparing_litert_needs_atfe_root(litert_build, monkeypatch) -> None:
     monkeypatch.delenv("ATFE_ROOT")
     with pytest.raises(ConfigError, match="needs ATFE_ROOT") as exc:
-        prepare_runtime("tflm")
+        prepare_runtime("litert")
     assert "ATFE_ROOT" in (exc.value.hint or "")
-    assert tflm_build == []
+    assert litert_build == []
 
 
-def test_preparing_tflm_names_missing_host_tools(tflm_build, monkeypatch) -> None:
+def test_preparing_litert_names_missing_host_tools(litert_build, monkeypatch) -> None:
     monkeypatch.setattr(prepared_runtimes.shutil, "which", lambda tool: None)
     with pytest.raises(ConfigError, match="needs make and bash on PATH"):
-        prepare_runtime("tflm")
+        prepare_runtime("litert")
 
 
-def test_an_empty_tflm_source_list_is_refused(tflm_build, monkeypatch) -> None:
+def test_an_empty_litert_source_list_is_refused(litert_build, monkeypatch) -> None:
     monkeypatch.setattr(
         prepared_runtimes, "_run", lambda argv, cwd, timeout_s, **_: "make: Nothing\n"
     )
     with pytest.raises(ConfigError, match="listed no translation units"):
-        prepare_runtime("tflm")
+        prepare_runtime("litert")
 
 
-def test_a_failed_tflm_compile_leaves_nothing_behind_and_no_traceback(
-    tflm_build, tmp_path, monkeypatch
+def test_a_failed_litert_compile_leaves_nothing_behind_and_no_traceback(
+    litert_build, tmp_path, monkeypatch
 ) -> None:
     def run(argv: list[str], cwd: Path, timeout_s: float, *, group: bool = False) -> str:
         if argv[0] == "make":
             return TFLM_LISTING
-        raise ConfigError("Preparing tflm failed at tensorflow/lite/micro/micro_log.cc (exit 1)")
+        raise ConfigError("Preparing litert failed at tensorflow/lite/micro/micro_log.cc (exit 1)")
 
     monkeypatch.setattr(prepared_runtimes, "_run", run)
-    result = CliRunner().invoke(app, ["runtimes", "prepare", "tflm"])
+    result = CliRunner().invoke(app, ["runtimes", "prepare", "litert"])
     assert result.exit_code == 1
     assert "failed at tensorflow/lite/micro/micro_log.cc" in result.output
     assert "Traceback" not in result.output
@@ -535,8 +537,8 @@ def test_a_timed_out_group_step_stops_its_children(tmp_path, monkeypatch) -> Non
     _assert_stopped(int(pid_file.read_text()))
 
 
-def test_every_tflm_build_step_takes_the_download_timeout_and_only_make_is_a_group(
-    tflm_build, monkeypatch
+def test_every_litert_build_step_takes_the_download_timeout_and_only_make_is_a_group(
+    litert_build, monkeypatch
 ) -> None:
     timeouts: list[float] = []
     groups: list[bool] = []
@@ -548,12 +550,12 @@ def test_every_tflm_build_step_takes_the_download_timeout_and_only_make_is_a_gro
         return fake(argv, cwd, timeout_s)
 
     monkeypatch.setattr(prepared_runtimes, "_run", run)
-    prepare_runtime("tflm", asset_s=7)
+    prepare_runtime("litert", asset_s=7)
     assert timeouts == [7, 7, 7, 7]
     assert groups == [True, False, False, False]  # only make starts processes of its own
 
 
-def test_a_truncated_tflm_download_is_refused_cleanly(tmp_path, monkeypatch) -> None:
+def test_a_truncated_litert_download_is_refused_cleanly(tmp_path, monkeypatch) -> None:
     class Truncated(io.BytesIO):
         def read(self, *args):
             raise http.client.IncompleteRead(b"partial", 1000)
@@ -563,7 +565,7 @@ def test_a_truncated_tflm_download_is_refused_cleanly(tmp_path, monkeypatch) -> 
         prepared_runtimes._download_tree(TFLM.source, tmp_path / "tflite-micro", 5)
 
 
-def test_a_tflm_tarball_cut_short_without_an_http_error_is_refused(tmp_path, monkeypatch) -> None:
+def test_a_litert_tarball_cut_short_without_an_http_error_is_refused(tmp_path, monkeypatch) -> None:
     root = f"tflite-micro-{TFLM.source.commit}"
     data = _tarball({f"{root}/x.h": (bytes(range(256)) * 64, 0o644)})
     monkeypatch.setattr(
@@ -573,14 +575,14 @@ def test_a_tflm_tarball_cut_short_without_an_http_error_is_refused(tmp_path, mon
         prepared_runtimes._download_tree(TFLM.source, tmp_path / "tflite-micro", 5)
 
 
-def test_preparing_tflm_is_refused_on_windows(tmp_path, monkeypatch) -> None:
+def test_preparing_litert_is_refused_on_windows(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "cache"))
     monkeypatch.setattr(prepared_runtimes.sys, "platform", "win32")
     monkeypatch.setattr(
         prepared_runtimes, "_download_tree", lambda *_: pytest.fail("downloaded on Windows")
     )
     with pytest.raises(ConfigError, match="not supported on Windows"):
-        prepare_runtime("tflm")
+        prepare_runtime("litert")
     assert not (tmp_path / "cache" / "runtimes").exists()
 
 
@@ -592,14 +594,14 @@ def test_a_python_without_tar_filters_is_refused(tmp_path, monkeypatch) -> None:
 
 @pytest.mark.parametrize("tool", ["clang", "clang++", "llvm-ar"])
 def test_an_atfe_root_missing_a_tool_is_refused_before_downloading(
-    tflm_build, tmp_path, monkeypatch, tool
+    litert_build, tmp_path, monkeypatch, tool
 ) -> None:
     (tmp_path / "atfe" / "bin" / tool).unlink()
     monkeypatch.setattr(
         prepared_runtimes, "_download_tree", lambda *_: pytest.fail("downloaded first")
     )
     with pytest.raises(ConfigError) as exc:
-        prepare_runtime("tflm")
+        prepare_runtime("litert")
     assert str(exc.value) == f"ATFE_ROOT has no {tmp_path / 'atfe' / 'bin' / tool}"
 
 
@@ -776,7 +778,7 @@ def _tarball(entries: dict[str, tuple[bytes, int]]) -> bytes:
     return buffer.getvalue()
 
 
-def test_the_tflm_tree_is_the_tarball_at_the_record_commit(tmp_path, monkeypatch) -> None:
+def test_the_litert_tree_is_the_tarball_at_the_record_commit(tmp_path, monkeypatch) -> None:
     root = f"tflite-micro-{TFLM.source.commit}"
     data = _tarball({f"{root}/x.h": (b"// x\n", 0o644), f"{root}/get.sh": (b"#!/bin/sh\n", 0o755)})
     urls: list[str] = []
@@ -799,16 +801,16 @@ def test_the_tflm_tree_is_the_tarball_at_the_record_commit(tmp_path, monkeypatch
         ({"../escape.h": (b"", 0o644)}, "Cannot download"),
     ],
 )
-def test_a_tflm_tarball_that_is_not_one_tree_is_refused(tmp_path, monkeypatch, entries, message):
+def test_a_litert_tarball_that_is_not_one_tree_is_refused(tmp_path, monkeypatch, entries, message):
     data = _tarball(entries)
     monkeypatch.setattr(prepared_runtimes, "urlopen", lambda url, timeout: io.BytesIO(data))
     with pytest.raises(ConfigError, match=message):
         prepared_runtimes._download_tree(TFLM.source, tmp_path / "tflite-micro", 5)
 
 
-def test_a_tflm_build_uses_the_prepared_runtime(tflm_build, tmp_path, fixture_builder) -> None:
-    prepared = prepare_runtime("tflm")
-    request = _request(tmp_path, EngineType.TFLM)
+def test_a_litert_build_uses_the_prepared_runtime(litert_build, tmp_path, fixture_builder) -> None:
+    prepared = prepare_runtime("litert")
+    request = _request(tmp_path, EngineType.LITERT)
     assert request.runtime is None
     fixture_builder.assert_not_called()
     build_fixture(request)
@@ -816,13 +818,13 @@ def test_a_tflm_build_uses_the_prepared_runtime(tflm_build, tmp_path, fixture_bu
     assert request.runtime is None
 
 
-def test_a_tflm_build_without_a_prepared_runtime_names_the_prepare_command(
+def test_a_litert_build_without_a_prepared_runtime_names_the_prepare_command(
     tmp_path, monkeypatch, fixture_builder
 ) -> None:
     monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "cache"))
-    request = _request(tmp_path, EngineType.TFLM)
+    request = _request(tmp_path, EngineType.LITERT)
     assert request.runtime is None
-    with pytest.raises(ConfigError, match="No prepared tflm 85638f0 runtime") as exc:
+    with pytest.raises(ConfigError, match="No prepared litert 85638f0 runtime") as exc:
         build_fixture(request)
     fixture_builder.assert_not_called()
-    assert "hpx runtimes prepare tflm 85638f0" in (exc.value.hint or "")
+    assert "hpx runtimes prepare litert 85638f0" in (exc.value.hint or "")

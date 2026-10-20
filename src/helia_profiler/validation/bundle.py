@@ -306,14 +306,14 @@ def _cmsis_nn_provider(identity: dict[str, Any], engine: str, case_id: str, vers
         backend = identity.get("backend")
         if engine == "executorch" and backend in {"arm", "ns"}:
             provider = backend
-        elif engine == "tflm":
+        elif engine == "litert":
             provider = "arm"
         elif engine in {"helia-rt", "helia-aot"}:
             provider = "ns"
     if provider not in {"arm", "ns"}:
         raise ValidationBundleError(f"Validation case {case_id!r} has invalid cmsis_nn_provider")
     expected = {
-        "tflm": "arm",
+        "litert": "arm",
         "helia-rt": "ns",
         "helia-aot": "ns",
     }.get(engine)

@@ -61,7 +61,7 @@ capture has no overlay file rather than a file of zeros.
 Nodes are matched by the original TFLite operator index, recorded as
 `source_index` in
 [Output files](../output/#2-profile_resultscsv). Compiled AOT MAC counts use
-execution positions; this overlay still targets the original model. heliaRT and TFLM run
+execution positions; this overlay still targets the original model. heliaRT and LiteRT run
 operators in graph order, so their overlays use the sequential operator
 index (0, 1, 2, ...). heliaAOT skips operators such as `VAR_HANDLE`
 without renumbering, so its overlays use the original index from the AOT

@@ -202,10 +202,10 @@ def _prepared_upstream_runtime(directory: Path) -> PreparedUpstreamRuntime:
     )
 
 
-def test_tflm_fixture_build_reads_only_closure_files(
+def test_litert_fixture_build_reads_only_closure_files(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A host-only TFLM fixture build through the prepared upstream runtime reads only closure files."""
+    """A host-only LiteRT fixture build through the prepared upstream runtime reads only closure files."""
     pytest.importorskip("ai_edge_litert")
     from helia_profiler.config import load_config
     from helia_profiler.fixture_analysis import analyze_typed_fixture_model
@@ -239,7 +239,7 @@ def test_tflm_fixture_build_reads_only_closure_files(
                 "arena_location": "sram",
                 "weights_location": "mram",
             },
-            "engine": {"type": "tflm", "backend": "cmsis_nn"},
+            "engine": {"type": "litert", "backend": "cmsis_nn"},
             "profiling": {"iterations": 3, "warmup": 1},
             "target": {"toolchain": "atfe", "board": "apollo510_evb", "clock": {"cpu": "lp"}},
             "work_dir": str(tmp_path / "work"),

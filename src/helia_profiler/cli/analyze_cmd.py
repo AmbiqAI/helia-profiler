@@ -38,11 +38,13 @@ def _cmd_analyze(
         if engine == EngineType.HELIA_AOT:
             primary = analyze_for_engine(model, engine=EngineType.HELIA_AOT, board=board)
             reference = (
-                analyze_for_engine(model, engine=EngineType.TFLM, board=board) if compare else None
+                analyze_for_engine(model, engine=EngineType.LITERT, board=board)
+                if compare
+                else None
             )
             graphs = {"original": reference, "aot_transformed": primary}
         else:
-            primary = analyze_for_engine(model, engine=EngineType.TFLM, board=board)
+            primary = analyze_for_engine(model, engine=EngineType.LITERT, board=board)
             reference = None
             graphs = {"original": primary}
     except HpxError as exc:

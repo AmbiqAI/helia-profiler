@@ -79,7 +79,7 @@ def _identity_reason(
     if meta.engine is None or meta.engine.type != build.engine.value:
         return "engine_mismatch"
     backend = (snapshot.get("engine") or {}).get("backend")
-    if build.engine is EngineType.TFLM and backend != FIXTURE_TFLM_BACKEND:
+    if build.engine is EngineType.LITERT and backend != FIXTURE_TFLM_BACKEND:
         return "backend_mismatch"
     if build.engine is EngineType.HELIA_RT and backend not in (None, "helia"):
         return "backend_mismatch"

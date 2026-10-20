@@ -17,7 +17,6 @@ from pathlib import Path
 from typing import Any, Literal
 
 from ..results import ResultValidity
-from .common import engine_type
 
 _UNSET: Any = object()
 
@@ -103,7 +102,7 @@ _OVERRIDE_SPECS: tuple[_OverrideSpec, ...] = (
     _OverrideSpec("runtime_arena_location", ("model", "arena_location")),
     _OverrideSpec("runtime_weights_location", ("model", "weights_location")),
     _OverrideSpec("core_override", ("engine", "config", "core_override")),
-    _OverrideSpec("engine", ("engine", "type"), coerce=engine_type),
+    _OverrideSpec("engine", ("engine", "type")),
     _OverrideSpec("engine_config", ("engine", "config_path"), coerce=str),
     # -- target hardware --
     _OverrideSpec("board", ("target", "board")),

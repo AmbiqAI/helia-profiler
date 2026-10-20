@@ -100,7 +100,7 @@ def _recorded(tmp_path, name, provider, kernel, schema):
 
 @pytest.mark.parametrize(
     "name,provider,kernel,schema",
-    [("helia-rt", "helia-rt", "ns-cmsis-nn", 2), ("tflm", "tflite-micro", "cmsis-nn", 1)],
+    [("helia-rt", "helia-rt", "ns-cmsis-nn", 2), ("litert", "tflite-micro", "cmsis-nn", 1)],
 )
 def test_runtime_version_is_the_record_built_from_both_commits(
     tmp_path, name, provider, kernel, schema

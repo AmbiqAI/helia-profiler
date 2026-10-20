@@ -21,7 +21,7 @@ def _config(tmp_path: Path, label: str, *, cached: bool, clean: bool = False) ->
         None,
         {
             "model": {"path": str(tmp_path / f"{label}.tflite")},
-            "engine": {"type": "tflm"},
+            "engine": {"type": "litert"},
             "target": {"jlink_serial": label},
             "clean": clean,
             **({} if cached else {"work_dir": str(tmp_path / "work")}),

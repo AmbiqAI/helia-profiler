@@ -95,7 +95,7 @@ _STACK_PROVIDERS = {
 _STACK_KERNEL_DIR = {"helia-rt": "helia"}
 #: Each stack's kernel library by baseline project name, and its runtime record name.
 STACK_KERNEL_LIBRARY = {"upstream": "arm-cmsis-nn", "helia-rt": "ns-cmsis-nn"}
-STACK_RUNTIME_RECORD = {"upstream": "tflm", "helia-rt": "helia-rt"}
+STACK_RUNTIME_RECORD = {"upstream": "litert", "helia-rt": "helia-rt"}
 #: Consumer defines of schema 1, which the manifest does not declare.
 _UPSTREAM_DEFINES = (
     "TF_LITE_STATIC_MEMORY",

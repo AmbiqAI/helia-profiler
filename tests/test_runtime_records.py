@@ -85,7 +85,7 @@ def test_fixture_integration_capability_table() -> None:
         for engine, statuses in FIXTURE_CAPABILITIES.items()
     }
     assert table == {
-        "tflm": {
+        "litert": {
             "int8": "supported",
             "int16": "supported",
             "int32": "supported",
@@ -144,12 +144,19 @@ def test_generic_fixture_io_support_does_not_inherit_release_qualification(
 @pytest.mark.parametrize(
     ("name", "version", "precision", "board", "state", "reason"),
     [
-        ("tflm", "85638f0", "a8w8", "apollo510_evb", "qualified", None),
-        ("tflm", None, "a8w8", "apollo510_evb", "qualified", None),
+        ("litert", "85638f0", "a8w8", "apollo510_evb", "qualified", None),
+        ("litert", None, "a8w8", "apollo510_evb", "qualified", None),
         ("helia-aot", None, "a8w8", "apollo510_evb", "supported", "0.33.0 is not qualified"),
-        ("tflm", "85638f0", "a16w8", "apollo510_evb", "supported", "not qualified for a16w8"),
-        ("tflm", "85638f0", "a8w8", "apollo4p_evb", "supported", "on apollo4p_evb at lp"),
-        ("tflm", None, "fp16", "apollo510_evb", "unsupported", "refuses any model with a FLOAT16"),
+        ("litert", "85638f0", "a16w8", "apollo510_evb", "supported", "not qualified for a16w8"),
+        ("litert", "85638f0", "a8w8", "apollo4p_evb", "supported", "on apollo4p_evb at lp"),
+        (
+            "litert",
+            None,
+            "fp16",
+            "apollo510_evb",
+            "unsupported",
+            "refuses any model with a FLOAT16",
+        ),
         ("helia-rt", None, "a8w4", "apollo510_evb", "unsupported", "does not declare a8w4"),
         ("helia-aot", "0.25.1", "a8w8", "apollo510_evb", "unsupported", "No runtime record"),
         ("vela", None, "a8w8", "apollo510_evb", "unsupported", "No runtime record for vela"),
@@ -167,7 +174,7 @@ def test_qualification_answers_from_the_records(
 
 
 def test_qualification_is_per_clock() -> None:
-    answer = qualification("tflm", board="apollo510_evb", clock="hp", precision="a8w8")
+    answer = qualification("litert", board="apollo510_evb", clock="hp", precision="a8w8")
     assert answer.state is RuntimeQualification.SUPPORTED
     assert answer.reason is not None and "at hp" in answer.reason
 
@@ -182,9 +189,9 @@ def test_an_omitted_version_means_the_default_record() -> None:
 
 def test_qualification_refuses_a_precision_outside_the_vocabulary() -> None:
     with pytest.raises(ValueError, match="Unknown precision 'int8'"):
-        qualification("tflm", board="apollo510_evb", clock="lp", precision="int8")
+        qualification("litert", board="apollo510_evb", clock="lp", precision="int8")
     with pytest.raises(ValueError, match="Unknown precision 'int8'"):
-        qualification("tflm", board="nonexistent", clock="xp", precision="int8")
+        qualification("litert", board="nonexistent", clock="xp", precision="int8")
 
 
 @pytest.mark.parametrize(
@@ -197,7 +204,7 @@ def test_qualification_refuses_a_precision_outside_the_vocabulary() -> None:
 )
 def test_qualification_refuses_an_unregistered_target(board: str, clock: str, message: str) -> None:
     with pytest.raises(ValueError, match=message):
-        qualification("tflm", board=board, clock=clock, precision="a8w8")
+        qualification("litert", board=board, clock=clock, precision="a8w8")
 
 
 def test_a_prepared_runtime_record_carries_kernels_and_archive(tmp_path: Path) -> None:
@@ -332,7 +339,7 @@ def test_runtimes_cli_lists_and_shows_records() -> None:
     listed = runner.invoke(app, ["runtimes", "list"])
     assert listed.exit_code == 0, listed.output
     assert (
-        "tflm        85638f0  default tensorflow/tflite-micro@85638f0b  apollo510_evb/lp: a8w8"
+        "litert      85638f0  default tensorflow/tflite-micro@85638f0b  apollo510_evb/lp: a8w8"
         in listed.output
     )
     assert "helia-aot   0.33.0   default AmbiqAI/helia-aot@d31bf222  -" in listed.output

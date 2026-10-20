@@ -56,7 +56,7 @@ data/runtimes/helia-rt/1.21.3.json
 data/runtimes/helia-rt/2.1.0.json
 data/runtimes/helia-rt/2.2.0.json
 data/runtimes/helia-rt/2.2.2.json
-data/runtimes/tflm/85638f0.json
+data/runtimes/litert/85638f0.json
 data/session_intent.schema.v1.json
 deps/__init__.py
 deps/compatibility.py
@@ -80,9 +80,9 @@ engines/helia_rt/adapter.py
 engines/helia_rt/artifacts.py
 engines/helia_rt/download.py
 engines/helia_rt/nsx_module.py
+engines/litert.py
 engines/semver.py
 engines/templates/heliaaot_attributes.h.j2
-engines/tflm.py
 errors.py
 evaluation/__init__.py
 evaluation/comparability.py

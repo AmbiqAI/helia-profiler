@@ -17,7 +17,7 @@ flashes the target, captures measurements, and writes a portable result bundle.
 - **Power & energy per inference** — GPIO-gated Joulescope capture
   (JS110/JS220/JS320) uses a dedicated transport-free firmware image to
   isolate the inference window from setup/teardown and capture traffic.
-- **Four engines, one per run** — `tflm` (vanilla TFLM baseline),
+- **Four engines, one per run** — `litert` (LiteRT, the vanilla TFLM baseline),
   `helia-rt` (Ambiq's optimized TFLM interpreter), `helia-aot` (Ambiq's
   ahead-of-time model compiler), and `executorch` (Cortex-M ExecuTorch
   programs, on the `arm` or `ns` CMSIS-NN provider). Selected explicitly —

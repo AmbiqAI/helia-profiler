@@ -35,7 +35,7 @@ from helia_profiler.placement import ArenaRole, Placement
 from helia_profiler.results.models import NsxModuleRef
 
 FIXTURE_KINDS = ("tcn", "kws", "typed")
-FIXTURE_ENGINES = ("tflm", "helia-rt", "helia-aot")
+FIXTURE_ENGINES = ("litert", "helia-rt", "helia-aot")
 FIXTURE_SCOPES = ("restore_and_invoke", "invoke_only")
 FIXTURE_KIND_ENGINES = tuple(
     (kind, engine) for kind in FIXTURE_KINDS for engine in FIXTURE_ENGINES

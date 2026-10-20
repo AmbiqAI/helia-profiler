@@ -47,7 +47,7 @@ marker alone does not guard anything.
 
 ## Architectural rules
 
-- **One engine per run.** The user selects `tflm`, `helia-rt`, `helia-aot`, or
+- **One engine per run.** The user selects `litert`, `helia-rt`, `helia-aot`, or
   `executorch` explicitly. No multi-engine orchestration, no auto-detection.
 - **Explicit over auto-magic.** Arena size, memory placement, and the like
   come from the user or from firmware at runtime with a clear error.

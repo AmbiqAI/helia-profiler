@@ -199,11 +199,11 @@ def test_minimal_old_artifact_loads(tmp_path: Path) -> None:
     """A pre-v2-shaped document (no schema fields, no power) still loads —
     the reader owes older artifacts tolerance, not a version gate."""
     path = tmp_path / "summary.json"
-    path.write_text(json.dumps({"engine": "tflm", "layers": 3, "total_cycles": 42}))
+    path.write_text(json.dumps({"engine": "litert", "layers": 3, "total_cycles": 42}))
 
     summary = load_run_summary(path)
 
-    assert summary.engine == "tflm"
+    assert summary.engine == "litert"
     assert summary.schema_version == 1
     assert summary.power is None
     assert summary.validity is None

@@ -40,7 +40,7 @@ _NO_PROVENANCE = Unknown("the run recorded no dependency provenance")
 #: TFLM's interpreter and reference kernels live in helia-rt-source, which the
 #: nsx-tflite-micro wrapper requires.
 _RUNTIME_MODULES = {
-    EngineType.TFLM: ("helia-rt-source", "nsx-tflite-micro"),
+    EngineType.LITERT: ("helia-rt-source", "nsx-tflite-micro"),
     EngineType.HELIA_RT: ("nsx-helia-rt",),
 }
 
@@ -184,7 +184,7 @@ def _prebuilt_heliart(ctx: PipelineContext) -> bool:
 
 def _links_reference_kernels(ctx: PipelineContext) -> bool:
     config = ctx.config.engine
-    return config.type is EngineType.TFLM and (config.backend or "reference") == "reference"
+    return config.type is EngineType.LITERT and (config.backend or "reference") == "reference"
 
 
 def _build_facts(ctx: PipelineContext) -> BuildFacts:

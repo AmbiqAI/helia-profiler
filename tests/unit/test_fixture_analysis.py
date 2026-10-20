@@ -90,7 +90,7 @@ def test_io_and_costs_use_one_original_model_snapshot(tmp_path, monkeypatch, typ
 
     monkeypatch.setattr(Path, "read_bytes", changed_after_read)
     result = (
-        analyze_typed_fixture_model_for_engine(path, engine=EngineType.TFLM)
+        analyze_typed_fixture_model_for_engine(path, engine=EngineType.LITERT)
         if typed
         else analyze_fixture_model(path)
     )

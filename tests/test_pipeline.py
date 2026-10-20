@@ -680,14 +680,14 @@ def test_render_context_requires_resolved_platform_metadata(tmp_path: Path):
     run_metadata.platform (a sub-field no accessor covers) — pinned like the
     nine accessor raises are."""
     from helia_profiler.engines import TFLM_ENGINE_HEADER
-    from helia_profiler.engines.base import TflmArtifacts
+    from helia_profiler.engines.base import LiteRtArtifacts
     from helia_profiler.firmware.context import FirmwareRenderContext
     from helia_profiler.platform import get_board, get_soc
 
     ctx = PipelineContext(config=_make_config(tmp_path), work_dir=tmp_path)
     ctx.soc = get_soc("apollo510")
     ctx.board = get_board("apollo510_evb")
-    ctx.engine_artifacts = TflmArtifacts(engine_header=TFLM_ENGINE_HEADER)
+    ctx.engine_artifacts = LiteRtArtifacts(engine_header=TFLM_ENGINE_HEADER)
     with pytest.raises(PipelineError, match="run_metadata.platform.*ResolvePlatformStage"):
         FirmwareRenderContext.from_pipeline_context(ctx)
 

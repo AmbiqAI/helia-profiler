@@ -1,8 +1,8 @@
 {
- "kws_tflm": {
+ "kws_litert": {
   "model_sha256": "aeea436800704fce17b17292e4412630ad856e9d777c044c64ef748a880bd0ae",
   "engine": {
-   "type": "tflm",
+   "type": "litert",
    "version": null
   },
   "toolchain": {

@@ -74,7 +74,9 @@ RUN_SUMMARY_SCHEMA = "hpx.run-summary"
 #: v16: #558 identity adds intent_hash and, under run, the instance boundary,
 #: first-invoke initializer and window, and the timing clock, its rate and the
 #: statistic; an ExecuTorch run's lifecycle is single. Otherwise additive.
-RUN_SUMMARY_SCHEMA_VERSION = 16
+#: v17: the engine id tflm is now litert, in engine and wherever a summary
+#: names the engine. Otherwise unchanged.
+RUN_SUMMARY_SCHEMA_VERSION = 17
 
 __all__ = [
     "RUN_SUMMARY_SCHEMA",

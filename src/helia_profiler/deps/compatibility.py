@@ -217,7 +217,7 @@ def cmsis_nn_provider_module(engine_type: str, engine_backend: str | None) -> st
     ``arm`` default) selects ``arm-cmsis-nn``. A PTE sidecar can still flip an
     unset backend to ``ns`` at prepare-engine time; the dependency
     provenance, which sees the prepared artifacts, is authoritative there.
-    Engines that never consume the selectors (TFLM) still get a name so a
+    Engines that never consume the selectors (LiteRT) still get a name so a
     stray selector stamps conservatively rather than being ignored.
     """
     if engine_type == "executorch" and engine_backend != "ns":

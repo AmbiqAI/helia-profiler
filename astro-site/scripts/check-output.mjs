@@ -113,7 +113,7 @@ const catalog = JSON.parse(read(site, "src/data/catalog.json"));
 const engineNames = {
   "helia-aot": "heliaAOT",
   "helia-rt": "heliaRT",
-  tflm: "LiteRT for Microcontrollers",
+  litert: "LiteRT for Microcontrollers",
   executorch: "ExecuTorch",
 };
 const missingEngines = catalog.engines

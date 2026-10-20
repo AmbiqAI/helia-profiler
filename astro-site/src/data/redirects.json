@@ -8,7 +8,6 @@
     "/examples/interactive-python/",
     "/examples/per-layer/",
     "/examples/power-profiling/",
-    "/examples/tflm-baseline/",
     "/examples/toolchain-comparison/",
     "/getting-started/",
     "/getting-started/first-profile/",
@@ -63,7 +62,8 @@
     "/reference/probes/": "/helia-profiler/reference/cli/probes/",
     "/reference/profile/": "/helia-profiler/reference/cli/profile/",
     "/reference/target/": "/helia-profiler/reference/cli/target/",
-    "/reference/validate/": "/helia-profiler/reference/cli/validate/"
+    "/reference/validate/": "/helia-profiler/reference/cli/validate/",
+    "/examples/tflm-baseline/": "/helia-profiler/examples/litert-baseline/"
   },
   "moved": {
     "/guide/in-depth/": "/helia-profiler/guide/",

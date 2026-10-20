@@ -44,7 +44,7 @@ def register(app: typer.Typer) -> None:
             "  hpx validate --suite smoke           # quick preset: kws / helia-rt / gcc / rtt / auto\n\n"
             "  hpx validate --suite models-rt       # 16-case RT sweep: 2 boards x 4 models x 2 toolchains\n\n"
             "  hpx validate --suite models-aot      # 16-case AOT sweep: 2 boards x 4 models x 2 toolchains\n\n"
-            "  hpx validate --suite complete        # RT + AOT + TFLM + ExecuTorch sweep"
+            "  hpx validate --suite complete        # RT + AOT + LiteRT + ExecuTorch sweep"
         ),
     )(validate_command)
 
@@ -130,7 +130,7 @@ def validate_command(
         typer.Option(
             "--engines",
             help=(
-                "Comma-separated engines: rt,aot,tflm,et,executorch,helia-rt,helia-aot "
+                "Comma-separated engines: rt,aot,litert,et,executorch,helia-rt,helia-aot "
                 "(default: all)."
             ),
         ),
@@ -141,7 +141,7 @@ def validate_command(
             "--executorch-backends",
             help=(
                 "ExecuTorch CMSIS-NN providers: arm, ns, or both (default: both). "
-                "TFLM always uses ARM CMSIS-NN; heliaRT and heliaAOT always use ns-cmsis-nn."
+                "LiteRT always uses ARM CMSIS-NN; heliaRT and heliaAOT always use ns-cmsis-nn."
             ),
         ),
     ] = "both",
@@ -210,7 +210,7 @@ def validate_command(
                 "toolchains=arm-none-eabi-gcc, interfaces=rtt, memories=auto. "
                 "'models-rt' and 'models-aot' default unset axes to all MLPerf Tiny models, "
                 "Apollo510 + Apollo330mP, gcc + atfe, rtt, auto memory, and the selected engine. "
-                "'complete' runs the same axes for helia-rt, helia-aot, TFLM/CMSIS-NN, "
+                "'complete' runs the same axes for helia-rt, helia-aot, LiteRT/CMSIS-NN, "
                 "and both ExecuTorch CMSIS-NN providers. "
                 "Explicit axis flags always win."
             ),

@@ -219,11 +219,11 @@ def specs_of_kind(kind: WireKind) -> tuple[WireSpec, ...]:
 #: as ``"ARM_PMU_CPU_CYCLES"``.
 CSV_GRAMMAR: Mapping[str, str] = MappingProxyType(
     {
-        EngineType.TFLM.value: (
+        EngineType.LITERT.value: (
             "rows are `<index>,<tag>,<counters...>,<overflow>`; the tag is "
             "TFLM's per-op tag string (or `?`)."
         ),
-        EngineType.HELIA_RT.value: "Identical to tflm — same template, same profiler class.",
+        EngineType.HELIA_RT.value: "Identical to litert — same template, same profiler class.",
         EngineType.HELIA_AOT.value: (
             "rows are `<index>,<OP_TYPE>:<op_id>,<counters...>,<overflow>`; the "
             "operator id is its .tflite index, or -1 when it has none or several."

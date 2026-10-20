@@ -173,7 +173,7 @@ class TestLayerAttributor:
         assert att.attribute(1, "FULLY_CONNECTED:3").macs == 43_200
 
     def test_sequential_engines_keep_the_identity_join(self):
-        """TFLM/helia-rt: plain labels, position == original index."""
+        """litert/helia-rt: plain labels, position == original index."""
         analysis = ModelAnalysis(
             layers=[
                 LayerOps(id=0, op="CONV_2D", macs=10),

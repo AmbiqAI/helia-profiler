@@ -204,13 +204,13 @@ def test_doctor_runs_through_session_with_flag_overrides(monkeypatch) -> None:
 
     result = runner.invoke(
         app,
-        ["doctor", "--toolchain", "atfe", "--transport", "usb_cdc", "--engine", "tflm"],
+        ["doctor", "--toolchain", "atfe", "--transport", "usb_cdc", "--engine", "litert"],
     )
 
     assert result.exit_code == 0, result.output
     assert seen[0].intent_dict() == {
         "target": {"toolchain": "atfe", "transport": "usb_cdc"},
-        "engine": {"type": "tflm"},
+        "engine": {"type": "litert"},
     }
 
 

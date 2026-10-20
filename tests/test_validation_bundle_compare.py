@@ -330,7 +330,7 @@ def test_loader_distinguishes_cmsis_nn_providers(tmp_path: Path) -> None:
     ("engine", "backend", "provider"),
     [
         ("executorch", "arm", "ns"),
-        ("tflm", "cmsis_nn", "ns"),
+        ("litert", "cmsis_nn", "ns"),
         ("helia-rt", None, "arm"),
         ("helia-aot", None, "arm"),
     ],

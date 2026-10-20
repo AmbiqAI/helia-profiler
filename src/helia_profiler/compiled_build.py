@@ -75,8 +75,8 @@ class CompiledBuild:
         The runtime version and commit and the kernel commit are compared
         wherever both the plan and the build state one; a build or plan
         that states none of a fact is not compared on it. heliaRT and
-        heliaAOT compare with the plan's pins. TFLM compares with this HPX's
-        prepared TFLM record, because the plan pins the modules an ordinary
+        heliaAOT compare with the plan's pins. LiteRT compares with this HPX's
+        prepared LiteRT record, because the plan pins the modules an ordinary
         profile builds from source, which a fixture build does not link.
 
         Raises:
@@ -349,7 +349,7 @@ def build(
     *lifecycle* must be one the plan's engine implements; it sets the timed
     iterations and warmups the firmware runs. *host* supplies host-local
     settings, such as ``{"work_dir": ...}``, as :meth:`FrozenRun.config` does.
-    heliaRT and TFLM link a prepared runtime: without *runtime*, the one the
+    heliaRT and LiteRT link a prepared runtime: without *runtime*, the one the
     plan names is taken from the HPX cache (``hpx runtimes prepare``), never
     downloaded or built. The result is verified before it is returned.
     """
@@ -416,26 +416,26 @@ def _linked_runtime(plan: FrozenRun, linked_version: str | None = None) -> _Link
     """What a fixture build of *plan* links, or ``None`` when the plan states no runtime.
 
     heliaRT and heliaAOT link the runtime and kernel commits the plan pins.
-    TFLM does not: the plan pins the tflite-micro and CMSIS-NN modules an
+    LiteRT does not: the plan pins the tflite-micro and CMSIS-NN modules an
     ordinary profile builds from source, while a fixture build links a
-    prepared TFLM record (``hpx runtimes prepare tflm``). A build is compared
-    with the record of the version it linked (*linked_version*), so a saved
-    build keeps verifying after this HPX's default changes; a new build
-    links the default.
+    prepared LiteRT record (``hpx runtimes prepare litert``). A build is
+    compared with the record of the version it linked (*linked_version*), so
+    a saved build keeps verifying after this HPX's default changes; a new
+    build links the default.
     """
     from .runtime_records import runtime
 
     planned = plan.runtime
     if planned is None:
         return None
-    if planned.name != "tflm":
+    if planned.name != "litert":
         return _LinkedRuntime(
             planned.name, planned.version, planned.source_commit, planned.kernels_commit
         )
-    record = runtime("tflm", linked_version)
+    record = runtime("litert", linked_version)
     if record is None:
         raise ConfigError(
-            f"This HPX ships no prepared TFLM runtime record {linked_version or ''}".rstrip()
+            f"This HPX ships no prepared LiteRT runtime record {linked_version or ''}".rstrip()
         )
     return _LinkedRuntime(
         record.name,
@@ -446,7 +446,7 @@ def _linked_runtime(plan: FrozenRun, linked_version: str | None = None) -> _Link
 
 
 def _prepared_runtime(plan: FrozenRun) -> PreparedUpstreamRuntime | None:
-    """The cached prepared runtime a fixture build of *plan* links, for heliaRT and TFLM."""
+    """The cached prepared runtime a fixture build of *plan* links, for heliaRT and LiteRT."""
     from .engines import EngineType, get_adapter
     from .engines.base import PreparedRuntimeAdapter
     from .prepared_runtimes import prepared_runtime

@@ -26,7 +26,7 @@ The current baseline is `hpx-neuralspotx-0.8.1-2026-10-19.2`:
 | `nsx-sensors` | `c219a2bc…3e25` (`v0.3.0`, peeled) |
 | heliaRT | runtime records `1.21.3`, `2.1.0`, `2.2.0`, `2.2.2` (default, commit `7fe6dfdb…0f0`; min supported `1.16.0`, from `HELIART_MIN_VERSION` in code) |
 | heliaAOT | runtime record `0.33.0` (default); accepted range `>=0.33.0,<2.0.0` |
-| tflm | profile path: governed by the `nsx-tflite-micro` and `arm-cmsis-nn` module refs above (the `tflm` runtime record describes the fixed fixture's prepared upstream archive instead); `nsx-tflite-micro` builds TFLM from the `helia-rt-source` project, which the baseline does not list and the neuralSPOT-X 0.8.1 registry lock fixes at `7c1b162c` (helia-rt v1.17.0) |
+| litert | profile path: governed by the `nsx-tflite-micro` and `arm-cmsis-nn` module refs above (the `litert` runtime record describes the fixed fixture's prepared upstream archive instead); `nsx-tflite-micro` builds TFLM from the `helia-rt-source` project, which the baseline does not list and the neuralSPOT-X 0.8.1 registry lock fixes at `7c1b162c` (helia-rt v1.17.0) |
 | executorch | `0.1.0`, commit `5514ac1e…b48e`, from the runtime record (a checkout's `version.txt` and commit are verified against it) |
 
 Every baseline project and module ref is immutable by policy: only a full

@@ -275,7 +275,7 @@ def test_the_kernel_library_is_the_linked_module_not_the_backend_label(tmp_path)
 
 def test_a_backend_label_without_a_linked_module_states_no_library(tmp_path):
     identity = profile_run_identity(
-        _ctx(tmp_path, engine="tflm", backend="cmsis_nn", modules=(TFLM,), version=None)
+        _ctx(tmp_path, engine="litert", backend="cmsis_nn", modules=(TFLM,), version=None)
     )
 
     reason = Unknown("the dependency lock names 0 CMSIS-NN modules, not one")
@@ -283,7 +283,7 @@ def test_a_backend_label_without_a_linked_module_states_no_library(tmp_path):
     assert identity.kernels.commit == reason
 
 
-def test_only_tflm_reference_links_no_kernel_module(tmp_path):
+def test_only_litert_reference_links_no_kernel_module(tmp_path):
     identity = profile_run_identity(_ctx(tmp_path, backend=None, modules=(HELIA_RT,)))
 
     assert identity.kernels.library == Unknown(
@@ -291,8 +291,8 @@ def test_only_tflm_reference_links_no_kernel_module(tmp_path):
     )
 
 
-def test_tflm_reference_links_no_kernel_module_and_states_reference(tmp_path):
-    identity = profile_run_identity(_ctx(tmp_path, engine="tflm", modules=(TFLM,), version=None))
+def test_litert_reference_links_no_kernel_module_and_states_reference(tmp_path):
+    identity = profile_run_identity(_ctx(tmp_path, engine="litert", modules=(TFLM,), version=None))
 
     assert identity.runtime.engine is CanonicalEngine.LITERT
     assert identity.runtime.version == "v1.3.0"
@@ -303,7 +303,7 @@ def test_tflm_reference_links_no_kernel_module_and_states_reference(tmp_path):
 
 def test_a_reference_label_with_a_linked_module_reports_the_module(tmp_path):
     identity = profile_run_identity(
-        _ctx(tmp_path, engine="tflm", modules=(ARM_CMSIS_NN, TFLM), version=None)
+        _ctx(tmp_path, engine="litert", modules=(ARM_CMSIS_NN, TFLM), version=None)
     )
 
     assert identity.kernels.library is CanonicalKernel.CMSIS_NN
@@ -591,9 +591,9 @@ HELIA_RT_SOURCE = _module(
 )
 
 
-def test_tflm_runtime_and_reference_kernels_come_from_helia_rt_source(tmp_path):
+def test_litert_runtime_and_reference_kernels_come_from_helia_rt_source(tmp_path):
     identity = profile_run_identity(
-        _ctx(tmp_path, engine="tflm", modules=(TFLM, HELIA_RT_SOURCE), version=None)
+        _ctx(tmp_path, engine="litert", modules=(TFLM, HELIA_RT_SOURCE), version=None)
     )
     assert identity.runtime.commit == "6" * 40
     assert identity.kernels.library is CanonicalKernel.REFERENCE
@@ -624,7 +624,7 @@ def _analysis(*ops: str, index_space: Literal["source", "execution"] = "source")
     "engine,analysis,expected",
     [
         ("helia-rt", _analysis("CALL_ONCE", "CONV_2D"), True),
-        ("tflm", _analysis("CONV_2D"), False),
+        ("litert", _analysis("CONV_2D"), False),
         ("helia-rt", None, Unknown("the run recorded no analysis of the source model's operators")),
         ("helia-aot", _analysis("CALL_ONCE", index_space="execution"), False),
     ],
