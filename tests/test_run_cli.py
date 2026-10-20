@@ -656,7 +656,9 @@ def test_a_result_that_cannot_be_saved_names_the_intact_evidence(out, plan, buil
     assert result.exit_code == 1
     message = _plain(result.output)
     assert "result was not saved: Cannot save the run result: disk full" in message
-    assert f"evidence directory {out / 'evidence-1'} is intact" in message
+    # Rich can wrap a long path mid-word, so compare without whitespace.
+    expected = f"evidence directory {out / 'evidence-1'} is intact"
+    assert "".join(expected.split()) in "".join(message.split())
 
 
 def test_run_refuses_an_evidence_directory_outside_the_run_directory(tmp_path, out, runs):
