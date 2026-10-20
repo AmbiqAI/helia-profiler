@@ -1,7 +1,7 @@
 {
   "api_version": [
     6,
-    0
+    1
   ],
   "surface": {
     "BuildFacts": {
@@ -2092,6 +2092,11 @@
           "timing_statistic",
           "str | Unknown",
           "Unknown(reason='the record predates this fact')"
+        ],
+        [
+          "energy",
+          "EnergyFacts | Unknown | None",
+          "None"
         ]
       ],
       "frozen": true,

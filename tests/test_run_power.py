@@ -29,6 +29,7 @@ from helia_profiler.fixture import (
     TypedFixture,
 )
 from helia_profiler.fixture_target import fixture_target_for_board
+from helia_profiler.identity import EnergyFacts, Unknown
 from helia_profiler.lifecycle import Lifecycle
 from helia_profiler.runtime_records import runtime
 from tests.run_api_helpers import ATFE_OUTPUT, atfe_build, compiled, linking, plan_for, reseal
@@ -397,3 +398,48 @@ def test_run_build_refuses_a_power_build_outside_the_route(
     with pytest.raises(ConfigError, match=message):
         _run(record, tmp_path, power=_rail(), power_guard=_Authority("station", []))
     assert device.calls == []
+
+
+# The run's identity
+
+
+def test_the_identity_states_the_rail_energy_method(tmp_path, build, device):
+    record = _powered(tmp_path, build)
+    device.reply = _success(tmp_path / "raw", _energy(tmp_path / "raw"))
+
+    result, _ = _run(record, tmp_path, power=_rail(), power_guard=_Authority("station", []))
+
+    expected = EnergyFacts("gross_rail_restore_and_invoke", "MCU", "none", 2)
+    assert result.identity.run.energy == expected
+    assert record.identity.run.energy == replace(
+        expected, rail=Unknown("the run's power request names the rail")
+    )
+    assert result.identity.to_dict()["run"]["energy"] == {
+        "scope": "gross_rail_restore_and_invoke",
+        "rail": "MCU",
+        "subtraction": "none",
+        "completion_protocol": 2,
+    }
+
+
+def test_a_power_run_that_measured_nothing_says_so(tmp_path, build, device):
+    record = _powered(tmp_path, build)
+    device.reply = FixtureCaptureResult("failure", _RESTORE, error="READY never came")
+
+    result, _ = _run(record, tmp_path, power=_rail(), power_guard=_Authority("station", []))
+
+    assert result.identity.run.energy is not None
+    assert result.identity.run.energy.rail == Unknown("the capture measured no energy")
+
+
+def test_supply_only_timing_states_no_energy(tmp_path, build, device):
+    record = _timing_only(tmp_path, build)
+    device.reply = replace(
+        _success(tmp_path / "raw", None),
+        timing_scope=FixtureTimingScope.INVOKE_ONLY,
+        timing=FixtureTiming(16384, 100, 5, 32768, 4, 96_000_000, FixtureTimingScope.INVOKE_ONLY),
+    )
+
+    result, _ = _run(record, tmp_path, power=_SUPPLY, power_guard=_Authority("station", []))
+
+    assert result.identity.run.energy is None and record.identity.run.energy is None

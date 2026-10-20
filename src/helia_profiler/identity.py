@@ -140,6 +140,24 @@ _UNRECORDED = Unknown("the record predates this fact")
 
 
 @dataclass(frozen=True)
+class EnergyFacts:
+    """How a run's energy was measured.
+
+    ``scope`` is what the measured window covers:
+    ``gross_rail_restore_and_invoke`` is everything the rail draws over the
+    timed restore-and-invoke loop. ``rail`` is the physical rail measured,
+    such as ``MCU``. ``subtraction`` is what was taken off the measurement,
+    ``none`` when nothing was. ``completion_protocol`` is the version of the
+    firmware's READY, GO and DONE handshake that bounds the window.
+    """
+
+    scope: str
+    rail: str | Unknown
+    subtraction: str
+    completion_protocol: int
+
+
+@dataclass(frozen=True)
 class RunFacts:
     """How the model was run: state handling, invocation counts, the timed span and its clock.
 
@@ -155,7 +173,8 @@ class RunFacts:
     the span, ``cpu`` cycles or the 32.768 kHz ``stimer``; ``timing_clock_hz``
     is its configured rate, not a measured one. ``timing_statistic`` is what
     the reported time is: the ``total`` over the measured invocations or
-    their ``mean``.
+    their ``mean``. ``energy`` is how the run's energy was measured, and
+    ``None`` when the run measures none.
     """
 
     lifecycle: str
@@ -168,6 +187,7 @@ class RunFacts:
     timing_clock: str | Unknown = _UNRECORDED
     timing_clock_hz: int | Unknown = _UNRECORDED
     timing_statistic: str | Unknown = _UNRECORDED
+    energy: EnergyFacts | Unknown | None = None
 
 
 @dataclass(frozen=True)

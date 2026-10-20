@@ -508,6 +508,7 @@ def load_fixture_build(record: str | bytes, *, roots: Mapping[str, Path]) -> Fix
             _json((5, 6)),
             _json((5, 7)),
             _json((5, 8)),
+            _json((6, 0)),
             _json(FIXTURE_API_VERSION),
         )
     ):
@@ -524,6 +525,7 @@ def load_fixture_build(record: str | bytes, *, roots: Mapping[str, Path]) -> Fix
         [5, 6],
         [5, 7],
         [5, 8],
+        [6, 0],
         list(FIXTURE_API_VERSION),
     ):
         raise ValueError("RAM diagnostic requires its declared API version")

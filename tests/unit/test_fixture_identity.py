@@ -217,8 +217,8 @@ def test_a_prepared_runtime_manifest_reads_without_its_archive(tmp_path):
 def test_a_record_from_the_previous_api_still_loads(tmp_path):
     build = _aot(tmp_path)
     record = json.loads(dump_fixture_build(build, roots={"run": tmp_path}))
-    assert record["fixture_api"] == [6, 0]
-    for previous in ([5, 6], [5, 7], [5, 8]):
+    assert record["fixture_api"] == [6, 1]
+    for previous in ([5, 6], [5, 7], [5, 8], [6, 0]):
         record["fixture_api"] = previous
         assert load_fixture_build(json.dumps(record), roots={"run": tmp_path}) == build
 

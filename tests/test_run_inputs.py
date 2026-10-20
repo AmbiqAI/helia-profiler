@@ -75,6 +75,7 @@ _NEW = (
     "OperatorGuard",
     "MemoryPlan",
     "ResolverPlan",
+    "EnergyFacts",
 )
 
 
