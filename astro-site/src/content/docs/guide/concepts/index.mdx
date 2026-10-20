@@ -59,6 +59,19 @@ fields earlier stages set, through narrowing accessors that raise
 `PipelineError` naming the producing stage when it has not run. The
 [Pipeline](pipeline/) page lists both.
 
+### Two programmatic flows
+
+`hpx.profile` and `Session.profile` run the whole pipeline once: build,
+flash, capture and write a result bundle. The run API splits that for fixed
+input bytes. `Session.freeze` resolves a plan into a `FrozenRun`;
+`hpx.build` compiles it for a `TypedFixture` into a `CompiledBuild`, saved
+as `hpx.compiled-build` and read back with `load_build`; `run_build`
+captures from it without rebuilding and returns a `RunResult`, saved as
+`hpx.run-result` and read with `load_run` or `api.load_result`. The
+`hpx freeze`, `hpx build` and `hpx run` commands drive the same flow. Its
+types are exported from the package root, which is the whole public Python
+contract; the `fixture_*` and `_fixture_*` modules behind it are internal.
+
 ### Errors are typed
 
 HPX uses subclasses of `HpxError` with an optional `hint` that
@@ -86,6 +99,7 @@ page.
 | Block | Path under `src/helia_profiler/` |
 |---|---|
 | Entry points | `cli/`, `api.py`, `session.py` |
+| Run API | `frozen_run.py`, `compiled_build.py`, `run_record.py`, `records.py`, and the internal `_fixture_*.py` and `fixture_*.py` modules |
 | Configuration | `config/`, `vocab.py`, `placement.py` |
 | Pipeline | `pipeline.py`, `profiler.py`, `stages/` |
 | Engines | `engines/` |

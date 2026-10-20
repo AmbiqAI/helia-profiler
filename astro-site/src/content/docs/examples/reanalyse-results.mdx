@@ -104,11 +104,14 @@ helia-rt 13 2060239.0
 
 ### Portable ordinary-profile view
 
-For ordinary profile bundles with summary schema 11 or 12, the additive
-offline reader verifies publication, artifact paths, sizes and hashes, and
-agreement of retained issues and overlapping summary/metadata/comparability
-identities before returning a native record. Missing identity facts remain
-unknown; contradictory recorded facts are refused:
+For ordinary profile bundles of the current summary schema, the offline
+reader verifies publication, artifact paths, sizes and hashes, and agreement
+of retained issues and overlapping summary/metadata/comparability identities
+before returning a native record. Missing identity facts remain unknown;
+contradictory recorded facts are refused. It refuses a summary of another
+version, such as the version 5 bundles above; read those with the HPX release
+that wrote them, or with `load_result_manifest` and `load_run_summary` as
+shown earlier:
 
 ```python
 from helia_profiler.api import inspect_result, load_result, observations, export_result

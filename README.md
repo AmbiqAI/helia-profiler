@@ -191,29 +191,22 @@ before a first change, whether you are a person or an agent.
 
 Apache-2.0
 
-### Fixed-fixture PSRAM weights
+### Run-API PSRAM weights
 
-The fixture API supports SRAM or DTCM working memory with PSRAM weights for heliaAOT
-and upstream LiteRT Micro on Apollo510 EVB. AOT uses externally bound arenas;
-Micro constructs its interpreter from the PSRAM flatbuffer. Both load complete
-weights once from MRAM staging before model initialization and timing. MRAM
-staging remains part of the firmware image. Internal state policy and input
-restoration are unchanged.
+The run API (`hpx.build`, `hpx.run_build`) supports SRAM or DTCM working memory
+with PSRAM weights for heliaAOT and upstream LiteRT Micro on Apollo510 EVB. AOT
+uses externally bound arenas; Micro constructs its interpreter from the PSRAM
+flatbuffer. Both load complete weights once from MRAM staging before model
+initialization and timing. MRAM staging remains part of the firmware image.
+Internal state policy and input restoration are unchanged.
 
-Pass the compiled build's `psram_weights` descriptor to
-`FixtureCaptureRequest.psram_weights`. The descriptor binds expected payloads
-and PSRAM clock to the exact image. Capture requires the bounded placement
-terminal and verifies ready/XIP status, active ranges and payload checksums.
-A linker map alone cannot establish runtime PSRAM placement. A build rendered
-without compilation has an unbound descriptor and cannot authorize capture.
-This additive interface is fixture API 3.5; it does not include a streaming or
-numerical qualification claim. Placement validation uses the canonical target
-bank extents and implemented backing paths rather than benchmark recipe pairs.
-Static working arenas currently use SRAM or DTCM; dynamic PSRAM working arenas,
-other fixture reset targets, and NOR/RRAM loader declarations are separate
-adapter gaps. External AOT fixture binding currently requires PSRAM weights.
-Operator timing binding compares the effective working and weight banks recorded
-in the build receipt; legacy receipts without those banks are refused.
-Ordinary profile operator timings cannot be bound to PSRAM fixture builds: their
-active payload, external arena layout and loader configuration are not recorded
-by that profile binding.
+A compiled build records a `psram_weights` descriptor that binds the expected
+payloads and PSRAM clock to the exact image, and a run checks it: the capture
+requires the bounded placement terminal and verifies ready/XIP status, active
+ranges and payload checksums. A linker map alone cannot establish runtime PSRAM
+placement. This does not include a streaming or numerical qualification claim.
+Placement validation uses the canonical target bank extents and implemented
+backing paths rather than benchmark recipe pairs. Static working arenas
+currently use SRAM or DTCM; dynamic PSRAM working arenas, other fixture reset
+targets, and NOR/RRAM loader declarations are separate adapter gaps. External
+AOT fixture binding currently requires PSRAM weights.

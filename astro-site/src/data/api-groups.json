@@ -290,6 +290,16 @@
       ]
     },
     {
+      "path": "helia_profiler.elf_inventory",
+      "summary": "The measured memory inventory of a linked image, read with the toolchain's own tools: every section with its address and size, the load segments, and how many rows could not be parsed.",
+      "members": [
+        "section_inventory",
+        "SectionInventory",
+        "ElfSection",
+        "LoadSegment"
+      ]
+    },
+    {
       "path": "helia_profiler.diagnostics",
       "summary": "Collecting a redacted support bundle from a run directory, and reading one back.",
       "members": [

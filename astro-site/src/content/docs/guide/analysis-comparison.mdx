@@ -59,9 +59,10 @@ hpx compare results/rt results/aot --output-dir results/rt-vs-aot
 hpx first verifies each bundle's manifest (paths, sizes, SHA-256 digests),
 then applies the comparability rules, then prints totals and the largest
 per-layer deltas. `--output-dir` also writes `compare_summary.json` and
-`layer_diff.csv`. A failed modern publication leaves an incomplete marker and
-cannot be loaded as a legacy bundle. Genuine older bundles without that marker
-remain supported.
+`layer_diff.csv`. A failed publication leaves an incomplete marker and is
+refused. A result directory without `result_manifest.json` was written by an
+older heliaPROFILER and is refused too; compare it with the release that wrote
+it.
 
 If any layer has no valid cycle measurement, the total and cycle percentages
 are unavailable (`null` in the summary), not a partial sum or a measured zero.
@@ -71,7 +72,7 @@ A comparison profile applies its missing-metric policy to that unavailable total
 
 | Rule | Effect on the comparison | Code raised |
 |---|---|---|
-| Either result is invalid | blocked | `result.invalid`, `result.invalid_pmu_overflow` |
+| Either result is invalid | blocked | `result.invalid` |
 | Either result is incomplete or degraded | blocked or annotated | `result.incomplete`, `result.degraded` |
 | Different model hash | blocked | `identity.model_mismatch` |
 | Different layer count or operator sequence | per-layer deltas suppressed; totals still compared | `topology.layer_count_mismatch`, `topology.operation_sequence_mismatch` |
