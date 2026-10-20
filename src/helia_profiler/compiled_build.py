@@ -230,12 +230,13 @@ class CompiledBuild:
     @classmethod
     def load(cls, path: str | Path, *, roots: Mapping[str, Path]) -> CompiledBuild:
         """Read and verify a build written by :meth:`save`, resolving paths under *roots*."""
-        from ._fixture_record import _read_json, load_fixture_build
+        from ._files import read_json
+        from ._fixture_record import load_fixture_build
         from .frozen_run import FrozenRun
 
         source = Path(path).expanduser()
         try:
-            data = _read_json(source.read_text(encoding="utf-8"))
+            data = read_json(source.read_text(encoding="utf-8"), label="compiled build")
         except FileNotFoundError as exc:
             raise ConfigError(f"Compiled build not found: {source}") from exc
         except (OSError, ValueError, RecursionError) as exc:
@@ -704,6 +705,39 @@ def _binding(plan: FrozenRun, lifecycle: Lifecycle, build: FixtureBuild) -> str:
 
 def _value(member: StrEnum | None) -> str | None:
     return member.value if member is not None else None
+
+
+def prepared_runtime_hint(path: Path, cache: Path) -> str:
+    """How to restore the prepared runtime the build saved in *path* links."""
+    from .errors import HpxError
+    from .frozen_run import FrozenRun
+
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+        source = document["build"].get("runtime_source") or {}
+        linked = _linked_runtime(FrozenRun.from_dict(document["plan"]), source.get("version"))
+    except (HpxError, OSError, ValueError, KeyError, TypeError):
+        linked = None
+    command = (
+        f"hpx runtimes prepare {linked.name} {linked.version}"
+        if linked is not None and linked.version
+        else "hpx runtimes prepare <engine> <version>"
+    )
+    return (
+        f"The build links a runtime prepared under the HPX cache {cache}. Run "
+        f"`{command}` on this host, or set HPX_CACHE_DIR to the cache that holds it."
+    )
+
+
+def missing_runtime_hint(error: ConfigError, path: Path, cache: Path | None) -> str | None:
+    """:func:`prepared_runtime_hint` when *error*, from loading *path*, names a file under *cache*."""
+    missing = error.__cause__
+    if cache is None or not isinstance(missing, OSError) or missing.filename is None:
+        return None
+    filename = Path(missing.filename)
+    if filename == path or not filename.is_relative_to(cache):
+        return None
+    return prepared_runtime_hint(path, cache)
 
 
 def load_build(path: str | Path, *, roots: Mapping[str, Path]) -> CompiledBuild:
