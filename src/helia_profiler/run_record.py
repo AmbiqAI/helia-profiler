@@ -105,8 +105,8 @@ def read_run(path: Path, raw: bytes) -> RunRecord:
     """Verify *raw*, the bytes of the run result at *path*, under the roots it implies.
 
     The root the result records itself under is the directory its recorded
-    path leads back to; ``cache`` is this host's HPX cache, as for
-    ``hpx run``.
+    path leads back to, which :func:`load_run`'s checks confirm; ``cache``
+    is this host's HPX cache, as for ``hpx run``.
     """
     from .hostenv.cache_dirs import hpx_cache_root
 
@@ -116,7 +116,7 @@ def read_run(path: Path, raw: bytes) -> RunRecord:
     parts = PurePosixPath(relative).parts if isinstance(relative, str) else ()
     resolved = path.resolve()
     base = resolved.parents[len(parts) - 1] if 0 < len(parts) <= len(resolved.parents) else None
-    if not isinstance(name, str) or base is None or base.joinpath(*parts) != resolved:
+    if not isinstance(name, str) or base is None:
         raise RunResultError(
             "invalid_path",
             f"The run result records itself at {relative!r} under root {name!r}, "

@@ -232,6 +232,18 @@ def _extra(data: dict[str, Any]) -> None:
     data["notes"] = "edited"
 
 
+def _resize(data: dict[str, Any]) -> None:
+    data["capture"]["outputs"][1]["size_bytes"] += 1
+
+
+def _state(data: dict[str, Any]) -> None:
+    data["capture"]["state"] = "pending"
+
+
+def _nested(data: dict[str, Any]) -> None:
+    data["capture"]["timing"]["notes"] = "edited"
+
+
 @pytest.mark.parametrize(
     "edit,code,message",
     [
@@ -241,6 +253,9 @@ def _extra(data: dict[str, Any]) -> None:
         (_schema, "unsupported_schema", None),
         (_version, "unsupported_schema", None),
         (_extra, "invalid_evidence", "Malformed run result"),
+        (_resize, "artifact_changed", "is not the file it recorded"),
+        (_state, "invalid_evidence", "unknown capture state"),
+        (_nested, "invalid_evidence", "Malformed run result timing"),
     ],
 )
 def test_an_edited_result_is_refused(root, record, edit, code, message):
@@ -250,11 +265,29 @@ def test_an_edited_result_is_refused(root, record, edit, code, message):
     with pytest.raises(ResultReadError) as read:
         load_result(path)
     assert read.value.code == code
-    if code != "unsupported_schema" or edit is _version:
-        with pytest.raises(RunResultError) as refused:
-            hpx.load_run(path, roots=_roots(root))
-        assert refused.value.code == code and isinstance(refused.value, ConfigError)
-        assert message is None or message in str(refused.value)
+    with pytest.raises(RunResultError) as refused:
+        hpx.load_run(path, roots=_roots(root))
+    assert refused.value.code == code and isinstance(refused.value, ConfigError)
+    assert message is None or message in str(refused.value)
+
+
+def test_a_renamed_result_is_refused(root, record):
+    path = _save(_run(record))
+    renamed = path.with_name("copy.json")
+    shutil.copy(path, renamed)
+
+    with pytest.raises(ResultReadError) as read:
+        load_result(renamed)
+    assert read.value.code == "invalid_path" and "records itself" in str(read.value)
+
+
+def test_a_location_deeper_than_the_file_is_refused(root, record):
+    path = _save(_run(record))
+    _edit(path, lambda data: data["location"].update(path="/".join(["x"] * 64) + "/r.json"))
+
+    with pytest.raises(ResultReadError) as read:
+        load_result(path)
+    assert read.value.code == "invalid_path"
 
 
 def _missing(root: Path) -> None:
