@@ -681,7 +681,7 @@ def _binding(plan: FrozenRun, lifecycle: Lifecycle, build: FixtureBuild) -> str:
     try:
         return semantic_hash("binding", payload)
     except ValueError as exc:
-        raise ConfigError(f"A compiled build cannot record a non-finite number: {exc}") from exc
+        raise ConfigError("A compiled build cannot record a non-finite number") from exc
 
 
 def _value(member: StrEnum | None) -> str | None:

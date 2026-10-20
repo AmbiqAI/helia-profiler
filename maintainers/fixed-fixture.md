@@ -179,8 +179,9 @@ API 7.0 changes the value of `RunIdentity.build_hash`, `observation_hash` and
 `inputs_sha256` to `inputs_hash`, an `hpx.inputs` semantic hash. The hashed
 bytes are unchanged, so the hex part is the same as before. Each remaining
 `*_sha256` fact is a file's sha256, and stays bare hex like the record's own
-identities. A plan, binding, build or inputs basis refuses a non-finite
-float; only an observation writes one as text. The record format is
+identities. A plan, binding or inputs basis refuses a non-finite float, a
+build hash read from such a lock is `Unknown`, and only an observation writes
+one as text. The record format is
 unchanged; API 7.0 reads records from 5.0 through 6.1.
 
 `helia_profiler.build(plan, fixture, method=..., lifecycle=...)`, also reached

@@ -756,7 +756,7 @@ def _intent_hash(plan: FrozenRun) -> str:
         return semantic_hash("intent", payload)
     except ValueError as exc:
         raise ConfigError(
-            f"A frozen run plan cannot hold a non-finite number: {exc}",
+            "A frozen run plan cannot hold a non-finite number",
             hint="Set a finite value, or leave the setting at its default.",
         ) from exc
 

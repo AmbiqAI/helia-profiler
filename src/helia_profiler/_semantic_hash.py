@@ -121,7 +121,9 @@ def basis(kind: Kind, value: Any) -> bytes:
     try:
         encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False)
     except ValueError as exc:
-        raise ValueError(f"The {kind} basis cannot hold a non-finite number: {exc}") from exc
+        if "Out of range float" not in str(exc):
+            raise
+        raise ValueError(f"The {kind} basis cannot hold a non-finite number") from exc
     return encoded.encode("ascii")
 
 
