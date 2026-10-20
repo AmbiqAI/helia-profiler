@@ -8,6 +8,7 @@ run against without a board.
 | Directory | Source |
 |---|---|
 | `hardware-validation-2026-09-16/` | run 35078330526 of `.github/workflows/hardware-validation.yml`, 2026-09-16, suite `complete`, hpx 0.1.6 at commit 0714893615b690b340661314d1165af61cd83d66 |
+| `run-api-synthetic/` | synthetic run API example: a `hpx.compiled-build` and one run's report from a mocked device; see its README |
 
 Each case directory holds the four core artifacts the manifest lists
 (`summary.json`, `run_metadata.json`, `profile_results.csv`, `nsx.lock`),

@@ -1,0 +1,87 @@
+{
+  "error": null,
+  "identity": {
+    "baseline_id": {
+      "unknown": "the dependency state records no workspace"
+    },
+    "build": {
+      "arena_bytes": 131072,
+      "arena_location": "sram",
+      "board": "apollo510_evb",
+      "clock_profile": "lp",
+      "cpu_hz": 96000000,
+      "toolchain": "atfe",
+      "toolchain_version": "clang version 22.1.0",
+      "weights_location": "mram"
+    },
+    "build_hash": {
+      "unknown": "the dependency lock is not an NSX lock"
+    },
+    "dependency_lock_sha256": "0c030586945fe504b604ecc2e875c38ede400cd5cd73da9730302162e6b02c6f",
+    "inputs_sha256": "2ca56ae8fa19aeebf0c53411603e6be71e50821f1c8b74735643928ee5191081",
+    "intent_hash": "a909fc4ac24bb0f9e3aea4110062ade20ee6857733b7014baabc534985097eee",
+    "kernels": {
+      "commit": {
+        "unknown": "the dependency state names 0 CMSIS-NN modules, not one"
+      },
+      "library": {
+        "unknown": "the dependency state names 0 CMSIS-NN modules, not one"
+      },
+      "repository": {
+        "unknown": "the dependency state names 0 CMSIS-NN modules, not one"
+      },
+      "version": {
+        "unknown": "the dependency state names 0 CMSIS-NN modules, not one"
+      }
+    },
+    "model_sha256": "4419dfff1e15e9479ad90b81c7997c4a2db274c87f6433e06cd34698108ac26f",
+    "observation_hash": "45d6451bce4da231df4a00b43f52b4e9679f65dab05b2c50e9b5f5116aaf53e1",
+    "prepared_archive_sha256": null,
+    "producer": {
+      "unknown": "the dependency state records no workspace"
+    },
+    "run": {
+      "first_invoke_initializer": false,
+      "first_invoke_window": "warmup",
+      "instance_boundary": "boot",
+      "iterations": 100,
+      "lifecycle": "carry",
+      "timing_clock": "stimer",
+      "timing_clock_hz": 32768,
+      "timing_scope": "invoke_only",
+      "timing_statistic": "total",
+      "warmups": 5
+    },
+    "runtime": {
+      "commit": {
+        "unknown": "the record states no runtime source"
+      },
+      "engine": "helia-aot",
+      "repository": {
+        "unknown": "the record states no runtime source"
+      },
+      "version": {
+        "unknown": "the record states no runtime source"
+      }
+    }
+  },
+  "measurements": {
+    "arena_used_after_invoke_bytes": null,
+    "iterations": 100,
+    "latency_s": 0.01,
+    "warmups": 5
+  },
+  "succeeded": true,
+  "verification": {
+    "matched": true,
+    "reference": "host-litert",
+    "tensors": [
+      {
+        "identical": true,
+        "max_abs_error": 0.0,
+        "mismatched_elements": 0,
+        "name": "probabilities"
+      }
+    ]
+  }
+}
