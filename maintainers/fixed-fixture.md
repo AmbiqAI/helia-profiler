@@ -594,6 +594,53 @@ arena of explicit size, MRAM weights), the build works under the host's
 and the saved build names the HPX cache as a second root. Its
 `PlaceholderGuard` refuses every capture; a harness passes its own guard.
 
+### Run API names and the command line
+
+The run API's inputs are importable from `helia_profiler` itself, and that is
+the documented route: `TypedFixture`, `FixtureIO`, `FixtureOutput`,
+`FixtureRole`, `FixtureFile`, `FixtureTensor`, `FixtureMethod`,
+`FixtureTimingScope`, `FixtureCaptureGuard`, `FixtureTarget`,
+`PreparedUpstreamRuntime`, `Expect` and `Tolerance` are the same objects as
+in `helia_profiler.fixture` (experimental tier). `hpx.capabilities()` returns
+what `fixture_capabilities()` returns. `analyze_run_model(path)` and
+`analyze_run_model_for_engine(path, engine)` (`run_inputs.py`) return the
+`TypedFixtureModelAnalysis` of `analyze_typed_fixture_model` and its
+per-engine form; they take an engine name as well as an `EngineType`, and
+raise `ConfigError` where those raise `ValueError`. `helia_profiler.fixture`
+keeps working until the cleanup slice removes it.
+
+The command line drives the same flow over a run directory
+(`run_directory.py`): `build.json`, the model and one `input_<index>.bin` per
+model input under `inputs/`, the firmware under `work/` unless `--work-dir`
+names another, and one `evidence-<N>` per capture. The build is saved with
+the roots `run` (the directory) and `cache` (`hpx_cache_root()`).
+
+- `hpx freeze` resolves `-c/--config` and the shared engine and target
+  options through `_build_cli_overrides`, the same mapping `hpx profile`
+  uses, plus `--backend` (`engine.backend`), and writes `Session.freeze()`
+  with `FrozenRun.save`.
+- `hpx build PLAN --out DIR` pins the plan's model (or `--model`) and the
+  `--input` files, zero bytes when none are given, refuses a count or size
+  that does not fit the model, and calls `build()` with `--lifecycle`
+  (default `carry`) and `--timing-scope` (default `invoke_only`).
+- `hpx validate build DIR` loads, and so verifies, `DIR/build.json`.
+  `hpx validate` became a group whose callback still runs the MLPerf suite
+  when no subcommand is given; suite options given with `build` are refused
+  as a usage error rather than ignored.
+- `hpx run DIR --board B --jlink-serial S` captures under an
+  `OperatorGuard(board, jlink_serial)` (`run_guard.py`): the operator vouches
+  for the physical board, as `hpx profile` assumes. Its `verify_target`
+  refuses a target board or serial other than the operator's, and `check()`
+  allows every step. `run_directory.run_from` asks the guard about the
+  build's target before `run_build`, so a wrong board is refused before the
+  evidence directory exists. `--expect host-litert|build|none` (default
+  `host-litert`), `--tolerance` (`max_abs_error`, default 0) and repeated
+  `--reference` files (instead of `--expect`) map onto `Expect`. Exit status
+  is 1 for a refusal or a failed capture and 3 when the outputs do not match.
+
+Each command prints its summary as JSON on stdout and reports a typed error
+on stderr with exit status 1.
+
 ### Timing windows by route
 
 Each route states its window in `RunIdentity.run`. The firmware decides the

@@ -21,9 +21,49 @@ real-valued zero for a quantized tensor with a nonzero zero point.
 Treat these results as timings for that input setup. Data-dependent kernels and
 stateful models can behave differently on application data; clearing input
 buffers is not a promise that the runtime resets internal state between calls.
-For caller-supplied inputs and output readback, use the
-[fixed-input fixture guide](https://github.com/AmbiqAI/helia-profiler/blob/main/maintainers/fixed-fixture.md) rather than inferring numerical
-correctness from a successful profile.
+For caller-supplied inputs and output readback, use the run API, from
+[the command line](#run-api-from-the-command-line) or from
+[Python](../../reference/api/helia_profiler/compiled_build/), rather than
+inferring numerical correctness from a successful profile.
+
+## Run API from the command line
+
+The run API builds a model once for fixed input bytes and captures from that
+build later, on this host or another, comparing the outputs with a
+reference. Four commands walk it:
+
+```sh
+hpx runtimes prepare helia-rt   # heliaRT and LiteRT link a prepared runtime
+hpx freeze model.tflite --engine helia-rt --backend helia --toolchain atfe \
+    --cpu-clock lp --arena-size 131072 --arena-location sram \
+    --weights-location mram -o plan.json
+hpx build plan.json --out runs/model --input input.bin
+hpx validate build runs/model
+hpx run runs/model --board apollo510_evb --jlink-serial 1160002255 --tolerance 1
+```
+
+- [`hpx freeze`](../../reference/cli/freeze/) resolves the config file and
+  options `hpx profile` takes and writes the plan. A run build needs ATfE,
+  the `lp` clock, an SRAM arena of explicit size and MRAM weights.
+- [`hpx build`](../../reference/cli/build/) copies the model and one file
+  per model input (`--input`, repeated in model order; zero bytes when
+  omitted) into `runs/model/inputs`, compiles under `runs/model/work`, and
+  saves `runs/model/build.json`. `--lifecycle` and `--timing-scope` choose
+  how the build runs and what its timed span covers.
+- [`hpx validate build`](../../reference/cli/validate/#hpx-validate-build) re-verifies
+  every pinned file and the plan without hardware. The saved build names the
+  run directory and the HPX cache as roots, so the directory can move.
+- [`hpx run`](../../reference/cli/run/) flashes the build and captures once
+  into a fresh `evidence-<N>` directory. You vouch for the physical board,
+  as `hpx profile` assumes: `--board` names the board wired to the probe
+  `--jlink-serial` names, and a board other than the build's is refused
+  before any device is touched. Outputs are compared with host LiteRT by
+  default (the `analysis` extra); `--expect build`, `--reference` files or
+  `--expect none` change that.
+
+Each command prints JSON: the build's identity, or a run's outcome,
+identity, per-tensor verification and timing. `hpx run` exits 1 when the
+capture fails and 3 when the outputs do not match.
 
 ## Prerequisites
 
