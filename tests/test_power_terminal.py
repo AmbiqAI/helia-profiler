@@ -496,12 +496,12 @@ def test_collect_from_chunks_survives_truncated_frame_prefix() -> None:
 def test_collect_from_chunks_discards_end_without_start() -> None:
     """An orphan END remnant is dropped so a later full frame still parses."""
     from helia_profiler.capture.power_terminal import (
-        POWER_TERMINAL_END,
         collect_power_terminal_envelope_from_chunks,
     )
+    from helia_profiler.wire import POWER_TERMINAL_END_SENTINEL
 
     valid = "\n".join(_lines()) + "\n"
-    chunks = [f"{POWER_TERMINAL_END}\n{valid}".encode()]
+    chunks = [f"{POWER_TERMINAL_END_SENTINEL}\n{valid}".encode()]
 
     envelope = collect_power_terminal_envelope_from_chunks(
         lambda: chunks.pop(0) if chunks else b"",

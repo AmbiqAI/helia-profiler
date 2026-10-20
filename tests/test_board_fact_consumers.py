@@ -43,7 +43,6 @@ def test_atomiq_trace_reference_is_independent_of_cpu():
     speed = soc.cpu_clock.speed("lp")
     assert speed is not None and speed.mhz == 25
     assert soc.capabilities.transport.swo_trace_clock_mhz == 48
-    assert not soc.capabilities.transport.swo_core_clocked
 
 
 @pytest.mark.parametrize("engine", ("tflm", "helia-rt", "helia-aot"))

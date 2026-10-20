@@ -1199,7 +1199,6 @@ _INA228_VARS: dict[str, object] = {
     "ina228_conversion_time_us": 540,
     "ina228_averaging_count": 16,
     "ina228_adc_range": 0,
-    "ina228_shunt_cal": 6250,
     "ina228_current_lsb_divisor": "13107200000.0",
     "ina228_calibration_id": "ina228:r2000000uohm:i500ma:adc0",
 }

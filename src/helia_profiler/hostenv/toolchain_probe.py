@@ -117,10 +117,6 @@ def _sections_via_size(
     )
 
 
-#: Legacy ``Grand Totals: <code> <ro> <rw> <zi>`` line, label first. No
-#: shipping fromelf has been observed to emit this shape; kept as the
-#: last-resort fallback so an unrecognised variant degrades to the old
-#: behaviour instead of reporting nothing (#132).
 #: Totals-row labels in the component-sizes table ("ROM Totals for x.axf",
 #: "Object Totals", "Library Totals", "Grand Totals", and armlink's own
 #: "ELF Image Totals" for defense). FULL-match, not prefix: fromelf echoes
@@ -130,6 +126,7 @@ def _sections_via_size(
 _FROMELF_TOTALS_LABEL_RE = re.compile(
     r"(?:ROM|Object|Library|Grand|ELF Image)\s+Totals(?:\s+for\s+.*)?"
 )
+#: Legacy ``Grand Totals`` line; last-resort fallback (#132).
 _FROMELF_TOTALS_RE = re.compile(r"\s*Grand Totals?\s*[:\s]+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)")
 
 #: Column header of ``fromelf --text -z``'s "Object/Image Component Sizes"
@@ -150,23 +147,6 @@ _FROMELF_SIZES_ROW_RE = re.compile(
     r"^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\S.*?)\s*$"
 )
 
-
-#: Section-name tokens treated as linker reservations rather than program
-#: state. Matched only among sections already known to be **NOBITS and
-#: allocated** -- the name alone is not evidence.
-#:
-#: Only ``.heap``; ``.stack`` is NOT one: on every NSX SoC that region IS
-#: the live stack --
-#: ``startup_gcc.c`` loads the initial MSP from its top and sets MSPLIM/PSPLIM
-#: from its base -- so it is memory the firmware genuinely needs, and it
-#: belongs in the reported footprint.
-#:
-#: ``.heap`` is different in kind on these parts, and that difference is the
-#: whole point of issue #24: NSX linker scripts do not size it to a
-#: requirement, they run it to the end of the region
-#: (``. = ORIGIN(MCU_TCM) + LENGTH(MCU_TCM);``) purely so ``_sbrk`` has a
-#: bounded area. Its size states what was left over, not what is needed, so
-#: counting it as footprint tells the reader nothing useful about the build.
 
 #: ``readelf -S -W`` row: ``[Nr] Name Type Addr Off Size ES Flg ...`` with the
 #: numeric columns in hex. The name is anchored to a leading dot so the empty

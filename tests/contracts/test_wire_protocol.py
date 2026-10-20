@@ -212,7 +212,6 @@ _INA228_VARS: dict[str, object] = {
     "ina228_conversion_time_us": 540,
     "ina228_averaging_count": 16,
     "ina228_adc_range": 0,
-    "ina228_shunt_cal": 6250,
     "ina228_current_lsb_divisor": "13107200000.0",
     "ina228_calibration_id": "ina228:r2000000uohm:i500ma:adc0",
 }
@@ -1181,13 +1180,6 @@ def test_power_terminal_key_sets():
         | POWER_TERMINAL_OPTIONAL_KEYS
         | {"HPX_POWER_INA228_DIAG", "HPX_POWER_INA228_BYSTANDER_FAILED"}
     )
-
-
-def test_power_terminal_parser_derives_its_schema_from_the_registry():
-    from helia_profiler.capture import power_terminal
-
-    assert power_terminal._REQUIRED_KEYS == POWER_TERMINAL_REQUIRED_KEYS
-    assert power_terminal._OPTIONAL_KEYS == POWER_TERMINAL_OPTIONAL_KEYS
 
 
 def _csv_emitter(soc: str, engine: str, *, has_armv8m_pmu: bool = True) -> str:

@@ -482,10 +482,7 @@ def _compare_layers(base_run: RunArtifacts, cand_run: RunArtifacts) -> list[Laye
     if len(base) != len(cand) or [row.get("op") for row in base] != [row.get("op") for row in cand]:
         return []
     rows: list[LayerDiffRow] = []
-    max_len = max(len(base), len(cand))
-    for idx in range(max_len):
-        b = base[idx] if idx < len(base) else {}
-        c = cand[idx] if idx < len(cand) else {}
+    for idx, (b, c) in enumerate(zip(base, cand, strict=True)):
         baseline_cycles = to_float(b.get("cycles"))
         candidate_cycles = to_float(c.get("cycles"))
         delta_cycles = None
