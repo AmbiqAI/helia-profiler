@@ -14,6 +14,7 @@ from rich.text import Text
 
 from ..firmware.workload import measured_clean_workload
 from ..power.metadata import PowerIntegrity
+from ..report.aot import _aot_manifest
 from ..report.memory import _cache_totals
 from ..results.serde import to_float
 from .tables import _fmt_bytes, _progress_bar
@@ -431,18 +432,9 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
     # op-label suffix), never on the execution position — AOT renumbers.
     attributor = None
     if has_macs:
-        from ..engines.base import HeliaAotArtifacts
         from ..modelcost.layer_attribution import LayerAttributor
 
-        # An AOT run always gets an authoritative manifest — [] when it has
-        # none, because degraded firmware labels layers with POSITIONS and
-        # the suffix fallback would join positionally again.
-        manifest = (
-            (ctx.engine_artifacts.aot_op_manifest or [])
-            if isinstance(ctx.engine_artifacts, HeliaAotArtifacts)
-            else None
-        )
-        attributor = LayerAttributor(ctx.model_analysis, manifest)
+        attributor = LayerAttributor(ctx.model_analysis, _aot_manifest(ctx))
 
     for i, layer in enumerate(top_n, 1):
         cyc = layer.cycles
@@ -551,13 +543,8 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
     elif ctx.memory_plan is not None and ctx.memory_plan.regions:
         render_memory_plan(console, ctx.memory_plan)
 
-    cache_totals: dict[str, float] = {}
-    for layer in layers:
-        for cname in _CACHE_DISPLAY:
-            if cname in layer.counters:
-                cache_totals[cname] = cache_totals.get(cname, 0) + layer.counters[cname]
-
-    if cache_totals:
+    cache_totals = _cache_totals(layers)
+    if any(cname in cache_totals for cname in _CACHE_DISPLAY):
         cache_table = Table(
             title="[bold]Cache & Memory[/bold]",
             box=box.SIMPLE_HEAVY,
@@ -573,7 +560,7 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
                 short = cname.replace("ARM_PMU_", "")
                 cache_table.add_row(short, f"{cache_totals[cname]:,.0f}")
 
-        hit_rate = _cache_totals(layers).get("l1d_hit_rate_pct")
+        hit_rate = cache_totals.get("l1d_hit_rate_pct")
         if hit_rate is not None:
             style = "green" if hit_rate >= 95 else "yellow" if hit_rate >= 80 else "red"
             cache_table.add_row(

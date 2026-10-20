@@ -16,6 +16,8 @@ from rich.text import Text
 from ..results.serde import to_float as _to_compare_float
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from ..evaluation import CompareResult, LayerDiffRow, MetricDiff
     from .base import HpxConsole
 
@@ -103,11 +105,13 @@ def _build_compare_run_table(metrics: list[MetricDiff]) -> Table:
     for metric in metrics:
         table.add_row(
             _friendly_metric_name(metric.name),
-            _format_compare_value_compact(metric.baseline, metric.unit),
-            _format_compare_value_compact(metric.candidate, metric.unit),
+            _format_compare_value(metric.baseline, metric.unit, _format_compact_number),
+            _format_compare_value(metric.candidate, metric.unit, _format_compact_number),
             # Direction is declared per row (#206), not guessed from the
             # name -- "free" and "inferences_per_joule" are higher-is-better.
-            _format_compare_change_compact(metric, lower_is_better=metric.lower_is_better),
+            _format_compare_delta(
+                metric, lower_is_better=metric.lower_is_better, fmt=_format_compact_number
+            ),
         )
 
     return table
@@ -196,9 +200,11 @@ def _build_compare_placement_table(
 
 
 def _format_compare_headline(metric: MetricDiff, *, lower_is_better: bool) -> str:
-    baseline = _format_compare_value(metric.baseline, metric.unit)
-    candidate = _format_compare_value(metric.candidate, metric.unit)
-    delta = _format_compare_delta(metric, lower_is_better=lower_is_better)
+    baseline = _format_compare_value(metric.baseline, metric.unit, _format_compare_number)
+    candidate = _format_compare_value(metric.candidate, metric.unit, _format_compare_number)
+    delta = _format_compare_delta(
+        metric, lower_is_better=lower_is_better, fmt=_format_compare_number
+    )
     return f"{baseline} → [bold]{candidate}[/bold]  {delta}"
 
 
@@ -241,44 +247,23 @@ def _friendly_metric_name(name: str) -> str:
     return labels.get(name, name)
 
 
-def _format_compare_value(value: Any, unit: str) -> str:
+def _format_compare_value(value: Any, unit: str, fmt: Callable[[Any], str]) -> str:
     if value is None:
         return "—"
     number = _to_compare_float(value)
     if number is not None:
         suffix = f" {_short_compare_unit(unit)}" if unit else ""
-        return f"{_format_compare_number(number)}{suffix}"
+        return f"{fmt(number)}{suffix}"
     return escape(str(value))
 
 
-def _format_compare_value_compact(value: Any, unit: str) -> str:
-    if value is None:
-        return "—"
-    number = _to_compare_float(value)
-    if number is not None:
-        suffix = f" {_short_compare_unit(unit)}" if unit else ""
-        return f"{_format_compact_number(number)}{suffix}"
-    return escape(str(value))
-
-
-def _format_compare_delta(metric: MetricDiff, *, lower_is_better: bool) -> str:
+def _format_compare_delta(
+    metric: MetricDiff, *, lower_is_better: bool, fmt: Callable[[Any], str]
+) -> str:
     if metric.delta is None:
         return "—"
     pct = f" ({metric.delta_pct:+.1f}%)" if metric.delta_pct is not None else ""
-    body = f"{_format_compare_number(metric.delta)}"
-    if metric.unit:
-        body += f" {_short_compare_unit(metric.unit)}"
-    body += pct
-
-    style = _delta_style(metric.delta, lower_is_better=lower_is_better)
-    return f"[{style}]{body}[/{style}]" if style else body
-
-
-def _format_compare_change_compact(metric: MetricDiff, *, lower_is_better: bool) -> str:
-    if metric.delta is None:
-        return "—"
-    pct = f" ({metric.delta_pct:+.1f}%)" if metric.delta_pct is not None else ""
-    body = _format_compact_number(metric.delta)
+    body = fmt(metric.delta)
     if metric.unit:
         body += f" {_short_compare_unit(metric.unit)}"
     body += pct
