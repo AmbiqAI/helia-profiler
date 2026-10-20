@@ -707,7 +707,10 @@ state carries between invocations. Where an instance ends is the engine's
 :class:`InstanceBoundary`: for a ``boot`` engine ``SINGLE`` is one timed
 invocation and no warmups per boot; for an ``invocation`` engine, such as
 ExecuTorch, every invocation is its own instance, so several measurements
-are several instances, never one carried state.
+are several instances, never one carried state. The fixture firmware
+refuses a timed span of zero ticks of its 32.768 kHz timer, so a
+``SINGLE`` invocation shorter than about 30.5 µs can fail as
+``TIMING_BOUND``.
 
 **API tier:** `experimental`
 
@@ -721,7 +724,7 @@ Source: `src/helia_profiler/lifecycle.py:17`
 CARRY = 'carry'
 ```
 
-Source: `src/helia_profiler/lifecycle.py:30`
+Source: `src/helia_profiler/lifecycle.py:33`
 
 ### helia_profiler.Lifecycle.SINGLE
 
@@ -731,7 +734,7 @@ Source: `src/helia_profiler/lifecycle.py:30`
 SINGLE = 'single'
 ```
 
-Source: `src/helia_profiler/lifecycle.py:31`
+Source: `src/helia_profiler/lifecycle.py:34`
 
 ## helia_profiler.hpx_cache_root
 
@@ -1025,7 +1028,7 @@ Read and verify a compiled build written by :meth:`CompiledBuild.save`.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/compiled_build.py:471`
+Source: `src/helia_profiler/compiled_build.py:478`
 
 ## helia_profiler.run_build
 
@@ -1048,7 +1051,7 @@ Flash *compiled*'s image, capture one run and compare outputs; see :meth:`Compil
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/compiled_build.py:476`
+Source: `src/helia_profiler/compiled_build.py:483`
 
 ---
 
