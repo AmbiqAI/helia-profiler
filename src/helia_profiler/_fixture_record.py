@@ -93,7 +93,7 @@ _FIELDS = frozenset(
 #: The record's ``fixture_api`` version, inside ``hpx.compiled-build`` version 3.
 _RECORD_VERSION = (7, 0)
 
-#: Optional since API 5.6; absent from a record when unknown, so older identities hold.
+#: Absent from a record when unknown.
 _SOURCE_FIELDS = ("kernel_source", "runtime_source")
 
 
@@ -121,8 +121,6 @@ def _payload(build: FixtureBuild, *, file, path) -> dict:
             del result[name]
     if result["power_sync"] is None:
         del result["power_sync"]
-    elif build.power_sync is not None and build.power_sync.protocol_version == 1:
-        del result["power_sync"]["protocol_version"]
     _object(
         result,
         _FIELDS
@@ -270,8 +268,6 @@ def verify_fixture_build(build: FixtureBuild) -> None:
             raise ValueError("Runtime source version must be a string or absent")
         _digest(build.runtime_source.archive_sha256)
     if build.kernel_source is not None or build.runtime_source is not None:
-        if build.power_sync is not None and build.power_sync.protocol_version == 1:
-            raise ValueError("Kernel and runtime sources postdate power protocol 1 records")
         try:
             stated = pinned_sources(
                 build.runtime_manifest.read() if build.runtime_manifest else None,
@@ -375,9 +371,7 @@ def dump_fixture_build(build: FixtureBuild, *, roots: Mapping[str, Path]) -> str
         _json(
             {
                 "schema_version": 1,
-                "fixture_api": (5, 1)
-                if build.power_sync is not None and build.power_sync.protocol_version == 1
-                else _RECORD_VERSION,
+                "fixture_api": _RECORD_VERSION,
                 "build": _payload(build, file=mapping.file, path=mapping.encode),
             }
         )
@@ -451,44 +445,17 @@ def load_fixture_build(record: str | bytes, *, roots: Mapping[str, Path]) -> Fix
     if (
         type(outer["schema_version"]) is not int
         or outer["schema_version"] != 1
-        or _json(outer["fixture_api"])
-        not in (
-            _json((5, 0)),
-            _json((5, 1)),
-            _json((5, 2)),
-            _json((5, 3)),
-            _json((5, 4)),
-            _json((5, 5)),
-            _json((5, 6)),
-            _json((5, 7)),
-            _json((5, 8)),
-            _json((6, 0)),
-            _json((6, 1)),
-            _json(_RECORD_VERSION),
-        )
+        or _json(outer["fixture_api"]) != _json(_RECORD_VERSION)
     ):
-        raise ValueError("Unsupported fixture build record/API version")
+        raise ValueError(
+            f"Unsupported fixture build record version {outer['fixture_api']!r}; "
+            f"this heliaPROFILER reads {list(_RECORD_VERSION)}, so read it with the "
+            "HPX release that wrote it"
+        )
     if not isinstance(outer["build"], dict):
         raise ValueError("Fixture build must be a JSON object")
-    power_fields = {"power_sync"} if "power_sync" in outer["build"] else set()
-    if power_fields and _json(outer["fixture_api"]) == _json((5, 0)):
-        raise ValueError("Power firmware requires its declared API version")
-    ram_fields = {"observe_ram"} if "observe_ram" in outer["build"] else set()
-    if ram_fields and outer["fixture_api"] not in (
-        [5, 4],
-        [5, 5],
-        [5, 6],
-        [5, 7],
-        [5, 8],
-        [6, 0],
-        [6, 1],
-        list(_RECORD_VERSION),
-    ):
-        raise ValueError("RAM diagnostic requires its declared API version")
-    source_fields = {name for name in _SOURCE_FIELDS if name in outer["build"]}
-    if source_fields and tuple(outer["fixture_api"]) < (5, 6):
-        raise ValueError("Kernel and runtime sources require their declared API version")
-    value = dict(_object(outer["build"], _FIELDS | power_fields | ram_fields | source_fields))
+    optional = {"power_sync", "observe_ram", *_SOURCE_FIELDS} & set(outer["build"])
+    value = dict(_object(outer["build"], _FIELDS | optional))
     try:
         value["app_dir"] = mapping.decode(value["app_dir"])
         for name in _FILE_FIELDS:
@@ -548,11 +515,11 @@ def load_fixture_build(record: str | bytes, *, roots: Mapping[str, Path]) -> Fix
                 psram["clock_hz"],
             )
         if "power_sync" in value:
-            legacy = _json(outer["fixture_api"]) == _json((5, 1))
-            fields = ("sync_gpio_pin", "state_gpio_pin", "go_gpio_pin")
             value["power_sync"] = FixturePowerSync(
-                **_object(value["power_sync"], fields if legacy else (*fields, "protocol_version")),
-                **({"protocol_version": 1} if legacy else {}),
+                **_object(
+                    value["power_sync"],
+                    ("sync_gpio_pin", "state_gpio_pin", "go_gpio_pin", "protocol_version"),
+                )
             )
         result = FixtureBuild(**value)
         verify_fixture_build(result)

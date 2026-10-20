@@ -11,9 +11,9 @@ One class owns the artifact's shape for BOTH sides of the boundary:
 * **consumers** (``validation/runner.py`` today; more as they migrate) load
   artifacts through :func:`load_run_summary` / :meth:`RunSummary.from_dict`,
   a *tolerant* reader: missing fields become ``None``, unknown keys are
-  preserved on ``extras`` for inspection, and cross-version interpretation
-  (legacy key spellings, drift arbitration between schema versions) lives in
-  properties here instead of being re-derived at every read site.
+  preserved on ``extras`` for inspection, and derived readings (unit
+  conversions, the gate-drift arbitration) live in properties here instead
+  of being re-derived at every read site.
 
 A field's meaning has one home: consumers read it here instead of
 re-deriving semantics the producer never promised.
@@ -24,8 +24,8 @@ imports nothing from ``evaluation/`` or ``report/`` — ``evaluation`` imports
 
 Reader vs writer asymmetry, stated honestly: ``to_dict`` serializes only the
 canonical schema — it does NOT re-emit ``extras``. The producer never
-populates ``extras``; the reader keeps them so a consumer can inspect a
-newer-or-older artifact without this module lying about round-tripping it.
+populates ``extras``; the reader keeps them so a consumer can inspect an
+unexpected key without this module lying about round-tripping it.
 """
 
 from __future__ import annotations
@@ -434,44 +434,26 @@ class PowerSection:
             extras={k: v for k, v in data.items() if k not in known},
         )
 
-    # -- cross-version interpretation (the runner's legacy fallbacks, once) --
+    # -- derived readings, interpreted once for every consumer --
 
     @property
     def energy_uj(self) -> float | None:
-        """Total gated energy in µJ, across three schema generations.
-
-        Precedence: explicit-unit legacy keys, then the canonical SI field
-        scaled. A null or garbage legacy value falls through to the next
-        source instead of raising.
-        """
-        for legacy in ("total_energy_uj", "energy_uJ"):
-            value = to_float(self.extras.get(legacy))
-            if value is not None:
-                return value
+        """Total gated energy in µJ."""
         value = to_float(self.energy_j)
         return value * 1e6 if value is not None else None
 
     @property
     def avg_current_ma(self) -> float | None:
-        value = to_float(self.extras.get("avg_current_ma"))
-        if value is not None:
-            return value
         value = to_float(self.avg_current_a)
         return value * 1e3 if value is not None else None
 
     @property
     def avg_power_mw(self) -> float | None:
-        value = to_float(self.extras.get("avg_power_mw"))
-        if value is not None:
-            return value
         value = to_float(self.avg_power_w)
         return value * 1e3 if value is not None else None
 
     @property
     def peak_current_ma(self) -> float | None:
-        value = to_float(self.extras.get("peak_current_ma"))
-        if value is not None:
-            return value
         value = to_float(self.peak_current_a)
         return value * 1e3 if value is not None else None
 

@@ -233,7 +233,11 @@ def compare_runs(
 
 
 def load_run_artifacts(path: Path) -> RunArtifacts:
-    """Load and, when published, verify one profile result bundle."""
+    """Load and verify one published profile result bundle.
+
+    A directory without ``result_manifest.json`` was written by an HPX
+    release before manifests and is refused; compare it with that release.
+    """
 
     run_dir = path.expanduser().resolve()
     if not run_dir.is_dir():
@@ -241,12 +245,15 @@ def load_run_artifacts(path: Path) -> RunArtifacts:
     if (run_dir / RESULT_PUBLICATION_INCOMPLETE).exists():
         raise ReportError(f"Result publication is incomplete: {run_dir}")
 
-    declared: set[str] | None = None
-    manifest: ResultManifest | None = None
     manifest_path = run_dir / "result_manifest.json"
-    if manifest_path.is_file():
-        manifest = load_result_manifest(manifest_path, verify=True)
-        declared = {artifact.path for artifact in manifest.artifacts}
+    if not manifest_path.is_file():
+        raise ReportError(
+            f"No result_manifest.json in {run_dir}",
+            hint="A result without a manifest was written by an older heliaPROFILER; "
+            "compare it with the HPX release that wrote it.",
+        )
+    manifest = load_result_manifest(manifest_path, verify=True)
+    declared = {artifact.path for artifact in manifest.artifacts}
 
     summary_path = _declared_artifact(run_dir, "summary.json", declared)
     metadata_path = _declared_artifact(run_dir, "run_metadata.json", declared)
@@ -255,10 +262,8 @@ def load_run_artifacts(path: Path) -> RunArtifacts:
 
     csv_path = run_dir / "profile_results.csv"
     json_path = run_dir / "profile_results.json"
-    csv_available = csv_path.is_file() and (declared is None or "profile_results.csv" in declared)
-    json_available = json_path.is_file() and (
-        declared is None or "profile_results.json" in declared
-    )
+    csv_available = csv_path.is_file() and "profile_results.csv" in declared
+    json_available = json_path.is_file() and "profile_results.json" in declared
     if csv_available:
         layers = _read_layer_csv(csv_path)
     elif json_available:
@@ -270,9 +275,7 @@ def load_run_artifacts(path: Path) -> RunArtifacts:
         )
 
     layer_memory_path = run_dir / "aot_memory_layers.csv"
-    layer_memory_available = layer_memory_path.is_file() and (
-        declared is None or "aot_memory_layers.csv" in declared
-    )
+    layer_memory_available = layer_memory_path.is_file() and "aot_memory_layers.csv" in declared
     layer_memory = _read_layer_memory_csv(layer_memory_path) if layer_memory_available else {}
 
     return RunArtifacts(
@@ -427,8 +430,8 @@ def _read_layer_json(path: Path) -> list[dict[str, Any]]:
     return layers
 
 
-def _declared_artifact(run_dir: Path, name: str, declared: set[str] | None) -> Path:
-    if declared is not None and name not in declared:
+def _declared_artifact(run_dir: Path, name: str, declared: set[str]) -> Path:
+    if name not in declared:
         raise ReportError(f"Result manifest does not declare required artifact: {name}")
     return run_dir / name
 

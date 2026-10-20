@@ -70,25 +70,29 @@ def test_reader_preserves_unknown_keys_and_reads_canonical_fields(tmp_path: Path
     assert summary.power.extras == {"a_future_power_field": 7}
 
 
-def test_legacy_energy_and_current_spellings() -> None:
-    """The validation runner's three-generation fallbacks, now on the model:
-    precedence is the legacy explicit-unit keys first, then the canonical
-    SI field scaled."""
-    legacy = PowerSection.from_dict(
-        {"total_energy_uj": 1600.0, "energy_j": 0.0999, "avg_current_ma": 4.5}
-    )
-    assert legacy.energy_uj == 1600.0
-    assert legacy.avg_current_ma == 4.5
-
+def test_energy_and_current_readings_scale_the_si_fields() -> None:
     canonical = PowerSection.from_dict(
-        {"energy_j": 0.0016, "avg_current_a": 0.004, "avg_power_w": 0.008}
+        {
+            "energy_j": 0.0016,
+            "avg_current_a": 0.004,
+            "avg_power_w": 0.008,
+            "peak_current_a": 0.01,
+        }
     )
     assert canonical.energy_uj == pytest.approx(1600.0)
     assert canonical.avg_current_ma == pytest.approx(4.0)
     assert canonical.avg_power_mw == pytest.approx(8.0)
+    assert canonical.peak_current_ma == pytest.approx(10.0)
+    assert PowerSection.from_dict({"energy_j": None}).energy_uj is None
 
-    middle = PowerSection.from_dict({"energy_uJ": 5.0})
-    assert middle.energy_uj == 5.0
+
+def test_unit_suffixed_keys_are_extras_not_readings() -> None:
+    section = PowerSection.from_dict(
+        {"total_energy_uj": 1600.0, "energy_uJ": 5.0, "avg_current_ma": 4.5, "energy_j": 2e-6}
+    )
+    assert section.energy_uj == pytest.approx(2.0)
+    assert section.avg_current_ma is None
+    assert set(section.extras) == {"total_energy_uj", "energy_uJ", "avg_current_ma"}
 
 
 def test_gate_duration_unarbitrated_failure_interpretation() -> None:
@@ -195,9 +199,9 @@ def test_healthy_producer_shape_passes_the_check() -> None:
     )
 
 
-def test_minimal_old_artifact_loads(tmp_path: Path) -> None:
-    """A pre-v2-shaped document (no schema fields, no power) still loads —
-    the reader owes older artifacts tolerance, not a version gate."""
+def test_a_minimal_document_loads_tolerantly(tmp_path: Path) -> None:
+    """A document with no schema fields and no power loads; the strict
+    reader in ``records`` is the one that gates the version."""
     path = tmp_path / "summary.json"
     path.write_text(json.dumps({"engine": "litert", "layers": 3, "total_cycles": 42}))
 
@@ -207,17 +211,6 @@ def test_minimal_old_artifact_loads(tmp_path: Path) -> None:
     assert summary.schema_version == 1
     assert summary.power is None
     assert summary.validity is None
-
-
-def test_legacy_pair_precedence() -> None:
-    """Both spellings present: the older explicit-unit key wins, in the
-    documented order."""
-    both_energy = PowerSection.from_dict({"total_energy_uj": 1.0, "energy_uJ": 2.0})
-    assert both_energy.energy_uj == 1.0
-    both_current = PowerSection.from_dict({"avg_current_ma": 3.0, "avg_current_a": 0.004})
-    assert both_current.avg_current_ma == 3.0
-    both_power = PowerSection.from_dict({"avg_power_mw": 5.0, "avg_power_w": 0.008})
-    assert both_power.avg_power_mw == 5.0
 
 
 def test_non_dict_root_raises_value_error(tmp_path: Path) -> None:
@@ -249,14 +242,6 @@ def test_hostile_shapes_read_as_absent_not_crash() -> None:
     assert infinite.total_cycles_int is None
 
 
-def test_null_legacy_keys_fall_through_to_canonical() -> None:
-    """A null-valued legacy key is garbage, not a value: the property falls
-    through to the next source (the old read sites crashed with TypeError)."""
-    section = PowerSection.from_dict({"total_energy_uj": None, "energy_j": 2e-6})
-    assert section.energy_uj == pytest.approx(2.0)
-    assert PowerSection.from_dict({"avg_current_ma": None}).avg_current_ma is None
-
-
 def test_identity_is_modelled_and_emitted_after_dependencies() -> None:
     identity = {"runtime": {"engine": "helia-rt"}, "build_hash": {"unknown": "no image"}}
     summary = _base_summary()
@@ -267,11 +252,3 @@ def test_identity_is_modelled_and_emitted_after_dependencies() -> None:
 
     _shape_check(ordered)
     assert RunSummary.from_dict(ordered).identity == identity
-
-
-def test_a_v13_summary_reads_without_identity() -> None:
-    summary = RunSummary.from_dict(_base_summary(schema_version=13))
-
-    assert summary.schema_version == 13
-    assert summary.identity is None
-    assert summary.extras == {}

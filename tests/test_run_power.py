@@ -525,18 +525,6 @@ def test_route_refusals_name_what_is_missing_and_what_to_do(engine, board, messa
     assert "None" not in str(raised.value) and raised.value.hint == hint
 
 
-def test_a_protocol_mismatch_is_named_apart_from_the_pins(tmp_path, build, device, monkeypatch):
-    legacy = FixturePowerSync(29, 36, 14, protocol_version=1)
-    wired = _as(build, "helia-aot", timing_scope=_RESTORE, power_sync=legacy)
-    record = compiled(plan_for(wired, tmp_path / "model.tflite"), wired, Lifecycle.CARRY)
-    monkeypatch.setattr(CompiledBuild, "verify", lambda self: None)
-
-    with pytest.raises(ConfigError, match="speaks power protocol 1") as raised:
-        _run(record, tmp_path, power=_rail(), power_guard=_Authority("station", []))
-    assert "pins" not in str(raised.value)
-    assert device.calls == []
-
-
 # settle_seconds
 
 

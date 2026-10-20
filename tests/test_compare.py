@@ -10,25 +10,30 @@ import pytest
 
 from helia_profiler.errors import ReportError
 from helia_profiler.evaluation import (
+    CompareResult,
     ComparisonProfile,
     ConfigDiffRow,
     CounterDiff,
     LayerDiffRow,
     MetricDirection,
     MetricPolicy,
-    compare_runs,
     write_compare_artifacts,
 )
+from helia_profiler.evaluation import compare_runs as _compare_runs
 from helia_profiler.report.csv_writer import _write_csv
 from helia_profiler.results import (
     FirmwareMeta,
     LayerResult,
     PmuResult,
-    ResultArtifact,
     ResultManifest,
-    ResultValidity,
-    RunStatus,
 )
+from tests.result_bundles import publish_manifest, published
+
+
+def compare_runs(baseline: Path, candidate: Path, **kwargs) -> CompareResult:
+    """Compare two runs as ``hpx profile`` publishes them, with a manifest each."""
+    published(baseline, candidate)
+    return _compare_runs(baseline, candidate, **kwargs)
 
 
 def _write_run(
@@ -175,34 +180,6 @@ def _replace_csv_with_json(path: Path) -> None:
     csv_path.unlink()
 
 
-def _publish_manifest(path: Path) -> Path:
-    import hashlib
-
-    artifacts = []
-    for artifact_path in sorted(item for item in path.iterdir() if item.is_file()):
-        artifacts.append(
-            ResultArtifact(
-                path=artifact_path.name,
-                media_type=("application/json" if artifact_path.suffix == ".json" else "text/csv"),
-                size_bytes=artifact_path.stat().st_size,
-                sha256=hashlib.sha256(artifact_path.read_bytes()).hexdigest(),
-            )
-        )
-    return ResultManifest(
-        schema="hpx.result-manifest",
-        schema_version=1,
-        run_id=path.name,
-        timestamp="2026-07-18T00:00:00+00:00",
-        hpx_version="0.1.0",
-        status=RunStatus.COMPLETE,
-        validity=ResultValidity.VALID,
-        issues=(),
-        provenance={},
-        comparability={},
-        artifacts=tuple(artifacts),
-    ).write(path / "result_manifest.json")
-
-
 def test_compare_runs_computes_run_and_layer_deltas(tmp_path: Path):
     baseline = tmp_path / "gcc"
     candidate = tmp_path / "atfe"
@@ -225,6 +202,18 @@ def test_compare_runs_computes_run_and_layer_deltas(tmp_path: Path):
     assert result.layer_rows[0].speedup == 800 / 600
     assert isinstance(result.config_rows[0], ConfigDiffRow)
     assert any(row.field == "Toolchain" and row.status == "diff" for row in result.config_rows)
+
+
+def test_a_run_without_a_manifest_is_refused(tmp_path: Path):
+    baseline = tmp_path / "base"
+    candidate = tmp_path / "candidate"
+    for path in (baseline, candidate):
+        _write_run(path, toolchain="atfe", total_cycles=1000, avg_us=10, layer_cycles=[800])
+    publish_manifest(candidate)
+
+    with pytest.raises(ReportError, match="No result_manifest.json") as refused:
+        _compare_runs(baseline, candidate)
+    assert "HPX release that wrote it" in (refused.value.hint or "")
 
 
 def test_required_missing_dimensions_refuse_otherwise_valid_legacy_pair(tmp_path: Path):
@@ -275,8 +264,8 @@ def test_compare_loads_json_profile_results(tmp_path: Path):
     )
     _replace_csv_with_json(baseline)
     _replace_csv_with_json(candidate)
-    _publish_manifest(baseline)
-    _publish_manifest(candidate)
+    publish_manifest(baseline)
+    publish_manifest(candidate)
 
     result = compare_runs(baseline, candidate)
 
@@ -294,7 +283,7 @@ def test_compare_verifies_manifest_before_loading(tmp_path: Path):
             avg_us=10,
             layer_cycles=[800],
         )
-        _publish_manifest(path)
+        publish_manifest(path)
     (candidate / "summary.json").write_text('{"total_cycles": 1}')
 
     with pytest.raises(ReportError, match="size mismatch|digest mismatch"):
@@ -693,6 +682,7 @@ def test_memory_rows_join_on_the_source_index_not_position(tmp_path: Path):
     # dual key attached it; the source-index join must not.
     for d, mem in ((baseline, "dtcm"), (candidate, "sram")):
         _write_aot_memory_layers(d, mem, layer_idx=0, layer_id=3)
+        publish_manifest(d)
 
     row = compare_runs(baseline, candidate).layer_rows[0]
 
@@ -871,28 +861,10 @@ def _memory_regions_block(link_family: str, **regions: tuple[int, int]) -> dict:
 class TestMemoryRegionRows:
     """#206: per-region used/free become compare rows, gated on link family."""
 
-    def test_config_row_shows_the_family_the_gate_judged(self, tmp_path):
-        """#213: a pre-#206 pair must not render 'Link family — — same'
-        while the gate (reading the summary fallback) withholds the rows."""
-        from helia_profiler.evaluation.compare import RunArtifacts, _compare_config
-
-        def run(measured: str) -> RunArtifacts:
-            return RunArtifacts(
-                path=tmp_path,
-                summary={"memory_regions": _memory_regions_block(measured, DTCM=(1, 1))},
-                metadata={"platform": {"board": "apollo510_evb"}},
-                layers=[],
-            )
-
-        row = next(r for r in _compare_config(run("gnu"), run("armlink")) if r.key == "link_family")
-
-        assert (row.baseline, row.candidate, row.status) == ("gnu", "armlink", "diff")
-
     def test_config_row_shows_the_manifest_merged_value_the_gate_judged(self, tmp_path):
         """#213: the manifest merges last for the gate; a Config
         row reading artifacts by path could disagree with it. One reader."""
         from helia_profiler.evaluation.compare import RunArtifacts, _compare_config
-        from helia_profiler.results import ResultManifest
 
         manifest = ResultManifest.from_dict(
             {

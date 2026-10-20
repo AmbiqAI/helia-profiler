@@ -217,10 +217,8 @@ def capture_fixture(
         "PSRAM expectation is not bound to the capture image",
     )
     require(
-        request.power_sync is None
-        or isinstance(request.power_sync, FixturePowerSync)
-        and request.power_sync.protocol_version == 2,
-        "Power capture requires protocol 2 firmware with DONE; rebuild the instrumented image",
+        request.power_sync is None or isinstance(request.power_sync, FixturePowerSync),
+        "Power capture requires the firmware's power wiring",
     )
     require(
         (request.power_sync is None) == (request.rail_power is None)

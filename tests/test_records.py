@@ -243,18 +243,11 @@ def test_incomplete_status_is_not_a_verified_failure(tmp_path):
     assert inspect_result(bundle(tmp_path, status="incomplete")).code == "incomplete_result"
 
 
-@pytest.mark.parametrize("version", [True, 10, RUN_SUMMARY_SCHEMA_VERSION + 1])
+@pytest.mark.parametrize("version", [True, 10, 11, 18, RUN_SUMMARY_SCHEMA_VERSION + 1])
 def test_unsupported_summary_semantics_are_explicit(tmp_path, version):
     path = bundle(tmp_path)
     edit_document(path, "summary.json", lambda d: d.update(schema_version=version))
     assert inspect_result(path).code == "unsupported_schema"
-
-
-@pytest.mark.parametrize("version", [13, RUN_SUMMARY_SCHEMA_VERSION])
-def test_summaries_before_and_with_identity_both_read(tmp_path, version):
-    path = bundle(tmp_path)
-    edit_document(path, "summary.json", lambda d: d.update(schema_version=version))
-    assert _profile(path).summary is not None
 
 
 _HEX = "ab" * 32
@@ -360,12 +353,16 @@ def test_the_reader_and_the_packaged_schema_agree_on_identity_hashes(tmp_path, i
     assert (inspect_result(path).code is None) is readable
 
 
-def test_a_previous_summary_keeps_its_bare_hex_identity_hashes(tmp_path):
+def test_a_v18_summary_is_refused_naming_the_release_that_reads_it(tmp_path):
     identity = _identity(build_hash=_HEX, observation_hash=_HEX, intent_hash=None, inputs_hash=_HEX)
     path = bundle(tmp_path)
     edit_document(path, "summary.json", lambda d: d.update(schema_version=18, identity=identity))
-    summary = _profile(path).summary
-    assert summary is not None and summary.identity == identity
+    refused = inspect_result(path)
+    assert refused.result is None and refused.code == "unsupported_schema"
+    assert refused.message == (
+        "Unsupported run summary version: 18; this heliaPROFILER reads version "
+        f"{RUN_SUMMARY_SCHEMA_VERSION}, so read the result with the HPX release that wrote it"
+    )
 
 
 @pytest.mark.parametrize("value", [True, 0.5, -1])

@@ -460,8 +460,6 @@ def build_fixed_fixture(
     """Render or compile one fixed fixture through profiler's host-only stages."""
     if not isinstance(method, FixtureMethod):
         raise ConfigError("Explicit FixtureMethod required")
-    if method.power_sync is not None and method.power_sync.protocol_version != 2:
-        raise ConfigError("New power firmware requires completion protocol 2")
     _validate(config, fixture)
     if config.target.board == "apollo510b_evb" and method.power_sync is not None:
         raise ConfigError("AP510B fixture integration is timing-only")

@@ -17,6 +17,7 @@ from helia_profiler.firmware.workload import measured_clean_workload
 from helia_profiler.report.summary import _write_summary
 from helia_profiler.results import PowerRun, PowerRunPlan
 from helia_profiler.results.run_summary import RunSummary, load_run_summary
+from tests.result_bundles import published
 from tests.test_compare import _write_run
 from tests.test_report import _gated_power_ctx
 from tests.test_template_render import _render_aot
@@ -190,6 +191,7 @@ def test_power_workload_comparison_preserves_profile_metrics(
         data["schema_version"] = 5 if name == "old" else 6
         summary_path.write_text(json.dumps(data), encoding="utf-8")
         assert load_run_summary(summary_path).schema_version == data["schema_version"]
+    published(tmp_path / "old", tmp_path / "new")
     result = compare_runs(tmp_path / "old", tmp_path / "new")
     schema_row = next(row for row in result.config_rows if row.key == "run_summary_schema_version")
     assert (schema_row.baseline, schema_row.candidate, schema_row.status) == (5, 6, "diff")

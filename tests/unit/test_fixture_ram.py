@@ -81,10 +81,8 @@ def test_ram_option_is_identity_bound_and_round_trips(tmp_path):
     record = dump_fixture_build(changed, roots={"run": tmp_path})
     assert load_fixture_build(record, roots={"run": tmp_path}) == changed
     body = json.loads(record)
-    body["fixture_api"] = [5, 4]
-    assert load_fixture_build(json.dumps(body), roots={"run": tmp_path}) == changed
-    body["fixture_api"] = [5, 3]
-    with pytest.raises(ValueError, match="RAM diagnostic"):
+    body["build"]["observe_ram"] = False
+    with pytest.raises(ValueError, match="identity mismatch"):
         load_fixture_build(json.dumps(body), roots={"run": tmp_path})
 
 

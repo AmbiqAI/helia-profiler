@@ -61,6 +61,7 @@ def test_power_health_rejects_invalid_gate_integrity():
         total_cycles=123456,
         energy_uj=100.0,
         gate_duration_integrity_valid=False,
+        gate_duration_unarbitrated_failure=True,
     )
 
     assert validation_health_issues(result) == (
@@ -93,6 +94,7 @@ def test_power_health_accepts_arbitrated_drift():
             "window ran 11.8% short of the profile-phase expectation but "
             "agrees with the firmware's own STIMER window time"
         ),
+        gate_duration_unarbitrated_failure=False,
     )
 
     assert validation_health_issues(result) == ()

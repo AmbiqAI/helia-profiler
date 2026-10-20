@@ -221,15 +221,6 @@ def test_a_prepared_runtime_manifest_reads_without_its_archive(tmp_path):
         _manifest_facts(tampered)
 
 
-def test_a_record_from_the_previous_api_still_loads(tmp_path):
-    build = _aot(tmp_path)
-    record = json.loads(dump_fixture_build(build, roots={"run": tmp_path}))
-    assert record["fixture_api"] == [7, 0]
-    for previous in ([5, 6], [5, 7], [5, 8], [6, 0], [6, 1]):
-        record["fixture_api"] = previous
-        assert load_fixture_build(json.dumps(record), roots={"run": tmp_path}) == build
-
-
 def test_the_build_hash_covers_the_runtime_archive_the_model_and_the_lock(tmp_path):
     from helia_profiler import FixtureRuntimeSource
 
@@ -313,11 +304,11 @@ def test_lifecycle_and_input_names_are_part_of_the_identity(tmp_path):
     )
 
 
-def test_a_ram_observing_record_from_the_previous_api_still_loads(tmp_path):
+def test_a_ram_observing_record_round_trips(tmp_path):
     build = _reseal(_aot(tmp_path), observe_ram=True)
-    record = json.loads(dump_fixture_build(build, roots={"run": tmp_path}))
-    record["fixture_api"] = [5, 6]
-    assert load_fixture_build(json.dumps(record), roots={"run": tmp_path}) == build
+    record = dump_fixture_build(build, roots={"run": tmp_path})
+    assert json.loads(record)["build"]["observe_ram"] is True
+    assert load_fixture_build(record, roots={"run": tmp_path}) == build
 
 
 @pytest.mark.parametrize(

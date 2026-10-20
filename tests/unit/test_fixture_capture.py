@@ -1001,21 +1001,6 @@ def test_power_authority_is_required_before_any_device_operation(rig):
     assert not flashes and not writes
 
 
-def test_legacy_power_image_refuses_before_device(rig):
-    from test_fixture_power import request as power_request
-
-    request, _, _, writes, flashes, guard = rig
-    request = replace(
-        request,
-        timing_scope=FixtureTimingScope.RESTORE_AND_INVOKE,
-        power_sync=replace(power_request().firmware_wiring(), protocol_version=1),
-        rail_power=power_request(),
-    )
-    with pytest.raises(ValueError, match="protocol 2"):
-        capture.capture_fixture(request, guard=guard)
-    assert not writes and not flashes and not guard.calls
-
-
 @pytest.mark.parametrize("unfinished", [capture._STATUS_RUNNING, capture._STATUS_POISON])
 @pytest.mark.parametrize("halted", [False, True])
 def test_power_capture_rejects_completion_after_observation(

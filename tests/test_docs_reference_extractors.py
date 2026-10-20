@@ -159,7 +159,7 @@ def test_the_issue_families_are_published_as_their_wire_codes():
     """
     payload = extract_issues.build()
     assert payload["counts"]["issues"] == 27
-    assert payload["counts"]["comparability"] == 8
+    assert payload["counts"]["comparability"] == 7
     assert payload["counts"]["families"] == 3
     power = next(
         family for family in payload["families"] if family["pattern"].startswith("metric.power_")
