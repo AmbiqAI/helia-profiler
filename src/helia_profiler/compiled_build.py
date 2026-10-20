@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from pathlib import Path
@@ -193,11 +194,15 @@ class CompiledBuild:
         }
         target = Path(path).expanduser()
         text = json.dumps(document, indent=2, sort_keys=True, allow_nan=False) + "\n"
+        partial = target.with_name(f".{target.name}.partial")
         try:
             target.parent.mkdir(parents=True, exist_ok=True)
-            with target.open("w", encoding="utf-8", newline="\n") as stream:
+            with partial.open("w", encoding="utf-8", newline="\n") as stream:
                 stream.write(text)
+            # An interrupted save leaves the previous file intact.
+            os.replace(partial, target)
         except OSError as exc:
+            partial.unlink(missing_ok=True)
             raise ConfigError(f"Cannot save compiled build to {target}: {exc}") from exc
         return target
 
