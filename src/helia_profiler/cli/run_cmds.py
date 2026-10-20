@@ -107,7 +107,12 @@ def _cmd_build(
             timing_scope=timing_scope,
             work_dir=work_dir,
         )
-    _print(build_summary(out, compiled))
+    sources = (
+        [str(path.expanduser().resolve()) for path in inputs]
+        if inputs
+        else ["zero-filled"] * len(compiled.build.inputs)
+    )
+    _print(build_summary(out, compiled, sources=sources))
 
 
 def _cmd_validate_build(*, directory: Path, verbose: int) -> None:

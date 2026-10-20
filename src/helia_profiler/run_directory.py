@@ -51,28 +51,40 @@ def run_directory_of(path: str | Path) -> Path:
 
 
 def pin_fixture(
-    model: str | Path, directory: str | Path, inputs: Sequence[str | Path] = ()
+    model: str | Path,
+    directory: str | Path,
+    inputs: Sequence[str | Path] = (),
+    *,
+    model_sha256: str | None = None,
+    model_hint: str | None = None,
 ) -> TypedFixture:
     """A fixture of *model*, its files copied under ``directory/inputs``.
 
     *inputs* holds one file of raw bytes per model input, in model order;
     without them every input is zero-filled. Inputs are named by index,
     since a tensor name such as ``serving_default:0`` is no portable filename.
+    Every check runs before the first file is written. *model_hint* is the
+    hint for an unreadable model.
 
     Raises:
-        ConfigError: A file is unreadable, or the inputs do not match the
-            model's input count or byte sizes.
+        ConfigError: A file is unreadable, the model's sha256 is not
+            *model_sha256*, or the inputs do not match the model's input
+            count or byte sizes.
     """
     from ._fixture_build import FixtureIO, FixtureOutput, TypedFixture
     from .run_inputs import analyze_run_model
 
     target = _absolute(directory) / INPUTS_DIR
     source = Path(model).expanduser()
-    pinned = _pin(
-        target / source.name,
-        _read(source, "model", hint="Name the model the plan was frozen against."),
-    )
-    analysis = analyze_run_model(pinned.path)
+    data = _read(source, "model", hint=model_hint)
+    digest = hashlib.sha256(data).hexdigest()
+    if model_sha256 is not None and digest != model_sha256:
+        raise ConfigError(
+            f"The model {source} (sha256 {digest[:12]}...) is not the model the plan was "
+            f"frozen against (sha256 {model_sha256[:12]}...)",
+            hint="Name the model the plan was frozen against.",
+        )
+    analysis = analyze_run_model(source)
     if inputs and len(inputs) != len(analysis.inputs):
         raise ConfigError(
             f"The model has {len(analysis.inputs)} input(s); {len(inputs)} input file(s) given",
@@ -90,7 +102,7 @@ def pin_fixture(
                 f"{tensor.dtype} tensor of shape {list(tensor.shape)} takes {tensor.size_bytes}"
             )
     return TypedFixture(
-        pinned,
+        _pin(target / source.name, data),
         tuple(
             FixtureIO(tensor, _pin(target / f"input_{index}.bin", payload))
             for index, (tensor, payload) in enumerate(zip(analysis.inputs, payloads, strict=True))
@@ -111,21 +123,48 @@ def build_into(
 ) -> CompiledBuild:
     """Build *plan* for pinned inputs into *directory* and save it as ``build.json``.
 
-    *model* is the plan's model when it is no longer at the path the plan
-    records. *work_dir* defaults to ``directory/work``.
+    *directory* must be new or empty, so a failed build never touches an
+    earlier one. *model* is the plan's model when it is no longer at the
+    path the plan records. *work_dir* defaults to ``directory/work`` and must
+    sit inside *directory*: the saved build's files are recorded relative to
+    its run root.
+
+    Raises:
+        ConfigError: *directory* holds files, *work_dir* is outside it, or
+            the model or inputs do not fit the plan.
     """
     from ._fixture_build import FixtureMethod, FixtureTimingScope
     from .compiled_build import build
 
     root = _absolute(directory)
-    fixture = pin_fixture(model if model is not None else plan.model.path, root, inputs)
+    work = _absolute(work_dir) if work_dir is not None else root / WORK_DIR
+    if root.exists() and (not root.is_dir() or any(root.iterdir())):
+        raise ConfigError(
+            f"{root} is not a new or empty directory",
+            hint="Build into a fresh directory; an earlier build there stays as it is.",
+        )
+    if not work.is_relative_to(root):
+        raise ConfigError(
+            f"The work directory {work} is outside the run directory {root}",
+            hint="The saved build records its files relative to the run directory; "
+            "name a work directory inside it, or leave the default.",
+        )
+    fixture = pin_fixture(
+        model if model is not None else plan.model.path,
+        root,
+        inputs,
+        model_sha256=plan.model.sha256,
+        model_hint=None
+        if model is not None
+        else "The plan records this path; name the model where it is now.",
+    )
     compiled = build(
         plan,
         fixture,
         method=FixtureMethod(FixtureTimingScope(timing_scope)),
         lifecycle=lifecycle,
         model=fixture.model.path,
-        host={"work_dir": str(_absolute(work_dir) if work_dir else root / WORK_DIR)},
+        host={"work_dir": str(work)},
     )
     compiled.save(root / BUILD_FILE, roots=run_roots(root))
     return compiled
@@ -182,10 +221,24 @@ def run_from(
     )
 
 
-def build_summary(directory: str | Path, compiled: CompiledBuild) -> dict[str, Any]:
-    """The saved build's path and identity, JSON-ready."""
+def build_summary(
+    directory: str | Path, compiled: CompiledBuild, *, sources: Sequence[str] | None = None
+) -> dict[str, Any]:
+    """The saved build's path, pinned inputs and identity, JSON-ready.
+
+    *sources* names where each input's bytes came from, in model order: a
+    file path, or ``zero-filled``.
+    """
+    inputs = [
+        {"name": io.tensor.name, "bytes": io.tensor.size_bytes, "path": str(io.data.path)}
+        for io in compiled.build.inputs
+    ]
+    if sources is not None:
+        for entry, source in zip(inputs, sources, strict=True):
+            entry["source"] = source
     return {
         "build": str(_absolute(directory) / BUILD_FILE),
+        "inputs": inputs,
         "identity": compiled.identity.to_dict(),
     }
 

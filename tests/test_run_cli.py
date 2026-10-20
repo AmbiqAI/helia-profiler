@@ -86,8 +86,17 @@ def plan_file(tmp_path: Path, plan: FrozenRun) -> Path:
 
 
 @pytest.fixture
+def dest(tmp_path: Path) -> Path:
+    """A run directory ``hpx build`` writes; ``out`` already holds the ``build`` fixture's files."""
+    return tmp_path / "dest"
+
+
+@pytest.fixture
 def calls(monkeypatch: pytest.MonkeyPatch, build: FixtureBuild) -> list[dict[str, Any]]:
-    """Mock the model analysis and the firmware build; record what the build was asked for."""
+    """Mock the model analysis and the firmware build; record what the build was asked for.
+
+    The mocked build writes its app and evidence under the work directory, as a real one does.
+    """
     analysis = SimpleNamespace(
         inputs=tuple(io.tensor for io in build.inputs), outputs=build.output_tensors
     )
@@ -98,7 +107,7 @@ def calls(monkeypatch: pytest.MonkeyPatch, build: FixtureBuild) -> list[dict[str
         seen.append({"config": config, "fixture": fixture, **options})
         profiling = config.profiling
         return reseal(
-            build,
+            atfe_build(_build(config.work_dir)),
             model=fixture.model,
             inputs=fixture.inputs,
             iterations=profiling.iterations,
@@ -221,28 +230,37 @@ def test_freeze_records_the_model_by_its_resolved_path(tmp_path, monkeypatch):
 # -- hpx build ----------------------------------------------------------------
 
 
-def test_build_pins_zero_inputs_and_saves_the_run_directory(out, plan, plan_file, build, calls):
-    result = _invoke("build", plan_file, "--out", out)
+def test_build_pins_zero_inputs_and_saves_the_run_directory(dest, plan, plan_file, build, calls):
+    result = _invoke("build", plan_file, "--out", dest)
 
     assert result.exit_code == 0, result.output
     (call,) = calls
     config, fixture = call["config"], call["fixture"]
-    assert fixture.model.path == out / "inputs" / "model.tflite" == config.model.path
+    assert fixture.model.path == dest / "inputs" / "model.tflite" == config.model.path
     assert [io.data.path.name for io in fixture.inputs] == ["input_0.bin", "input_1.bin"]
     assert [io.data.read() for io in fixture.inputs] == [bytes(4), bytes(4)]
     assert [output.tensor for output in fixture.outputs] == list(build.output_tensors)
-    assert config.work_dir == out / "work"
+    assert config.work_dir == dest / "work"
     assert (config.profiling.iterations, config.profiling.warmup) == (100, 5)
     assert call["method"] == hpx.FixtureMethod(hpx.FixtureTimingScope.INVOKE_ONLY)
     report = json.loads(result.stdout)
-    assert report["build"] == str(out / "build.json")
+    assert report["build"] == str(dest / "build.json")
+    assert report["inputs"] == [
+        {
+            "name": name,
+            "bytes": 4,
+            "path": str(dest / "inputs" / f"input_{index}.bin"),
+            "source": "zero-filled",
+        }
+        for index, name in enumerate(["signal", "cache"])
+    ]
     assert report["identity"]["intent_hash"] == plan.intent_hash
     assert report["identity"]["run"]["lifecycle"] == "carry"
-    loaded = hpx.load_build(out / "build.json", roots=run_roots(out))
+    loaded = hpx.load_build(dest / "build.json", roots=run_roots(dest))
     assert loaded.identity.to_dict() == report["identity"]
 
 
-def test_build_takes_inputs_lifecycle_scope_and_work_dir(tmp_path, out, plan_file, calls):
+def test_build_takes_inputs_lifecycle_scope_and_work_dir(tmp_path, dest, plan_file, calls):
     first, second = tmp_path / "a.bin", tmp_path / "b.bin"
     first.write_bytes(b"\x01\x02\x03\x04")
     second.write_bytes(b"\x80" * 4)
@@ -251,7 +269,7 @@ def test_build_takes_inputs_lifecycle_scope_and_work_dir(tmp_path, out, plan_fil
         "build",
         plan_file,
         "--out",
-        out,
+        dest,
         "--input",
         first,
         "--input",
@@ -261,18 +279,66 @@ def test_build_takes_inputs_lifecycle_scope_and_work_dir(tmp_path, out, plan_fil
         "--timing-scope",
         "restore_and_invoke",
         "--work-dir",
-        tmp_path / "work",
+        dest / "firmware",
     )
 
     assert result.exit_code == 0, result.output
     (call,) = calls
     config, fixture = call["config"], call["fixture"]
     assert [io.data.read() for io in fixture.inputs] == [b"\x01\x02\x03\x04", b"\x80" * 4]
-    assert fixture.inputs[0].data.path == out / "inputs" / "input_0.bin"
+    assert fixture.inputs[0].data.path == dest / "inputs" / "input_0.bin"
     assert (config.profiling.iterations, config.profiling.warmup) == (1, 0)
     assert call["method"].timing_scope is hpx.FixtureTimingScope.RESTORE_AND_INVOKE
-    assert config.work_dir == tmp_path / "work"
-    assert json.loads(result.stdout)["identity"]["run"]["lifecycle"] == "single"
+    assert config.work_dir == dest / "firmware"
+    report = json.loads(result.stdout)
+    assert report["identity"]["run"]["lifecycle"] == "single"
+    assert [entry["source"] for entry in report["inputs"]] == [str(first), str(second)]
+    assert _invoke("validate", "build", dest).exit_code == 0
+
+
+def test_build_refuses_a_work_dir_outside_the_run_directory_before_building(
+    tmp_path, dest, plan_file, calls
+):
+    result = _invoke("build", plan_file, "--out", dest, "--work-dir", tmp_path / "elsewhere")
+
+    assert result.exit_code == 1 and calls == []
+    assert "outside the run directory" in " ".join(result.output.split())
+    assert not dest.exists()
+
+
+def test_a_refused_rebuild_leaves_the_earlier_build_valid(tmp_path, dest, plan_file, calls):
+    assert _invoke("build", plan_file, "--out", dest).exit_code == 0
+    pinned = (dest / "inputs" / "input_0.bin").read_bytes()
+    first, second = tmp_path / "a.bin", tmp_path / "b.bin"
+    first.write_bytes(b"\x01" * 4)
+    second.write_bytes(b"\x02" * 4)
+
+    result = _invoke("build", plan_file, "--out", dest, "--input", first, "--input", second)
+
+    assert result.exit_code == 1 and len(calls) == 1
+    assert "not a new or empty directory" in " ".join(result.output.split())
+    assert (dest / "inputs" / "input_0.bin").read_bytes() == pinned
+    assert _invoke("validate", "build", dest).exit_code == 0
+
+
+def test_build_refuses_a_non_empty_directory_without_a_build(dest, plan_file, calls):
+    dest.mkdir()
+    (dest / "notes.txt").write_text("keep")
+
+    result = _invoke("build", plan_file, "--out", dest)
+
+    assert result.exit_code == 1 and calls == []
+    assert sorted(path.name for path in dest.iterdir()) == ["notes.txt"]
+
+
+def test_build_refuses_a_model_other_than_the_plans_before_writing(dest, plan, plan_file, calls):
+    Path(plan.model.path).write_bytes(b"an edited model")
+
+    result = _invoke("build", plan_file, "--out", dest)
+
+    assert result.exit_code == 1 and calls == []
+    assert "is not the model the plan was frozen against" in " ".join(result.output.split())
+    assert not dest.exists()
 
 
 @pytest.mark.parametrize(
@@ -280,7 +346,7 @@ def test_build_takes_inputs_lifecycle_scope_and_work_dir(tmp_path, out, plan_fil
     [((b"\x00" * 4,), "2 input(s); 1 input file"), ((b"\x00" * 3, b"\x00" * 4), "holds 3 bytes")],
 )
 def test_build_refuses_inputs_that_do_not_fit_the_model(
-    tmp_path, out, plan_file, calls, inputs, message
+    tmp_path, dest, plan_file, calls, inputs, message
 ):
     args: list[str | Path] = []
     for index, data in enumerate(inputs):
@@ -288,23 +354,32 @@ def test_build_refuses_inputs_that_do_not_fit_the_model(
         path.write_bytes(data)
         args += ["--input", path]
 
-    result = _invoke("build", plan_file, "--out", out, *args)
+    result = _invoke("build", plan_file, "--out", dest, *args)
 
     assert result.exit_code == 1
     assert message in " ".join(result.output.split())
-    assert calls == [] and not (out / "build.json").exists()
+    assert calls == [] and not dest.exists()
 
 
-def test_build_takes_the_model_from_another_path(tmp_path, out, plan, plan_file, calls):
+def test_build_takes_the_model_from_another_path(tmp_path, dest, plan, plan_file, calls):
     moved = tmp_path / "elsewhere" / "model.tflite"
     moved.parent.mkdir()
     Path(plan.model.path).rename(moved)
 
-    assert _invoke("build", plan_file, "--out", out).exit_code == 1
-    result = _invoke("build", plan_file, "--out", out, "--model", moved)
+    missing = _invoke("build", plan_file, "--out", dest)
+    assert missing.exit_code == 1
+    assert "name the model where it is now" in " ".join(missing.output.split())
+    result = _invoke("build", plan_file, "--out", dest, "--model", moved)
 
     assert result.exit_code == 0, result.output
-    assert calls[-1]["fixture"].model.path == out / "inputs" / "model.tflite"
+    assert calls[-1]["fixture"].model.path == dest / "inputs" / "model.tflite"
+
+
+def test_build_shows_the_moved_model_hint_only_for_the_plans_path(tmp_path, dest, plan_file, calls):
+    result = _invoke("build", plan_file, "--out", dest, "--model", tmp_path / "absent.tflite")
+
+    assert result.exit_code == 1
+    assert "Cannot read the model file" in result.output and "hint" not in result.output
 
 
 # -- hpx validate build -------------------------------------------------------
@@ -317,7 +392,14 @@ def test_validate_build_verifies_and_prints_the_identity(out, plan, build):
 
     assert result.exit_code == 0, result.output
     report = json.loads(result.stdout)
-    assert report == {"build": str(out / "build.json"), "identity": record.identity.to_dict()}
+    assert report == {
+        "build": str(out / "build.json"),
+        "inputs": [
+            {"name": "signal", "bytes": 4, "path": str(out / "input" / "signal.bin")},
+            {"name": "cache", "bytes": 4, "path": str(out / "input" / "cache.bin")},
+        ],
+        "identity": record.identity.to_dict(),
+    }
 
 
 def test_validate_build_takes_the_build_file_as_well_as_its_directory(out, plan, build):
