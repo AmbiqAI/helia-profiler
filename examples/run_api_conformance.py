@@ -92,8 +92,9 @@ def typed_fixture(model: Path, out: Path) -> TypedFixture:
     return TypedFixture(
         pinned,
         tuple(
-            FixtureIO(tensor, _pin(out / "inputs" / f"{tensor.name}.bin", bytes(tensor.size_bytes)))
-            for tensor in analysis.inputs
+            # By index: a tensor name such as "serving_default:0" is no portable filename.
+            FixtureIO(tensor, _pin(out / "inputs" / f"input_{index}.bin", bytes(tensor.size_bytes)))
+            for index, tensor in enumerate(analysis.inputs)
         ),
         tuple(FixtureOutput(tensor) for tensor in analysis.outputs),
     )

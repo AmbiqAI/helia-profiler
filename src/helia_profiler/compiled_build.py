@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import tempfile
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from pathlib import Path
@@ -134,7 +135,8 @@ class CompiledBuild:
 
     def _linked_facts(self) -> list[tuple[str, object, object]]:
         """The runtime and kernel facts both the plan and the build state."""
-        expected = _linked_runtime(self.plan)
+        source = self.build.runtime_source
+        expected = _linked_runtime(self.plan, source.version if source is not None else None)
         if expected is None:
             return []
         build = self.build
@@ -194,15 +196,25 @@ class CompiledBuild:
         }
         target = Path(path).expanduser()
         text = json.dumps(document, indent=2, sort_keys=True, allow_nan=False) + "\n"
-        partial = target.with_name(f".{target.name}.partial")
+        partial: Path | None = None
         try:
             target.parent.mkdir(parents=True, exist_ok=True)
-            with partial.open("w", encoding="utf-8", newline="\n") as stream:
+            with tempfile.NamedTemporaryFile(
+                "w",
+                encoding="utf-8",
+                newline="\n",
+                dir=target.parent,
+                prefix=f".{target.name}.",
+                suffix=".partial",
+                delete=False,
+            ) as stream:
+                partial = Path(stream.name)
                 stream.write(text)
             # An interrupted save leaves the previous file intact.
             os.replace(partial, target)
         except OSError as exc:
-            partial.unlink(missing_ok=True)
+            if partial is not None:
+                partial.unlink(missing_ok=True)
             raise ConfigError(f"Cannot save compiled build to {target}: {exc}") from exc
         return target
 
@@ -400,14 +412,16 @@ class _LinkedRuntime:
     kernels_commit: str | None
 
 
-def _linked_runtime(plan: FrozenRun) -> _LinkedRuntime | None:
+def _linked_runtime(plan: FrozenRun, linked_version: str | None = None) -> _LinkedRuntime | None:
     """What a fixture build of *plan* links, or ``None`` when the plan states no runtime.
 
     heliaRT and heliaAOT link the runtime and kernel commits the plan pins.
     TFLM does not: the plan pins the tflite-micro and CMSIS-NN modules an
-    ordinary profile builds from source, while a fixture build links this
-    HPX's prepared TFLM record (``hpx runtimes prepare tflm``), so TFLM is
-    compared with that record.
+    ordinary profile builds from source, while a fixture build links a
+    prepared TFLM record (``hpx runtimes prepare tflm``). A build is compared
+    with the record of the version it linked (*linked_version*), so a saved
+    build keeps verifying after this HPX's default changes; a new build
+    links the default.
     """
     from .runtime_records import runtime
 
@@ -418,9 +432,11 @@ def _linked_runtime(plan: FrozenRun) -> _LinkedRuntime | None:
         return _LinkedRuntime(
             planned.name, planned.version, planned.source_commit, planned.kernels_commit
         )
-    record = runtime("tflm")
+    record = runtime("tflm", linked_version)
     if record is None:
-        raise ConfigError("This HPX ships no prepared TFLM runtime record")
+        raise ConfigError(
+            f"This HPX ships no prepared TFLM runtime record {linked_version or ''}".rstrip()
+        )
     return _LinkedRuntime(
         record.name,
         record.version,

@@ -164,3 +164,17 @@ def test_a_plan_without_a_recorded_release_names_why_it_links_nothing(tmp_path):
     )
     with pytest.raises(ConfigError, match=f"no prepared helia-rt release to link: {reason}"):
         _prepared_runtime(unrecorded)
+
+
+def test_a_saved_tflm_build_verifies_after_the_default_record_changes(tmp_path, monkeypatch):
+    plan, build = _linked(tmp_path, "tflm")
+    record = compiled(plan, build, Lifecycle.CARRY)
+    real = runtime
+
+    def newer_default(name: str, version: str | None = None) -> RuntimeRecord | None:
+        if name == "tflm" and version is None:
+            return replace(TFLM, version="newer", source=replace(TFLM.source, commit="e" * 40))
+        return real(name, version)
+
+    monkeypatch.setattr("helia_profiler.runtime_records.runtime", newer_default)
+    record.verify()
