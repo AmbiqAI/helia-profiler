@@ -371,7 +371,7 @@ is set, in which case it exits 3.
 `hpx run` saves each capture as `result.json` in its evidence directory.
 From Python, `RunResult.save(path, roots=..., build=...)` writes one and
 `helia_profiler.load_run(path, roots=...)` reads it back as a `RunResultRecord`
-(`path`, `size_bytes`, `sha256`, `result`, `document`). Paths are
+(`path`, `size_bytes`, `sha256`, `hpx_version`, `result`, `document`). Paths are
 `{root, path}` under named roots, as in a saved compiled build, so the run
 directory moves as a unit.
 

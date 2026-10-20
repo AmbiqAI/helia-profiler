@@ -261,7 +261,11 @@ def run_from(
     except ConfigError as exc:
         raise ConfigError(
             f"The capture finished but its result was not saved: {exc.args[0] if exc.args else exc}",
-            hint=f"The capture's evidence directory {evidence} is intact.",
+            hint=" ".join(
+                part
+                for part in (f"The capture's evidence directory {evidence} is intact.", exc.hint)
+                if part
+            ),
         ) from exc
     return result
 
