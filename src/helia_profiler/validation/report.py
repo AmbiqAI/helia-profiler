@@ -528,9 +528,12 @@ def _bundle_relative(path: Path, root: Path) -> str:
 def _read_optional_summary(path: Path) -> dict[str, Any]:
     from ..results.run_summary import _require_current_summary
 
-    if not path.exists():
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
         return {}
-    value = _read_optional_json(path)
+    if not isinstance(value, dict):
+        return {}
     try:
         _require_current_summary(value)
     except ValueError as exc:
