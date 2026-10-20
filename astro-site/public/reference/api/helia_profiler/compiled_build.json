@@ -193,7 +193,7 @@
               "summary": "The build's identity, with its plan's intenthash; observationhash is None until it runs."
             },
             {
-              "description": "Re-check the build against its pinned files and its plan; raise on any mismatch.\n\nThe build's files must match their hashes, the plan its intent hash,\nand the binding the plan, lifecycle and build. The facts the build\nrecords must be the ones the plan states: engine, board, model,\ntoolchain and its version, arena and weights placement, arena size,\nclock profile and the lifecycle's invocation counts.\n\nThe runtime version and commit and the kernel commit are compared\nwherever both the plan and the build state one; a build or plan\nthat states none of a fact is not compared on it. heliaRT and\nheliaAOT compare with the plan's pins. TFLM compares with this HPX's\nprepared TFLM record, because the plan pins the modules an ordinary\nprofile builds from source, which a fixture build does not link.",
+              "description": "Re-check the build against its pinned files and its plan; raise on any mismatch.\n\nThe build's files must match their hashes, the plan its intent hash,\nand the binding the plan, lifecycle and build. The facts the build\nrecords must be the ones the plan states: engine, board, model,\ntoolchain and its version, arena and weights placement, arena size,\nclock profile and the lifecycle's invocation counts.\n\nThe runtime version and commit and the kernel commit are compared\nwherever both the plan and the build state one; a build or plan\nthat states none of a fact is not compared on it. heliaRT and\nheliaAOT compare with the plan's pins. LiteRT compares with this HPX's\nprepared LiteRT record, because the plan pins the modules an ordinary\nprofile builds from source, which a fixture build does not link.",
               "examples": [],
               "id": "helia_profiler.CompiledBuild.verify",
               "kind": "method",
@@ -411,7 +411,7 @@
           "summary": "One capture from a :class:CompiledBuild."
         },
         {
-          "description": "Compile *plan* for *fixture*'s pinned inputs and return the compiled build.\n\n*lifecycle* must be one the plan's engine implements; it sets the timed\niterations and warmups the firmware runs. *host* supplies host-local\nsettings, such as ``{\"work_dir\": ...}``, as :meth:`FrozenRun.config` does.\nheliaRT and TFLM link a prepared runtime: without *runtime*, the one the\nplan names is taken from the HPX cache (``hpx runtimes prepare``), never\ndownloaded or built. The result is verified before it is returned.\n\n**API tier:** `experimental`",
+          "description": "Compile *plan* for *fixture*'s pinned inputs and return the compiled build.\n\n*lifecycle* must be one the plan's engine implements; it sets the timed\niterations and warmups the firmware runs. *host* supplies host-local\nsettings, such as ``{\"work_dir\": ...}``, as :meth:`FrozenRun.config` does.\nheliaRT and LiteRT link a prepared runtime: without *runtime*, the one the\nplan names is taken from the HPX cache (``hpx runtimes prepare``), never\ndownloaded or built. The result is verified before it is returned.\n\n**API tier:** `experimental`",
           "examples": [],
           "id": "helia_profiler.build",
           "kind": "function",

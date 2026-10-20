@@ -23,15 +23,15 @@
             {
               "description": "",
               "examples": [],
-              "id": "helia_profiler.EngineType.TFLM",
+              "id": "helia_profiler.EngineType.LITERT",
               "kind": "constant",
               "language": "python",
               "members": [],
-              "name": "TFLM",
+              "name": "LITERT",
               "params": [],
               "raises": [],
               "returns": [],
-              "signature": "TFLM = 'tflm'",
+              "signature": "LITERT = 'litert'",
               "source": {
                 "line": 25,
                 "path": "src/helia_profiler/engines/__init__.py",

@@ -238,9 +238,9 @@
           "returns": [],
           "signature": "canonical_engine(name: str) -> CanonicalEngine",
           "source": {
-            "line": 85,
+            "line": 84,
             "path": "src/helia_profiler/identity.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L85"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L84"
           },
           "summary": "The shared name for an engine, from its canonical name or any alias."
         },
@@ -257,9 +257,9 @@
           "returns": [],
           "signature": "canonical_kernel(name: str) -> CanonicalKernel",
           "source": {
-            "line": 90,
+            "line": 89,
             "path": "src/helia_profiler/identity.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L90"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L89"
           },
           "summary": "The shared name for a kernel library, from its canonical name or any alias."
         }

@@ -28,7 +28,7 @@ Defined in `src/helia_profiler/cli/app.py` line 715.
 hpx runtimes prepare NAME [VERSION]
 ```
 
-Build a runtime's prepared archive into the hpx cache (helia-rt, tflm)
+Build a runtime's prepared archive into the hpx cache (helia-rt, litert)
 
 Defined in `src/helia_profiler/cli/app.py` line 732.
 

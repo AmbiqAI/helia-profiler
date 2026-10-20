@@ -161,8 +161,8 @@ clock profile and the lifecycle's invocation counts.
 The runtime version and commit and the kernel commit are compared
 wherever both the plan and the build state one; a build or plan
 that states none of a fact is not compared on it. heliaRT and
-heliaAOT compare with the plan's pins. TFLM compares with this HPX's
-prepared TFLM record, because the plan pins the modules an ordinary
+heliaAOT compare with the plan's pins. LiteRT compares with this HPX's
+prepared LiteRT record, because the plan pins the modules an ordinary
 profile builds from source, which a fixture build does not link.
 
 **Raises**
@@ -326,7 +326,7 @@ Compile *plan* for *fixture*'s pinned inputs and return the compiled build.
 *lifecycle* must be one the plan's engine implements; it sets the timed
 iterations and warmups the firmware runs. *host* supplies host-local
 settings, such as ``{"work_dir": ...}``, as :meth:`FrozenRun.config` does.
-heliaRT and TFLM link a prepared runtime: without *runtime*, the one the
+heliaRT and LiteRT link a prepared runtime: without *runtime*, the one the
 plan names is taken from the HPX cache (``hpx runtimes prepare``), never
 downloaded or built. The result is verified before it is returned.
 

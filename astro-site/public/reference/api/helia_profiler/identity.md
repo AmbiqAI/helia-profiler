@@ -147,7 +147,7 @@ The shared name for an engine, from its canonical name or any alias.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/identity.py:85`
+Source: `src/helia_profiler/identity.py:84`
 
 ## helia_profiler.canonical_kernel
 
@@ -161,4 +161,4 @@ The shared name for a kernel library, from its canonical name or any alias.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/identity.py:90`
+Source: `src/helia_profiler/identity.py:89`
