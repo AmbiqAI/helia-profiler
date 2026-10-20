@@ -10,7 +10,7 @@ One class owns the artifact's shape for BOTH sides of the boundary:
   the equality check makes any divergence a loud producer-time failure);
 * **consumers** (``validation/runner.py`` today; more as they migrate) load
   artifacts through :func:`load_run_summary` / :meth:`RunSummary.from_dict`,
-  a *tolerant* reader: missing fields become ``None``, unknown keys are
+  a current-schema reader: missing optional fields become ``None``, unknown keys are
   preserved on ``extras`` for inspection, and derived readings (unit
   conversions, the gate-drift arbitration) live in properties here instead
   of being re-derived at every read site.
@@ -82,6 +82,19 @@ RUN_SUMMARY_SCHEMA = "hpx.run-summary"
 #: semantic hashes, hpx.<kind>/<version>:sha256:<hex>, not bare hex, and
 #: inputs_sha256 is renamed inputs_hash, also a semantic hash. Otherwise unchanged.
 RUN_SUMMARY_SCHEMA_VERSION = 19
+
+
+def _require_current_summary(data: Mapping[str, Any]) -> None:
+    version = data.get("schema_version")
+    if type(version) is not int or version != RUN_SUMMARY_SCHEMA_VERSION:
+        raise ValueError(
+            f"Unsupported run summary version: {version!r}; this heliaPROFILER reads "
+            f"version {RUN_SUMMARY_SCHEMA_VERSION}, so read the result with the HPX "
+            "release that wrote it"
+        )
+    if data.get("schema") != RUN_SUMMARY_SCHEMA:
+        raise ValueError(f"Expected summary schema {RUN_SUMMARY_SCHEMA!r}")
+
 
 __all__ = [
     "RUN_SUMMARY_SCHEMA",
@@ -564,6 +577,7 @@ class RunSummary:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> RunSummary:
+        _require_current_summary(data)
         known = {
             "schema",
             "schema_version",
@@ -600,7 +614,7 @@ class RunSummary:
             validity=(str(data["validity"]) if data.get("validity") is not None else None),
             issues=_tuple_of_mappings(data.get("issues")),
             schema=str(data.get("schema", RUN_SUMMARY_SCHEMA)),
-            schema_version=to_int(data.get("schema_version")) or 1,
+            schema_version=RUN_SUMMARY_SCHEMA_VERSION,
             compatibility=data.get("compatibility"),
             dependencies=data.get("dependencies"),
             identity=data.get("identity"),
@@ -620,10 +634,10 @@ class RunSummary:
 
 
 def load_run_summary(path: str | Path) -> RunSummary:
-    """Load a ``summary.json`` from disk, tolerantly.
+    """Load a current-version ``summary.json`` from disk.
 
     Raises ``OSError``/``json.JSONDecodeError``/``ValueError`` for an
-    unreadable or non-object document — the caller decides what a broken
+    unreadable, non-object or unsupported-schema document — the caller decides what a broken
     artifact means (the validation runner fails the case; a report viewer
     might not).
     """

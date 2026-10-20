@@ -27,6 +27,7 @@ from helia_profiler.results import (
     PmuResult,
     ResultManifest,
 )
+from helia_profiler.results.run_summary import RUN_SUMMARY_SCHEMA_VERSION
 from tests.result_bundles import publish_manifest, published
 
 
@@ -54,6 +55,8 @@ def _write_run(
     (path / "summary.json").write_text(
         json.dumps(
             {
+                "schema": "hpx.run-summary",
+                "schema_version": RUN_SUMMARY_SCHEMA_VERSION,
                 "engine": "helia-rt",
                 "layers": len(layer_cycles),
                 "total_cycles": total_cycles,
@@ -1088,7 +1091,9 @@ def test_compare_console_survives_a_non_finite_metric(tmp_path: Path):
     print_compare(HpxConsole(verbosity=0), result)  # must not raise ValueError
 
 
-@pytest.mark.parametrize("baseline_version,candidate_version", [(4, 5), (5, 5), (5, 6), (6, 6)])
+@pytest.mark.parametrize(
+    "baseline_version,candidate_version", [(RUN_SUMMARY_SCHEMA_VERSION, RUN_SUMMARY_SCHEMA_VERSION)]
+)
 def test_summary_schema_dimension_is_visible_and_usable_in_profiles(
     tmp_path, baseline_version, candidate_version
 ):
@@ -1117,3 +1122,17 @@ def test_summary_schema_dimension_is_visible_and_usable_in_profiles(
     assert result.verdict.dimension_mismatches == (
         () if baseline_version == candidate_version else ("run_summary_schema_version",)
     )
+
+
+@pytest.mark.parametrize("version", [1, 18, 20, True, 19.0, "19", None])
+@pytest.mark.parametrize("side", ["base", "candidate"])
+def test_compare_refuses_unsupported_summary(tmp_path, version, side):
+    paths = [tmp_path / "base", tmp_path / "candidate"]
+    for path in paths:
+        _write_run(path, toolchain="gcc", total_cycles=100, avg_us=100, layer_cycles=[100])
+    path = tmp_path / side / "summary.json"
+    summary = json.loads(path.read_text())
+    summary["schema_version"] = version
+    path.write_text(json.dumps(summary))
+    with pytest.raises(ReportError, match="Unsupported run summary version"):
+        compare_runs(*paths)

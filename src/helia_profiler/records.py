@@ -23,7 +23,7 @@ from .results.manifest import (
     ResultManifest,
     RunStatus,
 )
-from .results.run_summary import RUN_SUMMARY_SCHEMA, RUN_SUMMARY_SCHEMA_VERSION, RunSummary
+from .results.run_summary import RunSummary, _require_current_summary
 from .results.serde import nested_get
 from .run_record import RUN_RESULT_SCHEMA, RunResultError, RunResultRecord, read_run
 
@@ -269,15 +269,10 @@ def _load_result(location: Path) -> ProfileResultRecord | RunResultRecord:
     )
     summary = None
     if summary_data is not None:
-        version = summary_data.get("schema_version")
-        if type(version) is not int or version != RUN_SUMMARY_SCHEMA_VERSION:
-            raise ResultReadError(
-                "unsupported_schema",
-                f"Unsupported run summary version: {version!r}; this heliaPROFILER reads "
-                f"version {RUN_SUMMARY_SCHEMA_VERSION}, so read the result with the HPX "
-                "release that wrote it",
-            )
-        _schema(summary_data, RUN_SUMMARY_SCHEMA, version)
+        try:
+            _require_current_summary(summary_data)
+        except ValueError as exc:
+            raise ResultReadError("unsupported_schema", str(exc)) from exc
         _identity_hashes(summary_data)
         if (
             summary_data.get("validity") is not None

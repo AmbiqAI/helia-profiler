@@ -47,7 +47,7 @@ def test_producer_roundtrip_is_identity(tmp_path: Path) -> None:
 def test_reader_preserves_unknown_keys_and_reads_canonical_fields(tmp_path: Path) -> None:
     data = {
         "schema": "hpx.run-summary",
-        "schema_version": RUN_SUMMARY_SCHEMA_VERSION + 1,
+        "schema_version": RUN_SUMMARY_SCHEMA_VERSION,
         "engine": "helia-rt",
         "layers": 13,
         "total_cycles": 123456,
@@ -199,18 +199,22 @@ def test_healthy_producer_shape_passes_the_check() -> None:
     )
 
 
-def test_a_minimal_document_loads_tolerantly(tmp_path: Path) -> None:
-    """A document with no schema fields and no power loads; the strict
-    reader in ``records`` is the one that gates the version."""
+@pytest.mark.parametrize("version", [1, 18, 20, True, 19.0, "19", None])
+def test_summary_readers_refuse_unsupported_versions(tmp_path: Path, version) -> None:
+    data = _base_summary(schema_version=version)
     path = tmp_path / "summary.json"
-    path.write_text(json.dumps({"engine": "litert", "layers": 3, "total_cycles": 42}))
+    path.write_text(json.dumps(data))
+    with pytest.raises(ValueError, match="Unsupported run summary version"):
+        load_run_summary(path)
+    with pytest.raises(ValueError, match="Unsupported run summary version"):
+        RunSummary.from_dict(data)
 
-    summary = load_run_summary(path)
 
-    assert summary.engine == "litert"
-    assert summary.schema_version == 1
-    assert summary.power is None
-    assert summary.validity is None
+def test_summary_reader_refuses_missing_header() -> None:
+    with pytest.raises(ValueError, match="Unsupported run summary version"):
+        RunSummary.from_dict({"engine": "litert"})
+    with pytest.raises(ValueError, match="Expected summary schema"):
+        RunSummary.from_dict(_base_summary(schema="other"))
 
 
 def test_non_dict_root_raises_value_error(tmp_path: Path) -> None:
@@ -226,6 +230,8 @@ def test_hostile_shapes_read_as_absent_not_crash() -> None:
     never the reader itself."""
     hostile = RunSummary.from_dict(
         {
+            "schema": "hpx.run-summary",
+            "schema_version": RUN_SUMMARY_SCHEMA_VERSION,
             "engine": "x",
             "layers": 1,
             "total_cycles": float("nan"),
@@ -238,7 +244,14 @@ def test_hostile_shapes_read_as_absent_not_crash() -> None:
     assert hostile.top_layers == ()
     assert hostile.total_cycles_int is None
 
-    infinite = RunSummary.from_dict({"engine": "x", "total_cycles": float("inf")})
+    infinite = RunSummary.from_dict(
+        {
+            "schema": "hpx.run-summary",
+            "schema_version": RUN_SUMMARY_SCHEMA_VERSION,
+            "engine": "x",
+            "total_cycles": float("inf"),
+        }
+    )
     assert infinite.total_cycles_int is None
 
 

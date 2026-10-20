@@ -14,6 +14,7 @@ from ..modelcost import LayerAttributor
 from ..results import ComparisonDimension, ResultManifest, load_result_manifest
 from ..results.dimensions import DIMENSION_REGISTRY
 from ..results.manifest import RESULT_PUBLICATION_INCOMPLETE
+from ..results.run_summary import _require_current_summary
 from ..results.serde import nested_get, to_float, write_dict_csv
 from .comparability import ComparabilityAssessment, assess_comparability, read_dimensions
 from .comparison_profile import (
@@ -258,6 +259,10 @@ def load_run_artifacts(path: Path) -> RunArtifacts:
     summary_path = _declared_artifact(run_dir, "summary.json", declared)
     metadata_path = _declared_artifact(run_dir, "run_metadata.json", declared)
     summary = _read_json(summary_path)
+    try:
+        _require_current_summary(summary)
+    except ValueError as exc:
+        raise ReportError(str(exc)) from exc
     metadata = _read_json(metadata_path)
 
     csv_path = run_dir / "profile_results.csv"

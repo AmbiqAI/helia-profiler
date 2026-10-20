@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from helia_profiler.errors import ReportError, ValidationBundleError
+from helia_profiler.results.run_summary import RUN_SUMMARY_SCHEMA_VERSION
 from helia_profiler.validation.bundle import SCHEMA_VERSION, load_validation_bundle
 from helia_profiler.validation.compare import (
     CaseOutcome,
@@ -28,7 +29,13 @@ def _write_bundle(root: Path, cycles: int, *, attempt: int = 1, repeat_total: in
     case_dir.mkdir(parents=True)
     (case_dir / "summary.json").write_text(
         json.dumps(
-            {"total_cycles": cycles, "layers": 1, "latency": {"device_profiled_infer_avg_us": 10}}
+            {
+                "schema": "hpx.run-summary",
+                "schema_version": RUN_SUMMARY_SCHEMA_VERSION,
+                "total_cycles": cycles,
+                "layers": 1,
+                "latency": {"device_profiled_infer_avg_us": 10},
+            }
         )
     )
     (case_dir / "run_metadata.json").write_text(

@@ -571,9 +571,6 @@ def run_case(
     summary_path = case_dir / "summary.json"
     if summary_path.exists():
         try:
-            # The typed, cross-version reader (#202): legacy key spellings
-            # and the drift-arbitration interpretation live on the model's
-            # properties, not re-derived here.
             summary = load_run_summary(summary_path)
             result.layers = summary.layers or None
             latency = summary.latency
