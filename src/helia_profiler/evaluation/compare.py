@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from ..errors import ReportError
-from ..modelcost import source_index_from_op
+from ..modelcost import LayerAttributor
 from ..results import ComparisonDimension, ResultManifest, load_result_manifest
 from ..results.dimensions import DIMENSION_REGISTRY
 from ..results.manifest import RESULT_PUBLICATION_INCOMPLETE
@@ -620,35 +620,29 @@ def _read_layer_memory_csv(path: Path) -> dict[Any, list[dict[str, Any]]]:
     return by_key
 
 
+_NO_MANIFEST = LayerAttributor(None)
+
+
 def _layer_source_index(layer: dict[str, Any]) -> int | None:
     """The profile layer's original tflite index, from the artifact.
 
-    Mirrors ``LayerAttributor``'s no-manifest resolution (#218): an explicit
-    ``source_index`` column (post-#222 artifacts) wins; else the integer
-    ``:N`` op-label suffix; else, for plain sequential-engine labels, the
-    id itself. A ``:``-labelled op with no integer suffix resolves nothing.
+    Normalizes the recorded ``source_index`` column (post-#222 artifacts),
+    then defers to ``LayerAttributor``'s no-manifest resolution (#218).
     """
     recorded = layer.get("source_index")
-    if isinstance(recorded, int) and not isinstance(recorded, bool):
-        return recorded
+    if recorded == "":
+        recorded = None
     if isinstance(recorded, float) and recorded.is_integer():
         # A spreadsheet round-trip turns 7 into 7.0; still the recorded key.
-        return int(recorded)
-    if recorded not in (None, ""):
+        recorded = int(recorded)
+    if recorded is not None and (isinstance(recorded, bool) or not isinstance(recorded, int)):
         # Present but malformed: the recorded column is the strongest
         # evidence — a corrupt value must not silently DOWNGRADE resolution
         # to the weaker label suffix (#227), it is unresolvable.
         return None
-    op = str(layer.get("op", ""))
-    suffix = source_index_from_op(op)
-    if suffix is not None:
-        return suffix
-    if ":" in op:
-        return None
-    layer_id = layer.get("id")
-    if isinstance(layer_id, int) and not isinstance(layer_id, bool):
-        return layer_id
-    return None
+    return _NO_MANIFEST.attribute(
+        layer.get("id", ""), str(layer.get("op", "")), recorded
+    ).source_index
 
 
 def _memory_rows_for_layer(
@@ -688,11 +682,7 @@ def _format_memory_summary(counts: dict[str, dict[str, int]]) -> str:
         return ""
     parts: list[str] = []
     for kind, placements in sorted(counts.items()):
-        placement_text = " + ".join(
-            _format_counted_placement(count, placement)
-            for placement, count in sorted(placements.items())
-        )
-        parts.append(f"{kind}: {placement_text}")
+        parts.append(f"{kind}: {_format_placement_group(placements)}")
     return "; ".join(parts)
 
 
