@@ -495,6 +495,15 @@ def test_build_compiles_a_power_plan_with_a_power_method(tmp_path, build, compil
     assert record.build.power_sync == _WIRING
 
 
+def test_a_power_plan_compiles_without_the_profile_power_section(tmp_path, build, compiler_calls):
+    plan = plan_for(build, tmp_path / "model.tflite", power=True)
+
+    hpx.build(plan, _fixture(build), method=_POWER_METHOD, runtime=_LINKED)
+
+    # build_fixed_fixture refuses a config with power enabled.
+    assert [call["config"].power.enabled for call in compiler_calls.calls] == [False]
+
+
 # Messages
 
 

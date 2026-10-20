@@ -567,8 +567,12 @@ def build(
     iterations, warmup = lifecycle_invocations(
         lifecycle, config.profiling.iterations, config.profiling.warmup
     )
+    # The method's power_sync compiles the power firmware; a profile's power
+    # section has no meaning to a fixture build, which refuses it.
     config = replace(
-        config, profiling=replace(config.profiling, iterations=iterations, warmup=warmup)
+        config,
+        profiling=replace(config.profiling, iterations=iterations, warmup=warmup),
+        power=replace(config.power, enabled=False),
     )
     fixture_build = build_fixed_fixture(
         config,
