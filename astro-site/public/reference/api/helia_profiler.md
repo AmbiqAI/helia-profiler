@@ -31,6 +31,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 | [build](/helia-profiler/reference/api/helia_profiler/compiled_build/#helia_profiler.build) | `helia_profiler.build` |
 | [load_build](/helia-profiler/reference/api/helia_profiler/compiled_build/#helia_profiler.load_build) | `helia_profiler.load_build` |
 | [run_build](/helia-profiler/reference/api/helia_profiler/compiled_build/#helia_profiler.run_build) | `helia_profiler.run_build` |
+| [hpx_cache_root](/helia-profiler/reference/api/helia_profiler/compiled_build/#helia_profiler.hpx_cache_root) | `helia_profiler.hpx_cache_root` |
 | [CompiledBuild](/helia-profiler/reference/api/helia_profiler/compiled_build/#helia_profiler.CompiledBuild) | `helia_profiler.CompiledBuild` |
 | [RunResult](/helia-profiler/reference/api/helia_profiler/compiled_build/#helia_profiler.RunResult) | `helia_profiler.RunResult` |
 | [Lifecycle](/helia-profiler/reference/api/helia_profiler/compiled_build/#helia_profiler.Lifecycle) | `helia_profiler.Lifecycle` |

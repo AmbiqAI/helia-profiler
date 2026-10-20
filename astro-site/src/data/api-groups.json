@@ -47,6 +47,7 @@
         "build",
         "load_build",
         "run_build",
+        "hpx_cache_root",
         "CompiledBuild",
         "RunResult",
         "Lifecycle"

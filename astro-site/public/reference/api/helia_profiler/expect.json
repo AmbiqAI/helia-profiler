@@ -33,9 +33,9 @@
               "returns": [],
               "signature": "max_abs_error: float = 0.0",
               "source": {
-                "line": 52,
+                "line": 53,
                 "path": "src/helia_profiler/expect.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L52"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L53"
               },
               "summary": ""
             }
@@ -46,9 +46,9 @@
           "returns": [],
           "signature": "Tolerance(max_abs_error: float = 0.0) -> None",
           "source": {
-            "line": 44,
+            "line": 45,
             "path": "src/helia_profiler/expect.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L44"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L45"
           },
           "summary": "Largest accepted absolute error per element, in each tensor's stored units."
         },
@@ -72,9 +72,9 @@
               "returns": [],
               "signature": "kind: ReferenceKind",
               "source": {
-                "line": 67,
+                "line": 68,
                 "path": "src/helia_profiler/expect.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L67"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L68"
               },
               "summary": ""
             },
@@ -91,9 +91,9 @@
               "returns": [],
               "signature": "litert_version: str | None = None",
               "source": {
-                "line": 68,
+                "line": 69,
                 "path": "src/helia_profiler/expect.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L68"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L69"
               },
               "summary": ""
             },
@@ -110,9 +110,9 @@
               "returns": [],
               "signature": "resolver: str | None = None",
               "source": {
-                "line": 69,
+                "line": 70,
                 "path": "src/helia_profiler/expect.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L69"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L70"
               },
               "summary": ""
             },
@@ -129,9 +129,9 @@
               "returns": [],
               "signature": "invocations: int | None = None",
               "source": {
-                "line": 70,
+                "line": 71,
                 "path": "src/helia_profiler/expect.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L70"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L71"
               },
               "summary": ""
             }
@@ -142,9 +142,9 @@
           "returns": [],
           "signature": "ReferenceOrigin(\n    kind: ReferenceKind,\n    litert_version: str | None = None,\n    resolver: str | None = None,\n    invocations: int | None = None,\n) -> None",
           "source": {
-            "line": 59,
+            "line": 60,
             "path": "src/helia_profiler/expect.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L59"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L60"
           },
           "summary": "Where reference outputs came from."
         },
@@ -168,9 +168,9 @@
               "returns": [],
               "signature": "origin: ReferenceOrigin",
               "source": {
-                "line": 77,
+                "line": 78,
                 "path": "src/helia_profiler/expect.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L77"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L78"
               },
               "summary": ""
             },
@@ -187,9 +187,9 @@
               "returns": [],
               "signature": "outputs: tuple[bytes, ...]",
               "source": {
-                "line": 78,
+                "line": 79,
                 "path": "src/helia_profiler/expect.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L78"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L79"
               },
               "summary": ""
             }
@@ -200,9 +200,9 @@
           "returns": [],
           "signature": "ReferenceOutputs(origin: ReferenceOrigin, outputs: tuple[bytes, ...]) -> None",
           "source": {
-            "line": 73,
+            "line": 74,
             "path": "src/helia_profiler/expect.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L73"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L74"
           },
           "summary": "Reference bytes for every output, in model order, and their origin."
         },
@@ -226,9 +226,9 @@
               "returns": [],
               "signature": "source: ReferenceKind",
               "source": {
-                "line": 88,
+                "line": 89,
                 "path": "src/helia_profiler/expect.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L88"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L89"
               },
               "summary": ""
             },
@@ -245,9 +245,9 @@
               "returns": [],
               "signature": "files: tuple[FixtureFile | Path, ...] = ()",
               "source": {
-                "line": 89,
+                "line": 90,
                 "path": "src/helia_profiler/expect.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L89"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L90"
               },
               "summary": ""
             },
@@ -264,9 +264,9 @@
               "returns": [],
               "signature": "resolver: LiteRtResolver = 'BUILTIN_REF'",
               "source": {
-                "line": 90,
+                "line": 91,
                 "path": "src/helia_profiler/expect.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L90"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L91"
               },
               "summary": ""
             },
@@ -283,9 +283,9 @@
               "returns": [],
               "signature": "tolerance: Tolerance | None = None",
               "source": {
-                "line": 91,
+                "line": 92,
                 "path": "src/helia_profiler/expect.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L91"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L92"
               },
               "summary": ""
             },
@@ -302,9 +302,9 @@
               "returns": [],
               "signature": "host_litert(*, resolver: LiteRtResolver = 'BUILTIN_REF', tolerance: Tolerance | None = None) -> Expect",
               "source": {
-                "line": 93,
+                "line": 94,
                 "path": "src/helia_profiler/expect.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L93"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L94"
               },
               "summary": "Run the model with host LiteRT on the run's input bytes (LiteRT models only)."
             },
@@ -321,9 +321,9 @@
               "returns": [],
               "signature": "from_build(*, tolerance: Tolerance | None = None) -> Expect",
               "source": {
-                "line": 101,
+                "line": 102,
                 "path": "src/helia_profiler/expect.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L101"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L102"
               },
               "summary": "Use the expected outputs the fixture build carries."
             },
@@ -340,9 +340,9 @@
               "returns": [],
               "signature": "from_files(*files: FixtureFile | str | Path = (), tolerance: Tolerance | None = None) -> Expect",
               "source": {
-                "line": 106,
+                "line": 107,
                 "path": "src/helia_profiler/expect.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L106"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L107"
               },
               "summary": "Compare with caller bytes, one file per output in model order."
             }
@@ -353,9 +353,9 @@
           "returns": [],
           "signature": "Expect(\n    source: ReferenceKind,\n    files: tuple[FixtureFile | Path, ...] = (),\n    resolver: LiteRtResolver = 'BUILTIN_REF',\n    tolerance: Tolerance | None = None,\n) -> None",
           "source": {
-            "line": 81,
+            "line": 82,
             "path": "src/helia_profiler/expect.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L81"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L82"
           },
           "summary": "What a run's outputs are compared against."
         },
@@ -379,9 +379,9 @@
               "returns": [],
               "signature": "name: str",
               "source": {
-                "line": 127,
+                "line": 128,
                 "path": "src/helia_profiler/expect.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L127"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L128"
               },
               "summary": ""
             },
@@ -398,9 +398,9 @@
               "returns": [],
               "signature": "index: int",
               "source": {
-                "line": 128,
+                "line": 129,
                 "path": "src/helia_profiler/expect.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L128"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L129"
               },
               "summary": ""
             },
@@ -417,9 +417,9 @@
               "returns": [],
               "signature": "dtype: str",
               "source": {
-                "line": 129,
+                "line": 130,
                 "path": "src/helia_profiler/expect.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L129"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L130"
               },
               "summary": ""
             },
@@ -436,9 +436,9 @@
               "returns": [],
               "signature": "shape: tuple[int, ...]",
               "source": {
-                "line": 130,
+                "line": 131,
                 "path": "src/helia_profiler/expect.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L130"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L131"
               },
               "summary": ""
             },
@@ -455,9 +455,9 @@
               "returns": [],
               "signature": "reference_sha256: str",
               "source": {
-                "line": 131,
+                "line": 132,
                 "path": "src/helia_profiler/expect.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L131"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L132"
               },
               "summary": ""
             },
@@ -474,9 +474,9 @@
               "returns": [],
               "signature": "observed_sha256: str",
               "source": {
-                "line": 132,
+                "line": 133,
                 "path": "src/helia_profiler/expect.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L132"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L133"
               },
               "summary": ""
             },
@@ -493,9 +493,9 @@
               "returns": [],
               "signature": "elements: int",
               "source": {
-                "line": 133,
+                "line": 134,
                 "path": "src/helia_profiler/expect.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L133"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L134"
               },
               "summary": ""
             },
@@ -512,9 +512,9 @@
               "returns": [],
               "signature": "mismatched_elements: int",
               "source": {
-                "line": 134,
+                "line": 135,
                 "path": "src/helia_profiler/expect.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L134"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L135"
               },
               "summary": ""
             },
@@ -531,9 +531,9 @@
               "returns": [],
               "signature": "max_abs_error: float",
               "source": {
-                "line": 135,
+                "line": 136,
                 "path": "src/helia_profiler/expect.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L135"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L136"
               },
               "summary": ""
             },
@@ -550,9 +550,9 @@
               "returns": [],
               "signature": "max_abs_error_real: float | None",
               "source": {
-                "line": 136,
+                "line": 137,
                 "path": "src/helia_profiler/expect.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L136"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L137"
               },
               "summary": ""
             },
@@ -569,9 +569,9 @@
               "returns": [],
               "signature": "within_tolerance: bool | None",
               "source": {
-                "line": 137,
+                "line": 138,
                 "path": "src/helia_profiler/expect.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L137"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L138"
               },
               "summary": ""
             },
@@ -588,9 +588,9 @@
               "returns": [],
               "signature": "identical: bool",
               "source": {
-                "line": 140,
+                "line": 141,
                 "path": "src/helia_profiler/expect.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L140"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L141"
               },
               "summary": ""
             }
@@ -601,9 +601,9 @@
           "returns": [],
           "signature": "TensorComparison(\n    name: str,\n    index: int,\n    dtype: str,\n    shape: tuple[int, ...],\n    reference_sha256: str,\n    observed_sha256: str,\n    elements: int,\n    mismatched_elements: int,\n    max_abs_error: float,\n    max_abs_error_real: float | None,\n    within_tolerance: bool | None,\n) -> None",
           "source": {
-            "line": 117,
+            "line": 118,
             "path": "src/helia_profiler/expect.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L117"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L118"
           },
           "summary": "Comparison facts for one output tensor."
         },
@@ -627,9 +627,9 @@
               "returns": [],
               "signature": "reference: ReferenceOutputs",
               "source": {
-                "line": 148,
+                "line": 149,
                 "path": "src/helia_profiler/expect.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L148"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L149"
               },
               "summary": ""
             },
@@ -646,9 +646,9 @@
               "returns": [],
               "signature": "tensors: tuple[TensorComparison, ...]",
               "source": {
-                "line": 149,
+                "line": 150,
                 "path": "src/helia_profiler/expect.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L149"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L150"
               },
               "summary": ""
             },
@@ -665,9 +665,9 @@
               "returns": [],
               "signature": "tolerance: Tolerance | None",
               "source": {
-                "line": 150,
+                "line": 151,
                 "path": "src/helia_profiler/expect.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L150"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L151"
               },
               "summary": ""
             },
@@ -684,9 +684,9 @@
               "returns": [],
               "signature": "matched: bool | None",
               "source": {
-                "line": 153,
+                "line": 154,
                 "path": "src/helia_profiler/expect.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L153"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L154"
               },
               "summary": "Whether every tensor is within tolerance; None when no tolerance was given."
             }
@@ -697,9 +697,9 @@
           "returns": [],
           "signature": "Verification(reference: ReferenceOutputs, tensors: tuple[TensorComparison, ...], tolerance: Tolerance | None) -> None",
           "source": {
-            "line": 144,
+            "line": 145,
             "path": "src/helia_profiler/expect.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L144"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L145"
           },
           "summary": "Per-tensor comparison facts, the reference they used and an optional verdict."
         },
@@ -716,9 +716,9 @@
           "returns": [],
           "signature": "host_reference(\n    model: bytes,\n    inputs: Sequence[tuple[FixtureTensor, bytes]],\n    outputs: Sequence[FixtureTensor],\n    *,\n    resolver: LiteRtResolver = 'BUILTIN_REF',\n    invocations: int = 1,\n) -> ReferenceOutputs",
           "source": {
-            "line": 160,
+            "line": 161,
             "path": "src/helia_profiler/expect.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L160"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L161"
           },
           "summary": "Run a LiteRT model on the host and return its output bytes in outputs order."
         },
@@ -735,9 +735,9 @@
           "returns": [],
           "signature": "compare_outputs(\n    tensors: Sequence[FixtureTensor],\n    reference: ReferenceOutputs,\n    observed: Sequence[bytes],\n    tolerance: Tolerance | None = None,\n) -> Verification",
           "source": {
-            "line": 234,
+            "line": 235,
             "path": "src/helia_profiler/expect.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L234"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L235"
           },
           "summary": "Compare observed output bytes with reference outputs, tensor by tensor."
         },
@@ -754,9 +754,9 @@
           "returns": [],
           "signature": "compare_fixture_outputs(build: FixtureBuild, capture: FixtureCaptureResult, expect: Expect) -> Verification",
           "source": {
-            "line": 256,
+            "line": 304,
             "path": "src/helia_profiler/expect.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L256"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/expect.py#L304"
           },
           "summary": "Compare a fixture capture's outputs with expect."
         }
