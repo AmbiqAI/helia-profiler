@@ -1,4 +1,4 @@
-"""Verified offline reading of native profiler result bundles.
+"""Verified offline reading of native profiler result bundles and saved run results.
 
 These readers never run a model or acquire hardware. Verification establishes
 consistency of retained evidence, not authenticity or numerical correctness.
@@ -14,7 +14,7 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
 from ._semantic_hash import Kind, require
-from .errors import ReportError
+from .errors import ConfigError, ReportError
 from .results.dimensions import DIMENSION_REGISTRY, ComparisonDimension
 from .results.manifest import (
     RESULT_PUBLICATION_INCOMPLETE,
@@ -25,6 +25,10 @@ from .results.manifest import (
 )
 from .results.run_summary import RUN_SUMMARY_SCHEMA, RunSummary
 from .results.serde import nested_get
+from .run_record import RUN_RESULT_SCHEMA, RunRecord, RunResultError, read_run
+
+_MANIFEST_FILE = "result_manifest.json"
+_RUN_RESULT_FILE = "result.json"
 
 
 class ResultReadError(ReportError):
@@ -52,7 +56,7 @@ class ProfileResultRecord:
 class ResultInspection:
     """Inspection does not promote an invalid bundle into a trusted result."""
 
-    result: ProfileResultRecord | None
+    result: ProfileResultRecord | RunRecord | None
     code: str | None = None
     message: str | None = None
 
@@ -208,8 +212,15 @@ def _reconcile_identities(
             raise ResultReadError("identity_mismatch", f"Native identities differ for {dimension}")
 
 
-def load_result(location: str | Path) -> ProfileResultRecord:
-    """Strictly load an ordinary profile manifest or its containing directory.
+def load_result(location: str | Path) -> ProfileResultRecord | RunRecord:
+    """Strictly load an ordinary profile manifest, a saved run result, or the directory of either.
+
+    The file's ``schema`` decides how it is read: ``hpx.result-manifest``
+    gives a :class:`ProfileResultRecord`, ``hpx.run-result`` a
+    :class:`~helia_profiler.RunRecord`, verified as
+    :func:`~helia_profiler.load_run` verifies it under the root it records
+    itself under and this host's HPX cache. A directory is read through its
+    ``result_manifest.json``, or its ``result.json`` when it has no manifest.
 
     Failed native runs remain failed records. Missing manifests and interrupted
     publication are refusals, not legacy fallbacks. Summary versions 11 to 19
@@ -225,14 +236,20 @@ def load_result(location: str | Path) -> ProfileResultRecord:
         raise ResultReadError("invalid_evidence", str(exc)) from exc
 
 
-def _load_result(location: Path) -> ProfileResultRecord:
-    path = location / "result_manifest.json" if location.is_dir() else location
+def _load_result(location: Path) -> ProfileResultRecord | RunRecord:
+    path = location
+    if location.is_dir():
+        path = location / _MANIFEST_FILE
+        if not path.exists() and (location / _RUN_RESULT_FILE).is_file():
+            path = location / _RUN_RESULT_FILE
     root = path.parent.resolve()
     marker = root / RESULT_PUBLICATION_INCOMPLETE
     if marker.exists() or marker.is_symlink():
         raise ResultReadError("incomplete_publication", "Native publication is incomplete")
     raw = path.read_bytes()
     data = _object(raw)
+    if data.get("schema") == RUN_RESULT_SCHEMA:
+        return _load_run(path, raw)
     _schema(data, "hpx.result-manifest", 1)
     manifest = ResultManifest.from_dict(data)
     if manifest.bundle_type != "profile":
@@ -324,6 +341,18 @@ def _load_result(location: Path) -> ProfileResultRecord:
     return ProfileResultRecord(
         root, path.resolve(), len(raw), hashlib.sha256(raw).hexdigest(), manifest, summary, metadata
     )
+
+
+def _load_run(path: Path, raw: bytes) -> RunRecord:
+    try:
+        record = read_run(path, raw)
+    except RunResultError as exc:
+        raise ResultReadError(exc.code, str(exc)) from exc
+    except ConfigError as exc:
+        raise ResultReadError("invalid_evidence", str(exc)) from exc
+    if path.read_bytes() != raw:
+        raise ResultReadError("publication_changed", "Run result changed during read")
+    return record
 
 
 def inspect_result(location: str | Path) -> ResultInspection:

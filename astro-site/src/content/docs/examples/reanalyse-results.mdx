@@ -148,7 +148,11 @@ Unknown values and provenance remain null. Byte counts remain integers;
 timing converted from microseconds retains its source pointer and conversion.
 Reported and observed clocks are evidence, not external calibration.
 
-This view does not map fixture captures, rail energy or per-layer attribution.
+The same entry points read a saved run result (`result.json` from `hpx run`,
+or its evidence directory) and map it as `hpx-run-1`: per-invoke latency,
+rail energy when measured, and arena use
+([A saved run result](../../guide/output/#7-a-saved-run-result)). Neither
+mapping covers per-layer attribution.
 It does not replace the existing native loaders or `hpx compare`, and it
 does not qualify numerical correctness or authenticate a result. The older
 shipped examples above continue to use their existing native loaders.

@@ -514,6 +514,24 @@ class RunResult:
         """
         return self.capture.rail_energy
 
+    def save(self, path: str | Path, *, roots: Mapping[str, Path], build: str | Path) -> Path:
+        """Write the run as a ``hpx.run-result`` with paths relative to *roots* and return its path.
+
+        *build* is the file the run's compiled build was saved to; the result
+        pins it by sha256 and size. The capture's files are pinned as they
+        are; the reference outputs of a verification are written beside the
+        result as ``<stem>.reference_<index>.bin`` and pinned too. Every
+        path must sit under one of *roots*. :func:`load_run` reads it back.
+
+        Raises:
+            ConfigError: *build* is not this run's compiled build, a file is
+                missing or changed, a path is under no root, or the identity
+                or verification does not recompute from the build and capture.
+        """
+        from .run_record import save_run
+
+        return save_run(self, path, roots=roots, build=build)
+
 
 def build(
     plan: FrozenRun,

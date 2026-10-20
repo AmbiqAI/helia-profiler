@@ -25,6 +25,7 @@ A `results/` directory from [First profile](../../getting-started/first-profile/
 | `aot_memory_layers.csv` | engine extension | the same placement data flattened for a spreadsheet | `helia-aot` runs |
 | `model_explorer/me_overlay_<COUNTER>.json` | Model Explorer overlay format | one overlay per counter | unless `output.model_explorer: false` |
 | `detailed/memory.json`, `detailed/profile_<group>.csv`, `detailed/profile_<preset>.csv`, `detailed/power_summary.csv` | projections and diagnostics | counters merged per compute-unit group and per PMU preset, memory breakdown, per-window power | `output.detailed: true` |
+| `result.json` in a run directory's `evidence-<N>/` | `hpx.run-result` v1 (`run_record.py`) | one run-API capture, saved and verifiable; see [A saved run result](#7-a-saved-run-result) | `hpx run`, `RunResult.save` |
 
 The manifest's artifact entries carry `role` (`core`, `projection`,
 `extension`, `export`, `diagnostic`), `name`, `producer`, `optional`, and
@@ -364,6 +365,68 @@ validity footer: `VALID`, `DEGRADED` with one `code: message` line per
 warning, or `INVALID` with the errors first. An invalid run still exits 0
 and writes its bundle unless `output.fail_on_invalid` (`--fail-on-invalid`)
 is set, in which case it exits 3.
+
+### 7. A saved run result
+
+`hpx run` saves each capture as `result.json` in its evidence directory.
+From Python, `RunResult.save(path, roots=..., build=...)` writes one and
+`helia_profiler.load_run(path, roots=...)` reads it back as a `RunRecord`
+(`path`, `size_bytes`, `sha256`, `result`, `document`). Paths are
+`{root, path}` under named roots, as in a saved compiled build, so the run
+directory moves as a unit.
+
+| Field | Holds |
+|---|---|
+| `location` | where the result itself sits, under its root |
+| `compiled_build` | the saved build's `root`, `path`, `sha256` and `size_bytes` |
+| `capture` | the capture's facts (`state`, `timing`, `memory`, `rail_energy`, `error` and the rest); every file it references (outputs, terminal snapshots, the rail trace) as `root`, `path`, `sha256` and `size_bytes` |
+| `power` | `null`, or the request with `kind` `rail` or `supply` |
+| `verification` | `null`, or the reference origin, `tolerance`, `matched`, the per-tensor facts and `reference_files`, the reference outputs written beside the result as `<stem>.reference_<index>.bin` |
+| `identity` | the run's `RunIdentity` |
+
+Loading raises a `ConfigError` whose `code` names the failed check:
+`unsupported_schema` for another schema or version, `invalid_path` for a
+result that is not where it records itself, `artifact_changed` for a missing
+or changed build, evidence or reference file, `invalid_evidence` for a build
+that does not verify, and `identity_mismatch` for an identity (including
+`observation_hash`) or comparison that does not recompute from the build and
+capture. A failed capture saves and loads too; its outcome is data. The
+checks catch accidents, such as an edited or mixed-up file, not tampering.
+
+`helia_profiler.api.load_result` takes a `result.json` or its evidence
+directory, dispatches on the file's `schema`, and verifies it under the root
+it records itself under and this host's HPX cache. `observations(record)`
+maps it to the portable result view (`1.0-draft`, mapping `hpx-run-1`);
+`hpx results show` and `hpx results export` print and write it.
+
+| Metric | Unit | Scope | Statistic | Basis |
+|---|---|---|---|---|
+| `latency.invoke.v1` or `latency.restore_invoke.v1` | ms | the run's `timing_scope` | mean over the measured iterations (`sample_count`) | `ticks / timer_hz / iterations * 1000`; clocks are the configured `timing_clock_hz` and the reported `timer_hz`, domain `timer` for the STIMER |
+| `energy.per_inference.v1` | uJ | `gross_rail_restore_and_invoke` | mean per measured iteration | `energy_per_iteration_j * 1e6`; domain `system`, since the MCU rail feeds more than the CPU |
+| `power.mean.v1` | mW | `gross_rail_restore_and_invoke` | time mean over the gated window | `mean_power_w * 1e3` |
+| `memory.arena_capacity.v1` | B | `arena_capacity` | size | the capture's memory terminal |
+| `memory.arena_used_after_invoke.v1` | B | `allocator_after_invoke` | size | the capture's memory terminal |
+
+A timing-only or supply-only run states energy unavailable
+(`energy_not_measured_timing_only`, `energy_not_measured_supply_only`), and a
+failed capture states every measurement unavailable (`capture_failed`).
+`workload` holds the model sha256, the `inputs_hash` and the lifecycle.
+`engine.version` follows the engine, and `extensions.helia-profiler` names
+its basis:
+
+| Engine | `engine.version` | `engine_version_basis` |
+|---|---|---|
+| `helia-aot` | the heliaAOT release that generated the module | `aot_provider_release` |
+| `helia-rt`, `litert` | the linked runtime release | `linked_runtime_release` |
+
+An unknown version stays `null`, with its reason in
+`engine_version_unavailable_reason`. `extensions.helia-profiler` also holds
+the output comparison, the semantic hashes and the run facts
+(`instance_boundary`, `first_invoke_initializer`, `first_invoke_window`,
+`timing_statistic`, `warmups`). The view does not qualify the engine
+numerically or authenticate the result.
+`examples/results/run-api-synthetic/` holds a synthetic saved result and
+its `portable.json`.
 
 ## Expected output
 

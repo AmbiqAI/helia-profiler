@@ -273,6 +273,9 @@ completion protocol, with the requested rail also when the capture failed.
 Each `run_build` call is one capture; run repeats as
 separate calls into separate evidence directories. The plan sets the warmup
 and iteration counts.
+`result.save(path, roots=..., build=...)` saves the run with its raw
+instrument record pinned; its portable view reports energy per inference and
+mean power ([A saved run result](../output/#7-a-saved-run-result)).
 
 For a timing capture through a configured supply, pass
 `power=hpx.FixtureBoardPowerRequest(driver, serial, rail)` and a

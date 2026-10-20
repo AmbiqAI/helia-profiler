@@ -1,21 +1,23 @@
-# Run API example: a compiled build and a run result (synthetic)
+# Run API example: a compiled build and a saved run result (synthetic)
 
-`build.json` is a `hpx.compiled-build` (schema version 3) for the tiny CNN on heliaAOT, Apollo510 EVB, ATfE, the `lp` clock, an SRAM arena and MRAM weights, with the `carry` lifecycle. The files it pins sit beside it under one root, `run`:
+`build.json` is a `hpx.compiled-build` (schema version 3) for the tiny CNN on heliaAOT, Apollo510 EVB, ATfE, the `lp` clock, an SRAM arena and MRAM weights, with the `carry` lifecycle. `result.json` is a `hpx.run-result` (schema version 1) for one run of that build: the capture's facts, the run's identity, and the per-tensor comparison with host LiteRT. It pins `build.json`, the captured output under `evidence/` and the reference output `result.reference_0.bin` by sha256 and size. Every path is relative to one root, `run`:
 
 ```python
 from pathlib import Path
 import helia_profiler as hpx
+from helia_profiler.api import load_result, observations
 
 root = Path("examples/results/run-api-synthetic").resolve()
-compiled = hpx.load_build(root / "build.json", roots={"run": root})
-print(compiled.identity.intent_hash)
+record = hpx.load_run(root / "result.json", roots={"run": root})
+print(record.result.identity.observation_hash)
+view = observations(load_result(root / "result.json"))
 ```
 
-`result.json` is what `examples/run_api_conformance.py`'s `report()` prints for one run of that build: the run's `RunIdentity`, the per-tensor verification against host LiteRT, and key measurements.
+`portable.json` is that view: the run mapped to the portable result schema (`1.0-draft`, mapping `hpx-run-1`).
 
 **Synthetic:**
 - The firmware files (`build/app/*`, `build/evidence/*`) are test stand-ins, not a real image.
-- The capture came from a mocked device that returned the host LiteRT outputs. No hardware ran.
-- Identity facts the stand-ins don't record (the NSX lock, the CMSIS-NN module) are `unknown` with a reason.
+- The capture came from a mocked device that returned the host LiteRT outputs. No hardware ran, so the latency is a placeholder.
+- Identity facts the stand-ins don't record (the NSX lock, the CMSIS-NN module, the heliaAOT release) are `unknown` with a reason.
 
 Use it to exercise readers and admission, not as a measurement.
