@@ -64,3 +64,8 @@ With no supply and no rail measurement, timing never resolves or opens a power
 driver. Rail measurement uses its already-selected instrument/rail for power
 setup; an explicit supply must match it. This does not add measurement to timing
 or change the build identity. Compilation remains instrument-free.
+
+The run API measures the same gross MCU-rail batch through
+`run_build(..., power=FixtureRailPowerRequest(...), power_guard=...)`, for
+heliaAOT and LiteRT on the `apollo510_evb` under `CARRY` only. See
+[Power through the run API](fixed-fixture.md#power-through-the-run-api).

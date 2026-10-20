@@ -211,6 +211,70 @@ calibration acceptance belong to the calling experiment. The typed request and
 result classes are exported by `helia_profiler.fixture`.
 
 
+## Rail energy through the run API
+
+The [run API](../../reference/api/helia_profiler/compiled_build/) measures one
+power route: the gross energy of the `MCU` rail over the timed
+restore-and-invoke loop, with nothing subtracted. It is admitted for heliaAOT
+and LiteRT builds on the `apollo510_evb` under `Lifecycle.CARRY`. HPX refuses
+any other engine, board, rail or lifecycle before it compiles or touches the
+board, and says why.
+
+Compile the power firmware with the GPIO wiring, then capture with the
+instrument, the rail and the station's authority over them:
+
+```python
+import helia_profiler as hpx
+
+wiring = hpx.FixturePowerSync(sync_gpio_pin=29, state_gpio_pin=36, go_gpio_pin=14)
+method = hpx.FixtureMethod(hpx.FixtureTimingScope.RESTORE_AND_INVOKE, power_sync=wiring)
+compiled = hpx.build(plan, fixture, method=method, lifecycle=hpx.Lifecycle.CARRY)
+
+result = hpx.run_build(
+    compiled,
+    guard=station.board_guard,
+    jlink_serial=station.probe_serial,
+    evidence_dir=output_dir,
+    settle_seconds=60,
+    power=hpx.FixtureRailPowerRequest(
+        serial=station.instrument_serial,
+        rail="MCU",
+        io_voltage=1.8,  # the AP510 EVB GPIO level
+        sync_gpio_pin=29,
+        state_gpio_pin=36,
+        go_gpio_pin=14,
+    ),
+    power_guard=station.power_guard,
+)
+energy = result.energy  # None when the capture failed
+```
+
+`guard` vouches for the board and probe; `power_guard` authorizes the
+instrument and rail (`verify_power_device`) and keeps checking ownership.
+These are refused before the board is touched:
+
+- request wiring that differs from the build's;
+- a build without wiring, or a power build run without a rail request;
+- a missing `power_guard`;
+- `settle_seconds` above 60.
+
+`result.energy` holds:
+
+- the measured iterations, seconds, watts, amperes, joules and joules per iteration;
+- the rail and the instrument serial;
+- the hash-pinned raw instrument record;
+- `completion`: the protocol-2 READY, GO, gate and DONE sample IDs that bound the window.
+
+`result.identity.run.energy` states the method: scope, rail, subtraction and
+completion protocol. Each `run_build` call is one capture; run repeats as
+separate calls into separate evidence directories. The plan sets the warmup
+and iteration counts.
+
+For a timing capture through a configured supply, pass
+`power=hpx.FixtureBoardPowerRequest(driver, serial, rail)` and a
+`power_guard` with a build compiled without `power_sync`. It powers the board
+and measures no energy. `hpx run` takes no power options.
+
 ## Optional fixture RAM diagnostics
 
 For timing-only fixtures, pass `observe_ram=True` to `build_fixed_fixture` or
