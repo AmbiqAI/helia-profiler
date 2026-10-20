@@ -86,6 +86,7 @@ if TYPE_CHECKING:
         host_reference,
     )
     from .frozen_run import FrozenModel, FrozenRun, FrozenRuntime, LocalInput, ToolchainIdentity
+    from .hostenv.cache_dirs import hpx_cache_root
     from .hostenv.doctor import DoctorCheck, DoctorResult, DoctorVersionCheck
     from .identity import (
         CanonicalEngine,
@@ -262,6 +263,7 @@ _EXPORTS = {
     "build": (".compiled_build", "build"),
     "load_build": (".compiled_build", "load_build"),
     "run_build": (".compiled_build", "run_build"),
+    "hpx_cache_root": (".hostenv.cache_dirs", "hpx_cache_root"),
     "Lifecycle": (".lifecycle", "Lifecycle"),
     "CanonicalEngine": (".identity", "CanonicalEngine"),
     "CanonicalKernel": (".identity", "CanonicalKernel"),
@@ -306,6 +308,7 @@ __all__ = [
     "build",
     "load_build",
     "run_build",
+    "hpx_cache_root",
     "Lifecycle",
     "CanonicalEngine",
     "CanonicalKernel",
@@ -487,6 +490,7 @@ _EXPERIMENTAL_API = {
     "build",
     "load_build",
     "run_build",
+    "hpx_cache_root",
     "Lifecycle",
     "CanonicalEngine",
     "CanonicalKernel",

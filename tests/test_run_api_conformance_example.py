@@ -136,15 +136,7 @@ def test_the_placeholder_guard_refuses_every_capture(example):
         guard.verify_target(target=None, jlink_serial="1160002255")
 
 
-@pytest.mark.parametrize(
-    "engine,backend", [("helia-aot", None), ("helia-rt", "helia"), ("tflm", "cmsis_nn")]
-)
-def test_main_builds_with_what_a_fixture_build_requires(
-    example, model, tmp_path, monkeypatch, capsys, engine, backend
-):
-    out = tmp_path / "out"
-    cache = tmp_path / "cache"
-    prepared = object()
+def _patch_build(monkeypatch, out: Path, cache: Path, engine: str, prepared: object):
     calls: list[dict[str, Any]] = []
     built: list[FixtureBuild] = []
 
@@ -165,15 +157,23 @@ def test_main_builds_with_what_a_fixture_build_requires(
         "helia_profiler.prepared_runtimes.prepared_runtime",
         lambda name, version=None: SimpleNamespace(runtime=prepared),
     )
-    _fake_capture(monkeypatch, tmp_path / "raw", built)
+    return calls, built
 
-    status = example.main(["--jlink-serial", "1160002255", "--engine", engine, "--out", str(out)])
+
+@pytest.mark.parametrize(
+    "engine,backend", [("helia-aot", None), ("helia-rt", "helia"), ("tflm", "cmsis_nn")]
+)
+def test_main_builds_with_what_a_fixture_build_requires(
+    example, model, tmp_path, monkeypatch, capsys, engine, backend
+):
+    out = tmp_path / "out"
+    prepared = object()
+    calls, _ = _patch_build(monkeypatch, out, tmp_path / "cache", engine, prepared)
+
+    status = example.main(["--build-only", "--engine", engine, "--out", str(out)])
 
     report = json.loads(capsys.readouterr().out)
-    assert status == 0 and report["succeeded"]
-    assert report["identity"]["observation_hash"]
-    assert report["identity"]["intent_hash"]
-    assert report["verification"]["matched"] is True
+    assert status == 0 and report["identity"]["intent_hash"]
     (call,) = calls
     config = call["config"]
     assert (config.target.toolchain, config.target.clock.cpu) == ("atfe", "lp")
@@ -187,3 +187,37 @@ def test_main_builds_with_what_a_fixture_build_requires(
     saved = json.dumps(json.loads((out / "build.json").read_text())["build"])
     assert str(tmp_path) not in saved
     assert ('"cache"' in saved) is (engine != "helia-aot")
+
+
+def test_main_refuses_to_capture_before_building(example, tmp_path, monkeypatch, capsys):
+    calls, _ = _patch_build(monkeypatch, tmp_path / "out", tmp_path / "cache", "helia-aot", None)
+    with pytest.raises(SystemExit) as exit_info:
+        example.main(["--out", str(tmp_path / "out")])
+    assert exit_info.value.code == 2 and "--build-only" in capsys.readouterr().err
+    assert calls == []
+
+
+def test_run_conformance_captures_and_verifies(example, model, tmp_path, monkeypatch):
+    out = tmp_path / "out"
+    _, built = _patch_build(monkeypatch, out, tmp_path / "cache", "helia-aot", None)
+    _fake_capture(monkeypatch, tmp_path / "raw", built)
+
+    result = example.run_conformance(
+        model=model,
+        engine="helia-aot",
+        board="apollo510_evb",
+        jlink_serial="1160002255",
+        out=out,
+        guard=_Unconsulted(),
+    )
+
+    assert result.succeeded and result.identity.observation_hash
+    assert result.verification is not None and result.verification.matched
+
+
+def test_each_capture_gets_a_fresh_evidence_directory(example, tmp_path):
+    first = example._fresh(tmp_path / "evidence")
+    assert first == tmp_path / "evidence"
+    first.mkdir()
+    (tmp_path / "evidence-1").mkdir()
+    assert example._fresh(tmp_path / "evidence") == tmp_path / "evidence-2"

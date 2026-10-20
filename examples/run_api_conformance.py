@@ -19,9 +19,11 @@ Before running it:
 - For ``helia-rt`` or ``tflm``, prepare the runtime once with
   ``hpx runtimes prepare helia-rt`` (or ``tflm``); :func:`~helia_profiler.build`
   links the one the plan names from the HPX cache. heliaAOT needs nothing.
-- Replace :class:`PlaceholderGuard`. It refuses every capture: a harness
-  passes its own guard to :func:`run_conformance`, one that proves the
-  physical board behind the probe serial and holds it for the capture.
+- To capture, call :func:`run_conformance` from a harness with its own board
+  guard, one that proves the physical board behind the probe serial and holds
+  it for the capture. :class:`PlaceholderGuard` refuses every capture, so the
+  command line only builds (``--build-only``). Each capture writes a fresh
+  ``evidence`` directory under ``--out``.
 
 The plan states what a fixture build requires: the ``lp`` clock, an SRAM
 arena of ``--arena-size`` bytes and MRAM weights. The build works under
@@ -31,7 +33,7 @@ directories can move to another host.
 
 Example::
 
-    uv run python examples/run_api_conformance.py --jlink-serial <probe-serial> \\
+    uv run python examples/run_api_conformance.py --build-only \\
         --engine helia-rt --board apollo510_evb --out runs/conformance
 """
 
@@ -57,7 +59,6 @@ from helia_profiler.fixture import (
     TypedFixture,
     analyze_typed_fixture_model,
 )
-from helia_profiler.hostenv.cache_dirs import hpx_cache_root
 
 #: The kernel backend each prepared-runtime engine builds its fixture with.
 BACKENDS = {"helia-rt": "helia", "tflm": "cmsis_nn"}
@@ -98,18 +99,15 @@ def typed_fixture(model: Path, out: Path) -> TypedFixture:
     )
 
 
-def run_conformance(
+def build_conformance(
     *,
     model: Path,
     engine: str,
     board: str,
-    jlink_serial: str,
     out: Path,
-    guard: FixtureCaptureGuard,
     arena_size: int = 128 * 1024,
-    settle_seconds: float = 60.0,
-) -> RunResult:
-    """Freeze, build, save, load and run *model* once; return the run's result."""
+) -> hpx.CompiledBuild:
+    """Freeze, build, save and load *model*; return the loaded, verified build."""
     fixture = typed_fixture(model, out)
     plan = (
         hpx.Session()
@@ -130,16 +128,41 @@ def run_conformance(
         lifecycle=Lifecycle.CARRY,
         host={"work_dir": str(out / "build")},
     )
-    roots = {"run": out, "cache": hpx_cache_root()}
-    record = hpx.load_build(built.save(out / "build.json", roots=roots), roots=roots)
+    roots = {"run": out, "cache": hpx.hpx_cache_root()}
+    return hpx.load_build(built.save(out / "build.json", roots=roots), roots=roots)
+
+
+def run_conformance(
+    *,
+    model: Path,
+    engine: str,
+    board: str,
+    jlink_serial: str,
+    out: Path,
+    guard: FixtureCaptureGuard,
+    arena_size: int = 128 * 1024,
+    settle_seconds: float = 60.0,
+) -> RunResult:
+    """Build *model* as :func:`build_conformance` does, then run it once under *guard*."""
+    compiled = build_conformance(
+        model=model, engine=engine, board=board, out=out, arena_size=arena_size
+    )
     return hpx.run_build(
-        record,
+        compiled,
         guard=guard,
         jlink_serial=jlink_serial,
-        evidence_dir=out / "evidence",
+        evidence_dir=_fresh(out / "evidence"),
         settle_seconds=settle_seconds,
         expect=Expect.host_litert(tolerance=Tolerance(max_abs_error=1)),
     )
+
+
+def _fresh(path: Path) -> Path:
+    """*path*, or the first ``<path>-N`` that does not exist yet."""
+    candidate, index = path, 1
+    while candidate.exists():
+        candidate, index = path.with_name(f"{path.name}-{index}"), index + 1
+    return candidate
 
 
 def report(result: RunResult) -> dict[str, object]:
@@ -178,24 +201,32 @@ def report(result: RunResult) -> dict[str, object]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--jlink-serial", required=True)
+    parser.add_argument(
+        "--build-only",
+        action="store_true",
+        help="Freeze, build, save, load and verify; capture nothing",
+    )
     parser.add_argument("--model", type=Path, help="LiteRT model; defaults to the tiny CNN")
     parser.add_argument("--engine", choices=("helia-rt", "helia-aot", "tflm"), default="helia-rt")
     parser.add_argument("--board", default="apollo510_evb")
     parser.add_argument("--arena-size", type=int, default=128 * 1024)
     parser.add_argument("--out", type=Path, default=Path("runs") / "conformance")
     args = parser.parse_args(argv)
-    result = run_conformance(
+    if not args.build_only:
+        # PlaceholderGuard refuses every capture; fail before spending a build on it.
+        parser.error(
+            "this script cannot capture: run it with --build-only, or call "
+            "run_conformance() from a harness with its own board guard"
+        )
+    compiled = build_conformance(
         model=args.model or hpx.examples.tiny_cnn(),
         engine=args.engine,
         board=args.board,
-        jlink_serial=args.jlink_serial,
         out=args.out.resolve(),
-        guard=PlaceholderGuard(),
         arena_size=args.arena_size,
     )
-    print(json.dumps(report(result), indent=2))
-    return 0 if result.succeeded else 1
+    print(json.dumps({"identity": compiled.identity.to_dict()}, indent=2))
+    return 0
 
 
 if __name__ == "__main__":
