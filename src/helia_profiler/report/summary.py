@@ -19,6 +19,7 @@ from ..results.run_summary import RunSummary
 from .contracts import RUN_SUMMARY_SCHEMA, RUN_SUMMARY_SCHEMA_VERSION
 from .memory import (
     _cache_totals,
+    _serialise_binary_sections,
     _serialise_memory_plan,
     _serialise_memory_reconciliation,
     _serialise_memory_regions,
@@ -51,6 +52,24 @@ def _write_per_inference(
     power[f"{prefix}energy_per_inference_j"] = round(per_inference, 9)
     if per_inference > 0:
         power[f"{prefix}inferences_per_joule"] = round(1.0 / per_inference, 6)
+
+
+# Order matches LatencySection.to_dict emission.
+_DEVICE_TIMING_FIELDS = (
+    "profiled_infer_count",
+    "profiled_infer_total_us",
+    "profiled_infer_avg_us",
+    "clean_infer_count",
+    "clean_infer_total_cycles",
+    "clean_infer_avg_cycles",
+    "clean_infer_avg_us",
+    "clean_stalled_iters",
+    "clean_partial_iters",
+    "clean_ref_cycles",
+    "clean_dwt_rate_cyc",
+    "clean_dwt_rate_us",
+    "clean_attach_wait_us",
+)
 
 
 def _write_summary(
@@ -138,15 +157,7 @@ def _write_summary(
         )
 
     if ctx.binary_sections is not None:
-        bs = ctx.binary_sections
-        summary["binary"] = {
-            "text": bs.text,
-            "data": bs.data,
-            "bss": bs.bss,
-            "total": bs.total,
-        }
-        if bs.reserved:
-            summary["binary"]["reserved"] = bs.reserved
+        summary["binary"] = _serialise_binary_sections(ctx.binary_sections)
 
     cache = _cache_totals(layers)
     if cache:
@@ -388,8 +399,8 @@ def _write_summary(
                     prefix="active_window_estimated_",
                 )
 
+    timing: dict[str, Any] = {}
     if ctx.run_metadata.timing is not None:
-        timing = {}
         if ctx.run_metadata.timing.capture_duration_s is not None:
             timing["capture_duration_s"] = round(ctx.run_metadata.timing.capture_duration_s, 6)
         if ctx.run_metadata.timing.hpx_start_latency_s is not None:
@@ -398,73 +409,12 @@ def _write_summary(
             timing["protocol_duration_s"] = round(ctx.run_metadata.timing.protocol_duration_s, 6)
         if ctx.run_metadata.timing.phases:
             timing["boot_phases_s"] = ctx.run_metadata.timing.phases
-        if meta.profiled_infer_count is not None:
-            timing["device_profiled_infer_count"] = meta.profiled_infer_count
-        if meta.profiled_infer_total_us is not None:
-            timing["device_profiled_infer_total_us"] = meta.profiled_infer_total_us
-        if meta.profiled_infer_avg_us is not None:
-            timing["device_profiled_infer_avg_us"] = meta.profiled_infer_avg_us
-        if meta.clean_infer_count is not None:
-            timing["device_clean_infer_count"] = meta.clean_infer_count
-        if meta.clean_infer_total_cycles is not None:
-            timing["device_clean_infer_total_cycles"] = meta.clean_infer_total_cycles
-        if meta.clean_infer_avg_cycles is not None:
-            timing["device_clean_infer_avg_cycles"] = meta.clean_infer_avg_cycles
-        if meta.clean_infer_avg_us is not None:
-            timing["device_clean_infer_avg_us"] = meta.clean_infer_avg_us
-        # Window-clock self-check (#121). Surfaced here for the same reason
-        # window_clock_ceiling is: a summary.json reader must be able to tell a
-        # build that checked and found nothing from one that never checked.
-        if meta.clean_stalled_iters is not None:
-            timing["device_clean_stalled_iters"] = meta.clean_stalled_iters
-        if meta.clean_partial_iters is not None:
-            timing["device_clean_partial_iters"] = meta.clean_partial_iters
-        if meta.clean_ref_cycles is not None:
-            timing["device_clean_ref_cycles"] = meta.clean_ref_cycles
-        if meta.clean_dwt_rate_cyc is not None:
-            timing["device_clean_dwt_rate_cyc"] = meta.clean_dwt_rate_cyc
-        if meta.clean_dwt_rate_us is not None:
-            timing["device_clean_dwt_rate_us"] = meta.clean_dwt_rate_us
-        if meta.clean_attach_wait_us is not None:
-            timing["device_clean_attach_wait_us"] = meta.clean_attach_wait_us
-        if timing:
-            summary["latency"] = timing
-    elif any(
-        value is not None
-        for value in (
-            meta.profiled_infer_count,
-            meta.profiled_infer_total_us,
-            meta.profiled_infer_avg_us,
-            meta.clean_infer_count,
-            meta.clean_infer_avg_cycles,
-            meta.clean_infer_avg_us,
-            meta.clean_stalled_iters,
-            meta.clean_partial_iters,
-            meta.clean_ref_cycles,
-            meta.clean_dwt_rate_cyc,
-            meta.clean_dwt_rate_us,
-            meta.clean_attach_wait_us,
-        )
-    ):
-        summary["latency"] = {
-            key: value
-            for key, value in {
-                "device_profiled_infer_count": meta.profiled_infer_count,
-                "device_profiled_infer_total_us": meta.profiled_infer_total_us,
-                "device_profiled_infer_avg_us": meta.profiled_infer_avg_us,
-                "device_clean_infer_count": meta.clean_infer_count,
-                "device_clean_infer_total_cycles": meta.clean_infer_total_cycles,
-                "device_clean_infer_avg_cycles": meta.clean_infer_avg_cycles,
-                "device_clean_infer_avg_us": meta.clean_infer_avg_us,
-                "device_clean_stalled_iters": meta.clean_stalled_iters,
-                "device_clean_partial_iters": meta.clean_partial_iters,
-                "device_clean_ref_cycles": meta.clean_ref_cycles,
-                "device_clean_dwt_rate_cyc": meta.clean_dwt_rate_cyc,
-                "device_clean_dwt_rate_us": meta.clean_dwt_rate_us,
-                "device_clean_attach_wait_us": meta.clean_attach_wait_us,
-            }.items()
-            if value is not None
-        }
+    for name in _DEVICE_TIMING_FIELDS:
+        value = getattr(meta, name)
+        if value is not None:
+            timing[f"device_{name}"] = value
+    if timing:
+        summary["latency"] = timing
 
     workload = measured_clean_workload(ctx)
     if workload is not None and "latency" in summary:

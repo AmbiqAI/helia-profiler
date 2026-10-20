@@ -320,6 +320,16 @@ def test_write_summary_surfaces_the_clean_window_self_check(tmp_path: Path):
     fallback = json.loads(_write_summary(ctx, tmp_path).read_text())
     assert fallback["latency"]["device_clean_stalled_iters"] == 4
 
+    set_profile_result(
+        ctx,
+        PmuResult(
+            meta=FirmwareMeta(clean_infer_total_cycles=83300),
+            layers=[LayerResult(id=0, op="CONV_2D", cycles=1000.0)],
+        ),
+    )
+    cycles_only = json.loads(_write_summary(ctx, tmp_path).read_text())
+    assert cycles_only["latency"] == {"device_clean_infer_total_cycles": 83300}
+
 
 def test_write_summary_includes_device_profiled_infer_latency(tmp_path: Path):
     config = load_config(

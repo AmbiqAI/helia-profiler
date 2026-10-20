@@ -16,6 +16,22 @@ if TYPE_CHECKING:
 log = logging.getLogger("hpx")
 
 
+def _aot_manifest(ctx: PipelineContext) -> list[dict[str, Any]] | None:
+    """The AOT operator manifest, when this run has one (#218).
+
+    It carries the execution-position -> original-tflite-index mapping the
+    per-layer MAC join needs; sequential engines have none and need none.
+    An AOT run whose manifest extraction FAILED returns ``[]``, not
+    ``None``: degraded firmware labels layers with positions, so the
+    suffix fallback would resurrect the positional join — an empty
+    authoritative manifest dashes everything instead.
+    """
+    artifacts = getattr(ctx, "engine_artifacts", None)
+    if isinstance(artifacts, HeliaAotArtifacts):
+        return artifacts.aot_op_manifest or []
+    return None
+
+
 def _write_aot_manifest(ctx: PipelineContext, output_dir: Path) -> Path | None:
     """Persist the heliaAOT operator manifest into the report directory.
 
@@ -25,10 +41,7 @@ def _write_aot_manifest(ctx: PipelineContext, output_dir: Path) -> Path | None:
     with the actual compiled graph.  Silently no-ops for non-AOT engines
     or when the manifest is empty.
     """
-    artifacts = getattr(ctx, "engine_artifacts", None)
-    if not isinstance(artifacts, HeliaAotArtifacts):
-        return None
-    manifest = artifacts.aot_op_manifest
+    manifest = _aot_manifest(ctx)
     if not manifest:
         return None
     out_path = output_dir / "aot_operator_manifest.json"
@@ -49,12 +62,12 @@ def _write_aot_memory_layers(ctx: PipelineContext, output_dir: Path) -> Path | N
     layer, tensor kind, runtime memory, or staged source/destination.
     """
 
-    artifacts = getattr(ctx, "engine_artifacts", None)
-    if not isinstance(artifacts, HeliaAotArtifacts) or not artifacts.aot_op_manifest:
+    manifest = _aot_manifest(ctx)
+    if not manifest:
         return None
 
     rows: list[dict[str, Any]] = []
-    for op in artifacts.aot_op_manifest:
+    for op in manifest:
         for group, tensor_role in (
             ("inputs", "input"),
             ("outputs", "output"),
