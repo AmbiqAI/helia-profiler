@@ -88,7 +88,8 @@ def calls(monkeypatch: pytest.MonkeyPatch, build) -> list[dict[str, Any]]:
 
     def fake(config, fixture, **options):
         seen.append({"config": config, "fixture": fixture, **options})
-        return build
+        profiling = config.profiling
+        return reseal(build, iterations=profiling.iterations, warmups=profiling.warmup)
 
     monkeypatch.setattr("helia_profiler._fixture_build.build_fixed_fixture", fake)
     return seen
@@ -105,8 +106,9 @@ def test_build_applies_the_lifecycle_and_compiles(plan, build, fixture, calls, l
     assert (profiling.iterations, profiling.warmup) == expected
     assert call["compile"] is True and call["observe_ram"] is True
     assert call["method"] is _METHOD and call["fixture"] is fixture
-    assert record == compiled(plan, build, lifecycle)
-    assert record.plan is plan
+    built = reseal(build, iterations=expected[0], warmups=expected[1])
+    assert record == compiled(plan, built, lifecycle)
+    assert record.plan is plan and call["runtime"] is None
 
 
 def test_build_asks_the_engine_for_the_lifecycle(plan, fixture, calls, monkeypatch):

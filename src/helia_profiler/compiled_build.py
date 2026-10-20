@@ -70,6 +70,13 @@ class CompiledBuild:
         toolchain and its version, arena and weights placement, arena size,
         clock profile and the lifecycle's invocation counts.
 
+        The runtime version and commit and the kernel commit are compared
+        wherever both the plan and the build state one; a build or plan
+        that states none of a fact is not compared on it. heliaRT and
+        heliaAOT compare with the plan's pins. TFLM compares with this HPX's
+        prepared TFLM record, because the plan pins the modules an ordinary
+        profile builds from source, which a fixture build does not link.
+
         Raises:
             ConfigError: Naming the first fact that does not match.
         """
@@ -92,7 +99,7 @@ class CompiledBuild:
                 "Compiled build's model does not match its plan "
                 f"(sha256 {self.plan.model.sha256[:12]}…)"
             )
-        for name, planned, built in self._facts(model):
+        for name, planned, built in (*self._facts(model), *self._linked_facts()):
             if planned != built:
                 raise ConfigError(
                     f"Compiled build's {name} {built!r} differs from its plan's {planned!r}"
@@ -121,6 +128,28 @@ class CompiledBuild:
                 f"{self.build.warmups} warmups; lifecycle {self.lifecycle.value} of its plan "
                 f"runs {expected[0]} and {expected[1]}"
             )
+
+    def _linked_facts(self) -> list[tuple[str, object, object]]:
+        """The runtime and kernel facts both the plan and the build state."""
+        expected = _linked_runtime(self.plan)
+        if expected is None:
+            return []
+        build = self.build
+        runtime_source, engine_source = build.runtime_source, build.engine_source
+        built = (
+            (runtime_source.version, runtime_source.commit)
+            if runtime_source is not None
+            else (engine_source.version, engine_source.commit)
+            if engine_source is not None
+            else (None, None)
+        )
+        kernel = build.kernel_source.commit if build.kernel_source is not None else None
+        facts = [
+            ("runtime version", expected.version, built[0]),
+            ("runtime commit", expected.commit, built[1]),
+            ("kernel commit", expected.kernels_commit, kernel),
+        ]
+        return [fact for fact in facts if fact[1] is not None and fact[2] is not None]
 
     def _facts(self, model: FixtureFile) -> list[tuple[str, object, object]]:
         """Each fact as (name, what the plan states, what the build records)."""
@@ -283,6 +312,9 @@ def build(
     *lifecycle* must be one the plan's engine implements; it sets the timed
     iterations and warmups the firmware runs. *host* supplies host-local
     settings, such as ``{"work_dir": ...}``, as :meth:`FrozenRun.config` does.
+    heliaRT and TFLM link a prepared runtime: without *runtime*, the one the
+    plan names is taken from the HPX cache (``hpx runtimes prepare``), never
+    downloaded or built. The result is verified before it is returned.
     """
     from ._fixture_build import build_fixed_fixture
 
@@ -315,12 +347,70 @@ def build(
         config,
         fixture,
         method=method,
-        runtime=runtime,
+        runtime=runtime if runtime is not None else _prepared_runtime(plan),
         compile=True,
         observe_aot_arenas=observe_aot_arenas,
         observe_ram=observe_ram,
     )
-    return CompiledBuild(plan, fixture_build, lifecycle, _binding(plan, lifecycle, fixture_build))
+    compiled = CompiledBuild(
+        plan, fixture_build, lifecycle, _binding(plan, lifecycle, fixture_build)
+    )
+    compiled.verify()
+    return compiled
+
+
+@dataclass(frozen=True)
+class _LinkedRuntime:
+    """The runtime and kernel library a fixture build of a plan links."""
+
+    name: str
+    version: str | None
+    commit: str | None
+    kernels_commit: str | None
+
+
+def _linked_runtime(plan: FrozenRun) -> _LinkedRuntime | None:
+    """What a fixture build of *plan* links, or ``None`` when the plan states no runtime.
+
+    heliaRT and heliaAOT link the runtime and kernel commits the plan pins.
+    TFLM does not: the plan pins the tflite-micro and CMSIS-NN modules an
+    ordinary profile builds from source, while a fixture build links this
+    HPX's prepared TFLM record (``hpx runtimes prepare tflm``), so TFLM is
+    compared with that record.
+    """
+    from .runtime_records import runtime
+
+    planned = plan.runtime
+    if planned is None:
+        return None
+    if planned.name != "tflm":
+        return _LinkedRuntime(
+            planned.name, planned.version, planned.source_commit, planned.kernels_commit
+        )
+    record = runtime("tflm")
+    if record is None:
+        raise ConfigError("This HPX ships no prepared TFLM runtime record")
+    return _LinkedRuntime(
+        record.name,
+        record.version,
+        record.source.commit,
+        record.kernels.commit if record.kernels is not None else None,
+    )
+
+
+def _prepared_runtime(plan: FrozenRun) -> PreparedUpstreamRuntime | None:
+    """The cached prepared runtime a fixture build of *plan* links, for heliaRT and TFLM."""
+    from .engines import EngineType, get_adapter
+    from .engines.base import PreparedRuntimeAdapter
+    from .prepared_runtimes import prepared_runtime
+
+    engine = EngineType(plan.settings["engine"]["type"])
+    if not isinstance(get_adapter(engine), PreparedRuntimeAdapter):
+        return None
+    linked = _linked_runtime(plan)
+    if linked is None:
+        raise ConfigError(f"The plan states no {engine.value} runtime to link")
+    return prepared_runtime(linked.name, linked.version).runtime
 
 
 def _binding(plan: FrozenRun, lifecycle: Lifecycle, build: FixtureBuild) -> str:

@@ -161,7 +161,10 @@ def test_main_builds_with_what_a_fixture_build_requires(
         monkeypatch.setattr(
             f"helia_profiler.{owner}.build_fixed_fixture", build_fixed_fixture, raising=False
         )
-    monkeypatch.setattr(example, "prepared_runtime", lambda name: SimpleNamespace(runtime=prepared))
+    monkeypatch.setattr(
+        "helia_profiler.prepared_runtimes.prepared_runtime",
+        lambda name, version=None: SimpleNamespace(runtime=prepared),
+    )
     _fake_capture(monkeypatch, tmp_path / "raw", built)
 
     status = example.main(["--jlink-serial", "1160002255", "--engine", engine, "--out", str(out)])

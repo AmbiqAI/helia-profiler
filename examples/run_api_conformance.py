@@ -17,7 +17,8 @@ Before running it:
 
 - Install ATfE; fixture builds use no other toolchain.
 - For ``helia-rt`` or ``tflm``, prepare the runtime once with
-  ``hpx runtimes prepare helia-rt`` (or ``tflm``). heliaAOT needs nothing.
+  ``hpx runtimes prepare helia-rt`` (or ``tflm``); :func:`~helia_profiler.build`
+  links the one the plan names from the HPX cache. heliaAOT needs nothing.
 - Replace :class:`PlaceholderGuard`. It refuses every capture: a harness
   passes its own guard to :func:`run_conformance`, one that proves the
   physical board behind the probe serial and holds it for the capture.
@@ -53,12 +54,10 @@ from helia_profiler.fixture import (
     FixtureOutput,
     FixtureTarget,
     FixtureTimingScope,
-    PreparedUpstreamRuntime,
     TypedFixture,
     analyze_typed_fixture_model,
 )
 from helia_profiler.hostenv.cache_dirs import hpx_cache_root
-from helia_profiler.prepared_runtimes import prepared_runtime
 
 #: The kernel backend each prepared-runtime engine builds its fixture with.
 BACKENDS = {"helia-rt": "helia", "tflm": "cmsis_nn"}
@@ -99,11 +98,6 @@ def typed_fixture(model: Path, out: Path) -> TypedFixture:
     )
 
 
-def runtime_for(engine: str) -> PreparedUpstreamRuntime | None:
-    """The prepared runtime *engine* links, or ``None`` for heliaAOT."""
-    return prepared_runtime(engine).runtime if engine in BACKENDS else None
-
-
 def run_conformance(
     *,
     model: Path,
@@ -134,7 +128,6 @@ def run_conformance(
         fixture,
         method=FixtureMethod(FixtureTimingScope.INVOKE_ONLY),
         lifecycle=Lifecycle.CARRY,
-        runtime=runtime_for(engine),
         host={"work_dir": str(out / "build")},
     )
     roots = {"run": out, "cache": hpx_cache_root()}
