@@ -155,17 +155,29 @@ _IDENTITY_HASHES: tuple[tuple[str, Kind, str], ...] = (
 )
 
 
-def _identity_hashes(identity: Any) -> None:
-    """Refuse a summary identity whose hashes are not semantic hashes of their kind."""
-    if identity is None:
+def _identity_hashes(summary: dict[str, Any]) -> None:
+    """Refuse a summary identity whose hashes are not semantic hashes of their kind.
+
+    It agrees with the packaged summary schema: an identity, when present, is
+    an object stating every hash, and an unknown hash is ``{"unknown": reason}``.
+    """
+    if "identity" not in summary:
         return
+    identity = summary["identity"]
     if not isinstance(identity, dict):
         raise ResultReadError("invalid_summary", "Summary identity must be an object")
     for name, kind, absent in _IDENTITY_HASHES:
-        value = identity.get(name)
+        if name not in identity:
+            raise ResultReadError("invalid_summary", f"Summary identity states no {name}")
+        value = identity[name]
         if absent == "null" and value is None:
             continue
-        if absent == "unknown" and isinstance(value, dict) and value.keys() == {"unknown"}:
+        if absent == "unknown" and isinstance(value, dict):
+            if value.keys() != {"unknown"} or not isinstance(value["unknown"], str):
+                raise ResultReadError(
+                    "invalid_summary",
+                    f'Summary identity.{name} must be a hash or {{"unknown": "<reason>"}}',
+                )
             continue
         try:
             require(value, kind)
@@ -244,7 +256,7 @@ def _load_result(location: Path) -> ProfileResultRecord:
             )
         _schema(summary_data, RUN_SUMMARY_SCHEMA, version)
         if version >= 19:
-            _identity_hashes(summary_data.get("identity"))
+            _identity_hashes(summary_data)
         if (
             summary_data.get("validity") is not None
             and summary_data["validity"] != manifest.validity.value

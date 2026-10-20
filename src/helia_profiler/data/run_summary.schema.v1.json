@@ -43,13 +43,13 @@
         "build_hash": {
           "oneOf": [
             {"type": "string", "pattern": "^hpx\\.build/1:sha256:[0-9a-f]{64}$"},
-            {"type": "object", "required": ["unknown"]}
+            {"type": "object", "required": ["unknown"], "properties": {"unknown": {"type": "string"}}, "additionalProperties": false}
           ]
         },
         "inputs_hash": {
           "oneOf": [
             {"type": "string", "pattern": "^hpx\\.inputs/1:sha256:[0-9a-f]{64}$"},
-            {"type": "object", "required": ["unknown"]}
+            {"type": "object", "required": ["unknown"], "properties": {"unknown": {"type": "string"}}, "additionalProperties": false}
           ]
         },
         "observation_hash": {
