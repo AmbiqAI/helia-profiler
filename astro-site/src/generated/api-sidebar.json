@@ -48,6 +48,18 @@
       "slug": "reference/api/helia_profiler/expect"
     },
     {
+      "label": "fixture_analysis",
+      "slug": "reference/api/helia_profiler/fixture_analysis"
+    },
+    {
+      "label": "fixture_capture",
+      "slug": "reference/api/helia_profiler/fixture_capture"
+    },
+    {
+      "label": "fixture_runtime",
+      "slug": "reference/api/helia_profiler/fixture_runtime"
+    },
+    {
       "label": "frozen_run",
       "slug": "reference/api/helia_profiler/frozen_run"
     },
@@ -74,6 +86,10 @@
       ]
     },
     {
+      "label": "prepared_runtimes",
+      "slug": "reference/api/helia_profiler/prepared_runtimes"
+    },
+    {
       "label": "results",
       "collapsed": true,
       "items": [
@@ -86,6 +102,10 @@
           "slug": "reference/api/helia_profiler/results/manifest"
         }
       ]
+    },
+    {
+      "label": "run_guard",
+      "slug": "reference/api/helia_profiler/run_guard"
     },
     {
       "label": "run_inputs",

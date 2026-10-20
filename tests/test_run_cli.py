@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from click import unstyle
 from typer.testing import CliRunner
 
 import helia_profiler as hpx
@@ -122,6 +124,11 @@ def _invoke(*args: str | Path):
     return runner.invoke(app, [str(arg) for arg in args])
 
 
+def _plain(text: str) -> str:
+    """*text* without Rich's colours, box rules or terminal-width wrapping."""
+    return " ".join(unstyle(text).replace("│", " ").split())
+
+
 def _saved(out: Path, plan: FrozenRun, build: FixtureBuild) -> hpx.CompiledBuild:
     record = compiled(plan, build, Lifecycle.CARRY)
     record.save(out / "build.json", roots=run_roots(out))
@@ -186,7 +193,7 @@ def test_freeze_reads_the_config_and_lets_options_override_it(tmp_path):
 def test_freeze_reports_a_config_error_and_exits_1(tmp_path):
     result = _invoke("freeze", tmp_path / "absent.tflite", "-o", tmp_path / "p.json")
     assert result.exit_code == 1
-    assert "Error" in result.output and not (tmp_path / "p.json").exists()
+    assert "Error" in _plain(result.output) and not (tmp_path / "p.json").exists()
 
 
 def test_freeze_requires_an_output_path(tmp_path):
@@ -200,7 +207,7 @@ def test_freeze_refuses_a_directory_as_the_plan(tmp_path):
     result = _invoke("freeze", model, *_FREEZE, "-o", tmp_path)
 
     assert result.exit_code == 1 and isinstance(result.exception, SystemExit)
-    assert "is a directory" in " ".join(result.output.split())
+    assert "is a directory" in _plain(result.output)
 
 
 def test_freeze_refuses_to_write_the_plan_over_the_model(tmp_path, monkeypatch):
@@ -211,7 +218,7 @@ def test_freeze_refuses_to_write_the_plan_over_the_model(tmp_path, monkeypatch):
     result = _invoke("freeze", "model.tflite", *_FREEZE, "-o", "./sub/../model.tflite")
 
     assert result.exit_code == 1
-    assert "is the model the plan is frozen against" in " ".join(result.output.split())
+    assert "is the model the plan is frozen against" in _plain(result.output)
     assert model.read_bytes() == b"model"
 
 
@@ -302,7 +309,7 @@ def test_build_refuses_a_work_dir_outside_the_run_directory_before_building(
     result = _invoke("build", plan_file, "--out", dest, "--work-dir", tmp_path / "elsewhere")
 
     assert result.exit_code == 1 and calls == []
-    assert "outside the run directory" in " ".join(result.output.split())
+    assert "outside the run directory" in _plain(result.output)
     assert not dest.exists()
 
 
@@ -316,7 +323,7 @@ def test_a_refused_rebuild_leaves_the_earlier_build_valid(tmp_path, dest, plan_f
     result = _invoke("build", plan_file, "--out", dest, "--input", first, "--input", second)
 
     assert result.exit_code == 1 and len(calls) == 1
-    assert "not a new or empty directory" in " ".join(result.output.split())
+    assert "not a new or empty directory" in _plain(result.output)
     assert (dest / "inputs" / "input_0.bin").read_bytes() == pinned
     assert _invoke("validate", "build", dest).exit_code == 0
 
@@ -337,7 +344,7 @@ def test_build_refuses_a_model_other_than_the_plans_before_writing(dest, plan, p
     result = _invoke("build", plan_file, "--out", dest)
 
     assert result.exit_code == 1 and calls == []
-    assert "is not the model the plan was frozen against" in " ".join(result.output.split())
+    assert "is not the model the plan was frozen against" in _plain(result.output)
     assert not dest.exists()
 
 
@@ -357,7 +364,7 @@ def test_build_refuses_inputs_that_do_not_fit_the_model(
     result = _invoke("build", plan_file, "--out", dest, *args)
 
     assert result.exit_code == 1
-    assert message in " ".join(result.output.split())
+    assert message in _plain(result.output)
     assert calls == [] and not dest.exists()
 
 
@@ -368,7 +375,7 @@ def test_build_takes_the_model_from_another_path(tmp_path, dest, plan, plan_file
 
     missing = _invoke("build", plan_file, "--out", dest)
     assert missing.exit_code == 1
-    assert "name the model where it is now" in " ".join(missing.output.split())
+    assert "name the model where it is now" in _plain(missing.output)
     result = _invoke("build", plan_file, "--out", dest, "--model", moved)
 
     assert result.exit_code == 0, result.output
@@ -379,7 +386,9 @@ def test_build_shows_the_moved_model_hint_only_for_the_plans_path(tmp_path, dest
     result = _invoke("build", plan_file, "--out", dest, "--model", tmp_path / "absent.tflite")
 
     assert result.exit_code == 1
-    assert "Cannot read the model file" in result.output and "hint" not in result.output
+    assert "Cannot read the model file" in _plain(result.output) and "hint" not in _plain(
+        result.output
+    )
 
 
 # -- hpx validate build -------------------------------------------------------
@@ -419,7 +428,7 @@ def test_validate_build_refuses_a_changed_pinned_file(out, plan, build):
     result = _invoke("validate", "build", out)
 
     assert result.exit_code == 1
-    assert "Fixture hash mismatch" in " ".join(result.output.split())
+    assert "Fixture hash mismatch" in _plain(result.output)
 
 
 @pytest.fixture
@@ -469,7 +478,7 @@ def test_build_saves_a_runtime_from_the_cache_under_the_cache_root(
     moved = _invoke("validate", "build", dest)
 
     assert moved.exit_code == 1
-    text = " ".join(moved.output.split())
+    text = _plain(moved.output)
     assert f"hpx runtimes prepare helia-rt {runtime.version}" in text and "HPX_CACHE_DIR" in text
     assert "roots=" not in text
 
@@ -482,13 +491,13 @@ def test_a_missing_file_under_the_run_directory_says_so(out, plan, build):
     result = _invoke("validate", "build", out)
 
     assert result.exit_code == 1
-    text = " ".join(result.output.split())
+    text = _plain(result.output)
     assert "is incomplete; build it again" in text and "roots=" not in text
 
 
 def test_validate_build_refuses_a_missing_directory(tmp_path):
     result = _invoke("validate", "build", tmp_path / "absent")
-    assert result.exit_code == 1 and "not found" in result.output
+    assert result.exit_code == 1 and "not found" in _plain(result.output)
 
 
 def test_a_refused_suite_option_is_named_by_its_flag(out, monkeypatch):
@@ -497,7 +506,7 @@ def test_a_refused_suite_option_is_named_by_its_flag(out, monkeypatch):
     result = _invoke("validate", "-k", "kws", "build", out)
 
     assert result.exit_code == 2
-    assert "-k" in result.output and "--keyword" not in result.output
+    assert "-k" in _plain(result.output) and "--keyword" not in _plain(result.output)
 
 
 def test_suite_options_do_not_reach_validate_build(out, monkeypatch):
@@ -506,7 +515,9 @@ def test_suite_options_do_not_reach_validate_build(out, monkeypatch):
 
     result = _invoke("validate", "--models", "kws", "build", out)
 
-    assert result.exit_code == 2 and "--models" in result.output and suite == []
+    # Rich may wrap mid-word inside its error box, whose rules differ by platform.
+    squeezed = re.sub(r"[\s│└┘╰╯─]", "", unstyle(result.output))
+    assert result.exit_code == 2 and "--models" in squeezed and suite == []
 
 
 # -- hpx run ------------------------------------------------------------------
@@ -564,7 +575,7 @@ def test_run_refuses_another_board_before_any_device_call(out, plan, build, monk
     )
 
     assert result.exit_code == 1
-    assert "the operator named apollo510b_evb" in " ".join(result.output.split())
+    assert "the operator named apollo510b_evb" in _plain(result.output)
     assert not (out / "evidence-1").exists()
 
 
@@ -796,7 +807,7 @@ def test_run_refuses_an_existing_evidence_directory_before_the_capture(tmp_path,
     )
 
     assert result.exit_code == 1 and runs == []
-    assert "already exists" in " ".join(result.output.split())
+    assert "already exists" in _plain(result.output)
 
 
 def test_run_takes_the_build_file_as_well_as_its_directory(out, runs):
@@ -821,7 +832,7 @@ def test_run_reports_a_value_or_os_error_without_a_traceback(out, plan, build, m
     result = _invoke("run", out, "--board", BOARD, "--jlink-serial", SERIAL, "--expect", "none")
 
     assert result.exit_code == 1 and isinstance(result.exception, SystemExit)
-    assert result.output.startswith("Error:") and str(error) in result.output
+    assert _plain(result.output).startswith("Error:") and str(error) in _plain(result.output)
 
 
 # -- OperatorGuard ------------------------------------------------------------

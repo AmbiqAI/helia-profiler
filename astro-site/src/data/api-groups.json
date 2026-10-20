@@ -50,22 +50,7 @@
         "hpx_cache_root",
         "CompiledBuild",
         "RunResult",
-        "Lifecycle",
-        "FixtureBuild",
-        "FixtureCaptureResult",
-        "FixtureTiming",
-        "FixtureMemory",
-        "FixturePowerSync",
-        "FixtureRailEnergy",
-        "FixtureBatchCompletion",
-        "FixturePsramWeights",
-        "FixturePsramPayload",
-        "FixturePsramObservation",
-        "FixtureKernelSource",
-        "FixtureRuntimeSource",
-        "EngineSource",
-        "MemoryPlan",
-        "ToolchainInfo"
+        "Lifecycle"
       ]
     },
     {
@@ -78,30 +63,75 @@
         "FixtureRole",
         "FixtureFile",
         "FixtureTensor",
-        "FixtureMethod",
-        "FixtureTimingScope",
-        "PreparedUpstreamRuntime",
-        "analyze_run_model",
-        "analyze_run_model_for_engine",
-        "TypedFixtureModelAnalysis",
-        "FixtureCaptureGuard",
-        "OperatorGuard",
-        "FixtureTarget",
-        "capabilities",
-        "FixtureCapabilities",
-        "QualifiedFixtureTarget",
-        "EngineDTypeCapability",
         "PerTensorQuantization",
         "PerAxisQuantization",
         "FixtureDType",
-        "FixtureCapability",
+        "FixtureMethod",
+        "FixtureTimingScope",
         "FixtureStatePolicy",
-        "ResolverPlan",
+        "analyze_run_model",
+        "analyze_run_model_for_engine",
+        "TypedFixtureModelAnalysis"
+      ]
+    },
+    {
+      "path": "helia_profiler.run_guard",
+      "summary": "Who vouches for the board a run flashes: the guard protocol a capture consults and the operator guard the command line uses.",
+      "members": [
+        "FixtureCaptureGuard",
+        "OperatorGuard",
+        "FixtureTarget"
+      ]
+    },
+    {
+      "path": "helia_profiler.fixture_capture",
+      "summary": "What a run captures from the board: the capture result, its timing and memory, and the power and PSRAM observations a capture can carry.",
+      "members": [
+        "FixtureCaptureResult",
+        "FixtureTiming",
+        "FixtureMemory",
+        "FixturePowerSync",
+        "FixtureRailEnergy",
+        "FixtureBatchCompletion",
+        "FixturePsramObservation"
+      ]
+    },
+    {
+      "path": "helia_profiler.prepared_runtimes",
+      "summary": "The runtimes a build links and how they are identified: prepared upstream archives, their verified manifests, and the kernel, runtime and engine sources a build records.",
+      "members": [
+        "PreparedUpstreamRuntime",
         "VerifiedPreparedRuntime",
         "PreparedRuntimeManifest",
         "RuntimeABI",
         "RuntimeHeader",
-        "RuntimeProvider"
+        "RuntimeProvider",
+        "ResolverPlan",
+        "FixtureKernelSource",
+        "FixtureRuntimeSource",
+        "EngineSource"
+      ]
+    },
+    {
+      "path": "helia_profiler.fixture_runtime",
+      "summary": "The compiled firmware a build produces and what it recorded: the build record, its memory plan, toolchain and PSRAM weight placement.",
+      "members": [
+        "FixtureBuild",
+        "MemoryPlan",
+        "ToolchainInfo",
+        "FixturePsramWeights",
+        "FixturePsramPayload"
+      ]
+    },
+    {
+      "path": "helia_profiler.fixture_analysis",
+      "summary": "What this HPX can run: engines, data types and qualified targets.",
+      "members": [
+        "capabilities",
+        "FixtureCapabilities",
+        "QualifiedFixtureTarget",
+        "EngineDTypeCapability",
+        "FixtureCapability"
       ]
     },
     {

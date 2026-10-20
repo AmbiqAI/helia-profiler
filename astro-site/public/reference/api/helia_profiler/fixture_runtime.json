@@ -1,0 +1,1222 @@
+{
+  "$schema": "https://ambiqai.github.io/helia-ui/schema/reference-model-1.json",
+  "generatedFrom": {
+    "tool": "pyref",
+    "version": "1.7.3"
+  },
+  "language": "python",
+  "modules": [
+    {
+      "description": "The compiled firmware a build produces and what it recorded: the build record, its memory plan, toolchain and PSRAM weight placement.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.",
+      "name": "fixture_runtime",
+      "path": "helia_profiler.fixture_runtime",
+      "submodules": [],
+      "summary": "The compiled firmware a build produces and what it recorded: the build record, its memory plan, toolchain and PSRAM weight placement.",
+      "symbols": [
+        {
+          "description": "`dataclass`\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.FixturePsramPayload",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixturePsramPayload.region_id",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "region_id",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "region_id: int",
+              "source": {
+                "line": 27,
+                "path": "src/helia_profiler/fixture_psram.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_psram.py#L27"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixturePsramPayload.size",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "size",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "size: int",
+              "source": {
+                "line": 28,
+                "path": "src/helia_profiler/fixture_psram.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_psram.py#L28"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixturePsramPayload.checksum",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "checksum",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "checksum: int",
+              "source": {
+                "line": 29,
+                "path": "src/helia_profiler/fixture_psram.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_psram.py#L29"
+              },
+              "summary": ""
+            }
+          ],
+          "name": "FixturePsramPayload",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "FixturePsramPayload(region_id: int, size: int, checksum: int) -> None",
+          "source": {
+            "line": 25,
+            "path": "src/helia_profiler/fixture_psram.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_psram.py#L25"
+          },
+          "summary": "API tier: experimental"
+        },
+        {
+          "description": "`dataclass`\n\nExpected constant payloads; an uncompiled build has no image binding.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.FixturePsramWeights",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixturePsramWeights.payloads",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "payloads",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "payloads: tuple[FixturePsramPayload, ...]",
+              "source": {
+                "line": 47,
+                "path": "src/helia_profiler/fixture_psram.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_psram.py#L47"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixturePsramWeights.image_sha256",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "image_sha256",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "image_sha256: str | None = None",
+              "source": {
+                "line": 48,
+                "path": "src/helia_profiler/fixture_psram.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_psram.py#L48"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixturePsramWeights.clock_hz",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "clock_hz",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "clock_hz: int = 96000000",
+              "source": {
+                "line": 49,
+                "path": "src/helia_profiler/fixture_psram.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_psram.py#L49"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixturePsramWeights.sink_size",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "sink_size",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "sink_size: int",
+              "source": {
+                "line": 68,
+                "path": "src/helia_profiler/fixture_psram.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_psram.py#L68"
+              },
+              "summary": ""
+            }
+          ],
+          "name": "FixturePsramWeights",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "FixturePsramWeights(\n    payloads: tuple[FixturePsramPayload, ...],\n    image_sha256: str | None = None,\n    clock_hz: int = 96000000,\n) -> None",
+          "source": {
+            "line": 43,
+            "path": "src/helia_profiler/fixture_psram.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_psram.py#L43"
+          },
+          "summary": "Expected constant payloads; an uncompiled build has no image binding."
+        },
+        {
+          "description": "`dataclass`\n\nBuild toolchain versions (populated by stage 4).\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.ToolchainInfo",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.ToolchainInfo.compiler",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "compiler",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "compiler: str = ''",
+              "source": {
+                "line": 257,
+                "path": "src/helia_profiler/results/models.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L257"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.ToolchainInfo.compiler_version",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "compiler_version",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "compiler_version: str = ''",
+              "source": {
+                "line": 258,
+                "path": "src/helia_profiler/results/models.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L258"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.ToolchainInfo.cmake_version",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "cmake_version",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "cmake_version: str = ''",
+              "source": {
+                "line": 259,
+                "path": "src/helia_profiler/results/models.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L259"
+              },
+              "summary": ""
+            }
+          ],
+          "name": "ToolchainInfo",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "ToolchainInfo(compiler: str = '', compiler_version: str = '', cmake_version: str = '') -> None",
+          "source": {
+            "line": 253,
+            "path": "src/helia_profiler/results/models.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L253"
+          },
+          "summary": "Build toolchain versions (populated by stage 4)."
+        },
+        {
+          "description": "`dataclass`\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.FixtureBuild",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.fixture_identity",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "fixture_identity",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "fixture_identity: str",
+              "source": {
+                "line": 290,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L290"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.app_dir",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "app_dir",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "app_dir: Path",
+              "source": {
+                "line": 291,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L291"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.binary",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "binary",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "binary: FixtureFile | None",
+              "source": {
+                "line": 292,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L292"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.generated_sources",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "generated_sources",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "generated_sources: tuple[FixtureFile, ...]",
+              "source": {
+                "line": 293,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L293"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.expected",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "expected",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "expected: FixtureFile | None",
+              "source": {
+                "line": 294,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L294"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.built",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "built",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "built: bool",
+              "source": {
+                "line": 295,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L295"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.runtime_manifest",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "runtime_manifest",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "runtime_manifest: FixtureFile | None",
+              "source": {
+                "line": 296,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L296"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.flat_binary",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "flat_binary",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "flat_binary: FixtureFile | None",
+              "source": {
+                "line": 297,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L297"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.dependency_lock",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "dependency_lock",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "dependency_lock: FixtureFile | None",
+              "source": {
+                "line": 298,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L298"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.link_map",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "link_map",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "link_map: FixtureFile | None",
+              "source": {
+                "line": 299,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L299"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.timing_scope",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "timing_scope",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "timing_scope: FixtureTimingScope",
+              "source": {
+                "line": 300,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L300"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.engine",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "engine",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "engine: EngineType",
+              "source": {
+                "line": 301,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L301"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.build_identity",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "build_identity",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "build_identity: str | None",
+              "source": {
+                "line": 302,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L302"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.iterations",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "iterations",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "iterations: int",
+              "source": {
+                "line": 303,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L303"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.warmups",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "warmups",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "warmups: int",
+              "source": {
+                "line": 304,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L304"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.intent_identity",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "intent_identity",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "intent_identity: str",
+              "source": {
+                "line": 305,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L305"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.target",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "target",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "target: FixtureTarget",
+              "source": {
+                "line": 306,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L306"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.toolchain",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "toolchain",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "toolchain: ToolchainInfo | None",
+              "source": {
+                "line": 307,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L307"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.provider_provenance",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "provider_provenance",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "provider_provenance: str = 'manifest-declared; independently audit the pinned build/source record'",
+              "source": {
+                "line": 308,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L308"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.planned_memory",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "planned_memory",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "planned_memory: MemoryPlan | None = None",
+              "source": {
+                "line": 311,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L311"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.planned_memory_reason",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "planned_memory_reason",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "planned_memory_reason: str | None = 'not_recorded'",
+              "source": {
+                "line": 312,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L312"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.outputs",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "outputs",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "outputs: tuple[FixtureFile, ...] = ()",
+              "source": {
+                "line": 314,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L314"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.capabilities",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "capabilities",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "capabilities: tuple[tuple[str, FixtureCapability], ...] = ()",
+              "source": {
+                "line": 316,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L316"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.aot_arena_scan",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "aot_arena_scan",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "aot_arena_scan: tuple[tuple[int, int], ...] = ()",
+              "source": {
+                "line": 318,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L318"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.aot_outputs",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "aot_outputs",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "aot_outputs: tuple[FixtureFile, ...] = ()",
+              "source": {
+                "line": 321,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L321"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.engine_source",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "engine_source",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "engine_source: EngineSource | None = None",
+              "source": {
+                "line": 323,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L323"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.dependency_state",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "dependency_state",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "dependency_state: FixtureFile | None = None",
+              "source": {
+                "line": 325,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L325"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.state_policy",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "state_policy",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "state_policy: FixtureStatePolicy | None = None",
+              "source": {
+                "line": 326,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L326"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.source_initializer_present",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "source_initializer_present",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "source_initializer_present: bool = False",
+              "source": {
+                "line": 327,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L327"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.psram_weights",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "psram_weights",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "psram_weights: FixturePsramWeights | None = None",
+              "source": {
+                "line": 329,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L329"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.arena_location",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "arena_location",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "arena_location: Placement | None = None",
+              "source": {
+                "line": 331,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L331"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.weights_location",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "weights_location",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "weights_location: Placement | None = None",
+              "source": {
+                "line": 332,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L332"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.model",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "model",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "model: FixtureFile | None = None",
+              "source": {
+                "line": 334,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L334"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.inputs",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "inputs",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "inputs: tuple[FixtureIO, ...] = ()",
+              "source": {
+                "line": 335,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L335"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.output_tensors",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "output_tensors",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "output_tensors: tuple[FixtureTensor, ...] = ()",
+              "source": {
+                "line": 336,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L336"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.arena_capacity",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "arena_capacity",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "arena_capacity: int | None = None",
+              "source": {
+                "line": 337,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L337"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.clock_profile",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "clock_profile",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "clock_profile: str | None = None",
+              "source": {
+                "line": 338,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L338"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.cpu_hz",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "cpu_hz",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "cpu_hz: int | None = None",
+              "source": {
+                "line": 339,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L339"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.timer_hz",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "timer_hz",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "timer_hz: int | None = None",
+              "source": {
+                "line": 340,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L340"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.power_sync",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "power_sync",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "power_sync: FixturePowerSync | None = None",
+              "source": {
+                "line": 341,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L341"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.observe_ram",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "observe_ram",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "observe_ram: bool = False",
+              "source": {
+                "line": 342,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L342"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.kernel_source",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "kernel_source",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "kernel_source: FixtureKernelSource | None = None",
+              "source": {
+                "line": 345,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L345"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureBuild.runtime_source",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "runtime_source",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "runtime_source: FixtureRuntimeSource | None = None",
+              "source": {
+                "line": 347,
+                "path": "src/helia_profiler/_fixture_build.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L347"
+              },
+              "summary": ""
+            }
+          ],
+          "name": "FixtureBuild",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "FixtureBuild(\n    fixture_identity: str,\n    app_dir: Path,\n    binary: FixtureFile | None,\n    generated_sources: tuple[FixtureFile, ...],\n    expected: FixtureFile | None,\n    built: bool,\n    runtime_manifest: FixtureFile | None,\n    flat_binary: FixtureFile | None,\n    dependency_lock: FixtureFile | None,\n    link_map: FixtureFile | None,\n    timing_scope: FixtureTimingScope,\n    engine: EngineType,\n    build_identity: str | None,\n    iterations: int,\n    warmups: int,\n    intent_identity: str,\n    target: FixtureTarget,\n    toolchain: ToolchainInfo | None,\n    provider_provenance: str = 'manifest-declared; independently audit the pinned build/source record',\n    planned_memory: MemoryPlan | None = None,\n    planned_memory_reason: str | None = 'not_recorded',\n    outputs: tuple[FixtureFile, ...] = (),\n    capabilities: tuple[tuple[str, FixtureCapability], ...] = (),\n    aot_arena_scan: tuple[tuple[int, int], ...] = (),\n    aot_outputs: tuple[FixtureFile, ...] = (),\n    engine_source: EngineSource | None = None,\n    dependency_state: FixtureFile | None = None,\n    state_policy: FixtureStatePolicy | None = None,\n    source_initializer_present: bool = False,\n    psram_weights: FixturePsramWeights | None = None,\n    arena_location: Placement | None = None,\n    weights_location: Placement | None = None,\n    model: FixtureFile | None = None,\n    inputs: tuple[FixtureIO, ...] = (),\n    output_tensors: tuple[FixtureTensor, ...] = (),\n    arena_capacity: int | None = None,\n    clock_profile: str | None = None,\n    cpu_hz: int | None = None,\n    timer_hz: int | None = None,\n    power_sync: FixturePowerSync | None = None,\n    observe_ram: bool = False,\n    kernel_source: FixtureKernelSource | None = None,\n    runtime_source: FixtureRuntimeSource | None = None,\n) -> None",
+          "source": {
+            "line": 288,
+            "path": "src/helia_profiler/_fixture_build.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L288"
+          },
+          "summary": "API tier: experimental"
+        },
+        {
+          "description": "`dataclass`\n\nEngine-agnostic memory plan for a single profiling run.\n\nProduced by the ``plan_memory`` stage by combining engine-specific\nknowledge (AOT arena regions, TFLM single-arena size, weight placement)\nwith the SoC's physical memory layout.  Consumed by the report and by\nthe firmware template generator for placement macros / linker hints.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.MemoryPlan",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.MemoryPlan.engine",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "engine",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "engine: EngineType",
+              "source": {
+                "line": 452,
+                "path": "src/helia_profiler/results/models.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L452"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.MemoryPlan.regions",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "regions",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "regions: tuple[MemoryRegionUsage, ...] = ()",
+              "source": {
+                "line": 453,
+                "path": "src/helia_profiler/results/models.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L453"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.MemoryPlan.model_weight_bytes",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "model_weight_bytes",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "model_weight_bytes: int = 0",
+              "source": {
+                "line": 455,
+                "path": "src/helia_profiler/results/models.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L455"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.MemoryPlan.has_overflow",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "has_overflow",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "has_overflow: bool = False",
+              "source": {
+                "line": 459,
+                "path": "src/helia_profiler/results/models.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L459"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.MemoryPlan.region",
+              "kind": "method",
+              "language": "python",
+              "members": [],
+              "name": "region",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "region(name: str | MemoryRegion) -> MemoryRegionUsage | None",
+              "source": {
+                "line": 465,
+                "path": "src/helia_profiler/results/models.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L465"
+              },
+              "summary": ""
+            }
+          ],
+          "name": "MemoryPlan",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "MemoryPlan(\n    engine: EngineType,\n    regions: tuple[MemoryRegionUsage, ...] = (),\n    model_weight_bytes: int = 0,\n    has_overflow: bool = False,\n) -> None",
+          "source": {
+            "line": 442,
+            "path": "src/helia_profiler/results/models.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L442"
+          },
+          "summary": "Engine-agnostic memory plan for a single profiling run."
+        }
+      ]
+    }
+  ],
+  "name": "helia_profiler"
+}
