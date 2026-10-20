@@ -338,7 +338,9 @@ def validate_command(
 
 @validate_app.command("build", help="Verify a run directory written by hpx build (no hardware)")
 def validate_build_command(
-    directory: Annotated[Path, typer.Argument(help="Run directory written by hpx build")],
+    directory: Annotated[
+        Path, typer.Argument(help="Run directory written by hpx build, or its build.json")
+    ],
     verbose: Annotated[
         int, typer.Option("-v", "--verbose", count=True, help="Increase verbosity")
     ] = 0,

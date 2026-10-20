@@ -184,6 +184,40 @@ def test_freeze_requires_an_output_path(tmp_path):
     assert _invoke("freeze", tmp_path / "model.tflite").exit_code == 2
 
 
+def test_freeze_refuses_a_directory_as_the_plan(tmp_path):
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"model")
+
+    result = _invoke("freeze", model, *_FREEZE, "-o", tmp_path)
+
+    assert result.exit_code == 1 and isinstance(result.exception, SystemExit)
+    assert "is a directory" in " ".join(result.output.split())
+
+
+def test_freeze_refuses_to_write_the_plan_over_the_model(tmp_path, monkeypatch):
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"model")
+    monkeypatch.chdir(tmp_path)
+
+    result = _invoke("freeze", "model.tflite", *_FREEZE, "-o", "./sub/../model.tflite")
+
+    assert result.exit_code == 1
+    assert "is the model the plan is frozen against" in " ".join(result.output.split())
+    assert model.read_bytes() == b"model"
+
+
+def test_freeze_records_the_model_by_its_resolved_path(tmp_path, monkeypatch):
+    (tmp_path / "models").mkdir()
+    model = tmp_path / "models" / "model.tflite"
+    model.write_bytes(b"model")
+    monkeypatch.chdir(tmp_path / "models")
+
+    result = _invoke("freeze", "model.tflite", *_FREEZE, "-o", tmp_path / "plan.json")
+
+    assert result.exit_code == 0, result.output
+    assert FrozenRun.load(tmp_path / "plan.json").model.path == str(model)
+
+
 # -- hpx build ----------------------------------------------------------------
 
 
@@ -284,6 +318,15 @@ def test_validate_build_verifies_and_prints_the_identity(out, plan, build):
     assert result.exit_code == 0, result.output
     report = json.loads(result.stdout)
     assert report == {"build": str(out / "build.json"), "identity": record.identity.to_dict()}
+
+
+def test_validate_build_takes_the_build_file_as_well_as_its_directory(out, plan, build):
+    _saved(out, plan, build)
+
+    result = _invoke("validate", "build", out / "build.json")
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.stdout)["build"] == str(out / "build.json")
 
 
 def test_validate_build_refuses_a_changed_pinned_file(out, plan, build):
@@ -517,6 +560,107 @@ def test_run_exit_status_follows_the_capture_and_the_verification(
     else:
         assert report["verification"]["matched"] is matched
         assert report["verification"]["tensors"][0]["name"] == "score"
+
+
+def _mismatch(build: FixtureBuild, error: float) -> Verification:
+    return Verification(
+        ReferenceOutputs(ReferenceOrigin("host-litert"), (bytes(8),)),
+        (
+            TensorComparison(
+                name="score",
+                index=3,
+                dtype="float32",
+                shape=(1, 2),
+                reference_sha256="a" * 64,
+                observed_sha256="b" * 64,
+                elements=2,
+                mismatched_elements=1,
+                max_abs_error=error,
+                max_abs_error_real=None,
+                within_tolerance=False,
+            ),
+        ),
+        Tolerance(0.5),
+    )
+
+
+@pytest.mark.parametrize("error", [float("inf"), float("nan")])
+def test_run_reports_a_non_finite_error_as_null_and_exits_3(out, plan, build, monkeypatch, error):
+    record = _saved(out, plan, build)
+    monkeypatch.setattr(
+        "helia_profiler.compiled_build.run_build",
+        lambda compiled, **options: RunResult(
+            compiled, _capture(build), record.identity, _mismatch(build, error)
+        ),
+    )
+
+    result = _invoke("run", out, "--board", BOARD, "--jlink-serial", SERIAL)
+
+    assert result.exit_code == 3, result.output
+    verification = json.loads(result.stdout)["verification"]
+    assert verification["matched"] is False and verification["tolerance"] == 0.5
+    assert verification["tensors"] == [
+        {"name": "score", "identical": False, "mismatched_elements": 1, "max_abs_error": None}
+    ]
+
+
+@pytest.mark.parametrize("settle", ["0", "-1", "nan", "300.5", "inf"])
+def test_run_refuses_a_settle_time_the_capture_cannot_take(out, runs, settle):
+    result = _invoke(
+        "run", out, "--board", BOARD, "--jlink-serial", SERIAL, "--settle-seconds", settle
+    )
+    assert result.exit_code == 2 and runs == []
+
+
+def test_run_takes_the_longest_settle_time_the_capture_takes(out, runs):
+    result = _invoke(
+        "run", out, "--board", BOARD, "--jlink-serial", SERIAL, "--settle-seconds", "300"
+    )
+    assert result.exit_code == 0, result.output
+    assert runs[0]["settle_seconds"] == 300.0
+
+
+def test_run_refuses_an_existing_evidence_directory_before_the_capture(tmp_path, out, runs):
+    (tmp_path / "evidence").mkdir()
+
+    result = _invoke(
+        "run",
+        out,
+        "--board",
+        BOARD,
+        "--jlink-serial",
+        SERIAL,
+        "--evidence-dir",
+        tmp_path / "evidence",
+    )
+
+    assert result.exit_code == 1 and runs == []
+    assert "already exists" in " ".join(result.output.split())
+
+
+def test_run_takes_the_build_file_as_well_as_its_directory(out, runs):
+    result = _invoke(
+        "run", out / "build.json", "--board", BOARD, "--jlink-serial", SERIAL, "--expect", "none"
+    )
+    assert result.exit_code == 0, result.output
+    assert runs[0]["evidence_dir"] == out / "evidence-1"
+
+
+@pytest.mark.parametrize(
+    "error", [ValueError("Unbounded settle time"), PermissionError(13, "Permission denied")]
+)
+def test_run_reports_a_value_or_os_error_without_a_traceback(out, plan, build, monkeypatch, error):
+    _saved(out, plan, build)
+
+    def run_build(compiled, **options):
+        raise error
+
+    monkeypatch.setattr("helia_profiler.compiled_build.run_build", run_build)
+
+    result = _invoke("run", out, "--board", BOARD, "--jlink-serial", SERIAL, "--expect", "none")
+
+    assert result.exit_code == 1 and isinstance(result.exception, SystemExit)
+    assert result.output.startswith("Error:") and str(error) in result.output
 
 
 # -- OperatorGuard ------------------------------------------------------------

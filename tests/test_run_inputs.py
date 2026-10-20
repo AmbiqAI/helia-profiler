@@ -91,6 +91,13 @@ def test_analyze_run_model_for_engine_takes_an_engine_name(monkeypatch, tmp_path
         hpx.analyze_run_model_for_engine(tmp_path / "m.tflite", "helia-rt")
 
 
+def test_an_unreadable_model_is_a_config_error(tmp_path):
+    with pytest.raises(ConfigError, match="Cannot build a run of"):
+        hpx.analyze_run_model(tmp_path / "absent.tflite")
+    with pytest.raises(ConfigError, match="litert cannot build a run of"):
+        hpx.analyze_run_model_for_engine(tmp_path, "litert")
+
+
 @pytest.mark.parametrize("engine", ["tflm", "cmsis"])
 def test_an_unknown_engine_is_a_config_error(engine, tmp_path):
     with pytest.raises(ConfigError, match="Unknown engine"):

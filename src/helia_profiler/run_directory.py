@@ -15,6 +15,7 @@ another host as a unit.
 from __future__ import annotations
 
 import hashlib
+import math
 from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -41,6 +42,12 @@ def run_roots(directory: str | Path) -> dict[str, Path]:
     from .hostenv.cache_dirs import hpx_cache_root
 
     return {"run": _absolute(directory), "cache": hpx_cache_root()}
+
+
+def run_directory_of(path: str | Path) -> Path:
+    """The run directory *path* names: the directory itself, or its ``build.json``."""
+    resolved = _absolute(path)
+    return resolved.parent if resolved.name == BUILD_FILE and resolved.is_file() else resolved
 
 
 def pin_fixture(
@@ -152,17 +159,24 @@ def run_from(
 
     The guard sees the build's target before anything else runs, so a board
     or probe it refuses is refused before the evidence directory exists or
-    any device is touched.
+    any device is touched. An *evidence_dir* that already exists is refused
+    as early.
     """
     from .compiled_build import run_build
 
     compiled = load_from(directory)
     guard.verify_target(target=compiled.build.target, jlink_serial=jlink_serial)
+    evidence = _absolute(evidence_dir)
+    if evidence.exists():
+        raise ConfigError(
+            f"The evidence directory {evidence} already exists",
+            hint="Each capture writes its evidence to a new directory.",
+        )
     return run_build(
         compiled,
         guard=guard,
         jlink_serial=jlink_serial,
-        evidence_dir=_absolute(evidence_dir),
+        evidence_dir=evidence,
         settle_seconds=settle_seconds,
         expect=expect,
     )
@@ -198,7 +212,8 @@ def run_summary(result: RunResult, evidence_dir: str | Path) -> dict[str, Any]:
                     "name": tensor.name,
                     "identical": tensor.identical,
                     "mismatched_elements": tensor.mismatched_elements,
-                    "max_abs_error": tensor.max_abs_error,
+                    # JSON has no inf or NaN; identical and mismatched_elements still tell.
+                    "max_abs_error": _finite(tensor.max_abs_error),
                 }
                 for tensor in verification.tensors
             ],
@@ -218,6 +233,10 @@ def run_summary(result: RunResult, evidence_dir: str | Path) -> dict[str, Any]:
         },
         "arena_used_after_invoke_bytes": None if memory is None else memory.after_invoke,
     }
+
+
+def _finite(value: float | None) -> float | None:
+    return value if value is not None and math.isfinite(value) else None
 
 
 def _absolute(path: str | Path) -> Path:

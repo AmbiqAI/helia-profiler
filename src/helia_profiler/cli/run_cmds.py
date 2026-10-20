@@ -1,8 +1,8 @@
 """Implementations of ``hpx freeze``, ``hpx build``, ``hpx validate build`` and ``hpx run``.
 
 Each one calls the run API (``helia_profiler.run_directory`` lays out the run
-directory), prints its JSON summary on stdout, and reports a typed error
-through the console on stderr with exit status 1.
+directory), prints its JSON summary on stdout, and reports an error through
+the console on stderr with exit status 1.
 """
 
 from __future__ import annotations
@@ -25,7 +25,11 @@ EXIT_MISMATCH = 3
 
 @contextmanager
 def _reported(verbose: int) -> Iterator[None]:
-    """Report an :class:`~helia_profiler.HpxError` or Ctrl-C the way ``hpx profile`` does."""
+    """Report an error or Ctrl-C the way ``hpx profile`` does, never as a traceback.
+
+    ``ValueError`` and ``OSError`` are reported too: a contract the capture
+    checks, or a file the host cannot read or write, is the user's to fix.
+    """
     from ..console import HpxConsole
     from ..errors import HpxError
 
@@ -34,7 +38,7 @@ def _reported(verbose: int) -> Iterator[None]:
     except KeyboardInterrupt:
         HpxConsole(verbose).print_interrupted()
         sys.exit(130)
-    except HpxError as exc:
+    except (HpxError, ValueError, OSError) as exc:
         HpxConsole(verbose).print_error(exc)
         sys.exit(1)
 
@@ -52,6 +56,7 @@ def _cmd_freeze(
     verbose: int,
     **params: Any,
 ) -> None:
+    from ..errors import ConfigError
     from ..session import Session
     from .profile_cmd import _build_cli_overrides
 
@@ -60,9 +65,19 @@ def _cmd_freeze(
     )
     if backend is not None:
         overrides.setdefault("engine", {})["backend"] = backend
+    target = output.expanduser().resolve()
     with _reported(verbose):
+        if target.is_dir():
+            raise ConfigError(
+                f"{output} is a directory", hint="Name the plan file, for example plan.json."
+            )
         session = Session.from_yaml(config) if config is not None else Session()
         plan = session.with_overrides(overrides).freeze()
+        if target == Path(plan.model.path).expanduser().resolve():
+            raise ConfigError(
+                f"{output} is the model the plan is frozen against",
+                hint="Name another file for the plan, for example plan.json.",
+            )
         path = plan.save(output)
     _print({"plan": str(path), "intent_hash": plan.intent_hash, "portable": plan.portable})
 
@@ -96,8 +111,9 @@ def _cmd_build(
 
 
 def _cmd_validate_build(*, directory: Path, verbose: int) -> None:
-    from ..run_directory import build_summary, load_from
+    from ..run_directory import build_summary, load_from, run_directory_of
 
+    directory = run_directory_of(directory)
     with _reported(verbose):
         compiled = load_from(directory)
     _print(build_summary(directory, compiled))
@@ -115,9 +131,10 @@ def _cmd_run(
     evidence_dir: Path | None,
     verbose: int,
 ) -> None:
-    from ..run_directory import fresh_evidence_dir, run_from, run_summary
+    from ..run_directory import fresh_evidence_dir, run_directory_of, run_from, run_summary
     from ..run_guard import OperatorGuard
 
+    directory = run_directory_of(directory)
     expectation = _expectation(expect, tolerance, references)
     with _reported(verbose):
         guard = OperatorGuard(board, jlink_serial)

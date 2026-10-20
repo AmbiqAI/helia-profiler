@@ -42,14 +42,14 @@ def analyze_run_model(path: str | Path) -> TypedFixtureModelAnalysis:
         and quantization, and the model's graph facts.
 
     Raises:
-        ConfigError: A run cannot pin inputs for this model, for example
-            because an input or output shape is dynamic.
+        ConfigError: The model is unreadable, or a run cannot pin inputs for
+            it, for example because an input or output shape is dynamic.
     """
     from .fixture_analysis import analyze_typed_fixture_model
 
     try:
         return analyze_typed_fixture_model(Path(path))
-    except ValueError as exc:
+    except (ValueError, OSError) as exc:
         raise ConfigError(f"Cannot build a run of {path}: {exc}") from exc
 
 
@@ -67,8 +67,8 @@ def analyze_run_model_for_engine(
         admitted the model.
 
     Raises:
-        ConfigError: *engine* is not an engine name, or the engine does not
-            admit the model.
+        ConfigError: *engine* is not an engine name, the model is unreadable,
+            or the engine does not admit the model.
     """
     from .engines import EngineType
     from .fixture_analysis import analyze_typed_fixture_model_for_engine
@@ -80,5 +80,5 @@ def analyze_run_model_for_engine(
         raise ConfigError(f"Unknown engine {engine!r}", hint=f"Use one of {names}.") from exc
     try:
         return analyze_typed_fixture_model_for_engine(Path(path), engine=selected)
-    except ValueError as exc:
+    except (ValueError, OSError) as exc:
         raise ConfigError(f"{selected.value} cannot build a run of {path}: {exc}") from exc

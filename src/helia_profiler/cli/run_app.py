@@ -38,6 +38,13 @@ class _Expect(StrEnum):
     NONE = "none"
 
 
+def _positive(value: float) -> float:
+    # typer's public Option has no open lower bound, and the capture needs more than 0.
+    if not value > 0:
+        raise typer.BadParameter(f"{value} is not more than 0")
+    return value
+
+
 def register(app: typer.Typer) -> None:
     """Attach ``freeze``, ``build`` and ``run`` to *app*."""
     app.command(
@@ -263,7 +270,9 @@ def build_command(
 
 
 def run_command(
-    directory: Annotated[Path, typer.Argument(help="Run directory written by hpx build")],
+    directory: Annotated[
+        Path, typer.Argument(help="Run directory written by hpx build, or its build.json")
+    ],
     board: Annotated[
         str,
         typer.Option(
@@ -311,8 +320,12 @@ def run_command(
         float,
         typer.Option(
             "--settle-seconds",
-            min=0.0,
-            help="Bound on each wait for the board to start and to finish",
+            max=300.0,
+            callback=_positive,
+            help=(
+                "Bound on each wait for the board to start and to finish, in seconds "
+                "(more than 0, at most 300)"
+            ),
         ),
     ] = 60.0,
     evidence_dir: Annotated[
