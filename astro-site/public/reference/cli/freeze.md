@@ -10,7 +10,7 @@ hpx freeze [OPTIONS] [MODEL]
 
 Freeze a resolved run plan to JSON for hpx build
 
-Defined in `src/helia_profiler/cli/run_app.py` line 86.
+Defined in `src/helia_profiler/cli/run_app.py` line 94.
 
 ### Arguments
 
@@ -51,15 +51,13 @@ Defined in `src/helia_profiler/cli/run_app.py` line 86.
 ### Examples
 
 ```text
-Resolves the same config and options hpx profile does and writes the plan, with the model's hash and the toolchain and runtime identities, so any host can build the same run.
+Takes the config file and the engine, target and profiling options of hpx profile, plus --backend, and writes the resolved plan with the model's hash and the toolchain and runtime identities, so any host can build the same run.
 
 Example:
 
-  hpx freeze model.tflite --engine helia-rt --backend helia --toolchain atfe \
-
-      --cpu-clock lp --arena-size 131072 --arena-location sram \
-
-      --weights-location mram -o plan.json
+  hpx freeze model.tflite --engine helia-rt --backend helia \
+      --toolchain atfe --cpu-clock lp --arena-size 131072 \
+      --arena-location sram --weights-location mram -o plan.json
 ```
 
 Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__` with typer 0.27.3 and click 8.3.3.

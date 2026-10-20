@@ -86,13 +86,13 @@ hpx validate build [OPTIONS] DIRECTORY
 
 Verify a run directory written by hpx build (no hardware)
 
-Defined in `src/helia_profiler/cli/validation_app.py` line 339.
+Defined in `src/helia_profiler/cli/validation_app.py` line 340.
 
 ### Arguments
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
-| `directory` | `Path` |  | Run directory written by hpx build Required. |
+| `directory` | `Path` |  | Run directory written by hpx build, or its build.json Required. |
 
 ### Options
 

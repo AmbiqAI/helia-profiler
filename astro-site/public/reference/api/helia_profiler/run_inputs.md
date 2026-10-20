@@ -1,6 +1,6 @@
 # helia_profiler.run_inputs
 
-What a run is built for and captured under: the typed fixture that pins a model's input bytes and declares its outputs, how the run is timed, the board guard a capture answers to, the model analysis that lists a model's inputs and outputs, and the targets and IO types this heliaPROFILER builds.
+What a run is built for and captured under: the typed fixture that pins a model's input bytes and declares its outputs, the tensors' element types and quantization, how the run is timed, the prepared runtime a build links, the board guard a capture answers to, the model analysis that lists a model's inputs and outputs, and the targets and IO types this heliaPROFILER builds.
 
 Every name on this page is imported from `helia_profiler`.
 
@@ -82,6 +82,52 @@ Refuse a target board or probe serial other than the operator's.
 | ConfigError | The board or the serial differs from the operator's. |
 
 Source: `src/helia_profiler/run_guard.py:41`
+
+## helia_profiler.ResolverPlan
+
+`class` · `python`
+
+```python
+ResolverPlan(mode: str, registrations: tuple[str, ...]) -> None
+```
+
+`dataclass`
+
+Concrete registration plan for generated firmware.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/firmware/op_resolver.py:14`
+
+### helia_profiler.ResolverPlan.mode
+
+`attribute` · `python`
+
+```python
+mode: str
+```
+
+Source: `src/helia_profiler/firmware/op_resolver.py:18`
+
+### helia_profiler.ResolverPlan.registrations
+
+`attribute` · `python`
+
+```python
+registrations: tuple[str, ...]
+```
+
+Source: `src/helia_profiler/firmware/op_resolver.py:19`
+
+### helia_profiler.ResolverPlan.max_ops
+
+`attribute` · `python`
+
+```python
+max_ops: int
+```
+
+Source: `src/helia_profiler/firmware/op_resolver.py:22`
 
 ## helia_profiler.FixtureFile
 
@@ -347,7 +393,7 @@ Read a LiteRT model's public inputs and outputs without selecting an engine.
 
 | Name | Description |
 | --- | --- |
-| ConfigError | A run cannot pin inputs for this model, for example because an input or output shape is dynamic. |
+| ConfigError | The model is unreadable, or a run cannot pin inputs for it, for example because an input or output shape is dynamic. |
 
 Source: `src/helia_profiler/run_inputs.py:34`
 
@@ -474,6 +520,40 @@ Reject if the caller has no current independent board/serial evidence.
 
 Source: `src/helia_profiler/fixture_capture.py:51`
 
+## helia_profiler.PerTensorQuantization
+
+`class` · `python`
+
+```python
+PerTensorQuantization(scale: float, zero_point: int) -> None
+```
+
+`dataclass`
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/fixture_analysis.py:47`
+
+### helia_profiler.PerTensorQuantization.scale
+
+`attribute` · `python`
+
+```python
+scale: float
+```
+
+Source: `src/helia_profiler/fixture_analysis.py:49`
+
+### helia_profiler.PerTensorQuantization.zero_point
+
+`attribute` · `python`
+
+```python
+zero_point: int
+```
+
+Source: `src/helia_profiler/fixture_analysis.py:50`
+
 ## helia_profiler.FixtureCapabilities
 
 `class` · `python`
@@ -535,6 +615,50 @@ readback_budget: int
 
 Source: `src/helia_profiler/_fixture_facts.py:56`
 
+## helia_profiler.PerAxisQuantization
+
+`class` · `python`
+
+```python
+PerAxisQuantization(axis: int, scales: tuple[float, ...], zero_points: tuple[int, ...]) -> None
+```
+
+`dataclass`
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/fixture_analysis.py:53`
+
+### helia_profiler.PerAxisQuantization.axis
+
+`attribute` · `python`
+
+```python
+axis: int
+```
+
+Source: `src/helia_profiler/fixture_analysis.py:55`
+
+### helia_profiler.PerAxisQuantization.scales
+
+`attribute` · `python`
+
+```python
+scales: tuple[float, ...]
+```
+
+Source: `src/helia_profiler/fixture_analysis.py:56`
+
+### helia_profiler.PerAxisQuantization.zero_points
+
+`attribute` · `python`
+
+```python
+zero_points: tuple[int, ...]
+```
+
+Source: `src/helia_profiler/fixture_analysis.py:57`
+
 ## helia_profiler.analyze_run_model_for_engine
 
 `function` · `python`
@@ -565,9 +689,33 @@ Read a model's public inputs and outputs as *engine*'s fixture integration admit
 
 | Name | Description |
 | --- | --- |
-| ConfigError | *engine* is not an engine name, or the engine does not admit the model. |
+| ConfigError | *engine* is not an engine name, the model is unreadable, or the engine does not admit the model. |
 
 Source: `src/helia_profiler/run_inputs.py:56`
+
+## helia_profiler.FixtureStatePolicy
+
+`class` · `python`
+
+```python
+FixtureStatePolicy()
+```
+
+Internal state behavior; input restoration is independent of this policy.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/_fixture_build.py:57`
+
+### helia_profiler.FixtureStatePolicy.CARRY
+
+`constant` · `python`
+
+```python
+CARRY = 'carry'
+```
+
+Source: `src/helia_profiler/_fixture_build.py:60`
 
 ## helia_profiler.FixtureTensor
 
@@ -651,6 +799,50 @@ size_bytes: int
 
 Source: `src/helia_profiler/fixture_analysis.py:102`
 
+## helia_profiler.RuntimeProvider
+
+`class` · `python`
+
+```python
+RuntimeProvider(name: str, url: str, revision: str) -> None
+```
+
+`dataclass`
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/fixture_runtime.py:61`
+
+### helia_profiler.RuntimeProvider.name
+
+`attribute` · `python`
+
+```python
+name: str
+```
+
+Source: `src/helia_profiler/fixture_runtime.py:63`
+
+### helia_profiler.RuntimeProvider.url
+
+`attribute` · `python`
+
+```python
+url: str
+```
+
+Source: `src/helia_profiler/fixture_runtime.py:64`
+
+### helia_profiler.RuntimeProvider.revision
+
+`attribute` · `python`
+
+```python
+revision: str
+```
+
+Source: `src/helia_profiler/fixture_runtime.py:65`
+
 ## helia_profiler.FixtureRole
 
 `class` · `python`
@@ -684,6 +876,160 @@ AUX = 'aux'
 ```
 
 Source: `src/helia_profiler/_fixture_build.py:67`
+
+## helia_profiler.RuntimeABI
+
+`class` · `python`
+
+```python
+RuntimeABI(toolchain: str, cpu: str, float_abi: str, short_enums: bool) -> None
+```
+
+`dataclass`
+
+Manifest-declared ABI; archive members are not independently inspected.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/fixture_runtime.py:68`
+
+### helia_profiler.RuntimeABI.toolchain
+
+`attribute` · `python`
+
+```python
+toolchain: str
+```
+
+Source: `src/helia_profiler/fixture_runtime.py:72`
+
+### helia_profiler.RuntimeABI.cpu
+
+`attribute` · `python`
+
+```python
+cpu: str
+```
+
+Source: `src/helia_profiler/fixture_runtime.py:73`
+
+### helia_profiler.RuntimeABI.float_abi
+
+`attribute` · `python`
+
+```python
+float_abi: str
+```
+
+Source: `src/helia_profiler/fixture_runtime.py:74`
+
+### helia_profiler.RuntimeABI.short_enums
+
+`attribute` · `python`
+
+```python
+short_enums: bool
+```
+
+Source: `src/helia_profiler/fixture_runtime.py:75`
+
+## helia_profiler.FixtureDType
+
+`class` · `python`
+
+```python
+FixtureDType()
+```
+
+IO tensor element types a fixture can declare.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/_fixture_build.py:70`
+
+### helia_profiler.FixtureDType.INT8
+
+`constant` · `python`
+
+```python
+INT8 = 'int8'
+```
+
+Source: `src/helia_profiler/_fixture_build.py:73`
+
+### helia_profiler.FixtureDType.INT16
+
+`constant` · `python`
+
+```python
+INT16 = 'int16'
+```
+
+Source: `src/helia_profiler/_fixture_build.py:74`
+
+### helia_profiler.FixtureDType.INT32
+
+`constant` · `python`
+
+```python
+INT32 = 'int32'
+```
+
+Source: `src/helia_profiler/_fixture_build.py:75`
+
+### helia_profiler.FixtureDType.FLOAT16
+
+`constant` · `python`
+
+```python
+FLOAT16 = 'float16'
+```
+
+Source: `src/helia_profiler/_fixture_build.py:76`
+
+### helia_profiler.FixtureDType.FLOAT32
+
+`constant` · `python`
+
+```python
+FLOAT32 = 'float32'
+```
+
+Source: `src/helia_profiler/_fixture_build.py:77`
+
+## helia_profiler.RuntimeHeader
+
+`class` · `python`
+
+```python
+RuntimeHeader(name: str, sha256: str) -> None
+```
+
+`dataclass`
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/fixture_runtime.py:78`
+
+### helia_profiler.RuntimeHeader.name
+
+`attribute` · `python`
+
+```python
+name: str
+```
+
+Source: `src/helia_profiler/fixture_runtime.py:80`
+
+### helia_profiler.RuntimeHeader.sha256
+
+`attribute` · `python`
+
+```python
+sha256: str
+```
+
+Source: `src/helia_profiler/fixture_runtime.py:81`
 
 ## helia_profiler.FixtureMethod
 
@@ -740,6 +1086,120 @@ power_sync: FixturePowerSync | None = None
 ```
 
 Source: `src/helia_profiler/_fixture_build.py:100`
+
+## helia_profiler.PreparedRuntimeManifest
+
+`class` · `python`
+
+```python
+PreparedRuntimeManifest(
+    schema_version: int,
+    archive_sha256: str,
+    providers: tuple[RuntimeProvider, ...],
+    abi: RuntimeABI,
+    headers: tuple[RuntimeHeader, ...],
+    include_dirs: tuple[str, ...],
+    stack: str = 'upstream',
+    consumer_defines: tuple[str, ...] = _UPSTREAM_DEFINES,
+    kernel_dir: str | None = None,
+) -> None
+```
+
+`dataclass`
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/fixture_runtime.py:110`
+
+### helia_profiler.PreparedRuntimeManifest.schema_version
+
+`attribute` · `python`
+
+```python
+schema_version: int
+```
+
+Source: `src/helia_profiler/fixture_runtime.py:112`
+
+### helia_profiler.PreparedRuntimeManifest.archive_sha256
+
+`attribute` · `python`
+
+```python
+archive_sha256: str
+```
+
+Source: `src/helia_profiler/fixture_runtime.py:113`
+
+### helia_profiler.PreparedRuntimeManifest.providers
+
+`attribute` · `python`
+
+```python
+providers: tuple[RuntimeProvider, ...]
+```
+
+Source: `src/helia_profiler/fixture_runtime.py:114`
+
+### helia_profiler.PreparedRuntimeManifest.abi
+
+`attribute` · `python`
+
+```python
+abi: RuntimeABI
+```
+
+Source: `src/helia_profiler/fixture_runtime.py:115`
+
+### helia_profiler.PreparedRuntimeManifest.headers
+
+`attribute` · `python`
+
+```python
+headers: tuple[RuntimeHeader, ...]
+```
+
+Source: `src/helia_profiler/fixture_runtime.py:116`
+
+### helia_profiler.PreparedRuntimeManifest.include_dirs
+
+`attribute` · `python`
+
+```python
+include_dirs: tuple[str, ...]
+```
+
+Source: `src/helia_profiler/fixture_runtime.py:117`
+
+### helia_profiler.PreparedRuntimeManifest.stack
+
+`attribute` · `python`
+
+```python
+stack: str = 'upstream'
+```
+
+Source: `src/helia_profiler/fixture_runtime.py:118`
+
+### helia_profiler.PreparedRuntimeManifest.consumer_defines
+
+`attribute` · `python`
+
+```python
+consumer_defines: tuple[str, ...] = _UPSTREAM_DEFINES
+```
+
+Source: `src/helia_profiler/fixture_runtime.py:120`
+
+### helia_profiler.PreparedRuntimeManifest.kernel_dir
+
+`attribute` · `python`
+
+```python
+kernel_dir: str | None = None
+```
+
+Source: `src/helia_profiler/fixture_runtime.py:121`
 
 ## helia_profiler.TypedFixtureModelAnalysis
 
@@ -876,6 +1336,114 @@ output_bytes: int
 ```
 
 Source: `src/helia_profiler/fixture_analysis.py:147`
+
+## helia_profiler.FixtureCapability
+
+`class` · `python`
+
+```python
+FixtureCapability()
+```
+
+Producer-declared status of one engine and IO dtype for fixed fixtures.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/_fixture_build.py:150`
+
+### helia_profiler.FixtureCapability.QUALIFIED
+
+`constant` · `python`
+
+```python
+QUALIFIED = 'qualified'
+```
+
+Source: `src/helia_profiler/_fixture_build.py:153`
+
+### helia_profiler.FixtureCapability.SUPPORTED
+
+`constant` · `python`
+
+```python
+SUPPORTED = 'supported'
+```
+
+Source: `src/helia_profiler/_fixture_build.py:154`
+
+### helia_profiler.FixtureCapability.UNSUPPORTED
+
+`constant` · `python`
+
+```python
+UNSUPPORTED = 'unsupported'
+```
+
+Source: `src/helia_profiler/_fixture_build.py:155`
+
+## helia_profiler.VerifiedPreparedRuntime
+
+`class` · `python`
+
+```python
+VerifiedPreparedRuntime(archive: FixtureFile, header_root: Path, manifest: FixtureFile, record: RuntimeManifest) -> None
+```
+
+`dataclass`
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/fixture_runtime.py:174`
+
+### helia_profiler.VerifiedPreparedRuntime.archive
+
+`attribute` · `python`
+
+```python
+archive: FixtureFile
+```
+
+Source: `src/helia_profiler/fixture_runtime.py:176`
+
+### helia_profiler.VerifiedPreparedRuntime.header_root
+
+`attribute` · `python`
+
+```python
+header_root: Path
+```
+
+Source: `src/helia_profiler/fixture_runtime.py:177`
+
+### helia_profiler.VerifiedPreparedRuntime.manifest
+
+`attribute` · `python`
+
+```python
+manifest: FixtureFile
+```
+
+Source: `src/helia_profiler/fixture_runtime.py:178`
+
+### helia_profiler.VerifiedPreparedRuntime.record
+
+`attribute` · `python`
+
+```python
+record: RuntimeManifest
+```
+
+Source: `src/helia_profiler/fixture_runtime.py:179`
+
+### helia_profiler.VerifiedPreparedRuntime.header_path
+
+`method` · `python`
+
+```python
+header_path(name: str) -> Path
+```
+
+Source: `src/helia_profiler/fixture_runtime.py:181`
 
 ## helia_profiler.FixtureIO
 

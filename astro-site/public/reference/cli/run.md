@@ -10,19 +10,19 @@ hpx run [OPTIONS] DIRECTORY
 
 Capture once from a run directory on a board you name
 
-Defined in `src/helia_profiler/cli/run_app.py` line 265.
+Defined in `src/helia_profiler/cli/run_app.py` line 279.
 
 ### Arguments
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
-| `directory` | `Path` |  | Run directory written by hpx build Required. |
+| `directory` | `Path` |  | Run directory written by hpx build, or its build.json Required. |
 
 ### Options
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
-| `--settle-seconds` | `float` | 60 | Bound on each wait for the board to start and to finish |
+| `--settle-seconds` | `float` | 60 | Bound on each wait for the board to start and to finish, in seconds (more than 0, at most 300) |
 | `--evidence-dir` | `Optional[Path]` |  | New directory for the capture's evidence (default: DIR/evidence-<N>) |
 | `--verbose, -v` | `int` | 0 | Increase verbosity |
 
@@ -30,7 +30,7 @@ Defined in `src/helia_profiler/cli/run_app.py` line 265.
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
-| `--expect` | `host-litert \| build \| none` |  | Reference outputs: host-litert runs the model on the host (default), build uses the outputs the build carries, none skips verification |
+| `--expect` | `host-litert \| none` |  | Reference outputs: host-litert runs the model on the host (default), none skips verification |
 | `--tolerance` | `float` | 0 | Largest accepted absolute error per element, in stored units |
 | `--reference` | `Optional[list[Path]]` |  | Reference bytes for one output; repeat once per output, in model order. Replaces --expect. Repeatable. |
 
@@ -44,7 +44,7 @@ Defined in `src/helia_profiler/cli/run_app.py` line 265.
 ### Examples
 
 ```text
-The operator vouches for the physical board, as hpx profile assumes: --board names the board wired to the probe that --jlink-serial names, and the operator holds it for the capture. A board other than the build's is refused before any device is touched.
+The operator vouches for the physical board behind the probe, as hpx profile assumes: --board names the board wired to the probe that --jlink-serial names, and the operator holds it for the capture. A --board other than the build's board is refused before any device is touched; HPX cannot check the physical board itself.
 
 Each capture writes its evidence to a fresh directory. Prints the outcome, identity, verification and timing as JSON. Exit status: 0 when the capture succeeds and its outputs match, 1 on a refusal or a failed capture, 3 when the outputs do not match.
 

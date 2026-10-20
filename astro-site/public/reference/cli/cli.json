@@ -349,12 +349,12 @@
         "usage": "hpx build [OPTIONS] PLAN",
         "short_help": "Build a frozen plan for fixed inputs into a run directory",
         "help": "Build a frozen plan for fixed inputs into a run directory",
-        "epilog": "Writes OUT/build.json, the model and one input_<index>.bin per model input under OUT/inputs, and the firmware under OUT/work. heliaRT and LiteRT link the runtime that hpx runtimes prepare cached. Prints the saved build's path and identity as JSON.\n\nExample:\n\n  hpx build plan.json --out runs/kws --input kws_input.bin",
+        "epilog": "Writes OUT/build.json, the model and one input_<index>.bin per model input under OUT/inputs, and the firmware under OUT/work. OUT must be new or empty, so a failed build never touches an earlier one. heliaRT and LiteRT link the runtime that hpx runtimes prepare cached under the HPX cache. Prints the saved build's path, inputs and identity as JSON.\n\nExample:\n\n  hpx build plan.json --out runs/kws --input kws_input.bin",
         "deprecated": false,
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/run_app.py",
-          "line": 203
+          "line": 211
         },
         "arguments": [
           {
@@ -470,7 +470,7 @@
                 "single"
               ]
             },
-            "python_type": "_Lifecycle",
+            "python_type": "Lifecycle",
             "default": "carry",
             "required": false,
             "help": "carry keeps the plan's iterations and warmups and carries model state; single times one invocation per boot",
@@ -565,7 +565,7 @@
             "python_type": "Optional[Path]",
             "default": null,
             "required": false,
-            "help": "Firmware build directory (default: OUT/work)",
+            "help": "Firmware build directory inside OUT (default: OUT/work); the saved build records its files relative to OUT",
             "panel": null,
             "is_flag": false,
             "multiple": false,
@@ -1205,12 +1205,12 @@
         "usage": "hpx freeze [OPTIONS] [MODEL]",
         "short_help": "Freeze a resolved run plan to JSON for hpx build",
         "help": "Freeze a resolved run plan to JSON for hpx build",
-        "epilog": "Resolves the same config and options hpx profile does and writes the plan, with the model's hash and the toolchain and runtime identities, so any host can build the same run.\n\nExample:\n\n  hpx freeze model.tflite --engine helia-rt --backend helia --toolchain atfe \\\n\n      --cpu-clock lp --arena-size 131072 --arena-location sram \\\n\n      --weights-location mram -o plan.json",
+        "epilog": "Takes the config file and the engine, target and profiling options of hpx profile, plus --backend, and writes the resolved plan with the model's hash and the toolchain and runtime identities, so any host can build the same run.\n\nExample:\n\n  hpx freeze model.tflite --engine helia-rt --backend helia \\\n      --toolchain atfe --cpu-clock lp --arena-size 131072 \\\n      --arena-location sram --weights-location mram -o plan.json",
         "deprecated": false,
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/run_app.py",
-          "line": 86
+          "line": 94
         },
         "arguments": [
           {
@@ -3591,12 +3591,12 @@
         "usage": "hpx run [OPTIONS] DIRECTORY",
         "short_help": "Capture once from a run directory on a board you name",
         "help": "Capture once from a run directory on a board you name",
-        "epilog": "The operator vouches for the physical board, as hpx profile assumes: --board names the board wired to the probe that --jlink-serial names, and the operator holds it for the capture. A board other than the build's is refused before any device is touched.\n\nEach capture writes its evidence to a fresh directory. Prints the outcome, identity, verification and timing as JSON. Exit status: 0 when the capture succeeds and its outputs match, 1 on a refusal or a failed capture, 3 when the outputs do not match.\n\nExample:\n\n  hpx run runs/kws --board apollo510_evb --jlink-serial 1160002255",
+        "epilog": "The operator vouches for the physical board behind the probe, as hpx profile assumes: --board names the board wired to the probe that --jlink-serial names, and the operator holds it for the capture. A --board other than the build's board is refused before any device is touched; HPX cannot check the physical board itself.\n\nEach capture writes its evidence to a fresh directory. Prints the outcome, identity, verification and timing as JSON. Exit status: 0 when the capture succeeds and its outputs match, 1 on a refusal or a failed capture, 3 when the outputs do not match.\n\nExample:\n\n  hpx run runs/kws --board apollo510_evb --jlink-serial 1160002255",
         "deprecated": false,
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/run_app.py",
-          "line": 265
+          "line": 279
         },
         "arguments": [
           {
@@ -3621,7 +3621,7 @@
             "python_type": "Path",
             "default": null,
             "required": true,
-            "help": "Run directory written by hpx build",
+            "help": "Run directory written by hpx build, or its build.json",
             "panel": null,
             "is_flag": false,
             "multiple": false,
@@ -3699,14 +3699,13 @@
               "class": "TyperChoice",
               "choices": [
                 "host-litert",
-                "build",
                 "none"
               ]
             },
             "python_type": "Optional[helia_profiler.cli.run_app._Expect]",
             "default": null,
             "required": false,
-            "help": "Reference outputs: host-litert runs the model on the host (default), build uses the outputs the build carries, none skips verification",
+            "help": "Reference outputs: host-litert runs the model on the host (default), none skips verification",
             "panel": "output verification",
             "is_flag": false,
             "multiple": false,
@@ -3786,12 +3785,12 @@
             "type": {
               "name": "float range",
               "class": "FloatRange",
-              "min": 0
+              "max": 300
             },
             "python_type": "float",
             "default": 60,
             "required": false,
-            "help": "Bound on each wait for the board to start and to finish",
+            "help": "Bound on each wait for the board to start and to finish, in seconds (more than 0, at most 300)",
             "panel": null,
             "is_flag": false,
             "multiple": false,
@@ -4901,7 +4900,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/validation_app.py",
-              "line": 339
+              "line": 340
             },
             "arguments": [
               {
@@ -4926,7 +4925,7 @@
                 "python_type": "Path",
                 "default": null,
                 "required": true,
-                "help": "Run directory written by hpx build",
+                "help": "Run directory written by hpx build, or its build.json",
                 "panel": null,
                 "is_flag": false,
                 "multiple": false,
