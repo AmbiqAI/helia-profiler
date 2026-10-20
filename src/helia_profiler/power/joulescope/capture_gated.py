@@ -41,6 +41,7 @@ from .diagnostics import (
     _gated_stats_diagnostics,
     _poll_edge_uncertainty_s,
     _with_gpi_poll_failures,
+    _write_gate_dump,
 )
 from .fullrate import FullRateRecorder
 from .stats import (
@@ -579,22 +580,21 @@ def capture_gated(
                 ]
                 if require_done_state:
                     counter_trace, completed = _completed_trace()
-                    pair = (completed.rise, completed.fall)
-                    streamed_gate_windows = [raw_streamed[counter_trace.windows.index(pair)]]
+                    index = counter_trace.windows.index((completed.rise, completed.fall))
                 else:
-                    streamed_gate_windows = _select_streamed_window(
+                    selected = _select_streamed_window(
                         raw_streamed,
                         minimum_gate_s=minimum_gate_s,
                         plan_floor_s=plan_floor_s,
                         allow_fallback=allow_fallback,
                     )
-                if streamed_gate_windows is None:
-                    raise ValueError("No complete qualifying packed GPI gate")
-                for pair in streamed_gate_windows:
-                    i = raw_streamed.index(pair)
-                    counter_evidence.append(
-                        counter_trace.window_evidence(*counter_trace.windows[i])
-                    )
+                    if selected is None:
+                        raise ValueError("No complete qualifying packed GPI gate")
+                    index = raw_streamed.index(selected[0])
+                streamed_gate_windows = [raw_streamed[index]]
+                counter_evidence.append(
+                    counter_trace.window_evidence(*counter_trace.windows[index])
+                )
                 gate_edge_source = "gpi_stream_sample_counter"
             except (KeyError, TypeError, ValueError, OverflowError) as exc:
                 gate_recorder.error = str(exc)
@@ -624,58 +624,20 @@ def capture_gated(
 
         dump_dir = os.environ.get("HPX_GATE_DEBUG_DUMP")
         if dump_dir:
-            try:
-                import json as _json
-                from pathlib import Path as _Path
-
-                _pkt_rows = []
-                for _p in packets:
-                    _t = _p.get("time", {}) if isinstance(_p, dict) else {}
-                    _utc = (_t.get("utc", {}) or {}).get("value")
-                    if not _utc or len(_utc) < 2:
-                        continue
-                    _sig = _p.get("signals", {})
-                    _pkt_rows.append(
-                        [
-                            _p.get("_host_time64"),
-                            float(_utc[0]),
-                            float(_utc[1]),
-                            float((_sig.get("current", {}).get("avg", {}) or {}).get("value", 0.0)),
-                        ]
-                    )
-                _out = _Path(dump_dir)
-                _out.mkdir(parents=True, exist_ok=True)
-                _fn = _out / f"gate_dump_{int(time.time())}.json"
-                _fn.write_text(
-                    _json.dumps(
-                        {
-                            "capture_start_monotonic": capture_start,
-                            "go_release_monotonic": go_release_at,
-                            "first_high_monotonic": first_high_at,
-                            "first_low_after_high_monotonic": first_low_after_high_at,
-                            "poll_samples_host_time64": poll_samples,
-                            "aligned_poll_samples": aligned_poll_samples,
-                            "packets_host_u0_u1_curavg": _pkt_rows,
-                            "gate_edge_source": gate_edge_source,
-                            "gpi_stream_frame_count": len(gpi_stream_frames),
-                            "gpi_stream_frames_meta": [
-                                {
-                                    "utc": f["utc"],
-                                    "rate": f["sample_rate"],
-                                    "sample_id": f.get("sample_id"),
-                                    "n": f["element_count"],
-                                }
-                                for f in gpi_stream_frames
-                            ],
-                            "gpi_stream_windows_raw": raw_streamed,
-                            "gpi_stream_windows": streamed_gate_windows,
-                        }
-                    ),
-                    encoding="utf-8",
-                )
-                log.info("Gate debug dump written: %s", _fn)
-            except Exception:
-                log.warning("Gate debug dump failed", exc_info=True)
+            _write_gate_dump(
+                dump_dir,
+                packets=packets,
+                gpi_stream_frames=gpi_stream_frames,
+                capture_start=capture_start,
+                go_release_at=go_release_at,
+                first_high_at=first_high_at,
+                first_low_after_high_at=first_low_after_high_at,
+                poll_samples=poll_samples,
+                aligned_poll_samples=aligned_poll_samples,
+                gate_edge_source=gate_edge_source,
+                raw_streamed=raw_streamed,
+                streamed_gate_windows=streamed_gate_windows,
+            )
 
         gating_diagnostics = _gated_stats_diagnostics(
             packets=packets,
@@ -773,14 +735,8 @@ def capture_gated(
                 saw_gate_rise=saw_any_gate_rise,
                 saw_gate_fall=fall_seen,
                 short_pulses_ignored=short_pulses_ignored,
+                failure=failure,
                 gating_diagnostics=gating_diagnostics,
-                lockstep=lockstep,
-                lockstep_wiring_available=lockstep_wiring_available,
-                planned_window_s=planned_window_s,
-                gate_high_s=gate_high_s,
-                longest_window_s=longest_window_s,
-                rise_due_s=rise_due_s,
-                gpi_poll_failures=gpi_poll_failures,
             )
             # The hint is logged, not just stored in metadata: on the degraded
             # path there is no PowerError to carry it, so the terminal warning

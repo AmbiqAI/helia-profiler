@@ -10,12 +10,15 @@ any power driver, not just Joulescope.
 
 from __future__ import annotations
 
+import json
 import logging
+import time
 from dataclasses import replace
+from pathlib import Path
 from typing import Any
 
 from ..base import PowerResult, PowerSummary
-from ..diagnostics import GateFailure, classify_gate_failure
+from ..diagnostics import GateFailure
 from ..metadata import MeasurementScope, ObservationMode, PowerIntegrity, PowerMetadata
 from .stats import (
     _gated_mask_axis,
@@ -174,27 +177,9 @@ def _degraded_observation_result(
     saw_gate_rise: bool,
     saw_gate_fall: bool,
     short_pulses_ignored: int,
+    failure: GateFailure,
     gating_diagnostics: dict[str, Any] | None = None,
-    lockstep: bool | None = None,
-    lockstep_wiring_available: bool = False,
-    planned_window_s: float | None = None,
-    gate_high_s: float | None = None,
-    longest_window_s: float | None = None,
-    rise_due_s: float | None = None,
-    gpi_poll_failures: int = 0,
 ) -> PowerResult:
-    failure = classify_gate_failure(
-        saw_gate_rise=saw_gate_rise,
-        saw_gate_fall=saw_gate_fall,
-        duration_s=duration_s,
-        lockstep=lockstep,
-        lockstep_wiring_available=lockstep_wiring_available,
-        planned_window_s=planned_window_s,
-        gate_high_s=gate_high_s,
-        longest_window_s=longest_window_s,
-        rise_due_s=rise_due_s,
-    )
-    failure = _with_gpi_poll_failures(failure, gpi_poll_failures)
     whole_summary = _whole_summary_from_stats(packets)
     return PowerResult(
         summary=whole_summary,
@@ -262,3 +247,69 @@ def _attach_capture_diagnostics(
                 diagnostics["selected_median_current_a"] * 1000.0,
                 diagnostics["rejected_median_current_a"] * 1000.0,
             )
+
+
+def _write_gate_dump(
+    dump_dir: str,
+    *,
+    packets: list[dict[str, Any]],
+    gpi_stream_frames: list[dict[str, Any]],
+    capture_start: float,
+    go_release_at: float | None,
+    first_high_at: float | None,
+    first_low_after_high_at: float | None,
+    poll_samples: list[tuple[int, int]],
+    aligned_poll_samples: list[tuple[int, int]],
+    gate_edge_source: str,
+    raw_streamed: list[tuple[float, float]],
+    streamed_gate_windows: list[tuple[float, float]] | None,
+) -> None:
+    try:
+        rows = []
+        for p in packets:
+            t = p.get("time", {}) if isinstance(p, dict) else {}
+            utc = (t.get("utc", {}) or {}).get("value")
+            if not utc or len(utc) < 2:
+                continue
+            sig = p.get("signals", {})
+            rows.append(
+                [
+                    p.get("_host_time64"),
+                    float(utc[0]),
+                    float(utc[1]),
+                    float((sig.get("current", {}).get("avg", {}) or {}).get("value", 0.0)),
+                ]
+            )
+        out = Path(dump_dir)
+        out.mkdir(parents=True, exist_ok=True)
+        path = out / f"gate_dump_{int(time.time())}.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "capture_start_monotonic": capture_start,
+                    "go_release_monotonic": go_release_at,
+                    "first_high_monotonic": first_high_at,
+                    "first_low_after_high_monotonic": first_low_after_high_at,
+                    "poll_samples_host_time64": poll_samples,
+                    "aligned_poll_samples": aligned_poll_samples,
+                    "packets_host_u0_u1_curavg": rows,
+                    "gate_edge_source": gate_edge_source,
+                    "gpi_stream_frame_count": len(gpi_stream_frames),
+                    "gpi_stream_frames_meta": [
+                        {
+                            "utc": f["utc"],
+                            "rate": f["sample_rate"],
+                            "sample_id": f.get("sample_id"),
+                            "n": f["element_count"],
+                        }
+                        for f in gpi_stream_frames
+                    ],
+                    "gpi_stream_windows_raw": raw_streamed,
+                    "gpi_stream_windows": streamed_gate_windows,
+                }
+            ),
+            encoding="utf-8",
+        )
+        log.info("Gate debug dump written: %s", path)
+    except Exception:
+        log.warning("Gate debug dump failed", exc_info=True)
