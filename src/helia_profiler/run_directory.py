@@ -5,10 +5,10 @@
     DIR/build.json      the saved CompiledBuild
     DIR/inputs/         the model and one input_<index>.bin per model input
     DIR/work/           the firmware build, unless another work directory is named
-    DIR/evidence-<N>/   one per capture
+    DIR/evidence-<N>/   one per capture, with its saved run result, result.json
 
-The saved build names two roots, ``run`` for the directory and ``cache`` for
-the HPX cache that holds a prepared runtime. The directory can move to
+The saved build and each saved run result name two roots, ``run`` for the
+directory and ``cache`` for the HPX cache that holds a prepared runtime. The directory can move to
 another host as a unit; a heliaRT or LiteRT build also needs its prepared
 runtime in that host's HPX cache.
 """
@@ -36,6 +36,7 @@ BUILD_FILE = "build.json"
 INPUTS_DIR = "inputs"
 WORK_DIR = "work"
 EVIDENCE_PREFIX = "evidence-"
+RESULT_FILE = "result.json"
 
 
 def run_roots(directory: str | Path) -> dict[str, Path]:
@@ -246,24 +247,32 @@ def run_from(
     settle_seconds: float,
     expect: Expect | None = None,
 ) -> RunResult:
-    """Capture once from the build saved in *directory*.
+    """Capture once from the build saved in *directory* and save it as ``evidence_dir/result.json``.
 
     The guard sees the build's target before anything else runs, so a board
     or probe it refuses is refused before the evidence directory exists or
-    any device is touched. An *evidence_dir* that already exists is refused
-    as early.
+    any device is touched. An *evidence_dir* that already exists, or that
+    is outside *directory*, is refused as early: the saved result records
+    its files relative to the run directory.
     """
     from .compiled_build import run_build
 
     compiled = load_from(directory)
     guard.verify_target(target=compiled.build.target, jlink_serial=jlink_serial)
+    roots = run_roots(directory)
     evidence = _absolute(evidence_dir)
     if evidence.exists():
         raise ConfigError(
             f"The evidence directory {evidence} already exists",
             hint="Each capture writes its evidence to a new directory.",
         )
-    return run_build(
+    if evidence == roots["run"] or not evidence.is_relative_to(roots["run"]):
+        raise ConfigError(
+            f"The evidence directory {evidence} is not inside the run directory {roots['run']}",
+            hint="The saved run result records its files relative to the run directory; "
+            "name a new subdirectory of it, or leave the default.",
+        )
+    result = run_build(
         compiled,
         guard=guard,
         jlink_serial=jlink_serial,
@@ -271,6 +280,8 @@ def run_from(
         settle_seconds=settle_seconds,
         expect=expect,
     )
+    result.save(evidence / RESULT_FILE, roots=roots, build=roots["run"] / BUILD_FILE)
+    return result
 
 
 def build_summary(
@@ -295,11 +306,18 @@ def build_summary(
     }
 
 
-def run_summary(result: RunResult, evidence_dir: str | Path, *, authority: str) -> dict[str, Any]:
+def run_summary(
+    result: RunResult,
+    evidence_dir: str | Path,
+    *,
+    authority: str,
+    saved: str | Path | None = None,
+) -> dict[str, Any]:
     """A capture's outcome, identity, verification facts and key timing, JSON-ready.
 
     *authority* names who vouched for the board, ``operator`` for an
-    :class:`~helia_profiler.OperatorGuard`.
+    :class:`~helia_profiler.OperatorGuard`. *saved* is the run result's
+    file, when it was saved.
     """
     capture, verification = result.capture, result.verification
     timing, memory = capture.timing, capture.memory
@@ -308,6 +326,7 @@ def run_summary(result: RunResult, evidence_dir: str | Path, *, authority: str) 
         "authority": authority,
         "error": capture.error,
         "evidence_dir": str(_absolute(evidence_dir)),
+        "result": None if saved is None else str(_absolute(saved)),
         "identity": result.identity.to_dict(),
         "verification": None
         if verification is None

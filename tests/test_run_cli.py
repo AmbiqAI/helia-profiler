@@ -14,6 +14,7 @@ from click import unstyle
 from typer.testing import CliRunner
 
 import helia_profiler as hpx
+from helia_profiler.api import load_result
 from helia_profiler.cli.app import app
 from helia_profiler.compiled_build import RunResult
 from helia_profiler.expect import (
@@ -619,6 +620,41 @@ def test_run_captures_under_the_operator_guard(out, plan, build, monkeypatch):
     assert report["identity"]["observation_hash"]
     assert report["timing"]["latency_s"] == pytest.approx(2 / build.iterations)
     assert (report["timing"]["iterations"], report["timing"]["warmups"]) == (100, 5)
+    assert report["result"] == str(out / "evidence-1" / "result.json")
+    saved = hpx.load_run(report["result"], roots=run_roots(out))
+    assert saved.result.identity.to_dict() == report["identity"]
+    assert isinstance(load_result(out / "evidence-1"), hpx.RunRecord)
+
+
+def test_run_saves_a_failed_capture_and_exits_1(out, plan, build, monkeypatch):
+    _saved(out, plan, build)
+    monkeypatch.setattr(
+        "helia_profiler.fixture_capture.capture_fixture",
+        lambda request, *, guard: _capture(build, state="failure"),
+    )
+
+    result = _invoke("run", out, "--board", BOARD, "--jlink-serial", SERIAL, "--expect", "none")
+
+    assert result.exit_code == 1, result.output
+    saved = hpx.load_run(out / "evidence-1" / "result.json", roots=run_roots(out))
+    assert not saved.result.succeeded and json.loads(result.stdout)["succeeded"] is False
+
+
+def test_run_refuses_an_evidence_directory_outside_the_run_directory(tmp_path, out, runs):
+    result = _invoke(
+        "run",
+        out,
+        "--board",
+        BOARD,
+        "--jlink-serial",
+        SERIAL,
+        "--evidence-dir",
+        tmp_path / "evidence",
+    )
+
+    assert result.exit_code == 1 and runs == []
+    assert "not inside the run directory" in _plain(result.output)
+    assert not (tmp_path / "evidence").exists()
 
 
 def test_run_refuses_another_board_before_any_device_call(out, plan, build, monkeypatch):
@@ -639,7 +675,20 @@ def test_run_refuses_another_board_before_any_device_call(out, plan, build, monk
 
 
 @pytest.fixture
-def runs(monkeypatch: pytest.MonkeyPatch, out, plan, build) -> list[dict[str, Any]]:
+def unsaved(monkeypatch: pytest.MonkeyPatch) -> list[Path]:
+    """Skip saving a mocked run, whose identity and verification are stand-ins."""
+    paths: list[Path] = []
+
+    def save_run(result, path, **options):
+        paths.append(Path(path))
+        return Path(path)
+
+    monkeypatch.setattr("helia_profiler.run_record.save_run", save_run)
+    return paths
+
+
+@pytest.fixture
+def runs(monkeypatch: pytest.MonkeyPatch, out, plan, build, unsaved) -> list[dict[str, Any]]:
     """Mock run_build; record what ``hpx run`` asked of it."""
     record = _saved(out, plan, build)
     seen: list[dict[str, Any]] = []
@@ -697,14 +746,14 @@ def test_run_compares_with_reference_files(tmp_path, out, runs):
         "--settle-seconds",
         "30",
         "--evidence-dir",
-        tmp_path / "evidence",
+        out / "capture",
     )
 
     assert result.exit_code == 0, result.output
     (call,) = runs
     assert call["expect"] == Expect.from_files(first, second, tolerance=Tolerance(1))
     assert call["settle_seconds"] == 30.0
-    assert call["evidence_dir"] == tmp_path / "evidence"
+    assert call["evidence_dir"] == out / "capture"
 
 
 def test_run_refuses_references_with_an_expect(tmp_path, out, runs):
@@ -748,7 +797,7 @@ def test_each_run_takes_a_fresh_evidence_directory(out, runs):
     "state,matched,code", [("failure", None, 1), ("success", False, 3), ("success", True, 0)]
 )
 def test_run_exit_status_follows_the_capture_and_the_verification(
-    out, plan, build, monkeypatch, state, matched, code
+    out, plan, build, monkeypatch, unsaved, state, matched, code
 ):
     record = _saved(out, plan, build)
     verification = (
@@ -816,7 +865,9 @@ def _mismatch(build: FixtureBuild, error: float) -> Verification:
 
 
 @pytest.mark.parametrize("error", [float("inf"), float("nan")])
-def test_run_reports_a_non_finite_error_as_null_and_exits_3(out, plan, build, monkeypatch, error):
+def test_run_reports_a_non_finite_error_as_null_and_exits_3(
+    out, plan, build, monkeypatch, unsaved, error
+):
     record = _saved(out, plan, build)
     monkeypatch.setattr(
         "helia_profiler.compiled_build.run_build",

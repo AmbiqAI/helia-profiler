@@ -63,8 +63,10 @@ hpx run runs/model --board apollo510_evb --jlink-serial 1160002255 --tolerance 1
   another host as a unit, but a heliaRT or LiteRT build links a runtime
   prepared under the HPX cache: on the new host, run `hpx runtimes prepare`
   for the same release, or set `HPX_CACHE_DIR` to a cache that holds it.
-- [`hpx run`](../../reference/cli/run/) flashes the build and captures once
-  into a fresh `evidence-<N>` directory, or a new `--evidence-dir`. You
+- [`hpx run`](../../reference/cli/run/) flashes the build, captures once
+  into a fresh `evidence-<N>` directory, or a new `--evidence-dir` inside the
+  run directory, and saves the run there as `result.json`
+  ([A saved run result](../output/#7-a-saved-run-result)). You
   vouch for the physical board behind the probe, as `hpx profile` assumes:
   `--board` names the board wired to the probe `--jlink-serial` names. A
   `--board` other than the build's board is refused before any device is
@@ -74,7 +76,8 @@ hpx run runs/model --board apollo510_evb --jlink-serial 1160002255 --tolerance 1
 
 `hpx validate build` and `hpx run` take the run directory or its
 `build.json`. Each command prints JSON: the build's inputs and identity, or
-a run's outcome, the authority that vouched for the board, its identity,
+a run's outcome, the authority that vouched for the board, the saved
+result's path, its identity,
 per-tensor verification and timing. A non-finite error is written as
 `null`; `identical` and `mismatched_elements` still say what differed.
 `hpx run` exits 1 when the capture fails and 3 when the outputs do not
