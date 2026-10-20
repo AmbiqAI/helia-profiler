@@ -239,10 +239,10 @@ def test_an_interrupted_save_keeps_the_previous_file(plan, build, tmp_path, monk
     target = tmp_path / "kws.json"
     target.write_text("previous", encoding="utf-8")
 
-    def interrupted(src: object, dst: object) -> None:
+    def interrupted(self: Path, target: object) -> Path:
         raise OSError("disk full")
 
-    monkeypatch.setattr("helia_profiler.compiled_build.os.replace", interrupted)
+    monkeypatch.setattr(Path, "replace", interrupted)
     with pytest.raises(ConfigError, match="disk full"):
         compiled(plan, build, Lifecycle.CARRY).save(target, roots={"run": tmp_path / "run"})
     assert target.read_text(encoding="utf-8") == "previous"

@@ -16,12 +16,12 @@ import hashlib
 import json
 import os
 import re
-import tempfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from types import MappingProxyType, UnionType
 from typing import TYPE_CHECKING, Any, Mapping, TypeVar, get_args, get_type_hints
 
+from ._files import write_text_atomically
 from .errors import ConfigError
 
 if TYPE_CHECKING:
@@ -284,25 +284,9 @@ class FrozenRun:
         """Write the plan as JSON and return its path."""
         target = Path(path).expanduser()
         text = json.dumps(self.to_dict(), indent=2, sort_keys=True, allow_nan=False) + "\n"
-        partial: Path | None = None
         try:
-            target.parent.mkdir(parents=True, exist_ok=True)
-            with tempfile.NamedTemporaryFile(
-                "w",
-                encoding="utf-8",
-                newline="\n",
-                dir=target.parent,
-                prefix=f".{target.name}.",
-                suffix=".partial",
-                delete=False,
-            ) as stream:
-                partial = Path(stream.name)
-                stream.write(text)
-            # Replacing the name, not writing through it, leaves any other link intact.
-            os.replace(partial, target)
+            write_text_atomically(target, text)
         except OSError as exc:
-            if partial is not None:
-                partial.unlink(missing_ok=True)
             raise ConfigError(f"Cannot save frozen run plan to {target}: {exc}") from exc
         return target
 
