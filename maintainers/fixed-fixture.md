@@ -607,19 +607,25 @@ the fixture route does. `_require_power_route` admits it for a heliaAOT or
 LiteRT plan (`helia-aot`, `litert`) on the `apollo510_evb` under `CARRY`. A
 model without internal state runs under `CARRY` unchanged; one with state
 records the `carry` policy. `SINGLE`, heliaRT, ExecuTorch and other boards
-(the AP510B fixture integration is timing-only) are refused. The build
-records its wiring in `FixtureBuild.power_sync`. `build_identity` and the
-binding (`_binding`) both cover the wiring, so `verify()` refuses a build
-whose wiring was changed.
+(the AP510B fixture integration is timing-only) are refused, and so is a
+method without `power_sync` for a plan frozen with power enabled, which
+would otherwise build timing-only firmware. The build records its wiring
+in `FixtureBuild.power_sync`. `build_identity` and the binding
+(`_binding`) both cover the wiring, so `verify()` refuses a build whose
+wiring was changed. A timing build's binding has no wiring key, so it is
+the same as before power reached the run API.
 
 `run_build(compiled, ..., power=FixtureRailPowerRequest(...),
 power_guard=...)` measures it. `CompiledBuild._check_power` refuses each of
 these before the evidence directory is created:
 
-- a rail request on a build without wiring, or with other wiring;
+- a rail request on a build without wiring, or with other GPIO pins or
+  another completion protocol;
 - a rail other than `MCU`;
 - a build outside the route (`_require_power_route` runs again, for a hand-made `CompiledBuild`);
-- `settle_seconds` above the 60 s a rail capture allows;
+- a `settle_seconds` that is not a number above 0 and at most the 60 s a
+  rail capture allows (a supply-only capture keeps the 300 s every capture
+  allows; both limits are `fixture_capture`'s own);
 - a power build run without a rail request (its firmware waits for GO);
 - a missing `power_guard`, or one without `check()` and `verify_power_device()`;
 - a `power_guard` given without a request.
@@ -642,9 +648,11 @@ It holds:
 
 `RunResult.power` is the request, with its instrument, rail, channels and
 the wiring it was checked against. `RunResult.identity.run.energy` is an
-`EnergyFacts` built from the scope, the rail, the subtraction and the
-completion protocol. Before a run, the build's identity states the rail as
-unknown. A run that measured nothing says so. The observation hash covers
+`EnergyFacts`: the method, built from the scope, the rail, the subtraction
+and the completion protocol. A run names the requested rail, also when its
+capture failed; before a run, the build's identity states the rail as
+unknown. Whether energy was measured is the outcome, `RunResult.energy`,
+which is `None` after a failed capture. The observation hash covers
 the energy record. Each call is one capture: repeats are separate
 `run_build` calls into separate evidence directories, never aggregated. The
 warmup and iteration counts are the plan's, so BENCH chooses them when it
@@ -655,7 +663,8 @@ rail)` powers the board through a configured supply for a timing capture of
 a build without power wiring. It measures no energy, needs no sync wiring and
 leaves `identity.run.energy` as `None`. It still needs a `power_guard` to
 authorize the supply, and is refused on a power build. It is not limited to
-the energy route's engines and boards.
+the energy route's engines, boards or lifecycles: an AP510B or `SINGLE`
+build takes it.
 
 `hpx run` takes no power options: a power run needs a station guard for the
 instrument, which the operator guard cannot vouch for.
@@ -669,13 +678,12 @@ quantization, `FixtureBuild`, `FixtureCaptureResult` with its timing, memory,
 power and PSRAM parts, the power requests and `FixturePowerGuard`,
 `RunIdentity` and its facts, the prepared runtime records, `Expect`,
 `Tolerance` and the rest are the same objects as in `helia_profiler.fixture`
-(experimental tier); `EnergyFacts` is exported from `helia_profiler` only. `test_run_inputs.py` walks the
-run API's annotations and fails on a reachable type the package does not
-export. `hpx.capabilities()` returns
-what `fixture_capabilities()` returns. `analyze_run_model(path)` and
-`analyze_run_model_for_engine(path, engine)` (`run_inputs.py`) return the
-`TypedFixtureModelAnalysis` of `analyze_typed_fixture_model` and its
-per-engine form; they take an engine name as well as an `EngineType`, and
+(experimental tier). `test_run_inputs.py` walks the run API's annotations
+and fails on a reachable type the package does not export.
+`hpx.capabilities()` returns what `fixture_capabilities()` returns.
+`analyze_run_model(path)` and `analyze_run_model_for_engine(path, engine)`
+(`run_inputs.py`) return the `TypedFixtureModelAnalysis` of
+`analyze_typed_fixture_model` and its per-engine form; they take an engine name as well as an `EngineType`, and
 raise `ConfigError` where those raise `ValueError`. `helia_profiler.fixture`
 keeps working until the cleanup slice removes it.
 

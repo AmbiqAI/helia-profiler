@@ -183,7 +183,7 @@ guessed:
 | `run.timing_scope` | `restore_and_invoke` for heliaAOT's clean window, else `invoke_only` |
 | `run.timing_clock`, `run.timing_clock_hz` | the clock that times the clean window and its configured rate: `stimer` at 32,768 Hz for the `busy_loop` probe; otherwise `cpu` cycles at the CPU clock for ExecuTorch (its execute-cycle count) on every SoC, `stimer` on Apollo5, and `cpu` (DWT) cycles elsewhere |
 | `run.timing_statistic` | `mean`: the clean window reports the mean per invocation (`latency.device_clean_infer_avg_us`); per-layer counters use `profiling.aggregation` |
-| `run.energy` | how the run's energy was measured: `null` for a profile without `power.enabled`, and unknown for one with it, whose measurement is the `power` section. A run-API rail capture states its `scope`, `rail`, `subtraction` and `completion_protocol` here |
+| `run.energy` | the method the run's energy is measured with: `null` for a profile without `power.enabled`, and unknown for one with it, since a profile does not state its energy method. A run-API rail capture states its `scope`, `rail`, `subtraction` and `completion_protocol` here, also when the capture failed |
 | `build_hash` | sha256 over the flashed `.bin` image, what the lock resolved, and the model; it ignores the HPX release and the lock's timestamps, so it changes only when what runs changes |
 | `observation_hash` | sha256 over the PMU and device timing results, without host paths; two captures of the same firmware can differ |
 | `intent_hash` | the frozen plan's intent hash for a run built from one; `null` for an ordinary profile |

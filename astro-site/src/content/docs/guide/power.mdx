@@ -253,10 +253,13 @@ energy = result.energy  # None when the capture failed
 instrument and rail (`verify_power_device`) and keeps checking ownership.
 These are refused before the board is touched:
 
-- request wiring that differs from the build's;
+- request GPIO pins or a completion protocol that differ from the build's;
 - a build without wiring, or a power build run without a rail request;
 - a missing `power_guard`;
-- `settle_seconds` above 60.
+- a `settle_seconds` that is not a finite number above 0, or is above 60.
+
+`build` also refuses a method without `power_sync` for a plan frozen with
+power enabled, rather than building timing-only firmware.
 
 `result.energy` holds:
 
@@ -266,14 +269,17 @@ These are refused before the board is touched:
 - `completion`: the protocol-2 READY, GO, gate and DONE sample IDs that bound the window.
 
 `result.identity.run.energy` states the method: scope, rail, subtraction and
-completion protocol. Each `run_build` call is one capture; run repeats as
+completion protocol, with the requested rail also when the capture failed.
+Each `run_build` call is one capture; run repeats as
 separate calls into separate evidence directories. The plan sets the warmup
 and iteration counts.
 
 For a timing capture through a configured supply, pass
 `power=hpx.FixtureBoardPowerRequest(driver, serial, rail)` and a
 `power_guard` with a build compiled without `power_sync`. It powers the board
-and measures no energy. `hpx run` takes no power options.
+and measures no energy. It is not limited to the energy route's engines,
+boards or lifecycles, and its `settle_seconds` may reach 300. `hpx run`
+takes no power options.
 
 ## Optional fixture RAM diagnostics
 
