@@ -303,6 +303,14 @@ def test_build_takes_inputs_lifecycle_scope_and_work_dir(tmp_path, dest, plan_fi
     assert _invoke("validate", "build", dest).exit_code == 0
 
 
+@pytest.mark.parametrize("inside", ["", "inputs", "inputs/firmware"])
+def test_build_refuses_a_work_dir_mixed_with_the_run_files(dest, plan_file, calls, inside):
+    result = _invoke("build", plan_file, "--out", dest, "--work-dir", dest / inside)
+
+    assert result.exit_code == 1 and calls == []
+    assert "mix the firmware tree" in _plain(result.output)
+
+
 def test_build_refuses_a_work_dir_outside_the_run_directory_before_building(
     tmp_path, dest, plan_file, calls
 ):
@@ -483,6 +491,24 @@ def test_build_saves_a_runtime_from_the_cache_under_the_cache_root(
     assert "roots=" not in text
 
 
+def test_a_symlinked_cache_still_names_the_runtime_to_prepare(
+    tmp_path, dest, rt_plan_file, monkeypatch
+):
+    (tmp_path / "cache").mkdir(exist_ok=True)
+    link = tmp_path / "cache-link"
+    link.symlink_to(tmp_path / "cache", target_is_directory=True)
+    monkeypatch.setenv("HPX_CACHE_DIR", str(link))
+    built = _invoke("build", rt_plan_file, "--out", dest)
+    assert built.exit_code == 0, built.output
+    for item in (tmp_path / "cache").rglob("*"):
+        if item.is_file():
+            item.unlink()
+
+    result = _invoke("validate", "build", dest)
+
+    assert result.exit_code == 1 and "hpx runtimes prepare helia-rt" in _plain(result.output)
+
+
 def test_a_missing_file_under_the_run_directory_says_so(out, plan, build):
     _saved(out, plan, build)
     assert build.flat_binary is not None
@@ -497,7 +523,14 @@ def test_a_missing_file_under_the_run_directory_says_so(out, plan, build):
 
 def test_validate_build_refuses_a_missing_directory(tmp_path):
     result = _invoke("validate", "build", tmp_path / "absent")
-    assert result.exit_code == 1 and "not found" in _plain(result.output)
+    text = _plain(result.output)
+    assert result.exit_code == 1 and "not found" in text and "incomplete" not in text
+
+
+def test_a_missing_build_file_is_named_once(tmp_path):
+    (tmp_path / "empty").mkdir()
+    result = _invoke("validate", "build", tmp_path / "empty" / "build.json")
+    assert result.exit_code == 1 and "build.json/build.json" not in _plain(result.output)
 
 
 def test_a_refused_suite_option_is_named_by_its_flag(out, monkeypatch):
@@ -887,3 +920,15 @@ def test_each_run_command_epilog_keeps_its_example_in_one_paragraph():
     ]
 
     assert epilogs and all("\\\n\n" not in (epilog or "") for epilog in epilogs)
+
+
+def test_an_os_error_naming_a_bracketed_path_prints_it_verbatim(out, monkeypatch):
+    error = PermissionError(13, "Permission denied", "/data/[dataset]/plan.json")
+
+    def refuse(*args: object, **kwargs: object) -> None:
+        raise error
+
+    monkeypatch.setattr("helia_profiler.run_directory.load_from", refuse)
+    result = _invoke("validate", "build", out)
+
+    assert result.exit_code == 1 and "/data/[dataset]/plan.json" in _plain(result.output)

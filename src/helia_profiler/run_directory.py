@@ -42,13 +42,14 @@ def run_roots(directory: str | Path) -> dict[str, Path]:
     """The roots a run directory's build is saved and loaded with."""
     from .hostenv.cache_dirs import hpx_cache_root
 
-    return {"run": _absolute(directory), "cache": hpx_cache_root()}
+    # Resolved like the paths a loaded build reports, so a symlinked cache matches.
+    return {"run": _absolute(directory), "cache": hpx_cache_root().resolve()}
 
 
 def run_directory_of(path: str | Path) -> Path:
     """The run directory *path* names: the directory itself, or its ``build.json``."""
     resolved = _absolute(path)
-    return resolved.parent if resolved.name == BUILD_FILE and resolved.is_file() else resolved
+    return resolved.parent if resolved.name == BUILD_FILE and not resolved.is_dir() else resolved
 
 
 def pin_fixture(
@@ -144,6 +145,11 @@ def build_into(
             f"{root} is not a new or empty directory",
             hint="Build into a fresh directory; an earlier build there stays as it is.",
         )
+    if work == root or work.is_relative_to(root / INPUTS_DIR):
+        raise ConfigError(
+            f"The work directory {work} would mix the firmware tree with the run's own files",
+            hint="Name a subdirectory of the run directory, or leave the default.",
+        )
     if not work.is_relative_to(root):
         raise ConfigError(
             f"The work directory {work} is outside the run directory {root}",
@@ -189,6 +195,8 @@ def load_from(directory: str | Path) -> CompiledBuild:
         if not isinstance(missing, OSError) or missing.filename is None:
             raise
         message = str(exc.args[0]) if exc.args else str(exc)
+        if Path(missing.filename) == path:
+            raise
         if Path(missing.filename).is_relative_to(roots["cache"]):
             raise ConfigError(message, hint=_prepare_hint(path, roots["cache"])) from exc
         raise ConfigError(
@@ -205,9 +213,9 @@ def _prepare_hint(path: Path, cache: Path) -> str:
     from .frozen_run import FrozenRun
 
     try:
-        linked = _linked_runtime(
-            FrozenRun.from_dict(json.loads(path.read_text(encoding="utf-8"))["plan"])
-        )
+        document = json.loads(path.read_text(encoding="utf-8"))
+        source = document["build"].get("runtime_source") or {}
+        linked = _linked_runtime(FrozenRun.from_dict(document["plan"]), source.get("version"))
     except (HpxError, OSError, ValueError, KeyError, TypeError):
         linked = None
     command = (

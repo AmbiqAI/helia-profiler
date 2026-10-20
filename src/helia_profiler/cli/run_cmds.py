@@ -25,10 +25,11 @@ EXIT_MISMATCH = 3
 
 @contextmanager
 def _reported(verbose: int) -> Iterator[None]:
-    """Report an error or Ctrl-C the way ``hpx profile`` does, never as a traceback.
+    """Report an error or Ctrl-C as one line, never as a traceback.
 
-    ``ValueError`` and ``OSError`` are reported too: a contract the capture
-    checks, or a file the host cannot read or write, is the user's to fix.
+    Beyond ``HpxError`` (all ``hpx profile`` reports), ``ValueError`` and
+    ``OSError`` are reported too: a contract the capture checks, or a file the
+    host cannot read or write, is the user's to fix.
     """
     from ..console import HpxConsole
     from ..errors import HpxError
