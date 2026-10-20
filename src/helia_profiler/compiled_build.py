@@ -17,7 +17,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Mapping
 
-from .errors import ConfigError
+from .errors import CaptureError, ConfigError
 from .lifecycle import Lifecycle, lifecycle_invocations, require_lifecycle
 
 if TYPE_CHECKING:
@@ -251,7 +251,7 @@ class CompiledBuild:
         verification; errors raised while capturing propagate.
         """
         from ._fixture_record import fixture_capture_request
-        from .expect import compare_fixture_outputs
+        from .expect import check_fixture_expectation, compare_fixture_outputs
         from .fixture_capture import capture_fixture
         from .fixture_identity import fixture_run_identity
 
@@ -261,6 +261,8 @@ class CompiledBuild:
                 "This compiled build carries no expected outputs",
                 hint="Use Expect.host_litert() or Expect.from_files().",
             )
+        if expect is not None:
+            check_fixture_expectation(self.build, expect)
         try:
             request = fixture_capture_request(
                 self.build,
@@ -272,6 +274,17 @@ class CompiledBuild:
         except ValueError as exc:
             raise ConfigError(f"Cannot capture from this compiled build: {exc}") from exc
         capture = capture_fixture(request, guard=guard)
+        timing = capture.timing
+        if capture.state == "success" and (
+            timing is None
+            or (timing.iterations, timing.warmups) != (self.build.iterations, self.build.warmups)
+        ):
+            counts = "none" if timing is None else f"{timing.iterations} and {timing.warmups}"
+            raise CaptureError(
+                f"The device reported {counts} timed iterations and warmups; this build "
+                f"runs {self.build.iterations} and {self.build.warmups}",
+                hint=f"The capture's evidence is in {evidence_dir}.",
+            )
         identity = self._identity(fixture_run_identity(self.build, capture))
         verification = (
             compare_fixture_outputs(self.build, capture, expect)

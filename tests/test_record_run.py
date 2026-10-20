@@ -9,7 +9,7 @@ import pytest
 
 from helia_profiler._fixture_record import compiled_fixture_identity, fixture_capture_request
 from helia_profiler.compiled_build import CompiledBuild, RunResult
-from helia_profiler.errors import ConfigError
+from helia_profiler.errors import CaptureError, ConfigError
 from helia_profiler.expect import Expect
 from helia_profiler.fixture import (
     FixtureBuild,
@@ -177,10 +177,18 @@ def test_an_expectation_compares_a_successful_capture(record, device, tmp_path, 
     assert cache.identical
 
 
+def _references(root: Path, *contents: bytes) -> Expect:
+    root.mkdir(parents=True, exist_ok=True)
+    paths = [root / f"ref_{index}.bin" for index in range(len(contents))]
+    for path, data in zip(paths, contents, strict=True):
+        path.write_bytes(data)
+    return Expect.from_files(*paths)
+
+
 def test_a_failed_capture_is_returned_without_verification(record, device, tmp_path):
     capture = _failure()
 
-    result = _run(record, device, capture, tmp_path, expect=Expect.from_files(tmp_path / "ref.bin"))
+    result = _run(record, device, capture, tmp_path, expect=_references(tmp_path, _SCORE, _CACHE))
 
     assert not result.succeeded and result.capture is capture
     assert result.verification is None
@@ -205,3 +213,35 @@ def test_an_error_raised_by_the_capture_propagates(record, monkeypatch, tmp_path
 def test_an_unusable_expectation_is_refused_before_flashing(record, device, tmp_path):
     with pytest.raises(ConfigError, match="carries no expected outputs"):
         _run(record, device, _failure(), tmp_path, expect=Expect.from_build())
+    assert device.calls == []
+
+
+@pytest.mark.parametrize(
+    ("contents", "message"),
+    [
+        (None, "Cannot read"),
+        ((_SCORE + b"\x00", _CACHE), "reference has 3 B, the tensor 2 B"),
+        ((_SCORE,), "2 output tensors, 1 reference outputs"),
+    ],
+    ids=["missing", "wrong size", "too few"],
+)
+def test_a_reference_that_cannot_be_compared_costs_no_capture(
+    record, device, tmp_path, contents, message
+):
+    expect = (
+        Expect.from_files(tmp_path / "absent.bin", tmp_path / "absent_1.bin")
+        if contents is None
+        else _references(tmp_path / "refs", *contents)
+    )
+    with pytest.raises(ConfigError, match=message):
+        _run(record, device, _success(tmp_path), tmp_path, expect=expect)
+    assert device.calls == []
+
+
+def test_counts_the_device_reports_must_be_the_builds(record, device, tmp_path):
+    capture = replace(
+        _success(tmp_path),
+        timing=FixtureTiming(3200, 100, 5, 32768, 4, 96_000_000, FixtureTimingScope.INVOKE_ONLY),
+    )
+    with pytest.raises(CaptureError, match="reported 100 and 5 .* runs 1 and 0"):
+        _run(record, device, capture, tmp_path)
