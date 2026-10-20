@@ -22,6 +22,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass, fields
 from enum import Enum
@@ -158,15 +159,16 @@ def save_run(
             f"{build_path} is not the compiled build this run captured from",
             hint="Name the build.json the run's CompiledBuild was saved to.",
         )
-    _check_power(result.compiled, result.power)
+    _check_power(result.compiled, result.capture, result.power)
     recomputed = _identity(result.compiled, result.capture, result.power)
     _check_identity(recomputed, result.identity.to_dict())
     references: list[Path] = []
     if result.verification is not None:
         if not result.succeeded:
             raise ConfigError("A failed capture has no output comparison")
+        publication = uuid.uuid4().hex
         references = [
-            target.with_name(f"{target.stem}.reference_{index}.bin")
+            target.with_name(f"{target.stem}.reference_{index}.{publication}.bin")
             for index in range(len(result.verification.reference.outputs))
         ]
         compared = _compare(result.compiled, result.capture, result.verification)
@@ -231,7 +233,7 @@ def _load(source: Path, raw: bytes, roots: Mapping[str, Path]) -> RunResultRecor
     except (TypeError, ValueError) as exc:
         raise RunResultError("invalid_evidence", f"Malformed run result: {exc}") from exc
     try:
-        _check_power(compiled, power)
+        _check_power(compiled, capture, power)
     except ConfigError as exc:
         raise RunResultError("invalid_evidence", str(exc), hint=_HINT) from exc
     identity = _identity(compiled, capture, power)
@@ -409,6 +411,7 @@ def _decode_capture(value: Any, file: Callable[[Any], FixtureFile]) -> FixtureCa
     )
     if state.state not in ("success", "failure"):
         raise ValueError(f"unknown capture state {state.state!r}")
+    _check_capture_error(state)
     return state
 
 
@@ -487,21 +490,91 @@ def _unknown_as_one(value: Any) -> Any:
     return value
 
 
-def _check_power(
-    compiled: CompiledBuild, power: FixtureRailPowerRequest | FixtureBoardPowerRequest | None
-) -> None:
-    """Refuse a power request the build's power wiring rules out, as :meth:`CompiledBuild.run` does."""
-    from .fixture_power import FixtureRailPowerRequest
+def _check_capture_error(capture: FixtureCaptureResult) -> None:
+    if capture.error is not None and not isinstance(capture.error, str):
+        raise ValueError("capture.error must be text or null")
 
-    wired = compiled.build.power_sync is not None
-    if isinstance(power, FixtureRailPowerRequest) and not wired:
-        raise ConfigError("The run states a rail power request; its build has no power wiring")
-    if power is not None and not isinstance(power, FixtureRailPowerRequest) and wired:
-        raise ConfigError(
-            "The run states a supply-only power request; its build is wired for rail energy"
+
+def _check_power(
+    compiled: CompiledBuild,
+    capture: FixtureCaptureResult,
+    power: FixtureRailPowerRequest | FixtureBoardPowerRequest | None,
+) -> None:
+    from .compiled_build import _check_power_request
+    from .fixture_power import GROSS_RAIL_SCOPE, NO_SUBTRACTION, FixtureRailPowerRequest
+
+    _check_power_request(compiled, power)
+    try:
+        _check_capture_error(capture)
+    except ValueError as exc:
+        raise ConfigError(str(exc)) from exc
+    energy = capture.rail_energy
+    if energy is None:
+        if capture.state == "success" and isinstance(power, FixtureRailPowerRequest):
+            raise ConfigError("A successful rail capture requires retained energy")
+        return
+    if capture.state != "success" or not isinstance(power, FixtureRailPowerRequest):
+        raise ConfigError("Retained rail energy requires a successful rail capture")
+    timing = capture.timing
+    if (
+        energy.instrument_serial != power.serial
+        or energy.rail != power.rail
+        or energy.scope != GROSS_RAIL_SCOPE
+        or energy.subtraction != NO_SUBTRACTION
+    ):
+        raise ConfigError("Retained rail energy differs from its power request or scope")
+    if (
+        type(energy.iterations) is not int
+        or energy.iterations <= 0
+        or energy.iterations != compiled.build.iterations
+        or timing is None
+        or timing.iterations != energy.iterations
+        or timing.warmups != compiled.build.warmups
+        or timing.timing_scope != compiled.build.timing_scope
+        or capture.timing_scope != compiled.build.timing_scope
+    ):
+        raise ConfigError("Retained rail energy counts or timing differ from the build")
+    completion = energy.completion
+    if completion is None:
+        raise ConfigError("Retained rail energy requires batch completion")
+    samples = (
+        completion.ready_sample,
+        completion.go_ack_sample,
+        completion.gate_rise_sample,
+        completion.gate_fall_sample,
+        completion.done_sample,
+    )
+    if (
+        type(completion.protocol_version) is not int
+        or completion.protocol_version != power.firmware_wiring().protocol_version
+        or completion.counter_domain != "joulescope_sensor_sample_id"
+        or type(completion.sample_rate) is not int
+        or completion.sample_rate <= 0
+        or any(type(sample) is not int or sample < 0 for sample in samples)
+        or not samples[0] < samples[1] <= samples[2] < samples[3] <= samples[4]
+        or completion.raw != energy.raw
+    ):
+        raise ConfigError("Retained rail energy has inconsistent batch completion")
+    values = (
+        energy.duration_s,
+        energy.mean_power_w,
+        energy.mean_current_a,
+        energy.energy_j,
+        energy.energy_per_iteration_j,
+    )
+    if any(
+        type(value) not in (int, float) or not math.isfinite(value) or value <= 0
+        for value in values
+    ):
+        raise ConfigError("Retained rail energy requires finite positive measurements")
+    if not all(
+        math.isclose(actual, expected, rel_tol=1e-9, abs_tol=1e-12)
+        for actual, expected in (
+            (energy.energy_j, energy.mean_power_w * energy.duration_s),
+            (energy.energy_per_iteration_j, energy.energy_j / energy.iterations),
         )
-    if power is None and wired:
-        raise ConfigError("The run states no power request; its build is wired for rail energy")
+    ):
+        raise ConfigError("Retained rail energy measurements disagree")
 
 
 def _compare(

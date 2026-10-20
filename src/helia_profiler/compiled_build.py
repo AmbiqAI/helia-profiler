@@ -364,57 +364,16 @@ class CompiledBuild:
     ) -> None:
         """Refuse a power request this build or the run API's rail-energy route cannot take."""
         from .fixture_capture import _RAIL_SETTLE_LIMIT_S, _SETTLE_LIMIT_S
-        from .fixture_power import FixtureBoardPowerRequest, FixtureRailPowerRequest
+        from .fixture_power import FixtureRailPowerRequest
 
-        wiring = self.build.power_sync
+        _check_power_request(self, power)
         if power is None:
             if power_guard is not None:
                 raise ConfigError(
                     "A power_guard was given without a power request",
                     hint="Pass power= with the instrument and rail it authorizes, or drop it.",
                 )
-            if wiring is not None:
-                raise ConfigError(
-                    "This build is compiled for rail energy and needs a FixtureRailPowerRequest",
-                    hint="Its firmware waits for the instrument's GO before its timed loop.",
-                )
             return
-        if isinstance(power, FixtureBoardPowerRequest):
-            if wiring is not None:
-                raise ConfigError(
-                    "A supply-only FixtureBoardPowerRequest measures no energy; "
-                    "this build is compiled for rail energy",
-                    hint="Pass a FixtureRailPowerRequest, or build without power_sync.",
-                )
-        elif isinstance(power, FixtureRailPowerRequest):
-            if wiring is None:
-                raise ConfigError(
-                    "This build has no power wiring to measure rail energy with",
-                    hint="Build with FixtureMethod(..., power_sync=FixturePowerSync(...)).",
-                )
-            requested = power.firmware_wiring()
-            if replace(requested, protocol_version=wiring.protocol_version) != wiring:
-                raise ConfigError(
-                    f"The power request's GPIO pins {_pins(requested)} "
-                    f"differ from the build's {_pins(wiring)}",
-                    hint="Wire the instrument as the firmware was built, or build again.",
-                )
-            if requested.protocol_version != wiring.protocol_version:
-                raise ConfigError(
-                    f"The build's firmware speaks power protocol {wiring.protocol_version}; "
-                    f"the run API's rail request speaks protocol {requested.protocol_version}",
-                    hint="Build again with build(); it compiles the current protocol.",
-                )
-            if power.rail != _POWER_RAIL:
-                raise ConfigError(
-                    f"The run API measures the {_POWER_RAIL} rail only, not {power.rail!r}"
-                )
-            _require_power_route(self.build.engine.value, self.build.target.board, self.lifecycle)
-        else:
-            raise ConfigError(
-                f"Unknown power request {type(power).__name__}",
-                hint="Pass a FixtureRailPowerRequest or a FixtureBoardPowerRequest.",
-            )
         limit, kind = (
             (_RAIL_SETTLE_LIMIT_S, "a rail capture")
             if isinstance(power, FixtureRailPowerRequest)
@@ -457,6 +416,58 @@ class _PowerCaptureGuard:
 
     def verify_power_device(self, *, serial: str, rail: str) -> None:
         self.power.verify_power_device(serial=serial, rail=rail)
+
+
+def _check_power_request(compiled: CompiledBuild, power: _PowerRequest) -> None:
+    """Validate power admission without acquiring device authority."""
+    from .fixture_power import FixtureBoardPowerRequest, FixtureRailPowerRequest
+
+    wiring = compiled.build.power_sync
+    if power is None:
+        if wiring is not None:
+            raise ConfigError(
+                "This build is compiled for rail energy and needs a FixtureRailPowerRequest",
+                hint="Its firmware waits for the instrument's GO before its timed loop.",
+            )
+        return
+    if isinstance(power, FixtureBoardPowerRequest):
+        if wiring is not None:
+            raise ConfigError(
+                "A supply-only FixtureBoardPowerRequest measures no energy; "
+                "this build is compiled for rail energy",
+                hint="Pass a FixtureRailPowerRequest, or build without power_sync.",
+            )
+    elif isinstance(power, FixtureRailPowerRequest):
+        if wiring is None:
+            raise ConfigError(
+                "This build has no power wiring to measure rail energy with",
+                hint="Build with FixtureMethod(..., power_sync=FixturePowerSync(...)).",
+            )
+        requested = power.firmware_wiring()
+        if replace(requested, protocol_version=wiring.protocol_version) != wiring:
+            raise ConfigError(
+                f"The power request's GPIO pins {_pins(requested)} "
+                f"differ from the build's {_pins(wiring)}",
+                hint="Wire the instrument as the firmware was built, or build again.",
+            )
+        if requested.protocol_version != wiring.protocol_version:
+            raise ConfigError(
+                f"The build's firmware speaks power protocol {wiring.protocol_version}; "
+                f"the run API's rail request speaks protocol {requested.protocol_version}",
+                hint="Build again with build(); it compiles the current protocol.",
+            )
+        if power.rail != _POWER_RAIL:
+            raise ConfigError(
+                f"The run API measures the {_POWER_RAIL} rail only, not {power.rail!r}"
+            )
+        _require_power_route(
+            compiled.build.engine.value, compiled.build.target.board, compiled.lifecycle
+        )
+    else:
+        raise ConfigError(
+            f"Unknown power request {type(power).__name__}",
+            hint="Pass a FixtureRailPowerRequest or a FixtureBoardPowerRequest.",
+        )
 
 
 def _pins(wiring: FixturePowerSync) -> str:
@@ -521,8 +532,8 @@ class RunResult:
         *build* is the file the run's compiled build was saved to; the result
         pins it by sha256 and size. The capture's files are pinned as they
         are; the reference outputs of a verification are written beside the
-        result as ``<stem>.reference_<index>.bin`` and pinned too. Every
-        path must sit under one of *roots*. :func:`load_run` reads it back.
+        result under unique names and pinned too. Every path must sit under
+        one of *roots*. :func:`load_run` reads it back.
 
         Raises:
             ConfigError: *build* is not this run's compiled build, a file is

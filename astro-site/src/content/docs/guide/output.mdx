@@ -381,19 +381,26 @@ directory moves as a unit.
 | `compiled_build` | the saved build's `root`, `path`, `sha256` and `size_bytes` |
 | `capture` | the capture's facts (`state`, `timing`, `memory`, `rail_energy`, `error` and the rest); every file it references (outputs, terminal snapshots, the rail trace) as `root`, `path`, `sha256` and `size_bytes` |
 | `power` | `null`, or the request with `kind` `rail` or `supply` |
-| `verification` | `null`, or the reference origin, `tolerance`, `matched`, the per-tensor facts and `reference_files`, the reference outputs written beside the result as `<stem>.reference_<index>.bin` |
+| `verification` | `null`, or the reference origin, `tolerance`, `matched`, the per-tensor facts and `reference_files`, the reference outputs written beside the result as `<stem>.reference_<index>.<publication>.bin` |
 | `identity` | the run's `RunIdentity` |
 | `hpx_version` | the heliaPROFILER that wrote the result |
 
 Loading checks four things: every pinned file matches its sha256 and size,
 the compiled build is the one recorded and verifies, the identity and the
 output comparison recompute from the build and the capture, and the power
-request fits the build's wiring (a rail request needs a power build, and a
-power build needs one). An unknown identity fact matches an unknown fact
+request matches the build's GPIO wiring, protocol and supported power route.
+Retained energy must agree with the request's instrument and rail, the build's
+iteration counts, and a valid batch completion record. Timing-only and
+supply-only runs cannot carry rail energy. An unknown identity fact matches an unknown fact
 whatever its reason text. Free text, such as a failed capture's `error`, is
 recorded, not verified. The checks catch accidents, such as an edited or
 mixed-up file, not tampering. A failed capture saves and loads too; its
-outcome is data.
+outcome is data. A failed rail capture may have no energy. Error text may be
+`null` or a string; its wording is not verified.
+
+Saving uses a new set of reference filenames for each publication. If a
+replacement save fails, the previous JSON and its reference files remain
+readable. Unreferenced files may remain after an interrupted save.
 
 A refusal is a `helia_profiler.RunResultError`, a `ConfigError` whose
 `code` names the failed check:

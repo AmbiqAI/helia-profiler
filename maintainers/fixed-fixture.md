@@ -603,7 +603,7 @@ under [Timing windows by route](#timing-windows-by-route).
 refuses a run whose identity or verification does not recompute from its build and capture,
 so a saved result always loads. The document pins the saved `build.json` and every
 `FixtureFile` the capture references by sha256 and size, writes the reference outputs beside
-it as `<stem>.reference_<index>.bin`, and records its own location so `api.load_result` can
+it as `<stem>.reference_<index>.<publication>.bin`, and records its own location so `api.load_result` can
 recover the root without being told. Loading recomputes the identity with the same
 `_identity` path `CompiledBuild.run` uses and the comparison with `compare_outputs`, so
 neither is trusted from the file. Unknown identity facts compare as unknown whatever their

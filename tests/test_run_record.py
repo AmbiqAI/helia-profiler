@@ -166,7 +166,8 @@ def test_a_saved_run_loads_back_as_it_was(root, record):
     assert loaded.document["location"] == {"root": "run", "path": "evidence-1/result.json"}
     assert loaded.document["compiled_build"]["path"] == "build.json"
     assert str(root) not in path.read_text(encoding="utf-8")
-    assert (root / "evidence-1" / "result.reference_0.bin").read_bytes() == bytes([1]) * 2
+    reference = loaded.document["verification"]["reference_files"][0]["path"]
+    assert (root / reference).read_bytes() == bytes([1]) * 2
 
 
 def test_a_run_directory_moves_as_a_unit(tmp_path, root, record):
@@ -306,7 +307,9 @@ def _changed(root: Path) -> None:
 
 
 def _reference(root: Path) -> None:
-    (root / "evidence-1" / "result.reference_0.bin").write_bytes(b"\x09\x09")
+    document = json.loads((root / "evidence-1" / "result.json").read_bytes())
+    reference = document["verification"]["reference_files"][0]["path"]
+    (root / reference).write_bytes(b"\x09\x09")
 
 
 def _build_edited(root: Path) -> None:
@@ -592,13 +595,13 @@ def test_the_checks_name_the_output_comparison_only_when_outputs_were_compared(r
 def test_save_refuses_a_rail_request_for_a_build_without_wiring(root, record):
     target = root / "evidence-1" / "result.json"
 
-    with pytest.raises(ConfigError, match="rail power request; its build has no power wiring"):
+    with pytest.raises(ConfigError, match="no power wiring"):
         _run(record, power=_rail()).save(target, roots=_roots(root), build=root / "build.json")
     assert not target.exists()
 
 
 @pytest.mark.parametrize(
-    "power,message", [(_SUPPLY, "supply-only"), (None, "states no power request")]
+    "power,message", [(_SUPPLY, "supply-only"), (None, "needs a FixtureRailPowerRequest")]
 )
 def test_save_refuses_a_power_build_run_without_its_rail_request(root, build_power, power, message):
     target = root / "evidence-1" / "result.json"
@@ -612,7 +615,7 @@ def test_load_refuses_a_power_request_the_build_cannot_take(root, build_power):
     path = _save(_run(build_power, power=_rail(), energy=_energy(root / "evidence-1")))
     _edit(path, lambda data: data.update(power=None))
 
-    with pytest.raises(RunResultError, match="states no power request") as refused:
+    with pytest.raises(RunResultError, match="needs a FixtureRailPowerRequest") as refused:
         hpx.load_run(path, roots=_roots(root))
     assert refused.value.code == "invalid_evidence"
 
@@ -758,3 +761,179 @@ def test_a_failed_capture_with_an_output_comparison_is_refused(root, record):
     with pytest.raises(RunResultError, match="failed capture has no output comparison") as refused:
         hpx.load_run(path, roots=_roots(root))
     assert refused.value.code == "invalid_evidence"
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("sync_gpio_pin", 30),
+        ("state_gpio_pin", 37),
+        ("go_gpio_pin", 15),
+        ("serial", "OTHER-INSTRUMENT"),
+        ("rail", "VDD"),
+    ],
+)
+@pytest.mark.parametrize("operation", ["save", "load"])
+def test_saved_power_must_match_build_and_energy(root, build_power, field, value, operation):
+    result = _run(build_power, power=_rail(), energy=_energy(root / "evidence-1"))
+    if operation == "save":
+        assert isinstance(result.power, FixtureRailPowerRequest)
+        result = replace(result, power=replace(result.power, **{field: value}))
+        with pytest.raises(ConfigError):
+            _save(result)
+    else:
+        path = _save(result)
+        _edit(path, lambda data: data["power"].update({field: value}))
+        with pytest.raises(RunResultError) as refused:
+            hpx.load_run(path, roots=_roots(root))
+        assert refused.value.code == "invalid_evidence"
+
+
+@pytest.mark.parametrize("power", [None, _SUPPLY])
+@pytest.mark.parametrize("operation", ["save", "load"])
+def test_timing_and_supply_only_runs_cannot_retain_energy(root, record, power, operation):
+    energy = _energy(root / "evidence-1")
+    result = _run(record, power=power)
+    if operation == "save":
+        with pytest.raises(ConfigError, match="successful rail capture"):
+            _save(replace(result, capture=replace(result.capture, rail_energy=energy)))
+    else:
+        from helia_profiler.run_record import _encode, _Files
+
+        path = _save(result)
+        encoded = _encode(energy, _Files(_roots(root)).file)
+        _edit(path, lambda data: data["capture"].update(rail_energy=encoded))
+        with pytest.raises(RunResultError, match="successful rail capture") as refused:
+            hpx.load_run(path, roots=_roots(root))
+        assert refused.value.code == "invalid_evidence"
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("instrument_serial", "OTHER"),
+        ("rail", "VDD"),
+        ("iterations", 99),
+        ("scope", "net"),
+        ("subtraction", "idle"),
+        ("completion", None),
+        ("duration_s", -1),
+        ("energy_per_iteration_j", 1),
+        ("mean_power_w", 1),
+    ],
+)
+@pytest.mark.parametrize("operation", ["save", "load"])
+def test_saved_energy_facts_are_consistent(root, build_power, field, value, operation):
+    result = _run(build_power, power=_rail(), energy=_energy(root / "evidence-1"))
+    if operation == "save":
+        assert result.capture.rail_energy is not None
+        energy = replace(result.capture.rail_energy, **{field: value})
+        with pytest.raises(ConfigError):
+            _save(replace(result, capture=replace(result.capture, rail_energy=energy)))
+    else:
+        path = _save(result)
+        _edit(path, lambda data: data["capture"]["rail_energy"].update({field: value}))
+        with pytest.raises(RunResultError) as refused:
+            hpx.load_run(path, roots=_roots(root))
+        assert refused.value.code == "invalid_evidence"
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("protocol_version", 1),
+        ("counter_domain", "host"),
+        ("sample_rate", 0),
+        ("ready_sample", 30),
+        ("gate_fall_sample", 20),
+        ("done_sample", 40),
+    ],
+)
+@pytest.mark.parametrize("operation", ["save", "load"])
+def test_saved_energy_requires_consistent_completion(root, build_power, field, value, operation):
+    result = _run(build_power, power=_rail(), energy=_energy(root / "evidence-1"))
+    if operation == "save":
+        energy = result.capture.rail_energy
+        assert energy is not None and energy.completion is not None
+        energy = replace(energy, completion=replace(energy.completion, **{field: value}))
+        with pytest.raises(ConfigError, match="batch completion"):
+            _save(replace(result, capture=replace(result.capture, rail_energy=energy)))
+    else:
+        path = _save(result)
+        _edit(
+            path, lambda data: data["capture"]["rail_energy"]["completion"].update({field: value})
+        )
+        with pytest.raises(RunResultError, match="batch completion") as refused:
+            hpx.load_run(path, roots=_roots(root))
+        assert refused.value.code == "invalid_evidence"
+
+
+def test_failed_rail_capture_without_energy_remains_readable(root, build_power):
+    result = _run(build_power, power=_rail(), state="failure")
+    path = _save(result)
+    assert hpx.load_run(path, roots=_roots(root)).result == result
+    _validate(observations(load_result(path)))
+
+
+@pytest.mark.parametrize("error", [17, {"message": "failed"}, ["failed"], False])
+@pytest.mark.parametrize("operation", ["save", "load"])
+def test_capture_error_must_be_text_or_null(root, record, error, operation):
+    result = _run(record, state="failure")
+    if operation == "save":
+        with pytest.raises(ConfigError, match="capture.error must be text or null"):
+            _save(replace(result, capture=replace(result.capture, error=error)))
+    else:
+        path = _save(result)
+        _edit(path, lambda data: data["capture"].update(error=error))
+        with pytest.raises(RunResultError, match="capture.error must be text or null") as refused:
+            hpx.load_run(path, roots=_roots(root))
+        assert refused.value.code == "invalid_evidence"
+
+
+@pytest.mark.parametrize("failure", ["reference", "document", None])
+def test_replacement_publication_preserves_previous_record_on_failure(
+    root, record, monkeypatch, failure
+):
+    from helia_profiler import run_record
+
+    original = _run(record)
+    path = _save(original)
+    original_bytes = path.read_bytes()
+    assert original.verification is not None
+    reference = replace(
+        original.verification.reference,
+        outputs=tuple(bytes([9]) * len(data) for data in original.verification.reference.outputs),
+    )
+    comparison = compare_outputs(
+        record.build.output_tensors,
+        reference,
+        [output.read() for output in original.capture.outputs],
+        Tolerance(0),
+    )
+    replacement = replace(original, verification=comparison)
+    write = run_record.write_bytes_atomically
+    writes = []
+
+    def fail_reference(target, data):
+        writes.append(target)
+        if len(writes) == 2:
+            raise OSError("reference publication failed")
+        write(target, data)
+
+    def fail_document(target, text):
+        raise OSError("document publication failed")
+
+    if failure == "reference":
+        monkeypatch.setattr(run_record, "write_bytes_atomically", fail_reference)
+    elif failure == "document":
+        monkeypatch.setattr(run_record, "write_text_atomically", fail_document)
+    if failure is None:
+        _save(replacement)
+        assert hpx.load_run(path, roots=_roots(root)).result == replacement
+    else:
+        with pytest.raises(ConfigError, match="publication failed"):
+            _save(replacement)
+        assert path.read_bytes() == original_bytes
+        assert hpx.load_run(path, roots=_roots(root)).result == original
+        if failure == "reference":
+            assert len(writes) == 2
