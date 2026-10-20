@@ -34,7 +34,8 @@ The explicit compiler constraint matters: the producer's supported version
 range is not an exact experiment pin. Record installed versions and the normal
 VCS `direct_url.json` commit. A wheel instead needs its own asset hash and
 source provenance; it does not have Git-installed commit metadata. Keep the
-installed public API version and `source_closure().digest` with those records.
+installed package version and hashes of the shipped files listed in
+`fixture_closure.txt` with those records.
 
 Set `HPX_STATION_HPX` to that same environment's installed `hpx` executable
 (`bin/hpx` on Linux/macOS, `Scripts/hpx.exe` on Windows). Installing with
@@ -56,8 +57,8 @@ header hashes. A match is a reproducibility result, not independent inspection
 of every archive member or acceptance of a model's execution. The setup below
 lists the host tools and supported platforms.
 
-Use the normal public `FixtureBuildRequest` with `runtime=None` to consume that
-prepared cache, or supply a verified `PreparedUpstreamRuntime` explicitly.
+Use `build(plan, fixture, runtime=None)` to consume that prepared cache, or
+supply a verified `PreparedUpstreamRuntime` explicitly.
 The consumer owns its normal source recipes, build receipts and reporting.
 Inspect the actual linked image/map and placement against the target's bounds
 before capture; an arena reservation alone does not establish linked fit or a
@@ -66,217 +67,66 @@ the caller's existing current-board guard and exclusive lock.
 
 ## Public API
 
-### API 5.0: measurement descriptors and compiled records
+The package root, `helia_profiler`, is the public run contract, recorded in
+`tests/test_api_stability.py`. Types still named `Fixture*` are public when
+exported there; the implementation modules are internal. There is no separate
+fixture facade or capability API-version field.
 
-New measurement callers use `TypedFixture(model, inputs, outputs)` with complete
-`FixtureIO` input/state bytes and ordered `FixtureOutput(tensor)` declarations.
-No expected-output file is needed. A numerical experiment may separately retain
-references and thresholds. Legacy `FixedFixture` and all-`FixtureIO` typed outputs
-still validate their reference files and retain their previous fixture identities;
-mixing referenced and descriptor outputs in one fixture is refused.
-
-The producer owns persistence of a completed `FixtureBuild`:
+Create a `TypedFixture(model, inputs, outputs)` with complete `FixtureIO`
+input bytes and ordered `FixtureOutput(tensor)` declarations. Numerical references
+are separate: choose an explicit `Expect` when executing or compare retained
+outputs later. Freeze configuration once, then build and retain it:
 
 ```python
-from helia_profiler.fixture import (
-    dump_fixture_build, load_fixture_build, fixture_capture_request, capture_fixture,
-)
+import helia_profiler as hpx
 
-# roots is an explicit mapping of stable names to station directories.
-record = dump_fixture_build(build, roots=roots)
-restored = load_fixture_build(record, roots=relocated_roots)
-request = fixture_capture_request(
-    restored, jlink_serial=serial, evidence_dir=raw_directory, settle_seconds=60,
+plan = session.freeze()
+compiled = hpx.build(
+    plan, fixture, method=method, lifecycle=hpx.Lifecycle.CARRY,
 )
-result = capture_fixture(request, guard=guard)
+compiled.save(build_path, roots=roots)
+restored = hpx.load_build(build_path, roots=relocated_roots)
+result = hpx.run_build(
+    restored, guard=guard, jlink_serial=serial, evidence_dir=raw_directory,
+)
 ```
 
-`dump_fixture_build` and `load_fixture_build` verify the compiled image, ELF,
-generated sources, map, dependency state/lock, complete inputs and any legacy
-references. The compiled identity includes method/counts/state, target/clocks,
-placement, output descriptors, provider and memory facts. Files use named-root
-relative paths and content hashes. Move roots by changing the caller's root map;
-do not rewrite or reseal the record. Render-only and incomplete historical
-objects cannot be promoted into this compiled record. Retain historical readers
-for historical receipts. The record schema is separate from the public API version.
+The caller supplies the session, typed fixture, method, named roots and physical
+execution authority. Building never acquires a device. `CompiledBuild.verify()`
+checks pinned artifacts, the frozen intent and the binding between plan and
+compiled facts. Loading does not build or repair dependencies. Relocation changes
+the caller's root map, not the recorded bytes.
 
-This proves record integrity, not provenance authenticity, numerical correctness
-or permission. The consumer must independently pin its selected model, inputs,
-specification, producer source, method/state and expected image/record. A rewritten
-self-consistent producer record does not establish the intended experiment.
-`fixture_capture_request` supplies recorded image/output/placement facts only;
-serial, evidence directory, bounded wait and the exact physical guard remain
-caller-owned. Timing, operator-instrumented and rail images remain distinct.
+Current saved formats are compiled-build schema 3, frozen-run schema 2,
+run-result schema 1 and profile summary schema 19. Earlier formats are refused;
+read old bundles with the HPX release that produced them. There is no conversion
+or archival-reader fallback. These checks establish consistency, not provenance
+authenticity, numerical correctness or permission to operate hardware. Consumers
+still admit the selected model, full IO, method, state, clocks and image against
+their own experiment.
 
-`FixtureBuild.inputs`, `output_tensors`, `model`, `arena_capacity`, `clock_profile`,
-`cpu_hz` and `timer_hz` carry complete producer facts. Existing `timing_scope`,
-`state_policy`, `iterations` and `warmups` retain their meanings. Descriptor-only
-builds have `expected=None` and `outputs=()`. Internal reset remains unsupported:
-the firmware initializes once and keeps internal state across warmups and samples.
-A model with internal state needs no declared policy; its build records
-`state_policy=CARRY` because that is how it ran. Variable and resource state,
-initializer subgraphs and multiple subgraphs are admitted on heliaAOT, LiteRT and
-heliaRT alike; what a model may contain is the engine's decision.
+`CompiledBuild.build` exposes `FixtureBuild` facts including the model, complete
+inputs/output descriptors, arena capacity, placement, clock profile, CPU/timer
+rates, invocation counts and linked files. `kernel_source` and `runtime_source`
+come from pinned build evidence; absent source facts remain unknown. The build's
+`identity` exposes a `RunIdentity` with canonical runtime/kernel names, lifecycle
+and timing facts. Intent, binding, inputs, build and observation hashes use
+`hpx.<kind>/<version>:sha256:<hex>`; file hashes remain plain SHA256.
 
-API 5.6 adds `FixtureBuild.kernel_source` (`FixtureKernelSource`) and
-`FixtureBuild.runtime_source` (`FixtureRuntimeSource`), so a consumer reads
-which kernel library and prepared runtime a compiled build linked without
-parsing the dependency state or the prepared-runtime manifest, whose layouts
-are internal. Both are derived from those pinned files. A heliaRT or LiteRT
-build states both in its manifest: the kernel is `ns-cmsis-nn` or
-`arm-cmsis-nn` at the manifest's commit, and the runtime is `helia-rt` or
-`tflite-micro` with its commit and archive sha256. A heliaAOT build states
-the kernel as the one CMSIS-NN module its dependency state resolved, with the
-lock's release tag as `version` when the lock named one, and has no runtime
-source. Render-only builds have neither. Unknown facts stay `None`.
+`build()` verifies the model, engine, board, toolchain, placement, arena size,
+clock profile, lifecycle counts and available runtime/provider facts against the
+frozen plan. `SINGLE` selects one measured invocation and no warmup; `CARRY`
+keeps one initialized instance through warmups and measured invocations. Input
+restoration does not reset internal model state. See
+[Timing windows by route](#timing-windows-by-route) for measurement boundaries.
 
-`verify_fixture_build` re-derives both from the pinned files and refuses a
-record whose fields differ. The runtime `version` is the exception: it names
-the runtime record built from both the runtime and kernel commits, when the
-producing HPX shipped one, and runtime records change between releases. Both
-fields are bound into the compiled identity, written only when known, and
-refused in records that declare an earlier API, so records from API 5.5 and
-earlier load unchanged with both fields `None`.
+Interpreter builds use the prepared runtime named by the plan, unless the caller
+supplies `PreparedUpstreamRuntime`. A missing cache entry is reported; building a
+run does not silently prepare a provider. `capabilities()` reports supported
+targets and IO dtypes. `analyze_run_model` and `analyze_run_model_for_engine` expose
+model metadata before build; engine failures still propagate.
 
-API 5.7 adds `fixture_run_identity(build, capture=None)`, which returns a
-`RunIdentity`: the runtime and kernel library a build linked, by their shared
-names (`CanonicalEngine`, `CanonicalKernel`); its build facts, baseline,
-dependency lock, model and input hashes; how it runs; and the HPX release that
-produced it. A fact the record does not state is `Unknown` with the reason,
-not `None`. `build_hash` covers the flashed image, the dependency lock, the
-prepared runtime archive and the model, and never the HPX release, so it
-changes only when what runs changes. The lock counts by what it resolved: git
-modules by URL and commit, packaged tooling by content hash (generated vendored
-modules are left out; the image reflects them), so a
-neuralspotx release that changes its packaged build tooling changes it too.
-`observation_hash` covers a capture's
-measured facts with files reduced to their content hashes. Both come from the
-record alone, so a relocated or reloaded record gives the same identity.
-`read_prepared_runtime_manifest` returns a prepared runtime's stack, archive
-hash and providers after checking only the manifest's own hash. The record
-format is unchanged; API 5.7 reads records from 5.0 through 5.6.
-
-API 5.8 adds `RunIdentity.intent_hash`, the frozen plan's intent hash for a
-run-API build and `None` otherwise, and six `RunFacts` fields: where a model
-instance ends (`instance_boundary`), whether the first invocation of an
-instance runs the model's one-time initializer (`first_invoke_initializer`)
-and where that invocation falls (`first_invoke_window`), and the clock, rate
-and statistic of the timed span (`timing_clock`, `timing_clock_hz`,
-`timing_statistic`). Each adapter supplies the instance boundary and the
-initializer answer; see "Timing windows by route" below. The new fields
-default to `Unknown`, and the record format is unchanged; API 5.8 reads
-records from 5.0 through 5.7.
-
-API 6.0 renames the engine `tflm` to `litert`: `EngineType.LITERT` replaces
-`EngineType.TFLM`, and `FIXTURE_CAPABILITIES` and every record name the engine
-`litert`. The loader still accepts the 5.x API versions, but a record that
-names the engine `tflm` no longer loads; read it with the HPX release that
-wrote it.
-
-API 7.0 changes the value of `RunIdentity.build_hash`, `observation_hash` and
-`intent_hash` from bare hex to semantic hashes, `hpx.<kind>/<version>:sha256:<hex>`
-(`_semantic_hash.py`; `helia_profiler.SemanticHash` parses them), and renames
-`inputs_sha256` to `inputs_hash`, an `hpx.inputs` semantic hash. The hashed
-bytes are unchanged, so the hex part is the same as before. Each remaining
-`*_sha256` fact is a file's sha256, and stays bare hex like the record's own
-identities. A plan, binding or inputs basis refuses a non-finite float, a
-build hash read from such a lock is `Unknown`, and only an observation writes
-one as text. The record format is
-unchanged; API 7.0 reads records from 5.0 through 6.1.
-
-`helia_profiler.build(plan, fixture, method=..., lifecycle=...)`, also reached
-as `FrozenRun.build(fixture, ...)`, compiles a frozen plan for a fixture through
-`build_fixed_fixture` and returns a `CompiledBuild` of the plan, the compiled
-`FixtureBuild` and the `Lifecycle` it runs. heliaRT and LiteRT link the
-prepared runtime the plan names, taken from the HPX cache (`hpx runtimes
-prepare`) unless `runtime=` is passed. It refuses a fixture whose model is
-not the plan's, asks the engine whether it implements the lifecycle,
-verifies the result before returning it, and applies the lifecycle's
-invocation counts (`SINGLE` runs one timed invocation
-and no warmups; see [Timing windows by route](#timing-windows-by-route) for its
-one-tick floor). `CompiledBuild.identity` is the build's `RunIdentity` with
-that lifecycle. `save(path, roots=...)` writes one canonical JSON document
-(`hpx.compiled-build`, schema version 3) holding the plan's `to_dict()`, the
-lifecycle, the binding and the `dump_fixture_build` record as an object;
-`load_build(path, roots=...)` (or `CompiledBuild.load`) rebuilds both halves,
-resolving files under the caller's roots, so moving the record means passing
-new roots. `load` and `save` call `verify()`, and every refusal, including a
-malformed or unknown-version file, is a `ConfigError` naming what failed.
-
-The binding, an `hpx.binding` semantic hash, ties a build to the plan it was
-compiled from. `build()` hashes the plan's intent hash, the lifecycle, the
-timing scope, state policy and power wiring (or none) the build records, its
-prepared-runtime manifest hash (or none) and what it observes (the RAM
-diagnostic and the scanned heliaAOT arenas). No host path
-enters it, so a build relocated to another host keeps its binding.
-`verify()` re-checks the build's pinned files and the plan's intent hash,
-recomputes the binding, and then compares what the build records with what
-the plan states: engine, board, model hash and size, toolchain name, the
-compiler version among the plan's version lines, arena and weights
-placement, arena size (both are the configured capacity), clock profile,
-the lifecycle's invocation counts, and the runtime version and commit and
-kernel commit wherever both the plan and the build state one. heliaRT and
-heliaAOT compare with the plan's pins; LiteRT compares with the prepared LiteRT
-record, because the plan pins the modules an ordinary profile builds from
-source, which a fixture build does not link. A plan swapped into a saved file fails on
-the binding; a plan paired in memory with a build of other settings fails on
-the first fact that differs.
-
-The plan fields outside its intent hash are informational: `hpx_version`,
-`model.path`, `baseline.id` (the fingerprint is in the hash) and
-`toolchain.unavailable_reason`. `model.size_bytes` is outside it too, so
-`verify()` checks it against the built model.
-
-Constructing `FixtureBuildRequest` performs no runtime-cache lookup. When an
-interpreter request omits `runtime`, `build_fixture` looks up the already prepared
-default archive and binds its manifest into the compiled intent; it does not
-download or build a missing provider. Explicit runtime requests retain their
-intent identity. The selected adapter stages that archive directly through the
-ordinary preparation stage. The existing `build_fixed_fixture(ProfileConfig, ...)`
-front door remains supported. This does not implement additional boards, clocks,
-working-arena regions or provider-owned registration generation.
-
-Consumers import only the names in `helia_profiler.fixture.__all__`; the other
-`fixture_*` modules and `_fixture_build` are internal. `FIXTURE_API_VERSION` is
-`(major, minor)`: minor grows with additions, major with removals or changed
-semantics, and `tests/contracts/fixture_api_v<major>.json` records the surface.
-`source_closure()` hashes every shipped file named in `fixture_closure.txt`
-(everything except the example models) and returns one digest; a consumer
-recomputes it from the installed files instead of trusting the call.
-
-API 1.1 adds a typed build path. `FixtureBuildRequest` names the build inputs
-a caller chooses (fixture, method, engine and backend, arena size,
-iterations, warmup, `FixturePlacement`, target, prepared runtime,
-`HeliaAotOptions`, arena observation) plus the work directory, and
-`build_fixture(request)` builds it. Its `intent_identity` hashes those inputs
-with files as content hashes and no paths, so the same request built in two
-directories has one identity. The installed profiler and engine are outside
-the request: the source closure pins the profiler, and `engine_source`
-records the engine.
-`build_fixed_fixture(config, ...)` is unchanged. `FixtureBuild.aot_outputs`
-pins heliaAOT's `<prefix>_plan.json` and `<prefix>_report.json` when the
-installed heliaAOT writes them (the build first drops any an earlier build
-left in the work directory), and `FixtureBuild.engine_source` records the
-engine package version and, for a VCS install, its commit.
-`fixture_capabilities()` reports the supported targets and each engine's IO
-dtype status.
-
-API 2.0 removes the fixture's energy path: `FixtureEnergyWindow`, the `energy`
-argument of `summarize_fixture_measurements` and the energy fields of
-`FixtureMeasurements` (schema 2). The fixture measures latency, outputs and
-memory; energy comes from the dedicated power firmware (`hpx profile --power`),
-which owns the power floor, the reset policy and the gated window.
-
-API 3.0 admits unquantized signed INT32 inputs, such as token indices, through
-the typed fixture path. Inputs retain their exact bytes and TfLite INT32 type.
-INT32 outputs remain unsupported. These input payloads are supported but not
-device-qualified, and do not introduce an INT32 neural compute precision.
-Complete Invoke status and every output byte still gate capture; the 128 KiB
-output readback limit, timing methods and role/state restrictions are unchanged.
-The API 3.0 bump follows the compatibility guard for additions to the exported
-capability constant; existing request fields and dtype statuses are preserved.
-
-Fixture builds take pinned inputs only. `build_fixed_fixture` refuses any
+Run builds take pinned inputs only. The build boundary refuses any
 module, engine or CMSIS-NN override the compatibility classifier reports,
 plus `SEGGER_RTT_PATH`, `target.segger_rtt_path`, the variables CMake and
 the compilers read that change compiled output (`CFLAGS`, `CPATH`,
@@ -289,19 +139,12 @@ refused or justified. Every app, fixture or profile, compiles with
 `-ffile-prefix-map`, so neither the ELF nor the flashed image records the
 work directory.
 
-`helia_profiler.fixture.build_fixed_fixture(config, fixture, method=method,
-runtime=runtime, compile=True)` composes the existing platform, engine,
-memory-plan, firmware-generation and NSX build stages. It never probes or
-flashes. `compile=False` prepares and renders without linking.
-
-Supply SHA256-pinned `FixtureFile` records for model/input/reference and
-`FixedFixture` tensor declarations. Model analysis verifies dimensions, indices,
-INT8 type and per-tensor quantization, then derives the used operator resolver.
-The single-IO capability is one static INT8 input and output on Apollo510 EVB
-LP, ATfE, SRAM arena and MRAM weights. Unsupported graphs fail
-before engine preparation. Advisory batch wildcards are accepted only when
-the stored shape has batch one; firmware never resizes or rewrites the model.
-No model names or fixed shapes select execution.
+`build(plan, fixture, method=..., lifecycle=..., runtime=...)` composes the
+platform, engine, memory-plan, firmware-generation and NSX build stages. The
+public run path returns a verified compiled build; it has no render-only mode.
+Supply SHA256-pinned `FixtureFile` records and complete typed IO descriptors.
+Model analysis validates shape, indices, storage types and quantization. Firmware
+never resizes or rewrites the model. No model name selects execution.
 
 `FixtureMethod(FixtureTimingScope.RESTORE_AND_INVOKE)` measures a batch including
 full input restoration. `INVOKE_ONLY` restores each input outside each measured
@@ -309,8 +152,7 @@ invocation and sums the timer intervals; timer quantization applies per call.
 Both use `config.profiling.warmup` and `iterations`. The intent identity binds
 fixture, configuration, provider and timing scope. A compiled build identity
 also binds ELF/image, dependency lock, link map, generated source hashes and
-recorded toolchain provenance. Render-only results have no build identity. Reusing a work directory with
-different intent fails. Historical measurements retain their original methods.
+recorded toolchain provenance. Reusing a work directory with different intent fails.
 
 LiteRT links a `PreparedUpstreamRuntime`: a pinned archive, header root
 and manifest. Strict typed ingress validates provider URL/revision declarations, declared ABI,
@@ -321,11 +163,9 @@ build/source/ABI record; manifest fields are assertions, not independent ABI evi
 containment. Provider source identities remain manifest-declared; retain the
 corresponding audited source/build record.
 
-A LiteRT `FixtureBuildRequest` that names no runtime uses the archive
+A LiteRT run build that names no runtime uses the archive
 `hpx runtimes prepare litert` built from the default litert runtime record. A
-station that prepared it while the engine was named `tflm` can move
-`<cache>/runtimes/tflm` to `<cache>/runtimes/litert` instead of rebuilding: the
-manifest names no engine and the archive digest is unchanged. Prepare
+station prepares this explicitly before building a run. Prepare
 downloads the tflite-micro source at the record's commit and runs TFLM's own
 make dry run for `cortex_m_generic`/`cortex-m55` with CMSIS-NN kernels. The dry
 run fetches TFLM's pinned third-party sources and lists the translation units.
@@ -358,7 +198,7 @@ heliaRT (`engine.type: helia-rt`, backend `helia`) also links a
 - `build.kernel_dir: helia`;
 - `build.consumer_defines`, which must include `TF_LITE_STATIC_MEMORY`.
 
-A heliaRT `FixtureBuildRequest` that names no runtime uses the archive
+A heliaRT run build that names no runtime uses the archive
 `hpx runtimes prepare helia-rt` built from the default helia-rt runtime record.
 Prepare takes the Cortex-M55 ATfE release-with-logs library and the `.h` closure
 of `tensorflow/`, `third_party/` and `signal/` from the helia-rt release the
@@ -398,12 +238,11 @@ all back to verify it, which costs roughly 11–12 s per MB per capture on the
 Apollo510 EVB. A prepared result is not a successful
 build or a numerical validation result.
 
-`helia_profiler.fixture_capture.capture_fixture(request, guard=guard)` captures
-raw evidence using existing profiler flash/probe APIs. `FixtureCaptureRequest`
-binds ELF/image pins, device/serial (`AP510NFA-CBR` for the supported board), output extent, load address, evidence
-directory, maximum completion wait (`settle_seconds`), timing scope and optional
-TFLM arena capacity.
-Pass `target=build.target`: the typed canonical board/device/load-origin record.
+`run_build(compiled, guard=..., jlink_serial=..., evidence_dir=...)` captures
+raw evidence using the profiler flash/probe APIs. It derives image pins, output
+extents, placement and canonical target from the verified compiled build. The
+caller supplies the serial, evidence directory and bounded completion wait
+(`settle_seconds`), plus an optional `expected_duration_s` prediction.
 Other devices, target declarations, custom target overlays and relocated
 application origins are rejected before device operations.
 The caller's `FixtureCaptureGuard.check(require_free=..., remaining_s=...)`
@@ -466,15 +305,14 @@ that tensor: fixed input bytes, or the expected output. Inputs carry a role
 `PerAxisQuantization`; float tensors carry none. INT32 is input-only and plain:
 it carries no quantization. Active affine, custom or unsupported quantization details are
 refused; empty metadata and informational min/max do not quantize the input.
-`analyze_typed_fixture_model` reads the same declarations from the flatbuffer,
+`analyze_run_model` reads the same declarations from the flatbuffer,
 and the build refuses any difference in name, index, order, dtype, shape or
 quantization. Every IO tensor must be named in the flatbuffer and have at least
 one dimension; unnamed or scalar (rank-0) IO is refused. An INT8/INT16 IO tensor with a
 single scale and zero point is read as per-tensor, even when its quantized axis
-has extent 1, so declare it with `PerTensorQuantization`. A `FixedFixture` keeps
-its single-INT8 rules and renders exactly as before.
+has extent 1, so declare it with `PerTensorQuantization`.
 
-`FIXTURE_CAPABILITIES` declares generic engine/IO support on the fixture
+`capabilities()` declares generic engine/IO support on the fixture
 target from the fixture integration's explicit IO declarations. Missing or
 unsupported runtime qualification records do not disable fixture execution.
 It reports `supported` or `unsupported`, never qualification inherited from
@@ -492,28 +330,20 @@ their failures propagate without conversion or fallback. Public FLOAT16 IO remai
 unsupported on LiteRT. `FixtureBuild.capabilities` records public IO dtype support,
 not internal compute or kernel qualification.
 
-API 4.0 changes the exported capability constant's values, as required by the
-existing public-surface version policy. This narrow reporting correction keeps
-request and receipt shapes, execution guards and placement support unchanged;
-it does not incorporate the separate registry API work. Pinned API 3.x consumers
-must explicitly adopt the corrected reporting contract.
-
 Firmware restores every input before each warmup and measured call. It checks
 each tensor's byte extent, and on TFLM also its type, shape and per-tensor
 quantization (per-axis parameters are verified on the host only). It then copies
 each output to its own DTCM sink, `deployment_output`, `deployment_output_1`, and
 so on. `deployment_checksum` covers all outputs in model order. Total output
 bytes may not exceed `FIXTURE_READBACK_BUDGET` (128 KiB), so every output of
-every capture is read back in full. The caller compares each
-`FixtureCaptureResult.outputs` file against `FixtureBuild.outputs`. For typed
-builds, pass `extra_output_sizes` (every output after the first) to
-`FixtureCaptureRequest`. Capture refuses an image whose typed sinks differ from
-the request.
+every capture is read back in full. The caller can compare each `FixtureCaptureResult.outputs` file against
+explicit reference bytes through `Expect` or `compare_outputs`. The run path
+derives readback extents from the compiled output descriptors and refuses an
+image whose typed sinks differ from them.
 
 `observe_aot_arenas=True` (heliaAOT only) paints every scratch arena with `0xA5`
 after model initialization, then scans it after the timed loop, outside the
-timed interval. `FixtureBuild.aot_arena_scan` lists `(region id, size)`. Pass
-the sizes as `arena_scan_sizes`; `FixtureCaptureResult.arena_scan` then gives
+timed interval. `FixtureBuild.aot_arena_scan` lists `(region id, size)`. The run path carries those sizes into capture; `FixtureCaptureResult.arena_scan` gives
 `(touched bytes, high water)` per arena. Both are lower bounds, since a kernel may
 write the paint value itself. Persistent and constant arenas are not painted.
 Painting touches every scratch byte just before the warmups, so configure at
@@ -522,64 +352,16 @@ when enabled, so existing identities are unchanged.
 
 ## Measurement records
 
-`fixture_metrics.inspect_fixture_footprint` reads pinned ELF/image/map artifacts
-through the existing host tool probes. It performs no build or device operation.
-ELF file length, flat image length and PT_LOAD bytes are separate: debug metadata
-and layout gaps make them different. Linked RAM includes stack reservation;
-non-stack RAM includes arenas, terminals and any RAM-resident code. Heap
-reservation is separate. Do not add these component rows to their parent totals.
-Partial, unattributed or straddling section inventories yield null with a reason.
-
-ATfE LLD `.text` input contributions give retained text bytes including literal
-pools, not instruction-only bytes. Nested symbol rows and overlapping aliases are
-not added twice. The pinned map and actual symbol inventory support attribution;
-selected `arm_`/`helia_` text symbols show linked membership, not execution or an
-exhaustive kernel count. Pure model-weight, runtime and kernel totals remain null
-when no exhaustive partition is available. Stack/heap peaks are not instrumented.
-
-`fixture_observation.summarize_fixture_measurements` binds the footprint map,
-ELF/image and successful raw capture identity to the compiled build receipt. It
-checks the captured iteration/warmup counts and timing scope. It reports current
-allocator snapshots by phase, never a transient peak or tested minimum. Numerical
-acceptance remains with the consumer. Both stale and wrong maps are rejected.
-
-Build receipts also expose `planned_memory` from the existing memory-plan stage,
-with `planned_memory_reason` when unavailable. This is a compiler/configuration
-plan, not a linked measurement or allocator observation. If AOT has no complete
-producer plan, the capacities-only fallback is not exported as an arena plan.
-Unknown runtime or source mappings invalidate the whole AOT plan rather than
-silently dropping allocations. Staged constant source and destination remain
-separate physical consumers; neither is added to enclosing section totals.
-
-`fixture.observe_operator_timing(build, fixture, profile)` reads per-operator
-cycles from a separate `hpx profile` image and records their relation to a fixture
-build. These are approximate sibling-image observations, never the fixture's
-latency. The immutable facts carry layer cycles and shares, clean-window cycles,
-signed agreement and unattributed cycles, recorded CPU frequency, runtime identity
-and observed engine version. There is no comparison tolerance or acceptance verdict.
-
-Invalid supplied provenance, overflowing/nonfinite counters and a clean window
-that did not invoke the model make observations unavailable (`reason`). A missing
-or conflicting model, method, compiler, board, clock or placement binding is an
-`attribution_reason`: valid profile cycles remain visible, but cannot be attributed
-to that fixture build. PSRAM payload/layout and state policy are not bound by an
-ordinary profile. Consumers must preserve these limitations; neither a comparison
-threshold nor an exploratory runtime choice overrides them.
-
-Runtime identity is `same`, `different` or `unknown`, comparing recorded engine
-source, resolved providers and effective settings after verifying pinned provenance.
-Requested refs, package versions and opaque intent hashes are not source proof.
-Missing source/settings, wheel installs without a VCS commit, unparsed config-file
-digests and unrecorded prepared-archive settings remain unknown. Qualification is
-not inferred from any of these facts.
-
-BENCH owns comparison eligibility and layer-sum agreement tolerances. Its policy
-retains the observations and records its verdict separately. API 5.0 removes the
-private `bind_operator_timing` compatibility wrapper, its acceptance record and
-its threshold constants. Import `observe_operator_timing` from the public facade
-and apply comparison policy in the consumer. The profiler reports facts and
-non-waivable integrity/attribution limitations, not a benchmark acceptance verdict.
-Historical raw records and build/capture safety validation are unchanged.
+Read timing, output files, allocator observations and optional power from
+`RunResult.capture`. These are producer observations, not consumer acceptance
+verdicts. `section_inventory` and the `SectionInventory`, `ElfSection` and
+`LoadSegment` types are exported from the package root for offline ELF inspection.
+ELF file size, flat image size, linked sections, reservations and observed peaks
+are different facts; do not substitute one for another. The run API does not
+expose the retired fixture-specific footprint or sibling-image operator helpers.
+Per-layer observations from ordinary profiling do not establish attribution to
+a separately compiled run image. Consumers own comparison eligibility and
+numerical acceptance under their selected policy.
 
 ### Running a compiled build
 
@@ -587,12 +369,11 @@ Historical raw records and build/capture safety validation are unchanged.
 expect=None, expected_duration_s=None)`, or `compiled.run(...)`, captures once from a
 compiled build without rebuilding. It verifies the build first, checks an `Expect` before
 the capture (one readable reference of each output's size, outputs the build carries, or
-LiteRT installed for a host reference), builds the request with `fixture_capture_request`,
-captures with `capture_fixture` under the caller's guard, and returns a `RunResult` holding
+LiteRT installed for a host reference), derives a capture request from the verified build,
+acquires under the caller's guard, and returns a `RunResult` holding
 the `compiled` build, the raw `capture`, the run's `identity` and the `verification`. A
 successful capture whose iterations and warmups differ from the build's raises
-`CaptureError`. The identity is `fixture_run_identity` of the build and capture, so it
-carries an `observation_hash`, with `run.lifecycle` taken from the build. With an
+`CaptureError`. The identity is derived from the build and capture, so it carries an `observation_hash`, with `run.lifecycle` taken from the build. With an
 `Expect`, a successful capture is compared through `compare_fixture_outputs`; without one,
 or when the capture failed, `verification` is `None`. `RunResult.succeeded` is true only
 for a `success` capture. A failed capture is returned, not raised; errors raised while
@@ -654,8 +435,7 @@ these before the evidence directory is created:
 - a missing `power_guard`, or one without `check()` and `verify_power_device()`;
 - a `power_guard` given without a request.
 
-The request goes to `capture_fixture` as `rail_power`, so the capture is the
-fixture route's power path. The guard it receives is `_PowerCaptureGuard`:
+The run path passes the rail request to the internal capture implementation. The guard it receives is `_PowerCaptureGuard`:
 the caller's guard keeps the board and probe (`verify_target`), the power
 guard is the station's authority over the instrument and rail
 (`verify_power_device`), and `check()` asks both, or once when they are the
@@ -701,15 +481,13 @@ documented route: `TypedFixture`, `FixtureIO`, `FixtureTensor` and its
 quantization, `FixtureBuild`, `FixtureCaptureResult` with its timing, memory,
 power and PSRAM parts, the power requests and `FixturePowerGuard`,
 `RunIdentity` and its facts, the prepared runtime records, `Expect`,
-`Tolerance` and the rest are the same objects as in `helia_profiler.fixture`
-(experimental tier). `test_run_inputs.py` walks the run API's annotations
+`Tolerance` and the other run types retain their documented API tiers. `test_run_inputs.py` walks the run API's annotations
 and fails on a reachable type the package does not export.
-`hpx.capabilities()` returns what `fixture_capabilities()` returns.
+`hpx.capabilities()` returns the supported target and dtype facts.
 `analyze_run_model(path)` and `analyze_run_model_for_engine(path, engine)`
 (`run_inputs.py`) return the `TypedFixtureModelAnalysis` of
 `analyze_typed_fixture_model` and its per-engine form; they take an engine name as well as an `EngineType`, and
-raise `ConfigError` where those raise `ValueError`. `helia_profiler.fixture`
-keeps working until the cleanup slice removes it.
+raise `ConfigError` where those internal helpers raise `ValueError`.
 
 The command line drives the same flow over a run directory
 (`run_directory.py`): `build.json`, the model and one `input_<index>.bin` per
