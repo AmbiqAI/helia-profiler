@@ -44,6 +44,7 @@ _SAME_AS_FACADE = {
     "RunIdentity": "RunIdentity",
     "RunFacts": "RunFacts",
     "BuildFacts": "BuildFacts",
+    "EnergyFacts": "EnergyFacts",
     "KernelIdentity": "KernelIdentity",
     "RuntimeIdentity": "RuntimeIdentity",
     "FixtureBuild": "FixtureBuild",
@@ -75,7 +76,6 @@ _NEW = (
     "OperatorGuard",
     "MemoryPlan",
     "ResolverPlan",
-    "EnergyFacts",
 )
 
 

@@ -85,19 +85,19 @@ def _run_facts(build: FixtureBuild, capture: FixtureCaptureResult | None) -> Run
 
 
 def _energy(build: FixtureBuild, capture: FixtureCaptureResult | None) -> EnergyFacts | None:
-    """The rail-energy method of a power build: its wiring fixes all but the rail."""
+    """The rail-energy method of a power build: its wiring fixes all but the rail.
+
+    The rail comes from the measurement; without one, only the power request names it.
+    """
     from .fixture_power import GROSS_RAIL_SCOPE, NO_SUBTRACTION
 
     wiring = build.power_sync
     if wiring is None:
         return None
     measured = capture.rail_energy if capture is not None else None
-    if measured is not None:
-        rail: str | Unknown = measured.rail
-    elif capture is None:
-        rail = Unknown("the run's power request names the rail")
-    else:
-        rail = Unknown("the capture measured no energy")
+    rail = (
+        measured.rail if measured is not None else Unknown("the run's power request names the rail")
+    )
     return EnergyFacts(GROSS_RAIL_SCOPE, rail, NO_SUBTRACTION, wiring.protocol_version)
 
 

@@ -103,6 +103,7 @@ from .identity import (
     BuildFacts,
     CanonicalEngine,
     CanonicalKernel,
+    EnergyFacts,
     KernelIdentity,
     RunFacts,
     RunIdentity,
@@ -211,5 +212,6 @@ __all__ = [
     "KernelIdentity",
     "BuildFacts",
     "RunFacts",
+    "EnergyFacts",
     "Unknown",
 ]

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -163,7 +164,12 @@ def test_build_compiles_the_rail_route_for_heliaaot_and_litert_on_ap510(
 @pytest.mark.parametrize(
     ("engine", "board", "lifecycle", "message"),
     [
-        ("helia-aot", None, Lifecycle.SINGLE, "too short for a power capture"),
+        (
+            "helia-aot",
+            None,
+            Lifecycle.SINGLE,
+            "not a Lifecycle.SINGLE one, which runs the model stateless",
+        ),
         ("helia-rt", None, Lifecycle.CARRY, "heliaAOT and LiteRT builds, not helia-rt"),
         ("executorch", None, Lifecycle.CARRY, "heliaAOT and LiteRT builds, not executorch"),
         ("helia-aot", "apollo510b_evb", Lifecycle.CARRY, "apollo510_evb, not apollo510b_evb"),
@@ -327,6 +333,17 @@ def test_supply_only_timing_passes_the_board_request(tmp_path, build, device):
     assert result.power is _SUPPLY and result.energy is None
 
 
+class _NoCheck:
+    def verify_power_device(self, *, serial: str, rail: str) -> None: ...
+
+
+class _NoVerifyPowerDevice:
+    def check(self, *, require_free: bool, remaining_s: float) -> None: ...
+
+
+_PARTIAL_GUARDS = {"no-check": _NoCheck, "no-verify": _NoVerifyPowerDevice}
+
+
 def _timing_only(tmp_path: Path, build: FixtureBuild) -> CompiledBuild:
     return compiled(plan_for(build, tmp_path / "model.tflite"), build, Lifecycle.CARRY)
 
@@ -335,9 +352,8 @@ def _timing_only(tmp_path: Path, build: FixtureBuild) -> CompiledBuild:
     ("which", "options", "message"),
     [
         ("timing", {"power": _rail()}, "no power wiring"),
-        ("power", {"power": _rail(go_gpio_pin=15)}, r"\(sync 29, state 36, GO 15\) differs"),
+        ("power", {"power": _rail(go_gpio_pin=15)}, r"pins \(sync 29, state 36, GO 15\) differ"),
         ("power", {"power": _rail(rail="VDDIO")}, "MCU rail only, not 'VDDIO'"),
-        ("power", {"power": _rail(), "settle_seconds": 61.0}, "at most 60 s"),
         ("power", {}, "needs a FixtureRailPowerRequest"),
         ("power", {"power": _SUPPLY}, "supply-only FixtureBoardPowerRequest measures no energy"),
         ("power", {"power": "MCU"}, "Unknown power request str"),
@@ -345,12 +361,15 @@ def _timing_only(tmp_path: Path, build: FixtureBuild) -> CompiledBuild:
         ("timing", {"power": _SUPPLY, "power_guard": None}, "needs a power_guard"),
         ("timing", {"power_guard": "station"}, "without a power request"),
         ("power", {"power": _rail(), "power_guard": object()}, "is not a FixturePowerGuard"),
+        ("power", {"power": _rail(), "power_guard": "no-check"}, "is not a FixturePowerGuard"),
+        ("power", {"power": _rail(), "power_guard": "no-verify"}, "is not a FixturePowerGuard"),
+        ("timing", {"power": _SUPPLY, "power_guard": "no-check"}, "is not a FixturePowerGuard"),
+        ("timing", {"power": _SUPPLY, "power_guard": "no-verify"}, "is not a FixturePowerGuard"),
     ],
     ids=[
         "no-wiring",
         "wiring",
         "rail",
-        "settle",
         "missing",
         "supply-on-power-build",
         "type",
@@ -358,6 +377,10 @@ def _timing_only(tmp_path: Path, build: FixtureBuild) -> CompiledBuild:
         "supply-no-guard",
         "stray-guard",
         "guard-type",
+        "rail-guard-without-check",
+        "rail-guard-without-verify-power-device",
+        "supply-guard-without-check",
+        "supply-guard-without-verify-power-device",
     ],
 )
 def test_run_build_refuses_a_power_mismatch_before_the_device(
@@ -366,8 +389,11 @@ def test_run_build_refuses_a_power_mismatch_before_the_device(
     record = _powered(tmp_path, build) if which == "power" else _timing_only(tmp_path, build)
     if "power" in options and "power_guard" not in options:
         options = {**options, "power_guard": _Authority("station", [])}
-    if options.get("power_guard") == "station":
+    named = options.get("power_guard")
+    if named == "station":
         options = {**options, "power_guard": _Authority("station", [])}
+    elif isinstance(named, str) and named in _PARTIAL_GUARDS:
+        options = {**options, "power_guard": _PARTIAL_GUARDS[named]()}
 
     with pytest.raises(ConfigError, match=message):
         _run(record, tmp_path, **options)
@@ -380,7 +406,7 @@ def test_run_build_refuses_a_power_mismatch_before_the_device(
     [
         ("helia-rt", "apollo510_evb", Lifecycle.CARRY, "not helia-rt"),
         ("helia-aot", "apollo510b_evb", Lifecycle.CARRY, "apollo510_evb, not apollo510b_evb"),
-        ("helia-aot", "apollo510_evb", Lifecycle.SINGLE, "too short for a power capture"),
+        ("helia-aot", "apollo510_evb", Lifecycle.SINGLE, "not a Lifecycle.SINGLE one"),
     ],
     ids=["engine", "board", "single"],
 )
@@ -422,14 +448,16 @@ def test_the_identity_states_the_rail_energy_method(tmp_path, build, device):
     }
 
 
-def test_a_power_run_that_measured_nothing_says_so(tmp_path, build, device):
+def test_a_failed_power_run_states_its_method_with_the_requested_rail(tmp_path, build, device):
     record = _powered(tmp_path, build)
     device.reply = FixtureCaptureResult("failure", _RESTORE, error="READY never came")
 
     result, _ = _run(record, tmp_path, power=_rail(), power_guard=_Authority("station", []))
 
-    assert result.identity.run.energy is not None
-    assert result.identity.run.energy.rail == Unknown("the capture measured no energy")
+    assert result.energy is None
+    assert result.identity.run.energy == EnergyFacts(
+        "gross_rail_restore_and_invoke", "MCU", "none", 2
+    )
 
 
 def test_supply_only_timing_states_no_energy(tmp_path, build, device):
@@ -443,3 +471,171 @@ def test_supply_only_timing_states_no_energy(tmp_path, build, device):
     result, _ = _run(record, tmp_path, power=_SUPPLY, power_guard=_Authority("station", []))
 
     assert result.identity.run.energy is None and record.identity.run.energy is None
+
+
+# build() for a plan frozen with power
+
+
+def test_build_refuses_a_power_plan_with_a_timing_method(tmp_path, build, compiler_calls):
+    plan = plan_for(build, tmp_path / "model.tflite", power=True)
+    timing = FixtureMethod(_RESTORE)
+
+    with pytest.raises(ConfigError, match="frozen with power enabled") as raised:
+        hpx.build(plan, _fixture(build), method=timing, runtime=_LINKED)
+    assert "power_sync=FixturePowerSync" in str(raised.value.hint)
+    assert "power= to run_build()" in str(raised.value.hint)
+    assert compiler_calls.calls == []
+
+
+def test_build_compiles_a_power_plan_with_a_power_method(tmp_path, build, compiler_calls):
+    plan = plan_for(build, tmp_path / "model.tflite", power=True)
+
+    record = hpx.build(plan, _fixture(build), method=_POWER_METHOD, runtime=_LINKED)
+
+    assert record.build.power_sync == _WIRING
+
+
+# Messages
+
+
+@pytest.mark.parametrize(
+    ("engine", "board", "message", "hint"),
+    [
+        (None, "apollo510_evb", "the plan names no engine", "Use a heliaAOT or LiteRT plan."),
+        ("helia-rt", "apollo510_evb", "not helia-rt", "Use a heliaAOT or LiteRT plan."),
+        ("helia-aot", None, "the plan names no board", "Build for apollo510_evb."),
+        ("helia-aot", "apollo4p_evb", "not apollo4p_evb", "Build for apollo510_evb."),
+    ],
+    ids=["no-engine", "engine", "no-board", "board"],
+)
+def test_route_refusals_name_what_is_missing_and_what_to_do(engine, board, message, hint):
+    from helia_profiler.compiled_build import _require_power_route
+
+    with pytest.raises(ConfigError, match=message) as raised:
+        _require_power_route(engine, board, Lifecycle.CARRY)
+    assert "None" not in str(raised.value) and raised.value.hint == hint
+
+
+def test_a_protocol_mismatch_is_named_apart_from_the_pins(tmp_path, build, device, monkeypatch):
+    legacy = FixturePowerSync(29, 36, 14, protocol_version=1)
+    wired = _as(build, "helia-aot", timing_scope=_RESTORE, power_sync=legacy)
+    record = compiled(plan_for(wired, tmp_path / "model.tflite"), wired, Lifecycle.CARRY)
+    monkeypatch.setattr(CompiledBuild, "verify", lambda self: None)
+
+    with pytest.raises(ConfigError, match="speaks power protocol 1") as raised:
+        _run(record, tmp_path, power=_rail(), power_guard=_Authority("station", []))
+    assert "pins" not in str(raised.value)
+    assert device.calls == []
+
+
+# settle_seconds
+
+
+@pytest.mark.parametrize("seconds", [61.0, 0, -1.0, math.nan, math.inf, None, "30", True])
+def test_a_rail_capture_refuses_an_unbounded_settle_time(tmp_path, build, device, seconds):
+    record = _powered(tmp_path, build)
+
+    with pytest.raises(ConfigError, match="settle_seconds must be a number above 0"):
+        _run(
+            record,
+            tmp_path,
+            power=_rail(),
+            power_guard=_Authority("station", []),
+            settle_seconds=seconds,
+        )
+    assert device.calls == []
+    assert not (tmp_path / "evidence").exists()
+
+
+def test_the_settle_refusal_names_the_rail_limit(tmp_path, build, device):
+    record = _powered(tmp_path, build)
+
+    with pytest.raises(ConfigError, match="at most 60 for a rail capture, not 61.0"):
+        _run(
+            record,
+            tmp_path,
+            power=_rail(),
+            power_guard=_Authority("station", []),
+            settle_seconds=61.0,
+        )
+
+
+def test_a_rail_capture_accepts_the_full_60_seconds(tmp_path, build, device):
+    record = _powered(tmp_path, build)
+    device.reply = _success(tmp_path / "raw", _energy(tmp_path / "raw"))
+
+    _run(record, tmp_path, power=_rail(), power_guard=_Authority("station", []), settle_seconds=60)
+
+    ((request, _),) = device.calls
+    assert request.settle_seconds == 60
+
+
+def _invoke_only(root: Path) -> FixtureCaptureResult:
+    return replace(
+        _success(root, None),
+        timing_scope=FixtureTimingScope.INVOKE_ONLY,
+        timing=FixtureTiming(16384, 100, 5, 32768, 4, 96_000_000, FixtureTimingScope.INVOKE_ONLY),
+    )
+
+
+@pytest.mark.parametrize("seconds", [61.0, 300])
+def test_supply_only_timing_keeps_the_capture_settle_limit(tmp_path, build, device, seconds):
+    device.reply = _invoke_only(tmp_path / "raw")
+
+    _run(
+        _timing_only(tmp_path, build),
+        tmp_path,
+        power=_SUPPLY,
+        power_guard=_Authority("station", []),
+        settle_seconds=seconds,
+    )
+
+    ((request, _),) = device.calls
+    assert request.settle_seconds == seconds
+
+
+@pytest.mark.parametrize("seconds", [301.0, 0, math.nan, None, "30"])
+def test_supply_only_timing_refuses_an_unbounded_settle_time(tmp_path, build, device, seconds):
+    with pytest.raises(ConfigError, match="settle_seconds must be a number above 0"):
+        _run(
+            _timing_only(tmp_path, build),
+            tmp_path,
+            power=_SUPPLY,
+            power_guard=_Authority("station", []),
+            settle_seconds=seconds,
+        )
+    assert device.calls == []
+
+
+def test_the_settle_limits_are_the_capture_s_own():
+    from helia_profiler import fixture_capture
+
+    assert (fixture_capture._RAIL_SETTLE_LIMIT_S, fixture_capture._SETTLE_LIMIT_S) == (60, 300)
+
+
+# Supply-only scope
+
+
+def test_supply_only_timing_runs_on_ap510b(tmp_path, build, device):
+    ap510b = reseal(build, target=fixture_target_for_board("apollo510b_evb"))
+    record = compiled(plan_for(ap510b, tmp_path / "model.tflite"), ap510b, Lifecycle.CARRY)
+    device.reply = _invoke_only(tmp_path / "raw")
+
+    result, _ = _run(record, tmp_path, power=_SUPPLY, power_guard=_Authority("station", []))
+
+    ((request, _),) = device.calls
+    assert request.board_power is _SUPPLY and result.power is _SUPPLY
+
+
+def test_supply_only_timing_runs_a_single_invocation(tmp_path, build, device):
+    single = reseal(build, iterations=1, warmups=0)
+    record = compiled(plan_for(single, tmp_path / "model.tflite"), single, Lifecycle.SINGLE)
+    device.reply = replace(
+        _invoke_only(tmp_path / "raw"),
+        timing=FixtureTiming(164, 1, 0, 32768, 4, 96_000_000, FixtureTimingScope.INVOKE_ONLY),
+    )
+
+    result, _ = _run(record, tmp_path, power=_SUPPLY, power_guard=_Authority("station", []))
+
+    ((request, _),) = device.calls
+    assert request.board_power is _SUPPLY and result.power is _SUPPLY

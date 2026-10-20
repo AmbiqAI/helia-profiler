@@ -21,7 +21,7 @@ import json
 from dataclasses import asdict, dataclass, replace
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import TYPE_CHECKING, Any, Mapping, TypeAlias
 
 from ._files import write_text_atomically
 from .errors import CaptureError, ConfigError
@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     from .fixture_power import (
         FixtureBoardPowerRequest,
         FixturePowerGuard,
+        FixturePowerSync,
         FixtureRailEnergy,
         FixtureRailPowerRequest,
     )
@@ -41,6 +42,8 @@ if TYPE_CHECKING:
     from .fixture_target import FixtureTarget
     from .frozen_run import FrozenRun
     from .identity import RunIdentity
+
+    _PowerRequest: TypeAlias = FixtureRailPowerRequest | FixtureBoardPowerRequest | None
 
 COMPILED_BUILD_SCHEMA = "hpx.compiled-build"
 COMPILED_BUILD_SCHEMA_VERSION = 2
@@ -53,8 +56,6 @@ _DOCUMENT_KEYS = frozenset({"schema", "schema_version", "plan", "lifecycle", "bi
 _POWER_ENGINES = ("helia-aot", "litert")
 _POWER_BOARDS = ("apollo510_evb",)
 _POWER_RAIL = "MCU"
-#: The longest wait capture_fixture allows for READY and for completion while a rail is measured.
-_POWER_SETTLE_LIMIT_S = 60
 
 
 @dataclass(frozen=True)
@@ -77,12 +78,14 @@ class CompiledBuild:
 
         return self._identity(fixture_run_identity(self.build))
 
-    def _identity(self, identity: RunIdentity) -> RunIdentity:
-        return replace(
-            identity,
-            run=replace(identity.run, lifecycle=self.lifecycle.value),
-            intent_hash=self.plan.intent_hash,
-        )
+    def _identity(self, identity: RunIdentity, rail: str | None = None) -> RunIdentity:
+        """*identity* under this build's lifecycle and plan, naming the requested *rail*."""
+        from .identity import EnergyFacts
+
+        run = replace(identity.run, lifecycle=self.lifecycle.value)
+        if rail is not None and isinstance(run.energy, EnergyFacts):
+            run = replace(run, energy=replace(run.energy, rail=rail))
+        return replace(identity, run=run, intent_hash=self.plan.intent_hash)
 
     def verify(self) -> None:
         """Re-check the build against its pinned files and its plan; raise on any mismatch.
@@ -295,6 +298,7 @@ class CompiledBuild:
         from .expect import check_fixture_expectation, compare_fixture_outputs
         from .fixture_capture import capture_fixture
         from .fixture_identity import fixture_run_identity
+        from .fixture_power import FixtureRailPowerRequest
 
         self.verify()
         self._check_power(power, power_guard, settle_seconds)
@@ -315,14 +319,11 @@ class CompiledBuild:
             )
         except ValueError as exc:
             raise ConfigError(f"Cannot capture from this compiled build: {exc}") from exc
-        if power is not None:
-            from .fixture_power import FixtureRailPowerRequest
-
-            request = (
-                replace(request, rail_power=power)
-                if isinstance(power, FixtureRailPowerRequest)
-                else replace(request, board_power=power)
-            )
+        rail = power if isinstance(power, FixtureRailPowerRequest) else None
+        if rail is not None:
+            request = replace(request, rail_power=rail)
+        elif power is not None:
+            request = replace(request, board_power=power)
         capture = capture_fixture(
             request,
             guard=guard if power_guard is None else _PowerCaptureGuard(guard, power_guard),
@@ -338,7 +339,9 @@ class CompiledBuild:
                 f"runs {self.build.iterations} and {self.build.warmups}",
                 hint=f"The capture's evidence is in {evidence_dir}.",
             )
-        identity = self._identity(fixture_run_identity(self.build, capture))
+        identity = self._identity(
+            fixture_run_identity(self.build, capture), rail.rail if rail is not None else None
+        )
         verification = (
             compare_fixture_outputs(self.build, capture, expect)
             if expect is not None and capture.state == "success"
@@ -348,11 +351,12 @@ class CompiledBuild:
 
     def _check_power(
         self,
-        power: FixtureRailPowerRequest | FixtureBoardPowerRequest | None,
+        power: _PowerRequest,
         power_guard: FixturePowerGuard | None,
         settle_seconds: float,
     ) -> None:
         """Refuse a power request this build or the run API's rail-energy route cannot take."""
+        from .fixture_capture import _RAIL_SETTLE_LIMIT_S, _SETTLE_LIMIT_S
         from .fixture_power import FixtureBoardPowerRequest, FixtureRailPowerRequest
 
         wiring = self.build.power_sync
@@ -381,26 +385,39 @@ class CompiledBuild:
                     "This build has no power wiring to measure rail energy with",
                     hint="Build with FixtureMethod(..., power_sync=FixturePowerSync(...)).",
                 )
-            if power.firmware_wiring() != wiring:
+            requested = power.firmware_wiring()
+            if replace(requested, protocol_version=wiring.protocol_version) != wiring:
                 raise ConfigError(
-                    f"The power request's GPIO wiring {_pins(power.firmware_wiring())} "
-                    f"differs from the build's {_pins(wiring)}",
+                    f"The power request's GPIO pins {_pins(requested)} "
+                    f"differ from the build's {_pins(wiring)}",
                     hint="Wire the instrument as the firmware was built, or build again.",
+                )
+            if requested.protocol_version != wiring.protocol_version:
+                raise ConfigError(
+                    f"The build's firmware speaks power protocol {wiring.protocol_version}; "
+                    f"the run API's rail request speaks protocol {requested.protocol_version}",
+                    hint="Build again with build(); it compiles the current protocol.",
                 )
             if power.rail != _POWER_RAIL:
                 raise ConfigError(
                     f"The run API measures the {_POWER_RAIL} rail only, not {power.rail!r}"
                 )
             _require_power_route(self.build.engine.value, self.build.target.board, self.lifecycle)
-            if settle_seconds > _POWER_SETTLE_LIMIT_S:
-                raise ConfigError(
-                    f"A rail capture waits at most {_POWER_SETTLE_LIMIT_S} s for READY and "
-                    f"for completion; settle_seconds is {settle_seconds}"
-                )
         else:
             raise ConfigError(
                 f"Unknown power request {type(power).__name__}",
                 hint="Pass a FixtureRailPowerRequest or a FixtureBoardPowerRequest.",
+            )
+        limit, kind = (
+            (_RAIL_SETTLE_LIMIT_S, "a rail capture")
+            if isinstance(power, FixtureRailPowerRequest)
+            else (_SETTLE_LIMIT_S, "a supply-only capture")
+        )
+        if not (type(settle_seconds) in (int, float) and 0 < settle_seconds <= limit):
+            raise ConfigError(
+                f"settle_seconds must be a number above 0 and at most {limit} for {kind}, "
+                f"not {settle_seconds!r}",
+                hint="It bounds each wait for READY and for completion.",
             )
         if power_guard is None:
             raise ConfigError(
@@ -435,26 +452,29 @@ class _PowerCaptureGuard:
         self.power.verify_power_device(serial=serial, rail=rail)
 
 
-def _pins(wiring: object) -> str:
-    return "(sync {0.sync_gpio_pin}, state {0.state_gpio_pin}, GO {0.go_gpio_pin})".format(wiring)
+def _pins(wiring: FixturePowerSync) -> str:
+    return f"(sync {wiring.sync_gpio_pin}, state {wiring.state_gpio_pin}, GO {wiring.go_gpio_pin})"
 
 
-def _require_power_route(engine: str, board: str, lifecycle: Lifecycle) -> None:
+def _require_power_route(engine: str | None, board: str | None, lifecycle: Lifecycle) -> None:
     """Refuse rail energy outside the route the run API admits."""
-    if lifecycle is Lifecycle.SINGLE:
+    if lifecycle is not Lifecycle.CARRY:
         raise ConfigError(
-            "A single invocation is too short for a power capture",
-            hint="Use Lifecycle.CARRY for a power run.",
+            "The run API measures rail energy over a Lifecycle.CARRY build's timed loop, "
+            f"not a Lifecycle.{lifecycle.name} one, which runs the model stateless",
+            hint="Build with lifecycle=Lifecycle.CARRY for a power run.",
         )
     if engine not in _POWER_ENGINES:
         raise ConfigError(
-            f"The run API measures rail energy for heliaAOT and LiteRT builds, not {engine}",
-            hint="Those are the engines its rail-energy route admits (helia-profiler#558).",
+            "The run API measures rail energy for heliaAOT and LiteRT builds, "
+            + (f"not {engine}" if engine else "and the plan names no engine"),
+            hint="Use a heliaAOT or LiteRT plan.",
         )
     if board not in _POWER_BOARDS:
         raise ConfigError(
-            f"The run API measures rail energy on the apollo510_evb, not {board}",
-            hint="That is the board its MCU-rail route is wired and admitted on.",
+            "The run API measures rail energy on the apollo510_evb, "
+            + (f"not {board}" if board else "and the plan names no board"),
+            hint="Build for apollo510_evb.",
         )
 
 
@@ -508,7 +528,8 @@ def build(
     compiles the protocol-2 power firmware, which a run measures with a
     matching :class:`~helia_profiler.FixtureRailPowerRequest`; it is admitted
     for a heliaAOT or LiteRT plan on the ``apollo510_evb`` under
-    ``Lifecycle.CARRY``, and refused otherwise. *host* supplies host-local
+    ``Lifecycle.CARRY``, and refused otherwise. A plan frozen with power
+    enabled needs such a method. *host* supplies host-local
     settings, such as ``{"work_dir": ...}``, as :meth:`FrozenRun.config` does.
     heliaRT and LiteRT link a prepared runtime: without *runtime*, the one the
     plan names is taken from the HPX cache (``hpx runtimes prepare``), never
@@ -535,6 +556,13 @@ def build(
             plan.settings.get("engine", {}).get("type"), target.get("board"), lifecycle
         )
     config = plan.config(model=model, host=host)
+    if config.power.enabled and method.power_sync is None:
+        raise ConfigError(
+            "The plan is frozen with power enabled, but the method has no power_sync; "
+            "the build would measure timing only",
+            hint="Pass FixtureMethod(..., power_sync=FixturePowerSync(...)) to build() "
+            "and power= to run_build().",
+        )
     require_lifecycle(config.engine.type, lifecycle)
     iterations, warmup = lifecycle_invocations(
         lifecycle, config.profiling.iterations, config.profiling.warmup
@@ -630,17 +658,18 @@ def _binding(plan: FrozenRun, lifecycle: Lifecycle, build: FixtureBuild) -> str:
     state policy and power wiring the build records, its prepared runtime
     manifest, and what it observes, and no host path.
     """
-    wiring = build.power_sync
     payload = {
         "plan": plan.intent_hash,
         "lifecycle": lifecycle.value,
         "timing_scope": build.timing_scope.value,
         "state_policy": _value(build.state_policy),
-        "power_sync": asdict(wiring) if wiring is not None else None,
         "runtime_manifest": build.runtime_manifest.sha256 if build.runtime_manifest else None,
         "observe_ram": build.observe_ram,
         "observe_aot_arenas": [list(arena) for arena in build.aot_arena_scan],
     }
+    # A timing build omits the key, so a timing build saved before power wiring still verifies.
+    if build.power_sync is not None:
+        payload["power_sync"] = asdict(build.power_sync)
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
     return hashlib.sha256(encoded.encode()).hexdigest()
 

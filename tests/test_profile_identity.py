@@ -688,14 +688,12 @@ def test_a_run_without_a_resolved_soc_states_why_its_clock_is_unknown(tmp_path):
 
 
 @pytest.mark.parametrize("enabled", [False, True])
-def test_a_profile_points_its_energy_at_the_power_section(tmp_path, enabled):
+def test_a_profile_with_power_states_its_energy_method_as_unknown(tmp_path, enabled):
     ctx = _ctx(tmp_path)
     ctx.config = replace(ctx.config, power=replace(ctx.config.power, enabled=enabled))
 
     energy = profile_run_identity(ctx).run.energy
 
     assert energy == (
-        Unknown("a profile states its power capture in the summary's power section")
-        if enabled
-        else None
+        Unknown("a profile does not state how its energy is measured") if enabled else None
     )

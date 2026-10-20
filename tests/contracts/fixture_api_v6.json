@@ -114,6 +114,34 @@
       "methods": {},
       "properties": []
     },
+    "EnergyFacts": {
+      "fields": [
+        [
+          "scope",
+          "str",
+          "<required>"
+        ],
+        [
+          "rail",
+          "str | Unknown",
+          "<required>"
+        ],
+        [
+          "subtraction",
+          "str",
+          "<required>"
+        ],
+        [
+          "completion_protocol",
+          "int",
+          "<required>"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
     "EngineDTypeCapability": {
       "fields": [
         [

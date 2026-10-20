@@ -37,11 +37,12 @@ def plan_for(
     clock: str = "lp",
     iterations: int = 100,
     warmup: int = 5,
+    power: bool = False,
 ) -> FrozenRun:
     """The plan *build* was compiled from, frozen with its model copied to *model*."""
     assert build.model is not None and build.arena_location and build.weights_location
     model.write_bytes(build.model.read())
-    return (
+    session = (
         hpx.Session()
         .with_model(
             model,
@@ -52,8 +53,8 @@ def plan_for(
         .with_engine(engine or build.engine.value)
         .with_target(board=board or build.target.board, toolchain="atfe", clock={"cpu": clock})
         .with_profiling(iterations=iterations, warmup=warmup)
-        .freeze()
     )
+    return (session.with_power(enabled=True) if power else session).freeze()
 
 
 def compiled(plan: FrozenRun, build: FixtureBuild, lifecycle: Lifecycle) -> CompiledBuild:
