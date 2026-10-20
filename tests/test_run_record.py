@@ -246,6 +246,10 @@ def _nested(data: dict[str, Any]) -> None:
     data["capture"]["timing"]["notes"] = "edited"
 
 
+def _writer(data: dict[str, Any]) -> None:
+    data["hpx_version"] = 3
+
+
 @pytest.mark.parametrize(
     "edit,code,message",
     [
@@ -258,6 +262,7 @@ def _nested(data: dict[str, Any]) -> None:
         (_resize, "artifact_changed", "is not the file it recorded"),
         (_state, "invalid_evidence", "unknown capture state"),
         (_nested, "invalid_evidence", "Malformed run result timing"),
+        (_writer, "invalid_evidence", "hpx_version"),
     ],
 )
 def test_an_edited_result_is_refused(root, record, edit, code, message):
@@ -289,7 +294,7 @@ def test_a_location_deeper_than_the_file_is_refused(root, record):
 
     with pytest.raises(ResultReadError) as read:
         load_result(path)
-    assert read.value.code == "invalid_path"
+    assert read.value.code == "invalid_path" and "does not lead back to" in str(read.value)
 
 
 def _missing(root: Path) -> None:
@@ -737,3 +742,19 @@ def test_a_directory_with_a_run_result_and_a_profile_manifest_is_refused(root, r
         load_result(path.parent)
     assert read.value.code == "ambiguous_location"
     assert isinstance(load_result(path), RunResultRecord)
+
+
+def test_a_failed_capture_with_an_output_comparison_is_refused(root, record):
+    result = _run(record)
+    path = _save(result)
+    failed = replace(result.capture, state="failure")
+    identity = _identity(record, failed, None).to_dict()
+
+    def fail(data: dict[str, Any]) -> None:
+        data["capture"]["state"] = "failure"
+        data["identity"] = identity
+
+    _edit(path, fail)
+    with pytest.raises(RunResultError, match="failed capture has no output comparison") as refused:
+        hpx.load_run(path, roots=_roots(root))
+    assert refused.value.code == "invalid_evidence"
