@@ -47,6 +47,9 @@ def compiler(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def _linked(tmp_path: Path, engine: str, **commits: str):
     """A plan for *engine* and a build linking what it names, unless *commits* say otherwise."""
+    if engine == "helia-aot":
+        # The plan pins the installed heliaAOT release; without it there is none to compare.
+        pytest.importorskip("helia_aot")
     base = atfe_build(_build(tmp_path / "run"))
     plan = plan_for(base, tmp_path / "model.tflite", engine=engine)
     assert plan.runtime is not None

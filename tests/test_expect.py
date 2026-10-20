@@ -251,14 +251,15 @@ def test_build_and_caller_references_and_executorch_refuses_a_host_one(tmp_path)
 
 def test_an_incomplete_capture_or_build_is_refused(tmp_path):
     out = _file(tmp_path / "out.bin", bytes(4))
+    expect = Expect.from_files(_file(tmp_path / "ref.bin", bytes(4)).path)
     with pytest.raises(ConfigError, match="Capture success with 0 of 1 outputs"):
-        compare_fixture_outputs(_build(tmp_path), _capture(()), Expect.host_litert())
+        compare_fixture_outputs(_build(tmp_path), _capture(()), expect)
     with pytest.raises(ConfigError, match="Capture failure with 1 of 1 outputs"):
-        compare_fixture_outputs(_build(tmp_path), _capture((out,), "failure"), Expect.host_litert())
+        compare_fixture_outputs(_build(tmp_path), _capture((out,), "failure"), expect)
     legacy = _build(tmp_path)
     legacy.model = None
     with pytest.raises(ConfigError, match="does not record its measurement inputs"):
-        compare_fixture_outputs(legacy, _capture((out,)), Expect.host_litert())
+        compare_fixture_outputs(legacy, _capture((out,)), expect)
     out.path.write_bytes(bytes(5))
     with pytest.raises(ConfigError, match="Cannot read"):
-        compare_fixture_outputs(_build(tmp_path), _capture((out,)), Expect.host_litert())
+        compare_fixture_outputs(_build(tmp_path), _capture((out,)), expect)
