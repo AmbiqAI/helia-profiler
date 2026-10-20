@@ -400,14 +400,18 @@ EnergyFacts(scope: str, rail: str | Unknown, subtraction: str, completion_protoc
 
 `dataclass`
 
-How a run's energy was measured.
+The method a run's energy is measured with, whether or not the capture succeeded.
 
 ``scope`` is what the measured window covers:
 ``gross_rail_restore_and_invoke`` is everything the rail draws over the
-timed restore-and-invoke loop. ``rail`` is the physical rail measured,
-such as ``MCU``. ``subtraction`` is what was taken off the measurement,
-``none`` when nothing was. ``completion_protocol`` is the version of the
-firmware's READY, GO and DONE handshake that bounds the window.
+timed restore-and-invoke loop. ``rail`` is the physical rail the run
+measures, such as ``MCU``: the rail requested, also after a failed
+capture, and unknown only where no request is at hand, as in a build's
+identity before it runs. ``subtraction`` is what is taken off the
+measurement, ``none`` when nothing is. ``completion_protocol`` is the
+version of the firmware's READY, GO and DONE handshake that bounds the
+window. The measurement itself, or its absence, is the run's outcome,
+such as ``RunResult.energy``.
 
 **API tier:** `experimental`
 
@@ -421,7 +425,7 @@ Source: `src/helia_profiler/identity.py:142`
 scope: str
 ```
 
-Source: `src/helia_profiler/identity.py:154`
+Source: `src/helia_profiler/identity.py:158`
 
 ### helia_profiler.EnergyFacts.rail
 
@@ -431,7 +435,7 @@ Source: `src/helia_profiler/identity.py:154`
 rail: str | Unknown
 ```
 
-Source: `src/helia_profiler/identity.py:155`
+Source: `src/helia_profiler/identity.py:159`
 
 ### helia_profiler.EnergyFacts.subtraction
 
@@ -441,7 +445,7 @@ Source: `src/helia_profiler/identity.py:155`
 subtraction: str
 ```
 
-Source: `src/helia_profiler/identity.py:156`
+Source: `src/helia_profiler/identity.py:160`
 
 ### helia_profiler.EnergyFacts.completion_protocol
 
@@ -451,7 +455,7 @@ Source: `src/helia_profiler/identity.py:156`
 completion_protocol: int
 ```
 
-Source: `src/helia_profiler/identity.py:157`
+Source: `src/helia_profiler/identity.py:161`
 
 ## helia_profiler.RunFacts
 
@@ -489,12 +493,14 @@ falls: ``warmup`` or ``measured``. ``timing_clock`` is the clock that times
 the span, ``cpu`` cycles or the 32.768 kHz ``stimer``; ``timing_clock_hz``
 is its configured rate, not a measured one. ``timing_statistic`` is what
 the reported time is: the ``total`` over the measured invocations or
-their ``mean``. ``energy`` is how the run's energy was measured, and
-``None`` when the run measures none.
+their ``mean``. ``energy`` is the method the run's energy is measured
+with, stated after a failed capture too, and ``None`` when the run
+measures no energy; whether it was measured is the outcome, not a fact
+here.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/identity.py:160`
+Source: `src/helia_profiler/identity.py:164`
 
 ### helia_profiler.RunFacts.lifecycle
 
@@ -504,7 +510,7 @@ Source: `src/helia_profiler/identity.py:160`
 lifecycle: str
 ```
 
-Source: `src/helia_profiler/identity.py:180`
+Source: `src/helia_profiler/identity.py:186`
 
 ### helia_profiler.RunFacts.iterations
 
@@ -514,7 +520,7 @@ Source: `src/helia_profiler/identity.py:180`
 iterations: int
 ```
 
-Source: `src/helia_profiler/identity.py:181`
+Source: `src/helia_profiler/identity.py:187`
 
 ### helia_profiler.RunFacts.warmups
 
@@ -524,7 +530,7 @@ Source: `src/helia_profiler/identity.py:181`
 warmups: int
 ```
 
-Source: `src/helia_profiler/identity.py:182`
+Source: `src/helia_profiler/identity.py:188`
 
 ### helia_profiler.RunFacts.timing_scope
 
@@ -534,7 +540,7 @@ Source: `src/helia_profiler/identity.py:182`
 timing_scope: str
 ```
 
-Source: `src/helia_profiler/identity.py:183`
+Source: `src/helia_profiler/identity.py:189`
 
 ### helia_profiler.RunFacts.instance_boundary
 
@@ -544,7 +550,7 @@ Source: `src/helia_profiler/identity.py:183`
 instance_boundary: str | Unknown = _UNRECORDED
 ```
 
-Source: `src/helia_profiler/identity.py:184`
+Source: `src/helia_profiler/identity.py:190`
 
 ### helia_profiler.RunFacts.first_invoke_initializer
 
@@ -554,7 +560,7 @@ Source: `src/helia_profiler/identity.py:184`
 first_invoke_initializer: bool | Unknown = _UNRECORDED
 ```
 
-Source: `src/helia_profiler/identity.py:185`
+Source: `src/helia_profiler/identity.py:191`
 
 ### helia_profiler.RunFacts.first_invoke_window
 
@@ -564,7 +570,7 @@ Source: `src/helia_profiler/identity.py:185`
 first_invoke_window: str | Unknown = _UNRECORDED
 ```
 
-Source: `src/helia_profiler/identity.py:186`
+Source: `src/helia_profiler/identity.py:192`
 
 ### helia_profiler.RunFacts.timing_clock
 
@@ -574,7 +580,7 @@ Source: `src/helia_profiler/identity.py:186`
 timing_clock: str | Unknown = _UNRECORDED
 ```
 
-Source: `src/helia_profiler/identity.py:187`
+Source: `src/helia_profiler/identity.py:193`
 
 ### helia_profiler.RunFacts.timing_clock_hz
 
@@ -584,7 +590,7 @@ Source: `src/helia_profiler/identity.py:187`
 timing_clock_hz: int | Unknown = _UNRECORDED
 ```
 
-Source: `src/helia_profiler/identity.py:188`
+Source: `src/helia_profiler/identity.py:194`
 
 ### helia_profiler.RunFacts.timing_statistic
 
@@ -594,7 +600,7 @@ Source: `src/helia_profiler/identity.py:188`
 timing_statistic: str | Unknown = _UNRECORDED
 ```
 
-Source: `src/helia_profiler/identity.py:189`
+Source: `src/helia_profiler/identity.py:195`
 
 ### helia_profiler.RunFacts.energy
 
@@ -604,7 +610,7 @@ Source: `src/helia_profiler/identity.py:189`
 energy: EnergyFacts | Unknown | None = None
 ```
 
-Source: `src/helia_profiler/identity.py:190`
+Source: `src/helia_profiler/identity.py:196`
 
 ## helia_profiler.RunIdentity
 
@@ -641,7 +647,7 @@ the plan a run was built from, and ``None`` for a run built without one.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/identity.py:193`
+Source: `src/helia_profiler/identity.py:199`
 
 ### helia_profiler.RunIdentity.runtime
 
@@ -651,7 +657,7 @@ Source: `src/helia_profiler/identity.py:193`
 runtime: RuntimeIdentity
 ```
 
-Source: `src/helia_profiler/identity.py:205`
+Source: `src/helia_profiler/identity.py:211`
 
 ### helia_profiler.RunIdentity.kernels
 
@@ -661,7 +667,7 @@ Source: `src/helia_profiler/identity.py:205`
 kernels: KernelIdentity
 ```
 
-Source: `src/helia_profiler/identity.py:206`
+Source: `src/helia_profiler/identity.py:212`
 
 ### helia_profiler.RunIdentity.prepared_archive_sha256
 
@@ -671,7 +677,7 @@ Source: `src/helia_profiler/identity.py:206`
 prepared_archive_sha256: str | None
 ```
 
-Source: `src/helia_profiler/identity.py:207`
+Source: `src/helia_profiler/identity.py:213`
 
 ### helia_profiler.RunIdentity.build
 
@@ -681,7 +687,7 @@ Source: `src/helia_profiler/identity.py:207`
 build: BuildFacts
 ```
 
-Source: `src/helia_profiler/identity.py:208`
+Source: `src/helia_profiler/identity.py:214`
 
 ### helia_profiler.RunIdentity.baseline_id
 
@@ -691,7 +697,7 @@ Source: `src/helia_profiler/identity.py:208`
 baseline_id: str | Unknown
 ```
 
-Source: `src/helia_profiler/identity.py:209`
+Source: `src/helia_profiler/identity.py:215`
 
 ### helia_profiler.RunIdentity.dependency_lock_sha256
 
@@ -701,7 +707,7 @@ Source: `src/helia_profiler/identity.py:209`
 dependency_lock_sha256: str | Unknown
 ```
 
-Source: `src/helia_profiler/identity.py:210`
+Source: `src/helia_profiler/identity.py:216`
 
 ### helia_profiler.RunIdentity.model_sha256
 
@@ -711,7 +717,7 @@ Source: `src/helia_profiler/identity.py:210`
 model_sha256: str | Unknown
 ```
 
-Source: `src/helia_profiler/identity.py:211`
+Source: `src/helia_profiler/identity.py:217`
 
 ### helia_profiler.RunIdentity.inputs_sha256
 
@@ -721,7 +727,7 @@ Source: `src/helia_profiler/identity.py:211`
 inputs_sha256: str | Unknown
 ```
 
-Source: `src/helia_profiler/identity.py:212`
+Source: `src/helia_profiler/identity.py:218`
 
 ### helia_profiler.RunIdentity.run
 
@@ -731,7 +737,7 @@ Source: `src/helia_profiler/identity.py:212`
 run: RunFacts
 ```
 
-Source: `src/helia_profiler/identity.py:213`
+Source: `src/helia_profiler/identity.py:219`
 
 ### helia_profiler.RunIdentity.producer
 
@@ -741,7 +747,7 @@ Source: `src/helia_profiler/identity.py:213`
 producer: str | Unknown
 ```
 
-Source: `src/helia_profiler/identity.py:214`
+Source: `src/helia_profiler/identity.py:220`
 
 ### helia_profiler.RunIdentity.build_hash
 
@@ -751,7 +757,7 @@ Source: `src/helia_profiler/identity.py:214`
 build_hash: str | Unknown
 ```
 
-Source: `src/helia_profiler/identity.py:215`
+Source: `src/helia_profiler/identity.py:221`
 
 ### helia_profiler.RunIdentity.observation_hash
 
@@ -761,7 +767,7 @@ Source: `src/helia_profiler/identity.py:215`
 observation_hash: str | None = None
 ```
 
-Source: `src/helia_profiler/identity.py:216`
+Source: `src/helia_profiler/identity.py:222`
 
 ### helia_profiler.RunIdentity.intent_hash
 
@@ -771,7 +777,7 @@ Source: `src/helia_profiler/identity.py:216`
 intent_hash: str | None = None
 ```
 
-Source: `src/helia_profiler/identity.py:217`
+Source: `src/helia_profiler/identity.py:223`
 
 ### helia_profiler.RunIdentity.to_dict
 
@@ -783,4 +789,4 @@ to_dict() -> dict[str, Any]
 
 JSON-ready form; an unknown fact becomes ``{"unknown": reason}``.
 
-Source: `src/helia_profiler/identity.py:219`
+Source: `src/helia_profiler/identity.py:225`
