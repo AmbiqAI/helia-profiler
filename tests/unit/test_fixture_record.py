@@ -7,10 +7,7 @@ from dataclasses import asdict, replace
 
 import pytest
 
-from helia_profiler._fixture_build import FIXTURE_CAPABILITIES
-from helia_profiler._fixture_record import compiled_fixture_identity
-from helia_profiler.fixture import (
-    FIXTURE_API_VERSION,
+from helia_profiler import (
     EngineType,
     FixtureBuild,
     FixtureFile,
@@ -22,12 +19,17 @@ from helia_profiler.fixture import (
     PerTensorQuantization,
     Placement,
     ToolchainInfo,
+)
+from helia_profiler._fixture_build import FIXTURE_CAPABILITIES
+from helia_profiler._fixture_record import (
+    _RECORD_VERSION,
+    compiled_fixture_identity,
     dump_fixture_build,
     fixture_capture_request,
     load_fixture_build,
-    supported_fixture_target,
     verify_fixture_build,
 )
+from helia_profiler.fixture_target import supported_fixture_target
 
 
 def _pin(path, data):
@@ -88,7 +90,7 @@ def _build(root):
 
 @pytest.mark.parametrize("version", [1, 2])
 def test_power_protocol_record_preserves_generation(tmp_path, version):
-    from helia_profiler.fixture import FixturePowerSync
+    from helia_profiler import FixturePowerSync
 
     build = replace(
         _build(tmp_path),
@@ -98,7 +100,7 @@ def test_power_protocol_record_preserves_generation(tmp_path, version):
     build = replace(build, build_identity=compiled_fixture_identity(build))
     record = dump_fixture_build(build, roots={"run": tmp_path})
     encoded = json.loads(record)
-    assert encoded["fixture_api"] == ([5, 1] if version == 1 else list(FIXTURE_API_VERSION))
+    assert encoded["fixture_api"] == ([5, 1] if version == 1 else list(_RECORD_VERSION))
     assert ("protocol_version" in encoded["build"]["power_sync"]) == (version == 2)
     assert load_fixture_build(record, roots={"run": tmp_path}) == build
     altered = json.loads(record)
@@ -251,7 +253,7 @@ def test_render_only_and_legacy_incomplete_builds_do_not_become_compiled(tmp_pat
 
 @pytest.mark.parametrize("engine", [EngineType.HELIA_AOT, EngineType.LITERT])
 def test_psram_record_retains_image_payload_and_capture_facts(tmp_path, engine):
-    from helia_profiler.fixture import FixturePsramPayload, FixturePsramWeights
+    from helia_profiler import FixturePsramPayload, FixturePsramWeights
 
     build = _build(tmp_path)
     build = replace(
@@ -280,7 +282,7 @@ def test_psram_record_retains_image_payload_and_capture_facts(tmp_path, engine):
 
 
 def test_power_build_identity_roundtrip_and_original_record_readback(tmp_path):
-    from helia_profiler.fixture import FixturePowerSync
+    from helia_profiler import FixturePowerSync
 
     original = _build(tmp_path)
     roots = {"run": tmp_path}
@@ -311,7 +313,7 @@ def test_power_build_identity_roundtrip_and_original_record_readback(tmp_path):
 
 @pytest.mark.parametrize("with_power", [False, True])
 def test_saved_api52_record_keeps_identity_and_file_checks(tmp_path, with_power):
-    from helia_profiler.fixture import FixturePowerSync
+    from helia_profiler import FixturePowerSync
 
     build = _build(tmp_path)
     if with_power:
@@ -350,7 +352,7 @@ def _sourced(root, build=None):
     """A heliaAOT record whose kernel is the one its pinned dependency state names."""
     from test_fixture_sources import NS
 
-    from helia_profiler.fixture import FixtureKernelSource
+    from helia_profiler import FixtureKernelSource
 
     build = build or _build(root)
     assert build.dependency_lock is not None
@@ -380,7 +382,7 @@ def test_kernel_source_round_trips_and_binds_identity(tmp_path):
 
 
 def test_resealed_sources_must_match_the_pinned_files(tmp_path):
-    from helia_profiler.fixture import FixtureRuntimeSource
+    from helia_profiler import FixtureRuntimeSource
 
     build = _sourced(tmp_path)
     assert build.kernel_source is not None
@@ -440,7 +442,7 @@ def test_sources_require_their_declared_api_version(tmp_path):
 
 
 def test_sources_are_refused_on_power_protocol_one_records(tmp_path):
-    from helia_profiler.fixture import FixturePowerSync
+    from helia_profiler import FixturePowerSync
 
     build = _sourced(tmp_path)
     build = _reseal(
@@ -466,7 +468,7 @@ def test_malformed_kernel_source_is_refused(tmp_path, key, value):
     "key,value", [("commit", None), ("version", 1), ("archive_sha256", "E" * 64)]
 )
 def test_malformed_runtime_source_is_refused(tmp_path, key, value):
-    from helia_profiler.fixture import FixtureRuntimeSource
+    from helia_profiler import FixtureRuntimeSource
 
     source = FixtureRuntimeSource("helia-rt", "https://r", None, "c" * 40, "e" * 64)
     with pytest.raises(ValueError):

@@ -1,4 +1,4 @@
-"""Supported integrations and limits for fixed-fixture builds and captures."""
+"""Supported targets, IO types and limits of run builds and captures."""
 
 from __future__ import annotations
 
@@ -48,9 +48,8 @@ class EngineDTypeCapability:
 
 @dataclass(frozen=True)
 class FixtureCapabilities:
-    """Targets, engine and dtype status, and limits of this fixture API."""
+    """Targets, engine and dtype status, and limits of this heliaPROFILER's runs."""
 
-    api_version: tuple[int, int]
     targets: tuple[QualifiedFixtureTarget, ...]
     engines: tuple[EngineDTypeCapability, ...]
     readback_budget: int
@@ -58,10 +57,7 @@ class FixtureCapabilities:
 
 def fixture_capabilities() -> FixtureCapabilities:
     """Report supported targets and public IO types, independently of qualification."""
-    from .fixture import FIXTURE_API_VERSION
-
     return FixtureCapabilities(
-        api_version=FIXTURE_API_VERSION,
         targets=tuple(
             QualifiedFixtureTarget(
                 board=target.board,

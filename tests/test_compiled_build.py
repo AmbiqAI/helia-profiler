@@ -13,6 +13,7 @@ from typing import Any
 import pytest
 
 import helia_profiler as hpx
+from helia_profiler import FixtureFile
 from helia_profiler._fixture_build import (
     FixtureMethod,
     FixtureOutput,
@@ -27,7 +28,7 @@ from helia_profiler.compiled_build import (
     _binding,
 )
 from helia_profiler.errors import ConfigError
-from helia_profiler.fixture import FixtureFile, fixture_run_identity
+from helia_profiler.fixture_identity import fixture_run_identity
 from helia_profiler.frozen_run import _ENVIRONMENT_VARIABLES, FrozenRun
 from helia_profiler.lifecycle import Lifecycle
 from helia_profiler.placement import Placement

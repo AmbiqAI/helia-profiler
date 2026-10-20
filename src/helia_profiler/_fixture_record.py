@@ -90,6 +90,9 @@ _FIELDS = frozenset(
 )
 
 
+#: The record's ``fixture_api`` version, inside ``hpx.compiled-build`` version 3.
+_RECORD_VERSION = (7, 0)
+
 #: Optional since API 5.6; absent from a record when unknown, so older identities hold.
 _SOURCE_FIELDS = ("kernel_source", "runtime_source")
 
@@ -366,8 +369,6 @@ class _Roots(RootedPaths):
 
 def dump_fixture_build(build: FixtureBuild, *, roots: Mapping[str, Path]) -> str:
     """Return canonical JSON for a verified compiled build under caller roots."""
-    from .fixture import FIXTURE_API_VERSION
-
     verify_fixture_build(build)
     mapping = _Roots(roots)
     return (
@@ -376,7 +377,7 @@ def dump_fixture_build(build: FixtureBuild, *, roots: Mapping[str, Path]) -> str
                 "schema_version": 1,
                 "fixture_api": (5, 1)
                 if build.power_sync is not None and build.power_sync.protocol_version == 1
-                else FIXTURE_API_VERSION,
+                else _RECORD_VERSION,
                 "build": _payload(build, file=mapping.file, path=mapping.encode),
             }
         )
@@ -443,8 +444,6 @@ def _memory(value) -> MemoryPlan | None:
 
 def load_fixture_build(record: str | bytes, *, roots: Mapping[str, Path]) -> FixtureBuild:
     """Load and verify a producer record without resolving/preparing an engine."""
-    from .fixture import FIXTURE_API_VERSION
-
     if not isinstance(record, (str, bytes)):
         raise ValueError("Fixture build record must be JSON text or bytes")
     mapping = _Roots(roots)
@@ -465,7 +464,7 @@ def load_fixture_build(record: str | bytes, *, roots: Mapping[str, Path]) -> Fix
             _json((5, 8)),
             _json((6, 0)),
             _json((6, 1)),
-            _json(FIXTURE_API_VERSION),
+            _json(_RECORD_VERSION),
         )
     ):
         raise ValueError("Unsupported fixture build record/API version")
@@ -483,7 +482,7 @@ def load_fixture_build(record: str | bytes, *, roots: Mapping[str, Path]) -> Fix
         [5, 8],
         [6, 0],
         [6, 1],
-        list(FIXTURE_API_VERSION),
+        list(_RECORD_VERSION),
     ):
         raise ValueError("RAM diagnostic requires its declared API version")
     source_fields = {name for name in _SOURCE_FIELDS if name in outer["build"]}

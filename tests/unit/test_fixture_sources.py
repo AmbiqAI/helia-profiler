@@ -6,7 +6,7 @@ from dataclasses import asdict, replace
 import pytest
 from test_heliart_fixture import runtime
 
-from helia_profiler.fixture import FixtureKernelSource, FixtureRuntimeSource
+from helia_profiler import FixtureKernelSource, FixtureRuntimeSource
 from helia_profiler.fixture_sources import comparable, pinned_sources
 from helia_profiler.results.dependencies import ContentDigest, DependencyModule
 from helia_profiler.runtime_records import runtime as runtime_record

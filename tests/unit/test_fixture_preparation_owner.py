@@ -10,35 +10,13 @@ import pytest
 from test_fixture_request import _request
 from test_fixture_runtime import runtime
 
+from helia_profiler import EngineType, TypedFixture
 from helia_profiler.config import EngineConfig
 from helia_profiler.engines import get_adapter
 from helia_profiler.engines.litert import LiteRtAdapter
-from helia_profiler.fixture import EngineType, FixtureBackend, TypedFixture, build_fixture
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.placement import Placement
 from helia_profiler.stages.prepare_engine import PrepareEngineStage
-
-
-def test_request_is_pure_and_build_resolves_selected_cached_archive(tmp_path, monkeypatch):
-    (tmp_path / "provider").mkdir()
-    cached = runtime(tmp_path / "provider")
-    lookup = Mock(return_value=SimpleNamespace(runtime=cached))
-    monkeypatch.setattr("helia_profiler._fixture_request.prepared_runtime", lookup)
-    request = replace(
-        _request(tmp_path / "input"), engine=EngineType.LITERT, backend=FixtureBackend.CMSIS_NN
-    )
-    assert request.runtime is None
-    lookup.assert_not_called()
-    operation = Mock(return_value="built")
-    monkeypatch.setattr("helia_profiler._fixture_request._build", operation)
-    assert build_fixture(request) == "built"
-    lookup.assert_called_once_with("litert")
-    assert operation.call_args.kwargs["runtime"] is cached
-    assert (
-        operation.call_args.kwargs["intent_identity"]
-        == replace(request, runtime=cached).intent_identity
-    )
-    assert request.runtime is None
 
 
 def test_selected_archive_does_not_prepare_and_replace_ordinary_engine(tmp_path, monkeypatch):

@@ -14,85 +14,83 @@ from typing import Any
 import pytest
 
 import helia_profiler as hpx
-import helia_profiler.fixture as facade
 from helia_profiler.engines import EngineType
 from helia_profiler.errors import ConfigError
 
-#: Top-level name -> the ``helia_profiler.fixture`` name it is.
-_SAME_AS_FACADE = {
-    "TypedFixture": "TypedFixture",
-    "FixtureIO": "FixtureIO",
-    "FixtureOutput": "FixtureOutput",
-    "FixtureRole": "FixtureRole",
-    "FixtureFile": "FixtureFile",
-    "FixtureTensor": "FixtureTensor",
-    "FixtureMethod": "FixtureMethod",
-    "FixtureTimingScope": "FixtureTimingScope",
-    "FixtureCaptureGuard": "FixtureCaptureGuard",
-    "FixtureTarget": "FixtureTarget",
-    "PreparedUpstreamRuntime": "PreparedUpstreamRuntime",
-    "TypedFixtureModelAnalysis": "TypedFixtureModelAnalysis",
-    "FixtureCapabilities": "FixtureCapabilities",
-    "QualifiedFixtureTarget": "QualifiedFixtureTarget",
-    "EngineDTypeCapability": "EngineDTypeCapability",
-    "PerTensorQuantization": "PerTensorQuantization",
-    "PerAxisQuantization": "PerAxisQuantization",
-    "FixtureDType": "FixtureDType",
-    "FixtureCapability": "FixtureCapability",
-    "FixtureStatePolicy": "FixtureStatePolicy",
-    "FixturePowerSync": "FixturePowerSync",
-    "RunIdentity": "RunIdentity",
-    "RunFacts": "RunFacts",
-    "BuildFacts": "BuildFacts",
-    "EnergyFacts": "EnergyFacts",
-    "KernelIdentity": "KernelIdentity",
-    "RuntimeIdentity": "RuntimeIdentity",
-    "FixtureBuild": "FixtureBuild",
-    "FixtureCaptureResult": "FixtureCaptureResult",
-    "FixtureTiming": "FixtureTiming",
-    "FixtureMemory": "FixtureMemory",
-    "FixtureRailEnergy": "FixtureRailEnergy",
-    "FixtureBatchCompletion": "FixtureBatchCompletion",
-    "FixtureRailPowerRequest": "FixtureRailPowerRequest",
-    "FixtureBoardPowerRequest": "FixtureBoardPowerRequest",
-    "FixturePowerGuard": "FixturePowerGuard",
-    "FixturePsramWeights": "FixturePsramWeights",
-    "FixturePsramPayload": "FixturePsramPayload",
-    "FixturePsramObservation": "FixturePsramObservation",
-    "FixtureKernelSource": "FixtureKernelSource",
-    "FixtureRuntimeSource": "FixtureRuntimeSource",
-    "EngineSource": "EngineSource",
-    "ToolchainInfo": "ToolchainInfo",
-    "VerifiedPreparedRuntime": "VerifiedPreparedRuntime",
-    "PreparedRuntimeManifest": "PreparedRuntimeManifest",
-    "RuntimeABI": "RuntimeABI",
-    "RuntimeHeader": "RuntimeHeader",
-    "RuntimeProvider": "RuntimeProvider",
+#: Each run-API type exported by ``helia_profiler``, and the module that defines it.
+_RUN_INPUT_TYPES = {
+    "TypedFixture": "_fixture_build",
+    "FixtureIO": "_fixture_build",
+    "FixtureOutput": "_fixture_build",
+    "FixtureRole": "_fixture_build",
+    "FixtureMethod": "_fixture_build",
+    "FixtureTimingScope": "_fixture_build",
+    "FixtureDType": "_fixture_build",
+    "FixtureCapability": "_fixture_build",
+    "FixtureStatePolicy": "_fixture_build",
+    "FixtureBuild": "_fixture_build",
+    "FixtureCapabilities": "_fixture_facts",
+    "QualifiedFixtureTarget": "_fixture_facts",
+    "EngineDTypeCapability": "_fixture_facts",
+    "FixtureTensor": "fixture_analysis",
+    "TypedFixtureModelAnalysis": "fixture_analysis",
+    "PerTensorQuantization": "fixture_analysis",
+    "PerAxisQuantization": "fixture_analysis",
+    "FixtureCaptureGuard": "fixture_capture",
+    "FixtureCaptureResult": "fixture_capture",
+    "FixtureTiming": "fixture_capture",
+    "FixtureMemory": "fixture_capture",
+    "FixturePowerSync": "fixture_power",
+    "FixtureRailEnergy": "fixture_power",
+    "FixtureBatchCompletion": "fixture_power",
+    "FixtureRailPowerRequest": "fixture_power",
+    "FixtureBoardPowerRequest": "fixture_power",
+    "FixturePowerGuard": "fixture_power",
+    "FixturePsramWeights": "fixture_psram",
+    "FixturePsramPayload": "fixture_psram",
+    "FixturePsramObservation": "fixture_psram",
+    "FixtureFile": "fixture_runtime",
+    "PreparedUpstreamRuntime": "fixture_runtime",
+    "VerifiedPreparedRuntime": "fixture_runtime",
+    "RuntimeABI": "fixture_runtime",
+    "RuntimeHeader": "fixture_runtime",
+    "RuntimeProvider": "fixture_runtime",
+    "FixtureKernelSource": "fixture_sources",
+    "FixtureRuntimeSource": "fixture_sources",
+    "FixtureTarget": "fixture_target",
+    "EngineSource": "engines.base",
+    "ToolchainInfo": "results.models",
+    "MemoryPlan": "results.models",
+    "ResolverPlan": "firmware.op_resolver",
+    "RunIdentity": "identity",
+    "RunFacts": "identity",
+    "BuildFacts": "identity",
+    "EnergyFacts": "identity",
+    "KernelIdentity": "identity",
+    "RuntimeIdentity": "identity",
 }
 _NEW = (
     "capabilities",
     "analyze_run_model",
     "analyze_run_model_for_engine",
     "OperatorGuard",
-    "MemoryPlan",
-    "ResolverPlan",
 )
 
 
-@pytest.mark.parametrize("name,facade_name", sorted(_SAME_AS_FACADE.items()))
-def test_each_input_type_is_the_fixture_type(name, facade_name):
-    assert getattr(hpx, name) is getattr(facade, facade_name)
+@pytest.mark.parametrize("name,module", sorted(_RUN_INPUT_TYPES.items()))
+def test_each_run_input_type_is_its_modules_type(name, module):
+    defined = importlib.import_module(f"helia_profiler.{module}")
+    assert getattr(hpx, name) is getattr(defined, name)
 
 
-def test_the_types_outside_the_fixture_facade_are_their_modules_types():
-    from helia_profiler.firmware.op_resolver import ResolverPlan
-    from helia_profiler.results.models import MemoryPlan
+def test_the_prepared_runtime_manifest_is_the_runtime_manifest():
+    from helia_profiler.fixture_runtime import RuntimeManifest
 
-    assert (hpx.MemoryPlan, hpx.ResolverPlan) == (MemoryPlan, ResolverPlan)
+    assert hpx.PreparedRuntimeManifest is RuntimeManifest
 
 
 def test_the_run_inputs_are_experimental_exports():
-    names = {*_SAME_AS_FACADE, *_NEW, "Expect", "Tolerance"}
+    names = {*_RUN_INPUT_TYPES, *_NEW, "PreparedRuntimeManifest", "Expect", "Tolerance"}
     assert names <= set(hpx.__all__)
     assert {hpx.__api_stability__[name] for name in names} == {"experimental"}
 
@@ -117,12 +115,14 @@ _RUN_API_MODULES = {
         "expect",
         "lifecycle",
         "run_guard",
+        "run_record",
     )
 }
 _RUN_API_ENTRY_POINTS = (
     "build",
     "load_build",
     "run_build",
+    "load_run",
     "capabilities",
     "analyze_run_model",
     "analyze_run_model_for_engine",
@@ -201,9 +201,11 @@ def test_every_type_the_run_api_reaches_is_importable_from_helia_profiler():
     )
 
 
-def test_capabilities_reports_what_the_fixture_api_reports():
+def test_capabilities_reports_the_producer_capabilities():
+    from helia_profiler._fixture_facts import fixture_capabilities
+
     reported = hpx.capabilities()
-    assert reported == facade.fixture_capabilities()
+    assert reported == fixture_capabilities()
     assert isinstance(reported, hpx.FixtureCapabilities)
     assert {target.board for target in reported.targets} >= {"apollo510_evb"}
 
@@ -266,6 +268,8 @@ def test_analyze_run_model_matches_the_fixture_analysis_of_a_real_model():
     pytest.importorskip("ai_edge_litert")
     model = hpx.examples.tiny_cnn()
     analysis = hpx.analyze_run_model(model)
-    expected = facade.analyze_typed_fixture_model(model)
+    from helia_profiler.fixture_analysis import analyze_typed_fixture_model
+
+    expected = analyze_typed_fixture_model(model)
     assert isinstance(analysis, hpx.TypedFixtureModelAnalysis)
     assert (analysis.inputs, analysis.outputs) == (expected.inputs, expected.outputs)

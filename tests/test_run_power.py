@@ -10,15 +10,10 @@ from typing import Any
 import pytest
 
 import helia_profiler as hpx
-from helia_profiler._fixture_build import FIXTURE_CAPABILITIES
-from helia_profiler.compiled_build import CompiledBuild, _binding
-from helia_profiler.engines import EngineType
-from helia_profiler.errors import ConfigError
-from helia_profiler.fixture import (
+from helia_profiler import (
     FixtureBatchCompletion,
     FixtureBoardPowerRequest,
     FixtureBuild,
-    FixtureCaptureRequest,
     FixtureCaptureResult,
     FixtureMethod,
     FixtureOutput,
@@ -29,6 +24,11 @@ from helia_profiler.fixture import (
     FixtureTimingScope,
     TypedFixture,
 )
+from helia_profiler._fixture_build import FIXTURE_CAPABILITIES
+from helia_profiler.compiled_build import CompiledBuild, _binding
+from helia_profiler.engines import EngineType
+from helia_profiler.errors import ConfigError
+from helia_profiler.fixture_capture import FixtureCaptureRequest
 from helia_profiler.fixture_target import fixture_target_for_board
 from helia_profiler.identity import EnergyFacts, Unknown
 from helia_profiler.lifecycle import Lifecycle

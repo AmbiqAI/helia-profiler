@@ -7,15 +7,11 @@ from pathlib import Path
 
 import pytest
 
-from helia_profiler.errors import ConfigError
-from helia_profiler.fixture import (
+from helia_profiler import (
     EngineType,
-    FixtureBackend,
-    FixtureBuildRequest,
     FixtureFile,
     FixtureIO,
     FixtureMethod,
-    FixturePlacement,
     FixtureTensor,
     FixtureTimingScope,
     PerTensorQuantization,
@@ -23,6 +19,7 @@ from helia_profiler.fixture import (
     PreparedUpstreamRuntime,
     TypedFixture,
 )
+from helia_profiler.errors import ConfigError
 from helia_profiler.fixture_image import ContractError
 from helia_profiler.fixture_psram import (
     FixturePsramPayload,
@@ -32,6 +29,7 @@ from helia_profiler.fixture_psram import (
 )
 from helia_profiler.fixture_target import fixture_app_region
 from helia_profiler.platform.memory_map import MemoryRegion
+from tests.fixture_requests import FixtureBackend, FixtureBuildRequest, FixturePlacement
 from tests.unit import test_fixture_capture as capture_helpers
 from tests.unit.test_fixture_capture import _SINKS, image_files
 from tests.unit.test_fixture_capture import rig as rig
@@ -63,7 +61,6 @@ def test_psram_aot_public_constructor(tmp_path):
         placement=FixturePlacement(Placement.SRAM, Placement.PSRAM),
     )
     assert request.to_config().model.weights_location is Placement.PSRAM
-    assert request.intent_identity != replace(request, placement=FixturePlacement()).intent_identity
 
 
 def terminal(expected, *, base=None, addresses=None):

@@ -138,6 +138,12 @@ if TYPE_CHECKING:
     from .frozen_run import FrozenModel, FrozenRun, FrozenRuntime, LocalInput, ToolchainIdentity
     from .hostenv.cache_dirs import hpx_cache_root
     from .hostenv.doctor import DoctorCheck, DoctorResult, DoctorVersionCheck
+    from .hostenv.elf_inventory import (
+        ElfSection,
+        LoadSegment,
+        SectionInventory,
+        section_inventory,
+    )
     from .identity import (
         BuildFacts,
         CanonicalEngine,
@@ -273,6 +279,10 @@ _EXPORTS = {
     "DoctorCheck": (".hostenv.doctor", "DoctorCheck"),
     "DoctorResult": (".hostenv.doctor", "DoctorResult"),
     "DoctorVersionCheck": (".hostenv.doctor", "DoctorVersionCheck"),
+    "ElfSection": (".hostenv.elf_inventory", "ElfSection"),
+    "LoadSegment": (".hostenv.elf_inventory", "LoadSegment"),
+    "SectionInventory": (".hostenv.elf_inventory", "SectionInventory"),
+    "section_inventory": (".hostenv.elf_inventory", "section_inventory"),
     "ModelAnalysis": (".modelcost", "ModelAnalysis"),
     "ProgressUpdate": (".pipeline", "ProgressUpdate"),
     "Placement": (".placement", "Placement"),
@@ -541,6 +551,10 @@ __all__ = [
     "RunMetadata",
     "NsxModuleRef",
     "ModelAnalysis",
+    "SectionInventory",
+    "ElfSection",
+    "LoadSegment",
+    "section_inventory",
     "CompareResult",
     "ComparabilityAssessment",
     "ComparabilityIssue",
@@ -746,6 +760,10 @@ _EXPERIMENTAL_API = {
     "PowerTerminalRecord",
     "OnDevicePowerSummary",
     "ModelAnalysis",
+    "SectionInventory",
+    "ElfSection",
+    "LoadSegment",
+    "section_inventory",
     "CompareResult",
     "ComparabilityAssessment",
     "ComparabilityIssue",

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import importlib
 import inspect
 from itertools import combinations
+
+import pytest
 
 import helia_profiler
 
@@ -27,8 +30,8 @@ def test_stability_tiers_partition_the_public_surface() -> None:
     }
     sizes = {name: len(members) for name, members in tiers.items()}
 
-    assert sizes == {"stable": 45, "experimental": 131, "implementation": 13}
-    assert sum(sizes.values()) == 189 == len(helia_profiler.__all__)
+    assert sizes == {"stable": 45, "experimental": 135, "implementation": 13}
+    assert sum(sizes.values()) == 193 == len(helia_profiler.__all__)
 
     for left, right in combinations(tiers, 2):
         assert not tiers[left] & tiers[right], (
@@ -95,6 +98,7 @@ def test_public_surface_membership_snapshot() -> None:
         "DoctorCheck",
         "DoctorResult",
         "DoctorVersionCheck",
+        "ElfSection",
         "EnergyFacts",
         "EngineConfig",
         "EngineDTypeCapability",
@@ -142,6 +146,7 @@ def test_public_surface_membership_snapshot() -> None:
         "KernelIdentity",
         "LayerResult",
         "Lifecycle",
+        "LoadSegment",
         "LocalInput",
         "LockError",
         "MeasurementScope",
@@ -209,6 +214,7 @@ def test_public_surface_membership_snapshot() -> None:
         "RuntimeQualification",
         "RuntimeRecord",
         "RuntimeSource",
+        "SectionInventory",
         "SemanticHash",
         "SerialPortInfo",
         "Session",
@@ -258,8 +264,24 @@ def test_public_surface_membership_snapshot() -> None:
         "read_dependency_lock_provenance",
         "run_build",
         "runtimes",
+        "section_inventory",
         "verify_support_bundle",
         "write_support_bundle",
     ]
     for name in helia_profiler.__all__:
         assert hasattr(helia_profiler, name), f"__all__ exports missing attribute {name}"
+
+
+def test_the_fixture_module_is_gone() -> None:
+    """The run API replaced the fixture API; the package root is the public contract."""
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module("helia_profiler.fixture")
+    assert not hasattr(helia_profiler, "fixture")
+
+
+def test_the_section_inventory_is_exported_from_the_package_root() -> None:
+    from helia_profiler.hostenv import elf_inventory
+
+    for name in ("section_inventory", "SectionInventory", "ElfSection", "LoadSegment"):
+        assert getattr(helia_profiler, name) is getattr(elf_inventory, name)
+        assert helia_profiler.__api_stability__[name] == "experimental"

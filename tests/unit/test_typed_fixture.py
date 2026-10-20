@@ -748,7 +748,7 @@ int main(int argc,char**argv) {
 
 @pytest.mark.parametrize("engine", [EngineType.HELIA_AOT, EngineType.LITERT])
 def test_power_render_gates_full_restore_loop_after_warmups(tmp_path, engine):
-    from helia_profiler.fixture import FixturePowerSync, FixtureStatePolicy
+    from helia_profiler import FixturePowerSync, FixtureStatePolicy
 
     fixture = typed(tmp_path)
     config = config_for(tmp_path, fixture, engine)
