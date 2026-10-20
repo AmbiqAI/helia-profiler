@@ -7,22 +7,6 @@ from contextlib import AbstractContextManager
 from typing import Any, Protocol, Self
 
 
-class Probe(Protocol):
-    """Identity exposed by a discovered hardware debug probe.
-
-    Read-only properties so frozen-dataclass implementations conform.
-    """
-
-    @property
-    def serial(self) -> str: ...
-
-    @property
-    def product(self) -> str: ...
-
-    @property
-    def connection(self) -> str: ...
-
-
 class ProbeSession(Protocol):
     """Open debug-session lifetime."""
 

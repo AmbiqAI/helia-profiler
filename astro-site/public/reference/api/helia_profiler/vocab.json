@@ -244,7 +244,7 @@
           "summary": "Supported cross-compiler toolchains for the profiler firmware."
         },
         {
-          "description": "Logical placement region for arenas / weights / model data.\n\nThe four logical regions abstract over the SoC physical layout —\ne.g. ``Placement.TCM`` covers DTCM on AP5 and is unavailable on AP3.\nEngine adapters that emit physical names (heliaAOT's ``DTCM``,\n``ITCM``, …) normalise to this enum at the adapter boundary.\n\n**API tier:** `stable`",
+          "description": "Logical placement region for arenas / weights / model data.\n\nThe four logical regions abstract over the SoC physical layout —\ne.g. ``Placement.TCM`` covers DTCM on AP5.\nEngine adapters that emit physical names (heliaAOT's ``DTCM``,\n``ITCM``, …) normalise to this enum at the adapter boundary.\n\n**API tier:** `stable`",
           "examples": [],
           "id": "helia_profiler.Placement",
           "kind": "class",

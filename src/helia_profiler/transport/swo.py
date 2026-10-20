@@ -117,8 +117,7 @@ def capture_swo_output(
     jlink_device: str,
     timeout_s: float | None = DEFAULT_TIMEOUT_S,
     heartbeat_timeout_s: float = HEARTBEAT_TIMEOUT_S,
-    cpu_freq: int = 96_000_000,
-    swo_freq: int = SWO_SPEED_HZ,
+    cpu_freq: int,
     timing_out: dict[str, float] | None = None,
     reset_controller: ResetController | None = None,
 ) -> list[str]:
@@ -166,8 +165,8 @@ def capture_swo_output(
             log.info("pylink connected to %s for SWO capture", jlink_device)
             resume_if_halted(jlink)
 
-            enable_swo(jlink, cpu_speed_hz=cpu_freq, swo_speed_hz=swo_freq)
-            log.info("SWO enabled (cpu=%d Hz, swo=%d Hz)", cpu_freq, swo_freq)
+            enable_swo(jlink, cpu_speed_hz=cpu_freq)
+            log.info("SWO enabled (cpu=%d Hz, swo=%d Hz)", cpu_freq, SWO_SPEED_HZ)
 
             lines = collect_lines(
                 lambda: read_swo_chunk(jlink),
@@ -225,8 +224,7 @@ def capture_swo_output(
             except Exception:
                 pass
 
-    finalize_timing()
-    return []
+    raise AssertionError("unreachable")
 
 
 class SwoTransport(BaseCaptureTransport):

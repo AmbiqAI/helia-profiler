@@ -91,9 +91,6 @@ class PowerMonitorContext:
     ina228_conversion_time_us: int = 0
     ina228_averaging_count: int = 0
     ina228_adc_range: int = 0
-    # Expected SHUNT_CAL register value, precomputed host-side. Carried into
-    # the calibration_id for provenance and range-checked at render time.
-    ina228_shunt_cal: int = 0
     # SHUNT_CAL = 13107.2e6 * CURRENT_LSB * R_shunt (x4 at ADCRANGE=1), so
     # firmware recovers the effective CURRENT_LSB as SHUNT_CAL / this. Kept
     # as a rendered double literal so the scaling tracks the register that is
@@ -147,7 +144,6 @@ class PowerMonitorContext:
             ina228_conversion_time_us=ina.conversion_time_us,
             ina228_averaging_count=ina.averaging_count,
             ina228_adc_range=adc_range,
-            ina228_shunt_cal=shunt_cal,
             ina228_current_lsb_divisor=repr(current_lsb_divisor),
             ina228_calibration_id=calibration_id,
         )

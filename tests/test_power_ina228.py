@@ -332,11 +332,7 @@ class TestPowerMonitorContext:
         assert monitor.ina228_adc_range == 1
         assert monitor.ina228_calibration_id == ("ina228:adafruit-ina228:r15000uohm:i500ma:adc1")
 
-    def test_shunt_cal_matches_datasheet_formula(self, tmp_path: Path):
-        """SHUNT_CAL = 13107.2e6 x CURRENT_LSB x R_shunt, x4 at ADCRANGE=1.
-
-        The 0.5 ohm / 0.5 A case is the hardware-verified one.
-        """
+    def test_wide_drop_keeps_the_wide_range(self, tmp_path: Path):
         config = _profile_config(
             tmp_path,
             {
@@ -348,9 +344,8 @@ class TestPowerMonitorContext:
         )
         monitor = PowerMonitorContext.from_config(config)
         assert monitor.ina228_adc_range == 0  # 0.25 V >> 40.96 mV
-        assert monitor.ina228_shunt_cal == 6250
 
-    def test_shunt_cal_scales_by_four_on_the_high_resolution_range(self, tmp_path: Path):
+    def test_small_drop_selects_high_resolution(self, tmp_path: Path):
         config = _profile_config(
             tmp_path,
             {
@@ -363,7 +358,6 @@ class TestPowerMonitorContext:
         )
         monitor = PowerMonitorContext.from_config(config)
         assert monitor.ina228_adc_range == 1
-        assert monitor.ina228_shunt_cal == 625 * 4
 
     def test_shunt_cal_overflow_is_rejected_with_actionable_error(self, tmp_path: Path):
         """SHUNT_CAL is a 15-bit register; an oversized current/shunt pair

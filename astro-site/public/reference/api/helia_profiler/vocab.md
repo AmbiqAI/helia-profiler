@@ -164,7 +164,7 @@ Placement()
 Logical placement region for arenas / weights / model data.
 
 The four logical regions abstract over the SoC physical layout —
-e.g. ``Placement.TCM`` covers DTCM on AP5 and is unavailable on AP3.
+e.g. ``Placement.TCM`` covers DTCM on AP5.
 Engine adapters that emit physical names (heliaAOT's ``DTCM``,
 ``ITCM``, …) normalise to this enum at the adapter boundary.
 

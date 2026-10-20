@@ -23,6 +23,7 @@ _FROMELF_SECTION_START_RE = re.compile(r"^\*\* Section #(\d+)")
 _FROMELF_SIZE_BYTES_RE = re.compile(r"^(\d+) bytes")
 
 
+#: ``.heap`` size is leftover, not need (#24).
 _RESERVED_NOBITS_NAMES = frozenset({"heap"})
 
 
@@ -60,8 +61,7 @@ def _is_reserved_section_name(name: str) -> bool:
 # the SAME tools the reserved/bss split already runs — readelf kept only
 # name/type/size/flags and deliberately discarded the Addr column; fromelf's
 # -v blocks carry Addr and full program headers. Everything below is
-# ADDITIVE: the BinarySections paths above are untouched, and every probe
-# degrades to None per #131's never-guess discipline. Serialization and the
+# ADDITIVE: every probe degrades to None per #131's never-guess discipline. Serialization and the
 # region attribution live in ``memory_measurement`` and ``report``.
 
 
@@ -136,7 +136,7 @@ class SectionInventory:
     unparsed_rows: int = 0
 
 
-#: readelf -S -W row, GENERAL section names (the reserved-path regex above
+#: readelf -S -W row, GENERAL section names (toolchain_probe's reserved-path regex
 #: anchors on a leading dot and cannot see armlink-style ARM_LIB_* names).
 #: The type group is constrained to an uppercase identifier so the NULL
 #: row — whose blank name column would otherwise let (\S+) swallow "NULL"
@@ -371,8 +371,8 @@ class SymbolEntry:
     """One sized symbol from the linked image (``nm -S``).
 
     ``type`` is nm's one-letter class (b/B bss, d/D data, t/T text, ...).
-    Names are RAW (mangled where C++ mangles them) — consumers match by
-    suffix, the same idiom :func:`symbol_address` uses, so
+    Names are RAW (mangled where C++ mangles them) — consumers match the
+    exact name or its ``_ZL<len>`` form, so
     ``_ZL15g_arena_storage`` matches ``g_arena_storage``. Aliases are
     real (two names at one address+size, e.g. a section-start alias over
     a static); collection consumers dedup by (address, size) when

@@ -157,8 +157,7 @@ def _serialise_memory_reconciliation(rec: MemoryReconciliation) -> dict[str, Any
 
 
 #: Per-region symbol rows emitted into detailed/memory.json -- a bounded,
-#: size-sorted view (the aggregates-vs-enumerations convention in
-#: report/__init__.py).
+#: size-sorted view.
 _SYMBOLS_PER_REGION = 32
 
 
@@ -264,8 +263,7 @@ def _write_memory_breakdown(ctx: PipelineContext, detail_dir: Path) -> Path:
     if ctx.memory_regions is not None:
         data["memory_regions"] = _serialise_memory_regions(ctx.memory_regions)
 
-    # Plan-vs-measured reconciliation + the per-symbol enumeration (#133;
-    # symbols are detailed-only by the aggregates convention)
+    # Plan-vs-measured reconciliation + the per-symbol enumeration (#133)
     if ctx.memory_reconciliation is not None:
         data["memory_reconciliation"] = _serialise_memory_reconciliation(ctx.memory_reconciliation)
     if ctx.memory_symbols is not None and ctx.memory_regions is not None:

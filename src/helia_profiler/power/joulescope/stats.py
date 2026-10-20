@@ -241,7 +241,7 @@ def _gated_mask_axis(a: dict[str, Any], *, prefer_device_time: bool = False) -> 
     if prefer_device_time:
         return a["mid"], "device_packet_midpoint_time64"
     host_time = a.get("host_time")
-    if host_time is not None and getattr(host_time, "size", 0) and not bool(host_time.size == 0):
+    if host_time is not None and getattr(host_time, "size", 0):
         import numpy as np
 
         if not np.isnan(host_time).any():

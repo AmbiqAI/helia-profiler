@@ -1258,6 +1258,7 @@ def test_capture_swo_output_restarts_halted_target(monkeypatch):
     capture_swo_output(
         jlink_serial="1160002204",
         jlink_device="AP510NFA-CBR",
+        cpu_freq=96_000_000,
     )
 
     assert fake_jlink.restart_calls == 1
@@ -1318,6 +1319,7 @@ def test_capture_swo_output_retries_once_after_empty_capture(monkeypatch):
     lines = capture_swo_output(
         jlink_serial="1160002204",
         jlink_device="AP510NFA-CBR",
+        cpu_freq=96_000_000,
     )
 
     assert lines == ["--- HPX_START ---", "--- HPX_END ---"]
@@ -1386,6 +1388,7 @@ def test_capture_swo_output_retries_when_start_sentinel_missing(monkeypatch):
     lines = capture_swo_output(
         jlink_serial="1160002204",
         jlink_device="AP510NFA-CBR",
+        cpu_freq=96_000_000,
     )
 
     assert lines == ["--- HPX_START ---", "0,CONV_2D,1", "--- HPX_END ---"]
@@ -1449,6 +1452,7 @@ def test_capture_swo_output_returns_partial_after_final_attempt(monkeypatch):
     lines = capture_swo_output(
         jlink_serial="1160002204",
         jlink_device="AP510NFA-CBR",
+        cpu_freq=96_000_000,
     )
 
     assert lines == ["0,CONV_2D,1", "--- HPX_END ---"]
@@ -1703,6 +1707,7 @@ def test_capture_swo_retries_share_one_deadline(monkeypatch):
     lines = capture_swo_output(
         jlink_serial="1160002204",
         jlink_device="AP510NFA-CBR",
+        cpu_freq=96_000_000,
         timeout_s=60.0,
     )
 

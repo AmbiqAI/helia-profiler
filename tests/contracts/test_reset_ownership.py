@@ -211,7 +211,9 @@ class TestReaderResetOwnership:
 
         events = _install_reader_reset_recorder(monkeypatch, "helia_profiler.transport.swo")
         with pytest.raises(_ResetStop):
-            capture_swo_output(jlink_device="AP510NFA-CBR", jlink_serial="1160002204")
+            capture_swo_output(
+                jlink_device="AP510NFA-CBR", jlink_serial="1160002204", cpu_freq=96_000_000
+            )
         assert events == ["jlinkexe_reset"]
 
     def test_rtt_reader_uses_released_jlinkexe_reset(self, monkeypatch):
@@ -340,7 +342,9 @@ def _drive_reader_reset(monkeypatch, tmp_path, family: str, transport: str) -> l
         from helia_profiler.transport.swo import capture_swo_output
 
         with pytest.raises(_ResetStop):
-            capture_swo_output(jlink_device=ctx.soc.jlink_device, jlink_serial="1")
+            capture_swo_output(
+                jlink_device=ctx.soc.jlink_device, jlink_serial="1", cpu_freq=96_000_000
+            )
     else:  # rtt
         from helia_profiler.transport.rtt import capture_rtt_output
 
