@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 from ..errors import PowerError
 from ..pipeline import PipelineContext
@@ -25,6 +26,15 @@ from ..power.metadata import (
     PowerMetadata,
 )
 from ..results import PowerObservation
+
+if TYPE_CHECKING:
+    from ..results import (
+        OnDevicePowerSummary,
+        PowerRun,
+        PowerRunPlan,
+        PowerTerminalEnvelope,
+        PowerTerminalRecord,
+    )
 
 
 def _host_phase_envelope_s(ctx: PipelineContext) -> float | None:
@@ -56,6 +66,321 @@ def _host_phase_envelope_s(ctx: PipelineContext) -> float | None:
 log = logging.getLogger("hpx")
 
 
+def _terminal_timeout_s(ctx: PipelineContext, power_run: PowerRun, internal_mode: bool) -> float:
+    plan = power_run.plan
+    clean_window_probe = ctx.config.profiling.clean_window_probe
+    if power_run.observation is not None:
+        timeout_s = max(2.0, min(10.0, power_run.observation.deadline_s / 10.0))
+    else:
+        planned_s = plan.planned_window_s
+        if planned_s is None:
+            planned_s = 5.0
+        timeout_s = max(5.0, min(30.0, planned_s * 2.0 + 5.0))
+        if (
+            internal_mode
+            and plan.planned_window_s is not None
+            and probe_runs_inferences(clean_window_probe)
+        ):
+            factor = reference_stall_factor(ctx)
+            if factor > 1.0:
+                timeout_s = max(timeout_s, planned_s * 2.0 * factor + 5.0)
+    return timeout_s
+
+
+def _check_terminal(
+    terminal: PowerTerminalRecord,
+    plan: PowerRunPlan,
+    clean_window_probe: str,
+    internal_mode: bool,
+) -> bool:
+    expected_requested = expected_terminal_requested_count(
+        inference_count=plan.inference_count,
+        clean_window_probe=clean_window_probe,
+    )
+    if expected_requested is not None and terminal.requested_count != expected_requested:
+        raise PowerError(
+            "Power terminal requested count does not match the host plan.",
+            hint=(
+                f"Firmware reported {terminal.requested_count}, host expected {expected_requested}."
+            ),
+        )
+    if terminal.status != "ok":
+        hint = None
+        if terminal.final_phase == "stimer_dead":
+            # #110's attribution on the dedicated power binary: the
+            # error_code carries the last settle probe's tick count
+            # PLUS ONE (the envelope forbids error_code 0 with
+            # status=error, and 0 ticks is the stopped-crystal
+            # signature — see #180).
+            last_ticks = max(0, terminal.error_code - 1)
+            hint = (
+                "The 32.768 kHz crystal (XT) that clocks the "
+                "measurement window never produced a plausible tick "
+                "rate within the settle deadline (last probe: "
+                f"{last_ticks} ticks per 10 ms; nominal 328; 0 means "
+                "the counter never moved). "
+                "This is a BOARD condition, not the debug-domain "
+                "frozen-clock bug: check the X32 crystal and its "
+                "jumpers/straps, and any shield or rework touching the "
+                "XT pins. The window never opened, so no misleading "
+                "power figures were recorded."
+            )
+        raise PowerError(
+            f"Power firmware reported error {terminal.error_code} in phase "
+            f"{terminal.final_phase} after {terminal.completed_count}/"
+            f"{terminal.requested_count} "
+            f"{count_noun(clean_window_probe, terminal.requested_count)}.",
+            hint=hint,
+        )
+    if terminal.completed_count != terminal.requested_count:
+        raise PowerError(
+            "Power firmware reported incomplete "
+            f"{'inference' if probe_runs_inferences(clean_window_probe) else 'busy-loop'} "
+            "execution.",
+            hint=(
+                f"Completed {terminal.completed_count}/"
+                f"{terminal.requested_count} "
+                f"{count_noun(clean_window_probe, terminal.requested_count)}."
+            ),
+        )
+    if not terminal.gate_lowered:
+        raise PowerError("Power firmware did not confirm that GATE was lowered.")
+    frozen_window_clock = firmware_window_clock_is_frozen(
+        elapsed_us=terminal.elapsed_us,
+        completed_count=terminal.completed_count,
+    )
+    if frozen_window_clock and internal_mode:
+        # The firmware says it ran N inferences in zero time, and in
+        # internal mode the denominator is read from that same clock, so
+        # average power and current are wrong by the same factor. The measurement of record
+        # is corrupt, which is terminal here for the same reason the
+        # all-zero INA228 reading below is.
+        raise PowerError(
+            "Power firmware reported zero elapsed time for "
+            f"{terminal.completed_count} completed "
+            f"{count_noun(clean_window_probe, terminal.completed_count)}.",
+            hint=FROZEN_WINDOW_CLOCK_HINT,
+        )
+    return frozen_window_clock
+
+
+def _check_measurement(
+    ctx: PipelineContext, envelope: PowerTerminalEnvelope, internal_mode: bool
+) -> None:
+    if envelope.measurement is not None and envelope.measurement.overflow:
+        if not internal_mode:
+            # The monitor is present but is not this run's measurement of
+            # record (e.g. an INA228 left on the bus while a Joulescope
+            # measures, or with its sense inputs disconnected). Its health
+            # flags are informational — failing the run would discard a
+            # perfectly good external capture.
+            log.warning(
+                "On-device power monitor reported accumulator overflow; "
+                "ignoring because %s is the measurement of record.",
+                ctx.config.power.driver,
+            )
+        else:
+            measurement = envelope.measurement
+            raise PowerError(
+                "On-device power monitor reported accumulator overflow.",
+                hint=(
+                    f"Monitor saw energy={measurement.energy_nj} nJ, "
+                    f"charge={measurement.charge_nc} nC, "
+                    f"bus_voltage={measurement.bus_voltage_uv} uV over "
+                    f"{measurement.duration_us} us. An implausible bus "
+                    "voltage usually means the VBUS sense input is "
+                    "floating — wire it to the target-side rail node. "
+                    "Check the 'Power firmware diagnostic' log line for "
+                    "the raw DIAG bits (0x200=MATHOF, 0x400=CHARGEOF, "
+                    "0x800=ENERGYOF)."
+                ),
+            )
+    if internal_mode and envelope.measurement is None:
+        raise PowerError("Internal power mode requires an on-device measurement payload.")
+    if internal_mode and envelope.measurement is not None:
+        measurement = envelope.measurement
+        # Plausibility gates for the measurement of record. Both
+        # signatures pass every register-level health check (no DIAG bit,
+        # firmware status ok), so without these the run would publish a
+        # confidently wrong number.
+        if measurement.energy_nj == 0 and measurement.charge_nc == 0:
+            # A window shorter than one accumulator update, or a dead
+            # sense path, reads exactly zero while bus voltage (which
+            # needs no calibration) still looks perfect.
+            raise PowerError(
+                "On-device power monitor measured exactly zero energy and charge.",
+                hint=(
+                    "Either the window contained no completed accumulator "
+                    "update (averaging_count x 2 x conversion_time_us "
+                    "longer than the window) or no current flows through "
+                    "the shunt. Check the IN+/IN- sense wiring and the "
+                    "conversion/averaging settings."
+                ),
+            )
+        # energy_nj and charge_nc are rounded to integers independently
+        # on-device, so a true charge below the 1 nC step reports as 0
+        # legitimately. Bound the energy such a charge could have carried
+        # (E = Q x V) and require an ample margin over it, so a genuinely
+        # tiny measurement is never misdiagnosed as miswiring. Real
+        # reversed wiring overshoots this by many orders of magnitude.
+        rounding_energy_nj = 0.5 * (measurement.bus_voltage_uv or 0) / 1_000_000
+        if measurement.energy_nj > 100 * rounding_energy_nj and measurement.charge_nc == 0:
+            # ENERGY integrates |power| while CHARGE is signed: reversed
+            # IN+/IN- accumulates negative charge, which the firmware
+            # clamps to zero. Substantial energy with zero charge is that
+            # miswiring's exact signature.
+            raise PowerError(
+                "On-device power monitor reports energy but zero charge.",
+                hint=(
+                    "This is the signature of reversed sense wiring: "
+                    "swap the INA228's IN+/IN- connections (current must "
+                    "flow IN+ -> IN-)."
+                ),
+            )
+
+
+def _publish_internal_result(
+    ctx: PipelineContext, measurement: OnDevicePowerSummary, plan: PowerRunPlan
+) -> None:
+    duration_s = measurement.duration_us / 1_000_000.0
+    energy_j = measurement.energy_nj / 1_000_000_000.0
+    average_power_w = energy_j / duration_s if duration_s > 0 else 0.0
+    average_current_a = (
+        measurement.charge_nc / 1_000_000_000.0 / duration_s
+        if measurement.charge_nc is not None and duration_s > 0
+        else 0.0
+    )
+    result = PowerResult(
+        summary=PowerSummary(
+            avg_current_a=average_current_a,
+            avg_power_w=average_power_w,
+            peak_current_a=0.0,
+            energy_j=energy_j,
+            duration_s=duration_s,
+            # The on-device accumulator reports totals, not a sample
+            # stream (HPX_POWER_SAMPLE_COUNT was retired by #165), so
+            # the host-summary sample count is honestly zero here.
+            sample_count=0,
+        ),
+        metadata=PowerMetadata(
+            measurement_scope=MeasurementScope.ON_DEVICE_GATED_INFERENCE,
+            observation_mode=ObservationMode.ON_DEVICE,
+            integrity=PowerIntegrity.VALID,
+            source=measurement.source,
+            inference_count=measurement.inference_count,
+            # Artifact-level POWER_FIRMWARE lets the fingerprint gate
+            # establish platform scope for a manifest-less
+            # internal-mode pair (#115, #173). External mode sets it
+            # in capture/__init__.py.
+            power_firmware=plan.firmware_mode,
+        ),
+    )
+    # Route through the publisher so result.metadata is enriched with
+    # the observation fields (set_observation), keeping the record and
+    # the serialized metadata in agreement.
+    ctx.publish_power_observation(
+        PowerObservation(
+            mode=ObservationMode.ON_DEVICE,
+            result=result,
+            gate_rise_observed=True,
+            gate_fall_observed=True,
+            deadline_s=duration_s,
+            integrity=PowerIntegrity.VALID,
+        )
+    )
+
+
+def _log_clock_diagnostics(
+    ctx: PipelineContext,
+    power_run: PowerRun,
+    terminal: PowerTerminalRecord,
+    clean_window_probe: str,
+    internal_mode: bool,
+    frozen_window_clock: bool,
+) -> None:
+    plan = power_run.plan
+    if frozen_window_clock:
+        # External mode: warn, do not raise. The instrument owns every
+        # published power number here, so a frozen firmware clock corrupts
+        # elapsed_us and nothing else; raising would throw away a good
+        # capture before any artifact exists. Same shape as the
+        # bystander-overflow path above.
+        log.warning(
+            "Power firmware reported zero elapsed time for %d completed "
+            "%s: its window clock never advanced. The %s owns this "
+            "run's power numbers and they are unaffected; only the "
+            "firmware-reported window duration is meaningless. %s",
+            terminal.completed_count,
+            count_noun(clean_window_probe, terminal.completed_count),
+            ctx.config.power.driver,
+            FROZEN_WINDOW_CLOCK_HINT,
+        )
+    # Cross-check of the firmware's window clock against an independent
+    # measurement. This stage only LOGS; evaluation.validity holds the
+    # verdict (external arm ERROR, internal arm warning -- #142/#181).
+    # Same helper, same inputs, so the two cannot diverge. Both references
+    # time the gated loop alone, so the firmware side is the gate bracket,
+    # not the whole window around the monitor's arm and read (#299).
+    agreement = assess_run_window_clock(
+        gate_elapsed_us=terminal.gate_elapsed_us,
+        internal_mode=internal_mode,
+        gated_result=(power_run.observation.result if power_run.observation is not None else None),
+        # Internal mode's reference is `count x reference_us`; the plan
+        # describes a busy_loop window in the probe's own units (#112),
+        # so the product is the right reference there too. Withholding it
+        # would leave internal mode with no duration check (#125), and
+        # its power denominator comes from the same clock. External mode's
+        # reference is the instrument's own gate.
+        planned_inference_count=plan.inference_count,
+        planned_inference_us=plan.reference_inference_us,
+        stats_rate_hz=ctx.config.power.stats_rate_hz,
+    )
+    if agreement is not None and not agreement.agrees:
+        log.warning(
+            "Power firmware reported a %.6f s window but the %s measured "
+            "%.6f s (%.1f%% apart, tolerance %.0f%%). The firmware's "
+            "window clock and the reference disagree, so elapsed time, "
+            "average power and average current derived from it are "
+            "suspect; integrated energy and charge are not.",
+            agreement.gate_elapsed_s,
+            agreement.reference_source,
+            agreement.reference_s,
+            agreement.relative_error * 100.0,
+            agreement.relative_tolerance * 100.0,
+        )
+    if internal_mode:
+        # Plan- and hardware-independent ceiling: the host knows when it
+        # started this binary and when it collected the record, and the
+        # measured window is strictly inside that interval -- what catches
+        # gross clock inflation for a user with no external instrument.
+        ceiling = assess_window_clock_ceiling(
+            elapsed_us=terminal.elapsed_us,
+            host_envelope_s=_host_phase_envelope_s(ctx),
+        )
+        if ceiling is not None:
+            if ctx.power_result is not None:
+                # Recorded so evaluation.validity can re-derive the same
+                # verdict later; it has no "now" of its own. Also copied
+                # into summary.json (report/summary.py's power-metadata
+                # allowlist) so the envelope comparison a
+                # power.window_clock_exceeds_host_time warning refers to
+                # is visible from the summary alone, not just the
+                # validity issue's context.
+                ctx.power_result.metadata.window_clock_ceiling = ceiling
+            if ceiling.exceeded:
+                log.warning(
+                    "Power firmware reported a %.6f s window, but only "
+                    "%.6f s of host wall time elapsed between starting the "
+                    "power binary and collecting its record (%.1fx). A "
+                    "window cannot outlast the interval that contains it, "
+                    "so the firmware's window clock is wrong; integrated "
+                    "energy and charge are unaffected.",
+                    ceiling.elapsed_s,
+                    ceiling.host_envelope_s,
+                    ceiling.ratio,
+                )
+
+
 class CollectPowerTerminalStage:
     @property
     def name(self) -> str:
@@ -81,297 +406,19 @@ class CollectPowerTerminalStage:
 
         plan = ctx.power_run.plan
         clean_window_probe = ctx.config.profiling.clean_window_probe
-        if ctx.power_run.observation is not None:
-            timeout_s = max(2.0, min(10.0, ctx.power_run.observation.deadline_s / 10.0))
-        else:
-            planned_s = plan.planned_window_s
-            if planned_s is None:
-                planned_s = 5.0
-            timeout_s = max(5.0, min(30.0, planned_s * 2.0 + 5.0))
-            if (
-                internal_mode
-                and plan.planned_window_s is not None
-                and probe_runs_inferences(clean_window_probe)
-            ):
-                factor = reference_stall_factor(ctx)
-                if factor > 1.0:
-                    timeout_s = max(timeout_s, planned_s * 2.0 * factor + 5.0)
+        timeout_s = _terminal_timeout_s(ctx, ctx.power_run, internal_mode)
         ctx.report_progress("Collecting post-GATE firmware diagnostics", eta_s=timeout_s)
         collector = get_power_terminal_transport(ctx.config.target.transport)
         envelope = collector.collect(ctx, timeout_s=timeout_s)
         terminal = envelope.terminal
-
-        expected_requested = expected_terminal_requested_count(
-            inference_count=plan.inference_count,
-            clean_window_probe=clean_window_probe,
-        )
-        if expected_requested is not None and terminal.requested_count != expected_requested:
-            raise PowerError(
-                "Power terminal requested count does not match the host plan.",
-                hint=(
-                    f"Firmware reported {terminal.requested_count}, host expected "
-                    f"{expected_requested}."
-                ),
-            )
-        if terminal.status != "ok":
-            hint = None
-            if terminal.final_phase == "stimer_dead":
-                # #110's attribution on the dedicated power binary: the
-                # error_code carries the last settle probe's tick count
-                # PLUS ONE (the envelope forbids error_code 0 with
-                # status=error, and 0 ticks is the stopped-crystal
-                # signature — see #180).
-                last_ticks = max(0, terminal.error_code - 1)
-                hint = (
-                    "The 32.768 kHz crystal (XT) that clocks the "
-                    "measurement window never produced a plausible tick "
-                    "rate within the settle deadline (last probe: "
-                    f"{last_ticks} ticks per 10 ms; nominal 328; 0 means "
-                    "the counter never moved). "
-                    "This is a BOARD condition, not the debug-domain "
-                    "frozen-clock bug: check the X32 crystal and its "
-                    "jumpers/straps, and any shield or rework touching the "
-                    "XT pins. The window never opened, so no misleading "
-                    "power figures were recorded."
-                )
-            raise PowerError(
-                f"Power firmware reported error {terminal.error_code} in phase "
-                f"{terminal.final_phase} after {terminal.completed_count}/"
-                f"{terminal.requested_count} "
-                f"{count_noun(clean_window_probe, terminal.requested_count)}.",
-                hint=hint,
-            )
-        if terminal.completed_count != terminal.requested_count:
-            raise PowerError(
-                "Power firmware reported incomplete "
-                f"{'inference' if probe_runs_inferences(clean_window_probe) else 'busy-loop'} "
-                "execution.",
-                hint=(
-                    f"Completed {terminal.completed_count}/"
-                    f"{terminal.requested_count} "
-                    f"{count_noun(clean_window_probe, terminal.requested_count)}."
-                ),
-            )
-        if not terminal.gate_lowered:
-            raise PowerError("Power firmware did not confirm that GATE was lowered.")
-        frozen_window_clock = firmware_window_clock_is_frozen(
-            elapsed_us=terminal.elapsed_us,
-            completed_count=terminal.completed_count,
-        )
-        if frozen_window_clock and internal_mode:
-            # The firmware says it ran N inferences in zero time, and in
-            # internal mode the denominator is read from that same clock, so
-            # average power and current are wrong by the same factor. The measurement of record
-            # is corrupt, which is terminal here for the same reason the
-            # all-zero INA228 reading below is.
-            raise PowerError(
-                "Power firmware reported zero elapsed time for "
-                f"{terminal.completed_count} completed "
-                f"{count_noun(clean_window_probe, terminal.completed_count)}.",
-                hint=FROZEN_WINDOW_CLOCK_HINT,
-            )
-        if envelope.measurement is not None and envelope.measurement.overflow:
-            if not internal_mode:
-                # The monitor is present but is not this run's measurement of
-                # record (e.g. an INA228 left on the bus while a Joulescope
-                # measures, or with its sense inputs disconnected). Its health
-                # flags are informational — failing the run would discard a
-                # perfectly good external capture.
-                log.warning(
-                    "On-device power monitor reported accumulator overflow; "
-                    "ignoring because %s is the measurement of record.",
-                    ctx.config.power.driver,
-                )
-            else:
-                measurement = envelope.measurement
-                raise PowerError(
-                    "On-device power monitor reported accumulator overflow.",
-                    hint=(
-                        f"Monitor saw energy={measurement.energy_nj} nJ, "
-                        f"charge={measurement.charge_nc} nC, "
-                        f"bus_voltage={measurement.bus_voltage_uv} uV over "
-                        f"{measurement.duration_us} us. An implausible bus "
-                        "voltage usually means the VBUS sense input is "
-                        "floating — wire it to the target-side rail node. "
-                        "Check the 'Power firmware diagnostic' log line for "
-                        "the raw DIAG bits (0x200=MATHOF, 0x400=CHARGEOF, "
-                        "0x800=ENERGYOF)."
-                    ),
-                )
-        if internal_mode and envelope.measurement is None:
-            raise PowerError("Internal power mode requires an on-device measurement payload.")
-        if internal_mode and envelope.measurement is not None:
-            measurement = envelope.measurement
-            # Plausibility gates for the measurement of record. Both
-            # signatures pass every register-level health check (no DIAG bit,
-            # firmware status ok), so without these the run would publish a
-            # confidently wrong number.
-            if measurement.energy_nj == 0 and measurement.charge_nc == 0:
-                # A window shorter than one accumulator update, or a dead
-                # sense path, reads exactly zero while bus voltage (which
-                # needs no calibration) still looks perfect.
-                raise PowerError(
-                    "On-device power monitor measured exactly zero energy and charge.",
-                    hint=(
-                        "Either the window contained no completed accumulator "
-                        "update (averaging_count x 2 x conversion_time_us "
-                        "longer than the window) or no current flows through "
-                        "the shunt. Check the IN+/IN- sense wiring and the "
-                        "conversion/averaging settings."
-                    ),
-                )
-            # energy_nj and charge_nc are rounded to integers independently
-            # on-device, so a true charge below the 1 nC step reports as 0
-            # legitimately. Bound the energy such a charge could have carried
-            # (E = Q x V) and require an ample margin over it, so a genuinely
-            # tiny measurement is never misdiagnosed as miswiring. Real
-            # reversed wiring overshoots this by many orders of magnitude.
-            rounding_energy_nj = 0.5 * (measurement.bus_voltage_uv or 0) / 1_000_000
-            if measurement.energy_nj > 100 * rounding_energy_nj and measurement.charge_nc == 0:
-                # ENERGY integrates |power| while CHARGE is signed: reversed
-                # IN+/IN- accumulates negative charge, which the firmware
-                # clamps to zero. Substantial energy with zero charge is that
-                # miswiring's exact signature.
-                raise PowerError(
-                    "On-device power monitor reports energy but zero charge.",
-                    hint=(
-                        "This is the signature of reversed sense wiring: "
-                        "swap the INA228's IN+/IN- connections (current must "
-                        "flow IN+ -> IN-)."
-                    ),
-                )
-
+        frozen_window_clock = _check_terminal(terminal, plan, clean_window_probe, internal_mode)
+        _check_measurement(ctx, envelope, internal_mode)
         ctx.publish_power_terminal_envelope(envelope)
         if internal_mode and envelope.measurement is not None:
-            measurement = envelope.measurement
-            duration_s = measurement.duration_us / 1_000_000.0
-            energy_j = measurement.energy_nj / 1_000_000_000.0
-            average_power_w = energy_j / duration_s if duration_s > 0 else 0.0
-            average_current_a = (
-                measurement.charge_nc / 1_000_000_000.0 / duration_s
-                if measurement.charge_nc is not None and duration_s > 0
-                else 0.0
-            )
-            result = PowerResult(
-                summary=PowerSummary(
-                    avg_current_a=average_current_a,
-                    avg_power_w=average_power_w,
-                    peak_current_a=0.0,
-                    energy_j=energy_j,
-                    duration_s=duration_s,
-                    # The on-device accumulator reports totals, not a sample
-                    # stream (HPX_POWER_SAMPLE_COUNT was retired by #165), so
-                    # the host-summary sample count is honestly zero here.
-                    sample_count=0,
-                ),
-                metadata=PowerMetadata(
-                    measurement_scope=MeasurementScope.ON_DEVICE_GATED_INFERENCE,
-                    observation_mode=ObservationMode.ON_DEVICE,
-                    integrity=PowerIntegrity.VALID,
-                    source=measurement.source,
-                    inference_count=measurement.inference_count,
-                    # Artifact-level POWER_FIRMWARE lets the fingerprint gate
-                    # establish platform scope for a manifest-less
-                    # internal-mode pair (#115, #173). External mode sets it
-                    # in capture/__init__.py.
-                    power_firmware=plan.firmware_mode,
-                ),
-            )
-            # Route through the publisher so result.metadata is enriched with
-            # the observation fields (set_observation), keeping the record and
-            # the serialized metadata in agreement.
-            ctx.publish_power_observation(
-                PowerObservation(
-                    mode=ObservationMode.ON_DEVICE,
-                    result=result,
-                    gate_rise_observed=True,
-                    gate_fall_observed=True,
-                    deadline_s=duration_s,
-                    integrity=PowerIntegrity.VALID,
-                )
-            )
-        if frozen_window_clock:
-            # External mode: warn, do not raise. The instrument owns every
-            # published power number here, so a frozen firmware clock corrupts
-            # elapsed_us and nothing else; raising would throw away a good
-            # capture before any artifact exists. Same shape as the
-            # bystander-overflow path above.
-            log.warning(
-                "Power firmware reported zero elapsed time for %d completed "
-                "%s: its window clock never advanced. The %s owns this "
-                "run's power numbers and they are unaffected; only the "
-                "firmware-reported window duration is meaningless. %s",
-                terminal.completed_count,
-                count_noun(clean_window_probe, terminal.completed_count),
-                ctx.config.power.driver,
-                FROZEN_WINDOW_CLOCK_HINT,
-            )
-        # Cross-check of the firmware's window clock against an independent
-        # measurement. This stage only LOGS; evaluation.validity holds the
-        # verdict (external arm ERROR, internal arm warning -- #142/#181).
-        # Same helper, same inputs, so the two cannot diverge. Both references
-        # time the gated loop alone, so the firmware side is the gate bracket,
-        # not the whole window around the monitor's arm and read (#299).
-        agreement = assess_run_window_clock(
-            gate_elapsed_us=terminal.gate_elapsed_us,
-            internal_mode=internal_mode,
-            gated_result=(
-                ctx.power_run.observation.result if ctx.power_run.observation is not None else None
-            ),
-            # Internal mode's reference is `count x reference_us`; the plan
-            # describes a busy_loop window in the probe's own units (#112),
-            # so the product is the right reference there too. Withholding it
-            # would leave internal mode with no duration check (#125), and
-            # its power denominator comes from the same clock. External mode's
-            # reference is the instrument's own gate.
-            planned_inference_count=plan.inference_count,
-            planned_inference_us=plan.reference_inference_us,
-            stats_rate_hz=ctx.config.power.stats_rate_hz,
+            _publish_internal_result(ctx, envelope.measurement, plan)
+        _log_clock_diagnostics(
+            ctx, ctx.power_run, terminal, clean_window_probe, internal_mode, frozen_window_clock
         )
-        if agreement is not None and not agreement.agrees:
-            log.warning(
-                "Power firmware reported a %.6f s window but the %s measured "
-                "%.6f s (%.1f%% apart, tolerance %.0f%%). The firmware's "
-                "window clock and the reference disagree, so elapsed time, "
-                "average power and average current derived from it are "
-                "suspect; integrated energy and charge are not.",
-                agreement.gate_elapsed_s,
-                agreement.reference_source,
-                agreement.reference_s,
-                agreement.relative_error * 100.0,
-                agreement.relative_tolerance * 100.0,
-            )
-        if internal_mode:
-            # Plan- and hardware-independent ceiling: the host knows when it
-            # started this binary and when it collected the record, and the
-            # measured window is strictly inside that interval -- what catches
-            # gross clock inflation for a user with no external instrument.
-            ceiling = assess_window_clock_ceiling(
-                elapsed_us=terminal.elapsed_us,
-                host_envelope_s=_host_phase_envelope_s(ctx),
-            )
-            if ceiling is not None:
-                if ctx.power_result is not None:
-                    # Recorded so evaluation.validity can re-derive the same
-                    # verdict later; it has no "now" of its own. Also copied
-                    # into summary.json (report/summary.py's power-metadata
-                    # allowlist) so the envelope comparison a
-                    # power.window_clock_exceeds_host_time warning refers to
-                    # is visible from the summary alone, not just the
-                    # validity issue's context.
-                    ctx.power_result.metadata.window_clock_ceiling = ceiling
-                if ceiling.exceeded:
-                    log.warning(
-                        "Power firmware reported a %.6f s window, but only "
-                        "%.6f s of host wall time elapsed between starting the "
-                        "power binary and collecting its record (%.1fx). A "
-                        "window cannot outlast the interval that contains it, "
-                        "so the firmware's window clock is wrong; integrated "
-                        "energy and charge are unaffected.",
-                        ceiling.elapsed_s,
-                        ceiling.host_envelope_s,
-                        ceiling.ratio,
-                    )
         log.info(
             "Power terminal: status=%s count=%d elapsed_us=%s gate_elapsed_us=%s phase=%s",
             terminal.status,
