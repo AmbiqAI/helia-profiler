@@ -7,7 +7,7 @@
   "language": "python",
   "modules": [
     {
-      "description": "Shared identity vocabulary: the identity of a captured run and the build, run, energy, runtime and kernel facts it names, canonical engine and kernel names with today's spellings as aliases, and unknown facts that carry their reason.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.",
+      "description": "Shared identity vocabulary: the identity of a captured run and the build, run, energy, runtime and kernel facts it names, canonical engine and kernel names with today's spellings as aliases, unknown facts that carry their reason, and the semantic hashes that name their kind and basis version.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.",
       "name": "identity",
       "path": "helia_profiler.identity",
       "submodules": [],
@@ -185,6 +185,126 @@
             "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L33"
           },
           "summary": "A kernel library, by its shared name."
+        },
+        {
+          "description": "`dataclass`\n\nA hash that names its producer, its kind and its basis version.\n\nThe text form is ``<producer>.<kind>/<version>:sha256:<hex>``: producer\nand kind are lowercase words joined by ``-``, the version a positive\ninteger, and the hex 64 lowercase digits. heliaPROFILER's hashes have\nthe producer ``hpx`` and the kinds ``intent``, ``build``,\n``observation`` and ``binding``; :meth:`parse` reads any producer's.\nCompare two hashes only when their producer, kind and version match.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.SemanticHash",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.SemanticHash.producer",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "producer",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "producer: str",
+              "source": {
+                "line": 55,
+                "path": "src/helia_profiler/_semantic_hash.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_semantic_hash.py#L55"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.SemanticHash.kind",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "kind",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "kind: str",
+              "source": {
+                "line": 56,
+                "path": "src/helia_profiler/_semantic_hash.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_semantic_hash.py#L56"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.SemanticHash.version",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "version",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "version: int",
+              "source": {
+                "line": 57,
+                "path": "src/helia_profiler/_semantic_hash.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_semantic_hash.py#L57"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.SemanticHash.hex",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "hex",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "hex: str",
+              "source": {
+                "line": 58,
+                "path": "src/helia_profiler/_semantic_hash.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_semantic_hash.py#L58"
+              },
+              "summary": ""
+            },
+            {
+              "description": "`classmethod`\n\nRead *text*, refusing anything not in the semantic hash form.",
+              "examples": [],
+              "id": "helia_profiler.SemanticHash.parse",
+              "kind": "method",
+              "language": "python",
+              "members": [],
+              "name": "parse",
+              "params": [],
+              "raises": [
+                {
+                  "description": "*text* is not ``<producer>.<kind>/<version>:sha256:<hex>``,\nfor example bare hex, uppercase hex or a missing version.",
+                  "type": "ValueError"
+                }
+              ],
+              "returns": [],
+              "signature": "parse(text: str) -> SemanticHash",
+              "source": {
+                "line": 68,
+                "path": "src/helia_profiler/_semantic_hash.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_semantic_hash.py#L68"
+              },
+              "summary": "Read text, refusing anything not in the semantic hash form."
+            }
+          ],
+          "name": "SemanticHash",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "SemanticHash(producer: str, kind: str, version: int, hex: str) -> None",
+          "source": {
+            "line": 43,
+            "path": "src/helia_profiler/_semantic_hash.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_semantic_hash.py#L43"
+          },
+          "summary": "A hash that names its producer, its kind and its basis version."
         },
         {
           "description": "`dataclass`\n\nA fact that could not be determined, with the reason.\n\n**API tier:** `experimental`",
@@ -953,7 +1073,7 @@
           "summary": "How the model was run: state handling, invocation counts, the timed span and its clock."
         },
         {
-          "description": "`dataclass`\n\nEverything a comparison needs to know about what ran.\n\n``build_hash`` covers the flashed image, the dependency lock, the linked\nruntime archive and the model, and never the HPX release (``producer``),\nso it changes only when what runs changes. ``observation_hash`` covers a\ncapture's measured facts, so the same firmware measured twice gives two.\n``intent_hash`` is the :attr:`~helia_profiler.FrozenRun.intent_hash` of\nthe plan a run was built from, and ``None`` for a run built without one.\n\n**API tier:** `experimental`",
+          "description": "`dataclass`\n\nEverything a comparison needs to know about what ran.\n\n``build_hash`` covers the flashed image, the dependency lock, the linked\nruntime archive and the model, and never the HPX release (``producer``),\nso it changes only when what runs changes. ``observation_hash`` covers a\ncapture's measured facts, so the same firmware measured twice gives two.\n``intent_hash`` is the :attr:`~helia_profiler.FrozenRun.intent_hash` of\nthe plan a run was built from, and ``None`` for a run built without one.\nThe three are :class:`~helia_profiler.SemanticHash` strings of the kinds\n``hpx.build``, ``hpx.observation`` and ``hpx.intent``; the ``*_sha256``\nfacts are bare hex digests of file bytes.\n\n**API tier:** `experimental`",
           "examples": [],
           "id": "helia_profiler.RunIdentity",
           "kind": "class",
@@ -972,9 +1092,9 @@
               "returns": [],
               "signature": "runtime: RuntimeIdentity",
               "source": {
-                "line": 211,
+                "line": 214,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L211"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L214"
               },
               "summary": ""
             },
@@ -991,9 +1111,9 @@
               "returns": [],
               "signature": "kernels: KernelIdentity",
               "source": {
-                "line": 212,
+                "line": 215,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L212"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L215"
               },
               "summary": ""
             },
@@ -1010,9 +1130,9 @@
               "returns": [],
               "signature": "prepared_archive_sha256: str | None",
               "source": {
-                "line": 213,
+                "line": 216,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L213"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L216"
               },
               "summary": ""
             },
@@ -1029,9 +1149,9 @@
               "returns": [],
               "signature": "build: BuildFacts",
               "source": {
-                "line": 214,
+                "line": 217,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L214"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L217"
               },
               "summary": ""
             },
@@ -1048,9 +1168,9 @@
               "returns": [],
               "signature": "baseline_id: str | Unknown",
               "source": {
-                "line": 215,
+                "line": 218,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L215"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L218"
               },
               "summary": ""
             },
@@ -1067,9 +1187,9 @@
               "returns": [],
               "signature": "dependency_lock_sha256: str | Unknown",
               "source": {
-                "line": 216,
+                "line": 219,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L216"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L219"
               },
               "summary": ""
             },
@@ -1086,9 +1206,9 @@
               "returns": [],
               "signature": "model_sha256: str | Unknown",
               "source": {
-                "line": 217,
+                "line": 220,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L217"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L220"
               },
               "summary": ""
             },
@@ -1105,9 +1225,9 @@
               "returns": [],
               "signature": "inputs_sha256: str | Unknown",
               "source": {
-                "line": 218,
+                "line": 221,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L218"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L221"
               },
               "summary": ""
             },
@@ -1124,9 +1244,9 @@
               "returns": [],
               "signature": "run: RunFacts",
               "source": {
-                "line": 219,
+                "line": 222,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L219"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L222"
               },
               "summary": ""
             },
@@ -1143,9 +1263,9 @@
               "returns": [],
               "signature": "producer: str | Unknown",
               "source": {
-                "line": 220,
+                "line": 223,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L220"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L223"
               },
               "summary": ""
             },
@@ -1162,9 +1282,9 @@
               "returns": [],
               "signature": "build_hash: str | Unknown",
               "source": {
-                "line": 221,
+                "line": 224,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L221"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L224"
               },
               "summary": ""
             },
@@ -1181,9 +1301,9 @@
               "returns": [],
               "signature": "observation_hash: str | None = None",
               "source": {
-                "line": 222,
+                "line": 225,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L222"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L225"
               },
               "summary": ""
             },
@@ -1200,9 +1320,9 @@
               "returns": [],
               "signature": "intent_hash: str | None = None",
               "source": {
-                "line": 223,
+                "line": 226,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L223"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L226"
               },
               "summary": ""
             },
@@ -1219,9 +1339,9 @@
               "returns": [],
               "signature": "to_dict() -> dict[str, Any]",
               "source": {
-                "line": 225,
+                "line": 228,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L225"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L228"
               },
               "summary": "JSON-ready form; an unknown fact becomes {\"unknown\": reason}."
             }

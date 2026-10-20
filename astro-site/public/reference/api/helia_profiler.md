@@ -92,6 +92,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 | [CanonicalEngine](/helia-profiler/reference/api/helia_profiler/identity/#helia_profiler.CanonicalEngine) | `helia_profiler.CanonicalEngine` |
 | [CanonicalKernel](/helia-profiler/reference/api/helia_profiler/identity/#helia_profiler.CanonicalKernel) | `helia_profiler.CanonicalKernel` |
 | [Unknown](/helia-profiler/reference/api/helia_profiler/identity/#helia_profiler.Unknown) | `helia_profiler.Unknown` |
+| [SemanticHash](/helia-profiler/reference/api/helia_profiler/identity/#helia_profiler.SemanticHash) | `helia_profiler.SemanticHash` |
 | [canonical_engine](/helia-profiler/reference/api/helia_profiler/identity/#helia_profiler.canonical_engine) | `helia_profiler.canonical_engine` |
 | [canonical_kernel](/helia-profiler/reference/api/helia_profiler/identity/#helia_profiler.canonical_kernel) | `helia_profiler.canonical_kernel` |
 | [PowerConfig](/helia-profiler/reference/api/helia_profiler/config/power/#helia_profiler.PowerConfig) | `helia_profiler.PowerConfig` |

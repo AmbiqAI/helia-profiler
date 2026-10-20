@@ -1,6 +1,6 @@
 # helia_profiler.identity
 
-Shared identity vocabulary: the identity of a captured run and the build, run, energy, runtime and kernel facts it names, canonical engine and kernel names with today's spellings as aliases, and unknown facts that carry their reason.
+Shared identity vocabulary: the identity of a captured run and the build, run, energy, runtime and kernel facts it names, canonical engine and kernel names with today's spellings as aliases, unknown facts that carry their reason, and the semantic hashes that name their kind and basis version.
 
 Every name on this page is imported from `helia_profiler`.
 
@@ -108,6 +108,89 @@ HELIA_CORE = 'helia-core'
 ```
 
 Source: `src/helia_profiler/identity.py:42`
+
+## helia_profiler.SemanticHash
+
+`class` · `python`
+
+```python
+SemanticHash(producer: str, kind: str, version: int, hex: str) -> None
+```
+
+`dataclass`
+
+A hash that names its producer, its kind and its basis version.
+
+The text form is ``<producer>.<kind>/<version>:sha256:<hex>``: producer
+and kind are lowercase words joined by ``-``, the version a positive
+integer, and the hex 64 lowercase digits. heliaPROFILER's hashes have
+the producer ``hpx`` and the kinds ``intent``, ``build``,
+``observation`` and ``binding``; :meth:`parse` reads any producer's.
+Compare two hashes only when their producer, kind and version match.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/_semantic_hash.py:43`
+
+### helia_profiler.SemanticHash.producer
+
+`attribute` · `python`
+
+```python
+producer: str
+```
+
+Source: `src/helia_profiler/_semantic_hash.py:55`
+
+### helia_profiler.SemanticHash.kind
+
+`attribute` · `python`
+
+```python
+kind: str
+```
+
+Source: `src/helia_profiler/_semantic_hash.py:56`
+
+### helia_profiler.SemanticHash.version
+
+`attribute` · `python`
+
+```python
+version: int
+```
+
+Source: `src/helia_profiler/_semantic_hash.py:57`
+
+### helia_profiler.SemanticHash.hex
+
+`attribute` · `python`
+
+```python
+hex: str
+```
+
+Source: `src/helia_profiler/_semantic_hash.py:58`
+
+### helia_profiler.SemanticHash.parse
+
+`method` · `python`
+
+```python
+parse(text: str) -> SemanticHash
+```
+
+`classmethod`
+
+Read *text*, refusing anything not in the semantic hash form.
+
+**Raises**
+
+| Name | Description |
+| --- | --- |
+| ValueError | *text* is not ``<producer>.<kind>/<version>:sha256:<hex>``, for example bare hex, uppercase hex or a missing version. |
+
+Source: `src/helia_profiler/_semantic_hash.py:68`
 
 ## helia_profiler.Unknown
 
@@ -644,6 +727,9 @@ so it changes only when what runs changes. ``observation_hash`` covers a
 capture's measured facts, so the same firmware measured twice gives two.
 ``intent_hash`` is the :attr:`~helia_profiler.FrozenRun.intent_hash` of
 the plan a run was built from, and ``None`` for a run built without one.
+The three are :class:`~helia_profiler.SemanticHash` strings of the kinds
+``hpx.build``, ``hpx.observation`` and ``hpx.intent``; the ``*_sha256``
+facts are bare hex digests of file bytes.
 
 **API tier:** `experimental`
 
@@ -657,7 +743,7 @@ Source: `src/helia_profiler/identity.py:199`
 runtime: RuntimeIdentity
 ```
 
-Source: `src/helia_profiler/identity.py:211`
+Source: `src/helia_profiler/identity.py:214`
 
 ### helia_profiler.RunIdentity.kernels
 
@@ -667,7 +753,7 @@ Source: `src/helia_profiler/identity.py:211`
 kernels: KernelIdentity
 ```
 
-Source: `src/helia_profiler/identity.py:212`
+Source: `src/helia_profiler/identity.py:215`
 
 ### helia_profiler.RunIdentity.prepared_archive_sha256
 
@@ -677,7 +763,7 @@ Source: `src/helia_profiler/identity.py:212`
 prepared_archive_sha256: str | None
 ```
 
-Source: `src/helia_profiler/identity.py:213`
+Source: `src/helia_profiler/identity.py:216`
 
 ### helia_profiler.RunIdentity.build
 
@@ -687,7 +773,7 @@ Source: `src/helia_profiler/identity.py:213`
 build: BuildFacts
 ```
 
-Source: `src/helia_profiler/identity.py:214`
+Source: `src/helia_profiler/identity.py:217`
 
 ### helia_profiler.RunIdentity.baseline_id
 
@@ -697,7 +783,7 @@ Source: `src/helia_profiler/identity.py:214`
 baseline_id: str | Unknown
 ```
 
-Source: `src/helia_profiler/identity.py:215`
+Source: `src/helia_profiler/identity.py:218`
 
 ### helia_profiler.RunIdentity.dependency_lock_sha256
 
@@ -707,7 +793,7 @@ Source: `src/helia_profiler/identity.py:215`
 dependency_lock_sha256: str | Unknown
 ```
 
-Source: `src/helia_profiler/identity.py:216`
+Source: `src/helia_profiler/identity.py:219`
 
 ### helia_profiler.RunIdentity.model_sha256
 
@@ -717,7 +803,7 @@ Source: `src/helia_profiler/identity.py:216`
 model_sha256: str | Unknown
 ```
 
-Source: `src/helia_profiler/identity.py:217`
+Source: `src/helia_profiler/identity.py:220`
 
 ### helia_profiler.RunIdentity.inputs_sha256
 
@@ -727,7 +813,7 @@ Source: `src/helia_profiler/identity.py:217`
 inputs_sha256: str | Unknown
 ```
 
-Source: `src/helia_profiler/identity.py:218`
+Source: `src/helia_profiler/identity.py:221`
 
 ### helia_profiler.RunIdentity.run
 
@@ -737,7 +823,7 @@ Source: `src/helia_profiler/identity.py:218`
 run: RunFacts
 ```
 
-Source: `src/helia_profiler/identity.py:219`
+Source: `src/helia_profiler/identity.py:222`
 
 ### helia_profiler.RunIdentity.producer
 
@@ -747,7 +833,7 @@ Source: `src/helia_profiler/identity.py:219`
 producer: str | Unknown
 ```
 
-Source: `src/helia_profiler/identity.py:220`
+Source: `src/helia_profiler/identity.py:223`
 
 ### helia_profiler.RunIdentity.build_hash
 
@@ -757,7 +843,7 @@ Source: `src/helia_profiler/identity.py:220`
 build_hash: str | Unknown
 ```
 
-Source: `src/helia_profiler/identity.py:221`
+Source: `src/helia_profiler/identity.py:224`
 
 ### helia_profiler.RunIdentity.observation_hash
 
@@ -767,7 +853,7 @@ Source: `src/helia_profiler/identity.py:221`
 observation_hash: str | None = None
 ```
 
-Source: `src/helia_profiler/identity.py:222`
+Source: `src/helia_profiler/identity.py:225`
 
 ### helia_profiler.RunIdentity.intent_hash
 
@@ -777,7 +863,7 @@ Source: `src/helia_profiler/identity.py:222`
 intent_hash: str | None = None
 ```
 
-Source: `src/helia_profiler/identity.py:223`
+Source: `src/helia_profiler/identity.py:226`
 
 ### helia_profiler.RunIdentity.to_dict
 
@@ -789,4 +875,4 @@ to_dict() -> dict[str, Any]
 
 JSON-ready form; an unknown fact becomes ``{"unknown": reason}``.
 
-Source: `src/helia_profiler/identity.py:225`
+Source: `src/helia_profiler/identity.py:228`
