@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.metadata
 import json
 import shutil
 from collections.abc import Callable
@@ -32,9 +33,10 @@ from helia_profiler.fixture import (
     FixtureRailPowerRequest,
     FixtureTiming,
 )
+from helia_profiler.identity import CanonicalEngine, RuntimeIdentity
 from helia_profiler.lifecycle import Lifecycle
 from helia_profiler.records import ResultReadError
-from helia_profiler.run_record import RunRecord, RunResultError, _identity
+from helia_profiler.run_record import RunResultError, RunResultRecord, _identity
 from tests.run_api_helpers import ATFE_OUTPUT, atfe_build, compiled, plan_for
 from tests.test_run_power import _energy, _powered, _rail
 from tests.unit.test_fixture_record import _build, _pin
@@ -158,7 +160,7 @@ def test_a_saved_run_loads_back_as_it_was(root, record):
 
     loaded = hpx.load_run(path, roots=_roots(root))
 
-    assert isinstance(loaded, RunRecord) and loaded.path == path.resolve()
+    assert isinstance(loaded, RunResultRecord) and loaded.path == path.resolve()
     assert loaded.result == result
     assert loaded.result.verification is not None and loaded.result.verification.matched
     assert loaded.document["location"] == {"root": "run", "path": "evidence-1/result.json"}
@@ -175,7 +177,7 @@ def test_a_run_directory_moves_as_a_unit(tmp_path, root, record):
     loaded = hpx.load_run(moved / "evidence-1" / "result.json", roots=_roots(moved))
 
     assert loaded.result.capture.outputs[0].path.is_relative_to(moved.resolve())
-    assert isinstance(load_result(moved / "evidence-1"), RunRecord)
+    assert isinstance(load_result(moved / "evidence-1"), RunResultRecord)
     with pytest.raises(RunResultError, match="records itself") as refused:
         hpx.load_run(moved / "evidence-1" / "result.json", roots=_roots(tmp_path))
     assert refused.value.code == "invalid_path"
@@ -186,7 +188,7 @@ def test_load_result_reads_a_run_result_by_its_schema(root, record):
 
     by_file, by_directory = load_result(path), load_result(path.parent)
 
-    assert isinstance(by_file, RunRecord) and isinstance(by_directory, RunRecord)
+    assert isinstance(by_file, RunResultRecord) and isinstance(by_directory, RunResultRecord)
     assert by_file.sha256 == by_directory.sha256
     assert inspect_result(path).result == by_file
 
@@ -247,8 +249,8 @@ def _nested(data: dict[str, Any]) -> None:
 @pytest.mark.parametrize(
     "edit,code,message",
     [
-        (_bump, "identity_mismatch", "observation_hash differ"),
-        (_rehash, "identity_mismatch", "observation_hash differ"),
+        (_bump, "identity_mismatch", "differs in observation_hash"),
+        (_rehash, "identity_mismatch", "differs in observation_hash"),
         (_unmatch, "identity_mismatch", "output comparison does not recompute"),
         (_schema, "unsupported_schema", None),
         (_version, "unsupported_schema", None),
@@ -307,6 +309,10 @@ def _build_edited(root: Path) -> None:
         stream.write("\n")
 
 
+def _terminal(root: Path) -> None:
+    (root / "evidence-1" / "identity.json").write_text("{}\n\n", encoding="utf-8")
+
+
 @pytest.mark.parametrize(
     "damage,message",
     [
@@ -314,6 +320,7 @@ def _build_edited(root: Path) -> None:
         (_changed, "is not the file it recorded"),
         (_reference, "reference output"),
         (_build_edited, "compiled build"),
+        (_terminal, "identity.json"),
     ],
 )
 def test_a_missing_or_changed_file_is_refused(root, record, damage, message):
@@ -345,7 +352,7 @@ def test_save_refuses_a_run_that_does_not_recompute(tmp_path, root, record):
     result = _run(record)
     target = root / "evidence-1" / "result.json"
 
-    with pytest.raises(ConfigError, match="observation_hash differ"):
+    with pytest.raises(ConfigError, match="differs in observation_hash"):
         replace(result, identity=record.identity).save(
             target, roots=_roots(root), build=root / "build.json"
         )
@@ -387,7 +394,7 @@ def test_save_refuses_a_path_under_no_root(tmp_path, root, record):
 def test_a_timing_only_run_maps_latency_memory_and_states_no_energy(root, record):
     path = _save(_run(record))
     loaded = load_result(path)
-    assert isinstance(loaded, RunRecord)
+    assert isinstance(loaded, RunResultRecord)
 
     view = observations(loaded)
 
@@ -485,26 +492,64 @@ def test_an_unknown_engine_version_stays_null_with_its_reason(root, record):
     assert extension["engine_version_unavailable_reason"] == "the record states no runtime source"
 
 
-@pytest.mark.parametrize(
-    "engine,basis", [("helia-aot", "aot_provider_release"), ("litert", "linked_runtime_release")]
-)
-def test_the_engine_version_states_its_basis(tmp_path, engine, basis):
-    from tests.test_compiled_build_runtime import _linked
+def _linked_record(tmp_path: Path, engine: str) -> tuple[RunResultRecord, str]:
+    """A loaded run of an *engine* build, and the release its engine version must come from."""
+    from tests.test_compiled_build_runtime import LITERT, _linked
 
     plan, build = _linked(tmp_path, engine)
-    record = _saved(compiled(plan, build, Lifecycle.CARRY))
-    loaded = load_result(_save(_run(record, verified=False)))
+    loaded = load_result(
+        _save(_run(_saved(compiled(plan, build, Lifecycle.CARRY)), verified=False))
+    )
+    assert isinstance(loaded, RunResultRecord) and plan.runtime is not None
+    if engine == "helia-aot":
+        # The heliaAOT release that generated the module, as the build recorded it.
+        assert build.engine_source is not None
+        origin = build.engine_source.version
+        assert origin == importlib.metadata.version("helia-aot")
+    elif engine == "litert":
+        origin = LITERT.version
+    else:
+        origin = plan.runtime.version
+    assert origin is not None
+    return loaded, origin
+
+
+def _executorch_record(tmp_path: Path, engine: str) -> tuple[RunResultRecord, str]:
+    """A run whose identity is an ExecuTorch one; no ExecuTorch fixture build is needed to map it."""
+    root = tmp_path / "run"
+    build = atfe_build(_build(root))
+    record = _saved(compiled(plan_for(build, tmp_path / "model.tflite"), build, Lifecycle.CARRY))
+    loaded = load_result(_save(_run(record)))
+    assert isinstance(loaded, RunResultRecord)
+    identity = loaded.result.identity
+    runtime = RuntimeIdentity(
+        CanonicalEngine.EXECUTORCH, "https://example.invalid/et", "1.0.1", "abc"
+    )
+    result = replace(loaded.result, identity=replace(identity, runtime=runtime))
+    return replace(loaded, result=result), "1.0.1"
+
+
+@pytest.mark.parametrize(
+    "engine,basis,make",
+    [
+        ("helia-aot", "aot_provider_release", _linked_record),
+        ("helia-rt", "linked_runtime_release", _linked_record),
+        ("litert", "linked_runtime_release", _linked_record),
+        ("executorch", "linked_runtime_release", _executorch_record),
+    ],
+)
+def test_the_engine_version_states_its_basis(tmp_path, engine, basis, make):
+    if engine == "helia-aot":
+        pytest.importorskip("helia_aot")
+    loaded, origin = make(tmp_path, engine)
 
     view = observations(loaded)
 
     _validate(view)
-    assert isinstance(loaded, RunRecord)
-    version = loaded.result.identity.runtime.version
-    assert isinstance(version, str) and view["engine"] == {"name": engine, "version": version}
+    assert view["engine"] == {"name": engine, "version": origin}
     extension = view["extensions"]["helia-profiler"]
     assert extension["engine_version_basis"] == basis
     assert extension["engine_version_unavailable_reason"] is None
-    assert extension["output_comparison"] is None
 
 
 def test_results_show_and_export_work_for_a_run(tmp_path, root, record):
@@ -521,3 +566,174 @@ def test_results_show_and_export_work_for_a_run(tmp_path, root, record):
     assert json.loads((tmp_path / "v.json").read_bytes()) == view
     with pytest.raises(FileExistsError):
         export_result(load_result(path), tmp_path / "v.json")
+
+
+# -- review round: power, writer, unknowns, runtime, codes -------------------------
+
+
+def test_the_checks_name_the_output_comparison_only_when_outputs_were_compared(root, record):
+    compared = observations(load_result(_save(_run(record))))["verification"]
+    path = _save(_run(record, verified=False))
+    uncompared = observations(load_result(path))["verification"]
+
+    assert "output-comparison-recomputed" in compared["checks"]
+    assert "Outputs were not compared with a reference." not in compared["limitations"]
+    assert "output-comparison-recomputed" not in uncompared["checks"]
+    assert "Outputs were not compared with a reference." in uncompared["limitations"]
+    failed = observations(load_result(_save(_run(record, state="failure"))))["verification"]
+    assert "output-comparison-recomputed" not in failed["checks"]
+
+
+def test_save_refuses_a_rail_request_for_a_build_without_wiring(root, record):
+    target = root / "evidence-1" / "result.json"
+
+    with pytest.raises(ConfigError, match="rail power request; its build has no power wiring"):
+        _run(record, power=_rail()).save(target, roots=_roots(root), build=root / "build.json")
+    assert not target.exists()
+
+
+@pytest.mark.parametrize(
+    "power,message", [(_SUPPLY, "supply-only"), (None, "states no power request")]
+)
+def test_save_refuses_a_power_build_run_without_its_rail_request(root, build_power, power, message):
+    target = root / "evidence-1" / "result.json"
+
+    with pytest.raises(ConfigError, match=message):
+        _run(build_power, power=power).save(target, roots=_roots(root), build=root / "build.json")
+    assert not target.exists()
+
+
+def test_load_refuses_a_power_request_the_build_cannot_take(root, build_power):
+    path = _save(_run(build_power, power=_rail(), energy=_energy(root / "evidence-1")))
+    _edit(path, lambda data: data.update(power=None))
+
+    with pytest.raises(RunResultError, match="states no power request") as refused:
+        hpx.load_run(path, roots=_roots(root))
+    assert refused.value.code == "invalid_evidence"
+
+
+def test_a_tampered_rail_trace_is_refused(root, build_power):
+    path = _save(_run(build_power, power=_rail(), energy=_energy(root / "evidence-1")))
+    (root / "evidence-1" / "rail-power.json").write_bytes(b"[]")
+
+    with pytest.raises(ResultReadError) as read:
+        load_result(path)
+    assert read.value.code == "artifact_changed" and "rail-power.json" in str(read.value)
+
+
+def test_the_result_records_the_hpx_that_wrote_it(root, record):
+    loaded = load_result(_save(_run(record)))
+    assert isinstance(loaded, RunResultRecord)
+
+    view = observations(loaded)
+
+    assert loaded.hpx_version == hpx.__version__ == loaded.document["hpx_version"]
+    assert view["producer"]["version"] == hpx.__version__
+    producer = loaded.result.identity.producer
+    assert view["extensions"]["helia-profiler"]["build_producer"] == (
+        producer if isinstance(producer, str) else {"unknown": producer.reason}
+    )
+
+
+def test_an_unknown_fact_matches_whatever_its_reason(root, record):
+    path = _save(_run(record))
+    _edit(path, lambda data: data["identity"].update(baseline_id={"unknown": "reworded"}))
+
+    assert hpx.load_run(path, roots=_roots(root)).result.succeeded
+    _edit(path, lambda data: data["identity"].update(baseline_id="b" * 8))
+    with pytest.raises(RunResultError, match="differs in baseline_id") as refused:
+        hpx.load_run(path, roots=_roots(root))
+    assert refused.value.code == "identity_mismatch"
+
+
+def test_a_missing_prepared_runtime_is_named_with_its_prepare_command(tmp_path, root):
+    from tests.run_api_helpers import linking
+    from tests.test_compiled_build_runtime import LITERT
+
+    assert LITERT.kernels is not None
+    cache = hpx.hpx_cache_root()
+    build = linking(
+        atfe_build(_build(root)), cache, "litert", LITERT.source.commit, LITERT.kernels.commit
+    )
+    record = compiled(
+        plan_for(build, tmp_path / "m.tflite", engine="litert"), build, Lifecycle.CARRY
+    )
+    roots = {"run": root, "cache": cache}
+    record.save(root / "build.json", roots=roots)
+    capture = _capture(record.build, root / "evidence-1")
+    path = RunResult(record, capture, _identity(record, capture, None), None).save(
+        root / "evidence-1" / "result.json", roots=roots, build=root / "build.json"
+    )
+    shutil.rmtree(cache)
+
+    with pytest.raises(RunResultError) as refused:
+        hpx.load_run(path, roots=roots)
+    assert refused.value.code == "runtime_missing"
+    assert f"hpx runtimes prepare litert {LITERT.version}" in str(refused.value)
+    with pytest.raises(ResultReadError) as read:
+        load_result(path)
+    assert read.value.code == "runtime_missing"
+
+
+@pytest.mark.parametrize("roots", [{}, {"run": "not a Path"}])
+def test_load_run_refuses_unusable_roots_with_a_code(root, record, roots):
+    path = _save(_run(record))
+
+    with pytest.raises(RunResultError) as refused:
+        hpx.load_run(path, roots=roots)
+    assert refused.value.code == "invalid_path"
+
+
+def test_hpx_exports_the_run_result_error():
+    assert hpx.RunResultError is RunResultError and issubclass(RunResultError, ConfigError)
+
+
+def test_the_workload_is_named_by_its_pinned_model_file(root, record):
+    loaded = load_result(_save(_run(record)))
+    assert isinstance(loaded, RunResultRecord)
+    plan = loaded.result.compiled.plan
+    windows = replace(plan, model=replace(plan.model, path="C:\\models\\other.tflite"))
+    moved = replace(loaded.result, compiled=replace(loaded.result.compiled, plan=windows))
+
+    view = observations(replace(loaded, result=moved))
+
+    assert view["workload"]["name"] == "model.tflite"
+
+
+def test_a_result_that_is_not_json_is_refused(root, record):
+    path = _save(_run(record))
+    path.write_text("{not json", encoding="utf-8")
+
+    with pytest.raises(RunResultError) as refused:
+        hpx.load_run(path, roots=_roots(root))
+    assert refused.value.code == "invalid_json"
+    with pytest.raises(ResultReadError) as read:
+        load_result(path)
+    assert read.value.code == "invalid_json"
+
+
+def test_a_result_that_changes_while_it_is_read_is_refused(root, record, monkeypatch):
+    from helia_profiler import records
+
+    path = _save(_run(record))
+    real = records.read_run
+
+    def read_then_change(location, raw):
+        loaded = real(location, raw)
+        location.write_bytes(raw + b"\n")
+        return loaded
+
+    monkeypatch.setattr(records, "read_run", read_then_change)
+    with pytest.raises(ResultReadError) as read:
+        load_result(path)
+    assert read.value.code == "publication_changed"
+
+
+def test_a_directory_with_a_run_result_and_a_profile_manifest_is_refused(root, record):
+    path = _save(_run(record))
+    (path.parent / "result_manifest.json").write_text("{}", encoding="utf-8")
+
+    with pytest.raises(ResultReadError) as read:
+        load_result(path.parent)
+    assert read.value.code == "ambiguous_location"
+    assert isinstance(load_result(path), RunResultRecord)

@@ -599,15 +599,18 @@ for a `success` capture. A failed capture is returned, not raised; errors raised
 capturing propagate. A very short `SINGLE` invocation can hit the one-tick floor described
 under [Timing windows by route](#timing-windows-by-route).
 `RunResult.save(path, roots=..., build=...)` (`run_record.py`) writes the run as a
-`hpx.run-result` v1 and `load_run(path, roots=...)` reads it back as a `RunRecord`. Save
+`hpx.run-result` v1 and `load_run(path, roots=...)` reads it back as a `RunResultRecord`. Save
 refuses a run whose identity or verification does not recompute from its build and capture,
 so a saved result always loads. The document pins the saved `build.json` and every
 `FixtureFile` the capture references by sha256 and size, writes the reference outputs beside
 it as `<stem>.reference_<index>.bin`, and records its own location so `api.load_result` can
 recover the root without being told. Loading recomputes the identity with the same
 `_identity` path `CompiledBuild.run` uses and the comparison with `compare_outputs`, so
-neither is trusted from the file; started.json and receipt.json are not pinned, since the
-capture does not reference them. `_run_view.py` maps a `RunRecord` as `hpx-run-1`.
+neither is trusted from the file. Unknown identity facts compare as unknown whatever their
+reason, so rewording a reason does not invalidate saved results; a reworded value does. Both
+save and load refuse a power request the build's wiring rules out, as `CompiledBuild.run`
+does. Free text such as the capture's error is recorded, not verified. started.json and
+receipt.json are not pinned, since the capture does not reference them. `_run_view.py` maps a `RunResultRecord` as `hpx-run-1`.
 `examples/run_api_conformance.py` walks freeze, build, save, load and run on a
 typed fixture and prints the identity, verification facts and key measurements.
 Its plan states what a fixture build requires (ATfE, the `lp` clock, an SRAM

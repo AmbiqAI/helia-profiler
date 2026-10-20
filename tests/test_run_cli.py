@@ -623,7 +623,7 @@ def test_run_captures_under_the_operator_guard(out, plan, build, monkeypatch):
     assert report["result"] == str(out / "evidence-1" / "result.json")
     saved = hpx.load_run(report["result"], roots=run_roots(out))
     assert saved.result.identity.to_dict() == report["identity"]
-    assert isinstance(load_result(out / "evidence-1"), hpx.RunRecord)
+    assert isinstance(load_result(out / "evidence-1"), hpx.RunResultRecord)
 
 
 def test_run_saves_a_failed_capture_and_exits_1(out, plan, build, monkeypatch):
@@ -638,6 +638,25 @@ def test_run_saves_a_failed_capture_and_exits_1(out, plan, build, monkeypatch):
     assert result.exit_code == 1, result.output
     saved = hpx.load_run(out / "evidence-1" / "result.json", roots=run_roots(out))
     assert not saved.result.succeeded and json.loads(result.stdout)["succeeded"] is False
+
+
+def test_a_result_that_cannot_be_saved_names_the_intact_evidence(out, plan, build, monkeypatch):
+    _saved(out, plan, build)
+    monkeypatch.setattr(
+        "helia_profiler.fixture_capture.capture_fixture",
+        lambda request, *, guard: _capture(build),
+    )
+
+    def refuse(result, path, **options):
+        raise hpx.ConfigError("Cannot save the run result: disk full")
+
+    monkeypatch.setattr("helia_profiler.run_record.save_run", refuse)
+    result = _invoke("run", out, "--board", BOARD, "--jlink-serial", SERIAL, "--expect", "none")
+
+    assert result.exit_code == 1
+    message = _plain(result.output)
+    assert "result was not saved: Cannot save the run result: disk full" in message
+    assert f"evidence directory {out / 'evidence-1'} is intact" in message
 
 
 def test_run_refuses_an_evidence_directory_outside_the_run_directory(tmp_path, out, runs):

@@ -185,7 +185,7 @@ def load_from(directory: str | Path) -> CompiledBuild:
         ConfigError: The build does not verify, or a file it records is
             missing, with a hint naming how to restore a missing runtime.
     """
-    from .compiled_build import load_build
+    from .compiled_build import load_build, missing_runtime_hint
 
     roots = run_roots(directory)
     path = roots["run"] / BUILD_FILE
@@ -198,36 +198,12 @@ def load_from(directory: str | Path) -> CompiledBuild:
         message = str(exc.args[0]) if exc.args else str(exc)
         if Path(missing.filename) == path:
             raise
-        if Path(missing.filename).is_relative_to(roots["cache"]):
-            raise ConfigError(message, hint=_prepare_hint(path, roots["cache"])) from exc
+        hint = missing_runtime_hint(exc, path, roots["cache"])
+        if hint is not None:
+            raise ConfigError(message, hint=hint) from exc
         raise ConfigError(
             message, hint=f"The run directory {roots['run']} is incomplete; build it again."
         ) from exc
-
-
-def _prepare_hint(path: Path, cache: Path) -> str:
-    """How to restore the prepared runtime the build in *path* links."""
-    import json
-
-    from .compiled_build import _linked_runtime
-    from .errors import HpxError
-    from .frozen_run import FrozenRun
-
-    try:
-        document = json.loads(path.read_text(encoding="utf-8"))
-        source = document["build"].get("runtime_source") or {}
-        linked = _linked_runtime(FrozenRun.from_dict(document["plan"]), source.get("version"))
-    except (HpxError, OSError, ValueError, KeyError, TypeError):
-        linked = None
-    command = (
-        f"hpx runtimes prepare {linked.name} {linked.version}"
-        if linked is not None and linked.version
-        else "hpx runtimes prepare <engine> <version>"
-    )
-    return (
-        f"The build links a runtime prepared under the HPX cache {cache}. Run "
-        f"`{command}` on this host, or set HPX_CACHE_DIR to the cache that holds it."
-    )
 
 
 def fresh_evidence_dir(directory: str | Path) -> Path:
@@ -280,7 +256,13 @@ def run_from(
         settle_seconds=settle_seconds,
         expect=expect,
     )
-    result.save(evidence / RESULT_FILE, roots=roots, build=roots["run"] / BUILD_FILE)
+    try:
+        result.save(evidence / RESULT_FILE, roots=roots, build=roots["run"] / BUILD_FILE)
+    except ConfigError as exc:
+        raise ConfigError(
+            f"The capture finished but its result was not saved: {exc.args[0] if exc.args else exc}",
+            hint=f"The capture's evidence directory {evidence} is intact.",
+        ) from exc
     return result
 
 

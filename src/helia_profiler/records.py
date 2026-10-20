@@ -25,7 +25,7 @@ from .results.manifest import (
 )
 from .results.run_summary import RUN_SUMMARY_SCHEMA, RunSummary
 from .results.serde import nested_get
-from .run_record import RUN_RESULT_SCHEMA, RunRecord, RunResultError, read_run
+from .run_record import RUN_RESULT_SCHEMA, RunResultError, RunResultRecord, read_run
 
 _MANIFEST_FILE = "result_manifest.json"
 _RUN_RESULT_FILE = "result.json"
@@ -56,7 +56,7 @@ class ProfileResultRecord:
 class ResultInspection:
     """Inspection does not promote an invalid bundle into a trusted result."""
 
-    result: ProfileResultRecord | RunRecord | None
+    result: ProfileResultRecord | RunResultRecord | None
     code: str | None = None
     message: str | None = None
 
@@ -212,15 +212,16 @@ def _reconcile_identities(
             raise ResultReadError("identity_mismatch", f"Native identities differ for {dimension}")
 
 
-def load_result(location: str | Path) -> ProfileResultRecord | RunRecord:
+def load_result(location: str | Path) -> ProfileResultRecord | RunResultRecord:
     """Strictly load an ordinary profile manifest, a saved run result, or the directory of either.
 
     The file's ``schema`` decides how it is read: ``hpx.result-manifest``
     gives a :class:`ProfileResultRecord`, ``hpx.run-result`` a
-    :class:`~helia_profiler.RunRecord`, verified as
+    :class:`~helia_profiler.RunResultRecord`, verified as
     :func:`~helia_profiler.load_run` verifies it under the root it records
     itself under and this host's HPX cache. A directory is read through its
-    ``result_manifest.json``, or its ``result.json`` when it has no manifest.
+    ``result_manifest.json`` or its ``result.json``; one holding both is
+    refused as ``ambiguous_location``, since only a file states its schema.
 
     Failed native runs remain failed records. Missing manifests and interrupted
     publication are refusals, not legacy fallbacks. Summary versions 11 to 19
@@ -236,11 +237,16 @@ def load_result(location: str | Path) -> ProfileResultRecord | RunRecord:
         raise ResultReadError("invalid_evidence", str(exc)) from exc
 
 
-def _load_result(location: Path) -> ProfileResultRecord | RunRecord:
+def _load_result(location: Path) -> ProfileResultRecord | RunResultRecord:
     path = location
     if location.is_dir():
         path = location / _MANIFEST_FILE
-        if not path.exists() and (location / _RUN_RESULT_FILE).is_file():
+        if (location / _RUN_RESULT_FILE).exists():
+            if path.exists():
+                raise ResultReadError(
+                    "ambiguous_location",
+                    f"{location} holds both {_MANIFEST_FILE} and {_RUN_RESULT_FILE}; name the file",
+                )
             path = location / _RUN_RESULT_FILE
     root = path.parent.resolve()
     marker = root / RESULT_PUBLICATION_INCOMPLETE
@@ -343,7 +349,7 @@ def _load_result(location: Path) -> ProfileResultRecord | RunRecord:
     )
 
 
-def _load_run(path: Path, raw: bytes) -> RunRecord:
+def _load_run(path: Path, raw: bytes) -> RunResultRecord:
     try:
         record = read_run(path, raw)
     except RunResultError as exc:

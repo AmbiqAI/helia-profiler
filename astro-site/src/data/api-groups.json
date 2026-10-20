@@ -51,7 +51,8 @@
         "hpx_cache_root",
         "CompiledBuild",
         "RunResult",
-        "RunRecord",
+        "RunResultRecord",
+        "RunResultError",
         "Lifecycle"
       ]
     },

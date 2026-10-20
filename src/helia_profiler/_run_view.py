@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from dataclasses import dataclass, field
 from typing import Any
 
 from .fixture_power import GROSS_RAIL_SCOPE, FixtureBoardPowerRequest
 from .identity import Unknown
-from .run_record import RunRecord
+from .run_record import RunResultRecord
 
 MAPPING_VERSION = "hpx-run-1"
 _RESULT = "native-result"
@@ -21,20 +21,40 @@ _VERSION_BASIS = {
 }
 _CLOCK_DOMAINS = {"stimer": "timer", "cpu": "cpu"}
 _FILE_KEYS = {"root", "path", "sha256", "size_bytes"}
+_VERIFIER = "helia-profiler.run_record/run-1"
+_CHECKS = (
+    "run-result-schema-version",
+    "compiled-build-path-size-sha256-and-verify",
+    "evidence-path-size-sha256",
+    "identity-recomputed",
+    "power-request-fits-build",
+)
+_COMPARED = "output-comparison-recomputed"
+_LIMITATIONS = (
+    "Not authentication or numerical qualification.",
+    "Free text, such as a failed capture's error message, is recorded, not verified.",
+    "Clock rates are configured or firmware-reported, not externally calibrated.",
+    "Rail energy is the gross MCU rail over the timed restore-and-invoke loop; "
+    "nothing is subtracted.",
+    "Per-layer attribution is not mapped.",
+)
+_COMPARED_LIMITATION = (
+    "The output comparison is against the recorded reference and the caller's "
+    "tolerance; it does not qualify the engine numerically."
+)
+_NOT_COMPARED = "Outputs were not compared with a reference."
 
 
-def run_observations(record: RunRecord) -> dict[str, Any]:
-    """Map a verified run result; schema validity alone does not establish verification."""
-    result, document = record.result, record.document
-    capture, identity = result.capture, result.identity
-    run = identity.run
-    home = document["location"]["root"]
-    artifacts = _artifacts(record, home)
-    roles = {item["id"]: item["role"] for item in artifacts}
-    blocked = None if result.succeeded else "capture_failed"
-    items: list[dict[str, Any]] = []
+@dataclass
+class _Observations:
+    """The observations of one view, each citing the saved result by JSON pointer."""
 
-    def metric(
+    blocked: str | None
+    roles: set[str]
+    items: list[dict[str, Any]] = field(default_factory=list)
+
+    def add(
+        self,
         name: str,
         value: float | int | None,
         *,
@@ -50,7 +70,7 @@ def run_observations(record: RunRecord) -> dict[str, Any]:
         clocks: list[dict[str, Any]] | None = None,
         evidence: tuple[str, ...] = (),
     ) -> None:
-        unavailable = blocked or reason or ("not_recorded" if value is None else None)
+        unavailable = self.blocked or reason or ("not_recorded" if value is None else None)
         basis = None
         if not unavailable:
             basis = {
@@ -60,7 +80,7 @@ def run_observations(record: RunRecord) -> dict[str, Any]:
             }
             if clocks:
                 basis["clocks"] = clocks
-        items.append(
+        self.items.append(
             {
                 "id": name,
                 "metric": name,
@@ -72,44 +92,86 @@ def run_observations(record: RunRecord) -> dict[str, Any]:
                 "value": None if unavailable else value,
                 "unavailable_reason": unavailable,
                 "sample_count": None if unavailable else count,
-                "evidence": [_RESULT, *(ref for ref in evidence if ref in roles)],
+                "evidence": [_RESULT, *(ref for ref in evidence if ref in self.roles)],
                 "basis": basis,
             }
         )
 
-    timing = capture.timing
-    scope = run.timing_scope
+
+def run_observations(record: RunResultRecord) -> dict[str, Any]:
+    """Map a verified run result; schema validity alone does not establish verification."""
+    result, document = record.result, record.document
+    home = document["location"]["root"]
+    artifacts = _artifacts(record, home)
+    observations = _Observations(
+        None if result.succeeded else "capture_failed", {item["id"] for item in artifacts}
+    )
+    _latency(record, observations)
+    _energy(record, observations, home)
+    _memory(record, observations)
+    return {
+        **_header(record, artifacts),
+        "observations": observations.items,
+        "verification": _verification(record),
+        "extensions": {"helia-profiler": _extension(record)},
+    }
+
+
+def _header(record: RunResultRecord, artifacts: list[dict[str, Any]]) -> dict[str, Any]:
+    result, identity = record.result, record.result.identity
+    model = result.compiled.build.model
+    return {
+        "schema_version": "1.0-draft",
+        "producer": {
+            "name": "helia-profiler",
+            "version": record.hpx_version,
+            "revision": None,
+            "mapping_version": MAPPING_VERSION,
+        },
+        "native_result": {
+            "schema": record.document["schema"],
+            "identity": record.sha256,
+            "artifacts": artifacts,
+        },
+        "workload": {
+            # The pinned file, not the plan's path, which may be another host's.
+            "name": model.path.name if model is not None else None,
+            "model_identity": _text(identity.model_sha256),
+            "input_identity": _text(identity.inputs_hash),
+            "state_policy": identity.run.lifecycle,
+        },
+        "engine": {
+            "name": identity.runtime.engine.value,
+            "version": _text(identity.runtime.version),
+        },
+        "target": {"name": identity.build.board, "identity": None},
+        "outcome": {
+            "status": "completed" if result.succeeded else "failed",
+            "stage": None if result.succeeded else "capture",
+            "reason": None if result.succeeded else result.capture.error or None,
+        },
+    }
+
+
+def _latency(record: RunResultRecord, observations: _Observations) -> None:
+    timing, run = record.result.capture.timing, record.result.identity.run
     latency = None
     if timing is not None and timing.timer_hz > 0 and timing.iterations > 0:
         latency = timing.ticks / timing.timer_hz / timing.iterations * 1000
     domain = _CLOCK_DOMAINS.get(run.timing_clock) if isinstance(run.timing_clock, str) else None
-    clocks = (
-        [
-            {
-                "role": "configured",
-                "value_hz": run.timing_clock_hz,
-                "source": {"artifact": _RESULT, "pointer": "/identity/run/timing_clock_hz"},
-                "domain": domain,
-            }
-        ]
-        if isinstance(run.timing_clock_hz, int) and run.timing_clock_hz > 0
-        else []
-    )
-    if timing is not None and timing.timer_hz > 0:
+    clocks = []
+    if isinstance(run.timing_clock_hz, int) and run.timing_clock_hz > 0:
         clocks.append(
-            {
-                "role": "reported",
-                "value_hz": timing.timer_hz,
-                "source": {"artifact": _RESULT, "pointer": "/capture/timing/timer_hz"},
-                "domain": domain,
-            }
+            _clock("configured", run.timing_clock_hz, "/identity/run/timing_clock_hz", domain)
         )
-    metric(
-        "latency.invoke.v1" if scope == "invoke_only" else "latency.restore_invoke.v1",
+    if timing is not None and timing.timer_hz > 0:
+        clocks.append(_clock("reported", timing.timer_hz, "/capture/timing/timer_hz", domain))
+    observations.add(
+        "latency.invoke.v1" if run.timing_scope == "invoke_only" else "latency.restore_invoke.v1",
         latency,
         unit="ms",
         domain="cpu",
-        scope=scope,
+        scope=run.timing_scope,
         origin="measured",
         statistic="mean",
         sources=("/capture/timing/ticks", "/capture/timing/timer_hz", "/capture/timing/iterations"),
@@ -118,7 +180,19 @@ def run_observations(record: RunRecord) -> dict[str, Any]:
         clocks=clocks,
     )
 
-    energy = capture.rail_energy
+
+def _clock(role: str, hz: int, pointer: str, domain: str | None) -> dict[str, Any]:
+    return {
+        "role": role,
+        "value_hz": hz,
+        "source": {"artifact": _RESULT, "pointer": pointer},
+        "domain": domain,
+    }
+
+
+def _energy(record: RunResultRecord, observations: _Observations, home: str) -> None:
+    result = record.result
+    energy = result.capture.rail_energy
     reason = (
         None
         if energy is not None
@@ -128,144 +202,96 @@ def run_observations(record: RunRecord) -> dict[str, Any]:
         if isinstance(result.power, FixtureBoardPowerRequest)
         else None
     )
-    trace = _file_id(document["capture"]["rail_energy"]["raw"], home) if energy else None
-
-    def rail(
-        name: str,
-        value: float | None,
-        *,
-        unit: str,
-        sources: tuple[str, ...],
-        transformation: str,
-        count: int | None = None,
-    ) -> None:
-        metric(
-            name,
-            value,
-            unit=unit,
-            # The MCU rail feeds the core, its memories and on-chip peripherals, not the CPU alone.
-            domain="system",
-            scope=GROSS_RAIL_SCOPE,
-            origin="measured",
-            statistic="mean",
-            sources=sources,
-            count=count,
-            transformation=transformation,
-            reason=reason,
-            evidence=(trace,) if trace else (),
-        )
-
-    rail(
+    raw = record.document["capture"]["rail_energy"]
+    evidence = (_file_id(raw["raw"], home),) if energy is not None else ()
+    rail: dict[str, Any] = {
+        # The MCU rail feeds the core, its memories and on-chip peripherals, not the CPU alone.
+        "domain": "system",
+        "scope": GROSS_RAIL_SCOPE,
+        "origin": "measured",
+        "statistic": "mean",
+        "reason": reason,
+        "evidence": evidence,
+    }
+    observations.add(
         "energy.per_inference.v1",
         energy.energy_per_iteration_j * 1e6 if energy else None,
         unit="uJ",
         sources=("/capture/rail_energy/energy_per_iteration_j", "/capture/rail_energy/iterations"),
         transformation="joules * 1e6",
         count=energy.iterations if energy else None,
+        **rail,
     )
     # A time average over the gated window, whose instrument sample count is not retained.
-    rail(
+    observations.add(
         "power.mean.v1",
         energy.mean_power_w * 1e3 if energy else None,
         unit="mW",
         sources=("/capture/rail_energy/mean_power_w", "/capture/rail_energy/duration_s"),
         transformation="watts * 1e3",
+        **rail,
     )
 
-    memory = capture.memory
-    for name, field, mscope in (
+
+def _memory(record: RunResultRecord, observations: _Observations) -> None:
+    memory = record.result.capture.memory
+    for name, field_name, scope in (
         ("memory.arena_capacity.v1", "capacity", "arena_capacity"),
         ("memory.arena_used_after_invoke.v1", "after_invoke", "allocator_after_invoke"),
     ):
-        metric(
+        observations.add(
             name,
-            getattr(memory, field) if memory is not None else None,
+            getattr(memory, field_name) if memory is not None else None,
             unit="B",
             domain="memory",
-            scope=mscope,
+            scope=scope,
             origin="reported",
             statistic="size",
-            sources=(f"/capture/memory/{field}",),
+            sources=(f"/capture/memory/{field_name}",),
         )
 
-    engine = identity.runtime.engine.value
-    version = identity.runtime.version
+
+def _verification(record: RunResultRecord) -> dict[str, Any]:
+    compared = record.result.verification is not None
     return {
-        "schema_version": "1.0-draft",
-        "producer": {
-            "name": "helia-profiler",
-            "version": _text(identity.producer),
-            "revision": None,
-            "mapping_version": MAPPING_VERSION,
+        "verifier": _VERIFIER,
+        "checks": [*_CHECKS, _COMPARED] if compared else list(_CHECKS),
+        "limitations": [*_LIMITATIONS, _COMPARED_LIMITATION if compared else _NOT_COMPARED],
+    }
+
+
+def _extension(record: RunResultRecord) -> dict[str, Any]:
+    result, document = record.result, record.document
+    identity = result.identity
+    run, version = identity.run, identity.runtime.version
+    return {
+        "engine_version_basis": _VERSION_BASIS.get(identity.runtime.engine.value),
+        "engine_version_unavailable_reason": version.reason
+        if isinstance(version, Unknown)
+        else None,
+        "build_producer": _plain(identity.producer),
+        "semantic_hashes": {
+            "intent_hash": identity.intent_hash,
+            "build_hash": _plain(identity.build_hash),
+            "inputs_hash": _plain(identity.inputs_hash),
+            "observation_hash": identity.observation_hash,
+            "binding": result.compiled.binding,
         },
-        "native_result": {
-            "schema": document["schema"],
-            "identity": record.sha256,
-            "artifacts": artifacts,
+        "run": {
+            "lifecycle": run.lifecycle,
+            "timing_scope": run.timing_scope,
+            "iterations": run.iterations,
+            "warmups": run.warmups,
+            "instance_boundary": _plain(run.instance_boundary),
+            "first_invoke_initializer": _plain(run.first_invoke_initializer),
+            "first_invoke_window": _plain(run.first_invoke_window),
+            "timing_clock": _plain(run.timing_clock),
+            "timing_clock_hz": _plain(run.timing_clock_hz),
+            "timing_statistic": _plain(run.timing_statistic),
         },
-        "workload": {
-            "name": Path(result.compiled.plan.model.path).name or None,
-            "model_identity": _text(identity.model_sha256),
-            "input_identity": _text(identity.inputs_hash),
-            "state_policy": run.lifecycle,
-        },
-        "engine": {"name": engine, "version": _text(version)},
-        "target": {"name": identity.build.board, "identity": None},
-        "outcome": {
-            "status": "completed" if result.succeeded else "failed",
-            "stage": None if result.succeeded else "capture",
-            "reason": None if result.succeeded else capture.error or None,
-        },
-        "observations": items,
-        "verification": {
-            "verifier": "helia-profiler.run_record/run-1",
-            "checks": [
-                "run-result-schema-version",
-                "compiled-build-path-size-sha256-and-verify",
-                "evidence-path-size-sha256",
-                "identity-recomputed",
-                "output-comparison-recomputed",
-            ],
-            "limitations": [
-                "Not authentication or numerical qualification.",
-                "The output comparison is against the recorded reference and the caller's "
-                "tolerance; it does not qualify the engine numerically.",
-                "Clock rates are configured or firmware-reported, not externally calibrated.",
-                "Rail energy is the gross MCU rail over the timed restore-and-invoke loop; "
-                "nothing is subtracted.",
-                "Per-layer attribution is not mapped.",
-            ],
-        },
-        "extensions": {
-            "helia-profiler": {
-                "engine_version_basis": _VERSION_BASIS.get(engine),
-                "engine_version_unavailable_reason": version.reason
-                if isinstance(version, Unknown)
-                else None,
-                "semantic_hashes": {
-                    "intent_hash": identity.intent_hash,
-                    "build_hash": _plain(identity.build_hash),
-                    "inputs_hash": _plain(identity.inputs_hash),
-                    "observation_hash": identity.observation_hash,
-                    "binding": result.compiled.binding,
-                },
-                "run": {
-                    "lifecycle": run.lifecycle,
-                    "timing_scope": run.timing_scope,
-                    "iterations": run.iterations,
-                    "warmups": run.warmups,
-                    "instance_boundary": _plain(run.instance_boundary),
-                    "first_invoke_initializer": _plain(run.first_invoke_initializer),
-                    "first_invoke_window": _plain(run.first_invoke_window),
-                    "timing_clock": _plain(run.timing_clock),
-                    "timing_clock_hz": _plain(run.timing_clock_hz),
-                    "timing_statistic": _plain(run.timing_statistic),
-                },
-                "capture_state": capture.state,
-                "power_request": None if result.power is None else document["power"]["kind"],
-                "output_comparison": _comparison(document["verification"]),
-            }
-        },
+        "capture_state": result.capture.state,
+        "power_request": None if result.power is None else document["power"]["kind"],
+        "output_comparison": _comparison(document["verification"]),
     }
 
 
@@ -275,7 +301,7 @@ def _comparison(verification: dict[str, Any] | None) -> dict[str, Any] | None:
     return {key: verification[key] for key in ("reference", "tolerance", "matched", "tensors")}
 
 
-def _artifacts(record: RunRecord, home: str) -> list[dict[str, Any]]:
+def _artifacts(record: RunResultRecord, home: str) -> list[dict[str, Any]]:
     document = record.document
     artifacts = [
         {

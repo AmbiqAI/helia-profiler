@@ -2,18 +2,19 @@
 
 :meth:`RunResult.save <helia_profiler.RunResult.save>` writes a
 ``hpx.run-result`` document; :func:`load_run` reads it back as a
-:class:`RunRecord`. The document names its compiled build by path, sha256 and
-size, holds the capture's facts, the power request, the output comparison
-and the identity, and pins every file the capture references by sha256 and
-size. Paths are relative to named roots, as a saved compiled build's are, so
-the directories can move together.
+:class:`RunResultRecord`. The document names its compiled build by path,
+sha256 and size, holds the capture's facts, the power request, the output
+comparison, the identity and the HPX version that wrote it, and pins every
+file the capture references by sha256 and size. Paths are relative to named
+roots, as a saved compiled build's are, so the directories can move together.
 
-Loading re-checks it all: the compiled build is the one recorded and
-verifies, every pinned file is intact, and the identity and the output
-comparison recompute from the build and the capture. The checks guard
-against accidents such as an edited or mixed-up file, not against
-tampering. A failed capture is saved and loaded as any other: its outcome is
-data.
+Loading checks that every pinned file is intact, that the compiled build is
+the one recorded and verifies, that the identity and the output comparison
+recompute from the build and the capture, and that the power request fits
+the build's power wiring. Free text, such as a failed capture's error
+message, is recorded, not verified. The checks guard against accidents such
+as an edited or mixed-up file, not against tampering. A failed capture is
+saved and loaded as any other: its outcome is data.
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ from enum import Enum
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any
 
-from ._files import write_bytes_atomically, write_text_atomically
+from ._files import RootedPaths, read_json, write_bytes_atomically, write_text_atomically
 from .errors import ConfigError
 
 if TYPE_CHECKING:
@@ -51,6 +52,7 @@ _KEYS = frozenset(
         "power",
         "verification",
         "identity",
+        "hpx_version",
     }
 )
 _HINT = "Save the run again, or restore the files it records."
@@ -59,9 +61,15 @@ _HINT = "Save the run again, or restore the files it records."
 class RunResultError(ConfigError):
     """A saved run result that does not load; ``code`` names the check it failed.
 
-    The codes are the verified result reader's: ``invalid_json``,
-    ``unsupported_schema``, ``invalid_path``, ``artifact_changed``,
-    ``identity_mismatch`` and ``invalid_evidence``.
+    The codes are the verified result reader's: ``invalid_json`` (not strict
+    JSON), ``unsupported_schema`` (another schema or version),
+    ``invalid_path`` (unusable roots, or a result not where it records
+    itself), ``artifact_changed`` (a pinned file missing or changed),
+    ``runtime_missing`` (the build's prepared runtime is not in the cache),
+    ``identity_mismatch`` (the identity or output comparison does not
+    recompute) and ``invalid_evidence`` (anything else: an unreadable or
+    malformed result, a build that does not verify, a power request the build
+    cannot take).
     """
 
     def __init__(self, code: str, message: str, *, hint: str | None = None) -> None:
@@ -70,22 +78,24 @@ class RunResultError(ConfigError):
 
 
 @dataclass(frozen=True)
-class RunRecord:
+class RunResultRecord:
     """A saved run result, loaded and verified.
 
     ``path``, ``size_bytes`` and ``sha256`` identify the saved document,
     ``document`` is its JSON, which the portable view cites by JSON pointer,
-    and ``result`` is the run it records.
+    ``hpx_version`` is the heliaPROFILER that wrote it, and ``result`` is the
+    run it records.
     """
 
     path: Path
     size_bytes: int
     sha256: str
+    hpx_version: str
     result: RunResult
     document: Mapping[str, Any]
 
 
-def load_run(path: str | Path, *, roots: Mapping[str, Path]) -> RunRecord:
+def load_run(path: str | Path, *, roots: Mapping[str, Path]) -> RunResultRecord:
     """Read and verify a run result saved by :meth:`RunResult.save`, resolving paths under *roots*.
 
     Raises:
@@ -101,7 +111,7 @@ def load_run(path: str | Path, *, roots: Mapping[str, Path]) -> RunRecord:
     return _load(source, raw, roots)
 
 
-def read_run(path: Path, raw: bytes) -> RunRecord:
+def read_run(path: Path, raw: bytes) -> RunResultRecord:
     """Verify *raw*, the bytes of the run result at *path*, under the roots it implies.
 
     The root the result records itself under is the directory its recorded
@@ -131,6 +141,7 @@ def save_run(
     result: RunResult, path: str | Path, *, roots: Mapping[str, Path], build: str | Path
 ) -> Path:
     """Write *result* as a run result; see :meth:`RunResult.save`."""
+    from ._version import __version__
     from .compiled_build import load_build
 
     target = Path(path).expanduser()
@@ -147,11 +158,13 @@ def save_run(
             f"{build_path} is not the compiled build this run captured from",
             hint="Name the build.json the run's CompiledBuild was saved to.",
         )
+    _check_power(result.compiled, result.power)
     recomputed = _identity(result.compiled, result.capture, result.power)
     _check_identity(recomputed, result.identity.to_dict())
     references: list[Path] = []
     if result.verification is not None:
-        _check_failed(result.capture, result.verification)
+        if not result.succeeded:
+            raise ConfigError("A failed capture has no output comparison")
         references = [
             target.with_name(f"{target.stem}.reference_{index}.bin")
             for index in range(len(result.verification.reference.outputs))
@@ -170,6 +183,7 @@ def save_run(
         "power": _encode_power(result.power),
         "verification": None,
         "identity": result.identity.to_dict(),
+        "hpx_version": __version__,
     }
     try:
         if result.verification is not None:
@@ -187,8 +201,8 @@ def save_run(
     return target
 
 
-def _load(source: Path, raw: bytes, roots: Mapping[str, Path]) -> RunRecord:
-    from .compiled_build import RunResult, load_build
+def _load(source: Path, raw: bytes, roots: Mapping[str, Path]) -> RunResultRecord:
+    from .compiled_build import RunResult, load_build, missing_runtime_hint
 
     data = _document(raw)
     files = _Files(roots)
@@ -203,14 +217,23 @@ def _load(source: Path, raw: bytes, roots: Mapping[str, Path]) -> RunRecord:
     try:
         compiled = load_build(build_path, roots=roots)
     except ConfigError as exc:
+        message = exc.args[0] if exc.args else str(exc)
+        cache = files.paths.roots.get("cache")
+        hint = missing_runtime_hint(exc, build_path.resolve(), cache)
+        if hint is not None:
+            raise RunResultError("runtime_missing", message, hint=hint) from exc
         raise RunResultError(
-            "invalid_evidence", f"The run's compiled build does not load: {exc}"
+            "invalid_evidence", f"The run's compiled build does not load: {message}"
         ) from exc
     try:
         capture = _decode_capture(data["capture"], files.fixture_file)
         power = _decode_power(data["power"])
     except (TypeError, ValueError) as exc:
         raise RunResultError("invalid_evidence", f"Malformed run result: {exc}") from exc
+    try:
+        _check_power(compiled, power)
+    except ConfigError as exc:
+        raise RunResultError("invalid_evidence", str(exc), hint=_HINT) from exc
     identity = _identity(compiled, capture, power)
     try:
         _check_identity(identity, data["identity"])
@@ -218,14 +241,13 @@ def _load(source: Path, raw: bytes, roots: Mapping[str, Path]) -> RunRecord:
         raise RunResultError("identity_mismatch", str(exc), hint=_HINT) from exc
     verification = _decode_verification(data["verification"], compiled, capture, files)
     result = RunResult(compiled, capture, identity, verification, power)
-    return RunRecord(source.resolve(), len(raw), hashlib.sha256(raw).hexdigest(), result, data)
+    digest = hashlib.sha256(raw).hexdigest()
+    return RunResultRecord(source.resolve(), len(raw), digest, data["hpx_version"], result, data)
 
 
 def _document(raw: bytes) -> dict[str, Any]:
-    from ._fixture_record import _read_json
-
     try:
-        data = _read_json(raw)
+        data = read_json(raw, label="run result")
     except (ValueError, RecursionError) as exc:
         raise RunResultError("invalid_json", f"A run result must be JSON: {exc}") from exc
     if not isinstance(data, dict):
@@ -246,6 +268,8 @@ def _document(raw: bytes) -> dict[str, Any]:
             "invalid_evidence",
             f"Malformed run result: fields {sorted(data)}, expected {sorted(_KEYS)}",
         )
+    if not isinstance(data["hpx_version"], str) or not data["hpx_version"]:
+        raise RunResultError("invalid_evidence", "Malformed run result: hpx_version")
     return data
 
 
@@ -253,40 +277,35 @@ class _Files:
     """Paths under named roots, and files pinned by sha256 and size."""
 
     def __init__(self, roots: Mapping[str, Path]) -> None:
-        from ._fixture_record import _Roots
-
         try:
-            self.roots = _Roots(roots)
+            self.paths = RootedPaths(roots)
         except ValueError as exc:
-            raise ConfigError(f"Invalid roots: {exc}") from exc
+            raise RunResultError("invalid_path", f"Invalid roots: {exc}") from exc
 
     def place(self, path: Path) -> dict[str, str]:
         try:
-            return self.roots.encode(path)
+            return self.paths.encode(path)
         except ValueError as exc:
             raise ConfigError(f"Cannot save the run result: {exc}") from exc
 
     def file(self, item: FixtureFile) -> dict[str, Any]:
-        try:
-            data = item.read()
-        except (OSError, ValueError) as exc:
-            raise ConfigError(f"Cannot save the run result: {exc}") from exc
-        return {**self.place(item.path), "sha256": item.sha256, "size_bytes": len(data)}
+        """*item*, refused unless its bytes still match its sha256."""
+        return self._entry(item.path, item.read)
 
     def pin(self, path: Path) -> dict[str, Any]:
+        return self._entry(path, path.read_bytes)
+
+    def _entry(self, path: Path, read: Callable[[], bytes]) -> dict[str, Any]:
         try:
-            data = path.read_bytes()
-        except OSError as exc:
+            data = read()
+        except (OSError, ValueError) as exc:
             raise ConfigError(f"Cannot save the run result: {exc}") from exc
-        return {
-            **self.place(path),
-            "sha256": hashlib.sha256(data).hexdigest(),
-            "size_bytes": len(data),
-        }
+        digest = hashlib.sha256(data).hexdigest()
+        return {**self.place(path), "sha256": digest, "size_bytes": len(data)}
 
     def locate(self, value: Any) -> Path:
         try:
-            return self.roots.decode(value)
+            return self.paths.decode(value)
         except ValueError as exc:
             raise RunResultError("invalid_path", f"Invalid run result path: {exc}") from exc
 
@@ -438,8 +457,13 @@ def _identity(
 
 
 def _check_identity(recomputed: RunIdentity, stated: Any) -> None:
-    """Refuse a *stated* identity, in its JSON form, other than the *recomputed* one."""
-    expected = recomputed.to_dict()
+    """Refuse a *stated* identity, in its JSON form, other than the *recomputed* one.
+
+    An unknown fact matches an unknown fact whatever its reason, so a later
+    heliaPROFILER that rewords a reason still reads the result.
+    """
+    expected = _unknown_as_one(recomputed.to_dict())
+    stated = _unknown_as_one(stated)
     if stated == expected:
         return
     keys = (
@@ -450,14 +474,34 @@ def _check_identity(recomputed: RunIdentity, stated: Any) -> None:
         else ["identity"]
     )
     raise ConfigError(
-        f"The run's identity does not recompute from its build and capture: {', '.join(keys)} "
-        "differ"
+        "The run's identity does not recompute from its build and capture; it differs in "
+        + ", ".join(keys)
     )
 
 
-def _check_failed(capture: FixtureCaptureResult, verification: Any) -> None:
-    if capture.state != "success" and verification is not None:
-        raise ConfigError("A failed capture has no output comparison")
+def _unknown_as_one(value: Any) -> Any:
+    if isinstance(value, dict):
+        if value.keys() == {"unknown"} and isinstance(value["unknown"], str):
+            return {"unknown": None}
+        return {key: _unknown_as_one(item) for key, item in value.items()}
+    return value
+
+
+def _check_power(
+    compiled: CompiledBuild, power: FixtureRailPowerRequest | FixtureBoardPowerRequest | None
+) -> None:
+    """Refuse a power request the build's power wiring rules out, as :meth:`CompiledBuild.run` does."""
+    from .fixture_power import FixtureRailPowerRequest
+
+    wired = compiled.build.power_sync is not None
+    if isinstance(power, FixtureRailPowerRequest) and not wired:
+        raise ConfigError("The run states a rail power request; its build has no power wiring")
+    if power is not None and not isinstance(power, FixtureRailPowerRequest) and wired:
+        raise ConfigError(
+            "The run states a supply-only power request; its build is wired for rail energy"
+        )
+    if power is None and wired:
+        raise ConfigError("The run states no power request; its build is wired for rail energy")
 
 
 def _compare(
@@ -516,7 +560,8 @@ def _decode_verification(
         value, ("reference", "tolerance", "matched", "tensors", "reference_files"), "verification"
     )
     try:
-        _check_failed(capture, data)
+        if capture.state != "success":
+            raise ValueError("a failed capture has no output comparison")
         if not isinstance(data["reference_files"], list):
             raise ValueError("reference_files must be a list")
         references = [files.check(item, "reference output") for item in data["reference_files"]]

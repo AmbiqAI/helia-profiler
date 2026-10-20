@@ -2,20 +2,20 @@
   "schema_version": "1.0-draft",
   "producer": {
     "name": "helia-profiler",
-    "version": null,
+    "version": "0.3.0",
     "revision": null,
     "mapping_version": "hpx-run-1"
   },
   "native_result": {
     "schema": "hpx.run-result",
-    "identity": "2f5654aba02aabadb9fb5b8887133dffd6346cdb576aad794071294d5f2d145d",
+    "identity": "0e294713666105f63d7d2b83cca6e733d4f239661e6a1e23b4cbfdf3d1e2988c",
     "artifacts": [
       {
         "id": "native-result",
         "role": "hpx.run-result",
         "location": "result.json",
-        "sha256": "2f5654aba02aabadb9fb5b8887133dffd6346cdb576aad794071294d5f2d145d",
-        "size_bytes": 4383
+        "sha256": "0e294713666105f63d7d2b83cca6e733d4f239661e6a1e23b4cbfdf3d1e2988c",
+        "size_bytes": 4409
       },
       {
         "id": "artifact:build.json",
@@ -185,20 +185,25 @@
       "compiled-build-path-size-sha256-and-verify",
       "evidence-path-size-sha256",
       "identity-recomputed",
+      "power-request-fits-build",
       "output-comparison-recomputed"
     ],
     "limitations": [
       "Not authentication or numerical qualification.",
-      "The output comparison is against the recorded reference and the caller's tolerance; it does not qualify the engine numerically.",
+      "Free text, such as a failed capture's error message, is recorded, not verified.",
       "Clock rates are configured or firmware-reported, not externally calibrated.",
       "Rail energy is the gross MCU rail over the timed restore-and-invoke loop; nothing is subtracted.",
-      "Per-layer attribution is not mapped."
+      "Per-layer attribution is not mapped.",
+      "The output comparison is against the recorded reference and the caller's tolerance; it does not qualify the engine numerically."
     ]
   },
   "extensions": {
     "helia-profiler": {
       "engine_version_basis": "aot_provider_release",
       "engine_version_unavailable_reason": "the record states no runtime source",
+      "build_producer": {
+        "unknown": "the dependency state records no workspace"
+      },
       "semantic_hashes": {
         "intent_hash": "hpx.intent/1:sha256:a909fc4ac24bb0f9e3aea4110062ade20ee6857733b7014baabc534985097eee",
         "build_hash": {

@@ -31,7 +31,7 @@ def test_the_retained_result_loads_with_its_build():
 def test_the_verified_reader_takes_the_retained_result():
     record = load_result(_ROOT / "result.json")
 
-    assert isinstance(record, hpx.RunRecord)
+    assert isinstance(record, hpx.RunResultRecord)
     assert record.sha256 == hpx.load_run(_ROOT / "result.json", roots={"run": _ROOT}).sha256
 
 

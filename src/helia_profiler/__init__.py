@@ -188,7 +188,7 @@ if TYPE_CHECKING:
     from .results.models import MemoryPlan, ToolchainInfo
     from .run_guard import OperatorGuard
     from .run_inputs import analyze_run_model, analyze_run_model_for_engine, capabilities
-    from .run_record import RunRecord, load_run
+    from .run_record import RunResultError, RunResultRecord, load_run
     from .runtime_records import (
         Qualification,
         QualifiedTarget,
@@ -323,7 +323,8 @@ _EXPORTS = {
     "build": (".compiled_build", "build"),
     "load_build": (".compiled_build", "load_build"),
     "run_build": (".compiled_build", "run_build"),
-    "RunRecord": (".run_record", "RunRecord"),
+    "RunResultRecord": (".run_record", "RunResultRecord"),
+    "RunResultError": (".run_record", "RunResultError"),
     "load_run": (".run_record", "load_run"),
     "hpx_cache_root": (".hostenv.cache_dirs", "hpx_cache_root"),
     "TypedFixture": ("._fixture_build", "TypedFixture"),
@@ -425,7 +426,8 @@ __all__ = [
     "build",
     "load_build",
     "run_build",
-    "RunRecord",
+    "RunResultRecord",
+    "RunResultError",
     "load_run",
     "hpx_cache_root",
     "TypedFixture",
@@ -664,7 +666,8 @@ _EXPERIMENTAL_API = {
     "build",
     "load_build",
     "run_build",
-    "RunRecord",
+    "RunResultRecord",
+    "RunResultError",
     "load_run",
     "hpx_cache_root",
     "TypedFixture",
