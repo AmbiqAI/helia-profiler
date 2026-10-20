@@ -42,7 +42,7 @@
     },
     {
       "path": "helia_profiler.compiled_build",
-      "summary": "Build once, run later: a frozen plan's compiled firmware, bound to its plan and saved so any host can verify, relocate and capture from it, and how model state carries across a run's invocations.",
+      "summary": "Build once, run later: a frozen plan's compiled firmware, bound to its plan and saved so any host can verify, relocate and capture from it, and how model state carries across a run's invocations. The hpx freeze, hpx build, hpx validate build and hpx run commands drive the same flow from the command line.",
       "members": [
         "build",
         "load_build",
@@ -70,6 +70,7 @@
         "analyze_run_model_for_engine",
         "TypedFixtureModelAnalysis",
         "FixtureCaptureGuard",
+        "OperatorGuard",
         "FixtureTarget",
         "capabilities",
         "FixtureCapabilities",

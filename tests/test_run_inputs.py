@@ -29,7 +29,7 @@ _SAME_AS_FACADE = {
     "QualifiedFixtureTarget": "QualifiedFixtureTarget",
     "EngineDTypeCapability": "EngineDTypeCapability",
 }
-_NEW = ("capabilities", "analyze_run_model", "analyze_run_model_for_engine")
+_NEW = ("capabilities", "analyze_run_model", "analyze_run_model_for_engine", "OperatorGuard")
 
 
 @pytest.mark.parametrize("name,facade_name", sorted(_SAME_AS_FACADE.items()))

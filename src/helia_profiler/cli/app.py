@@ -23,7 +23,9 @@ from ..placement import Placement
 from ..power import list_drivers
 from ..target.lifecycle import ResetStrategy
 from . import inspect_app as _inspect_app
+from . import run_app as _run_app
 from . import validation_app as _validation_app
+from .choices import _ArenaLocation, _CoreOverride
 from .results_cmd import app as results_app
 
 app = typer.Typer(
@@ -61,16 +63,6 @@ def _hpx_callback(
     if ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
         raise typer.Exit(0)
-
-
-_ArenaLocation = StrEnum(
-    "_ArenaLocation", {p.name: p.value for p in Placement if p != Placement.MRAM}
-)
-
-
-class _CoreOverride(StrEnum):
-    CM4 = "cm4"
-    CM55 = "cm55"
 
 
 _PowerDriver = StrEnum(
@@ -607,6 +599,9 @@ _inspect_app.register(app)
 
 
 _validation_app.register(app)
+
+
+_run_app.register(app)
 
 
 @app.command(

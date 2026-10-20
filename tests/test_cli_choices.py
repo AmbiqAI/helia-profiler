@@ -34,6 +34,9 @@ VALUES = {
     "driver": ["joulescope"],
     "power": ["both", "on", "off"],
     "suite": ["smoke", "models-rt", "models-aot", "complete"],
+    "lifecycle": ["carry", "single"],
+    "timing_scope": ["invoke_only", "restore_and_invoke"],
+    "expect": ["host-litert", "build", "none"],
 }
 SITES = [
     ("profile", "engine", None),
@@ -55,6 +58,13 @@ SITES = [
     ("power-on", "driver", "joulescope"),
     ("validate", "power", "off"),
     ("validate", "suite", None),
+    ("freeze", "engine", None),
+    ("freeze", "runtime_arena_location", None),
+    ("freeze", "runtime_weights_location", None),
+    ("freeze", "core_override", None),
+    ("build", "lifecycle", "carry"),
+    ("build", "timing_scope", "invoke_only"),
+    ("run", "expect", None),
 ]
 
 

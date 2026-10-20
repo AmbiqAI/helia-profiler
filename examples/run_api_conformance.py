@@ -23,7 +23,9 @@ Before running it:
   guard, one that proves the physical board behind the probe serial and holds
   it for the capture. :class:`PlaceholderGuard` refuses every capture, so the
   command line only builds (``--build-only``). Each capture writes a fresh
-  ``evidence`` directory under ``--out``.
+  ``evidence`` directory under ``--out``. ``hpx freeze``, ``hpx build`` and
+  ``hpx run`` walk the same flow from the command line, with an operator who
+  vouches for the board.
 
 The plan states what a fixture build requires: the ``lp`` clock, an SRAM
 arena of ``--arena-size`` bytes and MRAM weights. The build works under

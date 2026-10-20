@@ -1,8 +1,10 @@
-"""Hardware-facing CLI commands: ``hpx power-on`` and ``hpx validate``.
+"""Hardware-facing CLI commands: ``hpx power-on``, ``hpx validate`` and ``hpx validate build``.
 
 Follows the ``inspect_app`` pattern: plain command functions here, attached
 to the main Typer app via :func:`register` so the module needs no import of
-``app`` itself.
+``app`` itself. ``hpx validate`` is a group whose callback runs the MLPerf
+suite when no subcommand is given, so ``hpx validate [OPTIONS]`` keeps working
+beside ``hpx validate build DIR``.
 """
 
 from __future__ import annotations
@@ -26,27 +28,33 @@ def register(app: typer.Typer) -> None:
             "board would otherwise be unpowered."
         ),
     )(power_on_command)
-    app.command(
-        "validate",
-        help="Run hardware-in-the-loop validation suite (MLPerf Tiny models)",
-        epilog=(
-            "Hardware validation — runs canonical MLPerf Tiny models end-to-end\n\n"
-            "against a real EVB + J-Link (and optional Joulescope).\n\n"
-            "Examples:\n\n"
-            "  hpx validate                         # Apollo510 reliability matrix, power off\n\n"
-            "  hpx validate --list                  # preview what would run\n\n"
-            "  hpx validate --models kws,ic         # subset by model\n\n"
-            "  hpx validate --engines aot           # subset by engine\n\n"
-            "  hpx validate --power off             # skip Joulescope (default)\n\n"
-            "  hpx validate --boards apollo3p_evb --repeat 2 --power off\n\n"
-            "                                       # require two passing iterations per case\n\n"
-            "  hpx validate -k kws-aot              # pytest keyword filter\n\n"
-            "  hpx validate --suite smoke           # quick preset: kws / helia-rt / gcc / rtt / auto\n\n"
-            "  hpx validate --suite models-rt       # 16-case RT sweep: 2 boards x 4 models x 2 toolchains\n\n"
-            "  hpx validate --suite models-aot      # 16-case AOT sweep: 2 boards x 4 models x 2 toolchains\n\n"
-            "  hpx validate --suite complete        # RT + AOT + LiteRT + ExecuTorch sweep"
-        ),
-    )(validate_command)
+    app.add_typer(validate_app, name="validate")
+
+
+validate_app = typer.Typer(
+    help=(
+        "Run hardware-in-the-loop validation suite (MLPerf Tiny models), "
+        "or verify a run directory with `hpx validate build`"
+    ),
+    epilog=(
+        "Hardware validation — runs canonical MLPerf Tiny models end-to-end\n\n"
+        "against a real EVB + J-Link (and optional Joulescope).\n\n"
+        "Examples:\n\n"
+        "  hpx validate                         # Apollo510 reliability matrix, power off\n\n"
+        "  hpx validate --list                  # preview what would run\n\n"
+        "  hpx validate --models kws,ic         # subset by model\n\n"
+        "  hpx validate --engines aot           # subset by engine\n\n"
+        "  hpx validate --power off             # skip Joulescope (default)\n\n"
+        "  hpx validate --boards apollo3p_evb --repeat 2 --power off\n\n"
+        "                                       # require two passing iterations per case\n\n"
+        "  hpx validate -k kws-aot              # pytest keyword filter\n\n"
+        "  hpx validate --suite smoke           # quick preset: kws / helia-rt / gcc / rtt / auto\n\n"
+        "  hpx validate --suite models-rt       # 16-case RT sweep: 2 boards x 4 models x 2 toolchains\n\n"
+        "  hpx validate --suite models-aot      # 16-case AOT sweep: 2 boards x 4 models x 2 toolchains\n\n"
+        "  hpx validate --suite complete        # RT + AOT + LiteRT + ExecuTorch sweep\n\n"
+        "  hpx validate build runs/kws          # verify a run directory, no hardware"
+    ),
+)
 
 
 class _PowerOnDriver(StrEnum):
@@ -89,7 +97,9 @@ class _ValidateSuite(StrEnum):
     COMPLETE = "complete"
 
 
+@validate_app.callback(invoke_without_command=True)
 def validate_command(
+    ctx: typer.Context,
     models: Annotated[
         str,
         typer.Option(
@@ -282,6 +292,19 @@ def validate_command(
     verbose: Annotated[int, typer.Option("-v", "--verbose", count=True)] = 0,
 ) -> None:
     """Drive the hardware validation suite via pytest."""
+    if ctx.invoked_subcommand is not None:
+        given = sorted(
+            f"--{name.rstrip('_').replace('_', '-')}"
+            for name in ctx.params
+            # Typer vendors its own click, so the source enum is matched by name.
+            if getattr(ctx.get_parameter_source(name), "name", "DEFAULT") != "DEFAULT"
+        )
+        if given:
+            raise typer.BadParameter(
+                f"validation suite options do not apply to "
+                f"`hpx validate {ctx.invoked_subcommand}`: {', '.join(given)}"
+            )
+        return
     from .validate_cmd import _cmd_validate
 
     _cmd_validate(
@@ -311,3 +334,16 @@ def validate_command(
         list_=list_,
         verbose=verbose,
     )
+
+
+@validate_app.command("build", help="Verify a run directory written by hpx build (no hardware)")
+def validate_build_command(
+    directory: Annotated[Path, typer.Argument(help="Run directory written by hpx build")],
+    verbose: Annotated[
+        int, typer.Option("-v", "--verbose", count=True, help="Increase verbosity")
+    ] = 0,
+) -> None:
+    """Load and verify a run directory's build; print its identity as JSON."""
+    from .run_cmds import _cmd_validate_build
+
+    _cmd_validate_build(directory=directory, verbose=verbose)

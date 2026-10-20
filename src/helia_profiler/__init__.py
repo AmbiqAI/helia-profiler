@@ -142,6 +142,7 @@ if TYPE_CHECKING:
         SupportBundleSection,
         load_result_manifest,
     )
+    from .run_guard import OperatorGuard
     from .run_inputs import analyze_run_model, analyze_run_model_for_engine, capabilities
     from .runtime_records import (
         Qualification,
@@ -296,6 +297,7 @@ _EXPORTS = {
     "capabilities": (".run_inputs", "capabilities"),
     "analyze_run_model": (".run_inputs", "analyze_run_model"),
     "analyze_run_model_for_engine": (".run_inputs", "analyze_run_model_for_engine"),
+    "OperatorGuard": (".run_guard", "OperatorGuard"),
     "Lifecycle": (".lifecycle", "Lifecycle"),
     "CanonicalEngine": (".identity", "CanonicalEngine"),
     "CanonicalKernel": (".identity", "CanonicalKernel"),
@@ -351,6 +353,7 @@ __all__ = [
     "FixtureTimingScope",
     "FixtureCaptureGuard",
     "FixtureTarget",
+    "OperatorGuard",
     "PreparedUpstreamRuntime",
     "analyze_run_model",
     "analyze_run_model_for_engine",
@@ -551,6 +554,7 @@ _EXPERIMENTAL_API = {
     "FixtureTimingScope",
     "FixtureCaptureGuard",
     "FixtureTarget",
+    "OperatorGuard",
     "PreparedUpstreamRuntime",
     "analyze_run_model",
     "analyze_run_model_for_engine",
