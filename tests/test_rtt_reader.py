@@ -143,7 +143,7 @@ def test_api_rtt_write_times_out_when_down_buffer_never_accepts_bytes(monkeypatc
     monkeypatch.setattr("helia_profiler.transport.rtt.time.sleep", fake_sleep)
     monkeypatch.setattr("helia_profiler.transport.rtt.time.monotonic", lambda: next(times))
 
-    with pytest.raises(CaptureError, match="Timed out sending RTT host-ready command"):
+    with pytest.raises(CaptureError, match="Timed out sending RTT HPX_GO command"):
         _write_rtt_command_api(
             _FakeApiRttWriteJLink(),  # ty: ignore[invalid-argument-type]  # fake J-Link: only the surface under test
             command=b"READY",

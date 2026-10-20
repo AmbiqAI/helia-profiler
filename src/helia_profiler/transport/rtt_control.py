@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
 
 from ..target.probe.base import DebugMemorySession
 
@@ -100,12 +101,10 @@ def direct_rtt_read(
     return data
 
 
-def scan_rtt_control_blocks(
+def _iter_valid_blocks(
     jlink: DebugMemorySession,
     ranges: tuple[tuple[int, int], ...],
-) -> list[tuple[int, int]]:
-    """Return valid RTT control blocks as ``(address, score)``, best-first."""
-    candidates: list[tuple[int, int]] = []
+) -> Iterator[tuple[int, int]]:
     seen: set[int] = set()
     for base, length in ranges:
         for offset in range(0, length, _RTT_SCAN_CHUNK):
@@ -124,8 +123,16 @@ def scan_rtt_control_blocks(
                     seen.add(address)
                     score = score_rtt_control_block(jlink, address)
                     if score >= 0:
-                        candidates.append((address, score))
+                        yield address, score
                 start = index + 1
+
+
+def scan_rtt_control_blocks(
+    jlink: DebugMemorySession,
+    ranges: tuple[tuple[int, int], ...],
+) -> list[tuple[int, int]]:
+    """Return valid RTT control blocks as ``(address, score)``, best-first."""
+    candidates = list(_iter_valid_blocks(jlink, ranges))
     candidates.sort(key=lambda item: item[1], reverse=True)
     return candidates
 
@@ -159,32 +166,13 @@ def wipe_rtt_control_blocks(
     """Blank the magic of every structurally valid RTT block in SRAM."""
     zeros = [0] * _RTT_ID_SIZE
     wiped = 0
-    seen: set[int] = set()
-    for base, length in ranges:
-        for offset in range(0, length, _RTT_SCAN_CHUNK):
-            chunk_len = min(_RTT_SCAN_CHUNK, length - offset)
-            try:
-                chunk = bytes(jlink.memory_read8(base + offset, chunk_len))
-            except Exception:  # noqa: BLE001 - probe errors are non-fatal
-                continue
-            start = 0
-            while True:
-                index = chunk.find(_RTT_MAGIC, start)
-                if index < 0:
-                    break
-                address = base + offset + index
-                start = index + 1
-                if address in seen:
-                    continue
-                seen.add(address)
-                try:
-                    if score_rtt_control_block(jlink, address) < 0:
-                        continue
-                    jlink.memory_write8(address, zeros)
-                    wiped += 1
-                    log.debug("pre-clean blanked RTT control block at 0x%08X", address)
-                except Exception:  # noqa: BLE001 - a failed wipe is non-fatal
-                    pass
+    for address, _score in _iter_valid_blocks(jlink, ranges):
+        try:
+            jlink.memory_write8(address, zeros)
+            wiped += 1
+            log.debug("pre-clean blanked RTT control block at 0x%08X", address)
+        except Exception:  # noqa: BLE001 - a failed wipe is non-fatal
+            pass
     return wiped
 
 

@@ -94,13 +94,6 @@ _RTT_DISCOVERY_SETTLE_S = 2.0
 #: and the firmware format string cannot drift apart.
 _PSRAM_READY_RE = re.compile(rf"{WireKey.PSRAM_READY.wire}=0x([0-9a-fA-F]+),(\d+)")
 
-# The firmware always names up-channel 0 "HPX" (see firmware/templates/
-# main*.cc.j2: SEGGER_RTT_ConfigUpBuffer(0, "HPX", ...)).  This is the
-# strongest, board-agnostic way to tell *our* RTT control block apart from
-# unrelated ones (e.g. a bootloader/monitor's default "Terminal" block, or a
-# stale block left in retained SRAM by a previous firmware).
-_RTT_READY_LINE = HPX_READY_LINE
-
 
 def _wait_for_rtt_line(
     read_chunk,
@@ -158,7 +151,7 @@ def _write_rtt_command_api(
 
     if written < len(command):
         raise CaptureError(
-            "Timed out sending RTT host-ready command",
+            "Timed out sending RTT HPX_GO command",
             hint="The firmware did not expose a writable RTT down-buffer in time.",
         )
 
@@ -175,7 +168,7 @@ def _perform_rtt_ready_handshake(
     # down-buffer descriptor).
     return _wait_for_rtt_line(
         read_chunk,
-        expected_line=_RTT_READY_LINE,
+        expected_line=HPX_READY_LINE,
         timeout_s=_RTT_READY_TIMEOUT_S,
     )
 
