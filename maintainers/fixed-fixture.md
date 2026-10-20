@@ -555,20 +555,21 @@ Historical raw records and build/capture safety validation are unchanged.
 
 ### Running a compiled build
 
-`run_build(record, guard=..., jlink_serial=..., evidence_dir=..., settle_seconds=...,
-expect=None, expected_duration_s=None)`, or `record.run(...)`, captures once from a record without
-rebuilding. It builds the request with `fixture_capture_request`, captures with
-`capture_fixture` under the caller's guard, and returns a `RunResult` holding the
-record, the raw `capture`, the run's `identity` and the `verification`. The
-identity is `fixture_run_identity` of the build and capture, so it carries an
-`observation_hash`, with `run.lifecycle` taken from the record. With an
-`Expect`, a successful capture is compared through `compare_fixture_outputs`;
-without one, or when the capture failed, `verification` is `None`.
-`RunResult.succeeded` is true only for a `success` capture. A failed capture is
-returned, not raised; errors raised while capturing propagate. A `SINGLE`
-build of a model whose invocation takes less than one STIMER tick, about
-30.5 µs, can come back as a `FixtureStage.TIMING_BOUND` failure, because the firmware
-refuses a timed span of zero ticks; build such a model with `CARRY`.
+`run_build(compiled, guard=..., jlink_serial=..., evidence_dir=..., settle_seconds=...,
+expect=None, expected_duration_s=None)`, or `compiled.run(...)`, captures once from a
+compiled build without rebuilding. It verifies the build first, checks an `Expect` before
+the capture (one readable reference of each output's size, outputs the build carries, or
+LiteRT installed for a host reference), builds the request with `fixture_capture_request`,
+captures with `capture_fixture` under the caller's guard, and returns a `RunResult` holding
+the `compiled` build, the raw `capture`, the run's `identity` and the `verification`. A
+successful capture whose iterations and warmups differ from the build's raises
+`CaptureError`. The identity is `fixture_run_identity` of the build and capture, so it
+carries an `observation_hash`, with `run.lifecycle` taken from the build. With an
+`Expect`, a successful capture is compared through `compare_fixture_outputs`; without one,
+or when the capture failed, `verification` is `None`. `RunResult.succeeded` is true only
+for a `success` capture. A failed capture is returned, not raised; errors raised while
+capturing propagate. A very short `SINGLE` invocation can hit the one-tick floor described
+under [Timing windows by route](#timing-windows-by-route).
 `examples/run_api_conformance.py` walks freeze, build, save, load and run on a
 typed fixture and prints the identity, verification facts and key measurements.
 Its plan states what a fixture build requires (ATfE, the `lp` clock, an SRAM

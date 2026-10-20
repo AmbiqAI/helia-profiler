@@ -125,7 +125,7 @@ def test_the_capture_request_comes_from_the_record_and_the_caller(record, device
         expected_duration_s=2.5,
     )
     assert request.expected_duration_s == 2.5 and request.image == record.build.flat_binary
-    assert result.record is record and result.capture is capture and result.succeeded
+    assert result.compiled is record and result.capture is capture and result.succeeded
 
 
 def test_the_identity_states_the_observation_and_the_record_lifecycle(record, device, tmp_path):

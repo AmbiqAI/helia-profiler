@@ -231,9 +231,9 @@ class CompiledBuild:
                 f"Compiled build file is missing under the given roots: {exc}",
                 hint="Pass roots= naming where the record's files now live.",
             ) from exc
-        record = cls(plan, build, lifecycle, document["binding"])
-        record.verify()
-        return record
+        compiled = cls(plan, build, lifecycle, document["binding"])
+        compiled.verify()
+        return compiled
 
     def run(
         self,
@@ -298,7 +298,7 @@ class CompiledBuild:
 class RunResult:
     """One capture from a :class:`CompiledBuild`."""
 
-    record: CompiledBuild
+    compiled: CompiledBuild
     capture: FixtureCaptureResult
     identity: RunIdentity
     verification: Verification | None
@@ -456,7 +456,7 @@ def load_build(path: str | Path, *, roots: Mapping[str, Path]) -> CompiledBuild:
 
 
 def run_build(
-    record: CompiledBuild,
+    compiled: CompiledBuild,
     *,
     guard: FixtureCaptureGuard,
     jlink_serial: str,
@@ -465,8 +465,8 @@ def run_build(
     expect: Expect | None = None,
     expected_duration_s: float | None = None,
 ) -> RunResult:
-    """Flash *record*'s image, capture one run and compare outputs; see :meth:`CompiledBuild.run`."""
-    return record.run(
+    """Flash *compiled*'s image, capture one run and compare outputs; see :meth:`CompiledBuild.run`."""
+    return compiled.run(
         guard=guard,
         jlink_serial=jlink_serial,
         evidence_dir=evidence_dir,
