@@ -393,7 +393,7 @@ Read and verify a compiled build written by :meth:`CompiledBuild.save`.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/compiled_build.py:681`
+Source: `src/helia_profiler/compiled_build.py:685`
 
 ## helia_profiler.run_build
 
@@ -418,4 +418,4 @@ Flash *compiled*'s image, capture one run and compare outputs; see :meth:`Compil
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/compiled_build.py:686`
+Source: `src/helia_profiler/compiled_build.py:690`
