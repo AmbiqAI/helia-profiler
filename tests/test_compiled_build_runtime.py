@@ -147,3 +147,17 @@ def test_a_helia_aot_vcs_install_compares_the_commit(tmp_path):
     other = reseal(build, engine_source=replace(build.engine_source, commit="b" * 40))
     with pytest.raises(ConfigError, match=f"runtime commit {'b' * 40!r} differs"):
         compiled(vcs, other, Lifecycle.CARRY).verify()
+
+
+def test_a_plan_without_a_recorded_release_names_why_it_links_nothing(tmp_path):
+    from helia_profiler.compiled_build import _prepared_runtime
+
+    base = atfe_build(_build(tmp_path / "run"))
+    plan = plan_for(base, tmp_path / "model.tflite", engine="helia-rt")
+    assert plan.runtime is not None
+    reason = "heliaRT selected by engine.config.dist_path"
+    unrecorded = replace(
+        plan, runtime=replace(plan.runtime, version=None, unavailable_reason=reason)
+    )
+    with pytest.raises(ConfigError, match=f"no prepared helia-rt release to link: {reason}"):
+        _prepared_runtime(unrecorded)

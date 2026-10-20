@@ -116,7 +116,7 @@ class CompiledBuild:
             raise ConfigError(
                 "Compiled build's toolchain version "
                 f"{toolchain.compiler_version if toolchain else None!r} is not its plan's {version!r}",
-                hint="Freeze the plan with target.toolchain set to the toolchain the build uses.",
+                hint="Build with the compiler version the plan was frozen with, or freeze again.",
             )
         try:
             profiling = self.plan.settings["profiling"]
@@ -354,7 +354,7 @@ def build(
     except ValueError as exc:
         raise ConfigError(
             f"Unknown lifecycle {lifecycle!r}",
-            hint="Use Lifecycle.CARRY or Lifecycle.SINGLE; reset is reserved.",
+            hint="Use Lifecycle.CARRY or Lifecycle.SINGLE.",
         ) from exc
     if method.power_sync is not None:
         if lifecycle is Lifecycle.SINGLE:
@@ -441,6 +441,13 @@ def _prepared_runtime(plan: FrozenRun) -> PreparedUpstreamRuntime | None:
     linked = _linked_runtime(plan)
     if linked is None:
         raise ConfigError(f"The plan states no {engine.value} runtime to link")
+    if linked.version is None:
+        reason = plan.runtime.unavailable_reason if plan.runtime else None
+        raise ConfigError(
+            f"The plan names no prepared {engine.value} release to link"
+            + (f": {reason}" if reason else ""),
+            hint="Freeze the plan with a recorded runtime release, or pass runtime=.",
+        )
     return prepared_runtime(linked.name, linked.version).runtime
 
 

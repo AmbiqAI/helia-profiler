@@ -111,6 +111,21 @@ def test_build_applies_the_lifecycle_and_compiles(plan, build, fixture, calls, l
     assert record.plan is plan and call["runtime"] is None
 
 
+def test_build_verifies_what_it_compiled(plan, build, fixture, monkeypatch):
+    def wrong_counts(config, fixture, **options):
+        return reseal(build, iterations=7, warmups=0)
+
+    monkeypatch.setattr("helia_profiler._fixture_build.build_fixed_fixture", wrong_counts)
+    with pytest.raises(ConfigError, match="runs 100 and 5"):
+        plan.build(fixture, method=_METHOD, lifecycle=Lifecycle.CARRY)
+
+
+def test_build_refuses_an_unknown_lifecycle(plan, fixture, calls):
+    with pytest.raises(ConfigError, match="Unknown lifecycle 'bogus'"):
+        plan.build(fixture, method=_METHOD, lifecycle="bogus")
+    assert calls == []
+
+
 def test_build_asks_the_engine_for_the_lifecycle(plan, fixture, calls, monkeypatch):
     def refuse(engine, lifecycle):
         raise ConfigError(f"{engine.value} refuses {lifecycle.value}")

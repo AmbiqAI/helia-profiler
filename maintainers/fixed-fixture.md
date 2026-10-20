@@ -170,9 +170,12 @@ records from 5.0 through 5.7.
 `helia_profiler.build(plan, fixture, method=..., lifecycle=...)`, also reached
 as `FrozenRun.build(fixture, ...)`, compiles a frozen plan for a fixture through
 `build_fixed_fixture` and returns a `CompiledBuild` of the plan, the compiled
-`FixtureBuild` and the `Lifecycle` it runs. It refuses a fixture whose model is
-not the plan's, asks the engine whether it implements the lifecycle, and
-applies the lifecycle's invocation counts (`SINGLE` runs one timed invocation
+`FixtureBuild` and the `Lifecycle` it runs. heliaRT and TFLM link the
+prepared runtime the plan names, taken from the HPX cache (`hpx runtimes
+prepare`) unless `runtime=` is passed. It refuses a fixture whose model is
+not the plan's, asks the engine whether it implements the lifecycle,
+verifies the result before returning it, and applies the lifecycle's
+invocation counts (`SINGLE` runs one timed invocation
 and no warmups; see [Timing windows by route](#timing-windows-by-route) for its
 one-tick floor). `CompiledBuild.identity` is the build's `RunIdentity` with
 that lifecycle. `save(path, roots=...)` writes one canonical JSON document
@@ -192,8 +195,12 @@ enters it, so a build relocated to another host keeps its binding.
 recomputes the binding, and then compares what the build records with what
 the plan states: engine, board, model hash and size, toolchain name, the
 compiler version among the plan's version lines, arena and weights
-placement, arena size (both are the configured capacity), clock profile and
-the lifecycle's invocation counts. A plan swapped into a saved file fails on
+placement, arena size (both are the configured capacity), clock profile,
+the lifecycle's invocation counts, and the runtime version and commit and
+kernel commit wherever both the plan and the build state one. heliaRT and
+heliaAOT compare with the plan's pins; TFLM compares with the prepared TFLM
+record, because the plan pins the modules an ordinary profile builds from
+source, which a fixture build does not link. A plan swapped into a saved file fails on
 the binding; a plan paired in memory with a build of other settings fails on
 the first fact that differs.
 
@@ -574,7 +581,7 @@ under [Timing windows by route](#timing-windows-by-route).
 typed fixture and prints the identity, verification facts and key measurements.
 Its plan states what a fixture build requires (ATfE, the `lp` clock, an SRAM
 arena of explicit size, MRAM weights), the build works under the host's
-`work_dir`, heliaRT and TFLM pass the runtime `hpx runtimes prepare` cached,
+`work_dir`, `build()` links the heliaRT or TFLM runtime `hpx runtimes prepare` cached,
 and the saved build names the HPX cache as a second root. Its
 `PlaceholderGuard` refuses every capture; a harness passes its own guard.
 

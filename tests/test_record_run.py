@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 from dataclasses import replace
 from pathlib import Path
 
@@ -238,13 +239,36 @@ def test_a_reference_that_cannot_be_compared_costs_no_capture(
     assert device.calls == []
 
 
-def test_counts_the_device_reports_must_be_the_builds(record, device, tmp_path):
-    capture = replace(
-        _success(tmp_path),
-        timing=FixtureTiming(3200, 100, 5, 32768, 4, 96_000_000, FixtureTimingScope.INVOKE_ONLY),
-    )
-    with pytest.raises(CaptureError, match="reported 100 and 5 .* runs 1 and 0"):
+@pytest.mark.parametrize(
+    ("timing", "reported"),
+    [
+        (
+            FixtureTiming(3200, 100, 5, 32768, 4, 96_000_000, FixtureTimingScope.INVOKE_ONLY),
+            "100 and 5",
+        ),
+        (
+            FixtureTiming(3200, 1, 5, 32768, 4, 96_000_000, FixtureTimingScope.INVOKE_ONLY),
+            "1 and 5",
+        ),
+        (None, "none"),
+    ],
+    ids=["iterations", "warmups only", "no timing"],
+)
+def test_counts_the_device_reports_must_be_the_builds(record, device, tmp_path, timing, reported):
+    capture = replace(_success(tmp_path), timing=timing)
+    with pytest.raises(CaptureError, match=f"reported {reported} .* runs 1 and 0"):
         _run(record, device, capture, tmp_path)
+
+
+def test_a_host_reference_without_litert_costs_no_capture(record, device, tmp_path, monkeypatch):
+    real = importlib.util.find_spec
+    monkeypatch.setattr(
+        "importlib.util.find_spec",
+        lambda name, *a: None if name == "ai_edge_litert" else real(name, *a),
+    )
+    with pytest.raises(ConfigError, match="needs the LiteRT interpreter"):
+        _run(record, device, _success(tmp_path), tmp_path, expect=Expect.host_litert())
+    assert device.calls == []
 
 
 def test_run_verifies_the_build_before_the_device(record, device, tmp_path):

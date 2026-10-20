@@ -24,7 +24,10 @@ class Lifecycle(StrEnum):
     :class:`InstanceBoundary`: for a ``boot`` engine ``SINGLE`` is one timed
     invocation and no warmups per boot; for an ``invocation`` engine, such as
     ExecuTorch, every invocation is its own instance, so several measurements
-    are several instances, never one carried state.
+    are several instances, never one carried state. The fixture firmware
+    refuses a timed span of zero ticks of its 32.768 kHz timer, so a
+    ``SINGLE`` invocation shorter than about 30.5 µs can fail as
+    ``TIMING_BOUND``.
     """
 
     CARRY = "carry"

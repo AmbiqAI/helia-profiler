@@ -101,7 +101,7 @@ Compare times only when these agree:
 | Field | Ordinary profile | Fixture and run API |
 |---|---|---|
 | `timing_scope` | the clean window: `restore_and_invoke` on heliaAOT, else `invoke_only` | the caller's `FixtureMethod`: `invoke_only` brackets each invocation, `restore_and_invoke` one span around the timed loop, input restoration included |
-| `timing_clock`, `timing_clock_hz` | `stimer` at 32,768 Hz on Apollo5 and for the `busy_loop` probe, otherwise `cpu` cycles (DWT, or ExecuTorch's execute-cycle count) at the CPU clock | `stimer` at 32,768 Hz |
+| `timing_clock`, `timing_clock_hz` | `stimer` at 32,768 Hz for the `busy_loop` probe; otherwise `cpu` cycles at the CPU clock for ExecuTorch (its execute-cycle count) on every SoC, `stimer` on Apollo5, and `cpu` (DWT) cycles elsewhere | `stimer` at 32,768 Hz; a `single` invocation under about 30.5 µs can fail as `TIMING_BOUND` |
 | `timing_statistic` | `mean` per invocation | `total` ticks over the timed invocations; divide by `iterations` and the rate for a mean |
 | `lifecycle`, `instance_boundary` | `carry`/`boot`; ExecuTorch `single`/`invocation`: every call reloads the program, so each invocation is its own instance | the build's lifecycle: `carry` runs the plan's counts, `single` one timed invocation and no warmups per boot |
 | `first_invoke_initializer`, `first_invoke_window` | whether the first invocation runs a one-time initializer, and whether it is a `warmup` (always, before the clean window) or `measured` (ExecuTorch) | the same answer per engine; `measured` under `single` or with no warmups, so a `CALL_ONCE` lands in the timed span |
