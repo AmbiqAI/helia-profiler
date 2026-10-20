@@ -8,7 +8,7 @@ import pytest
 
 from helia_profiler.config import load_config
 from helia_profiler.engines import EngineType
-from helia_profiler.engines.litert import LiteRTAdapter
+from helia_profiler.engines.litert import LiteRtAdapter
 from helia_profiler.errors import ConfigError, EngineError
 from helia_profiler.results import NsxModuleRef
 
@@ -23,7 +23,7 @@ def _config(tmp_path: Path, backend: str | None = None):
 
 
 def test_reference_backend_adds_litert_module(tmp_path: Path):
-    artifacts = LiteRTAdapter().prepare(_config(tmp_path), tmp_path)
+    artifacts = LiteRtAdapter().prepare(_config(tmp_path), tmp_path)
 
     assert artifacts.engine_type is EngineType.LITERT
     assert artifacts.cmake_vars == {"NSX_TFLITE_MICRO_BACKEND": "reference"}
@@ -33,7 +33,7 @@ def test_reference_backend_adds_litert_module(tmp_path: Path):
 
 
 def test_cmsis_nn_backend_adds_kernel_module_before_litert(tmp_path: Path):
-    artifacts = LiteRTAdapter().prepare(_config(tmp_path, "cmsis_nn"), tmp_path)
+    artifacts = LiteRtAdapter().prepare(_config(tmp_path, "cmsis_nn"), tmp_path)
 
     assert artifacts.cmake_vars == {"NSX_TFLITE_MICRO_BACKEND": "cmsis_nn"}
     assert [(module.name, module.project) for module in artifacts.extra_modules] == [
@@ -44,7 +44,7 @@ def test_cmsis_nn_backend_adds_kernel_module_before_litert(tmp_path: Path):
 
 def test_invalid_backend_fails_with_actionable_error(tmp_path: Path):
     with pytest.raises(EngineError, match="Invalid LiteRT backend 'helia'"):
-        LiteRTAdapter().prepare(_config(tmp_path, "helia"), tmp_path)
+        LiteRtAdapter().prepare(_config(tmp_path, "helia"), tmp_path)
 
 
 @pytest.mark.parametrize("backend", ["reference", "cmsis_nn"])
@@ -62,7 +62,7 @@ def test_unread_config_file_is_rejected_before_preparation(tmp_path: Path, backe
     )
     work_dir = tmp_path / "work"
     with pytest.raises(EngineError, match="LiteRT does not read engine.config_path") as excinfo:
-        LiteRTAdapter().prepare(config, work_dir)
+        LiteRtAdapter().prepare(config, work_dir)
     assert "Remove engine.config_path" in (excinfo.value.hint or "")
     assert not work_dir.exists()
 
@@ -99,7 +99,7 @@ def test_prepared_settings_before_staging(
     monkeypatch.setattr("helia_profiler.fixture_runtime.prepare_runtime_module", stage)
     work_dir = tmp_path / "work"
     if case == "valid":
-        artifacts = LiteRTAdapter().prepare_runtime(config, work_dir, runtime)
+        artifacts = LiteRtAdapter().prepare_runtime(config, work_dir, runtime)
         stage.assert_called_once_with(runtime, work_dir)
         assert artifacts.extra_modules == [module]
         assert artifacts.engine_header == "tensorflow/lite/micro/micro_interpreter.h"
@@ -107,6 +107,6 @@ def test_prepared_settings_before_staging(
     else:
         message = "config_path" if case == "unread_file" else "Prepared LiteRT requires"
         with pytest.raises(EngineError, match=message):
-            LiteRTAdapter().prepare_runtime(config, work_dir, runtime)
+            LiteRtAdapter().prepare_runtime(config, work_dir, runtime)
         stage.assert_not_called()
         assert not work_dir.exists()

@@ -12,7 +12,7 @@ from test_fixture_runtime import runtime
 
 from helia_profiler.config import EngineConfig
 from helia_profiler.engines import get_adapter
-from helia_profiler.engines.litert import LiteRTAdapter
+from helia_profiler.engines.litert import LiteRtAdapter
 from helia_profiler.fixture import EngineType, FixtureBackend, TypedFixture, build_fixture
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.placement import Placement
@@ -45,7 +45,7 @@ def test_selected_archive_does_not_prepare_and_replace_ordinary_engine(tmp_path,
     (tmp_path / "provider").mkdir()
     cached = runtime(tmp_path / "provider").verify()
     normal = Mock(side_effect=AssertionError("ordinary provider must not prepare"))
-    monkeypatch.setattr(LiteRTAdapter, "prepare", normal)
+    monkeypatch.setattr(LiteRtAdapter, "prepare", normal)
     config = replace(
         _request(tmp_path / "input").to_config(),
         engine=EngineConfig(type=EngineType.LITERT, backend="cmsis_nn"),

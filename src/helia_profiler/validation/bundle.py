@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from ..engines import EngineType
 from ..errors import ValidationBundleError
 
 #: Written by ``validation.report``; the loader accepts every version up to it.
@@ -250,6 +251,12 @@ def _load_case(
         raise ValidationBundleError(f"Validation case {case_id!r} has invalid comparison_group")
 
     engine = _required_string(identity_raw, "engine", index)
+    if engine not in {member.value for member in EngineType}:
+        raise ValidationBundleError(
+            f"Validation case {case_id!r} names engine {engine!r}, which this HPX does not "
+            "know; a case that says 'tflm' was written before the engine became 'litert', "
+            "so read it with the HPX release that wrote it"
+        )
     identity = ValidationCaseIdentity(
         model_id=_required_string(identity_raw, "model_id", index),
         engine=engine,
@@ -306,8 +313,6 @@ def _cmsis_nn_provider(identity: dict[str, Any], engine: str, case_id: str, vers
         backend = identity.get("backend")
         if engine == "executorch" and backend in {"arm", "ns"}:
             provider = backend
-        elif engine == "litert":
-            provider = "arm"
         elif engine in {"helia-rt", "helia-aot"}:
             provider = "ns"
     if provider not in {"arm", "ns"}:

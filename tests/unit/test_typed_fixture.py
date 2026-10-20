@@ -664,7 +664,7 @@ def test_int32_emitted_control_checks_bytes_status_and_full_output(tmp_path):
 #include <cstdint>
 #include <cstring>
 #include <cstdlib>
-#include "hpx_stub_litert_common.h"
+#include "hpx_stub_tflm_common.h"
 #define NSX_MEM_SRAM_BSS
 #define TFLITE_SCHEMA_VERSION 3
 static int fault, calls;

@@ -38,6 +38,7 @@
     "/architecture/field-diagnostics/": "/helia-profiler/guide/concepts/field-diagnostics/",
     "/architecture/firmware/": "/helia-profiler/guide/concepts/firmware/",
     "/architecture/pipeline/": "/helia-profiler/guide/concepts/pipeline/",
+    "/examples/tflm-baseline/": "/helia-profiler/examples/litert-baseline/",
     "/getting-started/quickstart/": "/helia-profiler/getting-started/configure-a-run/",
     "/guides/": "/helia-profiler/guide/",
     "/guides/executorch-ns-kernels/": "/helia-profiler/guide/executorch-ns-kernels/",
@@ -62,8 +63,7 @@
     "/reference/probes/": "/helia-profiler/reference/cli/probes/",
     "/reference/profile/": "/helia-profiler/reference/cli/profile/",
     "/reference/target/": "/helia-profiler/reference/cli/target/",
-    "/reference/validate/": "/helia-profiler/reference/cli/validate/",
-    "/examples/tflm-baseline/": "/helia-profiler/examples/litert-baseline/"
+    "/reference/validate/": "/helia-profiler/reference/cli/validate/"
   },
   "moved": {
     "/guide/in-depth/": "/helia-profiler/guide/",

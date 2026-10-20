@@ -310,7 +310,10 @@ containment. Provider source identities remain manifest-declared; retain the
 corresponding audited source/build record.
 
 A LiteRT `FixtureBuildRequest` that names no runtime uses the archive
-`hpx runtimes prepare litert` built from the default litert runtime record. Prepare
+`hpx runtimes prepare litert` built from the default litert runtime record. A
+station that prepared it while the engine was named `tflm` can move
+`<cache>/runtimes/tflm` to `<cache>/runtimes/litert` instead of rebuilding: the
+manifest names no engine and the archive digest is unchanged. Prepare
 downloads the tflite-micro source at the record's commit and runs TFLM's own
 make dry run for `cortex_m_generic`/`cortex-m55` with CMSIS-NN kernels. The dry
 run fetches TFLM's pinned third-party sources and lists the translation units.

@@ -31,7 +31,7 @@ def _reject_config_path(config: ProfileConfig) -> None:
         )
 
 
-class LiteRTAdapter(SingleArenaPlacementMixin):
+class LiteRtAdapter(SingleArenaPlacementMixin):
     """Adapter for LiteRT, stock TensorFlow Lite for Microcontrollers (TFLM)."""
 
     prepared_runtime_contract = ("upstream", "cmsis_nn")

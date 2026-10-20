@@ -87,8 +87,8 @@ test('option help reaches the parameter table as plain text', () => {
   /* RefParams escapes the description cell, so a backtick would render as a
    * backtick rather than as a code span. */
   assert.equal(plainHelp('Pass `--offline`\n  to skip the network.'), 'Pass --offline to skip the network.');
-  const row = paramRow(option({ help: 'Use `tflm`.', required: true, multiple: true }));
-  assert.equal(row.description, 'Use tflm. Required. Repeatable.');
+  const row = paramRow(option({ help: 'Use `litert`.', required: true, multiple: true }));
+  assert.equal(row.description, 'Use litert. Required. Repeatable.');
 });
 
 test('a parameter name leads with its long declaration', () => {

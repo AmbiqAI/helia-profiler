@@ -488,8 +488,8 @@ compare` surfaces such a promotion via the `engine_version` comparability
 dimension (#193): the measured `run_metadata.engine.version` renders as an
 `Engine version` row in the compare Config table and an informative
 `dimension.engine_version_differs` warning when the two sides differ
-(absent for artifacts predating the dimension, and for tflm/executorch
-runs, which record no resolved version).
+(absent for artifacts predating the dimension, and for litert (then `tflm`)
+and executorch runs, which record no resolved version).
 HPX consumes the Ethos-U kernel support since the atomiq110 work (PR
 #284): the `ethos_u` engine backend opts in via
 `NSX_HELIA_RT_ENABLE_ETHOSU` on a heliaRT source build, which requires a

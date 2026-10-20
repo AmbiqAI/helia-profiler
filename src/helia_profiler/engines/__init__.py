@@ -49,9 +49,9 @@ class EngineType(StrEnum):
 
 
 def _load_litert_adapter() -> "EngineAdapter":
-    from .litert import LiteRTAdapter
+    from .litert import LiteRtAdapter
 
-    return LiteRTAdapter()
+    return LiteRtAdapter()
 
 
 def _load_helia_rt_adapter() -> "EngineAdapter":

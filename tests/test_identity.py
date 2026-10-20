@@ -10,7 +10,7 @@ from helia_profiler.engines import EngineType
 from helia_profiler.engines.executorch import EXECUTORCH_MODULE
 from helia_profiler.engines.helia_rt.adapter import HeliaRTAdapter
 from helia_profiler.engines.helia_rt.artifacts import HELIART_MODULE
-from helia_profiler.engines.litert import _SUPPORTED_BACKENDS, TFLITE_MICRO_MODULE, LiteRTAdapter
+from helia_profiler.engines.litert import _SUPPORTED_BACKENDS, TFLITE_MICRO_MODULE, LiteRtAdapter
 from helia_profiler.fixture_runtime import STACK_KERNEL_LIBRARY, STACK_RUNTIME_RECORD
 from helia_profiler.identity import (
     CanonicalEngine,
@@ -73,7 +73,7 @@ def test_kernel_names_map_to_their_library():
         FixtureBackend.HELIA: HELIA_CORE,
     }
     for adapter, engine, kernel in (
-        (LiteRTAdapter, LITERT, CMSIS_NN),
+        (LiteRtAdapter, LITERT, CMSIS_NN),
         (HeliaRTAdapter, HELIA_RT, HELIA_CORE),
     ):
         stack, backend = adapter.prepared_runtime_contract
