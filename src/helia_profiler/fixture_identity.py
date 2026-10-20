@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any
 
-from ._identity_hash import build_hash, digest, measured_facts
+from ._identity_hash import build_hash, measured_facts
 from ._semantic_hash import semantic_hash
 from .deps.compatibility import CMSIS_NN_PROVIDER_MODULES
 from .engines import get_adapter
@@ -54,7 +54,7 @@ def fixture_run_identity(
         baseline_id=_workspace_fact(workspace, "baseline_id"),
         dependency_lock_sha256=_sha(build.dependency_lock),
         model_sha256=_sha(build.model, Unknown("the record predates pinned models")),
-        inputs_sha256=_inputs_sha256(build),
+        inputs_hash=_inputs_hash(build),
         run=_run_facts(build, capture),
         producer=_workspace_fact(_inputs(workspace), "hpx_version"),
         build_hash=_build_hash(build, archive),
@@ -213,10 +213,10 @@ def _sha(file: FixtureFile | None, absent: Unknown = _NOT_COMPILED) -> str | Unk
     return file.sha256 if file is not None else absent
 
 
-def _inputs_sha256(build: FixtureBuild) -> str | Unknown:
+def _inputs_hash(build: FixtureBuild) -> str | Unknown:
     if not build.inputs:
         return Unknown("the record predates pinned inputs")
-    return digest([[io.tensor.name, io.data.sha256] for io in build.inputs])
+    return semantic_hash("inputs", [[io.tensor.name, io.data.sha256] for io in build.inputs])
 
 
 def _build_hash(build: FixtureBuild, archive: str | None) -> str | Unknown:

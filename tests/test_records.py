@@ -257,6 +257,7 @@ _HEX = "ab" * 32
 def _identity(**changes):
     return {
         "build_hash": f"hpx.build/1:sha256:{_HEX}",
+        "inputs_hash": f"hpx.inputs/1:sha256:{_HEX}",
         "observation_hash": f"hpx.observation/1:sha256:{_HEX}",
         "intent_hash": f"hpx.intent/1:sha256:{_HEX}",
         **changes,
@@ -284,6 +285,7 @@ def test_a_summary_identity_with_semantic_hashes_reads(tmp_path, identity):
         _identity(build_hash=_HEX),
         _identity(build_hash=None),
         _identity(build_hash={"unknown": "x", "extra": 1}),
+        _identity(inputs_hash=_HEX),
         _identity(observation_hash=_HEX),
         _identity(observation_hash={"unknown": "no capture"}),
         _identity(intent_hash=_HEX),
@@ -298,7 +300,7 @@ def test_a_current_summary_identity_hash_of_the_wrong_form_is_refused(tmp_path, 
 
 
 def test_a_previous_summary_keeps_its_bare_hex_identity_hashes(tmp_path):
-    identity = _identity(build_hash=_HEX, observation_hash=_HEX, intent_hash=None)
+    identity = _identity(build_hash=_HEX, observation_hash=_HEX, intent_hash=None, inputs_hash=_HEX)
     path = bundle(tmp_path)
     edit_document(path, "summary.json", lambda d: d.update(schema_version=18, identity=identity))
     summary = load_result(path).summary

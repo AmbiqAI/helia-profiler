@@ -106,9 +106,9 @@ def test_a_compiled_build_states_what_it_linked(tmp_path):
     assert identity.producer == "0.2.3"
     assert identity.build.toolchain_version == "22.1.0" and identity.build.cpu_hz == 96000000
     assert (identity.run.lifecycle, identity.run.iterations) == ("carry", 100)
-    assert isinstance(identity.build_hash, str) and isinstance(identity.inputs_sha256, str)
+    assert isinstance(identity.build_hash, str) and isinstance(identity.inputs_hash, str)
     assert SemanticHash.parse(identity.build_hash).kind == "build"
-    assert len(identity.inputs_sha256) == 64
+    assert SemanticHash.parse(identity.inputs_hash).kind == "inputs"
 
 
 def test_the_build_hash_ignores_the_hpx_release_but_not_the_image(tmp_path):
@@ -263,7 +263,7 @@ def test_each_missing_fact_states_its_own_reason(tmp_path):
         )
     )
     assert identity.model_sha256 == Unknown("the record predates pinned models")
-    assert identity.inputs_sha256 == Unknown("the record predates pinned inputs")
+    assert identity.inputs_hash == Unknown("the record predates pinned inputs")
     assert identity.build.cpu_hz == Unknown("the record predates this fact")
     assert identity.build.toolchain == Unknown("the record states no toolchain")
     assert identity.kernels.library == Unknown(
@@ -306,8 +306,8 @@ def test_lifecycle_and_input_names_are_part_of_the_identity(tmp_path):
         replace(io, tensor=replace(io.tensor, name=io.tensor.name + "_x")) for io in build.inputs
     )
     assert (
-        fixture_run_identity(replace(build, inputs=renamed)).inputs_sha256
-        != fixture_run_identity(build).inputs_sha256
+        fixture_run_identity(replace(build, inputs=renamed)).inputs_hash
+        != fixture_run_identity(build).inputs_hash
     )
 
 
@@ -364,6 +364,23 @@ def test_a_lock_that_is_not_an_nsx_lock_has_no_build_hash(tmp_path):
     assert fixture_run_identity(build).build_hash == Unknown(
         "the dependency lock is not an NSX lock"
     )
+
+
+def test_a_lock_with_a_non_finite_number_has_no_build_hash():
+    from helia_profiler._identity_hash import build_hash
+
+    lock = b"""
+targets:
+  app:
+    target: apollo510_evb
+    modules:
+      tooling:
+        kind: packaged
+        resolved: {content_hash: .nan}
+"""
+    assert build_hash(
+        image_sha256="0" * 64, lock=lock, runtime_archive=None, model_sha256="1" * 64
+    ) == Unknown("the dependency lock holds a non-finite number")
 
 
 def test_records_that_predate_sources_rederive_them_from_pinned_files(tmp_path):

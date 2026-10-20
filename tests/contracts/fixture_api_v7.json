@@ -2170,7 +2170,7 @@
           "<required>"
         ],
         [
-          "inputs_sha256",
+          "inputs_hash",
           "str | Unknown",
           "<required>"
         ],

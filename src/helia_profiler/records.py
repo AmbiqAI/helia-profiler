@@ -149,6 +149,7 @@ _SUMMARY_VERSIONS = (11, 12, 13, 14, 15, 16, 17, 18, 19)
 #: Each identity hash, its kind, and the non-hash value it may take instead.
 _IDENTITY_HASHES: tuple[tuple[str, Kind, str], ...] = (
     ("build_hash", "build", "unknown"),
+    ("inputs_hash", "inputs", "unknown"),
     ("observation_hash", "observation", "null"),
     ("intent_hash", "intent", "null"),
 )

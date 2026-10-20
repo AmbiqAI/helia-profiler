@@ -628,3 +628,8 @@ def test_an_unavailable_compiler_is_not_reported_as_drift(session, compiler, mon
 )
 def test_a_custom_heliart_release_is_not_portable(session, source):
     assert not session.with_engine("helia-rt", config={"source": source}).freeze().portable
+
+
+def test_a_non_finite_setting_is_refused_at_freeze(session):
+    with pytest.raises(ConfigError, match="cannot hold a non-finite number"):
+        session.with_power(io_voltage=float("nan")).freeze()

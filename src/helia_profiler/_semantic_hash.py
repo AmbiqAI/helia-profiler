@@ -1,11 +1,19 @@
 """heliaPROFILER's semantic hashes: what a hash means, stated in the hash.
 
 A semantic hash is written ``<producer>.<kind>/<version>:sha256:<hex>``,
-for example ``hpx.build/1:sha256:`` and 64 lowercase hex digits. The kind
-names what was hashed and the version names its basis, the exact bytes
-hashed: the value's canonical JSON (sorted keys, compact separators,
-non-finite floats spelled as their ``repr``), UTF-8 encoded. Two hashes are
-comparable only when producer, kind and version all match.
+where ``<hex>`` is 64 lowercase hex digits, for example
+``hpx.build/1:sha256:`` followed by the digest. The kind names what was
+hashed and the version names its basis, the exact bytes hashed. Two hashes
+are comparable only when producer, kind and version all match.
+
+The basis is the value's JSON as Python's ``json.dumps`` writes it with
+``sort_keys=True``, ``separators=(",", ":")`` and ``ensure_ascii=True``:
+keys sorted, no whitespace, every non-ASCII character escaped as
+``\\uXXXX`` (a surrogate pair beyond U+FFFF) so the bytes are ASCII, and
+each float in Python's shortest round-trip ``repr`` (``0.1``, ``1e-05``).
+A non-finite float (NaN or an infinity) is refused, except in an
+``observation`` basis, where a capture can report a NaN counter and it is
+written as the string ``"nan"``, ``"inf"`` or ``"-inf"``.
 
 A raw artifact digest, such as ``model_sha256``, hashes a file's bytes and
 stays bare hex.
@@ -18,20 +26,37 @@ import json
 import math
 import re
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Literal, NamedTuple
 
 PRODUCER = "hpx"
 
-Kind = Literal["intent", "build", "observation", "binding"]
+Kind = Literal["intent", "build", "observation", "binding", "inputs"]
 
-#: Each kind's basis version. Changing what goes into a kind's basis, or how
-#: it is encoded, means bumping that kind's version.
+
+class _Basis(NamedTuple):
+    version: int
+    #: Whether a non-finite float is written as its ``repr`` string rather than refused.
+    non_finite_as_text: bool = False
+
+
+#: Each kind's basis. Changing what goes into a kind's basis, or how it is
+#: encoded, means bumping that kind's version.
 #:
 #: - ``intent``: what a frozen plan asks for (:attr:`FrozenRun.intent_hash`).
 #: - ``build``: the flashed image, the resolved lock, the runtime archive and the model.
 #: - ``observation``: one capture's measured facts, without host paths.
-#: - ``binding``: a compiled build's plan intent, lifecycle and recorded build method.
-KIND_VERSIONS: dict[Kind, int] = {"intent": 1, "build": 1, "observation": 1, "binding": 1}
+#: - ``binding``: a compiled build's plan intent, lifecycle, timing scope, state
+#:   policy, power wiring, runtime manifest and observed facts.
+#: - ``inputs``: each pinned input's tensor name and data sha256, in model order.
+_KINDS: dict[Kind, _Basis] = {
+    "intent": _Basis(1),
+    "build": _Basis(1),
+    "observation": _Basis(1, non_finite_as_text=True),
+    "binding": _Basis(1),
+    "inputs": _Basis(1),
+}
+
+KIND_VERSIONS: dict[Kind, int] = {kind: basis.version for kind, basis in _KINDS.items()}
 
 _NAME = r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*"
 _FORM = re.compile(
@@ -48,7 +73,8 @@ class SemanticHash:
     and kind are lowercase words joined by ``-``, the version a positive
     integer, and the hex 64 lowercase digits. heliaPROFILER's hashes have
     the producer ``hpx`` and the kinds ``intent``, ``build``,
-    ``observation`` and ``binding``; :meth:`parse` reads any producer's.
+    ``observation``, ``binding`` and ``inputs``; :meth:`parse` reads any
+    producer's.
     Compare two hashes only when their producer, kind and version match.
     """
 
@@ -84,15 +110,28 @@ class SemanticHash:
         return f"{self.producer}.{self.kind}/{self.version}:sha256:{self.hex}"
 
 
-def canonical_json(value: Any) -> bytes:
-    """The basis bytes of *value*: canonical JSON, UTF-8 encoded."""
-    encoded = json.dumps(_finite(value), sort_keys=True, separators=(",", ":"), allow_nan=False)
-    return encoded.encode("utf-8")
+def basis(kind: Kind, value: Any) -> bytes:
+    """The bytes a *kind* hash of *value* covers; see the module docstring.
+
+    Raises:
+        ValueError: *value* holds a non-finite float and *kind* refuses one.
+    """
+    if _KINDS[kind].non_finite_as_text:
+        value = _finite(value)
+    try:
+        encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    except ValueError as exc:
+        raise ValueError(f"The {kind} basis cannot hold a non-finite number: {exc}") from exc
+    return encoded.encode("ascii")
 
 
 def semantic_hash(kind: Kind, value: Any) -> str:
-    """The ``hpx`` semantic hash of *value* as a *kind*, at the kind's current version."""
-    hexdigest = hashlib.sha256(canonical_json(value)).hexdigest()
+    """The ``hpx`` semantic hash of *value* as a *kind*, at the kind's current version.
+
+    Raises:
+        ValueError: *value* holds a non-finite float and *kind* refuses one.
+    """
+    hexdigest = hashlib.sha256(basis(kind, value)).hexdigest()
     return str(SemanticHash(PRODUCER, kind, KIND_VERSIONS[kind], hexdigest))
 
 
@@ -115,7 +154,7 @@ def require(text: object, kind: Kind) -> str:
 
 
 def _finite(value: Any) -> Any:
-    """``value`` with non-finite floats spelled out, so a NaN counter still hashes."""
+    """``value`` with non-finite floats written as their ``repr`` strings."""
     if isinstance(value, float) and not math.isfinite(value):
         return repr(value)
     if isinstance(value, dict):

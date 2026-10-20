@@ -10,36 +10,56 @@ import json
 import re
 from importlib.resources import files
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 import helia_profiler
 from helia_profiler import SemanticHash
-from helia_profiler._semantic_hash import KIND_VERSIONS, canonical_json, require, semantic_hash
+from helia_profiler._semantic_hash import KIND_VERSIONS, Kind, basis, require, semantic_hash
 
 HEX = "a74a43acef82134a3774a67959b8da1232a38fb88d7ea6f93e55e3e7662786c8"
+#: The JSON escape prefix, kept out of the literals so the expected bytes read as written.
+_U = "\\" + "u"
 
-#: kind -> (basis value, canonical bytes, namespaced string).
-GOLDEN = {
+#: name -> (kind, basis value, basis bytes, namespaced string); one per kind,
+#: plus one whose basis needs non-ASCII escapes and float reprs.
+GOLDEN: dict[str, tuple[Kind, Any, bytes, str]] = {
     "intent": (
+        "intent",
         {"settings": {"engine": {"type": "helia-aot"}}, "toolchain": ["atfe", "21.1.1"]},
         b'{"settings":{"engine":{"type":"helia-aot"}},"toolchain":["atfe","21.1.1"]}',
         f"hpx.intent/1:sha256:{HEX}",
     ),
     "build": (
+        "build",
         {"image": "ab12", "lock": {}, "runtime_archive": None, "model": "cd34"},
         b'{"image":"ab12","lock":{},"model":"cd34","runtime_archive":null}',
         "hpx.build/1:sha256:6c416b863ba7e576075dca7ff677be4449aa90e879738cb4591dcb323d9583f5",
     ),
     "observation": (
+        "observation",
         {"cycles": [120, 80], "mean_us": float("nan"), "error": False},
         b'{"cycles":[120,80],"error":false,"mean_us":"nan"}',
         "hpx.observation/1:sha256:8f2796b5d85db5099f58b011ce8cb5c0b7c38f22d36d462cf80e6e9b77eba605",
     ),
     "binding": (
+        "binding",
         {"lifecycle": "carry", "power_sync": None},
         b'{"lifecycle":"carry","power_sync":null}',
         "hpx.binding/1:sha256:7b9198891413a5779f01bb8aed3d0a68125d87cf983fddec759efbfcb58201ed",
+    ),
+    "inputs": (
+        "inputs",
+        [["input_1", "cd34"], ["input_2", "ef56"]],
+        b'[["input_1","cd34"],["input_2","ef56"]]',
+        "hpx.inputs/1:sha256:4a9320c8ecb5b4deede7d46e4dd9f2ad11ecf27e7626385dc7e7e03d84f2c9cc",
+    ),
+    "non-ascii": (
+        "intent",
+        {"note": "\N{MICRO SIGN}s \N{CHECK MARK}", "scale": 1e-05, "ratio": 0.1},
+        f'{{"note":"{_U}00b5s {_U}2713","ratio":0.1,"scale":1e-05}}'.encode("ascii"),
+        "hpx.intent/1:sha256:78888b62d415f66c54322c1aa3ea08858c0ffd0df737e142b8c13424825ca312",
     ),
 }
 
@@ -47,24 +67,35 @@ DOCS = Path(__file__).resolve().parents[2] / "astro-site/src/content/docs/guide/
 
 
 def test_every_kind_has_a_golden_at_its_current_version():
-    assert set(GOLDEN) == set(KIND_VERSIONS)
+    assert {kind for kind, *_ in GOLDEN.values()} == set(KIND_VERSIONS)
     assert all(version == 1 for version in KIND_VERSIONS.values())
 
 
-@pytest.mark.parametrize("kind", sorted(GOLDEN))
-def test_each_kind_encodes_its_golden_basis_exactly(kind):
-    value, basis, expected = GOLDEN[kind]
-    assert canonical_json(value) == basis
+@pytest.mark.parametrize("name", sorted(GOLDEN))
+def test_each_golden_encodes_its_basis_exactly(name):
+    kind, value, expected_basis, expected = GOLDEN[name]
+    assert basis(kind, value) == expected_basis
     assert semantic_hash(kind, value) == expected
     assert str(SemanticHash.parse(expected)) == expected
 
 
-@pytest.mark.parametrize("kind", sorted(GOLDEN))
-def test_the_output_guide_states_every_golden(kind):
-    _, basis, expected = GOLDEN[kind]
+@pytest.mark.parametrize("name", sorted(GOLDEN))
+def test_the_output_guide_states_every_golden(name):
+    _, _, expected_basis, expected = GOLDEN[name]
     text = DOCS.read_text(encoding="utf-8")
     assert expected in text
-    assert basis.decode() in text
+    assert expected_basis.decode() in text
+
+
+@pytest.mark.parametrize("kind", sorted(set(KIND_VERSIONS) - {"observation"}))
+@pytest.mark.parametrize("number", [float("nan"), float("inf"), float("-inf")])
+def test_every_kind_but_observation_refuses_a_non_finite_number(kind, number):
+    with pytest.raises(ValueError, match="cannot hold a non-finite number"):
+        semantic_hash(kind, {"value": [number]})
+
+
+def test_an_observation_writes_a_non_finite_number_as_its_repr():
+    assert basis("observation", {"a": [float("inf"), float("-inf")]}) == b'{"a":["inf","-inf"]}'
 
 
 def test_parse_reads_the_parts():

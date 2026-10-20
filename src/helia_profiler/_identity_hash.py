@@ -7,7 +7,6 @@ hashes are semantic hashes; :mod:`._semantic_hash` owns their kinds and form.
 
 from __future__ import annotations
 
-import hashlib
 from collections.abc import Callable, Mapping
 from dataclasses import fields, is_dataclass
 from enum import Enum
@@ -15,7 +14,7 @@ from typing import Any
 
 import yaml
 
-from ._semantic_hash import canonical_json, semantic_hash
+from ._semantic_hash import semantic_hash
 from .identity import Unknown
 
 _NOT_A_LOCK = Unknown("the dependency lock is not an NSX lock")
@@ -28,15 +27,16 @@ def build_hash(
     resolved = _resolved_lock(lock)
     if isinstance(resolved, Unknown):
         return resolved
-    return semantic_hash(
-        "build",
-        {
-            "image": image_sha256,
-            "lock": resolved,
-            "runtime_archive": runtime_archive,
-            "model": model_sha256,
-        },
-    )
+    basis = {
+        "image": image_sha256,
+        "lock": resolved,
+        "runtime_archive": runtime_archive,
+        "model": model_sha256,
+    }
+    try:
+        return semantic_hash("build", basis)
+    except ValueError:
+        return Unknown("the dependency lock holds a non-finite number")
 
 
 def _resolved_lock(lock: bytes) -> Any:
@@ -89,8 +89,3 @@ def measured_facts(value: Any, leaf: Callable[[Any], Any] | None = None) -> Any:
     if isinstance(value, (list, tuple)):
         return [measured_facts(item, leaf) for item in value]
     return value
-
-
-def digest(value: Any) -> str:
-    """The bare sha256 of ``value``'s canonical JSON, for a digest that is not a semantic hash."""
-    return hashlib.sha256(canonical_json(value)).hexdigest()

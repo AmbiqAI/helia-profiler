@@ -175,7 +175,7 @@ guessed:
 | `kernels` | `library` (`reference`, `cmsis-nn` or `helia-core`), `repository`, `version`, `commit`: the one CMSIS-NN module the lock resolved, never the backend label; `reference` only for LiteRT's reference backend, which links none |
 | `build` | `toolchain`, `toolchain_version`, `board`, `cpu_hz`, `clock_profile`, `arena_location`, `weights_location`, `arena_bytes` |
 | `baseline_id`, `dependency_lock_sha256`, `producer` | the compatibility baseline, the lock's sha256 and the HPX release, from the dependency workspace |
-| `model_sha256`, `inputs_sha256` | the model file; profile firmware feeds zero-filled inputs, so `inputs_sha256` is unknown |
+| `model_sha256`, `inputs_hash` | the model file's sha256, and an `hpx.inputs` [semantic hash](#semantic-hashes) of each pinned input's tensor name and data sha256; profile firmware feeds zero-filled inputs, so `inputs_hash` is unknown |
 | `run` | how it ran and how the clean window was timed: the fields below |
 | `run.lifecycle`, `run.instance_boundary` | `carry` with `boot`: the engine initializes once and keeps its state across invocations; `single` with `invocation` for ExecuTorch, whose firmware reloads and initializes the program on every call |
 | `run.iterations`, `run.warmups` | the configured counts; the clean window always runs at least one warmup |
@@ -190,14 +190,21 @@ guessed:
 
 #### Semantic hashes
 
-`build_hash`, `observation_hash` and `intent_hash`, and a compiled build's
-`binding`, are semantic hashes: `hpx.<kind>/<version>:sha256:<hex>`, with
-64 lowercase hex digits. The kind says what was hashed and the version says
-how. The `*_sha256` fields stay bare hex: each is the sha256 of a file's bytes.
+`build_hash`, `inputs_hash`, `observation_hash` and `intent_hash`, and a
+compiled build's `binding`, are semantic hashes:
+`hpx.<kind>/<version>:sha256:<hex>`, with 64 lowercase hex digits. The kind
+says what was hashed and the version says how. The identity's `*_sha256`
+fields stay bare hex: each is the sha256 of one file's bytes (the model, the
+dependency lock, the prepared runtime archive).
 
-The hashed bytes, the basis, are the value's canonical JSON, UTF-8 encoded:
-keys sorted, no spaces, and a non-finite float written as its Python `repr`
-string (`"nan"`, `"inf"`). Each kind has one basis:
+The hashed bytes, the basis, are the value's JSON as Python's `json.dumps`
+writes it with `sort_keys=True`, `separators=(",", ":")` and
+`ensure_ascii=True`: keys sorted, no whitespace, every non-ASCII character
+escaped as `\uXXXX` (a surrogate pair beyond U+FFFF) so the bytes are
+ASCII, and each float in Python's shortest round-trip `repr` (`0.1`,
+`1e-05`). A non-finite float (NaN or an infinity) is refused, except in an
+`observation` basis, where a capture can report a NaN counter and it is
+written as the string `"nan"`, `"inf"` or `"-inf"`. Each kind has one basis:
 
 | Kind | Basis |
 |---|---|
@@ -205,6 +212,7 @@ string (`"nan"`, `"inf"`). Each kind has one basis:
 | `hpx.build/1` | the flashed image's sha256, what the dependency lock resolved, the linked runtime archive's sha256 and the model's sha256 |
 | `hpx.observation/1` | one capture's measured facts, with files reduced to their sha256 and no host paths or error text |
 | `hpx.binding/1` | a compiled build's plan `intent_hash`, lifecycle, timing scope, state policy, power wiring, prepared runtime manifest and what it observes |
+| `hpx.inputs/1` | each pinned input's `[tensor name, data sha256]`, in model order |
 
 Changing what goes into a kind's basis bumps that kind's version. Compare two
 hashes only when their producer, kind and version all match.
@@ -220,6 +228,11 @@ These examples pin the encoding:
 | `build` | `{"image":"ab12","lock":{},"model":"cd34","runtime_archive":null}` | `hpx.build/1:sha256:6c416b863ba7e576075dca7ff677be4449aa90e879738cb4591dcb323d9583f5` |
 | `observation` | `{"cycles":[120,80],"error":false,"mean_us":"nan"}` | `hpx.observation/1:sha256:8f2796b5d85db5099f58b011ce8cb5c0b7c38f22d36d462cf80e6e9b77eba605` |
 | `binding` | `{"lifecycle":"carry","power_sync":null}` | `hpx.binding/1:sha256:7b9198891413a5779f01bb8aed3d0a68125d87cf983fddec759efbfcb58201ed` |
+| `inputs` | `[["input_1","cd34"],["input_2","ef56"]]` | `hpx.inputs/1:sha256:4a9320c8ecb5b4deede7d46e4dd9f2ad11ecf27e7626385dc7e7e03d84f2c9cc` |
+| `intent` | `{"note":"\u00b5s \u2713","ratio":0.1,"scale":1e-05}` | `hpx.intent/1:sha256:78888b62d415f66c54322c1aa3ea08858c0ffd0df737e142b8c13424825ca312` |
+
+The last example is `{"note": "µs ✓", "scale": 1e-05, "ratio": 0.1}`: its
+non-ASCII characters are escaped and its floats keep their shortest form.
 
 Four more top-level sections appear when the run produced them and are
 owned by other pages: `compatibility` and `dependencies` (the qualified
@@ -253,9 +266,12 @@ says `tflm` with the HPX release that wrote it.
 Version 18 adds `identity.run.energy`; nothing else changes meaning.
 
 Version 19 writes `identity.build_hash`, `observation_hash` and `intent_hash`
-as [semantic hashes](#semantic-hashes) instead of bare hex; the hex part is
-unchanged. The verified result reader refuses a version 19 summary whose
-identity hashes are not of their kind.
+as [semantic hashes](#semantic-hashes) instead of bare hex, and renames
+`identity.inputs_sha256` to `inputs_hash`, also a semantic hash; the hex part
+of each is unchanged. The verified result reader refuses a version 19 summary
+whose identity is not an object, omits one of these four, or states one that
+is neither a hash of its kind nor, where allowed, `{"unknown": "<reason>"}`
+or `null`.
 
 ### 2. `profile_results.csv`
 

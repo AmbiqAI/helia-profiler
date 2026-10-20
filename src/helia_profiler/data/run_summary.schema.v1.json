@@ -32,7 +32,7 @@
         "baseline_id",
         "dependency_lock_sha256",
         "model_sha256",
-        "inputs_sha256",
+        "inputs_hash",
         "run",
         "producer",
         "build_hash",
@@ -43,6 +43,12 @@
         "build_hash": {
           "oneOf": [
             {"type": "string", "pattern": "^hpx\\.build/1:sha256:[0-9a-f]{64}$"},
+            {"type": "object", "required": ["unknown"]}
+          ]
+        },
+        "inputs_hash": {
+          "oneOf": [
+            {"type": "string", "pattern": "^hpx\\.inputs/1:sha256:[0-9a-f]{64}$"},
             {"type": "object", "required": ["unknown"]}
           ]
         },

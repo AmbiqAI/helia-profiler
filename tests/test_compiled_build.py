@@ -533,6 +533,12 @@ def test_the_binding_names_no_host_path(plan, tmp_path):
     assert _binding(plan, Lifecycle.CARRY, here) == _binding(plan, Lifecycle.CARRY, there)
 
 
+def test_a_binding_refuses_a_non_finite_number(plan, tmp_path):
+    build = replace(atfe_build(_build(tmp_path)), aot_arena_scan=((float("nan"), 1),))
+    with pytest.raises(ConfigError, match="cannot record a non-finite number"):
+        _binding(plan, Lifecycle.CARRY, build)
+
+
 @pytest.mark.parametrize(
     "binding,message",
     [

@@ -678,7 +678,10 @@ def _binding(plan: FrozenRun, lifecycle: Lifecycle, build: FixtureBuild) -> str:
         "observe_aot_arenas": [list(arena) for arena in build.aot_arena_scan],
         "power_sync": asdict(build.power_sync) if build.power_sync is not None else None,
     }
-    return semantic_hash("binding", payload)
+    try:
+        return semantic_hash("binding", payload)
+    except ValueError as exc:
+        raise ConfigError(f"A compiled build cannot record a non-finite number: {exc}") from exc
 
 
 def _value(member: StrEnum | None) -> str | None:

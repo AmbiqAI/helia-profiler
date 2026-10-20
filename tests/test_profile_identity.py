@@ -213,7 +213,7 @@ def test_a_helia_rt_run_states_what_it_linked(tmp_path):
     assert identity.baseline_id == BASELINE
     assert identity.dependency_lock_sha256 == LOCK_SHA
     assert identity.model_sha256 == MODEL_SHA
-    assert identity.inputs_sha256 == Unknown(
+    assert identity.inputs_hash == Unknown(
         "profile firmware feeds zero-filled inputs and pins no input data"
     )
     assert identity.producer == "0.2.3"
@@ -581,7 +581,7 @@ def test_the_summary_carries_the_identity(tmp_path):
     assert identity is not None
     summary = json.loads((tmp_path / "results" / "summary.json").read_text())
     assert summary["identity"] == identity.to_dict()
-    assert summary["identity"]["inputs_sha256"] == {
+    assert summary["identity"]["inputs_hash"] == {
         "unknown": "profile firmware feeds zero-filled inputs and pins no input data"
     }
     loaded = load_run_summary(tmp_path / "results" / "summary.json")
