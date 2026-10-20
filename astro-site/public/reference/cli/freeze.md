@@ -10,7 +10,7 @@ hpx freeze [OPTIONS] [MODEL]
 
 Freeze a resolved run plan to JSON for hpx build
 
-Defined in `src/helia_profiler/cli/run_app.py` line 94.
+Defined in `src/helia_profiler/cli/run_app.py` line 95.
 
 ### Arguments
 

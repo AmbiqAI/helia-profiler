@@ -31,9 +31,11 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 | [build](/helia-profiler/reference/api/helia_profiler/compiled_build/#helia_profiler.build) | `helia_profiler.build` |
 | [load_build](/helia-profiler/reference/api/helia_profiler/compiled_build/#helia_profiler.load_build) | `helia_profiler.load_build` |
 | [run_build](/helia-profiler/reference/api/helia_profiler/compiled_build/#helia_profiler.run_build) | `helia_profiler.run_build` |
+| [load_run](/helia-profiler/reference/api/helia_profiler/compiled_build/#helia_profiler.load_run) | `helia_profiler.load_run` |
 | [hpx_cache_root](/helia-profiler/reference/api/helia_profiler/compiled_build/#helia_profiler.hpx_cache_root) | `helia_profiler.hpx_cache_root` |
 | [CompiledBuild](/helia-profiler/reference/api/helia_profiler/compiled_build/#helia_profiler.CompiledBuild) | `helia_profiler.CompiledBuild` |
 | [RunResult](/helia-profiler/reference/api/helia_profiler/compiled_build/#helia_profiler.RunResult) | `helia_profiler.RunResult` |
+| [RunRecord](/helia-profiler/reference/api/helia_profiler/compiled_build/#helia_profiler.RunRecord) | `helia_profiler.RunRecord` |
 | [Lifecycle](/helia-profiler/reference/api/helia_profiler/compiled_build/#helia_profiler.Lifecycle) | `helia_profiler.Lifecycle` |
 | [TypedFixture](/helia-profiler/reference/api/helia_profiler/run_inputs/#helia_profiler.TypedFixture) | `helia_profiler.TypedFixture` |
 | [FixtureIO](/helia-profiler/reference/api/helia_profiler/run_inputs/#helia_profiler.FixtureIO) | `helia_profiler.FixtureIO` |
@@ -737,7 +739,7 @@ Source: `src/helia_profiler/session.py:376`
 
 # helia_profiler.compiled_build
 
-Build once, run later: a frozen plan's compiled firmware, bound to its plan and saved so any host can verify, relocate and capture from it, how model state carries across a run's invocations, and the build and capture records a compiled build and a run result carry. The hpx freeze, hpx build, hpx validate build and hpx run commands drive the same flow from the command line.
+Build once, run later: a frozen plan's compiled firmware, bound to its plan and saved so any host can verify, relocate and capture from it, each run saved as a verifiable result that loads back on any host, how model state carries across a run's invocations, and the build and capture records a compiled build and a run result carry. The hpx freeze, hpx build, hpx validate build and hpx run commands drive the same flow from the command line.
 
 Every name on this page is imported from `helia_profiler`.
 
@@ -978,6 +980,96 @@ the device is touched.
 
 Source: `src/helia_profiler/compiled_build.py:271`
 
+## helia_profiler.RunRecord
+
+`class` · `python`
+
+```python
+RunRecord(path: Path, size_bytes: int, sha256: str, result: RunResult, document: Mapping[str, Any]) -> None
+```
+
+`dataclass`
+
+A saved run result, loaded and verified.
+
+``path``, ``size_bytes`` and ``sha256`` identify the saved document,
+``document`` is its JSON, which the portable view cites by JSON pointer,
+and ``result`` is the run it records.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/run_record.py:72`
+
+### helia_profiler.RunRecord.path
+
+`attribute` · `python`
+
+```python
+path: Path
+```
+
+Source: `src/helia_profiler/run_record.py:81`
+
+### helia_profiler.RunRecord.size_bytes
+
+`attribute` · `python`
+
+```python
+size_bytes: int
+```
+
+Source: `src/helia_profiler/run_record.py:82`
+
+### helia_profiler.RunRecord.sha256
+
+`attribute` · `python`
+
+```python
+sha256: str
+```
+
+Source: `src/helia_profiler/run_record.py:83`
+
+### helia_profiler.RunRecord.result
+
+`attribute` · `python`
+
+```python
+result: RunResult
+```
+
+Source: `src/helia_profiler/run_record.py:84`
+
+### helia_profiler.RunRecord.document
+
+`attribute` · `python`
+
+```python
+document: Mapping[str, Any]
+```
+
+Source: `src/helia_profiler/run_record.py:85`
+
+## helia_profiler.load_run
+
+`function` · `python`
+
+```python
+load_run(path: str | Path, *, roots: Mapping[str, Path]) -> RunRecord
+```
+
+Read and verify a run result saved by :meth:`RunResult.save`, resolving paths under *roots*.
+
+**API tier:** `experimental`
+
+**Raises**
+
+| Name | Description |
+| --- | --- |
+| RunResultError | A ``ConfigError`` naming the first check that fails: the schema or version, the compiled build, a pinned file, the identity or the output comparison. |
+
+Source: `src/helia_profiler/run_record.py:88`
+
 ## helia_profiler.RunResult
 
 `class` · `python`
@@ -1082,6 +1174,30 @@ none.
 
 Source: `src/helia_profiler/compiled_build.py:506`
 
+### helia_profiler.RunResult.save
+
+`method` · `python`
+
+```python
+save(path: str | Path, *, roots: Mapping[str, Path], build: str | Path) -> Path
+```
+
+Write the run as a ``hpx.run-result`` with paths relative to *roots* and return its path.
+
+*build* is the file the run's compiled build was saved to; the result
+pins it by sha256 and size. The capture's files are pinned as they
+are; the reference outputs of a verification are written beside the
+result as ``<stem>.reference_<index>.bin`` and pinned too. Every
+path must sit under one of *roots*. :func:`load_run` reads it back.
+
+**Raises**
+
+| Name | Description |
+| --- | --- |
+| ConfigError | *build* is not this run's compiled build, a file is missing or changed, a path is under no root, or the identity or verification does not recompute from the build and capture. |
+
+Source: `src/helia_profiler/compiled_build.py:517`
+
 ## helia_profiler.build
 
 `function` · `python`
@@ -1117,7 +1233,7 @@ downloaded or built. The result is verified before it is returned.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/compiled_build.py:518`
+Source: `src/helia_profiler/compiled_build.py:536`
 
 ## helia_profiler.load_build
 
@@ -1131,7 +1247,7 @@ Read and verify a compiled build written by :meth:`CompiledBuild.save`.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/compiled_build.py:691`
+Source: `src/helia_profiler/compiled_build.py:709`
 
 ## helia_profiler.run_build
 
@@ -1156,7 +1272,7 @@ Flash *compiled*'s image, capture one run and compare outputs; see :meth:`Compil
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/compiled_build.py:696`
+Source: `src/helia_profiler/compiled_build.py:714`
 
 ---
 
