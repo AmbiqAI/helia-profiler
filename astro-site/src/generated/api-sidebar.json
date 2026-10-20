@@ -32,6 +32,10 @@
       "slug": "reference/api/helia_profiler/diagnostics"
     },
     {
+      "label": "elf_inventory",
+      "slug": "reference/api/helia_profiler/elf_inventory"
+    },
+    {
       "label": "errors",
       "slug": "reference/api/helia_profiler/errors"
     },

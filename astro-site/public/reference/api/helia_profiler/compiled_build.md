@@ -263,7 +263,7 @@ cannot take).
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/run_record.py:62`
+Source: `src/helia_profiler/run_record.py:61`
 
 ### helia_profiler.RunResultError.code
 
@@ -273,7 +273,7 @@ Source: `src/helia_profiler/run_record.py:62`
 code = code
 ```
 
-Source: `src/helia_profiler/run_record.py:77`
+Source: `src/helia_profiler/run_record.py:76`
 
 ## helia_profiler.RunResultRecord
 
@@ -301,7 +301,7 @@ run it records.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/run_record.py:81`
+Source: `src/helia_profiler/run_record.py:80`
 
 ### helia_profiler.RunResultRecord.path
 
@@ -311,7 +311,7 @@ Source: `src/helia_profiler/run_record.py:81`
 path: Path
 ```
 
-Source: `src/helia_profiler/run_record.py:91`
+Source: `src/helia_profiler/run_record.py:90`
 
 ### helia_profiler.RunResultRecord.size_bytes
 
@@ -321,7 +321,7 @@ Source: `src/helia_profiler/run_record.py:91`
 size_bytes: int
 ```
 
-Source: `src/helia_profiler/run_record.py:92`
+Source: `src/helia_profiler/run_record.py:91`
 
 ### helia_profiler.RunResultRecord.sha256
 
@@ -331,7 +331,7 @@ Source: `src/helia_profiler/run_record.py:92`
 sha256: str
 ```
 
-Source: `src/helia_profiler/run_record.py:93`
+Source: `src/helia_profiler/run_record.py:92`
 
 ### helia_profiler.RunResultRecord.hpx_version
 
@@ -341,7 +341,7 @@ Source: `src/helia_profiler/run_record.py:93`
 hpx_version: str
 ```
 
-Source: `src/helia_profiler/run_record.py:94`
+Source: `src/helia_profiler/run_record.py:93`
 
 ### helia_profiler.RunResultRecord.result
 
@@ -351,7 +351,7 @@ Source: `src/helia_profiler/run_record.py:94`
 result: RunResult
 ```
 
-Source: `src/helia_profiler/run_record.py:95`
+Source: `src/helia_profiler/run_record.py:94`
 
 ### helia_profiler.RunResultRecord.document
 
@@ -361,7 +361,7 @@ Source: `src/helia_profiler/run_record.py:95`
 document: Mapping[str, Any]
 ```
 
-Source: `src/helia_profiler/run_record.py:96`
+Source: `src/helia_profiler/run_record.py:95`
 
 ## helia_profiler.load_run
 
@@ -381,7 +381,7 @@ Read and verify a run result saved by :meth:`RunResult.save`, resolving paths un
 | --- | --- |
 | RunResultError | A ``ConfigError`` naming the first check that fails: the schema or version, the compiled build, a pinned file, the identity or the output comparison. |
 
-Source: `src/helia_profiler/run_record.py:99`
+Source: `src/helia_profiler/run_record.py:98`
 
 ## helia_profiler.RunResult
 
@@ -405,7 +405,7 @@ One capture from a :class:`CompiledBuild`.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/compiled_build.py:499`
+Source: `src/helia_profiler/compiled_build.py:482`
 
 ### helia_profiler.RunResult.compiled
 
@@ -415,7 +415,7 @@ Source: `src/helia_profiler/compiled_build.py:499`
 compiled: CompiledBuild
 ```
 
-Source: `src/helia_profiler/compiled_build.py:506`
+Source: `src/helia_profiler/compiled_build.py:489`
 
 ### helia_profiler.RunResult.capture
 
@@ -425,7 +425,7 @@ Source: `src/helia_profiler/compiled_build.py:506`
 capture: FixtureCaptureResult
 ```
 
-Source: `src/helia_profiler/compiled_build.py:507`
+Source: `src/helia_profiler/compiled_build.py:490`
 
 ### helia_profiler.RunResult.identity
 
@@ -435,7 +435,7 @@ Source: `src/helia_profiler/compiled_build.py:507`
 identity: RunIdentity
 ```
 
-Source: `src/helia_profiler/compiled_build.py:508`
+Source: `src/helia_profiler/compiled_build.py:491`
 
 ### helia_profiler.RunResult.verification
 
@@ -445,7 +445,7 @@ Source: `src/helia_profiler/compiled_build.py:508`
 verification: Verification | None
 ```
 
-Source: `src/helia_profiler/compiled_build.py:509`
+Source: `src/helia_profiler/compiled_build.py:492`
 
 ### helia_profiler.RunResult.power
 
@@ -455,7 +455,7 @@ Source: `src/helia_profiler/compiled_build.py:509`
 power: FixtureRailPowerRequest | FixtureBoardPowerRequest | None = None
 ```
 
-Source: `src/helia_profiler/compiled_build.py:510`
+Source: `src/helia_profiler/compiled_build.py:493`
 
 ### helia_profiler.RunResult.succeeded
 
@@ -467,7 +467,7 @@ succeeded: bool
 
 True only for a ``success`` capture.
 
-Source: `src/helia_profiler/compiled_build.py:513`
+Source: `src/helia_profiler/compiled_build.py:496`
 
 ### helia_profiler.RunResult.energy
 
@@ -485,7 +485,7 @@ hash-pinned raw instrument trace, and the protocol-2 READY, GO,
 gate and DONE samples in ``completion``. A failed capture measures
 none.
 
-Source: `src/helia_profiler/compiled_build.py:518`
+Source: `src/helia_profiler/compiled_build.py:501`
 
 ### helia_profiler.RunResult.save
 
@@ -500,8 +500,8 @@ Write the run as a ``hpx.run-result`` with paths relative to *roots* and return 
 *build* is the file the run's compiled build was saved to; the result
 pins it by sha256 and size. The capture's files are pinned as they
 are; the reference outputs of a verification are written beside the
-result under unique names and pinned too. Every path must sit under
-one of *roots*. :func:`load_run` reads it back.
+result as ``<stem>.reference_<index>.bin`` and pinned too. Every
+path must sit under one of *roots*. :func:`load_run` reads it back.
 
 **Raises**
 
@@ -509,7 +509,7 @@ one of *roots*. :func:`load_run` reads it back.
 | --- | --- |
 | ConfigError | *build* is not this run's compiled build, a file is missing or changed, a path is under no root, or the identity or verification does not recompute from the build and capture. |
 
-Source: `src/helia_profiler/compiled_build.py:529`
+Source: `src/helia_profiler/compiled_build.py:512`
 
 ## helia_profiler.build
 
@@ -546,7 +546,7 @@ downloaded or built. The result is verified before it is returned.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/compiled_build.py:548`
+Source: `src/helia_profiler/compiled_build.py:531`
 
 ## helia_profiler.load_build
 
@@ -560,7 +560,7 @@ Read and verify a compiled build written by :meth:`CompiledBuild.save`.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/compiled_build.py:754`
+Source: `src/helia_profiler/compiled_build.py:737`
 
 ## helia_profiler.run_build
 
@@ -585,4 +585,4 @@ Flash *compiled*'s image, capture one run and compare outputs; see :meth:`Compil
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/compiled_build.py:759`
+Source: `src/helia_profiler/compiled_build.py:742`

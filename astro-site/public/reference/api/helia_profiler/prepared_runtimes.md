@@ -482,7 +482,7 @@ VerifiedPreparedRuntime(archive: FixtureFile, header_root: Path, manifest: Fixtu
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/fixture_runtime.py:174`
+Source: `src/helia_profiler/fixture_runtime.py:164`
 
 ### helia_profiler.VerifiedPreparedRuntime.archive
 
@@ -492,7 +492,7 @@ Source: `src/helia_profiler/fixture_runtime.py:174`
 archive: FixtureFile
 ```
 
-Source: `src/helia_profiler/fixture_runtime.py:176`
+Source: `src/helia_profiler/fixture_runtime.py:166`
 
 ### helia_profiler.VerifiedPreparedRuntime.header_root
 
@@ -502,7 +502,7 @@ Source: `src/helia_profiler/fixture_runtime.py:176`
 header_root: Path
 ```
 
-Source: `src/helia_profiler/fixture_runtime.py:177`
+Source: `src/helia_profiler/fixture_runtime.py:167`
 
 ### helia_profiler.VerifiedPreparedRuntime.manifest
 
@@ -512,7 +512,7 @@ Source: `src/helia_profiler/fixture_runtime.py:177`
 manifest: FixtureFile
 ```
 
-Source: `src/helia_profiler/fixture_runtime.py:178`
+Source: `src/helia_profiler/fixture_runtime.py:168`
 
 ### helia_profiler.VerifiedPreparedRuntime.record
 
@@ -522,7 +522,7 @@ Source: `src/helia_profiler/fixture_runtime.py:178`
 record: RuntimeManifest
 ```
 
-Source: `src/helia_profiler/fixture_runtime.py:179`
+Source: `src/helia_profiler/fixture_runtime.py:169`
 
 ### helia_profiler.VerifiedPreparedRuntime.header_path
 
@@ -532,7 +532,7 @@ Source: `src/helia_profiler/fixture_runtime.py:179`
 header_path(name: str) -> Path
 ```
 
-Source: `src/helia_profiler/fixture_runtime.py:181`
+Source: `src/helia_profiler/fixture_runtime.py:171`
 
 ## helia_profiler.PreparedUpstreamRuntime
 
@@ -552,7 +552,7 @@ directory it was built with.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/fixture_runtime.py:185`
+Source: `src/helia_profiler/fixture_runtime.py:175`
 
 ### helia_profiler.PreparedUpstreamRuntime.archive
 
@@ -562,7 +562,7 @@ Source: `src/helia_profiler/fixture_runtime.py:185`
 archive: FixtureFile
 ```
 
-Source: `src/helia_profiler/fixture_runtime.py:194`
+Source: `src/helia_profiler/fixture_runtime.py:184`
 
 ### helia_profiler.PreparedUpstreamRuntime.header_root
 
@@ -572,7 +572,7 @@ Source: `src/helia_profiler/fixture_runtime.py:194`
 header_root: Path
 ```
 
-Source: `src/helia_profiler/fixture_runtime.py:195`
+Source: `src/helia_profiler/fixture_runtime.py:185`
 
 ### helia_profiler.PreparedUpstreamRuntime.manifest
 
@@ -582,7 +582,7 @@ Source: `src/helia_profiler/fixture_runtime.py:195`
 manifest: FixtureFile
 ```
 
-Source: `src/helia_profiler/fixture_runtime.py:196`
+Source: `src/helia_profiler/fixture_runtime.py:186`
 
 ### helia_profiler.PreparedUpstreamRuntime.verify
 
@@ -592,4 +592,4 @@ Source: `src/helia_profiler/fixture_runtime.py:196`
 verify() -> VerifiedPreparedRuntime
 ```
 
-Source: `src/helia_profiler/fixture_runtime.py:198`
+Source: `src/helia_profiler/fixture_runtime.py:188`
