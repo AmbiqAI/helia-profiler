@@ -1704,7 +1704,7 @@
       "type": "string"
     },
     "Placement": {
-      "description": "Logical placement region for arenas / weights / model data.\n\nThe four logical regions abstract over the SoC physical layout \u2014\ne.g. ``Placement.TCM`` covers DTCM on AP5 and is unavailable on AP3.\nEngine adapters that emit physical names (heliaAOT's ``DTCM``,\n``ITCM``, \u2026) normalise to this enum at the adapter boundary.",
+      "description": "Logical placement region for arenas / weights / model data.\n\nThe four logical regions abstract over the SoC physical layout \u2014\ne.g. ``Placement.TCM`` covers DTCM on AP5.\nEngine adapters that emit physical names (heliaAOT's ``DTCM``,\n``ITCM``, \u2026) normalise to this enum at the adapter boundary.",
       "enum": [
         "tcm",
         "sram",
