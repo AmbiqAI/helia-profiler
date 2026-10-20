@@ -10,7 +10,7 @@ hpx power-on [OPTIONS]
 
 Enable Joulescope current passthrough (keeps board powered)
 
-Defined in `src/helia_profiler/cli/validation_app.py` line 56.
+Defined in `src/helia_profiler/cli/validation_app.py` line 64.
 
 ### Options
 

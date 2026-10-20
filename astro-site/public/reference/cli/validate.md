@@ -1,16 +1,16 @@
 # hpx validate
 
-Run hardware-in-the-loop validation suite (MLPerf Tiny models)
+Run hardware-in-the-loop validation suite (MLPerf Tiny models), or verify a run directory with `hpx validate build`
 
 ## hpx validate
 
 ```bash
-hpx validate [OPTIONS]
+hpx validate [OPTIONS] COMMAND [ARGS]...
 ```
 
-Run hardware-in-the-loop validation suite (MLPerf Tiny models)
+Run hardware-in-the-loop validation suite (MLPerf Tiny models), or verify a run directory with `hpx validate build`
 
-Defined in `src/helia_profiler/cli/validation_app.py` line 92.
+Defined in `src/helia_profiler/cli/validation_app.py` line 100.
 
 ### Options
 
@@ -74,6 +74,30 @@ Examples:
   hpx validate --suite models-aot      # 16-case AOT sweep: 2 boards x 4 models x 2 toolchains
 
   hpx validate --suite complete        # RT + AOT + LiteRT + ExecuTorch sweep
+
+  hpx validate build runs/kws          # verify a run directory, no hardware
 ```
+
+## hpx validate build
+
+```bash
+hpx validate build [OPTIONS] DIRECTORY
+```
+
+Verify a run directory written by hpx build (no hardware)
+
+Defined in `src/helia_profiler/cli/validation_app.py` line 339.
+
+### Arguments
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `directory` | `Path` |  | Run directory written by hpx build Required. |
+
+### Options
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--verbose, -v` | `int` | 0 | Increase verbosity |
 
 Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__` with typer 0.27.3 and click 8.3.3.

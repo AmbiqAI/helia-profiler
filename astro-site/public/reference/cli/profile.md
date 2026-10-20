@@ -10,7 +10,7 @@ hpx profile [OPTIONS] [MODEL]
 
 Profile a model on target hardware
 
-Defined in `src/helia_profiler/cli/app.py` line 95.
+Defined in `src/helia_profiler/cli/app.py` line 87.
 
 ### Arguments
 

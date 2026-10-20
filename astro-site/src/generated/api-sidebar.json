@@ -88,6 +88,10 @@
       ]
     },
     {
+      "label": "run_inputs",
+      "slug": "reference/api/helia_profiler/run_inputs"
+    },
+    {
       "label": "runtime_records",
       "slug": "reference/api/helia_profiler/runtime_records"
     },
