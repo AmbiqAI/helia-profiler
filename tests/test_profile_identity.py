@@ -10,6 +10,7 @@ from typing import Literal
 
 import pytest
 
+from helia_profiler import SemanticHash
 from helia_profiler.config import load_config
 from helia_profiler.deps.compatibility import QualificationState
 from helia_profiler.identity import CanonicalEngine, CanonicalKernel, Unknown
@@ -224,8 +225,10 @@ def test_a_helia_rt_run_states_what_it_linked(tmp_path):
     run = identity.run
     assert (run.lifecycle, run.iterations, run.warmups) == ("carry", 100, 5)
     assert run.timing_scope == "invoke_only"
-    assert isinstance(identity.build_hash, str) and len(identity.build_hash) == 64
-    assert isinstance(identity.observation_hash, str) and len(identity.observation_hash) == 64
+    assert isinstance(identity.build_hash, str)
+    assert SemanticHash.parse(identity.build_hash).kind == "build"
+    assert isinstance(identity.observation_hash, str)
+    assert SemanticHash.parse(identity.observation_hash).kind == "observation"
 
 
 def test_the_build_hash_ignores_the_hpx_release_and_lock_stamps_but_not_the_image(tmp_path):

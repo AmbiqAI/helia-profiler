@@ -15,7 +15,7 @@
   ],
   "properties": {
     "schema": {"const": "hpx.run-summary"},
-    "schema_version": {"const": 18},
+    "schema_version": {"const": 19},
     "engine": {"type": "string", "minLength": 1},
     "layers": {"type": "integer", "minimum": 0},
     "total_cycles": {"type": ["number", "null"]},
@@ -38,7 +38,27 @@
         "build_hash",
         "observation_hash",
         "intent_hash"
-      ]
+      ],
+      "properties": {
+        "build_hash": {
+          "oneOf": [
+            {"type": "string", "pattern": "^hpx\\.build/1:sha256:[0-9a-f]{64}$"},
+            {"type": "object", "required": ["unknown"]}
+          ]
+        },
+        "observation_hash": {
+          "oneOf": [
+            {"type": "string", "pattern": "^hpx\\.observation/1:sha256:[0-9a-f]{64}$"},
+            {"type": "null"}
+          ]
+        },
+        "intent_hash": {
+          "oneOf": [
+            {"type": "string", "pattern": "^hpx\\.intent/1:sha256:[0-9a-f]{64}$"},
+            {"type": "null"}
+          ]
+        }
+      }
     }
   },
   "additionalProperties": true

@@ -195,6 +195,41 @@ def test_an_edited_or_malformed_plan_file_is_refused(session, tmp_path):
         FrozenRun.load(path)
 
 
+def test_the_intent_hash_is_a_semantic_hash(session):
+    parsed = hpx.SemanticHash.parse(session.freeze().intent_hash)
+    assert (parsed.producer, parsed.kind, parsed.version) == ("hpx", "intent", 1)
+
+
+@pytest.mark.parametrize(
+    "intent",
+    [
+        lambda good: good.rsplit(":", 1)[1],
+        lambda good: good.replace("hpx.intent/", "hpx.build/"),
+        lambda good: good.replace("/1:", "/2:"),
+        lambda good: None,
+    ],
+)
+def test_a_plan_whose_intent_hash_is_not_an_intent_hash_is_refused(session, tmp_path, intent):
+    path = session.freeze().save(tmp_path / "run.json")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["intent_hash"] = intent(data["intent_hash"])
+    path.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ConfigError, match="intent hash is malformed") as caught:
+        FrozenRun.load(path)
+    assert "freeze the plan again" in str(caught.value)
+
+
+def test_a_plan_saved_in_the_previous_format_is_refused(session, tmp_path):
+    path = session.freeze().save(tmp_path / "run.json")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["schema_version"] = 1
+    data["intent_hash"] = data["intent_hash"].rsplit(":", 1)[1]
+    path.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ConfigError, match="Unsupported frozen run plan version: 1") as caught:
+        FrozenRun.load(path)
+    assert "freeze the plan again" in str(caught.value)
+
+
 def test_to_dict_is_a_copy(session):
     plan = session.freeze()
     data = plan.to_dict()

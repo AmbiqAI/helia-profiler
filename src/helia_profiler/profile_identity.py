@@ -11,7 +11,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ._identity_hash import build_hash, digest, measured_facts
+from ._identity_hash import build_hash, measured_facts
+from ._semantic_hash import semantic_hash
 from .config import CleanWindowProbe
 from .deps.compatibility import CMSIS_NN_PROVIDER_MODULES
 from .engines import EngineType, get_adapter
@@ -64,7 +65,9 @@ def profile_run_identity(ctx: PipelineContext) -> RunIdentity:
         producer=_producer(provenance),
         build_hash=_build_hash(ctx, model_sha256),
         observation_hash=(
-            digest(measured_facts(ctx.pmu_result)) if ctx.pmu_result is not None else None
+            semantic_hash("observation", measured_facts(ctx.pmu_result))
+            if ctx.pmu_result is not None
+            else None
         ),
     )
 

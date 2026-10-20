@@ -27,8 +27,8 @@ def test_stability_tiers_partition_the_public_surface() -> None:
     }
     sizes = {name: len(members) for name, members in tiers.items()}
 
-    assert sizes == {"stable": 45, "experimental": 127, "implementation": 13}
-    assert sum(sizes.values()) == 185 == len(helia_profiler.__all__)
+    assert sizes == {"stable": 45, "experimental": 128, "implementation": 13}
+    assert sum(sizes.values()) == 186 == len(helia_profiler.__all__)
 
     for left, right in combinations(tiers, 2):
         assert not tiers[left] & tiers[right], (
@@ -207,6 +207,7 @@ def test_public_surface_membership_snapshot() -> None:
         "RuntimeQualification",
         "RuntimeRecord",
         "RuntimeSource",
+        "SemanticHash",
         "SerialPortInfo",
         "Session",
         "SocDef",

@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
+from ._semantic_hash import Kind, require
 from .errors import ReportError
 from .results.dimensions import DIMENSION_REGISTRY, ComparisonDimension
 from .results.manifest import (
@@ -143,6 +144,34 @@ def _document(root: Path, artifact: ResultArtifact) -> dict[str, Any]:
     return data
 
 
+_SUMMARY_VERSIONS = (11, 12, 13, 14, 15, 16, 17, 18, 19)
+
+#: Each identity hash, its kind, and the non-hash value it may take instead.
+_IDENTITY_HASHES: tuple[tuple[str, Kind, str], ...] = (
+    ("build_hash", "build", "unknown"),
+    ("observation_hash", "observation", "null"),
+    ("intent_hash", "intent", "null"),
+)
+
+
+def _identity_hashes(identity: Any) -> None:
+    """Refuse a summary identity whose hashes are not semantic hashes of their kind."""
+    if identity is None:
+        return
+    if not isinstance(identity, dict):
+        raise ResultReadError("invalid_summary", "Summary identity must be an object")
+    for name, kind, absent in _IDENTITY_HASHES:
+        value = identity.get(name)
+        if absent == "null" and value is None:
+            continue
+        if absent == "unknown" and isinstance(value, dict) and value.keys() == {"unknown"}:
+            continue
+        try:
+            require(value, kind)
+        except ValueError as exc:
+            raise ResultReadError("invalid_summary", f"Summary identity.{name}: {exc}") from exc
+
+
 def _reconcile_identities(
     manifest: ResultManifest, summary: RunSummary | None, metadata: dict[str, Any] | None
 ) -> None:
@@ -170,9 +199,10 @@ def load_result(location: str | Path) -> ProfileResultRecord:
     """Strictly load an ordinary profile manifest or its containing directory.
 
     Failed native runs remain failed records. Missing manifests and interrupted
-    publication are refusals, not legacy fallbacks. Summary versions 11 to 18
+    publication are refusals, not legacy fallbacks. Summary versions 11 to 19
     retain the timing/memory fields read here; other versions remain available
-    to native readers without receiving this verification guarantee.
+    to native readers without receiving this verification guarantee. From
+    version 19 the identity's hashes must be ``hpx`` semantic hashes.
     """
     try:
         return _load_result(Path(location))
@@ -206,11 +236,14 @@ def _load_result(location: Path) -> ProfileResultRecord:
     summary = None
     if summary_data is not None:
         version = summary_data.get("schema_version")
-        if type(version) is not int or version not in (11, 12, 13, 14, 15, 16, 17, 18):
+        if type(version) is not int or version not in _SUMMARY_VERSIONS:
             raise ResultReadError(
-                "unsupported_schema", "Supported summary versions: 11, 12, 13, 14, 15, 16, 17, 18"
+                "unsupported_schema",
+                f"Supported summary versions: {', '.join(map(str, _SUMMARY_VERSIONS))}",
             )
         _schema(summary_data, RUN_SUMMARY_SCHEMA, version)
+        if version >= 19:
+            _identity_hashes(summary_data.get("identity"))
         if (
             summary_data.get("validity") is not None
             and summary_data["validity"] != manifest.validity.value

@@ -173,6 +173,13 @@ API 6.0 renames the engine `tflm` to `litert`: `EngineType.LITERT` replaces
 names the engine `tflm` no longer loads; read it with the HPX release that
 wrote it.
 
+API 7.0 changes the value of `RunIdentity.build_hash`, `observation_hash` and
+`intent_hash` from bare hex to semantic hashes, `hpx.<kind>/<version>:sha256:<hex>`
+(`_semantic_hash.py`; `helia_profiler.SemanticHash` parses them). The hashed
+bytes are unchanged, so the hex part is the same as before. The `*_sha256`
+facts and the record's own identities stay bare hex. The record format is
+unchanged; API 7.0 reads records from 5.0 through 6.1.
+
 `helia_profiler.build(plan, fixture, method=..., lifecycle=...)`, also reached
 as `FrozenRun.build(fixture, ...)`, compiles a frozen plan for a fixture through
 `build_fixed_fixture` and returns a `CompiledBuild` of the plan, the compiled
@@ -185,17 +192,18 @@ invocation counts (`SINGLE` runs one timed invocation
 and no warmups; see [Timing windows by route](#timing-windows-by-route) for its
 one-tick floor). `CompiledBuild.identity` is the build's `RunIdentity` with
 that lifecycle. `save(path, roots=...)` writes one canonical JSON document
-(`hpx.compiled-build`, schema version 2) holding the plan's `to_dict()`, the
+(`hpx.compiled-build`, schema version 3) holding the plan's `to_dict()`, the
 lifecycle, the binding and the `dump_fixture_build` record as an object;
 `load_build(path, roots=...)` (or `CompiledBuild.load`) rebuilds both halves,
 resolving files under the caller's roots, so moving the record means passing
 new roots. `load` and `save` call `verify()`, and every refusal, including a
 malformed or unknown-version file, is a `ConfigError` naming what failed.
 
-The binding ties a build to the plan it was compiled from. `build()` hashes
-the plan's intent hash, the lifecycle, the timing scope and state policy the
-build records, its prepared-runtime manifest hash (or none) and what it
-observes (the RAM diagnostic and the scanned heliaAOT arenas). No host path
+The binding, an `hpx.binding` semantic hash, ties a build to the plan it was
+compiled from. `build()` hashes the plan's intent hash, the lifecycle, the
+timing scope, state policy and power wiring (or none) the build records, its
+prepared-runtime manifest hash (or none) and what it observes (the RAM
+diagnostic and the scanned heliaAOT arenas). No host path
 enters it, so a build relocated to another host keeps its binding.
 `verify()` re-checks the build's pinned files and the plan's intent hash,
 recomputes the binding, and then compares what the build records with what
@@ -612,8 +620,7 @@ method without `power_sync` for a plan frozen with power enabled, which
 would otherwise build timing-only firmware. The build records its wiring
 in `FixtureBuild.power_sync`. `build_identity` and the binding
 (`_binding`) both cover the wiring, so `verify()` refuses a build whose
-wiring was changed. A timing build's binding has no wiring key, so it is
-the same as before power reached the run API.
+wiring was changed.
 
 `run_build(compiled, ..., power=FixtureRailPowerRequest(...),
 power_guard=...)` measures it. `CompiledBuild._check_power` refuses each of

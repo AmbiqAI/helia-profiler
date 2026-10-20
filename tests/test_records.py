@@ -251,6 +251,60 @@ def test_summaries_before_and_with_identity_both_read(tmp_path, version):
     assert load_result(path).summary is not None
 
 
+_HEX = "ab" * 32
+
+
+def _identity(**changes):
+    return {
+        "build_hash": f"hpx.build/1:sha256:{_HEX}",
+        "observation_hash": f"hpx.observation/1:sha256:{_HEX}",
+        "intent_hash": f"hpx.intent/1:sha256:{_HEX}",
+        **changes,
+    }
+
+
+@pytest.mark.parametrize(
+    "identity",
+    [
+        _identity(),
+        _identity(build_hash={"unknown": "the run kept no dependency lock"}),
+        _identity(observation_hash=None, intent_hash=None),
+    ],
+)
+def test_a_summary_identity_with_semantic_hashes_reads(tmp_path, identity):
+    path = bundle(tmp_path)
+    edit_document(path, "summary.json", lambda d: d.update(identity=identity))
+    summary = load_result(path).summary
+    assert summary is not None and summary.identity == identity
+
+
+@pytest.mark.parametrize(
+    "identity",
+    [
+        _identity(build_hash=_HEX),
+        _identity(build_hash=None),
+        _identity(build_hash={"unknown": "x", "extra": 1}),
+        _identity(observation_hash=_HEX),
+        _identity(observation_hash={"unknown": "no capture"}),
+        _identity(intent_hash=_HEX),
+        _identity(intent_hash=f"hpx.build/1:sha256:{_HEX}"),
+        "not an object",
+    ],
+)
+def test_a_current_summary_identity_hash_of_the_wrong_form_is_refused(tmp_path, identity):
+    path = bundle(tmp_path)
+    edit_document(path, "summary.json", lambda d: d.update(identity=identity))
+    assert inspect_result(path).code == "invalid_summary"
+
+
+def test_a_previous_summary_keeps_its_bare_hex_identity_hashes(tmp_path):
+    identity = _identity(build_hash=_HEX, observation_hash=_HEX, intent_hash=None)
+    path = bundle(tmp_path)
+    edit_document(path, "summary.json", lambda d: d.update(schema_version=18, identity=identity))
+    summary = load_result(path).summary
+    assert summary is not None and summary.identity == identity
+
+
 @pytest.mark.parametrize("value", [True, 0.5, -1])
 def test_memory_bytes_are_not_coerced(tmp_path, value):
     path = bundle(tmp_path)

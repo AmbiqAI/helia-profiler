@@ -139,7 +139,7 @@
     },
     {
       "path": "helia_profiler.identity",
-      "summary": "Shared identity vocabulary: the identity of a captured run and the build, run, energy, runtime and kernel facts it names, canonical engine and kernel names with today's spellings as aliases, and unknown facts that carry their reason.",
+      "summary": "Shared identity vocabulary: the identity of a captured run and the build, run, energy, runtime and kernel facts it names, canonical engine and kernel names with today's spellings as aliases, unknown facts that carry their reason, and the semantic hashes that name their kind and basis version.",
       "members": [
         "RunIdentity",
         "RunFacts",
@@ -150,6 +150,7 @@
         "CanonicalEngine",
         "CanonicalKernel",
         "Unknown",
+        "SemanticHash",
         "canonical_engine",
         "canonical_kernel"
       ]

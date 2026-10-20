@@ -20,6 +20,7 @@ if TYPE_CHECKING:
         TypedFixture,
     )
     from ._fixture_facts import EngineDTypeCapability, FixtureCapabilities, QualifiedFixtureTarget
+    from ._semantic_hash import SemanticHash
     from ._version import __version__
     from .api import profile
     from .compiled_build import CompiledBuild, RunResult, build, load_build, run_build
@@ -380,6 +381,7 @@ _EXPORTS = {
     "CanonicalEngine": (".identity", "CanonicalEngine"),
     "CanonicalKernel": (".identity", "CanonicalKernel"),
     "Unknown": (".identity", "Unknown"),
+    "SemanticHash": ("._semantic_hash", "SemanticHash"),
     "canonical_engine": (".identity", "canonical_engine"),
     "canonical_kernel": (".identity", "canonical_kernel"),
     "LocalInput": (".frozen_run", "LocalInput"),
@@ -479,6 +481,7 @@ __all__ = [
     "CanonicalEngine",
     "CanonicalKernel",
     "Unknown",
+    "SemanticHash",
     "canonical_engine",
     "canonical_kernel",
     "ProgressUpdate",
@@ -715,6 +718,7 @@ _EXPERIMENTAL_API = {
     "CanonicalEngine",
     "CanonicalKernel",
     "Unknown",
+    "SemanticHash",
     "canonical_engine",
     "canonical_kernel",
     "Qualification",

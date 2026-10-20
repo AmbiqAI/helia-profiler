@@ -9,6 +9,7 @@ import pytest
 from test_fixture_record import _build, _pin, _sourced
 from test_fixture_sources import NS
 
+from helia_profiler import SemanticHash
 from helia_profiler._fixture_record import compiled_fixture_identity
 from helia_profiler.engines import EngineType
 from helia_profiler.engines.base import EngineSource
@@ -106,6 +107,8 @@ def test_a_compiled_build_states_what_it_linked(tmp_path):
     assert identity.build.toolchain_version == "22.1.0" and identity.build.cpu_hz == 96000000
     assert (identity.run.lifecycle, identity.run.iterations) == ("carry", 100)
     assert isinstance(identity.build_hash, str) and isinstance(identity.inputs_sha256, str)
+    assert SemanticHash.parse(identity.build_hash).kind == "build"
+    assert len(identity.inputs_sha256) == 64
 
 
 def test_the_build_hash_ignores_the_hpx_release_but_not_the_image(tmp_path):
@@ -181,6 +184,8 @@ def test_the_observation_hash_follows_measured_facts_not_paths(tmp_path):
     failed = fixture_run_identity(build, _capture(tmp_path / "z", status=3))
 
     assert one.observation_hash == moved.observation_hash != failed.observation_hash
+    assert isinstance(one.observation_hash, str)
+    assert SemanticHash.parse(one.observation_hash).kind == "observation"
     assert one.build_hash == failed.build_hash
     assert fixture_run_identity(build).observation_hash is None
 
@@ -217,8 +222,8 @@ def test_a_prepared_runtime_manifest_reads_without_its_archive(tmp_path):
 def test_a_record_from_the_previous_api_still_loads(tmp_path):
     build = _aot(tmp_path)
     record = json.loads(dump_fixture_build(build, roots={"run": tmp_path}))
-    assert record["fixture_api"] == [6, 1]
-    for previous in ([5, 6], [5, 7], [5, 8], [6, 0]):
+    assert record["fixture_api"] == [7, 0]
+    for previous in ([5, 6], [5, 7], [5, 8], [6, 0], [6, 1]):
         record["fixture_api"] = previous
         assert load_fixture_build(json.dumps(record), roots={"run": tmp_path}) == build
 

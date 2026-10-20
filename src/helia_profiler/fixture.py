@@ -113,7 +113,7 @@ from .identity import (
 from .placement import Placement
 from .results.models import ToolchainInfo
 
-FIXTURE_API_VERSION: Final[tuple[int, int]] = (6, 1)
+FIXTURE_API_VERSION: Final[tuple[int, int]] = (7, 0)
 
 __all__ = [
     "FIXTURE_API_VERSION",

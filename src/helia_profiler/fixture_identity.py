@@ -11,6 +11,7 @@ import json
 from typing import TYPE_CHECKING, Any
 
 from ._identity_hash import build_hash, digest, measured_facts
+from ._semantic_hash import semantic_hash
 from .deps.compatibility import CMSIS_NN_PROVIDER_MODULES
 from .engines import get_adapter
 from .fixture_runtime import FixtureFile
@@ -242,7 +243,7 @@ def _observation_hash(capture: FixtureCaptureResult) -> str:
     )
     # An error's text can name host paths; the state and status carry the outcome.
     facts["error"] = capture.error is not None
-    return digest(facts)
+    return semantic_hash("observation", facts)
 
 
 def _file_hash(value: Any) -> Any:

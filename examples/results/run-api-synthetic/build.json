@@ -1,5 +1,5 @@
 {
-  "binding": "8835f29387471c48f833aa1bc1dcd0a93e72ff77acfc5d8ca28345ce3d0fea82",
+  "binding": "hpx.binding/1:sha256:5f8e121b65e5ec79ae5c098fe004a4fe9e1e0d31c771f87f6edd60650fe8389a",
   "build": {
     "build": {
       "aot_arena_scan": [],
@@ -127,8 +127,8 @@
       "weights_location": "mram"
     },
     "fixture_api": [
-      5,
-      8
+      7,
+      0
     ],
     "schema_version": 1
   },
@@ -140,7 +140,7 @@
     },
     "environment": {},
     "hpx_version": "0.3.0",
-    "intent_hash": "a909fc4ac24bb0f9e3aea4110062ade20ee6857733b7014baabc534985097eee",
+    "intent_hash": "hpx.intent/1:sha256:a909fc4ac24bb0f9e3aea4110062ade20ee6857733b7014baabc534985097eee",
     "local_inputs": [],
     "model": {
       "path": "inputs/tiny_cnn.tflite",
@@ -158,7 +158,7 @@
       "version": "0.33.0"
     },
     "schema": "hpx.frozen-run",
-    "schema_version": 1,
+    "schema_version": 2,
     "settings": {
       "build": {
         "channel": null,
@@ -244,5 +244,5 @@
     }
   },
   "schema": "hpx.compiled-build",
-  "schema_version": 2
+  "schema_version": 3
 }

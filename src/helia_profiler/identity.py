@@ -206,6 +206,9 @@ class RunIdentity:
     capture's measured facts, so the same firmware measured twice gives two.
     ``intent_hash`` is the :attr:`~helia_profiler.FrozenRun.intent_hash` of
     the plan a run was built from, and ``None`` for a run built without one.
+    The three are :class:`~helia_profiler.SemanticHash` strings of the kinds
+    ``hpx.build``, ``hpx.observation`` and ``hpx.intent``; the ``*_sha256``
+    facts are bare hex digests of file bytes.
     """
 
     runtime: RuntimeIdentity

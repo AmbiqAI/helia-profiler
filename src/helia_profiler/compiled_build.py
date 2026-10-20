@@ -16,7 +16,6 @@ timing capture through a configured supply with a
 
 from __future__ import annotations
 
-import hashlib
 import json
 from dataclasses import asdict, dataclass, replace
 from enum import StrEnum
@@ -24,6 +23,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Mapping, TypeAlias
 
 from ._files import write_text_atomically
+from ._semantic_hash import require, semantic_hash
 from .errors import CaptureError, ConfigError
 from .lifecycle import Lifecycle, lifecycle_invocations, require_lifecycle
 
@@ -46,7 +46,7 @@ if TYPE_CHECKING:
     _PowerRequest: TypeAlias = FixtureRailPowerRequest | FixtureBoardPowerRequest | None
 
 COMPILED_BUILD_SCHEMA = "hpx.compiled-build"
-COMPILED_BUILD_SCHEMA_VERSION = 2
+COMPILED_BUILD_SCHEMA_VERSION = 3
 
 _DOCUMENT_KEYS = frozenset({"schema", "schema_version", "plan", "lifecycle", "binding", "build"})
 
@@ -62,8 +62,9 @@ _POWER_RAIL = "MCU"
 class CompiledBuild:
     """A frozen plan and the firmware compiled from it, verifiable on any host.
 
-    ``binding`` ties the build to the plan and lifecycle it was compiled
-    from; :func:`build` computes it and :meth:`verify` recomputes it.
+    ``binding``, an ``hpx.binding`` semantic hash, ties the build to the plan
+    and lifecycle it was compiled from; :func:`build` computes it and
+    :meth:`verify` recomputes it.
     """
 
     plan: FrozenRun
@@ -246,8 +247,13 @@ class CompiledBuild:
             raise ConfigError(
                 f"Malformed compiled build: unknown lifecycle {document['lifecycle']!r}"
             ) from exc
-        if not isinstance(document["binding"], str):
-            raise ConfigError("Malformed compiled build: binding is not a string")
+        try:
+            require(document["binding"], "binding")
+        except ValueError as exc:
+            raise ConfigError(
+                f"Malformed compiled build: {exc}",
+                hint="The build was saved by another heliaPROFILER or edited; build it again.",
+            ) from exc
         plan = FrozenRun.from_dict(document["plan"])
         try:
             build = load_fixture_build(json.dumps(document["build"]), roots=roots)
@@ -656,7 +662,7 @@ def _prepared_runtime(plan: FrozenRun) -> PreparedUpstreamRuntime | None:
 
 
 def _binding(plan: FrozenRun, lifecycle: Lifecycle, build: FixtureBuild) -> str:
-    """SHA-256 tying *build* to the plan and lifecycle it was compiled from.
+    """The ``hpx.binding`` hash tying *build* to the plan and lifecycle it was compiled from.
 
     It covers the plan's intent hash, the lifecycle, the timing scope,
     state policy and power wiring the build records, its prepared runtime
@@ -670,12 +676,9 @@ def _binding(plan: FrozenRun, lifecycle: Lifecycle, build: FixtureBuild) -> str:
         "runtime_manifest": build.runtime_manifest.sha256 if build.runtime_manifest else None,
         "observe_ram": build.observe_ram,
         "observe_aot_arenas": [list(arena) for arena in build.aot_arena_scan],
+        "power_sync": asdict(build.power_sync) if build.power_sync is not None else None,
     }
-    # A timing build omits the key, so a timing build saved before power wiring still verifies.
-    if build.power_sync is not None:
-        payload["power_sync"] = asdict(build.power_sync)
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
-    return hashlib.sha256(encoded.encode()).hexdigest()
+    return semantic_hash("binding", payload)
 
 
 def _value(member: StrEnum | None) -> str | None:
@@ -719,7 +722,11 @@ def _document(data: Any) -> dict[str, Any]:
         raise ConfigError(f"Not a compiled build: schema {data.get('schema')!r}")
     version = data.get("schema_version")
     if type(version) is not int or version != COMPILED_BUILD_SCHEMA_VERSION:
-        raise ConfigError(f"Unsupported compiled build version: {version!r}")
+        raise ConfigError(
+            f"Unsupported compiled build version: {version!r}",
+            hint=f"This heliaPROFILER reads version {COMPILED_BUILD_SCHEMA_VERSION}; "
+            "build it again.",
+        )
     if data.keys() != _DOCUMENT_KEYS:
         raise ConfigError(
             f"Malformed compiled build: fields {sorted(data)}, expected {sorted(_DOCUMENT_KEYS)}"
