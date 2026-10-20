@@ -16,8 +16,9 @@ from __future__ import annotations
 import glob
 import logging
 import shutil
+from collections.abc import Iterable
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..config import PowerFirmware, Transport, WindowMode
 
@@ -113,13 +114,11 @@ def generate_app(ctx: PipelineContext) -> Path:
 
     transport = config.target.transport
     if transport == Transport.USB_CDC:
-        module_names = {m.name for m in module_specs}
-        for name in _usb_provider_module_names(module_specs, profile):
-            if name not in module_names:
-                module_specs.append(NsxModuleSpec(name, _module_project(name, profile)))
-                module_names.add(name)
-        if "nsx-usb" not in module_names:
-            module_specs.append(NsxModuleSpec("nsx-usb", _module_project("nsx-usb", profile)))
+        _add_missing_modules(
+            module_specs,
+            [*_usb_provider_module_names(module_specs, profile), "nsx-usb"],
+            profile,
+        )
 
     psram_needed = (
         arena_region is Placement.PSRAM
@@ -127,21 +126,10 @@ def generate_app(ctx: PipelineContext) -> Path:
         or any(region.placement is Placement.PSRAM for region in aot_arena_regions)
     )
     if psram_needed:
-        module_names = {m.name for m in module_specs}
-        if "nsx-interrupt" not in module_names:
-            module_specs.append(
-                NsxModuleSpec("nsx-interrupt", _module_project("nsx-interrupt", profile))
-            )
-            module_names.add("nsx-interrupt")
-        if "nsx-psram" not in module_names:
-            module_specs.append(NsxModuleSpec("nsx-psram", _module_project("nsx-psram", profile)))
+        _add_missing_modules(module_specs, ("nsx-interrupt", "nsx-psram"), profile)
 
     if power_sync_enabled:
-        module_names = {m.name for m in module_specs}
-        for name in _POWER_SYNC_MODULE_NAMES:
-            if name not in module_names:
-                module_specs.append(NsxModuleSpec(name, _module_project(name, profile)))
-                module_names.add(name)
+        _add_missing_modules(module_specs, _POWER_SYNC_MODULE_NAMES, profile)
 
     # On-target INA228 power monitor: the dedicated power binary reads the
     # monitor over I2C, so pull in the transport and driver modules.
@@ -150,11 +138,7 @@ def generate_app(ctx: PipelineContext) -> Path:
     # PowerMonitorContext.from_config gates on — single-sourced so the two
     # gates cannot diverge.
     if power_binary_enabled and config.power.monitor_selected:
-        module_names = {m.name for m in module_specs}
-        for name in ("nsx-i2c", "nsx-sensors"):
-            if name not in module_names:
-                module_specs.append(NsxModuleSpec(name, _module_project(name, profile)))
-                module_names.add(name)
+        _add_missing_modules(module_specs, ("nsx-i2c", "nsx-sensors"), profile)
 
     # BLE-controller-reset GPIO drive (Blue-variant boards, dedicated power
     # binary only — see _ble_reset.j2) needs nsx-gpio even when power_sync
@@ -162,10 +146,7 @@ def generate_app(ctx: PipelineContext) -> Path:
     # render_context.power_binary_needs_gpio exactly, or the include/link
     # lines and module selection disagree and the build fails.
     if power_binary_enabled and board.ble_reset_gpio_pin is not None:
-        module_names = {m.name for m in module_specs}
-        if "nsx-gpio" not in module_names:
-            module_specs.append(NsxModuleSpec("nsx-gpio", _module_project("nsx-gpio", profile)))
-            module_names.add("nsx-gpio")
+        _add_missing_modules(module_specs, ("nsx-gpio",), profile)
 
     # Build module descriptors (name + local flag + optional overrides)
     nsx_overrides = config.build.nsx_modules
@@ -341,10 +322,6 @@ def generate_app(ctx: PipelineContext) -> Path:
                 src_dir / "model_data.h",
                 _model_to_header(config.model.path, weights_region),
             )
-        _write_text(
-            src_dir / "main.cc",
-            _jinja_env.get_template(_main_template(engine_type)).render(**template_vars),
-        )
     elif engine_type is EngineType.HELIA_AOT:
         # The heliaAOT adapter is the only producer of this engine_type, and
         # HeliaAotArtifacts pins the pairing, so the narrowing is total — but
@@ -390,46 +367,12 @@ def generate_app(ctx: PipelineContext) -> Path:
                             region.blob_filename,
                             blob_path,
                         )
-
-        _write_text(
-            src_dir / "main.cc",
-            _jinja_env.get_template(
-                "fixed_fixture.cc.j2" if ctx.fixture else _main_template(engine_type)
-            ).render(**template_vars),
-        )
-        if power_binary_enabled:
-            # Same template, power_only=True: no transport init, no per-layer
-            # PMU passes -- see main_aot.cc.j2's power_only branches.
-            _write_text(
-                src_dir / "main_power.cc",
-                _jinja_env.get_template(_main_template(engine_type, power_only=True)).render(
-                    **render_context.to_template_vars(power_only=True),
-                ),
-            )
     else:
         # TFLM / heliaRT: embed model as byte array, use TFLM profiler.
         if weights_region != "psram" or ctx.fixture is not None:
             staging_region = Placement.MRAM if weights_region is Placement.PSRAM else weights_region
             model_header = _model_to_header(config.model.path, staging_region)
             _write_text(src_dir / "model_data.h", model_header)
-
-        _write_text(
-            src_dir / "main.cc",
-            _jinja_env.get_template(
-                "fixed_fixture.cc.j2" if ctx.fixture else _main_template(engine_type)
-            ).render(
-                **template_vars,
-            ),
-        )
-        if power_binary_enabled:
-            # Same template, power_only=True: no transport init, no per-layer
-            # PMU passes -- see main.cc.j2's power_only branches.
-            _write_text(
-                src_dir / "main_power.cc",
-                _jinja_env.get_template(_main_template(engine_type, power_only=True)).render(
-                    **render_context.to_template_vars(power_only=True),
-                ),
-            )
 
         # PMU profiler (TFLM-specific C++ class)
         _write_text(
@@ -445,6 +388,24 @@ def generate_app(ctx: PipelineContext) -> Path:
             src_dir / "hpx_pmu_profiler.cc",
             _jinja_env.get_template("hpx_pmu_profiler.cc.j2").render(
                 has_armv8m_pmu=has_armv8m_pmu,
+            ),
+        )
+
+    is_executorch = engine_type is EngineType.EXECUTORCH
+    main_template = (
+        "fixed_fixture.cc.j2" if ctx.fixture and not is_executorch else _main_template(engine_type)
+    )
+    _write_text(
+        src_dir / "main.cc",
+        _jinja_env.get_template(main_template).render(**template_vars),
+    )
+    if power_binary_enabled and not is_executorch:
+        # Same template, power_only=True: no transport init, no per-layer
+        # PMU passes -- see the templates' power_only branches.
+        _write_text(
+            src_dir / "main_power.cc",
+            _jinja_env.get_template(_main_template(engine_type, power_only=True)).render(
+                **render_context.to_template_vars(power_only=True),
             ),
         )
 
@@ -497,6 +458,17 @@ def _resolved_aot_arena_regions(ctx: PipelineContext) -> list[ArenaRegion]:
         list(artifacts.aot_arena_regions),
         ctx.arena_region or Placement.TCM,
     )
+
+
+def _add_missing_modules(
+    module_specs: list[NsxModuleSpec], names: Iterable[str], profile: dict[str, Any]
+) -> None:
+    """Append each named module not already in *module_specs*, in order."""
+    present = {spec.name for spec in module_specs}
+    for name in names:
+        if name not in present:
+            module_specs.append(NsxModuleSpec(name, _module_project(name, profile)))
+            present.add(name)
 
 
 def _main_template(engine_type: EngineType, *, power_only: bool = False) -> str:
