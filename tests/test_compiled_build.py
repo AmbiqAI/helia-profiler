@@ -416,6 +416,8 @@ def test_load_build_and_run_build_delegate_to_the_record(plan, build, root, tmp_
         "settle_seconds": 1.0,
         "expect": None,
         "expected_duration_s": None,
+        "power": None,
+        "power_guard": None,
     }
 
 

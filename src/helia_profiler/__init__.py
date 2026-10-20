@@ -112,7 +112,14 @@ if TYPE_CHECKING:
         FixtureMemory,
         FixtureTiming,
     )
-    from .fixture_power import FixtureBatchCompletion, FixturePowerSync, FixtureRailEnergy
+    from .fixture_power import (
+        FixtureBatchCompletion,
+        FixtureBoardPowerRequest,
+        FixturePowerGuard,
+        FixturePowerSync,
+        FixtureRailEnergy,
+        FixtureRailPowerRequest,
+    )
     from .fixture_psram import FixturePsramObservation, FixturePsramPayload, FixturePsramWeights
     from .fixture_runtime import (
         FixtureFile,
@@ -342,6 +349,9 @@ _EXPORTS = {
     "FixturePowerSync": (".fixture_power", "FixturePowerSync"),
     "FixtureRailEnergy": (".fixture_power", "FixtureRailEnergy"),
     "FixtureBatchCompletion": (".fixture_power", "FixtureBatchCompletion"),
+    "FixtureRailPowerRequest": (".fixture_power", "FixtureRailPowerRequest"),
+    "FixtureBoardPowerRequest": (".fixture_power", "FixtureBoardPowerRequest"),
+    "FixturePowerGuard": (".fixture_power", "FixturePowerGuard"),
     "FixturePsramWeights": (".fixture_psram", "FixturePsramWeights"),
     "FixturePsramPayload": (".fixture_psram", "FixturePsramPayload"),
     "FixturePsramObservation": (".fixture_psram", "FixturePsramObservation"),
@@ -441,6 +451,9 @@ __all__ = [
     "FixturePowerSync",
     "FixtureRailEnergy",
     "FixtureBatchCompletion",
+    "FixtureRailPowerRequest",
+    "FixtureBoardPowerRequest",
+    "FixturePowerGuard",
     "FixturePsramWeights",
     "FixturePsramPayload",
     "FixturePsramObservation",
@@ -673,6 +686,9 @@ _EXPERIMENTAL_API = {
     "FixturePowerSync",
     "FixtureRailEnergy",
     "FixtureBatchCompletion",
+    "FixtureRailPowerRequest",
+    "FixtureBoardPowerRequest",
+    "FixturePowerGuard",
     "FixturePsramWeights",
     "FixturePsramPayload",
     "FixturePsramObservation",
