@@ -937,3 +937,40 @@ def test_replacement_publication_preserves_previous_record_on_failure(
         assert hpx.load_run(path, roots=_roots(root)).result == original
         if failure == "reference":
             assert len(writes) == 2
+
+
+@pytest.mark.parametrize("power", [None, _SUPPLY])
+@pytest.mark.parametrize("operation", ["save", "load"])
+@pytest.mark.parametrize("field", ["missing", "iterations", "warmups"])
+def test_successful_saved_run_requires_build_timing_counts(root, record, power, operation, field):
+    result = _run(record, power=power, verified=False)
+    timing = result.capture.timing
+    assert timing is not None
+    timing = None if field == "missing" else replace(timing, **{field: getattr(timing, field) + 1})
+    capture = replace(result.capture, timing=timing)
+    changed = replace(result, capture=capture, identity=_identity(record, capture, power))
+    if operation == "save":
+        with pytest.raises(ConfigError, match="timed iterations and warmups"):
+            _save(changed)
+    else:
+        from helia_profiler.run_record import _encode, _Files
+
+        path = _save(result)
+        _edit(
+            path,
+            lambda data: data.update(
+                capture=_encode(capture, _Files(_roots(root)).file),
+                identity=changed.identity.to_dict(),
+            ),
+        )
+        with pytest.raises(RunResultError, match="timed iterations and warmups") as refused:
+            hpx.load_run(path, roots=_roots(root))
+        assert refused.value.code == "invalid_evidence"
+
+
+@pytest.mark.parametrize("power", [None, _SUPPLY])
+@pytest.mark.parametrize("state", ["success", "failure"])
+def test_saved_run_count_validation_preserves_valid_and_failed_captures(root, record, power, state):
+    result = _run(record, power=power, state=state)
+    path = _save(result)
+    assert hpx.load_run(path, roots=_roots(root)).result == result

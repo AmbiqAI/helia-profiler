@@ -387,10 +387,13 @@ directory moves as a unit.
 | `identity` | the run's `RunIdentity` |
 | `hpx_version` | the heliaPROFILER that wrote the result |
 
-Loading checks four things: every pinned file matches its sha256 and size,
+Loading checks the evidence: every pinned file matches its sha256 and size,
 the compiled build is the one recorded and verifies, the identity and the
 output comparison recompute from the build and the capture, and the power
 request matches the build's GPIO wiring, protocol and supported power route.
+A successful capture must include timing whose iteration and warmup counts match
+the compiled build; both saving and loading enforce this check. Failed captures
+may retain no timing.
 Retained energy must agree with the request's instrument and rail, the build's
 iteration counts, and a valid batch completion record. Timing-only and
 supply-only runs cannot carry rail energy. An unknown identity fact matches an unknown fact

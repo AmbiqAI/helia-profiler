@@ -143,7 +143,7 @@ def save_run(
 ) -> Path:
     """Write *result* as a run result; see :meth:`RunResult.save`."""
     from ._version import __version__
-    from .compiled_build import load_build
+    from .compiled_build import _check_capture_counts, load_build
 
     target = Path(path).expanduser()
     build_path = Path(build).expanduser()
@@ -159,6 +159,7 @@ def save_run(
             f"{build_path} is not the compiled build this run captured from",
             hint="Name the build.json the run's CompiledBuild was saved to.",
         )
+    _check_capture_counts(result.compiled, result.capture)
     _check_power(result.compiled, result.capture, result.power)
     recomputed = _identity(result.compiled, result.capture, result.power)
     _check_identity(recomputed, result.identity.to_dict())
@@ -204,7 +205,7 @@ def save_run(
 
 
 def _load(source: Path, raw: bytes, roots: Mapping[str, Path]) -> RunResultRecord:
-    from .compiled_build import RunResult, load_build, missing_runtime_hint
+    from .compiled_build import RunResult, _check_capture_counts, load_build, missing_runtime_hint
 
     data = _document(raw)
     files = _Files(roots)
@@ -233,6 +234,7 @@ def _load(source: Path, raw: bytes, roots: Mapping[str, Path]) -> RunResultRecor
     except (TypeError, ValueError) as exc:
         raise RunResultError("invalid_evidence", f"Malformed run result: {exc}") from exc
     try:
+        _check_capture_counts(compiled, capture)
         _check_power(compiled, capture, power)
     except ConfigError as exc:
         raise RunResultError("invalid_evidence", str(exc), hint=_HINT) from exc
