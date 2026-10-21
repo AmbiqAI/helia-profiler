@@ -13,7 +13,7 @@ print(record.result.identity.observation_hash)
 view = observations(load_result(root / "result.json"))
 ```
 
-`portable.json` is that view: the run mapped to the portable result schema (`1.0-draft`, mapping `hpx-run-1`).
+`portable.json` is that view: the run mapped to the portable result schema (`1.0-draft`, mapping `hpx-run-2`).
 
 **Synthetic:**
 - The firmware files (`build/app/*`, `build/evidence/*`) are test stand-ins, not a real image.

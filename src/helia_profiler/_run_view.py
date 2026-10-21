@@ -5,11 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from ._semantic_hash import semantic_hash
 from .fixture_power import GROSS_RAIL_SCOPE, FixtureBoardPowerRequest
 from .identity import Unknown
 from .run_record import RunResultRecord
 
-MAPPING_VERSION = "hpx-run-1"
+MAPPING_VERSION = "hpx-run-2"
 _RESULT = "native-result"
 #: What ``engine.version`` means for each engine.
 _VERSION_BASIS = {
@@ -144,7 +145,7 @@ def _header(record: RunResultRecord, artifacts: list[dict[str, Any]]) -> dict[st
             "name": identity.runtime.engine.value,
             "version": _text(identity.runtime.version),
         },
-        "target": {"name": identity.build.board, "identity": None},
+        "target": {"name": identity.build.board, "identity": _target_config(record)["identity"]},
         "outcome": {
             "status": "completed" if result.succeeded else "failed",
             "stage": None if result.succeeded else "capture",
@@ -166,6 +167,17 @@ def _latency(record: RunResultRecord, observations: _Observations) -> None:
         )
     if timing is not None and timing.timer_hz > 0:
         clocks.append(_clock("reported", timing.timer_hz, "/capture/timing/timer_hz", domain))
+    if domain != "cpu":
+        for role, fact in _cpu_clocks(record)["facts"].items():
+            if fact["value_hz"] is not None:
+                clocks.append(
+                    {
+                        "role": role,
+                        "domain": "cpu",
+                        "value_hz": fact["value_hz"],
+                        "source": fact["source"],
+                    }
+                )
     observations.add(
         "latency.invoke.v1" if run.timing_scope == "invoke_only" else "latency.restore_invoke.v1",
         latency,
@@ -270,6 +282,8 @@ def _extension(record: RunResultRecord) -> dict[str, Any]:
         if isinstance(version, Unknown)
         else None,
         "build_producer": _plain(identity.producer),
+        "target_config": _target_config(record),
+        "cpu_clocks": _cpu_clocks(record),
         "semantic_hashes": {
             "intent_hash": identity.intent_hash,
             "build_hash": _plain(identity.build_hash),
@@ -293,6 +307,72 @@ def _extension(record: RunResultRecord) -> dict[str, Any]:
         "power_request": None if result.power is None else document["power"]["kind"],
         "output_comparison": _comparison(document["verification"]),
     }
+
+
+def _target_config(record: RunResultRecord) -> dict[str, Any]:
+    facts = record.result.identity.build
+    target = record.result.compiled.build.target
+    values = {
+        "board": facts.board,
+        "device": target.device,
+        "load_address": target.load_address,
+        "clock_profile": facts.clock_profile,
+        "cpu_hz": facts.cpu_hz,
+        "arena_location": facts.arena_location,
+        "weights_location": facts.weights_location,
+    }
+    home = record.document["location"]["root"]
+    compiled_artifact = _file_id(record.document["compiled_build"], home)
+    sources = {
+        name: {
+            "artifact": compiled_artifact if name in ("device", "load_address") else _RESULT,
+            "pointer": f"/build/build/target/{name}"
+            if name in ("device", "load_address")
+            else f"/identity/build/{name}",
+        }
+        for name in values
+    }
+    unavailable = {}
+    for name, value in values.items():
+        if name in ("cpu_hz", "load_address"):
+            valid = type(value) is int and value >= (1 if name == "cpu_hz" else 0)
+        else:
+            valid = isinstance(value, str) and bool(value.strip())
+        if not valid:
+            unavailable[name] = (
+                value.reason if isinstance(value, Unknown) else "not_recorded_or_invalid"
+            )
+    basis = {name: None if name in unavailable else value for name, value in values.items()}
+    return {
+        "schema_id": "hpx.target-config",
+        "schema_version": 1,
+        "identity": None if unavailable else semantic_hash("target-config", basis),
+        "basis": basis,
+        "sources": sources,
+        "unavailable_reasons": unavailable,
+    }
+
+
+def _cpu_clocks(record: RunResultRecord) -> dict[str, Any]:
+    timing = record.result.capture.timing
+    values = {
+        "configured": (record.result.identity.build.cpu_hz, "/identity/build/cpu_hz"),
+        "reported": (timing.cpu_hz if timing is not None else None, "/capture/timing/cpu_hz"),
+    }
+    facts = {}
+    for role, (value, pointer) in values.items():
+        valid = type(value) is int and value > 0
+        source = {"artifact": _RESULT, "pointer": pointer}
+        facts[role] = {
+            "value_hz": value if valid else None,
+            "source": source,
+            "unavailable_reason": None
+            if valid
+            else value.reason
+            if isinstance(value, Unknown)
+            else "not_recorded_or_invalid",
+        }
+    return {"schema_id": "hpx.cpu-clocks", "schema_version": 1, "facts": facts}
 
 
 def _comparison(verification: dict[str, Any] | None) -> dict[str, Any] | None:

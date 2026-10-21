@@ -30,7 +30,7 @@ from typing import Any, Literal, NamedTuple
 
 PRODUCER = "hpx"
 
-Kind = Literal["intent", "build", "observation", "binding", "inputs"]
+Kind = Literal["intent", "build", "observation", "binding", "inputs", "target-config"]
 
 
 class _Basis(NamedTuple):
@@ -48,12 +48,15 @@ class _Basis(NamedTuple):
 #: - ``binding``: a compiled build's plan intent, lifecycle, timing scope, state
 #:   policy, power wiring, runtime manifest and observed facts.
 #: - ``inputs``: each pinned input's tensor name and data sha256, in model order.
+#: - ``target-config``: retained board, device, load address, clock profile, configured
+#:   CPU rate and arena/weights placements; no workload or capacity.
 _KINDS: dict[Kind, _Basis] = {
     "intent": _Basis(1),
     "build": _Basis(1),
     "observation": _Basis(1, non_finite_as_text=True),
     "binding": _Basis(1),
     "inputs": _Basis(1),
+    "target-config": _Basis(1),
 }
 
 KIND_VERSIONS: dict[Kind, int] = {kind: basis.version for kind, basis in _KINDS.items()}
@@ -73,7 +76,7 @@ class SemanticHash:
     and kind are lowercase words joined by ``-``, the version a positive
     integer, and the hex 64 lowercase digits. heliaPROFILER's hashes have
     the producer ``hpx`` and the kinds ``intent``, ``build``,
-    ``observation``, ``binding`` and ``inputs``; :meth:`parse` reads any
+    ``observation``, ``binding``, ``inputs`` and ``target-config``; :meth:`parse` reads any
     producer's.
     Compare two hashes only when their producer, kind and version match.
     """
