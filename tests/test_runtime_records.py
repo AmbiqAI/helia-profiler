@@ -112,8 +112,8 @@ def test_fixture_integration_capability_table() -> None:
 def test_generic_fixture_io_support_does_not_inherit_release_qualification(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from helia_profiler import runtime_records
-    from helia_profiler.fixture import EngineType, FixtureCapability, fixture_capabilities
+    from helia_profiler import EngineType, FixtureCapability, runtime_records
+    from helia_profiler._fixture_facts import fixture_capabilities
 
     aot = {"name": "helia-aot", "source": {"repo": "AmbiqAI/helia-aot", "commit": _COMMIT}}
     root = _write(

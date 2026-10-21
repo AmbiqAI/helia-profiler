@@ -535,7 +535,7 @@ def test_build_refuses_a_flat_image_capture_cannot_flash(tmp_path, monkeypatch, 
 def test_power_build_validates_linked_terminal_before_returning_receipt(
     tmp_path, monkeypatch, sink_size
 ):
-    from helia_profiler.fixture import FixturePowerSync
+    from helia_profiler import FixturePowerSync
     from tests.unit.test_fixture_capture import image_files
 
     c, f = fixture(tmp_path)

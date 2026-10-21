@@ -9,22 +9,24 @@ import pytest
 from test_fixture_record import _build, _pin, _sourced
 from test_fixture_sources import NS
 
-from helia_profiler import SemanticHash
-from helia_profiler._fixture_record import compiled_fixture_identity
-from helia_profiler.engines import EngineType
-from helia_profiler.engines.base import EngineSource
-from helia_profiler.fixture import (
+from helia_profiler import (
     CanonicalEngine,
     CanonicalKernel,
     FixtureCaptureResult,
     FixtureFile,
     FixtureTimingScope,
+    SemanticHash,
     Unknown,
-    dump_fixture_build,
-    fixture_run_identity,
-    load_fixture_build,
-    read_prepared_runtime_manifest,
 )
+from helia_profiler._fixture_record import (
+    compiled_fixture_identity,
+    dump_fixture_build,
+    load_fixture_build,
+)
+from helia_profiler.engines import EngineType
+from helia_profiler.engines.base import EngineSource
+from helia_profiler.fixture_identity import fixture_run_identity
+from helia_profiler.fixture_runtime import _manifest_facts
 
 AOT_COMMIT = "7b92ec8a3ced8459eb68940a42d405536144368e"
 
@@ -208,7 +210,7 @@ def _manifest(root):
 
 
 def test_a_prepared_runtime_manifest_reads_without_its_archive(tmp_path):
-    facts = read_prepared_runtime_manifest(_manifest(tmp_path))
+    facts = _manifest_facts(_manifest(tmp_path))[2]
     assert (facts.stack, facts.archive_sha256) == ("helia-rt", "c" * 64)
     assert [(p.name, p.revision) for p in facts.providers] == [
         ("helia-rt", "a" * 40),
@@ -216,20 +218,11 @@ def test_a_prepared_runtime_manifest_reads_without_its_archive(tmp_path):
     ]
     tampered = FixtureFile(_manifest(tmp_path).path, "0" * 64)
     with pytest.raises(ValueError, match="hash mismatch"):
-        read_prepared_runtime_manifest(tampered)
-
-
-def test_a_record_from_the_previous_api_still_loads(tmp_path):
-    build = _aot(tmp_path)
-    record = json.loads(dump_fixture_build(build, roots={"run": tmp_path}))
-    assert record["fixture_api"] == [7, 0]
-    for previous in ([5, 6], [5, 7], [5, 8], [6, 0], [6, 1]):
-        record["fixture_api"] = previous
-        assert load_fixture_build(json.dumps(record), roots={"run": tmp_path}) == build
+        _manifest_facts(tampered)
 
 
 def test_the_build_hash_covers_the_runtime_archive_the_model_and_the_lock(tmp_path):
-    from helia_profiler.fixture import FixtureRuntimeSource
+    from helia_profiler import FixtureRuntimeSource
 
     build = _aot(tmp_path)
     base = fixture_run_identity(build).build_hash
@@ -247,7 +240,7 @@ def test_the_build_hash_covers_the_runtime_archive_the_model_and_the_lock(tmp_pa
 
 
 def test_each_missing_fact_states_its_own_reason(tmp_path):
-    from helia_profiler.fixture import FixtureRuntimeSource
+    from helia_profiler import FixtureRuntimeSource
 
     build = _aot(tmp_path)
     no_modules = _pin(tmp_path / "none.json", json.dumps({"modules": []}).encode())
@@ -311,11 +304,11 @@ def test_lifecycle_and_input_names_are_part_of_the_identity(tmp_path):
     )
 
 
-def test_a_ram_observing_record_from_the_previous_api_still_loads(tmp_path):
+def test_a_ram_observing_record_round_trips(tmp_path):
     build = _reseal(_aot(tmp_path), observe_ram=True)
-    record = json.loads(dump_fixture_build(build, roots={"run": tmp_path}))
-    record["fixture_api"] = [5, 6]
-    assert load_fixture_build(json.dumps(record), roots={"run": tmp_path}) == build
+    record = dump_fixture_build(build, roots={"run": tmp_path})
+    assert json.loads(record)["build"]["observe_ram"] is True
+    assert load_fixture_build(record, roots={"run": tmp_path}) == build
 
 
 @pytest.mark.parametrize(
@@ -334,7 +327,7 @@ def test_the_manifest_reader_checks_declared_fields(tmp_path, change, message):
     data = json.loads(manifest.path.read_bytes())
     change(data)
     with pytest.raises(ValueError, match=message):
-        read_prepared_runtime_manifest(_pin(tmp_path / "changed.json", json.dumps(data).encode()))
+        _manifest_facts(_pin(tmp_path / "changed.json", json.dumps(data).encode()))
 
 
 def test_capture_evidence_files_are_not_part_of_the_observation(tmp_path):

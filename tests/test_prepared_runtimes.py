@@ -15,27 +15,16 @@ import time
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock
 
 import pytest
 from typer.testing import CliRunner
 
-from helia_profiler import prepared_runtimes
+from helia_profiler import (
+    FixtureFile,
+    prepared_runtimes,
+)
 from helia_profiler.cli.app import app
 from helia_profiler.errors import ConfigError
-from helia_profiler.fixture import (
-    EngineType,
-    FixtureBackend,
-    FixtureBuildRequest,
-    FixtureFile,
-    FixtureIO,
-    FixtureMethod,
-    FixtureTensor,
-    FixtureTimingScope,
-    PerTensorQuantization,
-    TypedFixture,
-    build_fixture,
-)
 from helia_profiler.prepared_runtimes import prepare_runtime, prepared_directory, prepared_runtime
 from helia_profiler.runtime_records import runtime
 
@@ -134,56 +123,6 @@ def _pin(path: Path, data: bytes) -> FixtureFile:
     return FixtureFile(path, hashlib.sha256(data).hexdigest())
 
 
-def _request(root: Path, engine: EngineType) -> FixtureBuildRequest:
-    tensor = FixtureTensor("x", 0, "int8", (1, 4), PerTensorQuantization(0.5, 0))
-    fixture = TypedFixture(
-        _pin(root / "model.tflite", b"model"),
-        (FixtureIO(tensor, _pin(root / "in.bin", bytes(4))),),
-        (FixtureIO(tensor, _pin(root / "out.bin", bytes(4))),),
-    )
-    backend = FixtureBackend.HELIA if engine is EngineType.HELIA_RT else FixtureBackend.CMSIS_NN
-    return FixtureBuildRequest(
-        fixture=fixture,
-        method=FixtureMethod(FixtureTimingScope.INVOKE_ONLY),
-        work_dir=root / "work",
-        engine=engine,
-        arena_size=65536,
-        iterations=3,
-        warmup=1,
-        backend=backend,
-    )
-
-
-@pytest.fixture
-def fixture_builder(monkeypatch: pytest.MonkeyPatch) -> Mock:
-    operation = Mock()
-    monkeypatch.setattr("helia_profiler._fixture_request._build", operation)
-    return operation
-
-
-def test_a_helia_rt_build_uses_the_prepared_runtime(cache, tmp_path, fixture_builder) -> None:
-    prepared = prepare_runtime("helia-rt")
-    request = _request(tmp_path, EngineType.HELIA_RT)
-    assert request.runtime is None
-    fixture_builder.assert_not_called()
-    build_fixture(request)
-    assert fixture_builder.call_args.kwargs["runtime"] == prepared.runtime
-    assert request.runtime is None
-    manifest = json.loads(prepared.runtime.manifest.read())
-    assert manifest["archive_sha256"] == hashlib.sha256(ARCHIVE).hexdigest()
-
-
-def test_a_helia_rt_build_without_a_prepared_runtime_is_refused(
-    tmp_path, monkeypatch, fixture_builder
-) -> None:
-    monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "cache"))
-    request = _request(tmp_path, EngineType.HELIA_RT)
-    assert request.runtime is None
-    with pytest.raises(ConfigError, match="No prepared helia-rt"):
-        build_fixture(request)
-    fixture_builder.assert_not_called()
-
-
 def test_runtimes_prepare_cli_reports_the_archive(cache: Path) -> None:
     result = CliRunner().invoke(app, ["runtimes", "prepare", "helia-rt"])
     assert result.exit_code == 0, result.output
@@ -238,33 +177,6 @@ def test_a_malformed_prepared_manifest_names_the_prepare_command(cache: Path) ->
     with pytest.raises(ConfigError, match="unreadable") as exc:
         prepared_runtime("helia-rt")
     assert "hpx runtimes prepare helia-rt 2.2.2" in (exc.value.hint or "")
-
-
-def test_an_explicit_runtime_is_kept_and_identity_covers_the_runtime(
-    cache, tmp_path, fixture_builder, monkeypatch
-) -> None:
-    prepared = prepare_runtime("helia-rt")
-    unresolved = _request(tmp_path / "a", EngineType.HELIA_RT)
-    build_fixture(unresolved)
-    resolved_identity = fixture_builder.call_args.kwargs["intent_identity"]
-    explicit = replace(unresolved, runtime=prepared.runtime)
-    assert explicit.runtime is prepared.runtime
-    assert explicit.intent_identity == resolved_identity
-    with monkeypatch.context() as patch:
-        lookup = Mock(side_effect=AssertionError("explicit runtime must not read the cache"))
-        patch.setattr("helia_profiler._fixture_request.prepared_runtime", lookup)
-        build_fixture(explicit)
-        lookup.assert_not_called()
-    assert fixture_builder.call_args.kwargs["runtime"] is prepared.runtime
-    assert fixture_builder.call_args.kwargs["intent_identity"] == resolved_identity
-    (prepared.directory / "provider-manifest.json").write_text(
-        (prepared.directory / "provider-manifest.json").read_text() + " "
-    )
-    changed = _request(tmp_path / "b", EngineType.HELIA_RT)
-    assert changed.intent_identity == unresolved.intent_identity
-    build_fixture(changed)
-    assert fixture_builder.call_args.kwargs["intent_identity"] != resolved_identity
-    assert unresolved.runtime is None and changed.runtime is None
 
 
 def test_a_failed_swap_restores_the_previous_install(cache: Path, monkeypatch) -> None:
@@ -806,25 +718,3 @@ def test_a_litert_tarball_that_is_not_one_tree_is_refused(tmp_path, monkeypatch,
     monkeypatch.setattr(prepared_runtimes, "urlopen", lambda url, timeout: io.BytesIO(data))
     with pytest.raises(ConfigError, match=message):
         prepared_runtimes._download_tree(TFLM.source, tmp_path / "tflite-micro", 5)
-
-
-def test_a_litert_build_uses_the_prepared_runtime(litert_build, tmp_path, fixture_builder) -> None:
-    prepared = prepare_runtime("litert")
-    request = _request(tmp_path, EngineType.LITERT)
-    assert request.runtime is None
-    fixture_builder.assert_not_called()
-    build_fixture(request)
-    assert fixture_builder.call_args.kwargs["runtime"] == prepared.runtime
-    assert request.runtime is None
-
-
-def test_a_litert_build_without_a_prepared_runtime_names_the_prepare_command(
-    tmp_path, monkeypatch, fixture_builder
-) -> None:
-    monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "cache"))
-    request = _request(tmp_path, EngineType.LITERT)
-    assert request.runtime is None
-    with pytest.raises(ConfigError, match="No prepared litert 85638f0 runtime") as exc:
-        build_fixture(request)
-    fixture_builder.assert_not_called()
-    assert "hpx runtimes prepare litert 85638f0" in (exc.value.hint or "")

@@ -5,11 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import cast
 
+from .._fixture_build import TypedFixture
 from .._fixture_placement import validate_fixture_regions
 from ..engines import EngineType
 from ..engines.base import ArenaRegion, HeliaAotArtifacts
 from ..errors import ConfigError
-from ..fixture import TypedFixture
 from ..fixture_analysis import PerTensorQuantization
 from ..fixture_psram import MAX_PSRAM_PAYLOADS, FixturePsramPayload, payload_checksum
 from ..fixture_stage import FixtureStage

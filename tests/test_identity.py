@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 
-from helia_profiler._fixture_build import FixtureBackend
 from helia_profiler.deps.compatibility import CMSIS_NN_PROVIDER_MODULES
 from helia_profiler.engines import EngineType
 from helia_profiler.engines.executorch import EXECUTORCH_MODULE
@@ -67,10 +66,6 @@ def test_kernel_names_map_to_their_library():
     assert {b: canonical_kernel(b) for b in _SUPPORTED_BACKENDS} == {
         "reference": REFERENCE,
         "cmsis_nn": CMSIS_NN,
-    }
-    assert {b: canonical_kernel(b) for b in FixtureBackend} == {
-        FixtureBackend.CMSIS_NN: CMSIS_NN,
-        FixtureBackend.HELIA: HELIA_CORE,
     }
     for adapter, engine, kernel in (
         (LiteRtAdapter, LITERT, CMSIS_NN),

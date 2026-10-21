@@ -96,9 +96,7 @@ class CaseResult:
     gated_window_reference_drift: str | None = None
     #: The model's arbitration verdict (#202): captured at parse time from
     #: PowerSection.gate_duration_unarbitrated_failure so the health check
-    #: consults ONE interpretation. ``None`` = parsed by an older hpx that
-    #: did not record it; the health check falls back to the two-field
-    #: predicate for those legacy records only.
+    #: consults ONE interpretation. ``None`` when the run measured no power.
     gate_duration_unarbitrated_failure: bool | None = None
     power_observation_mode: str | None = None
     power_observation_integrity: str | None = None
@@ -573,9 +571,6 @@ def run_case(
     summary_path = case_dir / "summary.json"
     if summary_path.exists():
         try:
-            # The typed, cross-version reader (#202): legacy key spellings
-            # and the drift-arbitration interpretation live on the model's
-            # properties, not re-derived here.
             summary = load_run_summary(summary_path)
             result.layers = summary.layers or None
             latency = summary.latency
@@ -682,17 +677,7 @@ def validation_health_issues(result: CaseResult) -> tuple[str, ...]:
         issues.append("power enabled but zero energy captured")
     if result.power and result.gated_window_duration_suspect:
         issues.append("GPIO-gated power window duration is suspect")
-    unarbitrated = result.gate_duration_unarbitrated_failure
-    if unarbitrated is None:
-        # Legacy record (parsed before the verdict field existed): fall back
-        # to the two-field predicate. New records carry the model's own
-        # PowerSection.gate_duration_unarbitrated_failure, so the #142/#181
-        # interpretation lives in exactly one place (#205).
-        unarbitrated = (
-            result.gate_duration_integrity_valid is False
-            and result.gated_window_reference_drift is None
-        )
-    if result.power and unarbitrated:
+    if result.power and result.gate_duration_unarbitrated_failure:
         issues.append("GPIO-gated power window failed duration integrity")
     if result.power and result.power_observation_integrity not in {None, "valid"}:
         detail = result.power_gate_failure_kind or result.power_observation_mode or "unknown"

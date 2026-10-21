@@ -163,6 +163,10 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 | [ReferenceOutputs](/helia-profiler/reference/api/helia_profiler/expect/#helia_profiler.ReferenceOutputs) | `helia_profiler.ReferenceOutputs` |
 | [ReferenceOrigin](/helia-profiler/reference/api/helia_profiler/expect/#helia_profiler.ReferenceOrigin) | `helia_profiler.ReferenceOrigin` |
 | [ModelAnalysis](/helia-profiler/reference/api/helia_profiler/modelcost/#helia_profiler.ModelAnalysis) | `helia_profiler.ModelAnalysis` |
+| [section_inventory](/helia-profiler/reference/api/helia_profiler/elf_inventory/#helia_profiler.section_inventory) | `helia_profiler.section_inventory` |
+| [SectionInventory](/helia-profiler/reference/api/helia_profiler/elf_inventory/#helia_profiler.SectionInventory) | `helia_profiler.SectionInventory` |
+| [ElfSection](/helia-profiler/reference/api/helia_profiler/elf_inventory/#helia_profiler.ElfSection) | `helia_profiler.ElfSection` |
+| [LoadSegment](/helia-profiler/reference/api/helia_profiler/elf_inventory/#helia_profiler.LoadSegment) | `helia_profiler.LoadSegment` |
 | [SupportBundleOptions](/helia-profiler/reference/api/helia_profiler/diagnostics/#helia_profiler.SupportBundleOptions) | `helia_profiler.SupportBundleOptions` |
 | [collect_support_bundle](/helia-profiler/reference/api/helia_profiler/diagnostics/#helia_profiler.collect_support_bundle) | `helia_profiler.collect_support_bundle` |
 | [write_support_bundle](/helia-profiler/reference/api/helia_profiler/diagnostics/#helia_profiler.write_support_bundle) | `helia_profiler.write_support_bundle` |

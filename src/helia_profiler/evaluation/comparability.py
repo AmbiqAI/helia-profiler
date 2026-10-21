@@ -170,14 +170,6 @@ def assess_comparability(
             )
         if manifest is not None and manifest.validity is ResultValidity.INVALID:
             issues.extend(_invalid_result_issues(role, manifest))
-        elif manifest is None and run.summary.get("overflow_detected"):
-            issues.append(
-                _issue(
-                    ComparabilityCode.RESULT_INVALID_PMU_OVERFLOW,
-                    f"The legacy {role} result has PMU counter overflow.",
-                    role=role,
-                )
-            )
         elif manifest is not None and manifest.validity is ResultValidity.DEGRADED:
             issues.append(
                 _issue(
@@ -335,7 +327,7 @@ def read_dimensions(run: RunArtifacts) -> dict[str, Any]:
 
     The ONE reader: the comparability gate and the compare Config table
     both consume this dict, so a dimension row can never show a value the
-    gate did not judge (manifest merge, summary fallback and all).
+    gate did not judge (manifest merge and all).
 
     Each spec declares its source and path (``results/dimensions.py``); the
     ``_nested`` traversal is deliberately crash-tolerant because artifacts
@@ -357,10 +349,7 @@ def read_dimensions(run: RunArtifacts) -> dict[str, Any]:
     power_dict = power if isinstance(power, dict) else None
     for spec in DIMENSION_REGISTRY.values():
         if spec.source in (ArtifactSource.RUN_METADATA, ArtifactSource.SUMMARY):
-            value = _read_artifact_value(run, spec.source, spec.path)
-            if value is None and spec.fallback is not None:
-                value = _read_artifact_value(run, spec.fallback.source, spec.fallback.path)
-            dimensions[spec.dimension] = value
+            dimensions[spec.dimension] = _read_artifact_value(run, spec.source, spec.path)
         elif spec.source is ArtifactSource.SUMMARY_POWER:
             if power_dict is not None:
                 dimensions[spec.dimension] = (
@@ -390,11 +379,7 @@ def read_dimensions(run: RunArtifacts) -> dict[str, Any]:
 
 
 def _read_artifact_value(run: RunArtifacts, source: ArtifactSource, path: tuple[str, ...]) -> Any:
-    """Path read from one path-addressable artifact (``None`` when absent).
-
-    Primary and ``fallback`` reads go through the same function so a
-    spec's fallback cannot mean something different from its path.
-    """
+    """Path read from one path-addressable artifact (``None`` when absent)."""
     if source is ArtifactSource.RUN_METADATA:
         return nested_get(run.metadata, *path)
     if source is ArtifactSource.SUMMARY:

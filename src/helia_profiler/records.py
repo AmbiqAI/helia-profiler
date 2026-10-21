@@ -23,7 +23,7 @@ from .results.manifest import (
     ResultManifest,
     RunStatus,
 )
-from .results.run_summary import RUN_SUMMARY_SCHEMA, RunSummary
+from .results.run_summary import RunSummary, _require_current_summary
 from .results.serde import nested_get
 from .run_record import RUN_RESULT_SCHEMA, RunResultError, RunResultRecord, read_run
 
@@ -148,8 +148,6 @@ def _document(root: Path, artifact: ResultArtifact) -> dict[str, Any]:
     return data
 
 
-_SUMMARY_VERSIONS = (11, 12, 13, 14, 15, 16, 17, 18, 19)
-
 #: Each identity hash, its kind, and the non-hash value it may take instead.
 _IDENTITY_HASHES: tuple[tuple[str, Kind, str], ...] = (
     ("build_hash", "build", "unknown"),
@@ -224,10 +222,10 @@ def load_result(location: str | Path) -> ProfileResultRecord | RunResultRecord:
     refused as ``ambiguous_location``, since only a file states its schema.
 
     Failed native runs remain failed records. Missing manifests and interrupted
-    publication are refusals, not legacy fallbacks. Summary versions 11 to 19
-    retain the timing/memory fields read here; other versions remain available
-    to native readers without receiving this verification guarantee. From
-    version 19 the identity's hashes must be ``hpx`` semantic hashes.
+    publication are refusals, not legacy fallbacks. Only the current run
+    summary version is read, and its identity's hashes must be ``hpx``
+    semantic hashes; a summary of another version is refused, naming the
+    version, and is read with the HPX release that wrote it.
     """
     try:
         return _load_result(Path(location))
@@ -271,15 +269,11 @@ def _load_result(location: Path) -> ProfileResultRecord | RunResultRecord:
     )
     summary = None
     if summary_data is not None:
-        version = summary_data.get("schema_version")
-        if type(version) is not int or version not in _SUMMARY_VERSIONS:
-            raise ResultReadError(
-                "unsupported_schema",
-                f"Supported summary versions: {', '.join(map(str, _SUMMARY_VERSIONS))}",
-            )
-        _schema(summary_data, RUN_SUMMARY_SCHEMA, version)
-        if version >= 19:
-            _identity_hashes(summary_data)
+        try:
+            _require_current_summary(summary_data)
+        except ValueError as exc:
+            raise ResultReadError("unsupported_schema", str(exc)) from exc
+        _identity_hashes(summary_data)
         if (
             summary_data.get("validity") is not None
             and summary_data["validity"] != manifest.validity.value

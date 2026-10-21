@@ -10,10 +10,10 @@ One class owns the artifact's shape for BOTH sides of the boundary:
   the equality check makes any divergence a loud producer-time failure);
 * **consumers** (``validation/runner.py`` today; more as they migrate) load
   artifacts through :func:`load_run_summary` / :meth:`RunSummary.from_dict`,
-  a *tolerant* reader: missing fields become ``None``, unknown keys are
-  preserved on ``extras`` for inspection, and cross-version interpretation
-  (legacy key spellings, drift arbitration between schema versions) lives in
-  properties here instead of being re-derived at every read site.
+  a current-schema reader: missing optional fields become ``None``, unknown keys are
+  preserved on ``extras`` for inspection, and derived readings (unit
+  conversions, the gate-drift arbitration) live in properties here instead
+  of being re-derived at every read site.
 
 A field's meaning has one home: consumers read it here instead of
 re-deriving semantics the producer never promised.
@@ -24,8 +24,8 @@ imports nothing from ``evaluation/`` or ``report/`` — ``evaluation`` imports
 
 Reader vs writer asymmetry, stated honestly: ``to_dict`` serializes only the
 canonical schema — it does NOT re-emit ``extras``. The producer never
-populates ``extras``; the reader keeps them so a consumer can inspect a
-newer-or-older artifact without this module lying about round-tripping it.
+populates ``extras``; the reader keeps them so a consumer can inspect an
+unexpected key without this module lying about round-tripping it.
 """
 
 from __future__ import annotations
@@ -82,6 +82,19 @@ RUN_SUMMARY_SCHEMA = "hpx.run-summary"
 #: semantic hashes, hpx.<kind>/<version>:sha256:<hex>, not bare hex, and
 #: inputs_sha256 is renamed inputs_hash, also a semantic hash. Otherwise unchanged.
 RUN_SUMMARY_SCHEMA_VERSION = 19
+
+
+def _require_current_summary(data: Mapping[str, Any]) -> None:
+    version = data.get("schema_version")
+    if type(version) is not int or version != RUN_SUMMARY_SCHEMA_VERSION:
+        raise ValueError(
+            f"Unsupported run summary version: {version!r}; this heliaPROFILER reads "
+            f"version {RUN_SUMMARY_SCHEMA_VERSION}, so read the result with the HPX "
+            "release that wrote it"
+        )
+    if data.get("schema") != RUN_SUMMARY_SCHEMA:
+        raise ValueError(f"Expected summary schema {RUN_SUMMARY_SCHEMA!r}")
+
 
 __all__ = [
     "RUN_SUMMARY_SCHEMA",
@@ -434,44 +447,26 @@ class PowerSection:
             extras={k: v for k, v in data.items() if k not in known},
         )
 
-    # -- cross-version interpretation (the runner's legacy fallbacks, once) --
+    # -- derived readings, interpreted once for every consumer --
 
     @property
     def energy_uj(self) -> float | None:
-        """Total gated energy in µJ, across three schema generations.
-
-        Precedence: explicit-unit legacy keys, then the canonical SI field
-        scaled. A null or garbage legacy value falls through to the next
-        source instead of raising.
-        """
-        for legacy in ("total_energy_uj", "energy_uJ"):
-            value = to_float(self.extras.get(legacy))
-            if value is not None:
-                return value
+        """Total gated energy in µJ."""
         value = to_float(self.energy_j)
         return value * 1e6 if value is not None else None
 
     @property
     def avg_current_ma(self) -> float | None:
-        value = to_float(self.extras.get("avg_current_ma"))
-        if value is not None:
-            return value
         value = to_float(self.avg_current_a)
         return value * 1e3 if value is not None else None
 
     @property
     def avg_power_mw(self) -> float | None:
-        value = to_float(self.extras.get("avg_power_mw"))
-        if value is not None:
-            return value
         value = to_float(self.avg_power_w)
         return value * 1e3 if value is not None else None
 
     @property
     def peak_current_ma(self) -> float | None:
-        value = to_float(self.extras.get("peak_current_ma"))
-        if value is not None:
-            return value
         value = to_float(self.peak_current_a)
         return value * 1e3 if value is not None else None
 
@@ -582,6 +577,7 @@ class RunSummary:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> RunSummary:
+        _require_current_summary(data)
         known = {
             "schema",
             "schema_version",
@@ -618,7 +614,7 @@ class RunSummary:
             validity=(str(data["validity"]) if data.get("validity") is not None else None),
             issues=_tuple_of_mappings(data.get("issues")),
             schema=str(data.get("schema", RUN_SUMMARY_SCHEMA)),
-            schema_version=to_int(data.get("schema_version")) or 1,
+            schema_version=RUN_SUMMARY_SCHEMA_VERSION,
             compatibility=data.get("compatibility"),
             dependencies=data.get("dependencies"),
             identity=data.get("identity"),
@@ -638,10 +634,10 @@ class RunSummary:
 
 
 def load_run_summary(path: str | Path) -> RunSummary:
-    """Load a ``summary.json`` from disk, tolerantly.
+    """Load a current-version ``summary.json`` from disk.
 
     Raises ``OSError``/``json.JSONDecodeError``/``ValueError`` for an
-    unreadable or non-object document — the caller decides what a broken
+    unreadable, non-object or unsupported-schema document — the caller decides what a broken
     artifact means (the validation runner fails the case; a report viewer
     might not).
     """

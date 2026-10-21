@@ -77,13 +77,6 @@ class FixtureDType(StrEnum):
     FLOAT32 = "float32"
 
 
-class FixtureBackend(StrEnum):
-    """Kernel backend a prepared-runtime fixture engine requires."""
-
-    CMSIS_NN = "cmsis_nn"
-    HELIA = "helia"
-
-
 @dataclass(frozen=True)
 class FixtureMethod:
     """Select input-restoration timing and, optionally, the internal-state policy.
@@ -465,32 +458,8 @@ def build_fixed_fixture(
     observe_ram: bool = False,
 ) -> FixtureBuild:
     """Render or compile one fixed fixture through profiler's host-only stages."""
-    return _build(
-        config,
-        fixture,
-        method=method,
-        runtime=runtime,
-        compile=compile,
-        observe_aot_arenas=observe_aot_arenas,
-        observe_ram=observe_ram,
-    )
-
-
-def _build(
-    config: ProfileConfig,
-    fixture: FixedFixture | TypedFixture,
-    *,
-    method: FixtureMethod,
-    runtime: PreparedUpstreamRuntime | None,
-    compile: bool,
-    observe_aot_arenas: bool,
-    intent_identity: str | None = None,
-    observe_ram: bool = False,
-) -> FixtureBuild:
     if not isinstance(method, FixtureMethod):
         raise ConfigError("Explicit FixtureMethod required")
-    if method.power_sync is not None and method.power_sync.protocol_version != 2:
-        raise ConfigError("New power firmware requires completion protocol 2")
     _validate(config, fixture)
     if config.target.board == "apollo510b_evb" and method.power_sync is not None:
         raise ConfigError("AP510B fixture integration is timing-only")
@@ -636,8 +605,7 @@ def _build(
             raise ConfigError(
                 f"Flat image is {size} B; fixture capture accepts at most {MAX_IMAGE} B in MRAM"
             )
-    if intent_identity is None:
-        intent_identity = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
+    intent_identity = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
     toolchain = ctx.run_metadata.toolchain if compile else None
     if compile and (toolchain is None or not toolchain.compiler_version):
         raise ConfigError("Compiled fixture requires recorded toolchain provenance")

@@ -193,7 +193,6 @@ Source: `src/helia_profiler/_fixture_facts.py:46`
 
 ```python
 FixtureCapabilities(
-    api_version: tuple[int, int],
     targets: tuple[QualifiedFixtureTarget, ...],
     engines: tuple[EngineDTypeCapability, ...],
     readback_budget: int,
@@ -202,21 +201,11 @@ FixtureCapabilities(
 
 `dataclass`
 
-Targets, engine and dtype status, and limits of this fixture API.
+Targets, engine and dtype status, and limits of this heliaPROFILER's runs.
 
 **API tier:** `experimental`
 
 Source: `src/helia_profiler/_fixture_facts.py:49`
-
-### helia_profiler.FixtureCapabilities.api_version
-
-`attribute` · `python`
-
-```python
-api_version: tuple[int, int]
-```
-
-Source: `src/helia_profiler/_fixture_facts.py:53`
 
 ### helia_profiler.FixtureCapabilities.targets
 
@@ -226,7 +215,7 @@ Source: `src/helia_profiler/_fixture_facts.py:53`
 targets: tuple[QualifiedFixtureTarget, ...]
 ```
 
-Source: `src/helia_profiler/_fixture_facts.py:54`
+Source: `src/helia_profiler/_fixture_facts.py:53`
 
 ### helia_profiler.FixtureCapabilities.engines
 
@@ -236,7 +225,7 @@ Source: `src/helia_profiler/_fixture_facts.py:54`
 engines: tuple[EngineDTypeCapability, ...]
 ```
 
-Source: `src/helia_profiler/_fixture_facts.py:55`
+Source: `src/helia_profiler/_fixture_facts.py:54`
 
 ### helia_profiler.FixtureCapabilities.readback_budget
 
@@ -246,7 +235,7 @@ Source: `src/helia_profiler/_fixture_facts.py:55`
 readback_budget: int
 ```
 
-Source: `src/helia_profiler/_fixture_facts.py:56`
+Source: `src/helia_profiler/_fixture_facts.py:55`
 
 ## helia_profiler.FixtureCapability
 
@@ -260,7 +249,7 @@ Producer-declared status of one engine and IO dtype for fixed fixtures.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/_fixture_build.py:150`
+Source: `src/helia_profiler/_fixture_build.py:143`
 
 ### helia_profiler.FixtureCapability.QUALIFIED
 
@@ -270,7 +259,7 @@ Source: `src/helia_profiler/_fixture_build.py:150`
 QUALIFIED = 'qualified'
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:153`
+Source: `src/helia_profiler/_fixture_build.py:146`
 
 ### helia_profiler.FixtureCapability.SUPPORTED
 
@@ -280,7 +269,7 @@ Source: `src/helia_profiler/_fixture_build.py:153`
 SUPPORTED = 'supported'
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:154`
+Source: `src/helia_profiler/_fixture_build.py:147`
 
 ### helia_profiler.FixtureCapability.UNSUPPORTED
 
@@ -290,4 +279,4 @@ Source: `src/helia_profiler/_fixture_build.py:154`
 UNSUPPORTED = 'unsupported'
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:155`
+Source: `src/helia_profiler/_fixture_build.py:148`

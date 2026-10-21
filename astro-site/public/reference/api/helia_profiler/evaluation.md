@@ -593,7 +593,7 @@ Full comparison between two profile runs.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/evaluation/compare.py:121`
+Source: `src/helia_profiler/evaluation/compare.py:122`
 
 ### helia_profiler.CompareResult.baseline
 
@@ -603,7 +603,7 @@ Source: `src/helia_profiler/evaluation/compare.py:121`
 baseline: RunArtifacts
 ```
 
-Source: `src/helia_profiler/evaluation/compare.py:125`
+Source: `src/helia_profiler/evaluation/compare.py:126`
 
 ### helia_profiler.CompareResult.candidate
 
@@ -613,7 +613,7 @@ Source: `src/helia_profiler/evaluation/compare.py:125`
 candidate: RunArtifacts
 ```
 
-Source: `src/helia_profiler/evaluation/compare.py:126`
+Source: `src/helia_profiler/evaluation/compare.py:127`
 
 ### helia_profiler.CompareResult.config_rows
 
@@ -623,7 +623,7 @@ Source: `src/helia_profiler/evaluation/compare.py:126`
 config_rows: list[ConfigDiffRow]
 ```
 
-Source: `src/helia_profiler/evaluation/compare.py:127`
+Source: `src/helia_profiler/evaluation/compare.py:128`
 
 ### helia_profiler.CompareResult.metrics
 
@@ -633,7 +633,7 @@ Source: `src/helia_profiler/evaluation/compare.py:127`
 metrics: list[MetricDiff]
 ```
 
-Source: `src/helia_profiler/evaluation/compare.py:128`
+Source: `src/helia_profiler/evaluation/compare.py:129`
 
 ### helia_profiler.CompareResult.layer_rows
 
@@ -643,7 +643,7 @@ Source: `src/helia_profiler/evaluation/compare.py:128`
 layer_rows: list[LayerDiffRow]
 ```
 
-Source: `src/helia_profiler/evaluation/compare.py:129`
+Source: `src/helia_profiler/evaluation/compare.py:130`
 
 ### helia_profiler.CompareResult.warnings
 
@@ -653,7 +653,7 @@ Source: `src/helia_profiler/evaluation/compare.py:129`
 warnings: list[str] = field(default_factory=list)
 ```
 
-Source: `src/helia_profiler/evaluation/compare.py:130`
+Source: `src/helia_profiler/evaluation/compare.py:131`
 
 ### helia_profiler.CompareResult.comparability
 
@@ -663,7 +663,7 @@ Source: `src/helia_profiler/evaluation/compare.py:130`
 comparability: ComparabilityAssessment = field(default_factory=ComparabilityAssessment)
 ```
 
-Source: `src/helia_profiler/evaluation/compare.py:131`
+Source: `src/helia_profiler/evaluation/compare.py:132`
 
 ### helia_profiler.CompareResult.verdict
 
@@ -673,7 +673,7 @@ Source: `src/helia_profiler/evaluation/compare.py:131`
 verdict: ComparisonVerdict | None = None
 ```
 
-Source: `src/helia_profiler/evaluation/compare.py:132`
+Source: `src/helia_profiler/evaluation/compare.py:133`
 
 ## helia_profiler.assess_comparability
 

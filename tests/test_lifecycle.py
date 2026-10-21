@@ -7,14 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from helia_profiler import lifecycle as lifecycle_module
-from helia_profiler._fixture_build import _validate
-from helia_profiler.engines import EngineType, get_adapter
-from helia_profiler.engines.base import EngineAdapter
-from helia_profiler.errors import EngineError
-from helia_profiler.fixture import (
-    FixtureBackend,
-    FixtureBuildRequest,
+from helia_profiler import (
     FixtureFile,
     FixtureIO,
     FixtureMethod,
@@ -23,6 +16,11 @@ from helia_profiler.fixture import (
     PerTensorQuantization,
     TypedFixture,
 )
+from helia_profiler import lifecycle as lifecycle_module
+from helia_profiler._fixture_build import _validate
+from helia_profiler.engines import EngineType, get_adapter
+from helia_profiler.engines.base import EngineAdapter
+from helia_profiler.errors import EngineError
 from helia_profiler.identity import Unknown
 from helia_profiler.lifecycle import (
     InstanceBoundary,
@@ -31,6 +29,7 @@ from helia_profiler.lifecycle import (
     lifecycle_invocations,
     require_lifecycle,
 )
+from tests.fixture_requests import FixtureBackend, FixtureBuildRequest
 
 #: What each engine's firmware runs today. ExecuTorch reloads its program on
 #: every invocation, so it cannot carry state.

@@ -1,4 +1,4 @@
-"""Explicit paired placements keep request identity and rendered regions aligned."""
+"""Explicit paired placements keep the configured and rendered regions aligned."""
 
 import json
 from dataclasses import replace
@@ -7,21 +7,21 @@ import pytest
 from test_fixture_request import _request
 from test_typed_fixture import METHOD, analysis_of, config_for, typed
 
+from helia_profiler import Placement
 from helia_profiler._fixture_build import FixtureRenderSpec, _validate
 from helia_profiler.engines import EngineType
 from helia_profiler.engines.base import ArenaRegion
 from helia_profiler.errors import ConfigError
 from helia_profiler.firmware.fixture import fixture_template_vars
 from helia_profiler.firmware.render import _jinja_env
-from helia_profiler.fixture import FixturePlacement, Placement
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.placement import ArenaRole
+from tests.fixture_requests import FixturePlacement
 
 
-def test_paired_tcm_request_has_distinct_intent_and_config(tmp_path):
+def test_paired_tcm_placement_reaches_the_config(tmp_path):
     sram = _request(tmp_path)
     tcm = replace(sram, placement=FixturePlacement(Placement.TCM, Placement.TCM))
-    assert tcm.intent_identity != sram.intent_identity
     config = tcm.to_config()
     assert config.model.arena_location == config.model.weights_location == Placement.TCM
     _validate(config, tcm.fixture)
@@ -250,8 +250,11 @@ def test_mixed_region_evidence_survives_record_and_rejects_tampering(tmp_path):
     from test_fixture_record import _build, _pin
 
     from helia_profiler._fixture_placement import validate_fixture_regions
-    from helia_profiler._fixture_record import compiled_fixture_identity
-    from helia_profiler.fixture import dump_fixture_build, load_fixture_build
+    from helia_profiler._fixture_record import (
+        compiled_fixture_identity,
+        dump_fixture_build,
+        load_fixture_build,
+    )
 
     ctx, regions = mixed_context(tmp_path)
     evidence = validate_fixture_regions(ctx, regions)

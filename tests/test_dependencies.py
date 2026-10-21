@@ -175,7 +175,7 @@ def test_ordinary_reuse_is_byte_stable_and_never_locks(
 
 
 def test_receipt_provenance_survives_workspace_reuse(tmp_path, monkeypatch):
-    from helia_profiler.fixture import FixtureFile
+    from helia_profiler import FixtureFile
 
     ctx = _context(tmp_path)
     monkeypatch.setattr(

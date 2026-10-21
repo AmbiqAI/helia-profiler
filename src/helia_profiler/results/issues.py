@@ -336,7 +336,6 @@ class ComparabilityCode(StrEnum):
 
     RESULT_INCOMPLETE = "result.incomplete"
     RESULT_INVALID = "result.invalid"
-    RESULT_INVALID_PMU_OVERFLOW = "result.invalid_pmu_overflow"
     RESULT_DEGRADED = "result.degraded"
     IDENTITY_MODEL_MISMATCH = "identity.model_mismatch"
     METRIC_POWER_INTEGRITY_INVALID = "metric.power_integrity_invalid"
@@ -370,11 +369,6 @@ _COMPARABILITY_SPECS: tuple[ComparabilitySpec, ...] = (
         ComparabilityCode.RESULT_INVALID,
         ComparabilitySeverity.BLOCKING,
         "A result is invalid and cannot be compared.",
-    ),
-    ComparabilitySpec(
-        ComparabilityCode.RESULT_INVALID_PMU_OVERFLOW,
-        ComparabilitySeverity.BLOCKING,
-        "A legacy result without a manifest has PMU counter overflow.",
     ),
     ComparabilitySpec(
         ComparabilityCode.RESULT_DEGRADED,

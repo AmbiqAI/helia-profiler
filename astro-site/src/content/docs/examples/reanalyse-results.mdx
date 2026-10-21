@@ -12,15 +12,16 @@ pass or fail.
 
 ## Hardware and wiring
 
-None. Every step runs on the host against the bundles shipped with the
-repository.
+None. Every step runs on the host against two saved, current-format profile bundles.
 
 ## Software prerequisites
 
-hpx installed (`pip install helia-profiler`) and a checkout of the
-repository for the shipped bundles under
-[`examples/results/hardware-validation-2026-09-16/`](https://github.com/AmbiqAI/helia-profiler/tree/main/examples/results/hardware-validation-2026-09-16).
-`jq` for the shell steps.
+Install hpx and collect two profile bundles with the current release. In the
+examples below, `baseline` and `candidate` are their result directories.
+Both must contain a published result manifest and a current `hpx.run-summary`
+summary. Older bundles require the HPX release that wrote them; current
+readers, including `load_run_summary` and `hpx compare`, refuse older versions.
+Do not change a bundle's version field to make it load.
 
 ## Config file
 
@@ -32,83 +33,64 @@ bundles. The bundles' own configs are recorded in each
 ## Run
 
 ```bash
-cd examples/results/hardware-validation-2026-09-16
-RT=apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto
-AOT=apollo510_evb-kws-aot-ns-arm-none-eabi-gcc-rtt-auto
-jq '{validity, engine, layers, total_cycles, clean: .latency.device_clean_infer_avg_cycles}' $RT/summary.json
-hpx compare $RT $AOT --output-dir /tmp/rt-vs-aot
+hpx results inspect baseline
+hpx results inspect candidate
+hpx compare baseline candidate --output-dir comparison
 ```
 
-From the repository root:
+For a verified native record and its portable observations:
+
+```python
+from helia_profiler.api import inspect_result, load_result, observations, export_result
+
+checked = inspect_result("baseline")
+if checked.result is None:
+    raise ValueError(f"{checked.code}: {checked.message}")
+record = load_result("baseline")
+view = observations(record)
+export_result(record, "portable-result.json")
+```
+
+To examine the typed summary after verifying the bundle:
 
 ```python
 from pathlib import Path
-from helia_profiler.results.manifest import load_result_manifest
 from helia_profiler.results.run_summary import load_run_summary
 
-bundle = Path("examples/results/hardware-validation-2026-09-16/apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto")
-manifest = load_result_manifest(bundle / "result_manifest.json", verify=True)
-print(manifest.run_id, manifest.validity, [issue.code for issue in manifest.issues])
-for artifact in manifest.artifacts:
-    print(artifact.role, artifact.name, artifact.path)
-
-summary = load_run_summary(bundle / "summary.json")
+summary = load_run_summary(Path("baseline/summary.json"))
+print(summary.validity, summary.issues)
 print(summary.engine, summary.layers, summary.total_cycles)
-print(summary.latency.device_clean_infer_avg_cycles, summary.latency.device_clean_infer_avg_us)
-print(summary.memory.allocated_arena, "of", summary.memory.arena_size, "bytes")
-print(summary.binary.total, summary.binary.text)
-print(summary.top_layers[:3])
+if summary.latency is not None:
+    print(summary.latency.device_clean_infer_avg_cycles)
 ```
 
 ## Expected output
 
-The Python block, run on the host on 2026-09-21 against the shipped bundle:
-
-```
-c4d1ee1e-fcc5-48f2-abdc-9ac9ba0aee4f valid []
-core hpx.profile-layers profile_results.csv
-core hpx.summary summary.json
-core hpx.run-metadata run_metadata.json
-core hpx.nsx-lock nsx.lock
-helia-rt 13 2060239.0
-2051232 21367
-29780 of 32768 bytes
-885056 278596
-({'op': 'CONV_2D', 'cycles': 337348.0, 'pct': 16.4}, {'op': 'DEPTHWISE_CONV_2D', 'cycles': 216207.0, 'pct': 10.5}, {'op': 'DEPTHWISE_CONV_2D', 'cycles': 216205.0, 'pct': 10.5})
-```
-
-`hpx compare` on the two bundles prints the report shown on
-[Compare engines](../engine-comparison/#expected-output) and writes
-`compare_summary.json` and `layer_diff.csv` into `/tmp/rt-vs-aot`.
+`inspect` returns a structured result or a refusal with a reason. A valid
+comparison prints metric and configuration differences and writes
+`compare_summary.json` and `layer_diff.csv` into `comparison`. Values depend
+on the captured models, engines, and target configuration.
 
 ## How to read it
 
-- `verify=True` re-hashes the four core artifacts against the manifest;
-  a bundle that has been edited, truncated or had a file swapped is
-  rejected before you read a number. Without it the manifest is read but
-  nothing is checked.
-- `validity` is the verdict and `issues` the reasons; read them before
-  `total_cycles`. These bundles are `valid` with no issues.
-- `total_cycles` is the instrumented per-layer sum and `top_layers[].pct`
-  divides it; the number to publish is
-  `latency.device_clean_infer_avg_cycles`
-  ([Latency and per-layer](../../guide/latency/)).
-- `summary.memory` and `summary.binary` are the arena and the linked
-  sections; `run_metadata.json` carries the platform, toolchain versions,
-  the model hash and the dependency provenance the comparison uses.
-- The bundles were written by hpx 0.1.6 with `hpx.run-summary` schema
-  version 5; `load_run_summary` reads every version since 2 and applies
-  the arbitration rules for you ([Output files](../../guide/output/)).
+- Check validity and issues before using measurements. Verified failed runs
+  remain failed results.
+- `total_cycles` is the instrumented per-layer sum. Clean invocation timing
+  is a separate measurement ([Latency and per-layer](../../guide/latency/)).
+- Missing optional measurements remain unknown. Reading a summary directly
+  checks its format but does not verify the enclosing bundle's hashes; use
+  `inspect_result` or `load_result` for that verification.
 
 ## Variations
 
 ### Portable ordinary-profile view
 
-For ordinary profile bundles with summary schema 11 or 12, the additive
-offline reader verifies publication, artifact paths, sizes and hashes, and
-agreement of retained issues and overlapping summary/metadata/comparability
-identities before returning a native record. Missing identity facts remain
-unknown; contradictory recorded facts are refused:
+For ordinary profile bundles of the current summary schema, the offline
+reader verifies publication, artifact paths, sizes and hashes, and agreement
+of retained issues and overlapping summary/metadata/comparability identities
+before returning a native record. Missing identity facts remain unknown;
+contradictory recorded facts are refused. It refuses summaries of another version. Read historical bundles with the
+HPX release that wrote them; there is no archival-reader fallback.
 
 ```python
 from helia_profiler.api import inspect_result, load_result, observations, export_result
@@ -154,8 +136,7 @@ rail energy when measured, and arena use
 ([A saved run result](../../guide/output/#7-a-saved-run-result)). Neither
 mapping covers per-layer attribution.
 It does not replace the existing native loaders or `hpx compare`, and it
-does not qualify numerical correctness or authenticate a result. The older
-shipped examples above continue to use their existing native loaders.
+does not qualify numerical correctness or authenticate a result. All summary readers require the current format.
 
 - Regression gate in CI: save the profile below and run
   `hpx compare baseline candidate --profile regression-profile.json`; a
@@ -178,17 +159,20 @@ shipped examples above continue to use their existing native loaders.
   `macs`, `ops` and `cycles_per_mac` ([Parsing outputs](../../guide/parsing-outputs/)).
 - From Python, `hpx.Session().compare(baseline_dir, candidate_dir, output_dir=...)`
   returns the same `CompareResult` the CLI prints.
-- Two bundles from different boards (the Apollo3P and Apollo4 Lite Blue
-  KWS bundles are shipped too): `hpx compare` reports `board`, `soc` and
+- Two current-format bundles from different boards: `hpx compare` reports `board`, `soc` and
   `cpu_clock` as differing dimensions and still shows the totals; a
   cycles-per-inference comparison across a Cortex-M4 and a Cortex-M55 is
   an architecture comparison, not an engine one.
 
 ## Validated on
 
-Host-only. The original shipped-bundle loaders and comparison example were executed on 2026-09-21 on macOS with
-hpx 0.1.6 against the shipped bundles, which come from nightly hardware
-validation [run 35078330526](https://github.com/AmbiqAI/helia-profiler/actions/runs/35078330526)
-(2026-09-16, source commit `0714893`, boards `apollo510_evb`,
-`apollo330mP_evb`, `apollo3p_evb`, `apollo4l_blue_evb`). The bundles are
-sanitized to remove probe serials, with manifest digests refreshed: `load_result_manifest(..., verify=True)` passes on all nine.
+Host-only reader and comparison regression tests cover current-format acceptance
+and unsupported-format refusal. The commands above require your own current
+profile bundles; this revision does not claim a new hardware capture.
+
+### Historical examples
+
+The bundles under `examples/results/hardware-validation-2026-09-16/` were
+written by hpx 0.1.6 with summary schema 5. They are historical evidence,
+not inputs for this walkthrough with the current release. Use their
+producing release to reproduce their original analysis.

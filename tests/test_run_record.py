@@ -15,6 +15,14 @@ from jsonschema import Draft202012Validator
 from typer.testing import CliRunner
 
 import helia_profiler as hpx
+from helia_profiler import (
+    FixtureBoardPowerRequest,
+    FixtureBuild,
+    FixtureCaptureResult,
+    FixtureMemory,
+    FixtureRailPowerRequest,
+    FixtureTiming,
+)
 from helia_profiler.api import export_result, inspect_result, load_result, observations
 from helia_profiler.compiled_build import CompiledBuild, RunResult
 from helia_profiler.errors import ConfigError
@@ -24,14 +32,6 @@ from helia_profiler.expect import (
     Tolerance,
     Verification,
     compare_outputs,
-)
-from helia_profiler.fixture import (
-    FixtureBoardPowerRequest,
-    FixtureBuild,
-    FixtureCaptureResult,
-    FixtureMemory,
-    FixtureRailPowerRequest,
-    FixtureTiming,
 )
 from helia_profiler.identity import CanonicalEngine, RuntimeIdentity
 from helia_profiler.lifecycle import Lifecycle

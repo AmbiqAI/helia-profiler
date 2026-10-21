@@ -9,6 +9,7 @@ import yaml
 
 from helia_profiler.config import Toolchain, Transport
 from helia_profiler.engines import EngineType
+from helia_profiler.results.run_summary import RUN_SUMMARY_SCHEMA_VERSION
 from helia_profiler.validation.matrix import (
     BOARDS,
     MODELS,
@@ -61,6 +62,7 @@ def test_power_health_rejects_invalid_gate_integrity():
         total_cycles=123456,
         energy_uj=100.0,
         gate_duration_integrity_valid=False,
+        gate_duration_unarbitrated_failure=True,
     )
 
     assert validation_health_issues(result) == (
@@ -93,6 +95,7 @@ def test_power_health_accepts_arbitrated_drift():
             "window ran 11.8% short of the profile-phase expectation but "
             "agrees with the firmware's own STIMER window time"
         ),
+        gate_duration_unarbitrated_failure=False,
     )
 
     assert validation_health_issues(result) == ()
@@ -370,6 +373,8 @@ def test_run_case_retries_once_on_transient_joulescope_lock(tmp_path: Path, monk
         (case_dir / "summary.json").write_text(
             json.dumps(
                 {
+                    "schema": "hpx.run-summary",
+                    "schema_version": RUN_SUMMARY_SCHEMA_VERSION,
                     "layers": 13,
                     "total_cycles": 123456,
                     "power": {
@@ -430,6 +435,8 @@ def test_run_case_uses_current_python_for_subprocess(tmp_path: Path, monkeypatch
         (case_dir / "summary.json").write_text(
             json.dumps(
                 {
+                    "schema": "hpx.run-summary",
+                    "schema_version": RUN_SUMMARY_SCHEMA_VERSION,
                     "layers": 13,
                     "total_cycles": 123456,
                     "latency": {
@@ -486,7 +493,16 @@ def test_run_case_writes_full_child_log(tmp_path: Path, monkeypatch):
         config_path = Path(cmd[-1])
         case_dir = Path(yaml.safe_load(config_path.read_text())["output"]["dir"])
         case_dir.mkdir(parents=True, exist_ok=True)
-        (case_dir / "summary.json").write_text(json.dumps({"layers": 13, "total_cycles": 123456}))
+        (case_dir / "summary.json").write_text(
+            json.dumps(
+                {
+                    "schema": "hpx.run-summary",
+                    "schema_version": RUN_SUMMARY_SCHEMA_VERSION,
+                    "layers": 13,
+                    "total_cycles": 123456,
+                }
+            )
+        )
         return subprocess.CompletedProcess(
             cmd, 0, stdout="child stdout marker\n", stderr="child stderr marker\n"
         )
@@ -525,7 +541,16 @@ def test_run_case_verbose_appends_v_flag(tmp_path: Path, monkeypatch):
         config_path = Path(cmd[cmd.index("--config") + 1])
         case_dir = Path(yaml.safe_load(config_path.read_text())["output"]["dir"])
         case_dir.mkdir(parents=True, exist_ok=True)
-        (case_dir / "summary.json").write_text(json.dumps({"layers": 13, "total_cycles": 123456}))
+        (case_dir / "summary.json").write_text(
+            json.dumps(
+                {
+                    "schema": "hpx.run-summary",
+                    "schema_version": RUN_SUMMARY_SCHEMA_VERSION,
+                    "layers": 13,
+                    "total_cycles": 123456,
+                }
+            )
+        )
         return subprocess.CompletedProcess(cmd, 0, stdout="ok\n", stderr="")
 
     monkeypatch.setattr("helia_profiler.validation.runner.subprocess.run", fake_run)

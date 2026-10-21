@@ -1,35 +1,41 @@
-"""Typed fixed-fixture build request with a path-free intent identity."""
+"""Build fixed fixtures in tests from a few chosen inputs instead of a full profile config."""
 
 from __future__ import annotations
 
-import hashlib
 import json
-from dataclasses import asdict, dataclass, field, replace
+from dataclasses import dataclass, field, replace
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from ._fixture_build import (
+from helia_profiler._fixture_build import (
     FIXTURE_CAPABILITIES,
     FixedFixture,
-    FixtureBackend,
     FixtureBuild,
     FixtureMethod,
     TypedFixture,
-    _build,
+    build_fixed_fixture,
 )
-from .config import ProfileConfig, load_config
-from .engines import EngineType, get_adapter
-from .engines.base import PreparedRuntimeAdapter
-from .errors import ConfigError
-from .fixture_runtime import PreparedUpstreamRuntime
-from .fixture_target import (
+from helia_profiler.config import ProfileConfig, load_config
+from helia_profiler.engines import EngineType, get_adapter
+from helia_profiler.engines.base import PreparedRuntimeAdapter
+from helia_profiler.errors import ConfigError
+from helia_profiler.fixture_runtime import PreparedUpstreamRuntime
+from helia_profiler.fixture_target import (
     FIXTURE_CLOCK_PROFILE,
     FixtureTarget,
     supported_fixture_target,
     validate_fixture_placement,
 )
-from .placement import Placement
-from .prepared_runtimes import prepared_runtime
+from helia_profiler.placement import Placement
+from helia_profiler.prepared_runtimes import prepared_runtime
+
+
+class FixtureBackend(StrEnum):
+    """Kernel backend a prepared-runtime fixture engine requires."""
+
+    CMSIS_NN = "cmsis_nn"
+    HELIA = "helia"
 
 
 @dataclass(frozen=True)
@@ -42,11 +48,7 @@ class FixturePlacement:
 
 @dataclass(frozen=True)
 class HeliaAotOptions:
-    """heliaAOT settings the profiler passes to the converter.
-
-    ``convert_args_json`` is heliaAOT's own convert-argument object as JSON; it
-    is stored in canonical form so equal settings hash equally.
-    """
+    """heliaAOT settings passed to the converter; ``convert_args_json`` is its argument object."""
 
     prefix: str | None = None
     module_name: str | None = None
@@ -54,16 +56,6 @@ class HeliaAotOptions:
     platform_name: str | None = None
     cmsis_nn_requantize_inline_asm: bool = True
     convert_args_json: str = "{}"
-
-    def __post_init__(self) -> None:
-        try:
-            convert_args = json.loads(self.convert_args_json)
-        except json.JSONDecodeError as exc:
-            raise ConfigError(f"heliaAOT convert arguments are not JSON: {exc}") from exc
-        if not isinstance(convert_args, dict):
-            raise ConfigError("heliaAOT convert arguments must be a JSON object")
-        canonical = json.dumps(convert_args, sort_keys=True, separators=(",", ":"))
-        object.__setattr__(self, "convert_args_json", canonical)
 
     def engine_config(self) -> dict[str, Any]:
         """The ``engine.config`` mapping the heliaAOT adapter reads."""
@@ -83,13 +75,10 @@ class HeliaAotOptions:
 
 @dataclass(frozen=True)
 class FixtureBuildRequest:
-    """The build inputs a caller chooses, plus the work directory.
+    """The build inputs a test chooses, plus the work directory.
 
-    The installed profiler and engine are not part of the request: the source
-    closure pins the profiler, and ``FixtureBuild.engine_source`` records the
-    engine package. A LiteRT or heliaRT request without ``runtime`` uses the
-    archive ``hpx runtimes prepare`` built from the engine's default record.
-    This cache lookup happens only at ``build_fixture``, never in construction.
+    A LiteRT or heliaRT request without ``runtime`` uses the archive
+    ``hpx runtimes prepare`` built from the engine's default record.
     """
 
     fixture: FixedFixture | TypedFixture
@@ -118,44 +107,13 @@ class FixtureBuildRequest:
         )
         if self.backend != expected:
             raise ConfigError(f"{self.engine.value} fixtures use backend {expected or 'none'}")
-        if self.aot is not None and self.engine is not EngineType.HELIA_AOT:
-            raise ConfigError("heliaAOT options apply to heliaAOT fixtures only")
         try:
             self.target.verify()
         except ValueError as exc:
             raise ConfigError(str(exc)) from exc
-        if self.target.board == "apollo510b_evb" and self.method.power_sync is not None:
-            raise ConfigError("AP510B fixture integration is timing-only")
         validate_fixture_placement(
             self.placement.arena, self.placement.weights, self.engine, board=self.target.board
         )
-
-    @property
-    def intent_identity(self) -> str:
-        """sha256 over every build-deciding input, with files as content hashes and no paths."""
-        intent = {
-            "fixture": self.fixture.identity,
-            "method": self.method.timing_scope.value,
-            "engine": self.engine.value,
-            "backend": self.backend.value if self.backend else None,
-            "arena_size": self.arena_size,
-            "iterations": self.iterations,
-            "warmup": self.warmup,
-            "placement": [self.placement.arena.value, self.placement.weights.value],
-            "target": asdict(self.target),
-            "runtime": self.runtime.manifest.sha256 if self.runtime else None,
-            "aot": asdict(self.aot or HeliaAotOptions())
-            if self.engine is EngineType.HELIA_AOT
-            else None,
-            "observe_aot_arenas": self.observe_aot_arenas,
-        }
-        if self.observe_ram:
-            intent["observe_ram"] = True
-        if self.method.power_sync is not None:
-            intent["power_sync"] = asdict(self.method.power_sync)
-        if self.method.state_policy is not None:
-            intent["state_policy"] = self.method.state_policy.value
-        return hashlib.sha256(json.dumps(intent, sort_keys=True).encode()).hexdigest()
 
     def to_config(self) -> ProfileConfig:
         """The profile configuration this request builds with."""
@@ -186,14 +144,10 @@ class FixtureBuildRequest:
 
 
 def build_fixture(request: FixtureBuildRequest, *, compile: bool = True) -> FixtureBuild:
-    """Resolve the selected cached runtime, then render or compile the request.
-
-    The compiled intent includes the resolved runtime manifest. No archive is
-    downloaded or built implicitly; a missing cache remains an explicit error.
-    """
+    """Resolve the engine's cached prepared runtime when none is given, then build."""
     if request.runtime is None and isinstance(get_adapter(request.engine), PreparedRuntimeAdapter):
         request = replace(request, runtime=prepared_runtime(request.engine.value).runtime)
-    return _build(
+    return build_fixed_fixture(
         request.to_config(),
         request.fixture,
         method=request.method,
@@ -201,5 +155,4 @@ def build_fixture(request: FixtureBuildRequest, *, compile: bool = True) -> Fixt
         compile=compile,
         observe_aot_arenas=request.observe_aot_arenas,
         observe_ram=request.observe_ram,
-        intent_identity=request.intent_identity,
     )

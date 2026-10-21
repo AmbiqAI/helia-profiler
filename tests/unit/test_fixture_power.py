@@ -7,8 +7,7 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
-from helia_profiler import fixture_power as power
-from helia_profiler.fixture import (
+from helia_profiler import (
     FixtureFile,
     FixtureMethod,
     FixturePowerSync,
@@ -17,11 +16,12 @@ from helia_profiler.fixture import (
     FixtureTiming,
     FixtureTimingScope,
 )
+from helia_profiler import fixture_power as power
 from helia_profiler.power.base import GatedPowerWindow, PowerResult, PowerSummary
 from helia_profiler.power.metadata import MeasurementScope, PowerIntegrity, PowerMetadata
 
 if TYPE_CHECKING:
-    from helia_profiler.fixture import FixtureCaptureRequest
+    from helia_profiler.fixture_capture import FixtureCaptureRequest
     from helia_profiler.pipeline import PipelineContext
 
 

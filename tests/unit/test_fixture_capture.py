@@ -11,8 +11,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from helia_profiler import FixtureTimingScope
 from helia_profiler import fixture_capture as capture
-from helia_profiler.fixture import FixtureTimingScope
 from helia_profiler.fixture_image import Sink, inspect_elf
 from helia_profiler.fixture_runtime import FixtureFile
 from helia_profiler.fixture_stage import FixtureStage
@@ -1001,21 +1001,6 @@ def test_power_authority_is_required_before_any_device_operation(rig):
     assert not flashes and not writes
 
 
-def test_legacy_power_image_refuses_before_device(rig):
-    from test_fixture_power import request as power_request
-
-    request, _, _, writes, flashes, guard = rig
-    request = replace(
-        request,
-        timing_scope=FixtureTimingScope.RESTORE_AND_INVOKE,
-        power_sync=replace(power_request().firmware_wiring(), protocol_version=1),
-        rail_power=power_request(),
-    )
-    with pytest.raises(ValueError, match="protocol 2"):
-        capture.capture_fixture(request, guard=guard)
-    assert not writes and not flashes and not guard.calls
-
-
 @pytest.mark.parametrize("unfinished", [capture._STATUS_RUNNING, capture._STATUS_POISON])
 @pytest.mark.parametrize("halted", [False, True])
 def test_power_capture_rejects_completion_after_observation(
@@ -1088,9 +1073,8 @@ def test_power_capture_rejects_completion_after_observation(
 
 @pytest.mark.parametrize("outcome", [True, False, "error"])
 def test_configured_board_power_before_attach(rig, monkeypatch, outcome):
-    from helia_profiler import power
+    from helia_profiler import FixtureBoardPowerRequest, power
     from helia_profiler.errors import PowerError
-    from helia_profiler.fixture import FixtureBoardPowerRequest
 
     request, memory, terminal, writes, flashes, guard = rig
     request = replace(
@@ -1142,8 +1126,7 @@ def test_timing_without_supply_never_resolves_driver(rig, monkeypatch):
 
 
 def test_board_power_requires_station_authority_before_hardware(rig, monkeypatch):
-    from helia_profiler import power
-    from helia_profiler.fixture import FixtureBoardPowerRequest
+    from helia_profiler import FixtureBoardPowerRequest, power
 
     request, memory, terminal, writes, flashes, guard = rig
     request = replace(request, board_power=FixtureBoardPowerRequest("supply", "serial", "MCU"))
@@ -1160,7 +1143,7 @@ def test_board_power_requires_station_authority_before_hardware(rig, monkeypatch
 def test_supply_and_measurement_must_select_same_device(rig, field, value):
     from test_fixture_power import request as power_request
 
-    from helia_profiler.fixture import FixtureBoardPowerRequest
+    from helia_profiler import FixtureBoardPowerRequest
 
     request, memory, terminal, writes, flashes, guard = rig
     guard.verify_power_device = lambda **kw: None
@@ -1179,8 +1162,7 @@ def test_supply_and_measurement_must_select_same_device(rig, field, value):
 
 @pytest.mark.parametrize("when", ["authority", "after_supply"])
 def test_supply_authority_failure_stops_before_attachment(rig, monkeypatch, when):
-    from helia_profiler import power
-    from helia_profiler.fixture import FixtureBoardPowerRequest
+    from helia_profiler import FixtureBoardPowerRequest, power
 
     request, memory, terminal, writes, flashes, guard = rig
     request = replace(request, board_power=FixtureBoardPowerRequest("supply", "serial", "MCU"))

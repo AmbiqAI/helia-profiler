@@ -14,6 +14,7 @@ from click import unstyle
 from typer.testing import CliRunner
 
 import helia_profiler as hpx
+from helia_profiler import FixtureBuild, FixtureCaptureResult, FixtureTiming
 from helia_profiler.api import load_result
 from helia_profiler.cli.app import app
 from helia_profiler.compiled_build import RunResult
@@ -25,7 +26,6 @@ from helia_profiler.expect import (
     Tolerance,
     Verification,
 )
-from helia_profiler.fixture import FixtureBuild, FixtureCaptureResult, FixtureTiming
 from helia_profiler.frozen_run import _ENVIRONMENT_VARIABLES, FrozenRun
 from helia_profiler.lifecycle import Lifecycle
 from helia_profiler.run_directory import run_roots

@@ -35,11 +35,7 @@ package or tool version, or the source line of a documented definition. The
 full list is in `maintainers/documentation.md`; `npm run check:reference` is
 the authority on when it is due.
 
-The public fixture API is `helia_profiler.fixture.__all__`, recorded in
-`tests/contracts/fixture_api_v<major>.json`. Changing it needs a
-`FIXTURE_API_VERSION` bump (minor to add, major to change or remove) before
-`HPX_UPDATE_SNAPSHOTS=1 uv run pytest tests/contracts/test_fixture_api.py`; a
-major bump writes a new golden, so delete the old one.
+The public Python contract is the package root `helia_profiler.__all__`, pinned by `tests/test_api_stability.py`.
 
 Software-only capture tests need the device guard installed before HPX is
 imported: `uv run python tools/software_only.py pytest <test> -q`. A pytest

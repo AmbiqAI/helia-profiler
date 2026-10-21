@@ -130,16 +130,6 @@ class PreparedRuntimeFacts:
     providers: tuple[RuntimeProvider, ...]
 
 
-def read_prepared_runtime_manifest(manifest: FixtureFile) -> PreparedRuntimeFacts:
-    """Read a prepared runtime's manifest without verifying its archive or headers.
-
-    The manifest's own hash and declared fields are checked;
-    :meth:`PreparedUpstreamRuntime.verify` also checks the archive, ABI and
-    header closure.
-    """
-    return _manifest_facts(manifest)[2]
-
-
 def _manifest_facts(
     manifest: FixtureFile, *, archive_sha256: str | None = None
 ) -> tuple[int, dict[str, Any], PreparedRuntimeFacts]:

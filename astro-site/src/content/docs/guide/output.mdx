@@ -254,7 +254,7 @@ memory map.
 Fusions can change totals and derived rates; compare like analysis bases.
 
 Version 14 adds `identity`. The change is additive: no existing field changes
-meaning, and the typed loader reads version 13 summaries, which have none.
+meaning.
 
 Version 16 adds `identity.intent_hash` and the `run` fields from
 `instance_boundary` to `timing_statistic`. An ExecuTorch run's
@@ -272,7 +272,9 @@ as [semantic hashes](#semantic-hashes) instead of bare hex, and renames
 of each is unchanged. The verified result reader refuses a version 19 summary
 whose identity is not an object, omits one of these four, or states one that
 is neither a hash of its kind nor, where allowed, `{"unknown": "<reason>"}`
-or `null`.
+or `null`. It reads no other summary version: one is refused as
+`unsupported_schema`, naming its version, and is read with the HPX release
+that wrote it.
 
 ### 2. `profile_results.csv`
 

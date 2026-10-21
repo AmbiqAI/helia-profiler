@@ -8,19 +8,19 @@ from pathlib import Path
 
 import pytest
 
-from helia_profiler._fixture_record import compiled_fixture_identity, fixture_capture_request
-from helia_profiler.compiled_build import CompiledBuild, RunResult
-from helia_profiler.errors import CaptureError, ConfigError
-from helia_profiler.expect import Expect
-from helia_profiler.fixture import (
+from helia_profiler import (
     FixtureBuild,
-    FixtureCaptureRequest,
     FixtureCaptureResult,
     FixtureStatePolicy,
     FixtureTiming,
     FixtureTimingScope,
-    fixture_run_identity,
 )
+from helia_profiler._fixture_record import compiled_fixture_identity, fixture_capture_request
+from helia_profiler.compiled_build import CompiledBuild, RunResult
+from helia_profiler.errors import CaptureError, ConfigError
+from helia_profiler.expect import Expect
+from helia_profiler.fixture_capture import FixtureCaptureRequest
+from helia_profiler.fixture_identity import fixture_run_identity
 from helia_profiler.lifecycle import Lifecycle
 from tests.run_api_helpers import ATFE_OUTPUT, atfe_build, compiled, plan_for, reseal
 from tests.unit.test_fixture_record import _build, _pin
@@ -285,7 +285,6 @@ def test_run_never_builds(record, device, tmp_path, monkeypatch):
 
     for target in (
         "helia_profiler._fixture_build.build_fixed_fixture",
-        "helia_profiler._fixture_request.build_fixture",
         "helia_profiler.deps.nsx.build",
         "helia_profiler.stages.build_firmware.BuildFirmwareStage.run",
     ):

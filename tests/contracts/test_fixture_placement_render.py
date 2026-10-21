@@ -2,7 +2,8 @@
 
 import pytest
 
-from helia_profiler.fixture import FixturePlacement, Placement
+from helia_profiler import Placement
+from tests.fixture_requests import FixturePlacement
 
 from .fixture_compile_cases import FIXTURE_ENGINES, FIXTURE_KINDS, FIXTURE_SCOPES, render_fixture
 

@@ -6,9 +6,9 @@ from dataclasses import replace
 from pathlib import Path
 
 import helia_profiler as hpx
+from helia_profiler import FixtureBuild
 from helia_profiler._fixture_record import compiled_fixture_identity
 from helia_profiler.compiled_build import CompiledBuild, _binding
-from helia_profiler.fixture import FixtureBuild
 from helia_profiler.frozen_run import FrozenRun
 from helia_profiler.lifecycle import Lifecycle
 from helia_profiler.results.models import ToolchainInfo

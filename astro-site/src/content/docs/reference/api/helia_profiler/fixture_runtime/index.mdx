@@ -2,7 +2,7 @@
 title: "fixture_runtime"
 description: "The compiled firmware a build produces and what it recorded: the build record, its memory plan, toolchain and PSRAM weight placement."
 sidebar:
-  order: 11
+  order: 12
 ---
 
 import RefMembers from '@ambiqai/helia-ui/astro/RefMembers';
@@ -225,7 +225,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   signature={"FixtureBuild(\n    fixture_identity: str,\n    app_dir: Path,\n    binary: FixtureFile | None,\n    generated_sources: tuple[FixtureFile, ...],\n    expected: FixtureFile | None,\n    built: bool,\n    runtime_manifest: FixtureFile | None,\n    flat_binary: FixtureFile | None,\n    dependency_lock: FixtureFile | None,\n    link_map: FixtureFile | None,\n    timing_scope: FixtureTimingScope,\n    engine: EngineType,\n    build_identity: str | None,\n    iterations: int,\n    warmups: int,\n    intent_identity: str,\n    target: FixtureTarget,\n    toolchain: ToolchainInfo | None,\n    provider_provenance: str = 'manifest-declared; independently audit the pinned build/source record',\n    planned_memory: MemoryPlan | None = None,\n    planned_memory_reason: str | None = 'not_recorded',\n    outputs: tuple[FixtureFile, ...] = (),\n    capabilities: tuple[tuple[str, FixtureCapability], ...] = (),\n    aot_arena_scan: tuple[tuple[int, int], ...] = (),\n    aot_outputs: tuple[FixtureFile, ...] = (),\n    engine_source: EngineSource | None = None,\n    dependency_state: FixtureFile | None = None,\n    state_policy: FixtureStatePolicy | None = None,\n    source_initializer_present: bool = False,\n    psram_weights: FixturePsramWeights | None = None,\n    arena_location: Placement | None = None,\n    weights_location: Placement | None = None,\n    model: FixtureFile | None = None,\n    inputs: tuple[FixtureIO, ...] = (),\n    output_tensors: tuple[FixtureTensor, ...] = (),\n    arena_capacity: int | None = None,\n    clock_profile: str | None = None,\n    cpu_hz: int | None = None,\n    timer_hz: int | None = None,\n    power_sync: FixturePowerSync | None = None,\n    observe_ram: bool = False,\n    kernel_source: FixtureKernelSource | None = None,\n    runtime_source: FixtureRuntimeSource | None = None,\n) -> None"}
   level={2}
   summary={"API tier: experimental"}
-  source={{"path":"src/helia_profiler/_fixture_build.py","line":288,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L288"}}
+  source={{"path":"src/helia_profiler/_fixture_build.py","line":281,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L281"}}
 >
 
   `dataclass`
@@ -239,7 +239,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"fixture_identity: str"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":290,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L290"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":283,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L283"}}
   >
 
 
@@ -253,7 +253,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"app_dir: Path"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":291,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L291"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":284,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L284"}}
   >
 
 
@@ -267,7 +267,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"binary: FixtureFile | None"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":292,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L292"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":285,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L285"}}
   >
 
 
@@ -281,7 +281,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"generated_sources: tuple[FixtureFile, ...]"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":293,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L293"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":286,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L286"}}
   >
 
 
@@ -295,7 +295,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"expected: FixtureFile | None"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":294,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L294"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":287,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L287"}}
   >
 
 
@@ -309,7 +309,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"built: bool"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":295,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L295"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":288,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L288"}}
   >
 
 
@@ -323,7 +323,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"runtime_manifest: FixtureFile | None"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":296,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L296"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":289,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L289"}}
   >
 
 
@@ -337,7 +337,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"flat_binary: FixtureFile | None"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":297,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L297"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":290,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L290"}}
   >
 
 
@@ -351,7 +351,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"dependency_lock: FixtureFile | None"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":298,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L298"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":291,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L291"}}
   >
 
 
@@ -365,7 +365,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"link_map: FixtureFile | None"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":299,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L299"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":292,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L292"}}
   >
 
 
@@ -379,7 +379,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"timing_scope: FixtureTimingScope"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":300,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L300"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":293,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L293"}}
   >
 
 
@@ -393,7 +393,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"engine: EngineType"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":301,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L301"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":294,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L294"}}
   >
 
 
@@ -407,7 +407,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"build_identity: str | None"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":302,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L302"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":295,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L295"}}
   >
 
 
@@ -421,7 +421,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"iterations: int"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":303,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L303"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":296,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L296"}}
   >
 
 
@@ -435,7 +435,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"warmups: int"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":304,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L304"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":297,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L297"}}
   >
 
 
@@ -449,7 +449,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"intent_identity: str"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":305,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L305"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":298,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L298"}}
   >
 
 
@@ -463,7 +463,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"target: FixtureTarget"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":306,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L306"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":299,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L299"}}
   >
 
 
@@ -477,7 +477,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"toolchain: ToolchainInfo | None"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":307,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L307"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":300,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L300"}}
   >
 
 
@@ -491,7 +491,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"provider_provenance: str = 'manifest-declared; independently audit the pinned build/source record'"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":308,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L308"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":301,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L301"}}
   >
 
 
@@ -505,7 +505,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"planned_memory: MemoryPlan | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":311,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L311"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":304,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L304"}}
   >
 
 
@@ -519,7 +519,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"planned_memory_reason: str | None = 'not_recorded'"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":312,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L312"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":305,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L305"}}
   >
 
 
@@ -533,7 +533,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"outputs: tuple[FixtureFile, ...] = ()"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":314,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L314"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":307,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L307"}}
   >
 
 
@@ -547,7 +547,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"capabilities: tuple[tuple[str, FixtureCapability], ...] = ()"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":316,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L316"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":309,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L309"}}
   >
 
 
@@ -561,7 +561,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"aot_arena_scan: tuple[tuple[int, int], ...] = ()"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":318,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L318"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":311,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L311"}}
   >
 
 
@@ -575,7 +575,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"aot_outputs: tuple[FixtureFile, ...] = ()"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":321,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L321"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":314,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L314"}}
   >
 
 
@@ -589,7 +589,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"engine_source: EngineSource | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":323,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L323"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":316,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L316"}}
   >
 
 
@@ -603,7 +603,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"dependency_state: FixtureFile | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":325,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L325"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":318,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L318"}}
   >
 
 
@@ -617,7 +617,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"state_policy: FixtureStatePolicy | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":326,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L326"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":319,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L319"}}
   >
 
 
@@ -631,7 +631,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"source_initializer_present: bool = False"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":327,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L327"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":320,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L320"}}
   >
 
 
@@ -645,7 +645,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"psram_weights: FixturePsramWeights | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":329,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L329"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":322,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L322"}}
   >
 
 
@@ -659,7 +659,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"arena_location: Placement | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":331,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L331"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":324,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L324"}}
   >
 
 
@@ -673,7 +673,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"weights_location: Placement | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":332,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L332"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":325,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L325"}}
   >
 
 
@@ -687,7 +687,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"model: FixtureFile | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":334,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L334"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":327,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L327"}}
   >
 
 
@@ -701,7 +701,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"inputs: tuple[FixtureIO, ...] = ()"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":335,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L335"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":328,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L328"}}
   >
 
 
@@ -715,7 +715,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"output_tensors: tuple[FixtureTensor, ...] = ()"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":336,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L336"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":329,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L329"}}
   >
 
 
@@ -729,7 +729,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"arena_capacity: int | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":337,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L337"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":330,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L330"}}
   >
 
 
@@ -743,7 +743,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"clock_profile: str | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":338,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L338"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":331,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L331"}}
   >
 
 
@@ -757,7 +757,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"cpu_hz: int | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":339,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L339"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":332,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L332"}}
   >
 
 
@@ -771,7 +771,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"timer_hz: int | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":340,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L340"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":333,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L333"}}
   >
 
 
@@ -785,7 +785,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"power_sync: FixturePowerSync | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":341,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L341"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":334,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L334"}}
   >
 
 
@@ -799,7 +799,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"observe_ram: bool = False"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":342,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L342"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":335,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L335"}}
   >
 
 
@@ -813,7 +813,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"kernel_source: FixtureKernelSource | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":345,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L345"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":338,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L338"}}
   >
 
 
@@ -827,7 +827,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"runtime_source: FixtureRuntimeSource | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/_fixture_build.py","line":347,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L347"}}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":340,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L340"}}
   >
 
 

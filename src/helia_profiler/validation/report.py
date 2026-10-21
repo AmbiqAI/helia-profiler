@@ -240,7 +240,7 @@ def _case_manifest(result: CaseResult, output_dir: Path) -> dict[str, Any]:
         for name, path in artifact_paths.items()
     }
     metadata = _read_optional_json(case_dir / "run_metadata.json")
-    summary = _read_optional_json(case_dir / "summary.json")
+    summary = _read_optional_summary(case_dir / "summary.json")
     model_config = _nested_dict(metadata, "config", "model")
     resources = _case_resources(summary)
     requested_memory = {
@@ -322,7 +322,7 @@ def _case_manifest(result: CaseResult, output_dir: Path) -> dict[str, Any]:
 def _case_report(result: CaseResult, output_dir: Path) -> dict[str, Any]:
     """Add dashboard resource data to the backward-compatible case result."""
     case_data = result.to_dict()
-    summary = _read_optional_json(_case_dir(result, output_dir) / "summary.json")
+    summary = _read_optional_summary(_case_dir(result, output_dir) / "summary.json")
     case_data["resources"] = _case_resources(summary)
     case_data["power_metrics"] = _nested_dict(summary, "power") or None
     case_data = strip_none(case_data)
@@ -523,6 +523,22 @@ def _bundle_relative(path: Path, root: Path) -> str:
     except ValueError as exc:
         raise ReportError(f"Validation artifact escapes bundle root: {path}") from exc
     return relative.as_posix()
+
+
+def _read_optional_summary(path: Path) -> dict[str, Any]:
+    from ..results.run_summary import _require_current_summary
+
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(value, dict):
+        return {}
+    try:
+        _require_current_summary(value)
+    except ValueError as exc:
+        raise ReportError(str(exc)) from exc
+    return value
 
 
 def _read_optional_json(path: Path) -> dict[str, Any]:
