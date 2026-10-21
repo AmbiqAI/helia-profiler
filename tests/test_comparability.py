@@ -27,7 +27,7 @@ def _run(
     if power is not None:
         summary["power"] = power
     # Matches report/metadata.py: a None version is FILTERED OUT of the JSON
-    # (tflm/executorch record no resolved version), so absence is the real
+    # (litert/executorch record no resolved version), so absence is the real
     # legacy/no-version shape, not a null.
     engine_block: dict = {"type": engine}
     if engine_version is not None:
@@ -88,7 +88,7 @@ def test_engine_version_difference_is_informative():
 
 
 def test_a_baseline_predating_engine_version_is_skipped_not_flagged():
-    """Old artifacts (and tflm/executorch runs, which record no resolved
+    """Old artifacts (and litert/executorch runs, which record no resolved
     version) omit the key entirely -- missing is unknown, not different."""
     assessment = assess_comparability(_run(engine_version=None), _run(engine_version="1.17.0"))
 

@@ -66,7 +66,7 @@ def rig(tmp_path, monkeypatch):
         None,
         link_map,
         FixtureTimingScope.RESTORE_AND_INVOKE,
-        EngineType.TFLM,
+        EngineType.LITERT,
         "compiled",
         10,
         2,

@@ -46,7 +46,7 @@ def bundle(root: Path, *, status="complete") -> Path:
             {
                 "schema": "hpx.run-summary",
                 "schema_version": RUN_SUMMARY_SCHEMA_VERSION,
-                "engine": "tflm",
+                "engine": "litert",
                 "layers": 1,
                 "total_cycles": 2**53 + 1,
                 "overflow_detected": False,
@@ -65,7 +65,7 @@ def bundle(root: Path, *, status="complete") -> Path:
                 "schema_version": 1,
                 "run_id": "synthetic-run",
                 "hpx_version": "synthetic",
-                "engine": {"type": "tflm"},
+                "engine": {"type": "litert"},
             },
         ),
         "layers.json": ("hpx.profile-layers", {"layers": [{"cycles": 2**53 + 1}]}),
@@ -492,7 +492,7 @@ def test_matching_normalized_issues_and_missing_summary_issues(tmp_path):
 @pytest.mark.parametrize(
     "field,section,key,value",
     [
-        ("engine", "engine", "type", "tflm"),
+        ("engine", "engine", "type", "litert"),
         ("model_sha256", "model", "sha256", "a" * 64),
         ("board", "platform", "board", "apollo510_evb"),
         ("engine_version", "engine", "version", "1.0"),

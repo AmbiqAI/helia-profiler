@@ -35,7 +35,7 @@ from helia_profiler.lifecycle import (
 #: What each engine's firmware runs today. ExecuTorch reloads its program on
 #: every invocation, so it cannot carry state.
 DECLARED: dict[EngineType, frozenset[Lifecycle]] = {
-    EngineType.TFLM: frozenset({Lifecycle.CARRY, Lifecycle.SINGLE}),
+    EngineType.LITERT: frozenset({Lifecycle.CARRY, Lifecycle.SINGLE}),
     EngineType.HELIA_RT: frozenset({Lifecycle.CARRY, Lifecycle.SINGLE}),
     EngineType.HELIA_AOT: frozenset({Lifecycle.CARRY, Lifecycle.SINGLE}),
     EngineType.EXECUTORCH: frozenset({Lifecycle.SINGLE}),
@@ -90,13 +90,13 @@ def test_undeclared_lifecycle_is_refused_with_the_engine_reason(
 
     monkeypatch.setattr(lifecycle_module, "get_adapter", fake_get_adapter)
 
-    require_lifecycle(EngineType.TFLM, Lifecycle.CARRY)
+    require_lifecycle(EngineType.LITERT, Lifecycle.CARRY)
     with pytest.raises(EngineError) as raised:
-        require_lifecycle(EngineType.TFLM, Lifecycle.SINGLE)
+        require_lifecycle(EngineType.LITERT, Lifecycle.SINGLE)
 
     assert str(raised.value).splitlines()[0] == "Fake firmware cannot run single"
     assert raised.value.hint == "Request a lifecycle Fake implements: carry."
-    assert requested == [EngineType.TFLM, EngineType.TFLM]
+    assert requested == [EngineType.LITERT, EngineType.LITERT]
 
 
 def test_carry_runs_the_configured_invocations() -> None:
@@ -115,7 +115,7 @@ def _pin(path: Path, data: bytes) -> FixtureFile:
 @pytest.mark.parametrize(
     ("engine", "backend"),
     [
-        (EngineType.TFLM, FixtureBackend.CMSIS_NN),
+        (EngineType.LITERT, FixtureBackend.CMSIS_NN),
         (EngineType.HELIA_RT, FixtureBackend.HELIA),
         (EngineType.HELIA_AOT, None),
     ],
@@ -149,7 +149,7 @@ def test_single_invocation_counts_pass_fixture_validation(
 
 #: Where each engine runs a model's one-time initializer, from its firmware.
 FIRST_INVOKE: dict[EngineType, tuple[InstanceBoundary, object]] = {
-    EngineType.TFLM: (InstanceBoundary.BOOT, "declared"),
+    EngineType.LITERT: (InstanceBoundary.BOOT, "declared"),
     EngineType.HELIA_RT: (InstanceBoundary.BOOT, "declared"),
     EngineType.HELIA_AOT: (InstanceBoundary.BOOT, False),
     EngineType.EXECUTORCH: (InstanceBoundary.INVOCATION, Unknown),

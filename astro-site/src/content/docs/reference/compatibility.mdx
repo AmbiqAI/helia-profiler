@@ -40,7 +40,7 @@ to check the exact revisions and combinations you need.
 
 ### 1. Boards against engines
 
-| Board | Channel | Core | heliaRT | heliaAOT | TFLM | ExecuTorch |
+| Board | Channel | Core | heliaRT | heliaAOT | LiteRT | ExecuTorch |
 |---|---|---|---|---|---|---|
 | `apollo3p_evb` | stable | Cortex-M4 | hardware-validated | hardware-validated | hardware-validated | unknown |
 | `apollo3p_evb_cygnus` | preview | Cortex-M4 | unknown | unknown | unknown | unknown |
@@ -83,10 +83,10 @@ MLPerf Tiny models `kws`, `vww`, `ic` and `ad`:
 
 | Board | Cases | Passed | Engines run | Toolchains run |
 |---|---|---|---|---|
-| `apollo510_evb` | 32 | 32 | heliaRT, heliaAOT, TFLM, ExecuTorch | GNU Arm, ATfE |
-| `apollo330mP_evb` | 32 | 32 | heliaRT, heliaAOT, TFLM, ExecuTorch | GNU Arm, ATfE |
-| `apollo3p_evb` | 24 | 24 | heliaRT, heliaAOT, TFLM | GNU Arm, ATfE |
-| `apollo4l_blue_evb` | 24 | 12 passed, 12 skipped | heliaRT, heliaAOT, TFLM | GNU Arm (ATfE skipped) |
+| `apollo510_evb` | 32 | 32 | heliaRT, heliaAOT, LiteRT, ExecuTorch | GNU Arm, ATfE |
+| `apollo330mP_evb` | 32 | 32 | heliaRT, heliaAOT, LiteRT, ExecuTorch | GNU Arm, ATfE |
+| `apollo3p_evb` | 24 | 24 | heliaRT, heliaAOT, LiteRT | GNU Arm, ATfE |
+| `apollo4l_blue_evb` | 24 | 12 passed, 12 skipped | heliaRT, heliaAOT, LiteRT | GNU Arm (ATfE skipped) |
 
 Nine of the run's bundles ship in the repository under
 `examples/results/hardware-validation-2026-09-16/`, described on

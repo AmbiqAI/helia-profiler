@@ -80,11 +80,11 @@ class TestRegistry:
             module_name, toolchains = declared
             assert case.toolchain in toolchains, (case.case_id, module_name)
 
-    def test_engines_include_tflm_cmsis_nn_baseline(self):
+    def test_engines_include_litert_cmsis_nn_baseline(self):
         assert set(ENGINES) == {
             EngineType.HELIA_RT,
             EngineType.HELIA_AOT,
-            EngineType.TFLM,
+            EngineType.LITERT,
             EngineType.EXECUTORCH,
         }
 
@@ -204,10 +204,10 @@ class TestBuildMatrix:
         assert len(cases) == 1108
         assert all(c.engine is EngineType.HELIA_AOT for c in cases)
 
-    def test_tflm_engine_filter(self):
-        cases = build_matrix(engines=["tflm"], power="off")
+    def test_litert_engine_filter(self):
+        cases = build_matrix(engines=["litert"], power="off")
         assert len(cases) == 1108
-        assert all(c.engine is EngineType.TFLM for c in cases)
+        assert all(c.engine is EngineType.LITERT for c in cases)
 
     @pytest.mark.parametrize(
         ("board", "ordinary", "executorch"),
@@ -225,7 +225,7 @@ class TestBuildMatrix:
         assert {engine: sum(case.engine is engine for case in cases) for engine in ENGINES} == {
             EngineType.HELIA_RT: ordinary,
             EngineType.HELIA_AOT: ordinary,
-            EngineType.TFLM: ordinary,
+            EngineType.LITERT: ordinary,
             EngineType.EXECUTORCH: executorch,
         }
         if board in {"apollo4p_blue_kxr_evb", "apollo4l_blue_evb"}:
@@ -277,7 +277,7 @@ class TestBuildMatrix:
     @pytest.mark.parametrize(
         ("engine", "expected"),
         [
-            (EngineType.TFLM, ExecuTorchBackend.ARM),
+            (EngineType.LITERT, ExecuTorchBackend.ARM),
             (EngineType.HELIA_RT, ExecuTorchBackend.NS),
             (EngineType.HELIA_AOT, ExecuTorchBackend.NS),
         ],

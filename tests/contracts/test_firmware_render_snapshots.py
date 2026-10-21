@@ -47,9 +47,9 @@ _UPDATE = os.environ.get("HPX_UPDATE_SNAPSHOTS") == "1"
 # Representative SoC per family.
 _SOCS = ["apollo3p", "apollo4p", "apollo510"]
 _TRANSPORTS = ["rtt", "usb_cdc", "swo", "uart"]
-# tflm and helia-rt both render main.cc.j2 with the same engine header, so they
+# litert and helia-rt both render main.cc.j2 with the same engine header, so they
 # produce identical output; helia-aot and executorch render their own templates.
-_ENGINES = ["tflm", "helia-rt", "helia-aot", "executorch"]
+_ENGINES = ["litert", "helia-rt", "helia-aot", "executorch"]
 
 #: Engines whose supported SoC set is narrower than ``_SOCS``.  ExecuTorch is
 #: built for Cortex-M55 only (the NSX ExecuTorch runtime needs Helium; every
@@ -68,7 +68,7 @@ _MATRIX_ENGINES = [e for e in _ENGINES if e != "executorch"]
 # Atomiq110 Ethos-U NPU matrix. The ethos_u-backend renders take template
 # branches no Apollo render reaches (_npu_init.j2 / _npu_pmu.j2 and the
 # ethos_npu PMU pass), so they get their own snapshot entries instead of
-# widening _SOCS: tflm cannot select the backend, executorch is
+# widening _SOCS: litert cannot select the backend, executorch is
 # Apollo510-only, and usb_cdc is unavailable on atomiq110 (no nsx-ambiq-usb
 # support).
 _NPU_SOC = "atomiq110"
@@ -300,10 +300,10 @@ def _common_kwargs(soc_name: str, transport: str) -> dict:
         "heartbeat_every_ms": 0,
         "psram_clock_hz": 48_000_000,
         # HPX_ENGINE= is emitted by the shared skeleton for every engine, so
-        # every render needs the wire name.  Defaulted to the tflm spelling
+        # every render needs the wire name.  Defaulted to the litert spelling
         # here and overridden per engine by _render(); the direct render sites
         # in this file all go through _common_kwargs and render main.cc.j2.
-        "engine_wire_name": "tflm",
+        "engine_wire_name": "litert",
     }
 
 
@@ -311,7 +311,7 @@ def _common_kwargs(soc_name: str, transport: str) -> dict:
 # host parser's HPX_(\w+)=value key, so they become underscores; mirrors
 # FirmwareRenderContext.to_template_vars()).
 _ENGINE_WIRE_NAMES = {
-    "tflm": "tflm",
+    "litert": "litert",
     "helia-rt": "helia_rt",
     "helia-aot": "helia_aot",
     "executorch": "executorch",
@@ -413,12 +413,12 @@ def _render(
             executorch_io_region="tcm",
         )
         return _jinja_env.get_template("main_executorch.cc.j2").render(**_resolve(kwargs))
-    if engine not in ("tflm", "helia-rt"):
+    if engine not in ("litert", "helia-rt"):
         # Production picks the template three ways (firmware/__init__.py:
         # HELIA_AOT -> main_aot.cc.j2, EXECUTORCH -> main_executorch.cc.j2,
         # else main.cc.j2), but this helper only ever branched on helia-aot.
         # Falling through for anything else would render main.cc.j2 while the
-        # snapshot key says otherwise -- entries byte-identical to tflm,
+        # snapshot key says otherwise -- entries byte-identical to litert,
         # asserting coverage of a template no contract test has ever rendered.
         # Fail loudly instead: a silent wrong answer here is worse than none,
         # because the snapshot it writes reads as real coverage forever after.
@@ -1477,7 +1477,7 @@ def test_attach_wait_budget_fits_the_power_capture_boot_allowance():
 
     from helia_profiler.power.diagnostics import BOOT_SETTLE_S
 
-    rendered = _render("apollo4p", "rtt", "tflm")
+    rendered = _render("apollo4p", "rtt", "litert")
     match = re.search(r"#define\s+HPX_CLEAN_WINDOW_ATTACH_WAIT_MS\s+(\d+)U", rendered)
     assert match, "attach wait renders no nominal budget to check"
     budget_s = int(match.group(1)) / 1000.0
@@ -1568,7 +1568,7 @@ def test_every_render_declares_its_engine_on_the_wire():
     from a single ``engine_wire_name`` variable -- so a wrong or missing
     mapping is one edit away from mislabelling an entire engine's results
     while every other assertion in this file stays green. main.cc.j2 is
-    rendered for BOTH tflm and helia-rt, which is exactly the case a
+    rendered for BOTH litert and helia-rt, which is exactly the case a
     template-side hardcoding would get wrong.
 
     The power binaries are the negative half: they force
@@ -1600,15 +1600,15 @@ def test_every_render_declares_its_engine_on_the_wire():
 
 def test_transport_specific_blocks_are_pinned():
     """Sanity anchors so a broken harness can't silently pin empty output."""
-    usb = _digest(_render("apollo510", "usb_cdc", "tflm"))
+    usb = _digest(_render("apollo510", "usb_cdc", "litert"))
     assert usb["markers"]["usb_timer"] is True
-    swo = _digest(_render("apollo510", "swo", "tflm"))
+    swo = _digest(_render("apollo510", "swo", "litert"))
     assert swo["markers"]["debug_itm"] is True
-    rtt = _digest(_render("apollo510", "rtt", "tflm"))
+    rtt = _digest(_render("apollo510", "rtt", "litert"))
     assert rtt["markers"]["rtt_config"] is True
     # AP5 has the Armv8-M PMU; AP3/AP4 are DWT-only.
-    assert _digest(_render("apollo510", "rtt", "tflm"))["markers"]["armv8m_pmu"] is True
-    assert _digest(_render("apollo3p", "rtt", "tflm"))["markers"]["armv8m_pmu"] is False
+    assert _digest(_render("apollo510", "rtt", "litert"))["markers"]["armv8m_pmu"] is True
+    assert _digest(_render("apollo3p", "rtt", "litert"))["markers"]["armv8m_pmu"] is False
 
 
 def test_ble_reset_only_in_power_only_binary_for_blue_boards():
@@ -1664,12 +1664,12 @@ def test_peripheral_power_down_ap4_power_only_only():
     empty no-op and AP5's only clears XTAL/VCOMP, so neither needs (or gets)
     this block.
     """
-    ap4_power = _render("apollo4p", "rtt", "tflm", power_only=True)
+    ap4_power = _render("apollo4p", "rtt", "litert", power_only=True)
     assert "AM_HAL_PWRCTRL_PERIPH_IOM0" in ap4_power
     assert "AM_HAL_PWRCTRL_PERIPH_DEBUG" in ap4_power
     assert "AM_HAL_PWRCTRL_PERIPH_MSPI0" in ap4_power  # no PSRAM in _common_kwargs
 
-    ap4_transport = _render("apollo4p", "rtt", "tflm", power_only=False)
+    ap4_transport = _render("apollo4p", "rtt", "litert", power_only=False)
     assert "AM_HAL_PWRCTRL_PERIPH_IOM0" not in ap4_transport
 
 
@@ -1683,20 +1683,20 @@ def test_crypto_otp_shutdown_ap5_power_only_only():
     exposes the internal radio-subsystem power-down AutoDeploy also calls);
     apollo510 does not, since its HAL variant lacks the symbol.
     """
-    ap510_power = _render("apollo510", "rtt", "tflm", power_only=True)
+    ap510_power = _render("apollo510", "rtt", "litert", power_only=True)
     assert "AM_HAL_PWRCTRL_PERIPH_CRYPTO" in ap510_power
     assert "AM_HAL_PWRCTRL_PERIPH_OTP" in ap510_power
     assert "am_hal_pwrctrl_rss_pwroff" not in ap510_power  # not on plain apollo510's HAL
 
-    ap510_transport = _render("apollo510", "rtt", "tflm", power_only=False)
+    ap510_transport = _render("apollo510", "rtt", "litert", power_only=False)
     assert "AM_HAL_PWRCTRL_PERIPH_CRYPTO" not in ap510_transport
 
-    ap330_power = _render("apollo330P", "rtt", "tflm", power_only=True)
+    ap330_power = _render("apollo330P", "rtt", "litert", power_only=True)
     assert "am_hal_pwrctrl_rss_pwroff" in ap330_power
 
     # AP4 doesn't get this narrow block -- broad_peripheral_shutdown already
     # covers crypto/VCOMP there.
-    ap4_power = _render("apollo4p", "rtt", "tflm", power_only=True)
+    ap4_power = _render("apollo4p", "rtt", "litert", power_only=True)
     assert "am_hal_pwrctrl_rss_pwroff" not in ap4_power
 
 
@@ -1749,14 +1749,14 @@ def test_pmu_profiler_sram_placement_transport_only_on_ap5():
     unused there -- to avoid adding an SSRAM power-on step that would
     perturb the very power measurement that binary exists to keep clean.
     """
-    ap510_transport = _render("apollo510", "rtt", "tflm", power_only=False)
+    ap510_transport = _render("apollo510", "rtt", "litert", power_only=False)
     # NSX_MEM_SRAM (initialized .shared, copied from MRAM), NOT SRAM_BSS
     # (NOLOAD zero-fill would discard the polymorphic object's vtable
     # pointer image -- NULL-vptr bus fault at the first virtual call).
     assert "NSX_MEM_SRAM static HpxPmuProfiler g_profiler;" in ap510_transport
     assert "AM_HAL_PWRCTRL_SRAM_3M" in ap510_transport  # SSRAM powered on
 
-    ap510_power = _render("apollo510", "rtt", "tflm", power_only=True)
+    ap510_power = _render("apollo510", "rtt", "litert", power_only=True)
     assert "NSX_MEM_SRAM static HpxPmuProfiler g_profiler;" not in ap510_power
     assert "static HpxPmuProfiler g_profiler;" in ap510_power
     assert "Shared SSRAM power-on" not in ap510_power
@@ -1765,7 +1765,7 @@ def test_pmu_profiler_sram_placement_transport_only_on_ap5():
     # applies (falls back gracefully per nsx_mem.h), but there is no
     # SSRAM power-on step to add since manages_shared_ssram_power is
     # AP5-only.
-    ap3_transport = _render("apollo3p", "rtt", "tflm", power_only=False)
+    ap3_transport = _render("apollo3p", "rtt", "litert", power_only=False)
     assert "NSX_MEM_SRAM static HpxPmuProfiler g_profiler;" in ap3_transport
     assert "Shared SSRAM power-on" not in ap3_transport
 
@@ -1824,15 +1824,15 @@ def test_ssram_full_power_enum_is_per_soc():
     assert "AM_HAL_PWRCTRL_SRAM_1P75M" in ap330_rendered
     assert "AM_HAL_PWRCTRL_SRAM_3M" not in ap330_rendered
 
-    ap510_rendered = _render("apollo510", "rtt", "tflm")
+    ap510_rendered = _render("apollo510", "rtt", "litert")
     assert "AM_HAL_PWRCTRL_SRAM_3M" in ap510_rendered
     assert "AM_HAL_PWRCTRL_SRAM_1P75M" not in ap510_rendered
 
     # AP3/AP5 never emit this block, even in the power_only binary --
     # matches AutoDeploy's own per-family ns_power_down_peripherals().
-    ap3_power = _render("apollo3p", "rtt", "tflm", power_only=True)
+    ap3_power = _render("apollo3p", "rtt", "litert", power_only=True)
     assert "AM_HAL_PWRCTRL_PERIPH_IOM0" not in ap3_power
-    ap510_power = _render("apollo510", "rtt", "tflm", power_only=True)
+    ap510_power = _render("apollo510", "rtt", "litert", power_only=True)
     assert "AM_HAL_PWRCTRL_PERIPH_IOM0" not in ap510_power
 
 

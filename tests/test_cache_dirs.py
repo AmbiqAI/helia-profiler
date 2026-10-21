@@ -45,7 +45,7 @@ def _config(tmp_path: Path, **extra: object):
         None,
         {
             "model": {"path": str(model)},
-            "engine": {"type": "tflm"},
+            "engine": {"type": "litert"},
             "target": {"board": "apollo510_evb"},
             **extra,
         },
@@ -58,7 +58,7 @@ class TestResolveWorkDirFallback:
     ) -> None:
         monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "cache"))
         wd = _resolve_work_dir(_config(tmp_path))
-        assert wd == tmp_path / "cache" / "workspaces" / "apollo510_evb-arm-none-eabi-gcc-tflm"
+        assert wd == tmp_path / "cache" / "workspaces" / "apollo510_evb-arm-none-eabi-gcc-litert"
         assert wd.is_dir()
 
     def test_unwritable_cache_falls_back_to_local_dir(
@@ -77,7 +77,7 @@ class TestResolveWorkDirFallback:
             wd = _resolve_work_dir(_config(tmp_path))
         finally:
             readonly.chmod(0o755)
-        assert wd == cwd / ".hpx-cache" / "workspaces" / "apollo510_evb-arm-none-eabi-gcc-tflm"
+        assert wd == cwd / ".hpx-cache" / "workspaces" / "apollo510_evb-arm-none-eabi-gcc-litert"
         assert wd.is_dir()
 
     def test_explicit_work_dir_is_untouched_by_fallback(

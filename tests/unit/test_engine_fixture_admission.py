@@ -23,7 +23,7 @@ def test_internal_symbolic_shapes_are_engine_owned(tmp_path):
     path = typed_model(
         tmp_path, [F32], [Y32], extra=[("internal", "float32", (1, 4), None, None)], change=change
     )
-    for engine in (None, api.EngineType.HELIA_AOT, api.EngineType.TFLM, api.EngineType.HELIA_RT):
+    for engine in (None, api.EngineType.HELIA_AOT, api.EngineType.LITERT, api.EngineType.HELIA_RT):
         actual = (
             api.analyze_typed_fixture_model(path)
             if engine is None
@@ -33,7 +33,7 @@ def test_internal_symbolic_shapes_are_engine_owned(tmp_path):
         assert actual.output_bytes == 16
 
 
-@pytest.mark.parametrize("engine", [api.EngineType.HELIA_AOT, api.EngineType.TFLM])
+@pytest.mark.parametrize("engine", [api.EngineType.HELIA_AOT, api.EngineType.LITERT])
 @pytest.mark.parametrize(
     "mutation,match",
     [
@@ -63,7 +63,7 @@ def test_auxiliary_subgraph_stays_in_original_model_and_is_validated(tmp_path):
     assert actual.input_bytes == 16
     assert actual.resolver.registrations == ()
     assert path.read_bytes() == before
-    micro = api.analyze_typed_fixture_model_for_engine(path, engine=api.EngineType.TFLM)
+    micro = api.analyze_typed_fixture_model_for_engine(path, engine=api.EngineType.LITERT)
     assert micro.subgraph_count == 2
     assert micro.resolver.registrations == ("r.AddAdd();",)
 
@@ -83,7 +83,7 @@ def test_aot_is_not_gated_by_micro_registration(tmp_path):
         == ()
     )
     with pytest.raises(ValueError, match="Unsupported fixture operators: GELU"):
-        api.analyze_typed_fixture_model_for_engine(path, engine=api.EngineType.TFLM)
+        api.analyze_typed_fixture_model_for_engine(path, engine=api.EngineType.LITERT)
 
 
 def test_internal_state_carries_without_a_declared_policy(tmp_path):
@@ -281,7 +281,7 @@ def test_real_build_entry_selects_engine_before_pipeline(tmp_path, monkeypatch):
         )
 
 
-@pytest.mark.parametrize("engine", [api.EngineType.HELIA_AOT, api.EngineType.TFLM])
+@pytest.mark.parametrize("engine", [api.EngineType.HELIA_AOT, api.EngineType.LITERT])
 def test_selected_engine_still_checks_quantized_public_io(tmp_path, engine):
     path = typed_model(tmp_path, [("x", "int16", (1, 4), None, None)], [Y32])
     with pytest.raises(ValueError, match="requires quantization"):
@@ -308,7 +308,7 @@ def test_resource_resolver_covers_initializer_subgraph(tmp_path):
         model.subgraphs.append(aux)
 
     path = typed_model(tmp_path, [F32], [Y32], change=change)
-    actual = api.analyze_typed_fixture_model_for_engine(path, engine=api.EngineType.TFLM)
+    actual = api.analyze_typed_fixture_model_for_engine(path, engine=api.EngineType.LITERT)
     assert actual.subgraph_count == 2
     assert actual.resource_variable_count == 1
     assert "r.AddVarHandle();" in actual.resolver.registrations
@@ -326,7 +326,7 @@ def test_resource_renderer_allocates_once_and_keeps_full_model(tmp_path):
     from helia_profiler.pipeline import PipelineContext
 
     path = typed_model(tmp_path, [F32], [Y32])
-    model = api.analyze_typed_fixture_model_for_engine(path, engine=api.EngineType.TFLM)
+    model = api.analyze_typed_fixture_model_for_engine(path, engine=api.EngineType.LITERT)
     model = replace(
         model,
         has_internal_state=True,
@@ -354,7 +354,7 @@ def test_resource_renderer_allocates_once_and_keeps_full_model(tmp_path):
                 "arena_location": "sram",
                 "weights_location": "mram",
             },
-            "engine": {"type": "tflm", "backend": "cmsis_nn"},
+            "engine": {"type": "litert", "backend": "cmsis_nn"},
             "profiling": {"iterations": 100, "warmup": 5},
         },
     )
@@ -375,7 +375,7 @@ def test_resource_renderer_allocates_once_and_keeps_full_model(tmp_path):
     assert "graph->outputs()->Get(0) != 1" in text
 
 
-@pytest.mark.parametrize("engine", [api.EngineType.HELIA_AOT, api.EngineType.TFLM])
+@pytest.mark.parametrize("engine", [api.EngineType.HELIA_AOT, api.EngineType.LITERT])
 def test_stateful_operator_carries_without_tensor_flags(tmp_path, engine):
     from test_typed_fixture_analysis import s
 
@@ -402,7 +402,7 @@ def test_auxiliary_float16_is_metadata_not_public_io_capability(tmp_path):
         model.subgraphs.append(aux)
 
     path = typed_model(tmp_path, [F32], [Y32], change=change)
-    actual = api.analyze_typed_fixture_model_for_engine(path, engine=api.EngineType.TFLM)
+    actual = api.analyze_typed_fixture_model_for_engine(path, engine=api.EngineType.LITERT)
     assert actual.has_float16
     from helia_profiler.fixture_runtime import FixtureFile
 
@@ -412,12 +412,12 @@ def test_auxiliary_float16_is_metadata_not_public_io_capability(tmp_path):
         tuple(api.FixtureIO(t, file) for t in actual.inputs),
         tuple(api.FixtureIO(t, file) for t in actual.outputs),
     )
-    assert _check_typed_fixture(fixture, actual, api.EngineType.TFLM) == (
+    assert _check_typed_fixture(fixture, actual, api.EngineType.LITERT) == (
         ("float32", api.FixtureCapability.SUPPORTED),
     )
 
 
-@pytest.mark.parametrize("engine", [api.EngineType.TFLM, api.EngineType.HELIA_AOT])
+@pytest.mark.parametrize("engine", [api.EngineType.LITERT, api.EngineType.HELIA_AOT])
 def test_connected_half_storage_keeps_source_and_supported_public_io(tmp_path, engine):
     from test_typed_fixture_analysis import s
 
@@ -461,7 +461,7 @@ def test_connected_half_storage_keeps_source_and_supported_public_io(tmp_path, e
     )
     assert path.read_bytes() == before
     assert model.resolver.registrations == (
-        ("r.AddAdd();", "r.AddDequantize();") if engine is api.EngineType.TFLM else ()
+        ("r.AddAdd();", "r.AddDequantize();") if engine is api.EngineType.LITERT else ()
     )
 
 
@@ -515,7 +515,7 @@ def test_selected_adapter_owns_fixture_preparation(tmp_path, monkeypatch):
 
     path = typed_model(tmp_path, [F32], [Y32])
     expected = api.analyze_typed_fixture_model(path)
-    adapter_type = type(get_adapter(api.EngineType.TFLM))
+    adapter_type = type(get_adapter(api.EngineType.LITERT))
     calls = []
 
     def prepare(self, model_path, *, single_io):
@@ -523,7 +523,9 @@ def test_selected_adapter_owns_fixture_preparation(tmp_path, monkeypatch):
         return expected
 
     monkeypatch.setattr(adapter_type, "prepare_fixture_model", prepare)
-    assert api.analyze_typed_fixture_model_for_engine(path, engine=api.EngineType.TFLM) is expected
+    assert (
+        api.analyze_typed_fixture_model_for_engine(path, engine=api.EngineType.LITERT) is expected
+    )
     assert calls == [(path, False)]
 
 

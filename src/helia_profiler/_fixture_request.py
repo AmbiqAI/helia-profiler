@@ -87,7 +87,7 @@ class FixtureBuildRequest:
 
     The installed profiler and engine are not part of the request: the source
     closure pins the profiler, and ``FixtureBuild.engine_source`` records the
-    engine package. A TFLM or heliaRT request without ``runtime`` uses the
+    engine package. A LiteRT or heliaRT request without ``runtime`` uses the
     archive ``hpx runtimes prepare`` built from the engine's default record.
     This cache lookup happens only at ``build_fixture``, never in construction.
     """

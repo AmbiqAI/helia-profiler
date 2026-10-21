@@ -177,11 +177,10 @@
                 "litert",
                 "helia-rt",
                 "helia-aot",
-                "executorch",
-                "tflm"
+                "executorch"
               ]
             },
-            "python_type": "Optional[EngineName]",
+            "python_type": "Optional[EngineType]",
             "default": null,
             "required": false,
             "help": "Analyze as this engine would execute it. Default (no flag) uses the raw tflite graph. 'helia-aot' runs AOT compilation and analyzes the transformed graph. 'helia-rt' analyzes the original tflite graph.",
@@ -327,7 +326,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/inspect_app.py",
-          "line": 132
+          "line": 130
         },
         "arguments": [],
         "options": [],
@@ -807,14 +806,13 @@
                 "litert",
                 "helia-rt",
                 "helia-aot",
-                "executorch",
-                "tflm"
+                "executorch"
               ]
             },
-            "python_type": "Optional[EngineName]",
+            "python_type": "Optional[EngineType]",
             "default": null,
             "required": false,
-            "help": "Engine to check (default: helia-rt); tflm is an alias of litert",
+            "help": "Engine to check (default: helia-rt)",
             "panel": null,
             "is_flag": false,
             "multiple": false,
@@ -918,7 +916,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/inspect_app.py",
-          "line": 125
+          "line": 123
         },
         "arguments": [],
         "options": [],
@@ -938,7 +936,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/inspect_app.py",
-          "line": 191
+          "line": 189
         },
         "arguments": [],
         "options": [],
@@ -959,7 +957,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/inspect_app.py",
-              "line": 198
+              "line": 196
             },
             "arguments": [],
             "options": [
@@ -1111,7 +1109,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/inspect_app.py",
-          "line": 144
+          "line": 142
         },
         "arguments": [],
         "options": [],
@@ -1132,7 +1130,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/inspect_app.py",
-              "line": 151
+              "line": 149
             },
             "arguments": [],
             "options": [
@@ -1232,7 +1230,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/inspect_app.py",
-              "line": 169
+              "line": 167
             },
             "arguments": [],
             "options": [
@@ -1446,14 +1444,13 @@
                 "litert",
                 "helia-rt",
                 "helia-aot",
-                "executorch",
-                "tflm"
+                "executorch"
               ]
             },
-            "python_type": "Optional[EngineName]",
+            "python_type": "Optional[EngineType]",
             "default": null,
             "required": false,
-            "help": "Inference engine (default: helia-rt); tflm is an alias of litert",
+            "help": "Inference engine (default: helia-rt)",
             "panel": "engine",
             "is_flag": false,
             "multiple": false,
@@ -2869,8 +2866,8 @@
             "name": "prepare",
             "kind": "command",
             "usage": "hpx runtimes prepare NAME [VERSION]",
-            "short_help": "Build a runtime's prepared archive into the hpx cache (helia-rt, tflm)",
-            "help": "Build a runtime's prepared archive into the hpx cache (helia-rt, tflm)",
+            "short_help": "Build a runtime's prepared archive into the hpx cache (helia-rt, litert)",
+            "help": "Build a runtime's prepared archive into the hpx cache (helia-rt, litert)",
             "epilog": null,
             "deprecated": false,
             "hidden": false,
@@ -3025,7 +3022,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/inspect_app.py",
-          "line": 216
+          "line": 214
         },
         "arguments": [],
         "options": [],
@@ -3046,7 +3043,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/inspect_app.py",
-              "line": 223
+              "line": 221
             },
             "arguments": [],
             "options": [
@@ -3146,7 +3143,7 @@
         "usage": "hpx validate [OPTIONS]",
         "short_help": "Run hardware-in-the-loop validation suite (MLPerf Tiny models)",
         "help": "Run hardware-in-the-loop validation suite (MLPerf Tiny models)",
-        "epilog": "Hardware validation — runs canonical MLPerf Tiny models end-to-end\n\nagainst a real EVB + J-Link (and optional Joulescope).\n\nExamples:\n\n  hpx validate                         # Apollo510 reliability matrix, power off\n\n  hpx validate --list                  # preview what would run\n\n  hpx validate --models kws,ic         # subset by model\n\n  hpx validate --engines aot           # subset by engine\n\n  hpx validate --power off             # skip Joulescope (default)\n\n  hpx validate --boards apollo3p_evb --repeat 2 --power off\n\n                                       # require two passing iterations per case\n\n  hpx validate -k kws-aot              # pytest keyword filter\n\n  hpx validate --suite smoke           # quick preset: kws / helia-rt / gcc / rtt / auto\n\n  hpx validate --suite models-rt       # 16-case RT sweep: 2 boards x 4 models x 2 toolchains\n\n  hpx validate --suite models-aot      # 16-case AOT sweep: 2 boards x 4 models x 2 toolchains\n\n  hpx validate --suite complete        # RT + AOT + TFLM + ExecuTorch sweep",
+        "epilog": "Hardware validation — runs canonical MLPerf Tiny models end-to-end\n\nagainst a real EVB + J-Link (and optional Joulescope).\n\nExamples:\n\n  hpx validate                         # Apollo510 reliability matrix, power off\n\n  hpx validate --list                  # preview what would run\n\n  hpx validate --models kws,ic         # subset by model\n\n  hpx validate --engines aot           # subset by engine\n\n  hpx validate --power off             # skip Joulescope (default)\n\n  hpx validate --boards apollo3p_evb --repeat 2 --power off\n\n                                       # require two passing iterations per case\n\n  hpx validate -k kws-aot              # pytest keyword filter\n\n  hpx validate --suite smoke           # quick preset: kws / helia-rt / gcc / rtt / auto\n\n  hpx validate --suite models-rt       # 16-case RT sweep: 2 boards x 4 models x 2 toolchains\n\n  hpx validate --suite models-aot      # 16-case AOT sweep: 2 boards x 4 models x 2 toolchains\n\n  hpx validate --suite complete        # RT + AOT + LiteRT + ExecuTorch sweep",
         "deprecated": false,
         "hidden": false,
         "source": {
@@ -3307,7 +3304,7 @@
             "python_type": "str",
             "default": "",
             "required": false,
-            "help": "Comma-separated engines: rt,aot,tflm,et,executorch,helia-rt,helia-aot (default: all).",
+            "help": "Comma-separated engines: rt,aot,litert,et,executorch,helia-rt,helia-aot (default: all).",
             "panel": null,
             "is_flag": false,
             "multiple": false,
@@ -3333,7 +3330,7 @@
             "python_type": "str",
             "default": "both",
             "required": false,
-            "help": "ExecuTorch CMSIS-NN providers: arm, ns, or both (default: both). TFLM always uses ARM CMSIS-NN; heliaRT and heliaAOT always use ns-cmsis-nn.",
+            "help": "ExecuTorch CMSIS-NN providers: arm, ns, or both (default: both). LiteRT always uses ARM CMSIS-NN; heliaRT and heliaAOT always use ns-cmsis-nn.",
             "panel": null,
             "is_flag": false,
             "multiple": false,
@@ -3553,7 +3550,7 @@
             "python_type": "Optional[helia_profiler.cli.validation_app._ValidateSuite]",
             "default": null,
             "required": false,
-            "help": "Preset suite. 'smoke' defaults unset axes to models=kws, engines=helia-rt, toolchains=arm-none-eabi-gcc, interfaces=rtt, memories=auto. 'models-rt' and 'models-aot' default unset axes to all MLPerf Tiny models, Apollo510 + Apollo330mP, gcc + atfe, rtt, auto memory, and the selected engine. 'complete' runs the same axes for helia-rt, helia-aot, TFLM/CMSIS-NN, and both ExecuTorch CMSIS-NN providers. Explicit axis flags always win.",
+            "help": "Preset suite. 'smoke' defaults unset axes to models=kws, engines=helia-rt, toolchains=arm-none-eabi-gcc, interfaces=rtt, memories=auto. 'models-rt' and 'models-aot' default unset axes to all MLPerf Tiny models, Apollo510 + Apollo330mP, gcc + atfe, rtt, auto memory, and the selected engine. 'complete' runs the same axes for helia-rt, helia-aot, LiteRT/CMSIS-NN, and both ExecuTorch CMSIS-NN providers. Explicit axis flags always win.",
             "panel": null,
             "is_flag": false,
             "multiple": false,

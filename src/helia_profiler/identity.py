@@ -1,9 +1,9 @@
 """Shared identity vocabulary: canonical engine and kernel names, and reasoned unknowns.
 
 The canonical names are the ones heliaPROFILER, heliaESTIMATOR and the
-benchmark harness share. Each component's existing spellings stay accepted
-as aliases: the engine selector, the TFLM backend, the ExecuTorch kernel
-provider, the NSX module and the library project name. Case, ``_`` and
+benchmark harness share; the engine selector uses them as they are. Each
+component's other spellings stay accepted as aliases: the LiteRT backend, the
+ExecuTorch kernel provider, the NSX module and the library project name. Case, ``_`` and
 ``-`` are interchangeable.
 
 These functions translate names, not evidence: a configured backend label
@@ -55,7 +55,6 @@ class Unknown:
 
 _ENGINE_ALIASES = {
     "litert": CanonicalEngine.LITERT,
-    "tflm": CanonicalEngine.LITERT,
     "tflite-micro": CanonicalEngine.LITERT,
     "nsx-tflite-micro": CanonicalEngine.LITERT,
     "upstream": CanonicalEngine.LITERT,

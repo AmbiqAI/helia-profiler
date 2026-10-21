@@ -56,7 +56,7 @@ def _npu_pmu_pass() -> dict[str, object]:
     }
 
 
-def _render_tflm(
+def _render_litert(
     transport: str = "rtt",
     template_name: str = "main.cc.j2",
     arena_region: str = "tcm",
@@ -132,7 +132,7 @@ def _render_tflm(
         psram_clock_hz=psram_clock_hz,
         # HPX_ENGINE= is emitted by the shared skeleton for every engine
         # (_main_base.cc.j2); production derives this from EngineType.
-        engine_wire_name="tflm",
+        engine_wire_name="litert",
         **extra_vars,
     )
 
@@ -153,7 +153,7 @@ def _render_aot(
     clean_iters: int = 3,
     clean_warmup: int = 1,
     power_only: bool = False,
-    # See _render_tflm.
+    # See _render_litert.
     power_window_timer: str = "stimer",
     has_ethos_u: bool = False,
     pmu_passes: list[dict[str, object]] | None = None,
@@ -204,7 +204,7 @@ def _render_aot(
         heartbeat_every_ms=0,
         pmu_max_ops=4096,
         psram_clock_hz=psram_clock_hz,
-        # See _render_tflm; the hyphen in the EngineType value becomes an
+        # See _render_litert; the hyphen in the EngineType value becomes an
         # underscore so the line parses as HPX_<KEY>=<value>.
         engine_wire_name="helia_aot",
         **extra_vars,
@@ -214,50 +214,50 @@ def _render_aot(
 class TestMainCcRender:
     @pytest.mark.parametrize("transport", ["rtt", "usb_cdc", "swo", "stdio"])
     def test_renders_without_error(self, transport: str):
-        out = _render_tflm(transport=transport)
+        out = _render_litert(transport=transport)
         assert "hpx_printf" in out
         assert "hpx_sync_init" in out
         assert "dwt_init" in out
 
-    def test_tflm_hpx_printf_is_extern_linkage(self):
-        out = _render_tflm(transport="rtt")
+    def test_litert_hpx_printf_is_extern_linkage(self):
+        out = _render_litert(transport="rtt")
         # void hpx_printf with no "static " prefix (extern so hpx_pmu_profiler.cc
         # can link to it).
         assert "void hpx_printf(" in out
         assert "static void hpx_printf(" not in out
 
     def test_power_only_routes_recoverable_errors_to_terminal_finalizer(self):
-        out = _render_tflm(transport="rtt", power_only=True)
+        out = _render_litert(transport="rtt", power_only=True)
         assert 'hpx_power_terminal_fail("schema", 2U);' in out
         assert 'hpx_power_terminal_fail("resolver", 3U);' in out
         assert 'hpx_power_terminal_fail("allocate", 4U);' in out
         assert out.index("hpx_sync_window_end();") < out.rindex("hpx_power_terminal_report(")
 
     def test_power_only_uart_enables_transport_after_gate(self):
-        out = _render_tflm(transport="uart", power_only=True)
+        out = _render_litert(transport="uart", power_only=True)
         assert "nsx_uart_printf_enable();" in out
         assert out.index("hpx_sync_window_end();") < out.rindex("hpx_power_terminal_report(")
         assert "sys_cfg.debug.transport = NSX_DEBUG_NONE;" in out
 
     def test_power_only_swo_enables_transport_after_gate(self):
-        out = _render_tflm(transport="swo", power_only=True)
+        out = _render_litert(transport="swo", power_only=True)
         assert "nsx_itm_printf_enable();" in out
         assert out.index("hpx_sync_window_end();") < out.rindex("hpx_power_terminal_report(")
         assert "sys_cfg.debug.transport = NSX_DEBUG_NONE;" in out
 
     def test_power_only_usb_initializes_transport_after_gate(self):
-        out = _render_tflm(transport="usb_cdc", power_only=True)
+        out = _render_litert(transport="usb_cdc", power_only=True)
         assert "nsx_usb_init(&g_usb_cfg)" in out
         assert out.index("hpx_sync_window_end();") < out.rindex("hpx_power_terminal_report(")
         assert "sys_cfg.debug.transport = NSX_DEBUG_NONE;" in out
 
     def test_rtt_transport_includes_drain_helper(self):
-        out = _render_tflm(transport="rtt")
+        out = _render_litert(transport="rtt")
         assert "SEGGER_RTT_Write" in out
         assert "hpx_rtt_drain" in out
 
     def test_rtt_transport_switches_to_blocking_for_csv_and_end(self):
-        out = _render_tflm(transport="rtt")
+        out = _render_litert(transport="rtt")
         assert "hpx_rtt_set_blocking" in out
         assert "hpx_rtt_set_nonblocking" in out
         # Lossless writes are done by our own cache-coherent writer, not by
@@ -270,7 +270,7 @@ class TestMainCcRender:
 
     def test_non_rtt_transport_omits_blocking_switch(self):
         for transport in ("usb_cdc", "swo", "stdio"):
-            out = _render_tflm(transport=transport)
+            out = _render_litert(transport=transport)
             assert "hpx_rtt_set_blocking" not in out
             assert "hpx_rtt_set_nonblocking" not in out
 
@@ -279,7 +279,7 @@ class TestMainCcRender:
         # a disposable HPX_READY sync preamble until the host is draining, then
         # prints the real header.  This closes the attach race that dropped the
         # HPX_START sentinel.
-        out = _render_tflm(transport="swo")
+        out = _render_litert(transport="swo")
         # Split on the actual sentinel emission (not the explanatory comments
         # that also mention HPX_START).
         preamble = out.split('hpx_printf("\\n--- HPX_START ---\\n")', 1)[0]
@@ -292,7 +292,7 @@ class TestMainCcRender:
         # pressure) and USB CDC (host-ready DTR signal) have dedicated branches
         # and must not run it.  stdio shares the SWO else-branch by design.
         for transport in ("rtt", "usb_cdc"):
-            out = _render_tflm(transport=transport)
+            out = _render_litert(transport=transport)
             assert "hpx_sync_i < HPX_SWO_SYNC_PREAMBLE_LINES" not in out
 
     def test_all_exits_route_through_hpx_park(self):
@@ -300,7 +300,7 @@ class TestMainCcRender:
         # final diagnostic is delivered; no raw __WFI() spin loops should remain
         # in the main entry point.
         for transport in ("rtt", "usb_cdc", "swo", "stdio"):
-            out = _render_tflm(transport=transport)
+            out = _render_litert(transport=transport)
             assert "void hpx_park(void)" in out
             assert "while (1) { __WFI(); }" not in out
             # schema_mismatch + missing_ops + alloc_tensors_failed + HPX_END
@@ -311,7 +311,7 @@ class TestMainCcRender:
         # On RTT the park helper must publish + drain (core still spinning) before
         # entering WFI, because the TCM-resident ring is unreadable to the J-Link
         # once the core sleeps. This is what lets failure messages escape.
-        out = _render_tflm(transport="rtt")
+        out = _render_litert(transport="rtt")
         park = out.split("void hpx_park(void)", 1)[1].split("}", 1)[0]
         assert "hpx_rtt_set_blocking();" in park
         assert "hpx_rtt_drain(HPX_RTT_FAIL_DRAIN_MS)" in park
@@ -321,7 +321,7 @@ class TestMainCcRender:
     def test_non_rtt_park_is_plain_wfi(self):
         # Non-RTT transports send synchronously, so park has no drain — just WFI.
         for transport in ("usb_cdc", "swo", "stdio"):
-            out = _render_tflm(transport=transport)
+            out = _render_litert(transport=transport)
             park = out.split("void hpx_park(void)", 1)[1].split("}", 1)[0]
             assert "__WFI();" in park
             assert "hpx_rtt_drain" not in park
@@ -338,7 +338,7 @@ class TestMainCcRender:
         assert "hpx_rtt_drain(HPX_RTT_FAIL_DRAIN_MS)" in park
 
     def test_auto_resolver_mode_embeds_selected_registrations(self):
-        out = _render_tflm(
+        out = _render_litert(
             transport="rtt",
             resolver_mode="auto",
             resolver_registrations=["r.AddConv2D();", "r.AddFullyConnected();"],
@@ -349,7 +349,7 @@ class TestMainCcRender:
         assert "r.AddSoftmax();" not in out
 
     def test_resource_variable_models_render_resource_variable_runtime(self):
-        out = _render_tflm(
+        out = _render_litert(
             transport="rtt",
             resource_variable_count=2,
         )
@@ -359,7 +359,7 @@ class TestMainCcRender:
         assert "MicroResourceVariables::Create(allocator, kNumResourceVariables)" in out
 
     def test_clock_mode_renders_selected_perf_mode(self):
-        out = _render_tflm(transport="rtt", perf_mode_symbol="NSX_PERF_HIGH", perf_mode_mhz=250)
+        out = _render_litert(transport="rtt", perf_mode_symbol="NSX_PERF_HIGH", perf_mode_mhz=250)
         assert "sys_cfg.perf_mode = NSX_PERF_HIGH;  // 250 MHz" in out
 
     def test_aot_clock_mode_renders_selected_perf_mode(self):
@@ -367,14 +367,14 @@ class TestMainCcRender:
         assert "sys_cfg.perf_mode = NSX_PERF_HIGH;  // 250 MHz" in out
 
     def test_apollo3_burst_enabled_emits_burst_block(self):
-        out = _render_tflm(transport="rtt", perf_mode_symbol="NSX_PERF_HIGH", perf_mode_mhz=96)
+        out = _render_litert(transport="rtt", perf_mode_symbol="NSX_PERF_HIGH", perf_mode_mhz=96)
         # No burst when the flag is off (default in helper).
         assert "am_hal_burst_mode_enable" not in out
         out = _env.get_template("main.cc.j2").render(
             busy_loop_probe=False,
             window_timer="dwt",
             use_stimer_window=False,
-            engine_wire_name="tflm",
+            engine_wire_name="litert",
             engine_header="tensorflow/lite/micro/micro_interpreter.h",
             cmsis_device_header="apollo3p.h",
             arena_size=65_536,
@@ -430,7 +430,7 @@ class TestMainCcRender:
         # (DWT-only) but must be skipped on Armv8-M (M55).  Both engine
         # templates must agree, or AOT-vs-heliaRT drift reintroduces the
         # Apollo3 link failure (undefined _sbrk/_exit).
-        for render in (_render_tflm, _render_aot):
+        for render in (_render_litert, _render_aot):
             m4 = render(has_armv8m_pmu=False)
             m55 = render(has_armv8m_pmu=True)
             assert "_sbrk" in m4 and "_exit" in m4
@@ -439,43 +439,45 @@ class TestMainCcRender:
     def test_systemcoreclock_set_from_resolved_clock_non_burst(self):
         # Non-AP3-burst targets must pin SystemCoreClock to the resolved clock
         # because NSX leaves the CMSIS global at the 96 MHz reset default.
-        tflm = _render_tflm(transport="rtt", perf_mode_symbol="NSX_PERF_HIGH", perf_mode_mhz=250)
-        assert "SystemCoreClock = 250U * 1000000U" in tflm
+        litert = _render_litert(
+            transport="rtt", perf_mode_symbol="NSX_PERF_HIGH", perf_mode_mhz=250
+        )
+        assert "SystemCoreClock = 250U * 1000000U" in litert
         aot = _render_aot(transport="rtt", perf_mode_symbol="NSX_PERF_HIGH", perf_mode_mhz=192)
         assert "SystemCoreClock = 192U * 1000000U" in aot
 
     def test_usb_transport_includes_timer_helpers(self):
-        out = _render_tflm(transport="usb_cdc")
+        out = _render_litert(transport="usb_cdc")
         assert "usb_timer_pause" in out
         assert "usb_timer_resume" in out
         assert "nsx_usb_send" in out
         assert 'NSX_TRY(nsx_usb_init(&g_usb_cfg), "USB CDC init failed\\n");' in out
 
     def test_usb_serial_marker_stamps_descriptor(self):
-        out = _render_tflm(transport="usb_cdc", usb_serial_marker="HPX-1160001350")
+        out = _render_litert(transport="usb_cdc", usb_serial_marker="HPX-1160001350")
         assert "g_hpx_usb_desc" in out
         assert '.serial  = "HPX-1160001350",' in out
         assert ".device_desc   = &g_hpx_usb_desc," in out
 
     def test_usb_without_marker_omits_descriptor(self):
-        out = _render_tflm(transport="usb_cdc", usb_serial_marker=None)
+        out = _render_litert(transport="usb_cdc", usb_serial_marker=None)
         assert "g_hpx_usb_desc" not in out
         assert ".device_desc" not in out
 
     def test_rtt_transport_excludes_usb_timer(self):
-        out = _render_tflm(transport="rtt")
+        out = _render_litert(transport="rtt")
         assert "usb_timer_pause" not in out
         assert "nsx_usb_send" not in out
 
     def test_swo_transport_uses_itm_output(self):
-        out = _render_tflm(transport="swo")
+        out = _render_litert(transport="swo")
         assert "sys_cfg.debug.transport = NSX_DEBUG_ITM;" in out
         assert "nsx_itm_printf_enable();" in out
         assert 'nsx_printf("%s", line_buf);' in out
         assert "ITM->PORT[0].u8" not in out
 
     def test_shared_blocks_appear_exactly_once(self):
-        out = _render_tflm(transport="rtt")
+        out = _render_litert(transport="rtt")
         # After dedup, each shared helper must render once (not twice).
         assert out.count("static inline void dwt_init(void)") == 1
         assert out.count("static inline void hpx_sync_init(void)") == 1
@@ -485,7 +487,7 @@ class TestMainCcRender:
             busy_loop_probe=False,
             window_timer="dwt",
             use_stimer_window=False,
-            engine_wire_name="tflm",
+            engine_wire_name="litert",
             engine_header="tensorflow/lite/micro/micro_interpreter.h",
             cmsis_device_header="apollo510.h",
             arena_size=65_536,
@@ -522,7 +524,7 @@ class TestMainCcRender:
         assert "ns_core_initialized" not in out
 
     def test_psram_weights_skip_model_data_header(self):
-        out = _render_tflm(
+        out = _render_litert(
             transport="rtt",
             weights_region="psram",
             psram_clock_hz=125_000_000,
@@ -535,16 +537,16 @@ class TestMainCcRender:
 
     @pytest.mark.parametrize("has_dcache", [True, False])
     def test_psram_weights_invalidate_the_dcache_only_where_there_is_one(self, has_dcache):
-        out = _render_tflm(transport="rtt", weights_region="psram", has_dcache=has_dcache)
+        out = _render_litert(transport="rtt", weights_region="psram", has_dcache=has_dcache)
         assert ("SCB_InvalidateDCache_by_Addr((void *)psram_info.base_address" in out) is has_dcache
 
     def test_psram_weights_override_skips_model_data_header(self):
-        out = _render_tflm(transport="rtt", weights_region="psram")
+        out = _render_litert(transport="rtt", weights_region="psram")
         assert '#include "model_data.h"' not in out
         assert "nsx_psram.h" in out
 
     def test_dwt_only_render_avoids_armv8m_pmu_headers(self):
-        out = _render_tflm(transport="rtt", has_armv8m_pmu=False)
+        out = _render_litert(transport="rtt", has_armv8m_pmu=False)
         assert "nsx_pmu_utils.h" not in out
         assert "g_profiler.Init(0);" in out
 
@@ -661,7 +663,7 @@ class TestMainAotCcRender:
 
     def test_fixed_window_mode_uses_literal_clean_iters(self):
         """Default (fixed) mode hardcodes the clean iteration count, no runtime math."""
-        for render in (_render_tflm, _render_aot):
+        for render in (_render_litert, _render_aot):
             out = render(transport="rtt")
             assert "const int clean_iters_n = 3;" in out
             # Keyed on the SIZING machinery, not on clean_warm_cyc: fixed mode
@@ -679,7 +681,7 @@ class TestMainAotCcRender:
 
     def test_auto_window_mode_computes_clean_iters_at_runtime(self):
         """Auto mode measures warm cycles and clamps N to fill the target window."""
-        for render in (_render_tflm, _render_aot):
+        for render in (_render_litert, _render_aot):
             out = render(transport="rtt", window_mode="auto")
             assert "const int clean_iters_n = 3;" not in out
             assert "uint32_t clean_warm_cyc = 0U;" in out
@@ -723,13 +725,13 @@ class TestMainAotCcRender:
         ],
     )
     def test_warm_up_count_per_window(self, window, clean_warmup, count):
-        for render in (_render_tflm, _render_aot):
+        for render in (_render_litert, _render_aot):
             out = render(transport="rtt", clean_warmup=clean_warmup, **window)
             # The first warm-up loop is the clean window's; the profiled pass has its own later.
             assert re.findall(r"for \(int w = 0; w < (\d+); w\+\+\)", out)[0] == count
 
     def test_power_only_fixed_count_override(self):
-        for render in (_render_tflm, _render_aot):
+        for render in (_render_litert, _render_aot):
             out = render(
                 transport="rtt",
                 power_only=True,
@@ -764,7 +766,7 @@ class TestMainAotCcRender:
             inference_count=2247, clean_window_probe="busy_loop"
         )
         assert host_count == 1
-        out = _render_tflm(
+        out = _render_litert(
             transport="rtt",
             power_only=True,
             window_mode="fixed",
@@ -782,7 +784,7 @@ class TestMainAotCcRender:
         assert set(report_counts) == {"1U"}, report_counts
         assert "(uint32_t)2247" not in out
         # ...and the infer probe still reports the plan's N in both paths.
-        infer = _render_tflm(
+        infer = _render_litert(
             transport="rtt", power_only=True, window_mode="fixed", clean_iters=2247
         )
         infer_counts = re.findall(
@@ -791,21 +793,23 @@ class TestMainAotCcRender:
         assert set(infer_counts) == {"(uint32_t)clean_iters_n", "(uint32_t)2247"}, infer_counts
 
     def test_busy_loop_probe_replaces_clean_window_body(self):
-        tflm_out = _render_tflm(transport="rtt", window_mode="auto", clean_window_probe="busy_loop")
-        assert "HPX_CLEAN_WINDOW_PROBE=busy_loop" in tflm_out
+        litert_out = _render_litert(
+            transport="rtt", window_mode="auto", clean_window_probe="busy_loop"
+        )
+        assert "HPX_CLEAN_WINDOW_PROBE=busy_loop" in litert_out
         # The busy-loop bound is calibrated against STIMER, then the gated
         # window itself runs a plain bounded counter loop with no live clock
         # reads at all — DWT lives in the debug power domain this probe
         # disables, so a live "while (DWT->CYCCNT - t0 < target)" loop as the
         # exit condition would hang forever once that domain is off.
-        assert "for (volatile uint32_t bi = 0; bi < busy_loop_iters; bi++)" in tflm_out
-        assert "clean_count = 1;" in tflm_out
+        assert "for (volatile uint32_t bi = 0; bi < busy_loop_iters; bi++)" in litert_out
+        assert "clean_count = 1;" in litert_out
 
         aot_out = _render_aot(transport="rtt", window_mode="auto", clean_window_probe="busy_loop")
         assert "HPX_CLEAN_WINDOW_PROBE=busy_loop" in aot_out
         assert "for (volatile uint32_t bi = 0; bi < busy_loop_iters; bi++)" in aot_out
         assert "clean_count = 1;" in aot_out
-        assert "am_hal_debug_disable();" in tflm_out
+        assert "am_hal_debug_disable();" in litert_out
         assert "am_hal_debug_disable();" in aot_out
 
         # Pin the "no live DWT read in the window" rule against the RENDER, not
@@ -815,7 +819,7 @@ class TestMainAotCcRender:
         # contained under any branch, so it could not fail.  Anchor on the
         # window CALL sites (the static inline definitions appear earlier) and
         # forbid the register outright.
-        for out in (tflm_out, aot_out):
+        for out in (litert_out, aot_out):
             begin = out.index("hpx_sync_window_begin();")
             window = out[begin : out.index("hpx_sync_window_end();", begin)]
             assert "DWT->CYCCNT" not in window
@@ -848,7 +852,7 @@ class TestMainAotCcRender:
         combination since it pins clean_window_probe="infer", and other
         busy-loop tests use AP5-shaped defaults instead.
         """
-        for render in (_render_tflm, _render_aot):
+        for render in (_render_litert, _render_aot):
             out = render(
                 transport="rtt",
                 power_only=True,
@@ -883,7 +887,7 @@ class TestMainAotCcRender:
         ``window_target_ms``, which would make a mis-sized window
         indistinguishable from a correct one.
         """
-        for render in (_render_tflm, _render_aot):
+        for render in (_render_litert, _render_aot):
             out = render(
                 transport="rtt",
                 power_only=True,
@@ -908,7 +912,7 @@ class TestMainAotCcRender:
         because the window is measured that fallback shows up in
         HPX_CLEAN_INFER_AVG_US rather than hiding behind the nominal target.
         """
-        for render in (_render_tflm, _render_aot):
+        for render in (_render_litert, _render_aot):
             out = render(
                 transport="rtt",
                 power_only=True,
@@ -931,13 +935,13 @@ class TestMainAotCcRender:
             assert "uint32_t busy_loop_iters = 100000U;" in out
 
     def test_armv8m_infer_probe_keeps_debug_domain_up_for_clean_timing(self):
-        tflm_out = _render_tflm(transport="rtt", has_armv8m_pmu=True)
+        litert_out = _render_litert(transport="rtt", has_armv8m_pmu=True)
         aot_out = _render_aot(transport="rtt", has_armv8m_pmu=True)
 
         # The per-iteration delta is bound to a name before it is accumulated
         # so the loop can also test it for the zero that marks a stalled cycle
         # counter (#121); the DWT-timed accumulation itself is unchanged.
-        for out in (tflm_out, aot_out):
+        for out in (litert_out, aot_out):
             assert "uint32_t t0 = DWT->CYCCNT;" in out
             assert "const uint32_t clean_iter_cyc = (uint32_t)(DWT->CYCCNT - t0);" in out
             assert "clean_cycles += clean_iter_cyc;" in out
@@ -1000,7 +1004,7 @@ class TestEthosURender:
     """has_ethos_u gates the NPU include + init block in main.cc.j2."""
 
     def test_npu_blocks_present_when_enabled(self):
-        out = _render_tflm(has_ethos_u=True)
+        out = _render_litert(has_ethos_u=True)
         assert '#include "nsx_npu.h"' in out
         assert "nsx_npu_init(&npu_cfg)" in out
         assert "HPX_NPU=ethos-u85 init=ok" in out
@@ -1009,25 +1013,27 @@ class TestEthosURender:
         assert out.index("nsx_npu_init") < out.index("tflite::InitializeTarget")
 
     def test_npu_blocks_absent_by_default(self):
-        out = _render_tflm()
+        out = _render_litert()
         assert "nsx_npu" not in out
         assert "HPX_NPU" not in out
 
     def test_power_only_uses_terminal_fail(self):
-        out = _render_tflm(has_ethos_u=True, power_only=True)
+        out = _render_litert(has_ethos_u=True, power_only=True)
         assert 'hpx_power_terminal_fail("npu", 2U);' in out
 
     def test_tolerate_power_ack_defaults_off(self):
-        out = _render_tflm(has_ethos_u=True)
+        out = _render_litert(has_ethos_u=True)
         assert ".tolerate_power_ack = false," in out
 
     def test_tolerate_power_ack_set_for_fpga_boards(self):
         for power_only in (False, True):
-            out = _render_tflm(has_ethos_u=True, power_only=power_only, npu_tolerate_power_ack=True)
+            out = _render_litert(
+                has_ethos_u=True, power_only=power_only, npu_tolerate_power_ack=True
+            )
             assert ".tolerate_power_ack = true," in out
 
     def test_npu_pmu_partial_included(self):
-        out = _render_tflm(has_ethos_u=True)
+        out = _render_litert(has_ethos_u=True)
         assert '#include "pmu_ethosu.h"' in out
         assert '#include "nsx_ethos_u.h"' in out
         assert "hpx_npu_probe(" in out
@@ -1038,7 +1044,7 @@ class TestEthosURender:
         at link (nsx-ethos-u-driver ships strong overrides via
         INTERFACE_SOURCES; see helia-profiler#183). We must register a probe
         instead."""
-        out = _render_tflm(has_ethos_u=True)
+        out = _render_litert(has_ethos_u=True)
         # No *definition* of the driver-owned symbols (prose mentioning them in
         # the explanatory comment is fine).
         assert "void ethosu_inference_begin(" not in out
@@ -1055,7 +1061,7 @@ class TestEthosURender:
         )
 
     def test_npu_pmu_partial_absent_without_ethos_u(self):
-        out = _render_tflm()
+        out = _render_litert()
         assert "pmu_ethosu.h" not in out
         assert "nsx_ethos_u_set_probe" not in out
         assert "hpx_npu_probe" not in out
@@ -1063,7 +1069,7 @@ class TestEthosURender:
     def test_npu_pmu_tracks_overflow_per_layer(self):
         """Hardware counter saturation and uint32 accumulation wrap must both
         reach the CSV overflow column — never a hardcoded 0."""
-        out = _render_tflm(has_ethos_u=True, pmu_passes=[_npu_pmu_pass()])
+        out = _render_litert(has_ethos_u=True, pmu_passes=[_npu_pmu_pass()])
         # Stale flags cleared before each dispatch window (W1C register).
         assert "ETHOSU_PMU_Set_CNTR_OVS(drv, mask);" in out
         # Hardware overflow read back and latched per layer.
@@ -1081,7 +1087,7 @@ class TestEthosURender:
     def test_npu_pmu_reports_dispatch_per_layer(self):
         """Layers the NPU never dispatched must be distinguishable from
         layers that ran and counted zero — via the NPU_DISPATCHED column."""
-        out = _render_tflm(has_ethos_u=True, pmu_passes=[_npu_pmu_pass()])
+        out = _render_litert(has_ethos_u=True, pmu_passes=[_npu_pmu_pass()])
         assert '",\\"NPU_DISPATCHED\\",\\"overflow\\"\\n"' in out
         assert "g_npu_hit[layer] = 1U;" in out
         assert "memset((void *)g_npu_hit, 0, sizeof(g_npu_hit));" in out
@@ -1091,7 +1097,7 @@ class TestEthosURender:
         # pass setup is observable: NPU tracking must be enabled ONLY for
         # the ethos_npu pass, not just disabled later by the unrelated
         # end-of-passes disable in engine_profiled_summary (#284).
-        out = _render_tflm(has_ethos_u=True, pmu_passes=_sample_pmu_passes() + [_npu_pmu_pass()])
+        out = _render_litert(has_ethos_u=True, pmu_passes=_sample_pmu_passes() + [_npu_pmu_pass()])
         # Pass programs NPU events symbolically and prints via the NPU path.
         assert "ETHOSU_PMU_CYCLE, ETHOSU_PMU_NPU_ACTIVE" in out
         assert "hpx_npu_configure(" in out
@@ -1104,7 +1110,7 @@ class TestEthosURender:
         assert "g_profiler.InitCustom(nullptr, 0);" in out
 
     def test_mixed_passes_branch_per_group(self):
-        out = _render_tflm(
+        out = _render_litert(
             has_ethos_u=True,
             pmu_passes=[_sample_pmu_passes()[0], _npu_pmu_pass()],
         )
@@ -1217,7 +1223,7 @@ _INA228_MEASUREMENT_KEYS = (
 
 
 class TestIna228PowerRender:
-    @pytest.mark.parametrize("render", [_render_tflm, _render_aot])
+    @pytest.mark.parametrize("render", [_render_litert, _render_aot])
     def test_power_only_render_contains_monitor_block(self, render):
         out = render(power_only=True, **_INA228_VARS)
         for fragment in (
@@ -1243,7 +1249,7 @@ class TestIna228PowerRender:
         ):
             assert fragment in out, f"missing: {fragment}"
 
-    @pytest.mark.parametrize("render", [_render_tflm, _render_aot])
+    @pytest.mark.parametrize("render", [_render_litert, _render_aot])
     def test_accumulator_calls_bracket_the_sync_window(self, render):
         """Reset before the gate opens, read after it closes — the I2C
         traffic must sit strictly outside the measured region."""
@@ -1254,14 +1260,14 @@ class TestIna228PowerRender:
         i_sync_end = out.index("hpx_sync_window_end();", i_sync_begin)
         out.index("hpx_ina228_window_end()", i_sync_end)  # raises if absent
 
-    @pytest.mark.parametrize("render", [_render_tflm, _render_aot])
+    @pytest.mark.parametrize("render", [_render_litert, _render_aot])
     def test_monitor_statics_precede_terminal_report_definition(self, render):
         out = render(power_only=True, **_INA228_VARS)
         assert out.index("static bool     g_hpx_ina228_ok") < out.index(
             "static void hpx_power_terminal_report("
         )
 
-    @pytest.mark.parametrize("render", [_render_tflm, _render_aot])
+    @pytest.mark.parametrize("render", [_render_litert, _render_aot])
     def test_bystander_monitor_failures_are_not_terminal(self, render):
         """driver: joulescope + an ina228 block builds the same monitor
         firmware, but a missing/mis-wired chip must not kill the run — the
@@ -1280,14 +1286,14 @@ class TestIna228PowerRender:
         # bystander yields no payload rather than a zeroed one.
         assert "g_hpx_ina228_ok" in out
 
-    @pytest.mark.parametrize("render", [_render_tflm, _render_aot])
+    @pytest.mark.parametrize("render", [_render_litert, _render_aot])
     def test_profile_binary_never_embeds_monitor_code(self, render):
         """power_only=false renders (the transport/profile binary) must not
         pick up monitor code even when the run selects the ina228 driver."""
         out = render(power_only=False, **_INA228_VARS)
         assert "ina228" not in out
 
-    @pytest.mark.parametrize("render", [_render_tflm, _render_aot])
+    @pytest.mark.parametrize("render", [_render_litert, _render_aot])
     def test_broad_peripheral_shutdown_spares_the_monitor_iom(self, render):
         """On families with broad peripheral shutdown (AP4) the IOM disable
         runs *after* hpx_ina228_setup(), so powering down the monitor's IOM
@@ -1296,12 +1302,12 @@ class TestIna228PowerRender:
         disabled = [i for i in range(8) if f"PERIPH_IOM{i});" in out]
         assert disabled == [0, 2, 3, 4, 5, 6, 7]
 
-    @pytest.mark.parametrize("render", [_render_tflm, _render_aot])
+    @pytest.mark.parametrize("render", [_render_litert, _render_aot])
     def test_broad_peripheral_shutdown_unchanged_without_a_monitor(self, render):
         out = render(power_only=True, broad_peripheral_shutdown=True)
         assert [i for i in range(8) if f"PERIPH_IOM{i});" in out] == list(range(8))
 
-    @pytest.mark.parametrize("render", [_render_tflm, _render_aot])
+    @pytest.mark.parametrize("render", [_render_litert, _render_aot])
     @pytest.mark.parametrize("power_only", [False, True])
     def test_renders_without_monitor_stay_clean(self, render, power_only: bool):
         """No power_monitor var at all (StrictUndefined would raise on a bad
@@ -1343,7 +1349,7 @@ def test_pmu_storage_seam_rejects_unknown_vocabulary(monkeypatch):
 
         this_module = sys.modules[__name__]
         monkeypatch.setattr(this_module, "_env", overlay)
-        render = _render_aot if base_template == "main_aot.cc.j2" else _render_tflm
+        render = _render_aot if base_template == "main_aot.cc.j2" else _render_litert
         if should_render:
             out = render(transport="rtt", template_name="seam_child.cc.j2")
             assert "int main(void)" in out

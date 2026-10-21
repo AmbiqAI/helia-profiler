@@ -1,6 +1,6 @@
 {
   "schema": "helia-profiler/runtime@1",
-  "name": "tflm",
+  "name": "litert",
   "version": "85638f0",
   "default": true,
   "source": {

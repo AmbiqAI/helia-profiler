@@ -45,8 +45,8 @@ Prepare the Micro provider using this explicit executable and a new, explicit
 `HPX_CACHE_DIR`, with `ATFE_ROOT` pointing to the station's toolchain:
 
 ```sh
-"$HPX_STATION_HPX" runtimes prepare tflm "$HPX_TFLM_VERSION"
-"$HPX_STATION_HPX" runtimes show tflm "$HPX_TFLM_VERSION"
+"$HPX_STATION_HPX" runtimes prepare litert "$HPX_LITERT_VERSION"
+"$HPX_STATION_HPX" runtimes show litert "$HPX_LITERT_VERSION"
 ```
 
 The version is positional. This command fetches the pinned sources and builds
@@ -115,14 +115,14 @@ builds have `expected=None` and `outputs=()`. Internal reset remains unsupported
 the firmware initializes once and keeps internal state across warmups and samples.
 A model with internal state needs no declared policy; its build records
 `state_policy=CARRY` because that is how it ran. Variable and resource state,
-initializer subgraphs and multiple subgraphs are admitted on heliaAOT, TFLM and
+initializer subgraphs and multiple subgraphs are admitted on heliaAOT, LiteRT and
 heliaRT alike; what a model may contain is the engine's decision.
 
 API 5.6 adds `FixtureBuild.kernel_source` (`FixtureKernelSource`) and
 `FixtureBuild.runtime_source` (`FixtureRuntimeSource`), so a consumer reads
 which kernel library and prepared runtime a compiled build linked without
 parsing the dependency state or the prepared-runtime manifest, whose layouts
-are internal. Both are derived from those pinned files. A heliaRT or TFLM
+are internal. Both are derived from those pinned files. A heliaRT or LiteRT
 build states both in its manifest: the kernel is `ns-cmsis-nn` or
 `arm-cmsis-nn` at the manifest's commit, and the runtime is `helia-rt` or
 `tflite-micro` with its commit and archive sha256. A heliaAOT build states
@@ -167,10 +167,16 @@ initializer answer; see "Timing windows by route" below. The new fields
 default to `Unknown`, and the record format is unchanged; API 5.8 reads
 records from 5.0 through 5.7.
 
+API 6.0 renames the engine `tflm` to `litert`: `EngineType.LITERT` replaces
+`EngineType.TFLM`, and `FIXTURE_CAPABILITIES` and every record name the engine
+`litert`. The loader still accepts the 5.x API versions, but a record that
+names the engine `tflm` no longer loads; read it with the HPX release that
+wrote it.
+
 `helia_profiler.build(plan, fixture, method=..., lifecycle=...)`, also reached
 as `FrozenRun.build(fixture, ...)`, compiles a frozen plan for a fixture through
 `build_fixed_fixture` and returns a `CompiledBuild` of the plan, the compiled
-`FixtureBuild` and the `Lifecycle` it runs. heliaRT and TFLM link the
+`FixtureBuild` and the `Lifecycle` it runs. heliaRT and LiteRT link the
 prepared runtime the plan names, taken from the HPX cache (`hpx runtimes
 prepare`) unless `runtime=` is passed. It refuses a fixture whose model is
 not the plan's, asks the engine whether it implements the lifecycle,
@@ -198,7 +204,7 @@ compiler version among the plan's version lines, arena and weights
 placement, arena size (both are the configured capacity), clock profile,
 the lifecycle's invocation counts, and the runtime version and commit and
 kernel commit wherever both the plan and the build state one. heliaRT and
-heliaAOT compare with the plan's pins; TFLM compares with the prepared TFLM
+heliaAOT compare with the plan's pins; LiteRT compares with the prepared LiteRT
 record, because the plan pins the modules an ordinary profile builds from
 source, which a fixture build does not link. A plan swapped into a saved file fails on
 the binding; a plan paired in memory with a build of other settings fails on
@@ -294,7 +300,7 @@ also binds ELF/image, dependency lock, link map, generated source hashes and
 recorded toolchain provenance. Render-only results have no build identity. Reusing a work directory with
 different intent fails. Historical measurements retain their original methods.
 
-TFLM links a `PreparedUpstreamRuntime`: a pinned archive, header root
+LiteRT links a `PreparedUpstreamRuntime`: a pinned archive, header root
 and manifest. Strict typed ingress validates provider URL/revision declarations, declared ABI,
 include directories and all header hashes. Archive hashing and regular-archive
 magic rejection do not verify member format, ARM attributes or ABI compatibility.
@@ -303,8 +309,11 @@ build/source/ABI record; manifest fields are assertions, not independent ABI evi
 containment. Provider source identities remain manifest-declared; retain the
 corresponding audited source/build record.
 
-A TFLM `FixtureBuildRequest` that names no runtime uses the archive
-`hpx runtimes prepare tflm` built from the default tflm runtime record. Prepare
+A LiteRT `FixtureBuildRequest` that names no runtime uses the archive
+`hpx runtimes prepare litert` built from the default litert runtime record. A
+station that prepared it while the engine was named `tflm` can move
+`<cache>/runtimes/tflm` to `<cache>/runtimes/litert` instead of rebuilding: the
+manifest names no engine and the archive digest is unchanged. Prepare
 downloads the tflite-micro source at the record's commit and runs TFLM's own
 make dry run for `cortex_m_generic`/`cortex-m55` with CMSIS-NN kernels. The dry
 run fetches TFLM's pinned third-party sources and lists the translation units.
@@ -327,7 +336,7 @@ and python3). Prepare checks only for make and bash; a missing script tool fails
 the dry run with TFLM's own message. The record's archive was built with GNU make
 4.3. GNU make 3.82 through 4.2 do not sort wildcard results, so their source order
 may differ; the archive then differs from the record, which prepare reports.
-Preparing TFLM is refused on Windows hosts.
+Preparing litert is refused on Windows hosts.
 
 heliaRT (`engine.type: helia-rt`, backend `helia`) also links a
 `PreparedUpstreamRuntime`, whose manifest uses schema 2:
@@ -468,7 +477,7 @@ Supported but unqualified execution remains available. Internal FLOAT16 tensors,
 including weights behind DEQUANTIZE, are recorded model facts, not a blanket
 fixture veto. The selected engine and its actual provider decide kernel support;
 their failures propagate without conversion or fallback. Public FLOAT16 IO remains
-unsupported on TFLM. `FixtureBuild.capabilities` records public IO dtype support,
+unsupported on LiteRT. `FixtureBuild.capabilities` records public IO dtype support,
 not internal compute or kernel qualification.
 
 API 4.0 changes the exported capability constant's values, as required by the
@@ -581,7 +590,7 @@ under [Timing windows by route](#timing-windows-by-route).
 typed fixture and prints the identity, verification facts and key measurements.
 Its plan states what a fixture build requires (ATfE, the `lp` clock, an SRAM
 arena of explicit size, MRAM weights), the build works under the host's
-`work_dir`, `build()` links the heliaRT or TFLM runtime `hpx runtimes prepare` cached,
+`work_dir`, `build()` links the heliaRT or LiteRT runtime `hpx runtimes prepare` cached,
 and the saved build names the HPX cache as a second root. Its
 `PlaceholderGuard` refuses every capture; a harness passes its own guard.
 

@@ -63,7 +63,7 @@ def test_json_compare_labels_each_graph_correctly(tmp_path: Path, calls: list[st
         "original": ORIGINAL.to_dict(),
         "aot_transformed": TRANSFORMED.to_dict(),
     }
-    assert calls == ["helia-aot", "tflm"]
+    assert calls == ["helia-aot", "litert"]
 
 
 def test_json_aot_without_compare_writes_only_transformed_graph(
@@ -87,10 +87,10 @@ def test_json_without_engine_writes_original_graph(tmp_path: Path, calls: list[s
 
     assert result.exit_code == 0, result.output
     assert json.loads(dest.read_text(encoding="utf-8")) == {"original": ORIGINAL.to_dict()}
-    assert calls == ["tflm"]
+    assert calls == ["litert"]
 
 
-@pytest.mark.parametrize("engine_args", [[], ["--engine", "helia-rt"], ["--engine", "tflm"]])
+@pytest.mark.parametrize("engine_args", [[], ["--engine", "helia-rt"], ["--engine", "litert"]])
 def test_compare_without_aot_analyzes_only_the_tflite_graph(
     tmp_path: Path, calls: list[str], engine_args: list[str]
 ) -> None:
@@ -100,7 +100,7 @@ def test_compare_without_aot_analyzes_only_the_tflite_graph(
 
     assert result.exit_code == 0, result.output
     assert json.loads(dest.read_text(encoding="utf-8")) == {"original": ORIGINAL.to_dict()}
-    assert calls == ["tflm"]
+    assert calls == ["litert"]
 
 
 def test_csv_includes_params_from_every_layer(tmp_path: Path, calls: list[str]) -> None:
@@ -117,7 +117,7 @@ def test_csv_includes_params_from_every_layer(tmp_path: Path, calls: list[str]) 
     assert [row["op"] for row in rows] == ["CONV_2D", "DEPTHWISE_CONV_2D", "SOFTMAX"]
     assert rows[1]["depth_multiplier"] == "1"
     assert rows[2]["stride_h"] == ""
-    assert calls == ["tflm"]
+    assert calls == ["litert"]
 
 
 def test_csv_rejects_compare(tmp_path: Path, calls: list[str]) -> None:

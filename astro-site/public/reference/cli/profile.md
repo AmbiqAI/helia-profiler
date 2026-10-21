@@ -47,7 +47,7 @@ Defined in `src/helia_profiler/cli/app.py` line 95.
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
-| `--engine` | `litert \| helia-rt \| helia-aot \| executorch \| tflm` |  | Inference engine (default: helia-rt); tflm is an alias of litert |
+| `--engine` | `litert \| helia-rt \| helia-aot \| executorch` |  | Inference engine (default: helia-rt) |
 | `--engine-config` | `Optional[Path]` |  | Engine-specific YAML config |
 | `--arena-size` | `Optional[int]` |  | Tensor arena size in bytes |
 | `--arena-location` | `tcm \| sram \| psram` |  | Tensor arena placement. helia-rt: places the single runtime tensor arena. helia-aot: use engine.config.aot_args.memory.tensors instead. Omit to let the engine and memory planner choose. |

@@ -26,12 +26,12 @@ form (``"helia-aot"``) without manually unwrapping ``.value``.
 
 Source: `src/helia_profiler/engines/__init__.py:17`
 
-### helia_profiler.EngineType.TFLM
+### helia_profiler.EngineType.LITERT
 
 `constant` · `python`
 
 ```python
-TFLM = 'tflm'
+LITERT = 'litert'
 ```
 
 Source: `src/helia_profiler/engines/__init__.py:25`

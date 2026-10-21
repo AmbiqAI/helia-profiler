@@ -156,7 +156,7 @@ model/runtime changes, then run again to check allocation and region capacity.
 PSRAM is opt-in with `weights_location: psram` (or `--weights-location
 psram`). How the data gets there depends on the engine:
 
-- `tflm` and `helia-rt`: the firmware initialises PSRAM and signals the
+- `litert` and `helia-rt`: the firmware initialises PSRAM and signals the
   host, which uploads the model over J-Link. This path requires
   `transport: rtt`.
 - `helia-aot`: the firmware writes its own flash-resident constant blobs
@@ -202,7 +202,7 @@ DTCM, `psram` with no PSRAM fitted) fails the same way.
 
 ## Placement models
 
-| | heliaRT and TFLM | heliaAOT | ExecuTorch |
+| | heliaRT and LiteRT | heliaAOT | ExecuTorch |
 |---|---|---|---|
 | Placement unit | one arena, one weights blob | individual tensors (or tensor kinds) | five fixed runtime buffers |
 | Who owns the memory | the interpreter | the generated code; every tensor is a named C object | the caller; the runtime receives five opaque blocks |

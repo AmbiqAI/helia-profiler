@@ -1,4 +1,4 @@
-# heliaPROFILER baseline — vanilla TFLM port
+# heliaPROFILER baseline — LiteRT, the vanilla TFLM port
 #
 # This is intended as a reference baseline for comparison with heliaRT and
 # heliaAOT. It uses the nsx-tflite-micro port and does not enable Ambiq's
@@ -8,7 +8,7 @@ model:
   arena_size: 131072
 
 engine:
-  type: tflm
+  type: litert
   backend: cmsis_nn    # reference or cmsis_nn
 
 target:
@@ -28,4 +28,4 @@ power:
 
 output:
   format: csv
-  dir: ./results/results_tflm_baseline
+  dir: ./results/results_litert_baseline

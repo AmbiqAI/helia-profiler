@@ -217,8 +217,8 @@ def test_a_prepared_runtime_manifest_reads_without_its_archive(tmp_path):
 def test_a_record_from_the_previous_api_still_loads(tmp_path):
     build = _aot(tmp_path)
     record = json.loads(dump_fixture_build(build, roots={"run": tmp_path}))
-    assert record["fixture_api"] == [5, 8]
-    for previous in ([5, 6], [5, 7]):
+    assert record["fixture_api"] == [6, 0]
+    for previous in ([5, 6], [5, 7], [5, 8]):
         record["fixture_api"] = previous
         assert load_fixture_build(json.dumps(record), roots={"run": tmp_path}) == build
 
@@ -423,8 +423,8 @@ def test_generated_vendored_modules_do_not_change_the_build_hash(tmp_path):
 @pytest.mark.parametrize(
     "engine,declared,expected",
     [
-        (EngineType.TFLM, True, True),
-        (EngineType.TFLM, False, False),
+        (EngineType.LITERT, True, True),
+        (EngineType.LITERT, False, False),
         (EngineType.HELIA_RT, True, True),
         (EngineType.HELIA_AOT, True, False),
     ],

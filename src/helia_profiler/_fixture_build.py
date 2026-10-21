@@ -151,7 +151,7 @@ class FixtureCapability(StrEnum):
 # Public IO types handled by the fixture renderer and each engine integration.
 # These declarations do not describe internal tensor or kernel support.
 _FIXTURE_IO_DTYPES = {
-    EngineType.TFLM: frozenset(
+    EngineType.LITERT: frozenset(
         {FixtureDType.INT8, FixtureDType.INT16, FixtureDType.INT32, FixtureDType.FLOAT32}
     ),
     EngineType.HELIA_AOT: frozenset(FixtureDType),
@@ -336,7 +336,7 @@ class FixtureBuild:
     #: Compiled builds only: the kernel library linked, as the pinned prepared-runtime
     #: manifest or dependency state states it.
     kernel_source: FixtureKernelSource | None = None
-    #: Compiled heliaRT and TFLM builds only: the prepared runtime archive linked.
+    #: Compiled heliaRT and LiteRT builds only: the prepared runtime archive linked.
     runtime_source: FixtureRuntimeSource | None = None
 
 
@@ -407,7 +407,7 @@ def _validate(config: ProfileConfig, fixture: FixedFixture | TypedFixture) -> No
     if config.model.path.resolve() != fixture.model.path.resolve():
         raise ConfigError("Profile model differs from the pinned fixture")
     if config.engine.type not in FIXTURE_CAPABILITIES:
-        raise ConfigError("Fixture supports upstream TFLM, heliaRT or helia-AOT only")
+        raise ConfigError("Fixture supports LiteRT, heliaRT or heliaAOT only")
     if config.target.custom_socs or config.target.custom_boards:
         raise ConfigError("Fixed fixture does not support custom target declarations")
     try:

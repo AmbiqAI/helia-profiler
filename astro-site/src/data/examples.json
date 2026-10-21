@@ -34,12 +34,12 @@
     }
   },
   {
-    "id": "tflm-baseline",
-    "name": "Vanilla TFLM baseline",
+    "id": "litert-baseline",
+    "name": "LiteRT baseline",
     "kind": "namespace",
     "module": "Examples",
     "group": "Profile",
-    "href": "/helia-profiler/examples/tflm-baseline/",
+    "href": "/helia-profiler/examples/litert-baseline/",
     "summary": "Profile the keyword-spotting model with LiteRT for Microcontrollers and CMSIS-NN. Includes a captured baseline.",
     "facets": {
       "workflow": [

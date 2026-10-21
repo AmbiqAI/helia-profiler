@@ -185,13 +185,13 @@ def test_public_observation_distinguishes_attribution_from_invalid_data(tmp_path
 
 def test_valid_cross_engine_provenance_is_a_difference_not_corruption(tmp_path):
     _, fixture, run = evidenced_pair(tmp_path)
-    build = build_for(EngineType.TFLM, fixture)
+    build = build_for(EngineType.LITERT, fixture)
     facts = observe_operator_timing(build, fixture, run)
     assert facts.reason is None and facts.operators is not None
     assert facts.attribution_reason == "engine_mismatch"
     assert facts.runtime_stack == "different"
     deps = run.metadata.dependencies
-    inputs = {"engine": {**deps.workspace.inputs["engine"], "type": "tflm"}}
+    inputs = {"engine": {**deps.workspace.inputs["engine"], "type": "litert"}}
     corrupt = replace(deps, workspace=replace(deps.workspace, inputs=inputs))
     inconsistent = replace(run, metadata=replace(run.metadata, dependencies=corrupt))
     refused = observe_operator_timing(build, fixture, inconsistent)
@@ -271,7 +271,7 @@ def test_busy_loop_clean_window_is_refused(tmp_path):
     [
         ({"model_sha256": "1" * 64}, "model_mismatch"),
         ({"model_sha256": ""}, "profile_model_identity_unrecorded"),
-        ({"engine": {"type": "tflm", "version": None}}, "engine_mismatch"),
+        ({"engine": {"type": "litert", "version": None}}, "engine_mismatch"),
         ({"toolchain": {"compiler": "gcc", "compiler_version": "15.2.1"}}, "compiler_mismatch"),
         (
             {"toolchain": {"compiler": "atfe", "compiler_version": "clang version 21.1.0"}},
@@ -364,11 +364,11 @@ def test_fixture_other_than_the_build_is_refused(tmp_path):
     assert result.attribution_reason == "fixture_mismatch" and result.operators is not None
 
 
-def test_tflm_backend_other_than_cmsis_nn_is_refused(tmp_path):
+def test_litert_backend_other_than_cmsis_nn_is_refused(tmp_path):
     fixture = fixture_for(KWS_SHA, tmp_path)
-    raw = PROFILES["kws_tflm"]
-    run = profile("kws_tflm", config={**raw["config"], "engine": {"backend": "reference"}})
-    build = build_for(EngineType.TFLM, fixture, prepared_runtime=True)
+    raw = PROFILES["kws_litert"]
+    run = profile("kws_litert", config={**raw["config"], "engine": {"backend": "reference"}})
+    build = build_for(EngineType.LITERT, fixture, prepared_runtime=True)
     result = observe_operator_timing(build, fixture, run)
     assert result.attribution_reason == "backend_mismatch" and result.operators is not None
 

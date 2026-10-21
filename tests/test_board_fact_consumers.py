@@ -45,7 +45,7 @@ def test_atomiq_trace_reference_is_independent_of_cpu():
     assert soc.capabilities.transport.swo_trace_clock_mhz == 48
 
 
-@pytest.mark.parametrize("engine", ("tflm", "helia-rt", "helia-aot"))
+@pytest.mark.parametrize("engine", ("litert", "helia-rt", "helia-aot"))
 def test_fixture_clock_reads_fixed_low_platform_fact(monkeypatch, engine):
     from helia_profiler import fixture_target
 

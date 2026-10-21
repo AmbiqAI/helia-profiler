@@ -132,11 +132,11 @@ def test_the_engine_identity_is_what_a_profile_build_uses(session):
     from helia_profiler.deps.compatibility import load_compatibility_baseline
 
     baseline = load_compatibility_baseline()
-    tflm = session.with_engine("tflm", backend="cmsis_nn").freeze().runtime
+    litert = session.with_engine("litert", backend="cmsis_nn").freeze().runtime
     heliart = session.freeze().runtime
 
-    assert tflm == hpx.FrozenRuntime(
-        "tflm",
+    assert litert == hpx.FrozenRuntime(
+        "litert",
         None,
         baseline.module("nsx-tflite-micro").ref,
         "arm-cmsis-nn",
@@ -190,8 +190,8 @@ def test_the_hpx_release_is_recorded_but_not_part_of_the_intent(session):
     assert replace(plan, hpx_version="9.9.9").intent_hash == plan.intent_hash
 
 
-def test_default_tflm_links_no_kernel_library(session):
-    runtime = session.with_engine("tflm").freeze().runtime
+def test_default_litert_links_no_kernel_library(session):
+    runtime = session.with_engine("litert").freeze().runtime
     assert runtime is not None and runtime.kernels_module is None and runtime.kernels_commit is None
 
 
@@ -218,7 +218,7 @@ def test_an_overridden_kernel_provider_has_no_pinned_commit(session, tmp_path, m
 
 def test_source_variables_count_only_for_engines_that_read_them(session, tmp_path, monkeypatch):
     monkeypatch.setenv("HELIART_DIST_PATH", str(tmp_path))
-    assert session.with_engine("tflm").freeze().local_inputs == ()
+    assert session.with_engine("litert").freeze().local_inputs == ()
     assert [i.setting for i in session.freeze().local_inputs] == ["env.HELIART_DIST_PATH"]
 
 
@@ -249,12 +249,12 @@ def test_a_non_utf8_plan_file_is_refused(tmp_path):
         FrozenRun.load(path)
 
 
-def test_tflm_modules_ignore_overrides_the_build_does_not_apply(session, tmp_path):
+def test_litert_modules_ignore_overrides_the_build_does_not_apply(session, tmp_path):
     from helia_profiler.deps.compatibility import load_compatibility_baseline
 
     module_dir = tmp_path / "nsx-tflite-micro"
     module_dir.mkdir()
-    overridden = session.with_engine("tflm").with_build(
+    overridden = session.with_engine("litert").with_build(
         nsx_modules={"nsx-tflite-micro": {"path": str(module_dir)}}
     )
     runtime = overridden.freeze().runtime
@@ -442,10 +442,10 @@ def test_a_heliart_variable_other_engines_ignore_does_not_block_replay(
     session, tmp_path, monkeypatch
 ):
     monkeypatch.setenv("HELIART_DIST_PATH", str(tmp_path))
-    tflm = session.with_engine("tflm").freeze()
-    assert tflm.qualification == "qualified" and tflm.overrides == ()
+    litert = session.with_engine("litert").freeze()
+    assert litert.qualification == "qualified" and litert.overrides == ()
     monkeypatch.delenv("HELIART_DIST_PATH")
-    assert tflm.config().engine.type.value == "tflm"
+    assert litert.config().engine.type.value == "litert"
 
 
 def test_a_prebuilt_heliart_links_no_separate_kernel_module(session, tmp_path, monkeypatch):

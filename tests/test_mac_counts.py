@@ -104,7 +104,7 @@ def _run_litert(path: Path, feeds: list[np.ndarray]) -> np.ndarray:
 
 
 def _analyzed_macs(path: Path) -> int:
-    analysis = analyze_for_engine(path, engine="tflm")
+    analysis = analyze_for_engine(path, engine="litert")
     assert len(analysis.layers) == 1
     return analysis.layers[0].macs
 
@@ -305,7 +305,7 @@ def test_aot_elementwise_ops_match_tflite(tmp_path: Path, op_name: str, arity: i
     )
     aot = analyze_for_engine(path, engine="helia-aot")
     assert [(layer.op, layer.ops) for layer in aot.layers] == [(op_name, math.prod(shape))]
-    assert aot.total_ops == analyze_for_engine(path, engine="tflm").total_ops
+    assert aot.total_ops == analyze_for_engine(path, engine="litert").total_ops
 
 
 _KWS_MODELS = sorted((Path(__file__).parent / "fixtures").glob("kws*.tflite"))

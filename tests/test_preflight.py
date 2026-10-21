@@ -799,12 +799,12 @@ class TestPreflightEthosNpuCounters:
 class TestPreflightNpuBackendEngineGate:
     """engine.backend=ethos_u is limited to engines with NPU dispatch."""
 
-    def test_tflm_with_ethos_u_backend_rejected(self, tmp_path: Path):
+    def test_litert_with_ethos_u_backend_rejected(self, tmp_path: Path):
         ctx = _make_ctx(
             tmp_path,
             {
                 "target": {"board": "atomiq110_fpga_turbo"},
-                "engine": {"type": "tflm", "backend": "ethos_u"},
+                "engine": {"type": "litert", "backend": "ethos_u"},
             },
         )
         from helia_profiler.stages.preflight import _check_npu_backend

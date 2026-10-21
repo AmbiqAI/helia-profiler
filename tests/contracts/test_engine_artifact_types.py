@@ -23,13 +23,13 @@ from helia_profiler.engines.base import (
     ExecutorchArtifacts,
     HeliaAotArtifacts,
     HeliaRtArtifacts,
-    TflmArtifacts,
+    LiteRtArtifacts,
 )
 
 #: The one artifact type each engine produces.  Asserted complete over
 #: ``EngineType`` below, so a new engine cannot land without one.
 ARTIFACT_TYPE_FOR_ENGINE: dict[EngineType, type[EngineArtifacts]] = {
-    EngineType.TFLM: TflmArtifacts,
+    EngineType.LITERT: LiteRtArtifacts,
     EngineType.HELIA_RT: HeliaRtArtifacts,
     EngineType.HELIA_AOT: HeliaAotArtifacts,
     EngineType.EXECUTORCH: ExecutorchArtifacts,
@@ -38,7 +38,7 @@ ARTIFACT_TYPE_FOR_ENGINE: dict[EngineType, type[EngineArtifacts]] = {
 
 def _required_kwargs(engine_type: EngineType) -> dict[str, object]:
     required: dict[EngineType, dict[str, object]] = {
-        EngineType.TFLM: {"engine_header": TFLM_ENGINE_HEADER},
+        EngineType.LITERT: {"engine_header": TFLM_ENGINE_HEADER},
         EngineType.HELIA_RT: {
             "engine_header": TFLM_ENGINE_HEADER,
             "engine_backend": "sentinel-backend",
@@ -122,7 +122,7 @@ def test_engine_header_has_no_cross_engine_default(engine_type: EngineType):
 #: split: only the owning adapter ever set its own fields, everything else
 #: kept the ``None`` default.
 _LEGACY_FIELDS: dict[EngineType, dict[str, str | None]] = {
-    EngineType.TFLM: {},
+    EngineType.LITERT: {},
     EngineType.HELIA_RT: {
         "engine_backend": "sentinel-backend",
         "heliart_version": "sentinel-rt-version",
@@ -165,9 +165,9 @@ def test_identity_properties_reproduce_legacy_fingerprint_routing(engine_type: E
 
 def test_identity_routing_is_engine_specific():
     """Spelled out per engine, so a wrong-but-consistent routing still fails."""
-    tflm = _build(EngineType.TFLM)
-    assert (tflm.resolved_backend, tflm.resolved_version) == (None, None)
-    assert (tflm.resolved_variant, tflm.resolved_toolchain_tag) == (None, None)
+    litert = _build(EngineType.LITERT)
+    assert (litert.resolved_backend, litert.resolved_version) == (None, None)
+    assert (litert.resolved_variant, litert.resolved_toolchain_tag) == (None, None)
 
     rt = _build(EngineType.HELIA_RT)
     assert rt.resolved_backend == "sentinel-backend"
@@ -188,9 +188,9 @@ def test_identity_routing_is_engine_specific():
 @pytest.mark.parametrize(
     ("engine_type", "foreign_field"),
     [
-        (EngineType.TFLM, "aot_prefix"),
-        (EngineType.TFLM, "executorch_planned_arena_size"),
-        (EngineType.TFLM, "heliart_version"),
+        (EngineType.LITERT, "aot_prefix"),
+        (EngineType.LITERT, "executorch_planned_arena_size"),
+        (EngineType.LITERT, "heliart_version"),
         (EngineType.HELIA_RT, "aot_op_manifest"),
         (EngineType.HELIA_RT, "executorch_io_region"),
         (EngineType.HELIA_AOT, "heliart_variant"),
@@ -276,11 +276,11 @@ def test_from_pipeline_context_carries_the_executorch_fields(tmp_path):
     assert engine.executorch_temporary_arena_region == "tcm"
 
 
-@pytest.mark.parametrize("engine_name", ["helia-rt", "tflm"])
+@pytest.mark.parametrize("engine_name", ["helia-rt", "litert"])
 def test_from_pipeline_context_neutralizes_foreign_engine_fields(tmp_path, engine_name):
     """The neutral values non-owning engines receive are a contract, not an
     accident: aot_prefix reaches main_aot.cc.j2 only, so no render digest can
-    see it change for a TFLM run. Mutating "" to "x" would leave the whole
+    see it change for a LiteRT run. Mutating "" to "x" would leave the whole
     suite green, so it's pinned here directly (#166)."""
     engine_type = EngineType(engine_name)
     engine = _render_engine_context(tmp_path, engine_name, _build(engine_type))
@@ -304,7 +304,7 @@ def test_from_pipeline_context_neutralizes_foreign_engine_fields(tmp_path, engin
 def test_replace_honours_the_engine_type_pin():
     import dataclasses
 
-    artifacts = _build(EngineType.TFLM)
+    artifacts = _build(EngineType.LITERT)
     with pytest.raises(ValueError, match="pinned to engine_type"):
         dataclasses.replace(artifacts, engine_type=EngineType.HELIA_RT)
 
@@ -320,4 +320,4 @@ def test_the_pin_rejects_a_raw_string_engine_type():
 
 def test_the_base_class_is_not_constructible():
     with pytest.raises(TypeError, match="abstract"):
-        EngineArtifacts(engine_type=EngineType.TFLM, engine_header=TFLM_ENGINE_HEADER)
+        EngineArtifacts(engine_type=EngineType.LITERT, engine_header=TFLM_ENGINE_HEADER)

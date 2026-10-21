@@ -161,7 +161,7 @@ def _patch_build(monkeypatch, out: Path, cache: Path, engine: str, prepared: obj
 
 
 @pytest.mark.parametrize(
-    "engine,backend", [("helia-aot", None), ("helia-rt", "helia"), ("tflm", "cmsis_nn")]
+    "engine,backend", [("helia-aot", None), ("helia-rt", "helia"), ("litert", "cmsis_nn")]
 )
 def test_main_builds_with_what_a_fixture_build_requires(
     example, model, tmp_path, monkeypatch, capsys, engine, backend

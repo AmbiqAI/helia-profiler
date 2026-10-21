@@ -758,7 +758,7 @@ class TestGenerateApp:
         cmake = (app_dir / "CMakeLists.txt").read_text()
         assert "nsx::helia_rt" in cmake
 
-    @pytest.mark.parametrize("engine", ["helia-rt", "tflm"])
+    @pytest.mark.parametrize("engine", ["helia-rt", "litert"])
     def test_compile_inventory_enabled_before_module_targets(
         self, tmp_path: Path, fake_dist: Path, engine: str
     ):
@@ -773,7 +773,7 @@ class TestGenerateApp:
         assert export < first_include
 
     def test_cmakelists_links_tflite_micro(self, tmp_path: Path, fake_dist: Path):
-        ctx = _make_ctx(tmp_path, fake_dist, engine="tflm")
+        ctx = _make_ctx(tmp_path, fake_dist, engine="litert")
         ResolvePlatformStage().run(ctx)
         PrepareEngineStage().run(ctx)
         app_dir = generate_app(ctx)
@@ -2260,7 +2260,7 @@ class TestNsxModuleOverrides:
         nsx_yml = (app_dir / "nsx.yml").read_text()
         assert "some-other-ref" not in nsx_yml
 
-    def test_tflm_extra_module_override_logs_generic_warning(
+    def test_litert_extra_module_override_logs_generic_warning(
         self,
         tmp_path: Path,
         fake_dist: Path,
@@ -2279,7 +2279,7 @@ class TestNsxModuleOverrides:
             None,
             {
                 "model": {"path": str(model)},
-                "engine": {"type": "tflm"},
+                "engine": {"type": "litert"},
                 "target": {"board": "apollo510_evb"},
                 "work_dir": str(tmp_path / "work"),
                 "build": {"nsx_modules": {"nsx-tflite-micro": {"ref": "some-other-ref"}}},

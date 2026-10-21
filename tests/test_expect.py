@@ -198,7 +198,7 @@ def test_inputs_are_restored_before_every_invocation_and_outputs_keep_their_orde
     assert reference.outputs == (bytes([8] * 4), bytes([7] * 4))
 
 
-def _build(tmp_path: Path, engine: EngineType = EngineType.TFLM, outputs: tuple = ()) -> Any:
+def _build(tmp_path: Path, engine: EngineType = EngineType.LITERT, outputs: tuple = ()) -> Any:
     model = _file(tmp_path / "model.tflite", TINY_CNN.read_bytes())
     data = _file(tmp_path / "input.bin", np.arange(64, dtype=np.int8).tobytes())
     return SimpleNamespace(

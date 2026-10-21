@@ -22,7 +22,7 @@ Defined in `src/helia_profiler/cli/inspect_app.py` line 42.
 | `--config` | `Optional[Path]` |  | YAML config whose target and engine select the checks; with --bundle, a sanitized snapshot of it is included instead |
 | `--toolchain` | `Optional[str]` |  | Toolchain to check (default: arm-none-eabi-gcc) |
 | `--transport` | `rtt \| usb_cdc \| swo \| uart` |  | Transport to check (default: rtt) |
-| `--engine` | `litert \| helia-rt \| helia-aot \| executorch \| tflm` |  | Engine to check (default: helia-rt); tflm is an alias of litert |
+| `--engine` | `litert \| helia-rt \| helia-aot \| executorch` |  | Engine to check (default: helia-rt) |
 | `--no-probes` | `bool` | false | Skip live J-Link probe enumeration in --bundle |
 | `--no-ports` | `bool` | false | Skip live serial port enumeration in --bundle |
 | `--raw-probe-ids` | `bool` | false | Include unredacted device serial numbers in --bundle (opt-in; prints a warning) |

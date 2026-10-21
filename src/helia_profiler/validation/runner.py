@@ -276,7 +276,7 @@ def _build_config(
                 "module_name": "hpx_model",
                 "cmsis_nn_path": str(cmsis_nn_candidate),
             }
-    elif case.engine is EngineType.TFLM:
+    elif case.engine is EngineType.LITERT:
         # Validation exercises the optimized upstream CMSIS-NN baseline. The
         # reference-kernel backend remains available to ad-hoc profile runs.
         engine_cfg["backend"] = "cmsis_nn"
@@ -286,7 +286,7 @@ def _build_config(
 
 def _engine_backend(case: CaseSpec) -> str | None:
     """Return the engine-level backend value written to the profile config."""
-    if case.engine is EngineType.TFLM:
+    if case.engine is EngineType.LITERT:
         return "cmsis_nn"
     if case.engine is EngineType.EXECUTORCH:
         return case.cmsis_nn_provider.value

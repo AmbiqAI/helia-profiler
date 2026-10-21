@@ -1332,7 +1332,7 @@
     "EngineType": {
       "description": "Supported inference engine identifiers.\n\n``StrEnum`` so values are interchangeable with raw strings \u2014 Jinja\ntemplates and YAML configs can compare against the canonical hyphen\nform (``\"helia-aot\"``) without manually unwrapping ``.value``.",
       "enum": [
-        "tflm",
+        "litert",
         "helia-rt",
         "helia-aot",
         "executorch"

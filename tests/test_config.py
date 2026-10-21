@@ -347,15 +347,15 @@ def test_engine_defaults_to_helia_rt():
     assert config.engine.type.value == "helia-rt"
 
 
-def test_tflm_engine_is_accepted():
+def test_litert_engine_is_accepted():
     cli = {
         "model": {"path": "test.tflite"},
-        "engine": {"type": "tflm"},
+        "engine": {"type": "litert"},
     }
 
     config = load_config(None, cli)
 
-    assert config.engine.type.value == "tflm"
+    assert config.engine.type.value == "litert"
 
 
 def test_build_config_channel_override():

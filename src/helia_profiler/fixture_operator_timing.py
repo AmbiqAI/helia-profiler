@@ -16,7 +16,7 @@ from .fixture_runtime import _unique_object
 from .fixture_target import FIXTURE_CLOCK_PROFILE
 from .results.models import DEVICE_CLOCK_TOLERANCE, ProfileResult
 
-FIXTURE_TFLM_BACKEND = "cmsis_nn"
+FIXTURE_LITERT_BACKEND = "cmsis_nn"
 
 
 @dataclass(frozen=True)
@@ -79,7 +79,7 @@ def _identity_reason(
     if meta.engine is None or meta.engine.type != build.engine.value:
         return "engine_mismatch"
     backend = (snapshot.get("engine") or {}).get("backend")
-    if build.engine is EngineType.TFLM and backend != FIXTURE_TFLM_BACKEND:
+    if build.engine is EngineType.LITERT and backend != FIXTURE_LITERT_BACKEND:
         return "backend_mismatch"
     if build.engine is EngineType.HELIA_RT and backend not in (None, "helia"):
         return "backend_mismatch"

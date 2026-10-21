@@ -138,7 +138,7 @@ export default defineConfig({
                 { label: 'Overview', slug: 'examples' },
                 { label: 'Profile a model', slug: 'examples/basic-profiling' },
                 { label: 'Capture per-layer counters', slug: 'examples/per-layer' },
-                { label: 'Vanilla TFLM baseline', slug: 'examples/tflm-baseline' },
+                { label: 'LiteRT baseline', slug: 'examples/litert-baseline' },
                 { label: 'Compare engines', slug: 'examples/engine-comparison' },
                 { label: 'Compare toolchains', slug: 'examples/toolchain-comparison' },
                 { label: 'Power capture', slug: 'examples/power-profiling' },

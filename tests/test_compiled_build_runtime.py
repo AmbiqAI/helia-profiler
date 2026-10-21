@@ -32,8 +32,10 @@ def _record(name: str, version: str | None = None) -> RuntimeRecord:
 
 
 RT = _record("helia-rt")
-TFLM = _record("tflm")
-assert RT is not None and RT.kernels is not None and TFLM is not None and TFLM.kernels is not None
+LITERT = _record("litert")
+assert (
+    RT is not None and RT.kernels is not None and LITERT is not None and LITERT.kernels is not None
+)
 
 
 @pytest.fixture(autouse=True)
@@ -53,9 +55,9 @@ def _linked(tmp_path: Path, engine: str, **commits: str):
     base = atfe_build(_build(tmp_path / "run"))
     plan = plan_for(base, tmp_path / "model.tflite", engine=engine)
     assert plan.runtime is not None
-    if engine == "tflm":
-        assert TFLM.kernels is not None
-        pinned = (TFLM.source.commit, TFLM.kernels.commit)
+    if engine == "litert":
+        assert LITERT.kernels is not None
+        pinned = (LITERT.source.commit, LITERT.kernels.commit)
     elif engine == "helia-rt":
         pinned = (plan.runtime.source_commit, plan.runtime.kernels_commit)
     else:
@@ -72,7 +74,7 @@ def _linked(tmp_path: Path, engine: str, **commits: str):
     )
 
 
-@pytest.mark.parametrize("engine", ["helia-rt", "tflm", "helia-aot"])
+@pytest.mark.parametrize("engine", ["helia-rt", "litert", "helia-aot"])
 def test_a_build_linking_what_its_plan_names_verifies(tmp_path, engine):
     plan, build = _linked(tmp_path, engine)
     compiled(plan, build, Lifecycle.CARRY).verify()
@@ -83,8 +85,8 @@ def test_a_build_linking_what_its_plan_names_verifies(tmp_path, engine):
     [
         ("helia-rt", {"runtime": "c" * 40}, f"runtime commit {'c' * 40!r} differs"),
         ("helia-rt", {"kernels": "d" * 40}, f"kernel commit {'d' * 40!r} differs"),
-        ("tflm", {"runtime": "a" * 40}, f"runtime commit {'a' * 40!r} differs"),
-        ("tflm", {"kernels": "b" * 40}, f"kernel commit {'b' * 40!r} differs"),
+        ("litert", {"runtime": "a" * 40}, f"runtime commit {'a' * 40!r} differs"),
+        ("litert", {"kernels": "b" * 40}, f"kernel commit {'b' * 40!r} differs"),
         ("helia-aot", {"runtime": "0.1.0"}, "runtime version '0.1.0' differs"),
         ("helia-aot", {"kernels": "d" * 40}, f"kernel commit {'d' * 40!r} differs"),
     ],
@@ -108,15 +110,19 @@ def test_a_helia_rt_plan_refuses_another_prepared_release(tmp_path):
         compiled(plan, build, Lifecycle.CARRY).verify()
 
 
-def test_tflm_compares_with_the_prepared_record_not_the_profile_modules(tmp_path):
-    plan, build = _linked(tmp_path, "tflm")
-    assert plan.runtime is not None and plan.runtime.source_commit != TFLM.source.commit
+def test_litert_compares_with_the_prepared_record_not_the_profile_modules(tmp_path):
+    plan, build = _linked(tmp_path, "litert")
+    assert plan.runtime is not None and plan.runtime.source_commit != LITERT.source.commit
     compiled(plan, build, Lifecycle.CARRY).verify()
 
 
 @pytest.mark.parametrize(
     "engine,expected",
-    [("helia-rt", ("helia-rt", RT.version)), ("tflm", ("tflm", TFLM.version)), ("helia-aot", None)],
+    [
+        ("helia-rt", ("helia-rt", RT.version)),
+        ("litert", ("litert", LITERT.version)),
+        ("helia-aot", None),
+    ],
 )
 def test_build_links_the_prepared_runtime_its_plan_names(tmp_path, monkeypatch, engine, expected):
     plan, build = _linked(tmp_path, engine)
@@ -166,14 +172,14 @@ def test_a_plan_without_a_recorded_release_names_why_it_links_nothing(tmp_path):
         _prepared_runtime(unrecorded)
 
 
-def test_a_saved_tflm_build_verifies_after_the_default_record_changes(tmp_path, monkeypatch):
-    plan, build = _linked(tmp_path, "tflm")
+def test_a_saved_litert_build_verifies_after_the_default_record_changes(tmp_path, monkeypatch):
+    plan, build = _linked(tmp_path, "litert")
     record = compiled(plan, build, Lifecycle.CARRY)
     real = runtime
 
     def newer_default(name: str, version: str | None = None) -> RuntimeRecord | None:
-        if name == "tflm" and version is None:
-            return replace(TFLM, version="newer", source=replace(TFLM.source, commit="e" * 40))
+        if name == "litert" and version is None:
+            return replace(LITERT, version="newer", source=replace(LITERT.source, commit="e" * 40))
         return real(name, version)
 
     monkeypatch.setattr("helia_profiler.runtime_records.runtime", newer_default)

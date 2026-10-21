@@ -1,7 +1,7 @@
 {
   "api_version": [
-    5,
-    8
+    6,
+    0
   ],
   "surface": {
     "BuildFacts": {
@@ -167,7 +167,7 @@
         "EXECUTORCH": "executorch",
         "HELIA_AOT": "helia-aot",
         "HELIA_RT": "helia-rt",
-        "TFLM": "tflm"
+        "LITERT": "litert"
       }
     },
     "FIXTURE_CAPABILITIES": {
@@ -187,7 +187,7 @@
           "int32": "supported",
           "int8": "supported"
         },
-        "tflm": {
+        "litert": {
           "float16": "unsupported",
           "float32": "supported",
           "int16": "supported",

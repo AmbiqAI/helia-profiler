@@ -34,7 +34,7 @@ on:
         default: ""
         type: string
       engines:
-        description: "Optional comma-separated engines: helia-rt,helia-aot,tflm,executorch; empty uses suite defaults"
+        description: "Optional comma-separated engines: helia-rt,helia-aot,litert,executorch; empty uses suite defaults"
         required: false
         default: ""
         type: string

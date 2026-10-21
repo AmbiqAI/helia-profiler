@@ -513,7 +513,7 @@ class TestHpxOwnedConsumers:
         from helia_profiler.stages.plan_memory import PMU_RECORD_SIZE_BYTES
 
         assert PMU_RECORD_SIZE_BYTES == {
-            EngineType.TFLM: 24,
+            EngineType.LITERT: 24,
             EngineType.HELIA_RT: 24,
             EngineType.HELIA_AOT: 20,
             # #301: OperatorEvent grew by two const char* (name, overload).
@@ -527,7 +527,7 @@ class TestHpxOwnedConsumers:
         # linked symbol byte-for-byte.
         for engine, expected in (
             ("helia-rt", 4096 * 24 + 252),
-            ("tflm", 4096 * 24 + 252),
+            ("litert", 4096 * 24 + 252),
         ):
             ctx = _make_ctx(tmp_path, {"engine": {"type": engine}})
             PlanMemoryStage().run(ctx)
@@ -655,7 +655,7 @@ class TestHpxOwnedConsumers:
         stack3 = [c for c in sram.consumers if c.name == "boot_stack"]
         assert [c.size for c in stack3] == [4_096]
 
-    def test_aot_extraction_failure_no_longer_fabricates_a_tflm_plan(self, tmp_path):
+    def test_aot_extraction_failure_no_longer_fabricates_a_litert_plan(self, tmp_path):
         """#133 D5: a failed AOT extraction must not book a
         tensor_arena or model_flatbuffer, since neither exists in an AOT
         binary."""

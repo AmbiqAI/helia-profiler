@@ -570,7 +570,7 @@ def test_memory_sink_names_stage_on_timeout(rig, monkeypatch):
     assert completion["completed"] is False and completion["status"] == -1
 
 
-@pytest.mark.parametrize("engine", ["tflm", "helia-aot"])
+@pytest.mark.parametrize("engine", ["litert", "helia-aot"])
 def test_rendered_fixture_returns_only_named_stages(engine):
     from tests.contracts.fixture_compile_cases import render_fixture
 

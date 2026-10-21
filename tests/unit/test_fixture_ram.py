@@ -88,7 +88,7 @@ def test_ram_option_is_identity_bound_and_round_trips(tmp_path):
         load_fixture_build(json.dumps(body), roots={"run": tmp_path})
 
 
-@pytest.mark.parametrize("engine", [EngineType.HELIA_AOT, EngineType.TFLM])
+@pytest.mark.parametrize("engine", [EngineType.HELIA_AOT, EngineType.LITERT])
 def test_stack_diagnostic_wraps_initialization_and_invokes_only_when_selected(tmp_path, engine):
     fixture = typed(tmp_path)
     ctx = PipelineContext(config=config_for(tmp_path, fixture, engine), work_dir=tmp_path)

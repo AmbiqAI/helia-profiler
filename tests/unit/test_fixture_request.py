@@ -115,10 +115,10 @@ def test_convert_arguments_must_be_a_json_object(text: str) -> None:
     ("changes", "message"),
     [
         ({"backend": FixtureBackend.CMSIS_NN}, "backend none"),
-        ({"engine": EngineType.TFLM}, "backend cmsis_nn"),
+        ({"engine": EngineType.LITERT}, "backend cmsis_nn"),
         (
             {
-                "engine": EngineType.TFLM,
+                "engine": EngineType.LITERT,
                 "backend": FixtureBackend.CMSIS_NN,
                 "aot": HeliaAotOptions(),
             },
@@ -136,7 +136,7 @@ def test_requests_outside_the_qualified_contract_are_refused(
         _request(tmp_path, **changes)
 
 
-@pytest.mark.parametrize("engine", [EngineType.HELIA_AOT, EngineType.TFLM])
+@pytest.mark.parametrize("engine", [EngineType.HELIA_AOT, EngineType.LITERT])
 @pytest.mark.parametrize(
     "placement",
     [
@@ -147,7 +147,7 @@ def test_requests_outside_the_qualified_contract_are_refused(
 )
 def test_requests_forward_independent_supported_banks(tmp_path, engine, placement):
     changes = {"engine": engine, "placement": placement}
-    if engine is EngineType.TFLM:
+    if engine is EngineType.LITERT:
         changes.update(
             backend=FixtureBackend.CMSIS_NN,
             runtime=_runtime(tmp_path / "runtime", b"{}"),
@@ -196,8 +196,8 @@ def test_request_config_carries_every_setting(tmp_path: Path) -> None:
 def test_capabilities_report_the_qualified_contract() -> None:
     facts = fixture_capabilities()
     target, ap510b = facts.targets
-    assert set(ap510b.engines) == {EngineType.HELIA_AOT, EngineType.TFLM}
-    assert set(target.engines) == {EngineType.HELIA_AOT, EngineType.TFLM, EngineType.HELIA_RT}
+    assert set(ap510b.engines) == {EngineType.HELIA_AOT, EngineType.LITERT}
+    assert set(target.engines) == {EngineType.HELIA_AOT, EngineType.LITERT, EngineType.HELIA_RT}
     assert ap510b.board == "apollo510b_evb"
     assert ap510b.device == "AP510BFA-CBR"
     assert (target.board, target.clock_profile) == ("apollo510_evb", "lp")
@@ -280,15 +280,15 @@ def test_intent_identity_moves_with_each_heliaaot_option(
 
 
 def test_intent_identity_moves_with_engine_and_runtime(tmp_path: Path) -> None:
-    tflm = _request(
+    litert = _request(
         tmp_path,
-        engine=EngineType.TFLM,
+        engine=EngineType.LITERT,
         backend=FixtureBackend.CMSIS_NN,
         runtime=_runtime(tmp_path / "rt1", b'{"a": 1}'),
     )
-    other_runtime = replace(tflm, runtime=_runtime(tmp_path / "rt2", b'{"a": 2}'))
-    helia_rt = replace(tflm, engine=EngineType.HELIA_RT, backend=FixtureBackend.HELIA)
-    identities = {r.intent_identity for r in (_request(tmp_path), tflm, other_runtime, helia_rt)}
+    other_runtime = replace(litert, runtime=_runtime(tmp_path / "rt2", b'{"a": 2}'))
+    helia_rt = replace(litert, engine=EngineType.HELIA_RT, backend=FixtureBackend.HELIA)
+    identities = {r.intent_identity for r in (_request(tmp_path), litert, other_runtime, helia_rt)}
     assert len(identities) == 4
 
 

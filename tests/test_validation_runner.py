@@ -253,20 +253,20 @@ def test_build_config_aot_discovers_neuralspotx_monorepo_checkout(tmp_path: Path
     assert cfg["engine"]["config"]["cmsis_nn_path"] == str(cmsis_nn)
 
 
-def test_build_config_tflm_selects_upstream_cmsis_nn_backend(tmp_path: Path):
+def test_build_config_litert_selects_upstream_cmsis_nn_backend(tmp_path: Path):
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     output_dir = tmp_path / "out"
     case = CaseSpec(
         model=MODELS["kws"],
-        engine=EngineType.TFLM,
+        engine=EngineType.LITERT,
         power=False,
         board=BOARDS["apollo510_evb"],
     )
 
     cfg = _build_config(case, repo_root=repo_root, output_dir=output_dir)
 
-    assert cfg["engine"] == {"type": "tflm", "backend": "cmsis_nn"}
+    assert cfg["engine"] == {"type": "litert", "backend": "cmsis_nn"}
 
 
 @pytest.mark.parametrize("backend", [ExecuTorchBackend.ARM, ExecuTorchBackend.NS])

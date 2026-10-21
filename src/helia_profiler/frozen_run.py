@@ -440,7 +440,7 @@ def _source_environment(config: ProfileConfig) -> dict[str, str]:
     effective: dict[str, str] = {}
     if config.target.segger_rtt_path is None and _uses_rtt(config):
         effective["SEGGER_RTT_PATH"] = environment["SEGGER_RTT_PATH"]
-    if engine is not EngineType.TFLM:
+    if engine is not EngineType.LITERT:
         provider = cmsis_nn_provider_module(engine.value, _effective_backend(config))
         selected = select_cmsis_nn_override(engine_config, provider_module=provider)
         if selected is not None and selected.selector == "env.CMSIS_NN_PATH":
@@ -631,7 +631,7 @@ def _frozen_runtime(config: ProfileConfig) -> FrozenRuntime | None:
     from .engines import EngineType
     from .engines.cmsis_nn import ARM_CMSIS_NN_MODULE, CMSIS_NN_MODULE
     from .engines.helia_rt.artifacts import HELIART_MODULE
-    from .engines.tflm import TFLITE_MICRO_MODULE
+    from .engines.litert import TFLITE_MICRO_MODULE
     from .runtime_records import runtime
 
     baseline = config.compatibility_baseline
@@ -648,11 +648,11 @@ def _frozen_runtime(config: ProfileConfig) -> FrozenRuntime | None:
 
     engine = config.engine.type
     backend = config.engine.backend
-    if engine is EngineType.TFLM:
-        # TFLM's modules take no build.nsx_modules override or CMSIS-NN selector.
+    if engine is EngineType.LITERT:
+        # LiteRT's modules take no build.nsx_modules override or CMSIS-NN selector.
         module = None if (backend or "reference") == "reference" else ARM_CMSIS_NN_MODULE
         return FrozenRuntime(
-            "tflm",
+            "litert",
             None,
             baseline.module(TFLITE_MICRO_MODULE).ref,
             module,

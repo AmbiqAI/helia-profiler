@@ -14,7 +14,7 @@ wrong one can lead to a misleading comparison.
 Ordinary `hpx profile` measures execution time and counters; it does not feed
 representative samples, export output tensor values, or compare outputs with a
 reference. The profiling harness initializes input storage with zero bytes:
-heliaRT/TFLM clear the first input tensor, heliaAOT clears every input buffer,
+heliaRT/LiteRT clear the first input tensor, heliaAOT clears every input buffer,
 and ExecuTorch clears its configured input buffer. Zero bytes need not represent
 real-valued zero for a quantized tensor with a nonzero zero point.
 
@@ -106,7 +106,7 @@ Compare times only when these agree:
 | `lifecycle`, `instance_boundary` | `carry`/`boot`; ExecuTorch `single`/`invocation`: every call reloads the program, so each invocation is its own instance | the build's lifecycle: `carry` runs the plan's counts, `single` one timed invocation and no warmups per boot |
 | `first_invoke_initializer`, `first_invoke_window` | whether the first invocation runs a one-time initializer, and whether it is a `warmup` (always, before the clean window) or `measured` (ExecuTorch) | the same answer per engine; `measured` under `single` or with no warmups, so a `CALL_ONCE` lands in the timed span |
 
-TFLM and heliaRT run a LiteRT `CALL_ONCE` subgraph inside the first
+LiteRT and heliaRT run a `CALL_ONCE` subgraph inside the first
 `Invoke()`; heliaAOT runs it in `model_init()`, before any timed span.
 Engine initialization (`AllocateTensors()`, `model_init()`) is never
 timed. Clock rates are the configured ones, not measured.

@@ -1,6 +1,6 @@
 ---
 title: "Compare engines on one model"
-description: "Profile the same KWS model through heliaRT, heliaAOT and the vanilla TFLM port on one board, then let hpx compare say what changed in cycles, binary size and memory, and which deltas it refuses to show."
+description: "Profile the same KWS model through heliaRT, heliaAOT and LiteRT, the vanilla TFLM port, on one board, then let hpx compare say what changed in cycles, binary size and memory, and which deltas it refuses to show."
 ---
 
 ## Goal
@@ -33,9 +33,9 @@ comparison:
 |---|---|
 | heliaRT | [`examples/quickstart/hpx_rt.yml`](https://github.com/AmbiqAI/helia-profiler/blob/main/examples/quickstart/hpx_rt.yml) |
 | heliaAOT | [`examples/quickstart/hpx_aot.yml`](https://github.com/AmbiqAI/helia-profiler/blob/main/examples/quickstart/hpx_aot.yml) |
-| TFLM | [`examples/quickstart/hpx_tflm_baseline.yml`](https://github.com/AmbiqAI/helia-profiler/blob/main/examples/quickstart/hpx_tflm_baseline.yml) |
+| LiteRT | [`examples/quickstart/hpx_litert_baseline.yml`](https://github.com/AmbiqAI/helia-profiler/blob/main/examples/quickstart/hpx_litert_baseline.yml) |
 
-The heliaRT and TFLM configs also ask for the `memory` counter group;
+The heliaRT and LiteRT configs also ask for the `memory` counter group;
 `hpx_aot.yml` asks for `cpu` only, so add `memory: default` to it before
 comparing per-layer columns, or expect them to differ.
 
@@ -46,9 +46,9 @@ From the repository root, pass the model path explicitly to override each config
 ```bash
 hpx profile examples/quickstart/kws_model.tflite --config examples/quickstart/hpx_rt.yml
 hpx profile examples/quickstart/kws_model.tflite --config examples/quickstart/hpx_aot.yml
-hpx profile examples/quickstart/kws_model.tflite --config examples/quickstart/hpx_tflm_baseline.yml
+hpx profile examples/quickstart/kws_model.tflite --config examples/quickstart/hpx_litert_baseline.yml
 hpx compare results/results_rt results/results_aot --output-dir results/rt-vs-aot
-hpx compare results/results_rt results/results_tflm_baseline
+hpx compare results/results_rt results/results_litert_baseline
 ```
 
 ## Expected output
@@ -91,7 +91,7 @@ The three single-engine runs, from their `summary.json`:
 |---|---|---|---|---|
 | heliaRT 1.20.0 | 2,060,239 | 2,051,232 | 885,056 | 278,596 |
 | heliaAOT 0.20.0 | 2,054,228 | 2,044,512 | 740,984 | 151,160 |
-| TFLM (CMSIS-NN backend) | 2,118,339 | 2,109,120 | 1,114,392 | 507,932 |
+| LiteRT (CMSIS-NN backend) | 2,118,339 | 2,109,120 | 1,114,392 | 507,932 |
 
 ## How to read it
 
@@ -121,7 +121,7 @@ The three single-engine runs, from their `summary.json`:
   the same board); the bundle
   `apollo510_evb-kws-executorch-ns-arm-none-eabi-gcc-rtt-auto` sits beside
   the others. The export path is on [Engines](../../guide/engines/).
-- TFLM reference kernels: copy `hpx_tflm_baseline.yml` and set
+- LiteRT reference kernels: copy `hpx_litert_baseline.yml` and set
   `engine.backend: reference` to measure the un-optimised interpreter.
 - A different model: keep the three configs and change `model.path` and
   `model.arena_size` in each; `hpx analyze model.tflite --engine helia-aot --compare`
@@ -137,10 +137,10 @@ The three single-engine runs, from their `summary.json`:
 |---|---|
 | Board | `apollo510_evb` (Apollo510, Cortex-M55, `lp` clock tier) |
 | Run | nightly hardware validation [run 35078330526](https://github.com/AmbiqAI/helia-profiler/actions/runs/35078330526), 2026-09-16, suite `complete`, hpx 0.1.6 at source commit `0714893` |
-| Cases | `apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto`, `apollo510_evb-kws-aot-ns-arm-none-eabi-gcc-rtt-auto`, `apollo510_evb-kws-tflm-arm-arm-none-eabi-gcc-rtt-auto`, all `valid` |
+| Cases | `apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto`, `apollo510_evb-kws-aot-ns-arm-none-eabi-gcc-rtt-auto`, `apollo510_evb-kws-tflm-arm-arm-none-eabi-gcc-rtt-auto` (captured when the LiteRT engine was named `tflm`), all `valid` |
 | nsx modules | baseline `hpx-neuralspotx-0.8.1-2026-09`: `nsx-helia-rt` helia-rt-v1.20.0, `nsx-cmsis-nn` aaeb145, `nsx-tflite-micro` 7afcf2b, `arm-cmsis-nn` 6d21a6f, `nsx-ambiq-sdk` a9f4ec2, `nsx-pmu-armv8m` 5725c06 (each bundle's `nsx.lock`) |
 | Toolchain | arm-none-eabi-gcc 15.2.1 (Arm GNU Toolchain 15.2.Rel1), CMake 4.1.2 |
-| Differences from the configs above | the nightly cases use `arena_size: 32768`, `pmu_counters: {cpu: default}`, `iterations: 3`, `warmup: 1`, `output.format: csv`; the quickstart configs use a 131,072-byte arena and, for heliaRT and TFLM, the `memory` group too |
+| Differences from the configs above | the nightly cases use `arena_size: 32768`, `pmu_counters: {cpu: default}`, `iterations: 3`, `warmup: 1`, `output.format: csv`; the quickstart configs use a 131,072-byte arena and, for heliaRT and LiteRT, the `memory` group too |
 | Bundles | [`examples/results/hardware-validation-2026-09-16/`](https://github.com/AmbiqAI/helia-profiler/tree/main/examples/results/hardware-validation-2026-09-16) |
 
 The `hpx compare` output above was produced on the host from those

@@ -18,12 +18,12 @@ import typer
 
 from .._version import __version__
 from ..config import Aggregation, PowerFirmware, PowerMode, Transport
+from ..engines import EngineType
 from ..placement import Placement
 from ..power import list_drivers
 from ..target.lifecycle import ResetStrategy
 from . import inspect_app as _inspect_app
 from . import validation_app as _validation_app
-from .common import EngineName, engine_type
 from .results_cmd import app as results_app
 
 app = typer.Typer(
@@ -114,10 +114,10 @@ def profile_command(
     ] = 0,
     # -- engine --
     engine: Annotated[
-        Optional[EngineName],
+        Optional[EngineType],
         typer.Option(
             "--engine",
-            help="Inference engine (default: helia-rt); tflm is an alias of litert",
+            help="Inference engine (default: helia-rt)",
             rich_help_panel=G_ENGINE,
         ),
     ] = None,
@@ -550,7 +550,7 @@ class _AnalyzeFormat(StrEnum):
 def analyze_command(
     model: Annotated[Path, typer.Argument(help="Path to .tflite model file")],
     engine: Annotated[
-        Optional[EngineName],
+        Optional[EngineType],
         typer.Option(
             "--engine",
             help=(
@@ -591,7 +591,7 @@ def analyze_command(
 
     _cmd_analyze(
         model=model,
-        engine=str(engine_type(engine)) if engine is not None else None,
+        engine=str(engine) if engine is not None else None,
         compare=compare,
         format=str(format),
         output=output,
@@ -730,7 +730,7 @@ def runtimes_show_command(
 
 
 @runtimes_app.command(
-    "prepare", help="Build a runtime's prepared archive into the hpx cache (helia-rt, tflm)"
+    "prepare", help="Build a runtime's prepared archive into the hpx cache (helia-rt, litert)"
 )
 def runtimes_prepare_command(
     name: Annotated[str, typer.Argument(help="Runtime name, e.g. helia-rt")],

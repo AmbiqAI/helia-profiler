@@ -249,7 +249,7 @@ def test_render_only_and_legacy_incomplete_builds_do_not_become_compiled(tmp_pat
             dump_fixture_build(changed, roots={"run": tmp_path})
 
 
-@pytest.mark.parametrize("engine", [EngineType.HELIA_AOT, EngineType.TFLM])
+@pytest.mark.parametrize("engine", [EngineType.HELIA_AOT, EngineType.LITERT])
 def test_psram_record_retains_image_payload_and_capture_facts(tmp_path, engine):
     from helia_profiler.fixture import FixturePsramPayload, FixturePsramWeights
 
@@ -259,7 +259,7 @@ def test_psram_record_retains_image_payload_and_capture_facts(tmp_path, engine):
         engine=engine,
         weights_location=Placement.PSRAM,
         runtime_manifest=_pin(tmp_path / "runtime.json", b"{}")
-        if engine is EngineType.TFLM
+        if engine is EngineType.LITERT
         else None,
         psram_weights=FixturePsramWeights(
             (FixturePsramPayload(0, 4, 123),), build.flat_binary.sha256
@@ -272,7 +272,7 @@ def test_psram_record_retains_image_payload_and_capture_facts(tmp_path, engine):
         actual, jlink_serial="serial", evidence_dir=tmp_path / "raw", settle_seconds=60
     )
     assert request.psram_weights == build.psram_weights
-    assert request.arena_capacity == (32768 if engine is EngineType.TFLM else None)
+    assert request.arena_capacity == (32768 if engine is EngineType.LITERT else None)
     wrong = replace(actual, flat_binary=_pin(tmp_path / "wrong.bin", b"wrong"))
     wrong = replace(wrong, build_identity=compiled_fixture_identity(wrong))
     with pytest.raises(ValueError, match="exact compiled image"):
@@ -406,8 +406,8 @@ def test_prepared_runtime_sources_are_checked_against_the_pinned_manifest(tmp_pa
     assert kernel is not None and stated is not None
     build = _reseal(
         _build(tmp_path),
-        engine=EngineType.TFLM,
-        capabilities=(("int8", FIXTURE_CAPABILITIES[EngineType.TFLM]["int8"]),),
+        engine=EngineType.LITERT,
+        capabilities=(("int8", FIXTURE_CAPABILITIES[EngineType.LITERT]["int8"]),),
         runtime_manifest=rt.manifest,
         kernel_source=kernel,
         runtime_source=stated,

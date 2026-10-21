@@ -310,7 +310,7 @@ _DIMENSION_SPECS: tuple[DimensionSpec, ...] = (
     # dist's version cannot be parsed, so an undetectable dist records the
     # pin, not proof. A runtime promotion (heliaRT 1.16 -> 1.17, #191) is
     # invisible in config but real in the artifact, which is exactly the
-    # A/B this dimension exists to surface. Absent for tflm/executorch
+    # A/B this dimension exists to surface. Absent for litert/executorch
     # (no resolved version today) and for artifacts predating it -- the
     # comparator's None-skip rule applies, zero migration.
     DimensionSpec(
