@@ -55,6 +55,20 @@ GOLDEN: dict[str, tuple[Kind, Any, bytes, str]] = {
         b'[["input_1","cd34"],["input_2","ef56"]]',
         "hpx.inputs/1:sha256:4a9320c8ecb5b4deede7d46e4dd9f2ad11ecf27e7626385dc7e7e03d84f2c9cc",
     ),
+    "target-config": (
+        "target-config",
+        {
+            "board": "apollo510_evb",
+            "device": "AP510NFA-CBR",
+            "load_address": 4259840,
+            "clock_profile": "lp",
+            "cpu_hz": 96000000,
+            "arena_location": "sram",
+            "weights_location": "mram",
+        },
+        b'{"arena_location":"sram","board":"apollo510_evb","clock_profile":"lp","cpu_hz":96000000,"device":"AP510NFA-CBR","load_address":4259840,"weights_location":"mram"}',
+        "hpx.target-config/1:sha256:41d565d1ce07c353df4a6156c30885773b692ad5b6224fd58b5a918d26ad04e0",
+    ),
     "non-ascii": (
         "intent",
         {"note": "\N{MICRO SIGN}s \N{CHECK MARK}", "scale": 1e-05, "ratio": 0.1},

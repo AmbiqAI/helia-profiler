@@ -407,7 +407,7 @@ def test_a_timing_only_run_maps_latency_memory_and_states_no_energy(root, record
     view = observations(loaded)
 
     _validate(view)
-    assert view["producer"]["mapping_version"] == "hpx-run-1"
+    assert view["producer"]["mapping_version"] == "hpx-run-2"
     assert view["native_result"]["identity"] == loaded.sha256
     latency = _items(view)["latency.invoke.v1"]
     assert latency["value"] == pytest.approx(65536 / 32768 / 100 * 1000)
@@ -420,6 +420,8 @@ def test_a_timing_only_run_maps_latency_memory_and_states_no_energy(root, record
     assert {(c["role"], c["domain"], c["value_hz"]) for c in latency["basis"]["clocks"]} == {
         ("configured", "timer", 32768),
         ("reported", "timer", 32768),
+        ("configured", "cpu", 96000000),
+        ("reported", "cpu", 96000000),
     }
     for name in ("energy.per_inference.v1", "power.mean.v1"):
         assert _items(view)[name]["unavailable_reason"] == "energy_not_measured_timing_only"
@@ -974,3 +976,184 @@ def test_saved_run_count_validation_preserves_valid_and_failed_captures(root, re
     result = _run(record, power=power, state=state)
     path = _save(result)
     assert hpx.load_run(path, roots=_roots(root)).result == result
+
+
+def _target_view(record, root):
+    return load_result(_save(_run(record)))
+
+
+def _change_target_fact(loaded, name, value):
+    result = loaded.result
+    if name in ("device", "load_address"):
+        target = replace(result.compiled.build.target, **{name: value})
+        compiled = replace(result.compiled, build=replace(result.compiled.build, target=target))
+        result = replace(result, compiled=compiled)
+    else:
+        facts = replace(result.identity.build, **{name: value})
+        result = replace(result, identity=replace(result.identity, build=facts))
+    return replace(loaded, result=result)
+
+
+def test_target_config_hash_and_sources_are_retained(record, root):
+    import hashlib
+
+    loaded = _target_view(record, root)
+    view = observations(loaded)
+    target = view["extensions"]["helia-profiler"]["target_config"]
+    expected = {
+        "board": "apollo510_evb",
+        "device": "AP510NFA-CBR",
+        "load_address": 4259840,
+        "clock_profile": "lp",
+        "cpu_hz": 96000000,
+        "arena_location": "sram",
+        "weights_location": "mram",
+    }
+    assert target["basis"] == expected
+    digest = hashlib.sha256(
+        json.dumps(expected, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    assert (
+        target["identity"] == view["target"]["identity"] == f"hpx.target-config/1:sha256:{digest}"
+    )
+    assert target["unavailable_reasons"] == {}
+    artifacts = {item["id"]: item for item in view["native_result"]["artifacts"]}
+    for name, source in target["sources"].items():
+        document = json.loads((root / artifacts[source["artifact"]]["location"]).read_text())
+        for part in source["pointer"].strip("/").split("/"):
+            document = document[part]
+        assert document == expected[name]
+
+
+@pytest.mark.parametrize(
+    "name,value",
+    [
+        ("board", "another-board"),
+        ("device", "another-device"),
+        ("load_address", 0),
+        ("clock_profile", "hp"),
+        ("cpu_hz", 192000000),
+        ("arena_location", "tcm"),
+        ("weights_location", "psram"),
+    ],
+)
+def test_every_target_fact_changes_identity(record, root, name, value):
+    loaded = _target_view(record, root)
+    before = observations(loaded)["target"]["identity"]
+    after = observations(_change_target_fact(loaded, name, value))["target"]["identity"]
+    assert before and after and before != after
+
+
+@pytest.mark.parametrize(
+    "name,value",
+    [
+        ("board", ""),
+        ("device", None),
+        ("load_address", True),
+        ("load_address", -1),
+        ("clock_profile", None),
+        ("cpu_hz", 0),
+        ("cpu_hz", True),
+        ("cpu_hz", 96e6),
+        ("arena_location", None),
+        ("weights_location", ""),
+    ],
+)
+def test_incomplete_target_configuration_never_gets_identity(record, root, name, value):
+    loaded = _target_view(record, root)
+    view = observations(_change_target_fact(loaded, name, value))
+    target = view["extensions"]["helia-profiler"]["target_config"]
+    assert view["target"]["identity"] is target["identity"] is None
+    assert target["basis"][name] is None
+    assert name in target["unavailable_reasons"]
+
+
+def test_target_unknown_reasons_do_not_become_identity(record, root):
+    from helia_profiler.identity import Unknown
+
+    loaded = _target_view(record, root)
+    for reason in ("not captured", "different wording"):
+        view = observations(_change_target_fact(loaded, "cpu_hz", Unknown(reason)))
+        target = view["extensions"]["helia-profiler"]["target_config"]
+        assert target["identity"] is None
+        assert target["unavailable_reasons"]["cpu_hz"] == reason
+        clocks = view["extensions"]["helia-profiler"]["cpu_clocks"]["facts"]
+        assert clocks["configured"]["value_hz"] is None
+        assert clocks["configured"]["unavailable_reason"] == reason
+
+
+def test_target_identity_excludes_workload_capacity_and_capture(record, root):
+    loaded = _target_view(record, root)
+    original = observations(loaded)["target"]["identity"]
+    result = loaded.result
+    identity = replace(
+        result.identity,
+        model_sha256="0" * 64,
+        inputs_hash="different",
+        build_hash="different",
+        build=replace(result.identity.build, arena_bytes=999, toolchain="different"),
+        run=replace(result.identity.run, iterations=7, warmups=3, lifecycle="single"),
+    )
+    changed = replace(
+        loaded,
+        result=replace(
+            result,
+            identity=identity,
+            capture=replace(result.capture, state="failure", timing=None),
+            verification=None,
+        ),
+    )
+    view = observations(changed)
+    assert view["target"]["identity"] == original
+    assert view["outcome"]["status"] == "failed"
+    assert _items(view)["latency.invoke.v1"]["value"] is None
+    assert (
+        view["extensions"]["helia-profiler"]["cpu_clocks"]["facts"]["reported"]["value_hz"] is None
+    )
+
+
+def test_cpu_report_disagreement_and_timer_clock_remain_distinct(record, root):
+    loaded = _target_view(record, root)
+    timing = replace(loaded.result.capture.timing, cpu_hz=192000000)
+    changed = replace(
+        loaded, result=replace(loaded.result, capture=replace(loaded.result.capture, timing=timing))
+    )
+    view = observations(changed)
+    clocks = _items(view)["latency.invoke.v1"]["basis"]["clocks"]
+    assert {(c["domain"], c["role"], c["value_hz"]) for c in clocks} == {
+        ("cpu", "configured", 96000000),
+        ("cpu", "reported", 192000000),
+        ("timer", "configured", 32768),
+        ("timer", "reported", 32768),
+    }
+    assert view["target"]["identity"] == observations(loaded)["target"]["identity"]
+
+
+def test_target_and_cpu_clocks_survive_bundle_relocation(record, root, tmp_path):
+    loaded = _target_view(record, root)
+    before = observations(loaded)
+    relative = loaded.path.relative_to(root)
+    moved = tmp_path / "relocated run"
+    shutil.copytree(root, moved)
+    after = observations(hpx.load_run(moved / relative, roots={"run": moved}))
+    assert before["target"] == after["target"]
+    for field in ("target_config", "cpu_clocks"):
+        assert (
+            before["extensions"]["helia-profiler"][field]
+            == after["extensions"]["helia-profiler"][field]
+        )
+
+
+def test_cpu_timing_source_has_no_duplicate_clock_roles(record, root):
+    loaded = _target_view(record, root)
+    result = loaded.result
+    run = replace(result.identity.run, timing_clock="cpu", timing_clock_hz=96000000)
+    capture = replace(result.capture, timing=replace(result.capture.timing, timer_hz=96000000))
+    loaded = replace(
+        loaded, result=replace(result, identity=replace(result.identity, run=run), capture=capture)
+    )
+    clocks = _items(observations(loaded))["latency.invoke.v1"]["basis"]["clocks"]
+    assert [(c["domain"], c["role"]) for c in clocks] == [
+        ("cpu", "configured"),
+        ("cpu", "reported"),
+    ]

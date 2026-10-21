@@ -226,7 +226,7 @@
           "summary": "A fact that could not be determined, with the reason."
         },
         {
-          "description": "`dataclass`\n\nA hash that names its producer, its kind and its basis version.\n\nThe text form is ``<producer>.<kind>/<version>:sha256:<hex>``: producer\nand kind are lowercase words joined by ``-``, the version a positive\ninteger, and the hex 64 lowercase digits. heliaPROFILER's hashes have\nthe producer ``hpx`` and the kinds ``intent``, ``build``,\n``observation``, ``binding`` and ``inputs``; :meth:`parse` reads any\nproducer's.\nCompare two hashes only when their producer, kind and version match.\n\n**API tier:** `experimental`",
+          "description": "`dataclass`\n\nA hash that names its producer, its kind and its basis version.\n\nThe text form is ``<producer>.<kind>/<version>:sha256:<hex>``: producer\nand kind are lowercase words joined by ``-``, the version a positive\ninteger, and the hex 64 lowercase digits. heliaPROFILER's hashes have\nthe producer ``hpx`` and the kinds ``intent``, ``build``,\n``observation``, ``binding``, ``inputs`` and ``target-config``; :meth:`parse` reads any\nproducer's.\nCompare two hashes only when their producer, kind and version match.\n\n**API tier:** `experimental`",
           "examples": [],
           "id": "helia_profiler.SemanticHash",
           "kind": "class",
@@ -245,9 +245,9 @@
               "returns": [],
               "signature": "producer: str",
               "source": {
-                "line": 81,
+                "line": 84,
                 "path": "src/helia_profiler/_semantic_hash.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_semantic_hash.py#L81"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_semantic_hash.py#L84"
               },
               "summary": ""
             },
@@ -264,9 +264,9 @@
               "returns": [],
               "signature": "kind: str",
               "source": {
-                "line": 82,
+                "line": 85,
                 "path": "src/helia_profiler/_semantic_hash.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_semantic_hash.py#L82"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_semantic_hash.py#L85"
               },
               "summary": ""
             },
@@ -283,9 +283,9 @@
               "returns": [],
               "signature": "version: int",
               "source": {
-                "line": 83,
+                "line": 86,
                 "path": "src/helia_profiler/_semantic_hash.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_semantic_hash.py#L83"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_semantic_hash.py#L86"
               },
               "summary": ""
             },
@@ -302,9 +302,9 @@
               "returns": [],
               "signature": "hex: str",
               "source": {
-                "line": 84,
+                "line": 87,
                 "path": "src/helia_profiler/_semantic_hash.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_semantic_hash.py#L84"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_semantic_hash.py#L87"
               },
               "summary": ""
             },
@@ -326,9 +326,9 @@
               "returns": [],
               "signature": "parse(text: str) -> SemanticHash",
               "source": {
-                "line": 94,
+                "line": 97,
                 "path": "src/helia_profiler/_semantic_hash.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_semantic_hash.py#L94"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_semantic_hash.py#L97"
               },
               "summary": "Read text, refusing anything not in the semantic hash form."
             }
@@ -339,9 +339,9 @@
           "returns": [],
           "signature": "SemanticHash(producer: str, kind: str, version: int, hex: str) -> None",
           "source": {
-            "line": 68,
+            "line": 71,
             "path": "src/helia_profiler/_semantic_hash.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_semantic_hash.py#L68"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_semantic_hash.py#L71"
           },
           "summary": "A hash that names its producer, its kind and its basis version."
         },

@@ -46,7 +46,7 @@ def observations(record: ProfileResultRecord | RunResultRecord) -> dict[str, Any
 
     A profile maps as ``hpx-profile-1``: timing and memory, not rail energy,
     per-layer attribution or numerical acceptance. A saved run result maps as
-    ``hpx-run-1``: per-invoke latency, rail energy and mean power when
+    ``hpx-run-2``: per-invoke latency, rail energy and mean power when
     measured, arena capacity and use, and its output comparison and semantic
     hashes under ``extensions.helia-profiler``.
     """

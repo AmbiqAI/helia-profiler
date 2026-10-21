@@ -214,6 +214,7 @@ written as the string `"nan"`, `"inf"` or `"-inf"`. Each kind has one basis:
 | `hpx.observation/1` | one capture's measured facts, with files reduced to their sha256 and no host paths or error text |
 | `hpx.binding/1` | a compiled build's plan `intent_hash`, lifecycle, timing scope, state policy, power wiring, prepared runtime manifest and what it observes |
 | `hpx.inputs/1` | each pinned input's `[tensor name, data sha256]`, in model order |
+| `hpx.target-config/1` | retained board, probe device type, load address, configured clock profile/CPU rate and arena/weights placements; no workload or arena capacity |
 
 Changing what goes into a kind's basis bumps that kind's version. Compare two
 hashes only when their producer, kind and version all match.
@@ -230,6 +231,7 @@ These examples pin the encoding:
 | `observation` | `{"cycles":[120,80],"error":false,"mean_us":"nan"}` | `hpx.observation/1:sha256:8f2796b5d85db5099f58b011ce8cb5c0b7c38f22d36d462cf80e6e9b77eba605` |
 | `binding` | `{"lifecycle":"carry","power_sync":null}` | `hpx.binding/1:sha256:7b9198891413a5779f01bb8aed3d0a68125d87cf983fddec759efbfcb58201ed` |
 | `inputs` | `[["input_1","cd34"],["input_2","ef56"]]` | `hpx.inputs/1:sha256:4a9320c8ecb5b4deede7d46e4dd9f2ad11ecf27e7626385dc7e7e03d84f2c9cc` |
+| `target-config` | `{"arena_location":"sram","board":"apollo510_evb","clock_profile":"lp","cpu_hz":96000000,"device":"AP510NFA-CBR","load_address":4259840,"weights_location":"mram"}` | `hpx.target-config/1:sha256:41d565d1ce07c353df4a6156c30885773b692ad5b6224fd58b5a918d26ad04e0` |
 | `intent` | `{"note":"\u00b5s \u2713","ratio":0.1,"scale":1e-05}` | `hpx.intent/1:sha256:78888b62d415f66c54322c1aa3ea08858c0ffd0df737e142b8c13424825ca312` |
 
 The last example is `{"note": "µs ✓", "scale": 1e-05, "ratio": 0.1}`: its
@@ -427,7 +429,7 @@ it records itself under and this host's HPX cache, raising a
 result that changed while it was read, and `ambiguous_location` for a
 directory holding both `result.json` and `result_manifest.json`; name the
 file instead. `observations(record)`
-maps it to the portable result view (`1.0-draft`, mapping `hpx-run-1`);
+maps it to the portable result view (`1.0-draft`, mapping `hpx-run-2`);
 `hpx results show` and `hpx results export` print and write it.
 
 | Metric | Unit | Scope | Statistic | Basis |
@@ -496,3 +498,32 @@ Schema v9 publishes `power.energy_per_inference_j` and `power.inferences_per_jou
 Schema v10 counts `SQRT`, `RSQRT`, `ABS`, and `SQUARED_DIFFERENCE` as one operation per output element in the heliaAOT analysis, matching the TFLite analysis. helia-aot models using these operators can have changed total operations and TOPS; MACs are unchanged.
 
 Schema v11 renames the firmware gate interval in the `power.window_observer_mismatch` and `power.window_clock_mismatch` issue contexts from `elapsed_us` / `elapsed_s` to `gate_elapsed_us` / `gate_elapsed_s`, so one key name no longer means two intervals. `elapsed_us` in `power.window_clock_ceiling` and `power.window_clock_frozen` remains the whole firmware window. Measured values are unchanged.
+
+### Retained target configuration and CPU clocks
+
+Saved-run mapping `hpx-run-2` exposes `target.identity` as
+`hpx.target-config/1:sha256:<hex>` when all seven retained facts are known:
+`board`, `device`, `load_address`, `clock_profile`, `cpu_hz`, `arena_location`
+and `weights_location`. The producer extension `target_config` exposes that flat
+hash basis, per-field artifact/JSON-pointer sources and unavailable reasons.
+Any unknown or invalid included fact makes the identity null; known fields stay
+visible, and reason text is never hashed. Values come from the verified saved
+result and compiled build, never current board definitions or installed pins.
+
+This is an HPX configuration identity, not a board serial, silicon qualification,
+or equivalence to a HELX simulation target. It excludes arena capacity, workload,
+runtime/kernel/toolchain, firmware image, lifecycle, measurements and host paths.
+Relocation does not change it. Equal identities describe only these seven facts;
+comparison eligibility remains the consumer's decision.
+
+Latency bases retain timing-source clocks and add CPU-domain configured and
+firmware-reported rates, with distinct sources. STIMER frequency is a timer fact,
+not CPU frequency. The `cpu_clocks` producer extension (`hpx.cpu-clocks`, version 1)
+preserves both rates and explicit reasons when unavailable; disagreements remain
+visible. Firmware reports an assigned `SystemCoreClock`, not an independently
+measured or calibrated frequency. If the timing source is CPU, its existing
+CPU-domain clock entries are kept without duplicates. Failed captures do not gain
+successful latency observations from these configuration facts.
+
+The native saved-result and compiled-build formats are unchanged. This mapping
+version applies to saved run results; the separate profile mapping is unchanged.

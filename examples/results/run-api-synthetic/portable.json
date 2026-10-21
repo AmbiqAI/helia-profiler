@@ -4,7 +4,7 @@
     "name": "helia-profiler",
     "version": "0.3.0",
     "revision": null,
-    "mapping_version": "hpx-run-1"
+    "mapping_version": "hpx-run-2"
   },
   "native_result": {
     "schema": "hpx.run-result",
@@ -52,7 +52,7 @@
   },
   "target": {
     "name": "apollo510_evb",
-    "identity": null
+    "identity": "hpx.target-config/1:sha256:41d565d1ce07c353df4a6156c30885773b692ad5b6224fd58b5a918d26ad04e0"
   },
   "outcome": {
     "status": "completed",
@@ -109,6 +109,24 @@
               "pointer": "/capture/timing/timer_hz"
             },
             "domain": "timer"
+          },
+          {
+            "role": "configured",
+            "domain": "cpu",
+            "value_hz": 96000000,
+            "source": {
+              "artifact": "native-result",
+              "pointer": "/identity/build/cpu_hz"
+            }
+          },
+          {
+            "role": "reported",
+            "domain": "cpu",
+            "value_hz": 96000000,
+            "source": {
+              "artifact": "native-result",
+              "pointer": "/capture/timing/cpu_hz"
+            }
           }
         ]
       }
@@ -203,6 +221,73 @@
       "engine_version_unavailable_reason": "the record states no runtime source",
       "build_producer": {
         "unknown": "the dependency state records no workspace"
+      },
+      "target_config": {
+        "schema_id": "hpx.target-config",
+        "schema_version": 1,
+        "identity": "hpx.target-config/1:sha256:41d565d1ce07c353df4a6156c30885773b692ad5b6224fd58b5a918d26ad04e0",
+        "basis": {
+          "board": "apollo510_evb",
+          "device": "AP510NFA-CBR",
+          "load_address": 4259840,
+          "clock_profile": "lp",
+          "cpu_hz": 96000000,
+          "arena_location": "sram",
+          "weights_location": "mram"
+        },
+        "sources": {
+          "board": {
+            "artifact": "native-result",
+            "pointer": "/identity/build/board"
+          },
+          "device": {
+            "artifact": "artifact:build.json",
+            "pointer": "/build/build/target/device"
+          },
+          "load_address": {
+            "artifact": "artifact:build.json",
+            "pointer": "/build/build/target/load_address"
+          },
+          "clock_profile": {
+            "artifact": "native-result",
+            "pointer": "/identity/build/clock_profile"
+          },
+          "cpu_hz": {
+            "artifact": "native-result",
+            "pointer": "/identity/build/cpu_hz"
+          },
+          "arena_location": {
+            "artifact": "native-result",
+            "pointer": "/identity/build/arena_location"
+          },
+          "weights_location": {
+            "artifact": "native-result",
+            "pointer": "/identity/build/weights_location"
+          }
+        },
+        "unavailable_reasons": {}
+      },
+      "cpu_clocks": {
+        "schema_id": "hpx.cpu-clocks",
+        "schema_version": 1,
+        "facts": {
+          "configured": {
+            "value_hz": 96000000,
+            "source": {
+              "artifact": "native-result",
+              "pointer": "/identity/build/cpu_hz"
+            },
+            "unavailable_reason": null
+          },
+          "reported": {
+            "value_hz": 96000000,
+            "source": {
+              "artifact": "native-result",
+              "pointer": "/capture/timing/cpu_hz"
+            },
+            "unavailable_reason": null
+          }
+        }
       },
       "semantic_hashes": {
         "intent_hash": "hpx.intent/1:sha256:a909fc4ac24bb0f9e3aea4110062ade20ee6857733b7014baabc534985097eee",
