@@ -198,7 +198,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   signature={"SemanticHash(producer: str, kind: str, version: int, hex: str) -> None"}
   level={2}
   summary={"A hash that names its producer, its kind and its basis version."}
-  source={{"path":"src/helia_profiler/_semantic_hash.py","line":68,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_semantic_hash.py#L68"}}
+  source={{"path":"src/helia_profiler/_semantic_hash.py","line":71,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_semantic_hash.py#L71"}}
 >
 
   `dataclass`
@@ -209,7 +209,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   and kind are lowercase words joined by ``-``, the version a positive
   integer, and the hex 64 lowercase digits. heliaPROFILER's hashes have
   the producer ``hpx`` and the kinds ``intent``, ``build``,
-  ``observation``, ``binding`` and ``inputs``; :meth:`parse` reads any
+  ``observation``, ``binding``, ``inputs`` and ``target-config``; :meth:`parse` reads any
   producer's.
   Compare two hashes only when their producer, kind and version match.
 
@@ -222,7 +222,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"producer: str"}
     level={3}
-    source={{"path":"src/helia_profiler/_semantic_hash.py","line":81,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_semantic_hash.py#L81"}}
+    source={{"path":"src/helia_profiler/_semantic_hash.py","line":84,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_semantic_hash.py#L84"}}
   >
 
 
@@ -236,7 +236,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"kind: str"}
     level={3}
-    source={{"path":"src/helia_profiler/_semantic_hash.py","line":82,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_semantic_hash.py#L82"}}
+    source={{"path":"src/helia_profiler/_semantic_hash.py","line":85,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_semantic_hash.py#L85"}}
   >
 
 
@@ -250,7 +250,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"version: int"}
     level={3}
-    source={{"path":"src/helia_profiler/_semantic_hash.py","line":83,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_semantic_hash.py#L83"}}
+    source={{"path":"src/helia_profiler/_semantic_hash.py","line":86,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_semantic_hash.py#L86"}}
   >
 
 
@@ -264,7 +264,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"hex: str"}
     level={3}
-    source={{"path":"src/helia_profiler/_semantic_hash.py","line":84,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_semantic_hash.py#L84"}}
+    source={{"path":"src/helia_profiler/_semantic_hash.py","line":87,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_semantic_hash.py#L87"}}
   >
 
 
@@ -279,7 +279,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"parse(text: str) -> SemanticHash"}
     level={3}
     summary={"Read text, refusing anything not in the semantic hash form."}
-    source={{"path":"src/helia_profiler/_semantic_hash.py","line":94,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_semantic_hash.py#L94"}}
+    source={{"path":"src/helia_profiler/_semantic_hash.py","line":97,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_semantic_hash.py#L97"}}
   >
 
     `classmethod`

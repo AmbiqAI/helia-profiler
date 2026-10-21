@@ -151,13 +151,13 @@ The text form is ``<producer>.<kind>/<version>:sha256:<hex>``: producer
 and kind are lowercase words joined by ``-``, the version a positive
 integer, and the hex 64 lowercase digits. heliaPROFILER's hashes have
 the producer ``hpx`` and the kinds ``intent``, ``build``,
-``observation``, ``binding`` and ``inputs``; :meth:`parse` reads any
+``observation``, ``binding``, ``inputs`` and ``target-config``; :meth:`parse` reads any
 producer's.
 Compare two hashes only when their producer, kind and version match.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/_semantic_hash.py:68`
+Source: `src/helia_profiler/_semantic_hash.py:71`
 
 ### helia_profiler.SemanticHash.producer
 
@@ -167,7 +167,7 @@ Source: `src/helia_profiler/_semantic_hash.py:68`
 producer: str
 ```
 
-Source: `src/helia_profiler/_semantic_hash.py:81`
+Source: `src/helia_profiler/_semantic_hash.py:84`
 
 ### helia_profiler.SemanticHash.kind
 
@@ -177,7 +177,7 @@ Source: `src/helia_profiler/_semantic_hash.py:81`
 kind: str
 ```
 
-Source: `src/helia_profiler/_semantic_hash.py:82`
+Source: `src/helia_profiler/_semantic_hash.py:85`
 
 ### helia_profiler.SemanticHash.version
 
@@ -187,7 +187,7 @@ Source: `src/helia_profiler/_semantic_hash.py:82`
 version: int
 ```
 
-Source: `src/helia_profiler/_semantic_hash.py:83`
+Source: `src/helia_profiler/_semantic_hash.py:86`
 
 ### helia_profiler.SemanticHash.hex
 
@@ -197,7 +197,7 @@ Source: `src/helia_profiler/_semantic_hash.py:83`
 hex: str
 ```
 
-Source: `src/helia_profiler/_semantic_hash.py:84`
+Source: `src/helia_profiler/_semantic_hash.py:87`
 
 ### helia_profiler.SemanticHash.parse
 
@@ -217,7 +217,7 @@ Read *text*, refusing anything not in the semantic hash form.
 | --- | --- |
 | ValueError | *text* is not ``<producer>.<kind>/<version>:sha256:<hex>``, for example bare hex, uppercase hex or a missing version. |
 
-Source: `src/helia_profiler/_semantic_hash.py:94`
+Source: `src/helia_profiler/_semantic_hash.py:97`
 
 ## helia_profiler.canonical_engine
 
