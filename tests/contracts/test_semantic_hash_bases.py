@@ -17,6 +17,7 @@ from helia_profiler import _semantic_hash
 from helia_profiler._fixture_build import FixtureTimingScope
 from helia_profiler._identity_hash import build_hash
 from helia_profiler._semantic_hash import KIND_VERSIONS
+from helia_profiler.api import observations
 from helia_profiler.fixture_capture import FixtureCaptureResult
 from helia_profiler.fixture_identity import fixture_run_identity
 from helia_profiler.profile_identity import _observation_hash
@@ -80,6 +81,19 @@ BASES: dict[tuple[str, int], set[frozenset[str]]] = {
         )
     },
     ("inputs", 1): {frozenset({"[2]"})},
+    ("target-config", 1): {
+        frozenset(
+            {
+                "board",
+                "device",
+                "load_address",
+                "clock_profile",
+                "cpu_hz",
+                "arena_location",
+                "weights_location",
+            }
+        )
+    },
 }
 
 
@@ -108,6 +122,7 @@ def test_every_kind_hashes_the_shape_its_version_records(observed):
     # identity hashes the pinned inputs.
     compiled = hpx.load_build(_EXAMPLE / "build.json", roots={"run": _EXAMPLE})
     compiled.identity
+    observations(hpx.load_run(_EXAMPLE / "result.json", roots={"run": _EXAMPLE}))
     fixture_run_identity(
         compiled.build, FixtureCaptureResult("success", FixtureTimingScope.INVOKE_ONLY)
     )
