@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.0-draft",
+  "producer": {
+    "name": "helia-profiler",
+    "version": "synthetic",
+    "revision": null,
+    "mapping_version": "draft1"
+  },
+  "native_result": {
+    "schema": "synthetic-example",
+    "identity": null,
+    "artifacts": []
+  },
+  "workload": {
+    "name": "example-only",
+    "model_identity": null,
+    "input_identity": null,
+    "state_policy": null
+  },
+  "engine": {
+    "name": "helia-aot",
+    "version": null
+  },
+  "target": {
+    "name": "example-board",
+    "identity": null
+  },
+  "outcome": {
+    "status": "completed",
+    "stage": "capture",
+    "reason": null
+  },
+  "observations": [
+    {
+      "id": "latency",
+      "metric": "latency.invoke.v1",
+      "unit": "ms",
+      "domain": "cpu",
+      "origin": "measured",
+      "scope": "invoke_only",
+      "statistic": "mean",
+      "value": 12.5,
+      "unavailable_reason": null,
+      "sample_count": 100,
+      "evidence": [],
+      "basis": null
+    }
+  ],
+  "verification": {
+    "verifier": "synthetic-example",
+    "checks": [
+      "example-construction"
+    ],
+    "limitations": [
+      "Synthetic documentation example; not benchmark evidence."
+    ]
+  }
+}

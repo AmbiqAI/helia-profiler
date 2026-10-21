@@ -5,10 +5,10 @@
     DIR/build.json      the saved CompiledBuild
     DIR/inputs/         the model and one input_<index>.bin per model input
     DIR/work/           the firmware build, unless another work directory is named
-    DIR/evidence-<N>/   one per capture
+    DIR/evidence-<N>/   one per capture, with its saved run result, result.json
 
-The saved build names two roots, ``run`` for the directory and ``cache`` for
-the HPX cache that holds a prepared runtime. The directory can move to
+The saved build and each saved run result name two roots, ``run`` for the
+directory and ``cache`` for the HPX cache that holds a prepared runtime. The directory can move to
 another host as a unit; a heliaRT or LiteRT build also needs its prepared
 runtime in that host's HPX cache.
 """
@@ -36,6 +36,7 @@ BUILD_FILE = "build.json"
 INPUTS_DIR = "inputs"
 WORK_DIR = "work"
 EVIDENCE_PREFIX = "evidence-"
+RESULT_FILE = "result.json"
 
 
 def run_roots(directory: str | Path) -> dict[str, Path]:
@@ -184,7 +185,7 @@ def load_from(directory: str | Path) -> CompiledBuild:
         ConfigError: The build does not verify, or a file it records is
             missing, with a hint naming how to restore a missing runtime.
     """
-    from .compiled_build import load_build
+    from .compiled_build import load_build, missing_runtime_hint
 
     roots = run_roots(directory)
     path = roots["run"] / BUILD_FILE
@@ -197,36 +198,12 @@ def load_from(directory: str | Path) -> CompiledBuild:
         message = str(exc.args[0]) if exc.args else str(exc)
         if Path(missing.filename) == path:
             raise
-        if Path(missing.filename).is_relative_to(roots["cache"]):
-            raise ConfigError(message, hint=_prepare_hint(path, roots["cache"])) from exc
+        hint = missing_runtime_hint(exc, path, roots["cache"])
+        if hint is not None:
+            raise ConfigError(message, hint=hint) from exc
         raise ConfigError(
             message, hint=f"The run directory {roots['run']} is incomplete; build it again."
         ) from exc
-
-
-def _prepare_hint(path: Path, cache: Path) -> str:
-    """How to restore the prepared runtime the build in *path* links."""
-    import json
-
-    from .compiled_build import _linked_runtime
-    from .errors import HpxError
-    from .frozen_run import FrozenRun
-
-    try:
-        document = json.loads(path.read_text(encoding="utf-8"))
-        source = document["build"].get("runtime_source") or {}
-        linked = _linked_runtime(FrozenRun.from_dict(document["plan"]), source.get("version"))
-    except (HpxError, OSError, ValueError, KeyError, TypeError):
-        linked = None
-    command = (
-        f"hpx runtimes prepare {linked.name} {linked.version}"
-        if linked is not None and linked.version
-        else "hpx runtimes prepare <engine> <version>"
-    )
-    return (
-        f"The build links a runtime prepared under the HPX cache {cache}. Run "
-        f"`{command}` on this host, or set HPX_CACHE_DIR to the cache that holds it."
-    )
 
 
 def fresh_evidence_dir(directory: str | Path) -> Path:
@@ -246,24 +223,32 @@ def run_from(
     settle_seconds: float,
     expect: Expect | None = None,
 ) -> RunResult:
-    """Capture once from the build saved in *directory*.
+    """Capture once from the build saved in *directory* and save it as ``evidence_dir/result.json``.
 
     The guard sees the build's target before anything else runs, so a board
     or probe it refuses is refused before the evidence directory exists or
-    any device is touched. An *evidence_dir* that already exists is refused
-    as early.
+    any device is touched. An *evidence_dir* that already exists, or that
+    is outside *directory*, is refused as early: the saved result records
+    its files relative to the run directory.
     """
     from .compiled_build import run_build
 
     compiled = load_from(directory)
     guard.verify_target(target=compiled.build.target, jlink_serial=jlink_serial)
+    roots = run_roots(directory)
     evidence = _absolute(evidence_dir)
     if evidence.exists():
         raise ConfigError(
             f"The evidence directory {evidence} already exists",
             hint="Each capture writes its evidence to a new directory.",
         )
-    return run_build(
+    if evidence == roots["run"] or not evidence.is_relative_to(roots["run"]):
+        raise ConfigError(
+            f"The evidence directory {evidence} is not inside the run directory {roots['run']}",
+            hint="The saved run result records its files relative to the run directory; "
+            "name a new subdirectory of it, or leave the default.",
+        )
+    result = run_build(
         compiled,
         guard=guard,
         jlink_serial=jlink_serial,
@@ -271,6 +256,18 @@ def run_from(
         settle_seconds=settle_seconds,
         expect=expect,
     )
+    try:
+        result.save(evidence / RESULT_FILE, roots=roots, build=roots["run"] / BUILD_FILE)
+    except ConfigError as exc:
+        raise ConfigError(
+            f"The capture finished but its result was not saved: {exc.args[0] if exc.args else exc}",
+            hint=" ".join(
+                part
+                for part in (f"The capture's evidence directory {evidence} is intact.", exc.hint)
+                if part
+            ),
+        ) from exc
+    return result
 
 
 def build_summary(
@@ -295,11 +292,18 @@ def build_summary(
     }
 
 
-def run_summary(result: RunResult, evidence_dir: str | Path, *, authority: str) -> dict[str, Any]:
+def run_summary(
+    result: RunResult,
+    evidence_dir: str | Path,
+    *,
+    authority: str,
+    saved: str | Path | None = None,
+) -> dict[str, Any]:
     """A capture's outcome, identity, verification facts and key timing, JSON-ready.
 
     *authority* names who vouched for the board, ``operator`` for an
-    :class:`~helia_profiler.OperatorGuard`.
+    :class:`~helia_profiler.OperatorGuard`. *saved* is the run result's
+    file, when it was saved.
     """
     capture, verification = result.capture, result.verification
     timing, memory = capture.timing, capture.memory
@@ -308,6 +312,7 @@ def run_summary(result: RunResult, evidence_dir: str | Path, *, authority: str) 
         "authority": authority,
         "error": capture.error,
         "evidence_dir": str(_absolute(evidence_dir)),
+        "result": None if saved is None else str(_absolute(saved)),
         "identity": result.identity.to_dict(),
         "verification": None
         if verification is None

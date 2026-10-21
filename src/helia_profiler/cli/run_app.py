@@ -81,8 +81,9 @@ def register(app: typer.Typer) -> None:
             "and the operator holds it for the capture. A --board other than the build's "
             "board is refused before any device is touched; HPX cannot check the physical "
             "board itself.\n\n"
-            "Each capture writes its evidence to a fresh directory. Prints the outcome, "
-            "identity, verification and timing as JSON. Exit status: 0 when the capture "
+            "Each capture writes its evidence and its saved run result, result.json, to a "
+            "fresh directory. Prints the outcome, the result's path, identity, "
+            "verification and timing as JSON. Exit status: 0 when the capture "
             "succeeds and its outputs match, 1 on a refusal or a failed capture, 3 when "
             "the outputs do not match.\n\n"
             "Example:\n\n"
@@ -339,7 +340,10 @@ def run_command(
         Optional[Path],
         typer.Option(
             "--evidence-dir",
-            help="New directory for the capture's evidence (default: DIR/evidence-<N>)",
+            help=(
+                "New directory inside DIR for the capture's evidence and its saved "
+                "result.json (default: DIR/evidence-<N>)"
+            ),
         ),
     ] = None,
     verbose: Annotated[

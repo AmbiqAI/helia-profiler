@@ -10,12 +10,13 @@ import hashlib
 import json
 from collections.abc import Mapping
 from dataclasses import asdict
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .fixture_capture import FixtureCaptureRequest
 
+from ._files import RootedPaths, read_json
 from ._fixture_build import (
     FixtureBuild,
     FixtureCapability,
@@ -103,21 +104,8 @@ def _object(value, fields):
     return value
 
 
-def _unique(pairs):
-    result = {}
-    for key, value in pairs:
-        if key in result:
-            raise ValueError(f"Duplicate fixture build field: {key}")
-        result[key] = value
-    return result
-
-
-def _reject_constant(value):
-    raise ValueError(f"Nonfinite fixture build value: {value}")
-
-
 def _read_json(value):
-    return json.loads(value, object_pairs_hook=_unique, parse_constant=_reject_constant)
+    return read_json(value, label="fixture build")
 
 
 def _payload(build: FixtureBuild, *, file, path) -> dict:
@@ -358,40 +346,7 @@ def verify_fixture_build(build: FixtureBuild) -> None:
         raise ValueError("Compiled fixture identity mismatch")
 
 
-class _Roots:
-    def __init__(self, roots: Mapping[str, Path]):
-        if not roots or any(
-            not isinstance(k, str) or not k or not isinstance(v, Path) for k, v in roots.items()
-        ):
-            raise ValueError("Named explicit Path roots required")
-        self.roots = {k: v.resolve() for k, v in roots.items()}
-
-    def encode(self, value: Path) -> dict:
-        resolved = value.resolve()
-        for name, root in sorted(self.roots.items(), key=lambda kv: (-len(kv[1].parts), kv[0])):
-            if resolved.is_relative_to(root):
-                return {"root": name, "path": resolved.relative_to(root).as_posix()}
-        raise ValueError(f"Fixture path has no supplied root: {value}")
-
-    def decode(self, value: dict) -> Path:
-        _object(value, ("root", "path"))
-        name, relative = value["root"], value["path"]
-        if not isinstance(name, str) or name not in self.roots or not isinstance(relative, str):
-            raise ValueError("Unknown fixture record root/path")
-        path = PurePosixPath(relative)
-        if (
-            not relative
-            or path.is_absolute()
-            or ".." in path.parts
-            or "\\" in relative
-            or path.as_posix() != relative
-        ):
-            raise ValueError("Fixture record requires canonical relative paths")
-        result = (self.roots[name] / relative).resolve()
-        if not result.is_relative_to(self.roots[name]):
-            raise ValueError("Fixture record path escapes its root")
-        return result
-
+class _Roots(RootedPaths):
     def file(self, value: FixtureFile) -> dict:
         return {**self.encode(value.path), "sha256": value.sha256}
 

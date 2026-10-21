@@ -10,8 +10,14 @@ from pathlib import Path, PureWindowsPath
 import pytest
 
 from helia_profiler.api import inspect_result, load_result
-from helia_profiler.records import ResultReadError
+from helia_profiler.records import ProfileResultRecord, ResultReadError
 from helia_profiler.results.run_summary import RUN_SUMMARY_SCHEMA_VERSION
+
+
+def _profile(location: Path) -> ProfileResultRecord:
+    record = load_result(location)
+    assert isinstance(record, ProfileResultRecord)
+    return record
 
 
 def test_public_reader_import_is_hardware_free(tmp_path):
@@ -125,9 +131,9 @@ def edit_document(path, name, edit):
 
 def test_complete_relocated_and_exact_integer(tmp_path):
     path = bundle(tmp_path / "first")
-    first = load_result(path)
+    first = _profile(path)
     shutil.copytree(path.parent, tmp_path / "moved")
-    moved = load_result(tmp_path / "moved")
+    moved = _profile(tmp_path / "moved")
     assert moved.manifest_sha256 == first.manifest_sha256
     assert moved.summary is not None
     assert moved.summary.latency is not None
@@ -151,7 +157,7 @@ def test_verified_failure_is_not_evidence_failure(tmp_path):
     )
     result = inspect_result(path)
     assert result.code is None
-    assert result.result is not None
+    assert isinstance(result.result, ProfileResultRecord)
     assert result.result.manifest.status.value == "failed"
     assert result.result.summary is None
 
@@ -248,7 +254,7 @@ def test_unsupported_summary_semantics_are_explicit(tmp_path, version):
 def test_summaries_before_and_with_identity_both_read(tmp_path, version):
     path = bundle(tmp_path)
     edit_document(path, "summary.json", lambda d: d.update(schema_version=version))
-    assert load_result(path).summary is not None
+    assert _profile(path).summary is not None
 
 
 _HEX = "ab" * 32
@@ -324,7 +330,7 @@ def _with_identity(path, identity):
 def test_a_summary_identity_with_semantic_hashes_reads(tmp_path, identity):
     path = bundle(tmp_path)
     _with_identity(path, identity)
-    summary = load_result(path).summary
+    summary = _profile(path).summary
     assert summary is not None and summary.identity == identity
 
 
@@ -358,7 +364,7 @@ def test_a_previous_summary_keeps_its_bare_hex_identity_hashes(tmp_path):
     identity = _identity(build_hash=_HEX, observation_hash=_HEX, intent_hash=None, inputs_hash=_HEX)
     path = bundle(tmp_path)
     edit_document(path, "summary.json", lambda d: d.update(schema_version=18, identity=identity))
-    summary = load_result(path).summary
+    summary = _profile(path).summary
     assert summary is not None and summary.identity == identity
 
 
@@ -595,7 +601,7 @@ def test_matching_normalized_issues_and_missing_summary_issues(tmp_path):
         "summary.json",
         lambda d: d.update(validity="degraded", issues=[dict(issue, context={})]),
     )
-    record = load_result(path)
+    record = _profile(path)
     assert observations(record)["outcome"]["reason"] == "retained warning"
     assert record.manifest.issues[0].extra == {"future": {"value": 7}}
 

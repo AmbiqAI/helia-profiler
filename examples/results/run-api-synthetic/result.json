@@ -1,5 +1,46 @@
 {
-  "error": null,
+  "capture": {
+    "arena_scan": [],
+    "artifacts": [],
+    "checksum": null,
+    "error": null,
+    "memory": null,
+    "output": {
+      "path": "evidence/output_0.bin",
+      "root": "run",
+      "sha256": "9de1ee39e1f56d88108b62c11f5fddf01d87615258f8318898311ebf65f03941",
+      "size_bytes": 4
+    },
+    "outputs": [
+      {
+        "path": "evidence/output_0.bin",
+        "root": "run",
+        "sha256": "9de1ee39e1f56d88108b62c11f5fddf01d87615258f8318898311ebf65f03941",
+        "size_bytes": 4
+      }
+    ],
+    "psram_weights": null,
+    "rail_energy": null,
+    "state": "success",
+    "status": 0,
+    "timing": {
+      "cpu_hz": 96000000,
+      "iterations": 100,
+      "settle_ticks": 4,
+      "ticks": 32768,
+      "timer_hz": 32768,
+      "timing_scope": "invoke_only",
+      "warmups": 5
+    },
+    "timing_scope": "invoke_only"
+  },
+  "compiled_build": {
+    "path": "build.json",
+    "root": "run",
+    "sha256": "01dd793a3fd87feb473c5344e9941997aad9281094de1a02c951ca198bd36ec6",
+    "size_bytes": 6996
+  },
+  "hpx_version": "0.3.0",
   "identity": {
     "baseline_id": {
       "unknown": "the dependency state records no workspace"
@@ -66,23 +107,48 @@
       }
     }
   },
-  "measurements": {
-    "arena_used_after_invoke_bytes": null,
-    "iterations": 100,
-    "latency_s": 0.01,
-    "warmups": 5
+  "location": {
+    "path": "result.json",
+    "root": "run"
   },
-  "succeeded": true,
+  "power": null,
+  "schema": "hpx.run-result",
+  "schema_version": 1,
   "verification": {
     "matched": true,
-    "reference": "host-litert",
+    "reference": {
+      "invocations": 105,
+      "kind": "host-litert",
+      "litert_version": "2.2.0",
+      "resolver": "BUILTIN_REF"
+    },
+    "reference_files": [
+      {
+        "path": "result.reference_0.bin",
+        "root": "run",
+        "sha256": "9de1ee39e1f56d88108b62c11f5fddf01d87615258f8318898311ebf65f03941",
+        "size_bytes": 4
+      }
+    ],
     "tensors": [
       {
+        "dtype": "int8",
+        "elements": 4,
         "identical": true,
+        "index": 13,
         "max_abs_error": 0.0,
+        "max_abs_error_real": 0.0,
         "mismatched_elements": 0,
-        "name": "probabilities"
+        "name": "probabilities",
+        "observed_sha256": "9de1ee39e1f56d88108b62c11f5fddf01d87615258f8318898311ebf65f03941",
+        "reference_sha256": "9de1ee39e1f56d88108b62c11f5fddf01d87615258f8318898311ebf65f03941",
+        "shape": [
+          1,
+          4
+        ],
+        "within_tolerance": true
       }
-    ]
+    ],
+    "tolerance": 1
   }
 }

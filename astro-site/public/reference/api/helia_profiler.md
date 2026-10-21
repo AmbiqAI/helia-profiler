@@ -31,9 +31,12 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 | [build](/helia-profiler/reference/api/helia_profiler/compiled_build/#helia_profiler.build) | `helia_profiler.build` |
 | [load_build](/helia-profiler/reference/api/helia_profiler/compiled_build/#helia_profiler.load_build) | `helia_profiler.load_build` |
 | [run_build](/helia-profiler/reference/api/helia_profiler/compiled_build/#helia_profiler.run_build) | `helia_profiler.run_build` |
+| [load_run](/helia-profiler/reference/api/helia_profiler/compiled_build/#helia_profiler.load_run) | `helia_profiler.load_run` |
 | [hpx_cache_root](/helia-profiler/reference/api/helia_profiler/compiled_build/#helia_profiler.hpx_cache_root) | `helia_profiler.hpx_cache_root` |
 | [CompiledBuild](/helia-profiler/reference/api/helia_profiler/compiled_build/#helia_profiler.CompiledBuild) | `helia_profiler.CompiledBuild` |
 | [RunResult](/helia-profiler/reference/api/helia_profiler/compiled_build/#helia_profiler.RunResult) | `helia_profiler.RunResult` |
+| [RunResultRecord](/helia-profiler/reference/api/helia_profiler/compiled_build/#helia_profiler.RunResultRecord) | `helia_profiler.RunResultRecord` |
+| [RunResultError](/helia-profiler/reference/api/helia_profiler/compiled_build/#helia_profiler.RunResultError) | `helia_profiler.RunResultError` |
 | [Lifecycle](/helia-profiler/reference/api/helia_profiler/compiled_build/#helia_profiler.Lifecycle) | `helia_profiler.Lifecycle` |
 | [TypedFixture](/helia-profiler/reference/api/helia_profiler/run_inputs/#helia_profiler.TypedFixture) | `helia_profiler.TypedFixture` |
 | [FixtureIO](/helia-profiler/reference/api/helia_profiler/run_inputs/#helia_profiler.FixtureIO) | `helia_profiler.FixtureIO` |

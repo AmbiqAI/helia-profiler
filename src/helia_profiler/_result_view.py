@@ -1,4 +1,4 @@
-"""Native profile mapping to the schema-owned portable result view."""
+"""Native profile and run mappings to the schema-owned portable result view."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from typing import Any
 
 from .records import ProfileResultRecord, ResultReadError
 from .results.manifest import ResultValidity, RunStatus
+from .run_record import RunResultRecord
 
 
 def _text(value: Any) -> str | None:
@@ -40,12 +41,19 @@ def _milliseconds(value: int | float | None) -> float | None:
     return converted
 
 
-def observations(record: ProfileResultRecord) -> dict[str, Any]:
+def observations(record: ProfileResultRecord | RunResultRecord) -> dict[str, Any]:
     """Map verified native facts; schema validity alone does not establish verification.
 
-    This first mapping covers ordinary profile timing and memory, not fixture
-    captures, rail energy, per-layer attribution or numerical acceptance.
+    A profile maps as ``hpx-profile-1``: timing and memory, not rail energy,
+    per-layer attribution or numerical acceptance. A saved run result maps as
+    ``hpx-run-1``: per-invoke latency, rail energy and mean power when
+    measured, arena capacity and use, and its output comparison and semantic
+    hashes under ``extensions.helia-profiler``.
     """
+    if isinstance(record, RunResultRecord):
+        from ._run_view import run_observations
+
+        return run_observations(record)
     manifest, summary = record.manifest, record.summary
     metadata = record.metadata or {}
     model, engine, platform = (
@@ -248,7 +256,7 @@ def observations(record: ProfileResultRecord) -> dict[str, Any]:
     }
 
 
-def export_result(record: ProfileResultRecord, destination: str | Path) -> Path:
+def export_result(record: ProfileResultRecord | RunResultRecord, destination: str | Path) -> Path:
     """Write the common JSON view without modifying any native evidence."""
     path = Path(destination)
     payload = json.dumps(observations(record), indent=2, allow_nan=False) + "\n"

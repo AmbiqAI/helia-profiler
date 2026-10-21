@@ -139,7 +139,13 @@ def _cmd_run(
     evidence_dir: Path | None,
     verbose: int,
 ) -> None:
-    from ..run_directory import fresh_evidence_dir, run_directory_of, run_from, run_summary
+    from ..run_directory import (
+        RESULT_FILE,
+        fresh_evidence_dir,
+        run_directory_of,
+        run_from,
+        run_summary,
+    )
     from ..run_guard import OperatorGuard
 
     directory = run_directory_of(directory)
@@ -155,7 +161,7 @@ def _cmd_run(
             settle_seconds=settle_seconds,
             expect=expectation,
         )
-    _print(run_summary(result, evidence, authority="operator"))
+    _print(run_summary(result, evidence, authority="operator", saved=evidence / RESULT_FILE))
     if not result.succeeded:
         raise typer.Exit(1)
     if result.verification is not None and result.verification.matched is False:

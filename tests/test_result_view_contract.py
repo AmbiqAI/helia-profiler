@@ -79,3 +79,32 @@ def test_cli_inspection_matches_authoritative_envelope(tmp_path):
         invocation = CliRunner().invoke(app, ["inspect", str(path)])
         assert invocation.exit_code == (0 if valid else 1)
         validator.validate(json.loads(invocation.stdout))
+
+
+def test_the_vendored_contract_is_the_recorded_bench_commit():
+    import hashlib
+
+    origin = json.loads((CONTRACT / "ORIGIN.json").read_bytes())
+    for name, entry in origin["files"].items():
+        assert hashlib.sha256((CONTRACT / name).read_bytes()).hexdigest() == entry["sha256"]
+        assert entry["source"] == f"AmbiqAI/helia-benchmark@{origin['commit'][:7]}:" + (
+            f"contracts/results/v1/{name}"
+        )
+    schema = json.loads((CONTRACT / "result.schema.json").read_bytes())
+    example = json.loads((CONTRACT / "examples" / "hpx.json").read_bytes())
+    Draft202012Validator(schema).validate(example)
+
+
+def test_the_run_reader_imports_no_instrument_or_probe_driver():
+    import subprocess
+    import sys
+
+    example = Path(__file__).parents[1] / "examples" / "results" / "run-api-synthetic"
+    probe = f"""
+import sys
+from helia_profiler.api import load_result, observations
+observations(load_result({str(example / "result.json")!r}))
+loaded = [name for name in sys.modules if name.startswith(("pylink", "pyjoulescope_driver"))]
+assert not loaded, loaded
+"""
+    subprocess.run([sys.executable, "-c", probe], check=True)

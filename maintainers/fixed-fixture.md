@@ -598,6 +598,19 @@ or when the capture failed, `verification` is `None`. `RunResult.succeeded` is t
 for a `success` capture. A failed capture is returned, not raised; errors raised while
 capturing propagate. A very short `SINGLE` invocation can hit the one-tick floor described
 under [Timing windows by route](#timing-windows-by-route).
+`RunResult.save(path, roots=..., build=...)` (`run_record.py`) writes the run as a
+`hpx.run-result` v1 and `load_run(path, roots=...)` reads it back as a `RunResultRecord`. Save
+refuses a run whose identity or verification does not recompute from its build and capture,
+so a saved result always loads. The document pins the saved `build.json` and every
+`FixtureFile` the capture references by sha256 and size, writes the reference outputs beside
+it as `<stem>.reference_<index>.<publication>.bin`, and records its own location so `api.load_result` can
+recover the root without being told. Loading recomputes the identity with the same
+`_identity` path `CompiledBuild.run` uses and the comparison with `compare_outputs`, so
+neither is trusted from the file. Unknown identity facts compare as unknown whatever their
+reason, so rewording a reason does not invalidate saved results; a reworded value does. Both
+save and load refuse a power request the build's wiring rules out, as `CompiledBuild.run`
+does. Free text such as the capture's error is recorded, not verified. started.json and
+receipt.json are not pinned, since the capture does not reference them. `_run_view.py` maps a `RunResultRecord` as `hpx-run-1`.
 `examples/run_api_conformance.py` walks freeze, build, save, load and run on a
 typed fixture and prints the identity, verification facts and key measurements.
 Its plan states what a fixture build requires (ATfE, the `lp` clock, an SRAM
@@ -730,9 +743,11 @@ the `hpx runtimes prepare` command that restores it.
   for the physical board, as `hpx profile` assumes. Its `verify_target`
   refuses a `--board` other than the build's board, or another serial, and
   `check()` allows every step; HPX cannot check the physical board. The run
-  summary records `"authority": "operator"`. `run_directory.run_from` asks
-  the guard about the build's target before `run_build`, and refuses an
-  existing `--evidence-dir`, so neither touches a device. `--expect
+  summary records `"authority": "operator"` and the saved result's path.
+  `run_directory.run_from` asks the guard about the build's target before
+  `run_build`, and refuses an existing `--evidence-dir` or one outside the run
+  directory, so neither touches a device; after the capture it saves
+  `result.json` in the evidence directory under the run directory's roots. `--expect
   host-litert|none` (default `host-litert`), `--tolerance` (`max_abs_error`,
   default 0) and repeated `--reference` files (instead of `--expect`) map
   onto `Expect`; a CLI build carries no expected outputs, so `Expect.from_build`

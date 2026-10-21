@@ -10,7 +10,7 @@ hpx build [OPTIONS] PLAN
 
 Build a frozen plan for fixed inputs into a run directory
 
-Defined in `src/helia_profiler/cli/run_app.py` line 211.
+Defined in `src/helia_profiler/cli/run_app.py` line 212.
 
 ### Arguments
 

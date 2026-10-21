@@ -10,7 +10,7 @@ hpx run [OPTIONS] DIRECTORY
 
 Capture once from a run directory on a board you name
 
-Defined in `src/helia_profiler/cli/run_app.py` line 279.
+Defined in `src/helia_profiler/cli/run_app.py` line 280.
 
 ### Arguments
 
@@ -23,7 +23,7 @@ Defined in `src/helia_profiler/cli/run_app.py` line 279.
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
 | `--settle-seconds` | `float` | 60 | Bound on each wait for the board to start and to finish, in seconds (more than 0, at most 300) |
-| `--evidence-dir` | `Optional[Path]` |  | New directory for the capture's evidence (default: DIR/evidence-<N>) |
+| `--evidence-dir` | `Optional[Path]` |  | New directory inside DIR for the capture's evidence and its saved result.json (default: DIR/evidence-<N>) |
 | `--verbose, -v` | `int` | 0 | Increase verbosity |
 
 ### output verification
@@ -46,7 +46,7 @@ Defined in `src/helia_profiler/cli/run_app.py` line 279.
 ```text
 The operator vouches for the physical board behind the probe, as hpx profile assumes: --board names the board wired to the probe that --jlink-serial names, and the operator holds it for the capture. A --board other than the build's board is refused before any device is touched; HPX cannot check the physical board itself.
 
-Each capture writes its evidence to a fresh directory. Prints the outcome, identity, verification and timing as JSON. Exit status: 0 when the capture succeeds and its outputs match, 1 on a refusal or a failed capture, 3 when the outputs do not match.
+Each capture writes its evidence and its saved run result, result.json, to a fresh directory. Prints the outcome, the result's path, identity, verification and timing as JSON. Exit status: 0 when the capture succeeds and its outputs match, 1 on a refusal or a failed capture, 3 when the outputs do not match.
 
 Example:
 

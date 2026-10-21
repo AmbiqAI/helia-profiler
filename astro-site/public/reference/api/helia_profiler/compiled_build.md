@@ -1,6 +1,6 @@
 # helia_profiler.compiled_build
 
-Build once, run later: a frozen plan's compiled firmware, bound to its plan and saved so any host can verify, relocate and capture from it, how model state carries across a run's invocations, and the build and capture records a compiled build and a run result carry. The hpx freeze, hpx build, hpx validate build and hpx run commands drive the same flow from the command line.
+Build once, run later: a frozen plan's compiled firmware, bound to its plan and saved so any host can verify, relocate and capture from it, each run saved as a verifiable result that loads back on any host, how model state carries across a run's invocations, and the build and capture records a compiled build and a run result carry. The hpx freeze, hpx build, hpx validate build and hpx run commands drive the same flow from the command line.
 
 Every name on this page is imported from `helia_profiler`.
 
@@ -239,7 +239,149 @@ the device is touched.
 | ConfigError | The build does not verify, *expect* cannot be compared, or *power* does not fit the build or the run API's rail-energy route. |
 | CaptureError | The device reports counts other than the build's. |
 
-Source: `src/helia_profiler/compiled_build.py:271`
+Source: `src/helia_profiler/compiled_build.py:272`
+
+## helia_profiler.RunResultError
+
+`class` · `python`
+
+```python
+RunResultError(code: str, message: str, *, hint: str | None = None) -> None
+```
+
+A saved run result that does not load; ``code`` names the check it failed.
+
+The codes are the verified result reader's: ``invalid_json`` (not strict
+JSON), ``unsupported_schema`` (another schema or version),
+``invalid_path`` (unusable roots, or a result not where it records
+itself), ``artifact_changed`` (a pinned file missing or changed),
+``runtime_missing`` (the build's prepared runtime is not in the cache),
+``identity_mismatch`` (the identity or output comparison does not
+recompute) and ``invalid_evidence`` (anything else: an unreadable or
+malformed result, a build that does not verify, a power request the build
+cannot take).
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/run_record.py:62`
+
+### helia_profiler.RunResultError.code
+
+`attribute` · `python`
+
+```python
+code = code
+```
+
+Source: `src/helia_profiler/run_record.py:77`
+
+## helia_profiler.RunResultRecord
+
+`class` · `python`
+
+```python
+RunResultRecord(
+    path: Path,
+    size_bytes: int,
+    sha256: str,
+    hpx_version: str,
+    result: RunResult,
+    document: Mapping[str, Any],
+) -> None
+```
+
+`dataclass`
+
+A saved run result, loaded and verified.
+
+``path``, ``size_bytes`` and ``sha256`` identify the saved document,
+``document`` is its JSON, which the portable view cites by JSON pointer,
+``hpx_version`` is the heliaPROFILER that wrote it, and ``result`` is the
+run it records.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/run_record.py:81`
+
+### helia_profiler.RunResultRecord.path
+
+`attribute` · `python`
+
+```python
+path: Path
+```
+
+Source: `src/helia_profiler/run_record.py:91`
+
+### helia_profiler.RunResultRecord.size_bytes
+
+`attribute` · `python`
+
+```python
+size_bytes: int
+```
+
+Source: `src/helia_profiler/run_record.py:92`
+
+### helia_profiler.RunResultRecord.sha256
+
+`attribute` · `python`
+
+```python
+sha256: str
+```
+
+Source: `src/helia_profiler/run_record.py:93`
+
+### helia_profiler.RunResultRecord.hpx_version
+
+`attribute` · `python`
+
+```python
+hpx_version: str
+```
+
+Source: `src/helia_profiler/run_record.py:94`
+
+### helia_profiler.RunResultRecord.result
+
+`attribute` · `python`
+
+```python
+result: RunResult
+```
+
+Source: `src/helia_profiler/run_record.py:95`
+
+### helia_profiler.RunResultRecord.document
+
+`attribute` · `python`
+
+```python
+document: Mapping[str, Any]
+```
+
+Source: `src/helia_profiler/run_record.py:96`
+
+## helia_profiler.load_run
+
+`function` · `python`
+
+```python
+load_run(path: str | Path, *, roots: Mapping[str, Path]) -> RunResultRecord
+```
+
+Read and verify a run result saved by :meth:`RunResult.save`, resolving paths under *roots*.
+
+**API tier:** `experimental`
+
+**Raises**
+
+| Name | Description |
+| --- | --- |
+| RunResultError | A ``ConfigError`` naming the first check that fails: the schema or version, the compiled build, a pinned file, the identity or the output comparison. |
+
+Source: `src/helia_profiler/run_record.py:99`
 
 ## helia_profiler.RunResult
 
@@ -263,7 +405,7 @@ One capture from a :class:`CompiledBuild`.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/compiled_build.py:487`
+Source: `src/helia_profiler/compiled_build.py:499`
 
 ### helia_profiler.RunResult.compiled
 
@@ -273,7 +415,7 @@ Source: `src/helia_profiler/compiled_build.py:487`
 compiled: CompiledBuild
 ```
 
-Source: `src/helia_profiler/compiled_build.py:494`
+Source: `src/helia_profiler/compiled_build.py:506`
 
 ### helia_profiler.RunResult.capture
 
@@ -283,7 +425,7 @@ Source: `src/helia_profiler/compiled_build.py:494`
 capture: FixtureCaptureResult
 ```
 
-Source: `src/helia_profiler/compiled_build.py:495`
+Source: `src/helia_profiler/compiled_build.py:507`
 
 ### helia_profiler.RunResult.identity
 
@@ -293,7 +435,7 @@ Source: `src/helia_profiler/compiled_build.py:495`
 identity: RunIdentity
 ```
 
-Source: `src/helia_profiler/compiled_build.py:496`
+Source: `src/helia_profiler/compiled_build.py:508`
 
 ### helia_profiler.RunResult.verification
 
@@ -303,7 +445,7 @@ Source: `src/helia_profiler/compiled_build.py:496`
 verification: Verification | None
 ```
 
-Source: `src/helia_profiler/compiled_build.py:497`
+Source: `src/helia_profiler/compiled_build.py:509`
 
 ### helia_profiler.RunResult.power
 
@@ -313,7 +455,7 @@ Source: `src/helia_profiler/compiled_build.py:497`
 power: FixtureRailPowerRequest | FixtureBoardPowerRequest | None = None
 ```
 
-Source: `src/helia_profiler/compiled_build.py:498`
+Source: `src/helia_profiler/compiled_build.py:510`
 
 ### helia_profiler.RunResult.succeeded
 
@@ -325,7 +467,7 @@ succeeded: bool
 
 True only for a ``success`` capture.
 
-Source: `src/helia_profiler/compiled_build.py:501`
+Source: `src/helia_profiler/compiled_build.py:513`
 
 ### helia_profiler.RunResult.energy
 
@@ -343,7 +485,31 @@ hash-pinned raw instrument trace, and the protocol-2 READY, GO,
 gate and DONE samples in ``completion``. A failed capture measures
 none.
 
-Source: `src/helia_profiler/compiled_build.py:506`
+Source: `src/helia_profiler/compiled_build.py:518`
+
+### helia_profiler.RunResult.save
+
+`method` · `python`
+
+```python
+save(path: str | Path, *, roots: Mapping[str, Path], build: str | Path) -> Path
+```
+
+Write the run as a ``hpx.run-result`` with paths relative to *roots* and return its path.
+
+*build* is the file the run's compiled build was saved to; the result
+pins it by sha256 and size. The capture's files are pinned as they
+are; the reference outputs of a verification are written beside the
+result under unique names and pinned too. Every path must sit under
+one of *roots*. :func:`load_run` reads it back.
+
+**Raises**
+
+| Name | Description |
+| --- | --- |
+| ConfigError | *build* is not this run's compiled build, a file is missing or changed, a path is under no root, or the identity or verification does not recompute from the build and capture. |
+
+Source: `src/helia_profiler/compiled_build.py:529`
 
 ## helia_profiler.build
 
@@ -380,7 +546,7 @@ downloaded or built. The result is verified before it is returned.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/compiled_build.py:518`
+Source: `src/helia_profiler/compiled_build.py:548`
 
 ## helia_profiler.load_build
 
@@ -394,7 +560,7 @@ Read and verify a compiled build written by :meth:`CompiledBuild.save`.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/compiled_build.py:691`
+Source: `src/helia_profiler/compiled_build.py:754`
 
 ## helia_profiler.run_build
 
@@ -419,4 +585,4 @@ Flash *compiled*'s image, capture one run and compare outputs; see :meth:`Compil
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/compiled_build.py:696`
+Source: `src/helia_profiler/compiled_build.py:759`

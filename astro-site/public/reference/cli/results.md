@@ -1,6 +1,6 @@
 # hpx results
 
-Inspect and export verified ordinary profile bundles.
+Inspect and export verified profile bundles and saved run results.
 
 ## hpx results
 
@@ -8,7 +8,7 @@ Inspect and export verified ordinary profile bundles.
 hpx results COMMAND [ARGS]...
 ```
 
-Inspect and export verified ordinary profile bundles.
+Inspect and export verified profile bundles and saved run results.
 
 Defined in `src/helia_profiler/cli/results_cmd.py` line 20.
 
@@ -56,7 +56,7 @@ Defined in `src/helia_profiler/cli/results_cmd.py` line 25.
 hpx results show LOCATION
 ```
 
-Emit the portable JSON view of a verified native bundle.
+Emit the portable JSON view of a verified profile bundle or saved run result.
 
 Defined in `src/helia_profiler/cli/results_cmd.py` line 60.
 

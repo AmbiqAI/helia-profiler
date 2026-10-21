@@ -230,12 +230,13 @@ class CompiledBuild:
     @classmethod
     def load(cls, path: str | Path, *, roots: Mapping[str, Path]) -> CompiledBuild:
         """Read and verify a build written by :meth:`save`, resolving paths under *roots*."""
-        from ._fixture_record import _read_json, load_fixture_build
+        from ._files import read_json
+        from ._fixture_record import load_fixture_build
         from .frozen_run import FrozenRun
 
         source = Path(path).expanduser()
         try:
-            data = _read_json(source.read_text(encoding="utf-8"))
+            data = read_json(source.read_text(encoding="utf-8"), label="compiled build")
         except FileNotFoundError as exc:
             raise ConfigError(f"Compiled build not found: {source}") from exc
         except (OSError, ValueError, RecursionError) as exc:
@@ -363,57 +364,16 @@ class CompiledBuild:
     ) -> None:
         """Refuse a power request this build or the run API's rail-energy route cannot take."""
         from .fixture_capture import _RAIL_SETTLE_LIMIT_S, _SETTLE_LIMIT_S
-        from .fixture_power import FixtureBoardPowerRequest, FixtureRailPowerRequest
+        from .fixture_power import FixtureRailPowerRequest
 
-        wiring = self.build.power_sync
+        _check_power_request(self, power)
         if power is None:
             if power_guard is not None:
                 raise ConfigError(
                     "A power_guard was given without a power request",
                     hint="Pass power= with the instrument and rail it authorizes, or drop it.",
                 )
-            if wiring is not None:
-                raise ConfigError(
-                    "This build is compiled for rail energy and needs a FixtureRailPowerRequest",
-                    hint="Its firmware waits for the instrument's GO before its timed loop.",
-                )
             return
-        if isinstance(power, FixtureBoardPowerRequest):
-            if wiring is not None:
-                raise ConfigError(
-                    "A supply-only FixtureBoardPowerRequest measures no energy; "
-                    "this build is compiled for rail energy",
-                    hint="Pass a FixtureRailPowerRequest, or build without power_sync.",
-                )
-        elif isinstance(power, FixtureRailPowerRequest):
-            if wiring is None:
-                raise ConfigError(
-                    "This build has no power wiring to measure rail energy with",
-                    hint="Build with FixtureMethod(..., power_sync=FixturePowerSync(...)).",
-                )
-            requested = power.firmware_wiring()
-            if replace(requested, protocol_version=wiring.protocol_version) != wiring:
-                raise ConfigError(
-                    f"The power request's GPIO pins {_pins(requested)} "
-                    f"differ from the build's {_pins(wiring)}",
-                    hint="Wire the instrument as the firmware was built, or build again.",
-                )
-            if requested.protocol_version != wiring.protocol_version:
-                raise ConfigError(
-                    f"The build's firmware speaks power protocol {wiring.protocol_version}; "
-                    f"the run API's rail request speaks protocol {requested.protocol_version}",
-                    hint="Build again with build(); it compiles the current protocol.",
-                )
-            if power.rail != _POWER_RAIL:
-                raise ConfigError(
-                    f"The run API measures the {_POWER_RAIL} rail only, not {power.rail!r}"
-                )
-            _require_power_route(self.build.engine.value, self.build.target.board, self.lifecycle)
-        else:
-            raise ConfigError(
-                f"Unknown power request {type(power).__name__}",
-                hint="Pass a FixtureRailPowerRequest or a FixtureBoardPowerRequest.",
-            )
         limit, kind = (
             (_RAIL_SETTLE_LIMIT_S, "a rail capture")
             if isinstance(power, FixtureRailPowerRequest)
@@ -456,6 +416,58 @@ class _PowerCaptureGuard:
 
     def verify_power_device(self, *, serial: str, rail: str) -> None:
         self.power.verify_power_device(serial=serial, rail=rail)
+
+
+def _check_power_request(compiled: CompiledBuild, power: _PowerRequest) -> None:
+    """Validate power admission without acquiring device authority."""
+    from .fixture_power import FixtureBoardPowerRequest, FixtureRailPowerRequest
+
+    wiring = compiled.build.power_sync
+    if power is None:
+        if wiring is not None:
+            raise ConfigError(
+                "This build is compiled for rail energy and needs a FixtureRailPowerRequest",
+                hint="Its firmware waits for the instrument's GO before its timed loop.",
+            )
+        return
+    if isinstance(power, FixtureBoardPowerRequest):
+        if wiring is not None:
+            raise ConfigError(
+                "A supply-only FixtureBoardPowerRequest measures no energy; "
+                "this build is compiled for rail energy",
+                hint="Pass a FixtureRailPowerRequest, or build without power_sync.",
+            )
+    elif isinstance(power, FixtureRailPowerRequest):
+        if wiring is None:
+            raise ConfigError(
+                "This build has no power wiring to measure rail energy with",
+                hint="Build with FixtureMethod(..., power_sync=FixturePowerSync(...)).",
+            )
+        requested = power.firmware_wiring()
+        if replace(requested, protocol_version=wiring.protocol_version) != wiring:
+            raise ConfigError(
+                f"The power request's GPIO pins {_pins(requested)} "
+                f"differ from the build's {_pins(wiring)}",
+                hint="Wire the instrument as the firmware was built, or build again.",
+            )
+        if requested.protocol_version != wiring.protocol_version:
+            raise ConfigError(
+                f"The build's firmware speaks power protocol {wiring.protocol_version}; "
+                f"the run API's rail request speaks protocol {requested.protocol_version}",
+                hint="Build again with build(); it compiles the current protocol.",
+            )
+        if power.rail != _POWER_RAIL:
+            raise ConfigError(
+                f"The run API measures the {_POWER_RAIL} rail only, not {power.rail!r}"
+            )
+        _require_power_route(
+            compiled.build.engine.value, compiled.build.target.board, compiled.lifecycle
+        )
+    else:
+        raise ConfigError(
+            f"Unknown power request {type(power).__name__}",
+            hint="Pass a FixtureRailPowerRequest or a FixtureBoardPowerRequest.",
+        )
 
 
 def _pins(wiring: FixturePowerSync) -> str:
@@ -513,6 +525,24 @@ class RunResult:
         none.
         """
         return self.capture.rail_energy
+
+    def save(self, path: str | Path, *, roots: Mapping[str, Path], build: str | Path) -> Path:
+        """Write the run as a ``hpx.run-result`` with paths relative to *roots* and return its path.
+
+        *build* is the file the run's compiled build was saved to; the result
+        pins it by sha256 and size. The capture's files are pinned as they
+        are; the reference outputs of a verification are written beside the
+        result under unique names and pinned too. Every path must sit under
+        one of *roots*. :func:`load_run` reads it back.
+
+        Raises:
+            ConfigError: *build* is not this run's compiled build, a file is
+                missing or changed, a path is under no root, or the identity
+                or verification does not recompute from the build and capture.
+        """
+        from .run_record import save_run
+
+        return save_run(self, path, roots=roots, build=build)
 
 
 def build(
@@ -686,6 +716,39 @@ def _binding(plan: FrozenRun, lifecycle: Lifecycle, build: FixtureBuild) -> str:
 
 def _value(member: StrEnum | None) -> str | None:
     return member.value if member is not None else None
+
+
+def prepared_runtime_hint(path: Path, cache: Path) -> str:
+    """How to restore the prepared runtime the build saved in *path* links."""
+    from .errors import HpxError
+    from .frozen_run import FrozenRun
+
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+        source = document["build"].get("runtime_source") or {}
+        linked = _linked_runtime(FrozenRun.from_dict(document["plan"]), source.get("version"))
+    except (HpxError, OSError, ValueError, KeyError, TypeError):
+        linked = None
+    command = (
+        f"hpx runtimes prepare {linked.name} {linked.version}"
+        if linked is not None and linked.version
+        else "hpx runtimes prepare <engine> <version>"
+    )
+    return (
+        f"The build links a runtime prepared under the HPX cache {cache}. Run "
+        f"`{command}` on this host, or set HPX_CACHE_DIR to the cache that holds it."
+    )
+
+
+def missing_runtime_hint(error: ConfigError, path: Path, cache: Path | None) -> str | None:
+    """:func:`prepared_runtime_hint` when *error*, from loading *path*, names a file under *cache*."""
+    missing = error.__cause__
+    if cache is None or not isinstance(missing, OSError) or missing.filename is None:
+        return None
+    filename = Path(missing.filename)
+    if filename == path or not filename.is_relative_to(cache):
+        return None
+    return prepared_runtime_hint(path, cache)
 
 
 def load_build(path: str | Path, *, roots: Mapping[str, Path]) -> CompiledBuild:

@@ -1,14 +1,19 @@
 {
   "authority": "AmbiqAI/helia-benchmark#75",
   "status": "draft, not released",
+  "commit": "6351718a5f656350837e37261798534d20de4d5e",
   "files": {
     "result.schema.json": {
-      "source": "/home/adamp/Ambiq/aitg/orchestration/teams/docs-bench/workspaces/bench/worktrees/helia-benchmark-result-contract-20261015/contracts/results/v1/result.schema.json",
-      "sha256": "8826d24d4447e79cda5970665b3de563cac0d5059883df1ae2ec17c57e3e516f"
+      "source": "AmbiqAI/helia-benchmark@6351718:contracts/results/v1/result.schema.json",
+      "sha256": "f919b64c823d1c44df75b186cb3be890fcbf5cc6b3dbfae5b35f8e3d686acf41"
     },
     "inspection.schema.json": {
-      "source": "/home/adamp/Ambiq/aitg/orchestration/teams/docs-bench/workspaces/bench/worktrees/helia-benchmark-result-contract-20261015/contracts/results/v1/inspection.schema.json",
+      "source": "AmbiqAI/helia-benchmark@6351718:contracts/results/v1/inspection.schema.json",
       "sha256": "59ef3a2d64c02067aa3aa946fb59526109cc45a9d545f48428366c329a9274b8"
+    },
+    "examples/hpx.json": {
+      "source": "AmbiqAI/helia-benchmark@6351718:contracts/results/v1/examples/hpx.json",
+      "sha256": "f4f5355593c1a0cbfe6ebc8a8e53f7d4bc2bd5612cac1ec1aa0046c740b621bc"
     }
   }
 }
