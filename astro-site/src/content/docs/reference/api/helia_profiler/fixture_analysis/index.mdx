@@ -1,0 +1,387 @@
+---
+title: "fixture_analysis"
+description: "What this HPX can run: engines, data types and qualified targets."
+sidebar:
+  order: 9
+---
+
+import RefMembers from '@ambiqai/helia-ui/astro/RefMembers';
+import RefParams from '@ambiqai/helia-ui/astro/RefParams';
+import RefSection from '@ambiqai/helia-ui/astro/RefSection';
+import RefSymbol from '@ambiqai/helia-ui/astro/RefSymbol';
+
+What this HPX can run: engines, data types and qualified targets.
+
+Every name on this page is imported from `helia_profiler`.
+
+**API tier:** `experimental`
+
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
+
+[Machine-readable model](/helia-profiler/reference/api/helia_profiler/fixture_analysis.json)
+
+<RefMembers label="On this page" items={[{"id":"helia_profiler.capabilities","name":"capabilities","kind":"function","summary":"The targets, engines and IO element types a run can be built and captured with."},{"id":"helia_profiler.QualifiedFixtureTarget","name":"QualifiedFixtureTarget","kind":"class","summary":"A supported fixture build and capture target, not model qualification."},{"id":"helia_profiler.EngineDTypeCapability","name":"EngineDTypeCapability","kind":"class","summary":"Producer status of one engine and IO element type."},{"id":"helia_profiler.FixtureCapabilities","name":"FixtureCapabilities","kind":"class","summary":"Targets, engine and dtype status, and limits of this fixture API."},{"id":"helia_profiler.FixtureCapability","name":"FixtureCapability","kind":"class","summary":"Producer-declared status of one engine and IO dtype for fixed fixtures."}]} />
+
+<RefSymbol
+  id={"helia_profiler.capabilities"}
+  name={"capabilities"}
+  kind={"function"}
+  language={"python"}
+  signature={"capabilities() -> FixtureCapabilities"}
+  level={2}
+  summary={"The targets, engines and IO element types a run can be built and captured with."}
+  source={{"path":"src/helia_profiler/run_inputs.py","line":23,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/run_inputs.py#L23"}}
+>
+
+  The targets, engines and IO element types a run can be built and captured with.
+
+  It reports what this HPX implements, not whether a runtime release is
+  qualified on a board; :func:`~helia_profiler.qualification` answers that.
+
+  **API tier:** `experimental`
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.QualifiedFixtureTarget"}
+  name={"QualifiedFixtureTarget"}
+  kind={"class"}
+  language={"python"}
+  signature={"QualifiedFixtureTarget(\n    board: str,\n    clock_profile: str,\n    cpu_hz: int,\n    device: str,\n    load_address: int,\n    timer_hz: int,\n    image_limit: int,\n    settle_ticks: tuple[int, int],\n    engines: tuple[EngineType, ...] = (),\n) -> None"}
+  level={2}
+  summary={"A supported fixture build and capture target, not model qualification."}
+  source={{"path":"src/helia_profiler/_fixture_facts.py","line":25,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_facts.py#L25"}}
+>
+
+  `dataclass`
+
+  A supported fixture build and capture target, not model qualification.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.QualifiedFixtureTarget.board"}
+    name={"board"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"board: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_facts.py","line":29,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_facts.py#L29"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.QualifiedFixtureTarget.clock_profile"}
+    name={"clock_profile"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"clock_profile: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_facts.py","line":30,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_facts.py#L30"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.QualifiedFixtureTarget.cpu_hz"}
+    name={"cpu_hz"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"cpu_hz: int"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_facts.py","line":31,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_facts.py#L31"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.QualifiedFixtureTarget.device"}
+    name={"device"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"device: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_facts.py","line":32,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_facts.py#L32"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.QualifiedFixtureTarget.load_address"}
+    name={"load_address"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"load_address: int"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_facts.py","line":33,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_facts.py#L33"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.QualifiedFixtureTarget.timer_hz"}
+    name={"timer_hz"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"timer_hz: int"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_facts.py","line":34,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_facts.py#L34"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.QualifiedFixtureTarget.image_limit"}
+    name={"image_limit"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"image_limit: int"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_facts.py","line":35,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_facts.py#L35"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.QualifiedFixtureTarget.settle_ticks"}
+    name={"settle_ticks"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"settle_ticks: tuple[int, int]"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_facts.py","line":36,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_facts.py#L36"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.QualifiedFixtureTarget.engines"}
+    name={"engines"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"engines: tuple[EngineType, ...] = ()"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_facts.py","line":37,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_facts.py#L37"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.EngineDTypeCapability"}
+  name={"EngineDTypeCapability"}
+  kind={"class"}
+  language={"python"}
+  signature={"EngineDTypeCapability(engine: EngineType, dtype: FixtureDType, capability: FixtureCapability) -> None"}
+  level={2}
+  summary={"Producer status of one engine and IO element type."}
+  source={{"path":"src/helia_profiler/_fixture_facts.py","line":40,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_facts.py#L40"}}
+>
+
+  `dataclass`
+
+  Producer status of one engine and IO element type.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.EngineDTypeCapability.engine"}
+    name={"engine"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"engine: EngineType"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_facts.py","line":44,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_facts.py#L44"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.EngineDTypeCapability.dtype"}
+    name={"dtype"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"dtype: FixtureDType"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_facts.py","line":45,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_facts.py#L45"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.EngineDTypeCapability.capability"}
+    name={"capability"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"capability: FixtureCapability"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_facts.py","line":46,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_facts.py#L46"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.FixtureCapabilities"}
+  name={"FixtureCapabilities"}
+  kind={"class"}
+  language={"python"}
+  signature={"FixtureCapabilities(\n    api_version: tuple[int, int],\n    targets: tuple[QualifiedFixtureTarget, ...],\n    engines: tuple[EngineDTypeCapability, ...],\n    readback_budget: int,\n) -> None"}
+  level={2}
+  summary={"Targets, engine and dtype status, and limits of this fixture API."}
+  source={{"path":"src/helia_profiler/_fixture_facts.py","line":49,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_facts.py#L49"}}
+>
+
+  `dataclass`
+
+  Targets, engine and dtype status, and limits of this fixture API.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.FixtureCapabilities.api_version"}
+    name={"api_version"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"api_version: tuple[int, int]"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_facts.py","line":53,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_facts.py#L53"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureCapabilities.targets"}
+    name={"targets"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"targets: tuple[QualifiedFixtureTarget, ...]"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_facts.py","line":54,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_facts.py#L54"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureCapabilities.engines"}
+    name={"engines"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"engines: tuple[EngineDTypeCapability, ...]"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_facts.py","line":55,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_facts.py#L55"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureCapabilities.readback_budget"}
+    name={"readback_budget"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"readback_budget: int"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_facts.py","line":56,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_facts.py#L56"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.FixtureCapability"}
+  name={"FixtureCapability"}
+  kind={"class"}
+  language={"python"}
+  signature={"FixtureCapability()"}
+  level={2}
+  summary={"Producer-declared status of one engine and IO dtype for fixed fixtures."}
+  source={{"path":"src/helia_profiler/_fixture_build.py","line":150,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L150"}}
+>
+
+  Producer-declared status of one engine and IO dtype for fixed fixtures.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.FixtureCapability.QUALIFIED"}
+    name={"QUALIFIED"}
+    kind={"constant"}
+    language={"python"}
+    signature={"QUALIFIED = 'qualified'"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":153,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L153"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureCapability.SUPPORTED"}
+    name={"SUPPORTED"}
+    kind={"constant"}
+    language={"python"}
+    signature={"SUPPORTED = 'supported'"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":154,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L154"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureCapability.UNSUPPORTED"}
+    name={"UNSUPPORTED"}
+    kind={"constant"}
+    language={"python"}
+    signature={"UNSUPPORTED = 'unsupported'"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":155,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L155"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+---
+
+Machine-readable: [`fixture_analysis.json`](/helia-profiler/reference/api/helia_profiler/fixture_analysis.json) · [`fixture_analysis.md`](/helia-profiler/reference/api/helia_profiler/fixture_analysis.md), complete and lossless.

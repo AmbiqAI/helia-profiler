@@ -34,6 +34,9 @@ VALUES = {
     "driver": ["joulescope"],
     "power": ["both", "on", "off"],
     "suite": ["smoke", "models-rt", "models-aot", "complete"],
+    "lifecycle": ["carry", "single"],
+    "timing_scope": ["invoke_only", "restore_and_invoke"],
+    "expect": ["host-litert", "none"],
 }
 SITES = [
     ("profile", "engine", None),
@@ -55,6 +58,13 @@ SITES = [
     ("power-on", "driver", "joulescope"),
     ("validate", "power", "off"),
     ("validate", "suite", None),
+    ("freeze", "engine", None),
+    ("freeze", "runtime_arena_location", None),
+    ("freeze", "runtime_weights_location", None),
+    ("freeze", "core_override", None),
+    ("build", "lifecycle", "carry"),
+    ("build", "timing_scope", "invoke_only"),
+    ("run", "expect", None),
 ]
 
 
@@ -86,8 +96,15 @@ def test_choice_contract(monkeypatch, path, name, default):
 
 def test_cli_uses_only_public_choice_api():
     root = Path(__file__).resolve().parents[1] / "src" / "helia_profiler" / "cli"
-    for name in ("app.py", "inspect_app.py", "validation_app.py"):
+    for name in ("app.py", "inspect_app.py", "validation_app.py", "run_app.py", "choices.py"):
         assert "typer._types" not in (root / name).read_text(encoding="utf-8")
+
+
+def test_the_timing_scope_choices_are_the_library_scopes():
+    from helia_profiler import FixtureTimingScope
+    from helia_profiler.cli.run_app import _TimingScope
+
+    assert [m.value for m in _TimingScope] == [m.value for m in FixtureTimingScope]
 
 
 def test_registered_driver_strings(monkeypatch):

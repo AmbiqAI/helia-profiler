@@ -12,13 +12,12 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
-import tempfile
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Mapping
 
+from ._files import write_text_atomically
 from .errors import CaptureError, ConfigError
 from .lifecycle import Lifecycle, lifecycle_invocations, require_lifecycle
 
@@ -196,25 +195,9 @@ class CompiledBuild:
         }
         target = Path(path).expanduser()
         text = json.dumps(document, indent=2, sort_keys=True, allow_nan=False) + "\n"
-        partial: Path | None = None
         try:
-            target.parent.mkdir(parents=True, exist_ok=True)
-            with tempfile.NamedTemporaryFile(
-                "w",
-                encoding="utf-8",
-                newline="\n",
-                dir=target.parent,
-                prefix=f".{target.name}.",
-                suffix=".partial",
-                delete=False,
-            ) as stream:
-                partial = Path(stream.name)
-                stream.write(text)
-            # An interrupted save leaves the previous file intact.
-            os.replace(partial, target)
+            write_text_atomically(target, text)
         except OSError as exc:
-            if partial is not None:
-                partial.unlink(missing_ok=True)
             raise ConfigError(f"Cannot save compiled build to {target}: {exc}") from exc
         return target
 

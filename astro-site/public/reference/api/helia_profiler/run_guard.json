@@ -1,0 +1,275 @@
+{
+  "$schema": "https://ambiqai.github.io/helia-ui/schema/reference-model-1.json",
+  "generatedFrom": {
+    "tool": "pyref",
+    "version": "1.7.3"
+  },
+  "language": "python",
+  "modules": [
+    {
+      "description": "Who vouches for the board a run flashes: the guard protocol a capture consults and the operator guard the command line uses.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.",
+      "name": "run_guard",
+      "path": "helia_profiler.run_guard",
+      "submodules": [],
+      "summary": "Who vouches for the board a run flashes: the guard protocol a capture consults and the operator guard the command line uses.",
+      "symbols": [
+        {
+          "description": "`dataclass`\n\nCapture authority from an operator who names the board and the J-Link probe on it.\n\nHPX cannot prove which physical board a probe is wired to: the core's\nCPUID and the probe list name a SoC and a serial, not a board. With this\nguard the operator vouches for the board and holds it for the whole\ncapture, as ``hpx profile`` assumes. :meth:`verify_target` refuses a\ncapture whose board or probe serial differs from the ones the operator\nnamed, and :meth:`check` allows every step. A harness that can prove the\nboard and lock it passes its own\n:class:`~helia_profiler.FixtureCaptureGuard` instead.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.OperatorGuard",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.OperatorGuard.board",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "board",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "board: str",
+              "source": {
+                "line": 28,
+                "path": "src/helia_profiler/run_guard.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/run_guard.py#L28"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.OperatorGuard.jlink_serial",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "jlink_serial",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "jlink_serial: str",
+              "source": {
+                "line": 29,
+                "path": "src/helia_profiler/run_guard.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/run_guard.py#L29"
+              },
+              "summary": ""
+            },
+            {
+              "description": "Allow the step: the operator holds the board for the whole capture.",
+              "examples": [],
+              "id": "helia_profiler.OperatorGuard.check",
+              "kind": "method",
+              "language": "python",
+              "members": [],
+              "name": "check",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "check(*, require_free: bool, remaining_s: float) -> None",
+              "source": {
+                "line": 37,
+                "path": "src/helia_profiler/run_guard.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/run_guard.py#L37"
+              },
+              "summary": "Allow the step: the operator holds the board for the whole capture."
+            },
+            {
+              "description": "Refuse a target board or probe serial other than the operator's.",
+              "examples": [],
+              "id": "helia_profiler.OperatorGuard.verify_target",
+              "kind": "method",
+              "language": "python",
+              "members": [],
+              "name": "verify_target",
+              "params": [],
+              "raises": [
+                {
+                  "description": "The board or the serial differs from the operator's.",
+                  "type": "ConfigError"
+                }
+              ],
+              "returns": [],
+              "signature": "verify_target(*, target: FixtureTarget, jlink_serial: str) -> None",
+              "source": {
+                "line": 41,
+                "path": "src/helia_profiler/run_guard.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/run_guard.py#L41"
+              },
+              "summary": "Refuse a target board or probe serial other than the operator's."
+            }
+          ],
+          "name": "OperatorGuard",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "OperatorGuard(board: str, jlink_serial: str) -> None",
+          "source": {
+            "line": 14,
+            "path": "src/helia_profiler/run_guard.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/run_guard.py#L14"
+          },
+          "summary": "Capture authority from an operator who names the board and the J-Link probe on it."
+        },
+        {
+          "description": "`dataclass`\n\nThe board a fixture image runs on, its J-Link device and the image's load address.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.FixtureTarget",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureTarget.board",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "board",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "board: str",
+              "source": {
+                "line": 23,
+                "path": "src/helia_profiler/fixture_target.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_target.py#L23"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureTarget.device",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "device",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "device: str",
+              "source": {
+                "line": 24,
+                "path": "src/helia_profiler/fixture_target.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_target.py#L24"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureTarget.load_address",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "load_address",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "load_address: int",
+              "source": {
+                "line": 25,
+                "path": "src/helia_profiler/fixture_target.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_target.py#L25"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureTarget.verify",
+              "kind": "method",
+              "language": "python",
+              "members": [],
+              "name": "verify",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "verify() -> None",
+              "source": {
+                "line": 27,
+                "path": "src/helia_profiler/fixture_target.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_target.py#L27"
+              },
+              "summary": ""
+            }
+          ],
+          "name": "FixtureTarget",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "FixtureTarget(board: str, device: str, load_address: int) -> None",
+          "source": {
+            "line": 19,
+            "path": "src/helia_profiler/fixture_target.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_target.py#L19"
+          },
+          "summary": "The board a fixture image runs on, its J-Link device and the image's load address."
+        },
+        {
+          "description": "Caller-owned authorization and remaining-window checks.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.FixtureCaptureGuard",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureCaptureGuard.check",
+              "kind": "method",
+              "language": "python",
+              "members": [],
+              "name": "check",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "check(*, require_free: bool, remaining_s: float) -> None",
+              "source": {
+                "line": 49,
+                "path": "src/helia_profiler/fixture_capture.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_capture.py#L49"
+              },
+              "summary": ""
+            },
+            {
+              "description": "Require caller-verified physical board/serial identity and exclusive ownership.\n\nCore CPUID and probe enumeration cannot establish the physical board.\nReject if the caller has no current independent board/serial evidence.",
+              "examples": [],
+              "id": "helia_profiler.FixtureCaptureGuard.verify_target",
+              "kind": "method",
+              "language": "python",
+              "members": [],
+              "name": "verify_target",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "verify_target(*, target: FixtureTarget, jlink_serial: str) -> None",
+              "source": {
+                "line": 51,
+                "path": "src/helia_profiler/fixture_capture.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_capture.py#L51"
+              },
+              "summary": "Require caller-verified physical board/serial identity and exclusive ownership."
+            }
+          ],
+          "name": "FixtureCaptureGuard",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "FixtureCaptureGuard()",
+          "source": {
+            "line": 46,
+            "path": "src/helia_profiler/fixture_capture.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_capture.py#L46"
+          },
+          "summary": "Caller-owned authorization and remaining-window checks."
+        }
+      ]
+    }
+  ],
+  "name": "helia_profiler"
+}

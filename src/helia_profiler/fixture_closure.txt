@@ -1,4 +1,5 @@
 __init__.py
+_files.py
 _fixture_build.py
 _fixture_closure.py
 _fixture_facts.py
@@ -20,6 +21,7 @@ cli/__init__.py
 cli/analyze_cmd.py
 cli/app.py
 cli/cache_cmd.py
+cli/choices.py
 cli/common.py
 cli/compare_cmd.py
 cli/inspect_app.py
@@ -27,6 +29,8 @@ cli/inspect_cmds.py
 cli/power_cmd.py
 cli/profile_cmd.py
 cli/results_cmd.py
+cli/run_app.py
+cli/run_cmds.py
 cli/runtimes_cmd.py
 cli/validate_cmd.py
 cli/validation_app.py
@@ -229,6 +233,9 @@ results/models.py
 results/run_summary.py
 results/serde.py
 results/support_bundle.py
+run_directory.py
+run_guard.py
+run_inputs.py
 runtime_records.py
 session.py
 stages/__init__.py

@@ -43,6 +43,13 @@ from .wire import STIMER_HZ
 
 
 class FixtureTimingScope(StrEnum):
+    """What the timed span covers.
+
+    ``INVOKE_ONLY`` brackets each invocation; ``RESTORE_AND_INVOKE`` brackets
+    the timed loop, so restoring the fixed inputs before each invocation is
+    inside the span.
+    """
+
     INVOKE_ONLY = "invoke_only"
     RESTORE_AND_INVOKE = "restore_and_invoke"
 

@@ -126,6 +126,8 @@ class FixtureModelAnalysis:
 
 @dataclass(frozen=True)
 class TypedFixtureModelAnalysis:
+    """A model's public inputs and outputs in model order, with its graph facts."""
+
     inputs: tuple[FixtureTensor, ...]
     outputs: tuple[FixtureTensor, ...]
     #: Any FLOAT16 tensor in the graph, including weights behind DEQUANTIZE.

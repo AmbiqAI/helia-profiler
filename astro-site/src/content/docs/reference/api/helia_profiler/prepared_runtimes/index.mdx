@@ -1,0 +1,801 @@
+---
+title: "prepared_runtimes"
+description: "The runtimes a build links and how they are identified: prepared upstream archives, their verified manifests, and the kernel, runtime and engine sources a buil…"
+sidebar:
+  order: 16
+---
+
+import RefMembers from '@ambiqai/helia-ui/astro/RefMembers';
+import RefParams from '@ambiqai/helia-ui/astro/RefParams';
+import RefSection from '@ambiqai/helia-ui/astro/RefSection';
+import RefSymbol from '@ambiqai/helia-ui/astro/RefSymbol';
+
+The runtimes a build links and how they are identified: prepared upstream archives, their verified manifests, and the kernel, runtime and engine sources a build records.
+
+Every name on this page is imported from `helia_profiler`.
+
+**API tier:** `experimental`
+
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
+
+[Machine-readable model](/helia-profiler/reference/api/helia_profiler/prepared_runtimes.json)
+
+<RefMembers label="On this page" items={[{"id":"helia_profiler.ResolverPlan","name":"ResolverPlan","kind":"class","summary":"Concrete registration plan for generated firmware."},{"id":"helia_profiler.FixtureKernelSource","name":"FixtureKernelSource","kind":"class","summary":"The kernel library a build linked: ns-cmsis-nn or arm-cmsis-nn."},{"id":"helia_profiler.FixtureRuntimeSource","name":"FixtureRuntimeSource","kind":"class","summary":"The prepared runtime archive a build linked: helia-rt or tflite-micro."},{"id":"helia_profiler.RuntimeProvider","name":"RuntimeProvider","kind":"class","summary":"API tier: experimental"},{"id":"helia_profiler.RuntimeABI","name":"RuntimeABI","kind":"class","summary":"Manifest-declared ABI; archive members are not independently inspected."},{"id":"helia_profiler.RuntimeHeader","name":"RuntimeHeader","kind":"class","summary":"API tier: experimental"},{"id":"helia_profiler.EngineSource","name":"EngineSource","kind":"class","summary":"Installed engine package: its version and, for a VCS install, the commit."},{"id":"helia_profiler.PreparedRuntimeManifest","name":"PreparedRuntimeManifest","kind":"class","summary":"API tier: experimental"},{"id":"helia_profiler.VerifiedPreparedRuntime","name":"VerifiedPreparedRuntime","kind":"class","summary":"API tier: experimental"},{"id":"helia_profiler.PreparedUpstreamRuntime","name":"PreparedUpstreamRuntime","kind":"class","summary":"Explicit prebuilt provider with a pinned, vendored header closure."}]} />
+
+<RefSymbol
+  id={"helia_profiler.ResolverPlan"}
+  name={"ResolverPlan"}
+  kind={"class"}
+  language={"python"}
+  signature={"ResolverPlan(mode: str, registrations: tuple[str, ...]) -> None"}
+  level={2}
+  summary={"Concrete registration plan for generated firmware."}
+  source={{"path":"src/helia_profiler/firmware/op_resolver.py","line":14,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/firmware/op_resolver.py#L14"}}
+>
+
+  `dataclass`
+
+  Concrete registration plan for generated firmware.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.ResolverPlan.mode"}
+    name={"mode"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"mode: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/firmware/op_resolver.py","line":18,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/firmware/op_resolver.py#L18"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResolverPlan.registrations"}
+    name={"registrations"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"registrations: tuple[str, ...]"}
+    level={3}
+    source={{"path":"src/helia_profiler/firmware/op_resolver.py","line":19,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/firmware/op_resolver.py#L19"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.ResolverPlan.max_ops"}
+    name={"max_ops"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"max_ops: int"}
+    level={3}
+    source={{"path":"src/helia_profiler/firmware/op_resolver.py","line":22,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/firmware/op_resolver.py#L22"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.FixtureKernelSource"}
+  name={"FixtureKernelSource"}
+  kind={"class"}
+  language={"python"}
+  signature={"FixtureKernelSource(name: str, url: str | None, version: str | None, commit: str | None) -> None"}
+  level={2}
+  summary={"The kernel library a build linked: ns-cmsis-nn or arm-cmsis-nn."}
+  source={{"path":"src/helia_profiler/fixture_sources.py","line":19,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_sources.py#L19"}}
+>
+
+  `dataclass`
+
+  The kernel library a build linked: ``ns-cmsis-nn`` or ``arm-cmsis-nn``.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.FixtureKernelSource.name"}
+    name={"name"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"name: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_sources.py","line":23,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_sources.py#L23"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureKernelSource.url"}
+    name={"url"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"url: str | None"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_sources.py","line":24,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_sources.py#L24"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureKernelSource.version"}
+    name={"version"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"version: str | None"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_sources.py","line":26,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_sources.py#L26"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureKernelSource.commit"}
+    name={"commit"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"commit: str | None"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_sources.py","line":27,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_sources.py#L27"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.FixtureRuntimeSource"}
+  name={"FixtureRuntimeSource"}
+  kind={"class"}
+  language={"python"}
+  signature={"FixtureRuntimeSource(name: str, url: str, version: str | None, commit: str, archive_sha256: str) -> None"}
+  level={2}
+  summary={"The prepared runtime archive a build linked: helia-rt or tflite-micro."}
+  source={{"path":"src/helia_profiler/fixture_sources.py","line":30,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_sources.py#L30"}}
+>
+
+  `dataclass`
+
+  The prepared runtime archive a build linked: ``helia-rt`` or ``tflite-micro``.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.FixtureRuntimeSource.name"}
+    name={"name"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"name: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_sources.py","line":34,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_sources.py#L34"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureRuntimeSource.url"}
+    name={"url"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"url: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_sources.py","line":35,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_sources.py#L35"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureRuntimeSource.version"}
+    name={"version"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"version: str | None"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_sources.py","line":38,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_sources.py#L38"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureRuntimeSource.commit"}
+    name={"commit"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"commit: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_sources.py","line":39,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_sources.py#L39"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureRuntimeSource.archive_sha256"}
+    name={"archive_sha256"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"archive_sha256: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_sources.py","line":40,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_sources.py#L40"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.RuntimeProvider"}
+  name={"RuntimeProvider"}
+  kind={"class"}
+  language={"python"}
+  signature={"RuntimeProvider(name: str, url: str, revision: str) -> None"}
+  level={2}
+  summary={"API tier: experimental"}
+  source={{"path":"src/helia_profiler/fixture_runtime.py","line":61,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L61"}}
+>
+
+  `dataclass`
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.RuntimeProvider.name"}
+    name={"name"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"name: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_runtime.py","line":63,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L63"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RuntimeProvider.url"}
+    name={"url"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"url: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_runtime.py","line":64,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L64"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RuntimeProvider.revision"}
+    name={"revision"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"revision: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_runtime.py","line":65,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L65"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.RuntimeABI"}
+  name={"RuntimeABI"}
+  kind={"class"}
+  language={"python"}
+  signature={"RuntimeABI(toolchain: str, cpu: str, float_abi: str, short_enums: bool) -> None"}
+  level={2}
+  summary={"Manifest-declared ABI; archive members are not independently inspected."}
+  source={{"path":"src/helia_profiler/fixture_runtime.py","line":68,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L68"}}
+>
+
+  `dataclass`
+
+  Manifest-declared ABI; archive members are not independently inspected.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.RuntimeABI.toolchain"}
+    name={"toolchain"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"toolchain: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_runtime.py","line":72,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L72"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RuntimeABI.cpu"}
+    name={"cpu"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"cpu: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_runtime.py","line":73,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L73"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RuntimeABI.float_abi"}
+    name={"float_abi"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"float_abi: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_runtime.py","line":74,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L74"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RuntimeABI.short_enums"}
+    name={"short_enums"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"short_enums: bool"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_runtime.py","line":75,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L75"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.RuntimeHeader"}
+  name={"RuntimeHeader"}
+  kind={"class"}
+  language={"python"}
+  signature={"RuntimeHeader(name: str, sha256: str) -> None"}
+  level={2}
+  summary={"API tier: experimental"}
+  source={{"path":"src/helia_profiler/fixture_runtime.py","line":78,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L78"}}
+>
+
+  `dataclass`
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.RuntimeHeader.name"}
+    name={"name"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"name: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_runtime.py","line":80,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L80"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RuntimeHeader.sha256"}
+    name={"sha256"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"sha256: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_runtime.py","line":81,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L81"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.EngineSource"}
+  name={"EngineSource"}
+  kind={"class"}
+  language={"python"}
+  signature={"EngineSource(package: str, version: str, commit: str | None = None) -> None"}
+  level={2}
+  summary={"Installed engine package: its version and, for a VCS install, the commit."}
+  source={{"path":"src/helia_profiler/engines/base.py","line":84,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/engines/base.py#L84"}}
+>
+
+  `dataclass`
+
+  Installed engine package: its version and, for a VCS install, the commit.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.EngineSource.package"}
+    name={"package"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"package: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/engines/base.py","line":88,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/engines/base.py#L88"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.EngineSource.version"}
+    name={"version"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"version: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/engines/base.py","line":89,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/engines/base.py#L89"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.EngineSource.commit"}
+    name={"commit"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"commit: str | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/engines/base.py","line":90,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/engines/base.py#L90"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.PreparedRuntimeManifest"}
+  name={"PreparedRuntimeManifest"}
+  kind={"class"}
+  language={"python"}
+  signature={"PreparedRuntimeManifest(\n    schema_version: int,\n    archive_sha256: str,\n    providers: tuple[RuntimeProvider, ...],\n    abi: RuntimeABI,\n    headers: tuple[RuntimeHeader, ...],\n    include_dirs: tuple[str, ...],\n    stack: str = 'upstream',\n    consumer_defines: tuple[str, ...] = _UPSTREAM_DEFINES,\n    kernel_dir: str | None = None,\n) -> None"}
+  level={2}
+  summary={"API tier: experimental"}
+  source={{"path":"src/helia_profiler/fixture_runtime.py","line":110,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L110"}}
+>
+
+  `dataclass`
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.PreparedRuntimeManifest.schema_version"}
+    name={"schema_version"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"schema_version: int"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_runtime.py","line":112,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L112"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PreparedRuntimeManifest.archive_sha256"}
+    name={"archive_sha256"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"archive_sha256: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_runtime.py","line":113,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L113"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PreparedRuntimeManifest.providers"}
+    name={"providers"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"providers: tuple[RuntimeProvider, ...]"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_runtime.py","line":114,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L114"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PreparedRuntimeManifest.abi"}
+    name={"abi"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"abi: RuntimeABI"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_runtime.py","line":115,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L115"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PreparedRuntimeManifest.headers"}
+    name={"headers"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"headers: tuple[RuntimeHeader, ...]"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_runtime.py","line":116,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L116"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PreparedRuntimeManifest.include_dirs"}
+    name={"include_dirs"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"include_dirs: tuple[str, ...]"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_runtime.py","line":117,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L117"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PreparedRuntimeManifest.stack"}
+    name={"stack"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"stack: str = 'upstream'"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_runtime.py","line":118,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L118"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PreparedRuntimeManifest.consumer_defines"}
+    name={"consumer_defines"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"consumer_defines: tuple[str, ...] = _UPSTREAM_DEFINES"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_runtime.py","line":120,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L120"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PreparedRuntimeManifest.kernel_dir"}
+    name={"kernel_dir"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"kernel_dir: str | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_runtime.py","line":121,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L121"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.VerifiedPreparedRuntime"}
+  name={"VerifiedPreparedRuntime"}
+  kind={"class"}
+  language={"python"}
+  signature={"VerifiedPreparedRuntime(archive: FixtureFile, header_root: Path, manifest: FixtureFile, record: RuntimeManifest) -> None"}
+  level={2}
+  summary={"API tier: experimental"}
+  source={{"path":"src/helia_profiler/fixture_runtime.py","line":174,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L174"}}
+>
+
+  `dataclass`
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.VerifiedPreparedRuntime.archive"}
+    name={"archive"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"archive: FixtureFile"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_runtime.py","line":176,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L176"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.VerifiedPreparedRuntime.header_root"}
+    name={"header_root"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"header_root: Path"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_runtime.py","line":177,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L177"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.VerifiedPreparedRuntime.manifest"}
+    name={"manifest"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"manifest: FixtureFile"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_runtime.py","line":178,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L178"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.VerifiedPreparedRuntime.record"}
+    name={"record"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"record: RuntimeManifest"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_runtime.py","line":179,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L179"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.VerifiedPreparedRuntime.header_path"}
+    name={"header_path"}
+    kind={"method"}
+    language={"python"}
+    signature={"header_path(name: str) -> Path"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_runtime.py","line":181,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L181"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.PreparedUpstreamRuntime"}
+  name={"PreparedUpstreamRuntime"}
+  kind={"class"}
+  language={"python"}
+  signature={"PreparedUpstreamRuntime(archive: FixtureFile, header_root: Path, manifest: FixtureFile) -> None"}
+  level={2}
+  summary={"Explicit prebuilt provider with a pinned, vendored header closure."}
+  source={{"path":"src/helia_profiler/fixture_runtime.py","line":185,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L185"}}
+>
+
+  `dataclass`
+
+  Explicit prebuilt provider with a pinned, vendored header closure.
+
+  Manifest schema 1 declares the upstream TFLM + CMSIS-NN stack; schema 2
+  declares its ``stack`` (``helia-rt``) and the consumer defines and kernel
+  directory it was built with.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.PreparedUpstreamRuntime.archive"}
+    name={"archive"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"archive: FixtureFile"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_runtime.py","line":194,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L194"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PreparedUpstreamRuntime.header_root"}
+    name={"header_root"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"header_root: Path"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_runtime.py","line":195,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L195"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PreparedUpstreamRuntime.manifest"}
+    name={"manifest"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"manifest: FixtureFile"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_runtime.py","line":196,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L196"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PreparedUpstreamRuntime.verify"}
+    name={"verify"}
+    kind={"method"}
+    language={"python"}
+    signature={"verify() -> VerifiedPreparedRuntime"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_runtime.py","line":198,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L198"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+---
+
+Machine-readable: [`prepared_runtimes.json`](/helia-profiler/reference/api/helia_profiler/prepared_runtimes.json) · [`prepared_runtimes.md`](/helia-profiler/reference/api/helia_profiler/prepared_runtimes.md), complete and lossless.

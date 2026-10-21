@@ -1,0 +1,1035 @@
+---
+title: "run_inputs"
+description: "What a run is built for and captured under: the typed fixture that pins a model's input bytes and declares its outputs, the tensors' element types and quantiza…"
+sidebar:
+  order: 19
+---
+
+import RefMembers from '@ambiqai/helia-ui/astro/RefMembers';
+import RefParams from '@ambiqai/helia-ui/astro/RefParams';
+import RefSection from '@ambiqai/helia-ui/astro/RefSection';
+import RefSymbol from '@ambiqai/helia-ui/astro/RefSymbol';
+
+What a run is built for and captured under: the typed fixture that pins a model's input bytes and declares its outputs, the tensors' element types and quantization, how the run is timed, the prepared runtime a build links, the board guard a capture answers to, the model analysis that lists a model's inputs and outputs, and the targets and IO types this heliaPROFILER builds.
+
+Every name on this page is imported from `helia_profiler`.
+
+**API tier:** `experimental`
+
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
+
+[Machine-readable model](/helia-profiler/reference/api/helia_profiler/run_inputs.json)
+
+<RefMembers label="On this page" items={[{"id":"helia_profiler.FixtureFile","name":"FixtureFile","kind":"class","summary":"A file pinned by its SHA-256; :meth:read refuses bytes that no longer match."},{"id":"helia_profiler.analyze_run_model","name":"analyze_run_model","kind":"function","summary":"Read a LiteRT model's public inputs and outputs without selecting an engine."},{"id":"helia_profiler.FixtureTimingScope","name":"FixtureTimingScope","kind":"class","summary":"What the timed span covers."},{"id":"helia_profiler.PerTensorQuantization","name":"PerTensorQuantization","kind":"class","summary":"API tier: experimental"},{"id":"helia_profiler.PerAxisQuantization","name":"PerAxisQuantization","kind":"class","summary":"API tier: experimental"},{"id":"helia_profiler.analyze_run_model_for_engine","name":"analyze_run_model_for_engine","kind":"function","summary":"Read a model's public inputs and outputs as engine's fixture integration admits them."},{"id":"helia_profiler.FixtureStatePolicy","name":"FixtureStatePolicy","kind":"class","summary":"Internal state behavior; input restoration is independent of this policy."},{"id":"helia_profiler.FixtureTensor","name":"FixtureTensor","kind":"class","summary":"One named model input or output with its dtype, shape and quantization."},{"id":"helia_profiler.FixtureRole","name":"FixtureRole","kind":"class","summary":"Role of one fixture tensor; outputs are always SIGNAL."},{"id":"helia_profiler.FixtureDType","name":"FixtureDType","kind":"class","summary":"IO tensor element types a fixture can declare."},{"id":"helia_profiler.FixtureMethod","name":"FixtureMethod","kind":"class","summary":"Select input-restoration timing and, optionally, the internal-state policy."},{"id":"helia_profiler.TypedFixtureModelAnalysis","name":"TypedFixtureModelAnalysis","kind":"class","summary":"A model's public inputs and outputs in model order, with its graph facts."},{"id":"helia_profiler.FixtureIO","name":"FixtureIO","kind":"class","summary":"One model input with its fixed bytes, or one output with its expected bytes."},{"id":"helia_profiler.FixtureOutput","name":"FixtureOutput","kind":"class","summary":"One complete output declaration, without a reference answer."},{"id":"helia_profiler.TypedFixture","name":"TypedFixture","kind":"class","summary":"Fixed input bytes and complete ordered outputs for a model."}]} />
+
+<RefSymbol
+  id={"helia_profiler.FixtureFile"}
+  name={"FixtureFile"}
+  kind={"class"}
+  language={"python"}
+  signature={"FixtureFile(path: Path, sha256: str) -> None"}
+  level={2}
+  summary={"A file pinned by its SHA-256; :meth:read refuses bytes that no longer match."}
+  source={{"path":"src/helia_profiler/fixture_runtime.py","line":15,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L15"}}
+>
+
+  `dataclass`
+
+  A file pinned by its SHA-256; :meth:`read` refuses bytes that no longer match.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.FixtureFile.path"}
+    name={"path"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"path: Path"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_runtime.py","line":19,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L19"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureFile.sha256"}
+    name={"sha256"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"sha256: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_runtime.py","line":20,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L20"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureFile.read"}
+    name={"read"}
+    kind={"method"}
+    language={"python"}
+    signature={"read() -> bytes"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_runtime.py","line":22,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_runtime.py#L22"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.analyze_run_model"}
+  name={"analyze_run_model"}
+  kind={"function"}
+  language={"python"}
+  signature={"analyze_run_model(path: str | Path) -> TypedFixtureModelAnalysis"}
+  level={2}
+  summary={"Read a LiteRT model's public inputs and outputs without selecting an engine."}
+  source={{"path":"src/helia_profiler/run_inputs.py","line":34,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/run_inputs.py#L34"}}
+>
+
+  Read a LiteRT model's public inputs and outputs without selecting an engine.
+
+  **API tier:** `experimental`
+
+  <RefSection title="Parameters">
+    <RefParams
+      caption={"Parameters of analyze_run_model"}
+      defaultLabel={"Default"}
+      density={"compact"}
+      rows={[{"name":"path","type":"str | Path","default":"Required","description":"The ``.tflite`` model."}]}
+    />
+  </RefSection>
+
+  <RefSection title="Returns">
+    <RefParams
+      caption={"Returns of analyze_run_model"}
+      density={"compact"}
+      nameLabel="Value"
+      rows={[{"type":"TypedFixtureModelAnalysis","description":"The input and output tensors in model order, with their dtype, shape"},{"type":"TypedFixtureModelAnalysis","description":"and quantization, and the model's graph facts."}]}
+    />
+  </RefSection>
+
+  <RefSection title="Raises">
+    <RefParams
+      caption={"Errors raised by analyze_run_model"}
+      density={"compact"}
+      nameLabel="Type"
+      rows={[{"name":"ConfigError","description":"The model is unreadable, or a run cannot pin inputs for\nit, for example because an input or output shape is dynamic."}]}
+    />
+  </RefSection>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.FixtureTimingScope"}
+  name={"FixtureTimingScope"}
+  kind={"class"}
+  language={"python"}
+  signature={"FixtureTimingScope()"}
+  level={2}
+  summary={"What the timed span covers."}
+  source={{"path":"src/helia_profiler/_fixture_build.py","line":45,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L45"}}
+>
+
+  What the timed span covers.
+
+  ``INVOKE_ONLY`` brackets each invocation; ``RESTORE_AND_INVOKE`` brackets
+  the timed loop, so restoring the fixed inputs before each invocation is
+  inside the span.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.FixtureTimingScope.INVOKE_ONLY"}
+    name={"INVOKE_ONLY"}
+    kind={"constant"}
+    language={"python"}
+    signature={"INVOKE_ONLY = 'invoke_only'"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":53,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L53"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureTimingScope.RESTORE_AND_INVOKE"}
+    name={"RESTORE_AND_INVOKE"}
+    kind={"constant"}
+    language={"python"}
+    signature={"RESTORE_AND_INVOKE = 'restore_and_invoke'"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":54,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L54"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.PerTensorQuantization"}
+  name={"PerTensorQuantization"}
+  kind={"class"}
+  language={"python"}
+  signature={"PerTensorQuantization(scale: float, zero_point: int) -> None"}
+  level={2}
+  summary={"API tier: experimental"}
+  source={{"path":"src/helia_profiler/fixture_analysis.py","line":47,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_analysis.py#L47"}}
+>
+
+  `dataclass`
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.PerTensorQuantization.scale"}
+    name={"scale"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"scale: float"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_analysis.py","line":49,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_analysis.py#L49"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PerTensorQuantization.zero_point"}
+    name={"zero_point"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"zero_point: int"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_analysis.py","line":50,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_analysis.py#L50"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.PerAxisQuantization"}
+  name={"PerAxisQuantization"}
+  kind={"class"}
+  language={"python"}
+  signature={"PerAxisQuantization(axis: int, scales: tuple[float, ...], zero_points: tuple[int, ...]) -> None"}
+  level={2}
+  summary={"API tier: experimental"}
+  source={{"path":"src/helia_profiler/fixture_analysis.py","line":53,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_analysis.py#L53"}}
+>
+
+  `dataclass`
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.PerAxisQuantization.axis"}
+    name={"axis"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"axis: int"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_analysis.py","line":55,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_analysis.py#L55"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PerAxisQuantization.scales"}
+    name={"scales"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"scales: tuple[float, ...]"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_analysis.py","line":56,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_analysis.py#L56"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PerAxisQuantization.zero_points"}
+    name={"zero_points"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"zero_points: tuple[int, ...]"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_analysis.py","line":57,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_analysis.py#L57"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.analyze_run_model_for_engine"}
+  name={"analyze_run_model_for_engine"}
+  kind={"function"}
+  language={"python"}
+  signature={"analyze_run_model_for_engine(path: str | Path, engine: EngineType | str) -> TypedFixtureModelAnalysis"}
+  level={2}
+  summary={"Read a model's public inputs and outputs as engine's fixture integration admits them."}
+  source={{"path":"src/helia_profiler/run_inputs.py","line":56,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/run_inputs.py#L56"}}
+>
+
+  Read a model's public inputs and outputs as *engine*'s fixture integration admits them.
+
+  **API tier:** `experimental`
+
+  <RefSection title="Parameters">
+    <RefParams
+      caption={"Parameters of analyze_run_model_for_engine"}
+      defaultLabel={"Default"}
+      density={"compact"}
+      rows={[{"name":"path","type":"str | Path","default":"Required","description":"The ``.tflite`` model."},{"name":"engine","type":"EngineType | str","default":"Required","description":"The engine the run builds with."}]}
+    />
+  </RefSection>
+
+  <RefSection title="Returns">
+    <RefParams
+      caption={"Returns of analyze_run_model_for_engine"}
+      density={"compact"}
+      nameLabel="Value"
+      rows={[{"type":"TypedFixtureModelAnalysis","description":"The same analysis as :func:`analyze_run_model`, after the engine has"},{"type":"TypedFixtureModelAnalysis","description":"admitted the model."}]}
+    />
+  </RefSection>
+
+  <RefSection title="Raises">
+    <RefParams
+      caption={"Errors raised by analyze_run_model_for_engine"}
+      density={"compact"}
+      nameLabel="Type"
+      rows={[{"name":"ConfigError","description":"*engine* is not an engine name, the model is unreadable,\nor the engine does not admit the model."}]}
+    />
+  </RefSection>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.FixtureStatePolicy"}
+  name={"FixtureStatePolicy"}
+  kind={"class"}
+  language={"python"}
+  signature={"FixtureStatePolicy()"}
+  level={2}
+  summary={"Internal state behavior; input restoration is independent of this policy."}
+  source={{"path":"src/helia_profiler/_fixture_build.py","line":57,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L57"}}
+>
+
+  Internal state behavior; input restoration is independent of this policy.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.FixtureStatePolicy.CARRY"}
+    name={"CARRY"}
+    kind={"constant"}
+    language={"python"}
+    signature={"CARRY = 'carry'"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":60,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L60"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.FixtureTensor"}
+  name={"FixtureTensor"}
+  kind={"class"}
+  language={"python"}
+  signature={"FixtureTensor(\n    name: str,\n    index: int,\n    dtype: str,\n    shape: tuple[int, ...],\n    quantization: PerTensorQuantization | PerAxisQuantization | None,\n) -> None"}
+  level={2}
+  summary={"One named model input or output with its dtype, shape and quantization."}
+  source={{"path":"src/helia_profiler/fixture_analysis.py","line":60,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_analysis.py#L60"}}
+>
+
+  `dataclass`
+
+  One named model input or output with its dtype, shape and quantization.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.FixtureTensor.name"}
+    name={"name"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"name: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_analysis.py","line":64,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_analysis.py#L64"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureTensor.index"}
+    name={"index"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"index: int"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_analysis.py","line":65,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_analysis.py#L65"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureTensor.dtype"}
+    name={"dtype"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"dtype: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_analysis.py","line":66,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_analysis.py#L66"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureTensor.shape"}
+    name={"shape"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"shape: tuple[int, ...]"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_analysis.py","line":67,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_analysis.py#L67"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureTensor.quantization"}
+    name={"quantization"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"quantization: PerTensorQuantization | PerAxisQuantization | None"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_analysis.py","line":68,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_analysis.py#L68"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureTensor.size_bytes"}
+    name={"size_bytes"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"size_bytes: int"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_analysis.py","line":102,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_analysis.py#L102"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.FixtureRole"}
+  name={"FixtureRole"}
+  kind={"class"}
+  language={"python"}
+  signature={"FixtureRole()"}
+  level={2}
+  summary={"Role of one fixture tensor; outputs are always SIGNAL."}
+  source={{"path":"src/helia_profiler/_fixture_build.py","line":63,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L63"}}
+>
+
+  Role of one fixture tensor; outputs are always ``SIGNAL``.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.FixtureRole.SIGNAL"}
+    name={"SIGNAL"}
+    kind={"constant"}
+    language={"python"}
+    signature={"SIGNAL = 'signal'"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":66,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L66"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureRole.AUX"}
+    name={"AUX"}
+    kind={"constant"}
+    language={"python"}
+    signature={"AUX = 'aux'"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":67,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L67"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.FixtureDType"}
+  name={"FixtureDType"}
+  kind={"class"}
+  language={"python"}
+  signature={"FixtureDType()"}
+  level={2}
+  summary={"IO tensor element types a fixture can declare."}
+  source={{"path":"src/helia_profiler/_fixture_build.py","line":70,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L70"}}
+>
+
+  IO tensor element types a fixture can declare.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.FixtureDType.INT8"}
+    name={"INT8"}
+    kind={"constant"}
+    language={"python"}
+    signature={"INT8 = 'int8'"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":73,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L73"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureDType.INT16"}
+    name={"INT16"}
+    kind={"constant"}
+    language={"python"}
+    signature={"INT16 = 'int16'"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":74,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L74"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureDType.INT32"}
+    name={"INT32"}
+    kind={"constant"}
+    language={"python"}
+    signature={"INT32 = 'int32'"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":75,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L75"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureDType.FLOAT16"}
+    name={"FLOAT16"}
+    kind={"constant"}
+    language={"python"}
+    signature={"FLOAT16 = 'float16'"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":76,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L76"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureDType.FLOAT32"}
+    name={"FLOAT32"}
+    kind={"constant"}
+    language={"python"}
+    signature={"FLOAT32 = 'float32'"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":77,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L77"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.FixtureMethod"}
+  name={"FixtureMethod"}
+  kind={"class"}
+  language={"python"}
+  signature={"FixtureMethod(\n    timing_scope: FixtureTimingScope,\n    state_policy: FixtureStatePolicy | None = None,\n    power_sync: FixturePowerSync | None = None,\n) -> None"}
+  level={2}
+  summary={"Select input-restoration timing and, optionally, the internal-state policy."}
+  source={{"path":"src/helia_profiler/_fixture_build.py","line":87,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L87"}}
+>
+
+  `dataclass`
+
+  Select input-restoration timing and, optionally, the internal-state policy.
+
+  Carry initializes the engine once, then retains internal state through
+  warmups and measurements. It is how fixtures always run, so a build of a
+  model with internal state records it when no policy is given. Fixed external
+  inputs are still restored each invocation; no internal reset or
+  source-initializer equivalence is implied.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.FixtureMethod.timing_scope"}
+    name={"timing_scope"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"timing_scope: FixtureTimingScope"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":98,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L98"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureMethod.state_policy"}
+    name={"state_policy"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"state_policy: FixtureStatePolicy | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":99,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L99"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureMethod.power_sync"}
+    name={"power_sync"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"power_sync: FixturePowerSync | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":100,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L100"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.TypedFixtureModelAnalysis"}
+  name={"TypedFixtureModelAnalysis"}
+  kind={"class"}
+  language={"python"}
+  signature={"TypedFixtureModelAnalysis(\n    inputs: tuple[FixtureTensor, ...],\n    outputs: tuple[FixtureTensor, ...],\n    has_float16: bool,\n    analysis: ModelAnalysis,\n    resolver: ResolverPlan,\n    has_internal_state: bool = False,\n    has_initializer: bool = False,\n    subgraph_count: int = 1,\n    resource_variable_count: int = 0,\n) -> None"}
+  level={2}
+  summary={"A model's public inputs and outputs in model order, with its graph facts."}
+  source={{"path":"src/helia_profiler/fixture_analysis.py","line":127,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_analysis.py#L127"}}
+>
+
+  `dataclass`
+
+  A model's public inputs and outputs in model order, with its graph facts.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.TypedFixtureModelAnalysis.inputs"}
+    name={"inputs"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"inputs: tuple[FixtureTensor, ...]"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_analysis.py","line":131,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_analysis.py#L131"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.TypedFixtureModelAnalysis.outputs"}
+    name={"outputs"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"outputs: tuple[FixtureTensor, ...]"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_analysis.py","line":132,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_analysis.py#L132"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.TypedFixtureModelAnalysis.has_float16"}
+    name={"has_float16"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"has_float16: bool"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_analysis.py","line":134,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_analysis.py#L134"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.TypedFixtureModelAnalysis.analysis"}
+    name={"analysis"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"analysis: ModelAnalysis"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_analysis.py","line":135,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_analysis.py#L135"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.TypedFixtureModelAnalysis.resolver"}
+    name={"resolver"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"resolver: ResolverPlan"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_analysis.py","line":136,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_analysis.py#L136"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.TypedFixtureModelAnalysis.has_internal_state"}
+    name={"has_internal_state"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"has_internal_state: bool = False"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_analysis.py","line":137,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_analysis.py#L137"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.TypedFixtureModelAnalysis.has_initializer"}
+    name={"has_initializer"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"has_initializer: bool = False"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_analysis.py","line":138,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_analysis.py#L138"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.TypedFixtureModelAnalysis.subgraph_count"}
+    name={"subgraph_count"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"subgraph_count: int = 1"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_analysis.py","line":139,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_analysis.py#L139"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.TypedFixtureModelAnalysis.resource_variable_count"}
+    name={"resource_variable_count"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"resource_variable_count: int = 0"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_analysis.py","line":140,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_analysis.py#L140"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.TypedFixtureModelAnalysis.input_bytes"}
+    name={"input_bytes"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"input_bytes: int"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_analysis.py","line":143,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_analysis.py#L143"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.TypedFixtureModelAnalysis.output_bytes"}
+    name={"output_bytes"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"output_bytes: int"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_analysis.py","line":147,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_analysis.py#L147"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.FixtureIO"}
+  name={"FixtureIO"}
+  kind={"class"}
+  language={"python"}
+  signature={"FixtureIO(tensor: FixtureTensor, data: FixtureFile, role: FixtureRole = FixtureRole.SIGNAL) -> None"}
+  level={2}
+  summary={"One model input with its fixed bytes, or one output with its expected bytes."}
+  source={{"path":"src/helia_profiler/_fixture_build.py","line":185,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L185"}}
+>
+
+  `dataclass`
+
+  One model input with its fixed bytes, or one output with its expected bytes.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.FixtureIO.tensor"}
+    name={"tensor"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"tensor: FixtureTensor"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":189,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L189"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureIO.data"}
+    name={"data"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"data: FixtureFile"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":190,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L190"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureIO.role"}
+    name={"role"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"role: FixtureRole = FixtureRole.SIGNAL"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":191,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L191"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.FixtureOutput"}
+  name={"FixtureOutput"}
+  kind={"class"}
+  language={"python"}
+  signature={"FixtureOutput(tensor: FixtureTensor) -> None"}
+  level={2}
+  summary={"One complete output declaration, without a reference answer."}
+  source={{"path":"src/helia_profiler/_fixture_build.py","line":194,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L194"}}
+>
+
+  `dataclass`
+
+  One complete output declaration, without a reference answer.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.FixtureOutput.tensor"}
+    name={"tensor"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"tensor: FixtureTensor"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":198,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L198"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.TypedFixture"}
+  name={"TypedFixture"}
+  kind={"class"}
+  language={"python"}
+  signature={"TypedFixture(\n    model: FixtureFile,\n    inputs: tuple[FixtureIO, ...],\n    outputs: tuple[FixtureIO, ...] | tuple[FixtureOutput, ...],\n) -> None"}
+  level={2}
+  summary={"Fixed input bytes and complete ordered outputs for a model."}
+  source={{"path":"src/helia_profiler/_fixture_build.py","line":201,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L201"}}
+>
+
+  `dataclass`
+
+  Fixed input bytes and complete ordered outputs for a model.
+
+  Outputs are descriptors, or legacy ``FixtureIO`` references. Reference
+  bytes are not needed for measurement; legacy identities remain unchanged.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.TypedFixture.model"}
+    name={"model"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"model: FixtureFile"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":209,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L209"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.TypedFixture.inputs"}
+    name={"inputs"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"inputs: tuple[FixtureIO, ...]"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":210,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L210"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.TypedFixture.outputs"}
+    name={"outputs"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"outputs: tuple[FixtureIO, ...] | tuple[FixtureOutput, ...]"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":211,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L211"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.TypedFixture.expected"}
+    name={"expected"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"expected: FixtureFile | None"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":231,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L231"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.TypedFixture.identity"}
+    name={"identity"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"identity: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":236,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L236"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.TypedFixture.verify"}
+    name={"verify"}
+    kind={"method"}
+    language={"python"}
+    signature={"verify() -> None"}
+    level={3}
+    source={{"path":"src/helia_profiler/_fixture_build.py","line":213,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_fixture_build.py#L213"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+---
+
+Machine-readable: [`run_inputs.json`](/helia-profiler/reference/api/helia_profiler/run_inputs.json) · [`run_inputs.md`](/helia-profiler/reference/api/helia_profiler/run_inputs.md), complete and lossless.

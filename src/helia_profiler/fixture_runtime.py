@@ -14,6 +14,8 @@ from .errors import ConfigError
 
 @dataclass(frozen=True)
 class FixtureFile:
+    """A file pinned by its SHA-256; :meth:`read` refuses bytes that no longer match."""
+
     path: Path
     sha256: str
 

@@ -59,6 +59,27 @@ def test_a_saved_plan_reloads_and_resolves_to_the_same_config(session, tmp_path)
     assert plan.qualification == "qualified" and plan.overrides == () and plan.portable
 
 
+def test_saving_a_plan_replaces_its_name_and_leaves_other_links_alone(session, tmp_path):
+    other = tmp_path / "other"
+    other.write_bytes(b"other")
+    target = tmp_path / "run.json"
+    target.hardlink_to(other)
+
+    FrozenRun.load(session.freeze().save(target))
+
+    assert other.read_bytes() == b"other"
+    assert [p.name for p in tmp_path.iterdir() if p.name.endswith(".partial")] == []
+
+
+def test_a_saved_plan_gets_the_mode_of_any_new_file(session, tmp_path):
+    reference = tmp_path / "reference"
+    reference.write_text("")
+
+    saved = session.freeze().save(tmp_path / "run.json")
+
+    assert saved.stat().st_mode == reference.stat().st_mode
+
+
 def test_host_local_settings_are_not_stored_and_come_from_the_replaying_host(session, tmp_path):
     local = (
         session.with_target(jlink_serial="1160002255")

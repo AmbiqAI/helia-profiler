@@ -8,15 +8,17 @@
     "pydantic": "2.13.4"
   },
   "counts": {
-    "leaf_commands": 20,
+    "leaf_commands": 23,
     "leaf_command_names": [
       "analyze",
       "boards",
+      "build",
       "cache info",
       "cache purge",
       "compare",
       "doctor",
       "engines",
+      "freeze",
       "ports list",
       "power-on",
       "probes list",
@@ -25,13 +27,14 @@
       "results export",
       "results inspect",
       "results show",
+      "run",
       "runtimes list",
       "runtimes prepare",
       "runtimes show",
       "target reset",
-      "validate"
+      "validate build"
     ],
-    "groups": 7,
+    "groups": 8,
     "group_names": [
       "hpx",
       "cache",
@@ -39,27 +42,32 @@
       "probes",
       "results",
       "runtimes",
-      "target"
-    ],
-    "top_level_entries": 14,
-    "epilogs": 6,
-    "epilog_commands": [
-      "analyze",
-      "cache",
-      "compare",
-      "power-on",
-      "profile",
+      "target",
       "validate"
     ],
-    "options": 103,
-    "arguments": 11,
-    "options_with_panel": 42,
+    "top_level_entries": 17,
+    "epilogs": 9,
+    "epilog_commands": [
+      "analyze",
+      "build",
+      "cache",
+      "compare",
+      "freeze",
+      "power-on",
+      "profile",
+      "run",
+      "validate"
+    ],
+    "options": 134,
+    "arguments": 15,
+    "options_with_panel": 57,
     "panel_names": [
       "PMU profiling",
       "advanced",
       "build overrides",
       "engine",
       "output",
+      "output verification",
       "power measurement",
       "target hardware"
     ],
@@ -77,7 +85,7 @@
     "hidden": false,
     "source": {
       "path": "src/helia_profiler/cli/app.py",
-      "line": 47
+      "line": 49
     },
     "arguments": [],
     "options": [
@@ -124,7 +132,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 539
+          "line": 531
         },
         "arguments": [
           {
@@ -334,6 +342,272 @@
       },
       {
         "path": [
+          "build"
+        ],
+        "name": "build",
+        "kind": "command",
+        "usage": "hpx build [OPTIONS] PLAN",
+        "short_help": "Build a frozen plan for fixed inputs into a run directory",
+        "help": "Build a frozen plan for fixed inputs into a run directory",
+        "epilog": "Writes OUT/build.json, the model and one input_<index>.bin per model input under OUT/inputs, and the firmware under OUT/work. OUT must be new or empty, so a failed build never touches an earlier one. heliaRT and LiteRT link the runtime that hpx runtimes prepare cached under the HPX cache. Prints the saved build's path, inputs and identity as JSON.\n\nExample:\n\n  hpx build plan.json --out runs/kws --input kws_input.bin",
+        "deprecated": false,
+        "hidden": false,
+        "source": {
+          "path": "src/helia_profiler/cli/run_app.py",
+          "line": 211
+        },
+        "arguments": [
+          {
+            "name": "plan",
+            "kind": "argument",
+            "declaration": "plan",
+            "opts": [
+              "plan"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Path",
+            "default": null,
+            "required": true,
+            "help": "Plan written by hpx freeze",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          }
+        ],
+        "options": [
+          {
+            "name": "out",
+            "kind": "option",
+            "declaration": "--out",
+            "opts": [
+              "--out"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Path",
+            "default": null,
+            "required": true,
+            "help": "Run directory to write",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "input_",
+            "kind": "option",
+            "declaration": "--input",
+            "opts": [
+              "--input"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Optional[list[Path]]",
+            "default": null,
+            "required": false,
+            "help": "Raw bytes for one model input; repeat once per input, in model order (default: zero-filled inputs)",
+            "panel": null,
+            "is_flag": false,
+            "multiple": true,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "lifecycle",
+            "kind": "option",
+            "declaration": "--lifecycle",
+            "opts": [
+              "--lifecycle"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "choice",
+              "class": "TyperChoice",
+              "choices": [
+                "carry",
+                "single"
+              ]
+            },
+            "python_type": "Lifecycle",
+            "default": "carry",
+            "required": false,
+            "help": "carry keeps the plan's iterations and warmups and carries model state; single times one invocation per boot",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "timing_scope",
+            "kind": "option",
+            "declaration": "--timing-scope",
+            "opts": [
+              "--timing-scope"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "choice",
+              "class": "TyperChoice",
+              "choices": [
+                "invoke_only",
+                "restore_and_invoke"
+              ]
+            },
+            "python_type": "_TimingScope",
+            "default": "invoke_only",
+            "required": false,
+            "help": "invoke_only times each invocation; restore_and_invoke times the loop, input restoration included",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "model",
+            "kind": "option",
+            "declaration": "--model",
+            "opts": [
+              "--model"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Optional[Path]",
+            "default": null,
+            "required": false,
+            "help": "The plan's model, when it is no longer at the path the plan records",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "work_dir",
+            "kind": "option",
+            "declaration": "--work-dir",
+            "opts": [
+              "--work-dir"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Optional[Path]",
+            "default": null,
+            "required": false,
+            "help": "Firmware build directory inside OUT (default: OUT/work); the saved build records its files relative to OUT",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "verbose",
+            "kind": "option",
+            "declaration": "--verbose",
+            "opts": [
+              "-v",
+              "--verbose"
+            ],
+            "aliases": [
+              "-v"
+            ],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "int",
+              "class": "IntParamType"
+            },
+            "python_type": "int",
+            "default": 0,
+            "required": false,
+            "help": "Increase verbosity",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": true,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          }
+        ],
+        "panels": []
+      },
+      {
+        "path": [
           "cache"
         ],
         "name": "cache",
@@ -346,7 +620,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 679
+          "line": 674
         },
         "arguments": [],
         "options": [],
@@ -367,7 +641,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 693
+              "line": 688
             },
             "arguments": [],
             "options": [],
@@ -388,7 +662,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 686
+              "line": 681
             },
             "arguments": [],
             "options": [],
@@ -410,7 +684,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 612
+          "line": 607
         },
         "arguments": [
           {
@@ -924,6 +1198,497 @@
       },
       {
         "path": [
+          "freeze"
+        ],
+        "name": "freeze",
+        "kind": "command",
+        "usage": "hpx freeze [OPTIONS] [MODEL]",
+        "short_help": "Freeze a resolved run plan to JSON for hpx build",
+        "help": "Freeze a resolved run plan to JSON for hpx build",
+        "epilog": "Takes the config file and the engine, target and profiling options of hpx profile, plus --backend, and writes the resolved plan with the model's hash and the toolchain and runtime identities, so any host can build the same run.\n\nExample:\n\n  hpx freeze model.tflite --engine helia-rt --backend helia \\\n      --toolchain atfe --cpu-clock lp --arena-size 131072 \\\n      --arena-location sram --weights-location mram -o plan.json",
+        "deprecated": false,
+        "hidden": false,
+        "source": {
+          "path": "src/helia_profiler/cli/run_app.py",
+          "line": 94
+        },
+        "arguments": [
+          {
+            "name": "model",
+            "kind": "argument",
+            "declaration": "model",
+            "opts": [
+              "model"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Optional[Path]",
+            "default": null,
+            "required": false,
+            "help": "Path to .tflite or .pte model file",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          }
+        ],
+        "options": [
+          {
+            "name": "output",
+            "kind": "option",
+            "declaration": "--output",
+            "opts": [
+              "-o",
+              "--output"
+            ],
+            "aliases": [
+              "-o"
+            ],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Path",
+            "default": null,
+            "required": true,
+            "help": "Where to write the plan (JSON)",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "config",
+            "kind": "option",
+            "declaration": "--config",
+            "opts": [
+              "-c",
+              "--config"
+            ],
+            "aliases": [
+              "-c"
+            ],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Optional[Path]",
+            "default": null,
+            "required": false,
+            "help": "YAML config file (hpx.yml)",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "verbose",
+            "kind": "option",
+            "declaration": "--verbose",
+            "opts": [
+              "-v",
+              "--verbose"
+            ],
+            "aliases": [
+              "-v"
+            ],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "int",
+              "class": "IntParamType"
+            },
+            "python_type": "int",
+            "default": 0,
+            "required": false,
+            "help": "Increase verbosity",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": true,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "engine",
+            "kind": "option",
+            "declaration": "--engine",
+            "opts": [
+              "--engine"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "choice",
+              "class": "TyperChoice",
+              "choices": [
+                "litert",
+                "helia-rt",
+                "helia-aot",
+                "executorch"
+              ]
+            },
+            "python_type": "Optional[EngineType]",
+            "default": null,
+            "required": false,
+            "help": "Inference engine (default: helia-rt)",
+            "panel": "engine",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "backend",
+            "kind": "option",
+            "declaration": "--backend",
+            "opts": [
+              "--backend"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "str",
+              "class": "StringParamType"
+            },
+            "python_type": "Optional[str]",
+            "default": null,
+            "required": false,
+            "help": "Kernel backend (engine.backend). Run builds need helia for helia-rt and cmsis_nn for litert.",
+            "panel": "engine",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "engine_config",
+            "kind": "option",
+            "declaration": "--engine-config",
+            "opts": [
+              "--engine-config"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Optional[Path]",
+            "default": null,
+            "required": false,
+            "help": "Engine-specific YAML config",
+            "panel": "engine",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "arena_size",
+            "kind": "option",
+            "declaration": "--arena-size",
+            "opts": [
+              "--arena-size"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "int",
+              "class": "IntParamType"
+            },
+            "python_type": "Optional[int]",
+            "default": null,
+            "required": false,
+            "help": "Tensor arena size in bytes",
+            "panel": "engine",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "runtime_arena_location",
+            "kind": "option",
+            "declaration": "--arena-location",
+            "opts": [
+              "--arena-location"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "choice",
+              "class": "TyperChoice",
+              "choices": [
+                "tcm",
+                "sram",
+                "psram"
+              ]
+            },
+            "python_type": "Optional[helia_profiler.cli.choices._ArenaLocation]",
+            "default": null,
+            "required": false,
+            "help": "Tensor arena placement. Omit to let the engine and memory planner choose.",
+            "panel": "engine",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "runtime_weights_location",
+            "kind": "option",
+            "declaration": "--weights-location",
+            "opts": [
+              "--weights-location"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "choice",
+              "class": "TyperChoice",
+              "choices": [
+                "tcm",
+                "sram",
+                "mram",
+                "psram"
+              ]
+            },
+            "python_type": "Optional[Placement]",
+            "default": null,
+            "required": false,
+            "help": "Model weights placement. Omit to let the engine and memory planner choose.",
+            "panel": "engine",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "core_override",
+            "kind": "option",
+            "declaration": "--core-override",
+            "opts": [
+              "--core-override"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "choice",
+              "class": "TyperChoice",
+              "choices": [
+                "cm4",
+                "cm55"
+              ]
+            },
+            "python_type": "Optional[helia_profiler.cli.choices._CoreOverride]",
+            "default": null,
+            "required": false,
+            "help": "Select the core library in an explicit heliaRT prebuilt distribution.",
+            "panel": "engine",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "board",
+            "kind": "option",
+            "declaration": "--board",
+            "opts": [
+              "--board"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "str",
+              "class": "StringParamType"
+            },
+            "python_type": "Optional[str]",
+            "default": null,
+            "required": false,
+            "help": "Target board (default: apollo510_evb)",
+            "panel": "target hardware",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "toolchain",
+            "kind": "option",
+            "declaration": "--toolchain",
+            "opts": [
+              "--toolchain"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "str",
+              "class": "StringParamType"
+            },
+            "python_type": "Optional[str]",
+            "default": null,
+            "required": false,
+            "help": "Toolchain (default: arm-none-eabi-gcc; run builds use atfe)",
+            "panel": "target hardware",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "cpu_clock",
+            "kind": "option",
+            "declaration": "--cpu-clock",
+            "opts": [
+              "--cpu-clock"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": "SPEED",
+            "type": {
+              "name": "str",
+              "class": "StringParamType"
+            },
+            "python_type": "Optional[str]",
+            "default": null,
+            "required": false,
+            "help": "CPU clock speed (board-specific, e.g. 'lp'/'hp'; run builds use lp)",
+            "panel": "target hardware",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "iterations",
+            "kind": "option",
+            "declaration": "--iterations",
+            "opts": [
+              "--iterations"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "int",
+              "class": "IntParamType"
+            },
+            "python_type": "Optional[int]",
+            "default": null,
+            "required": false,
+            "help": "Timed iterations (default: 100)",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "warmup",
+            "kind": "option",
+            "declaration": "--warmup",
+            "opts": [
+              "--warmup"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "int",
+              "class": "IntParamType"
+            },
+            "python_type": "Optional[int]",
+            "default": null,
+            "required": false,
+            "help": "Warmup iterations (default: 5)",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          }
+        ],
+        "panels": [
+          "engine",
+          "target hardware"
+        ]
+      },
+      {
+        "path": [
           "ports"
         ],
         "name": "ports",
@@ -1032,7 +1797,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/validation_app.py",
-          "line": 56
+          "line": 64
         },
         "arguments": [],
         "options": [
@@ -1331,7 +2096,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 95
+          "line": 87
         },
         "arguments": [
           {
@@ -1535,7 +2300,7 @@
                 "psram"
               ]
             },
-            "python_type": "Optional[helia_profiler.cli.app._ArenaLocation]",
+            "python_type": "Optional[helia_profiler.cli.choices._ArenaLocation]",
             "default": null,
             "required": false,
             "help": "Tensor arena placement. helia-rt: places the single runtime tensor arena. helia-aot: use engine.config.aot_args.memory.tensors instead. Omit to let the engine and memory planner choose.",
@@ -1597,7 +2362,7 @@
                 "cm55"
               ]
             },
-            "python_type": "Optional[helia_profiler.cli.app._CoreOverride]",
+            "python_type": "Optional[helia_profiler.cli.choices._CoreOverride]",
             "default": null,
             "required": false,
             "help": "Select the core library in an explicit heliaRT prebuilt distribution. Unsupported for registry and local source builds.",
@@ -2819,6 +3584,289 @@
       },
       {
         "path": [
+          "run"
+        ],
+        "name": "run",
+        "kind": "command",
+        "usage": "hpx run [OPTIONS] DIRECTORY",
+        "short_help": "Capture once from a run directory on a board you name",
+        "help": "Capture once from a run directory on a board you name",
+        "epilog": "The operator vouches for the physical board behind the probe, as hpx profile assumes: --board names the board wired to the probe that --jlink-serial names, and the operator holds it for the capture. A --board other than the build's board is refused before any device is touched; HPX cannot check the physical board itself.\n\nEach capture writes its evidence to a fresh directory. Prints the outcome, identity, verification and timing as JSON. Exit status: 0 when the capture succeeds and its outputs match, 1 on a refusal or a failed capture, 3 when the outputs do not match.\n\nExample:\n\n  hpx run runs/kws --board apollo510_evb --jlink-serial 1160002255",
+        "deprecated": false,
+        "hidden": false,
+        "source": {
+          "path": "src/helia_profiler/cli/run_app.py",
+          "line": 279
+        },
+        "arguments": [
+          {
+            "name": "directory",
+            "kind": "argument",
+            "declaration": "directory",
+            "opts": [
+              "directory"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Path",
+            "default": null,
+            "required": true,
+            "help": "Run directory written by hpx build, or its build.json",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          }
+        ],
+        "options": [
+          {
+            "name": "board",
+            "kind": "option",
+            "declaration": "--board",
+            "opts": [
+              "--board"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "str",
+              "class": "StringParamType"
+            },
+            "python_type": "str",
+            "default": null,
+            "required": true,
+            "help": "The board wired to the probe; it must be the build's board",
+            "panel": "target hardware",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "jlink_serial",
+            "kind": "option",
+            "declaration": "--jlink-serial",
+            "opts": [
+              "--jlink-serial"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "str",
+              "class": "StringParamType"
+            },
+            "python_type": "str",
+            "default": null,
+            "required": true,
+            "help": "J-Link probe serial number",
+            "panel": "target hardware",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "expect",
+            "kind": "option",
+            "declaration": "--expect",
+            "opts": [
+              "--expect"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "choice",
+              "class": "TyperChoice",
+              "choices": [
+                "host-litert",
+                "none"
+              ]
+            },
+            "python_type": "Optional[helia_profiler.cli.run_app._Expect]",
+            "default": null,
+            "required": false,
+            "help": "Reference outputs: host-litert runs the model on the host (default), none skips verification",
+            "panel": "output verification",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "tolerance",
+            "kind": "option",
+            "declaration": "--tolerance",
+            "opts": [
+              "--tolerance"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "float range",
+              "class": "FloatRange",
+              "min": 0.0
+            },
+            "python_type": "float",
+            "default": 0.0,
+            "required": false,
+            "help": "Largest accepted absolute error per element, in stored units",
+            "panel": "output verification",
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "reference",
+            "kind": "option",
+            "declaration": "--reference",
+            "opts": [
+              "--reference"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Optional[list[Path]]",
+            "default": null,
+            "required": false,
+            "help": "Reference bytes for one output; repeat once per output, in model order. Replaces --expect.",
+            "panel": "output verification",
+            "is_flag": false,
+            "multiple": true,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "settle_seconds",
+            "kind": "option",
+            "declaration": "--settle-seconds",
+            "opts": [
+              "--settle-seconds"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "float range",
+              "class": "FloatRange",
+              "max": 300.0
+            },
+            "python_type": "float",
+            "default": 60.0,
+            "required": false,
+            "help": "Bound on each wait for the board to start and to finish, in seconds (more than 0, at most 300)",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "evidence_dir",
+            "kind": "option",
+            "declaration": "--evidence-dir",
+            "opts": [
+              "--evidence-dir"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Optional[Path]",
+            "default": null,
+            "required": false,
+            "help": "New directory for the capture's evidence (default: DIR/evidence-<N>)",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "verbose",
+            "kind": "option",
+            "declaration": "--verbose",
+            "opts": [
+              "-v",
+              "--verbose"
+            ],
+            "aliases": [
+              "-v"
+            ],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "int",
+              "class": "IntParamType"
+            },
+            "python_type": "int",
+            "default": 0,
+            "required": false,
+            "help": "Increase verbosity",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": true,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          }
+        ],
+        "panels": [
+          "output verification",
+          "target hardware"
+        ]
+      },
+      {
+        "path": [
           "runtimes"
         ],
         "name": "runtimes",
@@ -2831,7 +3879,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 708
+          "line": 703
         },
         "arguments": [],
         "options": [],
@@ -2852,7 +3900,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 715
+              "line": 710
             },
             "arguments": [],
             "options": [],
@@ -2873,7 +3921,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 732
+              "line": 727
             },
             "arguments": [
               {
@@ -2947,7 +3995,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 722
+              "line": 717
             },
             "arguments": [
               {
@@ -3139,16 +4187,16 @@
           "validate"
         ],
         "name": "validate",
-        "kind": "command",
-        "usage": "hpx validate [OPTIONS]",
-        "short_help": "Run hardware-in-the-loop validation suite (MLPerf Tiny models)",
-        "help": "Run hardware-in-the-loop validation suite (MLPerf Tiny models)",
-        "epilog": "Hardware validation \u2014 runs canonical MLPerf Tiny models end-to-end\n\nagainst a real EVB + J-Link (and optional Joulescope).\n\nExamples:\n\n  hpx validate                         # Apollo510 reliability matrix, power off\n\n  hpx validate --list                  # preview what would run\n\n  hpx validate --models kws,ic         # subset by model\n\n  hpx validate --engines aot           # subset by engine\n\n  hpx validate --power off             # skip Joulescope (default)\n\n  hpx validate --boards apollo3p_evb --repeat 2 --power off\n\n                                       # require two passing iterations per case\n\n  hpx validate -k kws-aot              # pytest keyword filter\n\n  hpx validate --suite smoke           # quick preset: kws / helia-rt / gcc / rtt / auto\n\n  hpx validate --suite models-rt       # 16-case RT sweep: 2 boards x 4 models x 2 toolchains\n\n  hpx validate --suite models-aot      # 16-case AOT sweep: 2 boards x 4 models x 2 toolchains\n\n  hpx validate --suite complete        # RT + AOT + LiteRT + ExecuTorch sweep",
+        "kind": "group",
+        "usage": "hpx validate [OPTIONS] COMMAND [ARGS]...",
+        "short_help": "Run hardware-in-the-loop validation suite (MLPerf Tiny models), or verify a run directory with `hpx validate build`",
+        "help": "Run hardware-in-the-loop validation suite (MLPerf Tiny models), or verify a run directory with `hpx validate build`",
+        "epilog": "Hardware validation \u2014 runs canonical MLPerf Tiny models end-to-end\n\nagainst a real EVB + J-Link (and optional Joulescope).\n\nExamples:\n\n  hpx validate                         # Apollo510 reliability matrix, power off\n\n  hpx validate --list                  # preview what would run\n\n  hpx validate --models kws,ic         # subset by model\n\n  hpx validate --engines aot           # subset by engine\n\n  hpx validate --power off             # skip Joulescope (default)\n\n  hpx validate --boards apollo3p_evb --repeat 2 --power off\n\n                                       # require two passing iterations per case\n\n  hpx validate -k kws-aot              # pytest keyword filter\n\n  hpx validate --suite smoke           # quick preset: kws / helia-rt / gcc / rtt / auto\n\n  hpx validate --suite models-rt       # 16-case RT sweep: 2 boards x 4 models x 2 toolchains\n\n  hpx validate --suite models-aot      # 16-case AOT sweep: 2 boards x 4 models x 2 toolchains\n\n  hpx validate --suite complete        # RT + AOT + LiteRT + ExecuTorch sweep\n\n  hpx validate build runs/kws          # verify a run directory, no hardware",
         "deprecated": false,
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/validation_app.py",
-          "line": 92
+          "line": 100
         },
         "arguments": [],
         "options": [
@@ -3835,7 +4883,92 @@
             "envvar": []
           }
         ],
-        "panels": []
+        "panels": [],
+        "commands": [
+          {
+            "path": [
+              "validate",
+              "build"
+            ],
+            "name": "build",
+            "kind": "command",
+            "usage": "hpx validate build [OPTIONS] DIRECTORY",
+            "short_help": "Verify a run directory written by hpx build (no hardware)",
+            "help": "Verify a run directory written by hpx build (no hardware)",
+            "epilog": null,
+            "deprecated": false,
+            "hidden": false,
+            "source": {
+              "path": "src/helia_profiler/cli/validation_app.py",
+              "line": 340
+            },
+            "arguments": [
+              {
+                "name": "directory",
+                "kind": "argument",
+                "declaration": "directory",
+                "opts": [
+                  "directory"
+                ],
+                "aliases": [],
+                "secondary_opts": [],
+                "metavar": null,
+                "type": {
+                  "name": "path",
+                  "class": "TyperPath",
+                  "exists": false,
+                  "file_okay": true,
+                  "dir_okay": true,
+                  "readable": true,
+                  "writable": false
+                },
+                "python_type": "Path",
+                "default": null,
+                "required": true,
+                "help": "Run directory written by hpx build, or its build.json",
+                "panel": null,
+                "is_flag": false,
+                "multiple": false,
+                "count": false,
+                "nargs": 1,
+                "hidden": false,
+                "envvar": []
+              }
+            ],
+            "options": [
+              {
+                "name": "verbose",
+                "kind": "option",
+                "declaration": "--verbose",
+                "opts": [
+                  "-v",
+                  "--verbose"
+                ],
+                "aliases": [
+                  "-v"
+                ],
+                "secondary_opts": [],
+                "metavar": null,
+                "type": {
+                  "name": "int",
+                  "class": "IntParamType"
+                },
+                "python_type": "int",
+                "default": 0,
+                "required": false,
+                "help": "Increase verbosity",
+                "panel": null,
+                "is_flag": false,
+                "multiple": false,
+                "count": true,
+                "nargs": 1,
+                "hidden": false,
+                "envvar": []
+              }
+            ],
+            "panels": []
+          }
+        ]
       }
     ]
   }

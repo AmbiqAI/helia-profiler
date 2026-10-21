@@ -21,6 +21,7 @@ from pathlib import Path
 from types import MappingProxyType, UnionType
 from typing import TYPE_CHECKING, Any, Mapping, TypeVar, get_args, get_type_hints
 
+from ._files import write_text_atomically
 from .errors import ConfigError
 
 if TYPE_CHECKING:
@@ -282,10 +283,11 @@ class FrozenRun:
     def save(self, path: str | Path) -> Path:
         """Write the plan as JSON and return its path."""
         target = Path(path).expanduser()
-        target.parent.mkdir(parents=True, exist_ok=True)
         text = json.dumps(self.to_dict(), indent=2, sort_keys=True, allow_nan=False) + "\n"
-        with target.open("w", encoding="utf-8", newline="\n") as stream:
-            stream.write(text)
+        try:
+            write_text_atomically(target, text)
+        except OSError as exc:
+            raise ConfigError(f"Cannot save frozen run plan to {target}: {exc}") from exc
         return target
 
     @classmethod

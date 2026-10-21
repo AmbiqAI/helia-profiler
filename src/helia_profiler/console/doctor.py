@@ -31,7 +31,11 @@ def print_error(console: HpxConsole, exc: Exception) -> None:
             msg.append(f"\n  details: {rendered}", style="dim")
         console.status_console.print(msg, highlight=False)
     else:
-        console.status_console.print(f"[bold red]Error:[/bold red] {exc}")
+        # Plain text: an OSError message can carry a user path with brackets.
+        msg = Text()
+        msg.append("Error: ", style="bold red")
+        msg.append(str(exc))
+        console.status_console.print(msg, highlight=False)
 
 
 def print_interrupted(console: HpxConsole) -> None:

@@ -6,6 +6,8 @@ __pycache__/
 # Distribution / packaging
 build/
 !examples/results/run-api-synthetic/build/
+# The generated reference page for the `hpx build` command.
+!astro-site/src/content/docs/reference/cli/build/
 dist/
 *.egg-info/
 *.egg
