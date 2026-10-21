@@ -1,7 +1,7 @@
 {
   "api_version": [
-    6,
-    1
+    7,
+    0
   ],
   "surface": {
     "BuildFacts": {
@@ -2170,7 +2170,7 @@
           "<required>"
         ],
         [
-          "inputs_sha256",
+          "inputs_hash",
           "str | Unknown",
           "<required>"
         ],

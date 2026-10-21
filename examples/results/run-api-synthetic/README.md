@@ -1,6 +1,6 @@
 # Run API example: a compiled build and a run result (synthetic)
 
-`build.json` is a `hpx.compiled-build` (schema version 2) for the tiny CNN on heliaAOT, Apollo510 EVB, ATfE, the `lp` clock, an SRAM arena and MRAM weights, with the `carry` lifecycle. The files it pins sit beside it under one root, `run`:
+`build.json` is a `hpx.compiled-build` (schema version 3) for the tiny CNN on heliaAOT, Apollo510 EVB, ATfE, the `lp` clock, an SRAM arena and MRAM weights, with the `carry` lifecycle. The files it pins sit beside it under one root, `run`:
 
 ```python
 from pathlib import Path

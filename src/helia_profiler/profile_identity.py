@@ -11,7 +11,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ._identity_hash import build_hash, digest, measured_facts
+from ._identity_hash import build_hash, measured_facts
+from ._semantic_hash import semantic_hash
 from .config import CleanWindowProbe
 from .deps.compatibility import CMSIS_NN_PROVIDER_MODULES
 from .engines import EngineType, get_adapter
@@ -33,6 +34,7 @@ from .wire import STIMER_HZ
 
 if TYPE_CHECKING:
     from .pipeline import PipelineContext
+    from .results import PmuResult
 
 _NO_PROVENANCE = Unknown("the run recorded no dependency provenance")
 
@@ -59,14 +61,18 @@ def profile_run_identity(ctx: PipelineContext) -> RunIdentity:
         baseline_id=provenance.workspace.baseline_id if provenance else _NO_PROVENANCE,
         dependency_lock_sha256=provenance.lock.sha256.value if provenance else _NO_PROVENANCE,
         model_sha256=model_sha256,
-        inputs_sha256=Unknown("profile firmware feeds zero-filled inputs and pins no input data"),
+        inputs_hash=Unknown("profile firmware feeds zero-filled inputs and pins no input data"),
         run=_run_facts(ctx),
         producer=_producer(provenance),
         build_hash=_build_hash(ctx, model_sha256),
         observation_hash=(
-            digest(measured_facts(ctx.pmu_result)) if ctx.pmu_result is not None else None
+            _observation_hash(ctx.pmu_result) if ctx.pmu_result is not None else None
         ),
     )
+
+
+def _observation_hash(pmu: PmuResult) -> str:
+    return semantic_hash("observation", measured_facts(pmu))
 
 
 def _module(provenance: DependencyProvenance, name: str) -> DependencyModule | None:

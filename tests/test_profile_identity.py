@@ -10,6 +10,7 @@ from typing import Literal
 
 import pytest
 
+from helia_profiler import SemanticHash
 from helia_profiler.config import load_config
 from helia_profiler.deps.compatibility import QualificationState
 from helia_profiler.identity import CanonicalEngine, CanonicalKernel, Unknown
@@ -212,7 +213,7 @@ def test_a_helia_rt_run_states_what_it_linked(tmp_path):
     assert identity.baseline_id == BASELINE
     assert identity.dependency_lock_sha256 == LOCK_SHA
     assert identity.model_sha256 == MODEL_SHA
-    assert identity.inputs_sha256 == Unknown(
+    assert identity.inputs_hash == Unknown(
         "profile firmware feeds zero-filled inputs and pins no input data"
     )
     assert identity.producer == "0.2.3"
@@ -224,8 +225,10 @@ def test_a_helia_rt_run_states_what_it_linked(tmp_path):
     run = identity.run
     assert (run.lifecycle, run.iterations, run.warmups) == ("carry", 100, 5)
     assert run.timing_scope == "invoke_only"
-    assert isinstance(identity.build_hash, str) and len(identity.build_hash) == 64
-    assert isinstance(identity.observation_hash, str) and len(identity.observation_hash) == 64
+    assert isinstance(identity.build_hash, str)
+    assert SemanticHash.parse(identity.build_hash).kind == "build"
+    assert isinstance(identity.observation_hash, str)
+    assert SemanticHash.parse(identity.observation_hash).kind == "observation"
 
 
 def test_the_build_hash_ignores_the_hpx_release_and_lock_stamps_but_not_the_image(tmp_path):
@@ -578,7 +581,7 @@ def test_the_summary_carries_the_identity(tmp_path):
     assert identity is not None
     summary = json.loads((tmp_path / "results" / "summary.json").read_text())
     assert summary["identity"] == identity.to_dict()
-    assert summary["identity"]["inputs_sha256"] == {
+    assert summary["identity"]["inputs_hash"] == {
         "unknown": "profile firmware feeds zero-filled inputs and pins no input data"
     }
     loaded = load_run_summary(tmp_path / "results" / "summary.json")

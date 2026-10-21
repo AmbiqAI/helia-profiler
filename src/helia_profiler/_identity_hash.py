@@ -1,14 +1,12 @@
 """The hashes a :class:`~helia_profiler.identity.RunIdentity` states, shared by every run kind.
 
 A fixture build and a profile run hash the same inputs the same way, so equal
-builds give equal ``build_hash`` values whichever path produced them.
+builds give equal ``build_hash`` values whichever path produced them. The
+hashes are semantic hashes; :mod:`._semantic_hash` owns their kinds and form.
 """
 
 from __future__ import annotations
 
-import hashlib
-import json
-import math
 from collections.abc import Callable, Mapping
 from dataclasses import fields, is_dataclass
 from enum import Enum
@@ -16,6 +14,7 @@ from typing import Any
 
 import yaml
 
+from ._semantic_hash import semantic_hash
 from .identity import Unknown
 
 _NOT_A_LOCK = Unknown("the dependency lock is not an NSX lock")
@@ -28,14 +27,16 @@ def build_hash(
     resolved = _resolved_lock(lock)
     if isinstance(resolved, Unknown):
         return resolved
-    return digest(
-        {
-            "image": image_sha256,
-            "lock": resolved,
-            "runtime_archive": runtime_archive,
-            "model": model_sha256,
-        }
-    )
+    basis = {
+        "image": image_sha256,
+        "lock": resolved,
+        "runtime_archive": runtime_archive,
+        "model": model_sha256,
+    }
+    try:
+        return semantic_hash("build", basis)
+    except ValueError:
+        return Unknown("the dependency lock holds a non-finite number")
 
 
 def _resolved_lock(lock: bytes) -> Any:
@@ -88,20 +89,3 @@ def measured_facts(value: Any, leaf: Callable[[Any], Any] | None = None) -> Any:
     if isinstance(value, (list, tuple)):
         return [measured_facts(item, leaf) for item in value]
     return value
-
-
-def _finite(value: Any) -> Any:
-    """``value`` with non-finite floats spelled out, so a NaN counter still hashes."""
-    if isinstance(value, float) and not math.isfinite(value):
-        return repr(value)
-    if isinstance(value, dict):
-        return {key: _finite(item) for key, item in value.items()}
-    if isinstance(value, list | tuple):
-        return [_finite(item) for item in value]
-    return value
-
-
-def digest(value: Any) -> str:
-    """The sha256 of ``value``'s canonical JSON."""
-    encoded = json.dumps(_finite(value), sort_keys=True, separators=(",", ":"), allow_nan=False)
-    return hashlib.sha256(encoded.encode()).hexdigest()

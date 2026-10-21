@@ -206,6 +206,10 @@ class RunIdentity:
     capture's measured facts, so the same firmware measured twice gives two.
     ``intent_hash`` is the :attr:`~helia_profiler.FrozenRun.intent_hash` of
     the plan a run was built from, and ``None`` for a run built without one.
+    ``inputs_hash`` covers each pinned input's tensor name and data sha256.
+    The four are :class:`~helia_profiler.SemanticHash` strings of the kinds
+    ``hpx.build``, ``hpx.observation``, ``hpx.intent`` and ``hpx.inputs``;
+    each ``*_sha256`` fact is the bare hex sha256 of one file's bytes.
     """
 
     runtime: RuntimeIdentity
@@ -215,7 +219,7 @@ class RunIdentity:
     baseline_id: str | Unknown
     dependency_lock_sha256: str | Unknown
     model_sha256: str | Unknown
-    inputs_sha256: str | Unknown
+    inputs_hash: str | Unknown
     run: RunFacts
     producer: str | Unknown
     build_hash: str | Unknown

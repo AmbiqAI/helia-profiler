@@ -10,6 +10,7 @@ _fixture_request.py
 _identity_hash.py
 _litert_inspection.py
 _result_view.py
+_semantic_hash.py
 _version.py
 api.py
 capture/__init__.py

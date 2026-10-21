@@ -6,8 +6,8 @@ and its override classification, the model's hash, the toolchain's identity,
 the engine identity a profile build uses, and every local file or directory
 the build reads. Host-local settings (probe serials, ports, output and work
 directories, timeouts) are not stored; :meth:`FrozenRun.config` takes them
-for the replaying host. ``intent_hash`` identifies what the plan asks for and
-excludes the HPX release.
+for the replaying host. ``intent_hash``, an ``hpx.intent`` semantic hash,
+identifies what the plan asks for and excludes the HPX release.
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ from types import MappingProxyType, UnionType
 from typing import TYPE_CHECKING, Any, Mapping, TypeVar, get_args, get_type_hints
 
 from ._files import write_text_atomically
+from ._semantic_hash import require, semantic_hash
 from .errors import ConfigError
 
 if TYPE_CHECKING:
@@ -31,7 +32,7 @@ if TYPE_CHECKING:
     from .deps.compatibility import CompatibilityResolution
 
 FROZEN_RUN_SCHEMA = "hpx.frozen-run"
-FROZEN_RUN_SCHEMA_VERSION = 1
+FROZEN_RUN_SCHEMA_VERSION = 2
 
 _T = TypeVar("_T")
 
@@ -196,7 +197,7 @@ class FrozenRun:
 
     @property
     def intent_hash(self) -> str:
-        """SHA-256 of what this plan asks for; the HPX release is not part of it."""
+        """The ``hpx.intent`` hash of what this plan asks for; the HPX release is not part of it."""
         return self._intent
 
     @property
@@ -239,7 +240,18 @@ class FrozenRun:
             raise ConfigError(f"Not a frozen run plan: schema {data.get('schema')!r}")
         version = data.get("schema_version")
         if type(version) is not int or version != FROZEN_RUN_SCHEMA_VERSION:
-            raise ConfigError(f"Unsupported frozen run plan version: {version!r}")
+            raise ConfigError(
+                f"Unsupported frozen run plan version: {version!r}",
+                hint=f"This heliaPROFILER reads version {FROZEN_RUN_SCHEMA_VERSION}; "
+                "freeze the plan again.",
+            )
+        try:
+            require(data.get("intent_hash"), "intent")
+        except ValueError as exc:
+            raise ConfigError(
+                f"Frozen run plan's intent hash is malformed: {exc}",
+                hint="The plan was saved by another heliaPROFILER or edited; freeze the plan again.",
+            ) from exc
         try:
             settings = data["settings"]
             if not isinstance(settings, Mapping) or not isinstance(settings.get("model"), Mapping):
@@ -740,8 +752,13 @@ def _intent_hash(plan: FrozenRun) -> str:
         "environment": _thaw(plan.environment),
         "runtime": asdict(plan.runtime) if plan.runtime is not None else None,
     }
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
-    return hashlib.sha256(encoded).hexdigest()
+    try:
+        return semantic_hash("intent", payload)
+    except ValueError as exc:
+        raise ConfigError(
+            "A frozen run plan cannot hold a non-finite number",
+            hint="Set a finite value, or leave the setting at its default.",
+        ) from exc
 
 
 def _setting_path(setting: str) -> tuple[str, ...]:

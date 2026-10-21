@@ -78,7 +78,10 @@ RUN_SUMMARY_SCHEMA = "hpx.run-summary"
 #: names the engine. Otherwise unchanged.
 #: v18: #558 identity.run adds energy: how the run's energy was measured, null
 #: for a profile without power and unknown for one with it. Otherwise additive.
-RUN_SUMMARY_SCHEMA_VERSION = 18
+#: v19: #558 identity's build_hash, observation_hash and intent_hash are
+#: semantic hashes, hpx.<kind>/<version>:sha256:<hex>, not bare hex, and
+#: inputs_sha256 is renamed inputs_hash, also a semantic hash. Otherwise unchanged.
+RUN_SUMMARY_SCHEMA_VERSION = 19
 
 __all__ = [
     "RUN_SUMMARY_SCHEMA",

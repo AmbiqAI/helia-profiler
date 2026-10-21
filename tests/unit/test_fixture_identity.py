@@ -9,6 +9,7 @@ import pytest
 from test_fixture_record import _build, _pin, _sourced
 from test_fixture_sources import NS
 
+from helia_profiler import SemanticHash
 from helia_profiler._fixture_record import compiled_fixture_identity
 from helia_profiler.engines import EngineType
 from helia_profiler.engines.base import EngineSource
@@ -105,7 +106,9 @@ def test_a_compiled_build_states_what_it_linked(tmp_path):
     assert identity.producer == "0.2.3"
     assert identity.build.toolchain_version == "22.1.0" and identity.build.cpu_hz == 96000000
     assert (identity.run.lifecycle, identity.run.iterations) == ("carry", 100)
-    assert isinstance(identity.build_hash, str) and isinstance(identity.inputs_sha256, str)
+    assert isinstance(identity.build_hash, str) and isinstance(identity.inputs_hash, str)
+    assert SemanticHash.parse(identity.build_hash).kind == "build"
+    assert SemanticHash.parse(identity.inputs_hash).kind == "inputs"
 
 
 def test_the_build_hash_ignores_the_hpx_release_but_not_the_image(tmp_path):
@@ -181,6 +184,8 @@ def test_the_observation_hash_follows_measured_facts_not_paths(tmp_path):
     failed = fixture_run_identity(build, _capture(tmp_path / "z", status=3))
 
     assert one.observation_hash == moved.observation_hash != failed.observation_hash
+    assert isinstance(one.observation_hash, str)
+    assert SemanticHash.parse(one.observation_hash).kind == "observation"
     assert one.build_hash == failed.build_hash
     assert fixture_run_identity(build).observation_hash is None
 
@@ -217,8 +222,8 @@ def test_a_prepared_runtime_manifest_reads_without_its_archive(tmp_path):
 def test_a_record_from_the_previous_api_still_loads(tmp_path):
     build = _aot(tmp_path)
     record = json.loads(dump_fixture_build(build, roots={"run": tmp_path}))
-    assert record["fixture_api"] == [6, 1]
-    for previous in ([5, 6], [5, 7], [5, 8], [6, 0]):
+    assert record["fixture_api"] == [7, 0]
+    for previous in ([5, 6], [5, 7], [5, 8], [6, 0], [6, 1]):
         record["fixture_api"] = previous
         assert load_fixture_build(json.dumps(record), roots={"run": tmp_path}) == build
 
@@ -258,7 +263,7 @@ def test_each_missing_fact_states_its_own_reason(tmp_path):
         )
     )
     assert identity.model_sha256 == Unknown("the record predates pinned models")
-    assert identity.inputs_sha256 == Unknown("the record predates pinned inputs")
+    assert identity.inputs_hash == Unknown("the record predates pinned inputs")
     assert identity.build.cpu_hz == Unknown("the record predates this fact")
     assert identity.build.toolchain == Unknown("the record states no toolchain")
     assert identity.kernels.library == Unknown(
@@ -301,8 +306,8 @@ def test_lifecycle_and_input_names_are_part_of_the_identity(tmp_path):
         replace(io, tensor=replace(io.tensor, name=io.tensor.name + "_x")) for io in build.inputs
     )
     assert (
-        fixture_run_identity(replace(build, inputs=renamed)).inputs_sha256
-        != fixture_run_identity(build).inputs_sha256
+        fixture_run_identity(replace(build, inputs=renamed)).inputs_hash
+        != fixture_run_identity(build).inputs_hash
     )
 
 
@@ -359,6 +364,23 @@ def test_a_lock_that_is_not_an_nsx_lock_has_no_build_hash(tmp_path):
     assert fixture_run_identity(build).build_hash == Unknown(
         "the dependency lock is not an NSX lock"
     )
+
+
+def test_a_lock_with_a_non_finite_number_has_no_build_hash():
+    from helia_profiler._identity_hash import build_hash
+
+    lock = b"""
+targets:
+  app:
+    target: apollo510_evb
+    modules:
+      tooling:
+        kind: packaged
+        resolved: {content_hash: .nan}
+"""
+    assert build_hash(
+        image_sha256="0" * 64, lock=lock, runtime_archive=None, model_sha256="1" * 64
+    ) == Unknown("the dependency lock holds a non-finite number")
 
 
 def test_records_that_predate_sources_rederive_them_from_pinned_files(tmp_path):

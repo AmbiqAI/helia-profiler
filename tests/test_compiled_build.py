@@ -373,6 +373,7 @@ def test_missing_record_or_pinned_file_is_a_config_error(plan, build, root, tmp_
         ("schema_version", COMPILED_BUILD_SCHEMA_VERSION + 1),
         ("schema_version", str(COMPILED_BUILD_SCHEMA_VERSION)),
         ("schema_version", True),
+        ("schema_version", 2),
     ],
 )
 def test_unknown_schema_or_version_is_refused(plan, build, root, tmp_path, key, value):
@@ -532,8 +533,20 @@ def test_the_binding_names_no_host_path(plan, tmp_path):
     assert _binding(plan, Lifecycle.CARRY, here) == _binding(plan, Lifecycle.CARRY, there)
 
 
+def test_a_binding_refuses_a_non_finite_number(plan, tmp_path):
+    build = replace(atfe_build(_build(tmp_path)), aot_arena_scan=((float("nan"), 1),))
+    with pytest.raises(ConfigError, match="cannot record a non-finite number"):
+        _binding(plan, Lifecycle.CARRY, build)
+
+
 @pytest.mark.parametrize(
-    "binding,message", [("0" * 64, "binding does not match"), (7, "binding is not a string")]
+    "binding,message",
+    [
+        ("hpx.binding/1:sha256:" + "0" * 64, "binding does not match"),
+        ("0" * 64, "not an hpx.binding/1:sha256:<hex> hash"),
+        ("hpx.intent/1:sha256:" + "0" * 64, "not an hpx.binding/1:sha256:<hex> hash"),
+        (7, "not an hpx.binding/1:sha256:<hex> hash"),
+    ],
 )
 def test_load_refuses_an_edited_binding(plan, build, root, tmp_path, binding, message):
     path = compiled(plan, build, Lifecycle.CARRY).save(tmp_path / "r.json", roots={"run": root})
